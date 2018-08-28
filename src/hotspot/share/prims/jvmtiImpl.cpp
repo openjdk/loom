@@ -532,8 +532,8 @@ VM_GetOrSetLocal::VM_GetOrSetLocal(JavaThread* thread, jint depth, jint index, B
   , _depth(depth)
   , _index(index)
   , _type(type)
-  , _set(false)
   , _jvf(NULL)
+  , _set(false)
   , _result(JVMTI_ERROR_NONE)
 {
 }
@@ -546,8 +546,8 @@ VM_GetOrSetLocal::VM_GetOrSetLocal(JavaThread* thread, jint depth, jint index, B
   , _index(index)
   , _type(type)
   , _value(value)
-  , _set(true)
   , _jvf(NULL)
+  , _set(true)
   , _result(JVMTI_ERROR_NONE)
 {
 }
@@ -559,8 +559,8 @@ VM_GetOrSetLocal::VM_GetOrSetLocal(JavaThread* thread, JavaThread* calling_threa
   , _depth(depth)
   , _index(index)
   , _type(T_OBJECT)
-  , _set(false)
   , _jvf(NULL)
+  , _set(false)
   , _result(JVMTI_ERROR_NONE)
 {
 }
@@ -622,7 +622,7 @@ bool VM_GetOrSetLocal::is_assignable(const char* ty_sign, Klass* klass, Thread* 
     }
   }
   // Compare secondary supers
-  Array<Klass*>* sec_supers = klass->secondary_supers();
+  const Array<Klass*>* sec_supers = klass->secondary_supers();
   for (idx = 0; idx < sec_supers->length(); idx++) {
     if (((Klass*) sec_supers->at(idx))->name() == ty_sym) {
       return true;

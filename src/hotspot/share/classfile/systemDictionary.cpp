@@ -242,13 +242,24 @@ Klass* SystemDictionary::resolve_or_fail(Symbol* class_name,
 }
 
 
-// Forwards to resolve_instance_class_or_null
+// Forwards to resolve_array_class_or_null or resolve_instance_class_or_null
 
 Klass* SystemDictionary::resolve_or_null(Symbol* class_name, Handle class_loader, Handle protection_domain, TRAPS) {
   assert(class_name != NULL, "must not be NULL");
   if (FieldType::is_array(class_name)) {
     return resolve_array_class_or_null(class_name, class_loader, protection_domain, THREAD);
-  } else if (FieldType::is_obj(class_name)) {
+  } else {
+    return resolve_instance_class_or_null_helper(class_name, class_loader, protection_domain, THREAD);
+  }
+}
+
+// name may be in the form of "java/lang/Object" or "Ljava/lang/Object;"
+InstanceKlass* SystemDictionary::resolve_instance_class_or_null_helper(Symbol* class_name,
+                                                                       Handle class_loader,
+                                                                       Handle protection_domain,
+                                                                       TRAPS) {
+  assert(class_name != NULL && !FieldType::is_array(class_name), "must be");
+  if (FieldType::is_obj(class_name)) {
     ResourceMark rm(THREAD);
     // Ignore wrapping L and ;.
     TempNewSymbol name = SymbolTable::new_symbol(class_name->as_C_string() + 1,
@@ -331,17 +342,18 @@ Klass* SystemDictionary::resolve_array_class_or_null(Symbol* class_name,
 // placeholders()->find_and_add(PlaceholderTable::LOAD_SUPER),
 // you need to find_and_remove it before returning.
 // So be careful to not exit with a CHECK_ macro betweeen these calls.
-Klass* SystemDictionary::resolve_super_or_fail(Symbol* child_name,
-                                                 Symbol* class_name,
-                                                 Handle class_loader,
-                                                 Handle protection_domain,
-                                                 bool is_superclass,
-                                                 TRAPS) {
+InstanceKlass* SystemDictionary::resolve_super_or_fail(Symbol* child_name,
+                                                       Symbol* super_name,
+                                                       Handle class_loader,
+                                                       Handle protection_domain,
+                                                       bool is_superclass,
+                                                       TRAPS) {
+  assert(!FieldType::is_array(super_name), "invalid super class name");
 #if INCLUDE_CDS
   if (DumpSharedSpaces) {
     // Special processing for CDS dump time.
-    Klass* k = SystemDictionaryShared::dump_time_resolve_super_or_fail(child_name,
-        class_name, class_loader, protection_domain, is_superclass, CHECK_NULL);
+    InstanceKlass* k = SystemDictionaryShared::dump_time_resolve_super_or_fail(child_name,
+        super_name, class_loader, protection_domain, is_superclass, CHECK_NULL);
     if (k) {
       return k;
     }
@@ -373,18 +385,17 @@ Klass* SystemDictionary::resolve_super_or_fail(Symbol* child_name,
   bool throw_circularity_error = false;
   {
     MutexLocker mu(SystemDictionary_lock, THREAD);
-    Klass* childk = find_class(d_hash, child_name, dictionary);
-    Klass* quicksuperk;
+    InstanceKlass* childk = find_class(d_hash, child_name, dictionary);
+    InstanceKlass* quicksuperk;
     // to support // loading: if child done loading, just return superclass
-    // if class_name, & class_loader don't match:
+    // if super_name, & class_loader don't match:
     // if initial define, SD update will give LinkageError
     // if redefine: compare_class_versions will give HIERARCHY_CHANGED
     // so we don't throw an exception here.
     // see: nsk redefclass014 & java.lang.instrument Instrument032
     if ((childk != NULL ) && (is_superclass) &&
-       ((quicksuperk = childk->super()) != NULL) &&
-
-         ((quicksuperk->name() == class_name) &&
+        ((quicksuperk = childk->java_super()) != NULL) &&
+         ((quicksuperk->name() == super_name) &&
             (oopDesc::equals(quicksuperk->class_loader(), class_loader())))) {
            return quicksuperk;
     } else {
@@ -395,7 +406,7 @@ Klass* SystemDictionary::resolve_super_or_fail(Symbol* child_name,
     }
     if (!throw_circularity_error) {
       // Be careful not to exit resolve_super
-      PlaceholderEntry* newprobe = placeholders()->find_and_add(p_index, p_hash, child_name, loader_data, PlaceholderTable::LOAD_SUPER, class_name, THREAD);
+      PlaceholderEntry* newprobe = placeholders()->find_and_add(p_index, p_hash, child_name, loader_data, PlaceholderTable::LOAD_SUPER, super_name, THREAD);
     }
   }
   if (throw_circularity_error) {
@@ -404,12 +415,13 @@ Klass* SystemDictionary::resolve_super_or_fail(Symbol* child_name,
   }
 
 // java.lang.Object should have been found above
-  assert(class_name != NULL, "null super class for resolving");
+  assert(super_name != NULL, "null super class for resolving");
   // Resolve the super class or interface, check results on return
-  Klass* superk = SystemDictionary::resolve_or_null(class_name,
-                                                    class_loader,
-                                                    protection_domain,
-                                                    THREAD);
+  InstanceKlass* superk =
+    SystemDictionary::resolve_instance_class_or_null_helper(super_name,
+                                                            class_loader,
+                                                            protection_domain,
+                                                            THREAD);
 
   // Clean up of placeholders moved so that each classloadAction registrar self-cleans up
   // It is no longer necessary to keep the placeholder table alive until update_dictionary
@@ -424,7 +436,11 @@ Klass* SystemDictionary::resolve_super_or_fail(Symbol* child_name,
   }
   if (HAS_PENDING_EXCEPTION || superk == NULL) {
     // can null superk
-    superk = handle_resolution_exception(class_name, true, superk, THREAD);
+    Klass* k = handle_resolution_exception(super_name, true, superk, THREAD);
+    assert(k == NULL || k == superk, "must be");
+    if (k == NULL) {
+      superk = NULL;
+    }
   }
 
   return superk;
@@ -444,8 +460,18 @@ void SystemDictionary::validate_protection_domain(InstanceKlass* klass,
     // Print out trace information
     LogStream ls(lt);
     ls.print_cr("Checking package access");
-    ls.print("class loader: "); class_loader()->print_value_on(&ls);
-    ls.print(" protection domain: "); protection_domain()->print_value_on(&ls);
+    if (class_loader() != NULL) {
+      ls.print("class loader: ");
+      class_loader()->print_value_on(&ls);
+    } else {
+      ls.print_cr("class loader: NULL");
+    }
+    if (protection_domain() != NULL) {
+      ls.print(" protection domain: ");
+      protection_domain()->print_value_on(&ls);
+    } else {
+      ls.print_cr(" protection domain: NULL");
+    }
     ls.print(" loading: "); klass->print_value_on(&ls);
     ls.cr();
   }
@@ -630,10 +656,12 @@ static void post_class_load_event(EventClassLoad* event, const InstanceKlass* k,
 // placeholders()->find_and_add(PlaceholderTable::LOAD_INSTANCE),
 // you need to find_and_remove it before returning.
 // So be careful to not exit with a CHECK_ macro betweeen these calls.
-Klass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
-                                                        Handle class_loader,
-                                                        Handle protection_domain,
-                                                        TRAPS) {
+//
+// name must be in the form of "java/lang/Object" -- cannot be "Ljava/lang/Object;"
+InstanceKlass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
+                                                                Handle class_loader,
+                                                                Handle protection_domain,
+                                                                TRAPS) {
   assert(name != NULL && !FieldType::is_array(name) &&
          !FieldType::is_obj(name), "invalid class name");
 
@@ -654,7 +682,7 @@ Klass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
   // before we return a result we call out to java to check for valid protection domain
   // to allow returning the Klass* and add it to the pd_set if it is valid
   {
-    Klass* probe = dictionary->find(d_hash, name, protection_domain);
+    InstanceKlass* probe = dictionary->find(d_hash, name, protection_domain);
     if (probe != NULL) return probe;
   }
 
@@ -697,7 +725,7 @@ Klass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
     MutexLocker mu(SystemDictionary_lock, THREAD);
     InstanceKlass* check = find_class(d_hash, name, dictionary);
     if (check != NULL) {
-      // Klass is already loaded, so just return it
+      // InstanceKlass is already loaded, so just return it
       class_has_been_loaded = true;
       k = check;
     } else {
@@ -868,7 +896,7 @@ Klass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
   {
     ClassLoaderData* loader_data = k->class_loader_data();
     MutexLocker mu(SystemDictionary_lock, THREAD);
-    Klass* kk = find_class(name, loader_data);
+    InstanceKlass* kk = find_class(name, loader_data);
     assert(kk == k, "should be present in dictionary");
   }
 #endif
@@ -961,18 +989,18 @@ InstanceKlass* SystemDictionary::parse_stream(Symbol* class_name,
                                               Handle class_loader,
                                               Handle protection_domain,
                                               ClassFileStream* st,
-                                              const InstanceKlass* host_klass,
+                                              const InstanceKlass* unsafe_anonymous_host,
                                               GrowableArray<Handle>* cp_patches,
                                               TRAPS) {
 
   EventClassLoad class_load_start_event;
 
   ClassLoaderData* loader_data;
-  if (host_klass != NULL) {
-    // Create a new CLD for anonymous class, that uses the same class loader
-    // as the host_klass
-    guarantee(oopDesc::equals(host_klass->class_loader(), class_loader()), "should be the same");
-    loader_data = ClassLoaderData::anonymous_class_loader_data(class_loader);
+  if (unsafe_anonymous_host != NULL) {
+    // Create a new CLD for an unsafe anonymous class, that uses the same class loader
+    // as the unsafe_anonymous_host
+    guarantee(oopDesc::equals(unsafe_anonymous_host->class_loader(), class_loader()), "should be the same");
+    loader_data = ClassLoaderData::unsafe_anonymous_class_loader_data(class_loader);
   } else {
     loader_data = ClassLoaderData::class_loader_data(class_loader());
   }
@@ -989,12 +1017,12 @@ InstanceKlass* SystemDictionary::parse_stream(Symbol* class_name,
                                                       class_name,
                                                       loader_data,
                                                       protection_domain,
-                                                      host_klass,
+                                                      unsafe_anonymous_host,
                                                       cp_patches,
                                                       CHECK_NULL);
 
-  if (host_klass != NULL && k != NULL) {
-    // Anonymous classes must update ClassLoaderData holder (was host_klass loader)
+  if (unsafe_anonymous_host != NULL && k != NULL) {
+    // Unsafe anonymous classes must update ClassLoaderData holder (was unsafe_anonymous_host loader)
     // so that they can be unloaded when the mirror is no longer referenced.
     k->class_loader_data()->initialize_holder(Handle(THREAD, k->java_mirror()));
 
@@ -1029,8 +1057,8 @@ InstanceKlass* SystemDictionary::parse_stream(Symbol* class_name,
       post_class_load_event(&class_load_start_event, k, loader_data);
     }
   }
-  assert(host_klass != NULL || NULL == cp_patches,
-         "cp_patches only found with host_klass");
+  assert(unsafe_anonymous_host != NULL || NULL == cp_patches,
+         "cp_patches only found with unsafe_anonymous_host");
 
   return k;
 }
@@ -1088,7 +1116,7 @@ InstanceKlass* SystemDictionary::resolve_from_stream(Symbol* class_name,
                                          class_name,
                                          loader_data,
                                          protection_domain,
-                                         NULL, // host_klass
+                                         NULL, // unsafe_anonymous_host
                                          NULL, // cp_patches
                                          CHECK_NULL);
   }
@@ -1299,11 +1327,11 @@ InstanceKlass* SystemDictionary::load_shared_class(InstanceKlass* ik,
       }
     }
 
-    Array<Klass*>* interfaces = ik->local_interfaces();
+    Array<InstanceKlass*>* interfaces = ik->local_interfaces();
     int num_interfaces = interfaces->length();
     for (int index = 0; index < num_interfaces; index++) {
-      Klass* k = interfaces->at(index);
-      Symbol*  name  = k->name();
+      InstanceKlass* k = interfaces->at(index);
+      Symbol* name  = k->name();
       Klass* i = resolve_super_or_fail(class_name, name, class_loader, protection_domain, false, CHECK_NULL);
       if (k != i) {
         // The dynamically resolved interface class is not the same as the one we used during dump time,
@@ -1826,12 +1854,24 @@ bool SystemDictionary::do_unloading(GCTimer* gc_timer,
 
     // First, mark for unload all ClassLoaderData referencing a dead class loader.
     unloading_occurred = ClassLoaderDataGraph::do_unloading(do_cleaning);
+    if (unloading_occurred) {
+      ClassLoaderDataGraph::clean_module_and_package_info();
+    }
   }
 
+  // TODO: just return if !unloading_occurred.
   if (unloading_occurred) {
-    GCTraceTime(Debug, gc, phases) t("Dictionary", gc_timer);
-    constraints()->purge_loader_constraints();
-    resolution_errors()->purge_resolution_errors();
+    {
+      GCTraceTime(Debug, gc, phases) t("SymbolTable", gc_timer);
+      // Check if there's work to do in the SymbolTable
+      SymbolTable::do_check_concurrent_work();
+    }
+
+    {
+      GCTraceTime(Debug, gc, phases) t("Dictionary", gc_timer);
+      constraints()->purge_loader_constraints();
+      resolution_errors()->purge_resolution_errors();
+    }
   }
 
   {
@@ -1844,7 +1884,7 @@ bool SystemDictionary::do_unloading(GCTimer* gc_timer,
 
   if (do_cleaning) {
     GCTraceTime(Debug, gc, phases) t("ResolvedMethodTable", gc_timer);
-    ResolvedMethodTable::unlink();
+    ResolvedMethodTable::trigger_cleanup();
   }
 
   return unloading_occurred;
@@ -2971,7 +3011,7 @@ class CombineDictionariesClosure : public CLDClosure {
       _master_dictionary(master_dictionary) {}
     void do_cld(ClassLoaderData* cld) {
       ResourceMark rm;
-      if (cld->is_anonymous()) {
+      if (cld->is_unsafe_anonymous()) {
         return;
       }
       if (cld->is_system_class_loader_data() || cld->is_platform_class_loader_data()) {

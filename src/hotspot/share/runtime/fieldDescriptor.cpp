@@ -31,7 +31,7 @@
 #include "oops/instanceKlass.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/fieldStreams.hpp"
-#include "runtime/fieldDescriptor.hpp"
+#include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/signature.hpp"
 
@@ -188,12 +188,20 @@ void fieldDescriptor::print_on_for(outputStream* st, oop obj) {
     case T_ARRAY:
       st->print(" ");
       NOT_LP64(as_int = obj->int_field(offset()));
-      obj->obj_field(offset())->print_value_on(st);
+      if (obj->obj_field(offset()) != NULL) {
+        obj->obj_field(offset())->print_value_on(st);
+      } else {
+        st->print_cr("NULL");
+      }
       break;
     case T_OBJECT:
       st->print(" ");
       NOT_LP64(as_int = obj->int_field(offset()));
-      obj->obj_field(offset())->print_value_on(st);
+      if (obj->obj_field(offset()) != NULL) {
+        obj->obj_field(offset())->print_value_on(st);
+      } else {
+        st->print_cr("NULL");
+      }
       break;
     default:
       ShouldNotReachHere();
