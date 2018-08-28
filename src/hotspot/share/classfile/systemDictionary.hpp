@@ -191,7 +191,6 @@ class OopStorage;
   do_klass(jdk_internal_loader_ClassLoaders_AppClassLoader_klass,      jdk_internal_loader_ClassLoaders_AppClassLoader,       Pre ) \
   do_klass(jdk_internal_loader_ClassLoaders_PlatformClassLoader_klass, jdk_internal_loader_ClassLoaders_PlatformClassLoader,  Pre ) \
   do_klass(CodeSource_klass,                            java_security_CodeSource,                  Pre                 ) \
-  do_klass(ArchivedModuleGraph_klass,                   jdk_internal_module_ArchivedModuleGraph,   Pre                 ) \
                                                                                                                          \
   do_klass(StackTraceElement_klass,                     java_lang_StackTraceElement,               Opt                 ) \
                                                                                                                          \
@@ -284,12 +283,12 @@ public:
   // Resolve a superclass or superinterface. Called from ClassFileParser,
   // parse_interfaces, resolve_instance_class_or_null, load_shared_class
   // "child_name" is the class whose super class or interface is being resolved.
-  static Klass* resolve_super_or_fail(Symbol* child_name,
-                                      Symbol* class_name,
-                                      Handle class_loader,
-                                      Handle protection_domain,
-                                      bool is_superclass,
-                                      TRAPS);
+  static InstanceKlass* resolve_super_or_fail(Symbol* child_name,
+                                              Symbol* class_name,
+                                              Handle class_loader,
+                                              Handle protection_domain,
+                                              bool is_superclass,
+                                              TRAPS);
 
   // Parse new stream. This won't update the dictionary or
   // class hierarchy, simply parse the stream. Used by JVMTI RedefineClasses.
@@ -303,7 +302,7 @@ public:
                         class_loader,
                         protection_domain,
                         st,
-                        NULL, // host klass
+                        NULL, // unsafe_anonymous_host
                         NULL, // cp_patches
                         THREAD);
   }
@@ -311,7 +310,7 @@ public:
                                      Handle class_loader,
                                      Handle protection_domain,
                                      ClassFileStream* st,
-                                     const InstanceKlass* host_klass,
+                                     const InstanceKlass* unsafe_anonymous_host,
                                      GrowableArray<Handle>* cp_patches,
                                      TRAPS);
 
@@ -642,7 +641,11 @@ protected:
   static SymbolPropertyTable* invoke_method_table() { return _invoke_method_table; }
 
   // Basic loading operations
-  static Klass* resolve_instance_class_or_null(Symbol* class_name, Handle class_loader, Handle protection_domain, TRAPS);
+  static InstanceKlass* resolve_instance_class_or_null_helper(Symbol* name,
+                                                              Handle class_loader,
+                                                              Handle protection_domain,
+                                                              TRAPS);
+  static InstanceKlass* resolve_instance_class_or_null(Symbol* class_name, Handle class_loader, Handle protection_domain, TRAPS);
   static Klass* resolve_array_class_or_null(Symbol* class_name, Handle class_loader, Handle protection_domain, TRAPS);
   static InstanceKlass* handle_parallel_super_load(Symbol* class_name, Symbol* supername, Handle class_loader, Handle protection_domain, Handle lockObject, TRAPS);
   // Wait on SystemDictionary_lock; unlocks lockObject before

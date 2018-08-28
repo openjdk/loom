@@ -1922,7 +1922,7 @@ void LIR_Assembler::comp_op(LIR_Condition condition, LIR_Opr opr1, LIR_Opr opr2,
         if (is_32bit)
           __ cmpw(reg1, imm);
         else
-          __ cmp(reg1, imm);
+          __ subs(zr, reg1, imm);
         return;
       } else {
         __ mov(rscratch1, imm);
@@ -2166,6 +2166,9 @@ void LIR_Assembler::emit_arraycopy(LIR_OpArrayCopy* op) {
   Register dst_pos = op->dst_pos()->as_register();
   Register length  = op->length()->as_register();
   Register tmp = op->tmp()->as_register();
+
+  __ resolve(ACCESS_READ, src);
+  __ resolve(ACCESS_WRITE, dst);
 
   CodeStub* stub = op->stub();
   int flags = op->flags();
@@ -2510,6 +2513,7 @@ void LIR_Assembler::emit_lock(LIR_OpLock* op) {
       scratch = op->scratch_opr()->as_register();
     }
     assert(BasicLock::displaced_header_offset_in_bytes() == 0, "lock_reg must point to the displaced header");
+    __ resolve(ACCESS_READ | ACCESS_WRITE, obj);
     // add debug info for NullPointerException only if one is possible
     int null_check_offset = __ lock_object(hdr, obj, lock, scratch, *op->stub()->entry());
     if (op->info() != NULL) {
@@ -2705,7 +2709,7 @@ void LIR_Assembler::emit_profile_type(LIR_OpProfileType* op) {
 
         if (TypeEntries::is_type_none(current_klass)) {
           __ cbz(rscratch2, none);
-          __ cmp(rscratch2, TypeEntries::null_seen);
+          __ cmp(rscratch2, (u1)TypeEntries::null_seen);
           __ br(Assembler::EQ, none);
           // There is a chance that the checks above (re-reading profiling
           // data from memory) fail if another thread has just set the
@@ -2750,7 +2754,7 @@ void LIR_Assembler::emit_profile_type(LIR_OpProfileType* op) {
           Label ok;
           __ ldr(rscratch1, mdo_addr);
           __ cbz(rscratch1, ok);
-          __ cmp(rscratch1, TypeEntries::null_seen);
+          __ cmp(rscratch1, (u1)TypeEntries::null_seen);
           __ br(Assembler::EQ, ok);
           // may have been set by another thread
           __ dmb(Assembler::ISHLD);

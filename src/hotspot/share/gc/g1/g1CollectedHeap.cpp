@@ -25,7 +25,6 @@
 #include "precompiled.hpp"
 #include "classfile/metadataOnStackMark.hpp"
 #include "classfile/stringTable.hpp"
-#include "classfile/symbolTable.hpp"
 #include "code/codeCache.hpp"
 #include "code/icBuffer.hpp"
 #include "gc/g1/g1Allocator.inline.hpp"
@@ -52,6 +51,7 @@
 #include "gc/g1/g1RemSet.hpp"
 #include "gc/g1/g1RootClosures.hpp"
 #include "gc/g1/g1RootProcessor.hpp"
+#include "gc/g1/g1SATBMarkQueueSet.hpp"
 #include "gc/g1/g1StringDedup.hpp"
 #include "gc/g1/g1ThreadLocalData.hpp"
 #include "gc/g1/g1YCTypes.hpp"
@@ -83,7 +83,6 @@
 #include "oops/access.inline.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/oop.inline.hpp"
-#include "prims/resolvedMethodTable.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/flags/flagSetting.hpp"
 #include "runtime/handles.inline.hpp"
@@ -1406,52 +1405,70 @@ void G1CollectedHeap::shrink(size_t shrink_bytes) {
   _verifier->verify_region_sets_optional();
 }
 
-// Public methods.
-
 G1CollectedHeap::G1CollectedHeap(G1CollectorPolicy* collector_policy) :
   CollectedHeap(),
   _young_gen_sampling_thread(NULL),
+  _workers(NULL),
   _collector_policy(collector_policy),
-  _soft_ref_policy(),
   _card_table(NULL),
+  _soft_ref_policy(),
   _memory_manager("G1 Young Generation", "end of minor GC"),
   _full_gc_memory_manager("G1 Old Generation", "end of major GC"),
   _eden_pool(NULL),
   _survivor_pool(NULL),
   _old_pool(NULL),
+  _old_set("Old Set", false /* humongous */, new OldRegionSetMtSafeChecker()),
+  _humongous_set("Master Humongous Set", true /* humongous */, new HumongousRegionSetMtSafeChecker()),
+  _bot(NULL),
+  _listener(),
+  _hrm(),
+  _allocator(NULL),
+  _verifier(NULL),
+  _summary_bytes_used(0),
+  _archive_allocator(NULL),
+  _survivor_evac_stats("Young", YoungPLABSize, PLABWeight),
+  _old_evac_stats("Old", OldPLABSize, PLABWeight),
+  _expand_heap_after_alloc_failure(true),
+  _g1mm(NULL),
+  _humongous_reclaim_candidates(),
+  _has_humongous_reclaim_candidates(false),
+  _hr_printer(),
+  _collector_state(),
+  _old_marking_cycles_started(0),
+  _old_marking_cycles_completed(0),
+  _eden(),
+  _survivor(),
   _gc_timer_stw(new (ResourceObj::C_HEAP, mtGC) STWGCTimer()),
   _gc_tracer_stw(new (ResourceObj::C_HEAP, mtGC) G1NewTracer()),
   _g1_policy(new G1Policy(_gc_timer_stw)),
+  _heap_sizing_policy(NULL),
   _collection_set(this, _g1_policy),
+  _hot_card_cache(NULL),
+  _g1_rem_set(NULL),
   _dirty_card_queue_set(false),
+  _cm(NULL),
+  _cm_thread(NULL),
+  _cr(NULL),
+  _task_queues(NULL),
+  _evacuation_failed(false),
+  _evacuation_failed_info_array(NULL),
+  _preserved_marks_set(true /* in_c_heap */),
+#ifndef PRODUCT
+  _evacuation_failure_alot_for_current_gc(false),
+  _evacuation_failure_alot_gc_number(0),
+  _evacuation_failure_alot_count(0),
+#endif
   _ref_processor_stw(NULL),
   _is_alive_closure_stw(this),
   _is_subject_to_discovery_stw(this),
   _ref_processor_cm(NULL),
   _is_alive_closure_cm(this),
   _is_subject_to_discovery_cm(this),
-  _bot(NULL),
-  _hot_card_cache(NULL),
-  _g1_rem_set(NULL),
-  _cr(NULL),
-  _g1mm(NULL),
-  _preserved_marks_set(true /* in_c_heap */),
-  _old_set("Old Set", false /* humongous */, new OldRegionSetMtSafeChecker()),
-  _humongous_set("Master Humongous Set", true /* humongous */, new HumongousRegionSetMtSafeChecker()),
-  _humongous_reclaim_candidates(),
-  _has_humongous_reclaim_candidates(false),
-  _archive_allocator(NULL),
-  _summary_bytes_used(0),
-  _survivor_evac_stats("Young", YoungPLABSize, PLABWeight),
-  _old_evac_stats("Old", OldPLABSize, PLABWeight),
-  _expand_heap_after_alloc_failure(true),
-  _old_marking_cycles_started(0),
-  _old_marking_cycles_completed(0),
   _in_cset_fast_test() {
 
   _workers = new WorkGang("GC Thread", ParallelGCThreads,
-                          /* are_GC_task_threads */true,
-                          /* are_ConcurrentGC_threads */false);
+                          true /* are_GC_task_threads */,
+                          false /* are_ConcurrentGC_threads */);
   _workers->initialize_workers();
   _verifier = new G1HeapVerifier(this);
 
@@ -1668,9 +1685,11 @@ jint G1CollectedHeap::initialize() {
   // Perform any initialization actions delegated to the policy.
   g1_policy()->init(this, &_collection_set);
 
-  G1BarrierSet::satb_mark_queue_set().initialize(SATB_Q_CBL_mon,
+  G1BarrierSet::satb_mark_queue_set().initialize(this,
+                                                 SATB_Q_CBL_mon,
                                                  SATB_Q_FL_lock,
                                                  G1SATBProcessCompletedThreshold,
+                                                 G1SATBBufferEnqueueingThresholdPercent,
                                                  Shared_SATB_Q_lock);
 
   jint ecode = initialize_concurrent_refinement();
@@ -3235,56 +3254,40 @@ void G1CollectedHeap::print_termination_stats(uint worker_id,
                undo_waste * HeapWordSize / K);
 }
 
-class G1StringAndSymbolCleaningTask : public AbstractGangTask {
+class G1StringCleaningTask : public AbstractGangTask {
 private:
   BoolObjectClosure* _is_alive;
   G1StringDedupUnlinkOrOopsDoClosure _dedup_closure;
   OopStorage::ParState<false /* concurrent */, false /* const */> _par_state_string;
 
   int _initial_string_table_size;
-  int _initial_symbol_table_size;
 
   bool  _process_strings;
   int _strings_processed;
   int _strings_removed;
 
-  bool  _process_symbols;
-  int _symbols_processed;
-  int _symbols_removed;
-
   bool _process_string_dedup;
 
 public:
-  G1StringAndSymbolCleaningTask(BoolObjectClosure* is_alive, bool process_strings, bool process_symbols, bool process_string_dedup) :
-    AbstractGangTask("String/Symbol Unlinking"),
+  G1StringCleaningTask(BoolObjectClosure* is_alive, bool process_strings, bool process_string_dedup) :
+    AbstractGangTask("String Unlinking"),
     _is_alive(is_alive),
     _dedup_closure(is_alive, NULL, false),
     _par_state_string(StringTable::weak_storage()),
     _process_strings(process_strings), _strings_processed(0), _strings_removed(0),
-    _process_symbols(process_symbols), _symbols_processed(0), _symbols_removed(0),
     _process_string_dedup(process_string_dedup) {
 
     _initial_string_table_size = (int) StringTable::the_table()->table_size();
-    _initial_symbol_table_size = SymbolTable::the_table()->table_size();
-    if (process_symbols) {
-      SymbolTable::clear_parallel_claimed_index();
-    }
     if (process_strings) {
       StringTable::reset_dead_counter();
     }
   }
 
-  ~G1StringAndSymbolCleaningTask() {
-    guarantee(!_process_symbols || SymbolTable::parallel_claimed_index() >= _initial_symbol_table_size,
-              "claim value %d after unlink less than initial symbol table size %d",
-              SymbolTable::parallel_claimed_index(), _initial_symbol_table_size);
-
+  ~G1StringCleaningTask() {
     log_info(gc, stringtable)(
-        "Cleaned string and symbol table, "
-        "strings: " SIZE_FORMAT " processed, " SIZE_FORMAT " removed, "
-        "symbols: " SIZE_FORMAT " processed, " SIZE_FORMAT " removed",
-        strings_processed(), strings_removed(),
-        symbols_processed(), symbols_removed());
+        "Cleaned string table, "
+        "strings: " SIZE_FORMAT " processed, " SIZE_FORMAT " removed",
+        strings_processed(), strings_removed());
     if (_process_strings) {
       StringTable::finish_dead_counter();
     }
@@ -3293,17 +3296,10 @@ public:
   void work(uint worker_id) {
     int strings_processed = 0;
     int strings_removed = 0;
-    int symbols_processed = 0;
-    int symbols_removed = 0;
     if (_process_strings) {
       StringTable::possibly_parallel_unlink(&_par_state_string, _is_alive, &strings_processed, &strings_removed);
       Atomic::add(strings_processed, &_strings_processed);
       Atomic::add(strings_removed, &_strings_removed);
-    }
-    if (_process_symbols) {
-      SymbolTable::possibly_parallel_unlink(&symbols_processed, &symbols_removed);
-      Atomic::add(symbols_processed, &_symbols_processed);
-      Atomic::add(symbols_removed, &_symbols_removed);
     }
     if (_process_string_dedup) {
       G1StringDedup::parallel_unlink(&_dedup_closure, worker_id);
@@ -3312,9 +3308,6 @@ public:
 
   size_t strings_processed() const { return (size_t)_strings_processed; }
   size_t strings_removed()   const { return (size_t)_strings_removed; }
-
-  size_t symbols_processed() const { return (size_t)_symbols_processed; }
-  size_t symbols_removed()   const { return (size_t)_symbols_removed; }
 };
 
 class G1CodeCacheUnloadingTask {
@@ -3538,46 +3531,22 @@ public:
   }
 };
 
-class G1ResolvedMethodCleaningTask : public StackObj {
-  volatile int       _resolved_method_task_claimed;
-public:
-  G1ResolvedMethodCleaningTask() :
-      _resolved_method_task_claimed(0) {}
-
-  bool claim_resolved_method_task() {
-    if (_resolved_method_task_claimed) {
-      return false;
-    }
-    return Atomic::cmpxchg(1, &_resolved_method_task_claimed, 0) == 0;
-  }
-
-  // These aren't big, one thread can do it all.
-  void work() {
-    if (claim_resolved_method_task()) {
-      ResolvedMethodTable::unlink();
-    }
-  }
-};
-
-
 // To minimize the remark pause times, the tasks below are done in parallel.
 class G1ParallelCleaningTask : public AbstractGangTask {
 private:
   bool                          _unloading_occurred;
-  G1StringAndSymbolCleaningTask _string_symbol_task;
+  G1StringCleaningTask          _string_task;
   G1CodeCacheUnloadingTask      _code_cache_task;
   G1KlassCleaningTask           _klass_cleaning_task;
-  G1ResolvedMethodCleaningTask  _resolved_method_cleaning_task;
 
 public:
   // The constructor is run in the VMThread.
   G1ParallelCleaningTask(BoolObjectClosure* is_alive, uint num_workers, bool unloading_occurred) :
       AbstractGangTask("Parallel Cleaning"),
-      _string_symbol_task(is_alive, true, true, G1StringDedup::is_enabled()),
-      _code_cache_task(num_workers, is_alive, unloading_occurred),
-      _klass_cleaning_task(),
       _unloading_occurred(unloading_occurred),
-      _resolved_method_cleaning_task() {
+      _string_task(is_alive, true, G1StringDedup::is_enabled()),
+      _code_cache_task(num_workers, is_alive, unloading_occurred),
+      _klass_cleaning_task() {
   }
 
   // The parallel work done by all worker threads.
@@ -3588,11 +3557,8 @@ public:
     // Let the threads mark that the first pass is done.
     _code_cache_task.barrier_mark(worker_id);
 
-    // Clean the Strings and Symbols.
-    _string_symbol_task.work(worker_id);
-
-    // Clean unreferenced things in the ResolvedMethodTable
-    _resolved_method_cleaning_task.work();
+    // Clean the Strings.
+    _string_task.work(worker_id);
 
     // Wait for all workers to finish the first code cache cleaning pass.
     _code_cache_task.barrier_wait(worker_id);
@@ -3621,16 +3587,14 @@ void G1CollectedHeap::complete_cleaning(BoolObjectClosure* is_alive,
 
 void G1CollectedHeap::partial_cleaning(BoolObjectClosure* is_alive,
                                        bool process_strings,
-                                       bool process_symbols,
                                        bool process_string_dedup) {
-  if (!process_strings && !process_symbols && !process_string_dedup) {
+  if (!process_strings && !process_string_dedup) {
     // Nothing to clean.
     return;
   }
 
-  G1StringAndSymbolCleaningTask g1_unlink_task(is_alive, process_strings, process_symbols, process_string_dedup);
+  G1StringCleaningTask g1_unlink_task(is_alive, process_strings, process_string_dedup);
   workers()->run_task(&g1_unlink_task);
-
 }
 
 class G1RedirtyLoggedCardsTask : public AbstractGangTask {
@@ -4024,7 +3988,7 @@ void G1CollectedHeap::post_evacuate_collection_set(EvacuationInfo& evacuation_in
   process_discovered_references(per_thread_states);
 
   // FIXME
-  // CM's reference processing also cleans up the string and symbol tables.
+  // CM's reference processing also cleans up the string table.
   // Should we do that here also? We could, but it is a serial operation
   // and could significantly increase the pause time.
 
@@ -4322,11 +4286,11 @@ private:
 public:
   G1FreeCollectionSetTask(G1CollectionSet* collection_set, EvacuationInfo* evacuation_info, const size_t* surviving_young_words) :
     AbstractGangTask("G1 Free Collection Set"),
-    _cl(evacuation_info, surviving_young_words),
     _collection_set(collection_set),
+    _cl(evacuation_info, surviving_young_words),
     _surviving_young_words(surviving_young_words),
-    _serial_work_claim(0),
     _rs_lengths(0),
+    _serial_work_claim(0),
     _parallel_work_claim(0),
     _num_work_items(collection_set->region_length()),
     _work_items(NEW_C_HEAP_ARRAY(WorkItem, _num_work_items, mtGC)) {

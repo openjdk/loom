@@ -23,6 +23,7 @@
 
 package sun.hotspot.code;
 
+import java.lang.reflect.Executable;
 import sun.hotspot.WhiteBox;
 
 /**
@@ -52,11 +53,6 @@ public class Compiler {
         }
         Boolean useJvmciComp = WB.getBooleanVMFlag("UseJVMCICompiler");
         if (useJvmciComp == null || !useJvmciComp) {
-            return false;
-        }
-        // This check might be redundant but let's keep it for now.
-        String jvmciCompiler = System.getProperty("jvmci.Compiler");
-        if (jvmciCompiler == null || !jvmciCompiler.equals("graal")) {
             return false;
         }
 
@@ -132,5 +128,21 @@ public class Compiler {
             return false;
         }
         return true;
+    }
+
+    /*
+     * Determine if the compiler corresponding to the compilation level 'compLevel'
+     * provides an intrinsic for 'class'.'method'.
+     */
+    public static boolean isIntrinsicAvailable(int compLevel, String klass, String method, Class<?>... parameterTypes) {
+        Executable intrinsicMethod;
+        try {
+            intrinsicMethod = Class.forName(klass).getDeclaredMethod(method, parameterTypes);
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException("Test bug, '" + method + "' method unavailable. " + e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Test bug, '" + klass + "' class unavailable. " + e);
+        }
+        return WB.isIntrinsicAvailable(intrinsicMethod, compLevel);
     }
 }
