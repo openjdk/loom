@@ -75,6 +75,7 @@
 # include <pwd.h>
 # include <poll.h>
 # include <ucontext.h>
+# include <cpuid.h>
 #ifndef AMD64
 # include <fpu_control.h>
 #endif
@@ -899,4 +900,10 @@ void os::workaround_expand_exec_shield_cs_limit() {
 int os::extra_bang_size_in_bytes() {
   // JDK-8050147 requires the full cache line bang for x86.
   return VM_Version::L1_line_size();
+}
+
+int os::getProcessorId() {
+  unsigned int eax, ebx, ecx, edx;
+  __cpuid(0xb, eax, ebx, ecx, edx);
+  return edx;
 }

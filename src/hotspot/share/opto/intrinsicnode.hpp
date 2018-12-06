@@ -165,6 +165,17 @@ class HasNegativesNode: public StrIntrinsicNode {
 };
 
 
+//------------------------------GetProcessorId ---------------------------------
+ class GetProcessorIdNode: public Node {
+  public:
+   GetProcessorIdNode(Node* ctrl):
+     Node(ctrl) {}
+
+   virtual int Opcode() const;
+   virtual uint ideal_reg() const { return Op_RegI; }
+   virtual const Type* bottom_type() const { return TypeInt::INT; }
+ };
+
 //------------------------------EncodeISOArray--------------------------------
 // encode char[] to byte[] in ISO_8859_1
 class EncodeISOArrayNode: public Node {

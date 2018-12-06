@@ -327,6 +327,7 @@ class LibraryCallKit : public GraphKit {
 
   bool inline_profileBoolean();
   bool inline_isCompileConstant();
+  bool inline_getProcessorId();
   void clear_upper_avx() {
 #ifdef X86
     if (UseAVX >= 2) {
@@ -866,6 +867,9 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_fmaD:
   case vmIntrinsics::_fmaF:
     return inline_fma(intrinsic_id());
+
+  case vmIntrinsics::_getProcessorId:
+    return inline_getProcessorId();
 
   default:
     // If you get here, it may be that someone has added a new intrinsic
@@ -6636,3 +6640,12 @@ bool LibraryCallKit::inline_isCompileConstant() {
   set_result(n->is_Con() ? intcon(1) : intcon(0));
   return true;
 }
+
+bool LibraryCallKit::inline_getProcessorId() {
+  if (!Matcher::match_rule_supported(Op_GetProcessorId)) {
+    return false;
+  }
+  set_result(_gvn.transform(new GetProcessorIdNode(control())));
+  return true;
+}
+

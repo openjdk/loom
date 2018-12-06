@@ -4014,4 +4014,19 @@ void LIR_Assembler::atomic_op(LIR_Code code, LIR_Opr src, LIR_Opr data, LIR_Opr 
   }
 }
 
+void LIR_Assembler::getprocessorid(LIR_Opr result, LIR_Opr tmp1, LIR_Opr tmp2) {
+  if (VM_Version::supports_rdpid()) {
+    __ rdpid(result->as_register());
+    __ andl(result->as_register(), 0xFFF); // TODO linux specific
+  } else if (VM_Version::supports_rdtscp()) {
+    assert(result->as_register() == rcx, "result register must be rcx");
+    assert(tmp1->as_register() == rdx, "tmp1 register must be rdx");
+    assert(tmp2->as_register() == rax, "tmp2 register must be rax");
+    __ rdtscp();
+    __ andl(result->as_register(), 0xFFF); // TODO linux specific
+  } else {
+    assert(false, "");
+  }
+}
+
 #undef __

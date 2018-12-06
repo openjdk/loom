@@ -767,6 +767,10 @@ void LIR_Assembler::emit_op2(LIR_Op2* op) {
       atomic_op(op->code(), op->in_opr1(), op->in_opr2(), op->result_opr(), op->tmp1_opr());
       break;
 
+    case lir_getprocessorid:
+      getprocessorid(op->result_opr(), op->in_opr1(), op->in_opr2());
+      break;
+
     default:
       Unimplemented();
       break;

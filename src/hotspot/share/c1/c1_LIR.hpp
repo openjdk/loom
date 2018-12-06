@@ -31,249 +31,249 @@
 #include "utilities/globalDefinitions.hpp"
 
 class BlockBegin;
-class BlockList;
-class LIR_Assembler;
-class CodeEmitInfo;
-class CodeStub;
-class CodeStubList;
-class ArrayCopyStub;
-class LIR_Op;
-class ciType;
-class ValueType;
-class LIR_OpVisitState;
-class FpuStackSim;
+  class BlockList;
+  class LIR_Assembler;
+  class CodeEmitInfo;
+  class CodeStub;
+  class CodeStubList;
+  class ArrayCopyStub;
+  class LIR_Op;
+  class ciType;
+  class ValueType;
+  class LIR_OpVisitState;
+  class FpuStackSim;
 
-//---------------------------------------------------------------------
-//                 LIR Operands
-//  LIR_OprDesc
-//    LIR_OprPtr
-//      LIR_Const
-//      LIR_Address
-//---------------------------------------------------------------------
-class LIR_OprDesc;
-class LIR_OprPtr;
-class LIR_Const;
-class LIR_Address;
-class LIR_OprVisitor;
-
-
-typedef LIR_OprDesc* LIR_Opr;
-typedef int          RegNr;
-
-typedef GrowableArray<LIR_Opr> LIR_OprList;
-typedef GrowableArray<LIR_Op*> LIR_OpArray;
-typedef GrowableArray<LIR_Op*> LIR_OpList;
-
-// define LIR_OprPtr early so LIR_OprDesc can refer to it
-class LIR_OprPtr: public CompilationResourceObj {
- public:
-  bool is_oop_pointer() const                    { return (type() == T_OBJECT); }
-  bool is_float_kind() const                     { BasicType t = type(); return (t == T_FLOAT) || (t == T_DOUBLE); }
-
-  virtual LIR_Const*  as_constant()              { return NULL; }
-  virtual LIR_Address* as_address()              { return NULL; }
-  virtual BasicType type() const                 = 0;
-  virtual void print_value_on(outputStream* out) const = 0;
-};
+  //---------------------------------------------------------------------
+  //                 LIR Operands
+  //  LIR_OprDesc
+  //    LIR_OprPtr
+  //      LIR_Const
+  //      LIR_Address
+  //---------------------------------------------------------------------
+  class LIR_OprDesc;
+  class LIR_OprPtr;
+  class LIR_Const;
+  class LIR_Address;
+  class LIR_OprVisitor;
 
 
+  typedef LIR_OprDesc* LIR_Opr;
+  typedef int          RegNr;
 
-// LIR constants
-class LIR_Const: public LIR_OprPtr {
- private:
-  JavaValue _value;
+  typedef GrowableArray<LIR_Opr> LIR_OprList;
+  typedef GrowableArray<LIR_Op*> LIR_OpArray;
+  typedef GrowableArray<LIR_Op*> LIR_OpList;
 
-  void type_check(BasicType t) const   { assert(type() == t, "type check"); }
-  void type_check(BasicType t1, BasicType t2) const   { assert(type() == t1 || type() == t2, "type check"); }
-  void type_check(BasicType t1, BasicType t2, BasicType t3) const   { assert(type() == t1 || type() == t2 || type() == t3, "type check"); }
+  // define LIR_OprPtr early so LIR_OprDesc can refer to it
+  class LIR_OprPtr: public CompilationResourceObj {
+   public:
+    bool is_oop_pointer() const                    { return (type() == T_OBJECT); }
+    bool is_float_kind() const                     { BasicType t = type(); return (t == T_FLOAT) || (t == T_DOUBLE); }
 
- public:
-  LIR_Const(jint i, bool is_address=false)       { _value.set_type(is_address?T_ADDRESS:T_INT); _value.set_jint(i); }
-  LIR_Const(jlong l)                             { _value.set_type(T_LONG);    _value.set_jlong(l); }
-  LIR_Const(jfloat f)                            { _value.set_type(T_FLOAT);   _value.set_jfloat(f); }
-  LIR_Const(jdouble d)                           { _value.set_type(T_DOUBLE);  _value.set_jdouble(d); }
-  LIR_Const(jobject o)                           { _value.set_type(T_OBJECT);  _value.set_jobject(o); }
-  LIR_Const(void* p) {
+    virtual LIR_Const*  as_constant()              { return NULL; }
+    virtual LIR_Address* as_address()              { return NULL; }
+    virtual BasicType type() const                 = 0;
+    virtual void print_value_on(outputStream* out) const = 0;
+  };
+
+
+
+  // LIR constants
+  class LIR_Const: public LIR_OprPtr {
+   private:
+    JavaValue _value;
+
+    void type_check(BasicType t) const   { assert(type() == t, "type check"); }
+    void type_check(BasicType t1, BasicType t2) const   { assert(type() == t1 || type() == t2, "type check"); }
+    void type_check(BasicType t1, BasicType t2, BasicType t3) const   { assert(type() == t1 || type() == t2 || type() == t3, "type check"); }
+
+   public:
+    LIR_Const(jint i, bool is_address=false)       { _value.set_type(is_address?T_ADDRESS:T_INT); _value.set_jint(i); }
+    LIR_Const(jlong l)                             { _value.set_type(T_LONG);    _value.set_jlong(l); }
+    LIR_Const(jfloat f)                            { _value.set_type(T_FLOAT);   _value.set_jfloat(f); }
+    LIR_Const(jdouble d)                           { _value.set_type(T_DOUBLE);  _value.set_jdouble(d); }
+    LIR_Const(jobject o)                           { _value.set_type(T_OBJECT);  _value.set_jobject(o); }
+    LIR_Const(void* p) {
 #ifdef _LP64
-    assert(sizeof(jlong) >= sizeof(p), "too small");;
-    _value.set_type(T_LONG);    _value.set_jlong((jlong)p);
+      assert(sizeof(jlong) >= sizeof(p), "too small");;
+      _value.set_type(T_LONG);    _value.set_jlong((jlong)p);
 #else
-    assert(sizeof(jint) >= sizeof(p), "too small");;
-    _value.set_type(T_INT);     _value.set_jint((jint)p);
+      assert(sizeof(jint) >= sizeof(p), "too small");;
+      _value.set_type(T_INT);     _value.set_jint((jint)p);
 #endif
-  }
-  LIR_Const(Metadata* m) {
-    _value.set_type(T_METADATA);
+    }
+    LIR_Const(Metadata* m) {
+      _value.set_type(T_METADATA);
 #ifdef _LP64
-    _value.set_jlong((jlong)m);
+      _value.set_jlong((jlong)m);
 #else
-    _value.set_jint((jint)m);
+      _value.set_jint((jint)m);
 #endif // _LP64
-  }
+    }
 
-  virtual BasicType type()       const { return _value.get_type(); }
-  virtual LIR_Const* as_constant()     { return this; }
+    virtual BasicType type()       const { return _value.get_type(); }
+    virtual LIR_Const* as_constant()     { return this; }
 
-  jint      as_jint()    const         { type_check(T_INT, T_ADDRESS); return _value.get_jint(); }
-  jlong     as_jlong()   const         { type_check(T_LONG  ); return _value.get_jlong(); }
-  jfloat    as_jfloat()  const         { type_check(T_FLOAT ); return _value.get_jfloat(); }
-  jdouble   as_jdouble() const         { type_check(T_DOUBLE); return _value.get_jdouble(); }
-  jobject   as_jobject() const         { type_check(T_OBJECT); return _value.get_jobject(); }
-  jint      as_jint_lo() const         { type_check(T_LONG  ); return low(_value.get_jlong()); }
-  jint      as_jint_hi() const         { type_check(T_LONG  ); return high(_value.get_jlong()); }
+    jint      as_jint()    const         { type_check(T_INT, T_ADDRESS); return _value.get_jint(); }
+    jlong     as_jlong()   const         { type_check(T_LONG  ); return _value.get_jlong(); }
+    jfloat    as_jfloat()  const         { type_check(T_FLOAT ); return _value.get_jfloat(); }
+    jdouble   as_jdouble() const         { type_check(T_DOUBLE); return _value.get_jdouble(); }
+    jobject   as_jobject() const         { type_check(T_OBJECT); return _value.get_jobject(); }
+    jint      as_jint_lo() const         { type_check(T_LONG  ); return low(_value.get_jlong()); }
+    jint      as_jint_hi() const         { type_check(T_LONG  ); return high(_value.get_jlong()); }
 
 #ifdef _LP64
-  address   as_pointer() const         { type_check(T_LONG  ); return (address)_value.get_jlong(); }
-  Metadata* as_metadata() const        { type_check(T_METADATA); return (Metadata*)_value.get_jlong(); }
+    address   as_pointer() const         { type_check(T_LONG  ); return (address)_value.get_jlong(); }
+    Metadata* as_metadata() const        { type_check(T_METADATA); return (Metadata*)_value.get_jlong(); }
 #else
-  address   as_pointer() const         { type_check(T_INT   ); return (address)_value.get_jint(); }
-  Metadata* as_metadata() const        { type_check(T_METADATA); return (Metadata*)_value.get_jint(); }
+    address   as_pointer() const         { type_check(T_INT   ); return (address)_value.get_jint(); }
+    Metadata* as_metadata() const        { type_check(T_METADATA); return (Metadata*)_value.get_jint(); }
 #endif
 
 
-  jint      as_jint_bits() const       { type_check(T_FLOAT, T_INT, T_ADDRESS); return _value.get_jint(); }
-  jint      as_jint_lo_bits() const    {
-    if (type() == T_DOUBLE) {
-      return low(jlong_cast(_value.get_jdouble()));
-    } else {
-      return as_jint_lo();
+    jint      as_jint_bits() const       { type_check(T_FLOAT, T_INT, T_ADDRESS); return _value.get_jint(); }
+    jint      as_jint_lo_bits() const    {
+      if (type() == T_DOUBLE) {
+        return low(jlong_cast(_value.get_jdouble()));
+      } else {
+        return as_jint_lo();
+      }
     }
-  }
-  jint      as_jint_hi_bits() const    {
-    if (type() == T_DOUBLE) {
-      return high(jlong_cast(_value.get_jdouble()));
-    } else {
-      return as_jint_hi();
+    jint      as_jint_hi_bits() const    {
+      if (type() == T_DOUBLE) {
+        return high(jlong_cast(_value.get_jdouble()));
+      } else {
+        return as_jint_hi();
+      }
     }
-  }
-  jlong      as_jlong_bits() const    {
-    if (type() == T_DOUBLE) {
-      return jlong_cast(_value.get_jdouble());
-    } else {
-      return as_jlong();
+    jlong      as_jlong_bits() const    {
+      if (type() == T_DOUBLE) {
+        return jlong_cast(_value.get_jdouble());
+      } else {
+        return as_jlong();
+      }
     }
-  }
 
-  virtual void print_value_on(outputStream* out) const PRODUCT_RETURN;
-
-
-  bool is_zero_float() {
-    jfloat f = as_jfloat();
-    jfloat ok = 0.0f;
-    return jint_cast(f) == jint_cast(ok);
-  }
-
-  bool is_one_float() {
-    jfloat f = as_jfloat();
-    return !g_isnan(f) && g_isfinite(f) && f == 1.0;
-  }
-
-  bool is_zero_double() {
-    jdouble d = as_jdouble();
-    jdouble ok = 0.0;
-    return jlong_cast(d) == jlong_cast(ok);
-  }
-
-  bool is_one_double() {
-    jdouble d = as_jdouble();
-    return !g_isnan(d) && g_isfinite(d) && d == 1.0;
-  }
-};
+    virtual void print_value_on(outputStream* out) const PRODUCT_RETURN;
 
 
-//---------------------LIR Operand descriptor------------------------------------
-//
-// The class LIR_OprDesc represents a LIR instruction operand;
-// it can be a register (ALU/FPU), stack location or a constant;
-// Constants and addresses are represented as resource area allocated
-// structures (see above).
-// Registers and stack locations are inlined into the this pointer
-// (see value function).
+    bool is_zero_float() {
+      jfloat f = as_jfloat();
+      jfloat ok = 0.0f;
+      return jint_cast(f) == jint_cast(ok);
+    }
 
-class LIR_OprDesc: public CompilationResourceObj {
- public:
-  // value structure:
-  //     data       opr-type opr-kind
-  // +--------------+-------+-------+
-  // [max...........|7 6 5 4|3 2 1 0]
-  //                               ^
-  //                         is_pointer bit
+    bool is_one_float() {
+      jfloat f = as_jfloat();
+      return !g_isnan(f) && g_isfinite(f) && f == 1.0;
+    }
+
+    bool is_zero_double() {
+      jdouble d = as_jdouble();
+      jdouble ok = 0.0;
+      return jlong_cast(d) == jlong_cast(ok);
+    }
+
+    bool is_one_double() {
+      jdouble d = as_jdouble();
+      return !g_isnan(d) && g_isfinite(d) && d == 1.0;
+    }
+  };
+
+
+  //---------------------LIR Operand descriptor------------------------------------
   //
-  // lowest bit cleared, means it is a structure pointer
-  // we need  4 bits to represent types
+  // The class LIR_OprDesc represents a LIR instruction operand;
+  // it can be a register (ALU/FPU), stack location or a constant;
+  // Constants and addresses are represented as resource area allocated
+  // structures (see above).
+  // Registers and stack locations are inlined into the this pointer
+  // (see value function).
 
- private:
-  friend class LIR_OprFact;
+  class LIR_OprDesc: public CompilationResourceObj {
+   public:
+    // value structure:
+    //     data       opr-type opr-kind
+    // +--------------+-------+-------+
+    // [max...........|7 6 5 4|3 2 1 0]
+    //                               ^
+    //                         is_pointer bit
+    //
+    // lowest bit cleared, means it is a structure pointer
+    // we need  4 bits to represent types
 
-  // Conversion
-  intptr_t value() const                         { return (intptr_t) this; }
+   private:
+    friend class LIR_OprFact;
 
-  bool check_value_mask(intptr_t mask, intptr_t masked_value) const {
-    return (value() & mask) == masked_value;
-  }
+    // Conversion
+    intptr_t value() const                         { return (intptr_t) this; }
 
-  enum OprKind {
-      pointer_value      = 0
-    , stack_value        = 1
-    , cpu_register       = 3
-    , fpu_register       = 5
-    , illegal_value      = 7
-  };
+    bool check_value_mask(intptr_t mask, intptr_t masked_value) const {
+      return (value() & mask) == masked_value;
+    }
 
-  enum OprBits {
-      pointer_bits   = 1
-    , kind_bits      = 3
-    , type_bits      = 4
-    , size_bits      = 2
-    , destroys_bits  = 1
-    , virtual_bits   = 1
-    , is_xmm_bits    = 1
-    , last_use_bits  = 1
-    , is_fpu_stack_offset_bits = 1        // used in assertion checking on x86 for FPU stack slot allocation
-    , non_data_bits  = kind_bits + type_bits + size_bits + destroys_bits + last_use_bits +
-                       is_fpu_stack_offset_bits + virtual_bits + is_xmm_bits
-    , data_bits      = BitsPerInt - non_data_bits
-    , reg_bits       = data_bits / 2      // for two registers in one value encoding
-  };
+    enum OprKind {
+        pointer_value      = 0
+      , stack_value        = 1
+      , cpu_register       = 3
+      , fpu_register       = 5
+      , illegal_value      = 7
+    };
 
-  enum OprShift {
-      kind_shift     = 0
-    , type_shift     = kind_shift     + kind_bits
-    , size_shift     = type_shift     + type_bits
-    , destroys_shift = size_shift     + size_bits
-    , last_use_shift = destroys_shift + destroys_bits
-    , is_fpu_stack_offset_shift = last_use_shift + last_use_bits
-    , virtual_shift  = is_fpu_stack_offset_shift + is_fpu_stack_offset_bits
-    , is_xmm_shift   = virtual_shift + virtual_bits
-    , data_shift     = is_xmm_shift + is_xmm_bits
-    , reg1_shift = data_shift
-    , reg2_shift = data_shift + reg_bits
+    enum OprBits {
+        pointer_bits   = 1
+      , kind_bits      = 3
+      , type_bits      = 4
+      , size_bits      = 2
+      , destroys_bits  = 1
+      , virtual_bits   = 1
+      , is_xmm_bits    = 1
+      , last_use_bits  = 1
+      , is_fpu_stack_offset_bits = 1        // used in assertion checking on x86 for FPU stack slot allocation
+      , non_data_bits  = kind_bits + type_bits + size_bits + destroys_bits + last_use_bits +
+                         is_fpu_stack_offset_bits + virtual_bits + is_xmm_bits
+      , data_bits      = BitsPerInt - non_data_bits
+      , reg_bits       = data_bits / 2      // for two registers in one value encoding
+    };
 
-  };
+    enum OprShift {
+        kind_shift     = 0
+      , type_shift     = kind_shift     + kind_bits
+      , size_shift     = type_shift     + type_bits
+      , destroys_shift = size_shift     + size_bits
+      , last_use_shift = destroys_shift + destroys_bits
+      , is_fpu_stack_offset_shift = last_use_shift + last_use_bits
+      , virtual_shift  = is_fpu_stack_offset_shift + is_fpu_stack_offset_bits
+      , is_xmm_shift   = virtual_shift + virtual_bits
+      , data_shift     = is_xmm_shift + is_xmm_bits
+      , reg1_shift = data_shift
+      , reg2_shift = data_shift + reg_bits
 
-  enum OprSize {
-      single_size = 0 << size_shift
-    , double_size = 1 << size_shift
-  };
+    };
 
-  enum OprMask {
-      kind_mask      = right_n_bits(kind_bits)
-    , type_mask      = right_n_bits(type_bits) << type_shift
-    , size_mask      = right_n_bits(size_bits) << size_shift
-    , last_use_mask  = right_n_bits(last_use_bits) << last_use_shift
-    , is_fpu_stack_offset_mask = right_n_bits(is_fpu_stack_offset_bits) << is_fpu_stack_offset_shift
-    , virtual_mask   = right_n_bits(virtual_bits) << virtual_shift
-    , is_xmm_mask    = right_n_bits(is_xmm_bits) << is_xmm_shift
-    , pointer_mask   = right_n_bits(pointer_bits)
-    , lower_reg_mask = right_n_bits(reg_bits)
-    , no_type_mask   = (int)(~(type_mask | last_use_mask | is_fpu_stack_offset_mask))
-  };
+    enum OprSize {
+        single_size = 0 << size_shift
+      , double_size = 1 << size_shift
+    };
 
-  uintptr_t data() const                         { return value() >> data_shift; }
-  int lo_reg_half() const                        { return data() & lower_reg_mask; }
-  int hi_reg_half() const                        { return (data() >> reg_bits) & lower_reg_mask; }
-  OprKind kind_field() const                     { return (OprKind)(value() & kind_mask); }
-  OprSize size_field() const                     { return (OprSize)(value() & size_mask); }
+    enum OprMask {
+        kind_mask      = right_n_bits(kind_bits)
+      , type_mask      = right_n_bits(type_bits) << type_shift
+      , size_mask      = right_n_bits(size_bits) << size_shift
+      , last_use_mask  = right_n_bits(last_use_bits) << last_use_shift
+      , is_fpu_stack_offset_mask = right_n_bits(is_fpu_stack_offset_bits) << is_fpu_stack_offset_shift
+      , virtual_mask   = right_n_bits(virtual_bits) << virtual_shift
+      , is_xmm_mask    = right_n_bits(is_xmm_bits) << is_xmm_shift
+      , pointer_mask   = right_n_bits(pointer_bits)
+      , lower_reg_mask = right_n_bits(reg_bits)
+      , no_type_mask   = (int)(~(type_mask | last_use_mask | is_fpu_stack_offset_mask))
+    };
+
+    uintptr_t data() const                         { return value() >> data_shift; }
+    int lo_reg_half() const                        { return data() & lower_reg_mask; }
+    int hi_reg_half() const                        { return (data() >> reg_bits) & lower_reg_mask; }
+    OprKind kind_field() const                     { return (OprKind)(value() & kind_mask); }
+    OprSize size_field() const                     { return (OprSize)(value() & size_mask); }
 
   static char type_char(BasicType t);
 
@@ -952,6 +952,7 @@ enum LIR_Code {
       , lir_compare_to
       , lir_xadd
       , lir_xchg
+      , lir_getprocessorid
   , end_op2
   , begin_op3
       , lir_idiv
@@ -2135,6 +2136,8 @@ class LIR_List: public CompilationResourceObj {
 
   void push(LIR_Opr opr)                                   { append(new LIR_Op1(lir_push, opr)); }
   void pop(LIR_Opr reg)                                    { append(new LIR_Op1(lir_pop,  reg)); }
+
+  void getprocessorid(LIR_Opr dst, LIR_Opr tmp1, LIR_Opr tmp2) { append(new LIR_Op2(lir_getprocessorid, tmp1, tmp2, dst)); }
 
   void cmp(LIR_Condition condition, LIR_Opr left, LIR_Opr right, CodeEmitInfo* info = NULL) {
     append(new LIR_Op2(lir_cmp, condition, left, right, info));

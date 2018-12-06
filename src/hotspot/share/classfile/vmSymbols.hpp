@@ -1329,6 +1329,10 @@
   do_intrinsic(_weakCompareAndSetShortAcquire,    jdk_internal_misc_Unsafe,  weakCompareAndSetShortAcquire_name,    compareAndSetShort_signature,       F_R) \
   do_intrinsic(_weakCompareAndSetShortRelease,    jdk_internal_misc_Unsafe,  weakCompareAndSetShortRelease_name,    compareAndSetShort_signature,       F_R) \
   do_intrinsic(_weakCompareAndSetShort,           jdk_internal_misc_Unsafe,  weakCompareAndSetShort_name,           compareAndSetShort_signature,       F_R) \
+  \
+  do_intrinsic(_getProcessorId,           jdk_internal_misc_Unsafe,     getProcessorId_name, getProcessorId_signature, F_RN)   \
+   do_name(     getProcessorId_name,                                    "getProcessorId")                                      \
+   do_alias(    getProcessorId_signature,                               void_int_signature)                                    \
                            \
   do_intrinsic(_getAndAddInt,             jdk_internal_misc_Unsafe,     getAndAddInt_name, getAndAddInt_signature, F_R)       \
    do_name(     getAndAddInt_name,                                      "getAndAddInt")                                       \

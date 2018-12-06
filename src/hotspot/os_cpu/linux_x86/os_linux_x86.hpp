@@ -49,4 +49,6 @@
    */
   static void workaround_expand_exec_shield_cs_limit();
 
+  static int getProcessorId();
+
 #endif // OS_CPU_LINUX_X86_VM_OS_LINUX_X86_HPP

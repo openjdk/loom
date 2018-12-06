@@ -339,7 +339,6 @@ void LIRGenerator::do_NegateOp(NegateOp* x) {
   set_result(x, round_item(reg));
 }
 
-
 // for  _fadd, _fmul, _fsub, _fdiv, _frem
 //      _dadd, _dmul, _dsub, _ddiv, _drem
 void LIRGenerator::do_ArithmeticOp_FPU(ArithmeticOp* x) {
@@ -1516,3 +1515,19 @@ void LIRGenerator::volatile_field_load(LIR_Address* address, LIR_Opr result,
     __ load(address, result, info);
   }
 }
+
+void LIRGenerator::do_getProcessorId(Intrinsic* x) {
+  LIR_Opr result = rlock_result(x);
+  if (VM_Version::supports_rdpid()) {
+    __ getprocessorid(result, LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr);
+  } else if (VM_Version::supports_rdtscp()) {
+    LIR_Opr result_reg = FrameMap::rcx_opr;
+    LIR_Opr tmp = FrameMap::rdx_opr; 
+    LIR_Opr tmp1 = FrameMap::rax_opr; 
+    __ getprocessorid(result_reg, tmp, tmp1);
+    __ move(result_reg, result);
+  } else {
+    assert(false, "");
+  }
+}
+

@@ -716,6 +716,7 @@ public:
     DEFINE_CLASS_ID(Mul,      Node, 12)
     DEFINE_CLASS_ID(Vector,   Node, 13)
     DEFINE_CLASS_ID(ClearArray, Node, 14)
+    DEFINE_CLASS_ID(GetProcessorId, Node, 15)
 
     _max_classes  = ClassMask_ClearArray
   };

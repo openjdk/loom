@@ -4334,6 +4334,23 @@ void Assembler::rdtsc() {
   emit_int8((unsigned char)0x31);
 }
 
+void Assembler::rdtscp() {
+  emit_int8((unsigned char)0x0F);
+  emit_int8((unsigned char)0x01);
+  emit_int8((unsigned char)0xF9);
+}
+
+void Assembler::rdpid(Register dst) {
+  assert(VM_Version::supports_rdpid(), "");
+  int encode = prefix_and_encode(dst->encoding());
+
+  emit_int8((unsigned char)0xF3);
+  emit_int8((unsigned char)0x0F);
+  emit_int8((unsigned char)0xC7);
+
+  emit_int8((unsigned char)(0xC0 | 7 << 3 | encode));
+}
+
 // copies data from [esi] to [edi] using rcx pointer sized words
 // generic
 void Assembler::rep_mov() {
@@ -9180,5 +9197,6 @@ void Assembler::xorq(Register dst, Address src) {
   emit_int8(0x33);
   emit_operand(dst, src);
 }
+
 
 #endif // !LP64

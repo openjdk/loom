@@ -3098,6 +3098,10 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
     do_vectorizedMismatch(x);
     break;
 
+  case vmIntrinsics::_getProcessorId:
+    do_getProcessorId(x);
+    break;
+
   default: ShouldNotReachHere(); break;
   }
 }

@@ -3595,6 +3595,12 @@ public final class Unsafe {
         putCharUnaligned(o, offset, convEndian(bigEndian, x));
     }
 
+    /**
+     * Get the processor id
+     */
+    @HotSpotIntrinsicCandidate
+    public native int getProcessorId();
+
     // JVM interface methods
     // BE is true iff the native endianness of this platform is big.
     private static final boolean BE = theUnsafe.isBigEndian0();

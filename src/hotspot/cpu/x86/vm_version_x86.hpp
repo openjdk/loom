@@ -162,7 +162,9 @@ class VM_Version : public Abstract_VM_Version {
                mmx_amd   : 1,
                mmx       : 1,
                fxsr      : 1,
-                         : 4,
+                         : 2,
+               rdtscp    : 1,
+                         : 1,
                long_mode : 1,
                tdnow2    : 1,
                tdnow     : 1;
@@ -246,7 +248,9 @@ class VM_Version : public Abstract_VM_Version {
              avx512_bitalg : 1,
                            : 1,
           avx512_vpopcntdq : 1,
-                           : 17;
+                           : 7,
+                     rdpid : 1,
+                           : 9;
     } bits;
   };
 
@@ -324,7 +328,7 @@ protected:
     CPU_AVX512DQ = (1 << 27),
     CPU_AVX512PF = (1 << 28),
     CPU_AVX512ER = (1 << 29),
-    CPU_AVX512CD = (1 << 30)
+    CPU_AVX512CD = (1 << 30),
     // Keeping sign bit 31 unassigned.
   };
 
@@ -336,6 +340,8 @@ protected:
 #define CPU_AVX512_VPOPCNTDQ ((uint64_t)UCONST64(0x2000000000)) // Vector popcount
 #define CPU_VPCLMULQDQ ((uint64_t)UCONST64(0x4000000000)) //Vector carryless multiplication
 #define CPU_VAES ((uint64_t)UCONST64(0x8000000000))    // Vector AES instructions
+#define CPU_RDTSCP ((uint64_t)UCONST64(0x10000000000))
+#define CPU_RDPID ((uint64_t)UCONST64(0x20000000000))
 
   enum Extended_Family {
     // AMD
@@ -572,6 +578,10 @@ protected:
       result |= CPU_SHA;
     if (_cpuid_info.std_cpuid1_ecx.bits.fma != 0)
       result |= CPU_FMA;
+    if (_cpuid_info.ext_cpuid1_edx.bits.rdtscp != 0)
+      result |= CPU_RDTSCP;
+    if (_cpuid_info.sef_cpuid7_ecx.bits.rdpid != 0)
+      result |= CPU_RDPID;
 
     // AMD features.
     if (is_amd()) {
@@ -828,6 +838,8 @@ public:
   static bool supports_vpopcntdq()  { return (_features & CPU_AVX512_VPOPCNTDQ) != 0; }
   static bool supports_vpclmulqdq() { return (_features & CPU_VPCLMULQDQ) != 0; }
   static bool supports_vaes()       { return (_features & CPU_VAES) != 0; }
+  static bool supports_rdtscp()     { return (_features & CPU_RDTSCP) != 0; }
+  static bool supports_rdpid()      { return (_features & CPU_RDPID) != 0; }
 
   // Intel features
   static bool is_intel_family_core() { return is_intel() &&

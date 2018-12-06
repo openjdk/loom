@@ -11312,6 +11312,34 @@ instruct encode_iso_array(rsi_RegP src, rdi_RegP dst, rdx_RegI len,
   ins_pipe( pipe_slow );
 %}
 
+instruct rdpidProcessorId(rRegI dst, rFlagsReg cr) %{
+  predicate(VM_Version::supports_rdpid());
+  match(Set dst (GetProcessorId));
+  effect(DEF dst, KILL cr);
+  ins_cost(10);
+
+  ins_encode %{
+    Register Rdst = $dst$$Register;
+    __ rdpid(Rdst);
+    __ andl(Rdst, 0xfff); // this is linux specific
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct rdtscpProcessorId(rcx_RegI dst, rdx_RegI tmp, rax_RegI tmp1, rFlagsReg cr) %{
+  predicate(VM_Version::supports_rdtscp());
+  match(Set dst (GetProcessorId));
+  effect(DEF dst, TEMP tmp, TEMP tmp1, KILL cr);
+  ins_cost(100);
+
+  ins_encode %{
+    Register Rdst = $dst$$Register;
+    __ rdtscp();
+    __ andl(Rdst, 0xfff); // this is linux specific
+  %}
+  ins_pipe( pipe_slow );
+%}
+
 //----------Overflow Math Instructions-----------------------------------------
 
 instruct overflowAddI_rReg(rFlagsReg cr, rax_RegI op1, rRegI op2)

@@ -62,4 +62,8 @@ public:
   void store_parameter(jobject c,   int offset_from_esp_in_words);
   void store_parameter(Metadata* c, int offset_from_esp_in_words);
 
+
+  void rdtscp(LIR_Opr dst, LIR_Opr tmp, LIR_Opr tmp1);
+  void rdpic(LIR_Opr dst);
+
 #endif // CPU_X86_VM_C1_LIRASSEMBLER_X86_HPP

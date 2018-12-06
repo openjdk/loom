@@ -302,6 +302,10 @@ UNSAFE_LEAF(jint, Unsafe_unalignedAccess0(JNIEnv *env, jobject unsafe)) {
   return UseUnalignedAccesses;
 } UNSAFE_END
 
+UNSAFE_LEAF(jint, Unsafe_getProcessorId(JNIEnv *env, jobject unsafe)) {
+  return os::getProcessorId();
+} UNSAFE_END
+
 #define DEFINE_GETSETOOP(java_type, Type) \
  \
 UNSAFE_ENTRY(java_type, Unsafe_Get##Type(JNIEnv *env, jobject unsafe, jobject obj, jlong offset)) { \
@@ -1092,7 +1096,8 @@ static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
     {CC "fullFence",          CC "()V",                  FN_PTR(Unsafe_FullFence)},
 
     {CC "isBigEndian0",       CC "()Z",                  FN_PTR(Unsafe_isBigEndian0)},
-    {CC "unalignedAccess0",   CC "()Z",                  FN_PTR(Unsafe_unalignedAccess0)}
+    {CC "unalignedAccess0",   CC "()Z",                  FN_PTR(Unsafe_unalignedAccess0)},
+    {CC "getProcessorId",     CC "()I",                  FN_PTR(Unsafe_getProcessorId)}
 };
 
 #undef CC

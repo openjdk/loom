@@ -679,6 +679,15 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
       break;
     }
 
+    case lir_getprocessorid: {
+      LIR_Op2* op2 = (LIR_Op2*)op;
+      assert(op2->_result->is_valid(), "must be"); do_output(op2->_result);
+      if (op2->_opr1->is_valid()) do_temp(op2->_opr1);
+      if (op2->_opr2->is_valid()) do_temp(op2->_opr2);
+      break;
+    }
+
+
 // LIR_Op3
     case lir_idiv:
     case lir_irem: {
@@ -1705,6 +1714,7 @@ const char * LIR_Op::name() const {
      case lir_irem:                  s = "irem";          break;
      case lir_fmad:                  s = "fmad";          break;
      case lir_fmaf:                  s = "fmaf";          break;
+     case lir_getprocessorid:        s = "getprocesssorid"; break;
      // LIR_OpJavaCall
      case lir_static_call:           s = "static";        break;
      case lir_optvirtual_call:       s = "optvirtual";    break;

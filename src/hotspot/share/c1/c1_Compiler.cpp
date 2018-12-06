@@ -225,6 +225,7 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
   case vmIntrinsics::_getEventWriter:
 #if defined(_LP64) || !defined(TRACE_ID_SHIFT)
   case vmIntrinsics::_getClassId:
+  case vmIntrinsics::_getProcessorId:
 #endif
 #endif
     break;

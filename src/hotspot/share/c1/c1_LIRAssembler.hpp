@@ -113,6 +113,8 @@ class LIR_Assembler: public CompilationResourceObj {
   void push(LIR_Opr opr);
   void pop(LIR_Opr opr);
 
+  void getprocessorid(LIR_Opr result, LIR_Opr tmp1, LIR_Opr tmp2);
+
   // patching
   void append_patching_stub(PatchingStub* stub);
   void patching_epilog(PatchingStub* patch, LIR_PatchCode patch_code, Register obj, CodeEmitInfo* info);
