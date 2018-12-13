@@ -903,6 +903,12 @@ int os::extra_bang_size_in_bytes() {
 }
 
 int os::getProcessorId() {
+  if (VM_Version::supports_rdtscp) {
+    register int proc __asm__ ("rcx");
+    __asm__ volatile("rdtscp" : "=r"(proc) : : "rax", "rdx", "cc");
+    return proc & 0xfff;
+  }
+
   unsigned int eax, ebx, ecx, edx;
   __cpuid(0xb, eax, ebx, ecx, edx);
   return edx;
