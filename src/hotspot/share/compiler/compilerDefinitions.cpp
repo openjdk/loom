@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "code/codeCache.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/globals_extension.hpp"
 #include "compiler/compilerDefinitions.hpp"
@@ -147,7 +148,7 @@ void set_client_compilation_mode() {
     FLAG_SET_ERGO(uintx, CodeCacheExpansionSize, 32*K);
   }
   if (FLAG_IS_DEFAULT(MetaspaceSize)) {
-    FLAG_SET_ERGO(size_t, MetaspaceSize, 12*M);
+    FLAG_SET_ERGO(size_t, MetaspaceSize, MIN2(12*M, MaxMetaspaceSize));
   }
   if (FLAG_IS_DEFAULT(MaxRAM)) {
     // Do not use FLAG_SET_ERGO to update MaxRAM, as this will impact
@@ -200,8 +201,10 @@ void CompilerConfig::set_tiered_flags() {
     FLAG_SET_ERGO(uintx, ReservedCodeCacheSize,
                   MIN2(CODE_CACHE_DEFAULT_LIMIT, (size_t)ReservedCodeCacheSize * 5));
   }
-  // Enable SegmentedCodeCache if TieredCompilation is enabled and ReservedCodeCacheSize >= 240M
-  if (FLAG_IS_DEFAULT(SegmentedCodeCache) && ReservedCodeCacheSize >= 240*M) {
+  // Enable SegmentedCodeCache if TieredCompilation is enabled, ReservedCodeCacheSize >= 240M
+  // and the code cache contains at least 8 pages (segmentation disables advantage of huge pages).
+  if (FLAG_IS_DEFAULT(SegmentedCodeCache) && ReservedCodeCacheSize >= 240*M &&
+      8 * CodeCache::page_size() <= ReservedCodeCacheSize) {
     FLAG_SET_ERGO(bool, SegmentedCodeCache, true);
   }
   if (!UseInterpreter) { // -Xcomp
@@ -261,7 +264,7 @@ void set_jvmci_specific_flags() {
       FLAG_SET_DEFAULT(InitialCodeCacheSize, MAX2(16*M, InitialCodeCacheSize));
     }
     if (FLAG_IS_DEFAULT(MetaspaceSize)) {
-      FLAG_SET_DEFAULT(MetaspaceSize, MAX2(12*M, MetaspaceSize));
+      FLAG_SET_DEFAULT(MetaspaceSize, MIN2(MAX2(12*M, MetaspaceSize), MaxMetaspaceSize));
     }
     if (FLAG_IS_DEFAULT(NewSizeThreadIncrease)) {
       FLAG_SET_DEFAULT(NewSizeThreadIncrease, MAX2(4*K, NewSizeThreadIncrease));
@@ -311,9 +314,9 @@ bool CompilerConfig::check_args_consistency(bool status) {
   }
 #endif
 
-  if (BackgroundCompilation && (CompileTheWorld || ReplayCompiles)) {
+  if (BackgroundCompilation && ReplayCompiles) {
     if (!FLAG_IS_DEFAULT(BackgroundCompilation)) {
-      warning("BackgroundCompilation disabled due to CompileTheWorld or ReplayCompiles options.");
+      warning("BackgroundCompilation disabled due to ReplayCompiles option.");
     }
     FLAG_SET_CMDLINE(bool, BackgroundCompilation, false);
   }

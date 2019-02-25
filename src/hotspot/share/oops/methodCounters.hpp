@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_OOPS_METHODCOUNTERS_HPP
-#define SHARE_VM_OOPS_METHODCOUNTERS_HPP
+#ifndef SHARE_OOPS_METHODCOUNTERS_HPP
+#define SHARE_OOPS_METHODCOUNTERS_HPP
 
 #include "oops/metadata.hpp"
 #include "compiler/compilerDefinitions.hpp"
@@ -103,9 +103,9 @@ class MethodCounters : public Metadata {
       // If interpreter profiling is enabled, the backward branch limit
       // is compared against the method data counter rather than an invocation
       // counter, therefore no shifting of bits is required.
-      _interpreter_backward_branch_limit = (compile_threshold * (OnStackReplacePercentage - InterpreterProfilePercentage)) / 100;
+      _interpreter_backward_branch_limit = (int)((int64_t)compile_threshold * (OnStackReplacePercentage - InterpreterProfilePercentage) / 100);
     } else {
-      _interpreter_backward_branch_limit = ((compile_threshold * OnStackReplacePercentage) / 100) << InvocationCounter::count_shift;
+      _interpreter_backward_branch_limit = (int)(((int64_t)compile_threshold * OnStackReplacePercentage / 100) << InvocationCounter::count_shift);
     }
     _interpreter_profile_limit = ((compile_threshold * InterpreterProfilePercentage) / 100) << InvocationCounter::count_shift;
     _invoke_mask = right_n_bits(CompilerConfig::scaled_freq_log(Tier0InvokeNotifyFreqLog, scale)) << InvocationCounter::count_shift;
@@ -265,4 +265,4 @@ class MethodCounters : public Metadata {
   virtual void print_value_on(outputStream* st) const;
 
 };
-#endif //SHARE_VM_OOPS_METHODCOUNTERS_HPP
+#endif // SHARE_OOPS_METHODCOUNTERS_HPP

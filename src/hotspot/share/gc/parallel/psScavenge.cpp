@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -57,7 +57,7 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/threadCritical.hpp"
 #include "runtime/vmThread.hpp"
-#include "runtime/vm_operations.hpp"
+#include "runtime/vmOperations.hpp"
 #include "services/memoryService.hpp"
 #include "utilities/stack.inline.hpp"
 
@@ -168,11 +168,11 @@ void PSRefProcTaskExecutor::execute(ProcessTask& task, uint ergo_workers)
   for(uint i=0; i < active_workers; i++) {
     q->enqueue(new PSRefProcTaskProxy(task, i));
   }
-  ParallelTaskTerminator terminator(active_workers,
-                                    (TaskQueueSetSuper*) PSPromotionManager::stack_array_depth());
+  TaskTerminator terminator(active_workers,
+                            (TaskQueueSetSuper*) PSPromotionManager::stack_array_depth());
   if (task.marks_oops_alive() && active_workers > 1) {
     for (uint j = 0; j < active_workers; j++) {
-      q->enqueue(new StealTask(&terminator));
+      q->enqueue(new StealTask(terminator.terminator()));
     }
   }
   manager->execute_and_wait(q);
@@ -380,16 +380,15 @@ bool PSScavenge::invoke_no_policy() {
       q->enqueue(new ScavengeRootsTask(ScavengeRootsTask::jvmti));
       q->enqueue(new ScavengeRootsTask(ScavengeRootsTask::code_cache));
 
-      ParallelTaskTerminator terminator(
-        active_workers,
-                  (TaskQueueSetSuper*) promotion_manager->stack_array_depth());
+      TaskTerminator terminator(active_workers,
+                                (TaskQueueSetSuper*) promotion_manager->stack_array_depth());
         // If active_workers can exceed 1, add a StrealTask.
         // PSPromotionManager::drain_stacks_depth() does not fully drain its
         // stacks and expects a StealTask to complete the draining if
         // ParallelGCThreads is > 1.
         if (gc_task_manager()->workers() > 1) {
           for (uint j = 0; j < active_workers; j++) {
-            q->enqueue(new StealTask(&terminator));
+            q->enqueue(new StealTask(terminator.terminator()));
           }
         }
 
@@ -429,12 +428,6 @@ bool PSScavenge::invoke_no_policy() {
     {
       GCTraceTime(Debug, gc, phases) tm("Weak Processing", &_gc_timer);
       WeakProcessor::weak_oops_do(&_is_alive_closure, &root_closure);
-    }
-
-    {
-      GCTraceTime(Debug, gc, phases) tm("Scrub String Table", &_gc_timer);
-      // Unlink any dead interned Strings and process the remaining live ones.
-      StringTable::unlink_or_oops_do(&_is_alive_closure, &root_closure);
     }
 
     // Verify that usage of root_closure didn't copy any objects.
@@ -761,5 +754,5 @@ void PSScavenge::initialize() {
   // Cache the cardtable
   _card_table = heap->card_table();
 
-  _counters = new CollectorCounters("PSScavenge", 0);
+  _counters = new CollectorCounters("Parallel young collection pauses", 0);
 }

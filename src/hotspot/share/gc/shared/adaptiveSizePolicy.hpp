@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2004, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,15 +22,12 @@
  *
  */
 
-#ifndef SHARE_VM_GC_SHARED_ADAPTIVESIZEPOLICY_HPP
-#define SHARE_VM_GC_SHARED_ADAPTIVESIZEPOLICY_HPP
+#ifndef SHARE_GC_SHARED_ADAPTIVESIZEPOLICY_HPP
+#define SHARE_GC_SHARED_ADAPTIVESIZEPOLICY_HPP
 
-#include "gc/shared/collectedHeap.hpp"
 #include "gc/shared/gcCause.hpp"
 #include "gc/shared/gcUtil.hpp"
-#include "logging/log.hpp"
 #include "memory/allocation.hpp"
-#include "memory/universe.hpp"
 
 // This class keeps statistical information and computes the
 // size of the heap.
@@ -188,8 +185,6 @@ class AdaptiveSizePolicy : public CHeapObj<mtGC> {
   julong _young_gen_change_for_minor_throughput;
   julong _old_gen_change_for_major_throughput;
 
-  static const uint GCWorkersPerJavaThread  = 2;
-
   // Accessors
 
   double gc_pause_goal_sec() const { return _gc_pause_goal_sec; }
@@ -334,40 +329,12 @@ class AdaptiveSizePolicy : public CHeapObj<mtGC> {
   // Return true if the policy suggested a change.
   bool tenuring_threshold_change() const;
 
-  static bool _debug_perturbation;
-
  public:
   AdaptiveSizePolicy(size_t init_eden_size,
                      size_t init_promo_size,
                      size_t init_survivor_size,
                      double gc_pause_goal_sec,
                      uint gc_cost_ratio);
-
-  // Return number default  GC threads to use in the next GC.
-  static uint calc_default_active_workers(uintx total_workers,
-                                          const uintx min_workers,
-                                          uintx active_workers,
-                                          uintx application_workers);
-
-  // Return number of GC threads to use in the next GC.
-  // This is called sparingly so as not to change the
-  // number of GC workers gratuitously.
-  //   For ParNew collections
-  //   For PS scavenge and ParOld collections
-  //   For G1 evacuation pauses (subject to update)
-  //   For G1 Full GCs (subject to update)
-  // Other collection phases inherit the number of
-  // GC workers from the calls above.  For example,
-  // a CMS parallel remark uses the same number of GC
-  // workers as the most recent ParNew collection.
-  static uint calc_active_workers(uintx total_workers,
-                                  uintx active_workers,
-                                  uintx application_workers);
-
-  // Return number of GC threads to use in the next concurrent GC phase.
-  static uint calc_active_conc_workers(uintx total_workers,
-                                       uintx active_workers,
-                                       uintx application_workers);
 
   bool is_gc_cms_adaptive_size_policy() {
     return kind() == _gc_cms_adaptive_size_policy;
@@ -506,4 +473,4 @@ class AdaptiveSizePolicy : public CHeapObj<mtGC> {
   void print_tenuring_threshold(uint new_tenuring_threshold) const;
 };
 
-#endif // SHARE_VM_GC_SHARED_ADAPTIVESIZEPOLICY_HPP
+#endif // SHARE_GC_SHARED_ADAPTIVESIZEPOLICY_HPP

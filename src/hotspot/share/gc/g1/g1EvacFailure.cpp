@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,10 +23,10 @@
  */
 
 #include "precompiled.hpp"
-#include "gc/g1/dirtyCardQueue.hpp"
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "gc/g1/g1CollectorState.hpp"
 #include "gc/g1/g1ConcurrentMark.inline.hpp"
+#include "gc/g1/g1DirtyCardQueue.hpp"
 #include "gc/g1/g1EvacFailure.hpp"
 #include "gc/g1/g1HeapVerifier.hpp"
 #include "gc/g1/g1OopClosures.inline.hpp"
@@ -41,11 +41,11 @@
 class UpdateRSetDeferred : public BasicOopIterateClosure {
 private:
   G1CollectedHeap* _g1h;
-  DirtyCardQueue* _dcq;
+  G1DirtyCardQueue* _dcq;
   G1CardTable*    _ct;
 
 public:
-  UpdateRSetDeferred(DirtyCardQueue* dcq) :
+  UpdateRSetDeferred(G1DirtyCardQueue* dcq) :
     _g1h(G1CollectedHeap::heap()), _dcq(dcq), _ct(_g1h->card_table()) {}
 
   virtual void do_oop(narrowOop* p) { do_oop_work(p); }
@@ -126,7 +126,7 @@ public:
         // explicitly and all objects in the CSet are considered
         // (implicitly) live. So, we won't mark them explicitly and
         // we'll leave them over NTAMS.
-        _cm->mark_in_next_bitmap(_worker_id, obj);
+        _cm->mark_in_next_bitmap(_worker_id, _hr, obj);
       }
       size_t obj_size = obj->size();
 
@@ -196,7 +196,7 @@ class RemoveSelfForwardPtrHRClosure: public HeapRegionClosure {
   uint _worker_id;
   HeapRegionClaimer* _hrclaimer;
 
-  DirtyCardQueue _dcq;
+  G1DirtyCardQueue _dcq;
   UpdateRSetDeferred _update_rset_cl;
 
 public:

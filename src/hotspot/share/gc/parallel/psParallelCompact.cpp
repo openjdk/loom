@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -883,7 +883,7 @@ void PSParallelCompact::post_initialize() {
     new PCReferenceProcessor(&_span_based_discoverer,
                              &_is_alive_closure); // non-header is alive closure
 
-  _counters = new CollectorCounters("PSParallelCompact", 1);
+  _counters = new CollectorCounters("Parallel full collection pauses", 1);
 
   // Initialize static fields in ParCompactionManager.
   ParCompactionManager::initialize(mark_bitmap());
@@ -1995,7 +1995,10 @@ bool PSParallelCompact::absorb_live_data_from_eden(PSAdaptiveSizePolicy* size_po
   assert(young_gen->virtual_space()->alignment() ==
          old_gen->virtual_space()->alignment(), "alignments do not match");
 
-  if (!(UseAdaptiveSizePolicy && UseAdaptiveGCBoundary)) {
+  // We also return false when it's a heterogenous heap because old generation cannot absorb data from eden
+  // when it is allocated on different memory (example, nv-dimm) than young.
+  if (!(UseAdaptiveSizePolicy && UseAdaptiveGCBoundary) ||
+      ParallelScavengeHeap::heap()->ps_collector_policy()->is_hetero_heap()) {
     return false;
   }
 
@@ -2100,7 +2103,7 @@ void PSParallelCompact::marking_phase(ParCompactionManager* cm,
   uint parallel_gc_threads = heap->gc_task_manager()->workers();
   uint active_gc_threads = heap->gc_task_manager()->active_workers();
   TaskQueueSetSuper* qset = ParCompactionManager::stack_array();
-  ParallelTaskTerminator terminator(active_gc_threads, qset);
+  TaskTerminator terminator(active_gc_threads, qset);
 
   PCMarkAndPushClosure mark_and_push_closure(cm);
   ParCompactionManager::FollowStackClosure follow_stack_closure(cm);
@@ -2129,7 +2132,7 @@ void PSParallelCompact::marking_phase(ParCompactionManager* cm,
 
     if (active_gc_threads > 1) {
       for (uint j = 0; j < active_gc_threads; j++) {
-        q->enqueue(new StealMarkingTask(&terminator));
+        q->enqueue(new StealMarkingTask(terminator.terminator()));
       }
     }
 
@@ -2181,18 +2184,6 @@ void PSParallelCompact::marking_phase(ParCompactionManager* cm,
     Klass::clean_weak_klass_links(purged_class);
   }
 
-  {
-    GCTraceTime(Debug, gc, phases) t("Scrub String Table", &_gc_timer);
-    // Delete entries for dead interned strings.
-    StringTable::unlink(is_alive_closure());
-  }
-
-  {
-    GCTraceTime(Debug, gc, phases) t("Scrub Symbol Table", &_gc_timer);
-    // Clean up unreferenced symbols in symbol table.
-    SymbolTable::unlink();
-  }
-
   _gc_tracer.report_object_count_after_gc(is_alive_closure());
 }
 
@@ -2223,7 +2214,6 @@ void PSParallelCompact::adjust_roots(ParCompactionManager* cm) {
   CodeBlobToOopClosure adjust_from_blobs(&oop_closure, CodeBlobToOopClosure::FixRelocations);
   CodeCache::blobs_do(&adjust_from_blobs);
   AOTLoader::oops_do(&oop_closure);
-  StringTable::oops_do(&oop_closure);
   ref_processor()->weak_oops_do(&oop_closure);
   // Roots were visited so references into the young gen in roots
   // may have been scanned.  Process them also.
@@ -2459,12 +2449,12 @@ void PSParallelCompact::compact() {
   uint parallel_gc_threads = heap->gc_task_manager()->workers();
   uint active_gc_threads = heap->gc_task_manager()->active_workers();
   TaskQueueSetSuper* qset = ParCompactionManager::region_array();
-  ParallelTaskTerminator terminator(active_gc_threads, qset);
+  TaskTerminator terminator(active_gc_threads, qset);
 
   GCTaskQueue* q = GCTaskQueue::create();
   prepare_region_draining_tasks(q, active_gc_threads);
   enqueue_dense_prefix_tasks(q, active_gc_threads);
-  enqueue_region_stealing_tasks(q, &terminator, active_gc_threads);
+  enqueue_region_stealing_tasks(q, terminator.terminator(), active_gc_threads);
 
   {
     GCTraceTime(Trace, gc, phases) tm("Par Compact", &_gc_timer);

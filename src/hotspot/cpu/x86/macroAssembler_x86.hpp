@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef CPU_X86_VM_MACROASSEMBLER_X86_HPP
-#define CPU_X86_VM_MACROASSEMBLER_X86_HPP
+#ifndef CPU_X86_MACROASSEMBLER_X86_HPP
+#define CPU_X86_MACROASSEMBLER_X86_HPP
 
 #include "asm/assembler.hpp"
 #include "utilities/macros.hpp"
@@ -943,12 +943,17 @@ class MacroAssembler: public Assembler {
         int iter);
 
   void addm(int disp, Register r1, Register r2);
-
+  void gfmul(XMMRegister tmp0, XMMRegister t);
+  void schoolbookAAD(int i, Register subkeyH, XMMRegister data, XMMRegister tmp0,
+                     XMMRegister tmp1, XMMRegister tmp2, XMMRegister tmp3);
+  void generateHtbl_one_block(Register htbl);
+  void generateHtbl_eight_blocks(Register htbl);
  public:
   void sha256_AVX2(XMMRegister msg, XMMRegister state0, XMMRegister state1, XMMRegister msgtmp0,
                    XMMRegister msgtmp1, XMMRegister msgtmp2, XMMRegister msgtmp3, XMMRegister msgtmp4,
                    Register buf, Register state, Register ofs, Register limit, Register rsp,
                    bool multi_block, XMMRegister shuf_mask);
+  void avx_ghash(Register state, Register htbl, Register data, Register blocks);
 #endif
 
 #ifdef _LP64
@@ -1498,6 +1503,15 @@ public:
     // 0x11 - multiply upper 64 bits [64:127]
     Assembler::vpclmulqdq(dst, nds, src, 0x11);
   }
+  void vpclmullqhqdq(XMMRegister dst, XMMRegister nds, XMMRegister src) {
+    // 0x10 - multiply nds[0:63] and src[64:127]
+    Assembler::vpclmulqdq(dst, nds, src, 0x10);
+  }
+  void vpclmulhqlqdq(XMMRegister dst, XMMRegister nds, XMMRegister src) {
+    //0x01 - multiply nds[64:127] and src[0:63]
+    Assembler::vpclmulqdq(dst, nds, src, 0x01);
+  }
+
   void evpclmulldq(XMMRegister dst, XMMRegister nds, XMMRegister src, int vector_len) {
     // 0x00 - multiply lower 64 bits [0:63]
     Assembler::evpclmulqdq(dst, nds, src, 0x00, vector_len);
@@ -1765,4 +1779,4 @@ class SkipIfEqual {
    ~SkipIfEqual();
 };
 
-#endif // CPU_X86_VM_MACROASSEMBLER_X86_HPP
+#endif // CPU_X86_MACROASSEMBLER_X86_HPP

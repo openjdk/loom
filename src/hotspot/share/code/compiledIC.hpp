@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,12 +22,13 @@
  *
  */
 
-#ifndef SHARE_VM_CODE_COMPILEDIC_HPP
-#define SHARE_VM_CODE_COMPILEDIC_HPP
+#ifndef SHARE_CODE_COMPILEDIC_HPP
+#define SHARE_CODE_COMPILEDIC_HPP
 
 #include "code/nativeInst.hpp"
 #include "interpreter/linkResolver.hpp"
 #include "oops/compiledICHolder.hpp"
+#include "runtime/safepointVerifiers.hpp"
 
 //-----------------------------------------------------------------------------
 // The CompiledIC represents a compiled inline cache.
@@ -67,6 +68,7 @@ class CompiledICLocker: public StackObj {
   CompiledMethod* _method;
   CompiledICProtectionBehaviour* _behaviour;
   bool _locked;
+  NoSafepointVerifier _nsv;
 
 public:
   CompiledICLocker(CompiledMethod* method);
@@ -224,10 +226,6 @@ class CompiledIC: public ResourceObj {
   friend CompiledIC* CompiledIC_at(Relocation* call_site);
   friend CompiledIC* CompiledIC_at(RelocIterator* reloc_iter);
 
-  // This is used to release CompiledICHolder*s from nmethods that
-  // are about to be freed.  The callsite might contain other stale
-  // values of other kinds so it must be careful.
-  static void cleanup_call_site(virtual_call_Relocation* call_site, const CompiledMethod* cm);
   static bool is_icholder_call_site(virtual_call_Relocation* call_site, const CompiledMethod* cm);
 
   // Return the cached_metadata/destination associated with this inline cache. If the cache currently points
@@ -272,13 +270,13 @@ class CompiledIC: public ResourceObj {
   //
   // They all takes a TRAP argument, since they can cause a GC if the inline-cache buffer is full.
   //
-  void set_to_clean(bool in_use = true);
-  void set_to_monomorphic(CompiledICInfo& info);
+  bool set_to_clean(bool in_use = true);
+  bool set_to_monomorphic(CompiledICInfo& info);
   void clear_ic_stub();
 
   // Returns true if successful and false otherwise. The call can fail if memory
-  // allocation in the code cache fails.
-  bool set_to_megamorphic(CallInfo* call_info, Bytecodes::Code bytecode, TRAPS);
+  // allocation in the code cache fails, or ic stub refill is required.
+  bool set_to_megamorphic(CallInfo* call_info, Bytecodes::Code bytecode, bool& needs_ic_stub_refill, TRAPS);
 
   static void compute_monomorphic_entry(const methodHandle& method, Klass* receiver_klass,
                                         bool is_optimized, bool static_bound, bool caller_is_nmethod,
@@ -372,7 +370,7 @@ public:
   virtual address destination() const = 0;
 
   // Clean static call (will force resolving on next use)
-  void set_to_clean(bool in_use = true);
+  bool set_to_clean(bool in_use = true);
 
   // Set state. The entry must be the same, as computed by compute_entry.
   // Computation and setting is split up, since the actions are separate during
@@ -452,4 +450,4 @@ private:
   virtual const char* name() const { return "CompiledDirectStaticCall"; }
 };
 
-#endif // SHARE_VM_CODE_COMPILEDIC_HPP
+#endif // SHARE_CODE_COMPILEDIC_HPP

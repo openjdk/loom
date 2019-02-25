@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,15 +22,14 @@
  *
  */
 
-#ifndef SHARE_VM_JFR_RECORDER_STACKTRACE_JFRSTACKTRACEREPOSITORY_HPP
-#define SHARE_VM_JFR_RECORDER_STACKTRACE_JFRSTACKTRACEREPOSITORY_HPP
+#ifndef SHARE_JFR_RECORDER_STACKTRACE_JFRSTACKTRACEREPOSITORY_HPP
+#define SHARE_JFR_RECORDER_STACKTRACE_JFRSTACKTRACEREPOSITORY_HPP
 
 #include "jfr/utilities/jfrAllocation.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
 
 class frame;
 class JavaThread;
-class JfrCheckpointSystem;
 class JfrCheckpointWriter;
 class JfrChunkWriter;
 class Method;
@@ -55,7 +54,7 @@ class JfrStackFrame {
   JfrStackFrame(const traceid& id, int bci, int type, const Method* method) :
     _method(method), _methodid(id), _line(0), _bci(bci), _type(type) {}
   JfrStackFrame(const traceid& id, int bci, int type, int lineno) :
-    _method(NULL), _methodid(id), _line(0), _bci(bci), _type(type) {}
+    _method(NULL), _methodid(id), _line(lineno), _bci(bci), _type(type) {}
   bool equals(const JfrStackFrame& rhs) const;
   void write(JfrChunkWriter& cw) const;
   void write(JfrCheckpointWriter& cpw) const;
@@ -151,4 +150,4 @@ class JfrStackTraceRepository : public JfrCHeapObj {
   size_t clear();
 };
 
-#endif // SHARE_VM_JFR_RECORDER_STACKTRACE_JFRSTACKTRACEREPOSITORY_HPP
+#endif // SHARE_JFR_RECORDER_STACKTRACE_JFRSTACKTRACEREPOSITORY_HPP

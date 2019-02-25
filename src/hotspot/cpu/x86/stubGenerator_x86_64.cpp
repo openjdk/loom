@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -4388,6 +4388,45 @@ address generate_cipherBlockChaining_decryptVectorAESCrypt() {
     return start;
 }
 
+// Polynomial x^128+x^127+x^126+x^121+1
+address ghash_polynomial_addr() {
+    __ align(CodeEntryAlignment);
+    StubCodeMark mark(this, "StubRoutines", "_ghash_poly_addr");
+    address start = __ pc();
+    __ emit_data64(0x0000000000000001, relocInfo::none);
+    __ emit_data64(0xc200000000000000, relocInfo::none);
+    return start;
+}
+
+address ghash_shufflemask_addr() {
+    __ align(CodeEntryAlignment);
+    StubCodeMark mark(this, "StubRoutines", "_ghash_shuffmask_addr");
+    address start = __ pc();
+    __ emit_data64(0x0f0f0f0f0f0f0f0f, relocInfo::none);
+    __ emit_data64(0x0f0f0f0f0f0f0f0f, relocInfo::none);
+    return start;
+}
+
+// Ghash single and multi block operations using AVX instructions
+address generate_avx_ghash_processBlocks() {
+    __ align(CodeEntryAlignment);
+
+    StubCodeMark mark(this, "StubRoutines", "ghash_processBlocks");
+    address start = __ pc();
+
+    // arguments
+    const Register state = c_rarg0;
+    const Register htbl = c_rarg1;
+    const Register data = c_rarg2;
+    const Register blocks = c_rarg3;
+    __ enter();
+   // Save state before entering routine
+    __ avx_ghash(state, htbl, data, blocks);
+    __ leave(); // required for proper stackwalking of RuntimeStub frame
+    __ ret(0);
+    return start;
+}
+
   // byte swap x86 long
   address generate_ghash_long_swap_mask() {
     __ align(CodeEntryAlignment);
@@ -5682,8 +5721,6 @@ address generate_cipherBlockChaining_decryptVectorAESCrypt() {
     // Round to nearest, 24-bit mode, exceptions masked
     StubRoutines::_fpu_cntrl_wrd_24    = 0x007F;
     // Round to nearest, 64-bit mode, exceptions masked
-    StubRoutines::_fpu_cntrl_wrd_64    = 0x037F;
-    // Round to nearest, 64-bit mode, exceptions masked
     StubRoutines::_mxcsr_std           = 0x1F80;
     // Note: the following two constants are 80-bit values
     //       layout is critical for correct loading by FPU.
@@ -5886,9 +5923,15 @@ address generate_cipherBlockChaining_decryptVectorAESCrypt() {
 
     // Generate GHASH intrinsics code
     if (UseGHASHIntrinsics) {
-      StubRoutines::x86::_ghash_long_swap_mask_addr = generate_ghash_long_swap_mask();
-      StubRoutines::x86::_ghash_byte_swap_mask_addr = generate_ghash_byte_swap_mask();
-      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
+    StubRoutines::x86::_ghash_long_swap_mask_addr = generate_ghash_long_swap_mask();
+    StubRoutines::x86::_ghash_byte_swap_mask_addr = generate_ghash_byte_swap_mask();
+      if (VM_Version::supports_avx()) {
+        StubRoutines::x86::_ghash_shuffmask_addr = ghash_shufflemask_addr();
+        StubRoutines::x86::_ghash_poly_addr = ghash_polynomial_addr();
+        StubRoutines::_ghash_processBlocks = generate_avx_ghash_processBlocks();
+      } else {
+        StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
+      }
     }
 
     if (UseBASE64Intrinsics) {

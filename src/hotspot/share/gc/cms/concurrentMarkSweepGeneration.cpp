@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,12 +32,12 @@
 #include "gc/cms/cmsGCStats.hpp"
 #include "gc/cms/cmsHeap.hpp"
 #include "gc/cms/cmsOopClosures.inline.hpp"
+#include "gc/cms/cmsVMOperations.hpp"
 #include "gc/cms/compactibleFreeListSpace.hpp"
 #include "gc/cms/concurrentMarkSweepGeneration.inline.hpp"
 #include "gc/cms/concurrentMarkSweepThread.hpp"
 #include "gc/cms/parNewGeneration.hpp"
 #include "gc/cms/promotionInfo.inline.hpp"
-#include "gc/cms/vmCMSOperations.hpp"
 #include "gc/serial/genMarkSweep.hpp"
 #include "gc/serial/tenuredGeneration.hpp"
 #include "gc/shared/adaptiveSizePolicy.hpp"
@@ -55,12 +55,14 @@
 #include "gc/shared/genOopClosures.inline.hpp"
 #include "gc/shared/isGCActiveMark.hpp"
 #include "gc/shared/oopStorageParState.hpp"
+#include "gc/shared/owstTaskTerminator.hpp"
 #include "gc/shared/referencePolicy.hpp"
 #include "gc/shared/referenceProcessorPhaseTimes.hpp"
 #include "gc/shared/space.inline.hpp"
 #include "gc/shared/strongRootsScope.hpp"
 #include "gc/shared/taskqueue.inline.hpp"
 #include "gc/shared/weakProcessor.hpp"
+#include "gc/shared/workerPolicy.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
 #include "memory/allocation.hpp"
@@ -634,8 +636,8 @@ CMSCollector::CMSCollector(ConcurrentMarkSweepGeneration* cmsGen,
   }
 
   NOT_PRODUCT(_overflow_counter = CMSMarkStackOverflowInterval;)
-  _gc_counters = new CollectorCounters("CMS", 1);
-  _cgc_counters = new CollectorCounters("CMS stop-the-world phases", 2);
+  _gc_counters = new CollectorCounters("CMS full collection pauses", 1);
+  _cgc_counters = new CollectorCounters("CMS concurrent cycle pauses", 2);
   _completed_initialization = true;
   _inter_sweep_timer.start();  // start of time
 }
@@ -2759,7 +2761,7 @@ CMSPhaseAccounting::CMSPhaseAccounting(CMSCollector *collector,
 CMSPhaseAccounting::~CMSPhaseAccounting() {
   _collector->gc_timer_cm()->register_gc_concurrent_end();
   _collector->stopTimer();
-  log_debug(gc)("Concurrent active time: %.3fms", TimeHelper::counter_to_seconds(_collector->timerTicks()));
+  log_debug(gc)("Concurrent active time: %.3fms", TimeHelper::counter_to_millis(_collector->timerTicks()));
   log_trace(gc)(" (CMS %s yielded %d times)", _title, _collector->yields());
 }
 
@@ -2981,7 +2983,7 @@ bool CMSCollector::markFromRootsWork() {
 // Forward decl
 class CMSConcMarkingTask;
 
-class CMSConcMarkingTerminator: public ParallelTaskTerminator {
+class CMSConcMarkingParallelTerminator: public ParallelTaskTerminator {
   CMSCollector*       _collector;
   CMSConcMarkingTask* _task;
  public:
@@ -2991,13 +2993,52 @@ class CMSConcMarkingTerminator: public ParallelTaskTerminator {
   // "queue_set" is a set of work queues of other threads.
   // "collector" is the CMS collector associated with this task terminator.
   // "yield" indicates whether we need the gang as a whole to yield.
-  CMSConcMarkingTerminator(int n_threads, TaskQueueSetSuper* queue_set, CMSCollector* collector) :
+  CMSConcMarkingParallelTerminator(int n_threads, TaskQueueSetSuper* queue_set, CMSCollector* collector) :
     ParallelTaskTerminator(n_threads, queue_set),
     _collector(collector) { }
 
   void set_task(CMSConcMarkingTask* task) {
     _task = task;
   }
+};
+
+class CMSConcMarkingOWSTTerminator: public OWSTTaskTerminator {
+  CMSCollector*       _collector;
+  CMSConcMarkingTask* _task;
+ public:
+  virtual void yield();
+
+  // "n_threads" is the number of threads to be terminated.
+  // "queue_set" is a set of work queues of other threads.
+  // "collector" is the CMS collector associated with this task terminator.
+  // "yield" indicates whether we need the gang as a whole to yield.
+  CMSConcMarkingOWSTTerminator(int n_threads, TaskQueueSetSuper* queue_set, CMSCollector* collector) :
+    OWSTTaskTerminator(n_threads, queue_set),
+    _collector(collector) { }
+
+  void set_task(CMSConcMarkingTask* task) {
+    _task = task;
+  }
+};
+
+class CMSConcMarkingTaskTerminator {
+ private:
+  ParallelTaskTerminator* _term;
+ public:
+  CMSConcMarkingTaskTerminator(int n_threads, TaskQueueSetSuper* queue_set, CMSCollector* collector) {
+    if (UseOWSTTaskTerminator) {
+      _term = new CMSConcMarkingOWSTTerminator(n_threads, queue_set, collector);
+    } else {
+      _term = new CMSConcMarkingParallelTerminator(n_threads, queue_set, collector);
+    }
+  }
+  ~CMSConcMarkingTaskTerminator() {
+    assert(_term != NULL, "Must not be NULL");
+    delete _term;
+  }
+
+  void set_task(CMSConcMarkingTask* task);
+  ParallelTaskTerminator* terminator() const { return _term; }
 };
 
 class CMSConcMarkingTerminatorTerminator: public TerminatorTerminator {
@@ -3027,7 +3068,7 @@ class CMSConcMarkingTask: public YieldingFlexibleGangTask {
   OopTaskQueueSet*  _task_queues;
 
   // Termination (and yielding) support
-  CMSConcMarkingTerminator _term;
+  CMSConcMarkingTaskTerminator       _term;
   CMSConcMarkingTerminatorTerminator _term_term;
 
  public:
@@ -3057,7 +3098,7 @@ class CMSConcMarkingTask: public YieldingFlexibleGangTask {
 
   HeapWord* volatile* global_finger_addr() { return &_global_finger; }
 
-  CMSConcMarkingTerminator* terminator() { return &_term; }
+  ParallelTaskTerminator* terminator() { return _term.terminator(); }
 
   virtual void set_for_termination(uint active_workers) {
     terminator()->reset_for_reuse(active_workers);
@@ -3075,7 +3116,7 @@ class CMSConcMarkingTask: public YieldingFlexibleGangTask {
   void reset(HeapWord* ra) {
     assert(_global_finger >= _cms_space->end(),  "Postcondition of ::work(i)");
     _restart_addr = _global_finger = ra;
-    _term.reset_for_reuse();
+    _term.terminator()->reset_for_reuse();
   }
 
   static bool get_work_from_overflow_stack(CMSMarkStack* ovflw_stk,
@@ -3096,11 +3137,27 @@ bool CMSConcMarkingTerminatorTerminator::should_exit_termination() {
   // thread has yielded.
 }
 
-void CMSConcMarkingTerminator::yield() {
+void CMSConcMarkingParallelTerminator::yield() {
   if (_task->should_yield()) {
     _task->yield();
   } else {
     ParallelTaskTerminator::yield();
+  }
+}
+
+void CMSConcMarkingOWSTTerminator::yield() {
+  if (_task->should_yield()) {
+    _task->yield();
+  } else {
+    OWSTTaskTerminator::yield();
+  }
+}
+
+void CMSConcMarkingTaskTerminator::set_task(CMSConcMarkingTask* task) {
+  if (UseOWSTTaskTerminator) {
+    ((CMSConcMarkingOWSTTerminator*)_term)->set_task(task);
+  } else {
+    ((CMSConcMarkingParallelTerminator*)_term)->set_task(task);
   }
 }
 
@@ -3488,9 +3545,9 @@ void CMSConcMarkingTask::coordinator_yield() {
 
 bool CMSCollector::do_marking_mt() {
   assert(ConcGCThreads > 0 && conc_workers() != NULL, "precondition");
-  uint num_workers = AdaptiveSizePolicy::calc_active_conc_workers(conc_workers()->total_workers(),
-                                                                  conc_workers()->active_workers(),
-                                                                  Threads::number_of_non_daemon_threads());
+  uint num_workers = WorkerPolicy::calc_active_conc_workers(conc_workers()->total_workers(),
+                                                            conc_workers()->active_workers(),
+                                                            Threads::number_of_non_daemon_threads());
   num_workers = conc_workers()->update_active_workers(num_workers);
   log_info(gc,task)("Using %u workers of %u for marking", num_workers, conc_workers()->total_workers());
 
@@ -4276,8 +4333,7 @@ void CMSParInitialMarkTask::work(uint worker_id) {
                           GenCollectedHeap::ScanningOption(_collector->CMSCollector::roots_scanning_options()),
                           _collector->should_unload_classes(),
                           &par_mri_cl,
-                          &cld_closure,
-                          &_par_state_string);
+                          &cld_closure);
 
   assert(_collector->should_unload_classes()
          || (_collector->CMSCollector::roots_scanning_options() & GenCollectedHeap::SO_AllCodeCache),
@@ -4292,7 +4348,7 @@ class CMSParRemarkTask: public CMSParMarkTask {
 
   // The per-thread work queues, available here for stealing.
   OopTaskQueueSet*       _task_queues;
-  ParallelTaskTerminator _term;
+  TaskTerminator         _term;
   StrongRootsScope*      _strong_roots_scope;
 
  public:
@@ -4314,7 +4370,7 @@ class CMSParRemarkTask: public CMSParMarkTask {
 
   OopTaskQueue* work_queue(int i) { return task_queues()->queue(i); }
 
-  ParallelTaskTerminator* terminator() { return &_term; }
+  ParallelTaskTerminator* terminator() { return _term.terminator(); }
   uint n_workers() { return _n_workers; }
 
   void work(uint worker_id);
@@ -4407,8 +4463,7 @@ void CMSParRemarkTask::work(uint worker_id) {
                           GenCollectedHeap::ScanningOption(_collector->CMSCollector::roots_scanning_options()),
                           _collector->should_unload_classes(),
                           &par_mrias_cl,
-                          NULL,     // The dirty klasses will be handled below
-                          &_par_state_string);
+                          NULL);     // The dirty klasses will be handled below
 
   assert(_collector->should_unload_classes()
          || (_collector->CMSCollector::roots_scanning_options() & GenCollectedHeap::SO_AllCodeCache),
@@ -5002,11 +5057,11 @@ void CMSCollector::do_remark_non_parallel() {
 ////////////////////////////////////////////////////////
 class AbstractGangTaskWOopQueues : public AbstractGangTask {
   OopTaskQueueSet*       _queues;
-  ParallelTaskTerminator _terminator;
+  TaskTerminator         _terminator;
  public:
   AbstractGangTaskWOopQueues(const char* name, OopTaskQueueSet* queues, uint n_threads) :
     AbstractGangTask(name), _queues(queues), _terminator(n_threads, _queues) {}
-  ParallelTaskTerminator* terminator() { return &_terminator; }
+  ParallelTaskTerminator* terminator() { return _terminator.terminator(); }
   OopTaskQueueSet* queues() { return _queues; }
 };
 
@@ -5213,18 +5268,6 @@ void CMSCollector::refProcessingWork() {
 
       // Prune dead klasses from subklass/sibling/implementor lists.
       Klass::clean_weak_klass_links(purged_class);
-    }
-
-    {
-      GCTraceTime(Debug, gc, phases) t("Scrub Symbol Table", _gc_timer_cm);
-      // Clean up unreferenced symbols in symbol table.
-      SymbolTable::unlink();
-    }
-
-    {
-      GCTraceTime(Debug, gc, phases) t("Scrub String Table", _gc_timer_cm);
-      // Delete entries for dead interned strings.
-      StringTable::unlink(&_is_alive_closure);
     }
   }
 

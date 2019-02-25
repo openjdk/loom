@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -195,75 +195,6 @@ void DictionaryEntry::add_protection_domain(Dictionary* dict, Handle protection_
   if (lt.is_enabled()) {
     LogStream ls(lt);
     print_count(&ls);
-  }
-}
-
-// During class loading we may have cached a protection domain that has
-// since been unreferenced, so this entry should be cleared.
-void Dictionary::clean_cached_protection_domains(DictionaryEntry* probe) {
-  assert_locked_or_safepoint(SystemDictionary_lock);
-
-  ProtectionDomainEntry* current = probe->pd_set();
-  ProtectionDomainEntry* prev = NULL;
-  while (current != NULL) {
-    if (current->object_no_keepalive() == NULL) {
-      LogTarget(Debug, protectiondomain) lt;
-      if (lt.is_enabled()) {
-        ResourceMark rm;
-        // Print out trace information
-        LogStream ls(lt);
-        ls.print_cr("PD in set is not alive:");
-        ls.print("class loader: "); loader_data()->class_loader()->print_value_on(&ls);
-        ls.print(" loading: "); probe->instance_klass()->print_value_on(&ls);
-        ls.cr();
-      }
-      if (probe->pd_set() == current) {
-        probe->set_pd_set(current->next());
-      } else {
-        assert(prev != NULL, "should be set by alive entry");
-        prev->set_next(current->next());
-      }
-      ProtectionDomainEntry* to_delete = current;
-      current = current->next();
-      delete to_delete;
-    } else {
-      prev = current;
-      current = current->next();
-    }
-  }
-}
-
-
-void Dictionary::do_unloading() {
-  assert_locked_or_safepoint(SystemDictionary_lock);
-
-  // The NULL class loader doesn't initiate loading classes from other class loaders
-  if (loader_data() == ClassLoaderData::the_null_class_loader_data()) {
-    return;
-  }
-
-  // Remove unloaded entries and classes from this dictionary
-  DictionaryEntry* probe = NULL;
-  for (int index = 0; index < table_size(); index++) {
-    for (DictionaryEntry** p = bucket_addr(index); *p != NULL; ) {
-      probe = *p;
-      InstanceKlass* ik = probe->instance_klass();
-      ClassLoaderData* k_def_class_loader_data = ik->class_loader_data();
-
-      // If the klass that this loader initiated is dead,
-      // (determined by checking the defining class loader)
-      // remove this entry.
-      if (k_def_class_loader_data->is_unloading()) {
-        assert(k_def_class_loader_data != loader_data(),
-               "cannot have live defining loader and unreachable klass");
-        *p = probe->next();
-        free_entry(probe);
-        continue;
-      }
-      // Clean pd_set
-      clean_cached_protection_domains(probe);
-      p = probe->next_addr();
-    }
   }
 }
 

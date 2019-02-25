@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -59,7 +59,7 @@ public class ClassLoaders {
         // -Xbootclasspath/a or -javaagent with Boot-Class-Path attribute
         String append = VM.getSavedProperty("jdk.boot.class.path.append");
         BOOT_LOADER =
-            new BootClassLoader((append != null && append.length() > 0)
+            new BootClassLoader((append != null && !append.isEmpty())
                 ? new URLClassPath(append, true)
                 : null);
         PLATFORM_LOADER = new PlatformClassLoader(BOOT_LOADER);
@@ -70,7 +70,7 @@ public class ClassLoaders {
         // contrary, we drop this historic interpretation of the empty
         // string and instead treat it as unspecified.
         String cp = System.getProperty("java.class.path");
-        if (cp == null || cp.length() == 0) {
+        if (cp == null || cp.isEmpty()) {
             String initialModuleName = System.getProperty("jdk.module.main");
             cp = (initialModuleName == null) ? "" : null;
         }
@@ -114,7 +114,7 @@ public class ClassLoaders {
         }
 
         @Override
-        protected Class<?> loadClassOrNull(String cn) {
+        protected Class<?> loadClassOrNull(String cn, boolean resolve) {
             return JLA.findBootstrapClassOrNull(this, cn);
         }
     };

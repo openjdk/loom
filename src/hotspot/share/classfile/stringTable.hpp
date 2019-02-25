@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_CLASSFILE_STRINGTABLE_HPP
-#define SHARE_VM_CLASSFILE_STRINGTABLE_HPP
+#ifndef SHARE_CLASSFILE_STRINGTABLE_HPP
+#define SHARE_CLASSFILE_STRINGTABLE_HPP
 
 #include "gc/shared/oopStorage.hpp"
 #include "gc/shared/oopStorageParState.hpp"
@@ -72,15 +72,15 @@ private:
   volatile size_t _uncleaned_items_count;
   DEFINE_PAD_MINUS_SIZE(2, DEFAULT_CACHE_LINE_SIZE, sizeof(volatile size_t));
 
-  double get_load_factor();
-  double get_dead_factor();
+  double get_load_factor() const;
+  double get_dead_factor() const;
 
   void check_concurrent_work();
   void trigger_concurrent_work();
 
   static size_t item_added();
   static void item_removed();
-  size_t add_items_count_to_clean(size_t ndead);
+  size_t add_items_to_clean(size_t ndead);
 
   StringTable();
 
@@ -125,23 +125,13 @@ private:
   // If GC uses ParState directly it should add the number of cleared
   // strings to this method.
   static void inc_dead_counter(size_t ndead) {
-    the_table()->add_items_count_to_clean(ndead);
+    the_table()->add_items_to_clean(ndead);
   }
-
-  //   Delete pointers to otherwise-unreachable objects.
-  static void unlink(BoolObjectClosure* cl) {
-    unlink_or_oops_do(cl);
-  }
-  static void unlink_or_oops_do(BoolObjectClosure* is_alive, OopClosure* f = NULL,
-                                size_t* processed = NULL, size_t* removed = NULL);
 
   // Serially invoke "f->do_oop" on the locations of all oops in the table.
   static void oops_do(OopClosure* f);
 
   // Possibly parallel versions of the above
-  static void possibly_parallel_unlink(
-     OopStorage::ParState<false /* concurrent */, false /* const*/>* par_state_string,
-     BoolObjectClosure* cl, size_t* processed, size_t* removed);
   static void possibly_parallel_oops_do(
      OopStorage::ParState<false /* concurrent */, false /* const*/>* par_state_string,
      OopClosure* f);
@@ -177,4 +167,4 @@ private:
   static void verify();
 };
 
-#endif // SHARE_VM_CLASSFILE_STRINGTABLE_HPP
+#endif // SHARE_CLASSFILE_STRINGTABLE_HPP

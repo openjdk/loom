@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -48,7 +48,7 @@ enum Alert {
     HANDSHAKE_FAILURE       ((byte)40,  "handshake_failure", true),
     NO_CERTIFICATE          ((byte)41,  "no_certificate", true),
     BAD_CERTIFICATE         ((byte)42,  "bad_certificate", true),
-    UNSUPPORTED_CERTIFCATE  ((byte)43,  "unsupported_certificate", true),
+    UNSUPPORTED_CERTIFICATE ((byte)43,  "unsupported_certificate", true),
     CERTIFICATE_REVOKED     ((byte)44,  "certificate_revoked", true),
     CERTIFICATE_EXPIRED     ((byte)45,  "certificate_expired", true),
     CERTIFICATE_UNKNOWN     ((byte)46,  "certificate_unknown", true),
@@ -122,11 +122,17 @@ enum Alert {
             reason = (cause != null) ? cause.getMessage() : "";
         }
 
-        SSLException ssle = (this == UNEXPECTED_MESSAGE) ?
-                new SSLProtocolException(reason) :
-                (handshakeOnly ?
-                        new SSLHandshakeException(reason) :
-                        new SSLException(reason));
+        SSLException ssle;
+        if ((cause != null) && (cause instanceof IOException)) {
+            ssle = new SSLException(reason);
+        } else if ((this == UNEXPECTED_MESSAGE)) {
+            ssle = new SSLProtocolException(reason);
+        } else if (handshakeOnly) {
+            ssle = new SSLHandshakeException(reason);
+        } else {
+            ssle = new SSLException(reason);
+        }
+
         if (cause != null) {
             ssle.initCause(cause);
         }
@@ -187,7 +193,7 @@ enum Alert {
             //      AlertDescription description;
             //  } Alert;
             if (m.remaining() != 2) {
-                context.fatal(Alert.ILLEGAL_PARAMETER,
+                throw context.fatal(Alert.ILLEGAL_PARAMETER,
                     "Invalid Alert message: no sufficient data");
             }
 
@@ -241,14 +247,14 @@ enum Alert {
                 if (tc.peerUserCanceled) {
                     tc.closeOutbound();
                 } else if (tc.handshakeContext != null) {
-                    tc.fatal(Alert.UNEXPECTED_MESSAGE,
+                    throw tc.fatal(Alert.UNEXPECTED_MESSAGE,
                             "Received close_notify during handshake");
                 }
             } else if (alert == Alert.USER_CANCELED) {
                 if (level == Level.WARNING) {
                     tc.peerUserCanceled = true;
                 } else {
-                    tc.fatal(alert,
+                    throw tc.fatal(alert,
                             "Received fatal close_notify alert", true, null);
                 }
             } else if ((level == Level.WARNING) && (alert != null)) {
@@ -263,7 +269,7 @@ enum Alert {
                             alert != Alert.NO_CERTIFICATE ||
                             (tc.sslConfig.clientAuthType !=
                                     ClientAuthType.CLIENT_AUTH_REQUESTED)) {
-                        tc.fatal(Alert.HANDSHAKE_FAILURE,
+                        throw tc.fatal(Alert.HANDSHAKE_FAILURE,
                             "received handshake warning: " + alert.description);
                     }  // Otherwise, ignore the warning
                 }   // Otherwise, ignore the warning.
@@ -276,7 +282,7 @@ enum Alert {
                     diagnostic = "Received fatal alert: " + alert.description;
                 }
 
-                tc.fatal(alert, diagnostic, true, null);
+                throw tc.fatal(alert, diagnostic, true, null);
             }
         }
     }

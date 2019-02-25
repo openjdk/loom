@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_GC_G1_G1OOPCLOSURES_HPP
-#define SHARE_VM_GC_G1_G1OOPCLOSURES_HPP
+#ifndef SHARE_GC_G1_G1OOPCLOSURES_HPP
+#define SHARE_GC_G1_G1OOPCLOSURES_HPP
 
 #include "gc/g1/g1InCSetState.hpp"
 #include "memory/iterator.hpp"
@@ -83,6 +83,16 @@ public:
   virtual void do_oop(narrowOop* p)    { do_oop_work(p); }
 };
 
+// Used during Optional RS scanning to make sure we trim the queues in a timely manner.
+class G1ScanRSForOptionalClosure : public OopClosure {
+  G1ScanObjsDuringScanRSClosure* _scan_cl;
+public:
+  G1ScanRSForOptionalClosure(G1ScanObjsDuringScanRSClosure* cl) : _scan_cl(cl) { }
+
+  template <class T> void do_oop_work(T* p);
+  virtual void do_oop(oop* p)          { do_oop_work(p); }
+  virtual void do_oop(narrowOop* p)    { do_oop_work(p); }
+};
 
 // This closure is applied to the fields of the objects that have just been copied during evacuation.
 class G1ScanEvacuatedObjClosure : public G1ScanClosureBase {
@@ -140,11 +150,6 @@ protected:
   // objects pointed to by roots that are guaranteed not to move
   // during the GC (i.e., non-CSet objects). It is MT-safe.
   inline void mark_object(oop obj);
-
-  // Mark the object if it's not already marked. This is used to mark
-  // objects pointed to by roots that have been forwarded during a
-  // GC. It is MT-safe.
-  inline void mark_forwarded_object(oop from_obj, oop to_obj);
 
   G1ParCopyHelper(G1CollectedHeap* g1h,  G1ParScanThreadState* par_scan_state);
   ~G1ParCopyHelper() { }
@@ -246,4 +251,4 @@ public:
   virtual ReferenceIterationMode reference_iteration_mode() { return DO_FIELDS; }
 };
 
-#endif // SHARE_VM_GC_G1_G1OOPCLOSURES_HPP
+#endif // SHARE_GC_G1_G1OOPCLOSURES_HPP

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_CLASSFILE_VERIFIER_HPP
-#define SHARE_VM_CLASSFILE_VERIFIER_HPP
+#ifndef SHARE_CLASSFILE_VERIFIER_HPP
+#define SHARE_CLASSFILE_VERIFIER_HPP
 
 #include "classfile/verificationType.hpp"
 #include "oops/klass.hpp"
@@ -36,7 +36,6 @@
 class Verifier : AllStatic {
  public:
   enum {
-    STRICTER_ACCESS_CTRL_CHECK_VERSION  = 49,
     STACKMAP_ATTRIBUTE_MAJOR_VERSION    = 50,
     INVOKEDYNAMIC_MAJOR_VERSION         = 51,
     NO_RELAX_ACCESS_CTRL_CHECK_VERSION  = 52,
@@ -50,7 +49,7 @@ class Verifier : AllStatic {
 
   // Return false if the class is loaded by the bootstrap loader,
   // or if defineClass was called requesting skipping verification
-  // -Xverify:all/none override this value
+  // -Xverify:all overrides this value
   static bool should_verify_for(oop class_loader, bool should_verify_class);
 
   // Relax certain access checks to enable some broken 1.1 apps to run on 1.2.
@@ -464,4 +463,4 @@ inline int ClassVerifier::change_sig_to_verificationType(
   }
 }
 
-#endif // SHARE_VM_CLASSFILE_VERIFIER_HPP
+#endif // SHARE_CLASSFILE_VERIFIER_HPP

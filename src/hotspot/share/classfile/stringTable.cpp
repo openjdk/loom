@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -54,13 +54,13 @@
 #include "utilities/macros.hpp"
 
 // We prefer short chains of avg 2
-#define PREF_AVG_LIST_LEN   2
+const double PREF_AVG_LIST_LEN = 2.0;
 // 2^24 is max size
-#define END_SIZE           24
+const size_t END_SIZE = 24;
 // If a chain gets to 32 something might be wrong
-#define REHASH_LEN         32
+const size_t REHASH_LEN = 32;
 // If we have as many dead items as 50% of the number of bucket
-#define CLEAN_DEAD_HIGH_WATER_MARK 0.5
+const double CLEAN_DEAD_HIGH_WATER_MARK = 0.5;
 
 #if INCLUDE_CDS_JAVA_HEAP
 inline oop read_string_from_compact_hashtable(address base_address, u4 offset) {
@@ -216,7 +216,7 @@ size_t StringTable::item_added() {
   return Atomic::add((size_t)1, &(the_table()->_items_count));
 }
 
-size_t StringTable::add_items_count_to_clean(size_t ndead) {
+size_t StringTable::add_items_to_clean(size_t ndead) {
   size_t total = Atomic::add((size_t)ndead, &(the_table()->_uncleaned_items_count));
   log_trace(stringtable)(
      "Uncleaned items:" SIZE_FORMAT " added: " SIZE_FORMAT " total:" SIZE_FORMAT,
@@ -228,11 +228,11 @@ void StringTable::item_removed() {
   Atomic::add((size_t)-1, &(the_table()->_items_count));
 }
 
-double StringTable::get_load_factor() {
+double StringTable::get_load_factor() const {
   return (double)_items_count/_current_size;
 }
 
-double StringTable::get_dead_factor() {
+double StringTable::get_dead_factor() const {
   return (double)_uncleaned_items_count/_current_size;
 }
 
@@ -334,6 +334,10 @@ oop StringTable::intern(Handle string_or_null_h, const jchar* name, int len, TRA
   if (StringTable::_alt_hash) {
     hash = hash_string(name, len, true);
   }
+  found_string = StringTable::the_table()->do_lookup(name, len, hash);
+  if (found_string != NULL) {
+    return found_string;
+  }
   return StringTable::the_table()->do_intern(string_or_null_h, name, len,
                                              hash, CHECK_NULL);
 }
@@ -376,66 +380,9 @@ oop StringTable::do_intern(Handle string_or_null_h, const jchar* name,
   } while(true);
 }
 
-// GC support
-class StringTableIsAliveCounter : public BoolObjectClosure {
-  BoolObjectClosure* _real_boc;
- public:
-  size_t _count;
-  size_t _count_total;
-  StringTableIsAliveCounter(BoolObjectClosure* boc) : _real_boc(boc), _count(0),
-                                                      _count_total(0) {}
-  bool do_object_b(oop obj) {
-    bool ret = _real_boc->do_object_b(obj);
-    if (!ret) {
-      ++_count;
-    }
-    ++_count_total;
-    return ret;
-  }
-};
-
-void StringTable::unlink_or_oops_do(BoolObjectClosure* is_alive, OopClosure* f,
-                                    size_t* processed, size_t* removed) {
-  DoNothingClosure dnc;
-  assert(is_alive != NULL, "No closure");
-  StringTableIsAliveCounter stiac(is_alive);
-  OopClosure* tmp = f != NULL ? f : &dnc;
-
-  StringTable::the_table()->_weak_handles->weak_oops_do(&stiac, tmp);
-
-  // This is the serial case without ParState.
-  // Just set the correct number and check for a cleaning phase.
-  the_table()->_uncleaned_items_count = stiac._count;
-  StringTable::the_table()->check_concurrent_work();
-
-  if (processed != NULL) {
-    *processed = stiac._count_total;
-  }
-  if (removed != NULL) {
-    *removed = stiac._count;
-  }
-}
-
 void StringTable::oops_do(OopClosure* f) {
   assert(f != NULL, "No closure");
   StringTable::the_table()->_weak_handles->oops_do(f);
-}
-
-void StringTable::possibly_parallel_unlink(
-   OopStorage::ParState<false, false>* _par_state_string, BoolObjectClosure* cl,
-   size_t* processed, size_t* removed)
-{
-  DoNothingClosure dnc;
-  assert(cl != NULL, "No closure");
-  StringTableIsAliveCounter stiac(cl);
-
-  _par_state_string->weak_oops_do(&stiac, &dnc);
-
-  // Accumulate the dead strings.
-  the_table()->add_items_count_to_clean(stiac._count);
-
-  *processed = stiac._count_total;
-  *removed = stiac._count;
 }
 
 void StringTable::possibly_parallel_oops_do(
@@ -525,7 +472,7 @@ void StringTable::check_concurrent_work() {
   if ((dead_factor > load_factor) ||
       (load_factor > PREF_AVG_LIST_LEN) ||
       (dead_factor > CLEAN_DEAD_HIGH_WATER_MARK)) {
-    log_debug(stringtable)("Concurrent work triggered, live factor:%g dead factor:%g",
+    log_debug(stringtable)("Concurrent work triggered, live factor: %g dead factor: %g",
                            load_factor, dead_factor);
     trigger_concurrent_work();
   }

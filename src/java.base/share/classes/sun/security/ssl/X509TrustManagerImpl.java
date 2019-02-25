@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -148,7 +148,7 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager
                 "null or zero-length certificate chain");
         }
 
-        if (authType == null || authType.length() == 0) {
+        if (authType == null || authType.isEmpty()) {
             throw new IllegalArgumentException(
                 "null or zero-length authentication type");
         }
@@ -218,7 +218,7 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager
                 responseList =
                         ((ExtendedSSLSession)session).getStatusResponses();
             }
-            trustedChain = validate(v, chain, responseList,
+            trustedChain = v.validate(chain, null, responseList,
                     constraints, isClient ? null : authType);
 
             // check if EE certificate chains to a public root CA (as
@@ -229,12 +229,12 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager
             // check endpoint identity
             String identityAlg = sslSocket.getSSLParameters().
                     getEndpointIdentificationAlgorithm();
-            if (identityAlg != null && identityAlg.length() != 0) {
+            if (identityAlg != null && !identityAlg.isEmpty()) {
                 checkIdentity(session, trustedChain[0], identityAlg, isClient,
                         getRequestedServerNames(socket), chainsToPublicCA);
             }
         } else {
-            trustedChain = validate(v, chain, Collections.emptyList(),
+            trustedChain = v.validate(chain, null, Collections.emptyList(),
                     null, isClient ? null : authType);
         }
 
@@ -276,7 +276,7 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager
                 responseList =
                         ((ExtendedSSLSession)session).getStatusResponses();
             }
-            trustedChain = validate(v, chain, responseList,
+            trustedChain = v.validate(chain, null, responseList,
                     constraints, isClient ? null : authType);
 
             // check if EE certificate chains to a public root CA (as
@@ -287,12 +287,12 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager
             // check endpoint identity
             String identityAlg = engine.getSSLParameters().
                     getEndpointIdentificationAlgorithm();
-            if (identityAlg != null && identityAlg.length() != 0) {
+            if (identityAlg != null && !identityAlg.isEmpty()) {
                 checkIdentity(session, trustedChain[0], identityAlg, isClient,
                         getRequestedServerNames(engine), chainsToPublicCA);
             }
         } else {
-            trustedChain = validate(v, chain, Collections.emptyList(),
+            trustedChain = v.validate(chain, null, Collections.emptyList(),
                     null, isClient ? null : authType);
         }
 
@@ -310,18 +310,6 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager
             v = Validator.getInstance(validatorType, variant, pkixParams);
         }
         return v;
-    }
-
-    private static X509Certificate[] validate(Validator v,
-            X509Certificate[] chain, List<byte[]> responseList,
-            AlgorithmConstraints constraints, String authType)
-            throws CertificateException {
-        Object o = JsseJce.beginFipsProvider();
-        try {
-            return v.validate(chain, null, responseList, constraints, authType);
-        } finally {
-            JsseJce.endFipsProvider(o);
-        }
     }
 
     // Get string representation of HostName from a list of server names.
@@ -448,7 +436,7 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager
     private static void checkIdentity(String hostname, X509Certificate cert,
             String algorithm, boolean chainsToPublicCA)
             throws CertificateException {
-        if (algorithm != null && algorithm.length() != 0) {
+        if (algorithm != null && !algorithm.isEmpty()) {
             // if IPv6 strip off the "[]"
             if ((hostname != null) && hostname.startsWith("[") &&
                     hostname.endsWith("]")) {

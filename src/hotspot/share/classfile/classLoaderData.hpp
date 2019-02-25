@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_CLASSFILE_CLASSLOADERDATA_HPP
-#define SHARE_VM_CLASSFILE_CLASSLOADERDATA_HPP
+#ifndef SHARE_CLASSFILE_CLASSLOADERDATA_HPP
+#define SHARE_CLASSFILE_CLASSLOADERDATA_HPP
 
 #include "memory/allocation.hpp"
 #include "memory/memRegion.hpp"
@@ -176,12 +176,12 @@ class ClassLoaderData : public CHeapObj<mtClass> {
   void clear_accumulated_modified_oops() { _accumulated_modified_oops = false; }
   bool has_accumulated_modified_oops()   { return _accumulated_modified_oops; }
   oop holder_no_keepalive() const;
+  oop holder_phantom() const;
 
  private:
   void unload();
   bool keep_alive() const       { return _keep_alive > 0; }
 
-  oop holder_phantom() const;
   void classes_do(void f(Klass* const));
   void loaded_classes_do(KlassClosure* klass_closure);
   void classes_do(void f(InstanceKlass*));
@@ -327,4 +327,4 @@ class ClassLoaderData : public CHeapObj<mtClass> {
   JFR_ONLY(DEFINE_TRACE_ID_METHODS;)
 };
 
-#endif // SHARE_VM_CLASSFILE_CLASSLOADERDATA_HPP
+#endif // SHARE_CLASSFILE_CLASSLOADERDATA_HPP

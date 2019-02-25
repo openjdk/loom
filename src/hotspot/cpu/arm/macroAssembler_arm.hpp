@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,11 +22,10 @@
  *
  */
 
-#ifndef CPU_ARM_VM_MACROASSEMBLER_ARM_HPP
-#define CPU_ARM_VM_MACROASSEMBLER_ARM_HPP
+#ifndef CPU_ARM_MACROASSEMBLER_ARM_HPP
+#define CPU_ARM_MACROASSEMBLER_ARM_HPP
 
 #include "code/relocInfo.hpp"
-#include "code/relocInfo_ext.hpp"
 
 class BiasedLockingCounters;
 
@@ -371,10 +370,10 @@ public:
   // lock_reg and obj_reg must be loaded up with the appropriate values.
   // swap_reg must be supplied.
   // tmp_reg must be supplied.
-  // Optional slow case is for implementations (interpreter and C1) which branch to
-  // slow case directly. If slow_case is NULL, then leaves condition
-  // codes set (for C2's Fast_Lock node) and jumps to done label.
-  // Falls through for the fast locking attempt.
+  // Done label is branched to with condition code EQ set if the lock is
+  // biased and we acquired it. Slow case label is branched to with
+  // condition code NE set if the lock is biased but we failed to acquire
+  // it. Otherwise fall through.
   // Returns offset of first potentially-faulting instruction for null
   // check info (currently consumed only by C1). If
   // swap_reg_contains_mark is true then returns -1 as it is assumed
@@ -513,15 +512,13 @@ public:
     }
   }
 
-  // Runtime address that may vary from one execution to another. The
-  // symbolic_reference describes what the address is, allowing
-  // the address to be resolved in a different execution context.
+  // Runtime address that may vary from one execution to another.
   // Warning: do not implement as a PC relative address.
-  void mov_address(Register rd, address addr, symbolic_Relocation::symbolic_reference t) {
+  void mov_address(Register rd, address addr) {
     mov_address(rd, addr, RelocationHolder::none);
   }
 
-  // rspec can be RelocationHolder::none (for ignored symbolic_Relocation).
+  // rspec can be RelocationHolder::none (for ignored symbolic Relocation).
   // In that case, the address is absolute and the generated code need
   // not be relocable.
   void mov_address(Register rd, address addr, RelocationHolder const& rspec) {
@@ -1073,7 +1070,7 @@ public:
   void restore_default_fp_mode();
 
 #ifdef COMPILER2
-  void fast_lock(Register obj, Register box, Register scratch, Register scratch2);
+  void fast_lock(Register obj, Register box, Register scratch, Register scratch2, Register scratch3 = noreg);
   void fast_unlock(Register obj, Register box, Register scratch, Register scratch2);
 #endif
 
@@ -1097,4 +1094,4 @@ private:
 };
 
 
-#endif // CPU_ARM_VM_MACROASSEMBLER_ARM_HPP
+#endif // CPU_ARM_MACROASSEMBLER_ARM_HPP

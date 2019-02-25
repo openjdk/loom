@@ -648,6 +648,7 @@ Compile::Compile( ciEnv* ci_env, C2Compiler* compiler, ciMethod* target, int osr
                   _orig_pc_slot_offset_in_bytes(0),
                   _inlining_progress(false),
                   _inlining_incrementally(false),
+                  _do_cleanup(false),
                   _has_reserved_stack_access(target->has_reserved_stack_access()),
 #ifndef PRODUCT
                   _trace_opto_output(directive->TraceOptoOutputOption),
@@ -2051,52 +2052,49 @@ void Compile::inline_boxing_calls(PhaseIterGVN& igvn) {
     }
     _boxing_late_inlines.trunc_to(0);
 
-    {
-      ResourceMark rm;
-      PhaseRemoveUseless pru(gvn, for_igvn());
-    }
+    inline_incrementally_cleanup(igvn);
 
-    igvn = PhaseIterGVN(gvn);
-    igvn.optimize();
-
-    set_inlining_progress(false);
     set_inlining_incrementally(false);
   }
 }
 
-void Compile::inline_incrementally_one(PhaseIterGVN& igvn) {
+bool Compile::inline_incrementally_one() {
   assert(IncrementalInline, "incremental inlining should be on");
-  PhaseGVN* gvn = initial_gvn();
+
+  TracePhase tp("incrementalInline_inline", &timers[_t_incrInline_inline]);
+  set_inlining_progress(false);
+  set_do_cleanup(false);
+  int i = 0;
+  for (; i <_late_inlines.length() && !inlining_progress(); i++) {
+    CallGenerator* cg = _late_inlines.at(i);
+    _late_inlines_pos = i+1;
+    cg->do_late_inline();
+    if (failing())  return false;
+  }
+  int j = 0;
+  for (; i < _late_inlines.length(); i++, j++) {
+    _late_inlines.at_put(j, _late_inlines.at(i));
+  }
+  _late_inlines.trunc_to(j);
+  assert(inlining_progress() || _late_inlines.length() == 0, "");
+
+  bool needs_cleanup = do_cleanup() || over_inlining_cutoff();
 
   set_inlining_progress(false);
-  for_igvn()->clear();
-  gvn->replace_with(&igvn);
+  set_do_cleanup(false);
+  return (_late_inlines.length() > 0) && !needs_cleanup;
+}
 
-  {
-    TracePhase tp("incrementalInline_inline", &timers[_t_incrInline_inline]);
-    int i = 0;
-    for (; i <_late_inlines.length() && !inlining_progress(); i++) {
-      CallGenerator* cg = _late_inlines.at(i);
-      _late_inlines_pos = i+1;
-      cg->do_late_inline();
-      if (failing())  return;
-    }
-    int j = 0;
-    for (; i < _late_inlines.length(); i++, j++) {
-      _late_inlines.at_put(j, _late_inlines.at(i));
-    }
-    _late_inlines.trunc_to(j);
-  }
-
+void Compile::inline_incrementally_cleanup(PhaseIterGVN& igvn) {
   {
     TracePhase tp("incrementalInline_pru", &timers[_t_incrInline_pru]);
     ResourceMark rm;
-    PhaseRemoveUseless pru(gvn, for_igvn());
+    PhaseRemoveUseless pru(initial_gvn(), for_igvn());
   }
-
   {
     TracePhase tp("incrementalInline_igvn", &timers[_t_incrInline_igvn]);
-    igvn = PhaseIterGVN(gvn);
+    igvn = PhaseIterGVN(initial_gvn());
+    igvn.optimize();
   }
 }
 
@@ -2104,43 +2102,40 @@ void Compile::inline_incrementally_one(PhaseIterGVN& igvn) {
 void Compile::inline_incrementally(PhaseIterGVN& igvn) {
   TracePhase tp("incrementalInline", &timers[_t_incrInline]);
 
-  PhaseGVN* gvn = initial_gvn();
-
   set_inlining_incrementally(true);
-  set_inlining_progress(true);
   uint low_live_nodes = 0;
 
-  while(inlining_progress() && _late_inlines.length() > 0) {
-
+  while (_late_inlines.length() > 0) {
     if (live_nodes() > (uint)LiveNodeCountInliningCutoff) {
       if (low_live_nodes < (uint)LiveNodeCountInliningCutoff * 8 / 10) {
         TracePhase tp("incrementalInline_ideal", &timers[_t_incrInline_ideal]);
         // PhaseIdealLoop is expensive so we only try it once we are
         // out of live nodes and we only try it again if the previous
         // helped got the number of nodes down significantly
-        PhaseIdealLoop ideal_loop(igvn, LoopOptsNone);
+        PhaseIdealLoop::optimize(igvn, LoopOptsNone);
         if (failing())  return;
         low_live_nodes = live_nodes();
         _major_progress = true;
       }
 
       if (live_nodes() > (uint)LiveNodeCountInliningCutoff) {
-        break;
+        break; // finish
       }
     }
 
-    inline_incrementally_one(igvn);
+    for_igvn()->clear();
+    initial_gvn()->replace_with(&igvn);
 
-    if (failing())  return;
-
-    {
-      TracePhase tp("incrementalInline_igvn", &timers[_t_incrInline_igvn]);
-      igvn.optimize();
+    while (inline_incrementally_one()) {
+      assert(!failing(), "inconsistent");
     }
 
     if (failing())  return;
-  }
 
+    inline_incrementally_cleanup(igvn);
+
+    if (failing())  return;
+  }
   assert( igvn._worklist.size() == 0, "should be done with igvn" );
 
   if (_string_late_inlines.length() > 0) {
@@ -2152,17 +2147,7 @@ void Compile::inline_incrementally(PhaseIterGVN& igvn) {
 
     if (failing())  return;
 
-    {
-      TracePhase tp("incrementalInline_pru", &timers[_t_incrInline_pru]);
-      ResourceMark rm;
-      PhaseRemoveUseless pru(initial_gvn(), for_igvn());
-    }
-
-    {
-      TracePhase tp("incrementalInline_igvn", &timers[_t_incrInline_igvn]);
-      igvn = PhaseIterGVN(gvn);
-      igvn.optimize();
-    }
+    inline_incrementally_cleanup(igvn);
   }
 
   set_inlining_incrementally(false);
@@ -2175,13 +2160,33 @@ bool Compile::optimize_loops(PhaseIterGVN& igvn, LoopOptsMode mode) {
     while(major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
       assert( cnt++ < 40, "infinite cycle in loop optimization" );
-      PhaseIdealLoop ideal_loop(igvn, mode);
+      PhaseIdealLoop::optimize(igvn, mode);
       _loop_opts_cnt--;
       if (failing())  return false;
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP_ITERATIONS, 2);
     }
   }
   return true;
+}
+
+// Remove edges from "root" to each SafePoint at a backward branch.
+// They were inserted during parsing (see add_safepoint()) to make
+// infinite loops without calls or exceptions visible to root, i.e.,
+// useful.
+void Compile::remove_root_to_sfpts_edges(PhaseIterGVN& igvn) {
+  Node *r = root();
+  if (r != NULL) {
+    for (uint i = r->req(); i < r->len(); ++i) {
+      Node *n = r->in(i);
+      if (n != NULL && n->is_SafePoint()) {
+        r->rm_prec(i);
+        if (n->outcnt() == 0) {
+          igvn.remove_dead_node(n);
+        }
+        --i;
+      }
+    }
+  }
 }
 
 //------------------------------Optimize---------------------------------------
@@ -2244,6 +2249,10 @@ void Compile::Optimize() {
     if (failing())  return;
   }
 
+  // Now that all inlining is over, cut edge from root to loop
+  // safepoints
+  remove_root_to_sfpts_edges(igvn);
+
   // Remove the speculative part of types and clean up the graph from
   // the extra CastPP nodes whose only purpose is to carry them. Do
   // that early so that optimizations are not disrupted by the extra
@@ -2273,7 +2282,7 @@ void Compile::Optimize() {
     if (has_loops()) {
       // Cleanup graph (remove dead nodes).
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
-      PhaseIdealLoop ideal_loop(igvn, LoopOptsNone);
+      PhaseIdealLoop::optimize(igvn, LoopOptsNone);
       if (major_progress()) print_method(PHASE_PHASEIDEAL_BEFORE_EA, 2);
       if (failing())  return;
     }
@@ -2307,7 +2316,7 @@ void Compile::Optimize() {
   if((_loop_opts_cnt > 0) && (has_loops() || has_split_ifs())) {
     {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
-      PhaseIdealLoop ideal_loop(igvn, LoopOptsDefault);
+      PhaseIdealLoop::optimize(igvn, LoopOptsDefault);
       _loop_opts_cnt--;
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP1, 2);
       if (failing())  return;
@@ -2315,7 +2324,7 @@ void Compile::Optimize() {
     // Loop opts pass if partial peeling occurred in previous pass
     if(PartialPeelLoop && major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
-      PhaseIdealLoop ideal_loop(igvn, LoopOptsSkipSplitIf);
+      PhaseIdealLoop::optimize(igvn, LoopOptsSkipSplitIf);
       _loop_opts_cnt--;
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP2, 2);
       if (failing())  return;
@@ -2323,7 +2332,7 @@ void Compile::Optimize() {
     // Loop opts pass for loop-unrolling before CCP
     if(major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
-      PhaseIdealLoop ideal_loop(igvn, LoopOptsSkipSplitIf);
+      PhaseIdealLoop::optimize(igvn, LoopOptsSkipSplitIf);
       _loop_opts_cnt--;
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP3, 2);
     }
@@ -3061,7 +3070,7 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
         Node *m = wq.at(next);
         for (DUIterator_Fast imax, i = m->fast_outs(imax); i < imax; i++) {
           Node* use = m->fast_out(i);
-          if (use->is_Mem() || use->is_EncodeNarrowPtr()) {
+          if (use->is_Mem() || use->is_EncodeNarrowPtr() || use->is_ShenandoahBarrier()) {
             use->ensure_control_or_add_prec(n->in(0));
           } else {
             switch(use->Opcode()) {
@@ -3248,8 +3257,10 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
             break;
           }
         }
-        assert(proj != NULL, "must be found");
-        p->subsume_by(proj, this);
+        assert(proj != NULL || p->_con == TypeFunc::I_O, "io may be dropped at an infinite loop");
+        if (proj != NULL) {
+          p->subsume_by(proj, this);
+        }
       }
     }
     break;
@@ -3469,8 +3480,7 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
   }
   case Op_CmpUL: {
     if (!Matcher::has_match_rule(Op_CmpUL)) {
-      // We don't support unsigned long comparisons. Set 'max_idx_expr'
-      // to max_julong if < 0 to make the signed comparison fail.
+      // No support for unsigned long comparisons
       ConINode* sign_pos = new ConINode(TypeInt::make(BitsPerLong - 1));
       Node* sign_bit_mask = new RShiftLNode(n->in(1), sign_pos);
       Node* orl = new OrLNode(n->in(1), sign_bit_mask);
@@ -3808,6 +3818,11 @@ void Compile::set_allowed_deopt_reasons() {
       }
     }
   }
+}
+
+bool Compile::is_compiling_clinit_for(ciKlass* k) {
+  ciMethod* root = method(); // the root method of compilation
+  return root->is_static_initializer() && root->holder() == k; // access in the context of clinit
 }
 
 #ifndef PRODUCT

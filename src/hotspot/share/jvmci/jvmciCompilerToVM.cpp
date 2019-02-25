@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -40,6 +40,7 @@
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/flags/jvmFlag.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/handles.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/timerTrace.hpp"
@@ -49,14 +50,14 @@ JVMCIKlassHandle::JVMCIKlassHandle(Thread* thread, Klass* klass) {
   _thread = thread;
   _klass = klass;
   if (klass != NULL) {
-    _holder = Handle(_thread, klass->holder_phantom());
+    _holder = Handle(_thread, klass->klass_holder());
   }
 }
 
 JVMCIKlassHandle& JVMCIKlassHandle::operator=(Klass* klass) {
   _klass = klass;
   if (klass != NULL) {
-    _holder = Handle(_thread, klass->holder_phantom());
+    _holder = Handle(_thread, klass->klass_holder());
   }
   return *this;
 }
@@ -600,6 +601,17 @@ C2V_VMENTRY(jobject, resolveMethod, (JNIEnv *, jobject, jobject receiver_jvmci_t
   if (MethodHandles::is_signature_polymorphic_method(method())) {
       // Signature polymorphic methods are already resolved, JVMCI just returns NULL in this case.
       return NULL;
+  }
+
+  if (method->name() == vmSymbols::clone_name() &&
+      resolved == SystemDictionary::Object_klass() &&
+      recv_klass->is_array_klass()) {
+    // Resolution of the clone method on arrays always returns Object.clone even though that method
+    // has protected access.  There's some trickery in the access checking to make this all work out
+    // so it's necessary to pass in the array class as the resolved class to properly trigger this.
+    // Otherwise it's impossible to resolve the array clone methods through JVMCI.  See
+    // LinkResolver::check_method_accessability for the matching logic.
+    resolved = recv_klass;
   }
 
   LinkInfo link_info(resolved, h_name, h_signature, caller_klass);
@@ -1229,7 +1241,6 @@ C2V_VMENTRY(jint, isResolvedInvokeHandleInPool, (JNIEnv*, jobject, jobject jvmci
       vmassert(MethodHandles::is_signature_polymorphic_method(resolved_method()),"!");
       vmassert(!MethodHandles::is_signature_polymorphic_static(resolved_method->intrinsic_id()), "!");
       vmassert(cp_cache_entry->appendix_if_resolved(cp) == NULL, "!");
-      vmassert(cp_cache_entry->method_type_if_resolved(cp) == NULL, "!");
 
       methodHandle m(LinkResolver::linktime_resolve_virtual_method_or_null(link_info));
       vmassert(m == resolved_method, "!!");

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef OS_LINUX_VM_GLOBALS_LINUX_HPP
-#define OS_LINUX_VM_GLOBALS_LINUX_HPP
+#ifndef OS_LINUX_GLOBALS_LINUX_HPP
+#define OS_LINUX_GLOBALS_LINUX_HPP
 
 //
 // Defines Linux specific flags. They are not available on other platforms.
@@ -67,6 +67,11 @@
           " of quotas (if set), when true. Otherwise, use the CPU"    \
           " shares value, provided it is less than quota.")             \
                                                                         \
+  diagnostic(bool, DumpPrivateMappingsInCore, true,                     \
+          "If true, sets bit 2 of /proc/PID/coredump_filter, thus "     \
+          "resulting in file-backed private mappings of the process to "\
+          "be dumped into the corefile, if UseSharedSpaces is true.")   \
+                                                                        \
   diagnostic(bool, UseCpuAllocPath, false,                              \
              "Use CPU_ALLOC code path in os::active_processor_count ")
 
@@ -79,4 +84,4 @@ define_pd_global(bool, UseLargePagesIndividualAllocation, false);
 define_pd_global(bool, UseOSErrorReporting, false);
 define_pd_global(bool, UseThreadPriorities, true) ;
 
-#endif // OS_LINUX_VM_GLOBALS_LINUX_HPP
+#endif // OS_LINUX_GLOBALS_LINUX_HPP

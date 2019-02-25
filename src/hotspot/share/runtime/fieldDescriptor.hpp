@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_RUNTIME_FIELDDESCRIPTOR_HPP
-#define SHARE_VM_RUNTIME_FIELDDESCRIPTOR_HPP
+#ifndef SHARE_RUNTIME_FIELDDESCRIPTOR_HPP
+#define SHARE_RUNTIME_FIELDDESCRIPTOR_HPP
 
 #include "oops/constantPool.hpp"
 #include "oops/fieldInfo.hpp"
@@ -91,6 +91,7 @@ class fieldDescriptor {
 
   bool is_static()                const    { return access_flags().is_static(); }
   bool is_final()                 const    { return access_flags().is_final(); }
+  bool is_stable()                const    { return access_flags().is_stable(); }
   bool is_volatile()              const    { return access_flags().is_volatile(); }
   bool is_transient()             const    { return access_flags().is_transient(); }
 
@@ -116,4 +117,4 @@ class fieldDescriptor {
   void verify() const                           PRODUCT_RETURN;
 };
 
-#endif // SHARE_VM_RUNTIME_FIELDDESCRIPTOR_HPP
+#endif // SHARE_RUNTIME_FIELDDESCRIPTOR_HPP

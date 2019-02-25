@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2012, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_OPTO_MULNODE_HPP
-#define SHARE_VM_OPTO_MULNODE_HPP
+#ifndef SHARE_OPTO_MULNODE_HPP
+#define SHARE_OPTO_MULNODE_HPP
 
 #include "opto/node.hpp"
 #include "opto/opcodes.hpp"
@@ -285,4 +285,16 @@ public:
   virtual const Type* Value(PhaseGVN* phase) const;
 };
 
-#endif // SHARE_VM_OPTO_MULNODE_HPP
+//------------------------------MulAddS2INode----------------------------------
+// Multiply shorts into integers and add them.
+// Semantics: I_OUT = S1 * S2 + S3 * S4
+class MulAddS2INode : public Node {
+  virtual uint hash() const;
+public:
+  MulAddS2INode(Node* in1, Node *in2, Node *in3, Node* in4) : Node(0, in1, in2, in3, in4) {}
+  virtual int Opcode() const;
+  const Type *bottom_type() const { return TypeInt::INT; }
+  virtual uint ideal_reg() const { return Op_RegI; }
+};
+
+#endif // SHARE_OPTO_MULNODE_HPP

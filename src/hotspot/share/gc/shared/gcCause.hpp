@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_GC_SHARED_GCCAUSE_HPP
-#define SHARE_VM_GC_SHARED_GCCAUSE_HPP
+#ifndef SHARE_GC_SHARED_GCCAUSE_HPP
+#define SHARE_GC_SHARED_GCCAUSE_HPP
 
 #include "memory/allocation.hpp"
 
@@ -76,8 +76,15 @@ class GCCause : public AllStatic {
 
     _g1_inc_collection_pause,
     _g1_humongous_allocation,
+    _g1_periodic_collection,
 
     _dcmd_gc_run,
+
+    _shenandoah_stop_vm,
+    _shenandoah_allocation_failure_evac,
+    _shenandoah_concurrent_gc,
+    _shenandoah_traversal_gc,
+    _shenandoah_upgrade_to_full_gc,
 
     _z_timer,
     _z_warmup,
@@ -122,11 +129,12 @@ class GCCause : public AllStatic {
     // _allocation_failure is the generic cause a collection for allocation failure
     // _adaptive_size_policy is for a collecton done before a full GC
     return (cause == GCCause::_allocation_failure ||
-            cause == GCCause::_adaptive_size_policy);
+            cause == GCCause::_adaptive_size_policy ||
+            cause == GCCause::_shenandoah_allocation_failure_evac);
   }
 
   // Return a string describing the GCCause.
   static const char* to_string(GCCause::Cause cause);
 };
 
-#endif // SHARE_VM_GC_SHARED_GCCAUSE_HPP
+#endif // SHARE_GC_SHARED_GCCAUSE_HPP

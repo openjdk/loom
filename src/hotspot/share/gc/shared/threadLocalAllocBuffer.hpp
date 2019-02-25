@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_GC_SHARED_THREADLOCALALLOCBUFFER_HPP
-#define SHARE_VM_GC_SHARED_THREADLOCALALLOCBUFFER_HPP
+#ifndef SHARE_GC_SHARED_THREADLOCALALLOCBUFFER_HPP
+#define SHARE_GC_SHARED_THREADLOCALALLOCBUFFER_HPP
 
 #include "gc/shared/gcUtil.hpp"
 #include "runtime/perfData.hpp"
@@ -188,8 +188,6 @@ public:
   static ByteSize end_offset()                   { return byte_offset_of(ThreadLocalAllocBuffer, _end); }
   static ByteSize top_offset()                   { return byte_offset_of(ThreadLocalAllocBuffer, _top); }
   static ByteSize pf_top_offset()                { return byte_offset_of(ThreadLocalAllocBuffer, _pf_top); }
-
-  void verify();
 };
 
 class ThreadLocalAllocStats : public StackObj {
@@ -240,4 +238,4 @@ public:
   void publish();
 };
 
-#endif // SHARE_VM_GC_SHARED_THREADLOCALALLOCBUFFER_HPP
+#endif // SHARE_GC_SHARED_THREADLOCALALLOCBUFFER_HPP

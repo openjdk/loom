@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2014, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -131,13 +131,13 @@ public class URIName implements GeneralNameInterface {
                 try {
                     hostDNS = new DNSName(host);
                 } catch (IOException ioe) {
-                    // Not a valid DNS Name; see if it is a valid IPv4
+                    // Not a valid DNSName; see if it is a valid IPv4
                     // IPAddressName
                     try {
                         hostIP = new IPAddressName(host);
                     } catch (Exception ioe2) {
                         throw new IOException("invalid URI name (host " +
-                            "portion is not a valid DNS name, IPv4 address," +
+                            "portion is not a valid DNSName, IPv4 address," +
                             " or IPv6 address):" + name);
                     }
                 }
@@ -213,7 +213,7 @@ public class URIName implements GeneralNameInterface {
     /**
      * Compares this name with another, for equality.
      *
-     * @return true iff the names are equivalent according to RFC2459.
+     * @return true iff the names are equivalent according to RFC 5280.
      */
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -339,7 +339,7 @@ public class URIName implements GeneralNameInterface {
                     // If one (or both) is an IP address, only same type
                     constraintType = NAME_SAME_TYPE;
                 } else {
-                    // Both host portions are DNS names. Are they domains?
+                    // Both host portions are DNSNames. Are they domains?
                     boolean thisDomain = (host.charAt(0) == '.');
                     boolean otherDomain = (otherHost.charAt(0) == '.');
                     DNSName otherDNS = (DNSName) otherHostObject;

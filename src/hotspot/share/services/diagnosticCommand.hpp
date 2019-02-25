@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_SERVICES_DIAGNOSTICCOMMAND_HPP
-#define SHARE_VM_SERVICES_DIAGNOSTICCOMMAND_HPP
+#ifndef SHARE_SERVICES_DIAGNOSTICCOMMAND_HPP
+#define SHARE_SERVICES_DIAGNOSTICCOMMAND_HPP
 
 #include "classfile/stringTable.hpp"
 #include "classfile/symbolTable.hpp"
@@ -34,7 +34,6 @@
 #include "runtime/vmThread.hpp"
 #include "services/diagnosticArgument.hpp"
 #include "services/diagnosticCommand.hpp"
-#include "services/diagnosticCommand_ext.hpp"
 #include "services/diagnosticFramework.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/ostream.hpp"
@@ -867,4 +866,26 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
-#endif // SHARE_VM_SERVICES_DIAGNOSTICCOMMAND_HPP
+#if INCLUDE_JVMTI
+class DebugOnCmdStartDCmd : public DCmdWithParser {
+public:
+  DebugOnCmdStartDCmd(outputStream* output, bool heap);
+  static const char* name() {
+    return "VM.start_java_debugging";
+  }
+  static const char* description() {
+    return "Starts up the Java debugging if the jdwp agentlib was enabled with the option onjcmd=y.";
+  }
+  static const char* impact() {
+    return "High: Switches the VM into Java debug mode.";
+  }
+  static const JavaPermission permission() {
+    JavaPermission p = { "java.lang.management.ManagementPermission", "monitor", NULL };
+    return p;
+  }
+  static int num_arguments() { return 0; }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+#endif // INCLUDE_JVMTI
+
+#endif // SHARE_SERVICES_DIAGNOSTICCOMMAND_HPP

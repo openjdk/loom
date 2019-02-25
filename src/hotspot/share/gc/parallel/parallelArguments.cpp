@@ -24,15 +24,16 @@
  */
 
 #include "precompiled.hpp"
+#include "gc/parallel/heterogeneousGenerationSizer.hpp"
 #include "gc/parallel/parallelArguments.hpp"
 #include "gc/parallel/parallelScavengeHeap.hpp"
 #include "gc/shared/adaptiveSizePolicy.hpp"
 #include "gc/shared/collectorPolicy.hpp"
 #include "gc/shared/gcArguments.inline.hpp"
+#include "gc/shared/workerPolicy.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/globals_extension.hpp"
 #include "runtime/java.hpp"
-#include "runtime/vm_version.hpp"
 #include "utilities/defaultStream.hpp"
 
 size_t ParallelArguments::conservative_max_heap_alignment() {
@@ -51,7 +52,7 @@ void ParallelArguments::initialize() {
   // If no heap maximum was requested explicitly, use some reasonable fraction
   // of the physical memory, up to a maximum of 1GB.
   FLAG_SET_DEFAULT(ParallelGCThreads,
-                   VM_Version::parallel_worker_threads());
+                   WorkerPolicy::parallel_worker_threads());
   if (ParallelGCThreads == 0) {
     jio_fprintf(defaultStream::error_stream(),
         "The Parallel GC can not be combined with -XX:ParallelGCThreads=0\n");
@@ -93,5 +94,9 @@ void ParallelArguments::initialize() {
 }
 
 CollectedHeap* ParallelArguments::create_heap() {
-  return create_heap_with_policy<ParallelScavengeHeap, GenerationSizer>();
+  if (AllocateOldGenAt != NULL) {
+    return create_heap_with_policy<ParallelScavengeHeap, HeterogeneousGenerationSizer>();
+  } else {
+    return create_heap_with_policy<ParallelScavengeHeap, GenerationSizer>();
+  }
 }

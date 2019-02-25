@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -72,7 +72,7 @@
 #include "runtime/synchronizer.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/timerTrace.hpp"
-#include "runtime/vm_operations.hpp"
+#include "runtime/vmOperations.hpp"
 #include "services/memoryService.hpp"
 #include "utilities/align.hpp"
 #include "utilities/copy.hpp"
@@ -1118,8 +1118,9 @@ void Universe::initialize_verify_flags() {
   size_t length = strlen(VerifySubSet);
   char* subset_list = NEW_C_HEAP_ARRAY(char, length + 1, mtInternal);
   strncpy(subset_list, VerifySubSet, length + 1);
+  char* save_ptr;
 
-  char* token = strtok(subset_list, delimiter);
+  char* token = strtok_r(subset_list, delimiter, &save_ptr);
   while (token != NULL) {
     if (strcmp(token, "threads") == 0) {
       verify_flags |= Verify_Threads;
@@ -1144,7 +1145,7 @@ void Universe::initialize_verify_flags() {
     } else {
       vm_exit_during_initialization(err_msg("VerifySubSet: \'%s\' memory sub-system is unknown, please correct it", token));
     }
-    token = strtok(NULL, delimiter);
+    token = strtok_r(NULL, delimiter, &save_ptr);
   }
   FREE_C_HEAP_ARRAY(char, subset_list);
 }
@@ -1283,14 +1284,6 @@ uintptr_t Universe::verify_mark_bits() {
   return bits;
 }
 #endif // PRODUCT
-
-
-void Universe::compute_verify_oop_data() {
-  verify_oop_mask();
-  verify_oop_bits();
-  verify_mark_mask();
-  verify_mark_bits();
-}
 
 
 void LatestMethodCache::init(Klass* k, Method* m) {

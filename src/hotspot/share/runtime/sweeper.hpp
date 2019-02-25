@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_RUNTIME_SWEEPER_HPP
-#define SHARE_VM_RUNTIME_SWEEPER_HPP
+#ifndef SHARE_RUNTIME_SWEEPER_HPP
+#define SHARE_RUNTIME_SWEEPER_HPP
 
 class WhiteBox;
 
@@ -89,7 +89,6 @@ class NMethodSweeper : public AllStatic {
   static Tickspan  _peak_sweep_fraction_time;     // Peak time sweeping one fraction
 
   static MethodStateChange process_compiled_method(CompiledMethod *nm);
-  static void              release_compiled_method(CompiledMethod* nm);
 
   static void init_sweeper_log() NOT_DEBUG_RETURN;
   static bool wait_for_stack_scanning();
@@ -128,4 +127,4 @@ class NMethodSweeper : public AllStatic {
   static void print() { print(tty); }
 };
 
-#endif // SHARE_VM_RUNTIME_SWEEPER_HPP
+#endif // SHARE_RUNTIME_SWEEPER_HPP

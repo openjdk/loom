@@ -416,6 +416,18 @@ int Type::uhash( const Type *const t ) {
 
 #define SMALLINT ((juint)3)  // a value too insignificant to consider widening
 
+static double pos_dinf() {
+  union { int64_t i; double d; } v;
+  v.i = CONST64(0x7ff0000000000000);
+  return v.d;
+}
+
+static float pos_finf() {
+  union { int32_t i; float f; } v;
+  v.i = 0x7f800000;
+  return v.f;
+}
+
 //--------------------------Initialize_shared----------------------------------
 void Type::Initialize_shared(Compile* current) {
   // This method does not need to be locked because the first system
@@ -445,9 +457,13 @@ void Type::Initialize_shared(Compile* current) {
 
   TypeF::ZERO = TypeF::make(0.0); // Float 0 (positive zero)
   TypeF::ONE  = TypeF::make(1.0); // Float 1
+  TypeF::POS_INF = TypeF::make(pos_finf());
+  TypeF::NEG_INF = TypeF::make(-pos_finf());
 
   TypeD::ZERO = TypeD::make(0.0); // Double 0 (positive zero)
   TypeD::ONE  = TypeD::make(1.0); // Double 1
+  TypeD::POS_INF = TypeD::make(pos_dinf());
+  TypeD::NEG_INF = TypeD::make(-pos_dinf());
 
   TypeInt::MINUS_1 = TypeInt::make(-1);  // -1
   TypeInt::ZERO    = TypeInt::make( 0);  //  0
@@ -1087,6 +1103,8 @@ void Type::typerr( const Type *t ) const {
 // Convenience common pre-built types.
 const TypeF *TypeF::ZERO;       // Floating point zero
 const TypeF *TypeF::ONE;        // Floating point one
+const TypeF *TypeF::POS_INF;    // Floating point positive infinity
+const TypeF *TypeF::NEG_INF;    // Floating point negative infinity
 
 //------------------------------make-------------------------------------------
 // Create a float constant
@@ -1195,6 +1213,8 @@ bool TypeF::empty(void) const {
 // Convenience common pre-built types.
 const TypeD *TypeD::ZERO;       // Floating point zero
 const TypeD *TypeD::ONE;        // Floating point one
+const TypeD *TypeD::POS_INF;    // Floating point positive infinity
+const TypeD *TypeD::NEG_INF;    // Floating point negative infinity
 
 //------------------------------make-------------------------------------------
 const TypeD *TypeD::make(double d) {
@@ -3044,6 +3064,10 @@ const TypeOopPtr *TypeOopPtr::cast_to_instance_id(int instance_id) const {
   return this;
 }
 
+const TypeOopPtr *TypeOopPtr::cast_to_nonconst() const {
+  return this;
+}
+
 //-----------------------------cast_to_exactness-------------------------------
 const Type *TypeOopPtr::cast_to_exactness(bool klass_is_exact) const {
   // There is no such thing as an exact general oop.
@@ -3412,6 +3436,12 @@ const TypePtr* TypeOopPtr::with_inline_depth(int depth) const {
   return make(_ptr, _offset, _instance_id, _speculative, depth);
 }
 
+//------------------------------with_instance_id--------------------------------
+const TypePtr* TypeOopPtr::with_instance_id(int instance_id) const {
+  assert(_instance_id != -1, "should be known");
+  return make(_ptr, _offset, instance_id, _speculative, _inline_depth);
+}
+
 //------------------------------meet_instance_id--------------------------------
 int TypeOopPtr::meet_instance_id( int instance_id ) const {
   // Either is 'TOP' instance?  Return the other instance!
@@ -3544,6 +3574,11 @@ const Type *TypeInstPtr::cast_to_exactness(bool klass_is_exact) const {
 const TypeOopPtr *TypeInstPtr::cast_to_instance_id(int instance_id) const {
   if( instance_id == _instance_id ) return this;
   return make(_ptr, klass(), _klass_is_exact, const_oop(), _offset, instance_id, _speculative, _inline_depth);
+}
+
+const TypeOopPtr *TypeInstPtr::cast_to_nonconst() const {
+  if (const_oop() == NULL) return this;
+  return make(NotNull, klass(), _klass_is_exact, NULL, _offset, _instance_id, _speculative, _inline_depth);
 }
 
 //------------------------------xmeet_unloaded---------------------------------
@@ -4015,6 +4050,11 @@ const TypePtr *TypeInstPtr::with_inline_depth(int depth) const {
   return make(_ptr, klass(), klass_is_exact(), const_oop(), _offset, _instance_id, _speculative, depth);
 }
 
+const TypePtr *TypeInstPtr::with_instance_id(int instance_id) const {
+  assert(is_known_instance(), "should be known");
+  return make(_ptr, klass(), klass_is_exact(), const_oop(), _offset, instance_id, _speculative, _inline_depth);
+}
+
 //=============================================================================
 // Convenience common pre-built types.
 const TypeAryPtr *TypeAryPtr::RANGE;
@@ -4072,6 +4112,12 @@ const TypeOopPtr *TypeAryPtr::cast_to_instance_id(int instance_id) const {
   if( instance_id == _instance_id ) return this;
   return make(_ptr, const_oop(), _ary, klass(), _klass_is_exact, _offset, instance_id, _speculative, _inline_depth);
 }
+
+const TypeOopPtr *TypeAryPtr::cast_to_nonconst() const {
+  if (const_oop() == NULL) return this;
+  return make(NotNull, NULL, _ary, klass(), _klass_is_exact, _offset, _instance_id, _speculative, _inline_depth);
+}
+
 
 //-----------------------------narrow_size_type-------------------------------
 // Local cache for arrayOopDesc::max_array_length(etype),
@@ -4493,6 +4539,11 @@ const TypePtr *TypeAryPtr::with_inline_depth(int depth) const {
     return this;
   }
   return make(_ptr, _const_oop, _ary->remove_speculative()->is_ary(), _klass, _klass_is_exact, _offset, _instance_id, _speculative, depth);
+}
+
+const TypePtr *TypeAryPtr::with_instance_id(int instance_id) const {
+  assert(is_known_instance(), "should be known");
+  return make(_ptr, _const_oop, _ary->remove_speculative()->is_ary(), _klass, _klass_is_exact, _offset, instance_id, _speculative, _inline_depth);
 }
 
 //=============================================================================

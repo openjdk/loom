@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,6 +26,8 @@
 package java.lang;
 
 import java.lang.annotation.Annotation;
+import java.lang.constant.ClassDesc;
+import java.lang.invoke.TypeDescriptor;
 import java.lang.module.ModuleReader;
 import java.lang.ref.SoftReference;
 import java.io.IOException;
@@ -46,6 +48,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.lang.constant.Constable;
 import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -58,6 +61,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
@@ -72,6 +76,7 @@ import jdk.internal.reflect.ConstantPool;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.reflect.ReflectionFactory;
 import jdk.internal.vm.annotation.ForceInline;
+import sun.invoke.util.Wrapper;
 import sun.reflect.generics.factory.CoreReflectionFactory;
 import sun.reflect.generics.factory.GenericsFactory;
 import sun.reflect.generics.repository.ClassRepository;
@@ -154,7 +159,9 @@ import sun.reflect.misc.ReflectUtil;
 public final class Class<T> implements java.io.Serializable,
                               GenericDeclaration,
                               Type,
-                              AnnotatedElement {
+                              AnnotatedElement,
+                              TypeDescriptor.OfField<Class<?>>,
+                              Constable {
     private static final int ANNOTATION= 0x00002000;
     private static final int ENUM      = 0x00004000;
     private static final int SYNTHETIC = 0x00001000;
@@ -265,8 +272,9 @@ public final class Class<T> implements java.io.Serializable,
 
             TypeVariable<?>[] typeparms = component.getTypeParameters();
             if (typeparms.length > 0) {
-                sb.append(Stream.of(typeparms).map(Class::typeVarBounds).
-                          collect(Collectors.joining(",", "<", ">")));
+                sb.append(Arrays.stream(typeparms)
+                          .map(Class::typeVarBounds)
+                          .collect(Collectors.joining(",", "<", ">")));
             }
 
             for (int i = 0; i < arrayDepth; i++)
@@ -282,8 +290,9 @@ public final class Class<T> implements java.io.Serializable,
             return typeVar.getName();
         } else {
             return typeVar.getName() + " extends " +
-                Stream.of(bounds).map(Type::getTypeName).
-                collect(Collectors.joining(" & "));
+                Arrays.stream(bounds)
+                .map(Type::getTypeName)
+                .collect(Collectors.joining(" & "));
         }
     }
 
@@ -788,14 +797,13 @@ public final class Class<T> implements java.io.Serializable,
      */
     public String getName() {
         String name = this.name;
-        if (name == null)
-            this.name = name = getName0();
-        return name;
+        return name != null ? name : initClassName();
     }
 
-    // cache the name to reduce the number of calls into the VM
+    // Cache the name to reduce the number of calls into the VM.
+    // This field would be set by VM itself during initClassName call.
     private transient String name;
-    private native String getName0();
+    private native String initClassName();
 
     /**
      * Returns the class loader for the class.  Some implementations may use
@@ -3413,8 +3421,9 @@ public final class Class<T> implements java.io.Serializable,
         StringBuilder sb = new StringBuilder();
         sb.append(getName() + "." + name + "(");
         if (argTypes != null) {
-            Stream.of(argTypes).map(c -> {return (c == null) ? "null" : c.getName();}).
-                collect(Collectors.joining(","));
+            sb.append(Arrays.stream(argTypes)
+                      .map(c -> (c == null) ? "null" : c.getName())
+                      .collect(Collectors.joining(",")));
         }
         sb.append(")");
         return sb.toString();
@@ -4026,5 +4035,69 @@ public final class Class<T> implements java.io.Serializable,
             }
         }
         return members;
+    }
+
+    /**
+     * Returns the type descriptor string for this class.
+     * <p>
+     * Note that this is not a strict inverse of {@link #forName};
+     * distinct classes which share a common name but have different class loaders
+     * will have identical descriptor strings.
+     *
+     * @return the type descriptor representation
+     * @jvms 4.3.2 Field Descriptors
+     * @since 12
+     */
+    @Override
+    public String descriptorString() {
+        if (isPrimitive())
+            return Wrapper.forPrimitiveType(this).basicTypeString();
+        else if (isArray()) {
+            return "[" + componentType.descriptorString();
+        }
+        else {
+            return "L" + getName().replace('.', '/') + ";";
+        }
+    }
+
+    /**
+     * Returns the component type of this {@code Class}, if it describes
+     * an array type, or {@code null} otherwise.
+     *
+     * @implSpec
+     * Equivalent to {@link Class#getComponentType()}.
+     *
+     * @return a {@code Class} describing the component type, or {@code null}
+     * if this {@code Class} does not describe an array type
+     * @since 12
+     */
+    @Override
+    public Class<?> componentType() {
+        return isArray() ? componentType : null;
+    }
+
+    /**
+     * Returns a {@code Class} for an array type whose component type
+     * is described by this {@linkplain Class}.
+     *
+     * @return a {@code Class} describing the array type
+     * @since 12
+     */
+    @Override
+    public Class<?> arrayType() {
+        return Array.newInstance(this, 0).getClass();
+    }
+
+    /**
+     * Returns a nominal descriptor for this instance, if one can be
+     * constructed, or an empty {@link Optional} if one cannot be.
+     *
+     * @return An {@link Optional} containing the resulting nominal descriptor,
+     * or an empty {@link Optional} if one cannot be constructed.
+     * @since 12
+     */
+    @Override
+    public Optional<ClassDesc> describeConstable() {
+        return Optional.of(ClassDesc.ofDescriptor(descriptorString()));
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_ADLC_FORMSOPT_HPP
-#define SHARE_VM_ADLC_FORMSOPT_HPP
+#ifndef SHARE_ADLC_FORMSOPT_HPP
+#define SHARE_ADLC_FORMSOPT_HPP
 
 // FORMSOPT.HPP - ADL Parser Target Specific Optimization Forms Classes
 
@@ -241,9 +241,6 @@ public:
   }
   char* code_snippet() {
     return _code_snippet;
-  }
-  void set_stack_version(bool flag) {
-    assert(false, "User defined register classes are not allowed to spill to the stack.");
   }
   void declare_register_masks(FILE* fp);
   void build_register_masks(FILE* fp) {
@@ -674,4 +671,4 @@ public:
   void output(FILE *fp);
 };
 
-#endif // SHARE_VM_ADLC_FORMSOPT_HPP
+#endif // SHARE_ADLC_FORMSOPT_HPP

@@ -75,8 +75,8 @@ on where and how to check out the source code.
     network share for the source code, see below for suggestions on how to keep
     the build artifacts on a local disk.
 
-  * On Windows, extra care must be taken to make sure the [Cygwin](#cygwin)
-    environment is consistent. It is recommended that you follow this
+  * On Windows, if using [Cygwin](#cygwin), extra care must be taken to make sure
+    the environment is consistent. It is recommended that you follow this
     procedure:
 
       * Create the directory that is going to contain the top directory of the
@@ -174,10 +174,10 @@ On Windows, it is important that you pay attention to the instructions in the
 
 Windows is the only non-POSIX OS supported by the JDK, and as such, requires
 some extra care. A POSIX support layer is required to build on Windows.
-Currently, the only supported such layer is Cygwin. (Msys is no longer
-supported due to a too old bash; msys2 and the new Windows Subsystem for Linux
-(WSL) would likely be possible to support in a future version but that would
-require effort to implement.)
+Currently, the only supported such layers are Cygwin and Windows Subsystem for
+Linux (WSL). (Msys is no longer supported due to a too old bash; msys2 would
+likely be possible to support in a future version but that would require effort
+to implement.)
 
 Internally in the build system, all paths are represented as Unix-style paths,
 e.g. `/cygdrive/c/hg/jdk9/Makefile` rather than `C:\hg\jdk9\Makefile`. This
@@ -188,7 +188,7 @@ on [Fixpath](#fixpath).
 
 #### Cygwin
 
-A functioning [Cygwin](http://www.cygwin.com/) environment is thus required for
+A functioning [Cygwin](http://www.cygwin.com/) environment is required for
 building the JDK on Windows. If you have a 64-bit OS, we strongly recommend
 using the 64-bit version of Cygwin.
 
@@ -198,7 +198,7 @@ that whenever you add or update a package in Cygwin, you might (inadvertently)
 update tools that are used by the JDK build process, and that can cause
 unexpected build problems.
 
-The JDK requires GNU Make 4.0 or greater on Windows. This is usually not a
+The JDK requires GNU Make 4.0 or greater in Cygwin. This is usually not a
 problem, since Cygwin currently only distributes GNU Make at a version above
 4.0.
 
@@ -220,6 +220,30 @@ experience build tool crashes or strange issues when building on Windows,
 please check the Cygwin FAQ on the ["BLODA" list](
 https://cygwin.com/faq/faq.html#faq.using.bloda) and the section on [fork()
 failures](https://cygwin.com/faq/faq.html#faq.using.fixing-fork-failures).
+
+#### Windows Subsystem for Linux (WSL)
+
+Windows 10 1809 or newer is supported due to a dependency on the wslpath utility
+and support for environment variable sharing through WSLENV. Version 1803 can
+work but intermittent build failures have been observed.
+
+It's possible to build both Windows and Linux binaries from WSL. To build
+Windows binaries, you must use a Windows boot JDK (located in a
+Windows-accessible directory). To build Linux binaries, you must use a Linux
+boot JDK. The default behavior is to build for Windows. To build for Linux, pass
+`--build=x86_64-unknown-linux-gnu --host=x86_64-unknown-linux-gnu` to
+`configure`.
+
+If building Windows binaries, the source code must be located in a Windows-
+accessible directory. This is because Windows executables (such as Visual Studio
+and the boot JDK) must be able to access the source code. Also, the drive where
+the source is stored must be mounted as case-insensitive by changing either
+/etc/fstab or /etc/wsl.conf in WSL. Individual directories may be corrected
+using the fsutil tool in case the source was cloned before changing the mount
+options.
+
+Note that while it's possible to build on WSL, testing is still not fully
+supported.
 
 ### Solaris
 
@@ -488,15 +512,15 @@ Certain [X11](http://www.x.org/) libraries and include files are required on
 Linux and Solaris.
 
   * To install on an apt-based Linux, try running `sudo apt-get install
-    libx11-dev libxext-dev libxrender-dev libxtst-dev libxt-dev`.
+    libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev`.
   * To install on an rpm-based Linux, try running `sudo yum install
-    libXtst-devel libXt-devel libXrender-devel libXi-devel`.
+    libXtst-devel libXt-devel libXrender-devel libXrandr-devel libXi-devel`.
   * To install on Solaris, try running `pkg install x11/header/x11-protocols
     x11/library/libice x11/library/libpthread-stubs x11/library/libsm
     x11/library/libx11 x11/library/libxau x11/library/libxcb
     x11/library/libxdmcp x11/library/libxevie x11/library/libxext
-    x11/library/libxrender x11/library/libxscrnsaver x11/library/libxtst
-    x11/library/toolkit/libxt`.
+    x11/library/libxrender x11/library/libxrandr x11/library/libxscrnsaver
+    x11/library/libxtst x11/library/toolkit/libxt`.
 
 Use `--with-x=<path>` if `configure` does not properly locate your X11 files.
 
@@ -918,7 +942,7 @@ targets are given, a native toolchain for the current platform will be
 created. Currently, at least the following targets are known to work:
 
  Supported devkit targets
- ------------------------
+ -------------------------
  x86_64-linux-gnu
  aarch64-linux-gnu
  arm-linux-gnueabihf
@@ -1062,6 +1086,7 @@ Note that X11 is needed even if you only want to build a headless JDK.
       * libice-dev
       * libxrender
       * libxrender-dev
+      * libxrandr-dev
       * libsm-dev
       * libxt-dev
       * libx11
@@ -1112,7 +1137,7 @@ apt install g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
   * Create chroot on the *build* system, configuring it for *target* system:
 ```
 sudo qemu-debootstrap --arch=arm64 --verbose \
-       --include=fakeroot,build-essential,libx11-dev,libxext-dev,libxrender-dev,libxtst-dev,libxt-dev,libcups2-dev,libfontconfig1-dev,libasound2-dev,libfreetype6-dev,libpng12-dev \
+       --include=fakeroot,build-essential,libx11-dev,libxext-dev,libxrender-dev,libxrandr-dev,libxtst-dev,libxt-dev,libcups2-dev,libfontconfig1-dev,libasound2-dev,libfreetype6-dev,libpng12-dev \
        --resolve-deps jessie /chroots/arm64 http://httpredir.debian.org/debian/
 ```
 
@@ -1128,13 +1153,13 @@ without additional cleanup.
 
 Architectures that are known to successfully cross-compile like this are:
 
-  Target        `CC`                      `CXX`                       `--arch=...` `--openjdk-target=...`
-  ------------  ------------------------- --------------------------- ------------ ----------------------
-  x86           default                   default                     i386         i386-linux-gnu
-  armhf         gcc-arm-linux-gnueabihf   g++-arm-linux-gnueabihf     armhf        arm-linux-gnueabihf
-  aarch64       gcc-aarch64-linux-gnu     g++-aarch64-linux-gnu       arm64        aarch64-linux-gnu
-  ppc64el       gcc-powerpc64le-linux-gnu g++-powerpc64le-linux-gnu   ppc64el      powerpc64le-linux-gnu
-  s390x         gcc-s390x-linux-gnu       g++-s390x-linux-gnu         s390x        s390x-linux-gnu
+  Target        `CC`                      `CXX`                       `--arch=...`  `--openjdk-target=...`
+  ------------  ------------------------- --------------------------- ------------- -----------------------
+  x86           default                   default                     i386          i386-linux-gnu
+  armhf         gcc-arm-linux-gnueabihf   g++-arm-linux-gnueabihf     armhf         arm-linux-gnueabihf
+  aarch64       gcc-aarch64-linux-gnu     g++-aarch64-linux-gnu       arm64         aarch64-linux-gnu
+  ppc64el       gcc-powerpc64le-linux-gnu g++-powerpc64le-linux-gnu   ppc64el       powerpc64le-linux-gnu
+  s390x         gcc-s390x-linux-gnu       g++-s390x-linux-gnu         s390x         s390x-linux-gnu
 
 Additional architectures might be supported by Debian/Ubuntu Ports.
 

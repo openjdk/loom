@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,15 +22,15 @@
  *
  */
 
-#ifndef SHARE_VM_CLASSFILE_CLASSLOADERSTATS_HPP
-#define SHARE_VM_CLASSFILE_CLASSLOADERSTATS_HPP
+#ifndef SHARE_CLASSFILE_CLASSLOADERSTATS_HPP
+#define SHARE_CLASSFILE_CLASSLOADERSTATS_HPP
 
 
 #include "classfile/classLoaderData.hpp"
 #include "oops/klass.hpp"
 #include "oops/oop.hpp"
 #include "oops/oopsHierarchy.hpp"
-#include "runtime/vm_operations.hpp"
+#include "runtime/vmOperations.hpp"
 #include "services/diagnosticCommand.hpp"
 #include "utilities/resourceHash.hpp"
 
@@ -150,4 +150,4 @@ public:
   void doit();
 };
 
-#endif // SHARE_VM_CLASSFILE_CLASSLOADERSTATS_HPP
+#endif // SHARE_CLASSFILE_CLASSLOADERSTATS_HPP

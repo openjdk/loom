@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_GC_SHARED_COLLECTEDHEAP_HPP
-#define SHARE_VM_GC_SHARED_COLLECTEDHEAP_HPP
+#ifndef SHARE_GC_SHARED_COLLECTEDHEAP_HPP
+#define SHARE_GC_SHARED_COLLECTEDHEAP_HPP
 
 #include "gc/shared/gcCause.hpp"
 #include "gc/shared/gcWhen.hpp"
@@ -90,6 +90,7 @@ class GCHeapLog : public EventLogBase<GCMessage> {
 //     CMSHeap
 //   G1CollectedHeap
 //   ParallelScavengeHeap
+//   ShenandoahHeap
 //   ZCollectedHeap
 //
 class CollectedHeap : public CHeapObj<mtInternal> {
@@ -99,10 +100,6 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   friend class MemAllocator;
 
  private:
-#ifdef ASSERT
-  static int       _fire_out_of_memory_count;
-#endif
-
   GCHeapLog* _gc_heap_log;
 
   MemRegion _reserved;
@@ -176,7 +173,8 @@ class CollectedHeap : public CHeapObj<mtInternal> {
     CMS,
     G1,
     Epsilon,
-    Z
+    Z,
+    Shenandoah
   };
 
   static inline size_t filler_array_max_size() {
@@ -536,12 +534,6 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   // The default implementation returns false.
   virtual bool supports_concurrent_phase_control() const;
 
-  // Return a NULL terminated array of concurrent phase names provided
-  // by this collector.  Supports Whitebox testing.  These are the
-  // names recognized by request_concurrent_phase(). The default
-  // implementation returns an array of one NULL element.
-  virtual const char* const* concurrent_phases() const;
-
   // Request the collector enter the indicated concurrent phase, and
   // wait until it does so.  Supports WhiteBox testing.  Only one
   // request may be active at a time.  Phases are designated by name;
@@ -598,12 +590,6 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   void reset_promotion_should_fail(volatile size_t* count);
   void reset_promotion_should_fail();
 #endif  // #ifndef PRODUCT
-
-#ifdef ASSERT
-  static int fired_fake_oom() {
-    return (CIFireOOMAt > 1 && _fire_out_of_memory_count >= CIFireOOMAt);
-  }
-#endif
 };
 
 // Class to set and reset the GC cause for a CollectedHeap.
@@ -623,4 +609,4 @@ class GCCauseSetter : StackObj {
   }
 };
 
-#endif // SHARE_VM_GC_SHARED_COLLECTEDHEAP_HPP
+#endif // SHARE_GC_SHARED_COLLECTEDHEAP_HPP

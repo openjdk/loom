@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef CPU_SPARC_VM_VM_VERSION_SPARC_HPP
-#define CPU_SPARC_VM_VM_VERSION_SPARC_HPP
+#ifndef CPU_SPARC_VM_VERSION_SPARC_HPP
+#define CPU_SPARC_VM_VERSION_SPARC_HPP
 
 #include "runtime/globals_extension.hpp"
 #include "runtime/vm_version.hpp"
@@ -365,8 +365,12 @@ public:
   //        this properly in order to enable complete page size support.
   static uint page_size_count() { return 2; }
 
-  // Calculates the number of parallel threads
-  static unsigned int calc_parallel_worker_threads();
+  // Override default denominator for ParallelGCThreads.
+  //
+  // FIXME: Simply checking the processor family is insufficient.
+  static uint parallel_worker_threads_denominator() {
+    return is_post_niagara() ? 16 : 8;
+  }
 };
 
-#endif // CPU_SPARC_VM_VM_VERSION_SPARC_HPP
+#endif // CPU_SPARC_VM_VERSION_SPARC_HPP

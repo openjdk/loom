@@ -56,7 +56,7 @@ $(eval $(call SetupJdkLibrary, BUILD_LIBNET, \
     LIBS_solaris := -lnsl -lsocket $(LIBDL), \
     LIBS_aix := $(LIBDL),\
     LIBS_windows := ws2_32.lib jvm.lib secur32.lib iphlpapi.lib winhttp.lib \
-        delayimp.lib $(WIN_JAVA_LIB) advapi32.lib, \
+        urlmon.lib delayimp.lib $(WIN_JAVA_LIB) advapi32.lib, \
     LIBS_macosx := -framework CoreFoundation -framework CoreServices, \
 ))
 
@@ -99,7 +99,7 @@ $(BUILD_LIBNIO): $(BUILD_LIBNET)
 ################################################################################
 # Create the macosx security library
 
-ifeq ($(OPENJDK_TARGET_OS), macosx)
+ifeq ($(call isTargetOs, macosx), true)
   # JavaNativeFoundation framework not supported in static builds
   ifneq ($(STATIC_BUILD), true)
 
@@ -130,7 +130,7 @@ endif
 ################################################################################
 # Create the jsig library
 
-ifeq ($(OPENJDK_TARGET_OS_TYPE), unix)
+ifeq ($(call isTargetOsType, unix), true)
   ifeq ($(STATIC_BUILD), false)
     $(eval $(call SetupJdkLibrary, BUILD_LIBJSIG, \
         NAME := jsig, \
@@ -205,7 +205,7 @@ endif
 ################################################################################
 # Copy tzmappings file for Windows
 
-ifeq ($(OPENJDK_TARGET_OS), windows)
+ifeq ($(call isTargetOs, windows), true)
   $(eval $(call SetupCopyFiles, COPY_TZMAPPINGS, \
       FILES := $(SUPPORT_OUTPUTDIR)/gensrc/java.base/windows/conf/tzmappings, \
       DEST := $(call FindLibDirForModule, $(MODULE)), \

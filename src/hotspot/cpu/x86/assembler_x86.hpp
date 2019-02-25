@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef CPU_X86_VM_ASSEMBLER_X86_HPP
-#define CPU_X86_VM_ASSEMBLER_X86_HPP
+#ifndef CPU_X86_ASSEMBLER_X86_HPP
+#define CPU_X86_ASSEMBLER_X86_HPP
 
 #include "asm/register.hpp"
 #include "vm_version_x86.hpp"
@@ -1668,6 +1668,12 @@ private:
 
   void evpmovdb(Address dst, XMMRegister src, int vector_len);
 
+  // Multiply add
+  void pmaddwd(XMMRegister dst, XMMRegister src);
+  void vpmaddwd(XMMRegister dst, XMMRegister nds, XMMRegister src, int vector_len);
+  // Multiply add accumulate
+  void evpdpwssd(XMMRegister dst, XMMRegister nds, XMMRegister src, int vector_len);
+
 #ifndef _LP64 // no 32bit push/pop on amd64
   void popl(Address dst);
 #endif
@@ -2057,6 +2063,7 @@ private:
   void vpsllw(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpslld(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpsllq(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
+  void vpslldq(XMMRegister dst, XMMRegister src, int shift, int vector_len);
 
   // Logical shift right packed integers
   void psrlw(XMMRegister dst, int shift);
@@ -2071,6 +2078,7 @@ private:
   void vpsrlw(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpsrld(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpsrlq(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
+  void vpsrldq(XMMRegister dst, XMMRegister src, int shift, int vector_len);
   void evpsrlvw(XMMRegister dst, XMMRegister nds, XMMRegister src, int vector_len);
   void evpsllvw(XMMRegister dst, XMMRegister nds, XMMRegister src, int vector_len);
 
@@ -2304,4 +2312,4 @@ public:
 
 };
 
-#endif // CPU_X86_VM_ASSEMBLER_X86_HPP
+#endif // CPU_X86_ASSEMBLER_X86_HPP

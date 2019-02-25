@@ -71,6 +71,16 @@ import jdk.javadoc.internal.doclets.toolkit.util.DocletConstants;
  */
 public class ClassWriterImpl extends SubWriterHolderWriter implements ClassWriter {
 
+    private static final Set<String> suppressSubtypesSet
+            = Set.of("java.lang.Object",
+                     "org.omg.CORBA.Object");
+
+    private static final Set<String> suppressImplementingSet
+            = Set.of( "java.lang.Cloneable",
+                    "java.lang.constant.Constable",
+                    "java.lang.constant.ConstantDesc",
+                    "java.io.Serializable");
+
     protected final TypeElement typeElement;
 
     protected final ClassTree classtree;
@@ -97,9 +107,7 @@ public class ClassWriterImpl extends SubWriterHolderWriter implements ClassWrite
     @Override
     public Content getHeader(String header) {
         HtmlTree bodyTree = getBody(true, getWindowTitle(utils.getSimpleName(typeElement)));
-        HtmlTree htmlTree = (configuration.allowTag(HtmlTag.HEADER))
-                ? HtmlTree.HEADER()
-                : bodyTree;
+        HtmlTree htmlTree = HtmlTree.HEADER();
         addTop(htmlTree);
         Content linkContent = getModuleLink(utils.elementUtils.getModuleOf(typeElement),
                 contents.moduleLabel);
@@ -107,9 +115,7 @@ public class ClassWriterImpl extends SubWriterHolderWriter implements ClassWrite
         navBar.setMemberSummaryBuilder(configuration.getBuilderFactory().getMemberSummaryBuilder(this));
         navBar.setUserHeader(getUserHeaderFooter(true));
         htmlTree.addContent(navBar.getContent(true));
-        if (configuration.allowTag(HtmlTag.HEADER)) {
-            bodyTree.addContent(htmlTree);
-        }
+        bodyTree.addContent(htmlTree);
         bodyTree.addContent(HtmlConstants.START_OF_CLASS_DATA);
         HtmlTree div = new HtmlTree(HtmlTag.DIV);
         div.setStyle(HtmlStyle.header);
@@ -141,11 +147,7 @@ public class ClassWriterImpl extends SubWriterHolderWriter implements ClassWrite
                 HtmlStyle.title, headerContent);
         heading.addContent(getTypeParameterLinks(linkInfo));
         div.addContent(heading);
-        if (configuration.allowTag(HtmlTag.MAIN)) {
-            mainTree.addContent(div);
-        } else {
-            bodyTree.addContent(div);
-        }
+        mainTree.addContent(div);
         return bodyTree;
     }
 
@@ -163,15 +165,11 @@ public class ClassWriterImpl extends SubWriterHolderWriter implements ClassWrite
     @Override
     public void addFooter(Content contentTree) {
         contentTree.addContent(HtmlConstants.END_OF_CLASS_DATA);
-        Content htmlTree = (configuration.allowTag(HtmlTag.FOOTER))
-                ? HtmlTree.FOOTER()
-                : contentTree;
+        Content htmlTree = HtmlTree.FOOTER();
         navBar.setUserFooter(getUserHeaderFooter(false));
         htmlTree.addContent(navBar.getContent(false));
         addBottom(htmlTree);
-        if (configuration.allowTag(HtmlTag.FOOTER)) {
-            contentTree.addContent(htmlTree);
-        }
+        contentTree.addContent(htmlTree);
     }
 
     /**
@@ -370,9 +368,10 @@ public class ClassWriterImpl extends SubWriterHolderWriter implements ClassWrite
     @Override
     public void addSubClassInfo(Content classInfoTree) {
         if (utils.isClass(typeElement)) {
-            if (typeElement.getQualifiedName().contentEquals("java.lang.Object") ||
-                    typeElement.getQualifiedName().contentEquals("org.omg.CORBA.Object")) {
-                return;    // Don't generate the list, too huge
+            for (String s : suppressSubtypesSet) {
+                if (typeElement.getQualifiedName().contentEquals(s)) {
+                    return;    // Don't generate the list, too huge
+                }
             }
             Set<TypeElement> subclasses = classtree.directSubClasses(typeElement, false);
             if (!subclasses.isEmpty()) {
@@ -412,9 +411,10 @@ public class ClassWriterImpl extends SubWriterHolderWriter implements ClassWrite
         if (!utils.isInterface(typeElement)) {
             return;
         }
-        if (typeElement.getQualifiedName().contentEquals("java.lang.Cloneable") ||
-                typeElement.getQualifiedName().contentEquals("java.io.Serializable")) {
-            return;   // Don't generate the list, too big
+        for (String s : suppressImplementingSet) {
+            if (typeElement.getQualifiedName().contentEquals(s)) {
+                return;    // Don't generate the list, too huge
+            }
         }
         Set<TypeElement> implcl = classtree.implementingClasses(typeElement);
         if (!implcl.isEmpty()) {

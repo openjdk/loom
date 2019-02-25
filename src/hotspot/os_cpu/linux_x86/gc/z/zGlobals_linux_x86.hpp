@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,8 +21,8 @@
  * questions.
  */
 
-#ifndef OS_CPU_LINUX_X86_ZGLOBALS_LINUX_X86_HPP
-#define OS_CPU_LINUX_X86_ZGLOBALS_LINUX_X86_HPP
+#ifndef OS_CPU_LINUX_X86_GC_Z_ZGLOBALS_LINUX_X86_HPP
+#define OS_CPU_LINUX_X86_GC_Z_ZGLOBALS_LINUX_X86_HPP
 
 //
 // Page Allocation Tiers
@@ -74,15 +74,17 @@
 //  * 63-47 Fixed (17-bits, always zero)
 //
 
-const size_t    ZPlatformPageSizeSmallShift   = 21; // 2M
+const size_t    ZPlatformPageSizeSmallShift    = 21; // 2M
 
-const size_t    ZPlatformAddressOffsetBits    = 42; // 4TB
+const size_t    ZPlatformAddressOffsetBits     = 42; // 4TB
 
-const uintptr_t ZPlatformAddressMetadataShift = ZPlatformAddressOffsetBits;
+const uintptr_t ZPlatformAddressMetadataShift  = ZPlatformAddressOffsetBits;
 
-const uintptr_t ZPlatformAddressSpaceStart    = (uintptr_t)1 << ZPlatformAddressOffsetBits;
-const uintptr_t ZPlatformAddressSpaceSize     = ((uintptr_t)1 << ZPlatformAddressOffsetBits) * 4;
+const uintptr_t ZPlatformAddressSpaceStart     = (uintptr_t)1 << ZPlatformAddressOffsetBits;
+const uintptr_t ZPlatformAddressSpaceSize      = ((uintptr_t)1 << ZPlatformAddressOffsetBits) * 4;
 
-const size_t    ZPlatformCacheLineSize        = 64;
+const size_t    ZPlatformNMethodDisarmedOffset = 4;
 
-#endif // OS_CPU_LINUX_X86_ZGLOBALS_LINUX_X86_HPP
+const size_t    ZPlatformCacheLineSize         = 64;
+
+#endif // OS_CPU_LINUX_X86_GC_Z_ZGLOBALS_LINUX_X86_HPP

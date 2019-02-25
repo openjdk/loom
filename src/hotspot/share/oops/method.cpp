@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,6 +42,7 @@
 #include "memory/oopFactory.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/constMethod.hpp"
+#include "oops/constantPool.hpp"
 #include "oops/method.inline.hpp"
 #include "oops/methodData.hpp"
 #include "oops/objArrayOop.inline.hpp"
@@ -1604,12 +1605,12 @@ static int method_comparator(Method* a, Method* b) {
 
 // This is only done during class loading, so it is OK to assume method_idnum matches the methods() array
 // default_methods also uses this without the ordering for fast find_method
-void Method::sort_methods(Array<Method*>* methods, bool idempotent, bool set_idnums) {
+void Method::sort_methods(Array<Method*>* methods, bool set_idnums) {
   int length = methods->length();
   if (length > 1) {
     {
       NoSafepointVerifier nsv;
-      QuickSort::sort(methods->data(), length, method_comparator, idempotent);
+      QuickSort::sort(methods->data(), length, method_comparator, /*idempotent=*/false);
     }
     // Reset method ordering
     if (set_idnums) {
@@ -2403,7 +2404,6 @@ void Method::print_touched_methods(outputStream* out) {
 void Method::verify_on(outputStream* st) {
   guarantee(is_method(), "object must be method");
   guarantee(constants()->is_constantPool(), "should be constant pool");
-  guarantee(constMethod()->is_constMethod(), "should be ConstMethod*");
   MethodData* md = method_data();
   guarantee(md == NULL ||
       md->is_methodData(), "should be method data");

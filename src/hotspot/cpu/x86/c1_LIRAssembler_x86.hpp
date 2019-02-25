@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef CPU_X86_VM_C1_LIRASSEMBLER_X86_HPP
-#define CPU_X86_VM_C1_LIRASSEMBLER_X86_HPP
+#ifndef CPU_X86_C1_LIRASSEMBLER_X86_HPP
+#define CPU_X86_C1_LIRASSEMBLER_X86_HPP
 
  private:
 
@@ -66,4 +66,4 @@ public:
   void rdtscp(LIR_Opr dst, LIR_Opr tmp, LIR_Opr tmp1);
   void rdpic(LIR_Opr dst);
 
-#endif // CPU_X86_VM_C1_LIRASSEMBLER_X86_HPP
+#endif // CPU_X86_C1_LIRASSEMBLER_X86_HPP

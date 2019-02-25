@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -71,7 +71,7 @@ interface SSLTransport {
      * destination application data buffers.
      *
      * For SSL/TLS connections, if no source data, the network data may be
-     * received from the underlying underlying SSL/TLS input stream.
+     * received from the underlying SSL/TLS input stream.
      *
      * @param context      the transportation context
      * @param srcs         an array of {@code ByteBuffers} containing the
@@ -115,7 +115,7 @@ interface SSLTransport {
                 }
             }
 
-            context.fatal(Alert.UNEXPECTED_MESSAGE, unsoe);
+            throw context.fatal(Alert.UNEXPECTED_MESSAGE, unsoe);
         } catch (BadPaddingException bpe) {
             /*
              * The basic SSLv3 record protection involves (optional)
@@ -126,15 +126,15 @@ interface SSLTransport {
             Alert alert = (context.handshakeContext != null) ?
                     Alert.HANDSHAKE_FAILURE :
                     Alert.BAD_RECORD_MAC;
-            context.fatal(alert, bpe);
+            throw context.fatal(alert, bpe);
         } catch (SSLHandshakeException she) {
             // may be record sequence number overflow
-            context.fatal(Alert.HANDSHAKE_FAILURE, she);
+            throw context.fatal(Alert.HANDSHAKE_FAILURE, she);
         } catch (EOFException eofe) {
             // rethrow EOFException, the call will handle it if neede.
             throw eofe;
         } catch (IOException ioe) {
-            context.fatal(Alert.UNEXPECTED_MESSAGE, ioe);
+            throw context.fatal(Alert.UNEXPECTED_MESSAGE, ioe);
         }
 
         if (plaintexts == null || plaintexts.length == 0) {
@@ -191,7 +191,7 @@ interface SSLTransport {
                     }
 
                     if (remains > 0) {
-                        context.fatal(Alert.INTERNAL_ERROR,
+                        throw context.fatal(Alert.INTERNAL_ERROR,
                             "no sufficient room in the destination buffers");
                     }
                 }

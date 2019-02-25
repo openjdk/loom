@@ -1014,7 +1014,11 @@ public class JavaCompiler {
      * Parses a list of files.
      */
    public List<JCCompilationUnit> parseFiles(Iterable<JavaFileObject> fileObjects) {
-       if (shouldStop(CompileState.PARSE))
+       return parseFiles(fileObjects, false);
+   }
+
+   public List<JCCompilationUnit> parseFiles(Iterable<JavaFileObject> fileObjects, boolean force) {
+       if (!force && shouldStop(CompileState.PARSE))
            return List.nil();
 
         //parse all files
@@ -1761,6 +1765,7 @@ public class JavaCompiler {
     private Name parseAndGetName(JavaFileObject fo,
                                  Function<JCTree.JCCompilationUnit, Name> tree2Name) {
         DiagnosticHandler dh = new DiscardDiagnosticHandler(log);
+        JavaFileObject prevSource = log.useSource(fo);
         try {
             JCTree.JCCompilationUnit t = parse(fo, fo.getCharContent(false));
             return tree2Name.apply(t);
@@ -1768,6 +1773,7 @@ public class JavaCompiler {
             return null;
         } finally {
             log.popDiagnosticHandler(dh);
+            log.useSource(prevSource);
         }
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2014, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2007, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,8 +21,8 @@
  * questions.
  */
 
-#ifndef SHARE_VM_OPTO_VECTORNODE_HPP
-#define SHARE_VM_OPTO_VECTORNODE_HPP
+#ifndef SHARE_OPTO_VECTORNODE_HPP
+#define SHARE_OPTO_VECTORNODE_HPP
 
 #include "opto/matcher.hpp"
 #include "opto/memnode.hpp"
@@ -67,6 +67,9 @@ class VectorNode : public TypeNode {
   static int  opcode(int opc, BasicType bt);
   static bool implemented(int opc, uint vlen, BasicType bt);
   static bool is_shift(Node* n);
+  static bool is_type_transition_short_to_int(Node* n);
+  static bool is_type_transition_to_int(Node* n);
+  static bool is_muladds2i(Node* n);
   static bool is_invariant_vector(Node* n);
   // [Start, end) half-open range defining which operands are vectors
   static void vector_operands(Node* n, uint* start, uint* end);
@@ -259,6 +262,14 @@ class MulVDNode : public VectorNode {
 public:
   MulVDNode(Node* in1, Node* in2, const TypeVect* vt) : VectorNode(in1, in2, vt) {}
   virtual int Opcode() const;
+};
+
+//------------------------------MulAddVS2VINode--------------------------------
+// Vector multiply shorts to int and add adjacent ints.
+class MulAddVS2VINode : public VectorNode {
+  public:
+    MulAddVS2VINode(Node* in1, Node* in2, const TypeVect* vt) : VectorNode(in1, in2, vt) {}
+    virtual int Opcode() const;
 };
 
 //------------------------------FmaVDNode--------------------------------------
@@ -848,4 +859,4 @@ public:
   virtual const Type *Value(PhaseGVN *phase) const { return TypeInt::INT; }
 };
 
-#endif // SHARE_VM_OPTO_VECTORNODE_HPP
+#endif // SHARE_OPTO_VECTORNODE_HPP

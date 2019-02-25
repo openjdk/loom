@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,25 +22,28 @@
  *
  */
 
-#ifndef SHARE_VM_GC_G1_G1COLLECTIONSET_HPP
-#define SHARE_VM_GC_G1_G1COLLECTIONSET_HPP
+#ifndef SHARE_GC_G1_G1COLLECTIONSET_HPP
+#define SHARE_GC_G1_G1COLLECTIONSET_HPP
 
-#include "gc/g1/collectionSetChooser.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 
 class G1CollectedHeap;
+class G1CollectionSetCandidates;
 class G1CollectorState;
 class G1GCPhaseTimes;
+class G1ParScanThreadStateSet;
 class G1Policy;
 class G1SurvivorRegions;
 class HeapRegion;
+class HeapRegionClosure;
 
 class G1CollectionSet {
   G1CollectedHeap* _g1h;
   G1Policy* _policy;
 
-  CollectionSetChooser* _cset_chooser;
+  // All old gen collection set candidate regions for the current mixed gc phase.
+  G1CollectionSetCandidates* _candidates;
 
   uint _eden_region_length;
   uint _survivor_region_length;
@@ -55,6 +58,13 @@ class G1CollectionSet {
   uint* _collection_set_regions;
   volatile size_t _collection_set_cur_length;
   size_t _collection_set_max_length;
+
+  // When doing mixed collections we can add old regions to the collection, which
+  // can be collected if there is enough time. We call these optional regions and
+  // the pointer to these regions are stored in the array below.
+  HeapRegion** _optional_regions;
+  uint _optional_region_length;
+  uint _optional_region_max_length;
 
   // The number of bytes in the collection set before the pause. Set from
   // the incrementally built collection set at the start of an evacuation
@@ -106,17 +116,27 @@ class G1CollectionSet {
   G1CollectorState* collector_state();
   G1GCPhaseTimes* phase_times();
 
-  double predict_region_elapsed_time_ms(HeapRegion* hr);
-
   void verify_young_cset_indices() const NOT_DEBUG_RETURN;
+  void add_as_optional(HeapRegion* hr);
+  void add_as_old(HeapRegion* hr);
+  bool optional_is_full();
+
 public:
   G1CollectionSet(G1CollectedHeap* g1h, G1Policy* policy);
   ~G1CollectionSet();
 
   // Initializes the collection set giving the maximum possible length of the collection set.
   void initialize(uint max_region_length);
+  void initialize_optional(uint max_length);
+  void free_optional_regions();
 
-  CollectionSetChooser* cset_chooser();
+  void clear_candidates();
+
+  void set_candidates(G1CollectionSetCandidates* candidates) {
+    assert(_candidates == NULL, "Trying to replace collection set candidates.");
+    _candidates = candidates;
+  }
+  G1CollectionSetCandidates* candidates() { return _candidates; }
 
   void init_region_lengths(uint eden_cset_region_length,
                            uint survivor_cset_region_length);
@@ -131,6 +151,7 @@ public:
   uint eden_region_length() const     { return _eden_region_length;     }
   uint survivor_region_length() const { return _survivor_region_length; }
   uint old_region_length() const      { return _old_region_length;      }
+  uint optional_region_length() const { return _optional_region_length; }
 
   // Incremental collection set support
 
@@ -175,6 +196,9 @@ public:
   // Add old region "hr" to the collection set.
   void add_old_region(HeapRegion* hr);
 
+  // Add old region "hr" to optional collection set.
+  void add_optional_region(HeapRegion* hr);
+
   // Update information about hr in the aggregated information for
   // the incrementally built collection set.
   void update_young_region_prediction(HeapRegion* hr, size_t new_rs_length);
@@ -191,10 +215,72 @@ public:
   void print(outputStream* st);
 #endif // !PRODUCT
 
+  double predict_region_elapsed_time_ms(HeapRegion* hr);
+
+  void clear_optional_region(const HeapRegion* hr);
+
+  HeapRegion* optional_region_at(uint i) const {
+    assert(_optional_regions != NULL, "Not yet initialized");
+    assert(i < _optional_region_length, "index %u out of bounds (%u)", i, _optional_region_length);
+    return _optional_regions[i];
+  }
+
+  HeapRegion* remove_last_optional_region() {
+    assert(_optional_regions != NULL, "Not yet initialized");
+    assert(_optional_region_length != 0, "No region to remove");
+    _optional_region_length--;
+    HeapRegion* removed = _optional_regions[_optional_region_length];
+    _optional_regions[_optional_region_length] = NULL;
+    return removed;
+  }
+
 private:
   // Update the incremental collection set information when adding a region.
   void add_young_region_common(HeapRegion* hr);
 };
 
-#endif // SHARE_VM_GC_G1_G1COLLECTIONSET_HPP
+// Helper class to manage the optional regions in a Mixed collection.
+class G1OptionalCSet : public StackObj {
+private:
+  G1CollectionSet* _cset;
+  G1ParScanThreadStateSet* _pset;
+  uint _current_index;
+  uint _current_limit;
+  bool _prepare_failed;
+  bool _evacuation_failed;
 
+  void prepare_to_evacuate_optional_region(HeapRegion* hr);
+
+public:
+  static const uint InvalidCSetIndex = UINT_MAX;
+
+  G1OptionalCSet(G1CollectionSet* cset, G1ParScanThreadStateSet* pset) :
+    _cset(cset),
+    _pset(pset),
+    _current_index(0),
+    _current_limit(0),
+    _prepare_failed(false),
+    _evacuation_failed(false) { }
+  // The destructor returns regions to the collection set candidates set and
+  // frees the optional structure in the collection set.
+  ~G1OptionalCSet();
+
+  uint current_index() { return _current_index; }
+  uint current_limit() { return _current_limit; }
+
+  uint size();
+  bool is_empty();
+
+  HeapRegion* region_at(uint index);
+
+  // Prepare a set of regions for optional evacuation.
+  void prepare_evacuation(double time_left_ms);
+  bool prepare_failed();
+
+  // Complete the evacuation of the previously prepared
+  // regions by updating their state and check for failures.
+  void complete_evacuation();
+  bool evacuation_failed();
+};
+
+#endif // SHARE_GC_G1_G1COLLECTIONSET_HPP

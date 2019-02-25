@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,8 +32,9 @@ import java.util.Observer;
 import sun.jvm.hotspot.debugger.Address;
 import sun.jvm.hotspot.gc.shared.CollectedHeap;
 import sun.jvm.hotspot.gc.shared.CollectedHeapName;
-import sun.jvm.hotspot.gc.shared.SpaceClosure;
+import sun.jvm.hotspot.gc.shared.LiveRegionsClosure;
 import sun.jvm.hotspot.gc.shared.PrintRegionClosure;
+import sun.jvm.hotspot.gc.shared.SpaceClosure;
 import sun.jvm.hotspot.memory.MemRegion;
 import sun.jvm.hotspot.runtime.VM;
 import sun.jvm.hotspot.runtime.VMObjectFactory;
@@ -47,7 +48,7 @@ import sun.jvm.hotspot.tools.HeapSummary;
 
 public class G1CollectedHeap extends CollectedHeap {
     // HeapRegionManager _hrm;
-    static private long hrmFieldOffset;
+    static private AddressField hrmField;
     // MemRegion _g1_reserved;
     static private long g1ReservedFieldOffset;
     // size_t _summary_bytes_used;
@@ -72,7 +73,7 @@ public class G1CollectedHeap extends CollectedHeap {
     static private synchronized void initialize(TypeDataBase db) {
         Type type = db.lookupType("G1CollectedHeap");
 
-        hrmFieldOffset = type.getField("_hrm").getOffset();
+        hrmField = type.getAddressField("_hrm");
         summaryBytesUsedField = type.getCIntegerField("_summary_bytes_used");
         g1mmField = type.getAddressField("_g1mm");
         oldSetFieldOffset = type.getField("_old_set").getOffset();
@@ -93,7 +94,7 @@ public class G1CollectedHeap extends CollectedHeap {
     }
 
     public HeapRegionManager hrm() {
-        Address hrmAddr = addr.addOffsetTo(hrmFieldOffset);
+        Address hrmAddr = hrmField.getValue(addr);
         return (HeapRegionManager) VMObjectFactory.newObject(HeapRegionManager.class,
                                                          hrmAddr);
     }
@@ -135,6 +136,15 @@ public class G1CollectedHeap extends CollectedHeap {
 
     public CollectedHeapName kind() {
         return CollectedHeapName.G1;
+    }
+
+    @Override
+    public void liveRegionsIterate(LiveRegionsClosure closure) {
+        Iterator<HeapRegion> iter = heapRegionIterator();
+        while (iter.hasNext()) {
+            HeapRegion hr = iter.next();
+            closure.doLiveRegions(hr);
+        }
     }
 
     @Override

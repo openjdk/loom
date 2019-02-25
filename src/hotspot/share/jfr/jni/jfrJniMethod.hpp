@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_JFR_JNI_JFRJNIMETHOD_HPP
-#define SHARE_VM_JFR_JNI_JFRJNIMETHOD_HPP
+#ifndef SHARE_JFR_JNI_JFRJNIMETHOD_HPP
+#define SHARE_JFR_JNI_JFRJNIMETHOD_HPP
 
 #include "jni.h"
 
@@ -129,8 +129,11 @@ jboolean JNICALL jfr_set_cutoff(JNIEnv* env, jobject jvm, jlong event_type_id, j
 
 void JNICALL jfr_emit_old_object_samples(JNIEnv* env, jobject jvm, jlong cutoff_ticks, jboolean);
 
+jboolean JNICALL jfr_should_rotate_disk(JNIEnv* env, jobject jvm);
+
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif // SHARE_VM_JFR_JNI_JFRJNIMETHOD_HPP
+#endif // SHARE_JFR_JNI_JFRJNIMETHOD_HPP

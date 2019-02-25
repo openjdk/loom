@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -94,7 +94,7 @@ final class RSAServerKeyExchange {
                 signature = signer.sign();
             } catch (NoSuchAlgorithmException |
                     InvalidKeyException | SignatureException ex) {
-                shc.conContext.fatal(Alert.INTERNAL_ERROR,
+                throw shc.conContext.fatal(Alert.INTERNAL_ERROR,
                         "Failed to sign ephemeral RSA parameters", ex);
             }
 
@@ -122,7 +122,7 @@ final class RSAServerKeyExchange {
             }
 
             if (x509Credentials == null) {
-                chc.conContext.fatal(Alert.ILLEGAL_PARAMETER,
+                throw chc.conContext.fatal(Alert.ILLEGAL_PARAMETER,
                     "No RSA credentials negotiated for server key exchange");
             }
 
@@ -133,12 +133,12 @@ final class RSAServerKeyExchange {
                           chc.clientHelloRandom.randomBytes,
                           chc.serverHelloRandom.randomBytes);
                 if (!signer.verify(paramsSignature)) {
-                    chc.conContext.fatal(Alert.HANDSHAKE_FAILURE,
+                    throw chc.conContext.fatal(Alert.HANDSHAKE_FAILURE,
                         "Invalid signature of RSA ServerKeyExchange message");
                 }
             } catch (NoSuchAlgorithmException |
                     InvalidKeyException | SignatureException ex) {
-                chc.conContext.fatal(Alert.INTERNAL_ERROR,
+                throw chc.conContext.fatal(Alert.INTERNAL_ERROR,
                     "Failed to sign ephemeral RSA parameters", ex);
             }
         }
@@ -250,12 +250,12 @@ final class RSAServerKeyExchange {
                 return null;
             } else if (x509Possession == null) {
                 // unlikely
-                shc.conContext.fatal(Alert.ILLEGAL_PARAMETER,
+                throw shc.conContext.fatal(Alert.ILLEGAL_PARAMETER,
                     "No RSA certificate negotiated for server key exchange");
             } else if (!"RSA".equals(
                     x509Possession.popPrivateKey.getAlgorithm())) {
                 // unlikely
-                shc.conContext.fatal(Alert.ILLEGAL_PARAMETER,
+                throw shc.conContext.fatal(Alert.ILLEGAL_PARAMETER,
                         "No X.509 possession can be used for " +
                         "ephemeral RSA ServerKeyExchange");
             }
@@ -306,21 +306,19 @@ final class RSAServerKeyExchange {
             // check constraints of RSA PublicKey
             RSAPublicKey publicKey;
             try {
-                KeyFactory kf = JsseJce.getKeyFactory("RSA");
+                KeyFactory kf = KeyFactory.getInstance("RSA");
                 RSAPublicKeySpec spec = new RSAPublicKeySpec(
                     new BigInteger(1, skem.modulus),
                     new BigInteger(1, skem.exponent));
                 publicKey = (RSAPublicKey)kf.generatePublic(spec);
             } catch (GeneralSecurityException gse) {
-                chc.conContext.fatal(Alert.INSUFFICIENT_SECURITY,
+                throw chc.conContext.fatal(Alert.INSUFFICIENT_SECURITY,
                         "Could not generate RSAPublicKey", gse);
-
-                return;     // make the compiler happy
             }
 
             if (!chc.algorithmConstraints.permits(
                     EnumSet.of(CryptoPrimitive.KEY_AGREEMENT), publicKey)) {
-                chc.conContext.fatal(Alert.INSUFFICIENT_SECURITY,
+                throw chc.conContext.fatal(Alert.INSUFFICIENT_SECURITY,
                         "RSA ServerKeyExchange does not comply to " +
                         "algorithm constraints");
             }
@@ -328,7 +326,8 @@ final class RSAServerKeyExchange {
             //
             // update
             //
-            chc.handshakeCredentials.add(new EphemeralRSACredentials(publicKey));
+            chc.handshakeCredentials.add(
+                    new EphemeralRSACredentials(publicKey));
 
             //
             // produce

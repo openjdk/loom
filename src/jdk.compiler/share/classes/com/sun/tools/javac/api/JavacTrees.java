@@ -443,11 +443,7 @@ public class JavacTrees extends DocTrees {
                 // we first check if qualifierExpression identifies a type,
                 // and if not, then we check to see if it identifies a package.
                 Type t = attr.attribType(ref.qualifierExpression, env);
-
-                if (t.getKind() == TypeKind.ARRAY) {
-                    // cannot refer to an array type
-                    return null;
-                } else if (t.isErroneous()) {
+                if (t.isErroneous()) {
                     JCCompilationUnit toplevel =
                         treeMaker.TopLevel(List.nil());
                     final ModuleSymbol msym = modules.getDefaultModule();
@@ -478,7 +474,11 @@ public class JavacTrees extends DocTrees {
                         }
                     }
                 } else {
-                    tsym = t.tsym;
+                    Type e = t;
+                    // If this is an array type convert to element type
+                    while (e instanceof ArrayType)
+                        e = ((ArrayType)e).elemtype;
+                    tsym = e.tsym;
                     memberName = (Name) ref.memberName;
                 }
             }
@@ -1152,7 +1152,7 @@ public class JavacTrees extends DocTrees {
         try {
             switch (kind) {
             case ERROR:
-                log.error(DiagnosticFlag.MULTIPLE, pos, Errors.ProcMessager(msg.toString()));
+                log.error(DiagnosticFlag.API, pos, Errors.ProcMessager(msg.toString()));
                 break;
 
             case WARNING:

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_GC_SHARED_WORKERDATAARRAY_HPP
-#define SHARE_VM_GC_SHARED_WORKERDATAARRAY_HPP
+#ifndef SHARE_GC_SHARED_WORKERDATAARRAY_HPP
+#define SHARE_GC_SHARED_WORKERDATAARRAY_HPP
 
 #include "memory/allocation.hpp"
 #include "utilities/debug.hpp"
@@ -34,7 +34,7 @@ template <class T>
 class WorkerDataArray  : public CHeapObj<mtGC> {
   friend class WDAPrinter;
 public:
-  static const uint MaxThreadWorkItems = 3;
+  static const uint MaxThreadWorkItems = 4;
 private:
   T*          _data;
   uint        _length;
@@ -49,6 +49,8 @@ private:
   void link_thread_work_items(WorkerDataArray<size_t>* thread_work_items, uint index = 0);
   void set_thread_work_item(uint worker_i, size_t value, uint index = 0);
   void add_thread_work_item(uint worker_i, size_t value, uint index = 0);
+  void set_or_add_thread_work_item(uint worker_i, size_t value, uint index = 0);
+
   WorkerDataArray<size_t>* thread_work_items(uint index = 0) const {
     assert(index < MaxThreadWorkItems, "Tried to access thread work item %u max %u", index, MaxThreadWorkItems);
     return _thread_work_items[index];
@@ -88,4 +90,4 @@ private:
   void print_details_on(outputStream* out) const;
 };
 
-#endif // SHARE_VM_GC_SHARED_WORKERDATAARRAY_HPP
+#endif // SHARE_GC_SHARED_WORKERDATAARRAY_HPP

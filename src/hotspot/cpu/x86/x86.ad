@@ -1446,6 +1446,10 @@ const bool Matcher::match_rule_supported(int opcode) {
       if (VM_Version::supports_on_spin_wait() == false)
         ret_value = false;
       break;
+    case Op_MulAddVS2VI:
+      if (UseSSE < 2)
+        ret_value = false;
+      break;
   }
 
   return ret_value;  // Per default match rules are supported.
@@ -1581,7 +1585,7 @@ const uint Matcher::vector_shift_count_ideal_reg(int size) {
 
 // x86 supports misaligned vectors store/load.
 const bool Matcher::misaligned_vectors_ok() {
-  return !AlignVector; // can be changed by flag
+  return true;
 }
 
 // x86 AES instructions are compatible with SunJCE expanded
@@ -1634,6 +1638,7 @@ bool Matcher::clone_address_expressions(AddPNode* m, Matcher::MStack& mstack, Ve
     // Cheap to find it by looking for screwy base.
     if (adr->is_AddP() &&
         !adr->in(AddPNode::Base)->is_top() &&
+        LP64_ONLY( off->get_long() == (int) (off->get_long()) && ) // immL32
         // Are there other uses besides address expressions?
         !is_visited(adr)) {
       address_visited.set(adr->_idx); // Flag as address_visited
@@ -1680,26 +1685,24 @@ static int vec_mov_helper(CodeBuffer *cbuf, bool do_size, int src_lo, int dst_lo
     case Op_VecS: // copy whole register
     case Op_VecD:
     case Op_VecX:
-#ifndef LP64
+#ifndef _LP64
       __ movdqu(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[src_lo]));
 #else
       if ((UseAVX < 3) || VM_Version::supports_avx512vl()) {
         __ movdqu(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[src_lo]));
       } else {
-        __ vpxor(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[dst_lo]), 2);
-        __ vinserti32x4(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[src_lo]), 0x0);
+        __ vextractf32x4(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[src_lo]), 0x0);
      }
 #endif
       break;
     case Op_VecY:
-#ifndef LP64
+#ifndef _LP64
       __ vmovdqu(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[src_lo]));
 #else
       if ((UseAVX < 3) || VM_Version::supports_avx512vl()) {
         __ vmovdqu(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[src_lo]));
       } else {
-        __ vpxor(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[dst_lo]), 2);
-        __ vinserti64x4(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[src_lo]), 0x0);
+        __ vextractf64x4(as_XMMRegister(Matcher::_regEncode[dst_lo]), as_XMMRegister(Matcher::_regEncode[src_lo]), 0x0);
      }
 #endif
       break;
@@ -1753,26 +1756,26 @@ static int vec_spill_helper(CodeBuffer *cbuf, bool do_size, bool is_load,
         __ movq(as_XMMRegister(Matcher::_regEncode[reg]), Address(rsp, stack_offset));
         break;
       case Op_VecX:
-#ifndef LP64
+#ifndef _LP64
         __ movdqu(as_XMMRegister(Matcher::_regEncode[reg]), Address(rsp, stack_offset));
 #else
         if ((UseAVX < 3) || VM_Version::supports_avx512vl()) {
           __ movdqu(as_XMMRegister(Matcher::_regEncode[reg]), Address(rsp, stack_offset));
         } else {
-          __ vpxor(as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), 2);
-          __ vinserti32x4(as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), Address(rsp, stack_offset),0x0);
+          __ vpxor(as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), 2);
+          __ vinsertf32x4(as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), Address(rsp, stack_offset),0x0);
         }
 #endif
         break;
       case Op_VecY:
-#ifndef LP64
+#ifndef _LP64
         __ vmovdqu(as_XMMRegister(Matcher::_regEncode[reg]), Address(rsp, stack_offset));
 #else
         if ((UseAVX < 3) || VM_Version::supports_avx512vl()) {
           __ vmovdqu(as_XMMRegister(Matcher::_regEncode[reg]), Address(rsp, stack_offset));
         } else {
-          __ vpxor(as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), 2);
-          __ vinserti64x4(as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), Address(rsp, stack_offset),0x0);
+          __ vpxor(as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), 2);
+          __ vinsertf64x4(as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), Address(rsp, stack_offset),0x0);
         }
 #endif
         break;
@@ -1791,26 +1794,26 @@ static int vec_spill_helper(CodeBuffer *cbuf, bool do_size, bool is_load,
         __ movq(Address(rsp, stack_offset), as_XMMRegister(Matcher::_regEncode[reg]));
         break;
       case Op_VecX:
-#ifndef LP64
+#ifndef _LP64
         __ movdqu(Address(rsp, stack_offset), as_XMMRegister(Matcher::_regEncode[reg]));
 #else
         if ((UseAVX < 3) || VM_Version::supports_avx512vl()) {
           __ movdqu(Address(rsp, stack_offset), as_XMMRegister(Matcher::_regEncode[reg]));
         }
         else {
-          __ vextracti32x4(Address(rsp, stack_offset), as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), 0x0);
+          __ vextractf32x4(Address(rsp, stack_offset), as_XMMRegister(Matcher::_regEncode[reg]), 0x0);
         }
 #endif
         break;
       case Op_VecY:
-#ifndef LP64
+#ifndef _LP64
         __ vmovdqu(Address(rsp, stack_offset), as_XMMRegister(Matcher::_regEncode[reg]));
 #else
         if ((UseAVX < 3) || VM_Version::supports_avx512vl()) {
           __ vmovdqu(Address(rsp, stack_offset), as_XMMRegister(Matcher::_regEncode[reg]));
         }
         else {
-          __ vextracti64x4(Address(rsp, stack_offset), as_XMMRegister(Matcher::_regEncode[reg]), as_XMMRegister(Matcher::_regEncode[reg]), 0x0);
+          __ vextractf64x4(Address(rsp, stack_offset), as_XMMRegister(Matcher::_regEncode[reg]), 0x0);
         }
 #endif
         break;
@@ -2920,11 +2923,11 @@ instruct MoveVecX2Leg(legVecX dst, vecX src) %{
   match(Set dst src);
   format %{ "movdqu $dst,$src\t! load vector (16 bytes)" %}
   ins_encode %{
-    if (UseAVX < 2 || VM_Version::supports_avx512vl()) {
-      __ movdqu($dst$$XMMRegister, $src$$XMMRegister);
-    } else {
+    if (UseAVX > 2 && !VM_Version::supports_avx512vl()) {
       int vector_len = 2;
       __ evmovdquq($dst$$XMMRegister, $src$$XMMRegister, vector_len);
+    } else {
+      __ movdqu($dst$$XMMRegister, $src$$XMMRegister);
     }
   %}
   ins_pipe( fpu_reg_reg );
@@ -2935,11 +2938,11 @@ instruct MoveLeg2VecX(vecX dst, legVecX src) %{
   match(Set dst src);
   format %{ "movdqu $dst,$src\t! load vector (16 bytes)" %}
   ins_encode %{
-    if (UseAVX < 2 || VM_Version::supports_avx512vl()) {
-      __ movdqu($dst$$XMMRegister, $src$$XMMRegister);
-    } else {
+    if (UseAVX > 2 && !VM_Version::supports_avx512vl()) {
       int vector_len = 2;
       __ evmovdquq($dst$$XMMRegister, $src$$XMMRegister, vector_len);
+    } else {
+      __ movdqu($dst$$XMMRegister, $src$$XMMRegister);
     }
   %}
   ins_pipe( fpu_reg_reg );
@@ -2962,11 +2965,11 @@ instruct MoveVecY2Leg(legVecY dst, vecY src) %{
   match(Set dst src);
   format %{ "vmovdqu $dst,$src\t! load vector (32 bytes)" %}
   ins_encode %{
-    if (UseAVX < 2 || VM_Version::supports_avx512vl()) {
-      __ vmovdqu($dst$$XMMRegister, $src$$XMMRegister);
-    } else {
+    if (UseAVX > 2 && !VM_Version::supports_avx512vl()) {
       int vector_len = 2;
       __ evmovdquq($dst$$XMMRegister, $src$$XMMRegister, vector_len);
+    } else {
+      __ vmovdqu($dst$$XMMRegister, $src$$XMMRegister);
     }
   %}
   ins_pipe( fpu_reg_reg );
@@ -2977,11 +2980,11 @@ instruct MoveLeg2VecY(vecY dst, legVecY src) %{
   match(Set dst src);
   format %{ "vmovdqu $dst,$src\t! load vector (32 bytes)" %}
   ins_encode %{
-    if (UseAVX < 2 || VM_Version::supports_avx512vl()) {
-      __ vmovdqu($dst$$XMMRegister, $src$$XMMRegister);
-    } else {
+    if (UseAVX > 2 && !VM_Version::supports_avx512vl()) {
       int vector_len = 2;
       __ evmovdquq($dst$$XMMRegister, $src$$XMMRegister, vector_len);
+    } else {
+      __ vmovdqu($dst$$XMMRegister, $src$$XMMRegister);
     }
   %}
   ins_pipe( fpu_reg_reg );
@@ -9853,6 +9856,122 @@ instruct vfma16F_mem(vecZ a, memory b, vecZ c) %{
     __ vfmaf($c$$XMMRegister, $a$$XMMRegister, $b$$Address, $c$$XMMRegister, vector_len);
   %}
   ins_pipe( pipe_slow );
+%}
+
+// --------------------------------- Vector Multiply Add --------------------------------------
+
+instruct smuladd4S2I_reg(vecD dst, vecD src1) %{
+  predicate(UseSSE >= 2 && UseAVX == 0 && n->as_Vector()->length() == 2);
+  match(Set dst (MulAddVS2VI dst src1));
+  format %{ "pmaddwd $dst,$dst,$src1\t! muladd packed4Sto2I" %}
+  ins_encode %{
+    __ pmaddwd($dst$$XMMRegister, $src1$$XMMRegister);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct vmuladd4S2I_reg(vecD dst, vecD src1, vecD src2) %{
+  predicate(UseAVX > 0 && n->as_Vector()->length() == 2);
+  match(Set dst (MulAddVS2VI src1 src2));
+  format %{ "vpmaddwd $dst,$src1,$src2\t! muladd packed4Sto2I" %}
+  ins_encode %{
+    int vector_len = 0;
+    __ vpmaddwd($dst$$XMMRegister, $src1$$XMMRegister, $src2$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct smuladd8S4I_reg(vecX dst, vecX src1) %{
+  predicate(UseSSE >= 2 && UseAVX == 0 && n->as_Vector()->length() == 4);
+  match(Set dst (MulAddVS2VI dst src1));
+  format %{ "pmaddwd $dst,$dst,$src1\t! muladd packed8Sto4I" %}
+  ins_encode %{
+    __ pmaddwd($dst$$XMMRegister, $src1$$XMMRegister);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct vmuladd8S4I_reg(vecX dst, vecX src1, vecX src2) %{
+  predicate(UseAVX > 0 && n->as_Vector()->length() == 4);
+  match(Set dst (MulAddVS2VI src1 src2));
+  format %{ "vpmaddwd $dst,$src1,$src2\t! muladd packed8Sto4I" %}
+  ins_encode %{
+    int vector_len = 0;
+    __ vpmaddwd($dst$$XMMRegister, $src1$$XMMRegister, $src2$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct vmuladd16S8I_reg(vecY dst, vecY src1, vecY src2) %{
+  predicate(UseAVX > 1 && n->as_Vector()->length() == 8);
+  match(Set dst (MulAddVS2VI src1 src2));
+  format %{ "vpmaddwd $dst,$src1,$src2\t! muladd packed16Sto8I" %}
+  ins_encode %{
+    int vector_len = 1;
+    __ vpmaddwd($dst$$XMMRegister, $src1$$XMMRegister, $src2$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct vmuladd32S16I_reg(vecZ dst, vecZ src1, vecZ src2) %{
+  predicate(UseAVX > 2 && n->as_Vector()->length() == 16);
+  match(Set dst (MulAddVS2VI src1 src2));
+  format %{ "vpmaddwd $dst,$src1,$src2\t! muladd packed32Sto16I" %}
+  ins_encode %{
+    int vector_len = 2;
+    __ vpmaddwd($dst$$XMMRegister, $src1$$XMMRegister, $src2$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+// --------------------------------- Vector Multiply Add Add ----------------------------------
+
+instruct vmuladdadd4S2I_reg(vecD dst, vecD src1, vecD src2) %{
+  predicate(VM_Version::supports_vnni() && UseAVX > 2 && n->as_Vector()->length() == 2);
+  match(Set dst (AddVI (MulAddVS2VI src1 src2) dst));
+  format %{ "evpdpwssd $dst,$src1,$src2\t! muladdadd packed4Sto2I" %}
+  ins_encode %{
+    int vector_len = 0;
+    __ evpdpwssd($dst$$XMMRegister, $src1$$XMMRegister, $src2$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+  ins_cost(10);
+%}
+
+instruct vmuladdadd8S4I_reg(vecX dst, vecX src1, vecX src2) %{
+  predicate(VM_Version::supports_vnni() && UseAVX > 2 && n->as_Vector()->length() == 4);
+  match(Set dst (AddVI (MulAddVS2VI src1 src2) dst));
+  format %{ "evpdpwssd $dst,$src1,$src2\t! muladdadd packed8Sto4I" %}
+  ins_encode %{
+    int vector_len = 0;
+    __ evpdpwssd($dst$$XMMRegister, $src1$$XMMRegister, $src2$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+  ins_cost(10);
+%}
+
+instruct vmuladdadd16S8I_reg(vecY dst, vecY src1, vecY src2) %{
+  predicate(VM_Version::supports_vnni() && UseAVX > 2 && n->as_Vector()->length() == 8);
+  match(Set dst (AddVI (MulAddVS2VI src1 src2) dst));
+  format %{ "evpdpwssd $dst,$src1,$src2\t! muladdadd packed16Sto8I" %}
+  ins_encode %{
+    int vector_len = 1;
+    __ evpdpwssd($dst$$XMMRegister, $src1$$XMMRegister, $src2$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+  ins_cost(10);
+%}
+
+instruct vmuladdadd32S16I_reg(vecZ dst, vecZ src1, vecZ src2) %{
+  predicate(VM_Version::supports_vnni() && UseAVX > 2 && n->as_Vector()->length() == 16);
+  match(Set dst (AddVI (MulAddVS2VI src1 src2) dst));
+  format %{ "evpdpwssd $dst,$src1,$src2\t! muladdadd packed32Sto16I" %}
+  ins_encode %{
+    int vector_len = 2;
+    __ evpdpwssd($dst$$XMMRegister, $src1$$XMMRegister, $src2$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+  ins_cost(10);
 %}
 
 // --------------------------------- PopCount --------------------------------------

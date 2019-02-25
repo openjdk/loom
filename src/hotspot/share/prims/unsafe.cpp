@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -38,6 +38,7 @@
 #include "prims/unsafe.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/globals.hpp"
+#include "runtime/handles.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/orderAccess.hpp"
@@ -930,11 +931,12 @@ UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetLong(JNIEnv *env, jobject unsafe, job
   }
 } UNSAFE_END
 
-static void post_thread_park_event(EventThreadPark* event, const oop obj, jlong timeout) {
+static void post_thread_park_event(EventThreadPark* event, const oop obj, jlong timeout_nanos, jlong until_epoch_millis) {
   assert(event != NULL, "invariant");
   assert(event->should_commit(), "invariant");
   event->set_parkedClass((obj != NULL) ? obj->klass() : NULL);
-  event->set_timeout(timeout);
+  event->set_timeout(timeout_nanos);
+  event->set_until(until_epoch_millis);
   event->set_address((obj != NULL) ? (u8)cast_from_oop<uintptr_t>(obj) : 0);
   event->commit();
 }
@@ -946,7 +948,16 @@ UNSAFE_ENTRY(void, Unsafe_Park(JNIEnv *env, jobject unsafe, jboolean isAbsolute,
   JavaThreadParkedState jtps(thread, time != 0);
   thread->parker()->park(isAbsolute != 0, time);
   if (event.should_commit()) {
-    post_thread_park_event(&event, thread->current_park_blocker(), time);
+    const oop obj = thread->current_park_blocker();
+    if (time == 0) {
+      post_thread_park_event(&event, obj, min_jlong, min_jlong);
+    } else {
+      if (isAbsolute != 0) {
+        post_thread_park_event(&event, obj, min_jlong, time);
+      } else {
+        post_thread_park_event(&event, obj, time, min_jlong);
+      }
+    }
   }
   HOTSPOT_THREAD_PARK_END((uintptr_t) thread->parker());
 } UNSAFE_END

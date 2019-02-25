@@ -291,7 +291,7 @@ Node* CheckCastPPNode::Identity(PhaseGVN* phase) {
     return this;
   }
   // Toned down to rescue meeting at a Phi 3 different oops all implementing
-  // the same interface.  CompileTheWorld starting at 502, kd12rc1.zip.
+  // the same interface.
   return (phase->type(in(1)) == phase->type(this)) ? in(1) : this;
 }
 
@@ -410,11 +410,11 @@ static inline Node* addP_of_X2P(PhaseGVN *phase,
                                 Node* dispX,
                                 bool negate = false) {
   if (negate) {
-    dispX = new SubXNode(phase->MakeConX(0), phase->transform(dispX));
+    dispX = phase->transform(new SubXNode(phase->MakeConX(0), dispX));
   }
   return new AddPNode(phase->C->top(),
                       phase->transform(new CastX2PNode(base)),
-                      phase->transform(dispX));
+                      dispX);
 }
 
 Node *CastX2PNode::Ideal(PhaseGVN *phase, bool can_reshape) {

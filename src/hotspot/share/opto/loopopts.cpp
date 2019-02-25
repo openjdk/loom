@@ -493,6 +493,60 @@ Node *PhaseIdealLoop::remix_address_expressions( Node *n ) {
   return NULL;
 }
 
+// Optimize ((in1[2*i] * in2[2*i]) + (in1[2*i+1] * in2[2*i+1]))
+Node *PhaseIdealLoop::convert_add_to_muladd(Node* n) {
+  assert(n->Opcode() == Op_AddI, "sanity");
+  Node * nn = NULL;
+  Node * in1 = n->in(1);
+  Node * in2 = n->in(2);
+  if (in1->Opcode() == Op_MulI && in2->Opcode() == Op_MulI) {
+    IdealLoopTree* loop_n = get_loop(get_ctrl(n));
+    if (loop_n->_head->as_Loop()->is_valid_counted_loop() &&
+        Matcher::match_rule_supported(Op_MulAddS2I) &&
+        Matcher::match_rule_supported(Op_MulAddVS2VI)) {
+      Node* mul_in1 = in1->in(1);
+      Node* mul_in2 = in1->in(2);
+      Node* mul_in3 = in2->in(1);
+      Node* mul_in4 = in2->in(2);
+      if (mul_in1->Opcode() == Op_LoadS &&
+          mul_in2->Opcode() == Op_LoadS &&
+          mul_in3->Opcode() == Op_LoadS &&
+          mul_in4->Opcode() == Op_LoadS) {
+        IdealLoopTree* loop1 = get_loop(get_ctrl(mul_in1));
+        IdealLoopTree* loop2 = get_loop(get_ctrl(mul_in2));
+        IdealLoopTree* loop3 = get_loop(get_ctrl(mul_in3));
+        IdealLoopTree* loop4 = get_loop(get_ctrl(mul_in4));
+        IdealLoopTree* loop5 = get_loop(get_ctrl(in1));
+        IdealLoopTree* loop6 = get_loop(get_ctrl(in2));
+        // All nodes should be in the same counted loop.
+        if (loop_n == loop1 && loop_n == loop2 && loop_n == loop3 &&
+            loop_n == loop4 && loop_n == loop5 && loop_n == loop6) {
+          Node* adr1 = mul_in1->in(MemNode::Address);
+          Node* adr2 = mul_in2->in(MemNode::Address);
+          Node* adr3 = mul_in3->in(MemNode::Address);
+          Node* adr4 = mul_in4->in(MemNode::Address);
+          if (adr1->is_AddP() && adr2->is_AddP() && adr3->is_AddP() && adr4->is_AddP()) {
+            if ((adr1->in(AddPNode::Base) == adr3->in(AddPNode::Base)) &&
+                (adr2->in(AddPNode::Base) == adr4->in(AddPNode::Base))) {
+              nn = new MulAddS2INode(mul_in1, mul_in2, mul_in3, mul_in4);
+              register_new_node(nn, get_ctrl(n));
+              _igvn.replace_node(n, nn);
+              return nn;
+            } else if ((adr1->in(AddPNode::Base) == adr4->in(AddPNode::Base)) &&
+                       (adr2->in(AddPNode::Base) == adr3->in(AddPNode::Base))) {
+              nn = new MulAddS2INode(mul_in1, mul_in2, mul_in4, mul_in3);
+              register_new_node(nn, get_ctrl(n));
+              _igvn.replace_node(n, nn);
+              return nn;
+            }
+          }
+        }
+      }
+    }
+  }
+  return nn;
+}
+
 //------------------------------conditional_move-------------------------------
 // Attempt to replace a Phi with a conditional move.  We have some pretty
 // strict profitability requirements.  All Phis at the merge point must
@@ -927,6 +981,11 @@ Node *PhaseIdealLoop::split_if_with_blocks_pre( Node *n ) {
   Node *m = remix_address_expressions( n );
   if( m ) return m;
 
+  if (n_op == Op_AddI) {
+    Node *nn = convert_add_to_muladd( n );
+    if ( nn ) return nn;
+  }
+
   if (n->is_ConstraintCast()) {
     Node* dom_cast = n->as_ConstraintCast()->dominating_cast(&_igvn, this);
     // ConstraintCastNode::dominating_cast() uses node control input to determine domination.
@@ -971,8 +1030,7 @@ Node *PhaseIdealLoop::split_if_with_blocks_pre( Node *n ) {
     }
   }
 
-  // Use same limit as split_if_with_blocks_post
-  if( C->live_nodes() > 35000 ) return n; // Method too big
+  if (must_throttle_split_if()) return n;
 
   // Split 'n' through the merge point if it is profitable
   Node *phi = split_thru_phi( n, n_blk, policy );
@@ -1024,6 +1082,11 @@ static bool merge_point_safe(Node* region) {
         Node* m = n->fast_out(j);
         if (m->is_FastLock())
           return false;
+#if INCLUDE_SHENANDOAHGC
+        if (m->is_ShenandoahBarrier() && m->has_out_with(Op_FastLock)) {
+          return false;
+        }
+#endif
 #ifdef _LP64
         if (m->Opcode() == Op_ConvI2L)
           return false;
@@ -1085,9 +1148,10 @@ bool PhaseIdealLoop::identical_backtoback_ifs(Node *n) {
   return true;
 }
 
-bool PhaseIdealLoop::can_split_if(Node *n_ctrl) {
-  if (C->live_nodes() > 35000) {
-    return false; // Method too big
+
+bool PhaseIdealLoop::can_split_if(Node* n_ctrl) {
+  if (must_throttle_split_if()) {
+    return false;
   }
 
   // Do not do 'split-if' if irreducible loops are present.
@@ -1310,6 +1374,7 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n, bool last_round) {
         // control, then the cloning of n is a pointless exercise, because
         // GVN will ensure that we end up where we started.
         if (!n->is_Load() || late_load_ctrl != n_ctrl) {
+          BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
           for (DUIterator_Last jmin, j = n->last_outs(jmin); j >= jmin; ) {
             Node *u = n->last_out(j); // Clone private computation per use
             _igvn.rehash_node_delayed(u);
@@ -1339,6 +1404,10 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n, bool last_round) {
             // Find control for 'x' next to use but not inside inner loops.
             // For inner loop uses get the preheader area.
             x_ctrl = place_near_use(x_ctrl);
+
+            if (bs->sink_node(this, n, x, x_ctrl, n_ctrl)) {
+              continue;
+            }
 
             if (n->is_Load()) {
               // For loads, add a control edge to a CFG node outside of the loop
@@ -1399,12 +1468,13 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n, bool last_round) {
 // Check for aggressive application of 'split-if' optimization,
 // using basic block level info.
 void PhaseIdealLoop::split_if_with_blocks(VectorSet &visited, Node_Stack &nstack, bool last_round) {
-  Node *n = C->root();
-  visited.set(n->_idx); // first, mark node as visited
+  Node* root = C->root();
+  visited.set(root->_idx); // first, mark root as visited
   // Do pre-visit work for root
-  n = split_if_with_blocks_pre( n );
-  uint cnt = n->outcnt();
-  uint i   = 0;
+  Node* n   = split_if_with_blocks_pre(root);
+  uint  cnt = n->outcnt();
+  uint  i   = 0;
+
   while (true) {
     // Visit all children
     if (i < cnt) {
@@ -1412,7 +1482,7 @@ void PhaseIdealLoop::split_if_with_blocks(VectorSet &visited, Node_Stack &nstack
       ++i;
       if (use->outcnt() != 0 && !visited.test_set(use->_idx)) {
         // Now do pre-visit work for this use
-        use = split_if_with_blocks_pre( use );
+        use = split_if_with_blocks_pre(use);
         nstack.push(n, i); // Save parent and next use's index.
         n   = use;         // Process all children of current use.
         cnt = use->outcnt();
@@ -1423,7 +1493,10 @@ void PhaseIdealLoop::split_if_with_blocks(VectorSet &visited, Node_Stack &nstack
       // All of n's children have been processed, complete post-processing.
       if (cnt != 0 && !n->is_Con()) {
         assert(has_node(n), "no dead nodes");
-        split_if_with_blocks_post( n, last_round );
+        split_if_with_blocks_post(n, last_round);
+      }
+      if (must_throttle_split_if()) {
+        nstack.clear();
       }
       if (nstack.is_empty()) {
         // Finished all nodes on stack.
@@ -3137,7 +3210,7 @@ bool PhaseIdealLoop::partial_peel( IdealLoopTree *loop, Node_List &old_new ) {
 
           // if not pinned and not a load (which maybe anti-dependent on a store)
           // and not a CMove (Matcher expects only bool->cmove).
-          if ( n->in(0) == NULL && !n->is_Load() && !n->is_CMove() ) {
+          if (n->in(0) == NULL && !n->is_Load() && !n->is_CMove() && n->Opcode() != Op_ShenandoahWBMemProj) {
             cloned_for_outside_use += clone_for_use_outside_loop( loop, n, worklist );
             sink_list.push(n);
             peel     >>= n->_idx; // delete n from peel set.

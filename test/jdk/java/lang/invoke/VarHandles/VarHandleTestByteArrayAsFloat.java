@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -54,25 +54,56 @@ public class VarHandleTestByteArrayAsFloat extends VarHandleBaseByteArrayTest {
 
 
     @Override
-    public void setupVarHandleSources() {
+    public List<VarHandleSource> setupVarHandleSources(boolean same) {
         // Combinations of VarHandle byte[] or ByteBuffer
-        vhss = new ArrayList<>();
-        for (MemoryMode endianess : Arrays.asList(MemoryMode.BIG_ENDIAN, MemoryMode.LITTLE_ENDIAN)) {
+        List<VarHandleSource> vhss = new ArrayList<>();
+        for (MemoryMode endianess : List.of(MemoryMode.BIG_ENDIAN, MemoryMode.LITTLE_ENDIAN)) {
 
             ByteOrder bo = endianess == MemoryMode.BIG_ENDIAN
                     ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
+
+            Class<?> arrayType;
+            if (same) {
+                arrayType = float[].class;
+            }
+            else {
+                arrayType = int[].class;
+            }
             VarHandleSource aeh = new VarHandleSource(
-                    MethodHandles.byteArrayViewVarHandle(float[].class, bo),
+                    MethodHandles.byteArrayViewVarHandle(arrayType, bo),
                     endianess, MemoryMode.READ_WRITE);
             vhss.add(aeh);
 
             VarHandleSource bbh = new VarHandleSource(
-                    MethodHandles.byteBufferViewVarHandle(float[].class, bo),
+                    MethodHandles.byteBufferViewVarHandle(arrayType, bo),
                     endianess, MemoryMode.READ_WRITE);
             vhss.add(bbh);
         }
+        return vhss;
     }
 
+    @Test
+    public void testEquals() {
+        VarHandle[] vhs1 = setupVarHandleSources(true).stream().
+            map(vhs -> vhs.s).toArray(VarHandle[]::new);
+        VarHandle[] vhs2 = setupVarHandleSources(true).stream().
+            map(vhs -> vhs.s).toArray(VarHandle[]::new);
+
+        for (int i = 0; i < vhs1.length; i++) {
+            for (int j = 0; j < vhs1.length; j++) {
+                if (i != j) {
+                    assertNotEquals(vhs1[i], vhs1[j]);
+                    assertNotEquals(vhs1[i], vhs2[j]);
+                }
+            }
+        }
+
+        VarHandle[] vhs3 = setupVarHandleSources(false).stream().
+            map(vhs -> vhs.s).toArray(VarHandle[]::new);
+        for (int i = 0; i < vhs1.length; i++) {
+            assertNotEquals(vhs1[i], vhs3[i]);
+        }
+    }
 
     @Test(dataProvider = "varHandlesProvider")
     public void testIsAccessModeSupported(VarHandleSource vhs) {

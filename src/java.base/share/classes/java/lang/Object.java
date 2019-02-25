@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -94,12 +94,10 @@ public class Object {
      *     programmer should be aware that producing distinct integer results
      *     for unequal objects may improve the performance of hash tables.
      * </ul>
-     * <p>
-     * As much as is reasonably practical, the hashCode method defined
-     * by class {@code Object} does return distinct integers for
-     * distinct objects. (The hashCode may or may not be implemented
-     * as some function of an object's memory address at some point
-     * in time.)
+     *
+     * @implSpec
+     * As far as is reasonably practical, the {@code hashCode} method defined
+     * by class {@code Object} returns distinct integers for distinct objects.
      *
      * @return  a hash code value for this object.
      * @see     java.lang.Object#equals(java.lang.Object)
@@ -432,7 +430,7 @@ public class Object {
      * }</pre>
      *
      * @param  timeoutMillis the maximum time to wait, in milliseconds
-     * @param  nanos   additional time, in nanoseconds, in the range range 0-999999 inclusive
+     * @param  nanos   additional time, in nanoseconds, in the range 0-999999 inclusive
      * @throws IllegalArgumentException if {@code timeoutMillis} is negative,
      *         or if the value of {@code nanos} is out of range
      * @throws IllegalMonitorStateException if the current thread is not

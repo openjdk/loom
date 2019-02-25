@@ -29,11 +29,13 @@
  *           Make sure class tree includes heirarchy for enums and annotation
  *           types.
  * @author   jamieh
- * @library  ../lib
+ * @library  ../../lib
  * @modules jdk.javadoc/jdk.javadoc.internal.tool
- * @build    JavadocTester
+ * @build    javadoc.tester.*
  * @run main TestClassTree
  */
+
+import javadoc.tester.JavadocTester;
 
 public class TestClassTree extends JavadocTester {
 
@@ -43,7 +45,7 @@ public class TestClassTree extends JavadocTester {
     }
 
     @Test
-    void test() {
+    public void test() {
         javadoc("-d", "out",
                 "-sourcepath", testSrc,
                 "pkg");
@@ -63,8 +65,7 @@ public class TestClassTree extends JavadocTester {
                 + "<ul>\n"
                 + "<li class=\"circle\">java.lang.Object\n"
                 + "<ul>\n"
-                + "<li class=\"circle\">java.lang.Enum&lt;E&gt; (implements java.lang."
-                + "Comparable&lt;T&gt;, java.io.Serializable)\n"
+                + "<li class=\"circle\">java.lang.Enum&lt;E&gt; (implements java.lang.Comparable&lt;T&gt;, java.lang.constant.Constable, java.io.Serializable)\n"
                 + "<ul>\n"
                 + "<li class=\"circle\">pkg.<a href=\"Coin.html\" "
                 + "title=\"enum in pkg\"><span class=\"typeNameLink\">Coin</span></a></li>\n"

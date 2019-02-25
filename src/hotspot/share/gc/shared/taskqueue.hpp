@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_GC_SHARED_TASKQUEUE_HPP
-#define SHARE_VM_GC_SHARED_TASKQUEUE_HPP
+#ifndef SHARE_GC_SHARED_TASKQUEUE_HPP
+#define SHARE_GC_SHARED_TASKQUEUE_HPP
 
 #include "memory/allocation.hpp"
 #include "memory/padded.hpp"
@@ -447,11 +447,14 @@ public:
 
 #undef TRACESPINNING
 
-class ParallelTaskTerminator: public StackObj {
-private:
+class ParallelTaskTerminator: public CHeapObj<mtGC> {
+protected:
   uint _n_threads;
   TaskQueueSetSuper* _queue_set;
+
+  DEFINE_PAD_MINUS_SIZE(0, DEFAULT_CACHE_LINE_SIZE, 0);
   volatile uint _offered_termination;
+  DEFINE_PAD_MINUS_SIZE(1, DEFAULT_CACHE_LINE_SIZE, sizeof(volatile uint));
 
 #ifdef TRACESPINNING
   static uint _total_yields;
@@ -464,11 +467,18 @@ protected:
   virtual void yield();
   void sleep(uint millis);
 
+  // Called when exiting termination is requested.
+  // When the request is made, terminator may have already terminated
+  // (e.g. all threads are arrived and offered termination). In this case,
+  // it should ignore the request and complete the termination.
+  // Return true if termination is completed. Otherwise, return false.
+  bool complete_or_exit_termination();
 public:
 
   // "n_threads" is the number of threads to be terminated.  "queue_set" is a
   // queue sets of work queues of other threads.
   ParallelTaskTerminator(uint n_threads, TaskQueueSetSuper* queue_set);
+  virtual ~ParallelTaskTerminator();
 
   // The current thread has no work, and is ready to terminate if everyone
   // else is.  If returns "true", all threads are terminated.  If returns
@@ -481,7 +491,7 @@ public:
   // As above, but it also terminates if the should_exit_termination()
   // method of the terminator parameter returns true. If terminator is
   // NULL, then it is ignored.
-  bool offer_termination(TerminatorTerminator* terminator);
+  virtual bool offer_termination(TerminatorTerminator* terminator);
 
   // Reset the terminator, so that it may be reused again.
   // The caller is responsible for ensuring that this is done
@@ -498,6 +508,22 @@ public:
   static uint total_peeks() { return _total_peeks; }
   static void print_termination_counts();
 #endif
+};
+
+class TaskTerminator : public StackObj {
+private:
+  ParallelTaskTerminator*  _terminator;
+
+  // Noncopyable.
+  TaskTerminator(const TaskTerminator&);
+  TaskTerminator& operator=(const TaskTerminator&);
+public:
+  TaskTerminator(uint n_threads, TaskQueueSetSuper* queue_set);
+  ~TaskTerminator();
+
+  ParallelTaskTerminator* terminator() const {
+    return _terminator;
+  }
 };
 
 typedef GenericTaskQueue<oop, mtGC>             OopTaskQueue;
@@ -587,4 +613,4 @@ typedef GenericTaskQueueSet<OopStarTaskQueue, mtGC> OopStarTaskQueueSet;
 typedef OverflowTaskQueue<size_t, mtGC>             RegionTaskQueue;
 typedef GenericTaskQueueSet<RegionTaskQueue, mtGC>  RegionTaskQueueSet;
 
-#endif // SHARE_VM_GC_SHARED_TASKQUEUE_HPP
+#endif // SHARE_GC_SHARED_TASKQUEUE_HPP

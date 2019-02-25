@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,7 +27,9 @@ package java.lang.invoke;
 import jdk.internal.util.Preconditions;
 import jdk.internal.vm.annotation.ForceInline;
 
+import java.lang.invoke.VarHandle.VarHandleDesc;
 import java.util.Objects;
+import java.util.Optional;
 
 import static java.lang.invoke.MethodHandleStatics.UNSAFE;
 
@@ -59,6 +61,19 @@ final class VarHandle$Type$s {
         @Override
         final MethodType accessModeTypeUncached(AccessMode accessMode) {
             return accessMode.at.accessModeType(receiverType, {#if[Object]?fieldType:$type$.class});
+        }
+
+        @Override
+        public Optional<VarHandleDesc> describeConstable() {
+            var receiverTypeRef = receiverType.describeConstable();
+            var fieldTypeRef = {#if[Object]?fieldType:$type$.class}.describeConstable();
+            if (!receiverTypeRef.isPresent() || !fieldTypeRef.isPresent())
+                return Optional.empty();
+
+            // Reflect on this VarHandle to extract the field name
+            String name = VarHandles.getFieldFromReceiverAndOffset(
+                receiverType, fieldOffset, {#if[Object]?fieldType:$type$.class}).getName();
+            return Optional.of(VarHandleDesc.ofField(receiverTypeRef.get(), name, fieldTypeRef.get()));
         }
 
         @ForceInline
@@ -324,6 +339,21 @@ final class VarHandle$Type$s {
         }
 
         @Override
+        public Optional<VarHandleDesc> describeConstable() {
+            var fieldTypeRef = {#if[Object]?fieldType:$type$.class}.describeConstable();
+            if (!fieldTypeRef.isPresent())
+                return Optional.empty();
+
+            // Reflect on this VarHandle to extract the field name
+            var staticField = VarHandles.getStaticFieldFromBaseAndOffset(
+                base, fieldOffset, {#if[Object]?fieldType:$type$.class});
+            var receiverTypeRef = staticField.getDeclaringClass().describeConstable();
+            if (!receiverTypeRef.isPresent())
+                return Optional.empty();
+            return Optional.of(VarHandleDesc.ofStaticField(receiverTypeRef.get(), staticField.getName(), fieldTypeRef.get()));
+        }
+
+        @Override
         final MethodType accessModeTypeUncached(AccessMode accessMode) {
             return accessMode.at.accessModeType(null, {#if[Object]?fieldType:$type$.class});
         }
@@ -585,6 +615,15 @@ final class VarHandle$Type$s {
             this.arrayType = {#if[Object]?arrayType:$type$[].class};
             this.componentType = arrayType.getComponentType();
 #end[Object]
+        }
+
+        @Override
+        public Optional<VarHandleDesc> describeConstable() {
+            var arrayTypeRef = {#if[Object]?arrayType:$type$[].class}.describeConstable();
+            if (!arrayTypeRef.isPresent())
+                return Optional.empty();
+
+            return Optional.of(VarHandleDesc.ofArray(arrayTypeRef.get()));
         }
 
         @Override

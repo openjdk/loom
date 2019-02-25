@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,9 +26,12 @@
 #include "gc/g1/g1Analytics.hpp"
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "gc/g1/g1CollectionSet.hpp"
+#include "gc/g1/g1CollectionSetCandidates.hpp"
 #include "gc/g1/g1ConcurrentMark.hpp"
 #include "gc/g1/g1ConcurrentMarkThread.inline.hpp"
 #include "gc/g1/g1ConcurrentRefine.hpp"
+#include "gc/g1/g1CollectionSetChooser.hpp"
+#include "gc/g1/g1HeterogeneousHeapPolicy.hpp"
 #include "gc/g1/g1HotCardCache.hpp"
 #include "gc/g1/g1IHOPControl.hpp"
 #include "gc/g1/g1GCPhaseTimes.hpp"
@@ -46,7 +49,7 @@
 #include "utilities/growableArray.hpp"
 #include "utilities/pair.hpp"
 
-G1Policy::G1Policy(STWGCTimer* gc_timer) :
+G1Policy::G1Policy(G1CollectorPolicy* policy, STWGCTimer* gc_timer) :
   _predictor(G1ConfidencePercent / 100.0),
   _analytics(new G1Analytics(&_predictor)),
   _remset_tracker(),
@@ -62,7 +65,7 @@ G1Policy::G1Policy(STWGCTimer* gc_timer) :
   _survivor_surv_rate_group(new SurvRateGroup()),
   _reserve_factor((double) G1ReservePercent / 100.0),
   _reserve_regions(0),
-  _young_gen_sizer(),
+  _young_gen_sizer(G1YoungGenSizer::create_gen_sizer(policy)),
   _free_regions_at_end_of_collection(0),
   _max_rs_lengths(0),
   _rs_lengths_prediction(0),
@@ -83,6 +86,15 @@ G1Policy::G1Policy(STWGCTimer* gc_timer) :
 
 G1Policy::~G1Policy() {
   delete _ihop_control;
+  delete _young_gen_sizer;
+}
+
+G1Policy* G1Policy::create_policy(G1CollectorPolicy* policy, STWGCTimer* gc_timer_stw) {
+  if (policy->is_hetero_heap()) {
+    return new G1HeterogeneousHeapPolicy(policy, gc_timer_stw);
+  } else {
+    return new G1Policy(policy, gc_timer_stw);
+  }
 }
 
 G1CollectorState* G1Policy::collector_state() const { return _g1h->collector_state(); }
@@ -94,9 +106,9 @@ void G1Policy::init(G1CollectedHeap* g1h, G1CollectionSet* collection_set) {
   assert(Heap_lock->owned_by_self(), "Locking discipline.");
 
   if (!adaptive_young_list_length()) {
-    _young_list_fixed_length = _young_gen_sizer.min_desired_young_length();
+    _young_list_fixed_length = _young_gen_sizer->min_desired_young_length();
   }
-  _young_gen_sizer.adjust_max_new_size(_g1h->max_regions());
+  _young_gen_sizer->adjust_max_new_size(_g1h->max_expandable_regions());
 
   _free_regions_at_end_of_collection = _g1h->num_free_regions();
 
@@ -176,7 +188,7 @@ void G1Policy::record_new_heap_size(uint new_number_of_regions) {
   // smaller than 1.0) we'll get 1.
   _reserve_regions = (uint) ceil(reserve_regions_d);
 
-  _young_gen_sizer.heap_size_changed(new_number_of_regions);
+  _young_gen_sizer->heap_size_changed(new_number_of_regions);
 
   _ihop_control->update_target_occupancy(new_number_of_regions * HeapRegion::GrainBytes);
 }
@@ -195,14 +207,14 @@ uint G1Policy::calculate_young_list_desired_min_length(uint base_min_length) con
   }
   desired_min_length += base_min_length;
   // make sure we don't go below any user-defined minimum bound
-  return MAX2(_young_gen_sizer.min_desired_young_length(), desired_min_length);
+  return MAX2(_young_gen_sizer->min_desired_young_length(), desired_min_length);
 }
 
 uint G1Policy::calculate_young_list_desired_max_length() const {
   // Here, we might want to also take into account any additional
   // constraints (i.e., user-defined minimum bound). Currently, we
   // effectively don't set this bound.
-  return _young_gen_sizer.max_desired_young_length();
+  return _young_gen_sizer->max_desired_young_length();
 }
 
 uint G1Policy::update_young_list_max_and_target_length() {
@@ -218,6 +230,7 @@ uint G1Policy::update_young_list_max_and_target_length(size_t rs_lengths) {
 uint G1Policy::update_young_list_target_length(size_t rs_lengths) {
   YoungTargetLengths young_lengths = young_list_target_lengths(rs_lengths);
   _young_list_target_length = young_lengths.first;
+
   return young_lengths.second;
 }
 
@@ -427,7 +440,7 @@ void G1Policy::record_full_collection_start() {
   // Release the future to-space so that it is available for compaction into.
   collector_state()->set_in_young_only_phase(false);
   collector_state()->set_in_full_gc(true);
-  cset_chooser()->clear();
+  _collection_set->clear_candidates();
 }
 
 void G1Policy::record_full_collection_end() {
@@ -469,6 +482,10 @@ void G1Policy::record_collection_pause_start(double start_time_sec) {
   // to the GC we're about to start. so, no point is calculating this
   // every time we calculate / recalculate the target young length.
   update_survivors_policy();
+
+  assert(max_survivor_regions() + _g1h->num_used_regions() <= _g1h->max_regions(),
+         "Maximum survivor regions %u plus used regions %u exceeds max regions %u",
+         max_survivor_regions(), _g1h->num_used_regions(), _g1h->max_regions());
 
   assert(_g1h->used() == _g1h->recalculate_used(),
          "sanity, used: " SIZE_FORMAT " recalculate_used: " SIZE_FORMAT,
@@ -529,10 +546,6 @@ double G1Policy::other_time_ms(double pause_time_ms) const {
 
 double G1Policy::constant_other_time_ms(double pause_time_ms) const {
   return other_time_ms(pause_time_ms) - phase_times()->total_free_cset_time_ms();
-}
-
-CollectionSetChooser* G1Policy::cset_chooser() const {
-  return _collection_set->cset_chooser();
 }
 
 bool G1Policy::about_to_start_mixed_phase() const {
@@ -714,20 +727,34 @@ void G1Policy::record_collection_pause_end(double pause_time_ms, size_t cards_sc
   }
 
   _free_regions_at_end_of_collection = _g1h->num_free_regions();
-  // IHOP control wants to know the expected young gen length if it were not
-  // restrained by the heap reserve. Using the actual length would make the
-  // prediction too small and the limit the young gen every time we get to the
-  // predicted target occupancy.
-  size_t last_unrestrained_young_length = update_young_list_max_and_target_length();
+
   update_rs_lengths_prediction();
 
-  update_ihop_prediction(app_time_ms / 1000.0,
-                         _bytes_allocated_in_old_since_last_gc,
-                         last_unrestrained_young_length * HeapRegion::GrainBytes,
-                         this_pause_was_young_only);
-  _bytes_allocated_in_old_since_last_gc = 0;
+  // Do not update dynamic IHOP due to G1 periodic collection as it is highly likely
+  // that in this case we are not running in a "normal" operating mode.
+  if (_g1h->gc_cause() != GCCause::_g1_periodic_collection) {
+    // IHOP control wants to know the expected young gen length if it were not
+    // restrained by the heap reserve. Using the actual length would make the
+    // prediction too small and the limit the young gen every time we get to the
+    // predicted target occupancy.
+    size_t last_unrestrained_young_length = update_young_list_max_and_target_length();
 
-  _ihop_control->send_trace_event(_g1h->gc_tracer_stw());
+    update_ihop_prediction(app_time_ms / 1000.0,
+                           _bytes_allocated_in_old_since_last_gc,
+                           last_unrestrained_young_length * HeapRegion::GrainBytes,
+                           this_pause_was_young_only);
+    _bytes_allocated_in_old_since_last_gc = 0;
+
+    _ihop_control->send_trace_event(_g1h->gc_tracer_stw());
+  } else {
+    // Any garbage collection triggered as periodic collection resets the time-to-mixed
+    // measurement. Periodic collection typically means that the application is "inactive", i.e.
+    // the marking threads may have received an uncharacterisic amount of cpu time
+    // for completing the marking, i.e. are faster than expected.
+    // This skews the predicted marking length towards smaller values which might cause
+    // the mark start being too late.
+    _initial_mark_to_mixed.reset();
+  }
 
   // Note that _mmu_tracker->max_gc_time() returns the time in seconds.
   double update_rs_time_goal_ms = _mmu_tracker->max_gc_time() * MILLIUNITS * G1RSetUpdatingPauseTimePercent / 100.0;
@@ -744,8 +771,6 @@ void G1Policy::record_collection_pause_end(double pause_time_ms, size_t cards_sc
   _g1h->concurrent_refine()->adjust(average_time_ms(G1GCPhaseTimes::UpdateRS),
                                     phase_times()->sum_thread_work_items(G1GCPhaseTimes::UpdateRS),
                                     update_rs_time_goal_ms);
-
-  cset_chooser()->verify();
 }
 
 G1IHOPControl* G1Policy::create_ihop_control(const G1Predictions* predictor){
@@ -882,11 +907,11 @@ bool G1Policy::can_expand_young_list() const {
 }
 
 bool G1Policy::adaptive_young_list_length() const {
-  return _young_gen_sizer.adaptive_young_list_length();
+  return _young_gen_sizer->adaptive_young_list_length();
 }
 
-size_t G1Policy::desired_survivor_size() const {
-  size_t const survivor_capacity = HeapRegion::GrainWords * _max_survivor_regions;
+size_t G1Policy::desired_survivor_size(uint max_regions) const {
+  size_t const survivor_capacity = HeapRegion::GrainWords * max_regions;
   return (size_t)((((double)survivor_capacity) * TargetSurvivorRatio) / 100);
 }
 
@@ -913,15 +938,22 @@ void G1Policy::update_max_gc_locker_expansion() {
 void G1Policy::update_survivors_policy() {
   double max_survivor_regions_d =
                  (double) _young_list_target_length / (double) SurvivorRatio;
-  // We use ceiling so that if max_survivor_regions_d is > 0.0 (but
-  // smaller than 1.0) we'll get 1.
-  _max_survivor_regions = (uint) ceil(max_survivor_regions_d);
 
-  _tenuring_threshold = _survivors_age_table.compute_tenuring_threshold(desired_survivor_size());
+  // Calculate desired survivor size based on desired max survivor regions (unconstrained
+  // by remaining heap). Otherwise we may cause undesired promotions as we are
+  // already getting close to end of the heap, impacting performance even more.
+  uint const desired_max_survivor_regions = ceil(max_survivor_regions_d);
+  size_t const survivor_size = desired_survivor_size(desired_max_survivor_regions);
+
+  _tenuring_threshold = _survivors_age_table.compute_tenuring_threshold(survivor_size);
   if (UsePerfData) {
     _policy_counters->tenuring_threshold()->set_value(_tenuring_threshold);
-    _policy_counters->desired_survivor_size()->set_value(desired_survivor_size() * oopSize);
+    _policy_counters->desired_survivor_size()->set_value(survivor_size * oopSize);
   }
+  // The real maximum survivor size is bounded by the number of regions that can
+  // be allocated into.
+  _max_survivor_regions = MIN2(desired_max_survivor_regions,
+                               _g1h->num_free_or_available_regions());
 }
 
 bool G1Policy::force_initial_mark_if_outside_cycle(GCCause::Cause gc_cause) {
@@ -996,7 +1028,8 @@ void G1Policy::decide_on_conc_mark_initiation() {
 }
 
 void G1Policy::record_concurrent_mark_cleanup_end() {
-  cset_chooser()->rebuild(_g1h->workers(), _g1h->num_regions());
+  G1CollectionSetCandidates* candidates = G1CollectionSetChooser::build(_g1h->workers(), _g1h->num_regions());
+  _collection_set->set_candidates(candidates);
 
   bool mixed_gc_pending = next_gc_should_be_mixed("request mixed gcs", "request young-only gcs");
   if (!mixed_gc_pending) {
@@ -1027,10 +1060,10 @@ class G1ClearCollectionSetCandidateRemSets : public HeapRegionClosure {
 
 void G1Policy::clear_collection_set_candidates() {
   // Clear remembered sets of remaining candidate regions and the actual candidate
-  // list.
+  // set.
   G1ClearCollectionSetCandidateRemSets cl;
-  cset_chooser()->iterate(&cl);
-  cset_chooser()->clear();
+  _collection_set->candidates()->iterate(&cl);
+  _collection_set->clear_candidates();
 }
 
 void G1Policy::maybe_start_marking() {
@@ -1078,7 +1111,9 @@ void G1Policy::record_pause(PauseKind kind, double start, double end) {
       _initial_mark_to_mixed.add_pause(end - start);
       break;
     case InitialMarkGC:
-      _initial_mark_to_mixed.record_initial_mark_end(end);
+      if (_g1h->gc_cause() != GCCause::_g1_periodic_collection) {
+        _initial_mark_to_mixed.record_initial_mark_end(end);
+      }
       break;
     case MixedGC:
       _initial_mark_to_mixed.record_mixed_gc_start(start);
@@ -1094,22 +1129,24 @@ void G1Policy::abort_time_to_mixed_tracking() {
 
 bool G1Policy::next_gc_should_be_mixed(const char* true_action_str,
                                        const char* false_action_str) const {
-  if (cset_chooser()->is_empty()) {
+  G1CollectionSetCandidates* candidates = _collection_set->candidates();
+
+  if (candidates->is_empty()) {
     log_debug(gc, ergo)("%s (candidate old regions not available)", false_action_str);
     return false;
   }
 
   // Is the amount of uncollected reclaimable space above G1HeapWastePercent?
-  size_t reclaimable_bytes = cset_chooser()->remaining_reclaimable_bytes();
+  size_t reclaimable_bytes = candidates->remaining_reclaimable_bytes();
   double reclaimable_percent = reclaimable_bytes_percent(reclaimable_bytes);
   double threshold = (double) G1HeapWastePercent;
   if (reclaimable_percent <= threshold) {
     log_debug(gc, ergo)("%s (reclaimable percentage not over threshold). candidate old regions: %u reclaimable: " SIZE_FORMAT " (%1.2f) threshold: " UINTX_FORMAT,
-                        false_action_str, cset_chooser()->remaining_regions(), reclaimable_bytes, reclaimable_percent, G1HeapWastePercent);
+                        false_action_str, candidates->num_remaining(), reclaimable_bytes, reclaimable_percent, G1HeapWastePercent);
     return false;
   }
   log_debug(gc, ergo)("%s (candidate old regions available). candidate old regions: %u reclaimable: " SIZE_FORMAT " (%1.2f) threshold: " UINTX_FORMAT,
-                      true_action_str, cset_chooser()->remaining_regions(), reclaimable_bytes, reclaimable_percent, G1HeapWastePercent);
+                      true_action_str, candidates->num_remaining(), reclaimable_bytes, reclaimable_percent, G1HeapWastePercent);
   return true;
 }
 
@@ -1121,10 +1158,10 @@ uint G1Policy::calc_min_old_cset_length() const {
   // maximum desired number of mixed GCs.
   //
   // The calculation is based on the number of marked regions we added
-  // to the CSet chooser in the first place, not how many remain, so
+  // to the CSet candidates in the first place, not how many remain, so
   // that the result is the same during all mixed GCs that follow a cycle.
 
-  const size_t region_num = (size_t) cset_chooser()->length();
+  const size_t region_num = _collection_set->candidates()->num_regions();
   const size_t gc_num = (size_t) MAX2(G1MixedGCCountTarget, (uintx) 1);
   size_t result = region_num / gc_num;
   // emulate ceiling

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef SHARE_VM_RUNTIME_SHAREDRUNTIME_HPP
-#define SHARE_VM_RUNTIME_SHAREDRUNTIME_HPP
+#ifndef SHARE_RUNTIME_SHAREDRUNTIME_HPP
+#define SHARE_RUNTIME_SHAREDRUNTIME_HPP
 
 #include "interpreter/bytecodeHistogram.hpp"
 #include "interpreter/bytecodeTracer.hpp"
@@ -48,6 +48,9 @@ class SharedRuntime: AllStatic {
   friend class VMStructs;
 
  private:
+  static bool resolve_sub_helper_internal(methodHandle callee_method, const frame& caller_frame,
+                                          CompiledMethod* caller_nm, bool is_virtual, bool is_optimized,
+                                          Handle receiver, CallInfo& call_info, Bytecodes::Code invoke_code, TRAPS);
   static methodHandle resolve_sub_helper(JavaThread *thread,
                                          bool is_virtual,
                                          bool is_optimized, TRAPS);
@@ -323,6 +326,10 @@ class SharedRuntime: AllStatic {
  private:
   // deopt blob
   static void generate_deopt_blob(void);
+
+  static bool handle_ic_miss_helper_internal(Handle receiver, CompiledMethod* caller_nm, const frame& caller_frame,
+                                             methodHandle callee_method, Bytecodes::Code bc, CallInfo& call_info,
+                                             bool& needs_ic_stub_refill, TRAPS);
 
  public:
   static DeoptimizationBlob* deopt_blob(void)      { return _deopt_blob; }
@@ -718,4 +725,4 @@ class AdapterHandlerLibrary: public AllStatic {
 
 };
 
-#endif // SHARE_VM_RUNTIME_SHAREDRUNTIME_HPP
+#endif // SHARE_RUNTIME_SHAREDRUNTIME_HPP

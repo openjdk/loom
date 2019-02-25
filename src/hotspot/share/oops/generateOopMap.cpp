@@ -27,6 +27,7 @@
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
 #include "memory/allocation.inline.hpp"
+#include "oops/constantPool.hpp"
 #include "oops/generateOopMap.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/symbol.hpp"
@@ -1879,7 +1880,7 @@ void GenerateOopMap::do_ldc(int bci) {
   constantTag tag = cp->tag_at(ldc.pool_index()); // idx is index in resolved_references
   BasicType       bt  = ldc.result_type();
 #ifdef ASSERT
-  BasicType   tag_bt = tag.is_dynamic_constant() ? bt : tag.basic_type();
+  BasicType   tag_bt = (tag.is_dynamic_constant() || tag.is_dynamic_constant_in_error()) ? bt : tag.basic_type();
   assert(bt == tag_bt, "same result");
 #endif
   CellTypeState   cts;

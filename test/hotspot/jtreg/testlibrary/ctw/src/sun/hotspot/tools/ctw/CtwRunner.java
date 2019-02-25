@@ -263,6 +263,8 @@ public class CtwRunner {
                 "-XX:-UseCounterDecay",
                 "-XX:-ShowMessageBoxOnError",
                 "-XX:+UnlockDiagnosticVMOptions",
+                // redirect VM output to cerr so it won't collide w/ ctw output
+                "-XX:+DisplayVMOutputToStderr",
                 // define phase start
                 "-DCompileTheWorldStartAt=" + classStart,
                 "-DCompileTheWorldStopAt=" + classStop,
@@ -272,6 +274,7 @@ public class CtwRunner {
                 "--add-exports", "java.base/jdk.internal.jimage=ALL-UNNAMED",
                 "--add-exports", "java.base/jdk.internal.misc=ALL-UNNAMED",
                 "--add-exports", "java.base/jdk.internal.reflect=ALL-UNNAMED",
+                "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
                 // enable diagnostic logging
                 "-XX:+LogCompilation",
                 // use phase specific log, hs_err and ciReplay files

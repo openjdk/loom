@@ -1170,6 +1170,7 @@ MachNode *Matcher::match_sfpt( SafePointNode *sfpt ) {
     if( mcall->is_MachCallJava() ) {
       MachCallJavaNode *mcall_java  = mcall->as_MachCallJava();
       const CallJavaNode *call_java =  call->as_CallJava();
+      assert(call_java->validate_symbolic_info(), "inconsistent info");
       method = call_java->method();
       mcall_java->_method = method;
       mcall_java->_bci = call_java->_bci;
@@ -2349,6 +2350,15 @@ void Matcher::find_shared_post_visit(Node* n, uint opcode) {
       Node* pair = new BinaryNode(n->in(1), n->in(2));
       n->set_req(2, pair);
       n->set_req(1, n->in(3));
+      n->del_req(3);
+      break;
+    }
+    case Op_MulAddS2I: {
+      Node* pair1 = new BinaryNode(n->in(1), n->in(2));
+      Node* pair2 = new BinaryNode(n->in(3), n->in(4));
+      n->set_req(1, pair1);
+      n->set_req(2, pair2);
+      n->del_req(4);
       n->del_req(3);
       break;
     }

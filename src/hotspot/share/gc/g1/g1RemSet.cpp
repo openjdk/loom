@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,12 +23,12 @@
  */
 
 #include "precompiled.hpp"
-#include "gc/g1/dirtyCardQueue.hpp"
 #include "gc/g1/g1BarrierSet.hpp"
 #include "gc/g1/g1BlockOffsetTable.inline.hpp"
 #include "gc/g1/g1CardTable.inline.hpp"
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "gc/g1/g1ConcurrentRefine.hpp"
+#include "gc/g1/g1DirtyCardQueue.hpp"
 #include "gc/g1/g1FromCardCache.hpp"
 #include "gc/g1/g1GCPhaseTimes.hpp"
 #include "gc/g1/g1HotCardCache.hpp"
@@ -300,7 +300,7 @@ G1RemSet::~G1RemSet() {
 }
 
 uint G1RemSet::num_par_rem_sets() {
-  return DirtyCardQueueSet::num_par_ids() + G1ConcurrentRefine::max_num_threads() + MAX2(ConcGCThreads, ParallelGCThreads);
+  return G1DirtyCardQueueSet::num_par_ids() + G1ConcurrentRefine::max_num_threads() + MAX2(ConcGCThreads, ParallelGCThreads);
 }
 
 void G1RemSet::initialize(size_t capacity, uint max_regions) {
@@ -311,12 +311,14 @@ void G1RemSet::initialize(size_t capacity, uint max_regions) {
 G1ScanRSForRegionClosure::G1ScanRSForRegionClosure(G1RemSetScanState* scan_state,
                                                    G1ScanObjsDuringScanRSClosure* scan_obj_on_card,
                                                    G1ParScanThreadState* pss,
+                                                   G1GCPhaseTimes::GCParPhases phase,
                                                    uint worker_i) :
   _g1h(G1CollectedHeap::heap()),
   _ct(_g1h->card_table()),
   _pss(pss),
   _scan_objs_on_card_cl(scan_obj_on_card),
   _scan_state(scan_state),
+  _phase(phase),
   _worker_i(worker_i),
   _cards_scanned(0),
   _cards_claimed(0),
@@ -402,11 +404,15 @@ void G1ScanRSForRegionClosure::scan_rem_set_roots(HeapRegion* r) {
 
     scan_card(mr, region_idx_for_card);
   }
-  event.commit(GCId::current(), _worker_i, G1GCPhaseTimes::phase_name(G1GCPhaseTimes::ScanRS));
+  event.commit(GCId::current(), _worker_i, G1GCPhaseTimes::phase_name(_phase));
 }
 
 void G1ScanRSForRegionClosure::scan_strong_code_roots(HeapRegion* r) {
   EventGCPhaseParallel event;
+  // We pass a weak code blobs closure to the remembered set scanning because we want to avoid
+  // treating the nmethods visited to act as roots for concurrent marking.
+  // We only want to make sure that the oops in the nmethods are adjusted with regard to the
+  // objects copied by the current evacuation.
   r->strong_code_roots_do(_pss->closures()->weak_codeblobs());
   event.commit(GCId::current(), _worker_i, G1GCPhaseTimes::phase_name(G1GCPhaseTimes::CodeRoots));
 }
@@ -437,7 +443,7 @@ bool G1ScanRSForRegionClosure::do_heap_region(HeapRegion* r) {
 
 void G1RemSet::scan_rem_set(G1ParScanThreadState* pss, uint worker_i) {
   G1ScanObjsDuringScanRSClosure scan_cl(_g1h, pss);
-  G1ScanRSForRegionClosure cl(_scan_state, &scan_cl, pss, worker_i);
+  G1ScanRSForRegionClosure cl(_scan_state, &scan_cl, pss, G1GCPhaseTimes::ScanRS, worker_i);
   _g1h->collection_set_iterate_from(&cl, worker_i);
 
   G1GCPhaseTimes* p = _g1p->phase_times();
@@ -454,7 +460,7 @@ void G1RemSet::scan_rem_set(G1ParScanThreadState* pss, uint worker_i) {
 }
 
 // Closure used for updating rem sets. Only called during an evacuation pause.
-class G1RefineCardClosure: public CardTableEntryClosure {
+class G1RefineCardClosure: public G1CardTableEntryClosure {
   G1RemSet* _g1rs;
   G1ScanObjsDuringUpdateRSClosure* _update_rs_cl;
 
@@ -518,7 +524,7 @@ void G1RemSet::oops_into_collection_set_do(G1ParScanThreadState* pss, uint worke
 }
 
 void G1RemSet::prepare_for_oops_into_collection_set_do() {
-  DirtyCardQueueSet& dcqs = G1BarrierSet::dirty_card_queue_set();
+  G1DirtyCardQueueSet& dcqs = G1BarrierSet::dirty_card_queue_set();
   dcqs.concatenate_logs();
 
   _scan_state->reset();
@@ -675,7 +681,7 @@ void G1RemSet::refine_card_concurrently(jbyte* card_ptr,
       *card_ptr = G1CardTable::dirty_card_val();
       MutexLockerEx x(Shared_DirtyCardQ_lock,
                       Mutex::_no_safepoint_check_flag);
-      DirtyCardQueue* sdcq =
+      G1DirtyCardQueue* sdcq =
         G1BarrierSet::dirty_card_queue_set().shared_dirty_card_queue();
       sdcq->enqueue(card_ptr);
     }

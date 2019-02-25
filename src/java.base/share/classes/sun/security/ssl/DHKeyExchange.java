@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -87,7 +87,7 @@ final class DHKeyExchange {
                 return null;
             }
 
-            KeyFactory kf = JsseJce.getKeyFactory("DiffieHellman");
+            KeyFactory kf = KeyFactory.getInstance("DiffieHellman");
             DHPublicKeySpec spec = new DHPublicKeySpec(
                     new BigInteger(1, encodedPublic),
                     params.getP(), params.getG());
@@ -106,7 +106,7 @@ final class DHKeyExchange {
         DHEPossession(NamedGroup namedGroup, SecureRandom random) {
             try {
                 KeyPairGenerator kpg =
-                        JsseJce.getKeyPairGenerator("DiffieHellman");
+                        KeyPairGenerator.getInstance("DiffieHellman");
                 DHParameterSpec params =
                         (DHParameterSpec)namedGroup.getParameterSpec();
                 kpg.initialize(params, random);
@@ -129,7 +129,7 @@ final class DHKeyExchange {
                     PredefinedDHParameterSpecs.definedParams.get(keyLength);
             try {
                 KeyPairGenerator kpg =
-                    JsseJce.getKeyPairGenerator("DiffieHellman");
+                    KeyPairGenerator.getInstance("DiffieHellman");
                 if (params != null) {
                     kpg.initialize(params, random);
                 } else {
@@ -155,7 +155,7 @@ final class DHKeyExchange {
         DHEPossession(DHECredentials credentials, SecureRandom random) {
             try {
                 KeyPairGenerator kpg =
-                        JsseJce.getKeyPairGenerator("DiffieHellman");
+                        KeyPairGenerator.getInstance("DiffieHellman");
                 kpg.initialize(credentials.popPublicKey.getParams(), random);
                 KeyPair kp = generateDHKeyPair(kpg);
                 if (kp == null) {
@@ -208,7 +208,7 @@ final class DHKeyExchange {
                                         params.getP(), params.getG());
             }
             try {
-                KeyFactory factory = JsseJce.getKeyFactory("DiffieHellman");
+                KeyFactory factory = KeyFactory.getInstance("DiffieHellman");
                 return factory.getKeySpec(key, DHPublicKeySpec.class);
             } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
                 // unlikely
@@ -220,8 +220,8 @@ final class DHKeyExchange {
         public byte[] encode() {
             // Note: the DH public value is encoded as a big-endian integer
             // and padded to the left with zeros to the size of p in bytes.
-            byte[] encoded = publicKey.getY().toByteArray();
-            int pSize = KeyUtil.getKeySize(publicKey);
+            byte[] encoded = Utilities.toByteArray(publicKey.getY());
+            int pSize = (KeyUtil.getKeySize(publicKey) + 7) >>> 3;
             if (pSize > 0 && encoded.length < pSize) {
                 byte[] buffer = new byte[pSize];
                 System.arraycopy(encoded, 0,
@@ -253,7 +253,7 @@ final class DHKeyExchange {
         static {
             String property = GetPropertyAction.privilegedGetProperty(
                     "jdk.tls.ephemeralDHKeySize");
-            if (property == null || property.length() == 0) {
+            if (property == null || property.isEmpty()) {
                 useLegacyEphemeralDHKeys = false;
                 useSmartEphemeralDHKeys = false;
                 customizedDHKeySize = -1;
@@ -438,7 +438,7 @@ final class DHKeyExchange {
             }
 
             if (dhePossession == null || dheCredentials == null) {
-                context.conContext.fatal(Alert.HANDSHAKE_FAILURE,
+                throw context.conContext.fatal(Alert.HANDSHAKE_FAILURE,
                     "No sufficient DHE key agreement parameters negotiated");
             }
 
@@ -473,7 +473,7 @@ final class DHKeyExchange {
             private SecretKey t12DeriveKey(String algorithm,
                     AlgorithmParameterSpec params) throws IOException {
                 try {
-                    KeyAgreement ka = JsseJce.getKeyAgreement("DiffieHellman");
+                    KeyAgreement ka = KeyAgreement.getInstance("DiffieHellman");
                     ka.init(localPrivateKey);
                     ka.doPhase(peerPublicKey, true);
                     SecretKey preMasterSecret =
@@ -499,7 +499,7 @@ final class DHKeyExchange {
             private SecretKey t13DeriveKey(String algorithm,
                     AlgorithmParameterSpec params) throws IOException {
                 try {
-                    KeyAgreement ka = JsseJce.getKeyAgreement("DiffieHellman");
+                    KeyAgreement ka = KeyAgreement.getInstance("DiffieHellman");
                     ka.init(localPrivateKey);
                     ka.doPhase(peerPublicKey, true);
                     SecretKey sharedSecret =

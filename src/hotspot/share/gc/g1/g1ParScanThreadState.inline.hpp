@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,10 +22,11 @@
  *
  */
 
-#ifndef SHARE_VM_GC_G1_G1PARSCANTHREADSTATE_INLINE_HPP
-#define SHARE_VM_GC_G1_G1PARSCANTHREADSTATE_INLINE_HPP
+#ifndef SHARE_GC_G1_G1PARSCANTHREADSTATE_INLINE_HPP
+#define SHARE_GC_G1_G1PARSCANTHREADSTATE_INLINE_HPP
 
 #include "gc/g1/g1CollectedHeap.inline.hpp"
+#include "gc/g1/g1OopStarChunkedList.inline.hpp"
 #include "gc/g1/g1ParScanThreadState.hpp"
 #include "gc/g1/g1RemSet.hpp"
 #include "oops/access.inline.hpp"
@@ -203,4 +204,23 @@ inline void G1ParScanThreadState::reset_trim_ticks() {
   _trim_ticks = Tickspan();
 }
 
-#endif // SHARE_VM_GC_G1_G1PARSCANTHREADSTATE_INLINE_HPP
+template <typename T>
+inline void G1ParScanThreadState::remember_root_into_optional_region(T* p) {
+  oop o = RawAccess<IS_NOT_NULL>::oop_load(p);
+  uint index = _g1h->heap_region_containing(o)->index_in_opt_cset();
+  _oops_into_optional_regions[index].push_root(p);
+}
+
+template <typename T>
+inline void G1ParScanThreadState::remember_reference_into_optional_region(T* p) {
+  oop o = RawAccess<IS_NOT_NULL>::oop_load(p);
+  uint index = _g1h->heap_region_containing(o)->index_in_opt_cset();
+  _oops_into_optional_regions[index].push_oop(p);
+  DEBUG_ONLY(verify_ref(p);)
+}
+
+G1OopStarChunkedList* G1ParScanThreadState::oops_into_optional_region(const HeapRegion* hr) {
+  return &_oops_into_optional_regions[hr->index_in_opt_cset()];
+}
+
+#endif // SHARE_GC_G1_G1PARSCANTHREADSTATE_INLINE_HPP

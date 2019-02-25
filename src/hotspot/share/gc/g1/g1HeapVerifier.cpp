@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -337,10 +337,6 @@ void G1HeapVerifier::verify_ready_for_archiving() {
 }
 
 class VerifyArchivePointerRegionClosure: public HeapRegionClosure {
-private:
-  G1CollectedHeap* _g1h;
-public:
-  VerifyArchivePointerRegionClosure(G1CollectedHeap* g1h) { }
   virtual bool do_heap_region(HeapRegion* r) {
    if (r->is_archive()) {
       VerifyObjectInArchiveRegionClosure verify_oop_pointers(r, false);
@@ -352,7 +348,7 @@ public:
 
 void G1HeapVerifier::verify_archive_regions() {
   G1CollectedHeap*  g1h = G1CollectedHeap::heap();
-  VerifyArchivePointerRegionClosure cl(NULL);
+  VerifyArchivePointerRegionClosure cl;
   g1h->heap_region_iterate(&cl);
 }
 
@@ -494,9 +490,7 @@ void G1HeapVerifier::verify(VerifyOption vo) {
 
   {
     G1RootProcessor root_processor(_g1h, 1);
-    root_processor.process_all_roots(&rootsCl,
-                                     &cldCl,
-                                     &blobsCl);
+    root_processor.process_all_roots(&rootsCl, &cldCl, &blobsCl);
   }
 
   bool failures = rootsCl.failures() || codeRootsCl.failures();
@@ -603,14 +597,14 @@ void G1HeapVerifier::verify_region_sets() {
   assert_heap_locked_or_at_safepoint(true /* should_be_vm_thread */);
 
   // First, check the explicit lists.
-  _g1h->_hrm.verify();
+  _g1h->_hrm->verify();
 
   // Finally, make sure that the region accounting in the lists is
   // consistent with what we see in the heap.
 
-  VerifyRegionListsClosure cl(&_g1h->_old_set, &_g1h->_archive_set, &_g1h->_humongous_set, &_g1h->_hrm);
+  VerifyRegionListsClosure cl(&_g1h->_old_set, &_g1h->_archive_set, &_g1h->_humongous_set, _g1h->_hrm);
   _g1h->heap_region_iterate(&cl);
-  cl.verify_counts(&_g1h->_old_set, &_g1h->_archive_set, &_g1h->_humongous_set, &_g1h->_hrm);
+  cl.verify_counts(&_g1h->_old_set, &_g1h->_archive_set, &_g1h->_humongous_set, _g1h->_hrm);
 }
 
 void G1HeapVerifier::prepare_for_verify() {
@@ -851,7 +845,7 @@ class G1CheckCSetFastTableClosure : public HeapRegionClosure {
 
 bool G1HeapVerifier::check_cset_fast_test() {
   G1CheckCSetFastTableClosure cl;
-  _g1h->_hrm.iterate(&cl);
+  _g1h->_hrm->iterate(&cl);
   return !cl.failures();
 }
 #endif // PRODUCT

@@ -204,7 +204,9 @@ bool InlineTree::should_not_inline(ciMethod *callee_method,
   // First check all inlining restrictions which are required for correctness
   if ( callee_method->is_abstract()) {
     fail_msg = "abstract method"; // // note: we allow ik->is_abstract()
-  } else if (!callee_method->holder()->is_initialized()) {
+  } else if (!callee_method->holder()->is_initialized() &&
+             // access allowed in the context of static initializer
+             !C->is_compiling_clinit_for(callee_method->holder())) {
     fail_msg = "method holder not initialized";
   } else if ( callee_method->is_native()) {
     fail_msg = "native method";
@@ -288,8 +290,8 @@ bool InlineTree::should_not_inline(ciMethod *callee_method,
     return false;
   }
 
-  // don't use counts with -Xcomp or CTW
-  if (UseInterpreter && !CompileTheWorld) {
+  // don't use counts with -Xcomp
+  if (UseInterpreter) {
 
     if (!callee_method->has_compiled_code() &&
         !callee_method->was_executed_more_than(0)) {
@@ -364,9 +366,9 @@ bool InlineTree::try_to_inline(ciMethod* callee_method, ciMethod* caller_method,
       }
     }
 
-    if ((!UseInterpreter || CompileTheWorld) &&
+    if (!UseInterpreter &&
         is_init_with_ea(callee_method, caller_method, C)) {
-      // Escape Analysis stress testing when running Xcomp or CTW:
+      // Escape Analysis stress testing when running Xcomp:
       // inline constructors even if they are not reached.
     } else if (forced_inline()) {
       // Inlining was forced by CompilerOracle, ciReplay or annotation
@@ -446,14 +448,18 @@ bool InlineTree::try_to_inline(ciMethod* callee_method, ciMethod* caller_method,
 }
 
 //------------------------------pass_initial_checks----------------------------
-bool pass_initial_checks(ciMethod* caller_method, int caller_bci, ciMethod* callee_method) {
+bool InlineTree::pass_initial_checks(ciMethod* caller_method, int caller_bci, ciMethod* callee_method) {
   ciInstanceKlass *callee_holder = callee_method ? callee_method->holder() : NULL;
   // Check if a callee_method was suggested
   if( callee_method == NULL )            return false;
   // Check if klass of callee_method is loaded
   if( !callee_holder->is_loaded() )      return false;
-  if( !callee_holder->is_initialized() ) return false;
-  if( !UseInterpreter || CompileTheWorld /* running Xcomp or CTW */ ) {
+  if( !callee_holder->is_initialized() &&
+      // access allowed in the context of static initializer
+      !C->is_compiling_clinit_for(callee_holder)) {
+    return false;
+  }
+  if( !UseInterpreter ) /* running Xcomp */ {
     // Checks that constant pool's call site has been visited
     // stricter than callee_holder->is_initialized()
     ciBytecodeStream iter(caller_method);

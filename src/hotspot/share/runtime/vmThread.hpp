@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,12 +22,13 @@
  *
  */
 
-#ifndef SHARE_VM_RUNTIME_VMTHREAD_HPP
-#define SHARE_VM_RUNTIME_VMTHREAD_HPP
+#ifndef SHARE_RUNTIME_VMTHREAD_HPP
+#define SHARE_RUNTIME_VMTHREAD_HPP
 
 #include "runtime/perfData.hpp"
 #include "runtime/thread.hpp"
-#include "runtime/vm_operations.hpp"
+#include "runtime/task.hpp"
+#include "runtime/vmOperations.hpp"
 
 //
 // Prioritized queue of VM operations.
@@ -84,6 +85,26 @@ class VMOperationQueue : public CHeapObj<mtInternal> {
 };
 
 
+// VM operation timeout handling: warn or abort the VM when VM operation takes
+// too long. Periodic tasks do not participate in safepoint protocol, and therefore
+// can fire when application threads are stopped.
+
+class VMOperationTimeoutTask : public PeriodicTask {
+private:
+  volatile int _armed;
+  jlong _arm_time;
+
+public:
+  VMOperationTimeoutTask(size_t interval_time) :
+          PeriodicTask(interval_time), _armed(0), _arm_time(0) {}
+
+  virtual void task();
+
+  bool is_armed();
+  void arm();
+  void disarm();
+};
+
 //
 // A single VMThread (the primordial thread) spawns all other threads
 // and is itself used by other threads to offload heavy vm operations
@@ -100,6 +121,8 @@ class VMThread: public NamedThread {
   static PerfCounter* _perf_accumulated_vm_operation_time;
 
   static const char* _no_op_reason;
+
+  static VMOperationTimeoutTask* _timeout_task;
 
   static bool no_op_safepoint_needed(bool check_time);
 
@@ -163,4 +186,4 @@ class VMThread: public NamedThread {
   static VMThread*     _vm_thread;
 };
 
-#endif // SHARE_VM_RUNTIME_VMTHREAD_HPP
+#endif // SHARE_RUNTIME_VMTHREAD_HPP

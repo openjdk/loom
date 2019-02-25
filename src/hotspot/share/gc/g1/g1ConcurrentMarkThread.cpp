@@ -31,7 +31,7 @@
 #include "gc/g1/g1MMUTracker.hpp"
 #include "gc/g1/g1Policy.hpp"
 #include "gc/g1/g1RemSet.hpp"
-#include "gc/g1/vm_operations_g1.hpp"
+#include "gc/g1/g1VMOperations.hpp"
 #include "gc/shared/concurrentGCPhaseManager.hpp"
 #include "gc/shared/gcId.hpp"
 #include "gc/shared/gcTrace.hpp"
@@ -224,10 +224,6 @@ public:
   { }
 };
 
-const char* const* G1ConcurrentMarkThread::concurrent_phases() const {
-  return concurrent_phase_names;
-}
-
 bool G1ConcurrentMarkThread::request_concurrent_phase(const char* phase_name) {
   int phase = lookup_concurrent_phase(phase_name);
   if (phase < 0) return false;
@@ -339,7 +335,7 @@ void G1ConcurrentMarkThread::run_service() {
                                 TimeHelper::counter_to_millis(mark_end - mark_start));
           mark_manager.set_phase(G1ConcurrentPhase::REMARK, false);
           CMRemark cl(_cm);
-          VM_CGC_Operation op(&cl, "Pause Remark");
+          VM_G1Concurrent op(&cl, "Pause Remark");
           VMThread::execute(&op);
           if (_cm->has_aborted()) {
             break;
@@ -370,7 +366,7 @@ void G1ConcurrentMarkThread::run_service() {
 
       if (!_cm->has_aborted()) {
         CMCleanup cl_cl(_cm);
-        VM_CGC_Operation op(&cl_cl, "Pause Cleanup");
+        VM_G1Concurrent op(&cl_cl, "Pause Cleanup");
         VMThread::execute(&op);
       }
 

@@ -91,7 +91,9 @@ void ThreadLocalAllocBuffer::accumulate_and_reset_statistics(ThreadLocalAllocSta
 
 void ThreadLocalAllocBuffer::insert_filler() {
   assert(end() != NULL, "Must not be retired");
-  Universe::heap()->fill_with_dummy_object(top(), hard_end(), true);
+  if (top() < hard_end()) {
+    Universe::heap()->fill_with_dummy_object(top(), hard_end(), true);
+  }
 }
 
 void ThreadLocalAllocBuffer::make_parsable() {
@@ -277,18 +279,6 @@ void ThreadLocalAllocBuffer::print_stats(const char* tag) {
             _gc_waste * HeapWordSize,
             _slow_refill_waste * HeapWordSize,
             _fast_refill_waste * HeapWordSize);
-}
-
-void ThreadLocalAllocBuffer::verify() {
-  HeapWord* p = start();
-  HeapWord* t = top();
-  HeapWord* prev_p = NULL;
-  while (p < t) {
-    oopDesc::verify(oop(p));
-    prev_p = p;
-    p += oop(p)->size();
-  }
-  guarantee(p == top(), "end of last object must match end of space");
 }
 
 void ThreadLocalAllocBuffer::set_sample_end() {

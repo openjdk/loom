@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -50,6 +50,9 @@
 #include "gc/serial/defNewGeneration.hpp"
 #include "gc/serial/vmStructs_serial.hpp"
 #endif
+#if INCLUDE_SHENANDOAHGC
+#include "gc/shenandoah/vmStructs_shenandoah.hpp"
+#endif
 #if INCLUDE_ZGC
 #include "gc/z/vmStructs_z.hpp"
 #endif
@@ -73,6 +76,9 @@
   SERIALGC_ONLY(VM_STRUCTS_SERIALGC(nonstatic_field,                                                                                 \
                                     volatile_nonstatic_field,                                                                        \
                                     static_field))                                                                                   \
+  SHENANDOAHGC_ONLY(VM_STRUCTS_SHENANDOAH(nonstatic_field,                                                                           \
+                               volatile_nonstatic_field,                                                                             \
+                               static_field))                                                                                        \
   ZGC_ONLY(VM_STRUCTS_ZGC(nonstatic_field,                                                                                           \
                           volatile_nonstatic_field,                                                                                  \
                           static_field))                                                                                             \
@@ -150,8 +156,6 @@
   nonstatic_field(GenCollectedHeap,            _young_gen_spec,                               GenerationSpec*)                       \
   nonstatic_field(GenCollectedHeap,            _old_gen_spec,                                 GenerationSpec*)                       \
                                                                                                                                      \
-  nonstatic_field(HeapWord,                    i,                                             char*)                                 \
-                                                                                                                                     \
   nonstatic_field(MemRegion,                   _start,                                        HeapWord*)                             \
   nonstatic_field(MemRegion,                   _word_size,                                    size_t)                                \
                                                                                                                                      \
@@ -178,6 +182,9 @@
   SERIALGC_ONLY(VM_TYPES_SERIALGC(declare_type,                           \
                                   declare_toplevel_type,                  \
                                   declare_integer_type))                  \
+  SHENANDOAHGC_ONLY(VM_TYPES_SHENANDOAH(declare_type,                     \
+                             declare_toplevel_type,                       \
+                             declare_integer_type))                       \
   ZGC_ONLY(VM_TYPES_ZGC(declare_type,                                     \
                         declare_toplevel_type,                            \
                         declare_integer_type))                            \
@@ -253,6 +260,8 @@
                                               declare_constant_with_value)) \
   SERIALGC_ONLY(VM_INT_CONSTANTS_SERIALGC(declare_constant,                 \
                                           declare_constant_with_value))     \
+  SHENANDOAHGC_ONLY(VM_INT_CONSTANTS_SHENANDOAH(declare_constant,           \
+                                     declare_constant_with_value))          \
   ZGC_ONLY(VM_INT_CONSTANTS_ZGC(declare_constant,                           \
                                 declare_constant_with_value))               \
                                                                             \

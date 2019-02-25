@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,18 +28,20 @@
 #include "jfr/jfrEvents.hpp"
 #include "jfr/support/jfrThreadId.hpp"
 #include "logging/log.hpp"
+#include "logging/logStream.hpp"
 #include "logging/logConfiguration.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/method.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/verifyOopClosure.hpp"
+#include "runtime/handles.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/mutexLocker.hpp"
 #include "runtime/os.hpp"
 #include "runtime/safepoint.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/vmThread.hpp"
-#include "runtime/vm_operations.hpp"
+#include "runtime/vmOperations.hpp"
 #include "services/runtimeService.hpp"
 #include "utilities/dtrace.hpp"
 #include "utilities/events.hpp"
@@ -197,6 +199,32 @@ void VMOperationQueue::oops_do(OopClosure* f) {
   drain_list_oops_do(f);
 }
 
+//------------------------------------------------------------------------------------------------------------------
+// Timeout machinery
+
+void VMOperationTimeoutTask::task() {
+  assert(AbortVMOnVMOperationTimeout, "only if enabled");
+  if (is_armed()) {
+    jlong delay = (os::javaTimeMillis() - _arm_time);
+    if (delay > AbortVMOnVMOperationTimeoutDelay) {
+      fatal("VM operation took too long: " JLONG_FORMAT " ms (timeout: " INTX_FORMAT " ms)",
+            delay, AbortVMOnVMOperationTimeoutDelay);
+    }
+  }
+}
+
+bool VMOperationTimeoutTask::is_armed() {
+  return OrderAccess::load_acquire(&_armed) != 0;
+}
+
+void VMOperationTimeoutTask::arm() {
+  _arm_time = os::javaTimeMillis();
+  OrderAccess::release_store_fence(&_armed, 1);
+}
+
+void VMOperationTimeoutTask::disarm() {
+  OrderAccess::release_store_fence(&_armed, 0);
+}
 
 //------------------------------------------------------------------------------------------------------------------
 // Implementation of VMThread stuff
@@ -209,11 +237,27 @@ VM_Operation*     VMThread::_cur_vm_operation   = NULL;
 VMOperationQueue* VMThread::_vm_queue           = NULL;
 PerfCounter*      VMThread::_perf_accumulated_vm_operation_time = NULL;
 const char*       VMThread::_no_op_reason       = NULL;
+VMOperationTimeoutTask* VMThread::_timeout_task = NULL;
 
 
 void VMThread::create() {
   assert(vm_thread() == NULL, "we can only allocate one VMThread");
   _vm_thread = new VMThread();
+
+  if (AbortVMOnVMOperationTimeout) {
+    // Make sure we call the timeout task frequently enough, but not too frequent.
+    // Try to make the interval 10% of the timeout delay, so that we miss the timeout
+    // by those 10% at max. Periodic task also expects it to fit min/max intervals.
+    size_t interval = (size_t)AbortVMOnVMOperationTimeoutDelay / 10;
+    interval = interval / PeriodicTask::interval_gran * PeriodicTask::interval_gran;
+    interval = MAX2<size_t>(interval, PeriodicTask::min_interval);
+    interval = MIN2<size_t>(interval, PeriodicTask::max_interval);
+
+    _timeout_task = new VMOperationTimeoutTask(interval);
+    _timeout_task->enroll();
+  } else {
+    assert(_timeout_task == NULL, "sanity");
+  }
 
   // Create VM operation queue
   _vm_queue = new VMOperationQueue();
@@ -241,8 +285,6 @@ void VMThread::destroy() {
 
 void VMThread::run() {
   assert(this == vm_thread(), "check");
-
-  this->initialize_named_thread();
 
   // Notify_lock wait checks on active_handles() to rewait in
   // case of spurious wakeup, it should wait on the last
@@ -416,6 +458,8 @@ bool VMThread::no_op_safepoint_needed(bool check_time) {
 void VMThread::loop() {
   assert(_cur_vm_operation == NULL, "no current one should be executing");
 
+  SafepointSynchronize::init(_vm_thread);
+
   while(true) {
     VM_Operation* safepoint_ops = NULL;
     //
@@ -492,6 +536,11 @@ void VMThread::loop() {
         _vm_queue->set_drain_list(safepoint_ops); // ensure ops can be scanned
 
         SafepointSynchronize::begin();
+
+        if (_timeout_task != NULL) {
+          _timeout_task->arm();
+        }
+
         evaluate_operation(_cur_vm_operation);
         // now process all queued safepoint ops, iteratively draining
         // the queue until there are none left
@@ -532,6 +581,10 @@ void VMThread::loop() {
         } while(safepoint_ops != NULL);
 
         _vm_queue->set_drain_list(NULL);
+
+        if (_timeout_task != NULL) {
+          _timeout_task->disarm();
+        }
 
         // Complete safepoint synchronization
         SafepointSynchronize::end();

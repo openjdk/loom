@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,6 +29,7 @@ import sun.jvm.hotspot.gc.epsilon.*;
 import sun.jvm.hotspot.gc.g1.*;
 import sun.jvm.hotspot.gc.parallel.*;
 import sun.jvm.hotspot.gc.serial.*;
+import sun.jvm.hotspot.gc.shenandoah.*;
 import sun.jvm.hotspot.gc.shared.*;
 import sun.jvm.hotspot.gc.z.*;
 import sun.jvm.hotspot.debugger.JVMDebugger;
@@ -83,7 +84,11 @@ public class HeapSummary extends Tool {
       printValMB("MetaspaceSize            = ", getFlagValue("MetaspaceSize", flagMap));
       printValMB("CompressedClassSpaceSize = ", getFlagValue("CompressedClassSpaceSize", flagMap));
       printValMB("MaxMetaspaceSize         = ", getFlagValue("MaxMetaspaceSize", flagMap));
-      printValMB("G1HeapRegionSize         = ", HeapRegion.grainBytes());
+      if (heap instanceof ShenandoahHeap) {
+         printValMB("ShenandoahRegionSize     = ", ShenandoahHeapRegion.regionSizeBytes());
+      } else {
+         printValMB("G1HeapRegionSize         = ", HeapRegion.grainBytes());
+      }
 
       System.out.println();
       System.out.println("Heap Usage:");
@@ -126,6 +131,14 @@ public class HeapSummary extends Tool {
          printValMB("used     = ", oldGen.used());
          printValMB("free     = ", oldFree);
          System.out.println(alignment + (double)oldGen.used() * 100.0 / oldGen.capacity() + "% used");
+      } else if (heap instanceof ShenandoahHeap) {
+         ShenandoahHeap sh = (ShenandoahHeap) heap;
+         long num_regions = sh.numOfRegions();
+         System.out.println("Shenandoah Heap:");
+         System.out.println("   regions   = " + num_regions);
+         printValMB("capacity  = ", num_regions * ShenandoahHeapRegion.regionSizeBytes());
+         printValMB("used      = ", sh.used());
+         printValMB("committed = ", sh.committed());
       } else if (heap instanceof EpsilonHeap) {
          EpsilonHeap eh = (EpsilonHeap) heap;
          printSpace(eh.space());
@@ -178,6 +191,14 @@ public class HeapSummary extends Tool {
        l = getFlagValue("UseZGC", flagMap);
        if (l == 1L) {
            System.out.print("ZGC ");
+           l = getFlagValue("ParallelGCThreads", flagMap);
+           System.out.println("with " + l + " thread(s)");
+           return;
+       }
+
+       l = getFlagValue("UseShenandoahGC", flagMap);
+       if (l == 1L) {
+           System.out.print("Shenandoah GC ");
            l = getFlagValue("ParallelGCThreads", flagMap);
            System.out.println("with " + l + " thread(s)");
            return;
@@ -273,6 +294,8 @@ public class HeapSummary extends Tool {
       if (f != null) {
          if (f.isBool()) {
             return f.getBool()? 1L : 0L;
+         } else if (f.isUIntx() || f.isSizet() || f.isUint64t()) {
+            return Long.parseUnsignedLong(f.getValue());
          } else {
             return Long.parseLong(f.getValue());
          }
