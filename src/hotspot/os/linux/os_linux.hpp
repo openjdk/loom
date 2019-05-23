@@ -25,6 +25,8 @@
 #ifndef OS_LINUX_OS_LINUX_HPP
 #define OS_LINUX_OS_LINUX_HPP
 
+#include "os_posix.hpp"
+
 // Linux_OS defines the interface to Linux operating systems
 
 // Information about the protection of the page at address '0' on this os.
@@ -393,6 +395,11 @@ class Linux {
       return false;
     }
   }
+
+ private:
+  static bool _supports_rseq;
+ public:
+  static bool supports_rseq() { return _supports_rseq; }
 };
 
 #endif // OS_LINUX_OS_LINUX_HPP

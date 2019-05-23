@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -225,10 +225,19 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
   case vmIntrinsics::_getEventWriter:
 #if defined(_LP64) || !defined(TRACE_ID_SHIFT)
   case vmIntrinsics::_getClassId:
+#endif
+#endif
+#ifdef C1_GET_PROCESSOR_ID
   case vmIntrinsics::_getProcessorId:
-#endif
-#endif
     break;
+#endif
+#ifdef C1_CMP_SET_CPU
+  case vmIntrinsics::_compareAndSetLongCPU:
+    if (!C1_MacroAssembler::supports_cmp_set_cpu()) {
+      return false;
+    }
+    break;
+#endif
   default:
     return false; // Intrinsics not on the previous list are not available.
   }

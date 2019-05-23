@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,6 +28,7 @@
 #include "opto/convertnode.hpp"
 #include "opto/graphKit.hpp"
 #include "opto/idealKit.hpp"
+#include "opto/intrinsicnode.hpp"
 #include "opto/macro.hpp"
 #include "opto/narrowptrnode.hpp"
 #include "utilities/macros.hpp"
@@ -449,7 +450,8 @@ Node* BarrierSetC2::atomic_cmpxchg_val_at_resolved(C2AtomicParseAccess& access, 
 }
 
 Node* BarrierSetC2::atomic_cmpxchg_bool_at_resolved(C2AtomicParseAccess& access, Node* expected_val,
-                                                    Node* new_val, const Type* value_type) const {
+                                                    Node* new_val, Node* cpu,
+						    const Type* value_type) const {
   GraphKit* kit = access.kit();
   DecoratorSet decorators = access.decorators();
   MemNode::MemOrd mo = access.mem_node_mo();
@@ -507,7 +509,11 @@ Node* BarrierSetC2::atomic_cmpxchg_bool_at_resolved(C2AtomicParseAccess& access,
         if (is_weak_cas) {
           load_store = kit->gvn().transform(new WeakCompareAndSwapLNode(kit->control(), mem, adr, new_val, expected_val, mo));
         } else {
-          load_store = kit->gvn().transform(new CompareAndSwapLNode(kit->control(), mem, adr, new_val, expected_val, mo));
+          if (cpu != NULL) {
+            load_store = kit->gvn().transform(new CompareAndSwapLCPUNode(kit->control(), mem, adr, new_val, expected_val, cpu, mo));
+          } else {
+            load_store = kit->gvn().transform(new CompareAndSwapLNode(kit->control(), mem, adr, new_val, expected_val, mo));
+          }
         }
         break;
       }
@@ -608,10 +614,11 @@ Node* BarrierSetC2::atomic_cmpxchg_val_at(C2AtomicParseAccess& access, Node* exp
 }
 
 Node* BarrierSetC2::atomic_cmpxchg_bool_at(C2AtomicParseAccess& access, Node* expected_val,
-                                           Node* new_val, const Type* value_type) const {
+                                           Node* new_val, Node* cpu,
+                                           const Type* value_type) const {
   C2AccessFence fence(access);
   resolve_address(access);
-  return atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, value_type);
+  return atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, cpu, value_type);
 }
 
 Node* BarrierSetC2::atomic_xchg_at(C2AtomicParseAccess& access, Node* new_val, const Type* value_type) const {

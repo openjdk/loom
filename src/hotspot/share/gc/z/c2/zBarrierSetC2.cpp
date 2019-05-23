@@ -744,8 +744,9 @@ Node* ZBarrierSetC2::atomic_cmpxchg_val_at_resolved(C2AtomicParseAccess& access,
 }
 
 Node* ZBarrierSetC2::atomic_cmpxchg_bool_at_resolved(C2AtomicParseAccess& access, Node* expected_val,
-                                                     Node* new_val, const Type* value_type) const {
-  Node* result = BarrierSetC2::atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, value_type);
+                                                     Node* new_val, Node* cpu,
+                                                     const Type* value_type) const {
+  Node* result = BarrierSetC2::atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, cpu, value_type);
   if (!barrier_needed(access)) {
     return result;
   }

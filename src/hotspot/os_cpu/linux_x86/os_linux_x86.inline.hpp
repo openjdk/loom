@@ -26,6 +26,7 @@
 #define OS_CPU_LINUX_X86_OS_LINUX_X86_INLINE_HPP
 
 #include "runtime/os.hpp"
+#include "runtime/thread.hpp"
 
 // See http://www.technovelty.org/code/c/reading-rdtsc.htl for details
 inline jlong os::rdtsc() {
@@ -42,5 +43,52 @@ inline jlong os::rdtsc() {
   return (jlong)res;
 #endif // AMD64
 }
+
+#if defined(__NR_rseq)
+inline bool os::compareAndSetLongCPU(JavaThread *thread, volatile jlong* addr, jlong offset, int cpu, jlong e, jlong x) {
+  register void *tmp = NULL;
+  __asm__ volatile goto (
+  ".pushsection rseq_cs, \"ax\"\n\t"
+  ".balign 32\n\t"	
+  "Lcs:\n\t"
+  ".long 0x0, 0x0\n\t"
+  ".quad Lstart_ip, (Lpost_commit_offset-Lstart_ip), Labort\n\t"
+  ".popsection\n\t"
+
+  "leaq Lcs(%%rip), %[tmp]\n\t"
+  "movq %[tmp], %[rseq_cs]\n\t"
+  "Lstart_ip:\n\t"
+
+  "cmpl %[cpu_id], %[current_cpu_id]\n\t"
+  "jne %l[fail]\n\t"
+
+  "cmpq %[mp], %[e]\n\t"
+  "jne %l[fail]\n\t"
+
+  "movq %[x], %[mp]\n\t"
+  "Lpost_commit_offset:\n\t"
+
+  ".pushsection rseq_abort, \"ax\"\n\t"
+  ".long 0x7ff7effe\n\t"
+  "Labort:\n\t"
+  "jmp %l[fail]\n\t"
+  ".popsection\n\t"
+  :
+  : [rseq_cs] "m" (thread->rs.rseq_cs),
+    [tmp] "r" (tmp),
+    [mp] "m" (*(volatile jlong *)addr),
+    [offset] "r" (offset),
+    [current_cpu_id] "m" (thread->rs.cpu_id),
+    [cpu_id]  "r" (cpu),
+    [e]  "r" (e),
+    [x]  "r" (x)
+  : "memory", "rax", "cc"
+  : fail);
+  // Need volatile barrier here?
+  return true;
+fail:
+  return false;
+}
+#endif
 
 #endif // OS_CPU_LINUX_X86_OS_LINUX_X86_INLINE_HPP

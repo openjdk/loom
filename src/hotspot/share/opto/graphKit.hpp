@@ -610,6 +610,7 @@ class GraphKit : public Phase {
                                       int alias_idx,
                                       Node* expected_val,
                                       Node* new_val,
+                                      Node* cpu,
                                       const Type* value_type,
                                       BasicType bt,
                                       DecoratorSet decorators);

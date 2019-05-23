@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -865,6 +865,7 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
 // LIR_OpCompareAndSwap
     case lir_cas_long:
     case lir_cas_obj:
+    case lir_cas_long_cpu:
     case lir_cas_int: {
       assert(op->as_OpCompareAndSwap() != NULL, "must be");
       LIR_OpCompareAndSwap* opCompareAndSwap = (LIR_OpCompareAndSwap*)op;
@@ -879,13 +880,20 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
                                                       do_temp(opCompareAndSwap->_cmp_value);
                                                       do_input(opCompareAndSwap->_new_value);
                                                       do_temp(opCompareAndSwap->_new_value);
+      if (opCompareAndSwap->_cpu->is_valid()) {
+                                         	      do_input(opCompareAndSwap->_offset);
+                                         	      do_temp(opCompareAndSwap->_offset);
+                                         	      do_input(opCompareAndSwap->_cpu);
+                                         	      do_temp(opCompareAndSwap->_cpu);
+      }
       if (opCompareAndSwap->_tmp1->is_valid())        do_temp(opCompareAndSwap->_tmp1);
       if (opCompareAndSwap->_tmp2->is_valid())        do_temp(opCompareAndSwap->_tmp2);
-      if (opCompareAndSwap->_result->is_valid())      do_output(opCompareAndSwap->_result);
-
+      if (opCompareAndSwap->_result->is_valid())      {
+	                                              do_output(opCompareAndSwap->_result);
+	                                              do_temp(opCompareAndSwap->_result);
+      }
       break;
     }
-
 
 // LIR_OpAllocArray;
     case lir_alloc_array: {
@@ -1441,6 +1449,11 @@ void LIR_List::null_check(LIR_Opr opr, CodeEmitInfo* info, bool deoptimize_on_nu
   }
 }
 
+void LIR_List::cas_long_cpu(LIR_Opr addr, LIR_Opr off, LIR_Opr cmp_value, LIR_Opr new_value,
+                        LIR_Opr t1, LIR_Opr t2, LIR_Opr cpu, LIR_Opr result) {
+  append(new LIR_OpCompareAndSwap(lir_cas_long_cpu, addr, off, cmp_value, new_value, t1, t2, cpu, result));
+}
+
 void LIR_List::cas_long(LIR_Opr addr, LIR_Opr cmp_value, LIR_Opr new_value,
                         LIR_Opr t1, LIR_Opr t2, LIR_Opr result) {
   append(new LIR_OpCompareAndSwap(lir_cas_long, addr, cmp_value, new_value, t1, t2, result));
@@ -1738,6 +1751,7 @@ const char * LIR_Op::name() const {
      case lir_cas_long:              s = "cas_long";      break;
      case lir_cas_obj:               s = "cas_obj";      break;
      case lir_cas_int:               s = "cas_int";      break;
+     case lir_cas_long_cpu:          s = "cas_long_cpu"; break;
      // LIR_OpProfileCall
      case lir_profile_call:          s = "profile_call";  break;
      // LIR_OpProfileType

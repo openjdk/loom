@@ -25,6 +25,8 @@
 #ifndef OS_CPU_LINUX_ARM_THREAD_LINUX_ARM_HPP
 #define OS_CPU_LINUX_ARM_THREAD_LINUX_ARM_HPP
 
+#include "thread_linux.hpp"
+
  private:
   // The following thread-local variables replicate corresponding global variables.
   // They are used for a quick access from compiled code via Rthread register.
@@ -33,6 +35,7 @@
   address _card_table_base;
 
   void pd_initialize() {
+    pd_linux_initialize();
     _anchor.clear();
     _in_top_frame_unsafe_section = NULL;
   }

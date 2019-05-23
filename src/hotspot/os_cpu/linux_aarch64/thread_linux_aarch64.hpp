@@ -26,6 +26,8 @@
 #ifndef OS_CPU_LINUX_AARCH64_THREAD_LINUX_AARCH64_HPP
 #define OS_CPU_LINUX_AARCH64_THREAD_LINUX_AARCH64_HPP
 
+#include "thread_linux.hpp"
+
  private:
 #ifdef ASSERT
   // spill stack holds N callee-save registers at each Java call and
@@ -38,6 +40,7 @@
 #endif // ASSERT
 
   void pd_initialize() {
+    pd_linux_initialize();
     _anchor.clear();
   }
 

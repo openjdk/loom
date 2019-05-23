@@ -11285,7 +11285,7 @@ instruct rdpidProcessorId(rRegI dst, rFlagsReg cr) %{
 %}
 
 instruct rdtscpProcessorId(rcx_RegI dst, rdx_RegI tmp, rax_RegI tmp1, rFlagsReg cr) %{
-  predicate(VM_Version::supports_rdtscp());
+  predicate(VM_Version::supports_rdtscp() LINUX_ONLY(&& !os::Linux::supports_rseq()));
   match(Set dst (GetProcessorId));
   effect(DEF dst, TEMP tmp, TEMP tmp1, KILL cr);
   ins_cost(100);

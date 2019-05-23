@@ -42,6 +42,7 @@
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/orderAccess.hpp"
+#include "runtime/os.inline.hpp"
 #include "runtime/reflection.hpp"
 #include "runtime/thread.hpp"
 #include "runtime/threadSMR.hpp"
@@ -303,9 +304,16 @@ UNSAFE_LEAF(jint, Unsafe_unalignedAccess0(JNIEnv *env, jobject unsafe)) {
   return UseUnalignedAccesses;
 } UNSAFE_END
 
+#ifdef PLATFORM_GET_PROCESSOR_ID
 UNSAFE_LEAF(jint, Unsafe_getProcessorId(JNIEnv *env, jobject unsafe)) {
   return os::getProcessorId();
 } UNSAFE_END
+#else
+UNSAFE_ENTRY(jint, Unsafe_getProcessorId(JNIEnv *env, jobject unsafe)) {
+  THROW_MSG_0(vmSymbols::java_lang_UnsupportedOperationException(), "Unsafe.getProcessorId not supported");
+  return -1;
+} UNSAFE_END
+#endif
 
 #define DEFINE_GETSETOOP(java_type, Type) \
  \
@@ -931,6 +939,32 @@ UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetLong(JNIEnv *env, jobject unsafe, job
   }
 } UNSAFE_END
 
+#if defined(PLATFORM_SUPPORTS_RSEQ)
+UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetLongCPU(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, int cpu, jlong e, jlong x)) {
+  if (!os::supports_rseq()) {
+    THROW_MSG_0(vmSymbols::java_lang_UnsupportedOperationException(), "Unsafe.compareAndSetLongCPU not supported");
+    return false;
+  }
+
+  oop p = JNIHandles::resolve(obj);
+  volatile jlong* addr;
+  if (p == NULL) {
+    addr = (volatile jlong *)p->field_addr(offset);
+    assert_field_offset_sane(p, offset);
+  } else {
+    addr = (volatile jlong*)index_oop_from_field_offset_long(p, offset);
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  return os::compareAndSetLongCPU(thread, addr, offset, cpu, e, x);
+} UNSAFE_END
+#else
+UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetLongCPU(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, int cpu, jlong e, jlong x)) {
+  assert(!os::supports_rseq(), "something is wrong");
+  THROW_MSG_0(vmSymbols::java_lang_UnsupportedOperationException(), "Unsafe.compareAndSetLongCPU not supported");
+  return false;
+} UNSAFE_END
+#endif
+
 static void post_thread_park_event(EventThreadPark* event, const oop obj, jlong timeout_nanos, jlong until_epoch_millis) {
   assert(event != NULL, "invariant");
   assert(event->should_commit(), "invariant");
@@ -1085,6 +1119,7 @@ static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
     {CC "compareAndSetReference",CC "(" OBJ "J" OBJ "" OBJ ")Z", FN_PTR(Unsafe_CompareAndSetReference)},
     {CC "compareAndSetInt",   CC "(" OBJ "J""I""I"")Z",  FN_PTR(Unsafe_CompareAndSetInt)},
     {CC "compareAndSetLong",  CC "(" OBJ "J""J""J"")Z",  FN_PTR(Unsafe_CompareAndSetLong)},
+    {CC "compareAndSetLongCPU",  CC "(" OBJ "J""I""J""J"")Z",  FN_PTR(Unsafe_CompareAndSetLongCPU)},
     {CC "compareAndExchangeReference", CC "(" OBJ "J" OBJ "" OBJ ")" OBJ, FN_PTR(Unsafe_CompareAndExchangeReference)},
     {CC "compareAndExchangeInt",  CC "(" OBJ "J""I""I"")I", FN_PTR(Unsafe_CompareAndExchangeInt)},
     {CC "compareAndExchangeLong", CC "(" OBJ "J""J""J"")J", FN_PTR(Unsafe_CompareAndExchangeLong)},

@@ -668,6 +668,9 @@ define SetupRunMicroTestBody
 
   # Current tests needs to open java.io
   $1_MICRO_JAVA_OPTIONS += --add-opens=java.base/java.io=ALL-UNNAMED
+  # Some tests need jdk.internal.misc
+  $1_MICRO_JAVA_OPTIONS += --add-exports java.base/jdk.internal.misc=ALL-UNNAMED
+
   # Set library path for native dependencies
   $1_MICRO_JAVA_OPTIONS += -Djava.library.path=$$(TEST_IMAGE_DIR)/micro/native
 

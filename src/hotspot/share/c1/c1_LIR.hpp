@@ -988,6 +988,7 @@ enum LIR_Code {
     , lir_cas_long
     , lir_cas_obj
     , lir_cas_int
+    , lir_cas_long_cpu
   , end_opCompareAndSwap
   , begin_opMDOProfile
     , lir_profile_call
@@ -1856,6 +1857,9 @@ class LIR_OpCompareAndSwap : public LIR_Op {
   LIR_Opr _addr;
   LIR_Opr _cmp_value;
   LIR_Opr _new_value;
+  LIR_Opr _cpu;
+  LIR_Opr _offset;
+  LIR_Opr _result;
   LIR_Opr _tmp1;
   LIR_Opr _tmp2;
 
@@ -1866,12 +1870,30 @@ class LIR_OpCompareAndSwap : public LIR_Op {
     , _addr(addr)
     , _cmp_value(cmp_value)
     , _new_value(new_value)
+    , _cpu(LIR_OprFact::illegalOpr)
+    , _offset(LIR_OprFact::illegalOpr)
+    , _result(result)
+    , _tmp1(t1)
+    , _tmp2(t2)                                  { }
+
+  LIR_OpCompareAndSwap(LIR_Code code, LIR_Opr obj, LIR_Opr off, LIR_Opr cmp_value, LIR_Opr new_value,
+                       LIR_Opr t1, LIR_Opr t2, LIR_Opr cpu, LIR_Opr result)
+    : LIR_Op(code, result, NULL)  // no result, no info
+    , _addr(obj)
+    , _cmp_value(cmp_value)
+    , _new_value(new_value)
+    , _cpu(cpu)
+    , _offset(off)
+    , _result(result)
     , _tmp1(t1)
     , _tmp2(t2)                                  { }
 
   LIR_Opr addr()        const                    { return _addr;  }
+  LIR_Opr offset()      const                    { return _offset;  }
+  LIR_Opr cpu()         const                    { return _cpu;  }
   LIR_Opr cmp_value()   const                    { return _cmp_value; }
   LIR_Opr new_value()   const                    { return _new_value; }
+  LIR_Opr result()      const                    { return _result; }
   LIR_Opr tmp1()        const                    { return _tmp1;      }
   LIR_Opr tmp2()        const                    { return _tmp2;      }
 
@@ -2148,6 +2170,8 @@ class LIR_List: public CompilationResourceObj {
     append(new LIR_Op2(lir_cmove, condition, src1, src2, dst, type));
   }
 
+  void cas_long_cpu(LIR_Opr addr, LIR_Opr off, LIR_Opr cmp_value, LIR_Opr new_value,
+                LIR_Opr t1, LIR_Opr t2, LIR_Opr cpu, LIR_Opr result);
   void cas_long(LIR_Opr addr, LIR_Opr cmp_value, LIR_Opr new_value,
                 LIR_Opr t1, LIR_Opr t2, LIR_Opr result = LIR_OprFact::illegalOpr);
   void cas_obj(LIR_Opr addr, LIR_Opr cmp_value, LIR_Opr new_value,

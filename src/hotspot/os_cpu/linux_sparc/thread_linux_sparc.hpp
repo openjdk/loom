@@ -25,9 +25,12 @@
 #ifndef OS_CPU_LINUX_SPARC_THREAD_LINUX_SPARC_HPP
 #define OS_CPU_LINUX_SPARC_THREAD_LINUX_SPARC_HPP
 
+#include "thread_linux.hpp"
+
 private:
 
   void pd_initialize() {
+    pd_linux_initialize();
     _anchor.clear();
     _base_of_stack_pointer        = NULL;
   }

@@ -127,4 +127,8 @@
   void restore_live_registers_except_rax(bool restore_fpu_registers);
   void restore_live_registers(bool restore_fpu_registers);
 
+#define C1_GET_PROCESSOR_ID
+#define C1_CMP_SET_CPU
+  static bool supports_cmp_set_cpu();
+
 #endif // CPU_X86_C1_MACROASSEMBLER_X86_HPP

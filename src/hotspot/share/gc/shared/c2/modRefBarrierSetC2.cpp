@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -83,18 +83,19 @@ Node* ModRefBarrierSetC2::atomic_cmpxchg_val_at_resolved(C2AtomicParseAccess& ac
 }
 
 Node* ModRefBarrierSetC2::atomic_cmpxchg_bool_at_resolved(C2AtomicParseAccess& access, Node* expected_val,
-                                                          Node* new_val, const Type* value_type) const {
+                                                          Node* new_val, Node* cpu,
+                                                          const Type* value_type) const {
   GraphKit* kit = access.kit();
 
   if (!access.is_oop()) {
-    return BarrierSetC2::atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, value_type);
+    return BarrierSetC2::atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, cpu, value_type);
   }
 
   pre_barrier(kit, false /* do_load */,
               kit->control(), NULL, NULL, max_juint, NULL, NULL,
               expected_val /* pre_val */, T_OBJECT);
 
-  Node* load_store = BarrierSetC2::atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, value_type);
+  Node* load_store = BarrierSetC2::atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, cpu, value_type);
 
   // Emit the post barrier only when the actual store happened. This makes sense
   // to check only for LS_cmp_* that can fail to set the value.

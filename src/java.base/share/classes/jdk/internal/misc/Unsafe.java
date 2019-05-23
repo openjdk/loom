@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1908,6 +1908,38 @@ public final class Unsafe {
      */
     @HotSpotIntrinsicCandidate
     public final native boolean compareAndSetLong(Object o, long offset,
+                                                  long expected,
+                                                  long x);
+
+    private static final boolean compareAndSetCPUSupported;
+
+    static {
+      boolean supported = false;
+      try {
+          Long[] l = new Long[1];
+          l[0] = 0L;
+          theUnsafe.compareAndSetLongCPU(l, ARRAY_LONG_BASE_OFFSET,
+              theUnsafe.getProcessorId(), 0L, 1L);
+          supported = true;
+      } catch (Throwable t) {
+      } finally {
+          compareAndSetCPUSupported = supported;
+      }
+    }
+
+    /**
+     * @return {@code true} if compareAndSet CPU operations are supported.
+     */
+    public final boolean compareAndSetCPUSupported() {
+        return compareAndSetCPUSupported;
+    }
+
+    /**
+     * @return {@code true} if successful
+     */
+    @HotSpotIntrinsicCandidate
+    public final native boolean compareAndSetLongCPU(Object o, long offset,
+                                                  int cpu,
                                                   long expected,
                                                   long x);
 

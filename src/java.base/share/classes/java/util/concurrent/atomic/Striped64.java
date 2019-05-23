@@ -127,6 +127,9 @@ abstract class Striped64 extends Number {
         final boolean cas(long cmp, long val) {
             return VALUE.compareAndSet(this, cmp, val);
         }
+        final boolean casCPU(int cpu, long cmp, long val) {
+	    return U.compareAndSetLongCPU(this, offset, cpu, cmp, val);
+        }
         final void reset() {
             VALUE.setVolatile(this, 0L);
         }
@@ -137,12 +140,16 @@ abstract class Striped64 extends Number {
             return (long)VALUE.getAndSet(this, val);
         }
 
+	private static final jdk.internal.misc.Unsafe U = jdk.internal.misc.Unsafe.getUnsafe();
+	private static final long offset;
+
         // VarHandle mechanics
         private static final VarHandle VALUE;
         static {
             try {
                 MethodHandles.Lookup l = MethodHandles.lookup();
                 VALUE = l.findVarHandle(Cell.class, "value", long.class);
+		offset = U.objectFieldOffset(Cell.class, "value");
             } catch (ReflectiveOperationException e) {
                 throw new ExceptionInInitializerError(e);
             }

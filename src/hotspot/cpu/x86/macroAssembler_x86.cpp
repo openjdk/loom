@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -9771,3 +9771,109 @@ void MacroAssembler::get_thread(Register thread) {
 }
 
 #endif
+
+void MacroAssembler::getprocessorid(Register dst, Register tmp1, Register tmp2) {
+  if (VM_Version::supports_rdpid()) {
+    rdpid(dst);
+    andl(dst, 0xFFF); // TODO linux specific
+#ifdef LINUX
+  } else if (os::Linux::supports_rseq()) {
+    rseq_cpuid(dst);
+#endif
+  } else if (VM_Version::supports_rdtscp()) {
+    assert(dst == rcx, "result register must be rcx");
+    assert(tmp1 == rdx, "tmp1 register must be rdx");
+    assert(tmp2 == rax, "tmp2 register must be rax");
+    rdtscp();
+    andl(dst, 0xFFF); // TODO linux specific
+  } else {
+    assert(false, "");
+  }
+}
+
+void MacroAssembler::rseq_cpuid(Register dst) {
+#if defined(_LP64) && defined(LINUX) && defined(__NR_rseq)
+  assert(os::Linux::supports_rseq(), "!");
+  movl(dst, Address(r15_thread, JavaThread::rseq_cpuid_start_offset()));
+#else
+  fatal("No OS support for rseq");
+#endif
+}
+
+void MacroAssembler::compareAndSetLCPU(Register result, Address mem, Register cpu,
+    Register oldval, Register newval, Register tmp)
+{
+#if defined(_LP64) && defined(LINUX) && defined(__NR_rseq)
+    // oldval and newval can be the same
+    assert_different_registers(mem.base(), mem.index(), cpu, oldval, tmp);
+    assert_different_registers(mem.base(), mem.index(), cpu, newval, tmp);
+
+    // Reserve space for rseq_cs table
+    CodeSection* cs = code_section();
+    address rseq_cs = start_a_const(32, 32);
+    end_a_const(cs);
+
+    Label fail;
+    Label done;
+
+    address fail_block = start_a_stub(16);
+    align(4);
+    emit_int32(0x7ff7effe);
+    address fail_pc = pc();
+    end_a_stub();
+
+    lea(tmp, InternalAddress(rseq_cs));
+    movptr(Address(r15_thread, JavaThread::rseq_cs_offset()), tmp);
+
+    address start_ip = pc();
+    cmpl(cpu, Address(r15_thread, JavaThread::rseq_cpuid_offset()));
+    AddressLiteral fail_loc(fail_pc, runtime_call_Relocation::spec());
+    jump_cc(Assembler::notEqual, fail_loc);
+    cmpq(mem, oldval);
+    jump_cc(Assembler::notEqual, fail_loc);
+    movq(mem, newval);
+    address post_commit = pc();
+    
+    movl(result, 1);
+    address done_pc = pc();
+    bind(done);
+
+    // continue fail/abort block
+    address f = start_a_stub(fail_pc - fail_block);
+    assert(f == fail_pc, "fail_pc address changed");
+    address abort_ip = pc();
+    movl(result, 0);
+    AddressLiteral done_loc(done_pc, runtime_call_Relocation::spec());
+    jump(done_loc);
+    end_a_stub();
+
+    // Fill in rseq_cs table
+    address p = start_a_const(32, 32);
+    assert(p == rseq_cs, "rseq_cs address changed");
+
+    emit_int32(0);
+    emit_int32(0);
+    relocate(internal_word_Relocation::spec(start_ip));
+    emit_address(start_ip);
+    emit_int64(post_commit - start_ip);
+    relocate(internal_word_Relocation::spec(abort_ip));
+    emit_address(abort_ip);
+    end_a_const(cs);
+
+    // Need volatile barrier here?
+#else
+  fatal("No OS support for rseq");
+#endif
+}
+
+void MacroAssembler::compareAndSetLCPU(Register result, Register obj,
+    Register offset, Register cpu,
+    Register oldval, Register newval)
+{
+#if defined(_LP64) && defined(LINUX) && defined(__NR_rseq)
+    Address mem(obj, offset);
+    compareAndSetLCPU(result, mem, cpu, oldval, newval, result);
+#else
+  fatal("No OS support for rseq");
+#endif
+}

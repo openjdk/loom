@@ -55,6 +55,9 @@
 #if INCLUDE_JFR
 #include "jfr/support/jfrThreadExtension.hpp"
 #endif
+#ifdef LINUX
+#include "thread_types_linux.hpp"
+#endif
 
 
 class SafeThreadsListPtr;
@@ -2058,6 +2061,11 @@ class JavaThread: public Thread {
 
   // Machine dependent stuff
 #include OS_CPU_HEADER(thread)
+
+#ifndef PD_DESTROY_SELF
+ public:
+  void pd_destroy_self() {}
+#endif
 
  public:
   void set_blocked_on_compilation(bool value) {

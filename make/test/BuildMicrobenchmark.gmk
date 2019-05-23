@@ -77,7 +77,9 @@ $(eval $(call SetupJavaCompiler, MICROBENCHMARK_JAVA_COMPILER, \
     JVM := $(JAVA) --add-modules jdk.unsupported --limit-modules java.management, \
     JAVAC := $(NEW_JAVAC), \
     DISABLE_SJAVAC := true, \
-    FLAGS := --upgrade-module-path $(JDK_OUTPUTDIR)/modules --system none $(DISABLE_WARNINGS), \
+    FLAGS := --upgrade-module-path $(JDK_OUTPUTDIR)/modules \
+        --system none $(DISABLE_WARNINGS) \
+        --add-exports java.base/jdk.internal.misc=ALL-UNNAMED, \
     SERVER_DIR := $(SJAVAC_SERVER_DIR), \
     SERVER_JVM := $(SJAVAC_SERVER_JAVA), \
 ))

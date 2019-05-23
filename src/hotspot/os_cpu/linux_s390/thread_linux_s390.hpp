@@ -26,9 +26,12 @@
 #ifndef OS_CPU_LINUX_S390_THREAD_LINUX_S390_HPP
 #define OS_CPU_LINUX_S390_THREAD_LINUX_S390_HPP
 
+#include "thread_linux.hpp"
+
  private:
 
   void pd_initialize() {
+    pd_linux_initialize();
     _anchor.clear();
   }
 

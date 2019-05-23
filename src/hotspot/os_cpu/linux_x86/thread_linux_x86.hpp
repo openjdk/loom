@@ -25,8 +25,11 @@
 #ifndef OS_CPU_LINUX_X86_THREAD_LINUX_X86_HPP
 #define OS_CPU_LINUX_X86_THREAD_LINUX_X86_HPP
 
+#include "thread_linux.hpp"
+
  private:
   void pd_initialize() {
+    pd_linux_initialize();
     _anchor.clear();
   }
 

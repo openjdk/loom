@@ -26,11 +26,14 @@
 #ifndef OS_CPU_LINUX_ZERO_THREAD_LINUX_ZERO_HPP
 #define OS_CPU_LINUX_ZERO_THREAD_LINUX_ZERO_HPP
 
+#include "thread_linux.hpp"
+
  private:
   ZeroStack  _zero_stack;
   ZeroFrame* _top_zero_frame;
 
   void pd_initialize() {
+    pd_linux_initialize();
     _top_zero_frame = NULL;
   }
 

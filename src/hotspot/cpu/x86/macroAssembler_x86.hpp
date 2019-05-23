@@ -1759,6 +1759,15 @@ public:
   void byte_array_inflate(Register src, Register dst, Register len,
                           XMMRegister tmp1, Register tmp2);
 
+  void getprocessorid(Register dst, Register tmp1, Register tmp2);
+
+  void rseq_cpuid(Register dst);
+  void compareAndSetLCPU(Register result, Register obj, Register offset, Register cpu,
+		         Register oldval, Register newval);
+  void compareAndSetLCPU(Register result, Address mem, Register cpu,
+                         Register oldval, Register newval,
+                         Register tmp);
+
 };
 
 /**

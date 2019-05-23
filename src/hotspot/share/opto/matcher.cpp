@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,6 +31,7 @@
 #include "opto/addnode.hpp"
 #include "opto/callnode.hpp"
 #include "opto/idealGraphPrinter.hpp"
+#include "opto/intrinsicnode.hpp"
 #include "opto/matcher.hpp"
 #include "opto/memnode.hpp"
 #include "opto/movenode.hpp"
@@ -2261,6 +2262,18 @@ bool Matcher::find_shared_visit(MStack& mstack, Node* n, uint opcode, bool& mem_
 
 void Matcher::find_shared_post_visit(Node* n, uint opcode) {
   switch(opcode) {       // Handle some opcodes special
+    case Op_CompareAndSwapLCPU: {
+      Node* mem    = n->in(MemNode::Address);
+      Node* newval = n->in(MemNode::ValueIn);
+      Node* oldval = n->in(LoadStoreConditionalNode::ExpectedIn);
+      Node* cpu    = n->in(CompareAndSwapLCPUNode::CpuIn);
+      Node* pair2 = new BinaryNode(oldval, newval);
+      Node* pair1 = new BinaryNode(pair2, cpu);
+      n->set_req(MemNode::ValueIn, pair1);
+      n->del_req(CompareAndSwapLCPUNode::CpuIn);
+      n->del_req(LoadStoreConditionalNode::ExpectedIn);
+      break;
+    }
     case Op_StorePConditional:
     case Op_StoreIConditional:
     case Op_StoreLConditional:

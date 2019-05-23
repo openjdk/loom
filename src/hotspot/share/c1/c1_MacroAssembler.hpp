@@ -48,6 +48,10 @@ class C1_MacroAssembler: public MacroAssembler {
 
 #include CPU_HEADER(c1_MacroAssembler)
 
+#ifndef C1_CMP_SET_CPU
+  static bool supports_cmp_set_cpu() { return false; }
+#endif
+
 };
 
 

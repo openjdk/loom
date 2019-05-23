@@ -25,6 +25,7 @@
 #ifndef SHARE_OPTO_INTRINSICNODE_HPP
 #define SHARE_OPTO_INTRINSICNODE_HPP
 
+#include "opto/memnode.hpp"
 #include "opto/node.hpp"
 #include "opto/opcodes.hpp"
 
@@ -225,6 +226,23 @@ public:
   virtual int Opcode() const;
   const Type* bottom_type() const { return TypeInt::BOOL; }
   virtual uint ideal_reg() const { return Op_RegI; }
+};
+
+// Restartable Sequences
+class CompareAndSwapLCPUNode : public CompareAndSwapLNode {
+
+public:
+  enum {
+    CpuIn = ExpectedIn+1, // One more input than CompareAndSwapNode
+    NumIn
+  };
+
+  CompareAndSwapLCPUNode(Node *c, Node *mem, Node *adr, Node *val, Node *ex, Node *cpu, MemNode::MemOrd mem_ord) : CompareAndSwapLNode(c, mem, adr, val, ex, mem_ord, NumIn)
+  {
+    init_req(CpuIn, cpu);
+  }
+
+  virtual int Opcode() const;
 };
 
 #endif // SHARE_OPTO_INTRINSICNODE_HPP

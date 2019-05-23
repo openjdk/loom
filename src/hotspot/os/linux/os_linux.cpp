@@ -107,6 +107,9 @@
 # include <stdint.h>
 # include <inttypes.h>
 # include <sys/ioctl.h>
+#ifdef __NR_rseq
+# include <linux/rseq.h>
+#endif
 
 #ifndef _GNU_SOURCE
   #define _GNU_SOURCE
@@ -148,6 +151,7 @@ Mutex* os::Linux::_createThread_lock = NULL;
 pthread_t os::Linux::_main_thread;
 int os::Linux::_page_size = -1;
 bool os::Linux::_supports_fast_thread_cpu_time = false;
+bool os::Linux::_supports_rseq = false;
 uint32_t os::Linux::_os_version = 0;
 const char * os::Linux::_glibc_version = NULL;
 const char * os::Linux::_libpthread_version = NULL;
@@ -708,6 +712,10 @@ static void *thread_native_entry(Thread *thread) {
 
   assert(osthread->pthread_id() != 0, "pthread_id was not set as expected");
 
+  if (thread->is_Java_thread()) {
+    ((JavaThread*)thread)->pd_initialize_self();
+  }
+
   // call one more level start routine
   thread->call_run();
 
@@ -878,6 +886,8 @@ bool os::create_attached_thread(JavaThread* thread) {
   // initialize signal mask for this thread
   // and save the caller's signal mask
   os::Linux::hotspot_sigmask(thread);
+
+  thread->pd_initialize_self();
 
   log_info(os, thread)("Thread attached (tid: " UINTX_FORMAT ", pthread id: " UINTX_FORMAT ").",
     os::current_thread_id(), (uintx) pthread_self());
@@ -5134,6 +5144,18 @@ jint os::init_2(void) {
 #if INCLUDE_CDS
   if (UseSharedSpaces && DumpPrivateMappingsInCore) {
     set_coredump_filter(FILE_BACKED_PVT_BIT);
+  }
+#endif
+
+#ifdef __NR_rseq
+  Linux::_supports_rseq = false;
+  int r = syscall(__NR_rseq, NULL, 0, 0, 0);
+  guarantee(r == -1, "error expected, got %d", r);
+  int e = errno;
+  if (e == EINVAL) {
+    Linux::_supports_rseq = true;
+  } else {
+    guarantee(e == ENOSYS, "expected ENOSYS, got %d", e);
   }
 #endif
 

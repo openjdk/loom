@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -283,7 +283,7 @@ class LibraryCallKit : public GraphKit {
                                       uint new_idx);
 
   typedef enum { LS_get_add, LS_get_set, LS_cmp_swap, LS_cmp_swap_weak, LS_cmp_exchange } LoadStoreKind;
-  bool inline_unsafe_load_store(BasicType type,  LoadStoreKind kind, AccessKind access_kind);
+  bool inline_unsafe_load_store(BasicType type,  LoadStoreKind kind, AccessKind access_kind, bool cpu = false);
   bool inline_unsafe_fence(vmIntrinsics::ID id);
   bool inline_onspinwait();
   bool inline_fp_conversions(vmIntrinsics::ID id);
@@ -685,6 +685,8 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_compareAndSetShort:       return inline_unsafe_load_store(T_SHORT,  LS_cmp_swap,      Volatile);
   case vmIntrinsics::_compareAndSetInt:         return inline_unsafe_load_store(T_INT,    LS_cmp_swap,      Volatile);
   case vmIntrinsics::_compareAndSetLong:        return inline_unsafe_load_store(T_LONG,   LS_cmp_swap,      Volatile);
+
+  case vmIntrinsics::_compareAndSetLongCPU:     return inline_unsafe_load_store(T_LONG,   LS_cmp_swap,      Volatile, true /* cpu */);
 
   case vmIntrinsics::_weakCompareAndSetReferencePlain:     return inline_unsafe_load_store(T_OBJECT, LS_cmp_swap_weak, Relaxed);
   case vmIntrinsics::_weakCompareAndSetReferenceAcquire:   return inline_unsafe_load_store(T_OBJECT, LS_cmp_swap_weak, Acquire);
@@ -2585,7 +2587,7 @@ bool LibraryCallKit::inline_unsafe_access(bool is_store, const BasicType type, c
 //   long   getAndSet(Object o, long offset, long   newValue)
 //   Object getAndSet(Object o, long offset, Object newValue)
 //
-bool LibraryCallKit::inline_unsafe_load_store(const BasicType type, const LoadStoreKind kind, const AccessKind access_kind) {
+bool LibraryCallKit::inline_unsafe_load_store(const BasicType type, const LoadStoreKind kind, const AccessKind access_kind, bool is_cpu) {
   // This basic scheme here is the same as inline_unsafe_access, but
   // differs in enough details that combining them would make the code
   // overly confusing.  (This is a true fact! I originally combined
@@ -2624,7 +2626,11 @@ bool LibraryCallKit::inline_unsafe_load_store(const BasicType type, const LoadSt
       // Check the signatures.
 #ifdef ASSERT
       assert(rtype == T_BOOLEAN, "CAS must return boolean");
-      assert(sig->count() == 4, "CAS has 4 arguments");
+      if (is_cpu) {
+        assert(sig->count() == 5, "CAS-CPU has 5 arguments");
+      } else {
+        assert(sig->count() == 4, "CAS has 4 arguments");
+      }
       assert(sig->type_at(0)->basic_type() == T_OBJECT, "CAS base is object");
       assert(sig->type_at(1)->basic_type() == T_LONG, "CAS offset is long");
 #endif // ASSERT
@@ -2654,6 +2660,7 @@ bool LibraryCallKit::inline_unsafe_load_store(const BasicType type, const LoadSt
   Node* offset   = NULL;
   Node* oldval   = NULL;
   Node* newval   = NULL;
+  Node* cpu      = NULL;
   switch(kind) {
     case LS_cmp_swap:
     case LS_cmp_swap_weak:
@@ -2662,8 +2669,10 @@ bool LibraryCallKit::inline_unsafe_load_store(const BasicType type, const LoadSt
       receiver = argument(0);  // type: oop
       base     = argument(1);  // type: oop
       offset   = argument(2);  // type: long
-      oldval   = argument(4);  // type: oop, int, or long
-      newval   = argument(two_slot_type ? 6 : 5);  // type: oop, int, or long
+      if (is_cpu) cpu = argument(4);
+      int old_index = is_cpu ? 5 : 4;
+      oldval   = argument(old_index);  // type: oop, int, or long
+      newval   = argument(two_slot_type ? old_index + 2 : old_index + 1);  // type: oop, int, or long
       break;
     }
     case LS_get_add:
@@ -2755,7 +2764,7 @@ bool LibraryCallKit::inline_unsafe_load_store(const BasicType type, const LoadSt
       decorators |= C2_WEAK_CMPXCHG;
     case LS_cmp_swap: {
       result = access_atomic_cmpxchg_bool_at(base, adr, adr_type, alias_idx,
-                                             oldval, newval, value_type, type, decorators);
+                                             oldval, newval, cpu, value_type, type, decorators);
       break;
     }
     case LS_get_set: {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -399,3 +399,11 @@ void C1_MacroAssembler::invalidate_registers(bool inv_rax, bool inv_rbx, bool in
 }
 
 #endif // ifndef PRODUCT
+
+bool C1_MacroAssembler::supports_cmp_set_cpu() {
+#if defined(_LP64) && defined(LINUX) && defined(__NR_rseq)
+  return true;
+#else
+  return false;
+#endif
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1529,5 +1529,28 @@ void LIRGenerator::do_getProcessorId(Intrinsic* x) {
   } else {
     assert(false, "");
   }
+}
+
+void LIRGenerator::do_compareAndSetLCPU(Intrinsic* x) {
+  LIR_Opr result = rlock_result(x);
+
+  LIRItem u(x->argument_at(0), this); // Object
+  LIRItem obj(x->argument_at(1), this); // Object
+  LIRItem offset(x->argument_at(2), this); // long
+  LIRItem cpu(x->argument_at(3), this); // int
+  LIRItem oldval(x->argument_at(4), this); // long
+  LIRItem newval(x->argument_at(5), this); // long
+
+  oldval.load_item_force(FrameMap::long0_opr);
+  newval.load_item_force(FrameMap::long1_opr);
+
+  obj.load_item();
+  offset.load_item();
+  cpu.load_item();
+  oldval.load_item();
+  newval.load_item();
+
+  __ cas_long_cpu(obj.result(), offset.result(), oldval.result(), newval.result(), LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr, cpu.result(), result);
+
 }
 

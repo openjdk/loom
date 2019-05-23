@@ -624,6 +624,9 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
   case vmIntrinsics::_Preconditions_checkIndex:
   case vmIntrinsics::_getProcessorId:
     break;
+  case vmIntrinsics::_compareAndSetLongCPU:
+    if (!Matcher::match_rule_supported(Op_CompareAndSwapLCPU)) return false;
+    break;
   default:
     return false;
   }

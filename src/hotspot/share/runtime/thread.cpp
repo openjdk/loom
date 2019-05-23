@@ -172,8 +172,14 @@ THREAD_LOCAL_DECL Thread* Thread::_thr_current = NULL;
 // ======= Thread ========
 // Support for forcing alignment of thread objects for biased locking
 void* Thread::allocate(size_t size, bool throw_excpt, MEMFLAGS flags) {
+  int alignment = 0;
   if (UseBiasedLocking) {
-    const int alignment = markOopDesc::biased_lock_alignment;
+    alignment = markOopDesc::biased_lock_alignment;
+  }
+#ifdef __NR_rseq
+  alignment = MAX2(alignment, (int)(__alignof__ (struct rseq)));
+#endif
+  if (alignment > 0) {
     size_t aligned_size = size + (alignment - sizeof(intptr_t));
     void* real_malloc_addr = throw_excpt? AllocateHeap(aligned_size, flags, CURRENT_PC)
                                           : AllocateHeap(aligned_size, flags, CURRENT_PC,
@@ -2081,6 +2087,8 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
   // Remove from list of active threads list, and notify VM thread if we are the last non-daemon thread
   Threads::remove(this);
 
+  pd_destroy_self();
+
   if (log_is_enabled(Debug, os, thread, timer)) {
     _timer_exit_phase4.stop();
     ResourceMark rm(this);
@@ -2118,6 +2126,8 @@ void JavaThread::cleanup_failed_attach_current_thread() {
   }
 
   BarrierSet::barrier_set()->on_thread_detach(this);
+
+  pd_destroy_self();
 
   Threads::remove(this);
   this->smr_delete();

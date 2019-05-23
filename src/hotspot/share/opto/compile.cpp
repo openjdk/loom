@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2944,6 +2944,7 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
   case Op_CompareAndExchangeL:
   case Op_CompareAndExchangeP:
   case Op_CompareAndExchangeN:
+  case Op_CompareAndSwapLCPU:
   case Op_GetAndAddS:
   case Op_GetAndAddB:
   case Op_GetAndAddI:

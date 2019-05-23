@@ -829,7 +829,7 @@ public:
   enum {
     ExpectedIn = MemNode::ValueIn+1 // One more input than MemNode
   };
-  LoadStoreConditionalNode(Node *c, Node *mem, Node *adr, Node *val, Node *ex);
+  LoadStoreConditionalNode(Node *c, Node *mem, Node *adr, Node *val, Node *ex, uint required = 5);
 };
 
 //------------------------------StorePConditionalNode---------------------------
@@ -870,6 +870,7 @@ private:
   const MemNode::MemOrd _mem_ord;
 public:
   CompareAndSwapNode( Node *c, Node *mem, Node *adr, Node *val, Node *ex, MemNode::MemOrd mem_ord) : LoadStoreConditionalNode(c, mem, adr, val, ex), _mem_ord(mem_ord) {}
+  CompareAndSwapNode( Node *c, Node *mem, Node *adr, Node *val, Node *ex, MemNode::MemOrd mem_ord, uint required) : LoadStoreConditionalNode(c, mem, adr, val, ex, required), _mem_ord(mem_ord) {}
   MemNode::MemOrd order() const {
     return _mem_ord;
   }
@@ -917,6 +918,7 @@ public:
 class CompareAndSwapLNode : public CompareAndSwapNode {
 public:
   CompareAndSwapLNode( Node *c, Node *mem, Node *adr, Node *val, Node *ex, MemNode::MemOrd mem_ord) : CompareAndSwapNode(c, mem, adr, val, ex, mem_ord) { }
+  CompareAndSwapLNode( Node *c, Node *mem, Node *adr, Node *val, Node *ex, MemNode::MemOrd mem_ord, uint required) : CompareAndSwapNode(c, mem, adr, val, ex, mem_ord, required) { }
   virtual int Opcode() const;
 };
 

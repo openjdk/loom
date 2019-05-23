@@ -115,6 +115,9 @@ class LIR_Assembler: public CompilationResourceObj {
 
   void getprocessorid(LIR_Opr result, LIR_Opr tmp1, LIR_Opr tmp2);
 
+  void compareAndSetLCPU(LIR_Opr result, LIR_Opr obj, LIR_Opr offset,
+                         LIR_Opr cpu, LIR_Opr oldval, LIR_Opr newval);
+
   // patching
   void append_patching_stub(PatchingStub* stub);
   void patching_epilog(PatchingStub* patch, LIR_PatchCode patch_code, Register obj, CodeEmitInfo* info);

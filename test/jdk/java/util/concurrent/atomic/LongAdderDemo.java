@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -46,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.concurrent.atomic.LongAdderCPU;
 
 public class LongAdderDemo {
     static final int INCS_PER_THREAD = 10000000;
@@ -58,18 +59,33 @@ public class LongAdderDemo {
         boolean shortRun = args.length > 0 && args[0].equals("-shortrun");
         int maxNumThreads = shortRun ? SHORT_RUN_MAX_THREADS : LONG_RUN_MAX_THREADS;
 
+        String base = "AtomicLong";
+        String test = "LongAdder";
+        if (args.length > 2) {
+            base = args[1];
+            test = args[2];
+        } else if (args.length > 1) {
+            test = args[1];
+        }
+
         System.out.println("Warmup...");
         int half = NCPU > 1 ? NCPU / 2 : 1;
-        if (!shortRun)
+        if (!shortRun && base.equals("AtomicLong") || test.equals("AtomicLong"))
             casTest(half, 1000);
-        adderTest(half, 1000);
+        if (base.equals("LongAdder") || test.equals("LongAdder"))
+            adderTest(half, 1000);
+        if (base.equals("LongAdderCPU") || test.equals("LongAdderCPU"))
+            adderTestCPU(half, 1000);
 
         for (int reps = 0; reps < 2; ++reps) {
             System.out.println("Running...");
             for (int i = 1; i <= maxNumThreads; i <<= 1) {
-                if (!shortRun)
+                if (!shortRun && (base.equals("AtomicLong") || test.equals("AtomicLong")))
                     casTest(i, INCS_PER_THREAD);
-                adderTest(i, INCS_PER_THREAD);
+                if (base.equals("LongAdder") || test.equals("LongAdder"))
+                    adderTest(i, INCS_PER_THREAD);
+                if (base.equals("LongAdderCPU") || test.equals("LongAdderCPU"))
+                    adderTestCPU(i, INCS_PER_THREAD);
             }
         }
         pool.shutdown();
@@ -85,11 +101,20 @@ public class LongAdderDemo {
     }
 
     static void adderTest(int nthreads, int incs) {
-        System.out.print("LongAdder  ");
+        System.out.print("LongAdder    ");
         Phaser phaser = new Phaser(nthreads + 1);
         LongAdder a = new LongAdder();
         for (int i = 0; i < nthreads; ++i)
             pool.execute(new AdderTask(a, phaser, incs));
+        report(nthreads, incs, timeTasks(phaser), a.sum());
+    }
+
+    static void adderTestCPU(int nthreads, int incs) {
+        System.out.print("LongAdderCPU ");
+        Phaser phaser = new Phaser(nthreads + 1);
+        LongAdderCPU a = new LongAdderCPU();
+        for (int i = 0; i < nthreads; ++i)
+            pool.execute(new AdderTaskCPU(a, phaser, incs));
         report(nthreads, incs, timeTasks(phaser), a.sum());
     }
 
@@ -126,6 +151,28 @@ public class LongAdderDemo {
             phaser.arriveAndAwaitAdvance();
             phaser.arriveAndAwaitAdvance();
             LongAdder a = adder;
+            for (int i = 0; i < incs; ++i)
+                a.increment();
+            result = a.sum();
+            phaser.arrive();
+        }
+    }
+
+    static final class AdderTaskCPU implements Runnable {
+        final LongAdderCPU adder;
+        final Phaser phaser;
+        final int incs;
+        volatile long result;
+        AdderTaskCPU(LongAdderCPU adder, Phaser phaser, int incs) {
+            this.adder = adder;
+            this.phaser = phaser;
+            this.incs = incs;
+        }
+
+        public void run() {
+            phaser.arriveAndAwaitAdvance();
+            phaser.arriveAndAwaitAdvance();
+            LongAdderCPU a = adder;
             for (int i = 0; i < incs; ++i)
                 a.increment();
             result = a.sum();

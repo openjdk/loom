@@ -49,6 +49,13 @@
    */
   static void workaround_expand_exec_shield_cs_limit();
 
+#define PLATFORM_GET_PROCESSOR_ID
   static int getProcessorId();
+
+#if defined(__NR_rseq)
+#define PLATFORM_SUPPORTS_RSEQ
+  static bool supports_rseq() { return os::Linux::supports_rseq(); }
+  static bool compareAndSetLongCPU(JavaThread *thread, volatile jlong* addr, jlong offset, int cpu, jlong e, jlong x);
+#endif
 
 #endif // OS_CPU_LINUX_X86_OS_LINUX_X86_HPP

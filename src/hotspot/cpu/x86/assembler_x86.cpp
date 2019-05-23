@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -7953,6 +7953,13 @@ bool Assembler::reachable(AddressLiteral adr) {
       adr.reloc() != relocInfo::poll_type &&         // relocs to identify them
       adr.reloc() != relocInfo::runtime_call_type ) {
     return false;
+  }
+
+  // Branches between sections might use relocInfo::runtime_call_type
+  if (adr.reloc() == relocInfo::runtime_call_type) {
+    if (code()->contains(adr._target)) {
+      return true;
+    }
   }
 
   // Stress the correction code

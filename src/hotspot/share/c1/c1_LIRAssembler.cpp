@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -767,9 +767,11 @@ void LIR_Assembler::emit_op2(LIR_Op2* op) {
       atomic_op(op->code(), op->in_opr1(), op->in_opr2(), op->result_opr(), op->tmp1_opr());
       break;
 
+#ifdef C1_GET_PROCESSOR_ID
     case lir_getprocessorid:
       getprocessorid(op->result_opr(), op->in_opr1(), op->in_opr2());
       break;
+#endif
 
     default:
       Unimplemented();

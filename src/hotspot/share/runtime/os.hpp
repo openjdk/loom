@@ -33,12 +33,17 @@
 #include "utilities/exceptions.hpp"
 #include "utilities/ostream.hpp"
 #include "utilities/macros.hpp"
+
 #ifndef _WINDOWS
 # include <setjmp.h>
 #endif
 #ifdef __APPLE__
 # include <mach/mach_time.h>
 #endif
+#ifdef LINUX
+#include "os_types_linux.hpp"
+#endif
+
 
 class AgentLibrary;
 class frame;
@@ -843,6 +848,14 @@ class os: AllStatic {
                                           char *buf, int buf_size) {
     return false;
   }
+#endif
+#ifndef PLATFORM_GET_PROCESSOR_ID
+  // No platform-specific code for getting processor id.
+  static int getProcessorID() { return -1; }
+#endif
+#ifndef PLATFORM_SUPPORTS_RSEQ
+  // No platform-specific code for restartable sequences
+  static bool supports_rseq() { return false; }
 #endif
 
   // debugging support (mostly used by debug.cpp but also fatal error handler)

@@ -1640,6 +1640,7 @@ Node* GraphKit::access_atomic_cmpxchg_bool_at(Node* obj,
                                               int alias_idx,
                                               Node* expected_val,
                                               Node* new_val,
+                                              Node* cpu,
                                               const Type* value_type,
                                               BasicType bt,
                                               DecoratorSet decorators) {
@@ -1647,9 +1648,9 @@ Node* GraphKit::access_atomic_cmpxchg_bool_at(Node* obj,
   C2AtomicParseAccess access(this, decorators | C2_READ_ACCESS | C2_WRITE_ACCESS,
                         bt, obj, addr, alias_idx);
   if (access.is_raw()) {
-    return _barrier_set->BarrierSetC2::atomic_cmpxchg_bool_at(access, expected_val, new_val, value_type);
+    return _barrier_set->BarrierSetC2::atomic_cmpxchg_bool_at(access, expected_val, new_val, cpu, value_type);
   } else {
-    return _barrier_set->atomic_cmpxchg_bool_at(access, expected_val, new_val, value_type);
+    return _barrier_set->atomic_cmpxchg_bool_at(access, expected_val, new_val, cpu, value_type);
   }
 }
 

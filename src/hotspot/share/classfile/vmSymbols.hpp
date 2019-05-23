@@ -1253,6 +1253,7 @@
                                                                                                                         \
   do_signature(compareAndSetReference_signature,      "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z")        \
   do_signature(compareAndExchangeReference_signature, "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;") \
+  do_signature(compareAndSetLongCPU_signature,        "(Ljava/lang/Object;JIJJ)Z")                                      \
   do_signature(compareAndSetLong_signature,        "(Ljava/lang/Object;JJJ)Z")                                          \
   do_signature(compareAndExchangeLong_signature,   "(Ljava/lang/Object;JJJ)J")                                          \
   do_signature(compareAndSetInt_signature,         "(Ljava/lang/Object;JII)Z")                                          \
@@ -1266,6 +1267,7 @@
   do_name(compareAndExchangeReference_name,         "compareAndExchangeReference")                                      \
   do_name(compareAndExchangeReferenceAcquire_name,  "compareAndExchangeReferenceAcquire")                               \
   do_name(compareAndExchangeReferenceRelease_name,  "compareAndExchangeReferenceRelease")                               \
+  do_name(compareAndSetLongCPU_name,                "compareAndSetLongCPU")                                             \
   do_name(compareAndSetLong_name,                   "compareAndSetLong")                                                \
   do_name(compareAndExchangeLong_name,              "compareAndExchangeLong")                                           \
   do_name(compareAndExchangeLongAcquire_name,       "compareAndExchangeLongAcquire")                                    \
@@ -1308,6 +1310,7 @@
   do_intrinsic(_compareAndExchangeReference,         jdk_internal_misc_Unsafe,  compareAndExchangeReference_name,         compareAndExchangeReference_signature, F_RN) \
   do_intrinsic(_compareAndExchangeReferenceAcquire,  jdk_internal_misc_Unsafe,  compareAndExchangeReferenceAcquire_name,  compareAndExchangeReference_signature, F_R)  \
   do_intrinsic(_compareAndExchangeReferenceRelease,  jdk_internal_misc_Unsafe,  compareAndExchangeReferenceRelease_name,  compareAndExchangeReference_signature, F_R)  \
+  do_intrinsic(_compareAndSetLongCPU,             jdk_internal_misc_Unsafe,  compareAndSetLongCPU_name,             compareAndSetLongCPU_signature,     F_RN) \
   do_intrinsic(_compareAndSetLong,                jdk_internal_misc_Unsafe,  compareAndSetLong_name,                compareAndSetLong_signature,        F_RN) \
   do_intrinsic(_compareAndExchangeLong,           jdk_internal_misc_Unsafe,  compareAndExchangeLong_name,           compareAndExchangeLong_signature,   F_RN) \
   do_intrinsic(_compareAndExchangeLongAcquire,    jdk_internal_misc_Unsafe,  compareAndExchangeLongAcquire_name,    compareAndExchangeLong_signature,   F_R)  \

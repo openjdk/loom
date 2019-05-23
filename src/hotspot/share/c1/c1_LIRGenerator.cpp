@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,6 +29,7 @@
 #include "c1/c1_Instruction.hpp"
 #include "c1/c1_LIRAssembler.hpp"
 #include "c1/c1_LIRGenerator.hpp"
+#include "c1/c1_MacroAssembler.hpp"
 #include "c1/c1_ValueStack.hpp"
 #include "ci/ciArrayKlass.hpp"
 #include "ci/ciInstance.hpp"
@@ -3098,9 +3099,17 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
     do_vectorizedMismatch(x);
     break;
 
+#ifdef C1_GET_PROCESSOR_ID
   case vmIntrinsics::_getProcessorId:
     do_getProcessorId(x);
     break;
+#endif
+
+#ifdef C1_CMP_SET_CPU
+  case vmIntrinsics::_compareAndSetLongCPU:
+    do_compareAndSetLCPU(x);
+    break;
+#endif
 
   default: ShouldNotReachHere(); break;
   }

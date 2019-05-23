@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1953,6 +1953,18 @@ void LIR_Assembler::emit_compare_and_swap(LIR_OpCompareAndSwap* op) {
     __ lock();
     __ cmpxchgq(newval, Address(addr, 0));
 #endif // _LP64
+  } else if (op->code() == lir_cas_long_cpu) {
+    Register cpu = op->cpu()->as_register();
+    Register offset = op->offset()->as_register_lo();
+    Register obj = (op->addr()->is_single_cpu() ? op->addr()->as_register() : op->addr()->as_register_lo());
+    Register newval = op->new_value()->as_register_lo();
+    Register oldval = op->cmp_value()->as_register_lo();
+    Register result = op->result()->as_register();
+    assert(newval != NULL, "new val must be register");
+    assert(oldval != newval, "cmp and new values must be in different registers");
+    assert(oldval != obj, "cmp and addr must be in different registers");
+    assert(newval != obj, "new value and addr must be in different registers");
+  __ compareAndSetLCPU(result, obj, offset, cpu, oldval, newval);
   } else {
     Unimplemented();
   }
@@ -4015,18 +4027,14 @@ void LIR_Assembler::atomic_op(LIR_Code code, LIR_Opr src, LIR_Opr data, LIR_Opr 
 }
 
 void LIR_Assembler::getprocessorid(LIR_Opr result, LIR_Opr tmp1, LIR_Opr tmp2) {
-  if (VM_Version::supports_rdpid()) {
-    __ rdpid(result->as_register());
-    __ andl(result->as_register(), 0xFFF); // TODO linux specific
-  } else if (VM_Version::supports_rdtscp()) {
-    assert(result->as_register() == rcx, "result register must be rcx");
-    assert(tmp1->as_register() == rdx, "tmp1 register must be rdx");
-    assert(tmp2->as_register() == rax, "tmp2 register must be rax");
-    __ rdtscp();
-    __ andl(result->as_register(), 0xFFF); // TODO linux specific
-  } else {
-    assert(false, "");
-  }
+  __ getprocessorid(result->as_register(), tmp1->as_register(), tmp2->as_register());
 }
+
+void LIR_Assembler::compareAndSetLCPU(LIR_Opr result, LIR_Opr obj, LIR_Opr offset,
+  LIR_Opr cpu, LIR_Opr oldval, LIR_Opr newval)
+{
+  __ compareAndSetLCPU(result->as_register(), obj->as_register(), offset->as_register(), cpu->as_register(), oldval->as_register(), newval->as_register());
+}
+
 
 #undef __

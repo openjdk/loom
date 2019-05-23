@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2852,7 +2852,7 @@ uint LoadStoreNode::size_of() const { return sizeof(*this); }
 
 //=============================================================================
 //----------------------------------LoadStoreConditionalNode--------------------
-LoadStoreConditionalNode::LoadStoreConditionalNode( Node *c, Node *mem, Node *adr, Node *val, Node *ex ) : LoadStoreNode(c, mem, adr, val, NULL, TypeInt::BOOL, 5) {
+LoadStoreConditionalNode::LoadStoreConditionalNode( Node *c, Node *mem, Node *adr, Node *val, Node *ex, uint required ) : LoadStoreNode(c, mem, adr, val, NULL, TypeInt::BOOL, required) {
   init_req(ExpectedIn, ex );
 }
 

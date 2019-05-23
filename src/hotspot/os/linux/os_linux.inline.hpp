@@ -28,6 +28,8 @@
 #include "runtime/os.hpp"
 #include "os_posix.inline.hpp"
 
+#include OS_CPU_HEADER_INLINE(os)
+
 // System includes
 
 #include <unistd.h>
