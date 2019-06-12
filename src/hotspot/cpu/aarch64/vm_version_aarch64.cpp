@@ -129,8 +129,11 @@ void VM_Version::get_processor_features() {
 
   int dcache_line = VM_Version::dcache_line_size();
 
+  // Limit AllocatePrefetchDistance so that it does not exceed the
+  // constraint in AllocatePrefetchDistanceConstraintFunc.
   if (FLAG_IS_DEFAULT(AllocatePrefetchDistance))
-    FLAG_SET_DEFAULT(AllocatePrefetchDistance, 3*dcache_line);
+    FLAG_SET_DEFAULT(AllocatePrefetchDistance, MIN2(512, 3*dcache_line));
+
   if (FLAG_IS_DEFAULT(AllocatePrefetchStepSize))
     FLAG_SET_DEFAULT(AllocatePrefetchStepSize, dcache_line);
   if (FLAG_IS_DEFAULT(PrefetchScanIntervalInBytes))
@@ -194,6 +197,19 @@ void VM_Version::get_processor_features() {
 
   // Enable vendor specific features
 
+  // Ampere eMAG
+  if (_cpu == CPU_AMCC && (_model == 0) && (_variant == 0x3)) {
+    if (FLAG_IS_DEFAULT(AvoidUnalignedAccesses)) {
+      FLAG_SET_DEFAULT(AvoidUnalignedAccesses, true);
+    }
+    if (FLAG_IS_DEFAULT(UseSIMDForMemoryOps)) {
+      FLAG_SET_DEFAULT(UseSIMDForMemoryOps, true);
+    }
+    if (FLAG_IS_DEFAULT(UseSIMDForArrayEquals)) {
+      FLAG_SET_DEFAULT(UseSIMDForArrayEquals, !(_revision == 1 || _revision == 2));
+    }
+  }
+
   // ThunderX
   if (_cpu == CPU_CAVIUM && (_model == 0xA1)) {
     if (_variant == 0) _features |= CPU_DMB_ATOMICS;
@@ -211,6 +227,16 @@ void VM_Version::get_processor_features() {
   // ThunderX2
   if ((_cpu == CPU_CAVIUM && (_model == 0xAF)) ||
       (_cpu == CPU_BROADCOM && (_model == 0x516))) {
+    if (FLAG_IS_DEFAULT(AvoidUnalignedAccesses)) {
+      FLAG_SET_DEFAULT(AvoidUnalignedAccesses, true);
+    }
+    if (FLAG_IS_DEFAULT(UseSIMDForMemoryOps)) {
+      FLAG_SET_DEFAULT(UseSIMDForMemoryOps, true);
+    }
+  }
+
+  // HiSilicon TSV110
+  if (_cpu == CPU_HISILICON && _model == 0xd01) {
     if (FLAG_IS_DEFAULT(AvoidUnalignedAccesses)) {
       FLAG_SET_DEFAULT(AvoidUnalignedAccesses, true);
     }
@@ -258,8 +284,10 @@ void VM_Version::get_processor_features() {
   if (FLAG_IS_DEFAULT(UseCRC32)) {
     UseCRC32 = (auxv & HWCAP_CRC32) != 0;
   }
+
   if (UseCRC32 && (auxv & HWCAP_CRC32) == 0) {
     warning("UseCRC32 specified, but not supported on this CPU");
+    FLAG_SET_DEFAULT(UseCRC32, false);
   }
 
   if (FLAG_IS_DEFAULT(UseAdler32Intrinsics)) {
@@ -277,6 +305,7 @@ void VM_Version::get_processor_features() {
   } else {
     if (UseLSE) {
       warning("UseLSE specified, but not supported on this CPU");
+      FLAG_SET_DEFAULT(UseLSE, false);
     }
   }
 
@@ -291,9 +320,11 @@ void VM_Version::get_processor_features() {
   } else {
     if (UseAES) {
       warning("UseAES specified, but not supported on this CPU");
+      FLAG_SET_DEFAULT(UseAES, false);
     }
     if (UseAESIntrinsics) {
       warning("UseAESIntrinsics specified, but not supported on this CPU");
+      FLAG_SET_DEFAULT(UseAESIntrinsics, false);
     }
   }
 

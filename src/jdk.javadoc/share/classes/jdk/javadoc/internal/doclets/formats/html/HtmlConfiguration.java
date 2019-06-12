@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,11 +41,7 @@ import com.sun.tools.doclint.DocLint;
 
 import jdk.javadoc.doclet.Doclet;
 import jdk.javadoc.doclet.DocletEnvironment;
-import jdk.javadoc.internal.doclets.formats.html.markup.HtmlConstants;
-import jdk.javadoc.internal.doclets.formats.html.markup.HtmlTag;
-import jdk.javadoc.internal.doclets.formats.html.markup.HtmlVersion;
 import jdk.javadoc.internal.doclets.toolkit.BaseConfiguration;
-import jdk.javadoc.internal.doclets.toolkit.Content;
 import jdk.javadoc.internal.doclets.toolkit.DocletException;
 import jdk.javadoc.internal.doclets.toolkit.Messages;
 import jdk.javadoc.internal.doclets.toolkit.Resources;
@@ -53,7 +49,6 @@ import jdk.javadoc.internal.doclets.toolkit.WriterFactory;
 import jdk.javadoc.internal.doclets.toolkit.util.DocFile;
 import jdk.javadoc.internal.doclets.toolkit.util.DocPath;
 import jdk.javadoc.internal.doclets.toolkit.util.DocPaths;
-import jdk.javadoc.internal.doclets.toolkit.util.Utils;
 
 import static javax.tools.Diagnostic.Kind.*;
 
@@ -81,6 +76,11 @@ import static javax.tools.Diagnostic.Kind.*;
  * @author Bhavesh Patel (Modified)
  */
 public class HtmlConfiguration extends BaseConfiguration {
+
+    /**
+     * Default charset for HTML.
+     */
+    public static final String HTML_DEFAULT_CHARSET = "utf-8";
 
     /**
      * Argument for command line option "-header".
@@ -197,12 +197,6 @@ public class HtmlConfiguration extends BaseConfiguration {
     public boolean createoverview = false;
 
     /**
-     * Specifies whether or not frames should be generated.
-     * Defaults to false; can be set to true by --frames; can be set to false by --no-frames; last one wins.
-     */
-    public boolean frames = false;
-
-    /**
      * Collected set of doclint options
      */
     public Map<Doclet.Option, String> doclintOpts = new LinkedHashMap<>();
@@ -239,6 +233,8 @@ public class HtmlConfiguration extends BaseConfiguration {
     protected final Messages messages;
 
     public DocPaths docPaths;
+
+    public Map<Element, List<DocPath>> localStylesheetMap = new HashMap<>();
 
     /**
      * Creates an object to hold the configuration for a doclet.
@@ -351,11 +347,10 @@ public class HtmlConfiguration extends BaseConfiguration {
                 }
             }
         }
-        docPaths = new DocPaths(utils, useModuleDirectories);
+        docPaths = new DocPaths(utils);
         setCreateOverview();
         setTopFile(docEnv);
-        workArounds.initDocLint(doclintOpts.values(), tagletManager.getAllTagletNames(),
-                Utils.toLowerCase(HtmlVersion.HTML5.name()));
+        workArounds.initDocLint(doclintOpts.values(), tagletManager.getAllTagletNames());
         return true;
     }
 
@@ -374,7 +369,7 @@ public class HtmlConfiguration extends BaseConfiguration {
             return;
         }
         if (createoverview) {
-            topFile = DocPaths.overviewSummary(frames);
+            topFile = DocPaths.INDEX;
         } else {
             if (showModules) {
                 topFile = DocPath.empty.resolve(docPaths.moduleSummary(modules.first()));
@@ -457,13 +452,17 @@ public class HtmlConfiguration extends BaseConfiguration {
         return null;
     }
 
-    public DocFile getMainStylesheet() {
-        return stylesheetfile.isEmpty() ? null : DocFile.createFileForInput(this, stylesheetfile);
+    public DocPath getMainStylesheet() {
+        if(!stylesheetfile.isEmpty()){
+            DocFile docFile = DocFile.createFileForInput(this, stylesheetfile);
+            return DocPath.create(docFile.getName());
+        }
+        return  null;
     }
 
-    public List<DocFile> getAdditionalStylesheets() {
+    public List<DocPath> getAdditionalStylesheets() {
         return additionalStylesheets.stream()
-                .map(ssf -> DocFile.createFileForInput(this, ssf))
+                .map(ssf -> DocFile.createFileForInput(this, ssf)).map(file -> DocPath.create(file.getName()))
                 .collect(Collectors.toList());
     }
 
@@ -639,21 +638,6 @@ public class HtmlConfiguration extends BaseConfiguration {
                     return true;
                 }
             },
-            new Option(resources, "--frames") {
-                @Override
-                public boolean process(String opt,  List<String> args) {
-                    reporter.print(WARNING, resources.getText("doclet.Frames_specified", helpfile));
-                    frames = true;
-                    return true;
-                }
-            },
-            new Option(resources, "--no-frames") {
-                @Override
-                public boolean process(String opt,  List<String> args) {
-                    frames = false;
-                    return true;
-                }
-            },
             new Hidden(resources, "-packagesheader", 1) {
                 @Override
                 public boolean process(String opt,  List<String> args) {
@@ -748,6 +732,13 @@ public class HtmlConfiguration extends BaseConfiguration {
                     }
                     return true;
                 }
+            },
+            new XOption(resources, "--no-frames") {
+                @Override
+                public boolean process(String opt, List<String> args) {
+                    reporter.print(WARNING, resources.getText("doclet.NoFrames_specified"));
+                    return true;
+                }
             }
         };
         Set<Doclet.Option> oset = new TreeSet<>();
@@ -760,7 +751,7 @@ public class HtmlConfiguration extends BaseConfiguration {
     protected boolean finishOptionSettings0() throws DocletException {
         if (docencoding == null) {
             if (charset == null) {
-                docencoding = charset = (encoding == null) ? HtmlConstants.HTML_DEFAULT_CHARSET : encoding;
+                docencoding = charset = (encoding == null) ? HTML_DEFAULT_CHARSET : encoding;
             } else {
                 docencoding = charset;
             }

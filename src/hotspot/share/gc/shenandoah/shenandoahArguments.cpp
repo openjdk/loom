@@ -23,13 +23,12 @@
  */
 
 #include "precompiled.hpp"
-#include "gc/shared/gcArguments.inline.hpp"
+#include "gc/shared/gcArguments.hpp"
 #include "gc/shared/workerPolicy.hpp"
 #include "gc/shenandoah/shenandoahArguments.hpp"
 #include "gc/shenandoah/shenandoahCollectorPolicy.hpp"
 #include "gc/shenandoah/shenandoahHeap.inline.hpp"
 #include "gc/shenandoah/shenandoahHeapRegion.hpp"
-#include "gc/shenandoah/shenandoahTaskqueue.hpp"
 #include "utilities/defaultStream.hpp"
 
 void ShenandoahArguments::initialize() {
@@ -37,7 +36,7 @@ void ShenandoahArguments::initialize() {
   vm_exit_during_initialization("Shenandoah GC is not supported on this platform.");
 #endif
 
-#ifdef IA32
+#if 0 // leave this block as stepping stone for future platforms
   log_warning(gc)("Shenandoah GC is not fully supported on this platform:");
   log_warning(gc)("  concurrent modes are not supported, only STW cycles are enabled;");
   log_warning(gc)("  arch-specific barrier code is not implemented, disabling barriers;");
@@ -45,25 +44,13 @@ void ShenandoahArguments::initialize() {
   FLAG_SET_DEFAULT(ShenandoahGCHeuristics,           "passive");
 
   FLAG_SET_DEFAULT(ShenandoahSATBBarrier,            false);
+  FLAG_SET_DEFAULT(ShenandoahLoadRefBarrier,         false);
   FLAG_SET_DEFAULT(ShenandoahKeepAliveBarrier,       false);
-  FLAG_SET_DEFAULT(ShenandoahWriteBarrier,           false);
-  FLAG_SET_DEFAULT(ShenandoahReadBarrier,            false);
   FLAG_SET_DEFAULT(ShenandoahStoreValEnqueueBarrier, false);
-  FLAG_SET_DEFAULT(ShenandoahStoreValReadBarrier,    false);
   FLAG_SET_DEFAULT(ShenandoahCASBarrier,             false);
-  FLAG_SET_DEFAULT(ShenandoahAcmpBarrier,            false);
   FLAG_SET_DEFAULT(ShenandoahCloneBarrier,           false);
-#endif
 
-#ifdef _LP64
-  // The optimized ObjArrayChunkedTask takes some bits away from the full 64 addressable
-  // bits, fail if we ever attempt to address more than we can. Only valid on 64bit.
-  if (MaxHeapSize >= ObjArrayChunkedTask::max_addressable()) {
-    jio_fprintf(defaultStream::error_stream(),
-                "Shenandoah GC cannot address more than " SIZE_FORMAT " bytes, and " SIZE_FORMAT " bytes heap requested.",
-                ObjArrayChunkedTask::max_addressable(), MaxHeapSize);
-    vm_exit(1);
-  }
+  FLAG_SET_DEFAULT(ShenandoahVerifyOptoBarriers,     false);
 #endif
 
   if (UseLargePages && (MaxHeapSize / os::large_page_size()) < ShenandoahHeapRegion::MIN_NUM_REGIONS) {
@@ -80,12 +67,34 @@ void ShenandoahArguments::initialize() {
     FLAG_SET_DEFAULT(UseNUMAInterleaving, true);
   }
 
-  FLAG_SET_DEFAULT(ParallelGCThreads,
-                   WorkerPolicy::parallel_worker_threads());
-
+  // Set up default number of concurrent threads. We want to have cycles complete fast
+  // enough, but we also do not want to steal too much CPU from the concurrently running
+  // application. Using 1/4 of available threads for concurrent GC seems a good
+  // compromise here.
   if (FLAG_IS_DEFAULT(ConcGCThreads)) {
-    uint conc_threads = MAX2((uint) 1, ParallelGCThreads);
-    FLAG_SET_DEFAULT(ConcGCThreads, conc_threads);
+    FLAG_SET_DEFAULT(ConcGCThreads, MAX2(1, os::processor_count() / 4));
+  }
+
+  if (ConcGCThreads == 0) {
+    vm_exit_during_initialization("Shenandoah expects ConcGCThreads > 0, check -XX:ConcGCThreads=#");
+  }
+
+  // Set up default number of parallel threads. We want to have decent pauses performance
+  // which would use parallel threads, but we also do not want to do too many threads
+  // that will overwhelm the OS scheduler. Using 1/2 of available threads seems to be a fair
+  // compromise here. Due to implementation constraints, it should not be lower than
+  // the number of concurrent threads.
+  if (FLAG_IS_DEFAULT(ParallelGCThreads)) {
+    FLAG_SET_DEFAULT(ParallelGCThreads, MAX2(1, os::processor_count() / 2));
+  }
+
+  if (ParallelGCThreads == 0) {
+    vm_exit_during_initialization("Shenandoah expects ParallelGCThreads > 0, check -XX:ParallelGCThreads=#");
+  }
+
+  if (ParallelGCThreads < ConcGCThreads) {
+    warning("Shenandoah expects ConcGCThreads <= ParallelGCThreads, adjusting ParallelGCThreads automatically");
+    FLAG_SET_DEFAULT(ParallelGCThreads, ConcGCThreads);
   }
 
   if (FLAG_IS_DEFAULT(ParallelRefProcEnabled)) {
@@ -110,13 +119,10 @@ void ShenandoahArguments::initialize() {
   // C2 barrier verification is only reliable when all default barriers are enabled
   if (ShenandoahVerifyOptoBarriers &&
           (!FLAG_IS_DEFAULT(ShenandoahSATBBarrier)            ||
+           !FLAG_IS_DEFAULT(ShenandoahLoadRefBarrier)         ||
            !FLAG_IS_DEFAULT(ShenandoahKeepAliveBarrier)       ||
-           !FLAG_IS_DEFAULT(ShenandoahWriteBarrier)           ||
-           !FLAG_IS_DEFAULT(ShenandoahReadBarrier)            ||
            !FLAG_IS_DEFAULT(ShenandoahStoreValEnqueueBarrier) ||
-           !FLAG_IS_DEFAULT(ShenandoahStoreValReadBarrier)    ||
            !FLAG_IS_DEFAULT(ShenandoahCASBarrier)             ||
-           !FLAG_IS_DEFAULT(ShenandoahAcmpBarrier)            ||
            !FLAG_IS_DEFAULT(ShenandoahCloneBarrier)
           )) {
     warning("Unusual barrier configuration, disabling C2 barrier verification");
@@ -135,18 +141,6 @@ void ShenandoahArguments::initialize() {
     FLAG_SET_DEFAULT(ShenandoahAlwaysPreTouch, true);
   }
 
-  // Shenandoah C2 optimizations apparently dislike the shape of thread-local handshakes.
-  // Disable it by default, unless we enable it specifically for debugging.
-  if (FLAG_IS_DEFAULT(ThreadLocalHandshakes)) {
-    if (ThreadLocalHandshakes) {
-      FLAG_SET_DEFAULT(ThreadLocalHandshakes, false);
-    }
-  } else {
-    if (ThreadLocalHandshakes) {
-      warning("Thread-local handshakes are not working correctly with Shenandoah at the moment. Enable at your own risk.");
-    }
-  }
-
   // Record more information about previous cycles for improved debugging pleasure
   if (FLAG_IS_DEFAULT(LogEventsBufferEntries)) {
     FLAG_SET_DEFAULT(LogEventsBufferEntries, 250);
@@ -156,6 +150,11 @@ void ShenandoahArguments::initialize() {
     if (!FLAG_IS_DEFAULT(ShenandoahUncommit)) {
       warning("AlwaysPreTouch is enabled, disabling ShenandoahUncommit");
     }
+    FLAG_SET_DEFAULT(ShenandoahUncommit, false);
+  }
+
+  if ((InitialHeapSize == MaxHeapSize) && ShenandoahUncommit) {
+    log_info(gc)("Min heap equals to max heap, disabling ShenandoahUncommit");
     FLAG_SET_DEFAULT(ShenandoahUncommit, false);
   }
 
@@ -175,13 +174,6 @@ void ShenandoahArguments::initialize() {
     }
     FLAG_SET_DEFAULT(UseAOT, false);
   }
-
-  // JNI fast get field stuff is not currently supported by Shenandoah.
-  // It would introduce another heap memory access for reading the forwarding
-  // pointer, which would have to be guarded by the signal handler machinery.
-  // See:
-  // http://mail.openjdk.java.net/pipermail/hotspot-dev/2018-June/032763.html
-  FLAG_SET_DEFAULT(UseFastJNIAccessors, false);
 
   // TLAB sizing policy makes resizing decisions before each GC cycle. It averages
   // historical data, assigning more recent data the weight according to TLABAllocationWeight.
@@ -220,6 +212,19 @@ size_t ShenandoahArguments::conservative_max_heap_alignment() {
   return align;
 }
 
+void ShenandoahArguments::initialize_alignments() {
+  // Need to setup sizes early to get correct alignments.
+  ShenandoahHeapRegion::setup_sizes(MaxHeapSize);
+
+  // This is expected by our algorithm for ShenandoahHeap::heap_region_containing().
+  size_t align = ShenandoahHeapRegion::region_size_bytes();
+  if (UseLargePages) {
+    align = MAX2(align, os::large_page_size());
+  }
+  SpaceAlignment = align;
+  HeapAlignment = align;
+}
+
 CollectedHeap* ShenandoahArguments::create_heap() {
-  return create_heap_with_policy<ShenandoahHeap, ShenandoahCollectorPolicy>();
+  return new ShenandoahHeap(new ShenandoahCollectorPolicy());
 }

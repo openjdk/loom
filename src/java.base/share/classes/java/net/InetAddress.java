@@ -45,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.Arrays;
 
 import jdk.internal.access.JavaNetInetAddressAccess;
 import jdk.internal.access.SharedSecrets;
@@ -71,7 +72,7 @@ import sun.net.util.IPAddressUtil;
  * with a host name or whether it has already done reverse host name
  * resolution).
  *
- * <h3> Address types </h3>
+ * <h2> Address types </h2>
  *
  * <table class="striped" style="margin-left:2em">
  *   <caption style="display:none">Description of unicast and multicast address types</caption>
@@ -105,7 +106,7 @@ import sun.net.util.IPAddressUtil;
  * </tbody>
  * </table>
  *
- * <h4> IP address scope </h4>
+ * <h3> IP address scope </h3>
  *
  * <p> <i>Link-local</i> addresses are designed to be used for addressing
  * on a single link for purposes such as auto-address configuration,
@@ -116,7 +117,7 @@ import sun.net.util.IPAddressUtil;
  *
  * <p> <i>Global</i> addresses are unique across the internet.
  *
- * <h4> Textual representation of IP addresses </h4>
+ * <h3> Textual representation of IP addresses </h3>
  *
  * The textual representation of an IP address is address family specific.
  *
@@ -130,7 +131,7 @@ import sun.net.util.IPAddressUtil;
  * <P>There is a <a href="doc-files/net-properties.html#Ipv4IPv6">couple of
  * System Properties</a> affecting how IPv4 and IPv6 addresses are used.</P>
  *
- * <h4> Host Name Resolution </h4>
+ * <h3> Host Name Resolution </h3>
  *
  * Host name-to-IP address <i>resolution</i> is accomplished through
  * the use of a combination of local machine configuration information
@@ -145,7 +146,7 @@ import sun.net.util.IPAddressUtil;
  * <p> The InetAddress class provides methods to resolve host names to
  * their IP addresses and vice versa.
  *
- * <h4> InetAddress Caching </h4>
+ * <h3> InetAddress Caching </h3>
  *
  * The InetAddress class has a cache to store successful as well as
  * unsuccessful host name resolutions.
@@ -989,29 +990,28 @@ class InetAddress implements java.io.Serializable {
             String hostEntry;
             String host = null;
 
-            String addrString = addrToString(addr);
             try (Scanner hostsFileScanner = new Scanner(new File(hostsFile), "UTF-8")) {
                 while (hostsFileScanner.hasNextLine()) {
                     hostEntry = hostsFileScanner.nextLine();
                     if (!hostEntry.startsWith("#")) {
                         hostEntry = removeComments(hostEntry);
-                        if (hostEntry.contains(addrString)) {
-                            host = extractHost(hostEntry, addrString);
-                            if (host != null) {
-                                break;
-                            }
+                        String[] mapping = hostEntry.split("\\s+");
+                        if (mapping.length >= 2 &&
+                            Arrays.equals(addr, createAddressByteArray(mapping[0]))) {
+                            host = mapping[1];
+                            break;
                         }
                     }
                 }
             } catch (FileNotFoundException e) {
                 throw new UnknownHostException("Unable to resolve address "
-                        + addrString + " as hosts file " + hostsFile
+                        + Arrays.toString(addr) + " as hosts file " + hostsFile
                         + " not found ");
             }
 
             if ((host == null) || (host.isEmpty()) || (host.equals(" "))) {
                 throw new UnknownHostException("Requested address "
-                        + addrString
+                        + Arrays.toString(addr)
                         + " resolves to an invalid entry in hosts file "
                         + hostsFile);
             }
@@ -1106,22 +1106,6 @@ class InetAddress implements java.io.Serializable {
                 }
             }
             return hostAddr;
-        }
-
-        /**
-         * IP Address to host mapping
-         * use first host alias in list
-         */
-        private String extractHost(String hostEntry, String addrString) {
-            String[] mapping = hostEntry.split("\\s+");
-            String host = null;
-
-            if (mapping.length >= 2) {
-                if (mapping[0].equalsIgnoreCase(addrString)) {
-                    host = mapping[1];
-                }
-            }
-            return host;
         }
     }
 

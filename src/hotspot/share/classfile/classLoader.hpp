@@ -61,6 +61,10 @@ public:
   // Attempt to locate file_name through this class path entry.
   // Returns a class file parsing stream if successfull.
   virtual ClassFileStream* open_stream(const char* name, TRAPS) = 0;
+  // Open the stream for a specific class loader
+  virtual ClassFileStream* open_stream_for_loader(const char* name, ClassLoaderData* loader_data, TRAPS) {
+    return open_stream(name, THREAD);
+  }
 };
 
 class ClassPathDirEntry: public ClassPathEntry {
@@ -114,6 +118,7 @@ class ClassPathImageEntry: public ClassPathEntry {
 private:
   JImageFile* _jimage;
   const char* _name;
+  DEBUG_ONLY(static ClassPathImageEntry* _singleton;)
 public:
   bool is_modules_image() const;
   bool is_jar_file() const { return false; }
@@ -124,6 +129,7 @@ public:
   ClassPathImageEntry(JImageFile* jimage, const char* name);
   virtual ~ClassPathImageEntry();
   ClassFileStream* open_stream(const char* name, TRAPS);
+  ClassFileStream* open_stream_for_loader(const char* name, ClassLoaderData* loader_data, TRAPS);
 };
 
 // ModuleClassPathList contains a linked list of ClassPathEntry's
@@ -247,11 +253,11 @@ class ClassLoader: AllStatic {
 
   static void load_zip_library();
   static void load_jimage_library();
+
+ public:
   static ClassPathEntry* create_class_path_entry(const char *path, const struct stat* st,
                                                  bool throw_exception,
                                                  bool is_boot_append, TRAPS);
-
- public:
 
   // If the package for the fully qualified class name is in the boot
   // loader's package entry table then add_package() sets the classpath_index
@@ -392,7 +398,8 @@ class ClassLoader: AllStatic {
   // Helper function used by CDS code to get the number of module path
   // entries during shared classpath setup time.
   static int num_module_path_entries() {
-    assert(DumpSharedSpaces, "Should only be called at CDS dump time");
+    assert(DumpSharedSpaces || DynamicDumpSharedSpaces,
+           "Should only be called at CDS dump time");
     int num_entries = 0;
     ClassPathEntry* e= ClassLoader::_module_path_entries;
     while (e != NULL) {
@@ -404,7 +411,7 @@ class ClassLoader: AllStatic {
   static void  finalize_shared_paths_misc_info();
   static int   get_shared_paths_misc_info_size();
   static void* get_shared_paths_misc_info();
-  static bool  check_shared_paths_misc_info(void* info, int size);
+  static bool  check_shared_paths_misc_info(void* info, int size, bool is_static);
   static void  exit_with_path_failure(const char* error, const char* message);
   static char* skip_uri_protocol(char* source);
   static void  record_result(InstanceKlass* ik, const ClassFileStream* stream, TRAPS);
@@ -438,8 +445,6 @@ class ClassLoader: AllStatic {
   // *bad_class_name is set to true if there's a problem with parsing class_name, to
   // distinguish from a class_name with no package name, as both cases have a NULL return value
   static const char* package_from_name(const char* const class_name, bool* bad_class_name = NULL);
-
-  static bool is_modules_image(const char* name) { return string_ends_with(name, MODULES_IMAGE_NAME); }
 
   // Debugging
   static void verify()              PRODUCT_RETURN;

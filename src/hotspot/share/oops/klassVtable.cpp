@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -500,11 +500,11 @@ bool klassVtable::update_inherited_vtable(InstanceKlass* klass, const methodHand
             if (failed_type_symbol != NULL) {
               stringStream ss;
               ss.print("loader constraint violation for class %s: when selecting "
-                       "overriding method %s the class loader %s of the "
+                       "overriding method '", klass->external_name());
+              target_method()->print_external_name(&ss),
+              ss.print("' the class loader %s of the "
                        "selected method's type %s, and the class loader %s for its super "
                        "type %s have different Class objects for the type %s used in the signature (%s; %s)",
-                       klass->external_name(),
-                       target_method()->name_and_sig_as_C_string(),
                        target_klass->class_loader_data()->loader_name_and_id(),
                        target_klass->external_name(),
                        super_klass->class_loader_data()->loader_name_and_id(),
@@ -942,21 +942,18 @@ bool klassVtable::adjust_default_method(int vtable_index, Method* old_method, Me
 }
 
 // search the vtable for uses of either obsolete or EMCP methods
-void klassVtable::adjust_method_entries(InstanceKlass* holder, bool * trace_name_printed) {
+void klassVtable::adjust_method_entries(bool * trace_name_printed) {
   int prn_enabled = 0;
   for (int index = 0; index < length(); index++) {
     Method* old_method = unchecked_method_at(index);
-    if (old_method == NULL || old_method->method_holder() != holder || !old_method->is_old()) {
+    if (old_method == NULL || !old_method->is_old()) {
       continue; // skip uninteresting entries
     }
     assert(!old_method->is_deleted(), "vtable methods may not be deleted");
 
-    Method* new_method = holder->method_with_idnum(old_method->orig_method_idnum());
-
-    assert(new_method != NULL, "method_with_idnum() should not be NULL");
-    assert(old_method != new_method, "sanity check");
-
+    Method* new_method = old_method->get_new_method();
     put_method_at(new_method, index);
+
     // For default methods, need to update the _default_methods array
     // which can only have one method entry for a given signature
     bool updated_default = false;
@@ -1230,15 +1227,16 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
           if (failed_type_symbol != NULL) {
             stringStream ss;
             ss.print("loader constraint violation in interface itable"
-                     " initialization for class %s: when selecting method %s the"
-                     " class loader %s for super interface %s, and the class"
-                     " loader %s of the selected method's type, %s have"
+                     " initialization for class %s: when selecting method '",
+                     _klass->external_name());
+            m->print_external_name(&ss),
+            ss.print("' the class loader %s for super interface %s, and the class"
+                     " loader %s of the selected method's %s, %s have"
                      " different Class objects for the type %s used in the signature (%s; %s)",
-                     _klass->external_name(),
-                     m->name_and_sig_as_C_string(),
                      interf->class_loader_data()->loader_name_and_id(),
                      interf->external_name(),
                      target()->method_holder()->class_loader_data()->loader_name_and_id(),
+                     target()->method_holder()->external_kind(),
                      target()->method_holder()->external_name(),
                      failed_type_symbol->as_klass_external_name(),
                      interf->class_in_module_of_loader(false, true),
@@ -1272,21 +1270,16 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
 
 #if INCLUDE_JVMTI
 // search the itable for uses of either obsolete or EMCP methods
-void klassItable::adjust_method_entries(InstanceKlass* holder, bool * trace_name_printed) {
+void klassItable::adjust_method_entries(bool * trace_name_printed) {
 
   itableMethodEntry* ime = method_entry(0);
   for (int i = 0; i < _size_method_table; i++, ime++) {
     Method* old_method = ime->method();
-    if (old_method == NULL || old_method->method_holder() != holder || !old_method->is_old()) {
+    if (old_method == NULL || !old_method->is_old()) {
       continue; // skip uninteresting entries
     }
     assert(!old_method->is_deleted(), "itable methods may not be deleted");
-
-    Method* new_method = holder->method_with_idnum(old_method->orig_method_idnum());
-
-    assert(new_method != NULL, "method_with_idnum() should not be NULL");
-    assert(old_method != new_method, "sanity check");
-
+    Method* new_method = old_method->get_new_method();
     ime->initialize(new_method);
 
     if (log_is_enabled(Info, redefine, class, update)) {

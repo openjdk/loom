@@ -26,7 +26,9 @@
 #include "code/nmethod.hpp"
 #include "gc/shenandoah/shenandoahHeap.inline.hpp"
 #include "gc/shenandoah/shenandoahCodeRoots.hpp"
+#include "gc/shenandoah/shenandoahUtils.hpp"
 #include "memory/resourceArea.hpp"
+#include "memory/universe.hpp"
 
 ShenandoahParallelCodeCacheIterator::ShenandoahParallelCodeCacheIterator(const GrowableArray<CodeHeap*>* heaps) {
   _length = heaps->length();
@@ -119,70 +121,28 @@ public:
   }
 };
 
-class ShenandoahNMethodOopInitializer : public OopClosure {
-private:
-  ShenandoahHeap* const _heap;
-
-public:
-  ShenandoahNMethodOopInitializer() : _heap(ShenandoahHeap::heap()) {};
-
-private:
-  template <class T>
-  inline void do_oop_work(T* p) {
-    T o = RawAccess<>::oop_load(p);
-    if (! CompressedOops::is_null(o)) {
-      oop obj1 = CompressedOops::decode_not_null(o);
-      oop obj2 = ShenandoahBarrierSet::barrier_set()->write_barrier(obj1);
-      if (! oopDesc::equals_raw(obj1, obj2)) {
-        shenandoah_assert_not_in_cset(NULL, obj2);
-        RawAccess<IS_NOT_NULL>::oop_store(p, obj2);
-        if (_heap->is_concurrent_traversal_in_progress()) {
-          ShenandoahBarrierSet::barrier_set()->enqueue(obj2);
-        }
-      }
-    }
-  }
-
-public:
-  void do_oop(oop* o) {
-    do_oop_work(o);
-  }
-  void do_oop(narrowOop* o) {
-    do_oop_work(o);
-  }
-};
-
-ShenandoahCodeRoots::PaddedLock ShenandoahCodeRoots::_recorded_nms_lock;
 GrowableArray<ShenandoahNMethod*>* ShenandoahCodeRoots::_recorded_nms;
+ShenandoahLock                     ShenandoahCodeRoots::_recorded_nms_lock;
 
 void ShenandoahCodeRoots::initialize() {
-  _recorded_nms_lock._lock = 0;
   _recorded_nms = new (ResourceObj::C_HEAP, mtGC) GrowableArray<ShenandoahNMethod*>(100, true, mtGC);
 }
 
 void ShenandoahCodeRoots::add_nmethod(nmethod* nm) {
   switch (ShenandoahCodeRootsStyle) {
     case 0:
-    case 1: {
-      ShenandoahNMethodOopInitializer init;
-      nm->oops_do(&init);
-      nm->fix_oop_relocations();
+    case 1:
       break;
-    }
     case 2: {
+      assert_locked_or_safepoint(CodeCache_lock);
+      ShenandoahLocker locker(CodeCache_lock->owned_by_self() ? NULL : &_recorded_nms_lock);
+
       ShenandoahNMethodOopDetector detector;
       nm->oops_do(&detector);
 
       if (detector.has_oops()) {
-        ShenandoahNMethodOopInitializer init;
-        nm->oops_do(&init);
-        nm->fix_oop_relocations();
-
         ShenandoahNMethod* nmr = new ShenandoahNMethod(nm, detector.oops());
         nmr->assert_alive_and_correct();
-
-        ShenandoahCodeRootsLock lock(true);
-
         int idx = _recorded_nms->find(nm, ShenandoahNMethod::find_with_nmethod);
         if (idx != -1) {
           ShenandoahNMethod* old = _recorded_nms->at(idx);
@@ -206,12 +166,13 @@ void ShenandoahCodeRoots::remove_nmethod(nmethod* nm) {
       break;
     }
     case 2: {
+      assert_locked_or_safepoint(CodeCache_lock);
+      ShenandoahLocker locker(CodeCache_lock->owned_by_self() ? NULL : &_recorded_nms_lock);
+
       ShenandoahNMethodOopDetector detector;
       nm->oops_do(&detector, /* allow_zombie = */ true);
 
       if (detector.has_oops()) {
-        ShenandoahCodeRootsLock lock(true);
-
         int idx = _recorded_nms->find(nm, ShenandoahNMethod::find_with_nmethod);
         assert(idx != -1, "nmethod " PTR_FORMAT " should be registered", p2i(nm));
         ShenandoahNMethod* old = _recorded_nms->at(idx);
@@ -239,7 +200,7 @@ ShenandoahCodeRootsIterator::ShenandoahCodeRootsIterator() :
       break;
     }
     case 2: {
-      ShenandoahCodeRoots::acquire_lock(false);
+      CodeCache_lock->lock();
       break;
     }
     default:
@@ -255,7 +216,7 @@ ShenandoahCodeRootsIterator::~ShenandoahCodeRootsIterator() {
       break;
     }
     case 2: {
-      ShenandoahCodeRoots::release_lock(false);
+      CodeCache_lock->unlock();
       break;
     }
     default:
@@ -283,14 +244,6 @@ void ShenandoahCodeRootsIterator::dispatch_parallel_blobs_do(CodeBlobClosure *f)
     default:
       ShouldNotReachHere();
   }
-}
-
-ShenandoahAllCodeRootsIterator ShenandoahCodeRoots::iterator() {
-  return ShenandoahAllCodeRootsIterator();
-}
-
-ShenandoahCsetCodeRootsIterator ShenandoahCodeRoots::cset_iterator() {
-  return ShenandoahCsetCodeRootsIterator();
 }
 
 void ShenandoahAllCodeRootsIterator::possibly_parallel_blobs_do(CodeBlobClosure *f) {

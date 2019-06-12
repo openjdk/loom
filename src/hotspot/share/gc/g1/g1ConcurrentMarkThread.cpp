@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -127,7 +127,7 @@ double G1ConcurrentMarkThread::mmu_sleep_time(G1Policy* g1_policy, bool remark) 
 }
 
 void G1ConcurrentMarkThread::delay_to_keep_mmu(G1Policy* g1_policy, bool remark) {
-  if (g1_policy->adaptive_young_list_length()) {
+  if (g1_policy->use_adaptive_young_list_length()) {
     jlong sleep_time_ms = mmu_sleep_time(g1_policy, remark);
     if (!_cm->has_aborted() && sleep_time_ms > 0) {
       os::sleep(this, sleep_time_ms, false);
@@ -243,7 +243,7 @@ void G1ConcurrentMarkThread::run_service() {
   _vtime_start = os::elapsedVTime();
 
   G1CollectedHeap* g1h = G1CollectedHeap::heap();
-  G1Policy* g1_policy = g1h->g1_policy();
+  G1Policy* policy = g1h->policy();
 
   G1ConcPhaseManager cpmanager(G1ConcurrentPhase::IDLE, this);
 
@@ -268,6 +268,7 @@ void G1ConcurrentMarkThread::run_service() {
 
       {
         G1ConcPhase p(G1ConcurrentPhase::CLEAR_CLAIMED_MARKS, this);
+        MutexLocker ml(ClassLoaderDataGraph_lock);
         ClassLoaderDataGraph::clear_claimed_marks();
       }
 
@@ -322,7 +323,7 @@ void G1ConcurrentMarkThread::run_service() {
           double mark_end_time = os::elapsedVTime();
           jlong mark_end = os::elapsed_counter();
           _vtime_mark_accum += (mark_end_time - cycle_start);
-          delay_to_keep_mmu(g1_policy, true /* remark */);
+          delay_to_keep_mmu(policy, true /* remark */);
           if (_cm->has_aborted()) {
             break;
           }
@@ -361,7 +362,7 @@ void G1ConcurrentMarkThread::run_service() {
       _vtime_accum = (end_time - _vtime_start);
 
       if (!_cm->has_aborted()) {
-        delay_to_keep_mmu(g1_policy, false /* cleanup */);
+        delay_to_keep_mmu(policy, false /* cleanup */);
       }
 
       if (!_cm->has_aborted()) {
@@ -397,7 +398,7 @@ void G1ConcurrentMarkThread::run_service() {
 }
 
 void G1ConcurrentMarkThread::stop_service() {
-  MutexLockerEx ml(CGC_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker ml(CGC_lock, Mutex::_no_safepoint_check_flag);
   CGC_lock->notify_all();
 }
 
@@ -407,9 +408,9 @@ void G1ConcurrentMarkThread::sleep_before_next_cycle() {
   // below while the world is otherwise stopped.
   assert(!in_progress(), "should have been cleared");
 
-  MutexLockerEx x(CGC_lock, Mutex::_no_safepoint_check_flag);
+  MonitorLocker ml(CGC_lock, Mutex::_no_safepoint_check_flag);
   while (!started() && !should_terminate()) {
-    CGC_lock->wait(Mutex::_no_safepoint_check_flag);
+    ml.wait();
   }
 
   if (started()) {

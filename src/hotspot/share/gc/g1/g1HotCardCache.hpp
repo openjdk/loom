@@ -26,7 +26,6 @@
 #define SHARE_GC_G1_G1HOTCARDCACHE_HPP
 
 #include "gc/g1/g1CardCounts.hpp"
-#include "gc/g1/g1_globals.hpp"
 #include "memory/allocation.hpp"
 #include "runtime/safepoint.hpp"
 #include "runtime/thread.hpp"
@@ -53,7 +52,10 @@ class HeapRegion;
 // code, increasing throughput.
 
 class G1HotCardCache: public CHeapObj<mtGC> {
+public:
+  typedef CardTable::CardValue CardValue;
 
+private:
   G1CollectedHeap*  _g1h;
 
   bool              _use_cache;
@@ -62,7 +64,7 @@ class G1HotCardCache: public CHeapObj<mtGC> {
 
 
   // The card cache table
-  jbyte**           _hot_cache;
+  CardValue** _hot_cache;
 
   size_t            _hot_cache_size;
 
@@ -107,7 +109,7 @@ class G1HotCardCache: public CHeapObj<mtGC> {
   // adding, NULL is returned and no further action in needed.
   // If we evict a card from the cache to make room for the new card,
   // the evicted card is then returned for refinement.
-  jbyte* insert(jbyte* card_ptr);
+  CardValue* insert(CardValue* card_ptr);
 
   // Refine the cards that have delayed as a result of
   // being in the cache.

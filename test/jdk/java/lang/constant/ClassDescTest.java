@@ -176,6 +176,12 @@ public class ClassDescTest extends SymbolicDescTest {
         } catch (IllegalArgumentException e) {
             // good
         }
+        try {
+            cr.arrayType(0);
+            fail("");
+        } catch (IllegalArgumentException e) {
+            // good
+        }
     }
 
     public void testArrayClassDesc() throws ReflectiveOperationException {
@@ -299,5 +305,29 @@ public class ClassDescTest extends SymbolicDescTest {
         String s = "";
         assertEquals(s.resolveConstantDesc(LOOKUP), s);
         assertEquals(s.describeConstable().get(), s);
+    }
+
+    public void testNullNestedClasses() {
+        ClassDesc cd = ClassDesc.of("Bar");
+        try {
+            cd.nested(null);
+            fail("");
+        } catch (NullPointerException e) {
+            // good
+        }
+
+        try {
+            cd.nested("good", null);
+            fail("");
+        } catch (NullPointerException e) {
+            // good
+        }
+
+        try {
+            cd.nested("good", "goodToo", null);
+            fail("");
+        } catch (NullPointerException e) {
+            // good
+        }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,17 +42,13 @@
 #include "opto/superword.hpp"
 
 //=============================================================================
-//------------------------------is_loop_iv-------------------------------------
-// Determine if a node is Counted loop induction variable.
-// The method is declared in node.hpp.
-const Node* Node::is_loop_iv() const {
-  if (this->is_Phi() && !this->as_Phi()->is_copy() &&
-      this->as_Phi()->region()->is_CountedLoop() &&
-      this->as_Phi()->region()->as_CountedLoop()->phi() == this) {
-    return this;
-  } else {
-    return NULL;
-  }
+//--------------------------is_cloop_ind_var-----------------------------------
+// Determine if a node is a counted loop induction variable.
+// NOTE: The method is declared in "node.hpp".
+bool Node::is_cloop_ind_var() const {
+  return (is_Phi() && !as_Phi()->is_copy() &&
+          as_Phi()->region()->is_CountedLoop() &&
+          as_Phi()->region()->as_CountedLoop()->phi() == this);
 }
 
 //=============================================================================
@@ -1593,12 +1589,17 @@ void OuterStripMinedLoopNode::adjust_strip_mined_loop(PhaseIterGVN* igvn) {
     } else {
       new_limit = igvn->transform(new SubINode(iv_phi, min));
     }
-    Node* cmp = inner_cle->cmp_node()->clone();
-    igvn->replace_input_of(cmp, 2, new_limit);
-    Node* bol = inner_cle->in(CountedLoopEndNode::TestValue)->clone();
-    cmp->set_req(2, limit);
-    bol->set_req(1, igvn->transform(cmp));
-    igvn->replace_input_of(outer_loop_end(), 1, igvn->transform(bol));
+    Node* inner_cmp = inner_cle->cmp_node();
+    Node* inner_bol = inner_cle->in(CountedLoopEndNode::TestValue);
+    Node* outer_bol = inner_bol;
+    // cmp node for inner loop may be shared
+    inner_cmp = inner_cmp->clone();
+    inner_cmp->set_req(2, new_limit);
+    inner_bol = inner_bol->clone();
+    inner_bol->set_req(1, igvn->transform(inner_cmp));
+    igvn->replace_input_of(inner_cle, CountedLoopEndNode::TestValue, igvn->transform(inner_bol));
+    // Set the outer loop's exit condition too
+    igvn->replace_input_of(outer_loop_end(), 1, outer_bol);
   } else {
     assert(false, "should be able to adjust outer loop");
     IfNode* outer_le = outer_loop_end();
@@ -2438,12 +2439,63 @@ void IdealLoopTree::counted_loop( PhaseIdealLoop *phase ) {
   if (loop->_next)  loop->_next ->counted_loop(phase);
 }
 
+
+// The Estimated Loop Clone Size:
+//   CloneFactor * (~112% * BodySize + BC) + CC + FanOutTerm,
+// where  BC and  CC are  totally ad-hoc/magic  "body" and "clone" constants,
+// respectively, used to ensure that the node usage estimates made are on the
+// safe side, for the most part. The FanOutTerm is an attempt to estimate the
+// possible additional/excessive nodes generated due to data and control flow
+// merging, for edges reaching outside the loop.
+uint IdealLoopTree::est_loop_clone_sz(uint factor) const {
+
+  precond(0 < factor && factor < 16);
+
+  uint const bc = 13;
+  uint const cc = 17;
+  uint const sz = _body.size() + (_body.size() + 7) / 8;
+  uint estimate = factor * (sz + bc) + cc;
+
+  assert((estimate - cc) / factor == sz + bc, "overflow");
+
+  uint ctrl_edge_out_cnt = 0;
+  uint data_edge_out_cnt = 0;
+
+  for (uint i = 0; i < _body.size(); i++) {
+    Node* node = _body.at(i);
+    uint outcnt = node->outcnt();
+
+    for (uint k = 0; k < outcnt; k++) {
+      Node* out = node->raw_out(k);
+
+      if (out->is_CFG()) {
+        if (!is_member(_phase->get_loop(out))) {
+          ctrl_edge_out_cnt++;
+        }
+      } else {
+        Node* ctrl = _phase->get_ctrl(out);
+        assert(ctrl->is_CFG(), "must be");
+        if (!is_member(_phase->get_loop(ctrl))) {
+          data_edge_out_cnt++;
+        }
+      }
+    }
+  }
+  // Add data (x1.5) and control (x1.0) count to estimate iff both are > 0.
+  if (ctrl_edge_out_cnt > 0 && data_edge_out_cnt > 0) {
+    estimate += ctrl_edge_out_cnt + data_edge_out_cnt + data_edge_out_cnt / 2;
+  }
+
+  return estimate;
+}
+
 #ifndef PRODUCT
 //------------------------------dump_head--------------------------------------
 // Dump 1 liner for loop header info
-void IdealLoopTree::dump_head( ) const {
-  for (uint i=0; i<_nest; i++)
+void IdealLoopTree::dump_head() const {
+  for (uint i = 0; i < _nest; i++) {
     tty->print("  ");
+  }
   tty->print("Loop: N%d/N%d ",_head->_idx,_tail->_idx);
   if (_irreducible) tty->print(" IRREDUCIBLE");
   Node* entry = _head->is_Loop() ? _head->as_Loop()->skip_strip_mined(-1)->in(LoopNode::EntryControl) : _head->in(LoopNode::EntryControl);
@@ -2512,7 +2564,7 @@ void IdealLoopTree::dump_head( ) const {
 
 //------------------------------dump-------------------------------------------
 // Dump loops by loop tree
-void IdealLoopTree::dump( ) const {
+void IdealLoopTree::dump() const {
   dump_head();
   if (_child) _child->dump();
   if (_next)  _next ->dump();
@@ -2907,8 +2959,8 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     assert(C->unique() == unique, "non-optimize mode made Nodes? ? ?");
     return;
   }
-  if(VerifyLoopOptimizations) verify();
-  if(TraceLoopOpts && C->has_loops()) {
+  if (VerifyLoopOptimizations) verify();
+  if (TraceLoopOpts && C->has_loops()) {
     _ltree_root->dump();
   }
 #endif
@@ -2941,17 +2993,20 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
       IdealLoopTree* lpt = iter.current();
       bool is_counted = lpt->is_counted();
-      if (!is_counted || !lpt->is_inner()) continue;
+      if (!is_counted || !lpt->is_innermost()) continue;
 
       // check for vectorized loops, any reassociation of invariants was already done
-      if (is_counted && lpt->_head->as_CountedLoop()->do_unroll_only()) continue;
-
-      lpt->reassociate_invariants(this);
-
+      if (is_counted && lpt->_head->as_CountedLoop()->is_unroll_only()) {
+        continue;
+      } else {
+        AutoNodeBudget node_budget(this);
+        lpt->reassociate_invariants(this);
+      }
       // Because RCE opportunities can be masked by split_thru_phi,
       // look for RCE candidates and inhibit split_thru_phi
       // on just their loop-phi's for this pass of loop opts
       if (SplitIfBlocks && do_split_ifs) {
+        AutoNodeBudget node_budget(this, AutoNodeBudget::NO_BUDGET_CHECK);
         if (lpt->policy_range_check(this)) {
           lpt->_rce_candidate = 1; // = true
         }
@@ -3966,7 +4021,7 @@ Node *PhaseIdealLoop::get_late_ctrl( Node *n, Node *early ) {
     }
     while(worklist.size() != 0 && LCA != early) {
       Node* s = worklist.pop();
-      if (s->is_Load() || s->is_ShenandoahBarrier() || s->Opcode() == Op_SafePoint ||
+      if (s->is_Load() || s->Opcode() == Op_SafePoint ||
           (s->is_CallStaticJava() && s->as_CallStaticJava()->uncommon_trap_request() != 0)) {
         continue;
       } else if (s->is_MergeMem()) {

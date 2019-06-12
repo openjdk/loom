@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -56,10 +56,11 @@ public class Head {
     private String title;
     private String charset;
     private final List<String> keywords;
+    private String description;
+    private String generator;
     private boolean showTimestamp;
-    private boolean useModuleDirectories;
-    private DocFile mainStylesheetFile;
-    private List<DocFile> additionalStylesheetFiles = Collections.emptyList();
+    private DocPath mainStylesheet;
+    private List<DocPath> additionalStylesheets = Collections.emptyList();
     private boolean index;
     private Script mainBodyScript;
     private final List<Script> scripts;
@@ -111,6 +112,22 @@ public class Head {
     }
 
     /**
+     * Sets the content for the description META element.
+     */
+    public Head setDescription(String description) {
+        this.description = description;
+        return this;
+    }
+
+    /**
+     * Sets the content for the generator META element.
+     */
+    public Head setGenerator(String generator) {
+        this.generator = generator;
+        return this;
+    }
+
+    /**
      * Adds a list of keywords to appear in META [@code keywords} elements.
      *
      * @param keywords the list of keywords, or null if none need to be added
@@ -140,25 +157,16 @@ public class Head {
 
     /**
      * Sets the main and any additional stylesheets to be listed in the HEAD element.
+     * The paths for the stylesheets must be relative to the root of the generated
+     * documentation hierarchy.
      *
      * @param main the main stylesheet, or null to use the default
      * @param additional a list of any additional stylesheets to be included
      * @return  this object
      */
-    public Head setStylesheets(DocFile main, List<DocFile> additional) {
-        this.mainStylesheetFile = main;
-        this.additionalStylesheetFiles = additional;
-        return this;
-    }
-
-    /**
-     * Sets whether the module directories should be used. This is used to set the JavaScript variable.
-     *
-     * @param useModuleDirectories true if the module directories should be used
-     * @return  this object
-     */
-    public Head setUseModuleDirectories(boolean useModuleDirectories) {
-        this.useModuleDirectories = useModuleDirectories;
+    public Head setStylesheets(DocPath main, List<DocPath> additional) {
+        this.mainStylesheet = main;
+        this.additionalStylesheets = additional;
         return this;
     }
 
@@ -233,32 +241,40 @@ public class Head {
         Date now = showTimestamp ? calendar.getTime() : null;
 
         HtmlTree tree = new HtmlTree(HtmlTag.HEAD);
-        tree.addContent(getGeneratedBy(showTimestamp, now));
-        tree.addContent(HtmlTree.TITLE(title));
+        tree.add(getGeneratedBy(showTimestamp, now));
+        tree.add(HtmlTree.TITLE(title));
 
         if (charset != null) { // compatibility; should this be allowed?
-            tree.addContent(HtmlTree.META("Content-Type", "text/html", charset));
+            tree.add(HtmlTree.META("Content-Type", "text/html", charset));
         }
 
         if (showTimestamp) {
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-            tree.addContent(HtmlTree.META("dc.created", dateFormat.format(now)));
+            tree.add(HtmlTree.META("dc.created", dateFormat.format(now)));
+        }
+
+        if (description != null) {
+            tree.add(HtmlTree.META("description", description));
+        }
+
+        if (generator != null) {
+            tree.add(HtmlTree.META("generator", generator));
         }
 
         for (String k : keywords) {
-            tree.addContent(HtmlTree.META("keywords", k));
+            tree.add(HtmlTree.META("keywords", k));
         }
 
         if (canonicalLink != null) {
             HtmlTree link = new HtmlTree(HtmlTag.LINK);
-            link.addAttr(HtmlAttr.REL, "canonical");
-            link.addAttr(HtmlAttr.HREF, canonicalLink.getPath());
-            tree.addContent(link);
+            link.put(HtmlAttr.REL, "canonical");
+            link.put(HtmlAttr.HREF, canonicalLink.getPath());
+            tree.add(link);
         }
 
         addStylesheets(tree);
         addScripts(tree);
-        extraContent.forEach(tree::addContent);
+        extraContent.forEach(tree::add);
 
         return tree;
     }
@@ -272,16 +288,13 @@ public class Head {
     }
 
     private void addStylesheets(HtmlTree tree) {
-        DocPath mainStylesheet;
-        if (mainStylesheetFile == null) {
+        if (mainStylesheet == null) {
             mainStylesheet = DocPaths.STYLESHEET;
-        } else {
-            mainStylesheet = DocPath.create(mainStylesheetFile.getName());
         }
         addStylesheet(tree, mainStylesheet);
 
-        for (DocFile file : additionalStylesheetFiles) {
-            addStylesheet(tree, DocPath.create(file.getName()));
+        for (DocPath path : additionalStylesheets) {
+            addStylesheet(tree, path);
         }
 
         if (index) {
@@ -290,13 +303,13 @@ public class Head {
     }
 
     private void addStylesheet(HtmlTree tree, DocPath stylesheet) {
-        tree.addContent(HtmlTree.LINK("stylesheet", "text/css",
+        tree.add(HtmlTree.LINK("stylesheet", "text/css",
                 pathToRoot.resolve(stylesheet).getPath(), "Style"));
     }
 
     private void addScripts(HtmlTree tree) {
         if (addDefaultScript) {
-            tree.addContent(HtmlTree.SCRIPT(pathToRoot.resolve(DocPaths.JAVASCRIPT).getPath()));
+            tree.add(HtmlTree.SCRIPT(pathToRoot.resolve(DocPaths.JAVASCRIPT).getPath()));
         }
         if (index) {
             if (pathToRoot != null && mainBodyScript != null) {
@@ -304,25 +317,23 @@ public class Head {
                 mainBodyScript.append("var pathtoroot = ")
                         .appendStringLiteral(ptrPath + "/")
                         .append(";\n")
-                        .append("var useModuleDirectories = " + useModuleDirectories + ";\n")
                         .append("loadScripts(document, \'script\');");
             }
             addJQueryFile(tree, DocPaths.JSZIP_MIN);
             addJQueryFile(tree, DocPaths.JSZIPUTILS_MIN);
-            tree.addContent(new RawHtml("<!--[if IE]>"));
+            tree.add(new RawHtml("<!--[if IE]>"));
             addJQueryFile(tree, DocPaths.JSZIPUTILS_IE_MIN);
-            tree.addContent(new RawHtml("<![endif]-->"));
-            addJQueryFile(tree, DocPaths.JQUERY_JS_3_3);
-            addJQueryFile(tree, DocPaths.JQUERY_MIGRATE);
+            tree.add(new RawHtml("<![endif]-->"));
+            addJQueryFile(tree, DocPaths.JQUERY_JS_3_4);
             addJQueryFile(tree, DocPaths.JQUERY_JS);
         }
         for (Script script : scripts) {
-            tree.addContent(script.asContent());
+            tree.add(script.asContent());
         }
     }
 
     private void addJQueryFile(HtmlTree tree, DocPath filePath) {
         DocPath jqueryFile = pathToRoot.resolve(DocPaths.JQUERY_FILES.resolve(filePath));
-        tree.addContent(HtmlTree.SCRIPT(jqueryFile.getPath()));
+        tree.add(HtmlTree.SCRIPT(jqueryFile.getPath()));
     }
 }

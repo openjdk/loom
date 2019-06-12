@@ -42,11 +42,13 @@
 #include "gc/shared/gcPolicyCounters.hpp"
 #include "gc/shared/gcTrace.hpp"
 #include "gc/shared/gcTraceTime.inline.hpp"
+#include "gc/shared/genArguments.hpp"
 #include "gc/shared/gcVMOperations.hpp"
 #include "gc/shared/genCollectedHeap.hpp"
 #include "gc/shared/genOopClosures.inline.hpp"
 #include "gc/shared/generationSpec.hpp"
 #include "gc/shared/oopStorageParState.inline.hpp"
+#include "gc/shared/scavengableNMethods.hpp"
 #include "gc/shared/space.hpp"
 #include "gc/shared/strongRootsScope.hpp"
 #include "gc/shared/weakProcessor.hpp"
@@ -54,6 +56,7 @@
 #include "memory/filemap.hpp"
 #include "memory/metaspaceCounters.hpp"
 #include "memory/resourceArea.hpp"
+#include "memory/universe.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/biasedLocking.hpp"
 #include "runtime/flags/flagSetting.hpp"
@@ -68,22 +71,23 @@
 #include "utilities/macros.hpp"
 #include "utilities/stack.inline.hpp"
 #include "utilities/vmError.hpp"
+#if INCLUDE_JVMCI
+#include "jvmci/jvmci.hpp"
+#endif
 
-GenCollectedHeap::GenCollectedHeap(GenCollectorPolicy *policy,
-                                   Generation::Name young,
+GenCollectedHeap::GenCollectedHeap(Generation::Name young,
                                    Generation::Name old,
                                    const char* policy_counters_name) :
   CollectedHeap(),
   _young_gen_spec(new GenerationSpec(young,
-                                     policy->initial_young_size(),
-                                     policy->max_young_size(),
-                                     policy->gen_alignment())),
+                                     NewSize,
+                                     MaxNewSize,
+                                     GenAlignment)),
   _old_gen_spec(new GenerationSpec(old,
-                                   policy->initial_old_size(),
-                                   policy->max_old_size(),
-                                   policy->gen_alignment())),
+                                   OldSize,
+                                   MaxOldSize,
+                                   GenAlignment)),
   _rem_set(NULL),
-  _gen_policy(policy),
   _soft_ref_gen_policy(),
   _gc_policy_counters(new GCPolicyCounters(policy_counters_name, 2, 2)),
   _full_collections_completed(0),
@@ -103,9 +107,7 @@ jint GenCollectedHeap::initialize() {
   char* heap_address;
   ReservedSpace heap_rs;
 
-  size_t heap_alignment = collector_policy()->heap_alignment();
-
-  heap_address = allocate(heap_alignment, &heap_rs);
+  heap_address = allocate(HeapAlignment, &heap_rs);
 
   if (!heap_rs.is_reserved()) {
     vm_shutdown_during_initialization(
@@ -166,7 +168,7 @@ char* GenCollectedHeap::allocate(size_t alignment,
   *heap_rs = Universe::reserve_heap(total_reserved, alignment);
 
   os::trace_page_sizes("Heap",
-                       collector_policy()->min_heap_byte_size(),
+                       MinHeapSize,
                        total_reserved,
                        alignment,
                        heap_rs->base(),
@@ -174,6 +176,15 @@ char* GenCollectedHeap::allocate(size_t alignment,
 
   return heap_rs->base();
 }
+
+class GenIsScavengable : public BoolObjectClosure {
+public:
+  bool do_object_b(oop obj) {
+    return GenCollectedHeap::heap()->is_in_young(obj);
+  }
+};
+
+static GenIsScavengable _is_scavengable;
 
 void GenCollectedHeap::post_initialize() {
   CollectedHeap::post_initialize();
@@ -186,6 +197,8 @@ void GenCollectedHeap::post_initialize() {
                          def_new_gen->from()->capacity());
 
   MarkSweep::initialize();
+
+  ScavengableNMethods::initialize(&_is_scavengable);
 }
 
 void GenCollectedHeap::ref_processing_init() {
@@ -221,7 +234,7 @@ size_t GenCollectedHeap::max_capacity() const {
 // Update the _full_collections_completed counter
 // at the end of a stop-world full GC.
 unsigned int GenCollectedHeap::update_full_collections_completed() {
-  MonitorLockerEx ml(FullGCCount_lock, Mutex::_no_safepoint_check_flag);
+  MonitorLocker ml(FullGCCount_lock, Mutex::_no_safepoint_check_flag);
   assert(_full_collections_completed <= _total_full_collections,
          "Can't complete more collections than were started");
   _full_collections_completed = _total_full_collections;
@@ -235,7 +248,7 @@ unsigned int GenCollectedHeap::update_full_collections_completed() {
 // without synchronizing in any manner with the VM thread (which
 // may already have initiated a STW full collection "concurrently").
 unsigned int GenCollectedHeap::update_full_collections_completed(unsigned int count) {
-  MonitorLockerEx ml(FullGCCount_lock, Mutex::_no_safepoint_check_flag);
+  MonitorLocker ml(FullGCCount_lock, Mutex::_no_safepoint_check_flag);
   assert((_full_collections_completed <= _total_full_collections) &&
          (count <= _total_full_collections),
          "Can't complete more collections than were started");
@@ -557,8 +570,6 @@ void GenCollectedHeap::do_collection(bool           full,
     return; // GC is disabled (e.g. JNI GetXXXCritical operation)
   }
 
-  GCIdMark gc_id_mark;
-
   const bool do_clear_all_soft_refs = clear_all_soft_refs ||
                           soft_ref_policy()->should_clear_all_soft_refs();
 
@@ -566,103 +577,114 @@ void GenCollectedHeap::do_collection(bool           full,
 
   const size_t metadata_prev_used = MetaspaceUtils::used_bytes();
 
-  print_heap_before_gc();
 
-  {
-    FlagSetting fl(_is_gc_active, true);
+  FlagSetting fl(_is_gc_active, true);
 
-    bool complete = full && (max_generation == OldGen);
-    bool old_collects_young = complete && !ScavengeBeforeFullGC;
-    bool do_young_collection = !old_collects_young && _young_gen->should_collect(full, size, is_tlab);
+  bool complete = full && (max_generation == OldGen);
+  bool old_collects_young = complete && !ScavengeBeforeFullGC;
+  bool do_young_collection = !old_collects_young && _young_gen->should_collect(full, size, is_tlab);
 
-    FormatBuffer<> gc_string("%s", "Pause ");
-    if (do_young_collection) {
-      gc_string.append("Young");
-    } else {
-      gc_string.append("Full");
-    }
+  size_t young_prev_used = _young_gen->used();
+  size_t old_prev_used = _old_gen->used();
 
+  bool run_verification = total_collections() >= VerifyGCStartAt;
+  bool prepared_for_verification = false;
+  bool do_full_collection = false;
+
+  if (do_young_collection) {
+    GCIdMark gc_id_mark;
     GCTraceCPUTime tcpu;
-    GCTraceTime(Info, gc) t(gc_string, NULL, gc_cause(), true);
+    GCTraceTime(Info, gc) t("Pause Young", NULL, gc_cause(), true);
+
+    print_heap_before_gc();
+
+    if (run_verification && VerifyGCLevel <= 0 && VerifyBeforeGC) {
+      prepare_for_verify();
+      prepared_for_verification = true;
+    }
 
     gc_prologue(complete);
     increment_total_collections(complete);
 
-    size_t young_prev_used = _young_gen->used();
-    size_t old_prev_used = _old_gen->used();
+    collect_generation(_young_gen,
+                       full,
+                       size,
+                       is_tlab,
+                       run_verification && VerifyGCLevel <= 0,
+                       do_clear_all_soft_refs,
+                       false);
 
-    bool run_verification = total_collections() >= VerifyGCStartAt;
-
-    bool prepared_for_verification = false;
-    bool collected_old = false;
-
-    if (do_young_collection) {
-      if (run_verification && VerifyGCLevel <= 0 && VerifyBeforeGC) {
-        prepare_for_verify();
-        prepared_for_verification = true;
-      }
-
-      collect_generation(_young_gen,
-                         full,
-                         size,
-                         is_tlab,
-                         run_verification && VerifyGCLevel <= 0,
-                         do_clear_all_soft_refs,
-                         false);
-
-      if (size > 0 && (!is_tlab || _young_gen->supports_tlab_allocation()) &&
-          size * HeapWordSize <= _young_gen->unsafe_max_alloc_nogc()) {
-        // Allocation request was met by young GC.
-        size = 0;
-      }
+    if (size > 0 && (!is_tlab || _young_gen->supports_tlab_allocation()) &&
+        size * HeapWordSize <= _young_gen->unsafe_max_alloc_nogc()) {
+      // Allocation request was met by young GC.
+      size = 0;
     }
 
-    bool must_restore_marks_for_biased_locking = false;
+    // Ask if young collection is enough. If so, do the final steps for young collection,
+    // and fallthrough to the end.
+    do_full_collection = should_do_full_collection(size, full, is_tlab, max_generation);
+    if (!do_full_collection) {
+      // Adjust generation sizes.
+      _young_gen->compute_new_size();
 
-    if (max_generation == OldGen && _old_gen->should_collect(full, size, is_tlab)) {
-      if (!complete) {
-        // The full_collections increment was missed above.
-        increment_total_full_collections();
-      }
+      print_heap_change(young_prev_used, old_prev_used);
+      MetaspaceUtils::print_metaspace_change(metadata_prev_used);
 
-      if (!prepared_for_verification && run_verification &&
-          VerifyGCLevel <= 1 && VerifyBeforeGC) {
-        prepare_for_verify();
-      }
+      // Track memory usage and detect low memory after GC finishes
+      MemoryService::track_memory_usage();
 
-      if (do_young_collection) {
-        // We did a young GC. Need a new GC id for the old GC.
-        GCIdMark gc_id_mark;
-        GCTraceTime(Info, gc) t("Pause Full", NULL, gc_cause(), true);
-        collect_generation(_old_gen, full, size, is_tlab, run_verification && VerifyGCLevel <= 1, do_clear_all_soft_refs, true);
-      } else {
-        // No young GC done. Use the same GC id as was set up earlier in this method.
-        collect_generation(_old_gen, full, size, is_tlab, run_verification && VerifyGCLevel <= 1, do_clear_all_soft_refs, true);
-      }
-
-      must_restore_marks_for_biased_locking = true;
-      collected_old = true;
+      gc_epilogue(complete);
     }
 
-    // Update "complete" boolean wrt what actually transpired --
-    // for instance, a promotion failure could have led to
-    // a whole heap collection.
-    complete = complete || collected_old;
+    print_heap_after_gc();
+
+  } else {
+    // No young collection, ask if we need to perform Full collection.
+    do_full_collection = should_do_full_collection(size, full, is_tlab, max_generation);
+  }
+
+  if (do_full_collection) {
+    GCIdMark gc_id_mark;
+    GCTraceCPUTime tcpu;
+    GCTraceTime(Info, gc) t("Pause Full", NULL, gc_cause(), true);
+
+    print_heap_before_gc();
+
+    if (!prepared_for_verification && run_verification &&
+        VerifyGCLevel <= 1 && VerifyBeforeGC) {
+      prepare_for_verify();
+    }
+
+    if (!do_young_collection) {
+      gc_prologue(complete);
+      increment_total_collections(complete);
+    }
+
+    // Accounting quirk: total full collections would be incremented when "complete"
+    // is set, by calling increment_total_collections above. However, we also need to
+    // account Full collections that had "complete" unset.
+    if (!complete) {
+      increment_total_full_collections();
+    }
+
+    collect_generation(_old_gen,
+                       full,
+                       size,
+                       is_tlab,
+                       run_verification && VerifyGCLevel <= 1,
+                       do_clear_all_soft_refs,
+                       true);
 
     // Adjust generation sizes.
-    if (collected_old) {
-      _old_gen->compute_new_size();
-    }
+    _old_gen->compute_new_size();
     _young_gen->compute_new_size();
 
-    if (complete) {
-      // Delete metaspaces for unloaded class loaders and clean up loader_data graph
-      ClassLoaderDataGraph::purge();
-      MetaspaceUtils::verify_metrics();
-      // Resize the metaspace capacity after full collections
-      MetaspaceGC::compute_new_size();
-      update_full_collections_completed();
-    }
+    // Delete metaspaces for unloaded class loaders and clean up loader_data graph
+    ClassLoaderDataGraph::purge();
+    MetaspaceUtils::verify_metrics();
+    // Resize the metaspace capacity after full collections
+    MetaspaceGC::compute_new_size();
+    update_full_collections_completed();
 
     print_heap_change(young_prev_used, old_prev_used);
     MetaspaceUtils::print_metaspace_change(metadata_prev_used);
@@ -670,26 +692,43 @@ void GenCollectedHeap::do_collection(bool           full,
     // Track memory usage and detect low memory after GC finishes
     MemoryService::track_memory_usage();
 
-    gc_epilogue(complete);
+    // Need to tell the epilogue code we are done with Full GC, regardless what was
+    // the initial value for "complete" flag.
+    gc_epilogue(true);
 
-    if (must_restore_marks_for_biased_locking) {
-      BiasedLocking::restore_marks();
-    }
+    BiasedLocking::restore_marks();
+
+    print_heap_after_gc();
   }
-
-  print_heap_after_gc();
 
 #ifdef TRACESPINNING
   ParallelTaskTerminator::print_termination_counts();
 #endif
 }
 
+bool GenCollectedHeap::should_do_full_collection(size_t size, bool full, bool is_tlab,
+                                                 GenCollectedHeap::GenerationType max_gen) const {
+  return max_gen == OldGen && _old_gen->should_collect(full, size, is_tlab);
+}
+
 void GenCollectedHeap::register_nmethod(nmethod* nm) {
-  CodeCache::register_scavenge_root_nmethod(nm);
+  ScavengableNMethods::register_nmethod(nm);
+}
+
+void GenCollectedHeap::unregister_nmethod(nmethod* nm) {
+  ScavengableNMethods::unregister_nmethod(nm);
 }
 
 void GenCollectedHeap::verify_nmethod(nmethod* nm) {
-  CodeCache::verify_scavenge_root_nmethod(nm);
+  ScavengableNMethods::verify_nmethod(nm);
+}
+
+void GenCollectedHeap::flush_nmethod(nmethod* nm) {
+  // Do nothing.
+}
+
+void GenCollectedHeap::prune_scavengable_nmethods() {
+  ScavengableNMethods::prune_nmethods();
 }
 
 HeapWord* GenCollectedHeap::satisfy_failed_allocation(size_t size, bool is_tlab) {
@@ -786,7 +825,6 @@ void GenCollectedHeap::process_roots(StrongRootsScope* scope,
                                      CLDClosure* weak_cld_closure,
                                      CodeBlobToOopClosure* code_roots) {
   // General roots.
-  assert(Threads::thread_claim_parity() != 0, "must have called prologue code");
   assert(code_roots != NULL, "code root closure should always be set");
   // _n_termination for _process_strong_tasks should be set up stream
   // in a method not running in a GC worker.  Otherwise the GC worker
@@ -820,10 +858,16 @@ void GenCollectedHeap::process_roots(StrongRootsScope* scope,
   if (_process_strong_tasks->try_claim_task(GCH_PS_jvmti_oops_do)) {
     JvmtiExport::oops_do(strong_roots);
   }
+#if INCLUDE_AOT
   if (UseAOT && _process_strong_tasks->try_claim_task(GCH_PS_aot_oops_do)) {
     AOTLoader::oops_do(strong_roots);
   }
-
+#endif
+#if INCLUDE_JVMCI
+  if (EnableJVMCI && _process_strong_tasks->try_claim_task(GCH_PS_jvmci_oops_do)) {
+    JVMCI::oops_do(strong_roots);
+  }
+#endif
   if (_process_strong_tasks->try_claim_task(GCH_PS_SystemDictionary_oops_do)) {
     SystemDictionary::oops_do(strong_roots);
   }
@@ -833,7 +877,7 @@ void GenCollectedHeap::process_roots(StrongRootsScope* scope,
       assert(code_roots != NULL, "must supply closure for code cache");
 
       // We only visit parts of the CodeCache when scavenging.
-      CodeCache::scavenge_root_nmethods_do(code_roots);
+      ScavengableNMethods::nmethods_do(code_roots);
     }
     if (so & SO_AllCodeCache) {
       assert(code_roots != NULL, "must supply closure for code cache");
@@ -845,7 +889,7 @@ void GenCollectedHeap::process_roots(StrongRootsScope* scope,
     // Verify that the code cache contents are not subject to
     // movement by a scavenging collection.
     DEBUG_ONLY(CodeBlobToOopClosure assert_code_is_non_scavengable(&assert_is_non_scavengable_closure, !CodeBlobToOopClosure::FixRelocations));
-    DEBUG_ONLY(CodeCache::asserted_non_scavengable_nmethods_do(&assert_code_is_non_scavengable));
+    DEBUG_ONLY(ScavengableNMethods::asserted_non_scavengable_nmethods_do(&assert_code_is_non_scavengable));
   }
 }
 
@@ -1048,18 +1092,6 @@ HeapWord* GenCollectedHeap::block_start(const void* addr) const {
   assert(_old_gen->is_in_reserved(addr), "Some generation should contain the address");
   assert(_old_gen->is_in(addr), "addr should be in allocated part of generation");
   return _old_gen->block_start(addr);
-}
-
-size_t GenCollectedHeap::block_size(const HeapWord* addr) const {
-  assert(is_in_reserved(addr), "block_size of address outside of heap");
-  if (_young_gen->is_in_reserved(addr)) {
-    assert(_young_gen->is_in(addr), "addr should be in allocated part of generation");
-    return _young_gen->block_size(addr);
-  }
-
-  assert(_old_gen->is_in_reserved(addr), "Some generation should contain the address");
-  assert(_old_gen->is_in(addr), "addr should be in allocated part of generation");
-  return _old_gen->block_size(addr);
 }
 
 bool GenCollectedHeap::block_is_obj(const HeapWord* addr) const {

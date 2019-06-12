@@ -1129,6 +1129,7 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
             clone.entrySet = null;
             clone.values = null;
             clone.descendingMap = null;
+            clone.adder = null;
             clone.buildFromSorted(this);
             return clone;
         } catch (CloneNotSupportedException e) {
@@ -1711,9 +1712,8 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
         Map<?,?> m = (Map<?,?>) o;
         try {
             Comparator<? super K> cmp = comparator;
-            @SuppressWarnings("unchecked")
-            Iterator<Map.Entry<?,?>> it =
-                (Iterator<Map.Entry<?,?>>)m.entrySet().iterator();
+            // See JDK-8223553 for Iterator type wildcard rationale
+            Iterator<? extends Map.Entry<?,?>> it = m.entrySet().iterator();
             if (m instanceof SortedMap &&
                 ((SortedMap<?,?>)m).comparator() == cmp) {
                 Node<K,V> b, n;

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2016 SAP SE. All rights reserved.
+ * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2019 SAP SE. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -63,7 +63,8 @@ bool JavaThread::pd_get_top_frame_for_profiling(frame* fr_addr, void* ucontext, 
 
     if (ret_frame.is_interpreted_frame()) {
       frame::z_ijava_state* istate = ret_frame.ijava_state_unchecked();
-       if (!((Method*)(istate->method))->is_metaspace_object()) {
+       if ((stack_base() >= (address)istate && (address)istate > stack_end()) ||
+           MetaspaceObj::is_valid((Method*)(istate->method)) == false) {
          return false;
        }
        uint64_t reg_bcp = uc->uc_mcontext.gregs[13/*Z_BCP*/];
@@ -89,10 +90,9 @@ bool JavaThread::pd_get_top_frame_for_profiling(frame* fr_addr, void* ucontext, 
   return false;
 }
 
-// Forte Analyzer AsyncGetCallTrace profiling support is not implemented on Linux/S390x.
+// Forte Analyzer AsyncGetCallTrace profiling support.
 bool JavaThread::pd_get_top_frame_for_signal_handler(frame* fr_addr, void* ucontext, bool isInJava) {
-  Unimplemented();
-  return false;
+  return pd_get_top_frame_for_profiling(fr_addr, ucontext, isInJava);
 }
 
 void JavaThread::cache_global_variables() { }

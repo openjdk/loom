@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, 2018, Red Hat Inc. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2019, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -135,8 +135,7 @@ OopMap* RegisterSaver::save_live_registers(MacroAssembler* masm, int additional_
   int frame_size_in_words = frame_size_in_bytes / wordSize;
   *total_frame_words = frame_size_in_words;
 
-  // Save registers, fpu state, and flags.
-
+  // Save Integer and Float registers.
   __ enter();
   __ push_CPU_state(save_vectors);
 
@@ -1413,7 +1412,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       out_sig_bt[argc++] = in_sig_bt[i];
     }
   } else {
-    Thread* THREAD = Thread::current();
     in_elem_bt = NEW_RESOURCE_ARRAY(BasicType, total_in_args);
     SignatureStream ss(method->signature());
     for (int i = 0; i < total_in_args ; i++ ) {
@@ -1421,7 +1419,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
         // Arrays are passed as int, elem* pair
         out_sig_bt[argc++] = T_INT;
         out_sig_bt[argc++] = T_ADDRESS;
-        Symbol* atype = ss.as_symbol(CHECK_NULL);
+        Symbol* atype = ss.as_symbol();
         const char* at = atype->as_C_string();
         if (strlen(at) == 2) {
           assert(at[0] == '[', "must be");
@@ -1782,14 +1780,11 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   }
 
   // Change state to native (we save the return address in the thread, since it might not
-  // be pushed on the stack when we do a a stack traversal). It is enough that the pc()
-  // points into the right code segment. It does not have to be the correct return pc.
+  // be pushed on the stack when we do a stack traversal).
   // We use the same pc/oopMap repeatedly when we call out
 
-  intptr_t the_pc = (intptr_t) __ pc();
-  oop_maps->add_gc_map(the_pc - start, map);
-
-  __ set_last_Java_frame(sp, noreg, (address)the_pc, rscratch1);
+  Label native_return;
+  __ set_last_Java_frame(sp, noreg, native_return, rscratch1);
 
   Label dtrace_method_entry, dtrace_method_entry_done;
   {
@@ -1921,6 +1916,11 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
             float_args,   // and up to 8 float args
             return_type);
   }
+
+  __ bind(native_return);
+
+  intptr_t return_pc = (intptr_t) __ pc();
+  oop_maps->add_gc_map(return_pc - start, map);
 
   // Unpack native results.
   switch (ret_type) {
@@ -2879,7 +2879,7 @@ SafepointBlob* SharedRuntime::generate_handler_blob(address call_ptr, int poll_t
   bool cause_return = (poll_type == POLL_AT_RETURN);
   bool save_vectors = (poll_type == POLL_AT_VECTOR_LOOP);
 
-  // Save registers, fpu state, and flags
+  // Save Integer and Float registers.
   map = RegisterSaver::save_live_registers(masm, 0, &frame_size_in_words, save_vectors);
 
   // The following is basically a call_VM.  However, we need the precise

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,6 +25,7 @@
 #ifndef SHARE_GC_SHARED_GC_GLOBALS_HPP
 #define SHARE_GC_SHARED_GC_GLOBALS_HPP
 
+#include "runtime/globals_shared.hpp"
 #include "utilities/macros.hpp"
 #if INCLUDE_CMSGC
 #include "gc/cms/cms_globals.hpp"
@@ -616,7 +617,7 @@
           "OutOfMemoryError is thrown (used with GCTimeLimit)")             \
           range(0, 100)                                                     \
                                                                             \
-  develop(uintx, AdaptiveSizePolicyGCTimeLimitThreshold, 5,                 \
+  develop(uintx, GCOverheadLimitThreshold, 5,                               \
           "Number of consecutive collections before gc time limit fires")   \
           range(1, max_uintx)                                               \
                                                                             \

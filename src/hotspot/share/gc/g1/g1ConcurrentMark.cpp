@@ -56,6 +56,7 @@
 #include "logging/log.hpp"
 #include "memory/allocation.hpp"
 #include "memory/resourceArea.hpp"
+#include "memory/universe.hpp"
 #include "oops/access.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/atomic.hpp"
@@ -166,13 +167,13 @@ void G1CMMarkStack::add_chunk_to_list(TaskQueueEntryChunk* volatile* list, TaskQ
 }
 
 void G1CMMarkStack::add_chunk_to_chunk_list(TaskQueueEntryChunk* elem) {
-  MutexLockerEx x(MarkStackChunkList_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker x(MarkStackChunkList_lock, Mutex::_no_safepoint_check_flag);
   add_chunk_to_list(&_chunk_list, elem);
   _chunks_in_chunk_list++;
 }
 
 void G1CMMarkStack::add_chunk_to_free_list(TaskQueueEntryChunk* elem) {
-  MutexLockerEx x(MarkStackFreeList_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker x(MarkStackFreeList_lock, Mutex::_no_safepoint_check_flag);
   add_chunk_to_list(&_free_list, elem);
 }
 
@@ -185,7 +186,7 @@ G1CMMarkStack::TaskQueueEntryChunk* G1CMMarkStack::remove_chunk_from_list(TaskQu
 }
 
 G1CMMarkStack::TaskQueueEntryChunk* G1CMMarkStack::remove_chunk_from_chunk_list() {
-  MutexLockerEx x(MarkStackChunkList_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker x(MarkStackChunkList_lock, Mutex::_no_safepoint_check_flag);
   TaskQueueEntryChunk* result = remove_chunk_from_list(&_chunk_list);
   if (result != NULL) {
     _chunks_in_chunk_list--;
@@ -194,7 +195,7 @@ G1CMMarkStack::TaskQueueEntryChunk* G1CMMarkStack::remove_chunk_from_chunk_list(
 }
 
 G1CMMarkStack::TaskQueueEntryChunk* G1CMMarkStack::remove_chunk_from_free_list() {
-  MutexLockerEx x(MarkStackFreeList_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker x(MarkStackFreeList_lock, Mutex::_no_safepoint_check_flag);
   return remove_chunk_from_list(&_free_list);
 }
 
@@ -311,7 +312,7 @@ uint G1CMRootRegions::num_root_regions() const {
 }
 
 void G1CMRootRegions::notify_scan_done() {
-  MutexLockerEx x(RootRegionScan_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker x(RootRegionScan_lock, Mutex::_no_safepoint_check_flag);
   _scan_in_progress = false;
   RootRegionScan_lock->notify_all();
 }
@@ -338,9 +339,9 @@ bool G1CMRootRegions::wait_until_scan_finished() {
   }
 
   {
-    MutexLockerEx x(RootRegionScan_lock, Mutex::_no_safepoint_check_flag);
+    MonitorLocker ml(RootRegionScan_lock, Mutex::_no_safepoint_check_flag);
     while (scan_in_progress()) {
-      RootRegionScan_lock->wait(Mutex::_no_safepoint_check_flag);
+      ml.wait();
     }
   }
   return true;
@@ -424,7 +425,7 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
     // Calculate the number of concurrent worker threads by scaling
     // the number of parallel GC threads.
     uint marking_thread_num = scale_concurrent_worker_threads(ParallelGCThreads);
-    FLAG_SET_ERGO(uint, ConcGCThreads, marking_thread_num);
+    FLAG_SET_ERGO(ConcGCThreads, marking_thread_num);
   }
 
   assert(ConcGCThreads > 0, "ConcGCThreads have been set.");
@@ -455,7 +456,7 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
                       mark_stack_size, MarkStackSizeMax);
       return;
     }
-    FLAG_SET_ERGO(size_t, MarkStackSize, mark_stack_size);
+    FLAG_SET_ERGO(MarkStackSize, mark_stack_size);
   } else {
     // Verify MarkStackSize is in range.
     if (FLAG_IS_CMDLINE(MarkStackSize)) {
@@ -734,7 +735,9 @@ public:
 };
 
 void G1ConcurrentMark::pre_initial_mark() {
-  // Initialize marking structures. This has to be done in a STW phase.
+  assert_at_safepoint_on_vm_thread();
+
+  // Reset marking state.
   reset();
 
   // For each region note start of marking.
@@ -1013,7 +1016,7 @@ class G1UpdateRemSetTrackingBeforeRebuildTask : public AbstractGangTask {
     uint _num_regions_selected_for_rebuild;  // The number of regions actually selected for rebuild.
 
     void update_remset_before_rebuild(HeapRegion* hr) {
-      G1RemSetTrackingPolicy* tracking_policy = _g1h->g1_policy()->remset_tracker();
+      G1RemSetTrackingPolicy* tracking_policy = _g1h->policy()->remset_tracker();
 
       bool selected_for_rebuild;
       if (hr->is_humongous()) {
@@ -1118,7 +1121,7 @@ public:
   G1UpdateRemSetTrackingAfterRebuild(G1CollectedHeap* g1h) : _g1h(g1h) { }
 
   virtual bool do_heap_region(HeapRegion* r) {
-    _g1h->g1_policy()->remset_tracker()->update_after_rebuild(r);
+    _g1h->policy()->remset_tracker()->update_after_rebuild(r);
     return false;
   }
 };
@@ -1132,8 +1135,8 @@ void G1ConcurrentMark::remark() {
     return;
   }
 
-  G1Policy* g1p = _g1h->g1_policy();
-  g1p->record_concurrent_mark_remark_start();
+  G1Policy* policy = _g1h->policy();
+  policy->record_concurrent_mark_remark_start();
 
   double start = os::elapsedTime();
 
@@ -1220,7 +1223,7 @@ void G1ConcurrentMark::remark() {
   _remark_weak_ref_times.add((now - mark_work_end) * 1000.0);
   _remark_times.add((now - start) * 1000.0);
 
-  g1p->record_concurrent_mark_remark_end();
+  policy->record_concurrent_mark_remark_end();
 }
 
 class G1ReclaimEmptyRegionsTask : public AbstractGangTask {
@@ -1286,7 +1289,7 @@ public:
     // Now update the old/humongous region sets
     _g1h->remove_from_old_sets(cl.old_regions_removed(), cl.humongous_regions_removed());
     {
-      MutexLockerEx x(ParGCRareEvent_lock, Mutex::_no_safepoint_check_flag);
+      MutexLocker x(ParGCRareEvent_lock, Mutex::_no_safepoint_check_flag);
       _g1h->decrement_summary_bytes(cl.freed_bytes());
 
       _cleanup_list->add_ordered(&local_cleanup_list);
@@ -1338,8 +1341,8 @@ void G1ConcurrentMark::cleanup() {
     return;
   }
 
-  G1Policy* g1p = _g1h->g1_policy();
-  g1p->record_concurrent_mark_cleanup_start();
+  G1Policy* policy = _g1h->policy();
+  policy->record_concurrent_mark_cleanup_start();
 
   double start = os::elapsedTime();
 
@@ -1369,7 +1372,7 @@ void G1ConcurrentMark::cleanup() {
 
   {
     GCTraceTime(Debug, gc, phases) debug("Finalize Concurrent Mark Cleanup", _gc_timer_cm);
-    _g1h->g1_policy()->record_concurrent_mark_cleanup_end();
+    policy->record_concurrent_mark_cleanup_end();
   }
 }
 
@@ -1764,33 +1767,28 @@ class G1RemarkThreadsClosure : public ThreadClosure {
   G1CMSATBBufferClosure _cm_satb_cl;
   G1CMOopClosure _cm_cl;
   MarkingCodeBlobClosure _code_cl;
-  int _thread_parity;
+  uintx _claim_token;
 
  public:
   G1RemarkThreadsClosure(G1CollectedHeap* g1h, G1CMTask* task) :
     _cm_satb_cl(task, g1h),
     _cm_cl(g1h, task),
     _code_cl(&_cm_cl, !CodeBlobToOopClosure::FixRelocations),
-    _thread_parity(Threads::thread_claim_parity()) {}
+    _claim_token(Threads::thread_claim_token()) {}
 
   void do_thread(Thread* thread) {
-    if (thread->is_Java_thread()) {
-      if (thread->claim_oops_do(true, _thread_parity)) {
-        JavaThread* jt = (JavaThread*)thread;
-
+    if (thread->claim_threads_do(true, _claim_token)) {
+      SATBMarkQueue& queue = G1ThreadLocalData::satb_mark_queue(thread);
+      queue.apply_closure_and_empty(&_cm_satb_cl);
+      if (thread->is_Java_thread()) {
         // In theory it should not be neccessary to explicitly walk the nmethods to find roots for concurrent marking
         // however the liveness of oops reachable from nmethods have very complex lifecycles:
         // * Alive if on the stack of an executing method
         // * Weakly reachable otherwise
         // Some objects reachable from nmethods, such as the class loader (or klass_holder) of the receiver should be
         // live by the SATB invariant but other oops recorded in nmethods may behave differently.
+        JavaThread* jt = (JavaThread*)thread;
         jt->nmethods_do(&_code_cl);
-
-        G1ThreadLocalData::satb_mark_queue(jt).apply_closure_and_empty(&_cm_satb_cl);
-      }
-    } else if (thread->is_VM_thread()) {
-      if (thread->claim_oops_do(true, _thread_parity)) {
-        G1BarrierSet::satb_mark_queue_set().shared_satb_queue()->apply_closure_and_empty(&_cm_satb_cl);
       }
     }
   }
@@ -1943,13 +1941,14 @@ public:
     guarantee(oopDesc::is_oop(task_entry.obj()),
               "Non-oop " PTR_FORMAT ", phase: %s, info: %d",
               p2i(task_entry.obj()), _phase, _info);
-    guarantee(!_g1h->is_in_cset(task_entry.obj()),
-              "obj: " PTR_FORMAT " in CSet, phase: %s, info: %d",
-              p2i(task_entry.obj()), _phase, _info);
+    HeapRegion* r = _g1h->heap_region_containing(task_entry.obj());
+    guarantee(!(r->in_collection_set() || r->has_index_in_opt_cset()),
+              "obj " PTR_FORMAT " from %s (%d) in region %u in (optional) collection set",
+              p2i(task_entry.obj()), _phase, _info, r->hrm_index());
   }
 };
 
-void G1ConcurrentMark::verify_no_cset_oops() {
+void G1ConcurrentMark::verify_no_collection_set_oops() {
   assert(SafepointSynchronize::is_at_safepoint(), "should be at a safepoint");
   if (!_g1h->collector_state()->mark_or_rebuild_in_progress()) {
     return;
@@ -1982,18 +1981,18 @@ void G1ConcurrentMark::verify_no_cset_oops() {
     HeapWord* task_finger = task->finger();
     if (task_finger != NULL && task_finger < _heap.end()) {
       // See above note on the global finger verification.
-      HeapRegion* task_hr = _g1h->heap_region_containing(task_finger);
-      guarantee(task_hr == NULL || task_finger == task_hr->bottom() ||
-                !task_hr->in_collection_set(),
+      HeapRegion* r = _g1h->heap_region_containing(task_finger);
+      guarantee(r == NULL || task_finger == r->bottom() ||
+                !r->in_collection_set() || !r->has_index_in_opt_cset(),
                 "task finger: " PTR_FORMAT " region: " HR_FORMAT,
-                p2i(task_finger), HR_FORMAT_PARAMS(task_hr));
+                p2i(task_finger), HR_FORMAT_PARAMS(r));
     }
   }
 }
 #endif // PRODUCT
 
 void G1ConcurrentMark::rebuild_rem_set_concurrently() {
-  _g1h->g1_rem_set()->rebuild_rem_set(this, _concurrent_workers, _worker_id_offset);
+  _g1h->rem_set()->rebuild_rem_set(this, _concurrent_workers, _worker_id_offset);
 }
 
 void G1ConcurrentMark::print_stats() {
@@ -2572,7 +2571,7 @@ void G1CMTask::do_marking_step(double time_target_ms,
   // and do_marking_step() is not being called serially.
   bool do_stealing = do_termination && !is_serial;
 
-  double diff_prediction_ms = _g1h->g1_policy()->predictor().get_new_prediction(&_marking_step_diffs_ms);
+  double diff_prediction_ms = _g1h->policy()->predictor().get_new_prediction(&_marking_step_diffs_ms);
   _time_target_ms = time_target_ms - diff_prediction_ms;
 
   // set up the variables that are used in the work-based scheme to

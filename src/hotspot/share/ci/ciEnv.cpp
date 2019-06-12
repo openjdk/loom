@@ -33,6 +33,7 @@
 #include "ci/ciNullObject.hpp"
 #include "ci/ciReplay.hpp"
 #include "ci/ciUtilities.inline.hpp"
+#include "classfile/symbolTable.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "code/codeCache.hpp"
@@ -119,6 +120,9 @@ ciEnv::ciEnv(CompileTask* task, int system_dictionary_modification_counter)
   _system_dictionary_modification_counter = system_dictionary_modification_counter;
   _num_inlined_bytecodes = 0;
   assert(task == NULL || thread->task() == task, "sanity");
+  if (task != NULL) {
+    task->mark_started(os::elapsed_counter());
+  }
   _task = task;
   _log = NULL;
 
@@ -401,8 +405,7 @@ ciKlass* ciEnv::get_klass_by_name_impl(ciKlass* accessing_klass,
     // This is a name from a signature.  Strip off the trimmings.
     // Call recursive to keep scope of strippedsym.
     TempNewSymbol strippedsym = SymbolTable::new_symbol(sym->as_utf8()+1,
-                    sym->utf8_length()-2,
-                    KILL_COMPILE_ON_FATAL_(_unloaded_ciinstance_klass));
+                                                        sym->utf8_length()-2);
     ciSymbol* strippedname = get_symbol(strippedsym);
     return get_klass_by_name_impl(accessing_klass, cpool, strippedname, require_local);
   }
@@ -455,8 +458,7 @@ ciKlass* ciEnv::get_klass_by_name_impl(ciKlass* accessing_klass,
     // We have an unloaded array.
     // Build it on the fly if the element class exists.
     TempNewSymbol elem_sym = SymbolTable::new_symbol(sym->as_utf8()+1,
-                                                 sym->utf8_length()-1,
-                                                 KILL_COMPILE_ON_FATAL_(fail_type));
+                                                     sym->utf8_length()-1);
 
     // Get element ciKlass recursively.
     ciKlass* elem_klass =
@@ -1253,7 +1255,7 @@ void ciEnv::dump_replay_data(int compile_id) {
   static char buffer[O_BUFLEN];
   int ret = jio_snprintf(buffer, O_BUFLEN, "replay_pid%p_compid%d.log", os::current_process_id(), compile_id);
   if (ret > 0) {
-    int fd = open(buffer, O_RDWR | O_CREAT | O_TRUNC, 0666);
+    int fd = os::open(buffer, O_RDWR | O_CREAT | O_TRUNC, 0666);
     if (fd != -1) {
       FILE* replay_data_file = os::open(fd, "w");
       if (replay_data_file != NULL) {
@@ -1271,7 +1273,7 @@ void ciEnv::dump_inline_data(int compile_id) {
   static char buffer[O_BUFLEN];
   int ret = jio_snprintf(buffer, O_BUFLEN, "inline_pid%p_compid%d.log", os::current_process_id(), compile_id);
   if (ret > 0) {
-    int fd = open(buffer, O_RDWR | O_CREAT | O_TRUNC, 0666);
+    int fd = os::open(buffer, O_RDWR | O_CREAT | O_TRUNC, 0666);
     if (fd != -1) {
       FILE* inline_data_file = os::open(fd, "w");
       if (inline_data_file != NULL) {

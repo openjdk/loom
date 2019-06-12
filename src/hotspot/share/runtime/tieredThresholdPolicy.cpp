@@ -34,7 +34,7 @@
 #include "code/scopeDesc.hpp"
 #include "oops/method.inline.hpp"
 #if INCLUDE_JVMCI
-#include "jvmci/jvmciRuntime.hpp"
+#include "jvmci/jvmci.hpp"
 #endif
 
 #ifdef TIERED
@@ -88,6 +88,21 @@ bool TieredThresholdPolicy::is_trivial(Method* method) {
       method->is_constant_getter()) {
     return true;
   }
+  return false;
+}
+
+bool TieredThresholdPolicy::should_compile_at_level_simple(Method* method) {
+  if (TieredThresholdPolicy::is_trivial(method)) {
+    return true;
+  }
+#if INCLUDE_JVMCI
+  if (UseJVMCICompiler) {
+    AbstractCompiler* comp = CompileBroker::compiler(CompLevel_full_optimization);
+    if (comp != NULL && comp->is_jvmci() && ((JVMCICompiler*) comp)->force_comp_at_level_simple(method)) {
+      return true;
+    }
+  }
+#endif
   return false;
 }
 
@@ -223,7 +238,7 @@ void TieredThresholdPolicy::initialize() {
       // Lower the compiler count such that all buffers fit into the code cache
       count = MAX2(max_count, c1_only ? 1 : 2);
     }
-    FLAG_SET_ERGO(intx, CICompilerCount, count);
+    FLAG_SET_ERGO(CICompilerCount, count);
   }
 #else
   // On 32-bit systems, the number of compiler threads is limited to 3.
@@ -235,7 +250,7 @@ void TieredThresholdPolicy::initialize() {
   /// available to the VM and thus cause the VM to crash.
   if (FLAG_IS_DEFAULT(CICompilerCount)) {
     count = 3;
-    FLAG_SET_ERGO(intx, CICompilerCount, count);
+    FLAG_SET_ERGO(CICompilerCount, count);
   }
 #endif
 
@@ -295,28 +310,24 @@ CompileTask* TieredThresholdPolicy::select_task(CompileQueue* compile_queue) {
   for (CompileTask* task = compile_queue->first(); task != NULL;) {
     CompileTask* next_task = task->next();
     Method* method = task->method();
+    // If a method was unloaded or has been stale for some time, remove it from the queue.
+    // Blocking tasks and tasks submitted from whitebox API don't become stale
+    if (task->is_unloaded() || (task->can_become_stale() && is_stale(t, TieredCompileTaskTimeout, method) && !is_old(method))) {
+      if (!task->is_unloaded()) {
+        if (PrintTieredEvents) {
+          print_event(REMOVE_FROM_QUEUE, method, method, task->osr_bci(), (CompLevel) task->comp_level());
+        }
+        method->clear_queued_for_compilation();
+      }
+      compile_queue->remove_and_mark_stale(task);
+      task = next_task;
+      continue;
+    }
     update_rate(t, method);
-    if (max_task == NULL) {
+    if (max_task == NULL || compare_methods(method, max_method)) {
+      // Select a method with the highest rate
       max_task = task;
       max_method = method;
-    } else {
-      // If a method has been stale for some time, remove it from the queue.
-      // Blocking tasks and tasks submitted from whitebox API don't become stale
-      if (task->can_become_stale() && is_stale(t, TieredCompileTaskTimeout, method) && !is_old(method)) {
-        if (PrintTieredEvents) {
-          print_event(REMOVE_FROM_QUEUE, method, method, task->osr_bci(), (CompLevel)task->comp_level());
-        }
-        compile_queue->remove_and_mark_stale(task);
-        method->clear_queued_for_compilation();
-        task = next_task;
-        continue;
-      }
-
-      // Select a method with a higher rate
-      if (compare_methods(method, max_method)) {
-        max_task = task;
-        max_method = method;
-      }
     }
 
     if (task->is_blocking()) {
@@ -342,6 +353,16 @@ CompileTask* TieredThresholdPolicy::select_task(CompileQueue* compile_queue) {
       TieredStopAtLevel > CompLevel_full_profile &&
       max_method != NULL && is_method_profiled(max_method)) {
     max_task->set_comp_level(CompLevel_limited_profile);
+
+    if (CompileBroker::compilation_is_complete(max_method, max_task->osr_bci(), CompLevel_limited_profile)) {
+      if (PrintTieredEvents) {
+        print_event(REMOVE_FROM_QUEUE, max_method, max_method, max_task->osr_bci(), (CompLevel)max_task->comp_level());
+      }
+      compile_queue->remove_and_mark_stale(max_task);
+      max_method->clear_queued_for_compilation();
+      return NULL;
+    }
+
     if (PrintTieredEvents) {
       print_event(UPDATE_IN_QUEUE, max_method, max_method, max_task->osr_bci(), (CompLevel)max_task->comp_level());
     }
@@ -391,8 +412,14 @@ nmethod* TieredThresholdPolicy::event(const methodHandle& method, const methodHa
     // method == inlinee if the event originated in the main method
     method_back_branch_event(method, inlinee, bci, comp_level, nm, thread);
     // Check if event led to a higher level OSR compilation
-    nmethod* osr_nm = inlinee->lookup_osr_nmethod_for(bci, comp_level, false);
-    if (osr_nm != NULL && osr_nm->comp_level() > comp_level) {
+    CompLevel expected_comp_level = comp_level;
+    if (inlinee->is_not_osr_compilable(expected_comp_level)) {
+      // It's not possble to reach the expected level so fall back to simple.
+      expected_comp_level = CompLevel_simple;
+    }
+    nmethod* osr_nm = inlinee->lookup_osr_nmethod_for(bci, expected_comp_level, false);
+    assert(osr_nm == NULL || osr_nm->comp_level() >= expected_comp_level, "lookup_osr_nmethod_for is broken");
+    if (osr_nm != NULL) {
       // Perform OSR with new nmethod
       return osr_nm;
     }
@@ -428,9 +455,20 @@ void TieredThresholdPolicy::compile(const methodHandle& mh, int bci, CompLevel l
   // in the interpreter and then compile with C2 (the transition function will request that,
   // see common() ). If the method cannot be compiled with C2 but still can with C1, compile it with
   // pure C1.
-  if (!can_be_compiled(mh, level)) {
+  if ((bci == InvocationEntryBci && !can_be_compiled(mh, level))) {
     if (level == CompLevel_full_optimization && can_be_compiled(mh, CompLevel_simple)) {
-        compile(mh, bci, CompLevel_simple, thread);
+      compile(mh, bci, CompLevel_simple, thread);
+    }
+    return;
+  }
+  if ((bci != InvocationEntryBci && !can_be_osr_compiled(mh, level))) {
+    if (level == CompLevel_full_optimization && can_be_osr_compiled(mh, CompLevel_simple)) {
+      nmethod* osr_nm = mh->lookup_osr_nmethod_for(bci, CompLevel_simple, false);
+      if (osr_nm != NULL && osr_nm->comp_level() > CompLevel_simple) {
+        // Invalidate the existing OSR nmethod so that a compile at CompLevel_simple is permitted.
+        osr_nm->make_not_entrant();
+      }
+      compile(mh, bci, CompLevel_simple, thread);
     }
     return;
   }
@@ -479,7 +517,7 @@ void TieredThresholdPolicy::update_rate(jlong t, Method* m) {
 
   // We don't update the rate if we've just came out of a safepoint.
   // delta_s is the time since last safepoint in milliseconds.
-  jlong delta_s = t - SafepointSynchronize::end_of_last_safepoint();
+  jlong delta_s = t - SafepointTracing::end_of_last_safepoint_epoch_ms();
   jlong delta_t = t - (m->prev_time() != 0 ? m->prev_time() : start_time()); // milliseconds since the last measurement
   // How many events were there since the last time?
   int event_count = m->invocation_count() + m->backedge_count();
@@ -501,10 +539,10 @@ void TieredThresholdPolicy::update_rate(jlong t, Method* m) {
   }
 }
 
-// Check if this method has been stale from a given number of milliseconds.
+// Check if this method has been stale for a given number of milliseconds.
 // See select_task().
 bool TieredThresholdPolicy::is_stale(jlong t, jlong timeout, Method* m) {
-  jlong delta_s = t - SafepointSynchronize::end_of_last_safepoint();
+  jlong delta_s = t - SafepointTracing::end_of_last_safepoint_epoch_ms();
   jlong delta_t = t - m->prev_time();
   if (delta_t > timeout && delta_s > timeout) {
     int event_count = m->invocation_count() + m->backedge_count();
@@ -617,7 +655,7 @@ bool TieredThresholdPolicy::call_predicate(int i, int b, CompLevel cur_level, Me
 
 // Determine is a method is mature.
 bool TieredThresholdPolicy::is_mature(Method* method) {
-  if (is_trivial(method)) return true;
+  if (should_compile_at_level_simple(method)) return true;
   MethodData* mdo = method->method_data();
   if (mdo != NULL) {
     int i = mdo->invocation_count();
@@ -713,7 +751,7 @@ CompLevel TieredThresholdPolicy::common(Predicate p, Method* method, CompLevel c
   int i = method->invocation_count();
   int b = method->backedge_count();
 
-  if (is_trivial(method)) {
+  if (should_compile_at_level_simple(method)) {
     next_level = CompLevel_simple;
   } else {
     switch(cur_level) {
@@ -829,11 +867,6 @@ CompLevel TieredThresholdPolicy::call_event(Method* method, CompLevel cur_level,
   } else {
     next_level = MAX2(osr_level, next_level);
   }
-#if INCLUDE_JVMCI
-  if (UseJVMCICompiler) {
-    next_level = JVMCIRuntime::adjust_comp_level(method, false, next_level, thread);
-  }
-#endif
   return next_level;
 }
 
@@ -848,11 +881,6 @@ CompLevel TieredThresholdPolicy::loop_event(Method* method, CompLevel cur_level,
       return osr_level;
     }
   }
-#if INCLUDE_JVMCI
-  if (UseJVMCICompiler) {
-    next_level = JVMCIRuntime::adjust_comp_level(method, true, next_level, thread);
-  }
-#endif
   return next_level;
 }
 

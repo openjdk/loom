@@ -57,13 +57,17 @@ public class TestAnnotationTypes extends JavadocTester {
                 + "<li><a href=\"#annotation.type."
                 + "field.detail\">Field</a>&nbsp;|&nbsp;</li>",
                 "<!-- =========== ANNOTATION TYPE FIELD SUMMARY =========== -->",
-                "<h3>Field Summary</h3>",
+                "<h2>Field Summary</h2>",
                 "<th class=\"colSecond\" scope=\"row\"><code><span class=\"memberNameLink\"><a href=\"#DEFAULT_NAME\">DEFAULT_NAME</a></span>"
                 + "</code></th>",
                 "<!-- ============ ANNOTATION TYPE FIELD DETAIL =========== -->",
-                "<h4>DEFAULT_NAME</h4>\n"
-                + "<pre>static final&nbsp;java."
-                + "lang.String&nbsp;DEFAULT_NAME</pre>");
+                "<h3>DEFAULT_NAME</h3>\n"
+                + "<a id=\"DEFAULT_NAME\">\n"
+                + "<!--   -->\n"
+                + "</a>\n"
+                + "<div class=\"memberSignature\"><span class=\"modifiers\">static final</span>&nbsp;"
+                + "<span class=\"returnType\">java.lang.String</span>&nbsp;"
+                + "<span class=\"memberName\">DEFAULT_NAME</span></div>\n");
 
         checkOutput("pkg/AnnotationType.html", true,
                 "<li>Summary:&nbsp;</li>\n"
@@ -74,17 +78,21 @@ public class TestAnnotationTypes extends JavadocTester {
         checkOutput("pkg/AnnotationType.html", true,
                     "<!-- ============ ANNOTATION TYPE MEMBER DETAIL =========== -->",
                     "<ul class=\"blockList\">",
-                    "<li class=\"blockList\"><a id=\"annotation.type.element.detail\">",
+                    "<li class=\"blockList\">",
+                    "<section class=\"memberDetails\">",
+                    "<h2>Element Details</h2>",
+                    "<a id=\"annotation.type.element.detail\">",
                     "<!--   -->",
                     "</a>",
-                    "<h3>Element Detail</h3>",
+                    "<ul class=\"blockList\">",
+                    "<li class=\"blockList\">",
+                    "<section class=\"detail\">",
+                    "<h3>value</h3>",
                     "<a id=\"value()\">",
                     "<!--   -->",
                     "</a>",
-                    "<ul class=\"blockListLast\">",
-                    "<li class=\"blockList\">",
-                    "<h4>value</h4>",
-                    "<pre>int&nbsp;value</pre>" );
+                    "<div class=\"memberSignature\"><span class=\"returnType\">int</span>"
+                    + "&nbsp;<span class=\"memberName\">value</span></div>");
 
         checkOutput("pkg/AnnotationType.html", false,
                 "<HR>\n\n"

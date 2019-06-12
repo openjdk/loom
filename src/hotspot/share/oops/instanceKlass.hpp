@@ -25,10 +25,7 @@
 #ifndef SHARE_OOPS_INSTANCEKLASS_HPP
 #define SHARE_OOPS_INSTANCEKLASS_HPP
 
-#include "classfile/classLoader.hpp"
 #include "classfile/classLoaderData.hpp"
-#include "classfile/moduleEntry.hpp"
-#include "classfile/packageEntry.hpp"
 #include "memory/referenceType.hpp"
 #include "oops/annotations.hpp"
 #include "oops/constMethod.hpp"
@@ -63,6 +60,7 @@
 class BreakpointInfo;
 #endif
 class ClassFileParser;
+class ClassFileStream;
 class KlassDepChange;
 class DependencyContext;
 class fieldDescriptor;
@@ -70,9 +68,10 @@ class jniIdMapBase;
 class JNIid;
 class JvmtiCachedClassFieldMap;
 class nmethodBucket;
-class SuperTypeClosure;
 class OopMapCache;
 class InterpreterOopMap;
+class PackageEntry;
+class ModuleEntry;
 
 // This is used in iterators below.
 class FieldClosure: public StackObj {
@@ -349,22 +348,7 @@ class InstanceKlass: public Klass {
     _misc_flags &= ~loader_type_bits();
   }
 
-  void set_class_loader_type(s2 loader_type) {
-    switch (loader_type) {
-    case ClassLoader::BOOT_LOADER:
-      _misc_flags |= _misc_is_shared_boot_class;
-       break;
-    case ClassLoader::PLATFORM_LOADER:
-      _misc_flags |= _misc_is_shared_platform_class;
-      break;
-    case ClassLoader::APP_LOADER:
-      _misc_flags |= _misc_is_shared_app_class;
-      break;
-    default:
-      ShouldNotReachHere();
-      break;
-    }
-  }
+  void set_class_loader_type(s2 loader_type);
 
   bool has_nonstatic_fields() const        {
     return (_misc_flags & _misc_has_nonstatic_fields) != 0;
@@ -847,14 +831,6 @@ public:
   JvmtiCachedClassFieldMap* jvmti_cached_class_field_map() const {
     return _jvmti_cached_class_field_map;
   }
-
-#if INCLUDE_CDS
-  void set_archived_class_data(JvmtiCachedClassFileData* data) {
-    _cached_class_file = data;
-  }
-
-  JvmtiCachedClassFileData * get_archived_class_data();
-#endif // INCLUDE_CDS
 #else // INCLUDE_JVMTI
 
   static void purge_previous_versions(InstanceKlass* ik) { return; };
@@ -1033,7 +1009,6 @@ public:
   void methods_do(void f(Method* method));
   void array_klasses_do(void f(Klass* k));
   void array_klasses_do(void f(Klass* k, TRAPS), TRAPS);
-  bool super_types_do(SuperTypeClosure* blk);
 
   static InstanceKlass* cast(Klass* k) {
     return const_cast<InstanceKlass*>(cast(const_cast<const Klass*>(k)));
@@ -1149,7 +1124,7 @@ public:
   Method* method_at_itable(Klass* holder, int index, TRAPS);
 
 #if INCLUDE_JVMTI
-  void adjust_default_methods(InstanceKlass* holder, bool* trace_name_printed);
+  void adjust_default_methods(bool* trace_name_printed);
 #endif // INCLUDE_JVMTI
 
   void clean_weak_instanceklass_links();

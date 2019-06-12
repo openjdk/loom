@@ -31,6 +31,7 @@
 #include "classfile/classLoaderData.inline.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/moduleEntry.hpp"
+#include "classfile/symbolTable.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/systemDictionaryShared.hpp"
 #include "classfile/verifier.hpp"
@@ -52,6 +53,7 @@
 #include "memory/metaspaceShared.hpp"
 #include "memory/oopFactory.hpp"
 #include "memory/resourceArea.hpp"
+#include "memory/universe.hpp"
 #include "oops/fieldStreams.hpp"
 #include "oops/constantPool.hpp"
 #include "oops/instanceClassLoaderKlass.hpp"
@@ -183,8 +185,14 @@ bool InstanceKlass::has_nest_member(InstanceKlass* k, TRAPS) const {
       if (name == k->name()) {
         log_trace(class, nestmates)("- Found it at nest_members[%d] => cp[%d]", i, cp_index);
 
-        // names match so check actual klass - this may trigger class loading if
-        // it doesn't match (but that should be impossible)
+        // Names match so check actual klass - this may trigger class loading if
+        // it doesn't match (though that should be impossible). But to be safe we
+        // have to check for a compiler thread executing here.
+        if (!THREAD->can_call_java() && !_constants->tag_at(cp_index).is_klass()) {
+          log_trace(class, nestmates)("- validation required resolution in an unsuitable thread");
+          return false;
+        }
+
         Klass* k2 = _constants->klass_at(cp_index, CHECK_false);
         if (k2 == k) {
           log_trace(class, nestmates)("- class is listed as a nest member");
@@ -296,7 +304,7 @@ InstanceKlass* InstanceKlass::nest_host(Symbol* validationException, TRAPS) {
            error);
       }
 
-      if (validationException != NULL) {
+      if (validationException != NULL && THREAD->can_call_java()) {
         ResourceMark rm(THREAD);
         Exceptions::fthrow(THREAD_AND_LOCATION,
                            validationException,
@@ -443,7 +451,7 @@ InstanceKlass::InstanceKlass(const ClassFileParser& parser, unsigned kind, Klass
   assert(is_instance_klass(), "is layout incorrect?");
   assert(size_helper() == parser.layout_size(), "incorrect size_helper?");
 
-  if (DumpSharedSpaces) {
+  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
     SystemDictionaryShared::init_dumptime_info(this);
   }
 }
@@ -593,7 +601,7 @@ void InstanceKlass::deallocate_contents(ClassLoaderData* loader_data) {
   }
   set_annotations(NULL);
 
-  if (DumpSharedSpaces) {
+  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
     SystemDictionaryShared::remove_dumptime_info(this);
   }
 }
@@ -2181,7 +2189,7 @@ void InstanceKlass::clean_method_data() {
   for (int m = 0; m < methods()->length(); m++) {
     MethodData* mdo = methods()->at(m)->method_data();
     if (mdo != NULL) {
-      MutexLockerEx ml(SafepointSynchronize::is_at_safepoint() ? NULL : mdo->extra_data_lock());
+      MutexLocker ml(SafepointSynchronize::is_at_safepoint() ? NULL : mdo->extra_data_lock());
       mdo->clean_method_data(/*always_clean*/false);
     }
   }
@@ -2217,8 +2225,8 @@ bool InstanceKlass::should_store_fingerprint(bool is_unsafe_anonymous) {
     // (1) We are running AOT to generate a shared library.
     return true;
   }
-  if (DumpSharedSpaces) {
-    // (2) We are running -Xshare:dump to create a shared archive
+  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
+    // (2) We are running -Xshare:dump or -XX:ArchiveClassesAtExit to create a shared archive
     return true;
   }
   if (UseAOT && is_unsafe_anonymous) {
@@ -2338,15 +2346,14 @@ void InstanceKlass::remove_unshareable_info() {
     array_klasses()->remove_unshareable_info();
   }
 
-  // These are not allocated from metaspace, but they should should all be empty
-  // during dump time, so we don't need to worry about them in InstanceKlass::iterate().
-  guarantee(_source_debug_extension == NULL, "must be");
-  guarantee(_dep_context == NULL, "must be");
-  guarantee(_osr_nmethods_head == NULL, "must be");
-
+  // These are not allocated from metaspace. They are safe to set to NULL.
+  _source_debug_extension = NULL;
+  _dep_context = NULL;
+  _osr_nmethods_head = NULL;
 #if INCLUDE_JVMTI
-  guarantee(_breakpoints == NULL, "must be");
-  guarantee(_previous_versions == NULL, "must be");
+  _breakpoints = NULL;
+  _previous_versions = NULL;
+  _cached_class_file = NULL;
 #endif
 
   _init_thread = NULL;
@@ -2431,6 +2438,23 @@ bool InstanceKlass::check_sharing_error_state() {
   return (old_state != is_in_error_state());
 }
 
+void InstanceKlass::set_class_loader_type(s2 loader_type) {
+  switch (loader_type) {
+  case ClassLoader::BOOT_LOADER:
+    _misc_flags |= _misc_is_shared_boot_class;
+    break;
+  case ClassLoader::PLATFORM_LOADER:
+    _misc_flags |= _misc_is_shared_platform_class;
+    break;
+  case ClassLoader::APP_LOADER:
+    _misc_flags |= _misc_is_shared_app_class;
+    break;
+  default:
+    ShouldNotReachHere();
+    break;
+  }
+}
+
 #if INCLUDE_JVMTI
 static void clear_all_breakpoints(Method* m) {
   m->clear_all_breakpoints();
@@ -2448,6 +2472,10 @@ void InstanceKlass::unload_class(InstanceKlass* ik) {
 
   // notify ClassLoadingService of class unload
   ClassLoadingService::notify_class_unloaded(ik);
+
+  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
+    SystemDictionaryShared::remove_dumptime_info(ik);
+  }
 
   if (log_is_enabled(Info, class, unload)) {
     ResourceMark rm;
@@ -2503,7 +2531,7 @@ void InstanceKlass::release_C_heap_structures() {
   }
 
   // deallocate the cached class file
-  if (_cached_class_file != NULL && !MetaspaceShared::is_in_shared_metaspace(_cached_class_file)) {
+  if (_cached_class_file != NULL) {
     os::free(_cached_class_file);
     _cached_class_file = NULL;
   }
@@ -2585,7 +2613,7 @@ Symbol* InstanceKlass::package_from_name(const Symbol* name, TRAPS) {
     if (package_name == NULL) {
       return NULL;
     }
-    Symbol* pkg_name = SymbolTable::new_symbol(package_name, THREAD);
+    Symbol* pkg_name = SymbolTable::new_symbol(package_name);
     return pkg_name;
   }
 }
@@ -2910,22 +2938,18 @@ Method* InstanceKlass::method_at_itable(Klass* holder, int index, TRAPS) {
 // not yet in the vtable due to concurrent subclass define and superinterface
 // redefinition
 // Note: those in the vtable, should have been updated via adjust_method_entries
-void InstanceKlass::adjust_default_methods(InstanceKlass* holder, bool* trace_name_printed) {
+void InstanceKlass::adjust_default_methods(bool* trace_name_printed) {
   // search the default_methods for uses of either obsolete or EMCP methods
   if (default_methods() != NULL) {
     for (int index = 0; index < default_methods()->length(); index ++) {
       Method* old_method = default_methods()->at(index);
-      if (old_method == NULL || old_method->method_holder() != holder || !old_method->is_old()) {
+      if (old_method == NULL || !old_method->is_old()) {
         continue; // skip uninteresting entries
       }
       assert(!old_method->is_deleted(), "default methods may not be deleted");
-
-      Method* new_method = holder->method_with_idnum(old_method->orig_method_idnum());
-
-      assert(new_method != NULL, "method_with_idnum() should not be NULL");
-      assert(old_method != new_method, "sanity check");
-
+      Method* new_method = old_method->get_new_method();
       default_methods()->at_put(index, new_method);
+
       if (log_is_enabled(Info, redefine, class, update)) {
         ResourceMark rm;
         if (!(*trace_name_printed)) {
@@ -2945,10 +2969,17 @@ void InstanceKlass::adjust_default_methods(InstanceKlass* holder, bool* trace_na
 
 // On-stack replacement stuff
 void InstanceKlass::add_osr_nmethod(nmethod* n) {
+#ifndef PRODUCT
+  if (TieredCompilation) {
+      nmethod * prev = lookup_osr_nmethod(n->method(), n->osr_entry_bci(), n->comp_level(), true);
+      assert(prev == NULL || !prev->is_in_use(),
+      "redundunt OSR recompilation detected. memory leak in CodeCache!");
+  }
+#endif
   // only one compilation can be active
   {
     // This is a short non-blocking critical region, so the no safepoint check is ok.
-    MutexLockerEx ml(OsrList_lock, Mutex::_no_safepoint_check_flag);
+    MutexLocker ml(OsrList_lock, Mutex::_no_safepoint_check_flag);
     assert(n->is_osr_method(), "wrong kind of nmethod");
     n->set_osr_link(osr_nmethods_head());
     set_osr_nmethods_head(n);
@@ -2973,7 +3004,7 @@ void InstanceKlass::add_osr_nmethod(nmethod* n) {
 // Remove osr nmethod from the list. Return true if found and removed.
 bool InstanceKlass::remove_osr_nmethod(nmethod* n) {
   // This is a short non-blocking critical region, so the no safepoint check is ok.
-  MutexLockerEx ml(OsrList_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker ml(OsrList_lock, Mutex::_no_safepoint_check_flag);
   assert(n->is_osr_method(), "wrong kind of nmethod");
   nmethod* last = NULL;
   nmethod* cur  = osr_nmethods_head();
@@ -3017,7 +3048,7 @@ bool InstanceKlass::remove_osr_nmethod(nmethod* n) {
 
 int InstanceKlass::mark_osr_nmethods(const Method* m) {
   // This is a short non-blocking critical region, so the no safepoint check is ok.
-  MutexLockerEx ml(OsrList_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker ml(OsrList_lock, Mutex::_no_safepoint_check_flag);
   nmethod* osr = osr_nmethods_head();
   int found = 0;
   while (osr != NULL) {
@@ -3033,7 +3064,7 @@ int InstanceKlass::mark_osr_nmethods(const Method* m) {
 
 nmethod* InstanceKlass::lookup_osr_nmethod(const Method* m, int bci, int comp_level, bool match_level) const {
   // This is a short non-blocking critical region, so the no safepoint check is ok.
-  MutexLockerEx ml(OsrList_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker ml(OsrList_lock, Mutex::_no_safepoint_check_flag);
   nmethod* osr = osr_nmethods_head();
   nmethod* best = NULL;
   while (osr != NULL) {
@@ -3063,7 +3094,9 @@ nmethod* InstanceKlass::lookup_osr_nmethod(const Method* m, int bci, int comp_le
     }
     osr = osr->osr_link();
   }
-  if (best != NULL && best->comp_level() >= comp_level && match_level == false) {
+
+  assert(match_level == false || best == NULL, "shouldn't pick up anything if match_level is set");
+  if (best != NULL && best->comp_level() >= comp_level) {
     return best;
   }
   return NULL;
@@ -3084,7 +3117,7 @@ static void print_vtable(intptr_t* start, int len, outputStream* st) {
   for (int i = 0; i < len; i++) {
     intptr_t e = start[i];
     st->print("%d : " INTPTR_FORMAT, i, e);
-    if (e != 0 && ((Metadata*)e)->is_metaspace_object()) {
+    if (MetaspaceObj::is_valid((Metadata*)e)) {
       st->print(" ");
       ((Metadata*)e)->print_value_on(st);
     }
@@ -3364,7 +3397,9 @@ void InstanceKlass::print_class_load_logging(ClassLoaderData* loader_data,
   if (cfs != NULL) {
     if (cfs->source() != NULL) {
       if (module_name != NULL) {
-        if (ClassLoader::is_modules_image(cfs->source())) {
+        // When the boot loader created the stream, it didn't know the module name
+        // yet. Let's format it now.
+        if (cfs->from_boot_loader_modules_image()) {
           info_stream.print(" source: jrt:/%s", module_name);
         } else {
           info_stream.print(" source: %s", cfs->source());
@@ -3389,7 +3424,12 @@ void InstanceKlass::print_class_load_logging(ClassLoaderData* loader_data,
       info_stream.print(" source: %s", class_loader->klass()->external_name());
     }
   } else {
-    info_stream.print(" source: shared objects file");
+    assert(this->is_shared(), "must be");
+    if (MetaspaceShared::is_shared_dynamic((void*)this)) {
+      info_stream.print(" source: shared objects file (top)");
+    } else {
+      info_stream.print(" source: shared objects file");
+    }
   }
 
   msg.info("%s", info_stream.as_string());
@@ -3964,12 +4004,7 @@ Method* InstanceKlass::method_with_orig_idnum(int idnum, int version) {
 
 #if INCLUDE_JVMTI
 JvmtiCachedClassFileData* InstanceKlass::get_cached_class_file() {
-  if (MetaspaceShared::is_in_shared_metaspace(_cached_class_file)) {
-    // Ignore the archived class stream data
-    return NULL;
-  } else {
-    return _cached_class_file;
-  }
+  return _cached_class_file;
 }
 
 jint InstanceKlass::get_cached_class_file_len() {
@@ -3979,19 +4014,4 @@ jint InstanceKlass::get_cached_class_file_len() {
 unsigned char * InstanceKlass::get_cached_class_file_bytes() {
   return VM_RedefineClasses::get_cached_class_file_bytes(_cached_class_file);
 }
-
-#if INCLUDE_CDS
-JvmtiCachedClassFileData* InstanceKlass::get_archived_class_data() {
-  if (DumpSharedSpaces) {
-    return _cached_class_file;
-  } else {
-    assert(this->is_shared(), "class should be shared");
-    if (MetaspaceShared::is_in_shared_metaspace(_cached_class_file)) {
-      return _cached_class_file;
-    } else {
-      return NULL;
-    }
-  }
-}
-#endif
 #endif

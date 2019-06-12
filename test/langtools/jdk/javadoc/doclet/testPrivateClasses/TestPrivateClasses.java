@@ -66,16 +66,14 @@ public class TestPrivateClasses extends JavadocTester {
                 "<a href=\"#methodInheritedFromParent(int)\">"
                 + "methodInheritedFromParent</a>",
                 // private class does not show up in tree
-                "<ul class=\"inheritance\">\n"
-                + "<li>java.lang.Object</li>\n"
-                + "<li>\n"
-                + "<ul class=\"inheritance\">\n"
-                + "<li>pkg.PublicChild</li>\n"
-                + "</ul>\n"
-                + "</li>\n"
-                + "</ul>",
+                "<div class=\"inheritance\" title=\"Inheritance Tree\">java.lang.Object\n"
+                + "<div class=\"inheritance\">pkg.PublicChild</div>\n"
+                + "</div>",
                 // Method is documented as though it is declared in the inheriting method.
-                "<pre class=\"methodSignature\">public&nbsp;void&nbsp;methodInheritedFromParent&#8203;(int&nbsp;p1)",
+                "<div class=\"memberSignature\"><span class=\"modifiers\">public</span>&nbsp;"
+                + "<span class=\"returnType\">void</span>&nbsp;<span class=\"memberName\">"
+                + "methodInheritedFromParent</span>&#8203;(<span class=\"arguments\">int&nbsp;p1)</span>\n"
+                + "                               throws <span class=\"exceptions\">java.lang.Exception</span></div>",
                 "<dl>\n"
                 + "<dt>All Implemented Interfaces:</dt>\n"
                 + "<dd><code><a href=\"PublicInterface.html\" title=\"interface in pkg\">"

@@ -37,7 +37,7 @@
 
 Node* CardTableBarrierSetC2::byte_map_base_node(GraphKit* kit) const {
   // Get base of card map
-  jbyte* card_table_base = ci_card_table_address();
+  CardTable::CardValue* card_table_base = ci_card_table_address();
    if (card_table_base != NULL) {
      return kit->makecon(TypeRawPtr::make((address)card_table_base));
    } else {
@@ -105,7 +105,7 @@ void CardTableBarrierSetC2::post_barrier(GraphKit* kit,
 
   if (UseCondCardMark) {
     if (ct->scanned_concurrently()) {
-      kit->insert_mem_bar(Op_MemBarVolatile, oop_store);
+      kit->insert_store_load_for_barrier();
       __ sync_kit(kit);
     }
     // The classic GC reference write barrier is typically implemented

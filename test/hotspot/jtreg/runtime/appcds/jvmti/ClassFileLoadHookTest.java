@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,15 +27,11 @@
  * @summary Test jvmti class file loader hook interaction with AppCDS
  * @library /test/lib /test/hotspot/jtreg/runtime/appcds
  * @requires vm.cds
- * @modules java.base/jdk.internal.misc
- *          jdk.jartool/sun.tools.jar
- *          java.management
  * @build ClassFileLoadHook
  * @run main/othervm/native ClassFileLoadHookTest
  */
 
 
-import jdk.test.lib.Asserts;
 import jdk.test.lib.cds.CDSOptions;
 import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
@@ -46,7 +42,8 @@ public class ClassFileLoadHookTest {
         "ClassFileLoadHook",
         "ClassFileLoadHook$TestCaseId",
         "ClassFileLoadHook$1",
-        "LoadMe"
+        "LoadMe",
+        "java/sql/SQLException"
     };
 
     public static void main(String[] args) throws Exception {

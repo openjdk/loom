@@ -51,7 +51,7 @@ const DecoratorSet C2_WRITE_ACCESS           = DECORATOR_LAST << 7;
 // This denotes that the access reads state.
 const DecoratorSet C2_READ_ACCESS            = DECORATOR_LAST << 8;
 // A nearby allocation?
-const DecoratorSet C2_TIGHLY_COUPLED_ALLOC   = DECORATOR_LAST << 9;
+const DecoratorSet C2_TIGHTLY_COUPLED_ALLOC  = DECORATOR_LAST << 9;
 // Loads and stores from an arraycopy being optimized
 const DecoratorSet C2_ARRAY_COPY             = DECORATOR_LAST << 10;
 

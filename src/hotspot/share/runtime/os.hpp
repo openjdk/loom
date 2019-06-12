@@ -468,6 +468,9 @@ class os: AllStatic {
   static void pd_start_thread(Thread* thread);
   static void start_thread(Thread* thread);
 
+  // Returns true if successful.
+  static bool signal_thread(Thread* thread, int sig, const char* reason);
+
   static void free_thread(OSThread* osthread);
 
   // thread id on Linux/64bit is 64bit, on Windows and Solaris, it's 32bit
@@ -520,6 +523,10 @@ class os: AllStatic {
   static void abort(bool dump_core = true);
 
   // Die immediately, no exit hook, no abort hook, no cleanup.
+  // Dump a core file, if possible, for debugging. os::abort() is the
+  // preferred means to abort the VM on error. os::die() should only
+  // be called if something has gone badly wrong. CreateCoredumpOnCrash
+  // is intentionally not honored by this function.
   static void die();
 
   // File i/o operations
@@ -593,6 +600,7 @@ class os: AllStatic {
   // Loads .dll/.so and
   // in case of error it checks if .dll/.so was built for the
   // same architecture as HotSpot is running on
+  // in case of an error NULL is returned and an error message is stored in ebuf
   static void* dll_load(const char *name, char *ebuf, int ebuflen);
 
   // lookup symbol in a shared library
@@ -642,6 +650,7 @@ class os: AllStatic {
   static void print_environment_variables(outputStream* st, const char** env_list);
   static void print_context(outputStream* st, const void* context);
   static void print_register_info(outputStream* st, const void* context);
+  static bool signal_sent_by_kill(const void* siginfo);
   static void print_siginfo(outputStream* st, const void* siginfo);
   static void print_signal_handlers(outputStream* st, char* buf, size_t buflen);
   static void print_date_and_time(outputStream* st, char* buf, size_t buflen);

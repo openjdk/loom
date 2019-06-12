@@ -28,6 +28,7 @@ import java.math.BigInteger;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -253,16 +254,21 @@ public final class XMLUtils {
         }
     }
 
+    @Deprecated
+    public static String getFullTextChildrenFromElement(Element element) {
+        return getFullTextChildrenFromNode(element);
+    }
+
     /**
-     * Method getFullTextChildrenFromElement
+     * Method getFullTextChildrenFromNode
      *
-     * @param element
+     * @param node
      * @return the string of children
      */
-    public static String getFullTextChildrenFromElement(Element element) {
+    public static String getFullTextChildrenFromNode(Node node) {
         StringBuilder sb = new StringBuilder();
 
-        Node child = element.getFirstChild();
+        Node child = node.getFirstChild();
         while (child != null) {
             if (child.getNodeType() == Node.TEXT_NODE) {
                 sb.append(((Text)child).getData());
@@ -441,6 +447,25 @@ public final class XMLUtils {
             Document doc = e.getOwnerDocument();
             e.insertBefore(doc.createTextNode("\n"), child);
         }
+    }
+
+    public static String encodeToString(byte[] bytes) {
+        if (ignoreLineBreaks) {
+            return Base64.getEncoder().encodeToString(bytes);
+        }
+        return Base64.getMimeEncoder().encodeToString(bytes);
+    }
+
+    public static byte[] decode(String encodedString) {
+        return Base64.getMimeDecoder().decode(encodedString);
+    }
+
+    public static byte[] decode(byte[] encodedBytes) {
+        return Base64.getMimeDecoder().decode(encodedBytes);
+    }
+
+    public static boolean isIgnoreLineBreaks() {
+        return ignoreLineBreaks;
     }
 
     /**
@@ -662,7 +687,7 @@ public final class XMLUtils {
         while (sibling != null) {
             if (sibling.getNamespaceURI() != null && sibling.getNamespaceURI().equals(uri)
                 && sibling.getLocalName().equals(nodeName)) {
-                if (number == 0){
+                if (number == 0) {
                     return (Element)sibling;
                 }
                 number--;

@@ -629,6 +629,14 @@ public:
 
   enum { instruction_size = 4 };
 
+  //---<  calculate length of instruction  >---
+  // We just use the values set above.
+  // instruction must start at passed address
+  static unsigned int instr_len(unsigned char *instr) { return instruction_size; }
+
+  //---<  longest instructions  >---
+  static unsigned int instr_maxlen() { return instruction_size; }
+
   Address adjust(Register base, int offset, bool preIncrement) {
     if (preIncrement)
       return Address(Pre(base, offset));
@@ -1211,8 +1219,8 @@ public:
       /* The size bit is in bit 30, not 31 */
       sz = (operand_size)(sz == word ? 0b00:0b01);
     }
-    f(sz, 31, 30), f(0b001000, 29, 24), f(1, 23), f(a, 22), f(1, 21);
-    rf(Rs, 16), f(r, 15), f(0b11111, 14, 10), rf(Rn, 5), rf(Rt, 0);
+    f(sz, 31, 30), f(0b001000, 29, 24), f(not_pair ? 1 : 0, 23), f(a, 22), f(1, 21);
+    zrf(Rs, 16), f(r, 15), f(0b11111, 14, 10), srf(Rn, 5), zrf(Rt, 0);
   }
 
   // CAS
@@ -1482,6 +1490,25 @@ public:
   INSN(orrw, 0, 0b01, 0);
   INSN(eorw, 0, 0b10, 0);
   INSN(andsw, 0, 0b11, 0);
+
+#undef INSN
+
+#define INSN(NAME, size, op, N)                                         \
+  void NAME(Register Rd, Register Rn, Register Rm,                      \
+            enum shift_kind kind = LSL, unsigned shift = 0) {           \
+    starti;                                                             \
+    f(N, 21);                                                           \
+    zrf(Rm, 16), zrf(Rn, 5), zrf(Rd, 0);                                \
+    op_shifted_reg(0b01010, kind, shift, size, op);                     \
+  }                                                                     \
+                                                                        \
+  /* These instructions have no immediate form. Provide an overload so  \
+     that if anyone does try to use an immediate operand -- this has    \
+     happened! -- we'll get a compile-time error. */                    \
+  void NAME(Register Rd, Register Rn, unsigned imm,                     \
+            enum shift_kind kind = LSL, unsigned shift = 0) {           \
+    assert(false, " can't be used with immediate operand");             \
+  }
 
   INSN(bic, 1, 0b00, 1);
   INSN(orn, 1, 0b01, 1);
@@ -2209,13 +2236,15 @@ public:
     rf(Vn, 5), rf(Vd, 0);                                                               \
   }
 
-  INSN(addv, 0, 0b100001);
-  INSN(subv, 1, 0b100001);
-  INSN(mulv, 0, 0b100111);
-  INSN(mlav, 0, 0b100101);
-  INSN(mlsv, 1, 0b100101);
-  INSN(sshl, 0, 0b010001);
-  INSN(ushl, 1, 0b010001);
+  INSN(addv,   0, 0b100001);
+  INSN(subv,   1, 0b100001);
+  INSN(mulv,   0, 0b100111);
+  INSN(mlav,   0, 0b100101);
+  INSN(mlsv,   1, 0b100101);
+  INSN(sshl,   0, 0b010001);
+  INSN(ushl,   1, 0b010001);
+  INSN(umullv, 1, 0b110000);
+  INSN(umlalv, 1, 0b100000);
 
 #undef INSN
 
@@ -2227,13 +2256,27 @@ public:
     rf(Vn, 5), rf(Vd, 0);                                                               \
   }
 
-  INSN(absr,  0, 0b100000101110);
-  INSN(negr,  1, 0b100000101110);
-  INSN(notr,  1, 0b100000010110);
-  INSN(addv,  0, 0b110001101110);
-  INSN(cls,   0, 0b100000010010);
-  INSN(clz,   1, 0b100000010010);
-  INSN(cnt,   0, 0b100000010110);
+  INSN(absr,   0, 0b100000101110);
+  INSN(negr,   1, 0b100000101110);
+  INSN(notr,   1, 0b100000010110);
+  INSN(addv,   0, 0b110001101110);
+  INSN(cls,    0, 0b100000010010);
+  INSN(clz,    1, 0b100000010010);
+  INSN(cnt,    0, 0b100000010110);
+  INSN(uaddlv, 1, 0b110000001110);
+
+#undef INSN
+
+#define INSN(NAME, opc) \
+  void NAME(FloatRegister Vd, SIMD_Arrangement T, FloatRegister Vn) {                  \
+    starti;                                                                            \
+    assert(T == T4S, "arrangement must be T4S");                                       \
+    f(0, 31), f((int)T & 1, 30), f(0b101110, 29, 24), f(opc, 23),                      \
+    f(T == T4S ? 0 : 1, 22), f(0b110000111110, 21, 10); rf(Vn, 5), rf(Vd, 0);          \
+  }
+
+  INSN(fmaxv, 0);
+  INSN(fminv, 1);
 
 #undef INSN
 
@@ -2278,6 +2321,8 @@ public:
   INSN(fsub, 0, 1, 0b110101);
   INSN(fmla, 0, 0, 0b110011);
   INSN(fmls, 0, 1, 0b110011);
+  INSN(fmax, 0, 0, 0b111101);
+  INSN(fmin, 0, 1, 0b111101);
 
 #undef INSN
 

@@ -30,7 +30,6 @@
 #include "gc/g1/g1EvacFailure.hpp"
 #include "gc/g1/g1HeapVerifier.hpp"
 #include "gc/g1/g1OopClosures.inline.hpp"
-#include "gc/g1/g1_globals.hpp"
 #include "gc/g1/heapRegion.hpp"
 #include "gc/g1/heapRegionRemSet.hpp"
 #include "gc/shared/preservedMarks.inline.hpp"
@@ -64,7 +63,7 @@ public:
     }
     size_t card_index = _ct->index_for(p);
     if (_ct->mark_card_deferred(card_index)) {
-      _dcq->enqueue((jbyte*)_ct->byte_for_index(card_index));
+      _dcq->enqueue(_ct->byte_for_index(card_index));
     }
   }
 };
@@ -228,6 +227,8 @@ public:
 
     if (_hrclaimer->claim_region(hr->hrm_index())) {
       if (hr->evacuation_failed()) {
+        hr->clear_index_in_opt_cset();
+
         bool during_initial_mark = _g1h->collector_state()->in_initial_mark_gc();
         bool during_conc_mark = _g1h->collector_state()->mark_or_rebuild_in_progress();
 
@@ -257,5 +258,5 @@ G1ParRemoveSelfForwardPtrsTask::G1ParRemoveSelfForwardPtrsTask() :
 void G1ParRemoveSelfForwardPtrsTask::work(uint worker_id) {
   RemoveSelfForwardPtrHRClosure rsfp_cl(worker_id, &_hrclaimer);
 
-  _g1h->collection_set_iterate_from(&rsfp_cl, worker_id);
+  _g1h->collection_set_iterate_increment_from(&rsfp_cl, worker_id);
 }

@@ -38,8 +38,6 @@ class IdealLoopTree;
 class LoopNode;
 class Node;
 class OuterStripMinedLoopEndNode;
-class ShenandoahBarrierNode;
-class ShenandoahWriteBarrierNode;
 class PathFrequency;
 class PhaseIdealLoop;
 class CountedLoopReserveKit;
@@ -266,7 +264,7 @@ public:
   bool is_reduction_loop() const { return (_loop_flags&HasReductions) == HasReductions; }
   bool was_slp_analyzed () const { return (_loop_flags&WasSlpAnalyzed) == WasSlpAnalyzed; }
   bool has_passed_slp   () const { return (_loop_flags&PassedSlpAnalysis) == PassedSlpAnalysis; }
-  bool do_unroll_only      () const { return (_loop_flags&DoUnrollOnly) == DoUnrollOnly; }
+  bool is_unroll_only   () const { return (_loop_flags&DoUnrollOnly) == DoUnrollOnly; }
   bool is_main_no_pre_loop() const { return _loop_flags & MainHasNoPreLoop; }
   bool has_atomic_post_loop  () const { return (_loop_flags & HasAtomicPostLoop) == HasAtomicPostLoop; }
   void set_main_no_pre_loop() { _loop_flags |= MainHasNoPreLoop; }
@@ -372,26 +370,49 @@ public:
 };
 
 
-inline CountedLoopEndNode *CountedLoopNode::loopexit_or_null() const {
-  Node *bc = back_control();
-  if( bc == NULL ) return NULL;
-  Node *le = bc->in(0);
-  if( le->Opcode() != Op_CountedLoopEnd )
-    return NULL;
-  return (CountedLoopEndNode*)le;
+inline CountedLoopEndNode* CountedLoopNode::loopexit_or_null() const {
+  Node* bctrl = back_control();
+  if (bctrl == NULL) return NULL;
+
+  Node* lexit = bctrl->in(0);
+  return (CountedLoopEndNode*)
+      (lexit->Opcode() == Op_CountedLoopEnd ? lexit : NULL);
 }
-inline CountedLoopEndNode *CountedLoopNode::loopexit() const {
+
+inline CountedLoopEndNode* CountedLoopNode::loopexit() const {
   CountedLoopEndNode* cle = loopexit_or_null();
   assert(cle != NULL, "loopexit is NULL");
   return cle;
 }
-inline Node *CountedLoopNode::init_trip() const { return loopexit_or_null() ? loopexit()->init_trip() : NULL; }
-inline Node *CountedLoopNode::stride() const { return loopexit_or_null() ? loopexit()->stride() : NULL; }
-inline int CountedLoopNode::stride_con() const { return loopexit_or_null() ? loopexit()->stride_con() : 0; }
-inline bool CountedLoopNode::stride_is_con() const { return loopexit_or_null() && loopexit()->stride_is_con(); }
-inline Node *CountedLoopNode::limit() const { return loopexit_or_null() ? loopexit()->limit() : NULL; }
-inline Node *CountedLoopNode::incr() const { return loopexit_or_null() ? loopexit()->incr() : NULL; }
-inline Node *CountedLoopNode::phi() const { return loopexit_or_null() ? loopexit()->phi() : NULL; }
+
+inline Node* CountedLoopNode::init_trip() const {
+  CountedLoopEndNode* cle = loopexit_or_null();
+  return cle != NULL ? cle->init_trip() : NULL;
+}
+inline Node* CountedLoopNode::stride() const {
+  CountedLoopEndNode* cle = loopexit_or_null();
+  return cle != NULL ? cle->stride() : NULL;
+}
+inline int CountedLoopNode::stride_con() const {
+  CountedLoopEndNode* cle = loopexit_or_null();
+  return cle != NULL ? cle->stride_con() : 0;
+}
+inline bool CountedLoopNode::stride_is_con() const {
+  CountedLoopEndNode* cle = loopexit_or_null();
+  return cle != NULL && cle->stride_is_con();
+}
+inline Node* CountedLoopNode::limit() const {
+  CountedLoopEndNode* cle = loopexit_or_null();
+  return cle != NULL ? cle->limit() : NULL;
+}
+inline Node* CountedLoopNode::incr() const {
+  CountedLoopEndNode* cle = loopexit_or_null();
+  return cle != NULL ? cle->incr() : NULL;
+}
+inline Node* CountedLoopNode::phi() const {
+  CountedLoopEndNode* cle = loopexit_or_null();
+  return cle != NULL ? cle->phi() : NULL;
+}
 
 //------------------------------LoopLimitNode-----------------------------
 // Counted Loop limit node which represents exact final iterator value:
@@ -458,9 +479,9 @@ public:
   IdealLoopTree *_child;        // First child in loop tree
 
   // The head-tail backedge defines the loop.
-  // If tail is NULL then this loop has multiple backedges as part of the
-  // same loop.  During cleanup I'll peel off the multiple backedges; merge
-  // them at the loop bottom and flow 1 real backedge into the loop.
+  // If a loop has multiple backedges, this is addressed during cleanup where
+  // we peel off the multiple backedges,  merging all edges at the bottom and
+  // ensuring that one proper backedge flow into the loop.
   Node *_head;                  // Head of loop
   Node *_tail;                  // Tail of loop
   inline Node *tail();          // Handle lazy update of _tail field
@@ -489,7 +510,10 @@ public:
       _safepts(NULL),
       _required_safept(NULL),
       _allow_optimizations(true)
-  { }
+  {
+    precond(_head != NULL);
+    precond(_tail != NULL);
+  }
 
   // Is 'l' a member of 'this'?
   bool is_member(const IdealLoopTree *l) const; // Test for nested membership
@@ -560,22 +584,23 @@ public:
   bool policy_unswitching( PhaseIdealLoop *phase ) const;
 
   // Micro-benchmark spamming.  Remove empty loops.
-  bool policy_do_remove_empty_loop( PhaseIdealLoop *phase );
+  bool do_remove_empty_loop( PhaseIdealLoop *phase );
 
   // Convert one iteration loop into normal code.
-  bool policy_do_one_iteration_loop( PhaseIdealLoop *phase );
+  bool do_one_iteration_loop( PhaseIdealLoop *phase );
 
-  // Return TRUE or FALSE if the loop should be peeled or not.  Peel if we can
-  // make some loop-invariant test (usually a null-check) happen before the
-  // loop.
-  bool policy_peeling( PhaseIdealLoop *phase ) const;
+  // Return TRUE or FALSE if the loop should be peeled or not. Peel if we can
+  // move some loop-invariant test (usually a null-check) before the loop.
+  bool policy_peeling(PhaseIdealLoop *phase);
+
+  uint estimate_peeling(PhaseIdealLoop *phase);
 
   // Return TRUE or FALSE if the loop should be maximally unrolled. Stash any
   // known trip count in the counted loop node.
-  bool policy_maximally_unroll( PhaseIdealLoop *phase ) const;
+  bool policy_maximally_unroll(PhaseIdealLoop *phase) const;
 
-  // Return TRUE or FALSE if the loop should be unrolled or not.  Unroll if
-  // the loop is a CountedLoop and the body is small enough.
+  // Return TRUE or FALSE if the loop should be unrolled or not. Apply unroll
+  // if the loop is a counted loop and the loop body is small enough.
   bool policy_unroll(PhaseIdealLoop *phase);
 
   // Loop analyses to map to a maximal superword unrolling for vectorization.
@@ -595,6 +620,9 @@ public:
 
   // Return TRUE if "iff" is a range check.
   bool is_range_check_if(IfNode *iff, PhaseIdealLoop *phase, Invariance& invar) const;
+
+  // Estimate the number of nodes required when cloning a loop (body).
+  uint est_loop_clone_sz(uint factor) const;
 
   // Compute loop trip count if possible
   void compute_trip_count(PhaseIdealLoop* phase);
@@ -617,9 +645,11 @@ public:
   // Put loop body on igvn work list
   void record_for_igvn();
 
-  bool is_loop()    { return !_irreducible && _tail && !_tail->is_top(); }
-  bool is_inner()   { return is_loop() && _child == NULL; }
-  bool is_counted() { return is_loop() && _head != NULL && _head->is_CountedLoop(); }
+  bool is_root() { return _parent == NULL; }
+  // A proper/reducible loop w/o any (occasional) dead back-edge.
+  bool is_loop() { return !_irreducible && !tail()->is_top(); }
+  bool is_counted()   { return is_loop() && _head->is_CountedLoop(); }
+  bool is_innermost() { return is_loop() && _child == NULL; }
 
   void remove_main_post_loops(CountedLoopNode *cl, PhaseIdealLoop *phase);
 
@@ -632,14 +662,14 @@ public:
 };
 
 // -----------------------------PhaseIdealLoop---------------------------------
-// Computes the mapping from Nodes to IdealLoopTrees.  Organizes IdealLoopTrees into a
-// loop tree.  Drives the loop-based transformations on the ideal graph.
+// Computes the mapping from Nodes to IdealLoopTrees. Organizes IdealLoopTrees
+// into a loop tree. Drives the loop-based transformations on the ideal graph.
 class PhaseIdealLoop : public PhaseTransform {
   friend class IdealLoopTree;
   friend class SuperWord;
   friend class CountedLoopReserveKit;
-  friend class ShenandoahBarrierNode;
-  friend class ShenandoahWriteBarrierNode;
+  friend class ShenandoahBarrierC2Support;
+  friend class AutoNodeBudget;
 
   // Pre-computed def-use info
   PhaseIterGVN &_igvn;
@@ -734,8 +764,7 @@ private:
   }
   Node *dom_lca_for_get_late_ctrl_internal( Node *lca, Node *n, Node *tag );
 
-  // Helper function for directing control inputs away from CFG split
-  // points.
+  // Helper function for directing control inputs away from CFG split points.
   Node *find_non_split_ctrl( Node *ctrl ) const {
     if (ctrl != NULL) {
       if (ctrl->is_MultiBranch()) {
@@ -886,7 +915,8 @@ private:
     _igvn(igvn),
     _verify_me(NULL),
     _verify_only(true),
-    _dom_lca_tags(arena()) { // Thread::resource_area
+    _dom_lca_tags(arena()),  // Thread::resource_area
+    _nodes_required(UINT_MAX) {
     build_and_optimize(LoopOptsVerify);
   }
 
@@ -902,7 +932,8 @@ private:
     _igvn(igvn),
     _verify_me(NULL),
     _verify_only(false),
-    _dom_lca_tags(arena()) { // Thread::resource_area
+    _dom_lca_tags(arena()),  // Thread::resource_area
+    _nodes_required(UINT_MAX) {
     build_and_optimize(mode);
   }
 
@@ -912,7 +943,8 @@ private:
     _igvn(igvn),
     _verify_me(verify_me),
     _verify_only(false),
-    _dom_lca_tags(arena()) { // Thread::resource_area
+    _dom_lca_tags(arena()),  // Thread::resource_area
+    _nodes_required(UINT_MAX) {
     build_and_optimize(LoopOptsVerify);
   }
 
@@ -1323,7 +1355,70 @@ private:
     return C->live_nodes() > threshold;
   }
 
+  // A simplistic node request tracking mechanism, where
+  //   = UINT_MAX   Request not valid or made final.
+  //   < UINT_MAX   Nodes currently requested (estimate).
+  uint _nodes_required;
+
+  enum { REQUIRE_MIN = 70 };
+
+  uint nodes_required() const { return _nodes_required; }
+
+  // Given the _currently_  available number of nodes, check  whether there is
+  // "room" for an additional request or not, considering the already required
+  // number of  nodes.  Return TRUE if  the new request is  exceeding the node
+  // budget limit, otherwise return FALSE.  Note that this interpretation will
+  // act pessimistic on  additional requests when new nodes  have already been
+  // generated since the 'begin'.  This behaviour fits with the intention that
+  // node estimates/requests should be made upfront.
+  bool exceeding_node_budget(uint required = 0) {
+    assert(C->live_nodes() < C->max_node_limit(), "sanity");
+    uint available = C->max_node_limit() - C->live_nodes();
+    return available < required + _nodes_required;
+  }
+
+  uint require_nodes(uint require, uint minreq = REQUIRE_MIN) {
+    precond(require > 0);
+    _nodes_required += MAX2(require, minreq);
+    return _nodes_required;
+  }
+
+  bool may_require_nodes(uint require, uint minreq = REQUIRE_MIN) {
+    return !exceeding_node_budget(require) && require_nodes(require, minreq) > 0;
+  }
+
+  uint require_nodes_begin() {
+    assert(_nodes_required == UINT_MAX, "Bad state (begin).");
+    _nodes_required = 0;
+    return C->live_nodes();
+  }
+
+  // When a node request is final,  optionally check that the requested number
+  // of nodes was  reasonably correct with respect to the  number of new nodes
+  // introduced since the last 'begin'. Always check that we have not exceeded
+  // the maximum node limit.
+  void require_nodes_final(uint live_at_begin, bool check_estimate) {
+    assert(_nodes_required < UINT_MAX, "Bad state (final).");
+
+    if (check_estimate) {
+      // Assert that the node budget request was not off by too much (x2).
+      // Should this be the case we _surely_ need to improve the estimates
+      // used in our budget calculations.
+      assert(C->live_nodes() - live_at_begin <= 2 * _nodes_required,
+             "Bad node estimate: actual = %d >> request = %d",
+             C->live_nodes() - live_at_begin, _nodes_required);
+    }
+    // Assert that we have stayed within the node budget limit.
+    assert(C->live_nodes() < C->max_node_limit(),
+           "Exceeding node budget limit: %d + %d > %d (request = %d)",
+           C->live_nodes() - live_at_begin, live_at_begin,
+           C->max_node_limit(), _nodes_required);
+
+    _nodes_required = UINT_MAX;
+  }
+
   bool _created_loop_node;
+
 public:
   void set_created_loop_node() { _created_loop_node = true; }
   bool created_loop_node()     { return _created_loop_node; }
@@ -1349,6 +1444,52 @@ public:
 #endif
   void rpo( Node *start, Node_Stack &stk, VectorSet &visited, Node_List &rpo_list ) const;
 };
+
+
+class AutoNodeBudget : public StackObj
+{
+public:
+  enum budget_check_t { BUDGET_CHECK, NO_BUDGET_CHECK };
+
+  AutoNodeBudget(PhaseIdealLoop* phase, budget_check_t chk = BUDGET_CHECK)
+    : _phase(phase),
+      _check_at_final(chk == BUDGET_CHECK),
+      _nodes_at_begin(0)
+  {
+    precond(_phase != NULL);
+
+    _nodes_at_begin = _phase->require_nodes_begin();
+  }
+
+  ~AutoNodeBudget() {
+#ifndef PRODUCT
+    if (TraceLoopOpts) {
+      uint request = _phase->nodes_required();
+      uint delta   = _phase->C->live_nodes() - _nodes_at_begin;
+
+      if (request < delta) {
+        tty->print_cr("Exceeding node budget: %d < %d", request, delta);
+      } else {
+        uint const REQUIRE_MIN = PhaseIdealLoop::REQUIRE_MIN;
+        // Identify the worst estimates as "poor" ones.
+        if (request > REQUIRE_MIN && delta > 0) {
+          if ((delta >  REQUIRE_MIN && request >  3 * delta) ||
+              (delta <= REQUIRE_MIN && request > 10 * delta)) {
+            tty->print_cr("Poor node estimate: %d >> %d", request, delta);
+          }
+        }
+      }
+    }
+#endif // PRODUCT
+    _phase->require_nodes_final(_nodes_at_begin, _check_at_final);
+  }
+
+private:
+  PhaseIdealLoop* _phase;
+  bool _check_at_final;
+  uint _nodes_at_begin;
+};
+
 
 // This kit may be used for making of a reserved copy of a loop before this loop
 //  goes under non-reversible changes.
@@ -1413,14 +1554,11 @@ class CountedLoopReserveKit {
 };// class CountedLoopReserveKit
 
 inline Node* IdealLoopTree::tail() {
-// Handle lazy update of _tail field
-  Node *n = _tail;
-  //while( !n->in(0) )  // Skip dead CFG nodes
-    //n = n->in(1);
-  if (n->in(0) == NULL)
-    n = _phase->get_ctrl(n);
-  _tail = n;
-  return n;
+  // Handle lazy update of _tail field.
+  if (_tail->in(0) == NULL) {
+    _tail = _phase->get_ctrl(_tail);
+  }
+  return _tail;
 }
 
 

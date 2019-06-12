@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -160,7 +160,7 @@ Node* ArrayCopyNode::load(BarrierSetC2* bs, PhaseGVN *phase, Node*& ctl, MergeMe
 void ArrayCopyNode::store(BarrierSetC2* bs, PhaseGVN *phase, Node*& ctl, MergeMemNode* mem, Node* adr, const TypePtr* adr_type, Node* val, const Type *type, BasicType bt) {
   DecoratorSet decorators = C2_WRITE_ACCESS | IN_HEAP | C2_ARRAY_COPY;
   if (is_alloc_tightly_coupled()) {
-    decorators |= C2_TIGHLY_COUPLED_ALLOC;
+    decorators |= C2_TIGHTLY_COUPLED_ALLOC;
   }
   C2AccessValuePtr addr(adr, adr_type);
   C2AccessValue value(val, type);
@@ -296,6 +296,10 @@ bool ArrayCopyNode::prepare_array_copy(PhaseGVN *phase, bool can_reshape,
 
     src_offset = Compile::conv_I2X_index(phase, src_offset, ary_src->size());
     dest_offset = Compile::conv_I2X_index(phase, dest_offset, ary_dest->size());
+    if (src_offset->is_top() || dest_offset->is_top()) {
+      // Offset is out of bounds (the ArrayCopyNode will be removed)
+      return false;
+    }
 
     Node* src_scale = phase->transform(new LShiftXNode(src_offset, phase->intcon(shift)));
     Node* dest_scale = phase->transform(new LShiftXNode(dest_offset, phase->intcon(shift)));

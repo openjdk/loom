@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -88,6 +88,11 @@ public final class Utils {
      */
     public static final String TEST_SRC = System.getProperty("test.src", "").trim();
 
+    /**
+     * Returns the value of 'test.root' system property.
+     */
+    public static final String TEST_ROOT = System.getProperty("test.root", "").trim();
+
     /*
      * Returns the value of 'test.jdk' system property
      */
@@ -96,12 +101,13 @@ public final class Utils {
     /*
      * Returns the value of 'compile.jdk' system property
      */
-    public static final String COMPILE_JDK= System.getProperty("compile.jdk", TEST_JDK);
+    public static final String COMPILE_JDK = System.getProperty("compile.jdk", TEST_JDK);
 
     /**
      * Returns the value of 'test.classes' system property
      */
     public static final String TEST_CLASSES = System.getProperty("test.classes", ".");
+
     /**
      * Defines property name for seed value.
      */
@@ -118,9 +124,9 @@ public final class Utils {
      */
     public static final long SEED = Long.getLong(SEED_PROPERTY_NAME, new Random().nextLong());
     /**
-    * Returns the value of 'test.timeout.factor' system property
-    * converted to {@code double}.
-    */
+     * Returns the value of 'test.timeout.factor' system property
+     * converted to {@code double}.
+     */
     public static final double TIMEOUT_FACTOR;
     static {
         String toFactor = System.getProperty("test.timeout.factor", "1.0");
@@ -128,9 +134,9 @@ public final class Utils {
     }
 
     /**
-    * Returns the value of JTREG default test timeout in milliseconds
-    * converted to {@code long}.
-    */
+     * Returns the value of JTREG default test timeout in milliseconds
+     * converted to {@code long}.
+     */
     public static final long DEFAULT_TEST_TIMEOUT = TimeUnit.SECONDS.toMillis(120);
 
     private Utils() {
@@ -808,5 +814,25 @@ public final class Utils {
     public static Path createTempFile(String prefix, String suffix, FileAttribute<?>... attrs) throws IOException {
         Path dir = Paths.get(System.getProperty("user.dir", "."));
         return Files.createTempFile(dir, prefix, suffix);
+    }
+
+    /**
+     * Creates an empty directory in "user.dir" or "."
+     * <p>
+     * This method is meant as a replacement for {@code Files#createTempDirectory(String, String, FileAttribute...)}
+     * that doesn't leave files behind in /tmp directory of the test machine
+     * <p>
+     * If the property "user.dir" is not set, "." will be used.
+     *
+     * @param prefix
+     * @param attrs
+     * @return the path to the newly created directory
+     * @throws IOException
+     *
+     * @see {@link Files#createTempDirectory(String, String, FileAttribute...)}
+     */
+    public static Path createTempDirectory(String prefix, FileAttribute<?>... attrs) throws IOException {
+        Path dir = Paths.get(System.getProperty("user.dir", "."));
+        return Files.createTempDirectory(dir, prefix);
     }
 }

@@ -39,6 +39,7 @@
 #include "memory/metaspaceShared.hpp"
 #include "memory/metaspaceTracer.hpp"
 #include "memory/universe.hpp"
+#include "oops/compressedOops.hpp"
 #include "runtime/init.hpp"
 #include "runtime/orderAccess.hpp"
 #include "services/memTracker.hpp"
@@ -46,6 +47,7 @@
 #include "utilities/debug.hpp"
 #include "utilities/formatBuffer.hpp"
 #include "utilities/globalDefinitions.hpp"
+#include "utilities/vmError.hpp"
 
 
 using namespace metaspace;
@@ -440,7 +442,6 @@ size_t MetaspaceUtils::free_chunks_total_words(Metaspace::MetadataType mdtype) {
   if (chunk_manager == NULL) {
     return 0;
   }
-  chunk_manager->slow_verify();
   return chunk_manager->free_chunks_total_words();
 }
 
@@ -535,6 +536,23 @@ void MetaspaceUtils::print_vs(outputStream* out, size_t scale) {
   }
 }
 
+static void print_basic_switches(outputStream* out, size_t scale) {
+  out->print("MaxMetaspaceSize: ");
+  if (MaxMetaspaceSize >= (max_uintx) - (2 * os::vm_page_size())) {
+    // aka "very big". Default is max_uintx, but due to rounding in arg parsing the real
+    // value is smaller.
+    out->print("unlimited");
+  } else {
+    print_human_readable_size(out, MaxMetaspaceSize, scale);
+  }
+  out->cr();
+  if (Metaspace::using_class_space()) {
+    out->print("CompressedClassSpaceSize: ");
+    print_human_readable_size(out, CompressedClassSpaceSize, scale);
+  }
+  out->cr();
+}
+
 // This will print out a basic metaspace usage report but
 // unlike print_report() is guaranteed not to lock or to walk the CLDG.
 void MetaspaceUtils::print_basic_report(outputStream* out, size_t scale) {
@@ -615,6 +633,12 @@ void MetaspaceUtils::print_basic_report(outputStream* out, size_t scale) {
                               Metaspace::chunk_manager_metadata()->free_chunks_total_bytes(), scale);
     out->cr();
   }
+
+  out->cr();
+
+  // Print basic settings
+  print_basic_switches(out, scale);
+
   out->cr();
 
 }
@@ -644,12 +668,19 @@ void MetaspaceUtils::print_report(outputStream* out, size_t scale, int flags) {
     for (int space_type = (int)Metaspace::ZeroMetaspaceType;
          space_type < (int)Metaspace::MetaspaceTypeCount; space_type ++)
     {
-      uintx num = cl._num_loaders_by_spacetype[space_type];
-      out->print("%s (" UINTX_FORMAT " loader%s)%c",
+      uintx num_loaders = cl._num_loaders_by_spacetype[space_type];
+      uintx num_classes = cl._num_classes_by_spacetype[space_type];
+      out->print("%s - " UINTX_FORMAT " %s",
         space_type_name((Metaspace::MetaspaceType)space_type),
-        num, (num == 1 ? "" : "s"), (num > 0 ? ':' : '.'));
-      if (num > 0) {
+        num_loaders, loaders_plural(num_loaders));
+      if (num_classes > 0) {
+        out->print(", ");
+        print_number_of_classes(out, num_classes, cl._num_classes_shared_by_spacetype[space_type]);
+        out->print(":");
         cl._stats_by_spacetype[space_type].print_on(out, scale, print_by_chunktype);
+      } else {
+        out->print(".");
+        out->cr();
       }
       out->cr();
     }
@@ -657,10 +688,15 @@ void MetaspaceUtils::print_report(outputStream* out, size_t scale, int flags) {
 
   // Print totals for in-use data:
   out->cr();
-  out->print_cr("Total Usage ( " UINTX_FORMAT " loader%s)%c",
-      cl._num_loaders, (cl._num_loaders == 1 ? "" : "s"), (cl._num_loaders > 0 ? ':' : '.'));
-
-  cl._stats_total.print_on(out, scale, print_by_chunktype);
+  {
+    uintx num_loaders = cl._num_loaders;
+    out->print("Total Usage - " UINTX_FORMAT " %s, ",
+      num_loaders, loaders_plural(num_loaders));
+    print_number_of_classes(out, cl._num_classes, cl._num_classes_shared);
+    out->print(":");
+    cl._stats_total.print_on(out, scale, print_by_chunktype);
+    out->cr();
+  }
 
   // -- Print Virtual space.
   out->cr();
@@ -793,25 +829,24 @@ void MetaspaceUtils::print_report(outputStream* out, size_t scale, int flags) {
   out->print_cr("Number of times virtual space nodes were expanded: " UINTX_FORMAT ".", g_internal_statistics.num_committed_space_expanded);
   out->print_cr("Number of deallocations: " UINTX_FORMAT " (" UINTX_FORMAT " external).", g_internal_statistics.num_deallocs, g_internal_statistics.num_external_deallocs);
   out->print_cr("Allocations from deallocated blocks: " UINTX_FORMAT ".", g_internal_statistics.num_allocs_from_deallocated_blocks);
+  out->print_cr("Number of chunks added to freelist: " UINTX_FORMAT ".",
+                g_internal_statistics.num_chunks_added_to_freelist);
+  out->print_cr("Number of chunks removed from freelist: " UINTX_FORMAT ".",
+                g_internal_statistics.num_chunks_removed_from_freelist);
+  out->print_cr("Number of chunk merges: " UINTX_FORMAT ", split-ups: " UINTX_FORMAT ".",
+                g_internal_statistics.num_chunk_merges, g_internal_statistics.num_chunk_splits);
+
   out->cr();
 #endif
 
   // Print some interesting settings
   out->cr();
   out->cr();
-  out->print("MaxMetaspaceSize: ");
-  print_human_readable_size(out, MaxMetaspaceSize, scale);
+  print_basic_switches(out, scale);
+
   out->cr();
   out->print("InitialBootClassLoaderMetaspaceSize: ");
   print_human_readable_size(out, InitialBootClassLoaderMetaspaceSize, scale);
-  out->cr();
-
-  out->print("UseCompressedClassPointers: %s", UseCompressedClassPointers ? "true" : "false");
-  out->cr();
-  if (Metaspace::using_class_space()) {
-    out->print("CompressedClassSpaceSize: ");
-    print_human_readable_size(out, CompressedClassSpaceSize, scale);
-  }
 
   out->cr();
   out->cr();
@@ -820,7 +855,7 @@ void MetaspaceUtils::print_report(outputStream* out, size_t scale, int flags) {
 
 // Prints an ASCII representation of the given space.
 void MetaspaceUtils::print_metaspace_map(outputStream* out, Metaspace::MetadataType mdtype) {
-  MutexLockerEx cl(MetaspaceExpand_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker cl(MetaspaceExpand_lock, Mutex::_no_safepoint_check_flag);
   const bool for_class = mdtype == Metaspace::ClassType ? true : false;
   VirtualSpaceList* const vsl = for_class ? Metaspace::class_space_list() : Metaspace::space_list();
   if (vsl != NULL) {
@@ -844,10 +879,12 @@ void MetaspaceUtils::print_metaspace_map(outputStream* out, Metaspace::MetadataT
 }
 
 void MetaspaceUtils::verify_free_chunks() {
-  Metaspace::chunk_manager_metadata()->verify();
+#ifdef ASSERT
+  Metaspace::chunk_manager_metadata()->verify(false);
   if (Metaspace::using_class_space()) {
-    Metaspace::chunk_manager_class()->verify();
+    Metaspace::chunk_manager_class()->verify(false);
   }
+#endif
 }
 
 void MetaspaceUtils::verify_metrics() {
@@ -880,31 +917,6 @@ void MetaspaceUtils::verify_metrics() {
   assert(mismatch == false, "MetaspaceUtils::verify_metrics: counter mismatch.");
 #endif
 }
-
-// Utils to check if a pointer or range is part of a committed metaspace region.
-metaspace::VirtualSpaceNode* MetaspaceUtils::find_enclosing_virtual_space(const void* p) {
-  MutexLockerEx cl(MetaspaceExpand_lock, Mutex::_no_safepoint_check_flag);
-  VirtualSpaceNode* vsn = Metaspace::space_list()->find_enclosing_space(p);
-  if (Metaspace::using_class_space() && vsn == NULL) {
-    vsn = Metaspace::class_space_list()->find_enclosing_space(p);
-  }
-  return vsn;
-}
-
-bool MetaspaceUtils::is_range_in_committed(const void* from, const void* to) {
-#if INCLUDE_CDS
-  if (UseSharedSpaces) {
-    for (int idx = MetaspaceShared::ro; idx <= MetaspaceShared::mc; idx++) {
-      if (FileMapInfo::current_info()->is_in_shared_region(from, idx)) {
-        return FileMapInfo::current_info()->is_in_shared_region(to, idx);
-      }
-    }
-  }
-#endif
-  VirtualSpaceNode* vsn = find_enclosing_virtual_space(from);
-  return (vsn != NULL) && vsn->contains(to);
-}
-
 
 // Metaspace methods
 
@@ -951,7 +963,7 @@ void Metaspace::set_narrow_klass_base_and_shift(address metaspace_base, address 
     }
   }
 
-  Universe::set_narrow_klass_base(lower_base);
+  CompressedKlassPointers::set_base(lower_base);
 
   // CDS uses LogKlassAlignmentInBytes for narrow_klass_shift. See
   // MetaspaceShared::initialize_dumptime_shared_and_meta_spaces() for
@@ -961,9 +973,9 @@ void Metaspace::set_narrow_klass_base_and_shift(address metaspace_base, address 
   // can be used at same time as AOT code.
   if (!UseSharedSpaces
       && (uint64_t)(higher_address - lower_base) <= UnscaledClassSpaceMax) {
-    Universe::set_narrow_klass_shift(0);
+    CompressedKlassPointers::set_shift(0);
   } else {
-    Universe::set_narrow_klass_shift(LogKlassAlignmentInBytes);
+    CompressedKlassPointers::set_shift(LogKlassAlignmentInBytes);
   }
   AOTLoader::set_narrow_klass_shift();
 }
@@ -1108,7 +1120,7 @@ void Metaspace::allocate_metaspace_compressed_klass_ptrs(char* requested_addr, a
 
 void Metaspace::print_compressed_class_space(outputStream* st, const char* requested_addr) {
   st->print_cr("Narrow klass base: " PTR_FORMAT ", Narrow klass shift: %d",
-               p2i(Universe::narrow_klass_base()), Universe::narrow_klass_shift());
+               p2i(CompressedKlassPointers::base()), CompressedKlassPointers::shift());
   if (_class_space_list != NULL) {
     address base = (address)_class_space_list->current_virtual_space()->bottom();
     st->print("Compressed class space size: " SIZE_FORMAT " Address: " PTR_FORMAT,
@@ -1140,7 +1152,7 @@ void Metaspace::initialize_class_space(ReservedSpace rs) {
 void Metaspace::ergo_initialize() {
   if (DumpSharedSpaces) {
     // Using large pages when dumping the shared archive is currently not implemented.
-    FLAG_SET_ERGO(bool, UseLargePagesInMetaspace, false);
+    FLAG_SET_ERGO(UseLargePagesInMetaspace, false);
   }
 
   size_t page_size = os::vm_page_size();
@@ -1182,12 +1194,12 @@ void Metaspace::ergo_initialize() {
       if (min_metaspace_sz >= MaxMetaspaceSize) {
         vm_exit_during_initialization("MaxMetaspaceSize is too small.");
       } else {
-        FLAG_SET_ERGO(size_t, CompressedClassSpaceSize,
+        FLAG_SET_ERGO(CompressedClassSpaceSize,
                       MaxMetaspaceSize - min_metaspace_sz);
       }
     }
   } else if (min_metaspace_sz >= MaxMetaspaceSize) {
-    FLAG_SET_ERGO(size_t, InitialBootClassLoaderMetaspaceSize,
+    FLAG_SET_ERGO(InitialBootClassLoaderMetaspaceSize,
                   min_metaspace_sz);
   }
 
@@ -1206,6 +1218,10 @@ void Metaspace::global_initialize() {
     // (!DumpSharedSpaces && !UseSharedSpaces) case to set up class
     // metaspace.
     MetaspaceShared::initialize_runtime_shared_and_meta_spaces();
+  }
+
+  if (DynamicDumpSharedSpaces && !UseSharedSpaces) {
+    vm_exit_during_initialization("DynamicDumpSharedSpaces not supported when base CDS archive is not loaded", NULL);
   }
 
   if (!DumpSharedSpaces && !UseSharedSpaces)
@@ -1379,8 +1395,8 @@ void Metaspace::purge(MetadataType mdtype) {
 }
 
 void Metaspace::purge() {
-  MutexLockerEx cl(MetaspaceExpand_lock,
-                   Mutex::_no_safepoint_check_flag);
+  MutexLocker cl(MetaspaceExpand_lock,
+                 Mutex::_no_safepoint_check_flag);
   purge(NonClassType);
   if (using_class_space()) {
     purge(ClassType);
@@ -1457,7 +1473,7 @@ void ClassLoaderMetaspace::initialize(Mutex* lock, Metaspace::MetaspaceType type
     _class_vsm = new SpaceManager(Metaspace::ClassType, type, lock);
   }
 
-  MutexLockerEx cl(MetaspaceExpand_lock, Mutex::_no_safepoint_check_flag);
+  MutexLocker cl(MetaspaceExpand_lock, Mutex::_no_safepoint_check_flag);
 
   // Allocate chunk for metadata objects
   initialize_first_chunk(type, Metaspace::NonClassType);
@@ -1526,7 +1542,7 @@ void ClassLoaderMetaspace::deallocate(MetaWord* ptr, size_t word_size, bool is_c
 
   DEBUG_ONLY(Atomic::inc(&g_internal_statistics.num_external_deallocs));
 
-  MutexLockerEx ml(vsm()->lock(), Mutex::_no_safepoint_check_flag);
+  MutexLocker ml(vsm()->lock(), Mutex::_no_safepoint_check_flag);
 
   if (is_class && Metaspace::using_class_space()) {
     class_vsm()->deallocate(ptr, word_size);
@@ -1566,7 +1582,7 @@ void ClassLoaderMetaspace::add_to_statistics_locked(ClassLoaderMetaspaceStatisti
 }
 
 void ClassLoaderMetaspace::add_to_statistics(ClassLoaderMetaspaceStatistics* out) const {
-  MutexLockerEx cl(lock(), Mutex::_no_safepoint_check_flag);
+  MutexLocker cl(lock(), Mutex::_no_safepoint_check_flag);
   add_to_statistics_locked(out);
 }
 
@@ -1616,7 +1632,7 @@ class TestMetaspaceUtilsTest : AllStatic {
 
   static void test_virtual_space_list_large_chunk() {
     VirtualSpaceList* vs_list = new VirtualSpaceList(os::vm_allocation_granularity());
-    MutexLockerEx cl(MetaspaceExpand_lock, Mutex::_no_safepoint_check_flag);
+    MutexLocker cl(MetaspaceExpand_lock, Mutex::_no_safepoint_check_flag);
     // A size larger than VirtualSpaceSize (256k) and add one page to make it _not_ be
     // vm_allocation_granularity aligned on Windows.
     size_t large_size = (size_t)(2*256*K + (os::vm_page_size()/BytesPerWord));

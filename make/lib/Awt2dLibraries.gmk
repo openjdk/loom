@@ -39,7 +39,7 @@ LIBAWT_DEFAULT_HEADER_DIRS := \
 
 # We must not include java.desktop/unix/native/libmlib_image, which is only
 # for usage by solaris-sparc in libmlib_image_v.
-BUILD_LIBMLIB_EXCLUDE_SRC_PATTERNS := unix
+BUILD_LIBMLIB_EXCLUDE_SRC_PATTERNS := /unix/
 
 BUILD_LIBMLIB_CFLAGS := -D__USE_J2D_NAMES -D__MEDIALIB_OLD_NAMES -DMLIB_NO_LIBSUNMATH
 
@@ -378,7 +378,6 @@ $(eval $(call SetupJdkLibrary, BUILD_LIBLCMS, \
     OPTIMIZATION := HIGHEST, \
     CFLAGS := $(CFLAGS_JDKLIB) \
         $(LCMS_CFLAGS), \
-    CFLAGS_solaris := -xc99=no_lib, \
     CFLAGS_windows := -DCMS_IS_WINDOWS_, \
     EXTRA_HEADER_DIRS := \
         common/awt/debug \
@@ -506,6 +505,8 @@ else
   LIBFREETYPE_CFLAGS := -I$(BUILD_LIBFREETYPE_HEADER_DIRS)
   ifeq ($(call isTargetOs, windows), true)
     LIBFREETYPE_LIBS := $(SUPPORT_OUTPUTDIR)/native/$(MODULE)/libfreetype/freetype.lib
+    # freetype now requires you to manually define this (see ftconfig.h)
+    BUILD_LIBFREETYPE_CFLAGS += -DDLL_EXPORT
   else
     LIBFREETYPE_LIBS := -lfreetype
   endif
@@ -519,8 +520,8 @@ else
       DISABLED_WARNINGS_solstudio := \
          E_STATEMENT_NOT_REACHED \
          E_END_OF_LOOP_CODE_NOT_REACHED, \
-      DISABLED_WARNINGS_microsoft := 4267 4244 4312 4819, \
-      DISABLED_WARNINGS_gcc := implicit-fallthrough, \
+      DISABLED_WARNINGS_microsoft := 4018 4267 4244 4312 4819, \
+      DISABLED_WARNINGS_gcc := implicit-fallthrough cast-function-type bad-function-cast, \
       LDFLAGS := $(LDFLAGS_JDKLIB) \
           $(call SET_SHARED_LIBRARY_ORIGIN), \
   ))
@@ -536,7 +537,8 @@ HARFBUZZ_CFLAGS := -DHAVE_OT -DHAVE_FALLBACK -DHAVE_UCDN -DHAVE_ROUND
 
 ifeq ($(call isTargetOs, windows), false)
   HARFBUZZ_CFLAGS += -DGETPAGESIZE -DHAVE_MPROTECT -DHAVE_PTHREAD \
-                      -DHAVE_SYSCONF -DHAVE_SYS_MMAN_H -DHAVE_UNISTD_H
+                      -DHAVE_SYSCONF -DHAVE_SYS_MMAN_H -DHAVE_UNISTD_H \
+                      -DHB_NO_PRAGMA_GCC_DIAGNOSTIC
 endif
 ifeq ($(call isTargetOs, linux macosx), true)
   HARFBUZZ_CFLAGS += -DHAVE_INTEL_ATOMIC_PRIMITIVES
@@ -613,7 +615,7 @@ $(eval $(call SetupJdkLibrary, BUILD_LIBFONTMANAGER, \
         type-limits missing-field-initializers implicit-fallthrough \
         strict-aliasing undef unused-function, \
     DISABLED_WARNINGS_CXX_gcc := reorder delete-non-virtual-dtor strict-overflow \
-        maybe-uninitialized, \
+        maybe-uninitialized class-memaccess, \
     DISABLED_WARNINGS_clang := unused-value incompatible-pointer-types \
         tautological-constant-out-of-range-compare int-to-pointer-cast \
         sign-compare undef missing-field-initializers, \
@@ -623,8 +625,8 @@ $(eval $(call SetupJdkLibrary, BUILD_LIBFONTMANAGER, \
         E_ENUM_VAL_OVERFLOWS_INT_MAX, \
     DISABLED_WARNINGS_CXX_solstudio := \
         truncwarn wvarhidenmem wvarhidemem wbadlkginit identexpected \
-        hidevf w_novirtualdescr arrowrtn2, \
-    DISABLED_WARNINGS_microsoft := 4267 4244 4018 4090 4996 4146 4334 4819 4101, \
+        hidevf w_novirtualdescr arrowrtn2 refmemnoconstr_aggr unknownpragma, \
+    DISABLED_WARNINGS_microsoft := 4267 4244 4018 4090 4996 4146 4334 4819 4101 4068 4805 4138, \
     LDFLAGS := $(subst -Xlinker -z -Xlinker defs,, \
         $(subst -Wl$(COMMA)-z$(COMMA)defs,,$(LDFLAGS_JDKLIB))) $(LDFLAGS_CXX_JDK) \
         $(call SET_SHARED_LIBRARY_ORIGIN), \
@@ -696,7 +698,7 @@ else # not windows
 
   ifeq ($(call isTargetOs, macosx), true)
     # libjawt on macosx do not use the unix code
-    LIBJAWT_EXCLUDE_SRC_PATTERNS := unix
+    LIBJAWT_EXCLUDE_SRC_PATTERNS := /unix/
   endif
 
   ifeq ($(call isTargetOs, macosx), true)
@@ -786,7 +788,7 @@ ifeq ($(ENABLE_HEADLESS_ONLY), false)
 
   ifeq ($(call isTargetOs, macosx), true)
     # libsplashscreen on macosx do not use the unix code
-    LIBSPLASHSCREEN_EXCLUDE_SRC_PATTERNS := unix
+    LIBSPLASHSCREEN_EXCLUDE_SRC_PATTERNS := /unix/
   endif
 
   LIBSPLASHSCREEN_CFLAGS += -DSPLASHSCREEN -DPNG_NO_MMX_CODE -DPNG_ARM_NEON_OPT=0
@@ -821,6 +823,7 @@ ifeq ($(ENABLE_HEADLESS_ONLY), false)
         $(LIBM) -lpthread -liconv -losxapp \
         -framework ApplicationServices \
         -framework Foundation \
+        -framework Security \
         -framework Cocoa \
         -framework JavaNativeFoundation
   else ifeq ($(call isTargetOs, windows), true)

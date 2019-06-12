@@ -255,7 +255,9 @@ public class ObjectHeap {
         OopHandle handle = bottom.addOffsetToAsOopHandle(0);
 
         while (handle.lessThan(top)) {
-        Oop obj = null;
+          Oop obj = null;
+          // Raw pointer walk
+          handle = handle.addOffsetToAsOopHandle(heap.oopOffset());
 
           try {
             obj = newOop(handle);
@@ -355,7 +357,9 @@ public class ObjectHeap {
     // end.
 
     if (VM.getVM().getUseTLAB()) {
-      for (JavaThread thread = VM.getVM().getThreads().first(); thread != null; thread = thread.next()) {
+      Threads threads = VM.getVM().getThreads();
+      for (int i = 0; i < threads.getNumberOfThreads(); i++) {
+        JavaThread thread = threads.getJavaThreadAt(i);
         ThreadLocalAllocBuffer tlab = thread.tlab();
         if (tlab.start() != null) {
           if ((tlab.top() == null) || (tlab.end() == null)) {

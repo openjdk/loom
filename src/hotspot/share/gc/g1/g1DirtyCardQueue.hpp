@@ -25,27 +25,33 @@
 #ifndef SHARE_GC_G1_G1DIRTYCARDQUEUE_HPP
 #define SHARE_GC_G1_G1DIRTYCARDQUEUE_HPP
 
+#include "gc/shared/cardTable.hpp"
 #include "gc/shared/ptrQueue.hpp"
 #include "memory/allocation.hpp"
 
 class G1DirtyCardQueueSet;
 class G1FreeIdSet;
-class JavaThread;
+class Thread;
 class Monitor;
 
 // A closure class for processing card table entries.  Note that we don't
 // require these closure objects to be stack-allocated.
 class G1CardTableEntryClosure: public CHeapObj<mtGC> {
 public:
+  typedef CardTable::CardValue CardValue;
+
   // Process the card whose card table entry is "card_ptr".  If returns
   // "false", terminate the iteration early.
-  virtual bool do_card_ptr(jbyte* card_ptr, uint worker_i) = 0;
+  virtual bool do_card_ptr(CardValue* card_ptr, uint worker_i) = 0;
 };
 
 // A ptrQueue whose elements are "oops", pointers to object heads.
 class G1DirtyCardQueue: public PtrQueue {
+protected:
+  virtual void handle_completed_buffer();
+
 public:
-  G1DirtyCardQueue(G1DirtyCardQueueSet* qset, bool permanent = false);
+  G1DirtyCardQueue(G1DirtyCardQueueSet* qset);
 
   // Flush before destroying; queue may be used to capture pending work while
   // doing something else, with auto-flush on completion.
@@ -53,6 +59,8 @@ public:
 
   // Process queue entries and release resources.
   void flush() { flush_impl(); }
+
+  inline G1DirtyCardQueueSet* dirty_card_qset() const;
 
   // Compiler support.
   static ByteSize byte_offset_of_index() {
@@ -67,11 +75,7 @@ public:
 
 };
 
-
-
 class G1DirtyCardQueueSet: public PtrQueueSet {
-  G1DirtyCardQueue _shared_dirty_card_queue;
-
   // Apply the closure to the elements of "node" from it's index to
   // buffer_size.  If all closure applications return true, then
   // returns true.  Stops processing after the first closure
@@ -103,6 +107,12 @@ class G1DirtyCardQueueSet: public PtrQueueSet {
 
   bool mut_process_buffer(BufferNode* node);
 
+  // If the queue contains more buffers than configured here, the
+  // mutator must start doing some of the concurrent refinement work,
+  size_t _max_completed_buffers;
+  size_t _completed_buffers_padding;
+  static const size_t MaxCompletedBuffersUnlimited = ~size_t(0);
+
   G1FreeIdSet* _free_ids;
 
   // The number of completed buffers processed by mutator and rs thread,
@@ -113,22 +123,24 @@ class G1DirtyCardQueueSet: public PtrQueueSet {
   // Current buffer node used for parallel iteration.
   BufferNode* volatile _cur_par_buffer_node;
 
-  void concatenate_log(G1DirtyCardQueue& dcq);
-
 public:
   G1DirtyCardQueueSet(bool notify_when_complete = true);
   ~G1DirtyCardQueueSet();
 
   void initialize(Monitor* cbl_mon,
                   BufferNode::Allocator* allocator,
-                  Mutex* lock,
                   bool init_free_ids = false);
 
   // The number of parallel ids that can be claimed to allow collector or
   // mutator threads to do card-processing work.
   static uint num_par_ids();
 
-  static void handle_zero_index_for_thread(JavaThread* t);
+  static void handle_zero_index_for_thread(Thread* t);
+
+  // Either process the entire buffer and return true, or enqueue the
+  // buffer and return false.  If the buffer is completely processed,
+  // it can be reused in place.
+  bool process_or_enqueue_completed_buffer(BufferNode* node);
 
   // Apply G1RefineCardConcurrentlyClosure to completed buffers until there are stop_at
   // completed buffers remaining.
@@ -144,16 +156,26 @@ public:
   // by reset_for_par_iteration.
   void par_apply_closure_to_all_completed_buffers(G1CardTableEntryClosure* cl);
 
-  G1DirtyCardQueue* shared_dirty_card_queue() {
-    return &_shared_dirty_card_queue;
-  }
-
   // If a full collection is happening, reset partial logs, and ignore
   // completed ones: the full collection will make them all irrelevant.
   void abandon_logs();
 
   // If any threads have partial logs, add them to the global list of logs.
   void concatenate_logs();
+
+  void set_max_completed_buffers(size_t m) {
+    _max_completed_buffers = m;
+  }
+  size_t max_completed_buffers() const {
+    return _max_completed_buffers;
+  }
+
+  void set_completed_buffers_padding(size_t padding) {
+    _completed_buffers_padding = padding;
+  }
+  size_t completed_buffers_padding() const {
+    return _completed_buffers_padding;
+  }
 
   jint processed_buffers_mut() {
     return _processed_buffers_mut;
@@ -163,5 +185,9 @@ public:
   }
 
 };
+
+inline G1DirtyCardQueueSet* G1DirtyCardQueue::dirty_card_qset() const {
+  return static_cast<G1DirtyCardQueueSet*>(qset());
+}
 
 #endif // SHARE_GC_G1_G1DIRTYCARDQUEUE_HPP

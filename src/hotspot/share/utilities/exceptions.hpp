@@ -186,7 +186,7 @@ class Exceptions {
   static void debug_check_abort(const char *value_string, const char* message = NULL);
 
   // for logging exceptions
-  static void log_exception(Handle exception, stringStream tempst);
+  static void log_exception(Handle exception, const char* message);
 };
 
 
@@ -237,11 +237,7 @@ class Exceptions {
 // visible within the scope containing the THROW. Usually this is achieved by declaring the function
 // with a TRAPS argument.
 
-#ifdef THIS_FILE
-#define THREAD_AND_LOCATION                      THREAD, THIS_FILE, __LINE__
-#else
 #define THREAD_AND_LOCATION                      THREAD, __FILE__, __LINE__
-#endif
 
 #define THROW_OOP(e)                                \
   { Exceptions::_throw_oop(THREAD_AND_LOCATION, e);                             return;  }

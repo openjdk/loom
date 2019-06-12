@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,15 +25,23 @@
 /**
  * @test
  * @bug 8189131 8198240 8191844 8189949 8191031 8196141 8204923 8195774 8199779
- *      8209452 8209506 8210432 8195793
+ *      8209452 8209506 8210432 8195793 8216577 8222089 8222133 8222137 8222136
+ *      8223499
  * @summary Check root CA entries in cacerts file
  */
 import java.io.File;
 import java.io.FileInputStream;
 import java.security.KeyStore;
 import java.security.MessageDigest;
-import java.security.cert.*;
-import java.util.*;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509Certificate;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 
 public class VerifyCACerts {
 
@@ -42,11 +50,11 @@ public class VerifyCACerts {
             + File.separator + "security" + File.separator + "cacerts";
 
     // The numbers of certs now.
-    private static final int COUNT = 92;
+    private static final int COUNT = 88;
 
     // map of cert alias to SHA-256 fingerprint
-    private static final Map<String, String> FINGERPRINT_MAP
-            = new HashMap<String, String>() {
+    @SuppressWarnings("serial")
+    private static final Map<String, String> FINGERPRINT_MAP = new HashMap<>() {
         {
             put("actalisauthenticationrootca [jdk]",
                     "55:92:60:84:EC:96:3A:64:B9:6E:2A:BE:01:CE:0B:A8:6A:64:FB:FE:BC:C7:AA:B5:AF:C1:55:B3:7F:D7:60:66");
@@ -78,10 +86,6 @@ public class VerifyCACerts {
                     "4F:F4:60:D5:4B:9C:86:DA:BF:BC:FC:57:12:E0:40:0D:2B:ED:3F:BC:4D:4F:BD:AA:86:E0:6A:DC:D2:A9:AD:7A");
             put("utnuserfirstobjectca [jdk]",
                     "6F:FF:78:E4:00:A7:0C:11:01:1C:D8:59:77:C4:59:FB:5A:F9:6A:3D:F0:54:08:20:D0:F4:B8:60:78:75:E5:8F");
-            put("utnuserfirstclientauthemailca [jdk]",
-                    "43:F2:57:41:2D:44:0D:62:74:76:97:4F:87:7D:A8:F1:FC:24:44:56:5A:36:7A:E6:0E:DD:C2:7A:41:25:31:AE");
-            put("utnuserfirsthardwareca [jdk]",
-                    "6E:A5:47:41:D0:04:66:7E:ED:1B:48:16:63:4A:A3:A7:9E:6E:4B:96:95:0F:82:79:DA:FC:8D:9B:D8:81:21:37");
             put("addtrustclass1ca [jdk]",
                     "8C:72:09:27:9A:C0:4E:27:5E:16:D0:7F:D3:B7:75:E8:01:54:B5:96:80:46:E3:1F:52:DD:25:76:63:24:E9:A7");
             put("addtrustexternalca [jdk]",
@@ -140,10 +144,6 @@ public class VerifyCACerts {
                     "69:DD:D7:EA:90:BB:57:C9:3E:13:5D:C8:5E:A6:FC:D5:48:0B:60:32:39:BD:C4:54:FC:75:8B:2A:26:CF:7F:79");
             put("verisignclass3g5ca [jdk]",
                     "9A:CF:AB:7E:43:C8:D8:80:D0:6B:26:2A:94:DE:EE:E4:B4:65:99:89:C3:D0:CA:F1:9B:AF:64:05:E4:1A:B7:DF");
-            put("certplusclass2primaryca [jdk]",
-                    "0F:99:3C:8A:EF:97:BA:AF:56:87:14:0E:D5:9A:D1:82:1B:B4:AF:AC:F0:AA:9A:58:B5:D5:7A:33:8A:3A:FB:CB");
-            put("certplusclass3pprimaryca [jdk]",
-                    "CC:C8:94:89:37:1B:AD:11:1C:90:61:9B:EA:24:0A:2E:6D:AD:D9:9F:9F:6E:1D:4D:41:E5:8E:D6:DE:3D:02:85");
             put("keynectisrootca [jdk]",
                     "42:10:F1:99:49:9A:9A:C3:3C:8D:E0:2B:A6:DB:AA:14:40:8B:DD:8A:6E:32:46:89:C1:92:2D:06:97:15:A3:32");
             put("dtrustclass3ca2 [jdk]",
@@ -212,8 +212,6 @@ public class VerifyCACerts {
                     "03:76:AB:1D:54:C5:F9:80:3C:E4:B2:E2:01:A0:EE:7E:EF:7B:57:B6:36:E8:A9:3C:9B:8D:48:60:C9:6F:5F:A7");
             put("affirmtrustpremiumeccca [jdk]",
                     "BD:71:FD:F6:DA:97:E4:CF:62:D1:64:7A:DD:25:81:B0:7D:79:AD:F8:39:7E:B4:EC:BA:9C:5E:84:88:82:14:23");
-            put("deutschetelekomrootca2 [jdk]",
-                    "B6:19:1A:50:D0:C3:97:7F:7D:A9:9B:CD:AA:C8:6A:22:7D:AE:B9:67:9E:C7:0B:A3:B0:C9:D9:22:71:C1:70:D3");
             put("ttelesecglobalrootclass3ca [jdk]",
                     "FD:73:DA:D3:1C:64:4F:F1:B4:3B:EF:0C:CD:DA:96:71:0B:9C:D9:87:5E:CA:7E:31:70:7A:F3:E9:6D:52:2B:BD");
             put("ttelesecglobalrootclass2ca [jdk]",
@@ -232,12 +230,20 @@ public class VerifyCACerts {
                     "CA:42:DD:41:74:5F:D0:B8:1E:B9:02:36:2C:F9:D8:BF:71:9D:A1:BD:1B:1E:FC:94:6F:5B:4C:99:F4:2C:1B:9E");
             put("teliasonerarootcav1 [jdk]",
                     "DD:69:36:FE:21:F8:F0:77:C1:23:A1:A5:21:C1:22:24:F7:22:55:B7:3E:03:A7:26:06:93:E8:A2:4B:0F:A3:89");
+            put("globalsignrootcar6 [jdk]",
+                    "2C:AB:EA:FE:37:D0:6C:A2:2A:BA:73:91:C0:03:3D:25:98:29:52:C4:53:64:73:49:76:3A:3A:B5:AD:6C:CF:69");
         }
     };
 
     // Exception list to 90 days expiry policy
     // No error will be reported if certificate in this list expires
-    private static final HashSet<String> EXPIRY_EXC_ENTRIES = new HashSet<>();
+    @SuppressWarnings("serial")
+    private static final HashSet<String> EXPIRY_EXC_ENTRIES = new HashSet<>() {
+        {
+            // Valid until: Tue Jul 09 14:40:36 EDT 2019
+            add("utnuserfirstobjectca [jdk]");
+        }
+    };
 
     // Ninety days in milliseconds
     private static final long NINETY_DAYS = 7776000000L;

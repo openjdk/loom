@@ -150,14 +150,14 @@ time of writing.
 
  Operating system   Vendor/version used
  -----------------  -------------------------------------------------------
- Linux              Oracle Enterprise Linux 6.4 / 7.1 (using kernel 3.8.13)
- Solaris            Solaris 11.1 SRU 21.4.1 / 11.2 SRU 5.5
- macOS              Mac OS X 10.9 (Mavericks) / 10.10 (Yosemite)
+ Linux              Oracle Enterprise Linux 6.4 / 7.6
+ Solaris            Solaris 11.3 SRU 20
+ macOS              Mac OS X 10.13 (High Sierra)
  Windows            Windows Server 2012 R2
 
-The double version numbers for Linux, Solaris and macOS is due to the hybrid
-model used at Oracle, where header files and external libraries from an older
-version are used when building on a more modern version of the OS.
+The double version numbers for Linux and Solaris are due to the hybrid model
+used at Oracle, where header files and external libraries from an older version
+are used when building on a more modern version of the OS.
 
 The Build Group has a wiki page with [Supported Build Platforms](
 https://wiki.openjdk.java.net/display/Build/Supported+Build+Platforms). From
@@ -295,9 +295,9 @@ sudo yum groupinstall "Development Tools"
 
 ### AIX
 
-The regular builds by SAP is using AIX version 7.1, but AIX 5.3 is also
-supported. See the [OpenJDK PowerPC Port Status Page](
-http://cr.openjdk.java.net/~simonis/ppc-aix-port) for details.
+Please consult the AIX section of the [Supported Build Platforms](
+https://wiki.openjdk.java.net/display/Build/Supported+Build+Platforms) OpenJDK
+Build Wiki page for details about which versions of AIX are supported.
 
 ## Native Compiler (Toolchain) Requirements
 
@@ -323,10 +323,15 @@ issues.
 
  Operating system   Toolchain version
  ------------------ -------------------------------------------------------
- Linux              gcc 7.3.0
- macOS              Apple Xcode 9.4 (using clang 9.1.0)
- Solaris            Oracle Solaris Studio 12.4 (with compiler version 5.13)
- Windows            Microsoft Visual Studio 2017 update 15.5.5
+ Linux              gcc 8.2.0
+ macOS              Apple Xcode 10.1 (using clang 10.0.0)
+ Solaris            Oracle Solaris Studio 12.6 (with compiler version 5.15)
+ Windows            Microsoft Visual Studio 2017 update 15.9.6
+
+All compilers are expected to be able to compile to the C99 language standard,
+as some C99 features are used in the source code. Microsoft Visual Studio
+doesn't fully support C99 so in practice shared code is limited to using C99
+features that it does support.
 
 ### gcc
 
@@ -404,7 +409,7 @@ CC: Sun C++ 5.13 SunOS_i386 151846-10 2015/10/30
 
 The minimum accepted version of Visual Studio is 2010. Older versions will not
 be accepted by `configure`. The maximum accepted version of Visual Studio is
-2017. Versions older than 2017 are unlikely to continue working for long.
+2019. Versions older than 2017 are unlikely to continue working for long.
 
 If you have multiple versions of Visual Studio installed, `configure` will by
 default pick the latest. You can request a specific version to be used by
@@ -419,11 +424,10 @@ https://stackoverflow.com/questions/10888391) for other suggestions.
 
 ### IBM XL C/C++
 
-The regular builds by SAP is using version 12.1, described as `IBM XL C/C++ for
-AIX, V12.1 (5765-J02, 5725-C72) Version: 12.01.0000.0017`.
+Please consult the AIX section of the [Supported Build Platforms](
+https://wiki.openjdk.java.net/display/Build/Supported+Build+Platforms) OpenJDK
+Build Wiki page for details about which versions of XLC are supported.
 
-See the [OpenJDK PowerPC Port Status Page](
-http://cr.openjdk.java.net/~simonis/ppc-aix-port) for details.
 
 ## Boot JDK Requirements
 
@@ -723,9 +727,12 @@ can in turn be overriden at runtime by setting the `java.library.path` property.
 
 Certain third-party libraries used by the JDK (libjpeg, giflib, libpng, lcms
 and zlib) are included in the JDK repository. The default behavior of the
-JDK build is to use this version of these libraries, but they might be
-replaced by an external version. To do so, specify `system` as the `<source>`
-option in these arguments. (The default is `bundled`).
+JDK build is to use the included ("bundled") versions of libjpeg, giflib,
+libpng and lcms.
+For zlib, the system lib (if present) is used except on Windows and AIX.
+However the bundled libraries may be replaced by an external version.
+To do so, specify `system` as the `<source>` option in these arguments.
+(The default is `bundled`).
 
   * `--with-libjpeg=<source>` - Use the specified source for libjpeg
   * `--with-giflib=<source>` - Use the specified source for giflib

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,12 +27,12 @@
  * @summary Hello World test for AppCDS custom loader support
  * @requires vm.cds
  * @requires vm.cds.custom.loaders
- * @library /test/lib /test/hotspot/jtreg/runtime/appcds
+ * @library /test/lib /test/hotspot/jtreg/runtime/appcds /runtime/testlibrary
  * @modules java.base/jdk.internal.misc
  *          java.management
- * @compile test-classes/Hello.java test-classes/CustomLoadee.java
- * @build sun.hotspot.WhiteBox
- * @run driver ClassFileInstaller -jar hello.jar Hello
+ * @compile test-classes/HelloUnload.java test-classes/CustomLoadee.java
+ * @build sun.hotspot.WhiteBox ClassUnloadCommon
+ * @run driver ClassFileInstaller -jar hello.jar HelloUnload ClassUnloadCommon ClassUnloadCommon$1 ClassUnloadCommon$TestFailure
  * @run driver ClassFileInstaller -jar hello_custom.jar CustomLoadee
  * @run driver ClassFileInstaller -jar WhiteBox.jar sun.hotspot.WhiteBox
  * @run driver HelloCustom
@@ -43,6 +43,9 @@ import sun.hotspot.WhiteBox;
 
 public class HelloCustom {
     public static void main(String[] args) throws Exception {
+        run();
+    }
+    public static void run(String... extra_runtime_args) throws Exception {
         String wbJar = ClassFileInstaller.getJarPath("WhiteBox.jar");
         String use_whitebox_jar = "-Xbootclasspath/a:" + wbJar;
 
@@ -51,7 +54,7 @@ public class HelloCustom {
 
         // Dump the archive
         String classlist[] = new String[] {
-            "Hello",
+            "HelloUnload",
             "java/lang/Object id: 1",
             "CustomLoadee id: 2 super: 1 source: " + customJarPath
         };
@@ -62,12 +65,12 @@ public class HelloCustom {
                             use_whitebox_jar);
 
         output = TestCommon.exec(appJar,
-                                 // command-line arguments ...
-                                 use_whitebox_jar,
-                                 "-XX:+UnlockDiagnosticVMOptions",
-                                 "-XX:+WhiteBoxAPI",
-                                 "Hello", customJarPath);
+                                 TestCommon.concat(extra_runtime_args,
+                                     // command-line arguments ...
+                                     use_whitebox_jar,
+                                     "-XX:+UnlockDiagnosticVMOptions",
+                                     "-XX:+WhiteBoxAPI",
+                                     "HelloUnload", customJarPath, "true", "true"));
         TestCommon.checkExec(output);
     }
 }
-

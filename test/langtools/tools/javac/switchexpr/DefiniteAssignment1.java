@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,9 +23,9 @@
 
 /**
  * @test
- * @bug 8214031
+ * @bug 8214031 8221413
  * @summary Verify that definite assignment when true works (legal code)
- * @compile --enable-preview --source 13 DefiniteAssignment1.java
+ * @compile --enable-preview --source ${jdk.version} DefiniteAssignment1.java
  * @run main/othervm --enable-preview DefiniteAssignment1
  */
 public class DefiniteAssignment1 {
@@ -389,6 +389,36 @@ public class DefiniteAssignment1 {
             case A: break isTrue() && e != E.C ? (x = 1) == 1 && e != E.B : false;
             case B: break (x = 1) == 1 || isTrue();
             default: break false;
+        }) && x == 1; //x is definitelly assigned here
+
+        if (!tA) {
+            throw new IllegalStateException("Unexpected result.");
+        }
+        }
+
+        { //JDK-8221413: definite assignment for implicit default in switch expressions
+        int x;
+        E e = E.A;
+
+        int v = (switch(e) {
+            case A -> x = 0;
+            case B -> x = 0;
+            case C -> x = 0;
+        });
+
+        if (x != 0 || v != 0) {
+            throw new IllegalStateException("Unexpected result.");
+        }
+        }
+
+        { //JDK-8221413: definite assignment for implicit default in switch expressions
+        int x;
+        E e = E.A;
+
+        boolean tA = (switch(e) {
+            case A -> { x = 1; break true; }
+            case B -> { x = 1; break true; }
+            case C -> { x = 1; break true; }
         }) && x == 1; //x is definitelly assigned here
 
         if (!tA) {

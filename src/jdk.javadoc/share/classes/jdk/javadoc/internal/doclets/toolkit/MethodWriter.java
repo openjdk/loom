@@ -25,8 +25,6 @@
 
 package jdk.javadoc.internal.doclets.toolkit;
 
-import java.io.*;
-
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
@@ -101,17 +99,24 @@ public interface MethodWriter {
     /**
      * Get the method details tree.
      *
+     * @param methodDetailsTreeHeader the content tree representing method details header
      * @param methodDetailsTree the content tree representing method details
      * @return content tree for the method details
      */
-    public Content getMethodDetails(Content methodDetailsTree);
+    public Content getMethodDetails(Content methodDetailsTreeHeader, Content methodDetailsTree);
 
     /**
      * Get the method documentation.
      *
      * @param methodDocTree the content tree representing method documentation
-     * @param isLastContent true if the content to be added is the last content
      * @return content tree for the method documentation
      */
-    public Content getMethodDoc(Content methodDocTree, boolean isLastContent);
+    public Content getMethodDoc(Content methodDocTree);
+
+    /**
+     * Gets the member header tree.
+     *
+     * @return a content tree for the member header
+     */
+    public Content getMemberTreeHeader();
 }

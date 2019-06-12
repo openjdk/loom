@@ -39,12 +39,16 @@
 <li><a href="#gtest-keywords">Gtest keywords</a></li>
 <li><a href="#microbenchmark-keywords">Microbenchmark keywords</a></li>
 </ul></li>
+<li><a href="#notes-for-specific-tests">Notes for Specific Tests</a><ul>
+<li><a href="#docker-tests">Docker Tests</a></li>
+<li><a href="#non-us-locale">Non-US locale</a></li>
+</ul></li>
 </ul>
 </nav>
 <h2 id="using-make-test-the-run-test-framework">Using &quot;make test&quot; (the run-test framework)</h2>
 <p>This new way of running tests is developer-centric. It assumes that you have built a JDK locally and want to test it. Running common test targets is simple, and more complex ad-hoc combination of tests is possible. The user interface is forgiving, and clearly report errors it cannot resolve.</p>
 <p>The main target <code>test</code> uses the jdk-image as the tested product. There is also an alternate target <code>exploded-test</code> that uses the exploded image instead. Not all tests will run successfully on the exploded image, but using this target can greatly improve rebuild times for certain workflows.</p>
-<p>Previously, <code>make test</code> was used invoke an old system for running test, and <code>make run-test</code> was used for the new test framework. For backward compatibility with scripts and muscle memory, <code>run-test</code> (and variants like <code>exploded-run-test</code> or <code>run-test-tier1</code>) are kept as aliases. The old system can still be accessed for some time using <code>cd test &amp;&amp; make</code>.</p>
+<p>Previously, <code>make test</code> was used to invoke an old system for running tests, and <code>make run-test</code> was used for the new test framework. For backward compatibility with scripts and muscle memory, <code>run-test</code> (and variants like <code>exploded-run-test</code> or <code>run-test-tier1</code>) are kept as aliases.</p>
 <p>Some example command-lines:</p>
 <pre><code>$ make test-tier1
 $ make test-jdk_lang JTREG=&quot;JOBS=8&quot;
@@ -124,7 +128,7 @@ TEST FAILURE</code></pre>
 <h3 id="jtreg-keywords">JTReg keywords</h3>
 <h4 id="jobs-1">JOBS</h4>
 <p>The test concurrency (<code>-concurrency</code>).</p>
-<p>Defaults to TEST_JOBS (if set by <code>--with-test-jobs=</code>), otherwise it defaults to JOBS, except for Hotspot, where the default is <em>number of CPU cores/2</em>, but never more than 12.</p>
+<p>Defaults to TEST_JOBS (if set by <code>--with-test-jobs=</code>), otherwise it defaults to JOBS, except for Hotspot, where the default is <em>number of CPU cores/2</em> (for sparc, if more than 16 cpus, then <em>number of CPU cores/5</em>, otherwise <em>number of CPU cores/4</em>), but never more than <em>memory size in GB/2</em>.</p>
 <h4 id="timeout_factor-1">TIMEOUT_FACTOR</h4>
 <p>The timeout factor (<code>-timeoutFactor</code>).</p>
 <p>Defaults to 4.</p>
@@ -185,5 +189,15 @@ TEST FAILURE</code></pre>
 <p>Additional VM arguments to provide to forked off VMs. Same as <code>-jvmArgs &lt;args&gt;</code></p>
 <h4 id="options-2">OPTIONS</h4>
 <p>Additional arguments to send to JMH.</p>
+<h2 id="notes-for-specific-tests">Notes for Specific Tests</h2>
+<h3 id="docker-tests">Docker Tests</h3>
+<p>Docker tests with default parameters may fail on systems with glibc versions not compatible with the one used in the default docker image (e.g., Oracle Linux 7.6 for x86). For example, they pass on Ubuntu 16.04 but fail on Ubuntu 18.04 if run like this on x86:</p>
+<pre><code>$ make test TEST=&quot;jtreg:test/hotspot/jtreg/containers/docker&quot;</code></pre>
+<p>To run these tests correctly, additional parameters for the correct docker image are required on Ubuntu 18.04 by using <code>JAVA_OPTIONS</code>.</p>
+<pre><code>$ make test TEST=&quot;jtreg:test/hotspot/jtreg/containers/docker&quot; JTREG=&quot;JAVA_OPTIONS=-Djdk.test.docker.image.name=ubuntu -Djdk.test.docker.image.version=latest&quot;</code></pre>
+<h3 id="non-us-locale">Non-US locale</h3>
+<p>If your locale is non-US, some tests are likely to fail. To work around this you can set the locale to US. On Unix platforms simply setting <code>LANG=&quot;en_US&quot;</code> in the environment before running tests should work. On Windows, setting <code>JTREG=&quot;VM_OPTIONS=-Duser.language=en -Duser.country=US&quot;</code> helps for most, but not all test cases. For example:</p>
+<pre><code>$ export LANG=&quot;en_US&quot; &amp;&amp; make test TEST=...
+$ make test JTREG=&quot;VM_OPTIONS=-Duser.language=en -Duser.country=US&quot; TEST=...</code></pre>
 </body>
 </html>

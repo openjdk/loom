@@ -277,8 +277,7 @@ public final class Class<T> implements java.io.Serializable,
                           .collect(Collectors.joining(",", "<", ">")));
             }
 
-            for (int i = 0; i < arrayDepth; i++)
-                sb.append("[]");
+            if (arrayDepth > 0) sb.append("[]".repeat(arrayDepth));
 
             return sb.toString();
         }
@@ -1000,7 +999,7 @@ public final class Class<T> implements java.io.Serializable,
      *
      * @since 9
      * @spec JPMS
-     * @jls 6.7  Fully Qualified Names
+     * @jls 6.7 Fully Qualified Names
      */
     public String getPackageName() {
         String pn = this.packageName;
@@ -1589,12 +1588,7 @@ public final class Class<T> implements java.io.Serializable,
                     dimensions++;
                     cl = cl.getComponentType();
                 } while (cl.isArray());
-                StringBuilder sb = new StringBuilder();
-                sb.append(cl.getName());
-                for (int i = 0; i < dimensions; i++) {
-                    sb.append("[]");
-                }
-                return sb.toString();
+                return cl.getName() + "[]".repeat(dimensions);
             } catch (Throwable e) { /*FALLTHRU*/ }
         }
         return getName();
@@ -3418,15 +3412,12 @@ public final class Class<T> implements java.io.Serializable,
      * Helper method to get the method name from arguments.
      */
     private String methodToString(String name, Class<?>[] argTypes) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(getName() + "." + name + "(");
-        if (argTypes != null) {
-            sb.append(Arrays.stream(argTypes)
-                      .map(c -> (c == null) ? "null" : c.getName())
-                      .collect(Collectors.joining(",")));
-        }
-        sb.append(")");
-        return sb.toString();
+        return getName() + '.' + name +
+                ((argTypes == null || argTypes.length == 0) ?
+                "()" :
+                Arrays.stream(argTypes)
+                        .map(c -> c == null ? "null" : c.getName())
+                        .collect(Collectors.joining(",", "(", ")")));
     }
 
     /** use serialVersionUID from JDK 1.1 for interoperability */
@@ -3919,7 +3910,8 @@ public final class Class<T> implements java.io.Serializable,
      *         SecurityManager#checkPackageAccess s.checkPackageAccess()}
      *         denies access to the package of the returned class
      * @since 11
-     * @jvms 4.7.28 and 4.7.29 NestHost and NestMembers attributes
+     * @jvms 4.7.28 The {@code NestHost} Attribute
+     * @jvms 4.7.29 The {@code NestMembers} Attribute
      * @jvms 5.4.4 Access Control
      */
     @CallerSensitive

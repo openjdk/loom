@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,13 +23,13 @@
  */
 
 #include "precompiled.hpp"
+#include "gc/g1/g1Arguments.hpp"
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "gc/g1/g1ConcurrentRefine.hpp"
 #include "gc/g1/heapRegion.hpp"
 #include "gc/g1/heapRegionManager.inline.hpp"
 #include "gc/g1/heapRegionSet.inline.hpp"
 #include "gc/g1/heterogeneousHeapRegionManager.hpp"
-#include "gc/shared/collectorPolicy.hpp"
 #include "memory/allocation.hpp"
 #include "utilities/bitMap.inline.hpp"
 
@@ -68,9 +68,9 @@ HeapRegionManager::HeapRegionManager() :
   _free_list("Free list", new MasterFreeRegionListChecker())
 { }
 
-HeapRegionManager* HeapRegionManager::create_manager(G1CollectedHeap* heap, G1CollectorPolicy* policy) {
-  if (policy->is_hetero_heap()) {
-    return new HeterogeneousHeapRegionManager((uint)(policy->max_heap_byte_size() / HeapRegion::GrainBytes) /*heap size as num of regions*/);
+HeapRegionManager* HeapRegionManager::create_manager(G1CollectedHeap* heap) {
+  if (G1Arguments::is_heterogeneous_heap()) {
+    return new HeterogeneousHeapRegionManager((uint)(G1Arguments::heap_max_size_bytes() / HeapRegion::GrainBytes) /*heap size as num of regions*/);
   }
   return new HeapRegionManager();
 }

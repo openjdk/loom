@@ -516,6 +516,19 @@ void VM_Version::print_features_internal(const char* text, bool print_anyway) {
   }
 }
 
+void VM_Version::print_platform_virtualization_info(outputStream* st) {
+  // /proc/sysinfo contains interesting information about
+  // - LPAR
+  // - whole "Box" (CPUs )
+  // - z/VM / KVM (VM<nn>); this is not available in an LPAR-only setup
+  const char* kw[] = { "LPAR", "CPUs", "VM", NULL };
+  const char* info_file = "/proc/sysinfo";
+
+  if (!print_matching_lines_from_file(info_file, st, kw)) {
+    st->print_cr("  <%s Not Available>", info_file);
+  }
+}
+
 void VM_Version::print_features() {
   print_features_internal("Version:");
 }
@@ -791,6 +804,8 @@ void VM_Version::determine_features() {
   address code_end = a->pc();
   a->flush();
 
+  cbuf.insts()->set_end(code_end);
+
   // Print the detection code.
   bool printVerbose = Verbose || PrintAssembly || PrintStubCode;
   if (printVerbose) {
@@ -799,8 +814,8 @@ void VM_Version::determine_features() {
     tty->print_cr("Stub length is %ld bytes, codebuffer reserves %d bytes, %ld bytes spare.",
                   code_end-code, cbuf_size, cbuf_size-(code_end-code));
 
-    // Use existing decode function. This enables the [Code] format which is needed to DecodeErrorFile.
-    Disassembler::decode((u_char*)code, (u_char*)code_end, tty);
+    // Use existing decode function. This enables the [MachCode] format which is needed to DecodeErrorFile.
+    Disassembler::decode(&cbuf, code, code_end, tty);
   }
 
   // Prepare for detection code execution and clear work buffer.

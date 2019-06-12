@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,6 +28,7 @@ package jdk.javadoc.internal.doclets.toolkit.builders;
 import javax.lang.model.element.ModuleElement;
 
 import jdk.javadoc.internal.doclets.toolkit.Content;
+import jdk.javadoc.internal.doclets.toolkit.DocFilesHandler;
 import jdk.javadoc.internal.doclets.toolkit.DocletException;
 import jdk.javadoc.internal.doclets.toolkit.ModuleSummaryWriter;
 
@@ -116,9 +117,8 @@ public class ModuleSummaryBuilder extends AbstractBuilder {
 
         moduleWriter.addModuleFooter(contentTree);
         moduleWriter.printDocument(contentTree);
-        // uncomment to support doc-files in modules
-        // DocFilesHandler docFilesHandler = configuration.getWriterFactory().getDocFilesWriter(mdle);
-        // docFilesHandler.copyDocFiles();
+        DocFilesHandler docFilesHandler = configuration.getWriterFactory().getDocFilesHandler(mdle);
+        docFilesHandler.copyDocFiles();
     }
 
     /**
@@ -152,7 +152,7 @@ public class ModuleSummaryBuilder extends AbstractBuilder {
         buildModulesSummary(summaryContentTree);
         buildServicesSummary(summaryContentTree);
 
-        moduleContentTree.addContent(moduleWriter.getSummaryTree(summaryContentTree));
+        moduleContentTree.add(moduleWriter.getSummaryTree(summaryContentTree));
     }
 
     /**

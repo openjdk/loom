@@ -35,6 +35,7 @@
 #include "gc/shared/collectedHeap.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/cardTableBarrierSet.hpp"
+#include "memory/universe.hpp"
 #include "nativeInst_s390.hpp"
 #include "oops/objArrayKlass.hpp"
 #include "runtime/frame.inline.hpp"
@@ -78,6 +79,10 @@ int LIR_Assembler::check_icache() {
   int offset = __ offset();
   __ inline_cache_check(receiver, Z_inline_cache);
   return offset;
+}
+
+void LIR_Assembler::clinit_barrier(ciMethod* method) {
+  ShouldNotReachHere(); // not implemented
 }
 
 void LIR_Assembler::osr_entry() {

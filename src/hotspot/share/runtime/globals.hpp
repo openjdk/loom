@@ -25,115 +25,15 @@
 #ifndef SHARE_RUNTIME_GLOBALS_HPP
 #define SHARE_RUNTIME_GLOBALS_HPP
 
+#include "compiler/compiler_globals.hpp"
 #include "gc/shared/gc_globals.hpp"
+#include "runtime/globals_shared.hpp"
 #include "utilities/align.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
-
-#include <float.h> // for DBL_MAX
-
-// The larger HeapWordSize for 64bit requires larger heaps
-// for the same application running in 64bit.  See bug 4967770.
-// The minimum alignment to a heap word size is done.  Other
-// parts of the memory system may require additional alignment
-// and are responsible for those alignments.
-#ifdef _LP64
-#define ScaleForWordSize(x) align_down_((x) * 13 / 10, HeapWordSize)
-#else
-#define ScaleForWordSize(x) (x)
-#endif
-
-// use this for flags that are true per default in the tiered build
-// but false in non-tiered builds, and vice versa
-#ifdef TIERED
-#define  trueInTiered true
-#define falseInTiered false
-#else
-#define  trueInTiered false
-#define falseInTiered true
-#endif
-
-// Default and minimum StringTable and SymbolTable size values
-// Must be powers of 2
-const size_t defaultStringTableSize = NOT_LP64(1024) LP64_ONLY(65536);
-const size_t minimumStringTableSize = 128;
-const size_t defaultSymbolTableSize = 32768; // 2^15
-const size_t minimumSymbolTableSize = 1024;
-
 #include CPU_HEADER(globals)
 #include OS_HEADER(globals)
 #include OS_CPU_HEADER(globals)
-#ifdef COMPILER1
-#include CPU_HEADER(c1_globals)
-#include OS_HEADER(c1_globals)
-#endif
-#ifdef COMPILER2
-#include CPU_HEADER(c2_globals)
-#include OS_HEADER(c2_globals)
-#endif
-
-#if !defined(COMPILER1) && !defined(COMPILER2) && !INCLUDE_JVMCI
-define_pd_global(bool, BackgroundCompilation,        false);
-define_pd_global(bool, UseTLAB,                      false);
-define_pd_global(bool, CICompileOSR,                 false);
-define_pd_global(bool, UseTypeProfile,               false);
-define_pd_global(bool, UseOnStackReplacement,        false);
-define_pd_global(bool, InlineIntrinsics,             false);
-define_pd_global(bool, PreferInterpreterNativeStubs, true);
-define_pd_global(bool, ProfileInterpreter,           false);
-define_pd_global(bool, ProfileTraps,                 false);
-define_pd_global(bool, TieredCompilation,            false);
-
-define_pd_global(intx, CompileThreshold,             0);
-
-define_pd_global(intx,   OnStackReplacePercentage,   0);
-define_pd_global(bool,   ResizeTLAB,                 false);
-define_pd_global(intx,   FreqInlineSize,             0);
-define_pd_global(size_t, NewSizeThreadIncrease,      4*K);
-define_pd_global(bool,   InlineClassNatives,         true);
-define_pd_global(bool,   InlineUnsafeOps,            true);
-define_pd_global(uintx,  InitialCodeCacheSize,       160*K);
-define_pd_global(uintx,  ReservedCodeCacheSize,      32*M);
-define_pd_global(uintx,  NonProfiledCodeHeapSize,    0);
-define_pd_global(uintx,  ProfiledCodeHeapSize,       0);
-define_pd_global(uintx,  NonNMethodCodeHeapSize,     32*M);
-
-define_pd_global(uintx,  CodeCacheExpansionSize,     32*K);
-define_pd_global(uintx,  CodeCacheMinBlockLength,    1);
-define_pd_global(uintx,  CodeCacheMinimumUseSpace,   200*K);
-define_pd_global(size_t, MetaspaceSize,              ScaleForWordSize(4*M));
-define_pd_global(bool, NeverActAsServerClassMachine, true);
-define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
-#define CI_COMPILER_COUNT 0
-#else
-
-#if COMPILER2_OR_JVMCI
-#define CI_COMPILER_COUNT 2
-#else
-#define CI_COMPILER_COUNT 1
-#endif // COMPILER2_OR_JVMCI
-
-#endif // no compilers
-
-// use this for flags that are true by default in the debug version but
-// false in the optimized version, and vice versa
-#ifdef ASSERT
-#define trueInDebug  true
-#define falseInDebug false
-#else
-#define trueInDebug  false
-#define falseInDebug true
-#endif
-
-// use this for flags that are true per default in the product build
-// but false in development builds, and vice versa
-#ifdef PRODUCT
-#define trueInProduct  true
-#define falseInProduct false
-#else
-#define trueInProduct  false
-#define falseInProduct true
-#endif
 
 // develop flags are settable / visible only during development and are constant in the PRODUCT version
 // product flags are always settable / visible
@@ -216,6 +116,12 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
 //    (multiple times allowed)
 //
 
+// Default and minimum StringTable and SymbolTable size values
+// Must be powers of 2
+const size_t defaultStringTableSize = NOT_LP64(1024) LP64_ONLY(65536);
+const size_t minimumStringTableSize = 128;
+const size_t defaultSymbolTableSize = 32768; // 2^15
+const size_t minimumSymbolTableSize = 1024;
 
 #define RUNTIME_FLAGS(develop, \
                       develop_pd, \
@@ -324,9 +230,6 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
           "Maximum number of pages to include in the page scan procedure")  \
           range(0, max_uintx)                                               \
                                                                             \
-  product_pd(bool, NeedsDeoptSuspend,                                       \
-          "True for register window machines (sparc/ia64)")                 \
-                                                                            \
   product(intx, UseSSE, 99,                                                 \
           "Highest supported SSE instructions set on x86/x64")              \
           range(0, 99)                                                      \
@@ -367,8 +270,12 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
           "Print out every time compilation is longer than "                \
           "a given threshold")                                              \
                                                                             \
-  develop(bool, SafepointALot, false,                                       \
+  diagnostic(bool, SafepointALot, false,                                    \
           "Generate a lot of safepoints. This works with "                  \
+          "GuaranteedSafepointInterval")                                    \
+                                                                            \
+  diagnostic(bool, HandshakeALot, false,                                    \
+          "Generate a lot of handshakes. This works with "                  \
           "GuaranteedSafepointInterval")                                    \
                                                                             \
   product_pd(bool, BackgroundCompilation,                                   \
@@ -537,14 +444,14 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
   diagnostic(bool, LogEvents, true,                                         \
           "Enable the various ring buffer event logs")                      \
                                                                             \
-  diagnostic(uintx, LogEventsBufferEntries, 10,                             \
+  diagnostic(uintx, LogEventsBufferEntries, 20,                             \
           "Number of ring buffer event logs")                               \
           range(1, NOT_LP64(1*K) LP64_ONLY(1*M))                            \
                                                                             \
-  product(bool, BytecodeVerificationRemote, true,                           \
+  diagnostic(bool, BytecodeVerificationRemote, true,                        \
           "Enable the Java bytecode verifier for remote classes")           \
                                                                             \
-  product(bool, BytecodeVerificationLocal, false,                           \
+  diagnostic(bool, BytecodeVerificationLocal, false,                        \
           "Enable the Java bytecode verifier for local classes")            \
                                                                             \
   develop(bool, ForceFloatExceptions, trueInDebug,                          \
@@ -650,9 +557,6 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
                                                                             \
   develop(bool, BreakAtWarning, false,                                      \
           "Execute breakpoint upon encountering VM warning")                \
-                                                                            \
-  develop(bool, UseFakeTimers, false,                                       \
-          "Tell whether the VM should use system time or a fake timer")     \
                                                                             \
   product(ccstr, NativeMemoryTracking, "off",                               \
           "Native memory tracking options")                                 \
@@ -864,7 +768,7 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
           "by the application (Solaris & Linux only)")                      \
                                                                             \
   product(bool, AllowJNIEnvProxy, false,                                    \
-          "Allow JNIEnv proxies for jdbx")                                  \
+          "(Deprecated) Allow JNIEnv proxies for jdbx")                     \
                                                                             \
   product(bool, RestoreMXCSROnJNICalls, false,                              \
           "Restore MXCSR when returning from JNI calls")                    \
@@ -976,6 +880,10 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
   /* change to false by default sometime after Mustang */                   \
   product(bool, VerifyMergedCPBytecodes, true,                              \
           "Verify bytecodes after RedefineClasses constant pool merging")   \
+                                                                            \
+  product(bool, AllowRedefinitionToAddDeleteMethods, false,                 \
+          "(Deprecated) Allow redefinition to add and delete private "      \
+          "static or final methods for compatibility with old releases")    \
                                                                             \
   develop(bool, TraceBytecodes, false,                                      \
           "Trace bytecode execution")                                       \
@@ -1237,7 +1145,7 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
           "exit")                                                           \
                                                                             \
   product(bool, PrintFlagsRanges, false,                                    \
-          "Print VM flags and their ranges and exit VM")                    \
+          "Print VM flags and their ranges")                                \
                                                                             \
   diagnostic(bool, SerializeVMOutput, true,                                 \
           "Use a mutex to serialize output to tty and LogFile")             \
@@ -1265,6 +1173,12 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
                                                                             \
   product(bool, DisplayVMOutputToStdout, false,                             \
           "If DisplayVMOutput is true, display all VM output to stdout")    \
+                                                                            \
+  product(bool, ErrorFileToStderr, false,                                   \
+          "If true, error data is printed to stderr instead of a file")     \
+                                                                            \
+  product(bool, ErrorFileToStdout, false,                                   \
+          "If true, error data is printed to stdout instead of a file")     \
                                                                             \
   product(bool, UseHeavyMonitors, false,                                    \
           "use heavyweight instead of lightweight Java monitors")           \
@@ -2341,8 +2255,7 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
           "Use shared spaces for metadata")                                 \
                                                                             \
   product(bool, VerifySharedSpaces, false,                                  \
-          "Verify shared spaces (false for default archive, true for "      \
-          "archive specified by -XX:SharedArchiveFile)")                    \
+          "Verify integrity of shared spaces")                              \
                                                                             \
   product(bool, RequireSharedSpaces, false,                                 \
           "Require shared spaces for metadata")                             \
@@ -2351,6 +2264,9 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
           "Special mode: JVM reads a class list, loads classes, builds "    \
           "shared spaces, and dumps the shared spaces to a file to be "     \
           "used in future JVM runs")                                        \
+                                                                            \
+  product(bool, DynamicDumpSharedSpaces, false,                             \
+          "Dynamic archive")                                                \
                                                                             \
   product(bool, PrintSharedArchiveAndExit, false,                           \
           "Print shared archive file contents")                             \
@@ -2469,6 +2385,9 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
   product(ccstr, SharedArchiveFile, NULL,                                   \
           "Override the default location of the CDS archive file")          \
                                                                             \
+  product(ccstr, ArchiveClassesAtExit, NULL,                                \
+          "The path and name of the dynamic archive file")                  \
+                                                                            \
   product(ccstr, ExtraSharedClassListFile, NULL,                            \
           "Extra classlist for building the CDS archive file")              \
                                                                             \
@@ -2525,8 +2444,9 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
           "File of size Xmx is pre-allocated for performance reason, so"    \
           "we need that much space available")                              \
                                                                             \
-  develop(bool, VerifyMetaspace, false,                                     \
-          "Verify metaspace on chunk movements.")                           \
+  develop(int, VerifyMetaspaceInterval, DEBUG_ONLY(500) NOT_DEBUG(0),       \
+               "Run periodic metaspace verifications (0 - none, "           \
+               "1 - always, >1 every nth interval)")                        \
                                                                             \
   diagnostic(bool, ShowRegistersOnAssert, true,                             \
           "On internal errors, include registers in error report.")         \
@@ -2545,57 +2465,6 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
                                                                             \
   experimental(bool, UseFastUnorderedTimeStamps, false,                     \
           "Use platform unstable time where supported for timestamps only")
-
-#define VM_FLAGS(develop,                                                   \
-                 develop_pd,                                                \
-                 product,                                                   \
-                 product_pd,                                                \
-                 diagnostic,                                                \
-                 diagnostic_pd,                                             \
-                 experimental,                                              \
-                 notproduct,                                                \
-                 manageable,                                                \
-                 product_rw,                                                \
-                 lp64_product,                                              \
-                 range,                                                     \
-                 constraint,                                                \
-                 writeable)                                                 \
-                                                                            \
-  RUNTIME_FLAGS(                                                            \
-    develop,                                                                \
-    develop_pd,                                                             \
-    product,                                                                \
-    product_pd,                                                             \
-    diagnostic,                                                             \
-    diagnostic_pd,                                                          \
-    experimental,                                                           \
-    notproduct,                                                             \
-    manageable,                                                             \
-    product_rw,                                                             \
-    lp64_product,                                                           \
-    range,                                                                  \
-    constraint,                                                             \
-    writeable)                                                              \
-                                                                            \
-  GC_FLAGS(                                                                 \
-    develop,                                                                \
-    develop_pd,                                                             \
-    product,                                                                \
-    product_pd,                                                             \
-    diagnostic,                                                             \
-    diagnostic_pd,                                                          \
-    experimental,                                                           \
-    notproduct,                                                             \
-    manageable,                                                             \
-    product_rw,                                                             \
-    lp64_product,                                                           \
-    range,                                                                  \
-    constraint,                                                             \
-    writeable)                                                              \
-
-/*
- *  Macros for factoring of globals
- */
 
 // Interface macros
 #define DECLARE_PRODUCT_FLAG(type, name, value, doc)      extern "C" type name;
@@ -2621,70 +2490,20 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
 #define DECLARE_LP64_PRODUCT_FLAG(type, name, value, doc) const type name = value;
 #endif // _LP64
 
-// Implementation macros
-#define MATERIALIZE_PRODUCT_FLAG(type, name, value, doc)      type name = value;
-#define MATERIALIZE_PD_PRODUCT_FLAG(type, name, doc)          type name = pd_##name;
-#define MATERIALIZE_DIAGNOSTIC_FLAG(type, name, value, doc)   type name = value;
-#define MATERIALIZE_PD_DIAGNOSTIC_FLAG(type, name, doc)       type name = pd_##name;
-#define MATERIALIZE_EXPERIMENTAL_FLAG(type, name, value, doc) type name = value;
-#define MATERIALIZE_MANAGEABLE_FLAG(type, name, value, doc)   type name = value;
-#define MATERIALIZE_PRODUCT_RW_FLAG(type, name, value, doc)   type name = value;
-#ifdef PRODUCT
-#define MATERIALIZE_DEVELOPER_FLAG(type, name, value, doc)
-#define MATERIALIZE_PD_DEVELOPER_FLAG(type, name, doc)
-#define MATERIALIZE_NOTPRODUCT_FLAG(type, name, value, doc)
-#else
-#define MATERIALIZE_DEVELOPER_FLAG(type, name, value, doc)    type name = value;
-#define MATERIALIZE_PD_DEVELOPER_FLAG(type, name, doc)        type name = pd_##name;
-#define MATERIALIZE_NOTPRODUCT_FLAG(type, name, value, doc)   type name = value;
-#endif // PRODUCT
-#ifdef _LP64
-#define MATERIALIZE_LP64_PRODUCT_FLAG(type, name, value, doc) type name = value;
-#else
-#define MATERIALIZE_LP64_PRODUCT_FLAG(type, name, value, doc) /* flag is constant */
-#endif // _LP64
-
-// Only materialize src code for range checking when required, ignore otherwise
-#define IGNORE_RANGE(a, b)
-// Only materialize src code for contraint checking when required, ignore otherwise
-#define IGNORE_CONSTRAINT(func,type)
-
-#define IGNORE_WRITEABLE(type)
-
-VM_FLAGS(DECLARE_DEVELOPER_FLAG, \
-         DECLARE_PD_DEVELOPER_FLAG, \
-         DECLARE_PRODUCT_FLAG, \
-         DECLARE_PD_PRODUCT_FLAG, \
-         DECLARE_DIAGNOSTIC_FLAG, \
-         DECLARE_PD_DIAGNOSTIC_FLAG, \
-         DECLARE_EXPERIMENTAL_FLAG, \
-         DECLARE_NOTPRODUCT_FLAG, \
-         DECLARE_MANAGEABLE_FLAG, \
-         DECLARE_PRODUCT_RW_FLAG, \
-         DECLARE_LP64_PRODUCT_FLAG, \
-         IGNORE_RANGE, \
-         IGNORE_CONSTRAINT, \
-         IGNORE_WRITEABLE)
-
-RUNTIME_OS_FLAGS(DECLARE_DEVELOPER_FLAG, \
-                 DECLARE_PD_DEVELOPER_FLAG, \
-                 DECLARE_PRODUCT_FLAG, \
-                 DECLARE_PD_PRODUCT_FLAG, \
-                 DECLARE_DIAGNOSTIC_FLAG, \
-                 DECLARE_PD_DIAGNOSTIC_FLAG, \
-                 DECLARE_NOTPRODUCT_FLAG, \
-                 IGNORE_RANGE, \
-                 IGNORE_CONSTRAINT, \
-                 IGNORE_WRITEABLE)
-
-ARCH_FLAGS(DECLARE_DEVELOPER_FLAG, \
-           DECLARE_PRODUCT_FLAG, \
-           DECLARE_DIAGNOSTIC_FLAG, \
-           DECLARE_EXPERIMENTAL_FLAG, \
-           DECLARE_NOTPRODUCT_FLAG, \
-           IGNORE_RANGE, \
-           IGNORE_CONSTRAINT, \
-           IGNORE_WRITEABLE)
+ALL_FLAGS(DECLARE_DEVELOPER_FLAG,     \
+          DECLARE_PD_DEVELOPER_FLAG,  \
+          DECLARE_PRODUCT_FLAG,       \
+          DECLARE_PD_PRODUCT_FLAG,    \
+          DECLARE_DIAGNOSTIC_FLAG,    \
+          DECLARE_PD_DIAGNOSTIC_FLAG, \
+          DECLARE_EXPERIMENTAL_FLAG,  \
+          DECLARE_NOTPRODUCT_FLAG,    \
+          DECLARE_MANAGEABLE_FLAG,    \
+          DECLARE_PRODUCT_RW_FLAG,    \
+          DECLARE_LP64_PRODUCT_FLAG,  \
+          IGNORE_RANGE,               \
+          IGNORE_CONSTRAINT,          \
+          IGNORE_WRITEABLE)
 
 // Extensions
 

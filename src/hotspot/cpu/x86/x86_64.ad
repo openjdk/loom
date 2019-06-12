@@ -547,7 +547,7 @@ void emit_d32_reloc(CodeBuffer& cbuf, int d32, RelocationHolder const& rspec, in
   if (rspec.reloc()->type() == relocInfo::oop_type &&
       d32 != 0 && d32 != (intptr_t) Universe::non_oop_word()) {
     assert(Universe::heap()->is_in_reserved((address)(intptr_t)d32), "should be real oop");
-    assert(oopDesc::is_oop(cast_to_oop((intptr_t)d32)) && (ScavengeRootsInCode || !Universe::heap()->is_scavengable(cast_to_oop((intptr_t)d32))), "cannot embed scavengable oops in code");
+    assert(oopDesc::is_oop(cast_to_oop((intptr_t)d32)), "cannot embed broken oops in code");
   }
 #endif
   cbuf.relocate(cbuf.insts_mark(), rspec, format);
@@ -574,8 +574,7 @@ void emit_d64_reloc(CodeBuffer& cbuf, int64_t d64, RelocationHolder const& rspec
   if (rspec.reloc()->type() == relocInfo::oop_type &&
       d64 != 0 && d64 != (int64_t) Universe::non_oop_word()) {
     assert(Universe::heap()->is_in_reserved((address)d64), "should be real oop");
-    assert(oopDesc::is_oop(cast_to_oop(d64)) && (ScavengeRootsInCode || !Universe::heap()->is_scavengable(cast_to_oop(d64))),
-           "cannot embed scavengable oops in code");
+    assert(oopDesc::is_oop(cast_to_oop(d64)), "cannot embed broken oops in code");
   }
 #endif
   cbuf.relocate(cbuf.insts_mark(), rspec, format);
@@ -698,6 +697,87 @@ void emit_cmpfp3(MacroAssembler& _masm, Register dst) {
   __ bind(done);
 }
 
+// Math.min()    # Math.max()
+// --------------------------
+// ucomis[s/d]   #
+// ja   -> b     # a
+// jp   -> NaN   # NaN
+// jb   -> a     # b
+// je            #
+// |-jz -> a | b # a & b
+// |    -> a     #
+void emit_fp_min_max(MacroAssembler& _masm, XMMRegister dst,
+                     XMMRegister a, XMMRegister b,
+                     XMMRegister xmmt, Register rt,
+                     bool min, bool single) {
+
+  Label nan, zero, below, above, done;
+
+  if (single)
+    __ ucomiss(a, b);
+  else
+    __ ucomisd(a, b);
+
+  if (dst->encoding() != (min ? b : a)->encoding())
+    __ jccb(Assembler::above, above); // CF=0 & ZF=0
+  else
+    __ jccb(Assembler::above, done);
+
+  __ jccb(Assembler::parity, nan);  // PF=1
+  __ jccb(Assembler::below, below); // CF=1
+
+  // equal
+  __ vpxor(xmmt, xmmt, xmmt, Assembler::AVX_128bit);
+  if (single) {
+    __ ucomiss(a, xmmt);
+    __ jccb(Assembler::equal, zero);
+
+    __ movflt(dst, a);
+    __ jmp(done);
+  }
+  else {
+    __ ucomisd(a, xmmt);
+    __ jccb(Assembler::equal, zero);
+
+    __ movdbl(dst, a);
+    __ jmp(done);
+  }
+
+  __ bind(zero);
+  if (min)
+    __ vpor(dst, a, b, Assembler::AVX_128bit);
+  else
+    __ vpand(dst, a, b, Assembler::AVX_128bit);
+
+  __ jmp(done);
+
+  __ bind(above);
+  if (single)
+    __ movflt(dst, min ? b : a);
+  else
+    __ movdbl(dst, min ? b : a);
+
+  __ jmp(done);
+
+  __ bind(nan);
+  if (single) {
+    __ movl(rt, 0x7fc00000); // Float.NaN
+    __ movdl(dst, rt);
+  }
+  else {
+    __ mov64(rt, 0x7ff8000000000000L); // Double.NaN
+    __ movdq(dst, rt);
+  }
+  __ jmp(done);
+
+  __ bind(below);
+  if (single)
+    __ movflt(dst, min ? a : b);
+  else
+    __ movdbl(dst, min ? a : b);
+
+  __ bind(done);
+}
 
 //=============================================================================
 const RegMask& MachConstantBaseNode::_out_RegMask = RegMask::Empty;
@@ -794,6 +874,22 @@ void MachPrologNode::emit(CodeBuffer &cbuf, PhaseRegAlloc *ra_) const {
   int framesize = C->frame_size_in_bytes();
   int bangsize = C->bang_size_in_bytes();
 
+  if (C->clinit_barrier_on_entry()) {
+    assert(VM_Version::supports_fast_class_init_checks(), "sanity");
+    assert(C->method()->holder()->is_being_initialized() || C->method()->holder()->is_initialized(),
+           "initialization should have been started");
+
+    Label L_skip_barrier;
+    Register klass = rscratch1;
+
+    __ mov_metadata(klass, C->method()->holder()->constant_encoding());
+    __ clinit_barrier(klass, r15_thread, &L_skip_barrier /*L_fast_path*/);
+
+    __ jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub())); // slow path
+
+    __ bind(L_skip_barrier);
+  }
+
   __ verified_entry(framesize, C->need_stack_bang(bangsize)?bangsize:0, false, C->stub_function() != NULL);
 
   C->set_frame_complete(cbuf.insts_size());
@@ -838,19 +934,19 @@ void MachEpilogNode::format(PhaseRegAlloc* ra_, outputStream* st) const
     st->print("\t");
   }
 
-  st->print_cr("popq   rbp");
+  st->print_cr("popq    rbp");
   if (do_polling() && C->is_method_compilation()) {
     st->print("\t");
     if (SafepointMechanism::uses_thread_local_poll()) {
-      st->print_cr("movq   rscratch1, poll_offset[r15_thread] #polling_page_address\n\t"
-                   "testl  rax, [rscratch1]\t"
+      st->print_cr("movq    rscratch1, poll_offset[r15_thread] #polling_page_address\n\t"
+                   "testl   rax, [rscratch1]\t"
                    "# Safepoint: poll for GC");
     } else if (Assembler::is_polling_page_far()) {
-      st->print_cr("movq   rscratch1, #polling_page_address\n\t"
-                   "testl  rax, [rscratch1]\t"
+      st->print_cr("movq    rscratch1, #polling_page_address\n\t"
+                   "testl   rax, [rscratch1]\t"
                    "# Safepoint: poll for GC");
     } else {
-      st->print_cr("testl  rax, [rip + #offset_to_poll_page]\t"
+      st->print_cr("testl   rax, [rip + #offset_to_poll_page]\t"
                    "# Safepoint: poll for GC");
     }
   }
@@ -1582,7 +1678,7 @@ bool Matcher::const_klass_prefer_decode() {
   // TODO: Either support matching DecodeNKlass (heap-based) in operand
   //       or condisider the following:
   // Prefer ConNKlass+DecodeNKlass over ConP in simple compressed klass mode.
-  //return Universe::narrow_klass_base() == NULL;
+  //return CompressedKlassPointers::base() == NULL;
   return true;
 }
 
@@ -3548,6 +3644,15 @@ operand regF() %{
 %}
 
 // Float register operands
+operand legRegF() %{
+   constraint(ALLOC_IN_RC(float_reg_legacy));
+   match(RegF);
+
+   format %{ %}
+   interface(REG_INTER);
+%}
+
+// Float register operands
 operand vlRegF() %{
    constraint(ALLOC_IN_RC(float_reg_vl));
    match(RegF);
@@ -3559,6 +3664,15 @@ operand vlRegF() %{
 // Double register operands
 operand regD() %{
    constraint(ALLOC_IN_RC(double_reg));
+   match(RegD);
+
+   format %{ %}
+   interface(REG_INTER);
+%}
+
+// Double register operands
+operand legRegD() %{
+   constraint(ALLOC_IN_RC(double_reg_legacy));
    match(RegD);
 
    format %{ %}
@@ -3816,9 +3930,9 @@ operand indPosIndexScaleOffset(any_RegP reg, immL32 off, rRegI idx, immI2 scale)
 
 // Indirect Narrow Oop Plus Offset Operand
 // Note: x86 architecture doesn't support "scale * index + offset" without a base
-// we can't free r12 even with Universe::narrow_oop_base() == NULL.
+// we can't free r12 even with CompressedOops::base() == NULL.
 operand indCompressedOopOffset(rRegN reg, immL32 off) %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_shift() == Address::times_8));
+  predicate(UseCompressedOops && (CompressedOops::shift() == Address::times_8));
   constraint(ALLOC_IN_RC(ptr_reg));
   match(AddP (DecodeN reg) off);
 
@@ -3835,7 +3949,7 @@ operand indCompressedOopOffset(rRegN reg, immL32 off) %{
 // Indirect Memory Operand
 operand indirectNarrow(rRegN reg)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   constraint(ALLOC_IN_RC(ptr_reg));
   match(DecodeN reg);
 
@@ -3851,7 +3965,7 @@ operand indirectNarrow(rRegN reg)
 // Indirect Memory Plus Short Offset Operand
 operand indOffset8Narrow(rRegN reg, immL8 off)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   constraint(ALLOC_IN_RC(ptr_reg));
   match(AddP (DecodeN reg) off);
 
@@ -3867,7 +3981,7 @@ operand indOffset8Narrow(rRegN reg, immL8 off)
 // Indirect Memory Plus Long Offset Operand
 operand indOffset32Narrow(rRegN reg, immL32 off)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   constraint(ALLOC_IN_RC(ptr_reg));
   match(AddP (DecodeN reg) off);
 
@@ -3883,7 +3997,7 @@ operand indOffset32Narrow(rRegN reg, immL32 off)
 // Indirect Memory Plus Index Register Plus Offset Operand
 operand indIndexOffsetNarrow(rRegN reg, rRegL lreg, immL32 off)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   constraint(ALLOC_IN_RC(ptr_reg));
   match(AddP (AddP (DecodeN reg) lreg) off);
 
@@ -3900,7 +4014,7 @@ operand indIndexOffsetNarrow(rRegN reg, rRegL lreg, immL32 off)
 // Indirect Memory Plus Index Register Plus Offset Operand
 operand indIndexNarrow(rRegN reg, rRegL lreg)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   constraint(ALLOC_IN_RC(ptr_reg));
   match(AddP (DecodeN reg) lreg);
 
@@ -3917,7 +4031,7 @@ operand indIndexNarrow(rRegN reg, rRegL lreg)
 // Indirect Memory Times Scale Plus Index Register
 operand indIndexScaleNarrow(rRegN reg, rRegL lreg, immI2 scale)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   constraint(ALLOC_IN_RC(ptr_reg));
   match(AddP (DecodeN reg) (LShiftL lreg scale));
 
@@ -3934,7 +4048,7 @@ operand indIndexScaleNarrow(rRegN reg, rRegL lreg, immI2 scale)
 // Indirect Memory Times Scale Plus Index Register Plus Offset Operand
 operand indIndexScaleOffsetNarrow(rRegN reg, immL32 off, rRegL lreg, immI2 scale)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   constraint(ALLOC_IN_RC(ptr_reg));
   match(AddP (AddP (DecodeN reg) (LShiftL lreg scale)) off);
 
@@ -3952,7 +4066,7 @@ operand indIndexScaleOffsetNarrow(rRegN reg, immL32 off, rRegL lreg, immI2 scale
 operand indPosIndexOffsetNarrow(rRegN reg, immL32 off, rRegI idx)
 %{
   constraint(ALLOC_IN_RC(ptr_reg));
-  predicate(Universe::narrow_oop_shift() == 0 && n->in(2)->in(3)->as_Type()->type()->is_long()->_lo >= 0);
+  predicate(CompressedOops::shift() == 0 && n->in(2)->in(3)->as_Type()->type()->is_long()->_lo >= 0);
   match(AddP (AddP (DecodeN reg) (ConvI2L idx)) off);
 
   op_cost(10);
@@ -3969,7 +4083,7 @@ operand indPosIndexOffsetNarrow(rRegN reg, immL32 off, rRegI idx)
 operand indPosIndexScaleOffsetNarrow(rRegN reg, immL32 off, rRegI idx, immI2 scale)
 %{
   constraint(ALLOC_IN_RC(ptr_reg));
-  predicate(Universe::narrow_oop_shift() == 0 && n->in(2)->in(3)->in(1)->as_Type()->type()->is_long()->_lo >= 0);
+  predicate(CompressedOops::shift() == 0 && n->in(2)->in(3)->in(1)->as_Type()->type()->is_long()->_lo >= 0);
   match(AddP (AddP (DecodeN reg) (LShiftL (ConvI2L idx) scale)) off);
 
   op_cost(10);
@@ -5304,9 +5418,29 @@ instruct MoveF2VL(vlRegF dst, regF src) %{
 %}
 
 // Load Float
+instruct MoveF2LEG(legRegF dst, regF src) %{
+  match(Set dst src);
+  format %{ "movss $dst,$src\t# if src != dst load float (4 bytes)" %}
+  ins_encode %{
+    __ movflt($dst$$XMMRegister, $src$$XMMRegister);
+  %}
+  ins_pipe( fpu_reg_reg );
+%}
+
+// Load Float
 instruct MoveVL2F(regF dst, vlRegF src) %{
   match(Set dst src);
   format %{ "movss $dst,$src\t! load float (4 bytes)" %}
+  ins_encode %{
+    __ movflt($dst$$XMMRegister, $src$$XMMRegister);
+  %}
+  ins_pipe( fpu_reg_reg );
+%}
+
+// Load Float
+instruct MoveLEG2F(regF dst, legRegF src) %{
+  match(Set dst src);
+  format %{ "movss $dst,$src\t# if src != dst load float (4 bytes)" %}
   ins_encode %{
     __ movflt($dst$$XMMRegister, $src$$XMMRegister);
   %}
@@ -5351,6 +5485,16 @@ instruct MoveD2VL(vlRegD dst, regD src) %{
 %}
 
 // Load Double
+instruct MoveD2LEG(legRegD dst, regD src) %{
+  match(Set dst src);
+  format %{ "movsd $dst,$src\t# if src != dst load double (8 bytes)" %}
+  ins_encode %{
+    __ movdbl($dst$$XMMRegister, $src$$XMMRegister);
+  %}
+  ins_pipe( fpu_reg_reg );
+%}
+
+// Load Double
 instruct MoveVL2D(regD dst, vlRegD src) %{
   match(Set dst src);
   format %{ "movsd $dst,$src\t! load double (8 bytes)" %}
@@ -5358,6 +5502,167 @@ instruct MoveVL2D(regD dst, vlRegD src) %{
     __ movdbl($dst$$XMMRegister, $src$$XMMRegister);
   %}
   ins_pipe( fpu_reg_reg );
+%}
+
+// Load Double
+instruct MoveLEG2D(regD dst, legRegD src) %{
+  match(Set dst src);
+  format %{ "movsd $dst,$src\t# if src != dst load double (8 bytes)" %}
+  ins_encode %{
+    __ movdbl($dst$$XMMRegister, $src$$XMMRegister);
+  %}
+  ins_pipe( fpu_reg_reg );
+%}
+
+// Following pseudo code describes the algorithm for max[FD]:
+// Min algorithm is on similar lines
+//  btmp = (b < +0.0) ? a : b
+//  atmp = (b < +0.0) ? b : a
+//  Tmp  = Max_Float(atmp , btmp)
+//  Res  = (atmp == NaN) ? atmp : Tmp
+
+// max = java.lang.Math.max(float a, float b)
+instruct maxF_reg(legRegF dst, legRegF a, legRegF b, legRegF tmp, legRegF atmp, legRegF btmp) %{
+  predicate(UseAVX > 0 && !n->is_reduction());
+  match(Set dst (MaxF a b));
+  effect(USE a, USE b, TEMP tmp, TEMP atmp, TEMP btmp);
+  format %{
+     "blendvps         $btmp,$b,$a,$b           \n\t"
+     "blendvps         $atmp,$a,$b,$b           \n\t"
+     "vmaxss           $tmp,$atmp,$btmp         \n\t"
+     "cmpps.unordered  $btmp,$atmp,$atmp        \n\t"
+     "blendvps         $dst,$tmp,$atmp,$btmp    \n\t"
+  %}
+  ins_encode %{
+    int vector_len = Assembler::AVX_128bit;
+    __ blendvps($btmp$$XMMRegister, $b$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, vector_len);
+    __ blendvps($atmp$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, $b$$XMMRegister, vector_len);
+    __ vmaxss($tmp$$XMMRegister, $atmp$$XMMRegister, $btmp$$XMMRegister);
+    __ cmpps($btmp$$XMMRegister, $atmp$$XMMRegister, $atmp$$XMMRegister, Assembler::_false, vector_len);
+    __ blendvps($dst$$XMMRegister, $tmp$$XMMRegister, $atmp$$XMMRegister, $btmp$$XMMRegister, vector_len);
+ %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct maxF_reduction_reg(regF dst, regF a, regF b, regF xmmt, rRegI tmp, rFlagsReg cr) %{
+  predicate(UseAVX > 0 && n->is_reduction());
+  match(Set dst (MaxF a b));
+  effect(USE a, USE b, TEMP xmmt, TEMP tmp, KILL cr);
+
+  format %{ "$dst = max($a, $b)\t# intrinsic (float)" %}
+  ins_encode %{
+    emit_fp_min_max(_masm, $dst$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, $xmmt$$XMMRegister, $tmp$$Register,
+                    false /*min*/, true /*single*/);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+// max = java.lang.Math.max(double a, double b)
+instruct maxD_reg(legRegD dst, legRegD a, legRegD b, legRegD tmp, legRegD atmp, legRegD btmp) %{
+  predicate(UseAVX > 0 && !n->is_reduction());
+  match(Set dst (MaxD a b));
+  effect(USE a, USE b, TEMP atmp, TEMP btmp, TEMP tmp);
+  format %{
+     "blendvpd         $btmp,$b,$a,$b            \n\t"
+     "blendvpd         $atmp,$a,$b,$b            \n\t"
+     "vmaxsd           $tmp,$atmp,$btmp          \n\t"
+     "cmppd.unordered  $btmp,$atmp,$atmp         \n\t"
+     "blendvpd         $dst,$tmp,$atmp,$btmp     \n\t"
+  %}
+  ins_encode %{
+    int vector_len = Assembler::AVX_128bit;
+    __ blendvpd($btmp$$XMMRegister, $b$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, vector_len);
+    __ blendvpd($atmp$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, $b$$XMMRegister, vector_len);
+    __ vmaxsd($tmp$$XMMRegister, $atmp$$XMMRegister, $btmp$$XMMRegister);
+    __ cmppd($btmp$$XMMRegister, $atmp$$XMMRegister, $atmp$$XMMRegister, Assembler::_false, vector_len);
+    __ blendvpd($dst$$XMMRegister, $tmp$$XMMRegister, $atmp$$XMMRegister, $btmp$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct maxD_reduction_reg(regD dst, regD a, regD b, regD xmmt, rRegL tmp, rFlagsReg cr) %{
+  predicate(UseAVX > 0 && n->is_reduction());
+  match(Set dst (MaxD a b));
+  effect(USE a, USE b, TEMP xmmt, TEMP tmp, KILL cr);
+
+  format %{ "$dst = max($a, $b)\t# intrinsic (double)" %}
+  ins_encode %{
+    emit_fp_min_max(_masm, $dst$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, $xmmt$$XMMRegister, $tmp$$Register,
+                    false /*min*/, false /*single*/);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+// min = java.lang.Math.min(float a, float b)
+instruct minF_reg(legRegF dst, legRegF a, legRegF b, legRegF tmp, legRegF atmp, legRegF btmp) %{
+  predicate(UseAVX > 0 && !n->is_reduction());
+  match(Set dst (MinF a b));
+  effect(USE a, USE b, TEMP tmp, TEMP atmp, TEMP btmp);
+  format %{
+     "blendvps         $atmp,$a,$b,$a             \n\t"
+     "blendvps         $btmp,$b,$a,$a             \n\t"
+     "vminss           $tmp,$atmp,$btmp           \n\t"
+     "cmpps.unordered  $btmp,$atmp,$atmp          \n\t"
+     "blendvps         $dst,$tmp,$atmp,$btmp      \n\t"
+  %}
+  ins_encode %{
+    int vector_len = Assembler::AVX_128bit;
+    __ blendvps($atmp$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, $a$$XMMRegister, vector_len);
+    __ blendvps($btmp$$XMMRegister, $b$$XMMRegister, $a$$XMMRegister, $a$$XMMRegister, vector_len);
+    __ vminss($tmp$$XMMRegister, $atmp$$XMMRegister, $btmp$$XMMRegister);
+    __ cmpps($btmp$$XMMRegister, $atmp$$XMMRegister, $atmp$$XMMRegister, Assembler::_false, vector_len);
+    __ blendvps($dst$$XMMRegister, $tmp$$XMMRegister, $atmp$$XMMRegister, $btmp$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct minF_reduction_reg(regF dst, regF a, regF b, regF xmmt, rRegI tmp, rFlagsReg cr) %{
+  predicate(UseAVX > 0 && n->is_reduction());
+  match(Set dst (MinF a b));
+  effect(USE a, USE b, TEMP xmmt, TEMP tmp, KILL cr);
+
+  format %{ "$dst = min($a, $b)\t# intrinsic (float)" %}
+  ins_encode %{
+    emit_fp_min_max(_masm, $dst$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, $xmmt$$XMMRegister, $tmp$$Register,
+                    true /*min*/, true /*single*/);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+// min = java.lang.Math.min(double a, double b)
+instruct minD_reg(legRegD dst, legRegD a, legRegD b, legRegD tmp, legRegD atmp, legRegD btmp) %{
+  predicate(UseAVX > 0 && !n->is_reduction());
+  match(Set dst (MinD a b));
+  effect(USE a, USE b, TEMP tmp, TEMP atmp, TEMP btmp);
+  format %{
+     "blendvpd         $atmp,$a,$b,$a           \n\t"
+     "blendvpd         $btmp,$b,$a,$a           \n\t"
+     "vminsd           $tmp,$atmp,$btmp         \n\t"
+     "cmppd.unordered  $btmp,$atmp,$atmp        \n\t"
+     "blendvpd         $dst,$tmp,$atmp,$btmp    \n\t"
+  %}
+  ins_encode %{
+    int vector_len = Assembler::AVX_128bit;
+    __ blendvpd($atmp$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, $a$$XMMRegister, vector_len);
+    __ blendvpd($btmp$$XMMRegister, $b$$XMMRegister, $a$$XMMRegister, $a$$XMMRegister, vector_len);
+    __ vminsd($tmp$$XMMRegister, $atmp$$XMMRegister, $btmp$$XMMRegister);
+    __ cmppd($btmp$$XMMRegister, $atmp$$XMMRegister, $atmp$$XMMRegister, Assembler::_false, vector_len);
+    __ blendvpd($dst$$XMMRegister, $tmp$$XMMRegister, $atmp$$XMMRegister, $btmp$$XMMRegister, vector_len);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct minD_reduction_reg(regD dst, regD a, regD b, regD xmmt, rRegL tmp, rFlagsReg cr) %{
+  predicate(UseAVX > 0 && n->is_reduction());
+  match(Set dst (MinD a b));
+  effect(USE a, USE b, TEMP xmmt, TEMP tmp, KILL cr);
+
+  format %{ "$dst = min($a, $b)\t# intrinsic (double)" %}
+  ins_encode %{
+    emit_fp_min_max(_masm, $dst$$XMMRegister, $a$$XMMRegister, $b$$XMMRegister, $xmmt$$XMMRegister, $tmp$$Register,
+                    true /*min*/, false /*single*/);
+  %}
+  ins_pipe( pipe_slow );
 %}
 
 // Load Effective Address
@@ -5463,7 +5768,7 @@ instruct leaPPosIdxScaleOff(rRegP dst, indPosIndexScaleOffset mem)
 // Load Effective Address which uses Narrow (32-bits) oop
 instruct leaPCompressedOopOffset(rRegP dst, indCompressedOopOffset mem)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_shift() != 0));
+  predicate(UseCompressedOops && (CompressedOops::shift() != 0));
   match(Set dst mem);
 
   ins_cost(110);
@@ -5475,7 +5780,7 @@ instruct leaPCompressedOopOffset(rRegP dst, indCompressedOopOffset mem)
 
 instruct leaP8Narrow(rRegP dst, indOffset8Narrow mem)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   match(Set dst mem);
 
   ins_cost(110); // XXX
@@ -5487,7 +5792,7 @@ instruct leaP8Narrow(rRegP dst, indOffset8Narrow mem)
 
 instruct leaP32Narrow(rRegP dst, indOffset32Narrow mem)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   match(Set dst mem);
 
   ins_cost(110);
@@ -5499,7 +5804,7 @@ instruct leaP32Narrow(rRegP dst, indOffset32Narrow mem)
 
 instruct leaPIdxOffNarrow(rRegP dst, indIndexOffsetNarrow mem)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   match(Set dst mem);
 
   ins_cost(110);
@@ -5511,7 +5816,7 @@ instruct leaPIdxOffNarrow(rRegP dst, indIndexOffsetNarrow mem)
 
 instruct leaPIdxScaleNarrow(rRegP dst, indIndexScaleNarrow mem)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   match(Set dst mem);
 
   ins_cost(110);
@@ -5523,7 +5828,7 @@ instruct leaPIdxScaleNarrow(rRegP dst, indIndexScaleNarrow mem)
 
 instruct leaPIdxScaleOffNarrow(rRegP dst, indIndexScaleOffsetNarrow mem)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   match(Set dst mem);
 
   ins_cost(110);
@@ -5535,7 +5840,7 @@ instruct leaPIdxScaleOffNarrow(rRegP dst, indIndexScaleOffsetNarrow mem)
 
 instruct leaPPosIdxOffNarrow(rRegP dst, indPosIndexOffsetNarrow mem)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   match(Set dst mem);
 
   ins_cost(110);
@@ -5547,7 +5852,7 @@ instruct leaPPosIdxOffNarrow(rRegP dst, indPosIndexOffsetNarrow mem)
 
 instruct leaPPosIdxScaleOffNarrow(rRegP dst, indPosIndexScaleOffsetNarrow mem)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   match(Set dst mem);
 
   ins_cost(110);
@@ -5911,7 +6216,7 @@ instruct storeP(memory mem, any_RegP src)
 
 instruct storeImmP0(memory mem, immP0 zero)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_base() == NULL) && (Universe::narrow_klass_base() == NULL));
+  predicate(UseCompressedOops && (CompressedOops::base() == NULL) && (CompressedKlassPointers::base() == NULL));
   match(Set mem (StoreP mem zero));
 
   ins_cost(125); // XXX
@@ -5961,7 +6266,7 @@ instruct storeNKlass(memory mem, rRegN src)
 
 instruct storeImmN0(memory mem, immN0 zero)
 %{
-  predicate(Universe::narrow_oop_base() == NULL && Universe::narrow_klass_base() == NULL);
+  predicate(CompressedOops::base() == NULL && CompressedKlassPointers::base() == NULL);
   match(Set mem (StoreN mem zero));
 
   ins_cost(125); // XXX
@@ -6004,7 +6309,7 @@ instruct storeImmNKlass(memory mem, immNKlass src)
 // Store Integer Immediate
 instruct storeImmI0(memory mem, immI0 zero)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_base() == NULL) && (Universe::narrow_klass_base() == NULL));
+  predicate(UseCompressedOops && (CompressedOops::base() == NULL) && (CompressedKlassPointers::base() == NULL));
   match(Set mem (StoreI mem zero));
 
   ins_cost(125); // XXX
@@ -6029,7 +6334,7 @@ instruct storeImmI(memory mem, immI src)
 // Store Long Immediate
 instruct storeImmL0(memory mem, immL0 zero)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_base() == NULL) && (Universe::narrow_klass_base() == NULL));
+  predicate(UseCompressedOops && (CompressedOops::base() == NULL) && (CompressedKlassPointers::base() == NULL));
   match(Set mem (StoreL mem zero));
 
   ins_cost(125); // XXX
@@ -6054,7 +6359,7 @@ instruct storeImmL(memory mem, immL32 src)
 // Store Short/Char Immediate
 instruct storeImmC0(memory mem, immI0 zero)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_base() == NULL) && (Universe::narrow_klass_base() == NULL));
+  predicate(UseCompressedOops && (CompressedOops::base() == NULL) && (CompressedKlassPointers::base() == NULL));
   match(Set mem (StoreC mem zero));
 
   ins_cost(125); // XXX
@@ -6080,7 +6385,7 @@ instruct storeImmI16(memory mem, immI16 src)
 // Store Byte Immediate
 instruct storeImmB0(memory mem, immI0 zero)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_base() == NULL) && (Universe::narrow_klass_base() == NULL));
+  predicate(UseCompressedOops && (CompressedOops::base() == NULL) && (CompressedKlassPointers::base() == NULL));
   match(Set mem (StoreB mem zero));
 
   ins_cost(125); // XXX
@@ -6105,7 +6410,7 @@ instruct storeImmB(memory mem, immI8 src)
 // Store CMS card-mark Immediate
 instruct storeImmCM0_reg(memory mem, immI0 zero)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_base() == NULL) && (Universe::narrow_klass_base() == NULL));
+  predicate(UseCompressedOops && (CompressedOops::base() == NULL) && (CompressedKlassPointers::base() == NULL));
   match(Set mem (StoreCM mem zero));
 
   ins_cost(125); // XXX
@@ -6143,7 +6448,7 @@ instruct storeF(memory mem, regF src)
 // Store immediate Float value (it is faster than store from XMM register)
 instruct storeF0(memory mem, immF0 zero)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_base() == NULL) && (Universe::narrow_klass_base() == NULL));
+  predicate(UseCompressedOops && (CompressedOops::base() == NULL) && (CompressedKlassPointers::base() == NULL));
   match(Set mem (StoreF mem zero));
 
   ins_cost(25); // XXX
@@ -6181,7 +6486,7 @@ instruct storeD(memory mem, regD src)
 // Store immediate double 0.0 (it is faster than store from XMM register)
 instruct storeD0_imm(memory mem, immD0 src)
 %{
-  predicate(!UseCompressedOops || (Universe::narrow_oop_base() != NULL));
+  predicate(!UseCompressedOops || (CompressedOops::base() != NULL));
   match(Set mem (StoreD mem src));
 
   ins_cost(50);
@@ -6193,7 +6498,7 @@ instruct storeD0_imm(memory mem, immD0 src)
 
 instruct storeD0(memory mem, immD0 zero)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_base() == NULL) && (Universe::narrow_klass_base() == NULL));
+  predicate(UseCompressedOops && (CompressedOops::base() == NULL) && (CompressedKlassPointers::base() == NULL));
   match(Set mem (StoreD mem zero));
 
   ins_cost(25); // XXX
@@ -6630,7 +6935,7 @@ instruct convP2I(rRegI dst, rRegP src)
 // in case of 32bit oops (heap < 4Gb).
 instruct convN2I(rRegI dst, rRegN src)
 %{
-  predicate(Universe::narrow_oop_shift() == 0);
+  predicate(CompressedOops::shift() == 0);
   match(Set dst (ConvL2I (CastP2X (DecodeN src))));
 
   format %{ "movl    $dst, $src\t# compressed ptr -> int" %}
@@ -7890,6 +8195,52 @@ instruct xchgN( memory mem, rRegN newval) %{
     __ xchgl($newval$$Register, $mem$$Address);
   %}
   ins_pipe( pipe_cmpxchg );
+%}
+
+//----------Abs Instructions-------------------------------------------
+
+// Integer Absolute Instructions
+instruct absI_rReg(rRegI dst, rRegI src, rRegI tmp, rFlagsReg cr)
+%{
+  match(Set dst (AbsI src));
+  effect(TEMP dst, TEMP tmp, KILL cr);
+  format %{ "movl $tmp, $src\n\t"
+            "sarl $tmp, 31\n\t"
+            "movl $dst, $src\n\t"
+            "xorl $dst, $tmp\n\t"
+            "subl $dst, $tmp\n"
+          %}
+  ins_encode %{
+    __ movl($tmp$$Register, $src$$Register);
+    __ sarl($tmp$$Register, 31);
+    __ movl($dst$$Register, $src$$Register);
+    __ xorl($dst$$Register, $tmp$$Register);
+    __ subl($dst$$Register, $tmp$$Register);
+  %}
+
+  ins_pipe(ialu_reg_reg);
+%}
+
+// Long Absolute Instructions
+instruct absL_rReg(rRegL dst, rRegL src, rRegL tmp, rFlagsReg cr)
+%{
+  match(Set dst (AbsL src));
+  effect(TEMP dst, TEMP tmp, KILL cr);
+  format %{ "movq $tmp, $src\n\t"
+            "sarq $tmp, 63\n\t"
+            "movq $dst, $src\n\t"
+            "xorq $dst, $tmp\n\t"
+            "subq $dst, $tmp\n"
+          %}
+  ins_encode %{
+    __ movq($tmp$$Register, $src$$Register);
+    __ sarq($tmp$$Register, 63);
+    __ movq($dst$$Register, $src$$Register);
+    __ xorq($dst$$Register, $tmp$$Register);
+    __ subq($dst$$Register, $tmp$$Register);
+  %}
+
+  ins_pipe(ialu_reg_reg);
 %}
 
 //----------Subtraction Instructions-------------------------------------------
@@ -9968,10 +10319,10 @@ instruct cadd_cmpLTMask(rRegI p, rRegI q, rRegI y, rFlagsReg cr)
   match(Set p (AddI (AndI (CmpLTMask p q) y) (SubI p q)));
   effect(KILL cr);
   ins_cost(300);
-  format %{ "subl   $p,$q\t# cadd_cmpLTMask\n\t"
-            "jge    done\n\t"
-            "addl   $p,$y\n"
-            "done:  " %}
+  format %{ "subl    $p,$q\t# cadd_cmpLTMask\n\t"
+            "jge     done\n\t"
+            "addl    $p,$y\n"
+            "done:   " %}
   ins_encode %{
     Register Rp = $p$$Register;
     Register Rq = $q$$Register;
@@ -9993,10 +10344,10 @@ instruct and_cmpLTMask(rRegI p, rRegI q, rRegI y, rFlagsReg cr)
 
   ins_cost(300);
 
-  format %{ "cmpl     $p, $q\t# and_cmpLTMask\n\t"
-            "jlt      done\n\t"
-            "xorl     $y, $y\n"
-            "done:  " %}
+  format %{ "cmpl    $p, $q\t# and_cmpLTMask\n\t"
+            "jlt     done\n\t"
+            "xorl    $y, $y\n"
+            "done:   " %}
   ins_encode %{
     Register Rp = $p$$Register;
     Register Rq = $q$$Register;
@@ -11581,7 +11932,7 @@ instruct testU_reg(rFlagsRegU cr, rRegI src, immI0 zero)
 %{
   match(Set cr (CmpU src zero));
 
-  format %{ "testl  $src, $src\t# unsigned" %}
+  format %{ "testl   $src, $src\t# unsigned" %}
   opcode(0x85);
   ins_encode(REX_reg_reg(src, src), OpcP, reg_reg(src, src));
   ins_pipe(ialu_cr_reg_imm);
@@ -11650,7 +12001,7 @@ instruct testP_reg(rFlagsReg cr, rRegP src, immP0 zero)
 // any compare to a zero should be eq/neq.
 instruct testP_mem(rFlagsReg cr, memory op, immP0 zero)
 %{
-  predicate(!UseCompressedOops || (Universe::narrow_oop_base() != NULL));
+  predicate(!UseCompressedOops || (CompressedOops::base() != NULL));
   match(Set cr (CmpP (LoadP op) zero));
 
   ins_cost(500); // XXX
@@ -11663,7 +12014,7 @@ instruct testP_mem(rFlagsReg cr, memory op, immP0 zero)
 
 instruct testP_mem_reg0(rFlagsReg cr, memory mem, immP0 zero)
 %{
-  predicate(UseCompressedOops && (Universe::narrow_oop_base() == NULL) && (Universe::narrow_klass_base() == NULL));
+  predicate(UseCompressedOops && (CompressedOops::base() == NULL) && (CompressedKlassPointers::base() == NULL));
   match(Set cr (CmpP (LoadP mem) zero));
 
   format %{ "cmpq    R12, $mem\t# ptr (R12_heapbase==0)" %}
@@ -11745,7 +12096,7 @@ instruct testN_reg(rFlagsReg cr, rRegN src, immN0 zero) %{
 
 instruct testN_mem(rFlagsReg cr, memory mem, immN0 zero)
 %{
-  predicate(Universe::narrow_oop_base() != NULL);
+  predicate(CompressedOops::base() != NULL);
   match(Set cr (CmpN (LoadN mem) zero));
 
   ins_cost(500); // XXX
@@ -11758,7 +12109,7 @@ instruct testN_mem(rFlagsReg cr, memory mem, immN0 zero)
 
 instruct testN_mem_reg0(rFlagsReg cr, memory mem, immN0 zero)
 %{
-  predicate(Universe::narrow_oop_base() == NULL && (Universe::narrow_klass_base() == NULL));
+  predicate(CompressedOops::base() == NULL && (CompressedKlassPointers::base() == NULL));
   match(Set cr (CmpN (LoadN mem) zero));
 
   format %{ "cmpl    R12, $mem\t# compressed ptr (R12_heapbase==0)" %}
@@ -12124,7 +12475,7 @@ instruct jmpConU(cmpOpU cop, rFlagsRegU cmp, label labl) %{
   effect(USE labl);
 
   ins_cost(300);
-  format %{ "j$cop,u  $labl" %}
+  format %{ "j$cop,u   $labl" %}
   size(6);
   ins_encode %{
     Label* L = $labl$$label;
@@ -12138,7 +12489,7 @@ instruct jmpConUCF(cmpOpUCF cop, rFlagsRegUCF cmp, label labl) %{
   effect(USE labl);
 
   ins_cost(200);
-  format %{ "j$cop,u  $labl" %}
+  format %{ "j$cop,u   $labl" %}
   size(6);
   ins_encode %{
     Label* L = $labl$$label;
@@ -12154,10 +12505,10 @@ instruct jmpConUCF2(cmpOpUCF2 cop, rFlagsRegUCF cmp, label labl) %{
   ins_cost(200);
   format %{ $$template
     if ($cop$$cmpcode == Assembler::notEqual) {
-      $$emit$$"jp,u   $labl\n\t"
+      $$emit$$"jp,u    $labl\n\t"
       $$emit$$"j$cop,u   $labl"
     } else {
-      $$emit$$"jp,u   done\n\t"
+      $$emit$$"jp,u    done\n\t"
       $$emit$$"j$cop,u   $labl\n\t"
       $$emit$$"done:"
     }
@@ -12359,10 +12710,10 @@ instruct jmpConUCF2_short(cmpOpUCF2 cop, rFlagsRegUCF cmp, label labl) %{
   ins_cost(300);
   format %{ $$template
     if ($cop$$cmpcode == Assembler::notEqual) {
-      $$emit$$"jp,u,s   $labl\n\t"
-      $$emit$$"j$cop,u,s   $labl"
+      $$emit$$"jp,u,s  $labl\n\t"
+      $$emit$$"j$cop,u,s  $labl"
     } else {
-      $$emit$$"jp,u,s   done\n\t"
+      $$emit$$"jp,u,s  done\n\t"
       $$emit$$"j$cop,u,s  $labl\n\t"
       $$emit$$"done:"
     }
@@ -12438,7 +12789,7 @@ instruct safePoint_poll(rFlagsReg cr)
   match(SafePoint);
   effect(KILL cr);
 
-  format %{ "testl  rax, [rip + #offset_to_poll_page]\t"
+  format %{ "testl   rax, [rip + #offset_to_poll_page]\t"
             "# Safepoint: poll for GC" %}
   ins_cost(125);
   ins_encode %{
@@ -12454,7 +12805,7 @@ instruct safePoint_poll_far(rFlagsReg cr, rRegP poll)
   match(SafePoint poll);
   effect(KILL cr, USE poll);
 
-  format %{ "testl  rax, [$poll]\t"
+  format %{ "testl   rax, [$poll]\t"
             "# Safepoint: poll for GC" %}
   ins_cost(125);
   ins_encode %{
@@ -12470,7 +12821,7 @@ instruct safePoint_poll_tls(rFlagsReg cr, rRegP poll)
   match(SafePoint poll);
   effect(KILL cr, USE poll);
 
-  format %{ "testl  rax, [$poll]\t"
+  format %{ "testl   rax, [$poll]\t"
             "# Safepoint: poll for GC" %}
   ins_cost(125);
   size(4); /* setting an explicit size will cause debug builds to assert if size is incorrect */

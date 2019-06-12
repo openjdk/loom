@@ -48,6 +48,8 @@ import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Enter;
 import com.sun.tools.javac.comp.Env;
+import com.sun.tools.javac.comp.LambdaToMethod;
+import com.sun.tools.javac.jvm.ClassFile;
 import com.sun.tools.javac.util.*;
 
 import static com.sun.tools.javac.code.BoundKind.*;
@@ -2731,7 +2733,7 @@ public class Types {
      * signature</em> of the other.  This is <b>not</b> an equivalence
      * relation.
      *
-     * @jls section 8.4.2.
+     * @jls 8.4.2 Method Signature
      * @see #overrideEquivalent(Type t, Type s)
      * @param t first signature (possibly raw).
      * @param s second signature (could be subjected to erasure).
@@ -2750,7 +2752,7 @@ public class Types {
      * equivalence</em>.  This is the natural extension of
      * isSubSignature to an equivalence relation.
      *
-     * @jls section 8.4.2.
+     * @jls 8.4.2 Method Signature
      * @see #isSubSignature(Type t, Type s)
      * @param t a signature (possible raw, could be subjected to
      * erasure).
@@ -4212,7 +4214,7 @@ public class Types {
 
     /**
      * Return-Type-Substitutable.
-     * @jls section 8.4.5
+     * @jls 8.4.5 Method Result
      */
     public boolean returnTypeSubstitutable(Type r1, Type r2) {
         if (hasSameArgs(r1, r2))
@@ -5179,6 +5181,31 @@ public class Types {
             for (List<Type> ts = types; ts.nonEmpty(); ts = ts.tail) {
                 assembleSig(ts.head);
             }
+        }
+    }
+
+    public Type constantType(LoadableConstant c) {
+        switch (c.poolTag()) {
+            case ClassFile.CONSTANT_Class:
+                return syms.classType;
+            case ClassFile.CONSTANT_String:
+                return syms.stringType;
+            case ClassFile.CONSTANT_Integer:
+                return syms.intType;
+            case ClassFile.CONSTANT_Float:
+                return syms.floatType;
+            case ClassFile.CONSTANT_Long:
+                return syms.longType;
+            case ClassFile.CONSTANT_Double:
+                return syms.doubleType;
+            case ClassFile.CONSTANT_MethodHandle:
+                return syms.methodHandleType;
+            case ClassFile.CONSTANT_MethodType:
+                return syms.methodTypeType;
+            case ClassFile.CONSTANT_Dynamic:
+                return ((DynamicVarSymbol)c).type;
+            default:
+                throw new AssertionError("Not a loadable constant: " + c.poolTag());
         }
     }
     // </editor-fold>

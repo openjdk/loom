@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,6 +23,7 @@
 
 /**
  * @test
+ * @library /test/lib
  * @modules java.management java.base/java.io:+open java.base/java.net:+open
  * @run main/othervm -Djava.net.preferIPv4Stack=true UnreferencedMulticastSockets
  * @run main/othervm UnreferencedMulticastSockets
@@ -40,6 +41,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.DatagramSocketImpl;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
@@ -49,6 +51,8 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+
+import jdk.test.lib.net.IPSupport;
 
 import com.sun.management.UnixOperatingSystemMXBean;
 
@@ -70,7 +74,9 @@ public class UnreferencedMulticastSockets {
         MulticastSocket ss;
 
         Server() throws IOException {
-            ss = new MulticastSocket(0);
+            InetSocketAddress serverAddress =
+                new InetSocketAddress(InetAddress.getLoopbackAddress(), 0);
+            ss = new MulticastSocket(serverAddress);
             System.out.printf("  DatagramServer addr: %s: %d%n",
                     this.getHost(), this.getPort());
             pendingSockets.add(new NamedWeak(ss, pendingQueue, "serverMulticastSocket"));
@@ -78,7 +84,7 @@ public class UnreferencedMulticastSockets {
         }
 
         InetAddress getHost() throws UnknownHostException {
-            InetAddress localhost = InetAddress.getByName("localhost"); //.getLocalHost();
+            InetAddress localhost = InetAddress.getLoopbackAddress();
             return localhost;
         }
 
@@ -104,6 +110,7 @@ public class UnreferencedMulticastSockets {
     }
 
     public static void main(String args[]) throws Exception {
+        IPSupport.throwSkippedExceptionIfNonOperational();
 
         // Create and close a MulticastSocket to warm up the FD count for side effects.
         try (MulticastSocket s = new MulticastSocket(0)) {

@@ -25,7 +25,6 @@
 #ifndef SHARE_CLASSFILE_VMSYMBOLS_HPP
 #define SHARE_CLASSFILE_VMSYMBOLS_HPP
 
-#include "classfile/moduleEntry.hpp"
 #include "jfr/support/jfrIntrinsics.hpp"
 #include "jvmci/vmSymbols_jvmci.hpp"
 #include "memory/iterator.hpp"
@@ -52,7 +51,7 @@
 
 #define VM_SYMBOLS_DO(template, do_alias)                                                         \
   /* commonly used class, package, module names */                                                \
-  template(java_base,                                 JAVA_BASE_NAME)                             \
+  template(java_base,                                 "java.base")                                \
   template(java_lang_System,                          "java/lang/System")                         \
   template(java_lang_Object,                          "java/lang/Object")                         \
   template(java_lang_Class,                           "java/lang/Class")                          \
@@ -127,6 +126,7 @@
   template(getBootClassPathEntryForClass_name,        "getBootClassPathEntryForClass")            \
   template(jdk_internal_vm_PostVMInitHook,            "jdk/internal/vm/PostVMInitHook")           \
   template(sun_net_www_ParseUtil,                     "sun/net/www/ParseUtil")                    \
+  template(java_util_Iterator,                        "java/util/Iterator")                       \
                                                                                                   \
   template(jdk_internal_loader_ClassLoaders_AppClassLoader,      "jdk/internal/loader/ClassLoaders$AppClassLoader")      \
   template(jdk_internal_loader_ClassLoaders_PlatformClassLoader, "jdk/internal/loader/ClassLoaders$PlatformClassLoader") \
@@ -359,8 +359,7 @@
   template(destroyed_name,                            "destroyed")                                \
   template(nthreads_name,                             "nthreads")                                 \
   template(ngroups_name,                              "ngroups")                                  \
-  template(shutdown_method_name,                      "shutdown")                                 \
-  template(bootstrapFinished_method_name,             "bootstrapFinished")                        \
+  template(shutdown_name,                             "shutdown")                                 \
   template(finalize_method_name,                      "finalize")                                 \
   template(reference_lock_name,                       "lock")                                     \
   template(reference_discovered_name,                 "discovered")                               \
@@ -443,10 +442,19 @@
   template(getProtectionDomain_name,                  "getProtectionDomain")                      \
   template(getProtectionDomain_signature,             "(Ljava/security/CodeSource;)Ljava/security/ProtectionDomain;") \
   template(java_lang_Integer_array_signature,         "[Ljava/lang/Integer;")                     \
+  template(java_lang_Long_array_signature,            "[Ljava/lang/Long;")                        \
+  template(java_lang_Character_array_signature,       "[Ljava/lang/Character;")                   \
+  template(java_lang_Short_array_signature,           "[Ljava/lang/Short;")                       \
+  template(java_lang_Byte_array_signature,            "[Ljava/lang/Byte;")                        \
+  template(java_lang_Boolean_signature,               "Ljava/lang/Boolean;")                      \
   template(url_code_signer_array_void_signature,      "(Ljava/net/URL;[Ljava/security/CodeSigner;)V") \
   template(module_entry_name,                         "module_entry")                             \
   template(resolved_references_name,                  "<resolved_references>")                    \
   template(init_lock_name,                            "<init_lock>")                              \
+  template(address_size_name,                         "ADDRESS_SIZE0")                            \
+  template(page_size_name,                            "PAGE_SIZE")                                \
+  template(big_endian_name,                           "BIG_ENDIAN")                               \
+  template(use_unaligned_access_name,                 "UNALIGNED_ACCESS")                         \
                                                                                                   \
   /* name symbols needed by intrinsics */                                                         \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, template, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \
@@ -470,6 +478,7 @@
   template(float_int_signature,                       "(F)I")                                     \
   template(double_long_signature,                     "(D)J")                                     \
   template(double_double_signature,                   "(D)D")                                     \
+  template(float_float_signature,                     "(F)F")                                     \
   template(int_float_signature,                       "(I)F")                                     \
   template(long_int_signature,                        "(J)I")                                     \
   template(long_long_signature,                       "(J)J")                                     \
@@ -769,6 +778,9 @@
   do_name(fma_name, "fma")                                                                                              \
                                                                                                                         \
   do_intrinsic(_dabs,                     java_lang_Math,         abs_name,   double_double_signature,           F_S)   \
+  do_intrinsic(_fabs,                     java_lang_Math,         abs_name,   float_float_signature,           F_S)   \
+  do_intrinsic(_iabs,                     java_lang_Math,         abs_name,   int_int_signature,           F_S)   \
+  do_intrinsic(_labs,                     java_lang_Math,         abs_name,   long_long_signature,           F_S)   \
   do_intrinsic(_dsin,                     java_lang_Math,         sin_name,   double_double_signature,           F_S)   \
   do_intrinsic(_dcos,                     java_lang_Math,         cos_name,   double_double_signature,           F_S)   \
   do_intrinsic(_dtan,                     java_lang_Math,         tan_name,   double_double_signature,           F_S)   \
@@ -1070,6 +1082,9 @@
   do_intrinsic(_updateBytesAdler32,       java_util_zip_Adler32,  updateBytes_C_name,  updateBytes_signature,  F_SN)    \
   do_intrinsic(_updateByteBufferAdler32,  java_util_zip_Adler32,  updateByteBuffer_A_name,  updateByteBuffer_signature,  F_SN) \
    do_name(     updateByteBuffer_A_name,                          "updateByteBuffer")                                   \
+                                                                                                                        \
+  /* support for UnsafeConstants */                                                                                     \
+  do_class(jdk_internal_misc_UnsafeConstants,      "jdk/internal/misc/UnsafeConstants")                                 \
                                                                                                                         \
   /* support for Unsafe */                                                                                              \
   do_class(jdk_internal_misc_Unsafe,               "jdk/internal/misc/Unsafe")                                          \

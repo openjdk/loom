@@ -28,6 +28,7 @@
 #include "classfile/classFileStream.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/metadataOnStackMark.hpp"
+#include "classfile/symbolTable.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/verifier.hpp"
 #include "code/codeCache.hpp"
@@ -62,10 +63,11 @@ Method**  VM_RedefineClasses::_matching_old_methods = NULL;
 Method**  VM_RedefineClasses::_matching_new_methods = NULL;
 Method**  VM_RedefineClasses::_deleted_methods      = NULL;
 Method**  VM_RedefineClasses::_added_methods        = NULL;
-int         VM_RedefineClasses::_matching_methods_length = 0;
-int         VM_RedefineClasses::_deleted_methods_length  = 0;
-int         VM_RedefineClasses::_added_methods_length    = 0;
-Klass*      VM_RedefineClasses::_the_class = NULL;
+int       VM_RedefineClasses::_matching_methods_length = 0;
+int       VM_RedefineClasses::_deleted_methods_length  = 0;
+int       VM_RedefineClasses::_added_methods_length    = 0;
+bool      VM_RedefineClasses::_has_redefined_Object = false;
+bool      VM_RedefineClasses::_has_null_class_loader = false;
 
 
 VM_RedefineClasses::VM_RedefineClasses(jint class_count,
@@ -76,6 +78,9 @@ VM_RedefineClasses::VM_RedefineClasses(jint class_count,
   _class_load_kind = class_load_kind;
   _any_class_has_resolved_methods = false;
   _res = JVMTI_ERROR_NONE;
+  _the_class = NULL;
+  _has_redefined_Object = false;
+  _has_null_class_loader = false;
 }
 
 static inline InstanceKlass* get_ik(jclass def) {
@@ -86,14 +91,14 @@ static inline InstanceKlass* get_ik(jclass def) {
 // If any of the classes are being redefined, wait
 // Parallel constant pool merging leads to indeterminate constant pools.
 void VM_RedefineClasses::lock_classes() {
-  MutexLocker ml(RedefineClasses_lock);
+  MonitorLocker ml(RedefineClasses_lock);
   bool has_redefined;
   do {
     has_redefined = false;
     // Go through classes each time until none are being redefined.
     for (int i = 0; i < _class_count; i++) {
       if (get_ik(_class_defs[i].klass)->is_being_redefined()) {
-        RedefineClasses_lock->wait();
+        ml.wait();
         has_redefined = true;
         break;  // for loop
       }
@@ -102,17 +107,17 @@ void VM_RedefineClasses::lock_classes() {
   for (int i = 0; i < _class_count; i++) {
     get_ik(_class_defs[i].klass)->set_is_being_redefined(true);
   }
-  RedefineClasses_lock->notify_all();
+  ml.notify_all();
 }
 
 void VM_RedefineClasses::unlock_classes() {
-  MutexLocker ml(RedefineClasses_lock);
+  MonitorLocker ml(RedefineClasses_lock);
   for (int i = 0; i < _class_count; i++) {
     assert(get_ik(_class_defs[i].klass)->is_being_redefined(),
            "should be being redefined to get here");
     get_ik(_class_defs[i].klass)->set_is_being_redefined(false);
   }
-  RedefineClasses_lock->notify_all();
+  ml.notify_all();
 }
 
 bool VM_RedefineClasses::doit_prologue() {
@@ -203,7 +208,7 @@ void VM_RedefineClasses::doit() {
 
   // Mark methods seen on stack and everywhere else so old methods are not
   // cleaned up if they're on the stack.
-  MetadataOnStackMark md_on_stack(true);
+  MetadataOnStackMark md_on_stack(/*walk_all_metadata*/true, /*redefinition_walk*/true);
   HandleMark hm(thread);   // make sure any handles created are deleted
                            // before the stack walk again.
 
@@ -214,11 +219,12 @@ void VM_RedefineClasses::doit() {
   // Flush all compiled code that depends on the classes redefined.
   flush_dependent_code();
 
-  // Clean out MethodData pointing to old Method*
+  // Adjust constantpool caches and vtables for all classes
+  // that reference methods of the evolved classes.
   // Have to do this after all classes are redefined and all methods that
   // are redefined are marked as old.
-  MethodDataCleaner clean_weak_method_links;
-  ClassLoaderDataGraph::classes_do(&clean_weak_method_links);
+  AdjustAndCleanMetadata adjust_and_clean_metadata(thread);
+  ClassLoaderDataGraph::classes_do(&adjust_and_clean_metadata);
 
   // JSR-292 support
   if (_any_class_has_resolved_methods) {
@@ -782,6 +788,12 @@ static jvmtiError check_nest_attributes(InstanceKlass* the_class,
   return JVMTI_ERROR_NONE;
 }
 
+static bool can_add_or_delete(Method* m) {
+      // Compatibility mode
+  return (AllowRedefinitionToAddDeleteMethods &&
+          (m->is_private() && (m->is_static() || m->is_final())));
+}
+
 jvmtiError VM_RedefineClasses::compare_and_normalize_class_versions(
              InstanceKlass* the_class,
              InstanceKlass* scratch_class) {
@@ -987,12 +999,7 @@ jvmtiError VM_RedefineClasses::compare_and_normalize_class_versions(
       break;
     case added:
       // method added, see if it is OK
-      new_flags = (jushort) k_new_method->access_flags().get_flags();
-      if ((new_flags & JVM_ACC_PRIVATE) == 0
-           // hack: private should be treated as final, but alas
-          || (new_flags & (JVM_ACC_FINAL|JVM_ACC_STATIC)) == 0
-         ) {
-        // new methods must be private
+      if (!can_add_or_delete(k_new_method)) {
         return JVMTI_ERROR_UNSUPPORTED_REDEFINITION_METHOD_ADDED;
       }
       {
@@ -1021,12 +1028,7 @@ jvmtiError VM_RedefineClasses::compare_and_normalize_class_versions(
       break;
     case deleted:
       // method deleted, see if it is OK
-      old_flags = (jushort) k_old_method->access_flags().get_flags();
-      if ((old_flags & JVM_ACC_PRIVATE) == 0
-           // hack: private should be treated as final, but alas
-          || (old_flags & (JVM_ACC_FINAL|JVM_ACC_STATIC)) == 0
-         ) {
-        // deleted methods must be private
+      if (!can_add_or_delete(k_old_method)) {
         return JVMTI_ERROR_UNSUPPORTED_REDEFINITION_METHOD_DELETED;
       }
       log_trace(redefine, class, normalize)
@@ -3415,24 +3417,34 @@ void VM_RedefineClasses::set_new_constant_pool(
 // Unevolving classes may point to methods of the_class directly
 // from their constant pool caches, itables, and/or vtables. We
 // use the ClassLoaderDataGraph::classes_do() facility and this helper
-// to fix up these pointers.
+// to fix up these pointers.  MethodData also points to old methods and
+// must be cleaned.
 
 // Adjust cpools and vtables closure
-void VM_RedefineClasses::AdjustCpoolCacheAndVtable::do_klass(Klass* k) {
+void VM_RedefineClasses::AdjustAndCleanMetadata::do_klass(Klass* k) {
 
   // This is a very busy routine. We don't want too much tracing
   // printed out.
   bool trace_name_printed = false;
-  InstanceKlass *the_class = InstanceKlass::cast(_the_class);
 
   // If the class being redefined is java.lang.Object, we need to fix all
   // array class vtables also
-  if (k->is_array_klass() && _the_class == SystemDictionary::Object_klass()) {
-    k->vtable().adjust_method_entries(the_class, &trace_name_printed);
+  if (k->is_array_klass() && _has_redefined_Object) {
+    k->vtable().adjust_method_entries(&trace_name_printed);
 
   } else if (k->is_instance_klass()) {
     HandleMark hm(_thread);
     InstanceKlass *ik = InstanceKlass::cast(k);
+
+    // Clean MethodData of this class's methods so they don't refer to
+    // old methods that are no longer running.
+    Array<Method*>* methods = ik->methods();
+    int num_methods = methods->length();
+    for (int index = 0; index < num_methods; ++index) {
+      if (methods->at(index)->method_data() != NULL) {
+        methods->at(index)->method_data()->clean_weak_method_links();
+      }
+    }
 
     // HotSpot specific optimization! HotSpot does not currently
     // support delegation from the bootstrap class loader to a
@@ -3446,57 +3458,29 @@ void VM_RedefineClasses::AdjustCpoolCacheAndVtable::do_klass(Klass* k) {
     // If the current class being redefined has a user-defined class
     // loader as its defining class loader, then we can skip all
     // classes loaded by the bootstrap class loader.
-    bool is_user_defined = (_the_class->class_loader() != NULL);
-    if (is_user_defined && ik->class_loader() == NULL) {
+    if (!_has_null_class_loader && ik->class_loader() == NULL) {
       return;
     }
 
-    // Fix the vtable embedded in the_class and subclasses of the_class,
-    // if one exists. We discard scratch_class and we don't keep an
-    // InstanceKlass around to hold obsolete methods so we don't have
-    // any other InstanceKlass embedded vtables to update. The vtable
-    // holds the Method*s for virtual (but not final) methods.
-    // Default methods, or concrete methods in interfaces are stored
-    // in the vtable, so if an interface changes we need to check
-    // adjust_method_entries() for every InstanceKlass, which will also
-    // adjust the default method vtable indices.
-    // We also need to adjust any default method entries that are
-    // not yet in the vtable, because the vtable setup is in progress.
-    // This must be done after we adjust the default_methods and
-    // default_vtable_indices for methods already in the vtable.
-    // If redefining Unsafe, walk all the vtables looking for entries.
-    if (ik->vtable_length() > 0 && (_the_class->is_interface()
-        || _the_class == SystemDictionary::internal_Unsafe_klass()
-        || ik->is_subtype_of(_the_class))) {
-      // ik->vtable() creates a wrapper object; rm cleans it up
-      ResourceMark rm(_thread);
-
-      ik->vtable().adjust_method_entries(the_class, &trace_name_printed);
-      ik->adjust_default_methods(the_class, &trace_name_printed);
+    // Adjust all vtables, default methods and itables, to clean out old methods.
+    ResourceMark rm(_thread);
+    if (ik->vtable_length() > 0) {
+      ik->vtable().adjust_method_entries(&trace_name_printed);
+      ik->adjust_default_methods(&trace_name_printed);
     }
 
-    // If the current class has an itable and we are either redefining an
-    // interface or if the current class is a subclass of the_class, then
-    // we potentially have to fix the itable. If we are redefining an
-    // interface, then we have to call adjust_method_entries() for
-    // every InstanceKlass that has an itable since there isn't a
-    // subclass relationship between an interface and an InstanceKlass.
-    // If redefining Unsafe, walk all the itables looking for entries.
-    if (ik->itable_length() > 0 && (_the_class->is_interface()
-        || _the_class == SystemDictionary::internal_Unsafe_klass()
-        || ik->is_subclass_of(_the_class))) {
-      ResourceMark rm(_thread);
-      ik->itable().adjust_method_entries(the_class, &trace_name_printed);
+    if (ik->itable_length() > 0) {
+      ik->itable().adjust_method_entries(&trace_name_printed);
     }
 
     // The constant pools in other classes (other_cp) can refer to
-    // methods in the_class. We have to update method information in
+    // old methods.  We have to update method information in
     // other_cp's cache. If other_cp has a previous version, then we
     // have to repeat the process for each previous version. The
     // constant pool cache holds the Method*s for non-virtual
     // methods and for virtual, final methods.
     //
-    // Special case: if the current class is the_class, then new_cp
+    // Special case: if the current class being redefined, then new_cp
     // has already been attached to the_class and old_cp has already
     // been added as a previous version. The new_cp doesn't have any
     // cached references to old methods so it doesn't need to be
@@ -3505,12 +3489,12 @@ void VM_RedefineClasses::AdjustCpoolCacheAndVtable::do_klass(Klass* k) {
     constantPoolHandle other_cp;
     ConstantPoolCache* cp_cache;
 
-    if (ik != _the_class) {
+    if (!ik->is_being_redefined()) {
       // this klass' constant pool cache may need adjustment
       other_cp = constantPoolHandle(ik->constants());
       cp_cache = other_cp->cache();
       if (cp_cache != NULL) {
-        cp_cache->adjust_method_entries(the_class, &trace_name_printed);
+        cp_cache->adjust_method_entries(&trace_name_printed);
       }
     }
 
@@ -3520,23 +3504,7 @@ void VM_RedefineClasses::AdjustCpoolCacheAndVtable::do_klass(Klass* k) {
          pv_node = pv_node->previous_versions()) {
       cp_cache = pv_node->constants()->cache();
       if (cp_cache != NULL) {
-        cp_cache->adjust_method_entries(pv_node, &trace_name_printed);
-      }
-    }
-  }
-}
-
-// Clean method data for this class
-void VM_RedefineClasses::MethodDataCleaner::do_klass(Klass* k) {
-  if (k->is_instance_klass()) {
-    InstanceKlass *ik = InstanceKlass::cast(k);
-    // Clean MethodData of this class's methods so they don't refer to
-    // old methods that are no longer running.
-    Array<Method*>* methods = ik->methods();
-    int num_methods = methods->length();
-    for (int index = 0; index < num_methods; ++index) {
-      if (methods->at(index)->method_data() != NULL) {
-        methods->at(index)->method_data()->clean_weak_method_links();
+        cp_cache->adjust_method_entries(&trace_name_printed);
       }
     }
   }
@@ -3552,6 +3520,15 @@ void VM_RedefineClasses::update_jmethod_ids() {
       Method::change_method_associated_with_jmethod_id(jmid, new_method_h());
       assert(Method::resolve_jmethod_id(jmid) == _matching_new_methods[j],
              "should be replaced");
+    }
+  }
+  // Update deleted jmethodID
+  for (int j = 0; j < _deleted_methods_length; ++j) {
+    Method* old_method = _deleted_methods[j];
+    jmethodID jmid = old_method->find_jmethod_id_or_null();
+    if (jmid != NULL) {
+      // Change the jmethodID to point to NSME.
+      Method::change_method_associated_with_jmethod_id(jmid, Universe::throw_no_such_method_error());
     }
   }
 }
@@ -3862,7 +3839,7 @@ void VM_RedefineClasses::flush_dependent_code() {
   // This is the first redefinition, mark all the nmethods for deoptimization
   if (!JvmtiExport::all_dependencies_are_recorded()) {
     log_debug(redefine, class, nmethod)("Marked all nmethods for deopt");
-    CodeCache::mark_all_nmethods_for_deoptimization();
+    CodeCache::mark_all_nmethods_for_evol_deoptimization();
     deopt_needed = true;
   } else {
     int deopt = CodeCache::mark_dependents_for_evol_deoptimization();
@@ -3971,6 +3948,10 @@ void VM_RedefineClasses::redefine_single_class(jclass the_jclass,
   }
 
   InstanceKlass* the_class = get_ik(the_jclass);
+
+  // Set some flags to control and optimize adjusting method entries
+  _has_redefined_Object |= the_class == SystemDictionary::Object_klass();
+  _has_null_class_loader |= the_class->class_loader() == NULL;
 
   // Remove all breakpoints in methods of this class
   JvmtiBreakpoints& jvmti_breakpoints = JvmtiCurrentBreakpoints::get_jvmti_breakpoints();
@@ -4192,11 +4173,6 @@ void VM_RedefineClasses::redefine_single_class(jclass the_jclass,
   if (log_is_enabled(Info, redefine, class, timer)) {
     _timer_rsc_phase2.start();
   }
-
-  // Adjust constantpool caches and vtables for all classes
-  // that reference methods of the evolved class.
-  AdjustCpoolCacheAndVtable adjust_cpool_cache_and_vtable(THREAD);
-  ClassLoaderDataGraph::classes_do(&adjust_cpool_cache_and_vtable);
 
   if (the_class->oop_map_cache() != NULL) {
     // Flush references to any obsolete methods from the oop map cache

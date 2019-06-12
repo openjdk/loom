@@ -24,7 +24,7 @@
 /*
  * @test
  * @bug      4789689 4905985 4927164 4827184 4993906 5004549 7025314 7010344 8025633 8026567 8162363
- *           8175200 8186332 8182765 8196202 8187288 8173730
+ *           8175200 8186332 8182765 8196202 8187288 8173730 8215307
  * @summary  Run Javadoc on a set of source files that demonstrate new
  *           language features.  Check the output to ensure that the new
  *           language features are properly documented.
@@ -49,7 +49,6 @@ public class TestNewLanguageFeatures extends JavadocTester {
         javadoc("-Xdoclint:none",
                 "-d", "out",
                 "-use",
-                "--frames",
                 "-sourcepath", testSrc,
                 "pkg", "pkg1", "pkg2");
         checkExit(Exit.OK);
@@ -66,7 +65,7 @@ public class TestNewLanguageFeatures extends JavadocTester {
     void checkEnums() {
        checkOutput("pkg/Coin.html", true,
                 // Make sure enum header is correct.
-                "Enum Coin</h2>",
+                "Enum Coin</h1>",
                 // Make sure enum signature is correct.
                 "<pre>public enum "
                 + "<span class=\"typeNameLabel\">Coin</span>\n"
@@ -82,8 +81,10 @@ public class TestNewLanguageFeatures extends JavadocTester {
                 "Returns the enum constant of this type with the specified name",
                 "Overloaded valueOf() method has correct documentation.",
                 "Overloaded values method  has correct documentation.",
-                "<pre class=\"methodSignature\">public static&nbsp;<a href=\"Coin.html\" title=\"enum in pkg\">Coin</a>" +
-                "&nbsp;valueOf&#8203;(java.lang.String&nbsp;name)</pre>\n" +
+                "<div class=\"memberSignature\"><span class=\"modifiers\">public static</span>&nbsp;"
+                + "<span class=\"returnType\"><a href=\"Coin.html\" title=\"enum in pkg\">Coin</a></span>&nbsp;"
+                + "<span class=\"memberName\">valueOf</span>&#8203;("
+                + "<span class=\"arguments\">java.lang.String&nbsp;name)</span></div>\n" +
                 "<div class=\"block\">Returns the enum constant of this type with the specified name.\n" +
                 "The string must match <i>exactly</i> an identifier used to declare an\n" +
                 "enum constant in this type.  (Extraneous whitespace characters are \n" +
@@ -110,7 +111,7 @@ public class TestNewLanguageFeatures extends JavadocTester {
     void checkTypeParameters() {
         checkOutput("pkg/TypeParameters.html", true,
                 // Make sure the header is correct.
-                "Class TypeParameters&lt;E&gt;</h2>",
+                "Class TypeParameters&lt;E&gt;</h1>",
                 // Check class type parameters section.
                 "<dt><span class=\"paramLabel\">Type Parameters:</span></dt>\n"
                 + "<dd><code>E</code> - "
@@ -132,8 +133,11 @@ public class TestNewLanguageFeatures extends JavadocTester {
                 + "<dd><code>V</code> - This is the second type "
                 + "parameter.",
                 // Signature of method with type parameters
-                "public&nbsp;&lt;T extends java.util.List,&#8203;V&gt;&nbsp;"
-                + "java.lang.String[]&nbsp;methodThatHasTypeParameters",
+                "<div class=\"memberSignature\"><span class=\"modifiers\">public</span>&nbsp;"
+                + "<span class=\"typeParameters\">&lt;T extends java.util.List,&#8203;\nV&gt;</span>\n"
+                + "<span class=\"returnType\">java.lang.String[]</span>&nbsp;<span class=\"memberName\">"
+                + "methodThatHasTypeParameters</span>&#8203;(<span class=\"arguments\">T&nbsp;param1,\n"
+                + "V&nbsp;param2)</span></div>",
                 // Method that returns TypeParameters
                 "<td class=\"colFirst\"><code><a href=\"TypeParameters.html\" "
                 + "title=\"type parameter in TypeParameters\">E</a>[]</code></td>\n"
@@ -141,10 +145,11 @@ public class TestNewLanguageFeatures extends JavadocTester {
                 + "<a href=\"#methodThatReturnsTypeParameterA(E%5B%5D)\">"
                 + "methodThatReturnsTypeParameterA</a></span>&#8203;(<a href=\"TypeParameters.html\" "
                 + "title=\"type parameter in TypeParameters\">E</a>[]&nbsp;e)</code>",
-                "<pre class=\"methodSignature\">public&nbsp;<a href=\"TypeParameters.html\" "
-                + "title=\"type parameter in TypeParameters\">E</a>[]&nbsp;"
-                + "methodThatReturnsTypeParameterA&#8203;(<a href=\"TypeParameters.html\" "
-                + "title=\"type parameter in TypeParameters\">E</a>[]&nbsp;e)</pre>\n",
+                "<div class=\"memberSignature\"><span class=\"modifiers\">public</span>&nbsp;<span "
+                + "class=\"returnType\"><a href=\"TypeParameters.html\" title=\"type parameter in TypeParameters\">"
+                + "E</a>[]</span>&nbsp;<span class=\"memberName\">methodThatReturnsTypeParameterA</span>&#8203;("
+                + "<span class=\"arguments\"><a href=\"TypeParameters.html\" title=\"type parameter in TypeParameters\">"
+                + "E</a>[]&nbsp;e)</span></div>\n",
                 "<td class=\"colFirst\"><code>&lt;T extends java.lang.Object &amp; java.lang.Comparable&lt;? super T&gt;&gt;"
                 + "<br>T</code></td>\n"
                 + "<th class=\"colSecond\" scope=\"row\"><code><span class=\"memberNameLink\">"
@@ -211,7 +216,10 @@ public class TestNewLanguageFeatures extends JavadocTester {
         // Handle multiple bounds.
         //==============================================================
         checkOutput("pkg/MultiTypeParameters.html", true,
-                "public&nbsp;&lt;T extends java.lang.Number &amp; java.lang.Runnable&gt;&nbsp;T&nbsp;foo&#8203;(T&nbsp;t)");
+                "<div class=\"memberSignature\"><span class=\"modifiers\">public</span>&nbsp;"
+                + "<span class=\"typeParameters\">&lt;T extends java.lang.Number &amp; java.lang.Runnable&gt;</span>\n"
+                + "<span class=\"returnType\">T</span>&nbsp;<span class=\"memberName\">foo</span>&#8203;"
+                + "(<span class=\"arguments\">T&nbsp;t)</span></div>");
 
         //==============================================================
         // Test Class-Use Documentation for Type Parameters.
@@ -426,11 +434,13 @@ public class TestNewLanguageFeatures extends JavadocTester {
                 + "type <a href=\"../Foo4.html\" title=\"class in "
                 + "pkg2\">Foo4</a></span><span class=\"tabEnd\">&nbsp;"
                 + "</span></caption>\n"
+                + "<thead>\n"
                 + "<tr>\n"
                 + "<th class=\"colFirst\" scope=\"col\">Modifier and Type</th>\n"
                 + "<th class=\"colSecond\" scope=\"col\">Method</th>\n"
                 + "<th class=\"colLast\" scope=\"col\">Description</th>\n"
                 + "</tr>\n"
+                + "</thead>\n"
                 + "<tbody>\n"
                 + "<tr class=\"altColor\">\n"
                 + "<td class=\"colFirst\"><code>void</code></td>\n"
@@ -461,13 +471,6 @@ public class TestNewLanguageFeatures extends JavadocTester {
         checkOutput("index-all.html", true,
                 "<span class=\"memberNameLink\"><a href=\"pkg2/Foo.html#method(java.util.Vector)\">"
                 + "method(Vector&lt;Object&gt;)</a></span>"
-        );
-
-        // No type parameters in class frame.
-        checkOutput("allclasses-frame.html", false,
-                "<a href=\"../pkg/TypeParameters.html\" title=\"class in pkg\">"
-                + "TypeParameters</a>&lt;<a href=\"../pkg/TypeParameters.html\" "
-                + "title=\"type parameter in TypeParameters\">E</a>&gt;"
         );
 
     }
@@ -537,45 +540,42 @@ public class TestNewLanguageFeatures extends JavadocTester {
                 + "AnnotationTypeUsage</span>\n"
                 + "extends java.lang.Object</pre>",
                 // FIELD
-                "<pre><a href=\"AnnotationType.html\" "
-                + "title=\"annotation in pkg\">@AnnotationType</a>("
-                + "<a href=\"AnnotationType.html#optional()\">optional</a>"
-                + "=\"Field Annotation\",\n"
-                + "                <a href=\"AnnotationType.html#required()\">"
-                + "required</a>=1994)\n"
-                + "public&nbsp;int field</pre>",
+                "<div class=\"memberSignature\"><span class=\"annotations\"><a href=\"AnnotationType.html\" "
+                + "title=\"annotation in pkg\">@AnnotationType</a>(<a href=\"AnnotationType.html#optional()\">"
+                + "optional</a>=\"Field Annotation\",\n"
+                + "                <a href=\"AnnotationType.html#required()\">required</a>=1994)\n"
+                + "</span><span class=\"modifiers\">public</span>&nbsp;<span class=\"returnType\">int</span>"
+                + "&nbsp;<span class=\"memberName\">field</span></div>",
                 // CONSTRUCTOR
-                "<pre><a href=\"AnnotationType.html\" "
-                + "title=\"annotation in pkg\">@AnnotationType</a>("
-                + "<a href=\"AnnotationType.html#optional()\">optional</a>"
-                + "=\"Constructor Annotation\",\n"
-                + "                <a href=\"AnnotationType.html#required()\">"
-                + "required</a>=1994)\n"
-                + "public&nbsp;AnnotationTypeUsage()</pre>",
+                "<div class=\"memberSignature\"><span class=\"annotations\"><a href=\"AnnotationType.html\" "
+                + "title=\"annotation in pkg\">@AnnotationType</a>(<a href=\"AnnotationType.html#optional()\">"
+                + "optional</a>=\"Constructor Annotation\",\n"
+                + "                <a href=\"AnnotationType.html#required()\">required</a>=1994)\n"
+                + "</span><span class=\"modifiers\">public</span>&nbsp;"
+                + "<span class=\"memberName\">AnnotationTypeUsage</span>()</div>",
                 // METHOD
-                "<pre class=\"methodSignature\"><a href=\"AnnotationType.html\" "
-                + "title=\"annotation in pkg\">@AnnotationType</a>("
-                + "<a href=\"AnnotationType.html#optional()\">optional</a>"
-                + "=\"Method Annotation\",\n"
-                + "                <a href=\"AnnotationType.html#required()\">"
-                + "required</a>=1994)\n"
-                + "public&nbsp;void&nbsp;method()</pre>",
+                "<div class=\"memberSignature\"><span class=\"annotations\"><a href=\"AnnotationType.html\" "
+                + "title=\"annotation in pkg\">@AnnotationType</a>(<a href=\"AnnotationType.html#optional()\">"
+                + "optional</a>=\"Method Annotation\",\n"
+                + "                <a href=\"AnnotationType.html#required()\">required</a>=1994)\n"
+                + "</span><span class=\"modifiers\">public</span>&nbsp;<span class=\"returnType\">"
+                + "void</span>&nbsp;<span class=\"memberName\">method</span>()</div>",
                 // METHOD PARAMS
-                "<pre class=\"methodSignature\">public&nbsp;void&nbsp;methodWithParams&#8203;("
-                + "<a href=\"AnnotationType.html\" title=\"annotation in pkg\">"
-                + "@AnnotationType</a>(<a href=\"AnnotationType.html#optional()\">"
-                + "optional</a>=\"Parameter Annotation\",<a "
-                + "href=\"AnnotationType.html#required()\">required</a>=1994)\n"
-                + "                             int&nbsp;documented,\n"
-                + "                             int&nbsp;undocmented)</pre>",
+                "<div class=\"memberSignature\"><span class=\"modifiers\">public</span>&nbsp;<span "
+                + "class=\"returnType\">void</span>&nbsp;<span class=\"memberName\">methodWithParams</span>"
+                + "&#8203;(<span class=\"arguments\"><a href=\"AnnotationType.html\" title=\"annotation in pkg\">"
+                + "@AnnotationType</a>(<a href=\"AnnotationType.html#optional()\">optional</a>"
+                + "=\"Parameter Annotation\",<a href=\"AnnotationType.html#required()\">required</a>=1994)\n"
+                + "int&nbsp;documented,\n"
+                + "int&nbsp;undocmented)</span></div>",
                 // CONSTRUCTOR PARAMS
-                "<pre>public&nbsp;AnnotationTypeUsage&#8203;(<a "
-                + "href=\"AnnotationType.html\" title=\"annotation in pkg\">"
-                + "@AnnotationType</a>(<a href=\"AnnotationType.html#optional()\">"
-                + "optional</a>=\"Constructor Param Annotation\",<a "
-                + "href=\"AnnotationType.html#required()\">required</a>=1994)\n"
-                + "                           int&nbsp;documented,\n"
-                + "                           int&nbsp;undocmented)</pre>");
+                "<div class=\"memberSignature\"><span class=\"modifiers\">public</span>&nbsp;"
+                + "<span class=\"memberName\">AnnotationTypeUsage</span>&#8203;(<span class=\"arguments\">"
+                + "<a href=\"AnnotationType.html\" title=\"annotation in pkg\">@AnnotationType</a>("
+                + "<a href=\"AnnotationType.html#optional()\">optional</a>=\"Constructor Param Annotation\","
+                + "<a href=\"AnnotationType.html#required()\">required</a>=1994)\n"
+                + "int&nbsp;documented,\n"
+                + "int&nbsp;undocmented)</span></div>");
 
         //=================================
         // Annotatation Type Usage

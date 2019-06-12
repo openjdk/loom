@@ -29,6 +29,7 @@
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
 #include "memory/resourceArea.hpp"
+#include "memory/universe.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/init.hpp"
@@ -131,15 +132,17 @@ void Exceptions::_throw_oop(Thread* thread, const char* file, int line, oop exce
 }
 
 void Exceptions::_throw(Thread* thread, const char* file, int line, Handle h_exception, const char* message) {
-  ResourceMark rm;
+  ResourceMark rm(thread);
   assert(h_exception() != NULL, "exception should not be NULL");
 
   // tracing (do this up front - so it works during boot strapping)
+  // Note, the print_value_string() argument is not called unless logging is enabled!
   log_info(exceptions)("Exception <%s%s%s> (" INTPTR_FORMAT ") \n"
                        "thrown [%s, line %d]\nfor thread " INTPTR_FORMAT,
                        h_exception->print_value_string(),
                        message ? ": " : "", message ? message : "",
                        p2i(h_exception()), file, line, p2i(thread));
+
   // for AbortVMOnException flag
   Exceptions::debug_check_abort(h_exception, message);
 
@@ -162,11 +165,7 @@ void Exceptions::_throw(Thread* thread, const char* file, int line, Handle h_exc
   thread->set_pending_exception(h_exception(), file, line);
 
   // vm log
-  if (LogEvents){
-    Events::log_exception(thread, "Exception <%s%s%s> (" INTPTR_FORMAT ") thrown at [%s, line %d]",
-                          h_exception->print_value_string(), message ? ": " : "", message ? message : "",
-                          p2i(h_exception()), file, line);
-  }
+  Events::log_exception(thread, h_exception, message, file, line);
 }
 
 
@@ -527,17 +526,17 @@ void Exceptions::debug_check_abort_helper(Handle exception, const char* message)
 }
 
 // for logging exceptions
-void Exceptions::log_exception(Handle exception, stringStream tempst) {
+void Exceptions::log_exception(Handle exception, const char* message) {
   ResourceMark rm;
-  Symbol* message = java_lang_Throwable::detail_message(exception());
-  if (message != NULL) {
+  Symbol* detail_message = java_lang_Throwable::detail_message(exception());
+  if (detail_message != NULL) {
     log_info(exceptions)("Exception <%s: %s>\n thrown in %s",
                          exception->print_value_string(),
-                         message->as_C_string(),
-                         tempst.as_string());
+                         detail_message->as_C_string(),
+                         message);
   } else {
     log_info(exceptions)("Exception <%s>\n thrown in %s",
                          exception->print_value_string(),
-                         tempst.as_string());
+                         message);
   }
 }

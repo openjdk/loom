@@ -34,6 +34,7 @@
 #include "c1/c1_ValueStack.hpp"
 #include "ci/ciArrayKlass.hpp"
 #include "ci/ciInstance.hpp"
+#include "code/compiledIC.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/cardTableBarrierSet.hpp"
 #include "gc/shared/collectedHeap.hpp"
@@ -315,6 +316,9 @@ int LIR_Assembler::check_icache() {
   return start_offset;
 }
 
+void LIR_Assembler::clinit_barrier(ciMethod* method) {
+  ShouldNotReachHere(); // not implemented
+}
 
 void LIR_Assembler::jobject2reg(jobject o, Register reg) {
   if (o == NULL) {
@@ -2063,11 +2067,10 @@ void LIR_Assembler::emit_static_call_stub() {
   int start = __ offset();
 
   __ relocate(static_stub_Relocation::spec(call_pc));
-  __ mov_metadata(rmethod, (Metadata*)NULL);
-  __ movptr(rscratch1, 0);
-  __ br(rscratch1);
+  __ emit_static_call_stub();
 
-  assert(__ offset() - start <= call_stub_size(), "stub too big");
+  assert(__ offset() - start + CompiledStaticCall::to_trampoline_stub_size()
+        <= call_stub_size(), "stub too big");
   __ end_a_stub();
 }
 
@@ -2268,7 +2271,7 @@ void LIR_Assembler::emit_arraycopy(LIR_OpArrayCopy* op) {
     __ ldr(src,              Address(sp, 4*BytesPerWord));
 
     // r0 is -1^K where K == partial copied count
-    __ eonw(rscratch1, r0, 0);
+    __ eonw(rscratch1, r0, zr);
     // adjust length down and src/end pos up by partial copied count
     __ subw(length, length, rscratch1);
     __ addw(src_pos, src_pos, rscratch1);

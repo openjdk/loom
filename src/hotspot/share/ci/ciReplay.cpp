@@ -29,6 +29,7 @@
 #include "ci/ciSymbol.hpp"
 #include "ci/ciKlass.hpp"
 #include "ci/ciUtilities.inline.hpp"
+#include "classfile/symbolTable.hpp"
 #include "compiler/compileBroker.hpp"
 #include "memory/allocation.inline.hpp"
 #include "memory/oopFactory.hpp"
@@ -40,6 +41,7 @@
 #include "runtime/handles.inline.hpp"
 #include "utilities/copy.hpp"
 #include "utilities/macros.hpp"
+#include "utilities/utf8.hpp"
 
 #ifndef PRODUCT
 
@@ -274,15 +276,42 @@ class CompileReplay : public StackObj {
   // Parse a sequence of raw data encoded as bytes and return the
   // resulting data.
   char* parse_data(const char* tag, int& length) {
-    if (!parse_tag_and_count(tag, length)) {
+    int read_size = 0;
+    if (!parse_tag_and_count(tag, read_size)) {
       return NULL;
     }
 
-    char * result = NEW_RESOURCE_ARRAY(char, length);
-    for (int i = 0; i < length; i++) {
+    int actual_size = sizeof(MethodData);
+    char *result = NEW_RESOURCE_ARRAY(char, actual_size);
+    int i = 0;
+    if (read_size != actual_size) {
+      tty->print_cr("Warning: ciMethodData parsing sees MethodData size %i in file, current is %i", read_size,
+                    actual_size);
+      // Replay serializes the entire MethodData, but the data is at the end.
+      // If the MethodData instance size has changed, we can pad or truncate in the beginning
+      int padding = actual_size - read_size;
+      if (padding > 0) {
+        // pad missing data with zeros
+        tty->print_cr("- Padding MethodData");
+        for (; i < padding; i++) {
+          result[i] = 0;
+        }
+      } else if (padding < 0) {
+        // drop some data
+        tty->print_cr("- Truncating MethodData");
+        for (int j = 0; j < -padding; j++) {
+          int val = parse_int("data");
+          // discard val
+        }
+      }
+    }
+
+    assert(i < actual_size, "At least some data must remain to be copied");
+    for (; i < actual_size; i++) {
       int val = parse_int("data");
       result[i] = val;
     }
+    length = actual_size;
     return result;
   }
 
@@ -307,7 +336,7 @@ class CompileReplay : public StackObj {
   Symbol* parse_symbol(TRAPS) {
     const char* str = parse_escaped_string();
     if (str != NULL) {
-      Symbol* sym = SymbolTable::lookup(str, (int)strlen(str), CHECK_NULL);
+      Symbol* sym = SymbolTable::new_symbol(str);
       return sym;
     }
     return NULL;
@@ -316,7 +345,7 @@ class CompileReplay : public StackObj {
   // Parse a valid klass name and look it up
   Klass* parse_klass(TRAPS) {
     const char* str = parse_escaped_string();
-    Symbol* klass_name = SymbolTable::lookup(str, (int)strlen(str), CHECK_NULL);
+    Symbol* klass_name = SymbolTable::new_symbol(str);
     if (klass_name != NULL) {
       Klass* k = NULL;
       if (_iklass != NULL) {
@@ -342,7 +371,7 @@ class CompileReplay : public StackObj {
 
   // Lookup a klass
   Klass* resolve_klass(const char* klass, TRAPS) {
-    Symbol* klass_name = SymbolTable::lookup(klass, (int)strlen(klass), CHECK_NULL);
+    Symbol* klass_name = SymbolTable::new_symbol(klass);
     return SystemDictionary::resolve_or_fail(klass_name, _loader, _protection_domain, true, THREAD);
   }
 
@@ -503,7 +532,11 @@ class CompileReplay : public StackObj {
     // old version w/o comp_level
     if (had_error() && (error_message() == comp_level_label)) {
       // use highest available tier
-      comp_level = TieredCompilation ? TieredStopAtLevel : CompLevel_highest_tier;
+      if (TieredCompilation) {
+        comp_level = TieredStopAtLevel;
+      } else {
+        comp_level = CompLevel_highest_tier;
+      }
     }
     if (!is_valid_comp_level(comp_level)) {
       return;
@@ -771,8 +804,8 @@ class CompileReplay : public StackObj {
     const char* field_name = parse_escaped_string();
     const char* field_signature = parse_string();
     fieldDescriptor fd;
-    Symbol* name = SymbolTable::lookup(field_name, (int)strlen(field_name), CHECK);
-    Symbol* sig = SymbolTable::lookup(field_signature, (int)strlen(field_signature), CHECK);
+    Symbol* name = SymbolTable::new_symbol(field_name);
+    Symbol* sig = SymbolTable::new_symbol(field_signature);
     if (!k->find_local_field(name, sig, &fd) ||
         !fd.is_static() ||
         fd.has_initial_value()) {

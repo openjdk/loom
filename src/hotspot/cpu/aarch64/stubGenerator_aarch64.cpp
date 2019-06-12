@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, 2015, Red Hat Inc. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2019, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,6 +29,7 @@
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetAssembler.hpp"
 #include "interpreter/interpreter.hpp"
+#include "memory/universe.hpp"
 #include "nativeInst_aarch64.hpp"
 #include "oops/instanceOop.hpp"
 #include "oops/method.hpp"
@@ -1363,7 +1364,7 @@ class StubGenerator: public StubCodeGenerator {
     }
 
     BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
-    bs->arraycopy_prologue(_masm, decorators, is_oop, d, count, saved_reg);
+    bs->arraycopy_prologue(_masm, decorators, is_oop, s, d, count, saved_reg);
 
     if (is_oop) {
       // save regs before copy_memory
@@ -1375,8 +1376,6 @@ class StubGenerator: public StubCodeGenerator {
       __ pop(RegSet::of(d, count), sp);
       if (VerifyOops)
         verify_oop_array(size, d, count, r16);
-      __ sub(count, count, 1); // make an inclusive end pointer
-      __ lea(count, Address(d, count, Address::lsl(exact_log2(size))));
     }
 
     bs->arraycopy_epilogue(_masm, decorators, is_oop, d, count, rscratch1, RegSet());
@@ -1437,7 +1436,7 @@ class StubGenerator: public StubCodeGenerator {
     }
 
     BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
-    bs->arraycopy_prologue(_masm, decorators, is_oop, d, count, saved_regs);
+    bs->arraycopy_prologue(_masm, decorators, is_oop, s, d, count, saved_regs);
 
     if (is_oop) {
       // save regs before copy_memory
@@ -1448,8 +1447,6 @@ class StubGenerator: public StubCodeGenerator {
       __ pop(RegSet::of(d, count), sp);
       if (VerifyOops)
         verify_oop_array(size, d, count, r16);
-      __ sub(count, count, 1); // make an inclusive end pointer
-      __ lea(count, Address(d, count, Address::lsl(exact_log2(size))));
     }
     bs->arraycopy_epilogue(_masm, decorators, is_oop, d, count, rscratch1, RegSet());
     __ leave();
@@ -1792,14 +1789,14 @@ class StubGenerator: public StubCodeGenerator {
     }
 #endif //ASSERT
 
-    DecoratorSet decorators = IN_HEAP | IS_ARRAY | ARRAYCOPY_CHECKCAST;
+    DecoratorSet decorators = IN_HEAP | IS_ARRAY | ARRAYCOPY_CHECKCAST | ARRAYCOPY_DISJOINT;
     bool is_oop = true;
     if (dest_uninitialized) {
       decorators |= IS_DEST_UNINITIALIZED;
     }
 
     BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
-    bs->arraycopy_prologue(_masm, decorators, is_oop, to, count, wb_pre_saved_regs);
+    bs->arraycopy_prologue(_masm, decorators, is_oop, from, to, count, wb_pre_saved_regs);
 
     // save the original count
     __ mov(count_save, count);
@@ -1842,8 +1839,7 @@ class StubGenerator: public StubCodeGenerator {
     __ br(Assembler::EQ, L_done_pop);
 
     __ BIND(L_do_card_marks);
-    __ add(to, to, -heapOopSize);         // make an inclusive end pointer
-    bs->arraycopy_epilogue(_masm, decorators, is_oop, start_to, to, rscratch1, wb_post_saved_regs);
+    bs->arraycopy_epilogue(_masm, decorators, is_oop, start_to, count_save, rscratch1, wb_post_saved_regs);
 
     __ bind(L_done_pop);
     __ pop(RegSet::of(r18, r19, r20, r21), sp);
@@ -3257,11 +3253,14 @@ class StubGenerator: public StubCodeGenerator {
     Register buff   = c_rarg1;
     Register len    = c_rarg2;
     Register nmax  = r4;
-    Register base = r5;
+    Register base  = r5;
     Register count = r6;
     Register temp0 = rscratch1;
     Register temp1 = rscratch2;
-    Register temp2 = r7;
+    FloatRegister vbytes = v0;
+    FloatRegister vs1acc = v1;
+    FloatRegister vs2acc = v2;
+    FloatRegister vtable = v3;
 
     // Max number of bytes we can process before having to take the mod
     // 0x15B0 is 5552 in decimal, the largest n such that 255n(n+1)/2 + (n+1)(BASE-1) <= 2^32-1
@@ -3270,6 +3269,10 @@ class StubGenerator: public StubCodeGenerator {
 
     __ mov(base, BASE);
     __ mov(nmax, NMAX);
+
+    // Load accumulation coefficients for the upper 16 bits
+    __ lea(temp0, ExternalAddress((address) StubRoutines::aarch64::_adler_table));
+    __ ld1(vtable, __ T16B, Address(temp0));
 
     // s1 is initialized to the lower 16 bits of adler
     // s2 is initialized to the upper 16 bits of adler
@@ -3311,53 +3314,8 @@ class StubGenerator: public StubCodeGenerator {
 
     __ bind(L_nmax_loop);
 
-    __ ldp(temp0, temp1, Address(__ post(buff, 16)));
-
-    __ add(s1, s1, temp0, ext::uxtb);
-    __ ubfx(temp2, temp0, 8, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 16, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 24, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 32, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 40, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 48, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp0, Assembler::LSR, 56);
-    __ add(s2, s2, s1);
-
-    __ add(s1, s1, temp1, ext::uxtb);
-    __ ubfx(temp2, temp1, 8, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 16, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 24, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 32, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 40, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 48, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp1, Assembler::LSR, 56);
-    __ add(s2, s2, s1);
+    generate_updateBytesAdler32_accum(s1, s2, buff, temp0, temp1,
+                                      vbytes, vs1acc, vs2acc, vtable);
 
     __ subs(count, count, 16);
     __ br(Assembler::HS, L_nmax_loop);
@@ -3400,53 +3358,8 @@ class StubGenerator: public StubCodeGenerator {
 
     __ bind(L_by16_loop);
 
-    __ ldp(temp0, temp1, Address(__ post(buff, 16)));
-
-    __ add(s1, s1, temp0, ext::uxtb);
-    __ ubfx(temp2, temp0, 8, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 16, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 24, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 32, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 40, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp0, 48, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp0, Assembler::LSR, 56);
-    __ add(s2, s2, s1);
-
-    __ add(s1, s1, temp1, ext::uxtb);
-    __ ubfx(temp2, temp1, 8, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 16, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 24, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 32, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 40, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ ubfx(temp2, temp1, 48, 8);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp2);
-    __ add(s2, s2, s1);
-    __ add(s1, s1, temp1, Assembler::LSR, 56);
-    __ add(s2, s2, s1);
+    generate_updateBytesAdler32_accum(s1, s2, buff, temp0, temp1,
+                                      vbytes, vs1acc, vs2acc, vtable);
 
     __ subs(len, len, 16);
     __ br(Assembler::HS, L_by16_loop);
@@ -3498,6 +3411,43 @@ class StubGenerator: public StubCodeGenerator {
     __ ret(lr);
 
     return start;
+  }
+
+  void generate_updateBytesAdler32_accum(Register s1, Register s2, Register buff,
+          Register temp0, Register temp1, FloatRegister vbytes,
+          FloatRegister vs1acc, FloatRegister vs2acc, FloatRegister vtable) {
+    // Below is a vectorized implementation of updating s1 and s2 for 16 bytes.
+    // We use b1, b2, ..., b16 to denote the 16 bytes loaded in each iteration.
+    // In non-vectorized code, we update s1 and s2 as:
+    //   s1 <- s1 + b1
+    //   s2 <- s2 + s1
+    //   s1 <- s1 + b2
+    //   s2 <- s2 + b1
+    //   ...
+    //   s1 <- s1 + b16
+    //   s2 <- s2 + s1
+    // Putting above assignments together, we have:
+    //   s1_new = s1 + b1 + b2 + ... + b16
+    //   s2_new = s2 + (s1 + b1) + (s1 + b1 + b2) + ... + (s1 + b1 + b2 + ... + b16)
+    //          = s2 + s1 * 16 + (b1 * 16 + b2 * 15 + ... + b16 * 1)
+    //          = s2 + s1 * 16 + (b1, b2, ... b16) dot (16, 15, ... 1)
+    __ ld1(vbytes, __ T16B, Address(__ post(buff, 16)));
+
+    // s2 = s2 + s1 * 16
+    __ add(s2, s2, s1, Assembler::LSL, 4);
+
+    // vs1acc = b1 + b2 + b3 + ... + b16
+    // vs2acc = (b1 * 16) + (b2 * 15) + (b3 * 14) + ... + (b16 * 1)
+    __ umullv(vs2acc, __ T8B, vtable, vbytes);
+    __ umlalv(vs2acc, __ T16B, vtable, vbytes);
+    __ uaddlv(vs1acc, __ T16B, vbytes);
+    __ uaddlv(vs2acc, __ T8H, vs2acc);
+
+    // s1 = s1 + vs1acc, s2 = s2 + vs2acc
+    __ fmovd(temp0, vs1acc);
+    __ fmovd(temp1, vs2acc);
+    __ add(s1, s1, temp0);
+    __ add(s2, s2, temp1);
   }
 
   /**
@@ -4085,14 +4035,14 @@ class StubGenerator: public StubCodeGenerator {
         : "compare_long_string_different_encoding UL");
     address entry = __ pc();
     Label SMALL_LOOP, TAIL, TAIL_LOAD_16, LOAD_LAST, DIFF1, DIFF2,
-        DONE, CALCULATE_DIFFERENCE, LARGE_LOOP_PREFETCH, SMALL_LOOP_ENTER,
+        DONE, CALCULATE_DIFFERENCE, LARGE_LOOP_PREFETCH, NO_PREFETCH,
         LARGE_LOOP_PREFETCH_REPEAT1, LARGE_LOOP_PREFETCH_REPEAT2;
     Register result = r0, str1 = r1, cnt1 = r2, str2 = r3, cnt2 = r4,
         tmp1 = r10, tmp2 = r11, tmp3 = r12, tmp4 = r14;
     FloatRegister vtmpZ = v0, vtmp = v1, vtmp3 = v2;
     RegSet spilled_regs = RegSet::of(tmp3, tmp4);
 
-    int prefetchLoopExitCondition = MAX(32, SoftwarePrefetchHintDistance/2);
+    int prefetchLoopExitCondition = MAX(64, SoftwarePrefetchHintDistance/2);
 
     __ eor(vtmpZ, __ T16B, vtmpZ, vtmpZ);
     // cnt2 == amount of characters left to compare
@@ -4119,7 +4069,7 @@ class StubGenerator: public StubCodeGenerator {
 
     if (SoftwarePrefetchHintDistance >= 0) {
       __ subs(rscratch2, cnt2, prefetchLoopExitCondition);
-      __ br(__ LT, SMALL_LOOP);
+      __ br(__ LT, NO_PREFETCH);
       __ bind(LARGE_LOOP_PREFETCH);
         __ prfm(Address(tmp2, SoftwarePrefetchHintDistance));
         __ mov(tmp4, 2);
@@ -4139,51 +4089,20 @@ class StubGenerator: public StubCodeGenerator {
           __ br(__ GE, LARGE_LOOP_PREFETCH);
     }
     __ cbz(cnt2, LOAD_LAST); // no characters left except last load
+    __ bind(NO_PREFETCH);
     __ subs(cnt2, cnt2, 16);
     __ br(__ LT, TAIL);
-    __ b(SMALL_LOOP_ENTER);
     __ bind(SMALL_LOOP); // smaller loop
       __ subs(cnt2, cnt2, 16);
-    __ bind(SMALL_LOOP_ENTER);
       compare_string_16_x_LU(tmpL, tmpU, DIFF1, DIFF2);
       __ br(__ GE, SMALL_LOOP);
-      __ cbz(cnt2, LOAD_LAST);
-    __ bind(TAIL); // 1..15 characters left
-      __ subs(zr, cnt2, -8);
-      __ br(__ GT, TAIL_LOAD_16);
-      __ ldrd(vtmp, Address(tmp2));
-      __ zip1(vtmp3, __ T8B, vtmp, vtmpZ);
-
-      __ ldr(tmpU, Address(__ post(cnt1, 8)));
-      __ fmovd(tmpL, vtmp3);
-      __ eor(rscratch2, tmp3, tmpL);
-      __ cbnz(rscratch2, DIFF2);
-      __ umov(tmpL, vtmp3, __ D, 1);
-      __ eor(rscratch2, tmpU, tmpL);
-      __ cbnz(rscratch2, DIFF1);
-      __ b(LOAD_LAST);
-    __ bind(TAIL_LOAD_16);
-      __ ldrq(vtmp, Address(tmp2));
-      __ ldr(tmpU, Address(__ post(cnt1, 8)));
-      __ zip1(vtmp3, __ T16B, vtmp, vtmpZ);
-      __ zip2(vtmp, __ T16B, vtmp, vtmpZ);
-      __ fmovd(tmpL, vtmp3);
-      __ eor(rscratch2, tmp3, tmpL);
-      __ cbnz(rscratch2, DIFF2);
-
-      __ ldr(tmp3, Address(__ post(cnt1, 8)));
-      __ umov(tmpL, vtmp3, __ D, 1);
-      __ eor(rscratch2, tmpU, tmpL);
-      __ cbnz(rscratch2, DIFF1);
-
-      __ ldr(tmpU, Address(__ post(cnt1, 8)));
-      __ fmovd(tmpL, vtmp);
-      __ eor(rscratch2, tmp3, tmpL);
-      __ cbnz(rscratch2, DIFF2);
-
-      __ umov(tmpL, vtmp, __ D, 1);
-      __ eor(rscratch2, tmpU, tmpL);
-      __ cbnz(rscratch2, DIFF1);
+      __ cmn(cnt2, (u1)16);
+      __ br(__ EQ, LOAD_LAST);
+    __ bind(TAIL); // 1..15 characters left until last load (last 4 characters)
+      __ add(cnt1, cnt1, cnt2, __ LSL, 1); // Address of 8 bytes before last 4 characters in UTF-16 string
+      __ add(tmp2, tmp2, cnt2); // Address of 16 bytes before last 4 characters in Latin1 string
+      __ ldr(tmp3, Address(cnt1, -8));
+      compare_string_16_x_LU(tmpL, tmpU, DIFF1, DIFF2); // last 16 characters before last load
       __ b(LOAD_LAST);
     __ bind(DIFF2);
       __ mov(tmpU, tmp3);
@@ -4191,10 +4110,12 @@ class StubGenerator: public StubCodeGenerator {
       __ pop(spilled_regs, sp);
       __ b(CALCULATE_DIFFERENCE);
     __ bind(LOAD_LAST);
+      // Last 4 UTF-16 characters are already pre-loaded into tmp3 by compare_string_16_x_LU.
+      // No need to load it again
+      __ mov(tmpU, tmp3);
       __ pop(spilled_regs, sp);
 
       __ ldrs(vtmp, Address(strL));
-      __ ldr(tmpU, Address(strU));
       __ zip1(vtmp, __ T8B, vtmp, vtmpZ);
       __ fmovd(tmpL, vtmp);
 
@@ -4256,10 +4177,10 @@ class StubGenerator: public StubCodeGenerator {
         compare_string_16_bytes_same(DIFF, DIFF2);
         __ br(__ GT, LARGE_LOOP_PREFETCH);
         __ cbz(cnt2, LAST_CHECK_AND_LENGTH_DIFF); // no more chars left?
-        // less than 16 bytes left?
-        __ subs(cnt2, cnt2, isLL ? 16 : 8);
-        __ br(__ LT, TAIL);
     }
+    // less than 16 bytes left?
+    __ subs(cnt2, cnt2, isLL ? 16 : 8);
+    __ br(__ LT, TAIL);
     __ bind(SMALL_LOOP);
       compare_string_16_bytes_same(DIFF, DIFF2);
       __ subs(cnt2, cnt2, isLL ? 16 : 8);
@@ -4388,6 +4309,7 @@ class StubGenerator: public StubCodeGenerator {
     __ ldr(ch1, Address(str1));
     // Read whole register from str2. It is safe, because length >=8 here
     __ ldr(ch2, Address(str2));
+    __ sub(cnt2, cnt2, cnt1);
     __ andr(first, ch1, str1_isL ? 0xFF : 0xFFFF);
     if (str1_isL != str2_isL) {
       __ eor(v0, __ T16B, v0, v0);
@@ -4846,7 +4768,7 @@ class StubGenerator: public StubCodeGenerator {
 
     // Set up last_Java_sp and last_Java_fp
     address the_pc = __ pc();
-    __ set_last_Java_frame(sp, rfp, (address)NULL, rscratch1);
+    __ set_last_Java_frame(sp, rfp, the_pc, rscratch1);
 
     // Call runtime
     if (arg1 != noreg) {

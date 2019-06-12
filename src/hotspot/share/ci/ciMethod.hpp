@@ -245,6 +245,8 @@ class ciMethod : public ciMetadata {
 
   ResourceBitMap live_local_oops_at_bci(int bci);
 
+  bool needs_clinit_barrier() const;
+
 #ifdef COMPILER1
   const BitMap& bci_block_start();
 #endif
@@ -351,6 +353,8 @@ class ciMethod : public ciMetadata {
   bool is_boxing_method() const;
   bool is_unboxing_method() const;
   bool is_object_initializer() const;
+
+  bool can_be_statically_bound(ciInstanceKlass* context) const;
 
   // Replay data methods
   void dump_name_as_ascii(outputStream* st);

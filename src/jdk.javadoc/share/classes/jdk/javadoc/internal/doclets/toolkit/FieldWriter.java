@@ -25,8 +25,6 @@
 
 package jdk.javadoc.internal.doclets.toolkit;
 
-import java.io.*;
-
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
@@ -100,17 +98,24 @@ public interface FieldWriter {
     /**
      * Get the field details tree.
      *
+     * @param memberDetailsTreeHeader the content tree representing member details tree header
      * @param memberDetailsTree the content tree representing member details
      * @return content tree for the field details
      */
-    public Content getFieldDetails(Content memberDetailsTree);
+    public Content getFieldDetails(Content memberDetailsTreeHeader, Content memberDetailsTree);
 
     /**
      * Get the field documentation.
      *
      * @param fieldDocTree the content tree representing field documentation
-     * @param isLastContent true if the content to be added is the last content
      * @return content tree for the field documentation
      */
-    public Content getFieldDoc(Content fieldDocTree, boolean isLastContent);
+    public Content getFieldDoc(Content fieldDocTree);
+
+    /**
+     * Gets the member header tree.
+     *
+     * @return a content tree for the member header
+     */
+    public Content getMemberTreeHeader();
 }

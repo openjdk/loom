@@ -250,7 +250,8 @@ inline int wcslen(const jchar* x) { return wcslen((const wchar_t*)x); }
 #define offsetof(klass,field) offset_of(klass,field)
 
 #if defined(_LP64) && defined(__APPLE__)
-#define JLONG_FORMAT           "%ld"
+#define JLONG_FORMAT          "%ld"
+#define JLONG_FORMAT_W(width) "%" #width "ld"
 #endif // _LP64 && __APPLE__
 
 #ifndef USE_LIBRARY_BASED_TLS_ONLY
@@ -269,6 +270,9 @@ inline int wcslen(const jchar* x) { return wcslen((const wchar_t*)x); }
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=55382 and
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53017
 //
-#define ATTRIBUTE_ALIGNED(x) __attribute__((aligned(x+0)))
+// GCC versions older than 4.6.4 would fail even with "+0", and needs additional
+// cast to __typeof__(x) to work around the similar bug.
+//
+#define ATTRIBUTE_ALIGNED(x) __attribute__((aligned((__typeof__(x))x+0)))
 
 #endif // SHARE_UTILITIES_GLOBALDEFINITIONS_GCC_HPP

@@ -35,17 +35,15 @@ ShenandoahSATBMarkQueueSet::ShenandoahSATBMarkQueueSet() :
 void ShenandoahSATBMarkQueueSet::initialize(ShenandoahHeap* const heap,
                                             Monitor* cbl_mon,
                                             int process_completed_threshold,
-                                            uint buffer_enqueue_threshold_percentage,
-                                            Mutex* lock) {
+                                            uint buffer_enqueue_threshold_percentage) {
   SATBMarkQueueSet::initialize(cbl_mon,
                                &_satb_mark_queue_buffer_allocator,
                                process_completed_threshold,
-                               buffer_enqueue_threshold_percentage,
-                               lock);
+                               buffer_enqueue_threshold_percentage);
   _heap = heap;
 }
 
-SATBMarkQueue& ShenandoahSATBMarkQueueSet::satb_queue_for_thread(JavaThread* const t) const {
+SATBMarkQueue& ShenandoahSATBMarkQueueSet::satb_queue_for_thread(Thread* const t) const {
   return ShenandoahThreadLocalData::satb_mark_queue(t);
 }
 
@@ -72,19 +70,17 @@ void ShenandoahSATBMarkQueueSet::filter(SATBMarkQueue* queue) {
   }
 }
 
-bool ShenandoahSATBMarkQueue::should_enqueue_buffer() {
-  bool should_enqueue = SATBMarkQueue::should_enqueue_buffer();
-  size_t cap = capacity();
-  Thread* t = Thread::current();
-  if (ShenandoahThreadLocalData::is_force_satb_flush(t)) {
-    if (!should_enqueue && cap != index()) {
+void ShenandoahSATBMarkQueue::handle_completed_buffer() {
+  SATBMarkQueue::handle_completed_buffer();
+  if (!is_empty()) {
+    Thread* t = Thread::current();
+    if (ShenandoahThreadLocalData::is_force_satb_flush(t)) {
       // Non-empty buffer is compacted, and we decided not to enqueue it.
       // We still want to know about leftover work in that buffer eventually.
       // This avoid dealing with these leftovers during the final-mark, after
       // the buffers are drained completely. See JDK-8205353 for more discussion.
-      should_enqueue = true;
+      ShenandoahThreadLocalData::set_force_satb_flush(t, false);
+      enqueue_completed_buffer();
     }
-    ShenandoahThreadLocalData::set_force_satb_flush(t, false);
   }
-  return should_enqueue;
 }

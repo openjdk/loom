@@ -194,9 +194,9 @@ uint LoadBarrierNode::size_of() const {
   return sizeof(*this);
 }
 
-uint LoadBarrierNode::cmp(const Node& n) const {
+bool LoadBarrierNode::cmp(const Node& n) const {
   ShouldNotReachHere();
-  return 0;
+  return false;
 }
 
 const Type *LoadBarrierNode::bottom_type() const {
@@ -1337,10 +1337,9 @@ static bool common_barriers(PhaseIdealLoop* phase, LoadBarrierNode* lb) {
       Node* other_ctrl = u->in(LoadBarrierNode::Control);
 
       Node* lca = phase->dom_lca(this_ctrl, other_ctrl);
-      bool ok = true;
-
       Node* proj1 = NULL;
       Node* proj2 = NULL;
+      bool ok = (lb->in(LoadBarrierNode::Address) == u->in(LoadBarrierNode::Address));
 
       while (this_ctrl != lca && ok) {
         if (this_ctrl->in(0) != NULL &&

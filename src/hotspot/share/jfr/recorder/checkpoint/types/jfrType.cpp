@@ -43,6 +43,7 @@
 #include "memory/metaspaceGCThresholdUpdater.hpp"
 #include "memory/referenceType.hpp"
 #include "memory/universe.hpp"
+#include "oops/compressedOops.hpp"
 #include "runtime/flags/jvmFlag.hpp"
 #include "runtime/mutexLocker.hpp"
 #include "runtime/osThread.hpp"
@@ -65,7 +66,7 @@ class JfrCheckpointThreadClosure : public ThreadClosure {
  private:
   JfrCheckpointWriter& _writer;
   JfrCheckpointContext _ctx;
-  const intptr_t _count_position;
+  const int64_t _count_position;
   Thread* const _curthread;
   u4 _count;
 
@@ -258,11 +259,11 @@ void ReferenceTypeConstant::serialize(JfrCheckpointWriter& writer) {
 }
 
 void NarrowOopModeConstant::serialize(JfrCheckpointWriter& writer) {
-  static const u4 nof_entries = Universe::HeapBasedNarrowOop + 1;
+  static const u4 nof_entries = CompressedOops::HeapBasedNarrowOop + 1;
   writer.write_count(nof_entries);
   for (u4 i = 0; i < nof_entries; ++i) {
     writer.write_key(i);
-    writer.write(Universe::narrow_oop_mode_to_string((Universe::NARROW_OOP_MODE)i));
+    writer.write(CompressedOops::mode_to_string((CompressedOops::Mode)i));
   }
 }
 

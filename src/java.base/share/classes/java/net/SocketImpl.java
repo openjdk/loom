@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,29 +25,64 @@
 
 package java.net;
 
+import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.FileDescriptor;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.Objects;
 import java.util.Set;
+
+import sun.net.NetProperties;
+import sun.net.PlatformSocketImpl;
+import sun.nio.ch.NioSocketImpl;
 
 /**
  * The abstract class {@code SocketImpl} is a common superclass
  * of all classes that actually implement sockets. It is used to
  * create both client and server sockets.
- * <p>
- * A "plain" socket implements these methods exactly as
- * described, without attempting to go through a firewall or proxy.
+ *
+ * @implNote Client and server sockets created with the {@code Socket} and
+ * {@code SocketServer} public constructors create a system-default
+ * {@code SocketImpl}. The JDK historically used a {@code SocketImpl}
+ * implementation type named "PlainSocketImpl" that has since been replaced by a
+ * newer implementation. The JDK continues to ship with the older implementation
+ * to allow code to run that depends on unspecified behavior that differs between
+ * the old and new implementations. The old implementation will be used if the
+ * Java virtual machine is started with the system property {@systemProperty
+ * jdk.net.usePlainSocketImpl} set to use the old implementation. It may also be
+ * set in the JDK's network configuration file, located in {@code
+ * ${java.home}/conf/net.properties}. The value of the property is the string
+ * representation of a boolean. If set without a value then it defaults to {@code
+ * true}, hence running with {@code -Djdk.net.usePlainSocketImpl} or {@code
+ * -Djdk.net.usePlainSocketImpl=true} will configure the Java virtual machine
+ * to use the old implementation. The property and old implementation will be
+ * removed in a future version.
  *
  * @author  unascribed
  * @since   1.0
  */
 public abstract class SocketImpl implements SocketOptions {
+    private static final boolean USE_PLAINSOCKETIMPL = usePlainSocketImpl();
+
+    private static boolean usePlainSocketImpl() {
+        PrivilegedAction<String> pa = () -> NetProperties.get("jdk.net.usePlainSocketImpl");
+        String s = AccessController.doPrivileged(pa);
+        return (s != null) && !s.equalsIgnoreCase("false");
+    }
+
     /**
-     * The actual Socket object.
+     * Creates an instance of platform's SocketImpl
      */
-    Socket socket = null;
-    ServerSocket serverSocket = null;
+    @SuppressWarnings("unchecked")
+    static <S extends SocketImpl & PlatformSocketImpl> S createPlatformSocketImpl(boolean server) {
+        if (USE_PLAINSOCKETIMPL) {
+            return (S) new PlainSocketImpl(server);
+        } else {
+            return (S) new NioSocketImpl(server);
+        }
+    }
 
     /**
      * The file descriptor object for this socket.
@@ -68,6 +103,11 @@ public abstract class SocketImpl implements SocketOptions {
      * The local port number to which this socket is connected.
      */
     protected int localport;
+
+    /**
+     * Initialize a new instance of this class
+     */
+    public SocketImpl() { }
 
     /**
      * Creates either a stream or a datagram socket.
@@ -178,6 +218,15 @@ public abstract class SocketImpl implements SocketOptions {
     protected abstract void close() throws IOException;
 
     /**
+     * Closes this socket, ignoring any IOException that is thrown by close.
+     */
+    void closeQuietly() {
+        try {
+            close();
+        } catch (IOException ignore) { }
+    }
+
+    /**
      * Places the input stream for this socket at "end of stream".
      * Any data sent to this socket is acknowledged and then
      * silently discarded.
@@ -280,22 +329,6 @@ public abstract class SocketImpl implements SocketOptions {
         return localport;
     }
 
-    void setSocket(Socket soc) {
-        this.socket = soc;
-    }
-
-    Socket getSocket() {
-        return socket;
-    }
-
-    void setServerSocket(ServerSocket soc) {
-        this.serverSocket = soc;
-    }
-
-    ServerSocket getServerSocket() {
-        return serverSocket;
-    }
-
     /**
      * Returns the address and port of this socket as a {@code String}.
      *
@@ -306,7 +339,8 @@ public abstract class SocketImpl implements SocketOptions {
             ",port=" + getPort() + ",localport=" + getLocalPort()  + "]";
     }
 
-    void reset() throws IOException {
+    void reset() {
+        fd = null;
         address = null;
         port = 0;
         localport = 0;
@@ -360,120 +394,82 @@ public abstract class SocketImpl implements SocketOptions {
     /**
      * Called to set a socket option.
      *
+     * @implSpec
+     * The default implementation of this method first checks that the given
+     * socket option {code name} is not null, then throws {@code
+     * UnsupportedOperationException}. Subclasses should override this method
+     * with an appropriate implementation.
+     *
      * @param <T> The type of the socket option value
      * @param name The socket option
-     *
      * @param value The value of the socket option. A value of {@code null}
      *              may be valid for some options.
      *
      * @throws UnsupportedOperationException if the SocketImpl does not
      *         support the option
-     *
-     * @throws IOException if an I/O error occurs, or if the socket is closed.
+     * @throws IllegalArgumentException if the value is not valid for
+     *         the option
+     * @throws IOException if an I/O error occurs, or if the socket is closed
+     * @throws NullPointerException if name is {@code null}
      *
      * @since 9
      */
     protected <T> void setOption(SocketOption<T> name, T value) throws IOException {
-        if (name == StandardSocketOptions.SO_KEEPALIVE &&
-                (getSocket() != null)) {
-            setOption(SocketOptions.SO_KEEPALIVE, value);
-        } else if (name == StandardSocketOptions.SO_SNDBUF &&
-                (getSocket() != null)) {
-            setOption(SocketOptions.SO_SNDBUF, value);
-        } else if (name == StandardSocketOptions.SO_RCVBUF) {
-            setOption(SocketOptions.SO_RCVBUF, value);
-        } else if (name == StandardSocketOptions.SO_REUSEADDR) {
-            setOption(SocketOptions.SO_REUSEADDR, value);
-        } else if (name == StandardSocketOptions.SO_REUSEPORT &&
-            supportedOptions().contains(name)) {
-            setOption(SocketOptions.SO_REUSEPORT, value);
-        } else if (name == StandardSocketOptions.SO_LINGER &&
-                (getSocket() != null)) {
-            setOption(SocketOptions.SO_LINGER, value);
-        } else if (name == StandardSocketOptions.IP_TOS) {
-            setOption(SocketOptions.IP_TOS, value);
-        } else if (name == StandardSocketOptions.TCP_NODELAY &&
-                (getSocket() != null)) {
-            setOption(SocketOptions.TCP_NODELAY, value);
-        } else {
-            throw new UnsupportedOperationException("unsupported option");
-        }
+        Objects.requireNonNull(name);
+        throw new UnsupportedOperationException("'" + name + "' not supported");
     }
 
     /**
      * Called to get a socket option.
      *
+     * @implSpec
+     * The default implementation of this method first checks that the given
+     * socket option {code name} is not null, then throws {@code
+     * UnsupportedOperationException}. Subclasses should override this method
+     * with an appropriate implementation.
+     *
      * @param <T> The type of the socket option value
      * @param name The socket option
-     *
      * @return the value of the named option
      *
      * @throws UnsupportedOperationException if the SocketImpl does not
-     *         support the option.
-     *
-     * @throws IOException if an I/O error occurs, or if the socket is closed.
+     *         support the option
+     * @throws IOException if an I/O error occurs, or if the socket is closed
+     * @throws NullPointerException if name is {@code null}
      *
      * @since 9
      */
-    @SuppressWarnings("unchecked")
     protected <T> T getOption(SocketOption<T> name) throws IOException {
-        if (name == StandardSocketOptions.SO_KEEPALIVE &&
-                (getSocket() != null)) {
-            return (T)getOption(SocketOptions.SO_KEEPALIVE);
-        } else if (name == StandardSocketOptions.SO_SNDBUF &&
-                (getSocket() != null)) {
-            return (T)getOption(SocketOptions.SO_SNDBUF);
-        } else if (name == StandardSocketOptions.SO_RCVBUF) {
-            return (T)getOption(SocketOptions.SO_RCVBUF);
-        } else if (name == StandardSocketOptions.SO_REUSEADDR) {
-            return (T)getOption(SocketOptions.SO_REUSEADDR);
-        } else if (name == StandardSocketOptions.SO_REUSEPORT &&
-            supportedOptions().contains(name)) {
-            return (T)getOption(SocketOptions.SO_REUSEPORT);
-        } else if (name == StandardSocketOptions.SO_LINGER &&
-                (getSocket() != null)) {
-            return (T)getOption(SocketOptions.SO_LINGER);
-        } else if (name == StandardSocketOptions.IP_TOS) {
-            return (T)getOption(SocketOptions.IP_TOS);
-        } else if (name == StandardSocketOptions.TCP_NODELAY &&
-                (getSocket() != null)) {
-            return (T)getOption(SocketOptions.TCP_NODELAY);
-        } else {
-            throw new UnsupportedOperationException("unsupported option");
-        }
+        Objects.requireNonNull(name);
+        throw new UnsupportedOperationException("'" + name + "' not supported");
     }
 
-    private static final Set<SocketOption<?>> socketOptions;
-
-    private static final Set<SocketOption<?>> serverSocketOptions;
-
-    static {
-        socketOptions = Set.of(StandardSocketOptions.SO_KEEPALIVE,
-                               StandardSocketOptions.SO_SNDBUF,
-                               StandardSocketOptions.SO_RCVBUF,
-                               StandardSocketOptions.SO_REUSEADDR,
-                               StandardSocketOptions.SO_LINGER,
-                               StandardSocketOptions.IP_TOS,
-                               StandardSocketOptions.TCP_NODELAY);
-
-        serverSocketOptions = Set.of(StandardSocketOptions.SO_RCVBUF,
-                                     StandardSocketOptions.SO_REUSEADDR,
-                                     StandardSocketOptions.IP_TOS);
+    /**
+     * Attempts to copy socket options from this SocketImpl to a target SocketImpl.
+     * At this time, only the SO_TIMEOUT make sense to copy.
+     */
+    void copyOptionsTo(SocketImpl target) {
+        try {
+            Object timeout = getOption(SocketOptions.SO_TIMEOUT);
+            if (timeout instanceof Integer) {
+                target.setOption(SocketOptions.SO_TIMEOUT, timeout);
+            }
+        } catch (IOException ignore) { }
     }
 
     /**
      * Returns a set of SocketOptions supported by this impl
      * and by this impl's socket (Socket or ServerSocket)
      *
+     * @implSpec
+     * The default implementation of this method returns an empty set.
+     * Subclasses should override this method with an appropriate implementation.
+     *
      * @return a Set of SocketOptions
      *
      * @since 9
      */
     protected Set<SocketOption<?>> supportedOptions() {
-        if (getSocket() != null) {
-            return socketOptions;
-        } else {
-            return serverSocketOptions;
-        }
+        return Set.of();
     }
 }

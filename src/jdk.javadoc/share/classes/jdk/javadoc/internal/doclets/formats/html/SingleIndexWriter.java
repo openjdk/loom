@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,8 +25,10 @@
 
 package jdk.javadoc.internal.doclets.formats.html;
 
-import java.util.*;
+import java.util.Set;
+import java.util.TreeSet;
 
+import jdk.javadoc.internal.doclets.formats.html.markup.Entity;
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlStyle;
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlTag;
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlTree;
@@ -92,12 +94,16 @@ public class SingleIndexWriter extends AbstractIndexWriter {
      */
     protected void generateIndexFile() throws DocFileIOException {
         String title = resources.getText("doclet.Window_Single_Index");
-        HtmlTree body = getBody(true, getWindowTitle(title));
-        HtmlTree htmlTree = HtmlTree.HEADER();
-        addTop(htmlTree);
+        HtmlTree body = getBody(getWindowTitle(title));
+        HtmlTree header = HtmlTree.HEADER();
+        addTop(header);
         navBar.setUserHeader(getUserHeaderFooter(true));
-        htmlTree.addContent(navBar.getContent(true));
-        body.addContent(htmlTree);
+        header.add(navBar.getContent(true));
+        body.add(header);
+        HtmlTree main = HtmlTree.MAIN();
+        main.add(HtmlTree.DIV(HtmlStyle.header,
+                HtmlTree.HEADING(Headings.PAGE_TITLE_HEADING,
+                        contents.getContent("doclet.Index"))));
         HtmlTree divTree = new HtmlTree(HtmlTag.DIV);
         divTree.setStyle(HtmlStyle.contentContainer);
         elements = new TreeSet<>(indexbuilder.getIndexMap().keySet());
@@ -114,14 +120,15 @@ public class SingleIndexWriter extends AbstractIndexWriter {
             }
         }
         addLinksForIndexes(divTree);
-        body.addContent(HtmlTree.MAIN(divTree));
-        htmlTree = HtmlTree.FOOTER();
+        main.add(divTree);
+        body.add(main);
+        HtmlTree footer = HtmlTree.FOOTER();
         navBar.setUserFooter(getUserHeaderFooter(false));
-        htmlTree.addContent(navBar.getContent(false));
-        addBottom(htmlTree);
-        body.addContent(htmlTree);
+        footer.add(navBar.getContent(false));
+        addBottom(footer);
+        body.add(footer);
         createSearchIndexFiles();
-        printHtmlDocument(null, true, body);
+        printHtmlDocument(null, "index", body);
     }
 
     /**
@@ -132,17 +139,17 @@ public class SingleIndexWriter extends AbstractIndexWriter {
     protected void addLinksForIndexes(Content contentTree) {
         for (Object ch : elements) {
             String unicode = ch.toString();
-            contentTree.addContent(
+            contentTree.add(
                     links.createLink(getNameForIndex(unicode),
                             new StringContent(unicode)));
-            contentTree.addContent(Contents.SPACE);
+            contentTree.add(Entity.NO_BREAK_SPACE);
         }
-        contentTree.addContent(new HtmlTree(HtmlTag.BR));
-        contentTree.addContent(links.createLink(DocPaths.ALLCLASSES_INDEX,
+        contentTree.add(new HtmlTree(HtmlTag.BR));
+        contentTree.add(links.createLink(DocPaths.ALLCLASSES_INDEX,
                 contents.allClassesLabel));
         if (!configuration.packages.isEmpty()) {
-            contentTree.addContent(Contents.SPACE);
-            contentTree.addContent(links.createLink(DocPaths.ALLPACKAGES_INDEX,
+            contentTree.add(Entity.NO_BREAK_SPACE);
+            contentTree.add(links.createLink(DocPaths.ALLPACKAGES_INDEX,
                     contents.allPackagesLabel));
     }
 }

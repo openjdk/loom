@@ -29,7 +29,6 @@
 #include "code/vmreg.hpp"
 #include "memory/allocation.hpp"
 #include "oops/oopsHierarchy.hpp"
-#include "utilities/growableArray.hpp"
 
 // Interface for generating the frame map for compiled code.  A frame map
 // describes for a specific pc whether each register and frame stack slot is:
@@ -42,7 +41,6 @@
 
 class frame;
 class RegisterMap;
-class DerivedPointerEntry;
 class OopClosure;
 
 class OopMapValue: public StackObj {
@@ -133,7 +131,7 @@ public:
   }
 
   void print_on(outputStream* st) const;
-  void print() const { print_on(tty); }
+  void print() const;
 };
 
 
@@ -194,7 +192,7 @@ class OopMap: public ResourceObj {
 
   // Printing
   void print_on(outputStream* st) const;
-  void print() const { print_on(tty); }
+  void print() const;
   bool equals(const OopMap* other) const;
 };
 
@@ -237,7 +235,7 @@ class OopMapSet : public ResourceObj {
   int heap_size() const;
 
   // Methods oops_do() and all_do() filter out NULL oops and
-  // oop == Universe::narrow_oop_base() before passing oops
+  // oop == CompressedOops::base() before passing oops
   // to closures.
 
   // Iterates through frame for a compiled method
@@ -253,7 +251,7 @@ class OopMapSet : public ResourceObj {
 
   // Printing
   void print_on(outputStream* st) const;
-  void print() const { print_on(tty); }
+  void print() const;
 };
 
 class ImmutableOopMapBuilder;
@@ -279,7 +277,7 @@ public:
 
   // Printing
   void print_on(outputStream* st) const;
-  void print() const { print_on(tty); }
+  void print() const;
 };
 
 class ImmutableOopMapSet;
@@ -330,7 +328,7 @@ public:
   int nr_of_bytes() const { return _size; }
 
   void print_on(outputStream* st) const;
-  void print() const { print_on(tty); }
+  void print() const;
 };
 
 class OopMapStream : public StackObj {
@@ -433,13 +431,14 @@ private:
 class DerivedPointerTable : public AllStatic {
   friend class VMStructs;
  private:
-   static GrowableArray<DerivedPointerEntry*>* _list;
-   static bool _active;                      // do not record pointers for verify pass etc.
+  class Entry;
+  static bool _active;                      // do not record pointers for verify pass etc.
+
  public:
   static void clear();                       // Called before scavenge/GC
   static void add(oop *derived, oop *base);  // Called during scavenge/GC
   static void update_pointers();             // Called after  scavenge/GC
-  static bool is_empty()                     { return _list == NULL || _list->is_empty(); }
+  static bool is_empty();
   static bool is_active()                    { return _active; }
   static void set_active(bool value)         { _active = value; }
 };
