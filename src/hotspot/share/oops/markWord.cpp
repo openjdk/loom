@@ -23,11 +23,11 @@
  */
 
 #include "precompiled.hpp"
-#include "oops/markOop.hpp"
+#include "oops/markWord.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/objectMonitor.hpp"
 
-void markOopDesc::print_on(outputStream* st) const {
+void markWord::print_on(outputStream* st) const {
   if (is_marked()) {  // last bits = 11
     st->print(" marked(" INTPTR_FORMAT ")", value());
   } else if (has_monitor()) {  // last bits = 10

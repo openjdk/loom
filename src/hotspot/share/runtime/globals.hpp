@@ -736,9 +736,6 @@ const size_t minimumSymbolTableSize = 1024;
   product(bool, ReduceSignalUsage, false,                                   \
           "Reduce the use of OS signals in Java and/or the VM")             \
                                                                             \
-  develop_pd(bool, ShareVtableStubs,                                        \
-          "Share vtable stubs (smaller code but worse branch prediction")   \
-                                                                            \
   develop(bool, LoadLineNumberTables, true,                                 \
           "Tell whether the class file parser loads line number tables")    \
                                                                             \
@@ -2354,7 +2351,7 @@ const size_t minimumSymbolTableSize = 1024;
   product(uintx, StringDeduplicationAgeThreshold, 3,                        \
           "A string must reach this age (or be promoted to an old region) " \
           "to be considered for deduplication")                             \
-          range(1, markOopDesc::max_age)                                    \
+          range(1, markWord::max_age)                                       \
                                                                             \
   diagnostic(bool, StringDeduplicationResizeALot, false,                    \
           "Force table resize every time the table is scanned")             \
@@ -2458,11 +2455,14 @@ const size_t minimumSymbolTableSize = 1024;
   diagnostic(bool, ShowRegistersOnAssert, true,                             \
           "On internal errors, include registers in error report.")         \
                                                                             \
-  experimental(bool, UseSwitchProfiling, true,                              \
+  diagnostic(bool, UseSwitchProfiling, true,                                \
           "leverage profiling for table/lookup switch")                     \
                                                                             \
+  develop(bool, TraceMemoryWriteback, false,                                \
+          "Trace memory writeback operations")                              \
+                                                                            \
   JFR_ONLY(product(bool, FlightRecorder, false,                             \
-          "(Deprecated) Enable Flight Recorder"))                                        \
+          "(Deprecated) Enable Flight Recorder"))                           \
                                                                             \
   JFR_ONLY(product(ccstr, FlightRecorderOptions, NULL,                      \
           "Flight Recorder options"))                                       \

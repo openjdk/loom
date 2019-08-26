@@ -37,7 +37,7 @@ class objArrayOopDesc : public arrayOopDesc {
   friend class ObjArrayKlass;
   friend class Runtime1;
   friend class psPromotionManager;
-  friend class CSetMarkOopClosure;
+  friend class CSetMarkWordClosure;
   friend class G1ParScanPartialArrayClosure;
   friend class Continuation;
   template <typename T>
