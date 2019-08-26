@@ -37,6 +37,7 @@
 #include "gc/shared/referenceProcessor.hpp"
 #include "gc/shared/softRefPolicy.hpp"
 #include "gc/shared/strongRootsScope.hpp"
+#include "gc/shared/workgroup.hpp"
 #include "logging/log.hpp"
 #include "memory/metaspace.hpp"
 #include "utilities/growableArray.hpp"
@@ -44,7 +45,6 @@
 
 class AdjoiningGenerations;
 class GCHeapSummary;
-class GCTaskManager;
 class MemoryManager;
 class MemoryPool;
 class PSAdaptiveSizePolicy;
@@ -68,15 +68,14 @@ class ParallelScavengeHeap : public CollectedHeap {
   AdjoiningGenerations* _gens;
   unsigned int _death_march_count;
 
-  // The task manager
-  static GCTaskManager* _gc_task_manager;
-
   GCMemoryManager* _young_manager;
   GCMemoryManager* _old_manager;
 
   MemoryPool* _eden_pool;
   MemoryPool* _survivor_pool;
   MemoryPool* _old_pool;
+
+  WorkGang _workers;
 
   virtual void initialize_serviceability();
 
@@ -99,7 +98,11 @@ class ParallelScavengeHeap : public CollectedHeap {
     _old_manager(NULL),
     _eden_pool(NULL),
     _survivor_pool(NULL),
-    _old_pool(NULL) { }
+    _old_pool(NULL),
+    _workers("GC Thread",
+             ParallelGCThreads,
+             true /* are_GC_task_threads */,
+             false /* are_ConcurrentGC_threads */) { }
 
   // For use by VM operations
   enum CollectionType {
@@ -128,8 +131,6 @@ class ParallelScavengeHeap : public CollectedHeap {
   static PSGCAdaptivePolicyCounters* gc_policy_counters() { return _gc_policy_counters; }
 
   static ParallelScavengeHeap* heap();
-
-  static GCTaskManager* const gc_task_manager() { return _gc_task_manager; }
 
   CardTableBarrierSet* barrier_set();
   PSCardTable* card_table();
@@ -252,6 +253,10 @@ class ParallelScavengeHeap : public CollectedHeap {
 
   GCMemoryManager* old_gc_manager() const { return _old_manager; }
   GCMemoryManager* young_gc_manager() const { return _young_manager; }
+
+  WorkGang& workers() {
+    return _workers;
+  }
 };
 
 // Class that can be used to print information about the

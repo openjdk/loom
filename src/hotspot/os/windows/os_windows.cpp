@@ -4122,7 +4122,7 @@ jint os::init_2(void) {
   // in order to forward implicit exceptions from code in AOT
   // generated DLLs.  This is necessary since these DLLs are not
   // registered for structured exceptions like codecache methods are.
-  if (UseAOT) {
+  if (AOTLibrary != NULL && (UseAOT || FLAG_IS_DEFAULT(UseAOT))) {
     topLevelVectoredExceptionHandler = AddVectoredExceptionHandler( 1, topLevelVectoredExceptionFilter);
   }
 #endif
@@ -5802,4 +5802,8 @@ static void call_wrapper_dummy() {}
 void os::win32::initialize_thread_ptr_offset() {
   os::os_exception_wrapper((java_call_t)call_wrapper_dummy,
                            NULL, NULL, NULL, NULL);
+}
+
+bool os::supports_map_sync() {
+  return false;
 }
