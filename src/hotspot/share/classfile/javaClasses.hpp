@@ -1119,6 +1119,8 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static int _parent_offset;
   static int _size_offset;
   static int _sp_offset;
+  static int _numFrames_offset;
+  static int _numOops_offset;
 
   static void compute_offsets();
  public:
@@ -1133,6 +1135,10 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline void set_size(HeapWord* ref, int value);
   static inline int sp(oop ref);
   static inline void set_sp(oop ref, int value);
+  static inline int numFrames(oop ref);
+  static inline void set_numFrames(oop ref, int value);
+  static inline int numOops(oop ref);
+  static inline void set_numOops(oop ref, int value);
 };
 
 // Interface to java.lang.invoke.MethodHandle objects

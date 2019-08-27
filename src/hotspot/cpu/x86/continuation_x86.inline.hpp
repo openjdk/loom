@@ -1107,22 +1107,29 @@ static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
 static const int mask = OopMapValue::oop_value | OopMapValue::narrowoop_value;
 
 void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
-  log_develop_trace(jvmcont)("stack_chunk_iterate_stack");
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack young: %d", is_young(chunk));
   // see sender_for_compiled_frame
+
+  int num_frames = 0;
+  int num_oops = 0;
 
   CodeBlob* cb = NULL;
   intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
   intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
   for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - 1);
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
+
     int slot;
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
     assert (slot >= 0, "");
     const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
 
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld", sp - start);
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack slot: %d codeblob:", slot);
     if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
     assert (cb->is_nmethod(), "");
+
+    num_frames++;
 
     for (OopMapStream oms(oopmap,mask); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
       OopMapValue omv = oms.current();
@@ -1136,8 +1143,12 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
 
       if (!SkipNullValue::should_skip(*p))
         omv.type() == OopMapValue::narrowoop_value ? closure->do_oop((narrowOop*)p) : closure->do_oop(p); // ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, p);
+      
+      num_oops++;
     }
   }
+  jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
+  jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
 }
 
 void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosure* closure, MemRegion mr) {

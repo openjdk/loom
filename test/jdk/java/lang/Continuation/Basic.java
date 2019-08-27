@@ -34,8 +34,6 @@
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
-* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
 */
 
 // * @run testng/othervm -Xint -XX:-UseContinuationLazyCopy Basic

@@ -389,11 +389,12 @@
   template(entryPC_name,                              "entryPC")                                  \
   template(tail_name,                                 "tail")                                     \
   template(size_name,                                 "size")                                     \
+  template(numFrames_name,                            "numFrames")                                \
+  template(numOops_name,                              "numOops")                                  \
   template(stack_name,                                "stack")                                    \
   template(maxSize_name,                              "maxSize")                                  \
   template(reset_name,                                "reset")                                    \
   template(mounted_name,                              "mounted")                                  \
-  template(numFrames_name,                            "numFrames")                                \
   template(numInterpretedFrames_name,                 "numInterpretedFrames")                     \
   template(fp_name,                                   "fp")                                       \
   template(sp_name,                                   "sp")                                       \

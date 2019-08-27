@@ -889,6 +889,7 @@ void ContMirror::write() {
     log_develop_trace(jvmcont)("Writing continuation object:");
     log_develop_trace(jvmcont)("\tsp: %d fp: %ld 0x%lx pc: " INTPTR_FORMAT, _sp, _fp, _fp, p2i(_pc));
     log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(_entrySP), p2i(_entryFP), p2i(_entryPC));
+    log_develop_trace(jvmcont)("\ttail: " INTPTR_FORMAT, p2i((oopDesc*)_tail));
     log_develop_trace(jvmcont)("\tmax_size: " SIZE_FORMAT, _max_size);
     log_develop_trace(jvmcont)("\tref_sp: %d", _ref_sp);
     log_develop_trace(jvmcont)("\tflags: %d", _flags);
@@ -1967,6 +1968,8 @@ public:
       chunk = _cont.allocate_stack_chunk(size);
       jdk_internal_misc_StackChunk::set_sp(chunk, size + metadata);
       jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, _cont.tail()); // field is uninitialized
+      jdk_internal_misc_StackChunk::set_numFrames(chunk, 0);
+      jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
     } 
     if (!is_young(chunk)) {
       log_develop_trace(jvmcont)("Young chunk fail");

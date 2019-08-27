@@ -30,8 +30,8 @@ public class StackChunk {
      private int size;
      private int sp;
 
-     // int numOops;
-     // int numFrames;
+     private int numFrames;
+     private int numOops;
      
      // the stack itself is appended here by the VM
  }

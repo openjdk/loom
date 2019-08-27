@@ -4453,6 +4453,8 @@ int java_lang_Continuation::_mounted_offset;
 int jdk_internal_misc_StackChunk::_parent_offset;
 int jdk_internal_misc_StackChunk::_size_offset;
 int jdk_internal_misc_StackChunk::_sp_offset;
+int jdk_internal_misc_StackChunk::_numFrames_offset;
+int jdk_internal_misc_StackChunk::_numOops_offset;
 int java_lang_ClassLoader::parent_offset;
 int java_lang_System::static_in_offset;
 int java_lang_System::static_out_offset;
@@ -4676,9 +4678,11 @@ void java_lang_Continuation::serialize_offsets(SerializeClosure* f) {
 // Support for jdk.internal.misc.StackChunk
 
 #define STACKCHUNK_FIELDS_DO(macro) \
-  macro(_parent_offset, k, vmSymbols::parent_name(), stackchunk_signature, false); \
-  macro(_size_offset,   k, vmSymbols::size_name(),   int_signature,        false); \
-  macro(_sp_offset,     k, vmSymbols::sp_name(),     int_signature,        false);
+  macro(_parent_offset,    k, vmSymbols::parent_name(),    stackchunk_signature, false); \
+  macro(_size_offset,      k, vmSymbols::size_name(),      int_signature,        false); \
+  macro(_sp_offset,        k, vmSymbols::sp_name(),        int_signature,        false); \
+  macro(_numFrames_offset, k, vmSymbols::numFrames_name(), int_signature,        false); \
+  macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false);
 
 void jdk_internal_misc_StackChunk::compute_offsets() {
   InstanceKlass* k = SystemDictionary::StackChunk_klass();
