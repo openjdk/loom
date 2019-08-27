@@ -46,7 +46,7 @@ public:
 private:
   static int _offset_of_stack;
 
-  InstanceStackChunkKlass(const ClassFileParser& parser) : InstanceKlass(parser, InstanceKlass::_misc_kind_stack_chunk, ID) {}
+  InstanceStackChunkKlass(const ClassFileParser& parser);
 
 public:
   InstanceStackChunkKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }

@@ -56,11 +56,19 @@ int InstanceStackChunkKlass::_offset_of_stack = 0;
 //   return (instanceOop)Universe::heap()->class_allocate(this, size, THREAD);
 // }
 
+InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
+ : InstanceKlass(parser, InstanceKlass::_misc_kind_stack_chunk, ID) {
+   // see oopDesc::size_given_klass TODO perf
+   const jint lh = Klass::instance_layout_helper(size_helper(), true);
+   set_layout_helper(lh);
+}
+
 int InstanceStackChunkKlass::instance_size(int stack_size_in_words) const {
   return align_object_size(size_helper() + stack_size_in_words);
 }
 
 int InstanceStackChunkKlass::oop_size(oop obj) const {
+  // see oopDesc::size_given_klass
   return instance_size(jdk_internal_misc_StackChunk::size(obj));
 }
 
