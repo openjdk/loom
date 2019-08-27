@@ -4432,6 +4432,7 @@ int java_lang_ContinuationScope::_name_offset;
 int java_lang_Continuation::_scope_offset;
 int java_lang_Continuation::_target_offset;
 int java_lang_Continuation::_stack_offset;
+int java_lang_Continuation::_tail_offset;
 int java_lang_Continuation::_maxSize_offset;
 int java_lang_Continuation::_numFrames_offset;
 int java_lang_Continuation::_numInterpretedFrames_offset;
@@ -4449,6 +4450,9 @@ int java_lang_Continuation::_cs_offset;
 int java_lang_Continuation::_flags_offset;
 int java_lang_Continuation::_reset_offset;
 int java_lang_Continuation::_mounted_offset;
+int jdk_internal_misc_StackChunk::_parent_offset;
+int jdk_internal_misc_StackChunk::_size_offset;
+int jdk_internal_misc_StackChunk::_sp_offset;
 int java_lang_ClassLoader::parent_offset;
 int java_lang_System::static_in_offset;
 int java_lang_System::static_out_offset;
@@ -4640,6 +4644,7 @@ void java_lang_ContinuationScope::serialize_offsets(SerializeClosure* f) {
   macro(_target_offset,    k, vmSymbols::target_name(),    runnable_signature,          false); \
   macro(_parent_offset,    k, vmSymbols::parent_name(),    continuation_signature,      false); \
   macro(_yieldInfo_offset, k, vmSymbols::yieldInfo_name(), object_signature,            false); \
+  macro(_tail_offset,      k, vmSymbols::tail_name(),      stackchunk_signature,        false); \
   macro(_stack_offset,     k, vmSymbols::stack_name(),     int_array_signature,         false); \
   macro(_maxSize_offset,   k, vmSymbols::maxSize_name(),   int_signature,               false); \
   macro(_refStack_offset,  k, vmSymbols::refStack_name(),  object_array_signature,      false); \
@@ -4665,6 +4670,24 @@ void java_lang_Continuation::compute_offsets() {
 #if INCLUDE_CDS
 void java_lang_Continuation::serialize_offsets(SerializeClosure* f) {
   CONTINUATION_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+}
+#endif
+
+// Support for jdk.internal.misc.StackChunk
+
+#define STACKCHUNK_FIELDS_DO(macro) \
+  macro(_parent_offset, k, vmSymbols::parent_name(), stackchunk_signature, false); \
+  macro(_size_offset,   k, vmSymbols::size_name(),   int_signature,        false); \
+  macro(_sp_offset,     k, vmSymbols::sp_name(),     int_signature,        false);
+
+void jdk_internal_misc_StackChunk::compute_offsets() {
+  InstanceKlass* k = SystemDictionary::StackChunk_klass();
+  STACKCHUNK_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+}
+
+#if INCLUDE_CDS
+void jdk_internal_misc_StackChunk::serialize_offsets(SerializeClosure* f) {
+  STACKCHUNK_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
 
@@ -4922,16 +4945,6 @@ void JavaClasses::compute_hard_coded_offsets() {
   java_lang_ref_Reference::queue_offset       = member_offset(java_lang_ref_Reference::hc_queue_offset);
   java_lang_ref_Reference::next_offset        = member_offset(java_lang_ref_Reference::hc_next_offset);
   java_lang_ref_Reference::discovered_offset  = member_offset(java_lang_ref_Reference::hc_discovered_offset);
-
-  // // java_lang_Continuation Class
-  // java_lang_Continuation::target_offset       = member_offset(java_lang_Continuation::hc_target_offset);
-  // java_lang_Continuation::parent_offset       = member_offset(java_lang_Continuation::hc_parent_offset);
-  // java_lang_Continuation::entrySP_offset      = member_offset(java_lang_Continuation::hc_entrySP_offset);
-  // java_lang_Continuation::entryFP_offset      = member_offset(java_lang_Continuation::hc_entryFP_offset);
-  // java_lang_Continuation::entryPC_offset      = member_offset(java_lang_Continuation::hc_entryPC_offset);
-  // java_lang_Continuation::stack_offset        = member_offset(java_lang_Continuation::hc_stack_offset);
-  // java_lang_Continuation::lastFP_offset       = member_offset(java_lang_Continuation::hc_lastFP_offset);
-  // java_lang_Continuation::lastSP_offset       = member_offset(java_lang_Continuation::hc_lastSP_offset);
 }
 
 #define DO_COMPUTE_OFFSETS(k) k::compute_offsets();

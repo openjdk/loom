@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,6 +26,7 @@
 #define SHARE_VM_RUNTIME_CONTINUATION_HPP
 
 #include "oops/oopsHierarchy.hpp"
+#include "memory/iterator.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/globals.hpp"
 #include "jni.h"
@@ -127,6 +128,7 @@ public:
   static oop continuation_scope(oop cont);
   static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
 
+
 #ifndef PRODUCT
   static void describe(FrameValues &values);
 #endif
@@ -137,6 +139,15 @@ private:
   // declared here as it's used in friend declarations
   static address oop_address(objArrayOop ref_stack, int ref_sp, int index);
   static address oop_address(objArrayOop ref_stack, int ref_sp, address stack_address);
+
+  friend class InstanceStackChunkKlass;
+
+  template <class OopClosureType> static void stack_chunk_iterate_stack(oop obj, OopClosureType* closure);
+  template <class OopClosureType> static void stack_chunk_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
+
+  // for now, we don't devirtualize the closure for faster compilation
+  static void stack_chunk_iterate_stack(oop obj, OopClosure* closure);
+  static void stack_chunk_iterate_stack_bounded(oop obj, OopClosure* closure, MemRegion mr);
 };
 
 void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls);

@@ -84,6 +84,7 @@
   f(java_lang_LiveStackFrameInfo) \
   f(java_lang_ContinuationScope) \
   f(java_lang_Continuation) \
+  f(jdk_internal_misc_StackChunk) \
   f(java_util_concurrent_locks_AbstractOwnableSynchronizer) \
   f(jdk_internal_misc_UnsafeConstants) \
   //end
@@ -1042,15 +1043,6 @@ class java_lang_ContinuationScope: AllStatic {
 class java_lang_Continuation: AllStatic {
   friend class JavaClasses;
  private:
-  //  enum {
-  //   hc_fp_offset      = 0,
-  //   hc_sp_offset      = 11,
-  //   hc_entrySP_offset = 1,
-  //   hc_entryFP_offset = 3,
-  //   hc_target_offset  = 13,
-  //   hc_parent_offset  = 14,
-  //   hc_stack_offset   = 15,
-  // };
   static int _scope_offset;
   static int _target_offset;
   static int _parent_offset;
@@ -1058,6 +1050,7 @@ class java_lang_Continuation: AllStatic {
   static int _entrySP_offset;
   static int _entryFP_offset;
   static int _entryPC_offset;
+  static int _tail_offset;
   static int _stack_offset;
   static int _maxSize_offset;
   static int _numFrames_offset;
@@ -1085,6 +1078,8 @@ class java_lang_Continuation: AllStatic {
   static inline objArrayOop refStack(oop ref);
   static inline void set_stack(oop obj, oop value);
   static inline void set_refStack(oop obj, oop value);
+  static inline oop tail(oop ref);
+  static inline void set_tail(oop ref, oop value);
   static inline jlong fp(oop ref);
   static inline void set_fp(oop ref, const jlong i);
   static inline jint sp(oop ref);
@@ -1115,6 +1110,29 @@ class java_lang_Continuation: AllStatic {
   static bool on_local_stack(oop ref, address adr);
   static bool is_reset(oop ref);
   static bool is_mounted(oop ref);
+};
+
+// Interface to jdk.internal.misc.StackChunk objects
+class jdk_internal_misc_StackChunk: AllStatic {
+  friend class JavaClasses;
+ private:
+  static int _parent_offset;
+  static int _size_offset;
+  static int _sp_offset;
+
+  static void compute_offsets();
+ public:
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+
+  // Accessors
+  static inline oop parent(oop ref);
+  static inline void set_parent(oop ref, oop value);
+  template<typename P>
+  static inline void set_parent_raw(oop ref, oop value);
+  static inline int size(oop ref);
+  static inline void set_size(HeapWord* ref, int value);
+  static inline int sp(oop ref);
+  static inline void set_sp(oop ref, int value);
 };
 
 // Interface to java.lang.invoke.MethodHandle objects

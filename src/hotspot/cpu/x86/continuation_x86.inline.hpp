@@ -1103,4 +1103,82 @@ static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
   st->print_cr("-------");
 }
 
+
+static const int mask = OopMapValue::oop_value | OopMapValue::narrowoop_value;
+
+void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack");
+  // see sender_for_compiled_frame
+
+  CodeBlob* cb = NULL;
+  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+    address pc = *(address*)(sp - 1);
+    int slot;
+    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+    assert (slot >= 0, "");
+    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
+
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld", sp - start);
+    if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
+    assert (cb->is_nmethod(), "");
+
+    for (OopMapStream oms(oopmap,mask); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+      OopMapValue omv = oms.current();
+      VMReg reg = omv.reg();
+      oop* p = reg->is_reg() ? (oop*)(sp - frame::sender_sp_offset) // frame::update_map_with_saved_link(&map, link_addr);
+                             : (oop*)((address)sp + (reg->reg2stack() * VMRegImpl::stack_slot_size)); // see frame::oopmapreg_to_location
+      assert (p != NULL, "");
+
+      log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %d p: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, reg->is_reg(), p2i(p));
+      // oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)RawAccess<>::oop_load((narrowOop*)p) : RawAccess<>::oop_load(p);
+
+      if (!SkipNullValue::should_skip(*p))
+        omv.type() == OopMapValue::narrowoop_value ? closure->do_oop((narrowOop*)p) : closure->do_oop(p); // ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, p);
+    }
+  }
+}
+
+void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosure* closure, MemRegion mr) {
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded");
+  intptr_t* const l = (intptr_t*)mr.start();
+  intptr_t* const h = (intptr_t*)mr.end();
+
+  CodeBlob* cb = NULL;
+  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  if (end > h) end = h;
+  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+    intptr_t* next_sp = sp + cb->frame_size();
+    if (sp + cb->frame_size() >= l) {
+      sp += cb->frame_size();
+      continue;
+    }
+
+    address pc = *(address*)(sp - 1);
+    int slot;
+    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
+    assert (slot >= 0, "");
+
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded sp: %ld", sp - start);
+    if (log_develop_is_enabled(Trace, jvmcont)) cb->print_on(tty);
+
+    for (OopMapStream oms(oopmap,mask); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+      OopMapValue omv = oms.current();
+      VMReg reg = omv.reg();
+      oop* p = reg->is_reg() ? (oop*)(sp - frame::sender_sp_offset) // frame::update_map_with_saved_link(&map, link_addr);
+                             : (oop*)((address)sp + (reg->reg2stack() * VMRegImpl::stack_slot_size)); // see frame::oopmapreg_to_location
+      assert (p != NULL, "");
+
+      if ((intptr_t*)p < l) continue;
+
+      log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded p: " INTPTR_FORMAT, p2i(p));
+      if (!SkipNullValue::should_skip(*p))
+        omv.type() == OopMapValue::narrowoop_value ? closure->do_oop((narrowOop*)p) : closure->do_oop(p); // ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, p);
+    }
+  }
+}
+
 #endif // CPU_X86_CONTINUATION_X86_INLINE_HPP

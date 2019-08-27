@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,34 +22,70 @@
  *
  */
 
-#ifndef SHARE_OOPS_INSTANCECLASSLOADERKLASS_HPP
-#define SHARE_OOPS_INSTANCECLASSLOADERKLASS_HPP
+#ifndef SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
+#define SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
 
 #include "oops/instanceKlass.hpp"
 #include "utilities/macros.hpp"
 
 class ClassFileParser;
 
-// An InstanceClassLoaderKlass is a specialization of the InstanceKlass. It does
+// An InstanceStackChunkKlass is a specialization of the InstanceKlass. 
+// It has 
 // not add any field.  It is added to walk the dependencies for the class loader
 // key that this class loader points to.  This is how the loader_data graph is
 // walked and dependent class loaders are kept alive.  I thought we walked
 // the list later?
 
-class InstanceClassLoaderKlass: public InstanceKlass {
+class InstanceStackChunkKlass: public InstanceKlass {
   friend class VMStructs;
   friend class InstanceKlass;
 public:
-  static const KlassID ID = InstanceClassLoaderKlassID;
+  static const KlassID ID = InstanceStackChunkKlassID;
 
 private:
-  InstanceClassLoaderKlass(const ClassFileParser& parser) : InstanceKlass(parser, InstanceKlass::_misc_kind_class_loader, ID) {}
+  static int _offset_of_stack;
+
+  InstanceStackChunkKlass(const ClassFileParser& parser) : InstanceKlass(parser, InstanceKlass::_misc_kind_stack_chunk, ID) {}
 
 public:
-  InstanceClassLoaderKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
+  InstanceStackChunkKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
+
+  // Casting from Klass*
+  static InstanceStackChunkKlass* cast(Klass* k) {
+    assert(InstanceKlass::cast(k)->is_stack_chunk_instance_klass(),
+           "cast to InstanceStackChunkKlass");
+    return static_cast<InstanceStackChunkKlass*>(k);
+  }
+
+  int instance_size(int stack_size_in_words) const;
+
+  // Returns the size of the instance including the stack data fields.
+  virtual int oop_size(oop obj) const;
+
+  // allocation
+  // instanceOop allocate_instance(int stack_size, TRAPS);
+
+  static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
+  
+  // Stack offset is an offset into the Heap
+  static HeapWord* start_of_stack(oop obj) {
+    return (HeapWord*)(cast_from_oop<intptr_t>(obj) + offset_of_stack());
+  }
+
+  static void init_offset_of_stack() {
+    // Cache the offset of the static fields in the Class instance
+    assert(_offset_of_stack == 0, "once");
+    _offset_of_stack = InstanceStackChunkKlass::cast(SystemDictionary::StackChunk_klass())->size_helper() << LogHeapWordSize;
+  }
+
+  static int offset_of_stack() {
+    return _offset_of_stack;
+  }
 
   // Oop fields (and metadata) iterators
   //
+  // The InstanceClassLoaderKlass iterators also visit the CLD pointer (or mirror of anonymous klasses.)
 
   // Forward iteration
   // Iterate over the oop fields and metadata.
@@ -66,8 +102,7 @@ public:
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
- private:
-
+private:
   // Iterate over the stack.
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_stack(oop obj, OopClosureType* closure);
@@ -77,4 +112,4 @@ public:
   inline void oop_oop_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 };
 
-#endif // SHARE_OOPS_INSTANCECLASSLOADERKLASS_HPP
+#endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP

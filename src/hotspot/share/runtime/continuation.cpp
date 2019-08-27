@@ -42,11 +42,11 @@
 #include "logging/logStream.hpp"
 #include "metaprogramming/conditional.hpp"
 #include "oops/access.inline.hpp"
+#include "oops/instanceStackChunkKlass.inline.hpp"
 #include "oops/objArrayOop.inline.hpp"
 #include "oops/weakHandle.hpp"
 #include "oops/weakHandle.inline.hpp"
 #include "prims/jvmtiThreadState.hpp"
-#include "runtime/continuation.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
@@ -61,6 +61,14 @@
 #include "utilities/debug.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/macros.hpp"
+
+#include "gc/g1/g1CollectedHeap.inline.hpp"
+
+static bool is_young(oop obj) {
+  assert(UseG1GC, "");
+  assert (obj != (oop)NULL, "");
+  return G1CollectedHeap::heap()->heap_region_containing(obj)->is_young();
+}
 
 // #define PERFTEST 1
 
@@ -480,6 +488,8 @@ private:
   intptr_t* _entryFP;
   address _entryPC;
 
+  oop _tail;
+
   int  _sp;
   intptr_t _fp;
   address _pc;
@@ -525,6 +535,9 @@ private:
   oop raw_allocate(Klass* klass, size_t words, size_t elements, bool zero);
 
 public:
+  oop allocate_stack_chunk(int stack_size);
+
+public:
   // TODO R: get rid of these:
   static inline int to_index(int x) { return x >> LogBytesPerElement; }
   static inline int to_bytes(int x)    { return x << LogBytesPerElement; }
@@ -562,6 +575,9 @@ public:
   void set_entrySP(intptr_t* sp) { _entrySP = sp; }
   void set_entryFP(intptr_t* fp) { _entryFP = fp; }
   void set_entryPC(address pc)   { _entryPC = pc; log_develop_trace(jvmcont)("set_entryPC " INTPTR_FORMAT, p2i(pc)); }
+
+  oop tail()               { return _tail; }
+  void set_tail(oop chunk) { _tail = chunk; }
 
   int sp() const           { return _sp; }
   intptr_t fp() const      { return _fp; }
@@ -831,6 +847,8 @@ void ContMirror::read() {
   _entryFP = java_lang_Continuation::entryFP(_cont);
   _entryPC = java_lang_Continuation::entryPC(_cont);
 
+  _tail = java_lang_Continuation::tail(_cont);
+
   _sp = java_lang_Continuation::sp(_cont);
   _fp = (intptr_t)java_lang_Continuation::fp(_cont);
   _pc = (address)java_lang_Continuation::pc(_cont);
@@ -856,6 +874,7 @@ void ContMirror::read() {
   if (log_develop_is_enabled(Trace, jvmcont)) {
     log_develop_trace(jvmcont)("Reading continuation object:");
     log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(_entrySP), p2i(_entryFP), p2i(_entryPC));
+    log_develop_trace(jvmcont)("\ttail: " INTPTR_FORMAT, p2i((oopDesc*)_tail));
     log_develop_trace(jvmcont)("\tsp: %d fp: %ld 0x%lx pc: " INTPTR_FORMAT, _sp, _fp, _fp, p2i(_pc));
     log_develop_trace(jvmcont)("\tstack: " INTPTR_FORMAT " hstack: " INTPTR_FORMAT ", stack_length: %d max_size: " SIZE_FORMAT, p2i((oopDesc*)_stack), p2i(_hstack), _stack_length, _max_size);
     log_develop_trace(jvmcont)("\tref_stack: " INTPTR_FORMAT " ref_sp: %d", p2i((oopDesc*)_ref_stack), _ref_sp);
@@ -882,6 +901,8 @@ void ContMirror::write() {
   java_lang_Continuation::set_fp(_cont, _fp);
   java_lang_Continuation::set_pc(_cont, _pc);
   java_lang_Continuation::set_refSP(_cont, _ref_sp);
+
+  java_lang_Continuation::set_tail(_cont, _tail);
 
   java_lang_Continuation::set_entrySP(_cont, _entrySP);
   java_lang_Continuation::set_entryFP(_cont, _entryFP);
@@ -1910,6 +1931,13 @@ public:
   freeze_result freeze(FrameInfo* fi) {
     _fi = fi;
 
+    if (ConfigT::has_young && mode == mode_fast) {
+      freeze_young();
+      // if (freeze_young()) {
+      //   return freeze_ok;
+      // }
+    }
+
     HandleMark hm(_thread);
 
     // tty->print_cr(">>> freeze mode: %d", mode);
@@ -1919,6 +1947,54 @@ public:
     frame f = freeze_start_frame(_map);
     hframe caller;
     return freeze<true>(f, caller, 0);
+  }
+
+  bool freeze_young() {
+    static const int metadata = 2; // return address + link
+
+    log_develop_trace(jvmcont)("freeze_young");
+    assert (mode == mode_fast, "");
+
+    intptr_t* top = _fi->sp;
+    intptr_t* bottom = _cont.entrySP();
+    if (Interpreter::contains(_cont.entryPC())) bottom -= 2;
+    int size = bottom - top; // in words
+    log_develop_trace(jvmcont)("freeze_young size: %d", size);
+
+    oop chunk = _cont.tail();
+    if (chunk == NULL || (is_young(chunk) && remaining_in_chunk(chunk) < size)) {
+      log_develop_trace(jvmcont)("freeze_young allocating new chunk");
+      chunk = _cont.allocate_stack_chunk(size);
+      jdk_internal_misc_StackChunk::set_sp(chunk, size + metadata);
+      jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, _cont.tail()); // field is uninitialized
+    } 
+    if (!is_young(chunk)) {
+      log_develop_trace(jvmcont)("Young chunk fail");
+      return false;
+    }
+
+    // copy; no need to patch because of how we handle return address and link
+    int sp = jdk_internal_misc_StackChunk::sp(chunk);
+    log_develop_trace(jvmcont)("freeze_young start: chunk " INTPTR_FORMAT " size: %d orig sp: %d", p2i((oopDesc*)chunk), jdk_internal_misc_StackChunk::size(chunk), sp);
+    sp -= size;
+    // we copy the top frame's return address and link, but not the bottom's
+    intptr_t* chunk_top = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp;
+    log_develop_trace(jvmcont)("freeze_young start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT, p2i(InstanceStackChunkKlass::start_of_stack(chunk)), sp, p2i(chunk_top));
+    void* to =  chunk_top - metadata;
+    void* from = top - metadata;
+    int sizeb = size << LogBytesPerWord;
+    log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + sizeb), sizeb);
+    log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + sizeb), sizeb);
+    memcpy(to, from, sizeb);
+    jdk_internal_misc_StackChunk::set_sp(chunk, sp);
+
+    _cont.set_tail(chunk);
+    log_develop_trace(jvmcont)("Young chunk success");
+    return true;
+  }
+
+  int remaining_in_chunk(oop chunk) {
+    return jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk);
   }
 
   frame freeze_start_frame(SmallRegisterMap& ignored) {
@@ -1931,7 +2007,9 @@ public:
 
     // Note: if the doYield stub does not have its own frame, we may need to consider deopt here, especially if yield is inlinable
     frame f = ContinuationHelper::last_frame(_thread); // thread->last_frame();
+
     assert(StubRoutines::cont_doYield_stub()->contains(f.pc()), "must be");
+    assert (f.sp() + slow_get_cb(f)->frame_size() == _fi->sp, "f.sp: %p size: %d fi->sp: %p", f.sp(), slow_get_cb(f)->frame_size(), _fi->sp);
   #ifdef ASSERT
     hframe::callee_info my_info = slow_link_address<StubF>(f);
   #endif
@@ -2095,6 +2173,12 @@ public:
   #ifdef ASSERT
     log_develop_trace(jvmcont)("Found entry:");
     if (log_develop_is_enabled(Trace, jvmcont)) f.print_on(tty);
+
+    assert (mode != mode_fast || !callee.is_interpreted_frame(), "");
+    assert (mode != mode_fast || Interpreter::contains(_cont.entryPC())
+      || f.sp() == _cont.entrySP(), "f.sp: %p entrySP: %p", f.sp(), _cont.entrySP());
+    assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC())
+      || f.sp() == _cont.entrySP() - 2, "f.sp: %p entrySP: %p", f.sp(), _cont.entrySP());
 
     hframe orig_top_frame = _cont.last_frame<mode_slow>();
     bool empty = _cont.is_empty();
@@ -4188,6 +4272,7 @@ int ContMirror::fix_decreasing_index(int index, int old_length, int new_length) 
 
 inline void ContMirror::post_safepoint(Handle conth) {
   _cont = conth(); // reload oop
+  _tail = java_lang_Continuation::tail(_cont);
   _ref_stack = java_lang_Continuation::refStack(_cont);
   _stack = java_lang_Continuation::stack(_cont);
   _hstack = (ElemType*)_stack->base(basicElementType);
@@ -4285,6 +4370,25 @@ oop ContMirror::raw_allocate(Klass* klass, size_t size_in_words, size_t elements
     Handle conth(_thread, _cont);
     uint64_t counter = SafepointSynchronize::safepoint_counter();
     oop result = allocator.allocate();
+    //if (!SafepointSynchronize::is_same_safepoint(counter)) {
+      post_safepoint(conth);
+    //}
+    return result;
+  }
+}
+
+oop ContMirror::allocate_stack_chunk(int stack_size) {
+  InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(SystemDictionary::StackChunk_klass());
+  int size_in_words = klass->instance_size(stack_size);
+  StackChunkAllocator allocator(klass, size_in_words, stack_size, _thread);
+  HeapWord* start = _thread->tlab().allocate(size_in_words);
+  if (start != NULL) {
+    return allocator.initialize(start);
+  } else {
+    //HandleMark hm(_thread);
+    Handle conth(_thread, _cont);
+    // uint64_t counter = SafepointSynchronize::safepoint_counter();
+    oop result = allocator.allocate(/* use_tlab */ false);
     //if (!SafepointSynchronize::is_same_safepoint(counter)) {
       post_safepoint(conth);
     //}
@@ -4464,6 +4568,7 @@ public:
   static const bool _compressed_oops = compressed_oops;
   static const bool _post_barrier = post_barrier;
   static const bool allow_stubs = gen_stubs && post_barrier && compressed_oops;
+  static const bool has_young = g1gc;
 
   template<op_mode mode>
   static freeze_result freeze(JavaThread* thread, ContMirror& cont, FrameInfo* fi) {

@@ -214,36 +214,39 @@ class InstanceKlass: public Klass {
   // This can be used to quickly discriminate among the four kinds of
   // InstanceKlass.
 
-  static const unsigned _misc_kind_field_size = 2;
-  static const unsigned _misc_kind_field_pos  = 0;
-  static const unsigned _misc_kind_field_mask = (1u << _misc_kind_field_size) - 1u;
+  // static const unsigned _misc_kind_field_pos  = 0;
+  static const unsigned _misc_kind_field_size = 0;
+  // static const unsigned _misc_kind_field_mask = (1u << _misc_kind_field_size) - 1u;
 
   static const unsigned _misc_kind_other        = 0; // concrete InstanceKlass
   static const unsigned _misc_kind_reference    = 1; // InstanceRefKlass
   static const unsigned _misc_kind_class_loader = 2; // InstanceClassLoaderKlass
   static const unsigned _misc_kind_mirror       = 3; // InstanceMirrorKlass
+  static const unsigned _misc_kind_stack_chunk  = 4; // InstanceStackChunk
+  static const unsigned _misc_kind_last  = _misc_kind_stack_chunk;
 
   // Start after _misc_kind field.
   enum {
-    _misc_rewritten                           = 1 << 2,  // methods rewritten.
-    _misc_has_nonstatic_fields                = 1 << 3,  // for sizing with UseCompressedOops
-    _misc_should_verify_class                 = 1 << 4,  // allow caching of preverification
-    _misc_is_unsafe_anonymous                 = 1 << 5,  // has embedded _unsafe_anonymous_host field
-    _misc_is_contended                        = 1 << 6,  // marked with contended annotation
-    _misc_has_nonstatic_concrete_methods      = 1 << 7,  // class/superclass/implemented interfaces has non-static, concrete methods
-    _misc_declares_nonstatic_concrete_methods = 1 << 8,  // directly declares non-static, concrete methods
-    _misc_has_been_redefined                  = 1 << 9,  // class has been redefined
-    _misc_has_passed_fingerprint_check        = 1 << 10, // when this class was loaded, the fingerprint computed from its
+    _misc_rewritten                           = 1 << (_misc_kind_field_size + 0),  // methods rewritten.
+    _misc_has_nonstatic_fields                = 1 << (_misc_kind_field_size + 1),  // for sizing with UseCompressedOops
+    _misc_should_verify_class                 = 1 << (_misc_kind_field_size + 2),  // allow caching of preverification
+    _misc_is_unsafe_anonymous                 = 1 << (_misc_kind_field_size + 3),  // has embedded _unsafe_anonymous_host field
+    _misc_is_contended                        = 1 << (_misc_kind_field_size + 4),  // marked with contended annotation
+    _misc_has_nonstatic_concrete_methods      = 1 << (_misc_kind_field_size + 5),  // class/superclass/implemented interfaces has non-static, concrete methods
+    _misc_declares_nonstatic_concrete_methods = 1 << (_misc_kind_field_size + 6),  // directly declares non-static, concrete methods
+    _misc_has_been_redefined                  = 1 << (_misc_kind_field_size + 7),  // class has been redefined
+    _misc_has_passed_fingerprint_check        = 1 << (_misc_kind_field_size + 8), // when this class was loaded, the fingerprint computed from its
                                                          // code source was found to be matching the value recorded by AOT.
-    _misc_is_scratch_class                    = 1 << 11, // class is the redefined scratch class
-    _misc_is_shared_boot_class                = 1 << 12, // defining class loader is boot class loader
-    _misc_is_shared_platform_class            = 1 << 13, // defining class loader is platform class loader
-    _misc_is_shared_app_class                 = 1 << 14, // defining class loader is app class loader
-    _misc_has_resolved_methods                = 1 << 15  // resolved methods table entries added for this class
+    _misc_is_scratch_class                    = 1 << (_misc_kind_field_size + 9), // class is the redefined scratch class
+    _misc_is_shared_boot_class                = 1 << (_misc_kind_field_size + 10), // defining class loader is boot class loader
+    _misc_is_shared_platform_class            = 1 << (_misc_kind_field_size + 11), // defining class loader is platform class loader
+    _misc_is_shared_app_class                 = 1 << (_misc_kind_field_size + 12), // defining class loader is app class loader
+    _misc_has_resolved_methods                = 1 << (_misc_kind_field_size + 13)  // resolved methods table entries added for this class
   };
   u2 loader_type_bits() {
     return _misc_is_shared_boot_class|_misc_is_shared_platform_class|_misc_is_shared_app_class;
   }
+  u1              _kind;
   u2              _misc_flags;
   u2              _minor_version;        // minor version number of class file
   u2              _major_version;        // major version number of class file
@@ -779,15 +782,17 @@ public:
 private:
 
   void set_kind(unsigned kind) {
-    assert(kind <= _misc_kind_field_mask, "Invalid InstanceKlass kind");
-    unsigned fmask = _misc_kind_field_mask << _misc_kind_field_pos;
-    unsigned flags = _misc_flags & ~fmask;
-    _misc_flags = (flags | (kind << _misc_kind_field_pos));
+    // assert(kind <= _misc_kind_field_mask, "Invalid InstanceKlass kind");
+    // unsigned fmask = _misc_kind_field_mask << _misc_kind_field_pos;
+    // unsigned flags = _misc_flags & ~fmask;
+    // _misc_flags = (flags | (kind << _misc_kind_field_pos));
+    assert(kind <= _misc_kind_last, "Invalid InstanceKlass kind");
+    _kind = kind;
   }
 
   bool is_kind(unsigned desired) const {
-    unsigned kind = (_misc_flags >> _misc_kind_field_pos) & _misc_kind_field_mask;
-    return kind == desired;
+    // unsigned kind = (_misc_flags >> _misc_kind_field_pos) & _misc_kind_field_mask;
+    return _kind == desired;
   }
 
 public:
@@ -797,6 +802,7 @@ public:
   bool is_reference_instance_klass() const    { return is_kind(_misc_kind_reference); }
   bool is_mirror_instance_klass() const       { return is_kind(_misc_kind_mirror); }
   bool is_class_loader_instance_klass() const { return is_kind(_misc_kind_class_loader); }
+  bool is_stack_chunk_instance_klass() const  { return is_kind(_misc_kind_stack_chunk); }
 
 #if INCLUDE_JVMTI
 

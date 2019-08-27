@@ -72,6 +72,7 @@
   template(java_lang_Runnable,                        "java/lang/Runnable")                       \
   /*template(java_lang_Continuation,                    "java/lang/Continuation")                 */\
   template(java_lang_ContinuationScope,               "java/lang/ContinuationScope")              \
+  template(jdk_internal_misc_StackChunk,              "jdk/internal/misc/StackChunk")             \
   template(java_lang_Boolean,                         "java/lang/Boolean")                        \
   template(java_lang_Character,                       "java/lang/Character")                      \
   template(java_lang_Character_CharacterCache,        "java/lang/Character$CharacterCache")       \
@@ -386,6 +387,8 @@
   template(entrySP_name,                              "entrySP")                                  \
   template(entryFP_name,                              "entryFP")                                  \
   template(entryPC_name,                              "entryPC")                                  \
+  template(tail_name,                                 "tail")                                     \
+  template(size_name,                                 "size")                                     \
   template(stack_name,                                "stack")                                    \
   template(maxSize_name,                              "maxSize")                                  \
   template(reset_name,                                "reset")                                    \
@@ -533,6 +536,7 @@
   template(runnable_signature,                        "Ljava/lang/Runnable;")                     \
   template(continuation_signature,                    "Ljava/lang/Continuation;")                 \
   template(continuationscope_signature,               "Ljava/lang/ContinuationScope;")            \
+  template(stackchunk_signature,                      "Ljdk/internal/misc/StackChunk;")           \
   template(fiber_signature,                           "Ljava/lang/Fiber;")                        \
   template(object_void_signature,                     "(Ljava/lang/Object;)V")                    \
   template(object_int_signature,                      "(Ljava/lang/Object;)I")                    \

@@ -430,3 +430,10 @@ oop ClassAllocator::initialize(HeapWord* mem) const {
   java_lang_Class::set_oop_size(mem, (int)_word_size);
   return finish(mem);
 }
+
+oop StackChunkAllocator::initialize(HeapWord* mem) const {
+  assert(_stack_size > 0, "");
+  assert(_word_size > (size_t)_stack_size, "");
+  jdk_internal_misc_StackChunk::set_size(mem, _stack_size);
+  return finish(mem);
+}
