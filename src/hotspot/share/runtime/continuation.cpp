@@ -1568,8 +1568,8 @@ template <>
 class FreezeFrame<Compiled> {
   public:
   template <bool top, bool bottom, bool IsKeepalive, typename FreezeT>
-  static hframe dispatch(FreezeT& self, const frame& f, const hframe& caller, int fsize, int argsize, int oops, FreezeFnT f_fn, typename FreezeT::CompiledMethodKeepaliveT* kd) {
-    return self.template freeze_compiled_frame<Compiled, top, bottom, IsKeepalive>(f, caller, fsize, argsize, oops, f_fn, kd);
+  static hframe dispatch(FreezeT& self, const frame& f, const hframe& caller, int fsize, int argsize, int oops, FreezeFnT freeze_stub, typename FreezeT::CompiledMethodKeepaliveT* kd) {
+    return self.template freeze_compiled_frame<Compiled, top, bottom, IsKeepalive>(f, caller, fsize, argsize, oops, freeze_stub, kd);
   }
 };
 
@@ -1918,9 +1918,9 @@ public:
 
     int frozen;
     if (LIKELY(!FKind::interpreted && extra != NULL)) { // dynamic branch
-      FreezeFnT f_fn = (FreezeFnT)extra;
+      FreezeFnT freeze_stub = (FreezeFnT)extra;
       // tty->print_cr(">>>>0000<<<<<");
-      frozen = freeze_compiled_oops_stub(f_fn, f, vsp, hsp, index);
+      frozen = freeze_compiled_oops_stub(freeze_stub, f, vsp, hsp, index);
     } else {
       if (num_oops == 0)
         return;
@@ -2029,7 +2029,7 @@ public:
       oops  = Compiled::num_oops(f);
       argsize = mode == mode_fast ? 0 : Compiled::stack_argsize(f);
     }
-    FreezeFnT f_fn = get_oopmap_stub(f); // try to do this early, so we wouldn't need to look at the oopMap again.
+    FreezeFnT freeze_stub = get_oopmap_stub(f); // try to do this early, so we wouldn't need to look at the oopMap again.
 
     log_develop_trace(jvmcont)("recurse_freeze_compiled_frame _size: %d add fsize: %d", _size, fsize);
     _size += fsize;
@@ -2037,11 +2037,11 @@ public:
     _frames++;
 
     // TODO PERF: consider recalculating fsize, argsize and oops in freeze_compiled_frame instead of passing them, as we now do in thaw
-    return recurse_freeze_java_frame<Compiled, top, IsKeepalive>(f, caller, fsize, argsize, oops, f_fn, kd);
+    return recurse_freeze_java_frame<Compiled, top, IsKeepalive>(f, caller, fsize, argsize, oops, freeze_stub, kd);
   }
 
   template <typename FKind, bool top, bool bottom, bool IsKeepalive>
-  hframe freeze_compiled_frame(const frame& f, const hframe& caller, int fsize, int argsize, int oops, FreezeFnT f_fn, CompiledMethodKeepaliveT* kd) {
+  hframe freeze_compiled_frame(const frame& f, const hframe& caller, int fsize, int argsize, int oops, FreezeFnT freeze_stub, CompiledMethodKeepaliveT* kd) {
     freeze_compiled_frame_bp();
 
     intptr_t* vsp = FKind::frame_top(f);
@@ -2075,8 +2075,8 @@ public:
 
       // ref_sp: 3, oops 4  -> [ 3: oop, 4: oop, 5: oop, 6: nmethod ]
       kd->write_at(_cont, hf.ref_sp() + oops - 1);
-      //freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp() + 1, oops - 1, (void*)f_fn);
-      freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp(), oops - 1, (void*)f_fn);
+      //freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp() + 1, oops - 1, (void*)freeze_stub);
+      freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp(), oops - 1, (void*)freeze_stub);
 
       if (mode == mode_preempt && _safepoint_stub_caller) {
         assert (!_fp_oop_info._has_fp_oop, "must be");
@@ -2147,12 +2147,12 @@ public:
     }
   }
 
-  inline int freeze_compiled_oops_stub(FreezeFnT f_fn, const frame& f, intptr_t* vsp, intptr_t* hsp, int starting_index) {
+  inline int freeze_compiled_oops_stub(FreezeFnT freeze_stub, const frame& f, intptr_t* vsp, intptr_t* hsp, int starting_index) {
     // tty->print_cr(">>>>2222<<<<<");
     // ContinuationHelper::update_register_map_with_callee(&_map, f);
     intptr_t** link_addr = Frame::callee_link_address(f); // Frame::map_link_address(map);
     typename ConfigT::OopT* addr = _cont.refStack()->template obj_at_address<typename ConfigT::OopT>(starting_index);
-    int cnt = f_fn( (address) vsp,  (address) addr, (address) link_addr, (address) hsp, _cont.refStack()->length() - starting_index, &_fp_oop_info);
+    int cnt = freeze_stub( (address) vsp,  (address) addr, (address) link_addr, (address) hsp, _cont.refStack()->length() - starting_index, &_fp_oop_info);
     return cnt;
   }
 
