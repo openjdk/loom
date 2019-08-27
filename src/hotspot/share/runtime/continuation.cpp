@@ -47,7 +47,6 @@
 #include "oops/weakHandle.hpp"
 #include "oops/weakHandle.inline.hpp"
 #include "prims/jvmtiThreadState.hpp"
-#include "runtime/continuation.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/frame.hpp"
@@ -4373,6 +4372,25 @@ oop ContMirror::raw_allocate(Klass* klass, size_t size_in_words, size_t elements
     Handle conth(_thread, _cont);
     uint64_t counter = SafepointSynchronize::safepoint_counter();
     oop result = allocator.allocate();
+    //if (!SafepointSynchronize::is_same_safepoint(counter)) {
+      post_safepoint(conth);
+    //}
+    return result;
+  }
+}
+
+oop ContMirror::allocate_stack_chunk(int stack_size) {
+  InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(SystemDictionary::StackChunk_klass());
+  int size_in_words = klass->instance_size(stack_size);
+  StackChunkAllocator allocator(klass, size_in_words, stack_size, _thread);
+  HeapWord* start = _thread->tlab().allocate(size_in_words);
+  if (start != NULL) {
+    return allocator.initialize(start);
+  } else {
+    //HandleMark hm(_thread);
+    Handle conth(_thread, _cont);
+    // uint64_t counter = SafepointSynchronize::safepoint_counter();
+    oop result = allocator.allocate(/* use_tlab */ false);
     //if (!SafepointSynchronize::is_same_safepoint(counter)) {
       post_safepoint(conth);
     //}
