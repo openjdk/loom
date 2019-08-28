@@ -27,11 +27,13 @@ package jdk.internal.misc;
 
 public class StackChunk {
      private StackChunk parent;
-     private int size;
-     private int sp;
+     private int size; // in words
+     private int sp; // in words
+     private int argsize; // bottom stack-passed arguments, in words
 
      private int numFrames;
      private int numOops;
+     private long safepoint;
      
      // the stack itself is appended here by the VM
  }

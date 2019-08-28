@@ -389,6 +389,8 @@
   template(entryPC_name,                              "entryPC")                                  \
   template(tail_name,                                 "tail")                                     \
   template(size_name,                                 "size")                                     \
+  template(argsize_name,                              "argsize")                                  \
+  template(safepoint_name,                            "safepoint")                                \
   template(numFrames_name,                            "numFrames")                                \
   template(numOops_name,                              "numOops")                                  \
   template(stack_name,                                "stack")                                    \

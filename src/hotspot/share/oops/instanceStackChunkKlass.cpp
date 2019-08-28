@@ -34,33 +34,17 @@
 #include "oops/instanceOop.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/symbol.hpp"
-#include "runtime/handles.inline.hpp"
 #include "utilities/macros.hpp"
 
 int InstanceStackChunkKlass::_offset_of_stack = 0;
-
-// int InstanceStackChunkKlass::instance_size(Klass* k) {
-//   if (k != NULL && k->is_instance_klass()) {
-//     return align_object_size(size_helper() + InstanceKlass::cast(k)->static_field_size());
-//   }
-//   return size_helper();
-// }
-
-// instanceOop InstanceStackChunkKlass::allocate_instance(int stack_size, TRAPS) {
-//   // Query before forming handle.
-//   int size = instance_size(k);
-//   assert(size > 0, "total object size must be positive: %d", size);
-
-//   // Since mirrors can be variable sized because of the static fields, store
-//   // the size in the mirror itself.
-//   return (instanceOop)Universe::heap()->class_allocate(this, size, THREAD);
-// }
 
 InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
  : InstanceKlass(parser, InstanceKlass::_misc_kind_stack_chunk, ID) {
    // see oopDesc::size_given_klass TODO perf
    const jint lh = Klass::instance_layout_helper(size_helper(), true);
    set_layout_helper(lh);
+   assert (layout_helper_is_instance(layout_helper()), "");
+   assert (layout_helper_needs_slow_path(layout_helper()), "");
 }
 
 int InstanceStackChunkKlass::instance_size(int stack_size_in_words) const {

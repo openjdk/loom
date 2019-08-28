@@ -386,20 +386,15 @@ InstanceKlass* InstanceKlass::allocate_instance_klass(const ClassFileParser& par
   // Allocation
   if (REF_NONE == parser.reference_type()) {
     if (class_name == vmSymbols::java_lang_Class()) {
-      // mirror
       ik = new (loader_data, size, THREAD) InstanceMirrorKlass(parser);
     } else if (class_name == vmSymbols::jdk_internal_misc_StackChunk()) {
-      // class loader
       ik = new (loader_data, size, THREAD) InstanceStackChunkKlass(parser);
     } else if (is_class_loader(class_name, parser)) {
-      // class loader
       ik = new (loader_data, size, THREAD) InstanceClassLoaderKlass(parser);
     } else {
-      // normal
       ik = new (loader_data, size, THREAD) InstanceKlass(parser, InstanceKlass::_misc_kind_other);
     }
   } else {
-    // reference
     ik = new (loader_data, size, THREAD) InstanceRefKlass(parser);
   }
 

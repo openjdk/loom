@@ -4453,6 +4453,8 @@ int java_lang_Continuation::_mounted_offset;
 int jdk_internal_misc_StackChunk::_parent_offset;
 int jdk_internal_misc_StackChunk::_size_offset;
 int jdk_internal_misc_StackChunk::_sp_offset;
+int jdk_internal_misc_StackChunk::_argsize_offset;
+int jdk_internal_misc_StackChunk::_safepoint_offset;
 int jdk_internal_misc_StackChunk::_numFrames_offset;
 int jdk_internal_misc_StackChunk::_numOops_offset;
 int java_lang_ClassLoader::parent_offset;
@@ -4681,6 +4683,8 @@ void java_lang_Continuation::serialize_offsets(SerializeClosure* f) {
   macro(_parent_offset,    k, vmSymbols::parent_name(),    stackchunk_signature, false); \
   macro(_size_offset,      k, vmSymbols::size_name(),      int_signature,        false); \
   macro(_sp_offset,        k, vmSymbols::sp_name(),        int_signature,        false); \
+  macro(_argsize_offset,   k, vmSymbols::argsize_name(),   int_signature,        false); \
+  macro(_safepoint_offset, k, vmSymbols::safepoint_name(), long_signature,       false); \
   macro(_numFrames_offset, k, vmSymbols::numFrames_name(), int_signature,        false); \
   macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false);
 

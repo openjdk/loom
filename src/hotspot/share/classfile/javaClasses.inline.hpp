@@ -310,6 +310,21 @@ inline int jdk_internal_misc_StackChunk::sp(oop ref) {
 inline void jdk_internal_misc_StackChunk::set_sp(oop ref, int value) {
   ref->int_field_put(_sp_offset, value);
 }
+inline int jdk_internal_misc_StackChunk::argsize(oop ref) {
+  return ref->int_field(_argsize_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_argsize(oop ref, int value) {
+  ref->int_field_put(_argsize_offset, value);
+}
+inline uint64_t jdk_internal_misc_StackChunk::safepoint(oop ref) {
+  return (uint64_t)ref->long_field(_safepoint_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_safepoint(oop ref, uint64_t value) {
+  ref->long_field_put(_safepoint_offset, (jlong)value);
+}
+inline int jdk_internal_misc_StackChunk::end(oop ref) {
+  return size(ref) - argsize(ref);
+}
 inline int jdk_internal_misc_StackChunk::numFrames(oop ref) {
   return ref->int_field(_numFrames_offset);
 }

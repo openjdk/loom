@@ -342,7 +342,7 @@ public class Basic {
         return Integer.parseInt(r)+1;
     }
     
-    public void testNotPinnedMonitor() {
+    private void testNotPinnedMonitor() {
         System.out.println("testNotPinnedMonitor");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
         
@@ -372,7 +372,7 @@ public class Basic {
         return Integer.parseInt(r)+1;
     }
 
-    public void testPinnedNative() {
+    private void testPinnedNative() {
         System.out.println("testPinnedNative");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
         
@@ -411,7 +411,7 @@ public class Basic {
         return "" + r;
     }
 
-    public void testPinnedCriticalSection() {
+    private void testPinnedCriticalSection() {
         System.out.println("testPinnedCriticalSection");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
         

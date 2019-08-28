@@ -31,11 +31,8 @@
 class ClassFileParser;
 
 // An InstanceStackChunkKlass is a specialization of the InstanceKlass. 
-// It has 
-// not add any field.  It is added to walk the dependencies for the class loader
-// key that this class loader points to.  This is how the loader_data graph is
-// walked and dependent class loaders are kept alive.  I thought we walked
-// the list later?
+// It has a header containing metadata, and a blob containing a stack segment
+// (some integral number of stack frames),
 
 class InstanceStackChunkKlass: public InstanceKlass {
   friend class VMStructs;
@@ -53,18 +50,14 @@ public:
 
   // Casting from Klass*
   static InstanceStackChunkKlass* cast(Klass* k) {
-    assert(InstanceKlass::cast(k)->is_stack_chunk_instance_klass(),
-           "cast to InstanceStackChunkKlass");
+    assert(InstanceKlass::cast(k)->is_stack_chunk_instance_klass(), "");
     return static_cast<InstanceStackChunkKlass*>(k);
   }
 
   int instance_size(int stack_size_in_words) const;
 
-  // Returns the size of the instance including the stack data fields.
+  // Returns the size of the instance including the stack data.
   virtual int oop_size(oop obj) const;
-
-  // allocation
-  // instanceOop allocate_instance(int stack_size, TRAPS);
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
   

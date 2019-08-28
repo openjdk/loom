@@ -2498,6 +2498,9 @@ const size_t minimumSymbolTableSize = 1024;
   product(bool, UseContinuationStrong, true,                                \
       "The weak keepalive is considered strong on stack")                   \
                                                                             \
+  product(bool, UseContinuationChunks, false,                               \
+      "Fast younggen freeze/thaw")                                          \
+                                                                            \
   product(bool, UseContinuationFastPath, true,                              \
       "Use fast-path frame walking in continuations")                       \
                                                                             \

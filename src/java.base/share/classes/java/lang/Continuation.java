@@ -382,7 +382,7 @@ public class Continuation {
     }
 
     private boolean isStarted() {
-        return stack != null && sp < stack.length;
+        return tail != null || (stack != null && sp < stack.length);
     }
 
     /**

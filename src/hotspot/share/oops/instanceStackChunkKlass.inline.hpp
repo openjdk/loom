@@ -34,24 +34,42 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
+// class DecoratorOopClosure : public BasicOopIterateClosure {
+//   OopIterateClosure* _cl;
+//  public:
+//   DecoratorOopClosure(OopIterateClosure* cl) : _cl(cl) {}
+
+//   virtual bool do_metadata() { return _cl->do_metadata(); }
+
+//   virtual void do_klass(Klass* k) { _cl->do_klass(k); }
+//   virtual void do_cld(ClassLoaderData* cld) { _cl->do_cld(cld); }
+
+//   virtual void do_oop(oop* o) {
+//     _cl->do_oop(o);
+//   }
+//   virtual void do_oop(narrowOop* o) {
+//     if (!CompressedOops::is_null(*o)) {
+//       oop obj = CompressedOops::decode_not_null(*o);
+//     }
+//     _cl->do_oop(o);
+//   }
+// };
+
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
   InstanceKlass::oop_oop_iterate<T>(obj, closure);
-
   oop_oop_iterate_stack<T>(obj, closure);
 }
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_reverse(oop obj, OopClosureType* closure) {
   InstanceKlass::oop_oop_iterate_reverse<T>(obj, closure);
-
-  InstanceStackChunkKlass::oop_oop_iterate_stack<T>(obj, closure);
+  oop_oop_iterate_stack<T>(obj, closure);
 }
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr) {
   InstanceKlass::oop_oop_iterate_bounded<T>(obj, closure, mr);
-
   oop_oop_iterate_stack_bounded<T>(obj, closure, mr);
 }
 

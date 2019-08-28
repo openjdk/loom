@@ -102,6 +102,44 @@
     <Field type="ushort" name="size" label="Stack size in bytes" />
   </Event>
 
+  <Event name="ContinuationIterateOops" category="Java Virtual Machine" label="Continuation Iterate OOPs" thread="true" stackTrace="false" startTime="false">
+    <Field type="ulong" name="id" label="Continuation ID" />
+    <Field type="boolean" name="safepoint" label="Safepoint" />
+    <Field type="ushort" name="numFrames" label="Frames" />
+    <Field type="ushort" name="numOops" label="Oops" />
+  </Event>
+
+  <Event name="ContinuationFreezeYoung" category="Java Virtual Machine" label="Continuation Freeze Young" thread="true" stackTrace="false" startTime="false">
+    <Field type="ulong" name="id" label="Continuation ID" />
+    <Field type="uint" name="size" label="Size" />
+  </Event>
+
+  <Event name="ContinuationFreezeOld" category="Java Virtual Machine" label="Continuation Freeze Old" thread="true" stackTrace="false" startTime="false">
+    <Field type="ulong" name="id" label="Continuation ID" />
+  </Event>
+
+  <Event name="ContinuationSquash" category="Java Virtual Machine" label="Continuation Squash" thread="true" stackTrace="false" startTime="false">
+    <Field type="ulong" name="id" label="Continuation ID" />
+    <Field type="ushort" name="numChunks" label="Chunks" />
+    <Field type="ushort" name="numFrames" label="Frames" />
+  </Event>
+
+  <Event name="ContinuationThawYoung" category="Java Virtual Machine" label="Continuation Thaw Young" thread="true" stackTrace="false" startTime="false">
+    <Field type="ulong" name="id" label="Continuation ID" />
+    <Field type="boolean" name="full" label="Full" />
+    <Field type="uint" name="size" label="Size" />
+  </Event>
+
+  <Event name="ContinuationThawOld" category="Java Virtual Machine" label="Continuation Thaw Old" thread="true" stackTrace="false" startTime="false">
+    <Field type="ulong" name="id" label="Continuation ID" />
+  </Event>
+
+  <Event name="ContinuationFix" category="Java Virtual Machine" label="Continuation Fix" thread="true" stackTrace="false" startTime="false">
+    <Field type="ulong" name="id" label="Continuation ID" />
+    <Field type="ushort" name="numFrames" label="Frames" />
+    <Field type="ushort" name="numOops" label="Oops" />
+  </Event>
+
   <Event name="ReservedStackActivation" category="Java Virtual Machine, Runtime" label="Reserved Stack Activation"
     description="Activation of Reserved Stack Area caused by stack overflow with ReservedStackAccess annotated method in call stack" thread="true" stackTrace="true"
     startTime="false">

@@ -114,9 +114,9 @@ public:
   // access frame data
   static bool is_in_usable_stack(address addr, const RegisterMap* map);
   static int usp_offset_to_index(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes);
-  static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes);
+  // static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes);
   static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes, bool is_oop);
-  static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg);
+  // static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg);
   static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop);
   static address reg_to_location(oop cont, const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop);
   static address interpreter_frame_expression_stack_at(const frame& fr, const RegisterMap* map, const InterpreterOopMap& oop_mask, int index);
@@ -145,9 +145,21 @@ private:
   template <class OopClosureType> static void stack_chunk_iterate_stack(oop obj, OopClosureType* closure);
   template <class OopClosureType> static void stack_chunk_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
+public:
   // for now, we don't devirtualize the closure for faster compilation
   static void stack_chunk_iterate_stack(oop obj, OopClosure* closure);
   static void stack_chunk_iterate_stack_bounded(oop obj, OopClosure* closure, MemRegion mr);
+
+#ifdef ASSERT
+public:
+  static bool debug_is_stack_chunk(Klass* klass);
+  static bool debug_is_stack_chunk(oop obj);
+  static bool debug_verify_stack_chunk(oop chunk, oop cont = (oop)NULL);
+  static void debug_print_stack_chunk(oop obj);
+  static bool debug_is_continuation(Klass* klass);
+  static bool debug_is_continuation(oop obj);
+  static bool debug_verify_continuation(oop cont);
+#endif
 };
 
 void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls);
