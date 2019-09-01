@@ -124,7 +124,8 @@ class KeepAliveStream extends MeteredStream implements Hurryable {
         throw new IOException("mark/reset not supported");
     }
 
-    public synchronized boolean hurry() {
+    public boolean hurry() {
+        lock();
         try {
             /* CASE 0: we're actually already done */
             if (closed || count >= expected) {
@@ -147,6 +148,8 @@ class KeepAliveStream extends MeteredStream implements Hurryable {
         } catch (IOException e) {
             // e.printStackTrace();
             return false;
+        } finally {
+            unlock();
         }
     }
 

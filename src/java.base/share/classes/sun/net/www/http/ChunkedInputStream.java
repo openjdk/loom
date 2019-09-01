@@ -26,6 +26,7 @@ package sun.net.www.http;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 import sun.net.*;
 import sun.net.www.*;
@@ -40,8 +41,17 @@ import sun.net.www.*;
  * can be hurried to the end of the stream if the bytes are available on
  * the underlying stream.
  */
-public
-class ChunkedInputStream extends InputStream implements Hurryable {
+public final class ChunkedInputStream extends InputStream implements Hurryable {
+
+    private final ReentrantLock lock = new ReentrantLock();
+
+    private void lock() {
+        lock.lock();
+    }
+
+    private void unlock() {
+        lock.unlock();
+    }
 
     /**
      * The underlying stream
@@ -645,14 +655,19 @@ class ChunkedInputStream extends InputStream implements Hurryable {
      * @exception  IOException  if an I/O error occurs.
      * @see        java.io.FilterInputStream#in
      */
-    public synchronized int read() throws IOException {
-        ensureOpen();
-        if (chunkPos >= chunkCount) {
-            if (readAhead(true) <= 0) {
-                return -1;
+    public int read() throws IOException {
+        lock();
+        try {
+            ensureOpen();
+            if (chunkPos >= chunkCount) {
+                if (readAhead(true) <= 0) {
+                    return -1;
+                }
             }
+            return chunkData[chunkPos++] & 0xff;
+        } finally {
+            lock.unlock();
         }
-        return chunkData[chunkPos++] & 0xff;
     }
 
 
@@ -667,9 +682,17 @@ class ChunkedInputStream extends InputStream implements Hurryable {
      *             the stream has been reached.
      * @exception  IOException  if an I/O error occurs.
      */
-    public synchronized int read(byte b[], int off, int len)
-        throws IOException
-    {
+    public int read(byte b[], int off, int len) throws IOException {
+        lock();
+        try {
+            return lockedRead(b, off, len);
+        } finally {
+            unlock();
+        }
+    }
+
+    private int lockedRead(byte b[], int off, int len) throws IOException {
+        assert lock.isHeldByCurrentThread();
         ensureOpen();
         if ((off < 0) || (off > b.length) || (len < 0) ||
             ((off + len) > b.length) || ((off + len) < 0)) {
@@ -714,20 +737,25 @@ class ChunkedInputStream extends InputStream implements Hurryable {
      * @exception  IOException  if an I/O error occurs.
      * @see        java.io.FilterInputStream#in
      */
-    public synchronized int available() throws IOException {
-        ensureOpen();
+    public int available() throws IOException {
+        lock();
+        try {
+            ensureOpen();
 
-        int avail = chunkCount - chunkPos;
-        if(avail > 0) {
-            return avail;
-        }
+            int avail = chunkCount - chunkPos;
+            if (avail > 0) {
+                return avail;
+            }
 
-        avail = readAhead(false);
+            avail = readAhead(false);
 
-        if (avail < 0) {
-            return 0;
-        } else  {
-            return avail;
+            if (avail < 0) {
+                return 0;
+            } else {
+                return avail;
+            }
+        } finally {
+            unlock();
         }
     }
 
@@ -742,12 +770,17 @@ class ChunkedInputStream extends InputStream implements Hurryable {
      *
      * @exception  IOException  if an I/O error occurs.
      */
-    public synchronized void close() throws IOException {
-        if (closed) {
-            return;
+    public void close() throws IOException {
+        lock();
+        try {
+            if (closed) {
+                return;
+            }
+            closeUnderlying();
+            closed = true;
+        } finally {
+            unlock();
         }
-        closeUnderlying();
-        closed = true;
     }
 
     /**
@@ -759,22 +792,27 @@ class ChunkedInputStream extends InputStream implements Hurryable {
      * without blocking then this stream can't be hurried and should be
      * closed.
      */
-    public synchronized boolean hurry() {
-        if (in == null || error) {
-            return false;
-        }
-
+    public boolean hurry() {
+        lock();
         try {
-            readAhead(false);
-        } catch (Exception e) {
-            return false;
-        }
+            if (in == null || error) {
+                return false;
+            }
 
-        if (error) {
-            return false;
-        }
+            try {
+                readAhead(false);
+            } catch (Exception e) {
+                return false;
+            }
 
-        return (state == STATE_DONE);
+            if (error) {
+                return false;
+            }
+
+            return (state == STATE_DONE);
+        } finally {
+            unlock();
+        }
     }
 
 }

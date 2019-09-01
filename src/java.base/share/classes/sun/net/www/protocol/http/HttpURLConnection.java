@@ -81,6 +81,8 @@ import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.concurrent.locks.ReentrantLock;
+
 import static sun.net.www.protocol.http.AuthScheme.BASIC;
 import static sun.net.www.protocol.http.AuthScheme.DIGEST;
 import static sun.net.www.protocol.http.AuthScheme.NTLM;
@@ -96,6 +98,16 @@ import sun.security.action.GetPropertyAction;
 
 
 public class HttpURLConnection extends java.net.HttpURLConnection {
+
+    private final ReentrantLock lock = new ReentrantLock();
+
+    protected final void lock() {
+        lock.lock();
+    }
+
+    protected final void unlock() {
+        lock.unlock();
+    }
 
     static String HTTP_CONNECT = "CONNECT";
 
@@ -352,7 +364,7 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
      *     - getOutputStream()
      *     - getInputStream())
      *     - connect()
-     * Access synchronized on this.
+     * Need "lock" to access.
      */
     private boolean connecting = false;
 
@@ -513,13 +525,18 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
     }
 
     @Override
-    public synchronized void setAuthenticator(Authenticator auth) {
-        if (connecting || connected) {
-            throw new IllegalStateException(
-                  "Authenticator must be set before connecting");
+    public void setAuthenticator(Authenticator auth) {
+        lock();
+        try {
+            if (connecting || connected) {
+                throw new IllegalStateException(
+                      "Authenticator must be set before connecting");
+            }
+            authenticator = Objects.requireNonNull(auth);
+            authenticatorKey = AuthenticatorKeys.getKey(authenticator);
+        } finally {
+            unlock();
         }
-        authenticator = Objects.requireNonNull(auth);
-        authenticatorKey = AuthenticatorKeys.getKey(authenticator);
     }
 
     public String getAuthenticatorKey() {
@@ -562,12 +579,16 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
         }
     }
 
-    public synchronized void setRequestMethod(String method)
-                        throws ProtocolException {
-        if (connecting) {
-            throw new IllegalStateException("connect in progress");
+    public void setRequestMethod(String method) throws ProtocolException {
+        lock();
+        try {
+            if (connecting) {
+                throw new IllegalStateException("connect in progress");
+            }
+            super.setRequestMethod(method);
+        } finally {
+            unlock();
         }
-        super.setRequestMethod(method);
     }
 
     /* adds the standard key/val pairs to reqests if necessary & write to
@@ -1009,8 +1030,11 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
     // overridden in HTTPS subclass
 
     public void connect() throws IOException {
-        synchronized (this) {
+        lock();
+        try {
             connecting = true;
+        } finally {
+            unlock();
         }
         plainConnect();
     }
@@ -1057,10 +1081,13 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
     }
 
     protected void plainConnect()  throws IOException {
-        synchronized (this) {
+        lock();
+        try {
             if (connected) {
                 return;
             }
+        } finally {
+            unlock();
         }
         SocketPermission p = URLtoSocketPermission(this.url);
         if (p != null) {
@@ -1305,6 +1332,16 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
             // Proceed
     }
 
+    @Override
+    public OutputStream getOutputStream() throws IOException {
+        lock();
+        try {
+            return lockedGetOutputStream();
+        } finally {
+            unlock();
+        }
+    }
+
     /*
      * Allowable input/output sequences:
      * [interpreted as request entity]
@@ -1315,9 +1352,8 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
      * Disallowed:
      * - get input, [read input,] get output, [write output]
      */
-
-    @Override
-    public synchronized OutputStream getOutputStream() throws IOException {
+    private OutputStream lockedGetOutputStream() throws IOException {
+        assert lock.isHeldByCurrentThread();
         connecting = true;
         SocketPermission p = URLtoSocketPermission(this.url);
 
@@ -1338,7 +1374,7 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
         }
     }
 
-    private synchronized OutputStream getOutputStream0() throws IOException {
+    private OutputStream getOutputStream0() throws IOException {
         try {
             if (!doOutput) {
                 throw new ProtocolException("cannot write to a URLConnection"
@@ -1428,7 +1464,8 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
             // we only want to capture the user defined Cookies once, as
             // they cannot be changed by user code after we are connected,
             // only internally.
-            synchronized (this) {
+            lock();
+            try {
                 if (setUserCookies) {
                     int k = requests.getKey("Cookie");
                     if (k != -1)
@@ -1438,6 +1475,8 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
                         userCookies2 = requests.getValue(k);
                     setUserCookies = false;
                 }
+            } finally {
+                unlock();
             }
 
             // remove old Cookie header before setting new one.
@@ -1495,7 +1534,17 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
     }
 
     @Override
-    public synchronized InputStream getInputStream() throws IOException {
+    public InputStream getInputStream() throws IOException {
+        lock();
+        try {
+            return lockedGetInputStream();
+        } finally {
+            unlock();
+        }
+    }
+
+    private InputStream lockedGetInputStream() throws IOException {
+        assert lock.isHeldByCurrentThread();
         connecting = true;
         SocketPermission p = URLtoSocketPermission(this.url);
 
@@ -1517,7 +1566,7 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
     }
 
     @SuppressWarnings("empty-statement")
-    private synchronized InputStream getInputStream0() throws IOException {
+    private InputStream getInputStream0() throws IOException {
 
         if (!doInput) {
             throw new ProtocolException("Cannot read from URLConnection"
@@ -2047,7 +2096,17 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
     /**
      * establish a tunnel through proxy server
      */
-    public synchronized void doTunneling() throws IOException {
+    public void doTunneling() throws IOException {
+        lock();
+        try {
+            lockedDoTunneling();
+        } finally {
+            unlock();
+        }
+    }
+
+    private void lockedDoTunneling() throws IOException {
+        assert lock.isHeldByCurrentThread();
         int retryTunnel = 0;
         String statusLine = "";
         int respCode = 0;
@@ -3156,17 +3215,22 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
      * @param value the value to be set
      */
     @Override
-    public synchronized void setRequestProperty(String key, String value) {
-        if (connected || connecting)
-            throw new IllegalStateException("Already connected");
-        if (key == null)
-            throw new NullPointerException ("key is null");
+    public void setRequestProperty(String key, String value) {
+        lock();
+        try {
+            if (connected || connecting)
+                throw new IllegalStateException("Already connected");
+            if (key == null)
+                throw new NullPointerException("key is null");
 
-        if (isExternalMessageHeaderAllowed(key, value)) {
-            requests.set(key, value);
-            if (!key.equalsIgnoreCase("Content-Type")) {
-                userHeaders.set(key, value);
+            if (isExternalMessageHeaderAllowed(key, value)) {
+                requests.set(key, value);
+                if (!key.equalsIgnoreCase("Content-Type")) {
+                    userHeaders.set(key, value);
+                }
             }
+        } finally {
+            unlock();
         }
     }
 
@@ -3186,17 +3250,22 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
      * @since 1.4
      */
     @Override
-    public synchronized void addRequestProperty(String key, String value) {
-        if (connected || connecting)
-            throw new IllegalStateException("Already connected");
-        if (key == null)
-            throw new NullPointerException ("key is null");
+    public void addRequestProperty(String key, String value) {
+        lock();
+        try {
+            if (connected || connecting)
+                throw new IllegalStateException("Already connected");
+            if (key == null)
+                throw new NullPointerException ("key is null");
 
-        if (isExternalMessageHeaderAllowed(key, value)) {
-            requests.add(key, value);
-            if (!key.equalsIgnoreCase("Content-Type")) {
-                    userHeaders.add(key, value);
+            if (isExternalMessageHeaderAllowed(key, value)) {
+                requests.add(key, value);
+                if (!key.equalsIgnoreCase("Content-Type")) {
+                        userHeaders.add(key, value);
+                }
             }
+        } finally {
+            unlock();
         }
     }
 
@@ -3210,26 +3279,32 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
     }
 
     @Override
-    public synchronized String getRequestProperty (String key) {
+    public String getRequestProperty (String key) {
         if (key == null) {
             return null;
         }
 
-        // don't return headers containing security sensitive information
-        for (int i=0; i < EXCLUDE_HEADERS.length; i++) {
-            if (key.equalsIgnoreCase(EXCLUDE_HEADERS[i])) {
-                return null;
+        lock();
+        try {
+
+            // don't return headers containing security sensitive information
+            for (int i = 0; i < EXCLUDE_HEADERS.length; i++) {
+                if (key.equalsIgnoreCase(EXCLUDE_HEADERS[i])) {
+                    return null;
+                }
             }
+            if (!setUserCookies) {
+                if (key.equalsIgnoreCase("Cookie")) {
+                    return userCookies;
+                }
+                if (key.equalsIgnoreCase("Cookie2")) {
+                    return userCookies2;
+                }
+            }
+            return requests.findValue(key);
+        } finally {
+            unlock();
         }
-        if (!setUserCookies) {
-            if (key.equalsIgnoreCase("Cookie")) {
-                return userCookies;
-            }
-            if (key.equalsIgnoreCase("Cookie2")) {
-                return userCookies2;
-            }
-        }
-        return requests.findValue(key);
     }
 
     /**
@@ -3245,29 +3320,34 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
      * @since 1.4
      */
     @Override
-    public synchronized Map<String, List<String>> getRequestProperties() {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+    public Map<String, List<String>> getRequestProperties() {
+        lock();
+        try {
+            if (connected)
+                throw new IllegalStateException("Already connected");
 
-        // exclude headers containing security-sensitive info
-        if (setUserCookies) {
-            return requests.getHeaders(EXCLUDE_HEADERS);
-        }
-        /*
-         * The cookies in the requests message headers may have
-         * been modified. Use the saved user cookies instead.
-         */
-        Map<String, List<String>> userCookiesMap = null;
-        if (userCookies != null || userCookies2 != null) {
-            userCookiesMap = new HashMap<>();
-            if (userCookies != null) {
-                userCookiesMap.put("Cookie", Arrays.asList(userCookies));
+            // exclude headers containing security-sensitive info
+            if (setUserCookies) {
+                return requests.getHeaders(EXCLUDE_HEADERS);
             }
-            if (userCookies2 != null) {
-                userCookiesMap.put("Cookie2", Arrays.asList(userCookies2));
+            /*
+             * The cookies in the requests message headers may have
+             * been modified. Use the saved user cookies instead.
+             */
+            Map<String, List<String>> userCookiesMap = null;
+            if (userCookies != null || userCookies2 != null) {
+                userCookiesMap = new HashMap<>();
+                if (userCookies != null) {
+                    userCookiesMap.put("Cookie", Arrays.asList(userCookies));
+                }
+                if (userCookies2 != null) {
+                    userCookiesMap.put("Cookie2", Arrays.asList(userCookies2));
+                }
             }
+            return requests.filterAndAddHeaders(EXCLUDE_HEADERS2, userCookiesMap);
+        } finally {
+            unlock();
         }
-        return requests.filterAndAddHeaders(EXCLUDE_HEADERS2, userCookiesMap);
     }
 
     @Override

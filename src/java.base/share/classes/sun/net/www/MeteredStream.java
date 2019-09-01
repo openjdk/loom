@@ -28,11 +28,23 @@ package sun.net.www;
 import java.net.URL;
 import java.util.*;
 import java.io.*;
+import java.util.concurrent.locks.ReentrantLock;
+
 import sun.net.ProgressSource;
 import sun.net.www.http.ChunkedInputStream;
 
 
 public class MeteredStream extends FilterInputStream {
+
+    private final ReentrantLock lock = new ReentrantLock();
+
+    public final void lock() {
+        lock.lock();
+    }
+
+    public final void unlock() {
+        lock.unlock();
+    }
 
     // Instance variables.
     /* if expected != -1, after we've read >= expected, we're "closed" and return -1
@@ -113,46 +125,59 @@ public class MeteredStream extends FilterInputStream {
         return true;
     }
 
-    public synchronized int read() throws java.io.IOException {
-        if (closed) {
-            return -1;
+    public int read() throws IOException {
+        lock();
+        try {
+            if (closed) {
+                return -1;
+            }
+            int c = in.read();
+            if (c != -1) {
+                justRead(1);
+            } else {
+                justRead(c);
+            }
+            return c;
+        } finally {
+            lock.unlock();
         }
-        int c = in.read();
-        if (c != -1) {
-            justRead(1);
-        } else {
-            justRead(c);
-        }
-        return c;
     }
 
-    public synchronized int read(byte b[], int off, int len)
-                throws java.io.IOException {
-        if (closed) {
-            return -1;
+    public int read(byte b[], int off, int len) throws IOException {
+        lock();
+        try {
+            if (closed) {
+                return -1;
+            }
+            int n = in.read(b, off, len);
+            justRead(n);
+            return n;
+        } finally {
+            lock.unlock();
         }
-        int n = in.read(b, off, len);
-        justRead(n);
-        return n;
     }
 
-    public synchronized long skip(long n) throws IOException {
+    public long skip(long n) throws IOException {
+        lock();
+        try {
+            // REMIND: what does skip do on EOF????
+            if (closed) {
+                return 0;
+            }
 
-        // REMIND: what does skip do on EOF????
-        if (closed) {
-            return 0;
-        }
+            if (in instanceof ChunkedInputStream) {
+                n = in.skip(n);
+            } else {
+                // just skip min(n, num_bytes_left)
+                long min = (n > expected - count) ? expected - count : n;
+                n = in.skip(min);
+            }
+            justRead(n);
+            return n;
 
-        if (in instanceof ChunkedInputStream) {
-            n = in.skip(n);
+        } finally {
+            lock.unlock();
         }
-        else {
-            // just skip min(n, num_bytes_left)
-            long min = (n > expected - count) ? expected - count: n;
-            n = in.skip(min);
-        }
-        justRead(n);
-        return n;
     }
 
     public void close() throws IOException {
@@ -166,34 +191,49 @@ public class MeteredStream extends FilterInputStream {
         in.close();
     }
 
-    public synchronized int available() throws IOException {
-        return closed ? 0: in.available();
+    public int available() throws IOException {
+        lock();
+        try {
+            return closed ? 0 : in.available();
+        } finally {
+            lock.unlock();
+        }
     }
 
-    public synchronized void mark(int readLimit) {
-        if (closed) {
-            return;
-        }
-        super.mark(readLimit);
+    public void mark(int readLimit) {
+        lock();
+        try {
+            if (closed) {
+                return;
+            }
+            super.mark(readLimit);
 
-        /*
-         * mark the count to restore upon reset
-         */
-        markedCount = count;
-        markLimit = readLimit;
+            /*
+             * mark the count to restore upon reset
+             */
+            markedCount = count;
+            markLimit = readLimit;
+        } finally {
+            lock.unlock();
+        }
     }
 
-    public synchronized void reset() throws IOException {
-        if (closed) {
-            return;
-        }
+    public void reset() throws IOException {
+        lock();
+        try {
+            if (closed) {
+                return;
+            }
 
-        if (!isMarked()) {
-            throw new IOException ("Resetting to an invalid mark");
-        }
+            if (!isMarked()) {
+                throw new IOException("Resetting to an invalid mark");
+            }
 
-        count = markedCount;
-        super.reset();
+            count = markedCount;
+            super.reset();
+        } finally {
+            lock.unlock();
+        }
     }
 
     public boolean markSupported() {

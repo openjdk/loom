@@ -118,7 +118,8 @@ class KeepAliveStreamCleaner
                 KeepAliveStream kas = kace.getKeepAliveStream();
 
                 if (kas != null) {
-                    synchronized(kas) {
+                    kas.lock();
+                    try {
                         HttpClient hc = kace.getHttpClient();
                         try {
                             if (hc != null && !hc.isInKeepAliveCache()) {
@@ -147,6 +148,8 @@ class KeepAliveStreamCleaner
                         } finally {
                             kas.setClosed();
                         }
+                    } finally {
+                        kas.unlock();
                     }
                 }
             } catch (InterruptedException ie) { }
