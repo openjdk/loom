@@ -25,6 +25,8 @@
 
 package java.io;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  * The class implements a buffered output stream. By setting up such
  * an output stream, an application can write bytes to the underlying
@@ -35,6 +37,9 @@ package java.io;
  * @since   1.0
  */
 public class BufferedOutputStream extends FilterOutputStream {
+    // initialized to null when BufferedInputStream is sub-classed
+    private final ReentrantLock lock;
+
     /**
      * The internal buffer where data is stored.
      */
@@ -73,6 +78,13 @@ public class BufferedOutputStream extends FilterOutputStream {
             throw new IllegalArgumentException("Buffer size <= 0");
         }
         buf = new byte[size];
+
+        // use monitors when BufferedOutputStream is sub-classed
+        if (getClass() == BufferedOutputStream.class) {
+            lock = new ReentrantLock();
+        } else {
+            lock = null;
+        }
     }
 
     /** Flush the internal buffer */
@@ -90,7 +102,22 @@ public class BufferedOutputStream extends FilterOutputStream {
      * @exception  IOException  if an I/O error occurs.
      */
     @Override
-    public synchronized void write(int b) throws IOException {
+    public void write(int b) throws IOException {
+        if (lock != null) {
+            lock.lock();
+            try {
+                lockedWrite(b);
+            } finally {
+                lock.unlock();
+            }
+        } else {
+            synchronized (this) {
+                lockedWrite(b);
+            }
+        }
+    }
+
+    private void lockedWrite(int b) throws IOException {
         if (count >= buf.length) {
             flushBuffer();
         }
@@ -114,7 +141,22 @@ public class BufferedOutputStream extends FilterOutputStream {
      * @exception  IOException  if an I/O error occurs.
      */
     @Override
-    public synchronized void write(byte b[], int off, int len) throws IOException {
+    public void write(byte b[], int off, int len) throws IOException {
+        if (lock != null) {
+            lock.lock();
+            try {
+                lockedWrite(b, off, len);
+            } finally {
+                lock.unlock();
+            }
+        } else {
+            synchronized (this) {
+                lockedWrite(b, off, len);
+            }
+        }
+    }
+
+    private void lockedWrite(byte b[], int off, int len) throws IOException {
         if (len >= buf.length) {
             /* If the request length exceeds the size of the output buffer,
                flush the output buffer and then write the data directly.
@@ -138,7 +180,22 @@ public class BufferedOutputStream extends FilterOutputStream {
      * @see        java.io.FilterOutputStream#out
      */
     @Override
-    public synchronized void flush() throws IOException {
+    public void flush() throws IOException {
+        if (lock != null) {
+            lock.lock();
+            try {
+                lockedFlush();
+            } finally {
+                lock.unlock();
+            }
+        } else {
+            synchronized (this) {
+                lockedFlush();
+            }
+        }
+    }
+
+    private void lockedFlush() throws IOException {
         flushBuffer();
         out.flush();
     }

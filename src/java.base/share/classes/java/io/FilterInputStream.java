@@ -196,7 +196,7 @@ class FilterInputStream extends InputStream {
      * @see     java.io.FilterInputStream#in
      * @see     java.io.FilterInputStream#reset()
      */
-    public synchronized void mark(int readlimit) {
+    public void mark(int readlimit) {
         in.mark(readlimit);
     }
 
@@ -221,7 +221,7 @@ class FilterInputStream extends InputStream {
      * @see        java.io.FilterInputStream#in
      * @see        java.io.FilterInputStream#mark(int)
      */
-    public synchronized void reset() throws IOException {
+    public void reset() throws IOException {
         in.reset();
     }
 
