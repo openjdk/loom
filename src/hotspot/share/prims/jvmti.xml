@@ -2250,9 +2250,7 @@ jvmtiEnv *jvmti;
       </description>
       <origin>new</origin>
       <capabilities>
-        <required id="can_support_fibers">
-          Can support fibers.
-        </required>
+        <required id="can_support_fibers">Can support fibers</required>
       </capabilities>
       <parameters>
         <param id="object">
@@ -2280,9 +2278,7 @@ jvmtiEnv *jvmti;
       </description>
       <origin>new</origin>
       <capabilities>
-        <required id="can_support_fibers">
-            Can support fibers.
-        </required>
+        <required id="can_support_fibers">Can support fibers</required>
       </capabilities>
       <parameters>
         <param id="thread">
@@ -2310,9 +2306,7 @@ jvmtiEnv *jvmti;
       </description>
       <origin>new</origin>
       <capabilities>
-        <required id="can_support_fibers">
-            Can support fibers.
-        </required>
+        <required id="can_support_fibers">Can support fibers</required>
       </capabilities>
       <parameters>
         <param id="fiber">
@@ -2353,7 +2347,7 @@ jvmtiEnv *jvmti;
       </description>
       <origin>new</origin>
       <capabilities>
-        <required id="can_support_fibers">Can support fibers.</required>
+        <required id="can_support_fibers">Can support fibers</required>
       </capabilities>
       <parameters>
         <param id="fiber">
@@ -2425,7 +2419,7 @@ jvmtiEnv *jvmti;
       </description>
       <origin>new</origin>
       <capabilities>
-        <required id="can_support_fibers">Can support fibers.</required>
+        <required id="can_support_fibers">Can support fibers</required>
       </capabilities>
       <parameters>
         <param id="fiber">
@@ -2457,7 +2451,7 @@ jvmtiEnv *jvmti;
       </description>
       <origin>new</origin>
       <capabilities>
-        <required id="can_support_fibers">Can support fibers.</required>
+        <required id="can_support_fibers">Can support fibers</required>
       </capabilities>
       <parameters>
         <param id="fiber">
@@ -6487,6 +6481,332 @@ class C2 extends C1 implements I2 {
 	<error id="JVMTI_ERROR_OPAQUE_FRAME">
 	  Not a visible frame
 	</error>
+      </errors>
+    </function>
+  </category>
+
+  <category id="fiberlocal" label="Fiber Local Variable">
+
+    <intro>
+      These functions are used to retrieve or set the value of a Fiber local variable.
+      The variable is identified by the depth of the frame containing its
+      value and the variable's slot number within that frame.
+      The mapping of variables to slot numbers can be obtained with the function
+      <functionlink id="GetLocalVariableTable"></functionlink>.
+    </intro>
+
+    <function id="GetFiberLocalObject" num="157" since="14">
+      <synopsis>Get Fiber Local Variable - Object</synopsis>
+      <description>
+        This function can be used to retrieve the value of a Fiber local
+        variable whose type is <code>Object</code> or a subclass of <code>Object</code>.
+      </description>
+      <origin>new</origin>
+      <capabilities>
+        <required id="can_access_local_variables"></required>
+        <required id="can_support_fibers">Can support fibers</required>
+      </capabilities>
+      <parameters>
+        <param id="fiber">
+          <jobject />
+            <description>
+              The fiber to query.
+            </description>
+        </param>
+        <param id="depth">
+          <jframeID fiber="fiber"/>
+          <description>
+            The depth of the frame containing the variable's value.
+          </description>
+        </param>
+        <param id="slot">
+          <jint/>
+          <description>
+            The variable's slot number.
+          </description>
+        </param>
+        <param id="value_ptr">
+          <outptr><jobject/></outptr>
+            <description>
+              On return, points to the variable's value.
+            </description>
+        </param>
+      </parameters>
+      <errors>
+        <error id="JVMTI_ERROR_INVALID_FIBER">
+          <paramlink id="fiber"></paramlink> is not a fiber.
+        </error>
+        <error id="JVMTI_ERROR_INVALID_SLOT">
+          Invalid <code>slot</code>.
+        </error>
+        <error id="JVMTI_ERROR_TYPE_MISMATCH">
+          The variable type is not
+          <code>Object</code> or a subclass of <code>Object</code>.
+        </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not a visible frame
+        </error>
+      </errors>
+    </function>
+
+    <function id="GetFiberLocalInstance" num="158" since="14">
+      <synopsis>Get Fiber Local Instance</synopsis>
+      <description>
+        This function can be used to retrieve the value of the Fiber local object
+        variable at slot 0 (the "<code>this</code>" object) from non-static
+        frames.  This function can retrieve the "<code>this</code>" object from
+        native method frames, whereas <code>GetFiberLocalObject()</code> would
+        return <code>JVMTI_ERROR_OPAQUE_FRAME</code> in those cases.
+      </description>
+      <origin>new</origin>
+      <capabilities>
+        <required id="can_access_local_variables"></required>
+        <required id="can_support_fibers">Can support fibers</required>
+      </capabilities>
+      <parameters>
+        <param id="fiber">
+          <jobject />
+            <description>
+              The fiber to query.
+            </description>
+        </param>
+        <param id="depth">
+          <jframeID fiber="fiber"/>
+          <description>
+            The depth of the frame containing the variable's value.
+          </description>
+        </param>
+        <param id="value_ptr">
+          <outptr><jobject/></outptr>
+            <description>
+              On return, points to the variable's value.
+            </description>
+        </param>
+      </parameters>
+      <errors>
+        <error id="JVMTI_ERROR_INVALID_FIBER">
+          <paramlink id="fiber"></paramlink> is not a fiber.
+        </error>
+        <error id="JVMTI_ERROR_INVALID_SLOT">
+          If the specified frame is a static method frame.
+        </error>
+      </errors>
+    </function>
+
+    <function id="GetFiberLocalInt" num="159" since="14">
+      <synopsis>Get Fiber Local Variable - Int</synopsis>
+      <description>
+        This function can be used to retrieve the value of a Fiber local
+        variable whose type is <code>int</code>,
+        <code>short</code>, <code>char</code>, <code>byte</code>, or
+        <code>boolean</code>.
+      </description>
+      <origin>new</origin>
+      <capabilities>
+        <required id="can_access_local_variables"></required>
+        <required id="can_support_fibers">Can support fibers</required>
+      </capabilities>
+      <parameters>
+        <param id="fiber">
+          <jobject />
+            <description>
+              The fiber to query.
+            </description>
+        </param>
+        <param id="depth">
+          <jframeID fiber="fiber"/>
+          <description>
+            The depth of the frame containing the variable's value.
+          </description>
+        </param>
+        <param id="slot">
+          <jint/>
+          <description>
+            The variable's slot number.
+          </description>
+        </param>
+        <param id="value_ptr">
+          <outptr><jint/></outptr>
+          <description>
+            On return, points to the variable's value.
+          </description>
+        </param>
+      </parameters>
+      <errors>
+        <error id="JVMTI_ERROR_INVALID_FIBER">
+          <paramlink id="fiber"></paramlink> is not a fiber.
+        </error>
+        <error id="JVMTI_ERROR_INVALID_SLOT">
+          Invalid <code>slot</code>.
+        </error>
+        <error id="JVMTI_ERROR_TYPE_MISMATCH">
+          The variable type is not
+          <code>int</code>, <code>short</code>,
+          <code>char</code>, <code>byte</code>, or
+          <code>boolean</code>.
+        </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not a visible frame
+        </error>
+      </errors>
+    </function>
+
+    <function id="GetFiberLocalLong" num="160" since="14">
+      <synopsis>Get Fiber Local Variable - Long</synopsis>
+      <description>
+        This function can be used to retrieve the value of a Fiber local
+        variable whose type is <code>long</code>.
+      </description>
+      <origin>new</origin>
+      <capabilities>
+        <required id="can_access_local_variables"></required>
+        <required id="can_support_fibers">Can support fibers</required>
+      </capabilities>
+      <parameters>
+        <param id="fiber">
+          <jobject />
+            <description>
+              The fiber to query.
+            </description>
+        </param>
+        <param id="depth">
+          <jframeID fiber="fiber"/>
+          <description>
+            The depth of the frame containing the variable's value.
+          </description>
+        </param>
+        <param id="slot">
+          <jint/>
+          <description>
+            The variable's slot number.
+          </description>
+        </param>
+        <param id="value_ptr">
+          <outptr><jlong/></outptr>
+          <description>
+            On return, points to the variable's value.
+          </description>
+        </param>
+      </parameters>
+      <errors>
+        <error id="JVMTI_ERROR_INVALID_FIBER">
+          <paramlink id="fiber"></paramlink> is not a fiber.
+        </error>
+        <error id="JVMTI_ERROR_INVALID_SLOT">
+          Invalid <code>slot</code>.
+        </error>
+        <error id="JVMTI_ERROR_TYPE_MISMATCH">
+          The variable type is not <code>long</code>.
+        </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not a visible frame
+        </error>
+      </errors>
+    </function>
+
+    <function id="GetFiberLocalFloat" num="161" since="14">
+      <synopsis>Get Fiber Local Variable - Float</synopsis>
+      <description>
+        This function can be used to retrieve the value of a Fiber local
+        variable whose type is <code>float</code>.
+      </description>
+      <origin>new</origin>
+      <capabilities>
+        <required id="can_access_local_variables"></required>
+        <required id="can_support_fibers">Can support fibers</required>
+      </capabilities>
+      <parameters>
+        <param id="fiber">
+          <jobject />
+            <description>
+              The fiber to query.
+            </description>
+        </param>
+        <param id="depth">
+          <jframeID fiber="fiber"/>
+          <description>
+            The depth of the frame containing the variable's value.
+          </description>
+        </param>
+        <param id="slot">
+          <jint/>
+          <description>
+            The variable's slot number.
+          </description>
+        </param>
+        <param id="value_ptr">
+          <outptr><jfloat/></outptr>
+          <description>
+            On return, points to the variable's value.
+          </description>
+        </param>
+      </parameters>
+      <errors>
+        <error id="JVMTI_ERROR_INVALID_FIBER">
+          <paramlink id="fiber"></paramlink> is not a fiber.
+        </error>
+        <error id="JVMTI_ERROR_INVALID_SLOT">
+          Invalid <code>slot</code>.
+        </error>
+        <error id="JVMTI_ERROR_TYPE_MISMATCH">
+          The variable type is not <code>float</code>.
+        </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not a visible frame
+        </error>
+      </errors>
+    </function>
+
+    <function id="GetFiberLocalDouble" num="162" since="14">
+      <synopsis>Get Fiber Local Variable - Double</synopsis>
+      <description>
+        This function can be used to retrieve the value of a Fiber local
+        variable whose type is <code>long</code>.
+      </description>
+      <origin>new</origin>
+      <capabilities>
+        <required id="can_access_local_variables"></required>
+        <required id="can_support_fibers">Can support fibers</required>
+      </capabilities>
+      <parameters>
+        <param id="fiber">
+          <jobject />
+            <description>
+              The fiber to query.
+            </description>
+        </param>
+        <param id="depth">
+          <jframeID fiber="fiber"/>
+          <description>
+            The depth of the frame containing the variable's value.
+          </description>
+        </param>
+        <param id="slot">
+          <jint/>
+          <description>
+            The variable's slot number.
+          </description>
+        </param>
+        <param id="value_ptr">
+          <outptr><jdouble/></outptr>
+          <description>
+            On return, points to the variable's value.
+          </description>
+        </param>
+      </parameters>
+      <errors>
+        <error id="JVMTI_ERROR_INVALID_FIBER">
+          <paramlink id="fiber"></paramlink> is not a fiber.
+        </error>
+        <error id="JVMTI_ERROR_INVALID_SLOT">
+          Invalid <code>slot</code>.
+        </error>
+        <error id="JVMTI_ERROR_TYPE_MISMATCH">
+          The variable type is not <code>double</code>.
+        </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not a visible frame
+        </error>
       </errors>
     </function>
   </category>
@@ -10639,23 +10959,32 @@ myInit() {
       </capabilityfield>
       <capabilityfield id="can_support_fibers" since="14">
         <description>
-          Can support Fibers.
-          If this capability is enabled then the following fiber aware functions can be called:
+          Can support fibers.
+          If this capability is enabled then the following functions can be called:
           <functionlink id="IsFiber"></functionlink>, 
           <functionlink id="GetThreadFiber"></functionlink>, 
           <functionlink id="GetFiberThread"></functionlink>
-          and the following fiber aware events can be enabled:
+          <functionlink id="GetFiberStackTrace"></functionlink>
+          <functionlink id="GetFiberFrameCount"></functionlink>
+          <functionlink id="GetFiberFrameLocation"></functionlink>
+          <functionlink id="GetFiberLocalObject"></functionlink>
+          <functionlink id="GetFiberLocalInstance"></functionlink>
+          <functionlink id="GetFiberLocalInt"></functionlink>
+          <functionlink id="GetFiberLocalLong"></functionlink>
+          <functionlink id="GetFiberLocalFloat"></functionlink>
+          <functionlink id="GetFiberLocalDouble"></functionlink>
+          and the following events can be enabled:
           <eventlink id="FiberScheduled"></eventlink>,
           <eventlink id="FiberTerminated"></eventlink>,
-          <eventlink id="FiberMount"></eventlink>,
+          <eventlink id="FiberMount"></eventlink> and
           <eventlink id="FiberUnmount"></eventlink>.
         </description>
       </capabilityfield>
       <capabilityfield id="can_support_continuations" since="14">
         <description>
-          Can support Continuations.
-          and the following continuation aware events can be enabled:
-          <eventlink id="ContinuationRun"></eventlink>.
+          Can support continuations. If this capability is enabled then
+          the following events can be enabled:
+          <eventlink id="ContinuationRun"></eventlink> and
           <eventlink id="ContinuationYield"></eventlink>.
         </description>
       </capabilityfield>
@@ -13007,9 +13336,7 @@ myInit() {
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_fibers">
-        Can support fibers.
-      </required>
+      <required id="can_support_fibers">Can support fibers</required>
     </capabilities>
     <parameters>
       <param id="jni_env">
@@ -13044,9 +13371,7 @@ myInit() {
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_fibers">
-        Can support fibers.
-      </required>
+      <required id="can_support_fibers">Can support fibers</required>
     </capabilities>
     <parameters>
       <param id="jni_env">
@@ -13081,9 +13406,7 @@ myInit() {
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_fibers">
-        Can support fibers.
-      </required>
+      <required id="can_support_fibers">Can support fibers</required>
     </capabilities>
     <parameters>
       <param id="jni_env">
@@ -13118,9 +13441,7 @@ myInit() {
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_fibers">
-        Can support fibers.
-      </required>
+      <required id="can_support_fibers">Can support fibers</required>
     </capabilities>
     <parameters>
       <param id="jni_env">
@@ -13155,9 +13476,7 @@ myInit() {
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_continuations">
-        Can support continuations.
-      </required>
+      <required id="can_support_continuations">Can support continuations</required>
     </capabilities>
     <parameters>
       <param id="jni_env">
@@ -13192,9 +13511,7 @@ myInit() {
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_continuations">
-        Can support continuations.
-      </required>
+      <required id="can_support_continuations">Can support continuations</required>
     </capabilities>
     <parameters>
       <param id="jni_env">

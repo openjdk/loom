@@ -1613,7 +1613,7 @@ VM_GetFrameLocation::doit() {
 }
 
 void
-VM_GetFiberThread::doit() {
+VM_FiberGetThread::doit() {
   oop carrier_thread = java_lang_Fiber::carrier_thread(_fiber_h());
   *_carrier_thread_ptr = (jthread)JNIHandles::make_local(_current_thread, carrier_thread);
 }
@@ -1623,7 +1623,8 @@ javaVFrame* get_fiber_jvf(Thread* cur_thread, oop fiber) {
   oop cont = java_lang_Fiber::continuation(fiber);
   javaVFrame* jvf = NULL;
 
-  if (cont != NULL && java_lang_Continuation::is_mounted(cont)) {
+  assert(cont != NULL, "fiber continuation must not be NULL");
+  if (java_lang_Continuation::is_mounted(cont)) {
     oop carrier_thread = java_lang_Fiber::carrier_thread(fiber);
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
     vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
@@ -1643,7 +1644,7 @@ javaVFrame* get_fiber_jvf(Thread* cur_thread, oop fiber) {
 }
 
 void
-VM_GetFiberStackTrace::doit() {
+VM_FiberGetStackTrace::doit() {
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
@@ -1654,7 +1655,7 @@ VM_GetFiberStackTrace::doit() {
 }
 
 void
-VM_GetFiberFrameCount::doit() {
+VM_FiberGetFrameCount::doit() {
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
@@ -1670,7 +1671,7 @@ VM_GetFiberFrameCount::doit() {
 }
 
 void
-VM_GetFiberFrameLocation::doit() {
+VM_FiberGetFrameLocation::doit() {
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);

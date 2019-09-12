@@ -39,10 +39,19 @@ public class FiberTest {
     static final int MSG_COUNT = 10*1000;
     static final SynchronousQueue<String> QUEUE = new SynchronousQueue<>();
 
+    static void producer(String msg) throws InterruptedException {
+        int ii = 1;
+        long ll = 2*(long)ii;
+        float ff = ll + 1.2f;
+        double dd = ff + 1.3D;
+        msg += dd;
+        QUEUE.put(msg);
+    }
+
     static final Runnable PRODUCER = () -> {
         try {
             for (int i = 0; i < MSG_COUNT; i++) {
-                QUEUE.put("msg");
+                producer("msg: ");
             }
         } catch (InterruptedException e) { }
     };

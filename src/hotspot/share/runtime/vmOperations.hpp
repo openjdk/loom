@@ -92,12 +92,13 @@
   template(GetThreadListStackTraces)              \
   template(GetFrameCount)                         \
   template(GetFrameLocation)                      \
-  template(GetFiberThread)                        \
-  template(GetFiberStackTrace)                    \
-  template(GetFiberFrameCount)                    \
-  template(GetFiberFrameLocation)                 \
+  template(FiberGetThread)                        \
+  template(FiberGetStackTrace)                    \
+  template(FiberGetFrameCount)                    \
+  template(FiberGetFrameLocation)                 \
   template(ChangeBreakpoints)                     \
   template(GetOrSetLocal)                         \
+  template(FiberGetOrSetLocal)                    \
   template(GetCurrentLocation)                    \
   template(EnterInterpOnlyMode)                   \
   template(ChangeSingleStep)                      \

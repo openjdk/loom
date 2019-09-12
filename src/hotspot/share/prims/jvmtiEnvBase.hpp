@@ -591,7 +591,7 @@ public:
 };
 
 // VM operation get to get fiber thread at safepoint.
-class VM_GetFiberThread : public VM_Operation {
+class VM_FiberGetThread : public VM_Operation {
 private:
   JavaThread* _current_thread;
   Handle _fiber_h;
@@ -599,19 +599,19 @@ private:
   jvmtiError _result;
 
 public:
-  VM_GetFiberThread(JavaThread* current_thread, Handle fiber_h, jthread* carrier_thread_ptr) {
+  VM_FiberGetThread(JavaThread* current_thread, Handle fiber_h, jthread* carrier_thread_ptr) {
     _current_thread = current_thread;
     _fiber_h = fiber_h;
     _carrier_thread_ptr = carrier_thread_ptr;
     _result = JVMTI_ERROR_NONE;
   }
-  VMOp_Type type() const { return VMOp_GetFiberThread; }
+  VMOp_Type type() const { return VMOp_FiberGetThread; }
   jvmtiError result()    { return _result; }
   void doit();
 };
 
 // VM operation to get fiber stack trace at safepoint.
-class VM_GetFiberStackTrace : public VM_Operation {
+class VM_FiberGetStackTrace : public VM_Operation {
 private:
   JvmtiEnv *_env;
   Handle _fiber_h;
@@ -622,7 +622,7 @@ private:
   jvmtiError _result;
 
 public:
-  VM_GetFiberStackTrace(JvmtiEnv *env, Handle fiber_h,
+  VM_FiberGetStackTrace(JvmtiEnv *env, Handle fiber_h,
                         jint start_depth, jint max_count,
                         jvmtiFrameInfo* frame_buffer, jint* count_ptr) {
     _env = env;
@@ -634,12 +634,12 @@ public:
     _result = JVMTI_ERROR_NONE;
   }
   jvmtiError result() { return _result; }
-  VMOp_Type type() const { return VMOp_GetFiberStackTrace; }
+  VMOp_Type type() const { return VMOp_FiberGetStackTrace; }
   void doit();
 };
 
 // VM operation to count fiber stack frames at safepoint.
-class VM_GetFiberFrameCount : public VM_Operation {
+class VM_FiberGetFrameCount : public VM_Operation {
 private:
   JvmtiEnv *_env;
   Handle _fiber_h;
@@ -647,19 +647,19 @@ private:
   jvmtiError _result;
 
 public:
-  VM_GetFiberFrameCount(JvmtiEnv *env, Handle fiber_h, jint *count_ptr) {
+  VM_FiberGetFrameCount(JvmtiEnv *env, Handle fiber_h, jint *count_ptr) {
     _env = env;
     _fiber_h = fiber_h;
     _count_ptr = count_ptr;
     _result = JVMTI_ERROR_NONE;
   }
-  VMOp_Type type() const { return VMOp_GetFiberFrameCount; }
+  VMOp_Type type() const { return VMOp_FiberGetFrameCount; }
   jvmtiError result()    { return _result; }
   void doit();
 };
 
 // VM operation get to fiber frame location at safepoint.
-class VM_GetFiberFrameLocation : public VM_Operation {
+class VM_FiberGetFrameLocation : public VM_Operation {
 private:
   JvmtiEnv *_env;
   Handle _fiber_h;
@@ -669,7 +669,7 @@ private:
   jvmtiError _result;
 
 public:
-  VM_GetFiberFrameLocation(JvmtiEnv *env, Handle fiber_h, jint depth,
+  VM_FiberGetFrameLocation(JvmtiEnv *env, Handle fiber_h, jint depth,
                            jmethodID* method_ptr, jlocation* location_ptr) {
     _env = env;
     _fiber_h = fiber_h;
@@ -678,7 +678,7 @@ public:
     _location_ptr = location_ptr;
     _result = JVMTI_ERROR_NONE;
   }
-  VMOp_Type type() const { return VMOp_GetFiberFrameLocation; }
+  VMOp_Type type() const { return VMOp_FiberGetFrameLocation; }
   jvmtiError result()    { return _result; }
   void doit();
 };

@@ -344,9 +344,8 @@ public:
 // to prevent compiledVFrames from trying to add deferred updates
 // to the thread simultaneously.
 //
-class VM_GetOrSetLocal : public VM_Operation {
+class VM_BaseGetOrSetLocal : public VM_Operation {
  protected:
-  JavaThread* _thread;
   JavaThread* _calling_thread;
   jint        _depth;
   jint        _index;
@@ -355,16 +354,41 @@ class VM_GetOrSetLocal : public VM_Operation {
   javaVFrame* _jvf;
   bool        _set;
 
+  static const jvalue _DEFAULT_VALUE;
+
   // It is possible to get the receiver out of a non-static native wrapper
   // frame.  Use VM_GetReceiver to do this.
   virtual bool getting_receiver() const { return false; }
 
   jvmtiError  _result;
 
-  vframe* get_vframe();
-  javaVFrame* get_java_vframe();
+  virtual javaVFrame* get_java_vframe() = 0;
   bool check_slot_type_lvt(javaVFrame* vf);
   bool check_slot_type_no_lvt(javaVFrame* vf);
+
+public:
+  VM_BaseGetOrSetLocal(JavaThread* calling_thread, jint depth, jint index,
+                       BasicType type, jvalue value, bool set);
+
+  jvalue value()         { return _value; }
+  jvmtiError result()    { return _result; }
+
+  bool doit_prologue();
+  void doit();
+  bool allow_nested_vm_operations() const;
+  virtual const char* name() const = 0;
+
+  // Check that the klass is assignable to a type with the given signature.
+  static bool is_assignable(const char* ty_sign, Klass* klass, Thread* thread);
+};
+
+
+class VM_GetOrSetLocal : public VM_BaseGetOrSetLocal {
+ protected:
+  JavaThread* _thread;
+
+  vframe* get_vframe();
+  javaVFrame* get_java_vframe();
 
 public:
   // Constructor for non-object getter
@@ -378,16 +402,8 @@ public:
                    int index);
 
   VMOp_Type type() const { return VMOp_GetOrSetLocal; }
-  jvalue value()         { return _value; }
-  jvmtiError result()    { return _result; }
 
-  bool doit_prologue();
-  void doit();
-  bool allow_nested_vm_operations() const;
   const char* name() const                       { return "get/set locals"; }
-
-  // Check that the klass is assignable to a type with the given signature.
-  static bool is_assignable(const char* ty_sign, Klass* klass, Thread* thread);
 };
 
 class VM_GetReceiver : public VM_GetOrSetLocal {
@@ -397,6 +413,40 @@ class VM_GetReceiver : public VM_GetOrSetLocal {
  public:
   VM_GetReceiver(JavaThread* thread, JavaThread* calling_thread, jint depth);
   const char* name() const                       { return "get receiver"; }
+};
+
+// VM operation to get or set fiber local
+class VM_FiberGetOrSetLocal : public VM_BaseGetOrSetLocal {
+ protected:
+  JvmtiEnv *_env;
+  Handle _fiber_h;
+
+  javaVFrame* get_java_vframe();
+
+public:
+  // Constructor for non-object getter
+  VM_FiberGetOrSetLocal(JvmtiEnv* env, Handle fiber_h, jint depth, jint index, BasicType type);
+
+  // Constructor for object or non-object setter
+  VM_FiberGetOrSetLocal(JvmtiEnv* env, Handle fiber_h, jint depth,
+                        jint index, BasicType type, jvalue value);
+
+  // Constructor for object getter
+  VM_FiberGetOrSetLocal(JvmtiEnv* env, Handle fiber_h, JavaThread* calling_thread,
+                        jint depth, int index);
+
+  VMOp_Type type() const { return VMOp_FiberGetOrSetLocal; }
+
+  const char* name() const                       { return "fiber get/set locals"; }
+};
+
+class VM_FiberGetReceiver : public VM_FiberGetOrSetLocal {
+ protected:
+  virtual bool getting_receiver() const { return true; }
+
+ public:
+  VM_FiberGetReceiver(JvmtiEnv* env, Handle fiber_h, JavaThread* calling_thread, jint depth);
+  const char* name() const                       { return "fiber get receiver"; }
 };
 
 
