@@ -3007,8 +3007,8 @@ threadControl_addFiber(jthread fiber)
 
 void
 threadControl_mountFiber(jthread fiber, jthread thread, jbyte sessionID) {
-    /* fiber fixme: this funciton no longer serves any purpose now that we rely on
-     * continuation events instead. remove.
+    /* fiber fixme: this function no longer serves any purpose now that we rely on
+     * continuation events instead. Remove.
      */
 }
 
