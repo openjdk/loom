@@ -617,9 +617,9 @@ test_GetFiberLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jobject fiber, 
     printf("JVMTI GetFiberLocalInt with good fiber returned error: %d\n", err);
     fatal(jni, "failed during JVMTI GetFiberLocalInt call");
   }
-  printf("    local long value at slot %d: %lld\n", SlotLong, ll);
+  printf("    local long value at slot %d: %lld\n", SlotLong, (long long)ll);
   if (ll != 2L) {
-    printf("    Failed: Expected local long value: 2L, got %lld\n", ll);
+    printf("    Failed: Expected local long value: 2L, got %lld\n", (long long)ll);
     fatal(jni, "Got unexpected local long value");
   }
 
