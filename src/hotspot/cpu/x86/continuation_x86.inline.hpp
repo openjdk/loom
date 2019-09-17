@@ -135,9 +135,6 @@ FreezeFnT ContinuationHelper::freeze_stub(const FrameT& f) {
 #endif
 
   FreezeFnT f_fn = (FreezeFnT)f.oop_map()->freeze_stub();
-  if ((void*)f_fn == (void*)f.oop_map()) {
-    f_fn = NULL; // need CompressedOops for now ????
-  }
 #ifdef CONT_DOUBLE_NOP
   // we currently patch explicitly, based on ConfigT etc.
   // if (LIKELY(nop != NULL && f_fn != NULL && !nop->is_mode2())) {
@@ -169,9 +166,6 @@ ThawFnT ContinuationHelper::thaw_stub(const FrameT& f) {
   }
 #endif
   ThawFnT t_fn = (ThawFnT)f.oop_map()->thaw_stub();
-  if ((void*)t_fn == (void*)f.oop_map()) {
-    t_fn = NULL; // need CompressedOops for now ????
-  }
   return t_fn;
 }
 

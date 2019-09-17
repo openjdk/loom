@@ -529,11 +529,17 @@ OopMapValue* ExplodedOopMap::copyOopMapValues(const ImmutableOopMap* oopMap, int
 void ImmutableOopMap::generate_stub(const CodeBlob* cb) const {
   /* The address of the ImmutableOopMap is put into the _freeze_stub and _thaw_stub 
    * if we can't generate the stub for some reason */
-  if (_freeze_stub == NULL) {
+  address default_value = Continuations::default_freeze_oops_stub();
+  address slow_value = Continuations::freeze_oops_slow();
+
+  assert(default_value != slow_value, "should not reach here!");
+
+  if (_freeze_stub == default_value) {
     OopMapStubGenerator cgen(cb, *this);
-    if (Atomic::cmpxchg((address) this, &_freeze_stub, (address) NULL) == NULL) {
+    // lock this by putting the slow path in place
+    if (Atomic::cmpxchg(slow_value, &_freeze_stub, default_value) == default_value) {
       if (!cgen.generate()) {
-        Atomic::store((address) this, &_thaw_stub);
+        Atomic::store((address) Continuations::thaw_oops_slow(), &_thaw_stub);
         cgen.free();
         return;
       }
@@ -833,7 +839,7 @@ const ImmutableOopMap* ImmutableOopMapSet::find_map_at_offset(int pc_offset) con
   return last->get_from(this);
 }
 
-ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap) : _exploded(NULL), _freeze_stub(NULL), _thaw_stub(NULL), _count(oopmap->count()), _num_oops(oopmap->num_oops()) {
+ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap) : _exploded(NULL), _freeze_stub(Continuations::default_freeze_oops_stub()), _thaw_stub(Continuations::default_thaw_oops_stub()), _count(oopmap->count()), _num_oops(oopmap->num_oops()) {
   _num_oops = oopmap->num_oops();
   address addr = data_addr();
   //oopmap->copy_data_to(addr);

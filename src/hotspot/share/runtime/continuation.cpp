@@ -47,6 +47,7 @@
 #include "oops/weakHandle.inline.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/continuation.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/frame.hpp"
@@ -65,7 +66,7 @@
 
 #ifdef PERFTEST
 #define PERFTEST_ONLY(code) code
-#else 
+#else
 #define PERFTEST_ONLY(code)
 #endif // ASSERT
 
@@ -85,9 +86,9 @@
   //       callgrind_counter = 0;
   //     } else
   //       callgrind_counter++;
-  //   }	
-  // }	
-#else	
+  //   }
+  // }
+#else
   // static void callgrind() {}
 #endif
 
@@ -206,6 +207,7 @@ class CompiledMethodKeepalive;
 class CachedCompiledMetadata;
 #endif
 
+
 // TODO R remove
 template<typename FKind> static intptr_t** slow_link_address(const frame& f);
 
@@ -268,7 +270,7 @@ public:
   template <typename FrameT> static inline int size(const FrameT& f);
   template <typename FrameT> static inline int stack_argsize(const FrameT& f);
   static inline int num_oops(const frame& f);
- 
+
   template <typename RegisterMapT>
   static bool is_owning_locks(JavaThread* thread, const RegisterMapT* map, const frame& f);
 };
@@ -284,7 +286,9 @@ public:
 DEBUG_ONLY(const char* NonInterpretedUnknown::name = "NonInterpretedUnknown";)
 
 struct FpOopInfo;
-typedef int (*FreezeFnT)(address, address, address, address, int, FpOopInfo*);
+
+typedef int (*FreezeFnT)(address, address, address, address, int, FpOopInfo*, void * /* FreezeCompiledOops::Extra */);
+typedef int (*ThawFnT)(address /* dst */, address /* objArray */, address /* map */, address /* ThawCompiledOops::Extra */);
 
 class Compiled : public NonInterpreted<Compiled>  {
 public:
@@ -417,7 +421,7 @@ public:
   address real_pc(const ContMirror& cont) const;
   void patch_pc(address pc, const ContMirror& cont) const;
   template<typename FKind> inline void patch_return_pc(address value); // only for interpreted frames
-  
+
   int compiled_frame_size() const;
   int compiled_frame_num_oops() const;
   int compiled_frame_stack_argsize() const;
@@ -454,15 +458,15 @@ public:
 // defines hframe
 #include CPU_HEADER(hframe)
 
-template<typename Self> 
-template <typename FrameT> 
-bool FrameCommon<Self>::is_instance(const FrameT& f) { 
+template<typename Self>
+template <typename FrameT>
+bool FrameCommon<Self>::is_instance(const FrameT& f) {
   return (Self::interpreted == f.is_interpreted_frame()) && (Self::stub == (!Self::interpreted && is_stub(slow_get_cb(f))));
 }
 
-template <typename FrameT> 
+template <typename FrameT>
 bool NonInterpretedUnknown::is_instance(const FrameT& f) {
-  return (interpreted == f.is_interpreted_frame()); 
+  return (interpreted == f.is_interpreted_frame());
 }
 
 // Mirrors the Java continuation objects.
@@ -535,7 +539,7 @@ public:
   ContMirror(JavaThread* thread, oop cont);
   ContMirror(const RegisterMap* map);
 
-  intptr_t hash() { 
+  intptr_t hash() {
     #ifndef PRODUCT
       return Thread::current()->is_Java_thread() ? _cont->identity_hash() : -1;
     #else
@@ -566,7 +570,7 @@ public:
   void set_sp(int sp)      { _sp = sp; }
   void set_fp(intptr_t fp) { _fp = fp; }
   void clear_pc()  { _pc = NULL; set_flag(FLAG_LAST_FRAME_INTERPRETED, false); }
-  void set_pc(address pc, bool interpreted)  { _pc = pc; set_flag(FLAG_LAST_FRAME_INTERPRETED, interpreted); 
+  void set_pc(address pc, bool interpreted)  { _pc = pc; set_flag(FLAG_LAST_FRAME_INTERPRETED, interpreted);
                                                assert (interpreted == Interpreter::contains(pc), ""); }
 
   bool is_flag(unsigned char flag) { return (_flags & flag) != 0; }
@@ -1007,14 +1011,14 @@ void ContMirror::copy_from_stack(void* from, void* to, int size) {
   _e_size += size;
 }
 
-template <typename ConfigT>
+template <typename OopWriterT>
 inline int ContMirror::add_oop(oop obj, int index) {
   // assert (_ref_stack != NULL, "");
   // assert (index >= 0 && index < _ref_stack->length(), "index: %d length: %d", index, _ref_stack->length());
   assert (index < _ref_sp, "");
 
   log_develop_trace(jvmcont)("i: %d ", index);
-  ConfigT::OopWriterT::obj_at_put(_ref_stack, index, obj);
+  OopWriterT::obj_at_put(_ref_stack, index, obj);
   return index;
 }
 
@@ -1047,8 +1051,6 @@ template<typename Event> void ContMirror::post_jfr_event(Event* e) {
 class CachedCompiledMetadata; // defined in PD
 struct FpOopInfo;
 
-typedef int (*FreezeFnT)(address, address, address, address, int, FpOopInfo*);
-typedef int (*ThawFnT)(address /* dst */, address /* objArray */, address /* map */);
 
 
 class ContinuationHelper {
@@ -1061,7 +1063,7 @@ public:
 
   template<op_mode mode, typename FrameT> static FreezeFnT freeze_stub(const FrameT& f);
   template<op_mode mode, typename FrameT> static ThawFnT thaw_stub(const FrameT& f);
-  
+
   template<typename FKind, typename RegisterMapT> static inline void update_register_map(RegisterMapT* map, const frame& f);
   template<typename RegisterMapT> static inline void update_register_map_with_callee(RegisterMapT* map, const frame& f);
   template<typename RegisterMapT> static inline void update_register_map(RegisterMapT* map, hframe::callee_info callee_info);
@@ -1380,6 +1382,18 @@ static FreezeContFnT cont_freeze_fast = NULL;
 static FreezeContFnT cont_freeze_slow = NULL;
 static FreezeContFnT cont_freeze_preempt = NULL;
 
+static ThawFnT cont_thaw_oops_slow = NULL;
+
+static FreezeFnT cont_freeze_oops_slow = NULL;
+static FreezeFnT cont_freeze_oops_generate = NULL;
+
+class OopStubs {
+public:
+  static FreezeFnT freeze_oops_slow() { return (FreezeFnT) cont_freeze_oops_slow; }
+  static ThawFnT thaw_oops_slow() { return (ThawFnT) cont_thaw_oops_slow; }
+  static FreezeFnT generate_stub() { return (FreezeFnT) cont_freeze_oops_generate; }
+};
+
 template<op_mode mode>
 static freeze_result cont_freeze(JavaThread* thread, ContMirror& cont, FrameInfo* fi) {
   switch (mode) {
@@ -1440,6 +1454,277 @@ private:
     OopT* addr = _array->obj_at_address<OopT>(_current++); // depends on UseCompressedOops
     NativeAccess<IS_DEST_UNINITIALIZED>::oop_store(addr, obj);
   }
+};
+
+template <typename RegisterMapT>
+class ThawOopFn : public ContOopBase<RegisterMapT> {
+private:
+  int _i;
+
+protected:
+  template <class T> inline void do_oop_work(T* p) {
+    this->process(p);
+    oop obj = this->_cont->obj_at(_i); // does a HeapAccess<IN_HEAP_ARRAY> load barrier
+
+    assert (oopDesc::is_oop_or_null(obj), "invalid oop");
+    log_develop_trace(jvmcont)("i: %d", _i); print_oop(p, obj);
+
+    NativeAccess<IS_DEST_UNINITIALIZED>::oop_store(p, obj);
+    _i++;
+  }
+public:
+  ThawOopFn(ContMirror* cont, frame* fr, int index, void* vsp, RegisterMapT* map)
+    : ContOopBase<RegisterMapT>(cont, fr, map, vsp) { _i = index; }
+  void do_oop(oop* p)       { do_oop_work(p); }
+  void do_oop(narrowOop* p) { do_oop_work(p); }
+
+  void do_derived_oop(oop *base_loc, oop *derived_loc) {
+    assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop: " INTPTR_FORMAT " (at " INTPTR_FORMAT ")", p2i((oopDesc*)*base_loc), p2i(base_loc));
+    assert(derived_loc != base_loc, "Base and derived in same location");
+    DEBUG_ONLY(this->verify(base_loc);)
+    DEBUG_ONLY(this->verify(derived_loc);)
+    assert (oopDesc::is_oop_or_null(*base_loc), "invalid oop");
+
+    intptr_t offset = *(intptr_t*)derived_loc;
+
+    log_develop_trace(jvmcont)(
+        "Continuation thaw derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
+        p2i(derived_loc), p2i((address)*derived_loc), p2i((address)*base_loc), p2i(base_loc), offset);
+
+    oop obj = cast_to_oop(cast_from_oop<intptr_t>(*base_loc) + offset);
+    *derived_loc = obj;
+
+    assert(Universe::heap()->is_in_or_null(obj), "");
+  }
+};
+
+template <typename RegisterMapT, typename OopWriterT>
+class FreezeOopFn : public ContOopBase<RegisterMapT> {
+private:
+  FpOopInfo* _fp_info;
+  void* const _hsp;
+  int _starting_index;
+
+  const address _stub_vsp;
+#ifndef PRODUCT
+  const address _stub_hsp;
+#endif
+
+  int add_oop(oop obj, int index) {
+    //log_develop_info(jvmcont)("writing oop at %d", index);
+    return this->_cont->template add_oop<OopWriterT>(obj, index);
+  }
+
+protected:
+  template <class T> inline void do_oop_work(T* p) {
+    this->process(p);
+    oop obj = RawAccess<>::oop_load(p); // we are reading off our own stack, Raw should be fine
+    int index = add_oop(obj, _starting_index + this->_count - 1);
+
+#ifdef ASSERT
+    print_oop(p, obj);
+    assert (oopDesc::is_oop_or_null(obj), "invalid oop");
+    log_develop_trace(jvmcont)("narrow: %d", sizeof(T) < wordSize);
+
+    int offset = this->verify(p);
+    assert(offset < 32768, "");
+    if (_stub_vsp == NULL && offset < 0) { // rbp could be stored in the callee frame.
+      assert (p == (T*)Frame::map_link_address(this->_map), "");
+      _fp_info->set_oop_fp_index(0xbaba); // assumed to be unnecessary at this time; used only in ASSERT for now
+    } else {
+      address hloc = (address)_hsp + offset; // address of oop in the (raw) h-stack
+      assert (this->_cont->in_hstack(hloc), "");
+      assert (*(T*)hloc == *p, "*hloc: " INTPTR_FORMAT " *p: " INTPTR_FORMAT, *(intptr_t*)hloc, *(intptr_t*)p);
+
+      log_develop_trace(jvmcont)("Marking oop at " INTPTR_FORMAT " (offset: %d)", p2i(hloc), offset);
+      memset(hloc, 0xba, sizeof(T)); // we must take care not to write a full word to a narrow oop
+      if (_stub_vsp != NULL && offset < 0) { // slow path
+        int offset0 = (address)p - _stub_vsp;
+        assert (offset0 >= 0, "stub vsp: " INTPTR_FORMAT " p: " INTPTR_FORMAT " offset: %d", p2i(_stub_vsp), p2i(p), offset0);
+        assert (hloc == _stub_hsp + offset0, "");
+      }
+    }
+#endif
+  }
+
+public:
+  FreezeOopFn(ContMirror* cont, FpOopInfo* fp_info, const frame* fr, void* vsp, void* hsp, RegisterMapT* map, int starting_index, intptr_t* stub_vsp = NULL, intptr_t* stub_hsp = NULL)
+    : ContOopBase<RegisterMapT>(cont, fr, map, vsp), _fp_info(fp_info), _hsp(hsp), _starting_index(starting_index),
+    _stub_vsp((address)stub_vsp)
+#ifndef PRODUCT
+      , _stub_hsp((address)stub_hsp)
+#endif
+      {
+        assert (cont->in_hstack(hsp), "");
+      }
+
+  void do_oop(oop* p)       { do_oop_work(p); }
+  void do_oop(narrowOop* p) { do_oop_work(p); }
+
+  void do_derived_oop(oop *base_loc, oop *derived_loc) {
+    assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop");
+    assert(derived_loc != base_loc, "Base and derived in same location");
+    DEBUG_ONLY(this->verify(base_loc);)
+    DEBUG_ONLY(this->verify(derived_loc);)
+
+    intptr_t offset = cast_from_oop<intptr_t>(*derived_loc) - cast_from_oop<intptr_t>(*base_loc);
+
+    log_develop_trace(jvmcont)(
+        "Continuation freeze derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
+        p2i(derived_loc), p2i((address)*derived_loc), p2i((address)*base_loc), p2i(base_loc), offset);
+
+    int hloc_offset = (address)derived_loc - (address)this->_vsp;
+    if (hloc_offset < 0 && _stub_vsp == NULL) {
+      assert ((intptr_t**)derived_loc == Frame::map_link_address(this->_map), "");
+      _fp_info->set_oop_fp_index(offset);
+
+      log_develop_trace(jvmcont)("Writing derived pointer offset in fp (offset: %ld, 0x%lx)", offset, offset);
+    } else {
+      intptr_t* hloc = (intptr_t*)((address)_hsp + hloc_offset);
+      *hloc = offset;
+
+      log_develop_trace(jvmcont)("Writing derived pointer offset at " INTPTR_FORMAT " (offset: " INTX_FORMAT ", " INTPTR_FORMAT ")", p2i(hloc), offset, offset);
+
+#ifdef ASSERT
+      if (_stub_vsp != NULL && hloc_offset < 0) {
+        int hloc_offset0 = (address)derived_loc - _stub_vsp;
+        assert (hloc_offset0 >= 0, "hloc_offset: %d", hloc_offset0);
+        assert(hloc == (intptr_t*)(_stub_hsp + hloc_offset0), "");
+      }
+#endif
+    }
+  }
+};
+
+template <typename OopWriterT>
+class FreezeCompiledOops {
+
+public:
+  class Extra {
+    const frame *_f;
+    ContMirror *_cont;
+    address *_map;
+    intptr_t *_stub_vsp;
+#ifndef PRODUCT
+    intptr_t *_stub_hsp;
+    bool _set_stub_vsp;
+    bool _set_stub_hsp;
+#endif
+
+  public:
+    Extra(const frame* f, ContMirror* cont, address* map) : _f(f), _cont(cont), _map(map) {
+#ifndef PRODUCT
+      _set_stub_vsp = false;
+      _set_stub_hsp = false;
+#endif
+    }
+
+    const frame* get_frame() { return _f; }
+    ContMirror* cont() { return _cont; }
+    address* map() { return _map; }
+
+    void set_stub_vsp(intptr_t* vsp) {
+#ifndef PRODUCT
+      _set_stub_vsp = true;
+#endif
+      _stub_vsp = vsp;
+    }
+    intptr_t* stub_vsp() const { assert(_set_stub_vsp, "accessed before set"); return _stub_vsp; }
+
+#ifndef PRODUCT
+    void set_stub_hsp(intptr_t* hsp) {
+      _set_stub_hsp = true;
+      _stub_hsp = hsp;
+    }
+    intptr_t* stub_hsp() const { assert(_set_stub_hsp, "accessed before set"); return _stub_hsp; }
+#endif
+  };
+
+  static int generate_stub(intptr_t* vsp, address* oops, address* link, intptr_t *hsp, int idx, FpOopInfo* fp_oop_info, Extra *extra) {
+    extra->get_frame()->oop_map()->generate_stub(extra->get_frame()->cb());
+    FreezeFnT stub = (FreezeFnT)extra->get_frame()->oop_map()->freeze_stub();
+  #ifdef CONT_DOUBLE_NOP
+    ContinuationHelper::patch_freeze_stub(*extra->get_frame(), (address) stub);
+  #endif
+    return stub((address) vsp, (address) oops, (address) link, (address) hsp, idx, fp_oop_info, (void *) extra);
+  }
+
+  template <typename RegisterMapT, bool is_preempt>
+  static int freeze_slow(address vsp, address oops, address addr, address hsp, int idx, FpOopInfo* fp_oop_info, Extra *extra) {
+#ifdef CONT_DOUBLE_NOP
+    extra->get_frame()->get_cb();
+#endif
+
+    const ImmutableOopMap* oopmap = extra->get_frame()->oop_map();
+    assert(oopmap, "must have");
+    int starting_index = extra->cont()->refStack()->length() - idx;
+
+    RegisterMapT *map = (RegisterMapT*) extra->map();
+    ContinuationHelper::update_register_map_with_callee(map, *(extra->get_frame())); // restore saved link
+
+    intptr_t* stub_vsp = NULL;
+    intptr_t* stub_hsp = NULL;
+    if (is_preempt) {
+      stub_vsp = extra->stub_vsp();
+#ifndef PRODUCT
+      stub_hsp = extra->stub_hsp();
+#endif
+    }
+
+    FreezeOopFn<RegisterMapT, OopWriterT> oopFn(extra->cont(), fp_oop_info, extra->get_frame(), vsp, hsp, map, starting_index, stub_vsp, stub_hsp);
+    OopMapDo<FreezeOopFn<RegisterMapT, OopWriterT>, FreezeOopFn<RegisterMapT, OopWriterT>, IncludeAllValues> visitor(&oopFn, &oopFn);
+    visitor.oops_do(extra->get_frame(), map, oopmap);
+    assert (!map->include_argument_oops(), "");
+    return oopFn.count();
+  }
+
+  // need to keep this lower down waiting for definition of SmallRegisterMap
+  static int slow_path(address vsp, address oops, address addr, address hsp, int idx, FpOopInfo* fp_oop_info, Extra *extra);
+  static int slow_path_preempt(address vsp, address oops, address addr, address hsp, int idx, FpOopInfo* fp_oop_info, Extra *extra, bool is_preempt);
+};
+
+class ThawCompiledOops {
+public:
+  class Extra {
+  private:
+    frame* _f;
+    ContMirror* _cont;
+    address* _map;
+    int _starting_index;
+  public:
+    Extra(frame* f, ContMirror* cont, address* map, int starting_index) : _f(f), _cont(cont), _map(map), _starting_index(starting_index) {}
+
+    frame* get_frame() { return _f; }
+    ContMirror* cont() { return _cont; }
+    address* map() { return _map; }
+    int starting_index() { return _starting_index; }
+  };
+
+
+  template <typename RegisterMapT>
+  static int thaw_slow(address vsp, address oops, address link_addr, Extra* extra) {
+    frame* f = extra->get_frame();
+    RegisterMapT* map = (RegisterMapT*) extra->map();
+
+    DEBUG_ONLY(intptr_t* tmp_fp = f->fp();) // TODO PD
+
+
+    // Thawing oops overwrite the link in the callee if rbp contained an oop (only possible if we're compiled).
+    // This only matters when we're the top frame, as that's the value that will be restored into rbp when we jump to continue.
+    ContinuationHelper::update_register_map(map, (intptr_t **) link_addr);
+
+    ThawOopFn<RegisterMapT> oopFn(extra->cont(), f, extra->starting_index(), vsp, map);
+    OopMapDo<ThawOopFn<RegisterMapT>, ThawOopFn<RegisterMapT>, IncludeAllValues> visitor(&oopFn, &oopFn);
+    visitor.oops_do(f, map, f->oop_map());
+
+    DEBUG_ONLY(if (tmp_fp != f->fp()) log_develop_trace(jvmcont)("WHOA link has changed (thaw) f.fp: " INTPTR_FORMAT " link: " INTPTR_FORMAT, p2i(f->fp()), p2i(tmp_fp));) // TODO PD
+
+    int cnt = oopFn.count();
+    return cnt;
+  }
+
+  static int slow_path(address vsp, address oops, address link_addr, Extra* extra);
+  static int slow_path_preempt(address vsp, address oops, address link_addr, Extra* extra);
 };
 
 /*
@@ -1509,7 +1794,7 @@ public:
   void write_at(ContMirror& mirror, int index) {
     //assert(_keepalive != NULL, "");
     //log_develop_info(jvmcont)("writing mirror at %d\n", index);
-    mirror.add_oop<ConfigT>(read_keepalive(), index);
+    mirror.add_oop<typename ConfigT::OopWriterT>(read_keepalive(), index);
     //*(hsp + index)
   }
 
@@ -1915,16 +2200,15 @@ public:
     _fp_oop_info._has_fp_oop = false;
 
     int frozen;
-    if (LIKELY(!FKind::interpreted && extra != NULL)) { // dynamic branch
+    if (!FKind::interpreted) { // dynamic branch
       FreezeFnT freeze_stub = (FreezeFnT)extra;
       // tty->print_cr(">>>>0000<<<<<");
-      frozen = freeze_compiled_oops_stub(freeze_stub, f, vsp, hsp, index);
+      frozen = freeze_compiled_oops(f, vsp, hsp, index, freeze_stub); //freeze_compiled_oops_stub(freeze_stub, f, vsp, hsp, index);
     } else {
       if (num_oops == 0)
         return;
       ContinuationHelper::update_register_map_with_callee(&_map, f); // restore saved link
-      frozen = FKind::interpreted ? freeze_intepreted_oops(f, vsp, hsp, index, *(InterpreterOopMap*)extra)
-                                  : freeze_compiled_oops  (f, vsp, hsp, index);
+      frozen = freeze_intepreted_oops(f, vsp, hsp, index, *(InterpreterOopMap*) extra);
     }
     assert(frozen == num_oops, "frozen: %d num_oops: %d", frozen, num_oops);
   }
@@ -1934,7 +2218,7 @@ public:
     assert (FKind::is_instance(f), "");
     assert (bottom || !caller.is_empty(), "");
     // in fast mode, partial copy does not copy _is_interpreted for the caller
-    assert (bottom || mode == mode_fast || Interpreter::contains(FKind::interpreted ? hf.return_pc<FKind>() : caller.real_pc(_cont)) == caller.is_interpreted_frame(), 
+    assert (bottom || mode == mode_fast || Interpreter::contains(FKind::interpreted ? hf.return_pc<FKind>() : caller.real_pc(_cont)) == caller.is_interpreted_frame(),
       "FKind: %s contains: %d is_interpreted: %d", FKind::name, Interpreter::contains(FKind::interpreted ? hf.return_pc<FKind>() : caller.real_pc(_cont)), caller.is_interpreted_frame()); // fails for perftest < 25, but that's ok
     assert (!bottom || !_cont.is_empty() || (_cont.fp() == 0 && _cont.pc() == NULL), "");
     assert (!bottom || _cont.is_empty() || caller == _cont.last_frame<mode_slow>(), "");
@@ -2002,7 +2286,7 @@ public:
   }
 
   int freeze_intepreted_oops(const frame& f, intptr_t* vsp, intptr_t* hsp, int starting_index, const InterpreterOopMap& mask) {
-    FreezeOopFn oopFn(&_cont, &_fp_oop_info, &f, vsp, hsp, &_map, starting_index);
+    FreezeOopFn<RegisterMapT, typename ConfigT::OopWriterT> oopFn(&_cont, &_fp_oop_info, &f, vsp, hsp, &_map, starting_index);
     const_cast<frame&>(f).oops_interpreted_do(&oopFn, NULL, mask);
     return oopFn.count();
   }
@@ -2044,7 +2328,7 @@ public:
 
     intptr_t* vsp = FKind::frame_top(f);
 
-    // The following assertion appears also in patch_pd and align. 
+    // The following assertion appears also in patch_pd and align.
     // Even in fast mode, we allow the caller of the bottom frame (i.e. last frame still on the hstack) to be interpreted.
     // We can have a different tradeoff, and only set mode_fast if this is not the case by uncommenting _fastpath = false in Thaw::finalize where we're setting the last frame
     // Doing so can save us the test for caller.is_interpreted_frame() when we're in mode_fast and bottom, but at the cost of not switching to fast mode even if only a frozen frame is interpreted.
@@ -2096,62 +2380,27 @@ public:
     return hf;
   }
 
-  int freeze_compiled_oops(const frame& f, intptr_t* vsp, intptr_t* hsp, int starting_index) {
-    if (mode != mode_preempt && ConfigT::allow_stubs && get_oopmap_stub(f) == NULL) {
-  #ifdef CONT_DOUBLE_NOP
-      f.get_cb();
-  #endif
-      const ImmutableOopMap* oopmap = f.oop_map();
-      assert(oopmap, "must have");
-      oopmap->generate_stub(f.cb());
-  #ifdef CONT_DOUBLE_NOP
-      ContinuationHelper::patch_freeze_stub(f, (address)get_oopmap_stub(f));
-  #endif
-      log_develop_trace(jvmcont)("freeze_compiled_oops generating oopmap stub; success: %d", get_oopmap_stub(f) != NULL);
-      // tty->print_cr(">>>> generating oopmap stub; success: %d <<<<<", get_oopmap_stub(f) != NULL);
-      // f.print_on(tty);
+  int freeze_compiled_oops(const frame& f, intptr_t* vsp, intptr_t* hsp, int starting_index, FreezeFnT stub) {
+    typename FreezeCompiledOops <typename ConfigT::OopWriterT>::Extra extra(&f, &_cont, (address*) &_map);
+
+    if (mode == mode_preempt && _safepoint_stub_caller) {
+      assert (!_safepoint_stub.is_empty(), "");
+      extra.set_stub_vsp(StubF::frame_top(_safepoint_stub));
+#ifndef PRODUCT
+      assert (_safepoint_stub_hsp != NULL, "");
+      extra.set_stub_hsp(_safepoint_stub_hsp);
+#endif
     }
-    FreezeFnT stub = get_oopmap_stub(f);
-
-    if (mode != mode_preempt && ConfigT::allow_stubs && stub != NULL) {
-      assert (_safepoint_stub.is_empty(), "");
-      return freeze_compiled_oops_stub(stub, f, vsp, hsp, starting_index);
-    } else {
-      // tty->print_cr(">>>>33333<<<<<");
-      intptr_t *stub_vsp = NULL;
-      intptr_t *stub_hsp = NULL;
-      if (mode == mode_preempt && _safepoint_stub_caller) {
-        assert (!_safepoint_stub.is_empty(), "");
-        stub_vsp = StubF::frame_top(_safepoint_stub);
-  #ifndef PRODUCT
-        assert (_safepoint_stub_hsp != NULL, "");
-        stub_hsp = _safepoint_stub_hsp;
-  #endif
-      }
-
-  #ifdef CONT_DOUBLE_NOP
-      f.get_cb();
-  #endif
-      const ImmutableOopMap* oopmap = f.oop_map();
-      assert(oopmap, "must have");
-
-      FreezeOopFn oopFn(&_cont, &_fp_oop_info, &f, vsp, hsp, &_map, starting_index, stub_vsp, stub_hsp);
-
-      OopMapDo<FreezeOopFn, FreezeOopFn, IncludeAllValues> visitor(&oopFn, &oopFn);
-      visitor.oops_do(&f, &_map, oopmap);
-      assert (!_map.include_argument_oops(), "");
-
-      return oopFn.count();
-    }
-  }
-
-  inline int freeze_compiled_oops_stub(FreezeFnT freeze_stub, const frame& f, intptr_t* vsp, intptr_t* hsp, int starting_index) {
-    // tty->print_cr(">>>>2222<<<<<");
-    // ContinuationHelper::update_register_map_with_callee(&_map, f);
-    intptr_t** link_addr = Frame::callee_link_address(f); // Frame::map_link_address(map);
     typename ConfigT::OopT* addr = _cont.refStack()->template obj_at_address<typename ConfigT::OopT>(starting_index);
-    int cnt = freeze_stub( (address) vsp,  (address) addr, (address) link_addr, (address) hsp, _cont.refStack()->length() - starting_index, &_fp_oop_info);
-    return cnt;
+
+    int idx = _cont.refStack()->length() - starting_index; // RB: I think this is unused in the fast path...
+    intptr_t** link_addr = Frame::callee_link_address(f); // Frame::map_link_address(map);
+
+    if (mode == mode_preempt) {
+      return FreezeCompiledOops<typename ConfigT::OopWriterT>::slow_path_preempt((address) vsp, (address) addr, (address) link_addr, (address) hsp, idx, &_fp_oop_info, &extra, _safepoint_stub_caller);
+    } else {
+      return stub((address) vsp, (address) addr, (address) link_addr, (address) hsp, idx, &_fp_oop_info, (address) &extra);
+    }
   }
 
   NOINLINE void finish(const frame& f, const hframe& top) {
@@ -2219,8 +2468,9 @@ public:
   }
 
   inline FreezeFnT get_oopmap_stub(const frame& f) {
-    if (!ConfigT::allow_stubs)
-      return NULL;
+    if (!ConfigT::allow_stubs) {
+      return OopStubs::freeze_oops_slow();
+    }
     return ContinuationHelper::freeze_stub<mode>(f);
   }
 
@@ -2229,102 +2479,6 @@ public:
     _cont.copy_to_stack(vsp, hsp, fsize);
   }
 
-  class FreezeOopFn : public ContOopBase<RegisterMapT> {
-  private:
-    FpOopInfo* _fp_info;
-    void* const _hsp;
-    int _starting_index;
-
-    const address _stub_vsp;
-  #ifndef PRODUCT
-    const address _stub_hsp;
-  #endif
-
-    int add_oop(oop obj, int index) {
-      //log_develop_info(jvmcont)("writing oop at %d", index);
-      return this->_cont->template add_oop<ConfigT>(obj, index);
-    }
-
-  protected:
-    template <class T> inline void do_oop_work(T* p) {
-      this->process(p);
-      oop obj = RawAccess<>::oop_load(p); // we are reading off our own stack, Raw should be fine
-      int index = add_oop(obj, _starting_index + this->_count - 1);
-
-  #ifdef ASSERT
-      print_oop(p, obj);
-      assert (oopDesc::is_oop_or_null(obj), "invalid oop");
-      log_develop_trace(jvmcont)("narrow: %d", sizeof(T) < wordSize);
-
-      int offset = this->verify(p);
-      assert(offset < 32768, "");
-      if (_stub_vsp == NULL && offset < 0) { // rbp could be stored in the callee frame.
-        assert (p == (T*)Frame::map_link_address(this->_map), "");
-        _fp_info->set_oop_fp_index(0xbaba); // assumed to be unnecessary at this time; used only in ASSERT for now
-      } else {
-        address hloc = (address)_hsp + offset; // address of oop in the (raw) h-stack
-        assert (this->_cont->in_hstack(hloc), "");
-        assert (*(T*)hloc == *p, "*hloc: " INTPTR_FORMAT " *p: " INTPTR_FORMAT, *(intptr_t*)hloc, *(intptr_t*)p);
-
-        log_develop_trace(jvmcont)("Marking oop at " INTPTR_FORMAT " (offset: %d)", p2i(hloc), offset);
-        memset(hloc, 0xba, sizeof(T)); // we must take care not to write a full word to a narrow oop
-        if (_stub_vsp != NULL && offset < 0) { // slow path
-          int offset0 = (address)p - _stub_vsp;
-          assert (offset0 >= 0, "stub vsp: " INTPTR_FORMAT " p: " INTPTR_FORMAT " offset: %d", p2i(_stub_vsp), p2i(p), offset0);
-          assert (hloc == _stub_hsp + offset0, "");
-        }
-      }
-  #endif
-    }
-
-  public:
-    FreezeOopFn(ContMirror* cont, FpOopInfo* fp_info, const frame* fr, void* vsp, void* hsp, RegisterMapT* map, int starting_index, intptr_t* stub_vsp = NULL, intptr_t* stub_hsp = NULL)
-    : ContOopBase<RegisterMapT>(cont, fr, map, vsp), _fp_info(fp_info), _hsp(hsp), _starting_index(starting_index),
-      _stub_vsp((address)stub_vsp)
-  #ifndef PRODUCT
-      , _stub_hsp((address)stub_hsp)
-  #endif
-    {
-      assert (cont->in_hstack(hsp), "");
-    }
-
-    void do_oop(oop* p)       { do_oop_work(p); }
-    void do_oop(narrowOop* p) { do_oop_work(p); }
-
-    void do_derived_oop(oop *base_loc, oop *derived_loc) {
-      assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop");
-      assert(derived_loc != base_loc, "Base and derived in same location");
-      DEBUG_ONLY(this->verify(base_loc);)
-      DEBUG_ONLY(this->verify(derived_loc);)
-
-      intptr_t offset = cast_from_oop<intptr_t>(*derived_loc) - cast_from_oop<intptr_t>(*base_loc);
-
-      log_develop_trace(jvmcont)(
-        "Continuation freeze derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
-        p2i(derived_loc), p2i((address)*derived_loc), p2i((address)*base_loc), p2i(base_loc), offset);
-
-      int hloc_offset = (address)derived_loc - (address)this->_vsp;
-      if (hloc_offset < 0 && _stub_vsp == NULL) {
-        assert ((intptr_t**)derived_loc == Frame::map_link_address(this->_map), "");
-        _fp_info->set_oop_fp_index(offset);
-
-        log_develop_trace(jvmcont)("Writing derived pointer offset in fp (offset: %ld, 0x%lx)", offset, offset);
-      } else {
-        intptr_t* hloc = (intptr_t*)((address)_hsp + hloc_offset);
-        *hloc = offset;
-
-        log_develop_trace(jvmcont)("Writing derived pointer offset at " INTPTR_FORMAT " (offset: " INTX_FORMAT ", " INTPTR_FORMAT ")", p2i(hloc), offset, offset);
-
-  #ifdef ASSERT
-        if (_stub_vsp != NULL && hloc_offset < 0) {
-          int hloc_offset0 = (address)derived_loc - _stub_vsp;
-          assert (hloc_offset0 >= 0, "hloc_offset: %d", hloc_offset0);
-          assert(hloc == (intptr_t*)(_stub_hsp + hloc_offset0), "");
-        }
-  #endif
-      }
-    }
-  };
 };
 
 template <typename ConfigT>
@@ -2729,7 +2883,7 @@ public:
   void recurse_thaw_java_frame(const hframe& hf, frame& caller, int num_frames, void* extra) {
     assert (num_frames > 0, "");
 
-    //hframe hsender = hf.sender<FKind, mode(_cont, 
+    //hframe hsender = hf.sender<FKind, mode(_cont,
     //return sender<FKind, mode>(cont, FKind::interpreted ? interpreted_frame_num_oops(*mask) : compiled_frame_num_oops());
     hframe hsender = hf.sender<FKind, mode>(_cont, FKind::interpreted ? (InterpreterOopMap*)extra : NULL, FKind::extra_oops); // TODO PERF maybe we can reuse fsize?
 
@@ -2764,7 +2918,7 @@ public:
     PERFTEST_ONLY(if (PERFTEST_LEVEL <= 115) return;)
 
     entry = new_entry_frame();
-    // if (entry.is_interpreted_frame()) _fastpath = false; // set _fastpath if entry is interpreted ? 
+    // if (entry.is_interpreted_frame()) _fastpath = false; // set _fastpath if entry is interpreted ?
 
   #ifdef ASSERT
     log_develop_trace(jvmcont)("Found entry:");
@@ -2794,7 +2948,7 @@ public:
           argsize = callee.compiled_frame_stack_argsize();
         // we'll be subtracting the argsize in thaw_compiled_frame, but if the caller is compiled, we shouldn't
         _cont.add_size(argsize);
-      } 
+      }
       // else {
       //   _fastpath = false; // see discussion in Freeze::freeze_compiled_frame
       // }
@@ -2835,8 +2989,9 @@ public:
     assert (!_map.include_argument_oops(), "");
 
     int thawed;
-    if (!FKind::interpreted && extra != NULL) {
-      thawed = thaw_compiled_oops_stub(f, (ThawFnT)extra, vsp, oop_index);
+    assert(extra != NULL, "");
+    if (!FKind::interpreted) {
+      thawed = thaw_compiled_oops(f, vsp, oop_index, (ThawFnT) extra);
       //log_develop_info(jvmcont)("thawing %d oops from %d (stub)", thawed, oop_index);
     } else {
       int num_oops = FKind::interpreted ? Interpreted::num_oops(f, (InterpreterOopMap*)extra) : NonInterpreted<FKind>::num_oops(f);
@@ -2849,8 +3004,7 @@ public:
         return;
       }
 
-      thawed = FKind::interpreted ? thaw_interpreted_oops(f, vsp, oop_index, (InterpreterOopMap*)extra)
-                                  : thaw_compiled_oops   (f, vsp, oop_index);
+      thawed = thaw_interpreted_oops(f, vsp, oop_index, (InterpreterOopMap*)extra);
     }
 
     log_develop_trace(jvmcont)("count: %d", thawed);
@@ -2930,20 +3084,20 @@ public:
   int thaw_interpreted_oops(frame& f, intptr_t* vsp, int starting_index, InterpreterOopMap* mask) {
     assert (mask != NULL, "");
 
-    ThawOopFn oopFn(&_cont, &f, starting_index, vsp, &_map);
+    ThawOopFn<RegisterMapT> oopFn(&_cont, &f, starting_index, vsp, &_map);
     f.oops_interpreted_do(&oopFn, NULL, mask); // f.oops_do(&oopFn, NULL, &oopFn, &_map);
     return oopFn.count();
   }
 
   template<bool top>
   void recurse_compiled_frame(const hframe& hf, frame& caller, int num_frames) {
-    ThawFnT t_fn = get_oopmap_stub(hf); // try to do this early, so we wouldn't need to look at the oopMap again.
+    ThawFnT thaw_stub = get_oopmap_stub(hf); // try to do this early, so we wouldn't need to look at the oopMap again.
 
-    return recurse_thaw_java_frame<Compiled, top>(hf, caller, num_frames, (void*)t_fn);
+    return recurse_thaw_java_frame<Compiled, top>(hf, caller, num_frames, (void*)thaw_stub);
   }
 
   template<typename FKind, bool top, bool bottom>
-  frame thaw_compiled_frame(const hframe& hf, const frame& caller, ThawFnT t_fn) {
+  frame thaw_compiled_frame(const hframe& hf, const frame& caller, ThawFnT thaw_stub) {
     thaw_compiled_frame_bp();
     assert(FKind::stub == is_stub(hf.cb()), "");
     assert (caller.sp() == caller.unextended_sp(), "");
@@ -2999,7 +3153,7 @@ public:
         _safepoint_stub_f = thaw_safepoint_stub(f);
       }
 
-      thaw_oops<FKind>(f, f.sp(), hf.ref_sp(), (void*)t_fn);
+      thaw_oops<FKind>(f, f.sp(), hf.ref_sp(), (void*)thaw_stub);
     }
 
     patch<FKind, top, bottom>(f, caller);
@@ -3016,40 +3170,28 @@ public:
 
         f.deoptimize(_thread); // we're assuming there are no monitors; this doesn't revoke biased locks
         // set_anchor(_thread, f); // deoptimization may need this
-        // Deoptimization::deoptimize(_thread, f, &_map); // gets passed frame by value 
+        // Deoptimization::deoptimize(_thread, f, &_map); // gets passed frame by value
         // clear_anchor(_thread);
 
-        assert (f.is_deoptimized_frame() && is_deopt_return(f.raw_pc(), f), 
-          "f.is_deoptimized_frame(): %d is_deopt_return(f.raw_pc()): %d is_deopt_return(f.pc()): %d", 
+        assert (f.is_deoptimized_frame() && is_deopt_return(f.raw_pc(), f),
+          "f.is_deoptimized_frame(): %d is_deopt_return(f.raw_pc()): %d is_deopt_return(f.pc()): %d",
           f.is_deoptimized_frame(), is_deopt_return(f.raw_pc(), f), is_deopt_return(f.pc(), f));
         _fastpath = false;
-      } 
+      }
     }
 
     return f;
   }
 
-  int thaw_compiled_oops(frame& f, intptr_t* vsp, int starting_index) {
-    DEBUG_ONLY(intptr_t* tmp_fp = f.fp();) // TODO PD
+  int thaw_compiled_oops(frame& f, intptr_t* vsp, int starting_index, ThawFnT stub) {
+    ThawCompiledOops::Extra extra(&f, &_cont, (address*) &_map, starting_index);
 
-    // Thawing oops overwrite the link in the callee if rbp contained an oop (only possible if we're compiled).
-    // This only matters when we're the top frame, as that's the value that will be restored into rbp when we jump to continue.
-    ContinuationHelper::update_register_map(&_map, frame_callee_info_address(f));
-
-    ThawOopFn oopFn(&_cont, &f, starting_index, vsp, &_map);
-    OopMapDo<ThawOopFn, ThawOopFn, IncludeAllValues> visitor(&oopFn, &oopFn);
-    visitor.oops_do(&f, &_map, f.oop_map());
-
-    DEBUG_ONLY(if (tmp_fp != f.fp()) log_develop_trace(jvmcont)("WHOA link has changed (thaw) f.fp: " INTPTR_FORMAT " link: " INTPTR_FORMAT, p2i(f.fp()), p2i(tmp_fp));) // TODO PD
-
-    int cnt = oopFn.count();
-    return cnt;
-  }
-
-  int thaw_compiled_oops_stub(frame& f, ThawFnT t_fn, intptr_t* vsp, int starting_index) {
     typename ConfigT::OopT* addr = _cont.refStack()->template obj_at_address<typename ConfigT::OopT>(starting_index);
-    int cnt = t_fn((address) vsp, (address)addr, (address)frame_callee_info_address(f)); // write the link straight into the frame struct
-    return cnt;
+    if (mode == mode_preempt) {
+      return ThawCompiledOops::slow_path_preempt((address) vsp, (address) addr, (address)frame_callee_info_address(f), &extra);
+    } else {
+      return stub((address) vsp, (address) addr, (address)frame_callee_info_address(f), (address) &extra);
+    }
   }
 
   void finish(frame& f) {
@@ -3140,46 +3282,6 @@ public:
     _cont.copy_from_stack(hsp, vsp, fsize);
   }
 
-  class ThawOopFn : public ContOopBase<RegisterMapT> {
-  private:
-    int _i;
-
-  protected:
-    template <class T> inline void do_oop_work(T* p) {
-      this->process(p);
-      oop obj = this->_cont->obj_at(_i); // does a HeapAccess<IN_HEAP_ARRAY> load barrier
-
-      assert (oopDesc::is_oop_or_null(obj), "invalid oop");
-      log_develop_trace(jvmcont)("i: %d", _i); print_oop(p, obj);
-      
-      NativeAccess<IS_DEST_UNINITIALIZED>::oop_store(p, obj);
-      _i++;
-    }
-  public:
-    ThawOopFn(ContMirror* cont, frame* fr, int index, void* vsp, RegisterMapT* map)
-      : ContOopBase<RegisterMapT>(cont, fr, map, vsp) { _i = index; }
-    void do_oop(oop* p)       { do_oop_work(p); }
-    void do_oop(narrowOop* p) { do_oop_work(p); }
-
-    void do_derived_oop(oop *base_loc, oop *derived_loc) {
-      assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop: " INTPTR_FORMAT " (at " INTPTR_FORMAT ")", p2i((oopDesc*)*base_loc), p2i(base_loc));
-      assert(derived_loc != base_loc, "Base and derived in same location");
-      DEBUG_ONLY(this->verify(base_loc);)
-      DEBUG_ONLY(this->verify(derived_loc);)
-      assert (oopDesc::is_oop_or_null(*base_loc), "invalid oop");
-
-      intptr_t offset = *(intptr_t*)derived_loc;
-
-      log_develop_trace(jvmcont)(
-        "Continuation thaw derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
-        p2i(derived_loc), p2i((address)*derived_loc), p2i((address)*base_loc), p2i(base_loc), offset);
-
-      oop obj = cast_to_oop(cast_from_oop<intptr_t>(*base_loc) + offset);
-      *derived_loc = obj;
-
-      assert(Universe::heap()->is_in_or_null(obj), "");
-    }
-  };
 };
 
 static void post_JVMTI_continue(JavaThread* thread, FrameInfo* fi, int java_frame_count) {
@@ -3370,7 +3472,7 @@ bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) 
 }
 
 address* Continuation::get_continuation_entry_pc_for_sender(Thread* thread, const frame& f, address* pc_addr0) {
-  if (!thread->is_Java_thread()) 
+  if (!thread->is_Java_thread())
     return pc_addr0;
   oop cont = get_continuation_for_frame((JavaThread*)thread, f.unextended_sp() - 1);
   if (cont == NULL)
@@ -3379,7 +3481,7 @@ address* Continuation::get_continuation_entry_pc_for_sender(Thread* thread, cons
     return pc_addr0; // not the run frame
   if (*pc_addr0 == f.raw_pc())
     return pc_addr0;
-  
+
   address *pc_addr = java_lang_Continuation::entryPC_addr(cont);
   // If our callee is the entry frame, we can continue as usual becuse we use the ordinary return address; see Freeze::setup_jump
   // If the entry frame is the callee, we set entryPC_addr to NULL in Thaw::finalize
@@ -3387,7 +3489,7 @@ address* Continuation::get_continuation_entry_pc_for_sender(Thread* thread, cons
   //   assert (!is_return_barrier_entry(*pc_addr0), "");
   //   return pc_addr0;
   // }
- 
+
   // tty->print_cr(">>>> get_continuation_entry_pc_for_sender"); f.print_on(tty);
   log_develop_trace(jvmcont)("get_continuation_entry_pc_for_sender pc_addr: " INTPTR_FORMAT " *pc_addr: " INTPTR_FORMAT, p2i(pc_addr), p2i(*pc_addr));
   DEBUG_ONLY(if (log_develop_is_enabled(Trace, jvmcont)) { print_blob(tty, *pc_addr); print_blob(tty, *(address*)(f.sp()-1)); })
@@ -3401,10 +3503,10 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
   if (thread != NULL && is_return_barrier_entry(*sender_pc)) {
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " sender_sp: " INTPTR_FORMAT " sender_fp: " INTPTR_FORMAT, p2i(*sender_pc), p2i(*sender_sp), p2i(*sender_fp));
-      
+
     oop cont = get_continuation_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert (cont != NULL, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: continuation entrySP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT, 
+    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: continuation entrySP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT,
       p2i(java_lang_Continuation::entrySP(cont)), p2i(java_lang_Continuation::entryPC(cont)), p2i(java_lang_Continuation::entryFP(cont)));
 
     address new_pc = java_lang_Continuation::entryPC(cont);
@@ -4298,6 +4400,27 @@ static inline CachedCompiledMetadata cached_metadata(const hframe& hf) {
 }
 #endif
 
+template <typename OopWriterT>
+int FreezeCompiledOops<OopWriterT>::slow_path_preempt(address vsp, address oops, address addr, address hsp, int idx, FpOopInfo* fp_oop_info, Extra *extra, bool is_preempt) {
+  if (is_preempt) {
+    return freeze_slow<RegisterMap, true>(vsp, oops, addr, hsp, idx, fp_oop_info, extra);
+  }
+  return freeze_slow<RegisterMap, false>(vsp, oops, addr, hsp, idx, fp_oop_info, extra);
+}
+
+template <typename OopWriterT>
+int FreezeCompiledOops<OopWriterT>::slow_path(address vsp, address oops, address addr, address hsp, int idx, FpOopInfo* fp_oop_info, Extra *extra) {
+  return freeze_slow<SmallRegisterMap, false>(vsp, oops, addr, hsp, idx, fp_oop_info, extra);
+}
+
+int ThawCompiledOops::slow_path_preempt(address vsp, address oops, address link_addr, Extra* extra) {
+  return thaw_slow<RegisterMap>(vsp, oops, link_addr, extra);
+}
+
+int ThawCompiledOops::slow_path(address vsp, address oops, address link_addr, Extra* extra) {
+  return thaw_slow<SmallRegisterMap>(vsp, oops, link_addr, extra);
+}
+
 /* This is hopefully only temporary, currently only G1 has support for making the weak
  * keepalive OOPs strong while their nmethods are on the stack. */
 class HandleKeepalive {
@@ -4367,10 +4490,10 @@ public:
 
   template <bool use_compressed, bool is_modref>
   static void resolve_gencode() {
-    LoomGenCode 
+    LoomGenCode
       ? resolve_g1<use_compressed, is_modref, true>()
       : resolve_g1<use_compressed, is_modref, false>();
-  } 
+  }
 
   template <bool use_compressed, bool is_modref, bool gencode>
   static void resolve_g1() {
@@ -4382,14 +4505,21 @@ public:
   template <bool use_compressed, bool is_modref, bool gencode, bool g1gc>
   static void resolve() {
     // tty->print_cr(">>> ConfigResolve::resolve use_compressed: %d is_modref: %d gen_code:%d", use_compressed, is_modref, gen_code);
+    //
+    typedef Config<use_compressed, is_modref, gencode, g1gc> SelectedConfigT;
 
-    cont_freeze_fast    = Config<use_compressed, is_modref, gencode, g1gc>::template freeze<mode_fast>;
-    cont_freeze_slow    = Config<use_compressed, is_modref, gencode, g1gc>::template freeze<mode_slow>;
-    cont_freeze_preempt = Config<use_compressed, is_modref, gencode, g1gc>::template freeze<mode_preempt>;
+    cont_freeze_fast    = SelectedConfigT::template freeze<mode_fast>;
+    cont_freeze_slow    = SelectedConfigT::template freeze<mode_slow>;
+    cont_freeze_preempt = SelectedConfigT::template freeze<mode_preempt>;
 
-    cont_thaw_fast    = Config<use_compressed, is_modref, gencode, g1gc>::template thaw<mode_fast>;
-    cont_thaw_slow    = Config<use_compressed, is_modref, gencode, g1gc>::template thaw<mode_slow>;
-    cont_thaw_preempt = Config<use_compressed, is_modref, gencode, g1gc>::template thaw<mode_preempt>;
+    cont_thaw_fast    = SelectedConfigT::template thaw<mode_fast>;
+    cont_thaw_slow    = SelectedConfigT::template thaw<mode_slow>;
+    cont_thaw_preempt = SelectedConfigT::template thaw<mode_preempt>;
+
+    cont_freeze_oops_slow = (FreezeFnT) FreezeCompiledOops<typename SelectedConfigT::OopWriterT>::slow_path;
+    cont_freeze_oops_generate = (FreezeFnT) FreezeCompiledOops<typename SelectedConfigT::OopWriterT>::generate_stub;
+
+    cont_thaw_oops_slow = (ThawFnT) ThawCompiledOops::slow_path;
   }
 };
 
@@ -4397,6 +4527,23 @@ void Continuations::init() {
   ConfigResolve::resolve();
   OopMapStubGenerator::init();
   Continuation::init();
+}
+
+address Continuations::default_thaw_oops_stub() {
+  return (address) OopStubs::thaw_oops_slow();
+}
+
+address Continuations::default_freeze_oops_stub() {
+  //return (address) OopStubs::freeze_oops_slow();
+  return (address) OopStubs::generate_stub();
+}
+
+address Continuations::freeze_oops_slow() {
+  return (address) OopStubs::freeze_oops_slow();
+}
+
+address Continuations::thaw_oops_slow() {
+  return (address) OopStubs::thaw_oops_slow();
 }
 
 void Continuation::init() {
@@ -4653,25 +4800,25 @@ static const ImmutableOopMap* slow_get_oopmap(const FrameT& f) {
 }
 
 template <typename FrameT>
-static int slow_size(const FrameT& f) { 
-  return slow_get_cb(f)->frame_size() * wordSize; 
+static int slow_size(const FrameT& f) {
+  return slow_get_cb(f)->frame_size() * wordSize;
 }
 
 template <typename FrameT>
-static address slow_return_pc(const FrameT& f) { 
-  return *slow_return_pc_address<NonInterpretedUnknown>(f); 
+static address slow_return_pc(const FrameT& f) {
+  return *slow_return_pc_address<NonInterpretedUnknown>(f);
 }
 
 template <typename FrameT>
-static int slow_stack_argsize(const FrameT& f) { 
+static int slow_stack_argsize(const FrameT& f) {
   CodeBlob* cb = slow_get_cb(f);
   assert (cb->is_compiled(), "");
-  return cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size; 
+  return cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size;
 }
 
 template <typename FrameT>
-static int slow_num_oops(const FrameT& f) { 
-  return slow_get_oopmap(f)->num_oops(); 
+static int slow_num_oops(const FrameT& f) {
+  return slow_get_oopmap(f)->num_oops();
 }
 
 static void print_blob(outputStream* st, address addr) {
