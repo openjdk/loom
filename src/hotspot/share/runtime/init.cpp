@@ -51,6 +51,7 @@
 void check_ThreadShadow();
 void eventlog_init();
 void mutex_init();
+void oopstorage_init();
 void chunkpool_init();
 void perfMemory_init();
 void SuspendibleThreadSet_init();
@@ -62,7 +63,6 @@ void classLoader_init1();
 void compilationPolicy_init();
 void codeCache_init();
 void VM_Version_init();
-void os_init_globals();        // depends on VM_Version_init, before universe_init
 void stubRoutines_init1();
 void stubRoutines_initContinuationStubs();
 jint universe_init();          // depends on codeCache_init and stubRoutines_init
@@ -102,6 +102,7 @@ void vm_init_globals() {
   basic_types_init();
   eventlog_init();
   mutex_init();
+  oopstorage_init();
   chunkpool_init();
   perfMemory_init();
   SuspendibleThreadSet_init();
@@ -116,7 +117,6 @@ jint init_globals() {
   compilationPolicy_init();
   codeCache_init();
   VM_Version_init();
-  os_init_globals();
   stubRoutines_init1();
   jint status = universe_init();  // dependent on codeCache_init and
                                   // stubRoutines_init1 and metaspace_init.

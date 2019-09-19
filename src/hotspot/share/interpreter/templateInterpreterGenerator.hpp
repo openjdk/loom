@@ -96,7 +96,6 @@ class TemplateInterpreterGenerator: public AbstractInterpreterGenerator {
   address generate_Continuation_jump_entry();
   address generate_Continuation_doContinue_entry();
   address generate_Continuation_getSP_entry();
-  address generate_Continuation_getFP_entry();
   address generate_Continuation_getPC_entry();
   address generate_Continuation_runLevel_entry();
   address generate_CRC32_update_entry();

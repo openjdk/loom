@@ -175,6 +175,7 @@ import sun.security.action.GetPropertyAction;
 public final class URL implements java.io.Serializable {
 
     static final String BUILTIN_HANDLERS_PREFIX = "sun.net.www.protocol";
+    @java.io.Serial
     static final long serialVersionUID = -7627629688361524110L;
 
     /**
@@ -328,10 +329,13 @@ public final class URL implements java.io.Serializable {
      * </ol>
      *
      * <p>Protocol handlers for the following protocols are guaranteed
-     * to exist on the search path :-
-     * <blockquote><pre>
-     *     http, https, file, and jar
-     * </pre></blockquote>
+     * to exist on the search path:
+     * <ul>
+     * <li>{@code http}</li>
+     * <li>{@code https}</li>
+     * <li>{@code file}</li>
+     * <li>{@code jar}</li>
+     * </ul>
      * Protocol handlers for additional protocols may also be  available.
      * Some protocol handlers, for example those used for loading platform
      * classes or classes on the class path, may not be overridden. The details
@@ -1489,6 +1493,7 @@ public final class URL implements java.io.Serializable {
      * @serialField    hashCode int
      *
      */
+    @java.io.Serial
     private static final ObjectStreamField[] serialPersistentFields = {
         new ObjectStreamField("protocol", String.class),
         new ObjectStreamField("host", String.class),
@@ -1508,6 +1513,7 @@ public final class URL implements java.io.Serializable {
      * the protocol variable returns a valid URLStreamHandler and
      * throw an IOException if it does not.
      */
+    @java.io.Serial
     private synchronized void writeObject(java.io.ObjectOutputStream s)
         throws IOException
     {
@@ -1519,6 +1525,7 @@ public final class URL implements java.io.Serializable {
      * stream.  It reads the components of the URL and finds the local
      * stream handler.
      */
+    @java.io.Serial
     private synchronized void readObject(java.io.ObjectInputStream s)
             throws IOException, ClassNotFoundException {
         GetField gf = s.readFields();
@@ -1550,7 +1557,7 @@ public final class URL implements java.io.Serializable {
      * @throws ObjectStreamException if a new object replacing this
      * object could not be created
      */
-
+   @java.io.Serial
    private Object readResolve() throws ObjectStreamException {
 
         URLStreamHandler handler = null;

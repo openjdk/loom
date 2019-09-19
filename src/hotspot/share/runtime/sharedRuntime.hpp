@@ -436,8 +436,6 @@ class SharedRuntime: AllStatic {
                               const VMRegPair *regs);
 
 
-  static jlong continuation_getFP(JavaThread *thread);
-
   // OSR support
 
   // OSR_migration_begin will extract the jvm state from an interpreter

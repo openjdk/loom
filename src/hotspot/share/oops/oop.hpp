@@ -40,8 +40,6 @@
 //
 // no virtual functions allowed
 
-extern bool always_do_update_barrier;
-
 // Forward declarations.
 class OopClosure;
 class ScanClosure;
@@ -256,15 +254,14 @@ class oopDesc {
   // asserts and guarantees
   static bool is_oop(oop obj, bool ignore_mark_word = false);
   static bool is_oop_or_null(oop obj, bool ignore_mark_word = false);
-#ifndef PRODUCT
-  static bool is_archived_object(oop p) NOT_CDS_JAVA_HEAP_RETURN_(false);
-#endif
 
   // garbage collection
   inline bool is_gc_marked() const;
 
   // Forward pointer operations for scavenge
   inline bool is_forwarded() const;
+
+  void verify_forwardee(oop forwardee) NOT_DEBUG_RETURN;
 
   inline void forward_to(oop p);
   inline bool cas_forward_to(oop p, markWord compare, atomic_memory_order order = memory_order_conservative);
@@ -331,8 +328,6 @@ class oopDesc {
   // for error reporting
   static void* load_klass_raw(oop obj);
   static void* load_oop_raw(oop obj, int offset);
-  static bool  is_valid(oop obj);
-  static oop   oop_or_null(address addr);
 };
 
 #endif // SHARE_OOPS_OOP_HPP

@@ -794,9 +794,6 @@ public class Continuation {
     private static long getSP() { throw new Error("Intrinsic not installed"); };
 
     @HotSpotIntrinsicCandidate
-    private static long getFP() { throw new Error("Intrinsic not installed"); };
-
-    @HotSpotIntrinsicCandidate
     private static long getPC() { throw new Error("Intrinsic not installed"); };
 
     @HotSpotIntrinsicCandidate

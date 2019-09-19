@@ -339,11 +339,6 @@ void LIRGenerator::do_NegateOp(NegateOp* x) {
   set_result(x, round_item(reg));
 }
 
-void LIRGenerator::do_continuation_getFP(Intrinsic* x) {
-  LIR_Opr result_reg = rlock_result(x);
-  __ getfp(result_reg);
-}
-
 void LIRGenerator::do_continuation_getSP(Intrinsic* x) {
   LIR_Address* cont_fastpath_addr = new LIR_Address(getThreadPointer(), in_bytes(JavaThread::cont_fastpath_offset()), T_INT);
   __ move(LIR_OprFact::intConst(1), cont_fastpath_addr);

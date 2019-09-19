@@ -106,8 +106,6 @@
 
 int Continuations::_flags = 0;
 
-OopStorage* Continuation::_weak_handles = NULL;
-
 PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 // Freeze:
 // 5 - no call into C
@@ -4180,7 +4178,7 @@ oop ContMirror::raw_allocate(Klass* klass, size_t size_in_words, size_t elements
     //HandleMark hm(_thread);
     Handle conth(_thread, _cont);
     uint64_t counter = SafepointSynchronize::safepoint_counter();
-    oop result = allocator.allocate(/* use_tlab */ false);
+    oop result = allocator.allocate();
     //if (!SafepointSynchronize::is_same_safepoint(counter)) {
       post_safepoint(conth);
     //}
@@ -4402,9 +4400,6 @@ void Continuations::init() {
 }
 
 void Continuation::init() {
-  _weak_handles = new OopStorage("Continuation NMethodKeepalive weak",
-      NMethodKeepaliveAlloc_lock,
-      NMethodKeepaliveActive_lock);
 }
 
 class KeepaliveCleanupClosure : public ThreadClosure {

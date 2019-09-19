@@ -743,21 +743,6 @@ address TemplateInterpreterGenerator::generate_Continuation_getSP_entry(void) {
 #endif
 }
 
-// return current fp
-address TemplateInterpreterGenerator::generate_Continuation_getFP_entry(void) {
-#ifdef _LP64
-  address entry = __ pc();
-
-  __ movptr(rax, rbp);
-  __ ret(0);
-
-  return entry;
-#else
-  Unimplemented();
-  return NULL;
-#endif
-}
-
 // return current pc
 address TemplateInterpreterGenerator::generate_Continuation_getPC_entry(void) {
 #ifdef _LP64
