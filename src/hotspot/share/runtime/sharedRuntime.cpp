@@ -2097,12 +2097,7 @@ JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_locking_C(oopDesc* _obj, B
     Atomic::inc(BiasedLocking::slow_path_entry_count_addr());
   }
   Handle h_obj(THREAD, obj);
-  if (UseBiasedLocking) {
-    // Retry fast entry if bias is revoked to avoid unnecessary inflation
-    ObjectSynchronizer::fast_enter(h_obj, lock, true, CHECK);
-  } else {
-    ObjectSynchronizer::slow_enter(h_obj, lock, CHECK);
-  }
+  ObjectSynchronizer::enter(h_obj, lock, CHECK);
   assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
   JRT_BLOCK_END
 JRT_END
@@ -2133,7 +2128,7 @@ JRT_LEAF(void, SharedRuntime::complete_monitor_unlocking_C(oopDesc* _obj, BasicL
   {
     // Exit must be non-blocking, and therefore no exceptions can be thrown.
     EXCEPTION_MARK;
-    ObjectSynchronizer::slow_exit(obj, lock, THREAD);
+    ObjectSynchronizer::exit(obj, lock, THREAD);
   }
 
 #ifdef MIGHT_HAVE_PENDING
@@ -2820,7 +2815,7 @@ void AdapterHandlerEntry::relocate(address new_base) {
 void AdapterHandlerEntry::deallocate() {
   delete _fingerprint;
 #ifdef ASSERT
-  if (_saved_code) FREE_C_HEAP_ARRAY(unsigned char, _saved_code);
+  FREE_C_HEAP_ARRAY(unsigned char, _saved_code);
 #endif
 }
 
@@ -3057,15 +3052,6 @@ VMRegPair *SharedRuntime::find_callee_arguments(Symbol* sig, bool has_receiver, 
   *arg_size = cnt;
   return regs;
 }
-
-JRT_LEAF(jlong, SharedRuntime::continuation_getFP(JavaThread* thread) )
-  RegisterMap reg_map2(thread);
-  assert(false, "");
-  frame stubFrame   = thread->last_frame();
-    // Caller-frame is a compiled frame
-  frame callerFrame = stubFrame.sender(&reg_map2);
-  return (jlong) callerFrame.real_fp();
-JRT_END
 
 // OSR Migration Code
 //

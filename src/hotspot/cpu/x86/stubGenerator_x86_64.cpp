@@ -6124,17 +6124,6 @@ RuntimeStub* generate_cont_doYield() {
     return start;
   }
 
-  address generate_cont_getFP() {
-    StubCodeMark mark(this, "StubRoutines", "GetFP");
-    address start = __ pc();
-
-    __ stop("WHAT?");
-    __ lea(rax, Address(rsp, wordSize));
-    __ ret(0);
-
-    return start;
-  }
-
 #undef __
 #define __ masm->
 

@@ -267,7 +267,6 @@ class LIRGenerator: public InstructionVisitor, public BlockClosure {
   void do_vectorizedMismatch(Intrinsic* x);
   void do_continuation_getPC(Intrinsic* x);
   void do_continuation_getSP(Intrinsic* x);
-  void do_continuation_getFP(Intrinsic* x);
   void do_continuation_doYield(Intrinsic* x);
   void do_continuation_jump(Intrinsic* x);
   void do_continuation_doContinue(Intrinsic* x);

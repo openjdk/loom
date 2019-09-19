@@ -103,7 +103,6 @@ address OptoRuntime::_rethrow_Java                                = NULL;
 
 address OptoRuntime::_slow_arraycopy_Java                         = NULL;
 address OptoRuntime::_register_finalizer_Java                     = NULL;
-address OptoRuntime::_continuation_getFP_Java                     = NULL;
 
 ExceptionBlob* OptoRuntime::_exception_blob;
 
@@ -147,7 +146,6 @@ bool OptoRuntime::generate(ciEnv* env) {
 
   gen(env, _slow_arraycopy_Java            , slow_arraycopy_Type          , SharedRuntime::slow_arraycopy_C ,    0 , false, false, false);
   gen(env, _register_finalizer_Java        , register_finalizer_Type      , register_finalizer              ,    0 , false, false, false);
-  gen(env, _continuation_getFP_Java        , void_long_Type               , SharedRuntime::continuation_getFP,    0 , false, false, false);
 
   return true;
 }

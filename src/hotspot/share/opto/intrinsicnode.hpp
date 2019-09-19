@@ -164,17 +164,6 @@ class HasNegativesNode: public StrIntrinsicNode {
   virtual const Type* bottom_type() const { return TypeInt::BOOL; }
 };
 
-//------------------------------GetFP ---------------------------------
- class GetFPNode: public Node {
-  public:
-   GetFPNode(Node* ctrl):
-     Node(ctrl) {}
-
-   virtual int Opcode() const;
-   virtual uint ideal_reg() const { return Op_RegL; }
-   virtual const Type* bottom_type() const { return TypeLong::LONG; }
- };
-
 //------------------------------EncodeISOArray--------------------------------
 // encode char[] to byte[] in ISO_8859_1
 class EncodeISOArrayNode: public Node {

@@ -300,6 +300,7 @@ class InetAddress implements java.io.Serializable {
     private transient String canonicalHostName = null;
 
     /** use serialVersionUID from JDK 1.0.2 for interoperability */
+    @java.io.Serial
     private static final long serialVersionUID = 3286316764910316507L;
 
     /*
@@ -354,6 +355,7 @@ class InetAddress implements java.io.Serializable {
      * @throws ObjectStreamException if a new object replacing this
      * object could not be created
      */
+    @java.io.Serial
     private Object readResolve() throws ObjectStreamException {
         // will replace the deserialized 'this' object
         return new Inet4Address(holder().getHostName(), holder().getAddress());
@@ -1688,6 +1690,7 @@ class InetAddress implements java.io.Serializable {
         return (InetAddressImpl) impl;
     }
 
+    @java.io.Serial
     private void readObjectNoData () {
         if (getClass().getClassLoader() != null) {
             throw new SecurityException ("invalid address type");
@@ -1699,6 +1702,7 @@ class InetAddress implements java.io.Serializable {
     private static final long FIELDS_OFFSET
             = UNSAFE.objectFieldOffset(InetAddress.class, "holder");
 
+    @java.io.Serial
     private void readObject (ObjectInputStream s) throws
                          IOException, ClassNotFoundException {
         if (getClass().getClassLoader() != null) {
@@ -1722,12 +1726,14 @@ class InetAddress implements java.io.Serializable {
      * @serialField address int
      * @serialField family int
      */
+    @java.io.Serial
     private static final ObjectStreamField[] serialPersistentFields = {
         new ObjectStreamField("hostName", String.class),
         new ObjectStreamField("address", int.class),
         new ObjectStreamField("family", int.class),
     };
 
+    @java.io.Serial
     private void writeObject (ObjectOutputStream s) throws
                         IOException {
         if (getClass().getClassLoader() != null) {

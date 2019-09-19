@@ -190,8 +190,6 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
                               : return java_lang_ref_reference_get;
     case vmIntrinsics::_Continuation_getSP
                               : return java_lang_continuation_getSP;
-    case vmIntrinsics::_Continuation_getFP
-                              : return java_lang_continuation_getFP;
     case vmIntrinsics::_Continuation_getPC
                               : return java_lang_continuation_getPC;
     case vmIntrinsics::_Continuation_doContinue

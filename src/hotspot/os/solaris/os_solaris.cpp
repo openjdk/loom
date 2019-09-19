@@ -454,9 +454,7 @@ static bool assign_distribution(processorid_t* id_array,
       board = 0;
     }
   }
-  if (available_id != NULL) {
-    FREE_C_HEAP_ARRAY(bool, available_id);
-  }
+  FREE_C_HEAP_ARRAY(bool, available_id);
   return true;
 }
 
@@ -493,9 +491,7 @@ bool os::distribute_processes(uint length, uint* distribution) {
       result = false;
     }
   }
-  if (id_array != NULL) {
-    FREE_C_HEAP_ARRAY(processorid_t, id_array);
-  }
+  FREE_C_HEAP_ARRAY(processorid_t, id_array);
   return result;
 }
 
@@ -562,7 +558,7 @@ void os::init_system_properties_values() {
     MAX3((size_t)MAXPATHLEN,  // For dll_dir & friends.
          sizeof(SYS_EXT_DIR) + sizeof("/lib/"), // invariant ld_library_path
          (size_t)MAXPATHLEN + sizeof(EXTENSIONS_DIR) + sizeof(SYS_EXT_DIR) + sizeof(EXTENSIONS_DIR)); // extensions dir
-  char *buf = (char *)NEW_C_HEAP_ARRAY(char, bufsize, mtInternal);
+  char *buf = NEW_C_HEAP_ARRAY(char, bufsize, mtInternal);
 
   // sysclasspath, java_home, dll_dir
   {
@@ -648,7 +644,7 @@ void os::init_system_properties_values() {
     // through the dlinfo() call, so only add additional space for the path
     // components explicitly added here.
     size_t library_path_size = info->dls_size + strlen(common_path);
-    library_path = (char *)NEW_C_HEAP_ARRAY(char, library_path_size, mtInternal);
+    library_path = NEW_C_HEAP_ARRAY(char, library_path_size, mtInternal);
     library_path[0] = '\0';
 
     // Construct the desired Java library path from the linker's library

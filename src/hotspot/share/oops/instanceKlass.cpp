@@ -946,7 +946,7 @@ void InstanceKlass::initialize_impl(TRAPS) {
     while (is_being_initialized() && !is_reentrant_initialization(jt)) {
       wait = true;
       jt->set_class_to_be_initialized(this);
-      ol.waitUninterruptibly(jt);
+      ol.wait_uninterruptibly(jt);
       jt->set_class_to_be_initialized(NULL);
     }
 
@@ -2546,7 +2546,7 @@ void InstanceKlass::release_C_heap_structures() {
   // unreference array name derived from this class name (arrays of an unloaded
   // class can't be referenced anymore).
   if (_array_name != NULL)  _array_name->decrement_refcount();
-  if (_source_debug_extension != NULL) FREE_C_HEAP_ARRAY(char, _source_debug_extension);
+  FREE_C_HEAP_ARRAY(char, _source_debug_extension);
 }
 
 void InstanceKlass::set_source_debug_extension(const char* array, int length) {

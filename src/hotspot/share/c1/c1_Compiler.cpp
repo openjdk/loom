@@ -220,7 +220,6 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
   case vmIntrinsics::_compareAndSetReference:
   case vmIntrinsics::_getCharStringU:
   case vmIntrinsics::_putCharStringU:
-  case vmIntrinsics::_Continuation_getFP:
   case vmIntrinsics::_Continuation_getSP:
   case vmIntrinsics::_Continuation_getPC:
   case vmIntrinsics::_Continuation_doContinue:

@@ -819,7 +819,6 @@ javax/swing/JTree/8003400/Test8003400.java 8197560 macosx-all,linux-all
 javax/swing/RepaintManager/IconifyTest/IconifyTest.java 8221903 linux-all
 javax/swing/JRadioButton/FocusTraversal/FocusTraversal.java 8221902 linux-all
 
-sanity/client/SwingSet/src/ColorChooserDemoTest.java 8221312 generic-all
 sanity/client/SwingSet/src/ToolTipDemoTest.java 8225012 windows-all
 sanity/client/SwingSet/src/ScrollPaneDemoTest.java 8225013 linux-all
 
@@ -885,8 +884,9 @@ javax/rmi/ssl/SSLSocketParametersTest.sh                        8162906 generic-
 
 jdk/jfr/event/io/TestInstrumentation.java                       8202142    generic-all
 jdk/jfr/api/recording/event/TestPeriod.java                     8215890    generic-all
-
 jdk/jfr/event/io/EvilInstrument.java                            8221331    generic-all
+jdk/jfr/event/runtime/TestNetworkUtilizationEvent.java          8228990,8229370    generic-all
+jdk/jfr/event/compiler/TestCodeSweeper.java                     8225209    generic-all
 
 ############################################################################
 

@@ -3092,9 +3092,6 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
     do_vectorizedMismatch(x);
     break;
 
-  case vmIntrinsics::_Continuation_getFP:
-    do_continuation_getFP(x);
-    break;
   case vmIntrinsics::_Continuation_getSP:
     do_continuation_getSP(x);
     break;

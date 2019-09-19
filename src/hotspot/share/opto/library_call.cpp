@@ -335,7 +335,6 @@ class LibraryCallKit : public GraphKit {
   bool inline_profileBoolean();
   bool inline_isCompileConstant();
   bool inline_continuation(vmIntrinsics::ID id);
-  bool inline_get_frame_pointer();
   bool inline_continuation_do_yield();
   bool inline_continuation_jump();
   bool inline_continuation_runLevel();
@@ -889,9 +888,6 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_fmaD:
   case vmIntrinsics::_fmaF:
     return inline_fma(intrinsic_id());
-
-  case vmIntrinsics::_Continuation_getFP:
-    return inline_get_frame_pointer();
 
   case vmIntrinsics::_Continuation_getSP:
   case vmIntrinsics::_Continuation_getPC:
@@ -6827,13 +6823,6 @@ Node* LibraryCallKit::inline_digestBase_implCompressMB_predicate(int predicate) 
   return instof_false;  // even if it is NULL
 }
 
-// long Continuations::getFP() ()J
-bool LibraryCallKit::inline_get_frame_pointer() {
-  Node *frame =  _gvn.transform(new GetFPNode(control()));
-  set_result(frame);
-  return true;
-}
-
 bool LibraryCallKit::inline_continuation(vmIntrinsics::ID id) {
   address call_addr = NULL;
   const char *name = NULL;
@@ -6841,7 +6830,6 @@ bool LibraryCallKit::inline_continuation(vmIntrinsics::ID id) {
   switch (id) {
     case vmIntrinsics::_Continuation_getSP: call_addr = StubRoutines::cont_getSP(); name = "getSP"; break;
     case vmIntrinsics::_Continuation_getPC: call_addr = StubRoutines::cont_getPC(); name = "getPC"; break;
-    case vmIntrinsics::_Continuation_getFP: call_addr = OptoRuntime::continuation_getFP_Java(); name = "getFP"; break;
     default: fatal("error"); return false;
   }
 

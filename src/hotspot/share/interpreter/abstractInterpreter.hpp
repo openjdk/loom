@@ -81,7 +81,6 @@ class AbstractInterpreter: AllStatic {
     java_lang_math_fmaD,                                        // implementation of java.lang.Math.fma   (x, y, z)
     java_lang_ref_reference_get,                                // implementation of java.lang.ref.Reference.get()
     java_lang_continuation_getSP,                               // implementation of java.lang.Continuation.getSP()
-    java_lang_continuation_getFP,                               // implementation of java.lang.Continuation.getFP()
     java_lang_continuation_getPC,                               // implementation of java.lang.Continuation.getPC()
     java_lang_continuation_doContinue,                          // implementation of java.lang.Continuation.doContinue()
     java_lang_continuation_doYield,                             // implementation of java.lang.Continuation.doYield()

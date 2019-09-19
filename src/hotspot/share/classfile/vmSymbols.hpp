@@ -371,7 +371,6 @@
   template(jump_name,                                 "jump")                                     \
   template(doContinue_name,                           "doContinue")                               \
   template(getSP_name,                                "getSP")                                    \
-  template(getFP_name,                                "getFP")                                    \
   template(runLevel_name,                             "runLevel")                                 \
   template(getPC_name,                                "getPC")                                    \
   template(enter_name,                                "enter")                                    \
@@ -1132,8 +1131,6 @@
   do_alias(continuationOnPinned_signature,                        int_void_signature)                                          \
   do_intrinsic(_Continuation_getSP,  java_lang_Continuation,       getSP_name,    continuationGetSP_signature, F_S)            \
     do_alias(continuationGetSP_signature,                            void_long_signature)                                      \
-  do_intrinsic(_Continuation_getFP,  java_lang_Continuation,       getFP_name,    continuationGetFP_signature, F_S)            \
-    do_alias(continuationGetFP_signature,                            void_long_signature)                                      \
   do_intrinsic(_Continuation_getPC,  java_lang_Continuation,       getPC_name,    continuationGetPC_signature, F_S)            \
     do_alias(continuationGetPC_signature,                            void_long_signature)                                      \
   do_intrinsic(_Continuation_doContinue,  java_lang_Continuation,  doContinue_name,    continuationDoContinue_signature, F_R)  \
