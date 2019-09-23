@@ -60,6 +60,11 @@ public:
 
   static void cleanup_keepalives();
 
+  static address default_freeze_oops_stub();
+  static address freeze_oops_slow();
+  static address default_thaw_oops_stub();
+  static address thaw_oops_slow();
+
   static int flags() { return _flags; }
 };
 
