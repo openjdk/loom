@@ -47,6 +47,7 @@
 #include "oops/weakHandle.hpp"
 #include "oops/weakHandle.inline.hpp"
 #include "prims/jvmtiThreadState.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/frame.hpp"
@@ -4999,26 +5000,7 @@ oop ContMirror::allocate_stack_chunk(int stack_size) {
     //HandleMark hm(_thread);
     Handle conth(_thread, _cont);
     // uint64_t counter = SafepointSynchronize::safepoint_counter();
-    oop result = allocator.allocate(/* use_tlab */ false);
-    //if (!SafepointSynchronize::is_same_safepoint(counter)) {
-      post_safepoint(conth);
-    //}
-    return result;
-  }
-}
-
-oop ContMirror::allocate_stack_chunk(int stack_size) {
-  InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(SystemDictionary::StackChunk_klass());
-  int size_in_words = klass->instance_size(stack_size);
-  StackChunkAllocator allocator(klass, size_in_words, stack_size, _thread);
-  HeapWord* start = _thread->tlab().allocate(size_in_words);
-  if (start != NULL) {
-    return allocator.initialize(start);
-  } else {
-    //HandleMark hm(_thread);
-    Handle conth(_thread, _cont);
-    // uint64_t counter = SafepointSynchronize::safepoint_counter();
-    oop result = allocator.allocate(/* use_tlab */ false);
+    oop result = allocator.allocate();
     //if (!SafepointSynchronize::is_same_safepoint(counter)) {
       post_safepoint(conth);
     //}
@@ -5209,6 +5191,10 @@ public:
   static bool thaw(JavaThread* thread, ContMirror& cont, FrameInfo* fi, int num_frames) {
     return Thaw<SelfT, mode>(thread, cont).thaw(fi, num_frames);
   }
+
+  static void print() {
+    tty->print_cr(">>> Config compressed_oops: %d post_barrier: %d allow_stubs: %d use_chunks: %d", _compressed_oops, _post_barrier, allow_stubs, has_young);
+  }
 };
 
 class ConfigResolve {
@@ -5250,9 +5236,8 @@ public:
 
   template <bool use_compressed, bool is_modref, bool gencode, bool g1gc, bool use_chunks>
   static void resolve() {
-    // tty->print_cr(">>> ConfigResolve::resolve use_compressed: %d is_modref: %d gen_code:%d", use_compressed, is_modref, gen_code);
-    //
-    typedef Config<use_compressed, is_modref, gencode, g1gc> SelectedConfigT;
+    typedef Config<use_compressed, is_modref, gencode, g1gc, use_chunks> SelectedConfigT;
+    SelectedConfigT::print();
 
     cont_freeze_fast    = SelectedConfigT::template freeze<mode_fast>;
     cont_freeze_slow    = SelectedConfigT::template freeze<mode_slow>;
