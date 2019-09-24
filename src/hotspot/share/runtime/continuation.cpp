@@ -3272,8 +3272,9 @@ public:
   }
 
   inline ThawFnT get_oopmap_stub(const hframe& f) {
-    if (!ConfigT::allow_stubs)
-      return NULL;
+    if (!ConfigT::allow_stubs) {
+      return OopStubs::thaw_oops_slow();
+    }
     return ContinuationHelper::thaw_stub<mode>(f);
   }
 
@@ -4517,7 +4518,11 @@ public:
     cont_thaw_preempt = SelectedConfigT::template thaw<mode_preempt>;
 
     cont_freeze_oops_slow = (FreezeFnT) FreezeCompiledOops<typename SelectedConfigT::OopWriterT>::slow_path;
-    cont_freeze_oops_generate = (FreezeFnT) FreezeCompiledOops<typename SelectedConfigT::OopWriterT>::generate_stub;
+    if (SelectedConfigT::allow_stubs) {
+      cont_freeze_oops_generate = (FreezeFnT) FreezeCompiledOops<typename SelectedConfigT::OopWriterT>::generate_stub;
+    } else {
+      cont_freeze_oops_generate = cont_freeze_oops_slow;
+    }
 
     cont_thaw_oops_slow = (ThawFnT) ThawCompiledOops::slow_path;
   }
@@ -4534,7 +4539,6 @@ address Continuations::default_thaw_oops_stub() {
 }
 
 address Continuations::default_freeze_oops_stub() {
-  //return (address) OopStubs::freeze_oops_slow();
   return (address) OopStubs::generate_stub();
 }
 
