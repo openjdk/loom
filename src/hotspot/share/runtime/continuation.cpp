@@ -682,7 +682,8 @@ public:
   inline void e_add_refs(int num) { _e_num_refs += num; }
   template<typename Event> void post_jfr_event(Event *e);
 
-  DEBUG_ONLY(bool chunk_invariant() {
+#ifdef ASSERT
+  bool chunk_invariant() {
     // only the topmost chunk can be empty
     if (_tail == (oop)NULL)
       return true;
@@ -698,7 +699,8 @@ public:
       i++;
     }
     return true;
-  })
+  }
+#endif
 };
 
 template<typename SelfPD>
@@ -1991,6 +1993,9 @@ private:
   hframe _safepoint_stub_h;
   bool  _safepoint_stub_caller;
   CompiledMethodKeepaliveT* _keepalive;
+
+  DEBUG_ONLY(int _pre_chunk_size;)
+  DEBUG_ONLY(int _post_chunk_size;)
 #ifndef PRODUCT
   intptr_t* _safepoint_stub_hsp;
 #endif
@@ -2096,16 +2101,17 @@ public:
     address pc = NULL;
 
     if (chunk == NULL || (is_young(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
-      oop chunk0 = chunk;
-      if (chunk0 != (oop)NULL && ContMirror::is_empty_chunk(chunk0)) {
-        chunk0 = jdk_internal_misc_StackChunk::parent(chunk0);
-        assert (chunk0 == (oop)NULL || !ContMirror::is_empty_chunk(chunk0), "");
-      }
       log_develop_trace(jvmcont)("freeze_young allocating new chunk");
       chunk = _cont.allocate_stack_chunk(size);
       assert (jdk_internal_misc_StackChunk::size(chunk) == size, "");
       assert (chunk->size() >= size, "");
-      
+
+      oop chunk0 = _cont.tail();
+      if (chunk0 != (oop)NULL && ContMirror::is_empty_chunk(chunk0)) {
+        chunk0 = jdk_internal_misc_StackChunk::parent(chunk0);
+        assert (chunk0 == (oop)NULL || !ContMirror::is_empty_chunk(chunk0), "");
+      }
+
       sp = size + metadata;
       jdk_internal_misc_StackChunk::set_sp(chunk, sp);
       jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, NULL); // field is uninitialized
@@ -2116,6 +2122,7 @@ public:
       jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
       jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
 
+      assert (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL || ContMirror::is_stack_chunk(jdk_internal_misc_StackChunk::parent(chunk)), "");
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
       // They'll then be stored twice: in the chunk and in the parent
 
@@ -2143,6 +2150,7 @@ public:
     NoSafepointVerifier nsv;
     assert (ContMirror::is_stack_chunk(chunk), "");
     assert (is_young(chunk), "");
+    assert (jdk_internal_misc_StackChunk::safepoint(chunk) == 0, "safepoint: %llu", jdk_internal_misc_StackChunk::safepoint(chunk));
 
     // copy; no need to patch because of how we handle return address and link
     log_develop_trace(jvmcont)("freeze_young start: chunk " INTPTR_FORMAT " size: %d orig sp: %d", p2i((oopDesc*)chunk), jdk_internal_misc_StackChunk::size(chunk), sp);
@@ -2196,8 +2204,8 @@ public:
   #endif
 
     log_develop_trace(jvmcont)("FREEZE YOUNG %d #" INTPTR_FORMAT,  _cont.stack_length(), _cont.hash());
+    assert (jdk_internal_misc_StackChunk::safepoint(chunk) == 0, "safepoint: %llu", jdk_internal_misc_StackChunk::safepoint(chunk));
     assert(_cont.chunk_invariant(), "");
-
     assert (Continuation::debug_verify_stack_chunk(chunk), "");
     
     EventContinuationFreezeYoung e;
@@ -2522,9 +2530,13 @@ public:
     DEBUG_ONLY(int orig_max_size = _cont.max_size());
     assert ((orig_max_size == 0) == _cont.is_empty(), "");
 
+    DEBUG_ONLY(_pre_chunk_size = _size;)
+
     if (ConfigT::has_young) {
       add_chunks_size();
     }
+
+    DEBUG_ONLY(_post_chunk_size = _size;)
 
     assert (!_cont.is_empty() || _cont.max_size() == 0, "_cont.max_size(): %lu _cont.is_empty(): %d", _cont.max_size(), _cont.is_empty());
 
@@ -2541,6 +2553,7 @@ public:
     if (ConfigT::has_young) {
       squash_chunks();
     }
+    assert ((_cont.sp() << LogBytesPerElement) >= _pre_chunk_size, "");
     assert (_cont.tail() == (oop)NULL, "");
     // assert ((int)_cont.max_size() == orig_max_size, "_cont.max_size(): %d orig_max_size: %d", (int)_cont.max_size(), orig_max_size);
 
@@ -3355,6 +3368,7 @@ public:
     bool young = is_young(chunk);
 
     fix_stack_chunk(chunk);
+    assert (jdk_internal_misc_StackChunk::safepoint(chunk) == 0, "safepoint: %llu", jdk_internal_misc_StackChunk::safepoint(chunk));
     if (young) {
       jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
       jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
@@ -3420,6 +3434,7 @@ public:
       if (frames == 0) {
         assert (size == 0, "");
         assert (_cont.tail() == (oop)NULL || !ContMirror::is_empty_chunk(_cont.tail()), ""); // only topmost chunk can be empty
+        assert (jdk_internal_misc_StackChunk::safepoint(chunk) == 0, "");
         return thaw<true>(num_frames); // we're still top, as no frames have been thawed
       } else {
         vsp = thaw<false>(num_frames - frames); // recursion
@@ -3488,6 +3503,7 @@ public:
       frame topf(vsp, vsp, *(intptr_t**)(hsp - 2), *(address*)(hsp - 1), NULL, NULL, true);
       setup_jump(topf);
     }
+    assert (jdk_internal_misc_StackChunk::safepoint(chunk) == 0, "");
     assert(_cont.chunk_invariant(), "");
 
     EventContinuationThawYoung e;

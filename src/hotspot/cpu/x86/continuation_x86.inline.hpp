@@ -712,7 +712,11 @@ static inline frame sender_for_compiled_frame(const frame& f) {
   int slot = 0;
   CodeBlob* sender_cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(sender_pc, slot);
   if (mode == mode_fast) {
-    assert (!Interpreter::contains(sender_pc), "");
+    // if (Interpreter::contains(sender_pc)) {
+    //   tty->print_cr("oops sender_cb: %p slot: %d", sender_cb, slot);
+    //   frame(sender_sp, *link_addr, sender_pc).print_on(tty);
+    // }
+    // assert (!Interpreter::contains(sender_pc), ""); // might be true for the entry frame
     assert (sender_cb != NULL, "");
     return frame(sender_sp, sender_sp, *link_addr, sender_pc, sender_cb, slot == -1 ? NULL : sender_cb->oop_map_for_slot(slot, sender_pc), true); // no deopt check TODO PERF: use a faster constructor that doesn't write cb (shows up in profile)
   } else {
@@ -1225,7 +1229,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
             *(oop*)p = NULL;
             *(narrowOop*)p = n;
           }
-          closure->do_oop((narrowOop*)p);
+          closure->do_oop((narrowOop*)p); // TODO: When not at a safepoint, we could be racing with fix !!!!
         } else {
           // For concurrent marking in narrow, we're passing a wide oop; hope this works :)
           closure->do_oop((oop*)p); // TODO Devirtualizer::do_oop(closure, (oop*)p)
@@ -1241,9 +1245,12 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
     jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
     jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
   }
-  if (SafepointSynchronize::is_at_safepoint()) {
+  if (first_safepoint_visit) {
     jdk_internal_misc_StackChunk::set_safepoint(chunk, SafepointSynchronize::safepoint_id());
+    assert (jdk_internal_misc_StackChunk::safepoint(chunk) != 0, "");
   }
+  assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::safepoint(chunk) != 0,
+    "jdk_internal_misc_StackChunk::safepoint(chunk): %llu SafepointSynchronize::safepoint_id(): %llu", jdk_internal_misc_StackChunk::safepoint(chunk), SafepointSynchronize::safepoint_id());
 
   if (closure != NULL) {
     EventContinuationIterateOops e;
@@ -1466,27 +1473,30 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
       }
       assert (oopDesc::is_oop_or_null(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     }
-    for (OopMapStream oms(oopmap,OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
-      OopMapValue omv = oms.current();
-      void* base_loc    = reg_to_loc(omv.content_reg(), sp);
-      void* derived_loc = reg_to_loc(omv.reg(), sp);
-      assert (is_in_frame(cb, sp, base_loc), "");
-      assert (is_in_frame(cb, sp, derived_loc), "");
-      oop base = narrow && gc_mode ? CompressedOops::decode((narrowOop)RawAccess<>::oop_load((narrowOop*)base_loc))
-                                   : (oop)RawAccess<>::oop_load((oop*)base_loc);
-      assert (oopDesc::is_oop_or_null(base), "not an oop");
-      assert (Universe::heap()->is_in_or_null(base), "not an oop");
-      if (base != (oop)NULL) {
-        assert (!CompressedOops::is_base(base), "");
-        assert (oopDesc::is_oop(base), "");
-        intptr_t offset = gc_mode ? *(intptr_t*)derived_loc
-                                  : cast_from_oop<intptr_t>(*(oop*)derived_loc) - cast_from_oop<intptr_t>(base);
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d gc_mode: %d safepoint: %d derived_loc: %p", offset, base->size() << LogHeapWordSize, gc_mode, SafepointSynchronize::is_at_safepoint(), derived_loc);
-      } else {
-        assert (*(oop*)derived_loc == (oop)NULL, "");
+    assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
+
+    if (SafepointSynchronize::is_at_safepoint()) { // don't try to race with fix
+      for (OopMapStream oms(oopmap,OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
+        OopMapValue omv = oms.current();
+        void* base_loc    = reg_to_loc(omv.content_reg(), sp);
+        void* derived_loc = reg_to_loc(omv.reg(), sp);
+        assert (is_in_frame(cb, sp, base_loc), "");
+        assert (is_in_frame(cb, sp, derived_loc), "");
+        oop base = narrow && gc_mode ? CompressedOops::decode((narrowOop)RawAccess<>::oop_load((narrowOop*)base_loc))
+                                    : (oop)RawAccess<>::oop_load((oop*)base_loc);
+        assert (oopDesc::is_oop_or_null(base), "not an oop");
+        assert (Universe::heap()->is_in_or_null(base), "not an oop");
+        if (base != (oop)NULL) {
+          assert (!CompressedOops::is_base(base), "");
+          assert (oopDesc::is_oop(base), "");
+          intptr_t offset = gc_mode ? *(intptr_t*)derived_loc
+                                    : cast_from_oop<intptr_t>(*(oop*)derived_loc) - cast_from_oop<intptr_t>(base);
+          assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld " INTPTR_FORMAT " size: %d gc_mode: %d safepoint: %d derived_loc: " INTPTR_FORMAT " chunk safepoint: %llu current safepoint: %llu", offset, offset, base->size() << LogHeapWordSize, gc_mode, SafepointSynchronize::is_at_safepoint(), p2i(derived_loc), jdk_internal_misc_StackChunk::safepoint(chunk), SafepointSynchronize::safepoint_id());
+        } else {
+          assert (*(oop*)derived_loc == (oop)NULL, "");
+        }
       }
     }
-    assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
   }
   // assert (is_young(chunk) || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
   // assert (is_young(chunk) || num_oops == jdk_internal_misc_StackChunk::numOops(chunk), "");
