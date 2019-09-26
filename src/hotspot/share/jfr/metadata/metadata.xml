@@ -112,6 +112,7 @@
   <Event name="ContinuationFreezeYoung" category="Java Virtual Machine" label="Continuation Freeze Young" thread="true" stackTrace="false" startTime="false">
     <Field type="ulong" name="id" label="Continuation ID" />
     <Field type="uint" name="size" label="Size" />
+    <Field type="boolean" name="allocate" label="Allocated new" />
   </Event>
 
   <Event name="ContinuationFreezeOld" category="Java Virtual Machine" label="Continuation Freeze Old" thread="true" stackTrace="false" startTime="false">

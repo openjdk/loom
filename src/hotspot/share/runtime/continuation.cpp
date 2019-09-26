@@ -2099,12 +2099,14 @@ public:
 
     int sp;
     address pc = NULL;
-
+    bool allocated;
     if (chunk == NULL || (is_young(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
       log_develop_trace(jvmcont)("freeze_young allocating new chunk");
       chunk = _cont.allocate_stack_chunk(size);
       assert (jdk_internal_misc_StackChunk::size(chunk) == size, "");
       assert (chunk->size() >= size, "");
+
+      allocated = true;
 
       oop chunk0 = _cont.tail();
       if (chunk0 != (oop)NULL && ContMirror::is_empty_chunk(chunk0)) {
@@ -2140,7 +2142,7 @@ public:
         assert(_cont.chunk_invariant(), "");
         return false;
       }
-
+      allocated = false;
       sp = jdk_internal_misc_StackChunk::sp(chunk);
       pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - 1);
       sp += argsize;
@@ -2211,6 +2213,7 @@ public:
     EventContinuationFreezeYoung e;
     if (e.should_commit()) {
       e.set_id(cast_from_oop<u8>(chunk));
+      e.set_allocate(allocated);
       e.set_size(sizeb);
       e.commit();
     }
