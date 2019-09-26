@@ -4800,12 +4800,10 @@ bool ContMirror::grow_stack(int new_size) {
   new_size = new_size >> LogBytesPerElement;
 
   int old_length = _stack_length;
-  int offset = _sp > 0 ? _sp : old_length;
+  int offset = _sp >= 0 ? _sp : old_length;
   int min_length = (old_length - offset) + new_size;
 
-  if (min_length <= old_length) {
-    return false;
-  }
+  guarantee (min_length > old_length, "");
 
   int new_length = ensure_capacity(old_length, min_length);
   if (new_length == -1) {
