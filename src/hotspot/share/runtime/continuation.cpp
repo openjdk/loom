@@ -4802,7 +4802,6 @@ bool ContMirror::grow_stack(int new_size) {
   int old_length = _stack_length;
   int offset = _sp >= 0 ? _sp : old_length;
   int min_length = (old_length - offset) + new_size;
-
   guarantee (min_length > old_length, "");
 
   int new_length = ensure_capacity(old_length, min_length);
@@ -4854,12 +4853,14 @@ bool ContMirror::allocate_ref_stack(int nr_oops) {
 template <typename ConfigT>
 bool ContMirror::grow_ref_stack(int nr_oops) {
   int old_length = _ref_stack->length();
-  int offset = _ref_sp > 0 ? _ref_sp : old_length;
+  int offset = _ref_sp >= 0 ? _ref_sp : old_length;
   int old_oops = old_length - offset;
   int min_length = old_oops + nr_oops;
+  guarantee (min_length > old_length, "");
 
   int new_length = ensure_capacity(old_length, min_length);
   if (new_length == -1) {
+    guarantee(false, ""); // TODO handle somehow
     return false;
   }
 
