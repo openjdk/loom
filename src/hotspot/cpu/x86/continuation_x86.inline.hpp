@@ -769,7 +769,8 @@ template<typename FKind> hframe Freeze<ConfigT, mode>::new_hframe(const frame& f
   assert (sp >= 0, "sp: %d caller.sp(): %d size: %d", sp, caller.sp(), fsize);
   // int sp = mode == mode_fast ? usp : usp - ((vsp - f.sp()) << LogElemsPerWord);
   int ref_sp = caller.ref_sp() - num_oops;
-  assert (ref_sp >= 0, "sp: %d caller.ref_sp(): %d size: %d", sp, caller.ref_sp(), num_oops);
+  assert (ref_sp >= 0, "ref_sp: %d caller.ref_sp(): %d num_oops: %d", ref_sp, caller.ref_sp(), num_oops);
+
   if (mode != mode_fast && caller.is_interpreted_frame()) { // must be done after computing sp above
     const_cast<hframe&>(caller).set_sp(caller.sp() - (argsize >> LogBytesPerElement));
   }
@@ -1139,13 +1140,14 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
   assert (ContMirror::is_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack young: %d", is_young(chunk));
   // assert (((SafepointSynchronize::safepoint_counter() & 0x1) == 1) == SafepointSynchronize::is_at_safepoint(), "couter: %lu safepoint: %d", SafepointSynchronize::safepoint_counter()), SafepointSynchronize::is_at_safepoint();
-  bool narrow = UseCompressedOops; // TODO PERF: templatize
+  // bool narrow = UseCompressedOops; // TODO PERF: templatize
 
   int num_frames = 0;
   int num_oops = 0;
 
   bool first_safepoint_visit = SafepointSynchronize::is_at_safepoint() 
                                 && jdk_internal_misc_StackChunk::safepoint(chunk) == 0;
+  assert (!SafepointSynchronize::is_at_safepoint() || first_safepoint_visit || jdk_internal_misc_StackChunk::safepoint(chunk) != 0, "");
 
   CodeBlob* cb = NULL;
   intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
@@ -1175,7 +1177,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
     }
 
     DEBUG_ONLY(int oops = 0;)
-    if (first_safepoint_visit) { // evacuation always takes place at a safepoint
+    if (first_safepoint_visit) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
       for (OopMapStream oms(oopmap,OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
         OopMapValue omv = oms.current();
         oop* derived_loc = (oop*)reg_to_loc(omv.reg(), sp);
@@ -1211,19 +1213,17 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
       log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %d p: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, omv.reg()->is_reg(), p2i(p));
       // oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)RawAccess<>::oop_load((narrowOop*)p) : RawAccess<>::oop_load(p);
 
-      assert (omv.type() != OopMapValue::narrowoop_value, ""); // for now
-      DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) // TODO: templatize by narrow/wide
+      DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) 
       // assert (oopDesc::is_oop_or_null(*p), "p: " INTPTR_FORMAT " *p: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)*p));
       // if (!SkipNullValue::should_skip(*p))
+
       if (omv.type() == OopMapValue::narrowoop_value) {
-        assert(false, "for now");
-        assert (narrow, "");
+        assert (UseCompressedOops, "");
         closure->do_oop((narrowOop*)p); // TODO Devirtualizer::do_oop(closure, (narrowOop*)p)
       } else {
-        guarantee (omv.type() == OopMapValue::oop_value, "");
+        assert (omv.type() == OopMapValue::oop_value, "");
         closure->do_oop((oop*)p); // TODO Devirtualizer::do_oop(closure, (oop*)p)
         // if (narrow && SafepointSynchronize::is_at_safepoint()) {
-        //   guarantee (false, "");
         //   if (first_safepoint_visit) {
         //     oop o = *(oop*)p;
         //     narrowOop n = CompressedOops::encode(o);
@@ -1418,7 +1418,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
   assert (oopDesc::is_oop_or_null(jdk_internal_misc_StackChunk::parent(chunk)), "");
   
   const bool gc_mode = jdk_internal_misc_StackChunk::safepoint(chunk) != 0;
-  const bool narrow = UseCompressedOops;
+  // const bool narrow = UseCompressedOops;
 
   int num_frames = 0;
   int num_oops = 0;
@@ -1467,8 +1467,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
 
       oop obj;
       if (omv.type() == OopMapValue::narrowoop_value /*|| (narrow && gc_mode)*/) {
-        assert(false, "for now");
-        assert (narrow, "");
+        assert (UseCompressedOops, "");
         obj = CompressedOops::decode((narrowOop)RawAccess<>::oop_load((narrowOop*)p));
       } else {
         assert (omv.type() == OopMapValue::oop_value, "");
@@ -1485,8 +1484,8 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
         void* derived_loc = reg_to_loc(omv.reg(), sp);
         assert (is_in_frame(cb, sp, base_loc), "");
         assert (is_in_frame(cb, sp, derived_loc), "");
-        oop base = narrow && gc_mode ? CompressedOops::decode((narrowOop)RawAccess<>::oop_load((narrowOop*)base_loc))
-                                    : (oop)RawAccess<>::oop_load((oop*)base_loc);
+        oop base = // narrow && gc_mode ? CompressedOops::decode((narrowOop)RawAccess<>::oop_load((narrowOop*)base_loc)) :
+                      (oop)RawAccess<>::oop_load((oop*)base_loc);
         assert (oopDesc::is_oop_or_null(base), "not an oop");
         assert (Universe::heap()->is_in_or_null(base), "not an oop");
         if (base != (oop)NULL) {

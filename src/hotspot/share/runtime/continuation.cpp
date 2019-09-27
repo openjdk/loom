@@ -996,6 +996,7 @@ template<op_mode mode>
 inline void ContMirror::set_last_frame(const hframe& f) {
   assert (mode != mode_fast || !Interpreter::contains(f.pc()), "");
   assert (mode == mode_fast || f.is_interpreted_frame() == Interpreter::contains(f.pc()), "");
+  guarantee (f.ref_sp() >= -1, "f.ref_sp(): %d", f.ref_sp());
   set_pc(f.pc(), mode == mode_fast ? false : f.is_interpreted_frame());
   set_sp(f.sp());
   set_last_frame_pd(f);
@@ -1994,8 +1995,6 @@ private:
   bool  _safepoint_stub_caller;
   CompiledMethodKeepaliveT* _keepalive;
 
-  DEBUG_ONLY(int _pre_chunk_size;)
-  DEBUG_ONLY(int _post_chunk_size;)
 #ifndef PRODUCT
   intptr_t* _safepoint_stub_hsp;
 #endif
@@ -2103,6 +2102,9 @@ public:
     if (chunk == NULL || (is_young(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
       log_develop_trace(jvmcont)("freeze_young allocating new chunk");
       chunk = _cont.allocate_stack_chunk(size);
+      if (chunk == NULL) { // OOM
+        guarantee(false, "Unhandled OOM");
+      }
       assert (jdk_internal_misc_StackChunk::size(chunk) == size, "");
       assert (chunk->size() >= size, "");
 
@@ -2311,8 +2313,10 @@ public:
     if (ContMirror::is_empty_chunk(chunk))
       return;
 
+    DEBUG_ONLY(int orig_sp = _cont.sp();)
     Freeze<ConfigT, mode_fast> frz(chunk, _cont);
     frz.squash_chunk(chunk);
+    assert (((orig_sp - _cont.sp()) << LogBytesPerElement) == frz.nr_bytes(), "sp diff size: %d frz.nr_bytes(): %d", ((orig_sp - _cont.sp()) << LogBytesPerElement), frz.nr_bytes());
     // undo add_chunks_size
     // _frames -= frz.nr_frames();
     _size -= frz.nr_bytes();
@@ -2533,13 +2537,14 @@ public:
     DEBUG_ONLY(int orig_max_size = _cont.max_size());
     assert ((orig_max_size == 0) == _cont.is_empty(), "");
 
-    DEBUG_ONLY(_pre_chunk_size = _size;)
+    DEBUG_ONLY(int pre_chunk_size = _size; int pre_chunk_oops = _oops;)
 
-    if (ConfigT::has_young) {
+    if (ConfigT::has_young && _thread != NULL) {
       add_chunks_size();
     }
 
-    DEBUG_ONLY(_post_chunk_size = _size;)
+    DEBUG_ONLY(int post_chunk_size = _size; int post_chunk_oops = _oops;)
+    assert (_thread != NULL || post_chunk_size == pre_chunk_size, "_post_chunk_size: %d _pre_chunk_size: %d", post_chunk_size, pre_chunk_size);
 
     assert (!_cont.is_empty() || _cont.max_size() == 0, "_cont.max_size(): %lu _cont.is_empty(): %d", _cont.max_size(), _cont.is_empty());
 
@@ -2553,11 +2558,14 @@ public:
 
     allocate_keepalive();
 
-    if (ConfigT::has_young) {
+    DEBUG_ONLY(int pre_chunk_sp = 0; int post_chunk_sp = 0);
+    if (ConfigT::has_young && _thread != NULL) {
+      DEBUG_ONLY(pre_chunk_sp = _cont.sp();)
       squash_chunks();
+      DEBUG_ONLY(post_chunk_sp = _cont.sp();)
     }
-    assert ((_cont.sp() << LogBytesPerElement) >= _pre_chunk_size, "");
-    assert (_cont.tail() == (oop)NULL, "");
+    assert ((_cont.sp() << LogBytesPerElement) >= pre_chunk_size, "sp: %d in bytes: %d _pre_chunk_size: %d reported chunk size: %d actual size: %d", 
+      _cont.sp(), (_cont.sp() << LogBytesPerElement), pre_chunk_size, post_chunk_size - pre_chunk_size, (pre_chunk_sp - post_chunk_sp) << LogBytesPerElement);
     // assert ((int)_cont.max_size() == orig_max_size, "_cont.max_size(): %d orig_max_size: %d", (int)_cont.max_size(), orig_max_size);
 
   #ifdef ASSERT
@@ -2589,6 +2597,8 @@ public:
         } else
     #endif
           argsize = Compiled::stack_argsize(callee);
+
+        guarantee (argsize == 0, "for now");
 
         if (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
           log_develop_trace(jvmcont)("finalize _size: %d add argsize: %d", _size, argsize);
@@ -4729,6 +4739,7 @@ inline bool ContMirror::allocate_stacks(int size, int oops, int frames) {
 #endif
 
   if (!allocate_stacks_in_native<ConfigT>(size, oops, needs_stack_allocation, needs_refStack_allocation)) {
+    guarantee(false, "");
     allocate_stacks_in_java(size, oops, frames);
     if (!thread()->has_pending_exception()) return true;
   }
