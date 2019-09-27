@@ -1140,7 +1140,6 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
   assert (ContMirror::is_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack young: %d", is_young(chunk));
   // assert (((SafepointSynchronize::safepoint_counter() & 0x1) == 1) == SafepointSynchronize::is_at_safepoint(), "couter: %lu safepoint: %d", SafepointSynchronize::safepoint_counter()), SafepointSynchronize::is_at_safepoint();
-  // bool narrow = UseCompressedOops; // TODO PERF: templatize
 
   int num_frames = 0;
   int num_oops = 0;
@@ -1217,13 +1216,13 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
       // assert (oopDesc::is_oop_or_null(*p), "p: " INTPTR_FORMAT " *p: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)*p));
       // if (!SkipNullValue::should_skip(*p))
 
-      if (omv.type() == OopMapValue::narrowoop_value) {
-        assert (UseCompressedOops, "");
-        closure->do_oop((narrowOop*)p); // TODO Devirtualizer::do_oop(closure, (narrowOop*)p)
-      } else {
-        assert (omv.type() == OopMapValue::oop_value, "");
-        closure->do_oop((oop*)p); // TODO Devirtualizer::do_oop(closure, (oop*)p)
-      }
+      assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
+      assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+      
+      omv.type() == OopMapValue::narrowoop_value
+        ? closure->do_oop((narrowOop*)p) // TODO Devirtualizer::do_oop(closure, (narrowOop*)p)
+        : closure->do_oop((oop*)p); // TODO Devirtualizer::do_oop(closure, (oop*)p)
+      
       assert (SafepointSynchronize::is_at_safepoint() || (*(intptr_t*)p == old), "");
     }
     assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
@@ -1428,14 +1427,13 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
       assert ((intptr_t*)p >= start, "");
       if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
 
-      oop obj;
-      if (omv.type() == OopMapValue::narrowoop_value /*|| (narrow && gc_mode)*/) {
-        assert (UseCompressedOops, "");
-        obj = CompressedOops::decode((narrowOop)RawAccess<>::oop_load((narrowOop*)p));
-      } else {
-        assert (omv.type() == OopMapValue::oop_value, "");
-        obj = (oop)RawAccess<>::oop_load((oop*)p);
-      }
+      assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
+      assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+      
+      oop obj = omv.type() == OopMapValue::narrowoop_value
+        ? CompressedOops::decode((narrowOop)RawAccess<>::oop_load((narrowOop*)p))
+        : (oop)RawAccess<>::oop_load((oop*)p);
+
       assert (oopDesc::is_oop_or_null(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     }
     assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
