@@ -1223,20 +1223,6 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
       } else {
         assert (omv.type() == OopMapValue::oop_value, "");
         closure->do_oop((oop*)p); // TODO Devirtualizer::do_oop(closure, (oop*)p)
-        // if (narrow && SafepointSynchronize::is_at_safepoint()) {
-        //   if (first_safepoint_visit) {
-        //     oop o = *(oop*)p;
-        //     narrowOop n = CompressedOops::encode(o);
-        //     *(oop*)p = NULL;
-        //     *(narrowOop*)p = n;
-        //   }
-        //   closure->do_oop((narrowOop*)p);
-        // } else {
-        //   // TODO: When not at a safepoint, we could be racing with fix !!!!
-
-        //   // For concurrent marking in narrow, we're passing a wide oop; hope this works :)
-        //   closure->do_oop((oop*)p); // TODO Devirtualizer::do_oop(closure, (oop*)p)
-        // }
       }
       assert (SafepointSynchronize::is_at_safepoint() || (*(intptr_t*)p == old), "");
     }
@@ -1307,29 +1293,6 @@ static void fix_stack_chunk(oop chunk) {
     num_frames++;
     num_oops += oopmap->num_oops();
 
-    // if (narrow) {
-    //   DEBUG_ONLY(int oops = 0;)
-    //   for (OopMapStream oms(oopmap,mask); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
-    //     DEBUG_ONLY(oops++;)
-    //     OopMapValue omv = oms.current();
-    //     void* p = reg_to_loc(omv.reg(), sp);
-    //     assert (p != NULL, "");
-    //     assert (is_in_frame(cb, sp, p), "");
-    //     assert ((intptr_t*)p >= start, "");
-    //     if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
-
-    //     log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %d p: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, omv.reg()->is_reg(), p2i(p));
-    //     // oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)RawAccess<>::oop_load((narrowOop*)p) : RawAccess<>::oop_load(p);
-
-    //     if (narrow && omv.type() == OopMapValue::oop_value) {
-    //       assert(false, "for now");
-    //       narrowOop n = *(narrowOop*)p;
-    //       oop o = CompressedOops::decode(n);
-    //       *(oop*)p = o;
-    //     }
-    //   }
-    //   assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
-    // }
     for (OopMapStream oms(oopmap,OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
       OopMapValue omv = oms.current();
       oop* derived_loc = (oop*)reg_to_loc(omv.reg(), sp);
