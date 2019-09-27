@@ -1229,7 +1229,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
   }
   assert (num_frames >= 0, "");
   assert (num_oops >= 0, "");
-  if (closure == NULL) {
+  if (first_safepoint_visit || closure == NULL) {
     jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
     jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
   }
@@ -1311,12 +1311,10 @@ static void fix_stack_chunk(oop chunk) {
       }
     }
   }
-  // assert (num_frames >= 0, "");
-  // assert (num_oops >= 0, "");
-  // jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
-  // jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
-
-  // Continuation::debug_verify_stack_chunk(chunk);
+  assert (num_frames >= 0, "");
+  assert (num_oops >= 0, "");
+  jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
+  jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
 
   jdk_internal_misc_StackChunk::set_safepoint(chunk, 0);
   assert(Continuation::debug_verify_stack_chunk(chunk), "");
@@ -1461,8 +1459,8 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
       }
     }
   }
-  // assert (is_young(chunk) || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
-  // assert (is_young(chunk) || num_oops == jdk_internal_misc_StackChunk::numOops(chunk), "");
+  assert (jdk_internal_misc_StackChunk::numFrames(chunk) == -1 || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "young: %d num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", is_young(chunk), num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
+  assert (jdk_internal_misc_StackChunk::numOops(chunk)   == -1 || num_oops   == jdk_internal_misc_StackChunk::numOops(chunk),   "young: %d num_oops: %d jdk_internal_misc_StackChunk::numOops(chunk): %d",     is_young(chunk), num_oops,   jdk_internal_misc_StackChunk::numOops(chunk));
   return true;
 }
 #endif

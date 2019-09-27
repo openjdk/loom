@@ -2149,6 +2149,8 @@ public:
       pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - 1);
       sp += argsize;
       assert (sp < jdk_internal_misc_StackChunk::size(chunk), "");
+      jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
+      jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
     }
     
     NoSafepointVerifier nsv;
@@ -2253,8 +2255,8 @@ public:
 
     for (oop chunk = _cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
       num_chunks++;
-      if (true || jdk_internal_misc_StackChunk::numFrames(chunk) < 0) { // TODO R
-        // assert (is_young(chunk) && mode != mode_fast, "");
+      if (jdk_internal_misc_StackChunk::numFrames(chunk) < 0) {
+        assert (is_young(chunk) && jdk_internal_misc_StackChunk::safepoint(chunk) == 0, "");
         Continuation::stack_chunk_iterate_stack(chunk, (OopClosure*)NULL); // &do_nothing_cl
       }
 
@@ -2275,10 +2277,6 @@ public:
       _cont.sub_num_frames(frames);
       log_develop_trace(jvmcont)("add_chunks_size frames: %d size: %d oops: %d", frames, size, oops);
       if (log_develop_is_enabled(Trace, jvmcont)) print_chunk(chunk, _cont.mirror(), false);
-
-      // TODO R
-      jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
-      jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
     }
     EventContinuationSquash e;
     if (e.should_commit()) {
@@ -3040,14 +3038,12 @@ int freeze0(JavaThread* thread, FrameInfo* fi) {
 
   if (java_lang_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
-    assert (false, ""); // TODO R REMOVE
     assert (verify_continuation<10>(cont.mirror()), "");
     return early_return(freeze_pinned_cs, thread, fi);
   }
 
   freeze_result res = cont_freeze<mode>(thread, cont, fi);
   if (res != freeze_ok) {
-    assert (false, ""); // TODO R REMOVE
     assert (verify_continuation<11>(cont.mirror()), "");
     return early_return(res, thread, fi);
   }
@@ -3414,7 +3410,7 @@ public:
         f.deoptimize(_thread);
       }
 
-      if (false && !young) { // TODO
+      if (!young) {
         assert (jdk_internal_misc_StackChunk::numOops(chunk) >= 0, "jdk_internal_misc_StackChunk::numOops(chunk): %d", jdk_internal_misc_StackChunk::numOops(chunk));
         const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
         assert (jdk_internal_misc_StackChunk::numOops(chunk) >= oopmap->num_oops(), "jdk_internal_misc_StackChunk::numOops(chunk): %d oopmap->num_oops() : %d", jdk_internal_misc_StackChunk::numOops(chunk), oopmap->num_oops());
@@ -3425,7 +3421,7 @@ public:
       size += fsize;
       frames++;
     }
-    if (false && !young) { // TODO
+    if (!young) {
       assert (jdk_internal_misc_StackChunk::numFrames(chunk) >= 0, "");
       jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - frames);
     }
