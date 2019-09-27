@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,20 +21,16 @@
  * questions.
  */
 
-#include "precompiled.hpp"
-#include "gc/z/zUtils.inline.hpp"
-#include "utilities/debug.hpp"
+/*
+ * @test
+ * @bug 8231058
+ * @requires vm.debug & (os.arch != "sparc") & (os.arch != "sparcv9")
+ * @run main/othervm -XX:+VerifyOops TestVerifyOops
+ */
 
-#include <stdlib.h>
+public class TestVerifyOops {
 
-uintptr_t ZUtils::alloc_aligned(size_t alignment, size_t size) {
-  void* res = NULL;
-
-  if (posix_memalign(&res, alignment, size) != 0) {
-    fatal("posix_memalign() failed");
-  }
-
-  memset(res, 0, size);
-
-  return (uintptr_t)res;
+    public static void main(String[] args) {
+        System.out.println("Test passed");
+    }
 }

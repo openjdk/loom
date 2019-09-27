@@ -669,7 +669,7 @@ static jclass Unsafe_DefineClass_impl(JNIEnv *env, jstring name, jbyteArray data
     ClassLoader::unsafe_defineClassCallCounter()->inc();
   }
 
-  body = NEW_C_HEAP_ARRAY(jbyte, length, mtInternal);
+  body = NEW_C_HEAP_ARRAY_RETURN_NULL(jbyte, length, mtInternal);
   if (body == NULL) {
     throw_new(env, "java/lang/OutOfMemoryError");
     return 0;
@@ -685,7 +685,7 @@ static jclass Unsafe_DefineClass_impl(JNIEnv *env, jstring name, jbyteArray data
     int unicode_len = env->GetStringLength(name);
 
     if (len >= sizeof(buf)) {
-      utfName = NEW_C_HEAP_ARRAY(char, len + 1, mtInternal);
+      utfName = NEW_C_HEAP_ARRAY_RETURN_NULL(char, len + 1, mtInternal);
       if (utfName == NULL) {
         throw_new(env, "java/lang/OutOfMemoryError");
         goto free_body;
@@ -790,7 +790,7 @@ Unsafe_DefineAnonymousClass_impl(JNIEnv *env,
 
   int class_bytes_length = (int) length;
 
-  u1* class_bytes = NEW_C_HEAP_ARRAY(u1, length, mtInternal);
+  u1* class_bytes = NEW_C_HEAP_ARRAY_RETURN_NULL(u1, length, mtInternal);
   if (class_bytes == NULL) {
     THROW_0(vmSymbols::java_lang_OutOfMemoryError());
   }
@@ -935,7 +935,7 @@ UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetReference(JNIEnv *env, jobject unsafe
   oop p = JNIHandles::resolve(obj);
   assert_field_offset_sane(p, offset);
   oop ret = HeapAccess<ON_UNKNOWN_OOP_REF>::oop_atomic_cmpxchg_at(x, p, (ptrdiff_t)offset, e);
-  return oopDesc::equals(ret, e);
+  return ret == e;
 } UNSAFE_END
 
 UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetInt(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jint e, jint x)) {

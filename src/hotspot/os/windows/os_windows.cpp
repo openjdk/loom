@@ -224,18 +224,12 @@ void os::init_system_properties_values() {
     }
 
     home_path = NEW_C_HEAP_ARRAY(char, strlen(home_dir) + 1, mtInternal);
-    if (home_path == NULL) {
-      return;
-    }
     strcpy(home_path, home_dir);
     Arguments::set_java_home(home_path);
     FREE_C_HEAP_ARRAY(char, home_path);
 
     dll_path = NEW_C_HEAP_ARRAY(char, strlen(home_dir) + strlen(bin) + 1,
                                 mtInternal);
-    if (dll_path == NULL) {
-      return;
-    }
     strcpy(dll_path, home_dir);
     strcat(dll_path, bin);
     Arguments::set_dll_dir(dll_path);
@@ -612,7 +606,9 @@ bool os::create_thread(Thread* thread, ThreadType thr_type,
     return false;
   }
   osthread->set_interrupt_event(interrupt_event);
-  osthread->set_interrupted(false);
+  // We don't call set_interrupted(false) as it will trip the assert in there
+  // as we are not operating on the current thread. We don't need to call it
+  // because the initial state is already correct.
 
   thread->set_osthread(osthread);
 
@@ -684,7 +680,6 @@ bool os::create_thread(Thread* thread, ThreadType thr_type,
 
   if (thread_handle == NULL) {
     // Need to clean up stuff we've allocated so far
-    CloseHandle(osthread->interrupt_event());
     thread->set_osthread(NULL);
     delete osthread;
     return false;
@@ -714,7 +709,6 @@ void os::free_thread(OSThread* osthread) {
          "os::free_thread but not current thread");
 
   CloseHandle(osthread->thread_handle());
-  CloseHandle(osthread->interrupt_event());
   delete osthread;
 }
 
@@ -3485,7 +3479,6 @@ void os::pd_start_thread(Thread* thread) {
 }
 
 
-
 // Short sleep, direct OS call.
 //
 // ms = 0, means allow others (if any) to run.
@@ -3591,50 +3584,6 @@ OSReturn os::get_native_priority(const Thread* const thread,
   }
   *priority_ptr = os_prio;
   return OS_OK;
-}
-
-void os::interrupt(Thread* thread) {
-  debug_only(Thread::check_for_dangling_thread_pointer(thread);)
-
-  OSThread* osthread = thread->osthread();
-  osthread->set_interrupted(true);
-  // More than one thread can get here with the same value of osthread,
-  // resulting in multiple notifications.  We do, however, want the store
-  // to interrupted() to be visible to other threads before we post
-  // the interrupt event.
-  OrderAccess::release();
-  SetEvent(osthread->interrupt_event());
-  // For JSR166:  unpark after setting status
-  if (thread->is_Java_thread()) {
-    ((JavaThread*)thread)->parker()->unpark();
-  }
-
-  ParkEvent * ev = thread->_ParkEvent;
-  if (ev != NULL) ev->unpark();
-
-  ev = thread->_SleepEvent;
-  if (ev != NULL) ev->unpark();
-}
-
-
-bool os::is_interrupted(Thread* thread, bool clear_interrupted) {
-  debug_only(Thread::check_for_dangling_thread_pointer(thread);)
-
-  OSThread* osthread = thread->osthread();
-  // There is no synchronization between the setting of the interrupt
-  // and it being cleared here. It is critical - see 6535709 - that
-  // we only clear the interrupt state, and reset the interrupt event,
-  // if we are going to report that we were indeed interrupted - else
-  // an interrupt can be "lost", leading to spurious wakeups or lost wakeups
-  // depending on the timing. By checking thread interrupt event to see
-  // if the thread gets real interrupt thus prevent spurious wakeup.
-  bool interrupted = osthread->interrupted() && (WaitForSingleObject(osthread->interrupt_event(), 0) == WAIT_OBJECT_0);
-  if (interrupted && clear_interrupted) {
-    osthread->set_interrupted(false);
-    ResetEvent(osthread->interrupt_event());
-  } // Otherwise leave the interrupted state alone
-
-  return interrupted;
 }
 
 // GetCurrentThreadId() returns DWORD
@@ -5347,7 +5296,7 @@ void Parker::park(bool isAbsolute, jlong time) {
   JavaThread* thread = JavaThread::current();
 
   // Don't wait if interrupted or already triggered
-  if (Thread::is_interrupted(thread, false) ||
+  if (thread->is_interrupted(false) ||
       WaitForSingleObject(_ParkEvent, 0) == WAIT_OBJECT_0) {
     ResetEvent(_ParkEvent);
     return;

@@ -1224,9 +1224,6 @@ char* os::format_boot_path(const char* format_string,
     }
 
     char* formatted_path = NEW_C_HEAP_ARRAY(char, formatted_path_len + 1, mtInternal);
-    if (formatted_path == NULL) {
-        return NULL;
-    }
 
     // Create boot classpath from format, substituting separator chars and
     // java home directory.
@@ -1330,9 +1327,6 @@ char** os::split_path(const char* path, size_t* elements, size_t file_name_lengt
   }
   const char psepchar = *os::path_separator();
   char* inpath = NEW_C_HEAP_ARRAY(char, strlen(path) + 1, mtInternal);
-  if (inpath == NULL) {
-    return NULL;
-  }
   strcpy(inpath, path);
   size_t count = 1;
   char* p = strchr(inpath, psepchar);
@@ -1357,13 +1351,7 @@ char** os::split_path(const char* path, size_t* elements, size_t file_name_lengt
                                     "sun.boot.library.path, to identify potential sources for this path.");
     }
     // allocate the string and add terminator storage
-    char* s  = NEW_C_HEAP_ARRAY_RETURN_NULL(char, len + 1, mtInternal);
-
-    if (s == NULL) {
-      // release allocated storage before returning null
-      free_array_of_char_arrays(opath, i++);
-      return NULL;
-    }
+    char* s = NEW_C_HEAP_ARRAY(char, len + 1, mtInternal);
     strncpy(s, p, len);
     s[len] = '\0';
     opath[i] = s;
@@ -1843,58 +1831,4 @@ void os::naked_sleep(jlong millis) {
     millis -= limit;
   }
   naked_short_sleep(millis);
-}
-
-int os::sleep(JavaThread* thread, jlong millis) {
-  assert(thread == Thread::current(),  "thread consistency check");
-
-  ParkEvent * const slp = thread->_SleepEvent;
-  // Because there can be races with thread interruption sending an unpark()
-  // to the event, we explicitly reset it here to avoid an immediate return.
-  // The actual interrupt state will be checked before we park().
-  slp->reset();
-  // Thread interruption establishes a happens-before ordering in the
-  // Java Memory Model, so we need to ensure we synchronize with the
-  // interrupt state.
-  OrderAccess::fence();
-
-  jlong prevtime = javaTimeNanos();
-
-  for (;;) {
-    // interruption has precedence over timing out
-    if (os::is_interrupted(thread, true)) {
-      return OS_INTRPT;
-    }
-
-    jlong newtime = javaTimeNanos();
-
-    if (newtime - prevtime < 0) {
-      // time moving backwards, should only happen if no monotonic clock
-      // not a guarantee() because JVM should not abort on kernel/glibc bugs
-      assert(!os::supports_monotonic_clock(),
-             "unexpected time moving backwards detected in os::sleep()");
-    } else {
-      millis -= (newtime - prevtime) / NANOSECS_PER_MILLISEC;
-    }
-
-    if (millis <= 0) {
-      return OS_OK;
-    }
-
-    prevtime = newtime;
-
-    {
-      ThreadBlockInVM tbivm(thread);
-      OSThreadWaitState osts(thread->osthread(), false /* not Object.wait() */);
-
-      thread->set_suspend_equivalent();
-      // cleared by handle_special_suspend_equivalent_condition() or
-      // java_suspend_self() via check_and_wait_while_suspended()
-
-      slp->park(millis);
-
-      // were we externally suspended while we were waiting?
-      thread->check_and_wait_while_suspended();
-    }
-  }
 }

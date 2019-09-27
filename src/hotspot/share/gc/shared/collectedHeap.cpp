@@ -174,7 +174,7 @@ bool CollectedHeap::request_concurrent_phase(const char* phase) {
 }
 
 bool CollectedHeap::is_oop(oop object) const {
-  if (!check_obj_alignment(object)) {
+  if (!is_object_aligned(object)) {
     return false;
   }
 
@@ -343,11 +343,6 @@ void CollectedHeap::check_for_non_bad_heap_word_value(HeapWord* addr, size_t siz
 }
 #endif // PRODUCT
 
-void CollectedHeap::check_oop_location(void* addr) const {
-  assert(check_obj_alignment(addr), "address is not aligned");
-  assert(_reserved.contains(addr),  "address is not in reserved heap");
-}
-
 size_t CollectedHeap::max_tlab_size() const {
   // TLABs can't be bigger than we can fill with a int[Integer.MAX_VALUE].
   // This restriction could be removed by enabling filling with multiple arrays.
@@ -376,8 +371,6 @@ void CollectedHeap::fill_args_check(HeapWord* start, size_t words)
 {
   assert(words >= min_fill_size(), "too small to fill");
   assert(is_object_aligned(words), "unaligned size");
-  DEBUG_ONLY(Universe::heap()->check_oop_location(start);)
-  DEBUG_ONLY(Universe::heap()->check_oop_location(start + words - MinObjAlignment);)
 }
 
 void CollectedHeap::zap_filler_array(HeapWord* start, size_t words, bool zap)

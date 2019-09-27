@@ -149,7 +149,8 @@ void ciObjectFactory::init_shared_objects() {
 
   for (int i = T_BOOLEAN; i <= T_CONFLICT; i++) {
     BasicType t = (BasicType)i;
-    if (type2name(t) != NULL && t != T_OBJECT && t != T_ARRAY && t != T_NARROWOOP && t != T_NARROWKLASS) {
+    if (type2name(t) != NULL && !is_reference_type(t) &&
+        t != T_NARROWOOP && t != T_NARROWKLASS) {
       ciType::_basic_types[t] = new (_arena) ciType(t);
       init_ident_of(ciType::_basic_types[t]);
     }
@@ -250,7 +251,7 @@ ciObject* ciObjectFactory::get(oop key) {
   // into the cache.
   Handle keyHandle(Thread::current(), key);
   ciObject* new_object = create_new_object(keyHandle());
-  assert(oopDesc::equals(keyHandle(), new_object->get_oop()), "must be properly recorded");
+  assert(keyHandle() == new_object->get_oop(), "must be properly recorded");
   init_ident_of(new_object);
   assert(Universe::heap()->is_in(new_object->get_oop()), "must be");
 
@@ -469,8 +470,8 @@ ciKlass* ciObjectFactory::get_unloaded_klass(ciKlass* accessing_klass,
   for (int i=0; i<_unloaded_klasses->length(); i++) {
     ciKlass* entry = _unloaded_klasses->at(i);
     if (entry->name()->equals(name) &&
-        oopDesc::equals(entry->loader(), loader) &&
-        oopDesc::equals(entry->protection_domain(), domain)) {
+        entry->loader() == loader &&
+        entry->protection_domain() == domain) {
       // We've found a match.
       return entry;
     }

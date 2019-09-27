@@ -81,7 +81,7 @@ void JVMCICompiler::bootstrap(TRAPS) {
   do {
     // Loop until there is something in the queue.
     do {
-      os::sleep((JavaThread*)THREAD, 100);
+      ((JavaThread*)THREAD)->sleep(100);
       qsize = CompileBroker::queue_size(CompLevel_full_optimization);
     } while (!_bootstrap_compilation_request_handled && first_round && qsize == 0);
     first_round = false;
@@ -123,7 +123,7 @@ bool JVMCICompiler::force_comp_at_level_simple(Method *method) {
     if (excludeModules.not_null()) {
       ModuleEntry* moduleEntry = method->method_holder()->module();
       for (int i = 0; i < excludeModules->length(); i++) {
-        if (oopDesc::equals(excludeModules->obj_at(i), moduleEntry->module())) {
+        if (excludeModules->obj_at(i) == moduleEntry->module()) {
           return true;
         }
       }
