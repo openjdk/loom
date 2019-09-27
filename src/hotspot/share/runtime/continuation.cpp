@@ -2657,7 +2657,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
     f = f.frame_sender<ContinuationCodeBlobLookup>(&map);
     if (!Continuation::is_frame_in_continuation(f, cont)) {
       oop scope = java_lang_Continuation::scope(cont);
-      if (oopDesc::equals(scope, cont_scope))
+      if (scope == cont_scope)
         break;
       cont = java_lang_Continuation::parent(cont);
       if (cont == (oop) NULL)
@@ -2677,7 +2677,7 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
   oop scope = NULL;
   oop innermost = get_continuation(thread);
   for (oop c = innermost; c != NULL; c = java_lang_Continuation::parent(c)) {
-    if (oopDesc::equals(c, cont)) {
+    if (c == cont) {
       scope = java_lang_Continuation::scope(c);
       break;
     }
@@ -2688,7 +2688,7 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
   if (thread->_cont_yield) {
     return -2; // during yield
   }
-  if (!oopDesc::equals(innermost, cont)) { // we have nested continuations
+  if (!(innermost == cont)) { // we have nested continuations
     // make sure none of the continuations in the hierarchy are pinned
     freeze_result res_pinned = is_pinned0(thread, java_lang_Continuation::scope(cont), true);
     if (res_pinned != freeze_ok)
@@ -3594,7 +3594,7 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
 
   oop sc = continuation_scope(cont);
   assert(sc != NULL, "");
-  return oopDesc::equals(sc, cont_scope);
+  return sc == cont_scope;
 }
 
 // TODO: delete? consider other is_scope_bottom or something
@@ -4018,7 +4018,7 @@ inline void ContMirror::allocate_stacks(int size, int oops, int frames) {
 
   // This first assertion isn't important, as we'll overwrite the Java-computed ones, but it's just to test that the Java computation is OK.
   assert(_sp == java_lang_Continuation::sp(_cont) && _fp == java_lang_Continuation::fp(_cont) && _pc == java_lang_Continuation::pc(_cont), "");
-  assert (oopDesc::equals(_stack, java_lang_Continuation::stack(_cont)), "");
+  assert (_stack == java_lang_Continuation::stack(_cont), "");
   assert (_stack->base(basicElementType) == _hstack, "");
   assert (to_bytes(_stack_length) >= size && to_bytes(_sp) >= size, "stack_length: %d sp: %d size: %d", to_bytes(_stack_length), _sp, size);
   assert (to_bytes(_ref_sp) >= oops, "oops: %d ref_sp: %d refStack length: %d", oops, _ref_sp, _ref_stack->length());

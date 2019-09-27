@@ -62,7 +62,7 @@ inline void vframeStreamCommon::next() {
 
       // *(_cont.raw_value()) = java_lang_Continuation::parent(_cont());
 
-      if (_continuation_scope.not_null() && oopDesc::equals(scope, _continuation_scope())) {
+      if (_continuation_scope.not_null() && (scope == _continuation_scope())) {
         assert (Continuation::is_frame_in_continuation(_frame, cont), "");
         _mode = at_end_mode;
         break;
@@ -74,7 +74,7 @@ inline void vframeStreamCommon::next() {
     
     if (cont_entry) {
       *(_cont.raw_value()) = java_lang_Continuation::parent(cont);
-      assert (_reg_map.cont() == (oop)NULL || oopDesc::equals(_cont(), _reg_map.cont()), 
+      assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()),
         "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
         p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
     }

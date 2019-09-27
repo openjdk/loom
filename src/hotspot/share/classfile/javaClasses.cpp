@@ -2376,7 +2376,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
       assert (contScope.is_null() || cont != NULL, "must be");
       if (cont != NULL && Continuation::is_continuation_entry_frame(fr, &map)) {
         oop scope = java_lang_Continuation::scope(cont);
-        if (contScope.not_null() && oopDesc::equals(scope, contScope())) {
+        if (contScope.not_null() && (scope == contScope())) {
           is_last = true;
         } else {
           // if (!Continuation::is_frame_in_continuation(fr, cont)) {

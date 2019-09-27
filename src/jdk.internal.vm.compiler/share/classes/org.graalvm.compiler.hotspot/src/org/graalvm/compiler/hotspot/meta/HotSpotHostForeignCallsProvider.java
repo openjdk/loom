@@ -423,8 +423,8 @@ public abstract class HotSpotHostForeignCallsProvider extends HotSpotForeignCall
         }
 
         if (c.continuationThaw != 0) {
-            registerForeignCall(CONTINUATION_DO_CONTINUE, c.continuationThaw, JavaCall, DESTROYS_REGISTERS, SAFEPOINT, NOT_REEXECUTABLE, any());
-            registerForeignCall(CONTINUATION_YIELD, c.continuationDoYield, JavaCall, DESTROYS_REGISTERS, SAFEPOINT, NOT_REEXECUTABLE, any());
+            registerForeignCall(CONTINUATION_DO_CONTINUE, c.continuationThaw, JavaCall, SAFEPOINT, NOT_REEXECUTABLE, any());
+            registerForeignCall(CONTINUATION_YIELD, c.continuationDoYield, JavaCall, SAFEPOINT, NOT_REEXECUTABLE, any());
         }
 
 

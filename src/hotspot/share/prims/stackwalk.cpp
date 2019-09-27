@@ -136,7 +136,7 @@ void LiveFrameStream::next() {
 
     *(_cont.raw_value()) = java_lang_Continuation::parent(cont);
     
-    if (_cont_scope.not_null() && oopDesc::equals(scope, _cont_scope())) {
+    if (_cont_scope.not_null() && (scope == _cont_scope())) {
       assert (Continuation::is_frame_in_continuation(_jvf->fr(), cont), "must be");
       _jvf = NULL;
       return;

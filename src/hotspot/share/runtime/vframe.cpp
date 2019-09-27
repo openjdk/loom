@@ -511,7 +511,7 @@ vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool s
   }
   _cont = Handle(Thread::current(), cont);
 
-  assert (_reg_map.cont() == (oop)NULL || oopDesc::equals(_cont(), _reg_map.cont()), 
+  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()), 
     "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
     p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
 }
@@ -533,7 +533,7 @@ vframeStream::vframeStream(Handle continuation)
     _frame = _frame.sender(&_reg_map);
   }
 
-  assert (_reg_map.cont() == (oop)NULL || oopDesc::equals(_cont(), _reg_map.cont()), 
+  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()), 
     "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
     p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
 }
