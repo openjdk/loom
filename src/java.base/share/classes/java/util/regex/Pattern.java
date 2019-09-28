@@ -357,7 +357,7 @@ import jdk.internal.util.ArraysSupport;
  * <a href="#UNIX_LINES">d</a> <a href="#MULTILINE">m</a> <a href="#DOTALL">s</a>
  * <a href="#UNICODE_CASE">u</a> <a href="#COMMENTS">x</a> <a href="#UNICODE_CHARACTER_CLASS">U</a>
  * on - off</td></tr>
- * <tr><th style="vertical-align:top; font-weight:normal" id="non_capture_group_flags"><code>(?idmsuxU-idmsuxU:</code><i>X</i>{@code )}&nbsp;&nbsp;</th>
+ * <tr><th style="vertical-align:top; font-weight:normal" id="non_capture_group_flags">{@code (?idmsuxU-idmsuxU:}<i>X</i>{@code )}&nbsp;&nbsp;</th>
  *     <td headers="matches special non_capture_group_flags"><i>X</i>, as a <a href="#cg">non-capturing group</a> with the
  *         given flags <a href="#CASE_INSENSITIVE">i</a> <a href="#UNIX_LINES">d</a>
  * <a href="#MULTILINE">m</a> <a href="#DOTALL">s</a> <a href="#UNICODE_CASE">u</a >
@@ -3931,12 +3931,14 @@ loop:   for(int x=0, offset=0; x<nCodePoints; x++, offset+=len) {
         boolean match(Matcher matcher, int i, CharSequence seq) {
             if (i < matcher.to) {
                 int ch = Character.codePointAt(seq, i);
-                return predicate.is(ch) &&
-                       next.match(matcher, i + Character.charCount(ch), seq);
-            } else {
-                matcher.hitEnd = true;
-                return false;
+                i += Character.charCount(ch);
+                if (i <= matcher.to) {
+                    return predicate.is(ch) &&
+                           next.match(matcher, i, seq);
+                }
             }
+            matcher.hitEnd = true;
+            return false;
         }
         boolean study(TreeInfo info) {
             info.minLength++;

@@ -39,6 +39,7 @@
 // Consider using GCC's __read_mostly.
 
 Mutex*   Patching_lock                = NULL;
+Mutex*   CompiledMethod_lock          = NULL;
 Monitor* SystemDictionary_lock        = NULL;
 Mutex*   ProtectionDomainSet_lock     = NULL;
 Mutex*   SharedDictionary_lock        = NULL;
@@ -93,7 +94,6 @@ Monitor* BeforeExit_lock              = NULL;
 Monitor* Notify_lock                  = NULL;
 Mutex*   ProfilePrint_lock            = NULL;
 Mutex*   ExceptionCache_lock          = NULL;
-Mutex*   OsrList_lock                 = NULL;
 Mutex*   NMethodSweeperStats_lock     = NULL;
 #ifndef PRODUCT
 Mutex*   FullGCALot_lock              = NULL;
@@ -135,6 +135,7 @@ Mutex*   CodeHeapStateAnalytics_lock  = NULL;
 Mutex*   MetaspaceExpand_lock         = NULL;
 Mutex*   ClassLoaderDataGraph_lock    = NULL;
 Monitor* ThreadsSMRDelete_lock        = NULL;
+Mutex*   ThreadIdTableCreate_lock     = NULL;
 Mutex*   SharedDecoder_lock           = NULL;
 Mutex*   DCmdFactory_lock             = NULL;
 #if INCLUDE_NMT
@@ -230,16 +231,17 @@ void mutex_init() {
   def(OopMapCacheAlloc_lock        , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_always); // used for oop_map_cache allocation.
 
   def(MetaspaceExpand_lock         , PaddedMutex  , leaf-1,      true,  Monitor::_safepoint_check_never);
-  def(ClassLoaderDataGraph_lock    , PaddedMutex  , nonleaf,     true,  Monitor::_safepoint_check_always);
+  def(ClassLoaderDataGraph_lock    , PaddedMutex  , nonleaf,     false, Monitor::_safepoint_check_always);
 
   def(Patching_lock                , PaddedMutex  , special,     true,  Monitor::_safepoint_check_never);      // used for safepointing and code patching.
+  def(CompiledMethod_lock          , PaddedMutex  , special-1,   true,  Monitor::_safepoint_check_never);
   def(Service_lock                 , PaddedMonitor, special,     true,  Monitor::_safepoint_check_never);      // used for service thread operations
   def(JmethodIdCreation_lock       , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_always); // used for creating jmethodIDs.
 
   def(SystemDictionary_lock        , PaddedMonitor, leaf,        true,  Monitor::_safepoint_check_always);
   def(ProtectionDomainSet_lock     , PaddedMutex  , leaf-1,      true,  Monitor::_safepoint_check_never);
   def(SharedDictionary_lock        , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_always);
-  def(Module_lock                  , PaddedMutex  , leaf+2,      true,  Monitor::_safepoint_check_always);
+  def(Module_lock                  , PaddedMutex  , leaf+2,      false, Monitor::_safepoint_check_always);
   def(InlineCacheBuffer_lock       , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_never);
   def(VMStatistic_lock             , PaddedMutex  , leaf,        false, Monitor::_safepoint_check_always);
   def(ExpandHeap_lock              , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_always); // Used during compilation by VM thread
@@ -248,7 +250,6 @@ void mutex_init() {
   def(SymbolArena_lock             , PaddedMutex  , leaf+2,      true,  Monitor::_safepoint_check_never);
   def(ProfilePrint_lock            , PaddedMutex  , leaf,        false, Monitor::_safepoint_check_always); // serial profile printing
   def(ExceptionCache_lock          , PaddedMutex  , leaf,        false, Monitor::_safepoint_check_always); // serial profile printing
-  def(OsrList_lock                 , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_never);
   def(Debug1_lock                  , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_never);
 #ifndef PRODUCT
   def(FullGCALot_lock              , PaddedMutex  , leaf,        false, Monitor::_safepoint_check_always); // a lock to make FullGCALot MT safe
@@ -291,7 +292,7 @@ void mutex_init() {
   def(MethodData_lock              , PaddedMutex  , nonleaf+3,   false, Monitor::_safepoint_check_always);
   def(TouchedMethodLog_lock        , PaddedMutex  , nonleaf+3,   false, Monitor::_safepoint_check_always);
 
-  def(MethodCompileQueue_lock      , PaddedMonitor, nonleaf+4,   true,  Monitor::_safepoint_check_always);
+  def(MethodCompileQueue_lock      , PaddedMonitor, nonleaf+4,   false, Monitor::_safepoint_check_always);
   def(Debug2_lock                  , PaddedMutex  , nonleaf+4,   true,  Monitor::_safepoint_check_never);
   def(Debug3_lock                  , PaddedMutex  , nonleaf+4,   true,  Monitor::_safepoint_check_never);
   def(CompileThread_lock           , PaddedMonitor, nonleaf+5,   false, Monitor::_safepoint_check_always);
@@ -316,7 +317,8 @@ void mutex_init() {
 
   def(CodeHeapStateAnalytics_lock  , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_never);
   def(NMethodSweeperStats_lock     , PaddedMutex  , special,     true,  Monitor::_safepoint_check_never);
-  def(ThreadsSMRDelete_lock        , PaddedMonitor, special,     false, Monitor::_safepoint_check_never);
+  def(ThreadsSMRDelete_lock        , PaddedMonitor, special,     true,  Monitor::_safepoint_check_never);
+  def(ThreadIdTableCreate_lock     , PaddedMutex  , leaf,        false, Monitor::_safepoint_check_always);
   def(SharedDecoder_lock           , PaddedMutex  , native,      false, Monitor::_safepoint_check_never);
   def(DCmdFactory_lock             , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_never);
 #if INCLUDE_NMT

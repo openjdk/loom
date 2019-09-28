@@ -132,7 +132,7 @@ class RedirtyLoggedCardTableEntryClosure : public G1CardTableEntryClosure {
   RedirtyLoggedCardTableEntryClosure(G1CollectedHeap* g1h) : G1CardTableEntryClosure(),
     _num_dirtied(0), _g1h(g1h), _g1_ct(g1h->card_table()) { }
 
-  void do_card_ptr(CardValue* card_ptr, uint worker_i) {
+  void do_card_ptr(CardValue* card_ptr, uint worker_id) {
     HeapRegion* hr = region_for_card(card_ptr);
 
     // Should only dirty cards in regions that won't be freed.
@@ -1938,8 +1938,8 @@ size_t G1CollectedHeap::unused_committed_regions_in_bytes() const {
   return _hrm->total_free_bytes();
 }
 
-void G1CollectedHeap::iterate_hcc_closure(G1CardTableEntryClosure* cl, uint worker_i) {
-  _hot_card_cache->drain(cl, worker_i);
+void G1CollectedHeap::iterate_hcc_closure(G1CardTableEntryClosure* cl, uint worker_id) {
+  _hot_card_cache->drain(cl, worker_id);
 }
 
 // Computes the sum of the storage used by the various regions.
@@ -2377,7 +2377,8 @@ void G1CollectedHeap::print_on(outputStream* st) const {
 void G1CollectedHeap::print_regions_on(outputStream* st) const {
   st->print_cr("Heap Regions: E=young(eden), S=young(survivor), O=old, "
                "HS=humongous(starts), HC=humongous(continues), "
-               "CS=collection set, F=free, A=archive, "
+               "CS=collection set, F=free, "
+               "OA=open archive, CA=closed archive, "
                "TAMS=top-at-mark-start (previous, next)");
   PrintRegionClosure blk(st);
   heap_region_iterate(&blk);

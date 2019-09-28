@@ -1014,7 +1014,7 @@ public class Fiber<V> {
     Thread shadowThread() {
         assert Thread.currentCarrierThread() == carrierThread;
         ShadowThread thread = shadowThread;
-        if (thread== null) {
+        if (thread == null) {
             shadowThread = thread = new ShadowThread(this, inheritableThreadContext);
 
             // allow context to be GC'ed.
