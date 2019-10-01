@@ -2079,11 +2079,12 @@ public:
     intptr_t* top = _fi->sp;
     intptr_t* bottom = _cont.entrySP();
 
+    // _thread->cont_frame()->sp when we thaw, we put the sp in _thread->cont_frame()->sp; subsequent return barriers may thaw single frames with their stack-passed arguments.
+    // this value helps pop those stack-passed arguments.
     intptr_t* saved_sp = _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
-    // TODO PERF: the following sometimes fails. Investigate
-    assert (saved_sp != 0 || top_stack_argsize() == 0, "");
+    assert (saved_sp != NULL || top_stack_argsize() == 0, "");
     int argsize = saved_sp == 0 ? 0 : saved_sp - _cont.entrySP(); // in words
-    assert (argsize == top_stack_argsize(), "argsize: %d top_stack_argsize(): %d", argsize, top_stack_argsize());
+    assert (argsize == top_stack_argsize(), "argsize: %d top_stack_argsize(): %d saved_sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, argsize, top_stack_argsize(), p2i(saved_sp), p2i(_cont.entrySP()));
     // int argsize = 0; // TODO R XXXXXX !!!!!!
     if (argsize != 0) {
       assert (argsize > 0, "");
@@ -3497,6 +3498,7 @@ public:
         assert (_cont.tail() == chunk, "");
         pc = StubRoutines::cont_returnBarrier();
       } else {
+        _thread->cont_frame()->sp = NULL;
         frame entry = new_entry_frame(); // TODO PERF
         pc = entry.raw_pc();
       }
