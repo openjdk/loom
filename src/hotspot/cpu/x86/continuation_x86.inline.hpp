@@ -1400,6 +1400,8 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
   assert (oopDesc::is_oop_or_null(jdk_internal_misc_StackChunk::parent(chunk)), "");
   
   const bool gc_mode = jdk_internal_misc_StackChunk::safepoint(chunk) != 0;
+  const bool concurrent = !SafepointSynchronize::is_at_safepoint() && !Thread::current()->is_Java_thread();
+
   // const bool narrow = UseCompressedOops;
 
   int num_frames = 0;
@@ -1477,8 +1479,10 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
       }
     }
   }
-  assert (jdk_internal_misc_StackChunk::numFrames(chunk) == -1 || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "young: %d num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", is_young(chunk), num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
-  assert (jdk_internal_misc_StackChunk::numOops(chunk)   == -1 || num_oops   == jdk_internal_misc_StackChunk::numOops(chunk),   "young: %d num_oops: %d jdk_internal_misc_StackChunk::numOops(chunk): %d",     is_young(chunk), num_oops,   jdk_internal_misc_StackChunk::numOops(chunk));
+  if (!concurrent) {
+    assert (jdk_internal_misc_StackChunk::numFrames(chunk) == -1 || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "young: %d num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", is_young(chunk), num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
+    assert (jdk_internal_misc_StackChunk::numOops(chunk)   == -1 || num_oops   == jdk_internal_misc_StackChunk::numOops(chunk),   "young: %d num_oops: %d jdk_internal_misc_StackChunk::numOops(chunk): %d",     is_young(chunk), num_oops,   jdk_internal_misc_StackChunk::numOops(chunk));
+  }
   return true;
 }
 #endif
