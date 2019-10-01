@@ -3449,8 +3449,7 @@ public:
         assert (jdk_internal_misc_StackChunk::numOops(chunk) >= 0, "jdk_internal_misc_StackChunk::numOops(chunk): %d", jdk_internal_misc_StackChunk::numOops(chunk));
         const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
         assert (jdk_internal_misc_StackChunk::numOops(chunk) >= oopmap->num_oops(), "jdk_internal_misc_StackChunk::numOops(chunk): %d oopmap->num_oops() : %d", jdk_internal_misc_StackChunk::numOops(chunk), oopmap->num_oops());
-        jdk_internal_misc_StackChunk::set_numOops(chunk, 
-            jdk_internal_misc_StackChunk::numOops(chunk) - oopmap->num_oops());
+        jdk_internal_misc_StackChunk::set_numOops(chunk, jdk_internal_misc_StackChunk::numOops(chunk) - oopmap->num_oops());
       }
       
       bool last_frame_in_chunk = jdk_internal_misc_StackChunk::sp(chunk) + size >= jdk_internal_misc_StackChunk::end(chunk);
@@ -3458,6 +3457,8 @@ public:
       jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::sp(chunk) + size + (last_frame_in_chunk ? argsize : 0));
     }
     
+    // tty->print_cr("thaw_chunk partial: %d full: %d top: %d bottom: %d", partial, full, top, bottom);
+
     if (bottom) {
       vsp -= argsize; // if not bottom, we're going to overwrite the args portion of the sender
       // if we're not in a full thaw, we're both top and bottom
@@ -5524,6 +5525,8 @@ static jlong java_tid(JavaThread* thread) {
 static void print_frames(JavaThread* thread, outputStream* st) {
   if (st != NULL && !log_develop_is_enabled(Trace, jvmcont)) return;
   if (st == NULL) st = tty;
+
+  if (!thread->has_last_Java_frame()) st->print_cr("NO ANCHOR!");
 
   st->print_cr("------- frames ---------");
   RegisterMap map(thread, true, false);
