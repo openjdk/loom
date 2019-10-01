@@ -2081,10 +2081,10 @@ public:
 
     intptr_t* saved_sp = _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
     // TODO PERF: the following sometimes fails. Investigate
-    // assert (saved_sp != 0 || top_stack_argsize() == 0, "");
-    // int argsize = saved_sp == 0 ? 0 : saved_sp - _cont.entrySP(); // in words
-    // assert (argsize == top_stack_argsize(), "argsize: %d top_stack_argsize(): %d", argsize, top_stack_argsize());
-    int argsize = 0; // TODO R XXXXXX !!!!!!
+    assert (saved_sp != 0 || top_stack_argsize() == 0, "");
+    int argsize = saved_sp == 0 ? 0 : saved_sp - _cont.entrySP(); // in words
+    assert (argsize == top_stack_argsize(), "argsize: %d top_stack_argsize(): %d", argsize, top_stack_argsize());
+    // int argsize = 0; // TODO R XXXXXX !!!!!!
     if (argsize != 0) {
       assert (argsize > 0, "");
       bottom += argsize;
@@ -3302,6 +3302,7 @@ private:
   void derelativize_interpreted_frame_metadata(const hframe& hf, const frame& f);
   inline hframe::callee_info frame_callee_info_address(frame& f);
   template<typename FKind, bool top, bool bottom> inline intptr_t* align(const hframe& hf, intptr_t* vsp, frame& caller);
+  void maybe_deoptimize_frames_in_chunk(oop chunk);
 
   bool should_deoptimize() {
     // frame::deoptimize (or Deoptimize::deoptimize) is called either "inline" with execution (current method or caller), -- not relevant for frozen frames
@@ -3365,10 +3366,12 @@ public:
   intptr_t* thaw_chunk(oop chunk, int num_frames, bool top) {
     assert (ConfigT::has_young, "");
     assert (chunk != (oop) NULL, "");
+    const bool full = num_frames > 2; // TODO
     
     assert (num_frames > 0, "");
 
     static const int metadata = 2; // return address + link
+    static const int threshold = 100; // words
 
     // tty->print_cr(">>> thaw_chunk:"); print_chunk(chunk, _cont.mirror(), false);
     log_develop_trace(jvmcont)("thaw_chunk");
@@ -3383,23 +3386,52 @@ public:
       jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
     }
 
-    int size = 0;
-    int slot;
-    CodeBlob* cb = NULL;
-    intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-    intptr_t* hsp = start + jdk_internal_misc_StackChunk::sp(chunk);
-    intptr_t* end = start + jdk_internal_misc_StackChunk::end(chunk);
-    int frames = 0;
-    while (hsp < end && frames < num_frames) {
+    if (ContMirror::is_empty_chunk(chunk)) {
+      _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
+      return thaw<true>(num_frames); // we're still top, as no frames have been thawed
+    } 
+    
+    intptr_t* hsp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
+    intptr_t* vsp;
+    if (full) {
+      _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
+      vsp = thaw<false>(num_frames);
+    } else {
+      intptr_t* bot = _cont.entrySP(); // _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
+      if (Interpreter::contains(_cont.entryPC())) {
+        bot -= 1; // See Thaw<ConfigT, mode>::align SP_WIGGLE etc.
+      }
+      vsp = bot;
+    }
+
+    const bool bottom = !full || _cont.is_empty();
+    
+    bool partial;
+    int size, argsize;
+    if (full || jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) < threshold) {
+      partial = false;
+      log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d", partial, full, top, bottom);
+      size = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + metadata;
+      argsize = jdk_internal_misc_StackChunk::argsize(chunk);
+
+      maybe_deoptimize_frames_in_chunk(chunk);
+      
+      jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + metadata);
+      if (!young) {
+        jdk_internal_misc_StackChunk::set_numFrames(chunk, 0);
+        jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
+      }
+    } else { // thaw a single frame
+      partial = true;
+      log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d", partial, full, top, bottom);
       address pc = *(address*)(hsp - 1);
       // tty->print_cr(">>> thaw_chunk at %p pc: %p", hsp - 1, pc);
       // print_chunk(chunk, _cont.mirror(), false);
 
       int slot;
-      cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
-      int fsize = cb->frame_size(); // in words
-
-      // tty->print_cr("<<< thaw_chunk frame %d: %p - %p", frames, hsp, hsp + fsize);
+      CodeBlob* cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+      size = cb->frame_size(); // in words
+      argsize = (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord; // in words
 
       if (should_deoptimize()
           && (cb->as_compiled_method()->is_marked_for_deoptimization() || (mode != mode_fast && _thread->is_interp_only_mode()))) {
@@ -3411,51 +3443,24 @@ public:
       }
 
       if (!young) {
+        assert (jdk_internal_misc_StackChunk::numFrames(chunk) >= 0, "");
+        jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - 1);
+
         assert (jdk_internal_misc_StackChunk::numOops(chunk) >= 0, "jdk_internal_misc_StackChunk::numOops(chunk): %d", jdk_internal_misc_StackChunk::numOops(chunk));
         const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
         assert (jdk_internal_misc_StackChunk::numOops(chunk) >= oopmap->num_oops(), "jdk_internal_misc_StackChunk::numOops(chunk): %d oopmap->num_oops() : %d", jdk_internal_misc_StackChunk::numOops(chunk), oopmap->num_oops());
         jdk_internal_misc_StackChunk::set_numOops(chunk, 
             jdk_internal_misc_StackChunk::numOops(chunk) - oopmap->num_oops());
       }
-      hsp += fsize;
-      size += fsize;
-      frames++;
+      
+      bool last_frame_in_chunk = jdk_internal_misc_StackChunk::sp(chunk) + size >= jdk_internal_misc_StackChunk::end(chunk);
+      assert (!last_frame_in_chunk || argsize == jdk_internal_misc_StackChunk::argsize(chunk), "");
+      jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::sp(chunk) + size + (last_frame_in_chunk ? argsize : 0));
     }
-    if (!young) {
-      assert (jdk_internal_misc_StackChunk::numFrames(chunk) >= 0, "");
-      jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - frames);
-    }
-    bool last_frame_in_chunk = hsp >= end;
     
-    intptr_t* vsp;
-    int argsize = frames != 0 ? (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord : 0;
-    assert (!last_frame_in_chunk || argsize == jdk_internal_misc_StackChunk::argsize(chunk), "");
-    if (frames == num_frames) { // this is the bottom of the thaw
-      assert (frames > 0, "");
-      intptr_t* bottom = _cont.entrySP(); // _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
-      argsize = (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;
-      if (Interpreter::contains(_cont.entryPC())) {
-        bottom -= 1; // See Thaw<ConfigT, mode>::align SP_WIGGLE etc.
-      }
-      vsp = bottom;
-    } else {
-      _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
-      if (frames == 0) {
-        assert (size == 0, "");
-        assert (_cont.tail() == (oop)NULL || !ContMirror::is_empty_chunk(_cont.tail()), ""); // only topmost chunk can be empty
-        assert (jdk_internal_misc_StackChunk::safepoint(chunk) == 0, "");
-        return thaw<true>(num_frames); // we're still top, as no frames have been thawed
-      } else {
-        vsp = thaw<false>(num_frames - frames); // recursion
-        vsp += argsize; // we're going to overwrite the args portion of the sender
-      }
-    }
-
-    int sp = jdk_internal_misc_StackChunk::sp(chunk);
-    assert (sp + argsize < jdk_internal_misc_StackChunk::size(chunk), "");
-
-    if (frames == num_frames) {
-      vsp -= argsize;
+    if (bottom) {
+      vsp -= argsize; // if not bottom, we're going to overwrite the args portion of the sender
+      // if we're not in a full thaw, we're both top and bottom
     #ifdef _LP64
       if ((argsize != 0 || Interpreter::contains(_cont.entryPC())) && (intptr_t)vsp % 16 != 0) { // TODO PERF
         log_develop_trace(jvmcont)("Aligning compiled frame 1: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(vsp), p2i(vsp - 1));
@@ -3464,14 +3469,16 @@ public:
       assert((intptr_t)vsp % 16 == 0, "");
     #endif
     }
+    #ifdef _LP64
+      assert((intptr_t)vsp % 16 == 0, "");
+    #endif
+    
     intptr_t* bottom_sp = vsp;
-
     vsp -= size;
-    hsp = start + sp;
 
     intptr_t* from = hsp - metadata;
     intptr_t* to   = vsp - metadata;
-    log_develop_trace(jvmcont)("thaw_chunk size: %d argsize: %d last_frame_in_chunk: %d", size, argsize, last_frame_in_chunk);
+    log_develop_trace(jvmcont)("thaw_chunk size: %d argsize: %d full: %d", size, argsize, full);
     int sizeb = (size + (LIKELY(argsize == 0) ? 0 : argsize + metadata)) << LogBytesPerWord;
     log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + sizeb), sizeb);
     log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + sizeb), sizeb);
@@ -3480,17 +3487,10 @@ public:
     //   memset(from, 0, size << LogBytesPerWord);
     // }
 
-    jdk_internal_misc_StackChunk::set_sp(chunk, sp + size + (last_frame_in_chunk ? argsize : 0));
-    if (frames == num_frames) {
-      // oop new_tail = !ContMirror::is_empty_chunk(chunk) ? chunk : jdk_internal_misc_StackChunk::parent(chunk);
-      _cont.set_tail(chunk); // even if empty
-      // print_chunk(chunk, _cont.mirror(), false);
-    }
-
     _cont.sub_size(size << LogBytesPerWord);
 
     // if (argsize != 0) { // patch pc + fp
-    if (frames == num_frames) { // we're bottom`
+    if (bottom) { // we're bottom`
       address pc;
       if (!_cont.is_empty()) { // TODO PERF
         assert (_cont.tail() == chunk, "");
@@ -3519,7 +3519,7 @@ public:
     if (e.should_commit()) {
       e.set_id(cast_from_oop<u8>(chunk));
       e.set_size(size << LogBytesPerWord);
-      e.set_full(false);
+      e.set_full(!partial);
       e.commit();
     }
 

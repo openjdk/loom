@@ -1371,6 +1371,28 @@ void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosure* clos
   }
 }
 
+template <typename ConfigT, op_mode mode>
+void Thaw<ConfigT, mode>::maybe_deoptimize_frames_in_chunk(oop chunk) {
+  if (mode == mode_fast || !should_deoptimize()) return;
+
+  CodeBlob* cb = NULL;
+  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* end = start + jdk_internal_misc_StackChunk::end(chunk);
+  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+    address pc = *(address*)(sp - 1);
+    int slot;
+    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+
+    if (cb->as_compiled_method()->is_marked_for_deoptimization() || _thread->is_interp_only_mode()) {
+      log_develop_trace(jvmcont)("Deoptimizing frame");
+      intptr_t* fp = *(intptr_t**)(sp - 2);
+      frame f(sp, sp, fp, pc, NULL, NULL, true);
+      DEBUG_ONLY(Frame::patch_pc(f, NULL));
+      f.deoptimize(_thread);
+    }
+  }
+}
+
 #ifdef ASSERT
 bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
   assert (oopDesc::is_oop(chunk), "");
@@ -1428,10 +1450,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
       assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
       assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
       
-      oop obj = omv.type() == OopMapValue::narrowoop_value
-        ? CompressedOops::decode((narrowOop)RawAccess<>::oop_load((narrowOop*)p))
-        : (oop)RawAccess<>::oop_load((oop*)p);
-
+      oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)RawAccess<>::oop_load((narrowOop*)p) : (oop)RawAccess<>::oop_load((oop*)p);
       assert (oopDesc::is_oop_or_null(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     }
     assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
@@ -1443,8 +1462,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
         void* derived_loc = reg_to_loc(omv.reg(), sp);
         assert (is_in_frame(cb, sp, base_loc), "");
         assert (is_in_frame(cb, sp, derived_loc), "");
-        oop base = // narrow && gc_mode ? CompressedOops::decode((narrowOop)RawAccess<>::oop_load((narrowOop*)base_loc)) :
-                      (oop)RawAccess<>::oop_load((oop*)base_loc);
+        oop base = (oop)RawAccess<>::oop_load((oop*)base_loc);
         assert (oopDesc::is_oop_or_null(base), "not an oop");
         assert (Universe::heap()->is_in_or_null(base), "not an oop");
         if (base != (oop)NULL) {
