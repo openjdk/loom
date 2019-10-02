@@ -2100,7 +2100,8 @@ public:
     int sp;
     address pc = NULL;
     bool allocated;
-    if (chunk == NULL || (is_young(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
+    // TODO The second disjunct means we don't squash old chunks, but let them be (Rickard's idea)
+    if (chunk == NULL || !is_young(chunk) || (is_young(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
       log_develop_trace(jvmcont)("freeze_young allocating new chunk");
       chunk = _cont.allocate_stack_chunk(size);
       if (chunk == NULL) { // OOM
@@ -2126,6 +2127,9 @@ public:
       jdk_internal_misc_StackChunk::set_argsize(chunk, 0); // TODO PERF unnecessary?
       jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
       jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
+      
+      // TODO Erik says: promote young chunks quickly
+      chunk->set_mark(chunk->mark().set_age(15));
 
       assert (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL || ContMirror::is_stack_chunk(jdk_internal_misc_StackChunk::parent(chunk)), "");
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
@@ -2139,12 +2143,13 @@ public:
         return false;
       }
     } else {
-      if (!is_young(chunk)) {
-        // tty->print_cr(">>> freeze_young old:"); print_chunk(chunk, _cont.mirror(), false);
-        log_develop_trace(jvmcont)("Young chunk: found old chunk");
-        assert(_cont.chunk_invariant(), "");
-        return false;
-      }
+      // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
+      // if (!is_young(chunk)) {
+      //   // tty->print_cr(">>> freeze_young old:"); print_chunk(chunk, _cont.mirror(), false);
+      //   log_develop_trace(jvmcont)("Young chunk: found old chunk");
+      //   assert(_cont.chunk_invariant(), "");
+      //   return false;
+      // }
       allocated = false;
       sp = jdk_internal_misc_StackChunk::sp(chunk);
       pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - 1);
