@@ -33,6 +33,7 @@
 
 class G1ThreadLocalData {
 private:
+  int _nmethod_disarm_value;
   SATBMarkQueue _satb_mark_queue;
   G1DirtyCardQueue _dirty_card_queue;
 
@@ -68,6 +69,18 @@ public:
 
   static G1DirtyCardQueue& dirty_card_queue(Thread* thread) {
     return data(thread)->_dirty_card_queue;
+  }
+
+  static int nmethod_disarm_value(Thread* thread) {
+    return data(thread)->_nmethod_disarm_value;
+  }
+
+  static void set_nmethod_disarm_value(Thread* thread, int value) {
+    data(thread)->_nmethod_disarm_value = value;
+  }
+
+  static ByteSize nmethod_disarmed_offset() {
+    return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _nmethod_disarm_value);
   }
 
   static ByteSize satb_mark_queue_active_offset() {

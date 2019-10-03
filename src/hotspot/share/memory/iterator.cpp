@@ -60,6 +60,7 @@ void CodeBlobToOopClosure::do_code_blob(CodeBlob* cb) {
 void MarkingCodeBlobClosure::do_code_blob(CodeBlob* cb) {
   nmethod* nm = cb->as_nmethod_or_null();
   if (nm != NULL && nm->oops_do_try_claim()) {
+    nm->mark_as_seen_on_stack();
     do_nmethod(nm);
   }
 }

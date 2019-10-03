@@ -620,6 +620,7 @@ nmethod::nmethod(
     // values something that will never match a pc like the nmethod vtable entry
     _exception_offset        = 0;
     _orig_pc_offset          = 0;
+    _marking_cycle           = 0;
 
     _consts_offset           = data_offset();
     _stub_offset             = data_offset();
@@ -1125,6 +1126,7 @@ void nmethod::mark_as_seen_on_stack() {
   // Set the traversal mark to ensure that the sweeper does 2
   // cleaning passes before moving to zombie.
   set_stack_traversal_mark(NMethodSweeper::traversal_count());
+  _marking_cycle = CodeCache::marking_cycle();
 }
 
 // Tell if a non-entrant method can be converted to a zombie (i.e.,
@@ -1137,13 +1139,16 @@ bool nmethod::can_convert_to_zombie() {
   // concurrent GC threads.
   assert(is_not_entrant() || is_unloading(), "must be a non-entrant method");
 
+  bool maybe_in_continuation = _marking_cycle + 1 < CodeCache::marking_cycle() ||
+                              !is_on_continuation_stack();
+
   // Since the nmethod sweeper only does partial sweep the sweeper's traversal
   // count can be greater than the stack traversal count before it hits the
   // nmethod for the second time.
   // If an is_unloading() nmethod is still not_entrant, then it is not safe to
   // convert it to zombie due to GC unloading interactions. However, if it
   // has become unloaded, then it is okay to convert such nmethods to zombie.
-  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && !is_on_continuation_stack() &&
+  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && !maybe_in_continuation &&
           !is_locked_by_vm() && (!is_unloading() || is_unloaded());
 }
 
@@ -1178,8 +1183,6 @@ bool nmethod::try_transition(int new_state_int) {
 }
 
 void nmethod::make_unloaded() {
-  assert(!is_on_continuation_stack(), "can't be on continuation stack");
-
   post_compiled_method_unload();
 
   // This nmethod is being unloaded, make sure that dependencies

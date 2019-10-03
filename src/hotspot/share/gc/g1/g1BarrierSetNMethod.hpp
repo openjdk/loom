@@ -22,25 +22,22 @@
  *
  */
 
-#ifndef SHARE_VM_RUNTIME_CONTINUATION_INLINE_HPP
-#define SHARE_VM_RUNTIME_CONTINUATION_INLINE_HPP
+#ifndef SHARE_GC_G1_G1BARRIERSETNMETHOD_HPP
+#define SHARE_GC_G1_G1BARRIERSETNMETHOD_HPP
 
-// #include "code/vmreg.inline.hpp"
-// #include "compiler/oopMap.hpp"
-// #include "logging/log.hpp"
-#include "runtime/continuation.hpp"
-// #include CPU_HEADER_INLINE(frame)
+#include "gc/shared/barrierSetNMethod.hpp"
 
-template <class OopClosureType>
-void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure) {
-  // for now, we don't devirtualize for faster compilation
-  Continuation::stack_chunk_iterate_stack(chunk, (OopClosure*)closure, closure->do_metadata());
-}
+class G1BarrierSetNMethod : public BarrierSetNMethod {
+  int _current_phase;
 
-template <class OopClosureType>
-void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* closure, MemRegion mr) {
-  // for now, we don't devirtualize for faster compilation
-  Continuation::stack_chunk_iterate_stack_bounded(chunk, (OopClosure*)closure, closure->do_metadata(), mr);
-}
+protected:
+  virtual int disarmed_value() const;
+  virtual bool nmethod_entry_barrier(nmethod* nm);
 
-#endif // SHARE_VM_RUNTIME_CONTINUATION_INLINE_HPP
+public:
+  G1BarrierSetNMethod() : _current_phase(1) { }
+  virtual ByteSize thread_disarmed_offset() const;
+  void arm_all_nmethods();
+};
+
+#endif // SHARE_GC_G1_G1BARRIERSETNMETHOD_HPP

@@ -1134,7 +1134,7 @@ static bool is_in_frame(CodeBlob* cb, intptr_t* sp, void* p0) {
 }
 #endif
 
-void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
+void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure, bool do_metadata) {
   // see sender_for_compiled_frame
 
   assert (ContMirror::is_stack_chunk(chunk), "");
@@ -1156,6 +1156,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
 
     int slot;
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+    nmethod* nm = cb->as_nmethod_or_null();
     assert (cb != NULL, "");
     assert (slot >= 0, "");
     const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
@@ -1164,6 +1165,11 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
     if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
     assert (cb->is_nmethod(), "");
     assert (cb->frame_size() > 0, "");
+
+    if (do_metadata && nm != NULL) {
+      nm->mark_as_seen_on_stack();
+      nm->oops_do(closure);
+    }
 
     num_frames++;
     num_oops += oopmap->num_oops();
@@ -1324,7 +1330,7 @@ static void fix_stack_chunk(oop chunk) {
   // tty->print_cr("<<< fix_stack_chunk %p %p", (oopDesc*)chunk, Thread::current());
 }
 
-void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosure* closure, MemRegion mr) {
+void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosure* closure, bool do_metadata, MemRegion mr) {
   assert (false, ""); // TODO REMOVE
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded");
   intptr_t* const l = (intptr_t*)mr.start();

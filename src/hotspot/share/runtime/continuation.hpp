@@ -147,8 +147,8 @@ private:
 
 public:
   // for now, we don't devirtualize the closure for faster compilation
-  static void stack_chunk_iterate_stack(oop obj, OopClosure* closure);
-  static void stack_chunk_iterate_stack_bounded(oop obj, OopClosure* closure, MemRegion mr);
+  static void stack_chunk_iterate_stack(oop obj, OopClosure* closure, bool do_metadata);
+  static void stack_chunk_iterate_stack_bounded(oop obj, OopClosure* closure, bool do_metadata, MemRegion mr);
 
 #ifdef ASSERT
 public:

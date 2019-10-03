@@ -24,6 +24,8 @@
 
 #include "precompiled.hpp"
 #include "code/codeCache.hpp"
+#include "gc/g1/g1BarrierSet.hpp"
+#include "gc/g1/g1BarrierSetNMethod.hpp"
 #include "gc/g1/g1CollectedHeap.hpp"
 #include "gc/g1/g1FullCollector.hpp"
 #include "gc/g1/g1FullGCAdjustTask.hpp"
@@ -172,6 +174,9 @@ void G1FullCollector::collect() {
   phase3_adjust_pointers();
 
   phase4_do_compaction();
+
+  CodeCache::increment_marking_cycle();
+  ((G1BarrierSetNMethod*)BarrierSet::barrier_set()->barrier_set_nmethod())->arm_all_nmethods();
 }
 
 void G1FullCollector::complete_collection() {

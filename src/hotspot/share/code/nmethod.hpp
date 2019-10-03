@@ -73,6 +73,8 @@ class nmethod : public CompiledMethod {
   int       _entry_bci;        // != InvocationEntryBci if this nmethod is an on-stack replacement method
   jmethodID _jmethod_id;       // Cache of method()->jmethod_id()
 
+  uint64_t  _marking_cycle;
+
   // To support simple linked-list chaining of nmethods:
   nmethod*  _osr_link;         // from InstanceKlass::osr_nmethods_head
 
@@ -598,7 +600,7 @@ public:
  public:
   void oops_do_keepalive(OopClosure* f, bool keepalive) { oops_do(f, false, false, keepalive); }
   void oops_do(OopClosure* f) { oops_do(f, false, false); }
-  void oops_do(OopClosure* f, bool allow_dead, bool allow_null = false, bool shadow_is_strong = false);
+  void oops_do(OopClosure* f, bool allow_dead, bool allow_null = false, bool keepalive_is_strong = false);
 
   // All-in-one claiming of nmethods: returns true if the caller successfully claimed that
   // nmethod.

@@ -26,6 +26,7 @@
 #include "classfile/classLoaderDataGraph.hpp"
 #include "code/codeCache.hpp"
 #include "gc/g1/g1BarrierSet.hpp"
+#include "gc/g1/g1BarrierSetNMethod.hpp"
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "gc/g1/g1CollectorState.hpp"
 #include "gc/g1/g1ConcurrentMark.inline.hpp"
@@ -1239,6 +1240,8 @@ void G1ConcurrentMark::remark() {
   _remark_times.add((now - start) * 1000.0);
 
   policy->record_concurrent_mark_remark_end();
+  CodeCache::increment_marking_cycle();
+  ((G1BarrierSetNMethod*)BarrierSet::barrier_set()->barrier_set_nmethod())->arm_all_nmethods();
 }
 
 class G1ReclaimEmptyRegionsTask : public AbstractGangTask {

@@ -35,11 +35,12 @@ protected:
   ModRefBarrierSet(BarrierSetAssembler* barrier_set_assembler,
                    BarrierSetC1* barrier_set_c1,
                    BarrierSetC2* barrier_set_c2,
+                   BarrierSetNMethod* barrier_set_nmethod,
                    const BarrierSet::FakeRtti& fake_rtti)
     : BarrierSet(barrier_set_assembler,
                  barrier_set_c1,
                  barrier_set_c2,
-                 NULL /* barrier_set_nmethod */,
+                 barrier_set_nmethod,
                  fake_rtti.add_tag(BarrierSet::ModRef)) { }
   ~ModRefBarrierSet() { }
 
