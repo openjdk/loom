@@ -37,5 +37,8 @@ run_benchmark() {
 	echo
 }
 
-run_benchmark justYield    5 10 15 20 25 30
-run_benchmark justContinue 105 110 112 115 120 125 130
+run_benchmark baseline 1000
+run_benchmark yieldAndContinue 1000
+
+# run_benchmark justYield    5 10 15 20 25 30
+# run_benchmark justContinue 105 110 112 115 120 125 130
