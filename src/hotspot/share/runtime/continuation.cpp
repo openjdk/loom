@@ -70,6 +70,8 @@ static bool is_young(oop obj) {
   return G1CollectedHeap::heap()->heap_region_containing(obj)->is_young();
 }
 
+#define SENDER_SP_RET_ADDRESS_OFFSET (frame::sender_sp_offset + frame::return_addr_offset)
+
 static void fix_stack_chunk(oop chunk);
 
 // #define PERFTEST 1
@@ -2085,7 +2087,6 @@ public:
     assert (saved_sp != NULL || top_stack_argsize() == 0, "");
     int argsize = saved_sp == 0 ? 0 : saved_sp - _cont.entrySP(); // in words
     assert (argsize == top_stack_argsize(), "argsize: %d top_stack_argsize(): %d saved_sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, argsize, top_stack_argsize(), p2i(saved_sp), p2i(_cont.entrySP()));
-    // int argsize = 0; // TODO R XXXXXX !!!!!!
     if (argsize != 0) {
       assert (argsize > 0, "");
       bottom += argsize;
@@ -2098,39 +2099,14 @@ public:
     assert (size > 0, "");
 
     int sp;
-    address pc = NULL;
+    address pc;
     bool allocated;
     // TODO The second disjunct means we don't squash old chunks, but let them be (Rickard's idea)
     if (chunk == NULL || !is_young(chunk) || (is_young(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
-      log_develop_trace(jvmcont)("freeze_young allocating new chunk");
-      chunk = _cont.allocate_stack_chunk(size);
-      if (chunk == NULL) { // OOM
-        guarantee(false, "Unhandled OOM");
-      }
-      assert (jdk_internal_misc_StackChunk::size(chunk) == size, "");
-      assert (chunk->size() >= size, "");
-
+      chunk = allocate_chunk(size);
       allocated = true;
-
-      oop chunk0 = _cont.tail();
-      if (chunk0 != (oop)NULL && ContMirror::is_empty_chunk(chunk0)) {
-        chunk0 = jdk_internal_misc_StackChunk::parent(chunk0);
-        assert (chunk0 == (oop)NULL || !ContMirror::is_empty_chunk(chunk0), "");
-      }
-
-      sp = size + metadata;
-      jdk_internal_misc_StackChunk::set_sp(chunk, sp);
-      jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, NULL); // field is uninitialized
-      jdk_internal_misc_StackChunk::set_parent(chunk, chunk0); // field is uninitialized
-      // jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, chunk0); // field is uninitialized
-      jdk_internal_misc_StackChunk::set_safepoint(chunk, 0);
-      jdk_internal_misc_StackChunk::set_argsize(chunk, 0); // TODO PERF unnecessary?
-      jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
-      jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
-      
-      // TODO Erik says: promote young chunks quickly
-      chunk->set_mark(chunk->mark().set_age(15));
-
+      sp = jdk_internal_misc_StackChunk::sp(chunk);
+      pc = NULL;
       assert (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL || ContMirror::is_stack_chunk(jdk_internal_misc_StackChunk::parent(chunk)), "");
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
       // They'll then be stored twice: in the chunk and in the parent
@@ -2145,18 +2121,16 @@ public:
     } else {
       // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
       // if (!is_young(chunk)) {
-      //   // tty->print_cr(">>> freeze_young old:"); print_chunk(chunk, _cont.mirror(), false);
       //   log_develop_trace(jvmcont)("Young chunk: found old chunk");
       //   assert(_cont.chunk_invariant(), "");
       //   return false;
       // }
       allocated = false;
       sp = jdk_internal_misc_StackChunk::sp(chunk);
-      pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - 1);
+      pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - SENDER_SP_RET_ADDRESS_OFFSET);
       sp += argsize;
       assert (sp < jdk_internal_misc_StackChunk::size(chunk), "");
-      jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
-      jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
+      reset_chunk_counters(chunk);
     }
     
     NoSafepointVerifier nsv;
@@ -2177,9 +2151,12 @@ public:
       to   -= metadata;
     }
     int sizeb = size << LogBytesPerWord;
+    
     log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + sizeb), sizeb);
     log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + sizeb), sizeb);
+    
     memcpy(to, from, sizeb);
+
     assert ((address)to >= (address)InstanceStackChunkKlass::start_of_stack(chunk), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(InstanceStackChunkKlass::start_of_stack(chunk)));
     assert ((address)to + sizeb <= (address)(InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)), 
       "to + size: " INTPTR_FORMAT " end: " INTPTR_FORMAT, p2i((address)to + sizeb), p2i(InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)));
@@ -2188,7 +2165,7 @@ public:
       intptr_t* bottom_sp = chunk_top + size - argsize;
       assert ((address)bottom_sp >= (address)InstanceStackChunkKlass::start_of_stack(chunk), "");
       assert (pc != NULL, "");
-      *(address*)(bottom_sp - 1) = pc;
+      *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
     }
     DEBUG_ONLY(int orig_sp = jdk_internal_misc_StackChunk::sp(chunk);)
     jdk_internal_misc_StackChunk::set_sp(chunk, sp);
@@ -2229,6 +2206,40 @@ public:
     }
 
     return true;
+  }
+
+  oop allocate_chunk(int size) {
+    log_develop_trace(jvmcont)("freeze_young allocating new chunk");
+    oop chunk = _cont.allocate_stack_chunk(size);
+    if (chunk == NULL) { // OOM
+      guarantee(false, "Unhandled OOM");
+    }
+    assert (jdk_internal_misc_StackChunk::size(chunk) == size, "");
+    assert (chunk->size() >= size, "");
+
+    oop chunk0 = _cont.tail();
+    if (chunk0 != (oop)NULL && ContMirror::is_empty_chunk(chunk0)) {
+      chunk0 = jdk_internal_misc_StackChunk::parent(chunk0);
+      assert (chunk0 == (oop)NULL || !ContMirror::is_empty_chunk(chunk0), "");
+    }
+
+    int sp = size + frame::sender_sp_offset;
+    jdk_internal_misc_StackChunk::set_sp(chunk, sp);
+    jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, NULL); // field is uninitialized
+    jdk_internal_misc_StackChunk::set_parent(chunk, chunk0); // field is uninitialized
+    // jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, chunk0); // field is uninitialized
+    jdk_internal_misc_StackChunk::set_safepoint(chunk, 0);
+    jdk_internal_misc_StackChunk::set_argsize(chunk, 0); // TODO PERF unnecessary?
+    reset_chunk_counters(chunk);
+    
+    // TODO Erik says: promote young chunks quickly
+    chunk->set_mark(chunk->mark().set_age(15));
+    return chunk;
+  }
+
+  void reset_chunk_counters(oop chunk) {
+    jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
+    jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
   }
 
 #ifdef ASSERT
@@ -3377,7 +3388,7 @@ public:
     assert (num_frames > 0, "");
 
     static const int metadata = 2; // return address + link
-    static const int threshold = 100; // words
+    static const int threshold = 1000; // words
 
     // tty->print_cr(">>> thaw_chunk:"); print_chunk(chunk, _cont.mirror(), false);
     log_develop_trace(jvmcont)("thaw_chunk");
