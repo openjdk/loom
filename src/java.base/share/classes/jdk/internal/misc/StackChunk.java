@@ -33,7 +33,7 @@ public class StackChunk {
 
      private int numFrames;
      private int numOops;
-     private long safepoint;
+     private boolean mode;
      
      // the stack itself is appended here by the VM
  }

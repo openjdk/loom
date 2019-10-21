@@ -1144,9 +1144,8 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
   int num_frames = 0;
   int num_oops = 0;
 
-  bool first_safepoint_visit = SafepointSynchronize::is_at_safepoint() 
-                                && jdk_internal_misc_StackChunk::safepoint(chunk) == 0;
-  assert (!SafepointSynchronize::is_at_safepoint() || first_safepoint_visit || jdk_internal_misc_StackChunk::safepoint(chunk) != 0, "");
+  bool first_safepoint_visit = SafepointSynchronize::is_at_safepoint() && !jdk_internal_misc_StackChunk::gc_mode(chunk);
+  assert (!SafepointSynchronize::is_at_safepoint() || first_safepoint_visit || jdk_internal_misc_StackChunk::gc_mode(chunk), "");
 
   CodeBlob* cb = NULL;
   intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
@@ -1234,11 +1233,9 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
     jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
   }
   if (first_safepoint_visit) {
-    jdk_internal_misc_StackChunk::set_safepoint(chunk, SafepointSynchronize::safepoint_id());
-    assert (jdk_internal_misc_StackChunk::safepoint(chunk) != 0, "");
+    jdk_internal_misc_StackChunk::set_gc_mode(chunk, true);
   }
-  assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::safepoint(chunk) != 0,
-    "jdk_internal_misc_StackChunk::safepoint(chunk): %llu SafepointSynchronize::safepoint_id(): %llu", jdk_internal_misc_StackChunk::safepoint(chunk), SafepointSynchronize::safepoint_id());
+  assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
 
   if (closure != NULL) {
     EventContinuationIterateOops e;
@@ -1260,7 +1257,7 @@ static void fix_stack_chunk(oop chunk) {
   // see sender_for_compiled_frame  
   assert (ContMirror::is_stack_chunk(chunk), "");
   assert (!SafepointSynchronize::is_at_safepoint(), "");
-  if (jdk_internal_misc_StackChunk::safepoint(chunk) == 0) {
+  if (!jdk_internal_misc_StackChunk::gc_mode(chunk)) {
     return;
   }
   log_develop_trace(jvmcont)("fix_stack_chunk young: %d", is_young(chunk));
@@ -1316,7 +1313,7 @@ static void fix_stack_chunk(oop chunk) {
   jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
   jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
 
-  jdk_internal_misc_StackChunk::set_safepoint(chunk, 0);
+  jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
   assert(Continuation::debug_verify_stack_chunk(chunk), "");
 
   EventContinuationFix e;
@@ -1399,7 +1396,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
   assert (ContMirror::is_stack_chunk(chunk), "");
   assert (oopDesc::is_oop_or_null(jdk_internal_misc_StackChunk::parent(chunk)), "");
   
-  const bool gc_mode = jdk_internal_misc_StackChunk::safepoint(chunk) != 0;
+  const bool gc_mode = jdk_internal_misc_StackChunk::gc_mode(chunk);
   const bool concurrent = !SafepointSynchronize::is_at_safepoint() && !Thread::current()->is_Java_thread();
 
   // const bool narrow = UseCompressedOops;
@@ -1472,7 +1469,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
           assert (oopDesc::is_oop(base), "");
           intptr_t offset = gc_mode ? *(intptr_t*)derived_loc
                                     : cast_from_oop<intptr_t>(*(oop*)derived_loc) - cast_from_oop<intptr_t>(base);
-          assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld " INTPTR_FORMAT " size: %d gc_mode: %d safepoint: %d derived_loc: " INTPTR_FORMAT " chunk safepoint: %llu current safepoint: %llu", offset, offset, base->size() << LogHeapWordSize, gc_mode, SafepointSynchronize::is_at_safepoint(), p2i(derived_loc), jdk_internal_misc_StackChunk::safepoint(chunk), SafepointSynchronize::safepoint_id());
+          assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld " INTPTR_FORMAT " size: %d gc_mode: %d safepoint: %d derived_loc: " INTPTR_FORMAT , offset, offset, base->size() << LogHeapWordSize, gc_mode, SafepointSynchronize::is_at_safepoint(), p2i(derived_loc));
         } else {
           assert (*(oop*)derived_loc == (oop)NULL, "");
         }
