@@ -1162,7 +1162,6 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
     const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
     assert (oopmap != NULL, "");
     log_develop_trace(jvmcont)("stack_chunk_iterate_stack slot: %d codeblob:", slot);
-
     if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
     assert (cb->is_nmethod(), "");
     assert (cb->frame_size() > 0, "");
@@ -1393,6 +1392,7 @@ void Thaw<ConfigT, mode>::maybe_deoptimize_frames_in_chunk(oop chunk) {
 #ifdef ASSERT
 bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
   assert (oopDesc::is_oop(chunk), "");
+  log_develop_trace(jvmcont)("debug_verify_stack_chunk young: %d", is_young(chunk));
   assert (ContMirror::is_stack_chunk(chunk), "");
   assert (oopDesc::is_oop_or_null(jdk_internal_misc_StackChunk::parent(chunk)), "");
   
@@ -1410,10 +1410,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
   for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
     // assert (is_young(chunk) || num_frames <= jdk_internal_misc_StackChunk::numFrames(chunk), "");
     address pc = *(address*)(sp - 1);
-    if (pc == NULL) {
-      tty->print_cr(">>> oops");
-      print_chunk(chunk, cont, false);
-    }
+    log_develop_trace(jvmcont)("debug_verify_stack_chunk sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
     assert (pc != NULL, 
       "young: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT, 
       is_young(chunk), jdk_internal_misc_StackChunk::numFrames(chunk), num_frames, p2i(sp), p2i(start), p2i(end));
@@ -1421,7 +1418,8 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
     int slot;
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
     assert (cb != NULL, "");
-    // if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
+    log_develop_trace(jvmcont)("debug_verify_stack_chunk slot: %d codeblob:", slot);
+    if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
     assert (cb->is_nmethod(), "");
     assert (cb->frame_size() > 0, "");
     
@@ -1446,11 +1444,14 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
       assert ((intptr_t*)p >= start, "");
       if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
 
+      log_develop_trace(jvmcont)("debug_verify_stack_chunk narrow: %d reg: %d p: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, omv.reg()->is_reg(), p2i(p));
       assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
       assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
       
       oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)RawAccess<>::oop_load((narrowOop*)p) : (oop)RawAccess<>::oop_load((oop*)p);
-      assert (oopDesc::is_oop_or_null(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
+      if (!SafepointSynchronize::is_at_safepoint()) {
+        assert (oopDesc::is_oop_or_null(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
+      }
     }
     assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
 
@@ -1461,6 +1462,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
         void* derived_loc = reg_to_loc(omv.reg(), sp);
         assert (is_in_frame(cb, sp, base_loc), "");
         assert (is_in_frame(cb, sp, derived_loc), "");
+        log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
         oop base = (oop)RawAccess<>::oop_load((oop*)base_loc);
         assert (oopDesc::is_oop_or_null(base), "not an oop");
         assert (Universe::heap()->is_in_or_null(base), "not an oop");

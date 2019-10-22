@@ -639,14 +639,15 @@ public:
   static inline void relativize(intptr_t* const fp, intptr_t* const hfp, int offset);
   static inline void derelativize(intptr_t* const fp, int offset);
 
-  static bool is_stack_chunk(oop obj);
   bool is_in_stack(void* p) const;
   bool is_in_ref_stack(void* p) const;
   bool is_empty();
 
+  static bool is_stack_chunk(oop obj);
   static bool is_empty_chunk(oop chunk);
   static bool is_in_chunk(oop chunk, void* p);
   static bool is_usable_in_chunk(oop chunk, void* p);
+  static void reset_chunk_counters(oop chunk);
   oop find_chunk(void* p) const;
 
   template<op_mode mode> const hframe last_frame();
@@ -1137,6 +1138,11 @@ bool ContMirror::is_usable_in_chunk(oop chunk, void* p) {
   HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
   HeapWord* end = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
   return (HeapWord*)p >= start && (HeapWord*)p < end;
+}
+
+void ContMirror::reset_chunk_counters(oop chunk) {
+  jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
+  jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
 }
 
 oop ContMirror::find_chunk(void* p) const {
@@ -2044,7 +2050,7 @@ public:
     _fi = fi;
 
     if (ConfigT::has_young && mode == mode_fast) {
-      if (freeze_young()) {
+      if (freeze_chunk()) {
         return freeze_ok;
       }
       EventContinuationFreezeOld e;
@@ -2067,12 +2073,12 @@ public:
     return freeze<true>(f, caller, 0);
   }
 
-  bool freeze_young() {
+  bool freeze_chunk() {
     assert (ConfigT::has_young, "");
     assert (_thread != NULL, "");
     assert(_cont.chunk_invariant(), "");
 
-    log_develop_trace(jvmcont)("freeze_young");
+    log_develop_trace(jvmcont)("freeze_chunk");
     assert (mode == mode_fast, "");
 
     oop chunk = _cont.tail();
@@ -2080,12 +2086,7 @@ public:
     intptr_t* const top = _fi->sp;
     intptr_t* bottom = _cont.entrySP();
 
-    // _thread->cont_frame()->sp when we thaw, we put the sp in _thread->cont_frame()->sp; subsequent return barriers may thaw single frames with their stack-passed arguments.
-    // this value helps pop those stack-passed arguments.
-    intptr_t* saved_sp = _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
-    assert (saved_sp != NULL || top_stack_argsize() == 0, "");
-    int argsize = saved_sp == 0 ? 0 : saved_sp - _cont.entrySP(); // in words
-    assert (argsize == top_stack_argsize(), "argsize: %d top_stack_argsize(): %d saved_sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, argsize, top_stack_argsize(), p2i(saved_sp), p2i(_cont.entrySP()));
+    int argsize = bottom_argsize();
     if (argsize != 0) {
       assert (argsize > 0, "");
       bottom += argsize;
@@ -2094,11 +2095,12 @@ public:
     }
 
     int size = bottom - top; // in words
-    log_develop_trace(jvmcont)("freeze_young size: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT, size, p2i(top), p2i(bottom));
+    log_develop_trace(jvmcont)("freeze_chunk size: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT, size, p2i(top), p2i(bottom));
     assert (size > 0, "");
 
     int sp;
     address pc;
+    intptr_t* fp;
     bool allocated;
     // TODO The second disjunct means we don't squash old chunks, but let them be (Rickard's idea)
     if (chunk == NULL || !is_young(chunk) || (is_young(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
@@ -2106,6 +2108,7 @@ public:
       allocated = true;
       sp = jdk_internal_misc_StackChunk::sp(chunk);
       pc = NULL;
+      fp = NULL;
       assert (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL || ContMirror::is_stack_chunk(jdk_internal_misc_StackChunk::parent(chunk)), "");
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
       // They'll then be stored twice: in the chunk and in the parent
@@ -2127,9 +2130,10 @@ public:
       allocated = false;
       sp = jdk_internal_misc_StackChunk::sp(chunk);
       pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - SENDER_SP_RET_ADDRESS_OFFSET);
+      // fp = *(intptr_t**)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - frame::sender_sp_offset); -- necessary?
       sp += argsize;
       assert (sp < jdk_internal_misc_StackChunk::size(chunk), "");
-      reset_chunk_counters(chunk);
+      ContMirror::reset_chunk_counters(chunk);
     }
     
     NoSafepointVerifier nsv;
@@ -2138,11 +2142,15 @@ public:
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
 
     // copy; no need to patch because of how we handle return address and link
-    log_develop_trace(jvmcont)("freeze_young start: chunk " INTPTR_FORMAT " size: %d orig sp: %d", p2i((oopDesc*)chunk), jdk_internal_misc_StackChunk::size(chunk), sp);
+    log_develop_trace(jvmcont)("freeze_chunk start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d", p2i((oopDesc*)chunk), jdk_internal_misc_StackChunk::size(chunk), sp, argsize);
     sp -= size;
+    assert (size == (jdk_internal_misc_StackChunk::sp(chunk) - sp), "size: %d used chunk size: %d", size, (jdk_internal_misc_StackChunk::sp(chunk) - sp));
+    jdk_internal_misc_StackChunk::set_sp(chunk, sp);
+    jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
+
     // we copy the top frame's return address and link, but not the bottom's
     intptr_t* chunk_top = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp;
-    log_develop_trace(jvmcont)("freeze_young start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT, p2i(InstanceStackChunkKlass::start_of_stack(chunk)), sp, p2i(chunk_top));
+    log_develop_trace(jvmcont)("freeze_chunk start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT, p2i(InstanceStackChunkKlass::start_of_stack(chunk)), sp, p2i(chunk_top));
     intptr_t* from = top;
     intptr_t* to   = chunk_top;
     if (LIKELY(argsize == 0)) {
@@ -2151,16 +2159,15 @@ public:
     }
     copy_to_chunk(from, to, size, chunk);
     
-    if (argsize != 0) { // patch pc
+    if (argsize != 0) { // patch pc + fp
+      log_develop_trace(jvmcont)("freeze_chunk patch");
       intptr_t* bottom_sp = chunk_top + size - argsize;
       assert ((address)bottom_sp >= (address)InstanceStackChunkKlass::start_of_stack(chunk), "");
       assert (pc != NULL, "");
       *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
+      // *(intptr_t**)(bottom_sp - frame::sender_sp_offset) = fp; -- necessary ?
     }
-    DEBUG_ONLY(int orig_sp = jdk_internal_misc_StackChunk::sp(chunk);)
-    jdk_internal_misc_StackChunk::set_sp(chunk, sp);
-    jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
-    assert (size == (orig_sp - jdk_internal_misc_StackChunk::sp(chunk)), "size: %d used chunk size: %d", size, (orig_sp - jdk_internal_misc_StackChunk::sp(chunk)));
+
     _cont.set_tail(chunk);
     _cont.add_size(size << LogBytesPerWord);
     log_develop_trace(jvmcont)("Young chunk success");
@@ -2168,9 +2175,9 @@ public:
 
     setup_chunk_jump(bottom);
 
-    log_develop_trace(jvmcont)("FREEZE YOUNG %d #" INTPTR_FORMAT,  _cont.stack_length(), _cont.hash());
+    log_develop_trace(jvmcont)("FREEZE CHUNK %d #" INTPTR_FORMAT, _cont.stack_length(), _cont.hash());
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
-    assert(_cont.chunk_invariant(), "");
+    assert (_cont.chunk_invariant(), "");
     assert (Continuation::debug_verify_stack_chunk(chunk), "");
     
     EventContinuationFreezeYoung e;
@@ -2184,8 +2191,17 @@ public:
     return true;
   }
 
+  int bottom_argsize() {
+    // _thread->cont_frame()->sp when we thaw, we put the sp in _thread->cont_frame()->sp; subsequent return barriers may thaw single frames with their stack-passed arguments.
+    // this value helps pop those stack-passed arguments.
+    intptr_t* saved_sp = _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
+    assert (saved_sp != NULL || top_stack_argsize() == 0, "");
+    int argsize = saved_sp == 0 ? 0 : saved_sp - _cont.entrySP(); // in words
+    assert (argsize == top_stack_argsize(), "argsize: %d top_stack_argsize(): %d saved_sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, argsize, top_stack_argsize(), p2i(saved_sp), p2i(_cont.entrySP()));
+    return argsize;
+  }
   oop allocate_chunk(int size) {
-    log_develop_trace(jvmcont)("freeze_young allocating new chunk");
+    log_develop_trace(jvmcont)("allocate_chunk allocating new chunk");
     oop chunk = _cont.allocate_stack_chunk(size);
     if (chunk == NULL) { // OOM
       guarantee(false, "Unhandled OOM");
@@ -2206,16 +2222,11 @@ public:
     // jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, chunk0); // field is uninitialized
     jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
     jdk_internal_misc_StackChunk::set_argsize(chunk, 0); // TODO PERF unnecessary?
-    reset_chunk_counters(chunk);
+    ContMirror::reset_chunk_counters(chunk);
     
     // TODO Erik says: promote young chunks quickly
     chunk->set_mark(chunk->mark().set_age(15));
     return chunk;
-  }
-
-  void reset_chunk_counters(oop chunk) {
-    jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
-    jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
   }
 
   void copy_to_chunk(intptr_t* from, intptr_t* to, int size, oop chunk) {
@@ -2354,8 +2365,7 @@ public:
     assert (res == freeze_ok, "");
 
     jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset);
-    jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
-    jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
+    ContMirror::reset_chunk_counters(chunk);
   }
 
   int remaining_in_chunk(oop chunk) {
@@ -3403,8 +3413,7 @@ public:
     fix_stack_chunk(chunk);
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
     if (young) {
-      jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
-      jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
+      ContMirror::reset_chunk_counters(chunk);
     }
 
     if (ContMirror::is_empty_chunk(chunk)) {
