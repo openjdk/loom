@@ -1071,7 +1071,6 @@ static oop create_initial_thread(Handle thread_group, JavaThread* thread,
   // constructor calls Thread.current(), which must be set here for the
   // initial thread.
   java_lang_Thread::set_thread(thread_oop(), thread);
-  java_lang_Thread::set_priority(thread_oop(), NormPriority);
   thread->set_threadObj(thread_oop());
 
   Handle string = java_lang_String::create_from_str("main", CHECK_NULL);
@@ -1084,6 +1083,8 @@ static oop create_initial_thread(Handle thread_group, JavaThread* thread,
                           thread_group,
                           string,
                           CHECK_NULL);
+  // initial thread is Thread.NORM_PRIORITY
+  os::set_priority(thread, NormPriority);
   return thread_oop();
 }
 
@@ -1159,7 +1160,6 @@ void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name
   // We cannot use JavaCalls::construct_new_instance because the java.lang.Thread
   // constructor calls Thread.current(), which must be set here.
   java_lang_Thread::set_thread(thread_oop(), this);
-  java_lang_Thread::set_priority(thread_oop(), NormPriority);
   set_threadObj(thread_oop());
 
   JavaValue result(T_VOID);
@@ -1186,7 +1186,7 @@ void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name
                             Handle(),
                             THREAD);
   }
-
+  os::set_priority(this, NormPriority);
 
   if (daemon) {
     java_lang_Thread::set_daemon(thread_oop());

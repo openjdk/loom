@@ -65,10 +65,8 @@ public class FiberTest {
     };
 
     public static void test1() throws Exception {
-        try (var scope = FiberScope.open()) {
-            scope.schedule(PRODUCER);
-            scope.schedule(CONSUMER);
-        }
+        Thread.newLightWeightThread(0, PRODUCER).start();
+        Thread.newLightWeightThread(0, CONSUMER).start();
     }
 
     void runTest() throws Exception {

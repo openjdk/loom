@@ -1603,39 +1603,97 @@ void java_lang_Class::set_classRedefinedCount(oop the_class_mirror, int value) {
 //
 // Note: The stackSize field is only present starting in 1.4.
 
+int java_lang_Thread_FieldHolder::_group_offset = 0;
+int java_lang_Thread_FieldHolder::_priority_offset = 0;
+int java_lang_Thread_FieldHolder::_stackSize_offset = 0;
+int java_lang_Thread_FieldHolder::_stillborn_offset = 0;
+int java_lang_Thread_FieldHolder::_daemon_offset = 0;
+int java_lang_Thread_FieldHolder::_thread_status_offset = 0;
+
+#define THREAD_FIELD_HOLDER_FIELDS_DO(macro) \
+  macro(_group_offset,         k, vmSymbols::group_name(), threadgroup_signature, false); \
+  macro(_priority_offset,      k, vmSymbols::priority_name(), int_signature, false); \
+  macro(_stackSize_offset,     k, "stackSize", long_signature, false); \
+  macro(_stillborn_offset,     k, "stillborn", bool_signature, false); \
+  macro(_daemon_offset,        k, vmSymbols::daemon_name(), bool_signature, false); \
+  macro(_thread_status_offset, k, "threadStatus", int_signature, false)
+
+void java_lang_Thread_FieldHolder::compute_offsets() {
+  assert(_group_offset == 0, "offsets should be initialized only once");
+
+  InstanceKlass* k = SystemDictionary::Thread_FieldHolder_klass();
+  THREAD_FIELD_HOLDER_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+}
+
+#if INCLUDE_CDS
+void java_lang_Thread_FieldHolder::serialize_offsets(SerializeClosure* f) {
+  THREAD_FIELD_HOLDER_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+}
+#endif
+
+oop java_lang_Thread_FieldHolder::threadGroup(oop holder) {
+  return holder->obj_field(_group_offset);
+}
+
+ThreadPriority java_lang_Thread_FieldHolder::priority(oop holder) {
+  return (ThreadPriority)holder->int_field(_priority_offset);
+}
+
+void java_lang_Thread_FieldHolder::set_priority(oop holder, ThreadPriority priority) {
+  holder->int_field_put(_priority_offset, priority);
+}
+
+jlong java_lang_Thread_FieldHolder::stackSize(oop holder) {
+  return holder->long_field(_stackSize_offset);
+}
+
+bool java_lang_Thread_FieldHolder::is_stillborn(oop holder) {
+  return holder->bool_field(_stillborn_offset) != 0;
+}
+
+void java_lang_Thread_FieldHolder::set_stillborn(oop holder) {
+  holder->bool_field_put(_stillborn_offset, true);
+}
+
+bool java_lang_Thread_FieldHolder::is_daemon(oop holder) {
+  return holder->bool_field(_daemon_offset) != 0;
+}
+
+void java_lang_Thread_FieldHolder::set_daemon(oop holder) {
+  holder->bool_field_put(_daemon_offset, true);
+}
+
+void java_lang_Thread_FieldHolder::set_thread_status(oop holder, java_lang_Thread::ThreadStatus status) {
+  holder->int_field_put(_thread_status_offset, status);
+}
+
+java_lang_Thread::ThreadStatus java_lang_Thread_FieldHolder::get_thread_status(oop holder) {
+  return (java_lang_Thread::ThreadStatus)holder->int_field(_thread_status_offset);
+}
+
+int java_lang_Thread::_holder_offset = 0;
 int java_lang_Thread::_name_offset = 0;
-int java_lang_Thread::_group_offset = 0;
 int java_lang_Thread::_contextClassLoader_offset = 0;
 int java_lang_Thread::_inheritedAccessControlContext_offset = 0;
-int java_lang_Thread::_priority_offset = 0;
 int java_lang_Thread::_eetop_offset = 0;
-int java_lang_Thread::_daemon_offset = 0;
-int java_lang_Thread::_stillborn_offset = 0;
-int java_lang_Thread::_stackSize_offset = 0;
 int java_lang_Thread::_tid_offset = 0;
 int java_lang_Thread::_continuation_offset = 0;
 int java_lang_Thread::_fiber_offset = 0 ;
-int java_lang_Thread::_thread_status_offset = 0;
 int java_lang_Thread::_park_blocker_offset = 0;
 
 #define THREAD_FIELDS_DO(macro) \
+  macro(_holder_offset,        k, "holder", thread_fieldholder_signature, false); \
   macro(_name_offset,          k, vmSymbols::name_name(), string_signature, false); \
-  macro(_group_offset,         k, vmSymbols::group_name(), threadgroup_signature, false); \
   macro(_contextClassLoader_offset, k, vmSymbols::contextClassLoader_name(), classloader_signature, false); \
   macro(_inheritedAccessControlContext_offset, k, vmSymbols::inheritedAccessControlContext_name(), accesscontrolcontext_signature, false); \
-  macro(_priority_offset,      k, vmSymbols::priority_name(), int_signature, false); \
-  macro(_daemon_offset,        k, vmSymbols::daemon_name(), bool_signature, false); \
   macro(_eetop_offset,         k, "eetop", long_signature, false); \
-  macro(_stillborn_offset,     k, "stillborn", bool_signature, false); \
-  macro(_stackSize_offset,     k, "stackSize", long_signature, false); \
   macro(_tid_offset,           k, "tid", long_signature, false); \
-  macro(_thread_status_offset, k, "threadStatus", int_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
   macro(_fiber_offset,         k, "fiber", fiber_signature, false)
 
 void java_lang_Thread::compute_offsets() {
-  assert(_group_offset == 0, "offsets should be initialized only once");
+  assert(_holder_offset == 0, "offsets should be initialized only once");
 
   InstanceKlass* k = SystemDictionary::Thread_klass();
   THREAD_FIELDS_DO(FIELD_COMPUTE_OFFSET);
@@ -1656,6 +1714,9 @@ void java_lang_Thread::set_thread(oop java_thread, JavaThread* thread) {
   java_thread->address_field_put(_eetop_offset, (address)thread);
 }
 
+oop java_lang_Thread::holder(oop java_thread) {
+  return java_thread->obj_field(_holder_offset);
+}
 
 oop java_lang_Thread::name(oop java_thread) {
   return java_thread->obj_field(_name_offset);
@@ -1668,28 +1729,33 @@ void java_lang_Thread::set_name(oop java_thread, oop name) {
 
 
 ThreadPriority java_lang_Thread::priority(oop java_thread) {
-  return (ThreadPriority)java_thread->int_field(_priority_offset);
+  oop holder = java_lang_Thread::holder(java_thread);
+  return java_lang_Thread_FieldHolder::priority(holder);
 }
 
 
 void java_lang_Thread::set_priority(oop java_thread, ThreadPriority priority) {
-  java_thread->int_field_put(_priority_offset, priority);
+  oop holder = java_lang_Thread::holder(java_thread);
+  java_lang_Thread_FieldHolder::set_priority(holder, priority);
 }
 
 
 oop java_lang_Thread::threadGroup(oop java_thread) {
-  return java_thread->obj_field(_group_offset);
+  oop holder = java_lang_Thread::holder(java_thread);
+  return java_lang_Thread_FieldHolder::threadGroup(holder);
 }
 
 
 bool java_lang_Thread::is_stillborn(oop java_thread) {
-  return java_thread->bool_field(_stillborn_offset) != 0;
+  oop holder = java_lang_Thread::holder(java_thread);
+  return java_lang_Thread_FieldHolder::is_stillborn(holder);
 }
 
 
 // We never have reason to turn the stillborn bit off
 void java_lang_Thread::set_stillborn(oop java_thread) {
-  java_thread->bool_field_put(_stillborn_offset, true);
+  oop holder = java_lang_Thread::holder(java_thread);
+  java_lang_Thread_FieldHolder::set_stillborn(holder);
 }
 
 
@@ -1700,12 +1766,13 @@ bool java_lang_Thread::is_alive(oop java_thread) {
 
 
 bool java_lang_Thread::is_daemon(oop java_thread) {
-  return java_thread->bool_field(_daemon_offset) != 0;
+  oop holder = java_lang_Thread::holder(java_thread);
+  return java_lang_Thread_FieldHolder::is_daemon(holder);
 }
 
-
 void java_lang_Thread::set_daemon(oop java_thread) {
-  java_thread->bool_field_put(_daemon_offset, true);
+  oop holder = java_lang_Thread::holder(java_thread);
+  java_lang_Thread_FieldHolder::set_daemon(holder);
 }
 
 oop java_lang_Thread::context_class_loader(oop java_thread) {
@@ -1718,13 +1785,15 @@ oop java_lang_Thread::inherited_access_control_context(oop java_thread) {
 
 
 jlong java_lang_Thread::stackSize(oop java_thread) {
-  return java_thread->long_field(_stackSize_offset);
+  oop holder = java_lang_Thread::holder(java_thread);
+  return java_lang_Thread_FieldHolder::stackSize(holder);
 }
 
 // Write the thread status value to threadStatus field in java.lang.Thread java class.
 void java_lang_Thread::set_thread_status(oop java_thread,
                                          java_lang_Thread::ThreadStatus status) {
-  java_thread->int_field_put(_thread_status_offset, status);
+  oop holder = java_lang_Thread::holder(java_thread);
+  java_lang_Thread_FieldHolder::set_thread_status(holder, status);
 }
 
 // Read thread status value from threadStatus field in java.lang.Thread java class.
@@ -1734,7 +1803,8 @@ java_lang_Thread::ThreadStatus java_lang_Thread::get_thread_status(oop java_thre
   assert(Threads_lock->owned_by_self() || Thread::current()->is_VM_thread() ||
          JavaThread::current()->thread_state() == _thread_in_vm,
          "Java Thread is not running in vm");
-  return (java_lang_Thread::ThreadStatus)java_thread->int_field(_thread_status_offset);
+  oop holder = java_lang_Thread::holder(java_thread);
+  return java_lang_Thread_FieldHolder::get_thread_status(holder);
 }
 
 
@@ -1760,7 +1830,8 @@ oop java_lang_Thread::park_blocker(oop java_thread) {
 }
 
 const char* java_lang_Thread::thread_status_name(oop java_thread) {
-  ThreadStatus status = (java_lang_Thread::ThreadStatus)java_thread->int_field(_thread_status_offset);
+  oop holder = java_lang_Thread::holder(java_thread);
+  ThreadStatus status = java_lang_Thread_FieldHolder::get_thread_status(holder);
   switch (status) {
     case NEW                      : return "NEW";
     case RUNNABLE                 : return "RUNNABLE";
@@ -4522,7 +4593,7 @@ void java_nio_Buffer::serialize_offsets(SerializeClosure* f) {
 #endif
 
 #define AOS_FIELDS_DO(macro) \
-  macro(_owner_offset, k, "exclusiveOwner", object_signature, false)
+  macro(_owner_offset, k, "exclusiveOwnerThread", thread_signature, false)
 
 void java_util_concurrent_locks_AbstractOwnableSynchronizer::compute_offsets() {
   InstanceKlass* k = SystemDictionary::java_util_concurrent_locks_AbstractOwnableSynchronizer_klass();

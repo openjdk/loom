@@ -50,7 +50,7 @@ static JNINativeMethod methods[] = {
     {"yield0",           "()V",        (void *)&JVM_Yield},
     {"sleep0",           "(J)V",       (void *)&JVM_Sleep},
     {"currentThread0",   "()" THD,     (void *)&JVM_CurrentThread},
-    {"countStackFrames", "()I",        (void *)&JVM_CountStackFrames},
+    {"countStackFrames0","()I",        (void *)&JVM_CountStackFrames},
     {"interrupt0",       "()V",        (void *)&JVM_Interrupt},
     {"isInterrupted",    "(Z)Z",       (void *)&JVM_IsInterrupted},
     {"holdsLock",        "(" OBJ ")Z", (void *)&JVM_HoldsLock},

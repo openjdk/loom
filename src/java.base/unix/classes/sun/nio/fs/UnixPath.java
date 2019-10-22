@@ -33,6 +33,9 @@ import java.net.URI;
 import java.util.*;
 import java.lang.ref.SoftReference;
 
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
+
 import static sun.nio.fs.UnixNativeDispatcher.*;
 import static sun.nio.fs.UnixConstants.*;
 
@@ -41,6 +44,7 @@ import static sun.nio.fs.UnixConstants.*;
  */
 
 class UnixPath implements Path {
+    private static JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static ThreadLocal<SoftReference<CharsetEncoder>> encoder =
         new ThreadLocal<SoftReference<CharsetEncoder>>();
 
@@ -115,13 +119,13 @@ class UnixPath implements Path {
 
     // encodes the given path-string into a sequence of bytes
     private static byte[] encode(UnixFileSystem fs, String input) {
-        SoftReference<CharsetEncoder> ref = encoder.get();
+        SoftReference<CharsetEncoder> ref = JLA.getCarrierThreadLocal(encoder);
         CharsetEncoder ce = (ref != null) ? ref.get() : null;
         if (ce == null) {
             ce = Util.jnuEncoding().newEncoder()
                 .onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT);
-            encoder.set(new SoftReference<>(ce));
+            JLA.setCarrierThreadLocal(encoder, new SoftReference<>(ce));
         }
 
         char[] ca = fs.normalizeNativePath(input.toCharArray());

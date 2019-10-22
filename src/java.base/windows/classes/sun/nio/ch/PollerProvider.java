@@ -29,10 +29,6 @@ import java.io.IOException;
 class PollerProvider {
     private PollerProvider() { }
 
-    static boolean available() {
-        return true;
-    }
-
     static Poller readPoller() throws IOException {
         return new PollPoller(true);
     }

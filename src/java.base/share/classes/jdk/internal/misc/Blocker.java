@@ -47,7 +47,7 @@ public class Blocker {
 
     /**
      * Runs the given task with a ManagedBlocker when invoked in the context of
-     * a fiber and the carrier thread is a ForkJoinWorkerThread.
+     * a lightweight thread and the carrier thread is a ForkJoinWorkerThread.
      */
     public static <X extends Throwable> void run(BlockingRunnable<X> task) throws X {
         BlockingCallable<Void, X> wrapper = () -> {
@@ -59,11 +59,11 @@ public class Blocker {
 
     /**
      * Runs the given task with a ManagedBlocker when invoked in the context of
-     * a fiber and the carrier thread is a ForkJoinWorkerThread.
+     * a lightweight thread and the carrier thread is a ForkJoinWorkerThread.
      */
     public static <V, X extends Throwable> V run(BlockingCallable<V, X> task) throws X {
-        if (!(Strands.currentCarrierThread() instanceof ForkJoinWorkerThread)
-                || Fiber.current().isEmpty()) {
+        if (!(LightweightThreads.currentCarrierThread() instanceof ForkJoinWorkerThread)
+                || !Thread.currentThread().isLightweight()) {
             return task.call();
         }
 

@@ -77,8 +77,7 @@ public class Util {
      * for potential future-proofing.
      */
     private static long getMaxCachedBufferSize() {
-        String s = GetPropertyAction
-                .privilegedGetProperty("jdk.nio.maxCachedBufferSize");
+        String s = GetPropertyAction.privilegedGetProperty("jdk.nio.maxCachedBufferSize");
         if (s != null) {
             try {
                 long m = Long.parseLong(s);

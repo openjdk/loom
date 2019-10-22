@@ -28,15 +28,12 @@ package sun.nio.ch;
 
 // Signalling operations on native threads
 
-import jdk.internal.misc.Strands;
-
 class NativeThread {
-    private static final long FIBER_ID = -1L;
+    private static final long LIGHTWEIGHT_THREAD_ID = -1L;
 
     static long current() {
-        Object s = Strands.currentStrand();
-        if (s instanceof Fiber) {
-            return FIBER_ID;
+        if (Thread.currentThread().isLightweight()) {
+            return LIGHTWEIGHT_THREAD_ID;
         } else {
             return 0;
         }
@@ -50,8 +47,8 @@ class NativeThread {
         throw new UnsupportedOperationException();
     }
 
-    static boolean isFiber(long tid) {
-        return (tid == FIBER_ID);
+    static boolean isLightweightThread(long tid) {
+        return (tid == LIGHTWEIGHT_THREAD_ID);
     }
 
     static boolean isKernelThread(long tid) {

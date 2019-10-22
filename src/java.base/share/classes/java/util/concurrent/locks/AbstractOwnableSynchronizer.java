@@ -61,31 +61,7 @@ public abstract class AbstractOwnableSynchronizer
     /**
      * The current owner of exclusive mode synchronization.
      */
-    private transient Object exclusiveOwner;
-
-    /**
-     * Sets the strand that currently owns exclusive access.
-     * A {@code null} argument indicates that no strand owns access.
-     * This method does not otherwise impose any synchronization or
-     * {@code volatile} field accesses.
-     * @param owner the owner thread or fiber
-     */
-    protected final void setExclusiveOwner(Object owner) {
-        if (owner != null && !(owner instanceof Thread || owner instanceof Fiber))
-            throw new IllegalArgumentException();
-        exclusiveOwner = owner;
-    }
-
-    /**
-     * Returns the strand last set by {@code setExclusiveOwnerStrand}
-     * or {@code setExclusiveOwnerThread}, or {@code null} if never set.
-     * This method does not otherwise impose any synchronization or {@code
-     * volatile} field accesses.
-     * @return the owner thread
-     */
-    protected final Object getExclusiveOwner() {
-        return exclusiveOwner;
-    }
+    private transient Thread exclusiveOwnerThread;
 
     /**
      * Sets the thread that currently owns exclusive access.
@@ -95,7 +71,7 @@ public abstract class AbstractOwnableSynchronizer
      * @param thread the owner thread
      */
     protected final void setExclusiveOwnerThread(Thread thread) {
-        exclusiveOwner = thread;
+        exclusiveOwnerThread = thread;
     }
 
     /**
@@ -103,9 +79,8 @@ public abstract class AbstractOwnableSynchronizer
      * or {@code null} if never set.  This method does not otherwise
      * impose any synchronization or {@code volatile} field accesses.
      * @return the owner thread
-     * @throws ClassCastException if the synchronizer is owned by a Fiber
      */
     protected final Thread getExclusiveOwnerThread() {
-        return (Thread) exclusiveOwner;
+        return exclusiveOwnerThread;
     }
 }

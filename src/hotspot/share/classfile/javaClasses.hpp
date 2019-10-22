@@ -56,6 +56,7 @@
   f(java_lang_ClassLoader) \
   f(java_lang_Throwable) \
   f(java_lang_Thread) \
+  f(java_lang_Thread_FieldHolder) \
   f(java_lang_ThreadGroup) \
   f(java_lang_Fiber) \
   f(java_lang_AssertionStatusDirectives) \
@@ -362,19 +363,14 @@ class java_lang_Thread : AllStatic {
  private:
   // Note that for this class the layout changed between JDK1.2 and JDK1.3,
   // so we compute the offsets at startup rather than hard-wiring them.
+  static int _holder_offset;
   static int _name_offset;
-  static int _group_offset;
   static int _contextClassLoader_offset;
   static int _inheritedAccessControlContext_offset;
-  static int _priority_offset;
   static int _eetop_offset;
-  static int _daemon_offset;
-  static int _stillborn_offset;
-  static int _stackSize_offset;
   static int _tid_offset;
   static int _continuation_offset;
   static int _fiber_offset;
-  static int _thread_status_offset;
   static int _park_blocker_offset;
 
   static void compute_offsets();
@@ -388,6 +384,8 @@ class java_lang_Thread : AllStatic {
   static JavaThread* thread(oop java_thread);
   // Set JavaThread for instance
   static void set_thread(oop java_thread, JavaThread* thread);
+  // FieldHolder
+  static oop holder(oop java_thread);
   // Name
   static oop name(oop java_thread);
   static void set_name(oop java_thread, oop name);
@@ -461,6 +459,40 @@ class java_lang_Thread : AllStatic {
   static const char*  thread_status_name(oop java_thread_oop);
 
   // Debugging
+  friend class JavaClasses;
+};
+
+// Interface to java.lang.Thread$FieldHolder objects
+
+class java_lang_Thread_FieldHolder : AllStatic {
+ private:
+  static int _group_offset;
+  static int _priority_offset;
+  static int _stackSize_offset;
+  static int _stillborn_offset;
+  static int _daemon_offset;
+  static int _thread_status_offset;
+
+  static void compute_offsets();
+ public:
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+
+  static oop threadGroup(oop holder);
+
+  static ThreadPriority priority(oop holder);
+  static void set_priority(oop holder, ThreadPriority priority);
+
+  static jlong stackSize(oop holder);
+
+  static bool is_stillborn(oop holder);
+  static void set_stillborn(oop holder);
+
+  static bool is_daemon(oop holder);
+  static void set_daemon(oop holder);
+
+  static void set_thread_status(oop holder, java_lang_Thread::ThreadStatus status);
+  static java_lang_Thread::ThreadStatus get_thread_status(oop holder);
+
   friend class JavaClasses;
 };
 

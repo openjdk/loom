@@ -79,8 +79,7 @@ public class ForkJoinWorkerThread extends Thread {
     final ForkJoinPool.WorkQueue workQueue; // work-stealing mechanics
 
     /**
-     * Creates a ForkJoinWorkerThread operating in the given thread group and
-     * pool.
+     * Creates a ForkJoinWorkerThread operating in the given pool.
      *
      * @param group thread group, can be null
      * @param pool the pool this thread works in

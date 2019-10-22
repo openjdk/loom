@@ -124,7 +124,7 @@ class SinkChannelImpl
             if (!tryClose()) {
                 long th = thread;
                 if (th != 0) {
-                    if (NativeThread.isFiber(th))
+                    if (NativeThread.isLightweightThread(th))
                         Poller.stopPoll(fdVal);
                     nd.preClose(fd);
                     if (NativeThread.isKernelThread(th))

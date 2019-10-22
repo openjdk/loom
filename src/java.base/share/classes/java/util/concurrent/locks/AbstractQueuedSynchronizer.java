@@ -40,8 +40,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ForkJoinPool;
-
-import jdk.internal.misc.Strands;
 import jdk.internal.misc.Unsafe;
 
 /**
@@ -207,7 +205,7 @@ import jdk.internal.misc.Unsafe;
  *     public boolean tryAcquire(int acquires) {
  *       assert acquires == 1; // Otherwise unused
  *       if (compareAndSetState(0, 1)) {
- *         setExclusiveOwnerThread(Strands.currentStrand());
+ *         setExclusiveOwnerThread(Thread.currentThread());
  *         return true;
  *       }
  *       return false;
@@ -230,7 +228,7 @@ import jdk.internal.misc.Unsafe;
  *
  *     public boolean isHeldExclusively() {
  *       // a data race, but safe due to out-of-thin-air guarantees
- *       return getExclusiveOwnerThread() == Strands.currentStrand();
+ *       return getExclusiveOwnerThread() == Thread.currentThread();
  *     }
  *
  *     // Provides a Condition
@@ -455,7 +453,7 @@ public abstract class AbstractQueuedSynchronizer
     abstract static class Node {
         volatile Node prev;       // initially attached via casTail
         volatile Node next;       // visibly nonnull when signallable
-        Object waiter;            // visibly nonnull when enqueued
+        Thread waiter;            // visibly nonnull when enqueued
         volatile int status;      // written by owner, atomic bit ops by others
 
         // methods for atomic operations
@@ -500,7 +498,7 @@ public abstract class AbstractQueuedSynchronizer
          * untimed Condition waits, not timed versions.
          */
         public final boolean isReleasable() {
-            return status <= 1 || Strands.isInterrupted();
+            return status <= 1 || Thread.currentThread().isInterrupted();
         }
 
         public final boolean block() {
@@ -636,7 +634,7 @@ public abstract class AbstractQueuedSynchronizer
      */
     final int acquire(Node node, int arg, boolean shared,
                       boolean interruptible, boolean timed, long time) {
-        Object current = Strands.currentStrand();
+        Thread current = Thread.currentThread();
         byte spins = 0, postSpins = 0;   // retries upon unpark of first thread
         boolean interrupted = false, first = false;
         Node pred = null;                // predecessor of node when enqueued
@@ -684,7 +682,7 @@ public abstract class AbstractQueuedSynchronizer
                         if (shared)
                             signalNextIfShared(node);
                         if (interrupted)
-                            Strands.interrupt(current);
+                            current.interrupt();
                     }
                     return 1;
                 }
@@ -780,7 +778,7 @@ public abstract class AbstractQueuedSynchronizer
             if (interruptible)
                 return CANCELLED;
             else
-                Strands.interruptSelf();
+                Thread.currentThread().interrupt();
         }
         return 0;
     }
@@ -1141,7 +1139,7 @@ public abstract class AbstractQueuedSynchronizer
      *         {@code null} if no threads are currently queued
      */
     public final Thread getFirstQueuedThread() {
-        Object first = null, w; Node h, s;
+        Thread first = null, w; Node h, s;
         if ((h = head) != null && ((s = h.next) == null ||
                                    (first = s.waiter) == null ||
                                    s.prev == null)) {
@@ -1150,7 +1148,7 @@ public abstract class AbstractQueuedSynchronizer
                 if ((w = p.waiter) != null)
                     first = w;
         }
-        return (Thread) first;
+        return first;
     }
 
     /**
@@ -1194,7 +1192,7 @@ public abstract class AbstractQueuedSynchronizer
      * <p>An invocation of this method is equivalent to (but may be
      * more efficient than):
      * <pre> {@code
-     * getFirstQueuedThread() != Strands.currentStrand()
+     * getFirstQueuedThread() != Thread.currentThread()
      *   && hasQueuedThreads()}</pre>
      *
      * <p>Note that because cancellations due to interrupts and
@@ -1231,12 +1229,12 @@ public abstract class AbstractQueuedSynchronizer
      * @since 1.7
      */
     public final boolean hasQueuedPredecessors() {
-        Object first = null; Node h, s;
+        Thread first = null; Node h, s;
         if ((h = head) != null && ((s = h.next) == null ||
                                    (first = s.waiter) == null ||
                                    s.prev == null))
             first = getFirstQueuedThread(); // retry via getFirstQueuedThread
-        return first != null && first != Strands.currentStrand();
+        return first != null && first != Thread.currentThread();
     }
 
     // Instrumentation and monitoring methods
@@ -1273,7 +1271,7 @@ public abstract class AbstractQueuedSynchronizer
     public final Collection<Thread> getQueuedThreads() {
         ArrayList<Thread> list = new ArrayList<>();
         for (Node p = tail; p != null; p = p.prev) {
-            Thread t = (Thread) p.waiter;
+            Thread t = p.waiter;
             if (t != null)
                 list.add(t);
         }
@@ -1292,7 +1290,7 @@ public abstract class AbstractQueuedSynchronizer
         ArrayList<Thread> list = new ArrayList<>();
         for (Node p = tail; p != null; p = p.prev) {
             if (!(p instanceof SharedNode)) {
-                Thread t = (Thread) p.waiter;
+                Thread t = p.waiter;
                 if (t != null)
                     list.add(t);
             }
@@ -1312,7 +1310,7 @@ public abstract class AbstractQueuedSynchronizer
         ArrayList<Thread> list = new ArrayList<>();
         for (Node p = tail; p != null; p = p.prev) {
             if (p instanceof SharedNode) {
-                Thread t = (Thread) p.waiter;
+                Thread t = p.waiter;
                 if (t != null)
                     list.add(t);
             }
@@ -1501,7 +1499,7 @@ public abstract class AbstractQueuedSynchronizer
          */
         private int enableWait(ConditionNode node) {
             if (isHeldExclusively()) {
-                node.waiter = Strands.currentStrand();
+                node.waiter = Thread.currentThread();
                 node.setStatusRelaxed(COND | WAITING);
                 ConditionNode last = lastWaiter;
                 if (last == null)
@@ -1584,8 +1582,7 @@ public abstract class AbstractQueuedSynchronizer
             node.clearStatus();
             acquire(node, savedState, false, false, false, 0L);
             if (interrupted)
-                Strands.interruptSelf();
-
+                Thread.currentThread().interrupt();
         }
 
         /**
@@ -1629,7 +1626,7 @@ public abstract class AbstractQueuedSynchronizer
                     unlinkCancelledWaiters(node);
                     throw new InterruptedException();
                 }
-                Strands.interruptSelf();
+                Thread.currentThread().interrupt();
             }
         }
 
@@ -1670,7 +1667,7 @@ public abstract class AbstractQueuedSynchronizer
                 if (interrupted)
                     throw new InterruptedException();
             } else if (interrupted)
-                Strands.interruptSelf();
+                Thread.currentThread().interrupt();
             long remaining = deadline - System.nanoTime(); // avoid overflow
             return (remaining <= nanosTimeout) ? remaining : Long.MIN_VALUE;
         }
@@ -1712,7 +1709,7 @@ public abstract class AbstractQueuedSynchronizer
                 if (interrupted)
                     throw new InterruptedException();
             } else if (interrupted)
-                Strands.interruptSelf();
+                Thread.currentThread().interrupt();
             return !cancelled;
         }
 
@@ -1755,7 +1752,7 @@ public abstract class AbstractQueuedSynchronizer
                 if (interrupted)
                     throw new InterruptedException();
             } else if (interrupted)
-                Strands.interruptSelf();
+                Thread.currentThread().interrupt();
             return !cancelled;
         }
 
@@ -1824,7 +1821,7 @@ public abstract class AbstractQueuedSynchronizer
             ArrayList<Thread> list = new ArrayList<>();
             for (ConditionNode w = firstWaiter; w != null; w = w.nextWaiter) {
                 if ((w.status & COND) != 0) {
-                    Thread t = (Thread) w.waiter;
+                    Thread t = w.waiter;
                     if (t != null)
                         list.add(t);
                 }

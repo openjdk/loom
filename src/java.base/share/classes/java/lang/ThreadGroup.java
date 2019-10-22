@@ -55,6 +55,7 @@ import java.util.Arrays;
 public
 class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private final ThreadGroup parent;
+    private final boolean isLightweight;
     String name;
     int maxPriority;
     boolean destroyed;
@@ -75,6 +76,7 @@ class ThreadGroup implements Thread.UncaughtExceptionHandler {
         this.name = "system";
         this.maxPriority = Thread.MAX_PRIORITY;
         this.parent = null;
+        this.isLightweight = false;
     }
 
     /**
@@ -112,14 +114,19 @@ class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     public ThreadGroup(ThreadGroup parent, String name) {
-        this(checkParentAccess(parent), parent, name);
+        this(checkParentAccess(parent), parent, name, false);
     }
 
-    private ThreadGroup(Void unused, ThreadGroup parent, String name) {
+    ThreadGroup(ThreadGroup parent, String name, boolean isLightweight) {
+        this(null, parent, name, isLightweight);
+    }
+
+    private ThreadGroup(Void unused, ThreadGroup parent, String name, boolean isLightweight) {
         this.name = name;
         this.maxPriority = parent.maxPriority;
         this.daemon = parent.daemon;
         this.parent = parent;
+        this.isLightweight = isLightweight;
         parent.add(this);
     }
 
@@ -258,7 +265,7 @@ class ThreadGroup implements Thread.UncaughtExceptionHandler {
         ThreadGroup[] groupsSnapshot;
         synchronized (this) {
             checkAccess();
-            if (pri < Thread.MIN_PRIORITY || pri > Thread.MAX_PRIORITY) {
+            if (isLightweight || (pri < Thread.MIN_PRIORITY || pri > Thread.MAX_PRIORITY)) {
                 return;
             }
             maxPriority = (parent != null) ? Math.min(pri, parent.maxPriority) : pri;
@@ -759,6 +766,8 @@ class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * First, the {@code checkAccess} method of this thread group is
      * called with no arguments; this may result in a security exception.
      *
+     * @throws     UnsupportedOperationException if this is the thread group
+     *               for lightweight threads
      * @throws     IllegalThreadStateException  if the thread group is not
      *               empty or if the thread group has already been destroyed.
      * @throws     SecurityException  if the current thread cannot modify this
@@ -767,6 +776,8 @@ class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since      1.0
      */
     public final void destroy() {
+        if (isLightweight)
+            throw new UnsupportedOperationException();
         int ngroupsSnapshot;
         ThreadGroup[] groupsSnapshot;
         synchronized (this) {
@@ -1072,7 +1083,7 @@ class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     @Deprecated(since="1.2")
     public boolean allowThreadSuspension(boolean b) {
-        return true;
+        return (isLightweight) ? !b : true;
     }
 
     /**

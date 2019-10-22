@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,31 +22,51 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package java.lang;
+
+package jdk.internal.misc;
+
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 
 /**
- * A holder for context that is inherited when creating a Thread.
+ * Supporting methods to park/unpark lightweight threads.
  */
 
-class InheritableThreadContext {
-    private final ClassLoader contextClassLoader;
-    private final ThreadLocal.ThreadLocalMap inheritableThreadLocals;
-
-    InheritableThreadContext(Thread parent) {
-        this.contextClassLoader = parent.getContextClassLoader();
-        ThreadLocal.ThreadLocalMap map = parent.inheritableThreadLocals;
-        if (map != null) {
-            this.inheritableThreadLocals = ThreadLocal.createInheritedMap(map);
-        } else {
-            this.inheritableThreadLocals = null;
+public final class LightweightThreads {
+    private static final JavaLangAccess JLA;
+    static {
+        JLA = SharedSecrets.getJavaLangAccess();
+        if (JLA == null) {
+            throw new InternalError("JavaLangAccess not setup");
         }
     }
+    private LightweightThreads() { }
 
-    ClassLoader contextClassLoader() {
-        return contextClassLoader;
+    /**
+     * Returns the current carrier thread
+     */
+    public static Thread currentCarrierThread() {
+        return JLA.currentCarrierThread();
     }
 
-    ThreadLocal.ThreadLocalMap inheritableThreadLocals() {
-        return inheritableThreadLocals;
+    /**
+     * Parks the current lightweight thread
+     */
+    public static void park() {
+        JLA.parkLightweightThread();
+    }
+
+    /**
+     * Parks the current lightweight thread for up to the given waiting time
+     */
+    public static void park(long nanos) {
+        JLA.parkLightweightThread(nanos);
+    }
+
+    /**
+     * Unparks the given lightweight thread
+     */
+    public static void unpark(Thread thread) {
+        JLA.unparkLightweightThread(thread);
     }
 }

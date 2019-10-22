@@ -31,14 +31,17 @@ import java.lang.ref.WeakReference;
 import java.security.AccessController;
 import java.security.AccessControlContext;
 import java.security.PrivilegedAction;
+import java.security.ProtectionDomain;
+import java.time.Duration;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
-import jdk.internal.misc.Strands;
 import jdk.internal.misc.TerminatingThreadLocal;
 import sun.nio.ch.Interruptible;
 import jdk.internal.reflect.CallerSensitive;
@@ -51,13 +54,17 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  * Virtual Machine allows an application to have multiple threads of
  * execution running concurrently.
  * <p>
- * Every thread has a priority. Threads with higher priority are
- * executed in preference to threads with lower priority. Each thread
- * may or may not also be marked as a daemon. When code running in
- * some thread creates a new {@code Thread} object, the new
- * thread has its priority initially set equal to the priority of the
- * creating thread, and is a daemon thread if and only if the
- * creating thread is a daemon.
+ * The {@code Thread} class defines constructors for creating threads that are
+ * scheduled by the operating system with preemptive scheduling. These threads
+ * are sometimes known as <i>heavyweight threads</i>, partly due to the large
+ * stack that is reserved for each thread.
+ * The {@code Thread} class also defines factory methods to create <i>lightweight
+ * threads</i> that are scheduled by the Java runtime with a default or user
+ * provided scheduler rather than the operating system. Lightweight threads
+ * are suitable for executing tasks that spend most of the time <i>blocked</i>,
+ * usually waiting for an I/O operation. The scheduler for lightweight threads
+ * will typically use a pool of heavyweight threads as <i>carrier threads</i>
+ * and use locking and I/O operations as scheduling points.
  * <p>
  * When a Java Virtual Machine starts up, there is usually a single
  * non-daemon thread (which typically calls the method named
@@ -68,13 +75,13 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  * <li>The {@code exit} method of class {@code Runtime} has been
  *     called and the security manager has permitted the exit operation
  *     to take place.
- * <li>All threads that are not daemon threads have died, either by
+ * <li>All threads that are not daemon threads have terminated, either by
  *     returning from the call to the {@code run} method or by
  *     throwing an exception that propagates beyond the {@code run}
  *     method.
  * </ul>
  * <p>
- * There are two ways to create a new thread of execution. One is to
+ * There are two ways to create a heavyweight thread. One is to
  * declare a class to be a subclass of {@code Thread}. This
  * subclass should override the {@code run} method of class
  * {@code Thread}. An instance of the subclass can then be
@@ -100,7 +107,7 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  *     p.start();
  * </pre></blockquote>
  * <p>
- * The other way to create a thread is to declare a class that
+ * The other way to create a heavyweight thread is to declare a class that
  * implements the {@code Runnable} interface. That class then
  * implements the {@code run} method. An instance of the class can
  * then be allocated, passed as an argument when creating
@@ -126,19 +133,12 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  *     new Thread(p).start();
  * </pre></blockquote>
  * <p>
- * Every thread has a name for identification purposes. More than
- * one thread may have the same name. If a name is not specified when
- * a thread is created, a new name is generated for it.
- * <p>
  * Unless otherwise noted, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be
  * thrown.
  *
  * @author  unascribed
- * @see     Runnable
  * @see     Runtime#exit(int)
- * @see     #run()
- * @see     #stop()
  * @since   1.0
  */
 public
@@ -149,26 +149,43 @@ class Thread implements Runnable {
         registerNatives();
     }
 
-    private volatile String name;
-    private int priority;
-
-    /* Whether or not the thread is a daemon thread. */
-    private boolean daemon = false;
-
-    /* Fields reserved for exclusive use by the JVM */
-    private boolean stillborn = false;
+    /* Reserved for exclusive use by the JVM, TBD: move to FieldHolder */
     private long eetop;
 
-    /* What will be run. */
-    private Runnable target;
+    // holds fields for heavyweight threads
+    private static class FieldHolder {
+        final ThreadGroup group;
+        final Runnable target;
+        final long stackSize;
+        int priority;
+        boolean daemon;
+        volatile int threadStatus;
+        boolean stillborn;
 
-    /* The group of this thread */
-    private ThreadGroup group;
+        FieldHolder(ThreadGroup group,
+                    Runnable target,
+                    long stackSize,
+                    int priority,
+                    boolean daemon) {
+            this.group = group;
+            this.target = target;
+            this.stackSize = stackSize;
+            this.priority = priority;
+            this.daemon = daemon;
+        }
+    }
+    private final FieldHolder holder;
 
-    /* The context ClassLoader for this thread */
+    // thread name
+    private volatile String name;
+
+    // thread id
+    private final long tid;
+
+    // context ClassLoader
     private ClassLoader contextClassLoader;
 
-    /* The inherited AccessControlContext of this thread */
+    // inherited AccessControlContext, TBD: move this to FieldHolder
     private AccessControlContext inheritedAccessControlContext;
 
     /* For autonumbering anonymous threads. */
@@ -187,23 +204,6 @@ class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
-    /*
-     * The requested stack size for this thread, or 0 if the creator did
-     * not specify a stack size.  It is up to the VM to do whatever it
-     * likes with this number; some VMs will ignore it.
-     */
-    private final long stackSize;
-
-    /*
-     * Thread ID
-     */
-    private final long tid;
-
-    /*
-     * Current inner-most continuation
-     */
-    private Continuation cont;
-
     /* For generating thread ID */
     private static long threadSeqNumber;
 
@@ -212,9 +212,9 @@ class Thread implements Runnable {
     }
 
     /*
-     * Java thread status for tools, default indicates thread 'not yet started'
+     * Lock object for thread interrupt.
      */
-    private volatile int threadStatus;
+    final Object interruptLock = new Object();
 
     /**
      * The argument supplied to the current call to
@@ -222,34 +222,21 @@ class Thread implements Runnable {
      * Set by (private) java.util.concurrent.locks.LockSupport.setBlocker
      * Accessed using java.util.concurrent.locks.LockSupport.getBlocker
      */
-    volatile Object parkBlocker;
+    private volatile Object parkBlocker;
 
     /* The object in which this thread is blocked in an interruptible I/O
      * operation, if any.  The blocker's interrupt method should be invoked
      * after setting this thread's interrupt status.
      */
-    private volatile Interruptible blocker;
-    private final Object blockerLock = new Object();
+    volatile Interruptible nioBlocker;
 
     /* Set the blocker field; invoked via jdk.internal.access.SharedSecrets
      * from java.nio code
      */
     static void blockedOn(Interruptible b) {
         Thread me = Thread.currentThread();
-        synchronized (me.blockerLock) {
-            me.blocker = b;
-        }
-    }
-
-    Object blockerLock() {
-        return blockerLock;
-    }
-
-    void runInterrupter() {
-        assert Thread.holdsLock(blockerLock);
-        Interruptible b = blocker;
-        if (b != null) {
-            b.interrupt(this);
+        synchronized (me.interruptLock) {
+            me.nioBlocker = b;
         }
     }
 
@@ -268,22 +255,38 @@ class Thread implements Runnable {
      */
     public static final int MAX_PRIORITY = 10;
 
+    // current inner-most continuation
+    private Continuation cont;
+
+    // the lightweight thread/fiber mounted on this thread
+    private Fiber fiber;
+
+    /**
+     * Sets the lightweight thread/fiber that is currently mounted on this thread.
+     */
+    void setFiber(Fiber fiber) {
+        // assert this == currentThread0();
+        this.fiber = fiber;
+    }
+
+    /**
+     * Returns the lightweight thread/fiber that is currently mounted on this thread.
+     */
+    Fiber getFiber() {
+        // assert this == currentThread0();
+        return fiber;
+    }
+
     /**
      * Returns the Thread object for the current thread.
-     *
-     * <p> When executed in the context of a fiber, the returned Thread object
-     * does not support all features of Thread. In particular, the Thread
-     * is not an <i>active thread</i> in its thread group and so is not enumerated
-     * or acted on by thread group operations. In addition it does not support
-     * the stop, suspend or resume methods.
      *
      * @return  the current thread
      */
     public static Thread currentThread() {
         Thread t = currentThread0();
-        Fiber<?> fiber = t.fiber;
+        Fiber fiber = t.fiber;
         if (fiber != null) {
-            return fiber.shadowThread();
+            return fiber;
         } else {
             return t;
         }
@@ -298,36 +301,6 @@ class Thread implements Runnable {
 
     @HotSpotIntrinsicCandidate
     private static native Thread currentThread0();
-
-    private Fiber<?> fiber;
-    private FiberScope scope;
-
-    /**
-     * Binds this thread to given Fiber. Once set, Thread.currentThread() will
-     * return the Fiber rather than the Thread object for the carrier thread.
-     */
-    void setFiber(Fiber<?> fiber) {
-        //assert this == currentThread0();
-        this.fiber = fiber;
-    }
-
-    /**
-     * Returns the Fiber that is currently bound to this thread.
-     */
-    Fiber<?> getFiber() {
-        //assert this == currentThread0();
-        return fiber;
-    }
-
-    FiberScope scope() {
-        assert Thread.currentThread() == this;
-        return scope;
-    }
-
-    void setScope(FiberScope scope) {
-        assert Thread.currentThread() == this;
-        this.scope = scope;
-    }
 
     /**
      * A hint to the scheduler that the current thread is willing to yield
@@ -346,9 +319,9 @@ class Thread implements Runnable {
      * {@link java.util.concurrent.locks} package.
      */
     public static void yield() {
-        Fiber<?> fiber = currentCarrierThread().getFiber();
+        Fiber fiber = currentCarrierThread().getFiber();
         if (fiber != null) {
-            fiber.yield();
+            fiber.tryYield();
         } else {
             yield0();
         }
@@ -376,8 +349,9 @@ class Thread implements Runnable {
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
-        if (currentCarrierThread().getFiber() != null) {
-            Fiber.sleepNanos(TimeUnit.MILLISECONDS.toNanos(millis));
+        Fiber fiber = currentCarrierThread().getFiber();
+        if (fiber != null) {
+            fiber.sleepNanos(TimeUnit.MILLISECONDS.toNanos(millis));
         } else {
             sleep0(millis);
         }
@@ -412,8 +386,7 @@ class Thread implements Runnable {
         }
 
         if (nanos < 0 || nanos > 999999) {
-            throw new IllegalArgumentException(
-                                "nanosecond timeout value out of range");
+            throw new IllegalArgumentException("nanosecond timeout value out of range");
         }
 
         if (nanos > 0 && millis < Long.MAX_VALUE) {
@@ -421,6 +394,30 @@ class Thread implements Runnable {
         }
 
         sleep(millis);
+    }
+
+    /**
+     * Causes the currently executing thread to sleep (temporarily cease
+     * execution) for the specified duration, subject to the precision and
+     * accuracy of system timers and schedulers. This method is a no-op if
+     * the duration is less than zero.
+     *
+     * @param  duration
+     *         the duration to sleep
+     *
+     * @throws  InterruptedException
+     *          if the current thread is interrupted while sleeping. The
+     *          <i>interrupted status</i> of the current thread is
+     *          cleared when this exception is thrown.
+     *
+     * @since 99
+     */
+    public static void sleep(Duration duration) throws InterruptedException {
+        if (!duration.isNegative()) {
+            // ignore nano precision for now
+            long millis = Long.max(TimeUnit.MILLISECONDS.convert(duration), 1);
+            sleep(millis);
+        }
     }
 
     /**
@@ -463,7 +460,19 @@ class Thread implements Runnable {
     public static void onSpinWait() {}
 
     /**
-     * Initializes a Thread.
+     * Returns the context class loader to inherit from the given parent thread
+     */
+    private static ClassLoader contextClassLoader(Thread parent) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm == null || isCCLOverridden(parent.getClass())) {
+            return parent.getContextClassLoader();
+        } else {
+            return parent.contextClassLoader;
+        }
+    }
+
+    /**
+     * Initializes a heavyweight Thread.
      *
      * @param g the Thread group
      * @param target the object whose run() method gets called
@@ -482,9 +491,8 @@ class Thread implements Runnable {
             throw new NullPointerException("name cannot be null");
         }
 
-        this.name = name;
-
         Thread parent = currentThread();
+
         SecurityManager security = System.getSecurityManager();
         if (g == null) {
             /* Determine if it's an applet or not */
@@ -518,49 +526,68 @@ class Thread implements Runnable {
 
         g.addUnstarted();
 
-        this.group = g;
-        this.daemon = parent.isDaemon();
-        this.priority = parent.getPriority();
-        if (security == null || isCCLOverridden(parent.getClass()))
-            this.contextClassLoader = parent.getContextClassLoader();
-        else
-            this.contextClassLoader = parent.contextClassLoader;
-        this.inheritedAccessControlContext =
-                acc != null ? acc : AccessController.getContext();
-        this.target = target;
-        setPriority(priority);
-        if (inheritThreadLocals && parent.inheritableThreadLocals != null)
-            this.inheritableThreadLocals =
-                ThreadLocal.createInheritedMap(parent.inheritableThreadLocals);
-        /* Stash the specified stack size in case the VM cares */
-        this.stackSize = stackSize;
-
-        /* Set thread ID */
+        this.name = name;
         this.tid = nextThreadID();
+        this.contextClassLoader = contextClassLoader(parent);
+        this.inheritedAccessControlContext = (acc != null) ? acc : AccessController.getContext();
+
+        // inherited thread locals may need to be copied from parent
+        if (inheritThreadLocals) {
+            ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
+            if (parentMap != null && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED) {
+                this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
+            }
+        }
+
+        int priority;
+        boolean daemon;
+        if (parent == this) {
+            // primordial or attached thread
+            priority = NORM_PRIORITY;
+            daemon = false;
+        } else {
+            priority = parent.getPriority();
+            daemon = parent.isDaemon();  // true if parent is lightweight thread
+        }
+        this.holder = new FieldHolder(g, target, stackSize, priority, daemon);
     }
 
     /**
-     * Initializes a Thread to be used as a shadow thread for Fibers.
+     * Initializes a lightweight Thread.
+     *
+     * @param name thread name
+     * @param characteristics thread characteristics
+     * @throws IllegalArgumentException if invalid characteristics are specified
      */
-    Thread(ThreadGroup group,
-           String name,
-           ClassLoader contextClassLoader,
-           ThreadLocal.ThreadLocalMap inheritedLocals,
-           AccessControlContext inheritedAccessControlContext)
-    {
-        this.group = group;
+    Thread(String name, int characteristics) {
+        if (name == null)
+            throw new NullPointerException("name cannot be null");
+        if (characteristics != 0 && (characteristics & ~validCharacteristics()) != 0)
+            throw new IllegalArgumentException();
+        if ((characteristics & THREAD_LOCALS_NOT_SUPPORTED) != 0
+                && (characteristics & INHERIT_THREAD_LOCALS) != 0)
+            throw new IllegalArgumentException();
+
+        Thread parent = currentThread();
+
         this.name = name;
-        this.daemon = false;
-        this.priority = NORM_PRIORITY;
-        this.contextClassLoader = contextClassLoader;
-        if (inheritedLocals != null) {
-            this.inheritableThreadLocals = ThreadLocal.createInheritedMap(inheritedLocals);
-        } else {
-            this.inheritableThreadLocals = null;
-        }
-        this.inheritedAccessControlContext = inheritedAccessControlContext;
-        this.stackSize = 0;
         this.tid = nextThreadID();
+        this.contextClassLoader = contextClassLoader(parent);
+        this.inheritedAccessControlContext = LightweightThreads.ACCESS_CONTROL_CONTEXT;
+
+        // thread locals
+        if ((characteristics & THREAD_LOCALS_NOT_SUPPORTED) != 0) {
+            this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
+            this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
+        } else if ((characteristics & INHERIT_THREAD_LOCALS) != 0) {
+            ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
+            if (parentMap != null && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED) {
+                this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
+            }
+        }
+
+        // no additional fields
+        this.holder = null;
     }
 
     /**
@@ -812,8 +839,7 @@ class Thread implements Runnable {
      *
      * @since 1.4
      */
-    public Thread(ThreadGroup group, Runnable target, String name,
-                  long stackSize) {
+    public Thread(ThreadGroup group, Runnable target, String name, long stackSize) {
         this(group, target, name, stackSize, null, true);
     }
 
@@ -874,6 +900,198 @@ class Thread implements Runnable {
     }
 
     /**
+     * Creates a thread.
+     *
+     * @param target the object to run when the thread executes
+     * @return an un-started thread
+     *
+     * @since 99
+     */
+    static Thread newThread(Runnable target) {
+        return new Thread(Objects.requireNonNull(target));
+    }
+
+    /**
+     * Creates a thread.
+     *
+     * @param name the name of the new Thread
+     * @param target the object to run when the thread executes
+     * @return an un-started thread
+     *
+     * @since 99
+     */
+    static Thread newThread(String name, Runnable target) {
+        return new Thread(Objects.requireNonNull(target), name);
+    }
+
+    /**
+     * Creates a thread.
+     *
+     * @param group the thread group
+     * @param target the object to run when the thread executes
+     * @return an un-started thread
+     *
+     * @since 99
+     */
+    static Thread newThread(ThreadGroup group, Runnable target) {
+        return new Thread(Objects.requireNonNull(group), Objects.requireNonNull(target));
+    }
+
+    /**
+     * Creates a thread.
+     *
+     * @param group the thread group
+     * @param name the name of the new Thread
+     * @param target the object to run when the thread executes
+     * @return an un-started thread
+     *
+     * @since 99
+     */
+    static Thread newThread(ThreadGroup group, String name, Runnable target) {
+        return new Thread(Objects.requireNonNull(group), Objects.requireNonNull(target), name);
+    }
+
+    /**
+     * Characteristic value signifying that {@link ThreadLocal thread-locals}
+     * are not supported by the thread.
+     *
+     * @apiNote This is for experimental purposes, a lot of existing code will
+     * not run if thread locals are not supported.
+     *
+     * @since 99
+     */
+    public static final int THREAD_LOCALS_NOT_SUPPORTED = 1 << 0;
+
+    /**
+     * Characteristic value signifying that {@link InheritableThreadLocal
+     * inheritable-thread-locals} are inherihted from the constructing thread.
+     * This characteristic is ignored when {@linkplain #THREAD_LOCALS_NOT_SUPPORTED}
+     * is specified.
+     *
+     * @since 99
+     */
+    public static final int INHERIT_THREAD_LOCALS = 1 << 1;
+
+    private static int validCharacteristics() {
+        return (THREAD_LOCALS_NOT_SUPPORTED | INHERIT_THREAD_LOCALS);
+    }
+
+    /**
+     * Creates an unnamed lightweight thread.
+     *
+     * By default, the thread supports {@link ThreadLocal thread-locals} but does
+     * not inherit any initial values for {@link InheritableThreadLocal
+     * inhertiable-thread-locals}.
+     *
+     * Once {@link #start() started}, the thread is scheduled with the default
+     * scheduler.
+     *
+     * @param characteristics characteristics of the thread
+     * @param target the object to run when the thread executes
+     * @throws IllegalArgumentException if an unknown characteristic or an invalid
+     *         combination of characteristic is specified
+     * @return an un-started lightweight thread
+     *
+     * @since 99
+     */
+    public static Thread newLightWeightThread(int characteristics, Runnable target) {
+        return new Fiber("", characteristics, target);
+    }
+
+    /**
+     * Creates a named lightweight thread.
+     *
+     * By default, the thread supports {@link ThreadLocal thread-locals} but does
+     * not inherit any initial values for {@link InheritableThreadLocal
+     * inhertiable-thread-locals}.
+     *
+     * Once {@link #start() started}, the thread is scheduled with the default
+     * scheduler.
+     *
+     * @param name the thread name
+     * @param characteristics characteristics of the thread
+     * @param target the object to run when the thread executes
+     * @throws IllegalArgumentException if an unknown characteristic or an invalid
+     *         combination of characteristic is specified
+     * @return an un-started lightweight thread
+     *
+     * @since 99
+     */
+    public static Thread newLightWeightThread(String name,
+                                              int characteristics,
+                                              Runnable target) {
+        return new Fiber(name, characteristics, target);
+    }
+
+    /**
+     * Creates an unnamed lightweight thread.
+     *
+     * By default, the thread supports {@link ThreadLocal thread-locals} but does
+     * not inherit any initial values for {@link InheritableThreadLocal
+     * inhertiable-thread-locals}.
+     *
+     * Once {@link #start() started}, the thread is scheduled with the given
+     * scheduler.
+     *
+     * @param scheduler the scheduler
+     * @param characteristics characteristics of the thread
+     * @param target the object to run when the thread executes
+     * @throws IllegalArgumentException if an unknown characteristic or an invalid
+     *         combination of characteristic is specified
+     * @return an un-started lightweight thread
+     *
+     * @since 99
+     */
+    public static Thread newLightWeightThread(Executor scheduler,
+                                              int characteristics,
+                                              Runnable target) {
+        return new Fiber(scheduler, "", characteristics, target);
+    }
+
+    /**
+     * Creates a named lightweight thread.
+     *
+     * By default, the thread supports {@link ThreadLocal thread-locals} but does
+     * not inherit any initial values for {@link InheritableThreadLocal
+     * inhertiable-thread-locals}.
+     *
+     * Once {@link #start() started}, the thread is scheduled with the given
+     * scheduler.
+     *
+     * @param name the thread name
+     * @param scheduler the scheduler
+     * @param characteristics characteristics of the thread
+     * @param target the object to run when the thread executes
+     * @throws IllegalArgumentException if an unknown characteristic or an invalid
+     *         combination of characteristic is specified
+     * @return an un-started lightweight thread
+     *
+     * @since 99
+     */
+    public static Thread newLightWeightThread(Executor scheduler,
+                                              String name,
+                                              int characteristics,
+                                              Runnable target) {
+        return new Fiber(scheduler, name, characteristics, target);
+    }
+
+    /**
+     * Returns {@code true} if this is a lightweight thread.
+     *
+     * <p> A lightweight thread does not support all features of Thread. In
+     * particular, the Thread is not an <i>active thread</i> in its thread group
+     * and so is not enumerated or acted on by thread group operations. In
+     * addition it does not support the stop, suspend or resume methods.
+     *
+     * @return {@code true} if this is a lightweight thread
+     *
+     * @since 99
+     */
+    public final boolean isLightweight() {
+        return (this instanceof Fiber);
+    }
+
+    /**
      * Causes this thread to begin execution; the Java Virtual Machine
      * calls the {@code run} method of this thread.
      * <p>
@@ -898,12 +1116,13 @@ class Thread implements Runnable {
          *
          * A zero status value corresponds to state "NEW".
          */
-        if (threadStatus != 0)
+        if (holder.threadStatus != 0)
             throw new IllegalThreadStateException();
 
         /* Notify the group that this thread is about to be started
          * so that it can be added to the group's list of threads
          * and the group's unstarted count can be decremented. */
+        ThreadGroup group = holder.group;
         group.add(this);
 
         boolean started = false;
@@ -929,17 +1148,21 @@ class Thread implements Runnable {
      * {@code Runnable} run object, then that
      * {@code Runnable} object's {@code run} method is called;
      * otherwise, this method does nothing and returns.
+     * This method does nothing when invoked on a {@link #isLightweight()
+     * lightweight} thread.
      * <p>
      * Subclasses of {@code Thread} should override this method.
      *
      * @see     #start()
-     * @see     #stop()
      * @see     #Thread(ThreadGroup, Runnable, String)
      */
     @Override
     public void run() {
-        if (target != null) {
-            target.run();
+        if (!isLightweight()) {
+            Runnable target = holder.target;
+            if (target != null) {
+                target.run();
+            }
         }
     }
 
@@ -948,20 +1171,20 @@ class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
+        // assert !isLightweight();
         if (threadLocals != null && TerminatingThreadLocal.REGISTRY.isPresent()) {
             TerminatingThreadLocal.threadTerminated();
         }
+        ThreadGroup group = holder.group;
         if (group != null) {
             group.threadTerminated(this);
-            group = null;
         }
         /* Aggressively null out all reference fields: see bug 4006245 */
-        target = null;
         /* Speed the release of some of these resources */
         threadLocals = null;
         inheritableThreadLocals = null;
         inheritedAccessControlContext = null;
-        blocker = null;
+        nioBlocker = null;
         uncaughtExceptionHandler = null;
     }
 
@@ -993,9 +1216,9 @@ class Thread implements Runnable {
      * cleanup operation (note that the throwing of
      * {@code ThreadDeath} causes {@code finally} clauses of
      * {@code try} statements to be executed before the thread
-     * officially dies).  If a {@code catch} clause catches a
+     * officially terminates).  If a {@code catch} clause catches a
      * {@code ThreadDeath} object, it is important to rethrow the
-     * object so that the thread actually dies.
+     * object so that the thread actually terminates.
      * <p>
      * The top-level error handler that reacts to otherwise uncaught
      * exceptions does not print out a message or otherwise notify the
@@ -1004,8 +1227,7 @@ class Thread implements Runnable {
      *
      * @throws     SecurityException  if the current thread cannot
      *             modify this thread.
-     * @throws     UnsupportedOperationException if invoked on the Thread object
-     *             for a Fiber
+     * @throws     UnsupportedOperationException if invoked on a lightweight thread
      * @see        #interrupt()
      * @see        #checkAccess()
      * @see        #run()
@@ -1043,12 +1265,12 @@ class Thread implements Runnable {
             }
         }
 
-        if (this instanceof ShadowThread)
+        if (isLightweight())
             throw new UnsupportedOperationException();
 
         // A zero status value corresponds to "NEW", it can't change to
         // not-NEW because we hold the lock.
-        if (threadStatus != 0) {
+        if (holder.threadStatus != 0) {
             resume(); // Wake up thread if it was suspended; no-op otherwise
         }
 
@@ -1100,10 +1322,10 @@ class Thread implements Runnable {
             checkAccess();
 
             // thread may be blocked in an I/O operation
-            synchronized (blockerLock) {
-                Interruptible b = blocker;
+            synchronized (interruptLock) {
+                Interruptible b = nioBlocker;
                 if (b != null) {
-                    interrupt0();  // set interrupt status
+                    interrupt0();  // set interrupt status, maybe unpark thread
                     b.interrupt(this);
                     return;
                 }
@@ -1132,13 +1354,7 @@ class Thread implements Runnable {
      * @revised 6.0
      */
     public static boolean interrupted() {
-        Thread thread = Thread.currentCarrierThread();
-        Fiber<?> fiber = thread.getFiber();
-        if (fiber != null) {
-            return fiber.isInterrupted(true);
-        } else {
-            return thread.isInterrupted(true);
-        }
+        return currentThread().getAndClearInterrupt();
     }
 
     /**
@@ -1158,8 +1374,16 @@ class Thread implements Runnable {
         return isInterrupted(false);
     }
 
-    void clearInterrupt() {
-        isInterrupted(true);
+    final void setInterrupt() {
+        interrupt0();
+    }
+
+    final void clearInterrupt() {
+        getAndClearInterrupt();
+    }
+
+    boolean getAndClearInterrupt() {
+        return isInterrupted(true);
     }
 
     /**
@@ -1172,16 +1396,15 @@ class Thread implements Runnable {
 
     /**
      * Tests if this thread is alive. A thread is alive if it has
-     * been started and has not yet died.
+     * been started and has not yet terminated.
      *
      * @return  {@code true} if this thread is alive;
      *          {@code false} otherwise.
      */
     public final boolean isAlive() {
-        if (this instanceof ShadowThread) {
+        if (isLightweight()) {
             State state = getState();
-            assert state != State.NEW;
-            return (state != State.TERMINATED);
+            return (state != State.NEW && state != State.TERMINATED);
         } else {
             return isAlive0();
         }
@@ -1200,8 +1423,7 @@ class Thread implements Runnable {
      *
      * @throws     SecurityException  if the current thread cannot modify
      *             this thread.
-     * @throws     UnsupportedOperationException if invoked on the Thread object
-     *             for a Fiber
+     * @throws     UnsupportedOperationException if invoked on a lightweight thread
      * @see #checkAccess
      * @deprecated   This method has been deprecated, as it is
      *   inherently deadlock-prone.  If the target thread holds a lock on the
@@ -1217,7 +1439,7 @@ class Thread implements Runnable {
     @Deprecated(since="1.2")
     public final void suspend() {
         checkAccess();
-        if (this instanceof ShadowThread)
+        if (isLightweight())
             throw new UnsupportedOperationException();
         suspend0();
     }
@@ -1238,8 +1460,7 @@ class Thread implements Runnable {
      *
      * @throws     SecurityException  if the current thread cannot modify this
      *             thread.
-     * @throws     UnsupportedOperationException if invoked on the Thread object
-     *             for a Fiber
+     * @throws     UnsupportedOperationException if invoked on a lightweight thread
      * @see        #checkAccess
      * @see        #suspend()
      * @deprecated This method exists solely for use with {@link #suspend},
@@ -1251,7 +1472,7 @@ class Thread implements Runnable {
     @Deprecated(since="1.2")
     public final void resume() {
         checkAccess();
-        if (this instanceof ShadowThread)
+        if (isLightweight())
             throw new UnsupportedOperationException();
         resume0();
     }
@@ -1266,6 +1487,8 @@ class Thread implements Runnable {
      * First the {@code checkAccess} method of this thread is called
      * with no arguments. This may result in throwing a {@code SecurityException}.
      * <p>
+     * The priority of lightweight-threads is always {@linkplain Thread#NORM_PRIORITY}
+     * and is not changed by this method.
      * Otherwise, the priority of this thread is set to the smaller of
      * the specified {@code newPriority} and the maximum permitted
      * priority of the thread's thread group.
@@ -1289,22 +1512,27 @@ class Thread implements Runnable {
         if (newPriority > MAX_PRIORITY || newPriority < MIN_PRIORITY) {
             throw new IllegalArgumentException();
         }
-        if((g = getThreadGroup()) != null) {
+        if (!isLightweight() && (g = getThreadGroup()) != null) {
             if (newPriority > g.getMaxPriority()) {
                 newPriority = g.getMaxPriority();
             }
-            setPriority0(priority = newPriority);
+            setPriority0(holder.priority = newPriority);
         }
     }
 
     /**
      * Returns this thread's priority.
+     * The priority of a lightweight thread is always {@linkplain Thread#NORM_PRIORITY}.
      *
      * @return  this thread's priority.
      * @see     #setPriority
      */
     public final int getPriority() {
-        return priority;
+        if (isLightweight()) {
+            return Thread.NORM_PRIORITY;
+        } else {
+            return holder.priority;
+        }
     }
 
     /**
@@ -1327,7 +1555,7 @@ class Thread implements Runnable {
         }
 
         this.name = name;
-        if (!(this instanceof ShadowThread) && threadStatus != 0) {
+        if (!isLightweight() && holder.threadStatus != 0) {
             setNativeName(name);
         }
     }
@@ -1344,13 +1572,21 @@ class Thread implements Runnable {
 
     /**
      * Returns the thread group to which this thread belongs.
-     * This method returns null if this thread has died
-     * (been stopped).
+     * This method returns null if the thread has terminated.
+     *
+     * <p> The thread group for lightweight threads does not support all features
+     * of regular thread groups. Lightweight threads are not considered <i>active
+     * threads</i> in the thread group and so are not enumerated or acted on by
+     * thread group operations.
      *
      * @return  this thread's thread group.
      */
     public final ThreadGroup getThreadGroup() {
-        return group;
+        if (getState() == State.TERMINATED) {
+            return null;
+        } else {
+            return isLightweight() ? LightweightThreads.THREAD_GROUP : holder.group;
+        }
     }
 
     /**
@@ -1417,13 +1653,21 @@ class Thread implements Runnable {
      * @see        StackWalker
      */
     @Deprecated(since="1.2", forRemoval=true)
-    public native int countStackFrames();
+    public int countStackFrames() {
+        if (isLightweight())
+            throw new IllegalThreadStateException();
+        return countStackFrames0();
+    }
+    private native int countStackFrames0();
 
     /**
-     * Waits at most {@code millis} milliseconds for this thread to
-     * die. A timeout of {@code 0} means to wait forever.
+     * Waits at most {@code millis} milliseconds for this thread to terminate.
+     * A timeout of {@code 0} means to wait forever.
+     * This method returns immediately, without waiting, if the thread has not
+     * been {@link #start() started}.
      *
-     * <p> This implementation uses a loop of {@code this.wait} calls
+     * <p> For non-{@link #isLightweight() lightweight}, this
+     * implementation uses a loop of {@code this.wait} calls
      * conditioned on {@code this.isAlive}. As a thread terminates the
      * {@code this.notifyAll} method is invoked. It is recommended that
      * applications not use {@code wait}, {@code notify}, or
@@ -1441,9 +1685,14 @@ class Thread implements Runnable {
      *          cleared when this exception is thrown.
      */
     public final void join(long millis) throws InterruptedException {
-        if (this instanceof ShadowThread) {
-            Fiber<?> fiber = ((ShadowThread) this).fiber();
-            fiber.awaitInterruptibly(TimeUnit.MILLISECONDS.toNanos(millis));
+        if (millis < 0)
+            throw new IllegalArgumentException("timeout value is negative");
+
+        if (isLightweight()) {
+            if (isAlive()) {
+                long nanos = TimeUnit.MILLISECONDS.toNanos(millis);
+                ((Fiber) this).joinNanos(nanos);
+            }
             return;
         }
 
@@ -1461,17 +1710,19 @@ class Thread implements Runnable {
                 while (isAlive()) {
                     wait(0);
                 }
-            } else {
-                throw new IllegalArgumentException("timeout value is negative");
             }
         }
     }
 
     /**
      * Waits at most {@code millis} milliseconds plus
-     * {@code nanos} nanoseconds for this thread to die.
+     * {@code nanos} nanoseconds for this thread to terminate.
      * If both arguments are {@code 0}, it means to wait forever.
+     * This method returns immediately, without waiting, if the thread has not
+     * been {@link #start() started}.
      *
+     * <p> For non-{@link #isLightweight() lightweight}, this
+     * implementation uses a loop of {@code this.wait} calls
      * <p> This implementation uses a loop of {@code this.wait} calls
      * conditioned on {@code this.isAlive}. As a thread terminates the
      * {@code this.notifyAll} method is invoked. It is recommended that
@@ -1499,8 +1750,7 @@ class Thread implements Runnable {
         }
 
         if (nanos < 0 || nanos > 999999) {
-            throw new IllegalArgumentException(
-                                "nanosecond timeout value out of range");
+            throw new IllegalArgumentException("nanosecond timeout value out of range");
         }
 
         if (nanos > 0 && millis < Long.MAX_VALUE) {
@@ -1511,7 +1761,7 @@ class Thread implements Runnable {
     }
 
     /**
-     * Waits for this thread to die.
+     * Waits for this thread to terminate.
      *
      * <p> An invocation of this method behaves in exactly the same
      * way as the invocation
@@ -1530,8 +1780,50 @@ class Thread implements Runnable {
     }
 
     /**
+     * Waits for this thread to terminate for up to the given waiting duration.
+     * This method does not wait if the duration to wait is less than or equal
+     * to zero.
+     *
+     * @param   duration
+     *          the maximum duration to wait
+     *
+     * @return  {@code true} if the thread has terminated
+     *
+     * @throws  InterruptedException
+     *          if the current thread is interrupted while waiting.
+     *          The <i>interrupted status</i> of the current thread is cleared
+     *          when this exception is thrown.
+     *
+     * @throws  IllegalThreadStateException
+     *          if this thread has not been started.
+     *
+     * @since 99
+     */
+    public final boolean join(Duration duration) throws InterruptedException {
+        Objects.requireNonNull(duration);
+
+        Thread.State state = getState();
+        if (state == State.TERMINATED)
+            return true;
+        if (state == State.NEW)
+            throw new IllegalThreadStateException("Thread not started");
+        if (duration.isZero() || duration.isNegative())
+            return false;
+
+        if (isLightweight()) {
+            long nanos = TimeUnit.NANOSECONDS.convert(duration);
+            return ((Fiber) this).joinNanos(nanos);
+        } else {
+            // ignore nano precision for now
+            long millis = Long.max(TimeUnit.MILLISECONDS.convert(duration), 1);
+            join(millis);
+            return getState() == State.TERMINATED;
+        }
+    }
+
+    /**
      * Prints a stack trace of the current thread to the standard error stream.
-     * This method is used only for debugging.
+     * This method is useful for debugging.
      */
     public static void dumpStack() {
         new Exception("Stack trace").printStackTrace();
@@ -1539,10 +1831,12 @@ class Thread implements Runnable {
 
     /**
      * Marks this thread as either a {@linkplain #isDaemon daemon} thread
-     * or a user thread. The Java Virtual Machine exits when the only
-     * threads running are all daemon threads. The daemon status of {@code
-     * Thread} objects associated with {@link Fiber}s is meaningless and does
-     * not determine if the Java Virtual Machine exits or not.
+     * or a user thread.
+     * The daemon status of a lightweight thread is meaningless and is not
+     * changed by this method (the {@linkplain #isDaemon() isDaemon} method
+     * always returns {@code true}).
+     * The Java Virtual Machine exits when the only threads running are all
+     * daemon threads.
      *
      * <p> This method must be invoked before the thread is started.
      *
@@ -1558,21 +1852,27 @@ class Thread implements Runnable {
      */
     public final void setDaemon(boolean on) {
         checkAccess();
-        if (isAlive()) {
+        if (isAlive())
             throw new IllegalThreadStateException();
-        }
-        daemon = on;
+        if (!isLightweight())
+            holder.daemon = on;
     }
 
     /**
      * Tests if this thread is a daemon thread.
+     * The daemon status of a lightweight thread is meaningless, this method
+     * returns {@code true} if this is a lightweight thread.
      *
      * @return  {@code true} if this thread is a daemon thread;
      *          {@code false} otherwise.
      * @see     #setDaemon(boolean)
      */
     public final boolean isDaemon() {
-        return daemon;
+        if (isLightweight()) {
+            return true;
+        } else {
+            return holder.daemon;
+        }
     }
 
     /**
@@ -1595,8 +1895,9 @@ class Thread implements Runnable {
     }
 
     /**
-     * Returns a string representation of this thread, including the
-     * thread's name, priority, and thread group.
+     * Returns a string representation of this thread. The string representation
+     * will usually include the thread's name. The default implementation
+     * includes the thread's name, priority, and the name of the thread group.
      *
      * @return  a string representation of this thread.
      */
@@ -1774,7 +2075,8 @@ class Thread implements Runnable {
     }
 
     /**
-     * Returns a map of stack traces for all live threads.
+     * Returns a map of stack traces for all live threads. The map does not
+     * include lightweight threads.
      * The map keys are threads and each map value is an array of
      * {@code StackTraceElement} that represents the stack dump
      * of the corresponding {@code Thread}.
@@ -2023,7 +2325,7 @@ class Thread implements Runnable {
      */
     public State getState() {
         // get current thread state
-        return jdk.internal.misc.VM.toThreadState(threadStatus);
+        return jdk.internal.misc.VM.toThreadState(holder.threadStatus);
     }
 
     // Added in JSR-166
@@ -2136,13 +2438,12 @@ class Thread implements Runnable {
      */
     public UncaughtExceptionHandler getUncaughtExceptionHandler() {
         return uncaughtExceptionHandler != null ?
-            uncaughtExceptionHandler : group;
+            uncaughtExceptionHandler : getThreadGroup();
     }
 
     /**
      * Set the handler invoked when this thread abruptly terminates
      * due to an uncaught exception.
-     *
      * <p>A thread can take full control of how it responds to uncaught
      * exceptions by having its uncaught exception handler explicitly set.
      * If no such handler is set then the thread's {@code ThreadGroup}
@@ -2162,8 +2463,7 @@ class Thread implements Runnable {
 
     /**
      * Dispatch an uncaught exception to the handler. This method is
-     * called by the VM when a thread terminates with an exception. It is also
-     * called when a fiber terminates with an exception.
+     * called when a thread terminates with an exception.
      */
     void dispatchUncaughtException(Throwable e) {
         getUncaughtExceptionHandler().uncaughtException(this, e);
@@ -2231,23 +2531,48 @@ class Thread implements Runnable {
         }
     }
 
+    private static class LightweightThreads {
+        static final ThreadGroup THREAD_GROUP = threadGroup();
+        static final AccessControlContext ACCESS_CONTROL_CONTEXT = accessControlContext();
+
+        /**
+         * The thread group for lightweight threads.
+         */
+        private static ThreadGroup threadGroup() {
+            return AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
+                public ThreadGroup run() {
+                    ThreadGroup group = Thread.currentCarrierThread().getThreadGroup();
+                    for (ThreadGroup p; (p = group.getParent()) != null; )
+                        group = p;
+                    var newGroup = new ThreadGroup(group, "LightweightThreads", true);
+                    newGroup.setDaemon(true);
+                    return newGroup;
+                }});
+        }
+
+        /**
+         * Return an AccessControlContext that doesn't support any permissions.
+         */
+        private static AccessControlContext accessControlContext() {
+            return new AccessControlContext(new ProtectionDomain[] {
+                    new ProtectionDomain(null, null)
+            });
+        }
+    }
 
     // The following three initially uninitialized fields are exclusively
     // managed by class java.util.concurrent.ThreadLocalRandom. These
     // fields are used to build the high-performance PRNGs in the
-    // concurrent code, and we can not risk accidental false sharing.
-    // Hence, the fields are isolated with @Contended.
+    // concurrent code. Upcoming changes in the concurrent code avoid
+    // needing to use @Contented here.
 
     /** The current seed for a ThreadLocalRandom */
-    @jdk.internal.vm.annotation.Contended("tlr")
     long threadLocalRandomSeed;
 
     /** Probe hash value; nonzero if threadLocalRandomSeed initialized */
-    @jdk.internal.vm.annotation.Contended("tlr")
     int threadLocalRandomProbe;
 
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
-    @jdk.internal.vm.annotation.Contended("tlr")
     int threadLocalRandomSecondarySeed;
 
     /* Some private helper methods */

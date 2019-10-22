@@ -333,58 +333,27 @@ public interface JavaLangAccess {
     <R> R executeOnCarrierThread(Callable<R> task) throws Exception;
 
     /**
-     * Returns the value in the current carrier thread's copy of a
-     * thread-local variable.
+     * Returns the value of the current carrier thread's copy of a thread-local.
      */
     <T> T getCarrierThreadLocal(ThreadLocal<T> local);
 
     /**
-     * Returns the Fiber for the given shadow Thread object. Returns null if
-     * the thread is not a shadow thread.
+     * Sets the value of the current carrier thread's copy of a thread-local.
      */
-    Fiber<?> getFiber(Thread t);
+    <T> void setCarrierThreadLocal(ThreadLocal<T> local, T value);
 
     /**
-     * Returns the shadow thread for the given fiber or null if it does not
-     * have a shadow thread.
+     * Parks the current lightweight thread.
      */
-    Thread getShadowThread(Fiber<?> f);
+    void parkLightweightThread();
 
     /**
-     * Returns the currently executing strand. If executed from a running fiber
-     * then the {@link Fiber} object will be returned, otherwise the {@code
-     * Thread} object.
+     * Parks the current lightweight thread.for up to the given waiting time.
      */
-    Object currentStrand();
+    void parkLightweightThread(long nanos);
 
     /**
-     * Interrupt the given strand.
+     * Unparks the given lightweight thread.
      */
-    void interrupt(Object strand);
-
-    /**
-     * Returns the current strand's interrupt status
-     */
-    boolean isInterrupted();
-
-    /**
-     * Clear the current strand's interrupt status
-     */
-    boolean clearInterrupt();
-
-    /**
-     * Disables the current fiber for scheduling purposes.
-     */
-    void parkFiber();
-
-    /**
-     * Disables the current fiber for scheduling purposes for up to the
-     * given waiting time.
-     */
-    void parkFiber(long nanos);
-
-    /**
-     * Re-enables a fiber for scheduling.
-     */
-    void unparkFiber(Fiber<?> fiber);
+    void unparkLightweightThread(Thread thread);
 }

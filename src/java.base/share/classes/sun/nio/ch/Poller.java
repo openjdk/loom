@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -67,11 +67,11 @@ abstract class Poller implements Runnable {
      * @throws IllegalStateException if another strand is already registered
      *         to be unparked when the file descriptor is ready for this event
      */
-    static void register(Object strand, int fdVal, int event) {
+    static void register(int fdVal, int event) {
         if (event == Net.POLLIN) {
-            READ_POLLER.register(strand, fdVal);
+            READ_POLLER.register(fdVal);
         } else if (event == Net.POLLOUT) {
-            WRITE_POLLER.register(strand, fdVal);
+            WRITE_POLLER.register(fdVal);
         } else {
             throw new IllegalArgumentException("Unknown event " + event);
         }
@@ -83,11 +83,11 @@ abstract class Poller implements Runnable {
      *
      * @throws IllegalArgumentException if the event is not POLLIN or POLLOUT
      */
-    static void deregister(Object strand, int fdVal, int event) {
+    static void deregister(int fdVal, int event) {
         if (event == Net.POLLIN) {
-            READ_POLLER.deregister(strand, fdVal);
+            READ_POLLER.deregister(fdVal);
         } else if (event == Net.POLLOUT) {
-            WRITE_POLLER.deregister(strand, fdVal);
+            WRITE_POLLER.deregister(fdVal);
         } else {
             throw new IllegalArgumentException("Unknown event " + event);
         }
@@ -116,28 +116,30 @@ abstract class Poller implements Runnable {
         stopPoll(fdVal, Net.POLLOUT);
     }
 
-    private final Map<Integer, Object> map = new ConcurrentHashMap<>();
+    private final Map<Integer, Thread> map = new ConcurrentHashMap<>();
 
     protected Poller() { }
 
-    private void register(Object strand, int fdVal) {
-        Object previous = map.putIfAbsent(fdVal, strand);
-        if (previous != null && previous != strand) {
+    private void register(int fdVal) {
+        Thread t = Thread.currentThread();
+        Thread previous = map.putIfAbsent(fdVal, t);
+        if (previous != null && previous != t) {
             throw new IllegalStateException();
         }
         implRegister(fdVal);
     }
-    private void deregister(Object strand, int fdVal) {
-        if (map.remove(fdVal, strand)) {
+    private void deregister(int fdVal) {
+        Thread t = Thread.currentThread();
+        if (map.remove(fdVal, t)) {
             implDeregister(fdVal);
         }
     }
 
     private void wakeup(int fdVal) {
-        Object strand = map.remove(fdVal);
-        if (strand != null) {
+        Thread t = map.remove(fdVal);
+        if (t != null) {
             implDeregister(fdVal);
-            LockSupport.unpark(strand);
+            LockSupport.unpark(t);
         }
     }
 
@@ -145,9 +147,9 @@ abstract class Poller implements Runnable {
      * Called by the polling facility when the file descriptor is polled
      */
     final protected void polled(int fdVal) {
-        Object strand = map.remove(fdVal);
-        if (strand != null) {
-            LockSupport.unpark(strand);
+        Thread t = map.remove(fdVal);
+        if (t != null) {
+            LockSupport.unpark(t);
         }
     }
 

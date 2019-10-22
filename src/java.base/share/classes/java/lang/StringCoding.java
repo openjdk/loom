@@ -73,14 +73,17 @@ class StringCoding {
     private static final Charset UTF_8 = sun.nio.cs.UTF_8.INSTANCE;
 
     private static <T> T deref(ThreadLocal<SoftReference<T>> tl) {
-        SoftReference<T> sr = tl.get();
-        if (sr == null)
-            return null;
-        return sr.get();
+        if (!Thread.currentThread().isLightweight()) {
+            SoftReference<T> sr = tl.get();
+            if (sr != null)
+                return sr.get();
+        }
+        return null;
     }
 
     private static <T> void set(ThreadLocal<SoftReference<T>> tl, T ob) {
-        tl.set(new SoftReference<>(ob));
+        if (!Thread.currentThread().isLightweight())
+            tl.set(new SoftReference<>(ob));
     }
 
     // Trim the given byte array to the given length
@@ -515,11 +518,19 @@ class StringCoding {
             protected StringCoding.Result initialValue() {
                 return new StringCoding.Result();
             }};
+    
+    private static StringCoding.Result cachedResultObject() {
+        if (Thread.currentThread().isLightweight()) {
+            return new StringCoding.Result();
+        } else {
+            return resultCached.get();
+        }
+    }
 
     ////////////////////////// ascii //////////////////////////////
 
     private static Result decodeASCII(byte[] ba, int off, int len) {
-        Result result = resultCached.get();
+        Result result = cachedResultObject();
         if (COMPACT_STRINGS && !hasNegatives(ba, off, len)) {
             return result.with(Arrays.copyOfRange(ba, off, off + len),
                                LATIN1);
@@ -569,7 +580,7 @@ class StringCoding {
     ////////////////////////// latin1/8859_1 ///////////////////////////
 
     private static Result decodeLatin1(byte[] ba, int off, int len) {
-       Result result = resultCached.get();
+       Result result = cachedResultObject();
        if (COMPACT_STRINGS) {
            return result.with(Arrays.copyOfRange(ba, off, off + len), LATIN1);
        } else {
@@ -707,13 +718,12 @@ class StringCoding {
     private static Result decodeUTF8(byte[] src, int sp, int len, boolean doReplace) {
         // ascii-bais, which has a relative impact to the non-ascii-only bytes
         if (COMPACT_STRINGS && !hasNegatives(src, sp, len))
-            return resultCached.get().with(Arrays.copyOfRange(src, sp, sp + len),
-                                           LATIN1);
+            return cachedResultObject().with(Arrays.copyOfRange(src, sp, sp + len), LATIN1);
         return decodeUTF8_0(src, sp, len, doReplace);
     }
 
     private static Result decodeUTF8_0(byte[] src, int sp, int len, boolean doReplace) {
-        Result ret = resultCached.get();
+        Result ret = cachedResultObject();
 
         int sl = sp + len;
         int dp = 0;
@@ -1044,7 +1054,7 @@ class StringCoding {
         } catch (CharacterCodingException x) {
             throw new IllegalArgumentException(x);  // todo
         }
-        Result ret = resultCached.get().with(ca, 0, cb.position());
+        Result ret = cachedResultObject().with(ca, 0, cb.position());
         return new String(ret.value, ret.coder);
     }
 

@@ -24,59 +24,33 @@
 /**
  * @test
  * @run testng NetSockets
- * @summary Basic tests for Fibers using java.net.Socket/ServerSocket
+ * @summary Basic tests for lightweight threads using java.net.Socket/ServerSocket
  */
 
-import java.io.*;
-import java.net.*;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.SocketException;
 
 import org.testng.annotations.Test;
-import org.testng.annotations.DataProvider;
 import static org.testng.Assert.*;
 
 @Test
 public class NetSockets {
 
     private static final long DELAY = 2000;
-
-    private interface TestCase {
-        void run() throws IOException;
-    }
-
-    private void test(TestCase test) throws Exception {
-        try (var scope = FiberScope.open()) {
-            scope.schedule(() -> {
-                test.run();
-                return null;
-            }).join();
-        }
-    }
-
-    /**
-     * Cancel a fiber in connect.
-     */
-    public void testSocketConnectCancel() throws Exception {
-        test(() -> {
-            try (var listener = new ServerSocket()) {
-                listener.bind(new InetSocketAddress( InetAddress.getLocalHost(), 0));
-                Fiber.current().map(Fiber::cancel);
-                Socket s = new Socket();
-                try {
-                    s.connect(listener.getLocalSocketAddress());
-                    assertTrue(false);
-                } catch (IOException expected) {
-                } finally {
-                    s.close();
-                }
-            }
-        });
-    }
-
+    
     /**
      * Socket read/write, no blocking.
      */
     public void testSocketReadWrite1() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -95,10 +69,10 @@ public class NetSockets {
     }
 
     /**
-     * Fiber blocks in read.
+     * Lightweight thread blocks in read.
      */
     public void testSocketReadWrite2() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -117,10 +91,10 @@ public class NetSockets {
     }
 
     /**
-     * Fiber blocks in write.
+     * Lightweight thread blocks in write.
      */
     public void testSocketReadWrite3() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -139,10 +113,10 @@ public class NetSockets {
     }
 
     /**
-     * Fibers blocks in read, peer closes connection.
+     * Lightweight thread blocks in read, peer closes connection.
      */
     public void testSocketReadPeerClose1() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -156,10 +130,10 @@ public class NetSockets {
     }
 
     /**
-     * Fibers blocks in read, peer closes connection abruptly.
+     * Lightweight thread blocks in read, peer closes connection abruptly.
      */
     public void testSocketReadPeerClose2() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -178,10 +152,10 @@ public class NetSockets {
     }
 
     /**
-     * Socket close while Fiber blocked in read.
+     * Socket close while lightweight thread blocked in read.
      */
     public void testSocketReadAsyncClose() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s = connection.socket1();
                 ScheduledCloser.schedule(s, DELAY);
@@ -194,50 +168,13 @@ public class NetSockets {
     }
 
     /**
-     * Socket close while Fiber blocked in write.
+     * Socket close while lightweight thread blocked in write.
      */
     public void testSocketWriteAsyncClose() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s = connection.socket1();
                 ScheduledCloser.schedule(s, DELAY);
-                try {
-                    byte[] ba = new byte[100*10024];
-                    OutputStream out = s.getOutputStream();
-                    for (;;) {
-                        out.write(ba);
-                    }
-                } catch (SocketException expected) { }
-            }
-        });
-    }
-
-    /**
-     * Cancel a fiber blocked in read.
-     */
-    public void testSocketReadCancel() throws Exception {
-        test(() -> {
-            try (var connection = new Connection()) {
-                var fiber = Fiber.current().orElseThrow();
-                ScheduledCanceller.schedule(fiber, DELAY);
-                Socket s = connection.socket1();
-                try {
-                    int n = s.getInputStream().read();
-                    throw new RuntimeException("read returned " + n);
-                } catch (SocketException expected) { }
-            }
-        });
-    }
-
-    /**
-     * Cancel a fiber blocked in write.
-     */
-    public void testSocketWriteCancel() throws Exception {
-        test(() -> {
-            try (var connection = new Connection()) {
-                var fiber = Fiber.current().orElseThrow();
-                ScheduledCanceller.schedule(fiber, DELAY);
-                Socket s = connection.socket1();
                 try {
                     byte[] ba = new byte[100*10024];
                     OutputStream out = s.getOutputStream();
@@ -253,7 +190,7 @@ public class NetSockets {
      * ServerSocket accept, no blocking.
      */
     public void testServerSocketAccept1() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var listener = new ServerSocket(0)) {
                 var socket1 = new Socket(listener.getInetAddress(), listener.getLocalPort());
                 // accept should not block
@@ -265,10 +202,10 @@ public class NetSockets {
     }
 
     /**
-     * Fiber blocks in accept.
+     * Lightweight thread blocks in accept.
      */
     public void testServerSocketAccept2() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var listener = new ServerSocket(0)) {
                 var socket1 = new Socket();
                 ScheduledConnector.schedule(socket1, listener.getLocalSocketAddress(), DELAY);
@@ -281,28 +218,12 @@ public class NetSockets {
     }
 
     /**
-     * ServerSocket close while Fiber blocked in accept.
+     * ServerSocket close while lightweight thread blocked in accept.
      */
     public void testServerSocketAcceptAsyncClose() throws Exception {
-        test(() -> {
+        TestHelper.runInLightWeightThread(() -> {
             try (var listener = new ServerSocket(0)) {
                 ScheduledCloser.schedule(listener, DELAY);
-                try {
-                    listener.accept().close();
-                    throw new RuntimeException("connection accepted???");
-                } catch (SocketException expected) { }
-            }
-        });
-    }
-
-    /**
-     * Fiber cancelled while blocked in accept.
-     */
-    public void testServerSocketAcceptCancel() throws Exception {
-        test(() -> {
-            try (var listener = new ServerSocket(0)) {
-                var fiber = Fiber.current().orElseThrow();
-                ScheduledCanceller.schedule(fiber, DELAY);
                 try {
                     listener.accept().close();
                     throw new RuntimeException("connection accepted???");
@@ -451,31 +372,6 @@ public class NetSockets {
 
         static void schedule(Socket socket, SocketAddress address, long delay) {
             new Thread(new ScheduledConnector(socket, address, delay)).start();
-        }
-    }
-
-    /**
-     * Cancel a fiber after a delay
-     */
-    static class ScheduledCanceller implements Runnable {
-        private final Fiber fiber;
-        private final long delay;
-
-        ScheduledCanceller(Fiber fiber, long delay) {
-            this.fiber = fiber;
-            this.delay = delay;
-        }
-
-        @Override
-        public void run() {
-            try {
-                Thread.sleep(delay);
-                fiber.cancel();
-            } catch (Exception e) { }
-        }
-
-        static void schedule(Fiber fiber, long delay) {
-            new Thread(new ScheduledCanceller(fiber, delay)).start();
         }
     }
 }

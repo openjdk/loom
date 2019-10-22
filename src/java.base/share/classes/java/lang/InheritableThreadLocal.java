@@ -24,7 +24,6 @@
  */
 
 package java.lang;
-import java.lang.ref.*;
 
 /**
  * This class extends {@code ThreadLocal} to provide inheritance of values
@@ -78,7 +77,11 @@ public class InheritableThreadLocal<T> extends ThreadLocal<T> {
      * @param t the current thread
      */
     ThreadLocalMap getMap(Thread t) {
-       return t.inheritableThreadLocals;
+        ThreadLocalMap map = t.inheritableThreadLocals;
+        if (map == ThreadLocalMap.NOT_SUPPORTED) {
+            throw new UnsupportedOperationException();
+        }
+        return map;
     }
 
     /**

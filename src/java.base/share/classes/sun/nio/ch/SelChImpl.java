@@ -31,7 +31,7 @@ import java.io.IOException;
 
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
-import jdk.internal.misc.Strands;
+import jdk.internal.misc.LightweightThreads;
 
 /**
  * An interface that allows translation (and more!).
@@ -73,7 +73,7 @@ public interface SelChImpl extends Channel {
     void kill() throws IOException;
 
     /**
-     * Disables the current thread or fiber for scheduling purposes until this
+     * Disables the current thread  for scheduling purposes until this
      * channel is ready for I/O, or asynchronously closed, for up to the
      * specified waiting time.
      *
@@ -85,18 +85,17 @@ public interface SelChImpl extends Channel {
      * @param nanos the timeout to wait; {@code <= 0} to wait indefinitely
      */
     default void park(int event, long nanos) throws IOException {
-        Object strand = Strands.currentStrand();
-        if (PollerProvider.available() && (strand instanceof Fiber)) {
-            Poller.register(strand, getFDVal(), event);
+        if (Thread.currentThread().isLightweight()) {
+            Poller.register(getFDVal(), event);
             if (isOpen()) {
                 try {
                     if (nanos == 0) {
-                        Strands.parkFiber();
+                        LightweightThreads.park();
                     } else {
-                        Strands.parkFiber(nanos);
+                        LightweightThreads.park(nanos);
                     }
                 } finally {
-                    Poller.deregister(strand, getFDVal(), event);
+                    Poller.deregister(getFDVal(), event);
                 }
             }
         } else {
@@ -111,7 +110,7 @@ public interface SelChImpl extends Channel {
     }
 
     /**
-     * Disables the current thread or fiber for scheduling purposes until this
+     * Disables the current thread or scheduling purposes until this
      * channel is ready for I/O, or asynchronously closed.
      *
      * <p> This method does <em>not</em> report which of these caused the

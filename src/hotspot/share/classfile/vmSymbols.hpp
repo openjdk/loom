@@ -61,6 +61,7 @@
   template(java_lang_StringLatin1,                    "java/lang/StringLatin1")                   \
   template(java_lang_StringUTF16,                     "java/lang/StringUTF16")                    \
   template(java_lang_Thread,                          "java/lang/Thread")                         \
+  template(java_lang_Thread_FieldHolder,              "java/lang/Thread$FieldHolder")             \
   template(java_lang_ThreadGroup,                     "java/lang/ThreadGroup")                    \
   template(java_lang_Fiber,                           "java/lang/Fiber")                          \
   template(java_lang_Cloneable,                       "java/lang/Cloneable")                      \
@@ -572,6 +573,7 @@
   template(accesscontrolcontext_signature,            "Ljava/security/AccessControlContext;")                     \
   template(class_protectiondomain_signature,          "(Ljava/lang/Class;Ljava/security/ProtectionDomain;)V")     \
   template(thread_signature,                          "Ljava/lang/Thread;")                                       \
+  template(thread_fieldholder_signature,              "Ljava/lang/Thread$FieldHolder;")                           \
   template(thread_array_signature,                    "[Ljava/lang/Thread;")                                      \
   template(threadgroup_signature,                     "Ljava/lang/ThreadGroup;")                                  \
   template(threadgroup_array_signature,               "[Ljava/lang/ThreadGroup;")                                 \

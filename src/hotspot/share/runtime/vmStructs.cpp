@@ -480,6 +480,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
      static_field(SystemDictionary,            WK_KLASS(ClassLoader_klass),                   InstanceKlass*)                        \
      static_field(SystemDictionary,            WK_KLASS(System_klass),                        InstanceKlass*)                        \
      static_field(SystemDictionary,            WK_KLASS(Thread_klass),                        InstanceKlass*)                        \
+     static_field(SystemDictionary,            WK_KLASS(Thread_FieldHolder_klass),            InstanceKlass*)                        \
      static_field(SystemDictionary,            WK_KLASS(ThreadGroup_klass),                   InstanceKlass*)                        \
      static_field(SystemDictionary,            WK_KLASS(MethodHandle_klass),                  InstanceKlass*)                        \
      static_field(SystemDictionary,            _java_system_loader,                           oop)                                   \

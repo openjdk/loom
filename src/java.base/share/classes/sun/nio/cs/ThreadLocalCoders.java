@@ -59,19 +59,24 @@ public class ThreadLocalCoders {
         abstract boolean hasName(Object ob, Object name);
 
         Object forName(Object name) {
-            Object[] oa = cache.get();
-            if (oa == null) {
+            Object[] oa;
+            if (Thread.currentThread().isLightweight()) {
                 oa = new Object[size];
-                cache.set(oa);
             } else {
-                for (int i = 0; i < oa.length; i++) {
-                    Object ob = oa[i];
-                    if (ob == null)
-                        continue;
-                    if (hasName(ob, name)) {
-                        if (i > 0)
-                            moveToFront(oa, i);
-                        return ob;
+                oa = cache.get();
+                if (oa == null) {
+                    oa = new Object[size];
+                    cache.set(oa);
+                } else {
+                    for (int i = 0; i < oa.length; i++) {
+                        Object ob = oa[i];
+                        if (ob == null)
+                            continue;
+                        if (hasName(ob, name)) {
+                            if (i > 0)
+                                moveToFront(oa, i);
+                            return ob;
+                        }
                     }
                 }
             }

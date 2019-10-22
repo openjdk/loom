@@ -48,7 +48,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
-import jdk.internal.misc.Strands;
 import sun.net.NetHooks;
 import sun.net.ext.ExtendedSocketOptions;
 
@@ -277,7 +276,7 @@ class ServerSocketChannelImpl
             boolean blocking = isBlocking();
             try {
                 begin(blocking);
-                lockedConfigureNonBlockingIfFiber();
+                lockedconfigureNonBlockingIfNeeded();
                 n = Net.accept(this.fd, newfd, isaa);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -387,7 +386,7 @@ class ServerSocketChannelImpl
         assert acceptLock.isHeldByCurrentThread();
         synchronized (stateLock) {
             ensureOpen();
-            // do nothing if fiber has forced the socket to be non-blocking
+            // do nothing if lightweight thread has forced the socket to be non-blocking
             if (!nonBlocking) {
                 IOUtil.configureBlocking(fd, block);
             }
@@ -395,12 +394,12 @@ class ServerSocketChannelImpl
     }
 
     /**
-     * Ensures that the socket is configured non-blocking when the current
-     * strand is a fiber.
+     * Ensures that the socket is configured non-blocking when on a lightweight
+     * thread.
      */
-    private void lockedConfigureNonBlockingIfFiber() throws IOException {
+    private void lockedconfigureNonBlockingIfNeeded() throws IOException {
         assert acceptLock.isHeldByCurrentThread();
-        if (!nonBlocking && (Strands.currentStrand() instanceof Fiber)) {
+        if (!nonBlocking && (Thread.currentThread().isLightweight())) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
@@ -449,7 +448,7 @@ class ServerSocketChannelImpl
             if (!tryClose()) {
                 long th = thread;
                 if (th != 0) {
-                    if (NativeThread.isFiber(th))
+                    if (NativeThread.isLightweightThread(th))
                         Poller.stopPoll(fdVal);
                     nd.preClose(fd);
                     if (NativeThread.isKernelThread(th))

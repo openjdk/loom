@@ -48,8 +48,6 @@ import java.util.Spliterators;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
-import jdk.internal.misc.Strands;
-
 /**
  * A {@linkplain BlockingQueue blocking queue} in which each insert
  * operation must wait for a corresponding remove operation by another
@@ -238,7 +236,7 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
         static final class SNode {
             volatile SNode next;        // next node in stack
             volatile SNode match;       // the node matched to this
-            volatile Object waiter;     // to control park/unpark
+            volatile Thread waiter;     // to control park/unpark
             Object item;                // data; or null for REQUESTs
             int mode;
             // Note: item and mode fields don't need to be volatile
@@ -265,7 +263,7 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
             boolean tryMatch(SNode s) {
                 if (match == null &&
                     SMATCH.compareAndSet(this, null, s)) {
-                    Object w = waiter;
+                    Thread w = waiter;
                     if (w != null) {    // waiters need at most one unpark
                         waiter = null;
                         LockSupport.unpark(w);
@@ -435,12 +433,12 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
              * method rather than calling awaitFulfill.
              */
             final long deadline = timed ? System.nanoTime() + nanos : 0L;
-            Object w = Strands.currentStrand();
+            Thread w = Thread.currentThread();
             int spins = shouldSpin(s)
                 ? (timed ? MAX_TIMED_SPINS : MAX_UNTIMED_SPINS)
                 : 0;
             for (;;) {
-                if (Strands.isInterrupted())
+                if (w.isInterrupted())
                     s.tryCancel();
                 SNode m = s.match;
                 if (m != null)
@@ -538,7 +536,7 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
         static final class QNode {
             volatile QNode next;          // next node in queue
             volatile Object item;         // CAS'ed to or from null
-            volatile Object waiter;       // to control park/unpark
+            volatile Thread waiter;       // to control park/unpark
             final boolean isData;
 
             QNode(Object item, boolean isData) {
@@ -734,12 +732,12 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
         Object awaitFulfill(QNode s, E e, boolean timed, long nanos) {
             /* Same idea as TransferStack.awaitFulfill */
             final long deadline = timed ? System.nanoTime() + nanos : 0L;
-            Object w = Strands.currentStrand();
+            Thread w = Thread.currentThread();
             int spins = (head.next == s)
                 ? (timed ? MAX_TIMED_SPINS : MAX_UNTIMED_SPINS)
                 : 0;
             for (;;) {
-                if (Strands.isInterrupted())
+                if (w.isInterrupted())
                     s.tryCancel(e);
                 Object x = s.item;
                 if (x != e)

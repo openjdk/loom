@@ -55,7 +55,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
-import jdk.internal.misc.Strands;
 import sun.net.ResourceManager;
 import sun.net.ext.ExtendedSocketOptions;
 import sun.net.util.IPAddressUtil;
@@ -413,7 +412,7 @@ class DatagramChannelImpl
             ByteBuffer bb = null;
             try {
                 SocketAddress remote = beginRead(blocking, false);
-                lockedConfigureNonBlockingIfFiber();
+                lockedconfigureNonBlockingIfNeeded();
                 boolean connected = (remote != null);
                 SecurityManager sm = System.getSecurityManager();
                 if (connected || (sm == null)) {
@@ -518,7 +517,7 @@ class DatagramChannelImpl
             int n = 0;
             try {
                 SocketAddress remote = beginWrite(blocking, false);
-                lockedConfigureNonBlockingIfFiber();
+                lockedconfigureNonBlockingIfNeeded();
                 if (remote != null) {
                     // connected
                     if (!target.equals(remote)) {
@@ -626,7 +625,7 @@ class DatagramChannelImpl
             int n = 0;
             try {
                 beginRead(blocking, true);
-                lockedConfigureNonBlockingIfFiber();
+                lockedconfigureNonBlockingIfNeeded();
                 n = IOUtil.read(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -656,7 +655,7 @@ class DatagramChannelImpl
             long n = 0;
             try {
                 beginRead(blocking, true);
-                lockedConfigureNonBlockingIfFiber();
+                lockedconfigureNonBlockingIfNeeded();
                 n = IOUtil.read(fd, dsts, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -734,7 +733,7 @@ class DatagramChannelImpl
             int n = 0;
             try {
                 beginWrite(blocking, true);
-                lockedConfigureNonBlockingIfFiber();
+                lockedconfigureNonBlockingIfNeeded();
                 n = IOUtil.write(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -764,7 +763,7 @@ class DatagramChannelImpl
             long n = 0;
             try {
                 beginWrite(blocking, true);
-                lockedConfigureNonBlockingIfFiber();
+                lockedconfigureNonBlockingIfNeeded();
                 n = IOUtil.write(fd, srcs, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -804,7 +803,7 @@ class DatagramChannelImpl
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
         synchronized (stateLock) {
             ensureOpen();
-            // do nothing if fiber has forced the socket to be non-blocking
+            // do nothing if lightweight thread has forced the socket to be non-blocking
             if (!nonBlocking) {
                 IOUtil.configureBlocking(fd, block);
             }
@@ -812,13 +811,13 @@ class DatagramChannelImpl
     }
 
     /**
-     * Ensures that the socket is configured non-blocking when the current
-     * strand is a fiber or a timeout is specified.
+     * Ensures that the socket is configured non-blocking when on a lightweight
+     * thread or a timeout is specified.
      * @throws IOException if there is an I/O error changing the blocking mode
      */
-    private void lockedConfigureNonBlockingIfFiber() throws IOException {
+    private void lockedconfigureNonBlockingIfNeeded() throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
-        if (!nonBlocking && (Strands.currentStrand() instanceof Fiber)) {
+        if (!nonBlocking && Thread.currentThread().isLightweight()) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
@@ -1242,7 +1241,8 @@ class DatagramChannelImpl
                 long reader = readerThread;
                 long writer = writerThread;
                 if (reader != 0 || writer != 0) {
-                    if (NativeThread.isFiber(reader) || NativeThread.isFiber(writer)) {
+                    if (NativeThread.isLightweightThread(reader)
+                            || NativeThread.isLightweightThread(writer)) {
                         Poller.stopPoll(fdVal);
                     }
                     nd.preClose(fd);

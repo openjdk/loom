@@ -351,9 +351,9 @@ public class Object {
         try {
             wait0(timeoutMillis);
         } catch (InterruptedException e) {
-            Fiber<?> fiber = Fiber.currentFiber();
-            if (fiber != null) {
-                fiber.isInterrupted(true);
+            Thread thread = Thread.currentThread();
+            if (thread.isLightweight()) {
+                thread.clearInterrupt();
             }
             throw e;
         }

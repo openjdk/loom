@@ -37,8 +37,6 @@ package java.util.concurrent.locks;
 
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
-
-import jdk.internal.misc.Strands;
 import jdk.internal.vm.annotation.ReservedStackAccess;
 
 /**
@@ -125,14 +123,14 @@ public class ReentrantLock implements Lock, java.io.Serializable {
          */
         @ReservedStackAccess
         final boolean tryLock() {
-            Object current = Strands.currentStrand();
+            Thread current = Thread.currentThread();
             int c = getState();
             if (c == 0) {
                 if (compareAndSetState(0, 1)) {
-                    setExclusiveOwner(current);
+                    setExclusiveOwnerThread(current);
                     return true;
                 }
-            } else if (getExclusiveOwner() == current) {
+            } else if (getExclusiveOwnerThread() == current) {
                 if (++c < 0) // overflow
                     throw new Error("Maximum lock count exceeded");
                 setState(c);
@@ -173,11 +171,11 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         @ReservedStackAccess
         protected final boolean tryRelease(int releases) {
             int c = getState() - releases;
-            if (getExclusiveOwner() != Strands.currentStrand())
+            if (getExclusiveOwnerThread() != Thread.currentThread())
                 throw new IllegalMonitorStateException();
             boolean free = (c == 0);
             if (free)
-                setExclusiveOwner(null);
+                setExclusiveOwnerThread(null);
             setState(c);
             return free;
         }
@@ -185,7 +183,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         protected final boolean isHeldExclusively() {
             // While we must in general read state before owner,
             // we don't need to do so to check if current thread is owner
-            return getExclusiveOwner() == Strands.currentStrand();
+            return getExclusiveOwnerThread() == Thread.currentThread();
         }
 
         final ConditionObject newCondition() {
@@ -223,11 +221,11 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         private static final long serialVersionUID = 7316153563782823691L;
 
         final boolean initialTryLock() {
-            Object current = Strands.currentStrand();
+            Thread current = Thread.currentThread();
             if (compareAndSetState(0, 1)) { // first attempt is unguarded
-                setExclusiveOwner(current);
+                setExclusiveOwnerThread(current);
                 return true;
-            } else if (getExclusiveOwner() == current) {
+            } else if (getExclusiveOwnerThread() == current) {
                 int c = getState() + 1;
                 if (c < 0) // overflow
                     throw new Error("Maximum lock count exceeded");
@@ -242,7 +240,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
          */
         protected final boolean tryAcquire(int acquires) {
             if (getState() == 0 && compareAndSetState(0, acquires)) {
-                setExclusiveOwner(Strands.currentStrand());
+                setExclusiveOwnerThread(Thread.currentThread());
                 return true;
             }
             return false;
@@ -259,14 +257,14 @@ public class ReentrantLock implements Lock, java.io.Serializable {
          * Acquires only if reentrant or queue is empty.
          */
         final boolean initialTryLock() {
-            Object current = Strands.currentStrand();
+            Thread current = Thread.currentThread();
             int c = getState();
             if (c == 0) {
                 if (!hasQueuedThreads() && compareAndSetState(0, 1)) {
-                    setExclusiveOwner(current);
+                    setExclusiveOwnerThread(current);
                     return true;
                 }
-            } else if (getExclusiveOwner() == current) {
+            } else if (getExclusiveOwnerThread() == current) {
                 if (++c < 0) // overflow
                     throw new Error("Maximum lock count exceeded");
                 setState(c);
@@ -281,7 +279,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         protected final boolean tryAcquire(int acquires) {
             if (getState() == 0 && !hasQueuedPredecessors() &&
                 compareAndSetState(0, acquires)) {
-                setExclusiveOwner(Strands.currentStrand());
+                setExclusiveOwnerThread(Thread.currentThread());
                 return true;
             }
             return false;

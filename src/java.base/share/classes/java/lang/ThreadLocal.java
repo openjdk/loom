@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2013, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,12 +24,13 @@
  */
 
 package java.lang;
-import jdk.internal.misc.TerminatingThreadLocal;
 
-import java.lang.ref.*;
+import java.lang.ref.WeakReference;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+
+import jdk.internal.misc.TerminatingThreadLocal;
 
 /**
  * This class provides thread-local variables.  These variables differ from
@@ -226,7 +227,14 @@ public class ThreadLocal<T> {
      *        this thread-local.
      */
     public void set(T value) {
-        Thread t = Thread.currentThread();
+        set(Thread.currentThread(), value);
+    }
+
+    void setCarrierThreadLocal(T value) {
+        set(Thread.currentCarrierThread(), value);
+    }
+
+    private void set(Thread t, T value) {
         ThreadLocalMap map = getMap(t);
         if (map != null) {
             map.set(this, value);
@@ -261,7 +269,11 @@ public class ThreadLocal<T> {
      * @return the map
      */
     ThreadLocalMap getMap(Thread t) {
-        return t.threadLocals;
+        ThreadLocalMap map = t.threadLocals;
+        if (map == ThreadLocalMap.NOT_SUPPORTED) {
+            throw new UnsupportedOperationException();
+        }
+        return map;
     }
 
     /**
@@ -346,6 +358,8 @@ public class ThreadLocal<T> {
             }
         }
 
+        static final ThreadLocalMap NOT_SUPPORTED = new ThreadLocalMap();
+
         /**
          * The initial capacity -- MUST be a power of two.
          */
@@ -386,6 +400,9 @@ public class ThreadLocal<T> {
          */
         private static int prevIndex(int i, int len) {
             return ((i - 1 >= 0) ? i - 1 : len - 1);
+        }
+
+        ThreadLocalMap() {
         }
 
         /**

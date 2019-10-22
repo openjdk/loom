@@ -50,7 +50,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.concurrent.locks.LockSupport;
-import jdk.internal.misc.Strands;
+
+import jdk.internal.misc.LightweightThreads;
 
 /**
  * An {@link ExecutorService} for running {@link ForkJoinTask}s.
@@ -1923,7 +1924,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         Thread t; ForkJoinWorkerThread w; WorkQueue q;
         if (task == null)
             throw new NullPointerException();
-        if (((t = Strands.currentCarrierThread()) instanceof ForkJoinWorkerThread) &&
+        if (((t = LightweightThreads.currentCarrierThread()) instanceof ForkJoinWorkerThread) &&
             (w = (ForkJoinWorkerThread)t).pool == this &&
             (q = w.workQueue) != null)
             q.push(task);

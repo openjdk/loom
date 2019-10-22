@@ -111,7 +111,7 @@ class NativeBuffers {
         if (buffers == null) {
             buffers = new NativeBuffer[TEMP_BUF_POOL_SIZE];
             buffers[0] = buffer;
-            threadLocal.set(buffers);
+            JLA.setCarrierThreadLocal(threadLocal, buffers);
             return;
         }
         // Put it in an empty slot if such exists

@@ -42,16 +42,20 @@ public class FormattedFloatingDecimal{
     private char[] mantissa;
     private char[] exponent;
 
-    private static final ThreadLocal<Object> threadLocalCharBuffer =
-            new ThreadLocal<Object>() {
+    private static final ThreadLocal<char[]> threadLocalCharBuffer =
+            new ThreadLocal<>() {
                 @Override
-                protected Object initialValue() {
+                protected char[] initialValue() {
                     return new char[20];
                 }
             };
 
     private static char[] getBuffer(){
-        return (char[]) threadLocalCharBuffer.get();
+        if (Thread.currentThread().isLightweight()) {
+            return new char[20];
+        } else {
+            return threadLocalCharBuffer.get();
+        }
     }
 
     private FormattedFloatingDecimal(int precision, Form form, FloatingDecimal.BinaryToASCIIConverter fdConverter) {

@@ -51,9 +51,9 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
+import jdk.internal.misc.LightweightThreads;
 import jdk.internal.ref.CleanerFactory;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.Strands;
 import sun.net.ConnectionResetException;
 import sun.net.NetHooks;
 import sun.net.PlatformSocketImpl;
@@ -70,12 +70,12 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * This implementation attempts to be compatible with legacy PlainSocketImpl,
  * including behavior and exceptions that are not specified by SocketImpl.
  *
- * The underlying socket used by this SocketImpl is initially configured
- * blocking. If a connect, accept or read is attempted with a timeout, or a
- * fiber invokes a blocking operation, then the socket is changed to non-blocking
+ * The underlying socket used by this SocketImpl is initially configured blocking.
+ * If a connect, accept or read is attempted with a timeout, or a lightweight
+ * thread invokes a blocking operation, then the socket is changed to non-blocking
  * When in non-blocking mode, operations that don't complete immediately will
- * poll the socket (or park the fiber when invoked on a fiber) and preserve the
- * semantics of blocking operations.
+ * poll the socket (or park when invoked on a lightweight thread) and preserve
+ * the semantics of blocking operations.
  */
 
 public final class NioSocketImpl extends SocketImpl implements PlatformSocketImpl {
@@ -167,29 +167,29 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
     }
 
     /**
-     * Disables the current thread or fiber for scheduling purposes until the
+     * Disables the current thread for scheduling purposes until the
      * socket is ready for I/O or is asynchronously closed, for up to the
      * specified waiting time.
-     * @throws IOException if an I/O error occurs or the fiber is interrupted
+     * @throws IOException if an I/O error occurs
      */
     private void park(FileDescriptor fd, int event, long nanos) throws IOException {
-        Object strand = Strands.currentStrand();
-        if (PollerProvider.available() && (strand instanceof Fiber)) {
+        Thread t = Thread.currentThread();
+        if (t.isLightweight()) {
             int fdVal = fdVal(fd);
-            Poller.register(strand, fdVal, event);
+            Poller.register(fdVal, event);
             if (isOpen()) {
                 try {
                     if (nanos == 0) {
-                        Strands.parkFiber();
+                        LightweightThreads.park();
                     } else {
-                        Strands.parkFiber(nanos);
+                        LightweightThreads.park(nanos);
                     }
                     // throw SocketException with interrupt status set for now
-                    if (Strands.isInterrupted()) {
+                    if (t.isInterrupted()) {
                         throw new SocketException("I/O operation interrupted");
                     }
                 } finally {
-                    Poller.deregister(strand, fdVal, event);
+                    Poller.deregister(fdVal, event);
                 }
             }
         } else {
@@ -206,22 +206,22 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
     /**
      * Disables the current thread for scheduling purposes until the socket is
      * ready for I/O or is asynchronously closed.
-     * @throws IOException if an I/O error occurs or the fiber is interrupted
+     * @throws IOException if an I/O error occurs
      */
     private void park(FileDescriptor fd, int event) throws IOException {
         park(fd, event, 0);
     }
 
     /**
-     * Ensures that the socket is configured non-blocking when the current
-     * strand is a fiber or the operation has a timeout
+     * Ensures that the socket is configured non-blocking invoked on a lightweight
+     * thread or the operation has a timeout
      * @throws IOException if there is an I/O error changing the blocking mode
      */
     private void configureNonBlockingIfNeeded(FileDescriptor fd, boolean timed)
         throws IOException
     {
         if (!nonBlocking
-            && (timed || Strands.currentStrand() instanceof Fiber)) {
+            && (timed || Thread.currentThread().isLightweight())) {
             assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
             IOUtil.configureBlocking(fd, false);
             nonBlocking = true;
@@ -900,7 +900,8 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             if (!tryClose()) {
                 long reader = readerThread;
                 long writer = writerThread;
-                if (NativeThread.isFiber(reader) || NativeThread.isFiber(writer))
+                if (NativeThread.isLightweightThread(reader)
+                        || NativeThread.isLightweightThread(writer))
                     Poller.stopPoll(fdVal(fd));
                 nd.preClose(fd);
                 if (NativeThread.isKernelThread(reader))
@@ -1147,7 +1148,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             ensureOpenAndConnected();
             if (!isInputClosed) {
                 Net.shutdown(fd, Net.SHUT_RD);
-                if (NativeThread.isFiber(readerThread)) {
+                if (NativeThread.isLightweightThread(readerThread)) {
                     Poller.stopPoll(fdVal(fd), Net.POLLIN);
                 }
                 isInputClosed = true;
@@ -1161,7 +1162,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             ensureOpenAndConnected();
             if (!isOutputClosed) {
                 Net.shutdown(fd, Net.SHUT_WR);
-                if (NativeThread.isFiber(writerThread)) {
+                if (NativeThread.isLightweightThread(writerThread)) {
                     Poller.stopPoll(fdVal(fd), Net.POLLOUT);
                 }
                 isOutputClosed = true;

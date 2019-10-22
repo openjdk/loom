@@ -41,7 +41,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-import jdk.internal.misc.Blocker;
 
 /**
  * Base Selector implementation class.
@@ -134,12 +133,14 @@ abstract class SelectorImpl
     public final int select(long timeout) throws IOException {
         if (timeout < 0)
             throw new IllegalArgumentException("Negative timeout");
-        return Blocker.run(() -> lockAndDoSelect(null, (timeout == 0) ? -1 : timeout));
+        // TBD blocks lightweight thread
+        return lockAndDoSelect(null, (timeout == 0) ? -1 : timeout);
     }
 
     @Override
     public final int select() throws IOException {
-        return Blocker.run(() -> lockAndDoSelect(null, -1));
+        // TBD blocks lightweight thread
+        return lockAndDoSelect(null, -1);
     }
 
     @Override
@@ -154,12 +155,14 @@ abstract class SelectorImpl
         Objects.requireNonNull(action);
         if (timeout < 0)
             throw new IllegalArgumentException("Negative timeout");
+        // TBD blocks lightweight thread
         return lockAndDoSelect(action, (timeout == 0) ? -1 : timeout);
     }
 
     @Override
     public final int select(Consumer<SelectionKey> action) throws IOException {
         Objects.requireNonNull(action);
+        // TBD blocks lightweight thread
         return lockAndDoSelect(action, -1);
     }
 

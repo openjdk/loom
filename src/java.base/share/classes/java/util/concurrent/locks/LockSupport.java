@@ -37,7 +37,7 @@ package java.util.concurrent.locks;
 
 import java.util.concurrent.TimeUnit;
 
-import jdk.internal.misc.Strands;
+import jdk.internal.misc.LightweightThreads;
 import jdk.internal.misc.Unsafe;
 
 /**
@@ -143,11 +143,7 @@ public class LockSupport {
     private LockSupport() {} // Cannot be instantiated.
 
     private static void setBlocker(Thread t, Object arg) {
-        U.putReferenceOpaque(t, THREAD_PARKBLOCKER, arg);
-    }
-
-    private static void setBlocker(Fiber<?> f, Object arg) {
-        U.putReferenceOpaque(f, FIBER_PARKBLOCKER, arg);
+        U.putReferenceOpaque(t, PARKBLOCKER, arg);
     }
 
     /**
@@ -165,12 +161,7 @@ public class LockSupport {
      * @since 14
      */
     public static void setCurrentBlocker(Object blocker) {
-        Object strand = Strands.currentStrand();
-        if (strand instanceof Fiber) {
-            U.putReferenceOpaque(strand, FIBER_PARKBLOCKER, blocker);
-        } else {
-            U.putReferenceOpaque(strand, THREAD_PARKBLOCKER, blocker);
-        }
+        U.putReferenceOpaque(Thread.currentThread(), PARKBLOCKER, blocker);
     }
 
     /**
@@ -186,40 +177,13 @@ public class LockSupport {
      */
     public static void unpark(Thread thread) {
         if (thread != null) {
-            Fiber<?> fiber = Strands.getFiber(thread);
-            if (fiber != null) {
-                Strands.unparkFiber(fiber);  // can throw RejectedExecutionException
+            if (thread.isLightweight()) {
+                LightweightThreads.unpark(thread); // can throw RejectedExecutionException
             } else {
                 U.unpark(thread);
             }
         }
     }
-
-    /**
-     * Makes available the permit for the given strand, if it
-     * was not already available.  If the strand was blocked on
-     * {@code park} then it will unblock.  Otherwise, its next call
-     * to {@code park} is guaranteed not to block. This operation
-     * is not guaranteed to have any effect at all if the given
-     * strand is a Thread that has not been started.
-     *
-     * @param strand the strand to unpark, or {@code null}, in which case
-     *        this operation has no effect
-     * @throws IllegalArgumentException if strand is not a {@code Thread},
-     *         {@code Fiber} or {@code null}
-     */
-    public static void unpark(Object strand) {
-        if (strand != null) {
-            if (strand instanceof Thread) {
-                U.unpark(strand);
-            } else if (strand instanceof Fiber) {
-                Strands.unparkFiber((Fiber<?>) strand);  // can throw RejectedExecutionException
-            } else {
-                throw new IllegalArgumentException();
-            }
-        }
-    }
-
 
     /**
      * Disables the current thread for thread scheduling purposes unless the
@@ -250,18 +214,14 @@ public class LockSupport {
      * @since 1.6
      */
     public static void park(Object blocker) {
-        Object strand = Strands.currentStrand();
-        if (strand instanceof Fiber) {
-            Fiber<?> f = (Fiber<?>) strand;
-            setBlocker(f, blocker);
-            Strands.parkFiber();
-            setBlocker(f, null);
+        Thread t = Thread.currentThread();
+        setBlocker(t, blocker);
+        if (t.isLightweight()) {
+            LightweightThreads.park();
         } else {
-            Thread t = (Thread) strand;
-            setBlocker(t, blocker);
             U.park(false, 0L);
-            setBlocker(t, null);
         }
+        setBlocker(t, null);
     }
 
     /**
@@ -299,18 +259,14 @@ public class LockSupport {
      */
     public static void parkNanos(Object blocker, long nanos) {
         if (nanos > 0) {
-            Object strand = Strands.currentStrand();
-            if (strand instanceof Fiber) {
-                Fiber<?> f = (Fiber<?>) strand;
-                setBlocker(f, blocker);
-                Strands.parkFiber(nanos);
-                setBlocker(f, null);
+            Thread t = Thread.currentThread();
+            setBlocker(t, blocker);
+            if (t.isLightweight()) {
+                LightweightThreads.park(nanos);
             } else {
-                Thread t = (Thread) strand;
-                setBlocker(t, blocker);
                 U.park(false, nanos);
-                setBlocker(t, null);
             }
+            setBlocker(t, null);
         }
     }
 
@@ -348,20 +304,16 @@ public class LockSupport {
      * @since 1.6
      */
     public static void parkUntil(Object blocker, long deadline) {
-        Object strand = Strands.currentStrand();
-        if (strand instanceof Fiber) {
-            Fiber<?> f = (Fiber<?>) strand;
-            setBlocker(f, blocker);
+        Thread t = Thread.currentThread();
+        setBlocker(t, blocker);
+        if (t.isLightweight()) {
             long millis = deadline - System.currentTimeMillis();
             long nanos = TimeUnit.NANOSECONDS.convert(millis, TimeUnit.MILLISECONDS);
-            Strands.parkFiber(nanos);
-            setBlocker(f, null);
+            LightweightThreads.park(nanos);
         } else {
-            Thread t = (Thread) strand;
-            setBlocker(t, blocker);
             U.park(true, deadline);
-            setBlocker(t, null);
         }
+        setBlocker(t, null);
     }
 
     /**
@@ -379,12 +331,7 @@ public class LockSupport {
     public static Object getBlocker(Thread t) {
         if (t == null)
             throw new NullPointerException();
-        Fiber<?> fiber = Strands.getFiber(t);
-        if (fiber != null) {
-            return U.getReferenceOpaque(t, FIBER_PARKBLOCKER);
-        } else {
-            return U.getReferenceOpaque(t, THREAD_PARKBLOCKER);
-        }
+        return U.getReferenceOpaque(t, PARKBLOCKER);
     }
 
     /**
@@ -413,9 +360,8 @@ public class LockSupport {
      * for example, the interrupt status of the thread upon return.
      */
     public static void park() {
-        Object strand = Strands.currentStrand();
-        if (strand instanceof Fiber) {
-            Strands.parkFiber();
+        if (Thread.currentThread().isLightweight()) {
+            LightweightThreads.park();
         } else {
             U.park(false, 0L);
         }
@@ -453,9 +399,8 @@ public class LockSupport {
      */
     public static void parkNanos(long nanos) {
         if (nanos > 0) {
-            Object strand = Strands.currentStrand();
-            if (strand instanceof Fiber) {
-                Strands.parkFiber(nanos);
+            if (Thread.currentThread().isLightweight()) {
+                LightweightThreads.park(nanos);
             } else {
                 U.park(false, nanos);
             }
@@ -493,11 +438,10 @@ public class LockSupport {
      *        to wait until
      */
     public static void parkUntil(long deadline) {
-        Object strand = Strands.currentStrand();
-        if (strand instanceof Fiber) {
+        if (Thread.currentThread().isLightweight()) {
             long millis = deadline - System.currentTimeMillis();
             long nanos = TimeUnit.NANOSECONDS.convert(millis, TimeUnit.MILLISECONDS);
-            Strands.parkFiber(nanos);
+            LightweightThreads.park(nanos);
         } else {
             U.park(true, deadline);
         }
@@ -515,10 +459,8 @@ public class LockSupport {
 
     // Hotspot implementation via intrinsics API
     private static final Unsafe U = Unsafe.getUnsafe();
-    private static final long THREAD_PARKBLOCKER
+    private static final long PARKBLOCKER
         = U.objectFieldOffset(Thread.class, "parkBlocker");
-    private static final long FIBER_PARKBLOCKER
-        = U.objectFieldOffset(Fiber.class, "parkBlocker");
     private static final long TID
         = U.objectFieldOffset(Thread.class, "tid");
 

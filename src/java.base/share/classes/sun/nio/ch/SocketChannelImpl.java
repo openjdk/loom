@@ -55,7 +55,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
-import jdk.internal.misc.Strands;
 import sun.net.ConnectionResetException;
 import sun.net.NetHooks;
 import sun.net.ext.ExtendedSocketOptions;
@@ -368,7 +367,7 @@ class SocketChannelImpl
                 if (isInputClosed)
                     return IOStatus.EOF;
 
-                lockedConfigureNonBlockingIfFiber();
+                configureNonBlockingIfNeeded();
                 n = IOUtil.read(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -411,7 +410,7 @@ class SocketChannelImpl
                 if (isInputClosed)
                     return IOStatus.EOF;
 
-                lockedConfigureNonBlockingIfFiber();
+                configureNonBlockingIfNeeded();
                 n = IOUtil.read(fd, dsts, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -487,7 +486,7 @@ class SocketChannelImpl
             int n = 0;
             try {
                 beginWrite(blocking);
-                lockedConfigureNonBlockingIfFiber();
+                configureNonBlockingIfNeeded();
                 n = IOUtil.write(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -518,7 +517,7 @@ class SocketChannelImpl
             long n = 0;
             try {
                 beginWrite(blocking);
-                lockedConfigureNonBlockingIfFiber();
+                configureNonBlockingIfNeeded();
                 n = IOUtil.write(fd, srcs, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -547,7 +546,7 @@ class SocketChannelImpl
             int n = 0;
             try {
                 beginWrite(blocking);
-                lockedConfigureNonBlockingIfFiber();
+                configureNonBlockingIfNeeded();
                 do {
                     n = Net.sendOOB(fd, b);
                 } while (n == IOStatus.INTERRUPTED && isOpen());
@@ -587,7 +586,7 @@ class SocketChannelImpl
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
         synchronized (stateLock) {
             ensureOpen();
-            // do nothing if fiber has forced the socket to be non-blocking
+            // do nothing if lightweight thread has forced the socket to be non-blocking
             if (!nonBlocking) {
                 IOUtil.configureBlocking(fd, block);
             }
@@ -595,12 +594,12 @@ class SocketChannelImpl
     }
 
     /**
-     * Ensures that the socket is configured non-blocking when the current
-     * strand is a fiber.
+     * Ensures that the socket is configured non-blocking when on a lightweight
+     * thread.
      */
-    private void lockedConfigureNonBlockingIfFiber() throws IOException {
+    private void configureNonBlockingIfNeeded() throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
-        if (!nonBlocking && (Strands.currentStrand() instanceof Fiber)) {
+        if (!nonBlocking && Thread.currentThread().isLightweight()) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
@@ -755,7 +754,7 @@ class SocketChannelImpl
                     boolean connected = false;
                     try {
                         beginConnect(blocking, isa);
-                        lockedConfigureNonBlockingIfFiber();
+                        configureNonBlockingIfNeeded();
                         int n = Net.connect(fd, isa.getAddress(), isa.getPort());
                         if (n > 0) {
                             connected = true;
@@ -915,7 +914,8 @@ class SocketChannelImpl
                 long reader = readerThread;
                 long writer = writerThread;
                 if (reader != 0 || writer != 0) {
-                    if (NativeThread.isFiber(reader) || NativeThread.isFiber(writer)) {
+                    if (NativeThread.isLightweightThread(reader)
+                            || NativeThread.isLightweightThread(writer)) {
                         Poller.stopPoll(fdVal);
                     }
                     nd.preClose(fd);
@@ -1003,7 +1003,7 @@ class SocketChannelImpl
             if (!isInputClosed) {
                 Net.shutdown(fd, Net.SHUT_RD);
                 long reader = readerThread;
-                if (NativeThread.isFiber(reader)) {
+                if (NativeThread.isLightweightThread(reader)) {
                     Poller.stopPoll(fdVal, Net.POLLIN);
                 } else if (NativeThread.isKernelThread(reader)) {
                     NativeThread.signal(reader);
@@ -1023,7 +1023,7 @@ class SocketChannelImpl
             if (!isOutputClosed) {
                 Net.shutdown(fd, Net.SHUT_WR);
                 long writer = writerThread;
-                if (NativeThread.isFiber(writer)) {
+                if (NativeThread.isLightweightThread(writer)) {
                     Poller.stopPoll(fdVal, Net.POLLOUT);
                 } else if (NativeThread.isKernelThread(writer)) {
                     NativeThread.signal(writer);
@@ -1185,7 +1185,7 @@ class SocketChannelImpl
                     }
                 } else {
                     // read, no timeout
-                    lockedConfigureNonBlockingIfFiber();
+                    configureNonBlockingIfNeeded();
                     n = tryRead(b, off, len);
                     while (IOStatus.okayToRetry(n) && isOpen()) {
                         park(Net.POLLIN);
@@ -1245,7 +1245,7 @@ class SocketChannelImpl
             int end = off + len;
             beginWrite(true);
             try {
-                lockedConfigureNonBlockingIfFiber();
+                configureNonBlockingIfNeeded();
                 while (pos < end && isOpen()) {
                     int size = end - pos;
                     int n = tryWrite(b, pos, size);

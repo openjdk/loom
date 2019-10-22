@@ -26,8 +26,10 @@
 package sun.nio.ch;
 
 import java.nio.ByteBuffer;
-import jdk.internal.ref.CleanerFactory;
 
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
+import jdk.internal.ref.CleanerFactory;
 
 /**
  * Manipulates a native array of iovec structs on Solaris:
@@ -42,6 +44,7 @@ import jdk.internal.ref.CleanerFactory;
  */
 
 class IOVecWrapper {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     // Miscellaneous constants
     private static final int BASE_OFFSET = 0;
@@ -79,8 +82,7 @@ class IOVecWrapper {
     }
 
     // per thread IOVecWrapper
-    private static final ThreadLocal<IOVecWrapper> cached =
-        new ThreadLocal<IOVecWrapper>();
+    private static final ThreadLocal<IOVecWrapper> cached = new ThreadLocal<>();
 
     private IOVecWrapper(int size) {
         this.size      = size;
@@ -93,7 +95,7 @@ class IOVecWrapper {
     }
 
     static IOVecWrapper get(int size) {
-        IOVecWrapper wrapper = cached.get();
+        IOVecWrapper wrapper = JLA.getCarrierThreadLocal(cached);
         if (wrapper != null && wrapper.size < size) {
             // not big enough; eagerly release memory
             wrapper.vecArray.free();
@@ -102,7 +104,7 @@ class IOVecWrapper {
         if (wrapper == null) {
             wrapper = new IOVecWrapper(size);
             CleanerFactory.cleaner().register(wrapper, new Deallocator(wrapper.vecArray));
-            cached.set(wrapper);
+            JLA.setCarrierThreadLocal(cached, wrapper);
         }
         return wrapper;
     }

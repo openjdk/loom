@@ -2289,7 +2289,7 @@ public final class System {
             }
             public <R> R executeOnCarrierThread(Callable<R> task) throws Exception {
                 Thread t = Thread.currentCarrierThread();
-                Fiber<?> f = t.getFiber();
+                Fiber f = t.getFiber();
                 if (f != null) t.setFiber(null);
                 try {
                     return task.call();
@@ -2297,54 +2297,25 @@ public final class System {
                     if (f != null) t.setFiber(f);
                 }
             }
+
             public <T> T getCarrierThreadLocal(ThreadLocal<T> local) {
                 return local.getCarrierThreadLocal();
             }
-            public Fiber<?> getFiber(Thread t) {
-                if (t instanceof ShadowThread) {
-                    return ((ShadowThread) t).fiber();
-                } else {
-                    return null;
-                }
+
+            public <T> void setCarrierThreadLocal(ThreadLocal<T> local, T value) {
+                local.setCarrierThreadLocal(value);
             }
-            public Thread getShadowThread(Fiber<?> f) {
-                return f.shadowThreadOrNull();
-            }
-            public Object currentStrand() {
-                Thread thread = Thread.currentCarrierThread();
-                Fiber<?> fiber = thread.getFiber();
-                return (fiber != null) ? fiber : thread;
-            }
-            public void interrupt(Object strand) {
-                if (strand instanceof Fiber) {
-                    ((Fiber) strand).interrupt();
-                } else {
-                    ((Thread) strand).interrupt();
-                }
-            }
-            public boolean isInterrupted() {
-                Object strand = currentStrand();
-                if (strand instanceof Fiber) {
-                    return ((Fiber) strand).isInterrupted();
-                } else {
-                    return ((Thread) strand).isInterrupted();
-                }
-            }
-            public boolean clearInterrupt() {
-                if (currentStrand() instanceof Fiber) {
-                    return Fiber.clearInterrupt();
-                } else {
-                    return Thread.interrupted();
-                }
-            }
-            public void parkFiber() {
+
+            public void parkLightweightThread() {
                 Fiber.park();
             }
-            public void parkFiber(long nanos) {
+
+            public void parkLightweightThread(long nanos) {
                 Fiber.parkNanos(nanos);
             }
-            public void unparkFiber(Fiber<?> fiber) {
-                fiber.unpark();
+
+            public void unparkLightweightThread(Thread thread) {
+                ((Fiber) thread).unpark();
             }
         });
     }

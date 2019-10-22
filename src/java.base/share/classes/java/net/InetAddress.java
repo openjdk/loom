@@ -49,7 +49,6 @@ import java.util.Arrays;
 
 import jdk.internal.access.JavaNetInetAddressAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.Blocker;
 import sun.security.action.*;
 import sun.net.InetAddressCachePolicy;
 import sun.net.util.IPAddressUtil;
@@ -923,13 +922,15 @@ class InetAddress implements java.io.Serializable {
         public InetAddress[] lookupAllHostAddr(String host)
             throws UnknownHostException
         {
-            return Blocker.run(() -> impl.lookupAllHostAddr(host));
+            // TBD blocks lightweight thread
+            return impl.lookupAllHostAddr(host);
         }
 
         public String getHostByAddr(byte[] addr)
             throws UnknownHostException
         {
-            return Blocker.run(() -> impl.getHostByAddr(addr));
+            // TBD blocks lightweight thread
+            return impl.getHostByAddr(addr);
         }
     }
 
