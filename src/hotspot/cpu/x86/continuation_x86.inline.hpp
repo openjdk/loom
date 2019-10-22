@@ -1368,9 +1368,7 @@ void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosure* clos
 }
 
 template <typename ConfigT, op_mode mode>
-void Thaw<ConfigT, mode>::maybe_deoptimize_frames_in_chunk(oop chunk) {
-  if (mode == mode_fast || !should_deoptimize()) return;
-
+void Thaw<ConfigT, mode>::deoptimize_frames_in_chunk(oop chunk) {
   CodeBlob* cb = NULL;
   intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
   intptr_t* end = start + jdk_internal_misc_StackChunk::end(chunk);
@@ -1380,13 +1378,43 @@ void Thaw<ConfigT, mode>::maybe_deoptimize_frames_in_chunk(oop chunk) {
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
 
     if (cb->as_compiled_method()->is_marked_for_deoptimization() || _thread->is_interp_only_mode()) {
-      log_develop_trace(jvmcont)("Deoptimizing frame");
-      intptr_t* fp = *(intptr_t**)(sp - 2);
-      frame f(sp, sp, fp, pc, NULL, NULL, true);
-      DEBUG_ONLY(Frame::patch_pc(f, NULL));
-      f.deoptimize(_thread);
+      deoptimize_frame_in_chunk(sp, pc, cb);
     }
   }
+}
+
+template <typename ConfigT, op_mode mode>
+void Thaw<ConfigT, mode>::deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb) {
+  log_develop_trace(jvmcont)("Deoptimizing frame");
+  intptr_t* fp = *(intptr_t**)(sp - 2);
+  frame f(sp, sp, fp, pc, cb, NULL, true);
+  DEBUG_ONLY(Frame::patch_pc(f, NULL));
+  f.deoptimize(_thread);
+}
+
+template <typename ConfigT, op_mode mode>
+void Thaw<ConfigT, mode>::setup_jump(intptr_t* vsp, intptr_t* hsp) {
+  frame topf(vsp, vsp, *(intptr_t**)(hsp - 2), *(address*)(hsp - 1), NULL, NULL, true);
+  setup_jump(topf);
+}
+
+template <typename ConfigT, op_mode mode>
+void Thaw<ConfigT, mode>::patch_chunk_pd(intptr_t* sp) {
+  intptr_t* fp = _cont.entryFP();
+  *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
+  log_develop_trace(jvmcont)("thaw_chunk patching fp at " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(sp - frame::sender_sp_offset), p2i(fp));
+}
+
+template <typename ConfigT, op_mode mode>
+intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp, int argsize) {
+#ifdef _LP64
+  if ((argsize != 0 || Interpreter::contains(_cont.entryPC())) && (intptr_t)vsp % 16 != 0) { // TODO PERF
+    log_develop_trace(jvmcont)("Aligning compiled frame 1: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(vsp), p2i(vsp - 1));
+    vsp--;
+  }
+  assert((intptr_t)vsp % 16 == 0, "");
+#endif
+  return vsp;
 }
 
 #ifdef ASSERT

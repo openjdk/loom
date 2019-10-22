@@ -2241,6 +2241,7 @@ public:
     assert ((address)to + sizeb <= (address)(InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)), 
       "to + size: " INTPTR_FORMAT " end: " INTPTR_FORMAT, p2i((address)to + sizeb), p2i(InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)));
   }
+
   void setup_chunk_jump(intptr_t* sp) {
     _fi->sp = sp;
     _fi->pc = Continuation::is_return_barrier_entry(*(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET)) 
@@ -3333,7 +3334,11 @@ private:
   void derelativize_interpreted_frame_metadata(const hframe& hf, const frame& f);
   inline hframe::callee_info frame_callee_info_address(frame& f);
   template<typename FKind, bool top, bool bottom> inline intptr_t* align(const hframe& hf, intptr_t* vsp, frame& caller);
-  void maybe_deoptimize_frames_in_chunk(oop chunk);
+  void deoptimize_frames_in_chunk(oop chunk);
+  void deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb);
+  void patch_chunk_pd(intptr_t* sp);
+  intptr_t* align_chunk(intptr_t* vsp, int argsize);
+  void setup_jump(intptr_t* vsp, intptr_t* hsp);
 
   bool should_deoptimize() {
     // frame::deoptimize (or Deoptimize::deoptimize) is called either "inline" with execution (current method or caller), -- not relevant for frozen frames
@@ -3401,8 +3406,7 @@ public:
     
     assert (num_frames > 0, "");
 
-    static const int metadata = 2; // return address + link
-    static const int threshold = 1000; // words
+    static const int threshold = 500; // words
 
     // tty->print_cr(">>> thaw_chunk:"); print_chunk(chunk, _cont.mirror(), false);
     log_develop_trace(jvmcont)("thaw_chunk");
@@ -3419,7 +3423,7 @@ public:
     if (ContMirror::is_empty_chunk(chunk)) {
       _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
       return thaw<true>(num_frames); // we're still top, as no frames have been thawed
-    } 
+    }
     
     intptr_t* hsp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
     intptr_t* vsp;
@@ -3437,16 +3441,18 @@ public:
     const bool bottom = !full || _cont.is_empty();
     
     bool partial;
-    int size, argsize;
-    if (full || jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) < threshold) {
+    int argsize;
+    int size = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + frame::sender_sp_offset; // this initial size could be reduced if it's a partial thaw
+    if (full || size < threshold) {
       partial = false;
       log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d", partial, full, top, bottom);
-      size = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + metadata;
       argsize = jdk_internal_misc_StackChunk::argsize(chunk);
 
-      maybe_deoptimize_frames_in_chunk(chunk);
+      if (mode != mode_fast && should_deoptimize()) {
+        deoptimize_frames_in_chunk(chunk);
+      }
       
-      jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + metadata);
+      jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset);
       if (!young) {
         jdk_internal_misc_StackChunk::set_numFrames(chunk, 0);
         jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
@@ -3454,8 +3460,8 @@ public:
     } else { // thaw a single frame
       partial = true;
       log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d", partial, full, top, bottom);
-      address pc = *(address*)(hsp - 1);
-      // tty->print_cr(">>> thaw_chunk at %p pc: %p", hsp - 1, pc);
+      address pc = *(address*)(hsp - SENDER_SP_RET_ADDRESS_OFFSET);
+      // tty->print_cr(">>> thaw_chunk at %p pc: %p", hsp - SENDER_SP_RET_ADDRESS_OFFSET, pc);
       // print_chunk(chunk, _cont.mirror(), false);
 
       int slot;
@@ -3465,18 +3471,13 @@ public:
 
       if (should_deoptimize()
           && (cb->as_compiled_method()->is_marked_for_deoptimization() || (mode != mode_fast && _thread->is_interp_only_mode()))) {
-        log_develop_trace(jvmcont)("Deoptimizing frame");
-        intptr_t* fp = *(intptr_t**)(hsp - 2);
-        frame f(hsp, hsp, fp, pc, NULL, NULL, true);
-        DEBUG_ONLY(Frame::patch_pc(f, NULL));
-        f.deoptimize(_thread);
+        deoptimize_frame_in_chunk(hsp, pc, cb);
       }
 
       if (!young) {
-        assert (jdk_internal_misc_StackChunk::numFrames(chunk) >= 0, "");
+        assert (jdk_internal_misc_StackChunk::numFrames(chunk) > 0, "");
         jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - 1);
 
-        assert (jdk_internal_misc_StackChunk::numOops(chunk) >= 0, "jdk_internal_misc_StackChunk::numOops(chunk): %d", jdk_internal_misc_StackChunk::numOops(chunk));
         const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
         assert (jdk_internal_misc_StackChunk::numOops(chunk) >= oopmap->num_oops(), "jdk_internal_misc_StackChunk::numOops(chunk): %d oopmap->num_oops() : %d", jdk_internal_misc_StackChunk::numOops(chunk), oopmap->num_oops());
         jdk_internal_misc_StackChunk::set_numOops(chunk, jdk_internal_misc_StackChunk::numOops(chunk) - oopmap->num_oops());
@@ -3489,16 +3490,10 @@ public:
     
     // tty->print_cr("thaw_chunk partial: %d full: %d top: %d bottom: %d", partial, full, top, bottom);
 
+    // if we're not in a full thaw, we're both top and bottom
     if (bottom) {
       vsp -= argsize; // if not bottom, we're going to overwrite the args portion of the sender
-      // if we're not in a full thaw, we're both top and bottom
-    #ifdef _LP64
-      if ((argsize != 0 || Interpreter::contains(_cont.entryPC())) && (intptr_t)vsp % 16 != 0) { // TODO PERF
-        log_develop_trace(jvmcont)("Aligning compiled frame 1: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(vsp), p2i(vsp - 1));
-        vsp--;
-      }
-      assert((intptr_t)vsp % 16 == 0, "");
-    #endif
+      vsp = align_chunk(vsp, argsize);
     }
     #ifdef _LP64
       assert((intptr_t)vsp % 16 == 0, "");
@@ -3507,43 +3502,24 @@ public:
     intptr_t* bottom_sp = vsp;
     vsp -= size;
 
-    intptr_t* from = hsp - metadata;
-    intptr_t* to   = vsp - metadata;
-    log_develop_trace(jvmcont)("thaw_chunk size: %d argsize: %d full: %d", size, argsize, full);
-    int sizeb = (size + (LIKELY(argsize == 0) ? 0 : argsize + metadata)) << LogBytesPerWord;
-    log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + sizeb), sizeb);
-    log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + sizeb), sizeb);
-    memcpy(to, from, sizeb);
+    intptr_t* from = hsp - frame::sender_sp_offset;
+    intptr_t* to   = vsp - frame::sender_sp_offset;
+
+    copy_from_chunk(from, to, size, argsize, chunk);
     // if (!young) {
     //   memset(from, 0, size << LogBytesPerWord);
     // }
 
     _cont.sub_size(size << LogBytesPerWord);
 
-    // if (argsize != 0) { // patch pc + fp
-    if (bottom) { // we're bottom`
-      address pc;
-      if (!_cont.is_empty()) { // TODO PERF
-        assert (_cont.tail() == chunk, "");
-        pc = StubRoutines::cont_returnBarrier();
-      } else {
-        _thread->cont_frame()->sp = NULL;
-        frame entry = new_entry_frame(); // TODO PERF
-        pc = entry.raw_pc();
-      }
-      intptr_t* fp = _cont.entryFP();
-
-      log_develop_trace(jvmcont)("thaw_chunk patching -- sp: " INTPTR_FORMAT, p2i(bottom_sp));
-      log_develop_trace(jvmcont)("thaw_chunk patching pc at " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(bottom_sp - 1), p2i(pc));
-      *(address*)(bottom_sp - 1) = pc;
-      log_develop_trace(jvmcont)("thaw_chunk patching fp at " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(bottom_sp - 2), p2i(fp));
-      *(intptr_t**)(bottom_sp - 2) = fp;
+    if (bottom) { // we're bottom
+      patch_chunk(chunk, bottom_sp);
     }
     
     if (top) {
-      frame topf(vsp, vsp, *(intptr_t**)(hsp - 2), *(address*)(hsp - 1), NULL, NULL, true);
-      setup_jump(topf);
+      setup_jump(vsp, hsp);
     }
+
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
     assert(_cont.chunk_invariant(), "");
 
@@ -3557,7 +3533,30 @@ public:
 
     return vsp;
   }
+  
+  void copy_from_chunk(intptr_t* from, intptr_t* to, int size, int argsize, oop chunk) {
+    int sizeb = (size + (LIKELY(argsize == 0) ? 0 : argsize + frame::sender_sp_offset)) << LogBytesPerWord;
+    log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + sizeb), sizeb);
+    log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + sizeb), sizeb);
+    memcpy(to, from, sizeb);
+  }
 
+  void patch_chunk(oop chunk, intptr_t* sp) {
+    log_develop_trace(jvmcont)("thaw_chunk patching -- sp: " INTPTR_FORMAT, p2i(sp));
+    address pc;
+    if (!_cont.is_empty()) { // TODO PERF
+      assert (_cont.tail() == chunk, "");
+      pc = StubRoutines::cont_returnBarrier();
+    } else {
+      _thread->cont_frame()->sp = NULL;
+      frame entry = new_entry_frame(); // TODO PERF
+      pc = entry.raw_pc();
+    }
+    *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
+    log_develop_trace(jvmcont)("thaw_chunk patching pc at " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(sp - SENDER_SP_RET_ADDRESS_OFFSET), p2i(pc));
+
+    patch_chunk_pd(sp);    
+  }
 
   template<bool top>
   void thaw(const hframe& hf, frame& caller, int num_frames) {
