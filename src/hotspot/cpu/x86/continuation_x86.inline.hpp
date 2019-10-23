@@ -1156,17 +1156,17 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure, boo
 
     int slot;
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
-    nmethod* nm = cb->as_nmethod_or_null();
     assert (cb != NULL, "");
     assert (slot >= 0, "");
     const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
     assert (oopmap != NULL, "");
     log_develop_trace(jvmcont)("stack_chunk_iterate_stack slot: %d codeblob:", slot);
     if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
-    assert (cb->is_nmethod(), "");
+    assert (cb->is_compiled(), "");
     assert (cb->frame_size() > 0, "");
 
-    if (do_metadata && nm != NULL) {
+    if (do_metadata && cb->is_nmethod()) {
+      nmethod* nm = cb->as_nmethod();
       nm->mark_as_seen_on_stack();
       nm->oops_do(closure);
     }
