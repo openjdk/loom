@@ -1139,7 +1139,6 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
 
   assert (ContMirror::is_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack young: %d", is_young(chunk));
-  // assert (((SafepointSynchronize::safepoint_counter() & 0x1) == 1) == SafepointSynchronize::is_at_safepoint(), "couter: %lu safepoint: %d", SafepointSynchronize::safepoint_counter()), SafepointSynchronize::is_at_safepoint();
 
   int num_frames = 0;
   int num_oops = 0;
@@ -1201,27 +1200,25 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure) {
     for (OopMapStream oms(oopmap,mask); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
       DEBUG_ONLY(oops++;)
       OopMapValue omv = oms.current();
+      assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
+      assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+
       void* p = reg_to_loc(omv.reg(), sp);
       assert (p != NULL, "");
       assert (is_in_frame(cb, sp, p), "");
       assert ((intptr_t*)p >= start, "");
+
       if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
 
       log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %d p: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, omv.reg()->is_reg(), p2i(p));
-      // oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)RawAccess<>::oop_load((narrowOop*)p) : RawAccess<>::oop_load(p);
 
-      DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) 
-      // assert (oopDesc::is_oop_or_null(*p), "p: " INTPTR_FORMAT " *p: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)*p));
       // if (!SkipNullValue::should_skip(*p))
-
-      assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
-      assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
       
+      DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) 
       omv.type() == OopMapValue::narrowoop_value
         ? closure->do_oop((narrowOop*)p) // TODO Devirtualizer::do_oop(closure, (narrowOop*)p)
-        : closure->do_oop((oop*)p); // TODO Devirtualizer::do_oop(closure, (oop*)p)
-      
-      assert (SafepointSynchronize::is_at_safepoint() || (*(intptr_t*)p == old), "");
+        : closure->do_oop((oop*)p); // TODO Devirtualizer::do_oop(closure, (oop*)p)      
+      assert (SafepointSynchronize::is_at_safepoint() || (*(intptr_t*)p == old), "old: " INTPTR_FORMAT " new: " INTPTR_FORMAT, old, *(intptr_t*)p);
     }
     assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
   }
