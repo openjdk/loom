@@ -39,6 +39,8 @@
 #include "compiler/directivesParser.hpp"
 #include "compiler/disassembler.hpp"
 #include "compiler/oopMap.inline.hpp"
+#include "gc/shared/barrierSet.hpp"
+#include "gc/shared/barrierSetNMethod.hpp"
 #include "interpreter/bytecode.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
@@ -1140,7 +1142,7 @@ bool nmethod::can_convert_to_zombie() {
   assert(is_not_entrant() || is_unloading(), "must be a non-entrant method");
 
   bool maybe_in_continuation = _marking_cycle + 1 < CodeCache::marking_cycle() ||
-                              !is_on_continuation_stack();
+                               is_on_continuation_stack();
 
   // Since the nmethod sweeper only does partial sweep the sweeper's traversal
   // count can be greater than the stack traversal count before it hits the
@@ -1819,6 +1821,10 @@ void nmethod::do_unloading(bool unloading_occurred) {
   } else {
     guarantee(unload_nmethod_caches(unloading_occurred),
               "Should not need transition stubs");
+    BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+    if (bs_nm != NULL) {
+      bs_nm->disarm(this);
+    }
   }
 }
 

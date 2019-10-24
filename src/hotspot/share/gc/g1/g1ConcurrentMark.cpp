@@ -1241,7 +1241,10 @@ void G1ConcurrentMark::remark() {
 
   policy->record_concurrent_mark_remark_end();
   CodeCache::increment_marking_cycle();
-  ((G1BarrierSetNMethod*)BarrierSet::barrier_set()->barrier_set_nmethod())->arm_all_nmethods();
+  G1BarrierSetNMethod* bs_nm = (G1BarrierSetNMethod*)BarrierSet::barrier_set()->barrier_set_nmethod();
+  if (bs_nm != NULL) {
+    bs_nm->arm_all_nmethods();
+  }
 }
 
 class G1ReclaimEmptyRegionsTask : public AbstractGangTask {

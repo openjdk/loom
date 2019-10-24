@@ -37,12 +37,6 @@ public:
 };
 
 bool G1BarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
-  if (!is_armed(nm)) {
-    // Some other thread got here first and marked the oops
-    // and disarmed the nmethod.
-    return true;
-  }
-
   G1LoadPhantomOopClosure cl;
   nm->oops_do(&cl);
   disarm(nm);
@@ -72,8 +66,8 @@ public:
 };
 
 void G1BarrierSetNMethod::arm_all_nmethods() {
-  _current_phase = _current_phase + 1;
-  if (_current_phase == 2) {
+  ++_current_phase;
+  if (_current_phase == 3) {
     _current_phase = 1;
   }
   G1BarrierSetNMethodArmClosure cl(_current_phase);
