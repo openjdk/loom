@@ -358,7 +358,12 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   virtual MetaWord* satisfy_failed_metadata_allocation(ClassLoaderData* loader_data,
                                                        size_t size,
                                                        Metaspace::MetadataType mdtype);
+
+  // Continuation support
   virtual void collect_for_codecache();
+  // If requires_barriers() returns false, then HeapAccesses into the object
+  // are equivalent to RawAccesses.
+  virtual bool requires_barriers(oop obj) const = 0;
 
   // Returns "true" iff there is a stop-world GC in progress.  (I assume
   // that it should answer "false" for the concurrent part of a concurrent

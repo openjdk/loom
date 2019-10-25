@@ -1138,7 +1138,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure, boo
   // see sender_for_compiled_frame
 
   assert (ContMirror::is_stack_chunk(chunk), "");
-  log_develop_trace(jvmcont)("stack_chunk_iterate_stack young: %d", is_young(chunk));
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack young: %d", !requires_barriers(chunk));
 
   int num_frames = 0;
   int num_oops = 0;
@@ -1262,7 +1262,7 @@ static void fix_stack_chunk(oop chunk) {
   if (!jdk_internal_misc_StackChunk::gc_mode(chunk)) {
     return;
   }
-  log_develop_trace(jvmcont)("fix_stack_chunk young: %d", is_young(chunk));
+  log_develop_trace(jvmcont)("fix_stack_chunk young: %d", !requires_barriers(chunk));
   bool narrow = UseCompressedOops; // TODO PERF: templatize
 
   int num_frames = 0;
@@ -1423,7 +1423,7 @@ intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp, int argsize) {
 #ifdef ASSERT
 bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
   assert (oopDesc::is_oop(chunk), "");
-  log_develop_trace(jvmcont)("debug_verify_stack_chunk young: %d", is_young(chunk));
+  log_develop_trace(jvmcont)("debug_verify_stack_chunk young: %d", !requires_barriers(chunk));
   assert (ContMirror::is_stack_chunk(chunk), "");
   assert (oopDesc::is_oop_or_null(jdk_internal_misc_StackChunk::parent(chunk)), "");
   
@@ -1444,7 +1444,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
     log_develop_trace(jvmcont)("debug_verify_stack_chunk sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
     assert (pc != NULL, 
       "young: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT, 
-      is_young(chunk), jdk_internal_misc_StackChunk::numFrames(chunk), num_frames, p2i(sp), p2i(start), p2i(end));
+      !requires_barriers(chunk), jdk_internal_misc_StackChunk::numFrames(chunk), num_frames, p2i(sp), p2i(start), p2i(end));
 
     int slot;
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
@@ -1510,8 +1510,8 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
     }
   }
   if (!concurrent) {
-    assert (jdk_internal_misc_StackChunk::numFrames(chunk) == -1 || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "young: %d num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", is_young(chunk), num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
-    assert (jdk_internal_misc_StackChunk::numOops(chunk)   == -1 || num_oops   == jdk_internal_misc_StackChunk::numOops(chunk),   "young: %d num_oops: %d jdk_internal_misc_StackChunk::numOops(chunk): %d",     is_young(chunk), num_oops,   jdk_internal_misc_StackChunk::numOops(chunk));
+    assert (jdk_internal_misc_StackChunk::numFrames(chunk) == -1 || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "young: %d num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", !requires_barriers(chunk), num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
+    assert (jdk_internal_misc_StackChunk::numOops(chunk)   == -1 || num_oops   == jdk_internal_misc_StackChunk::numOops(chunk),   "young: %d num_oops: %d jdk_internal_misc_StackChunk::numOops(chunk): %d",     !requires_barriers(chunk), num_oops,   jdk_internal_misc_StackChunk::numOops(chunk));
   }
   return true;
 }

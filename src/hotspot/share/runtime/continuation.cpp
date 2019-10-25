@@ -64,10 +64,8 @@
 
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 
-static bool is_young(oop obj) {
-  assert(UseG1GC, "");
-  assert (obj != (oop)NULL, "");
-  return G1CollectedHeap::heap()->heap_region_containing(obj)->is_young();
+static bool requires_barriers(oop obj) {
+  return Universe::heap()->requires_barriers(obj);
 }
 
 #define SENDER_SP_RET_ADDRESS_OFFSET (frame::sender_sp_offset - frame::return_addr_offset)
@@ -2103,7 +2101,7 @@ public:
     intptr_t* fp;
     bool allocated;
     // TODO The second disjunct means we don't squash old chunks, but let them be (Rickard's idea)
-    if (chunk == NULL || !is_young(chunk) || (is_young(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
+    if (chunk == NULL || requires_barriers(chunk) || (requires_barriers(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
       chunk = allocate_chunk(size);
       allocated = true;
       sp = jdk_internal_misc_StackChunk::sp(chunk);
@@ -2113,7 +2111,7 @@ public:
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
       // They'll then be stored twice: in the chunk and in the parent
 
-      if (!is_young(chunk)) {
+      if (requires_barriers(chunk)) {
         log_develop_trace(jvmcont)("Young chunk: allocated old! size: %d", size);
         tty->print_cr("Young chunk: allocated old! size: %d", size);
         assert(_cont.chunk_invariant(), "");
@@ -2122,7 +2120,7 @@ public:
       }
     } else {
       // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
-      // if (!is_young(chunk)) {
+      // if (requires_barriers(chunk)) {
       //   log_develop_trace(jvmcont)("Young chunk: found old chunk");
       //   assert(_cont.chunk_invariant(), "");
       //   return false;
@@ -2138,7 +2136,7 @@ public:
     
     NoSafepointVerifier nsv;
     assert (ContMirror::is_stack_chunk(chunk), "");
-    assert (is_young(chunk), "");
+    assert (!requires_barriers(chunk), "");
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
 
     // copy; no need to patch because of how we handle return address and link
@@ -2290,8 +2288,8 @@ public:
     for (oop chunk = _cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
       num_chunks++;
       if (jdk_internal_misc_StackChunk::numFrames(chunk) < 0) {
-        assert (is_young(chunk) && !jdk_internal_misc_StackChunk::gc_mode(chunk), "");
-        Continuation::stack_chunk_iterate_stack(chunk, (OopClosure*)NULL); // &do_nothing_cl
+        assert (!requires_barriers(chunk) && !jdk_internal_misc_StackChunk::gc_mode(chunk), "");
+        Continuation::stack_chunk_iterate_stack(chunk, (OopClosure*)NULL, false /* do_metadata */); // &do_nothing_cl
       }
 
       static const int metadata = 2;
@@ -2329,7 +2327,7 @@ public:
     oop chunk = _cont.tail();
     if (chunk == (oop)NULL)
       return;
-    
+
     log_develop_trace(jvmcont)("PRE SQUASH: sp: %d ref_sp: %d", _cont.sp(), _cont.refSP());
     squash_chunks(chunk);
     log_develop_trace(jvmcont)("POST SQUASH: sp: %d ref_sp: %d", _cont.sp(), _cont.refSP());
@@ -3412,11 +3410,11 @@ public:
     log_develop_trace(jvmcont)("thaw_chunk");
     if (log_develop_is_enabled(Debug, jvmcont)) print_chunk(chunk, _cont.mirror(), true);
 
-    bool young = is_young(chunk);
+    bool barriers = requires_barriers(chunk);
 
     fix_stack_chunk(chunk);
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
-    if (young) {
+    if (!barriers) {
       ContMirror::reset_chunk_counters(chunk);
     }
 
@@ -3424,7 +3422,7 @@ public:
       _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
       return thaw<true>(num_frames); // we're still top, as no frames have been thawed
     }
-    
+
     intptr_t* hsp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
     intptr_t* vsp;
     if (full) {
@@ -3439,7 +3437,7 @@ public:
     }
 
     const bool bottom = !full || _cont.is_empty();
-    
+
     bool partial;
     int argsize;
     int size = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + frame::sender_sp_offset; // this initial size could be reduced if it's a partial thaw
@@ -3451,9 +3449,9 @@ public:
       if (mode != mode_fast && should_deoptimize()) {
         deoptimize_frames_in_chunk(chunk);
       }
-      
+
       jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset);
-      if (!young) {
+      if (barriers) {
         jdk_internal_misc_StackChunk::set_numFrames(chunk, 0);
         jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
       }
@@ -3474,7 +3472,7 @@ public:
         deoptimize_frame_in_chunk(hsp, pc, cb);
       }
 
-      if (!young) {
+      if (barriers) {
         assert (jdk_internal_misc_StackChunk::numFrames(chunk) > 0, "");
         jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - 1);
 
@@ -3498,7 +3496,7 @@ public:
     #ifdef _LP64
       assert((intptr_t)vsp % 16 == 0, "");
     #endif
-    
+
     intptr_t* bottom_sp = vsp;
     vsp -= size;
 
@@ -3506,7 +3504,7 @@ public:
     intptr_t* to   = vsp - frame::sender_sp_offset;
 
     copy_from_chunk(from, to, size, argsize, chunk);
-    // if (!young) {
+    // if (barriers) {
     //   memset(from, 0, size << LogBytesPerWord);
     // }
 
@@ -3515,7 +3513,7 @@ public:
     if (bottom) { // we're bottom
       patch_chunk(chunk, bottom_sp);
     }
-    
+
     if (top) {
       setup_jump(vsp, hsp);
     }
@@ -5615,7 +5613,7 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
   HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
   tty->print_cr("CHUNK " INTPTR_FORMAT " - " INTPTR_FORMAT " :: %s", p2i((oopDesc*)chunk), p2i((HeapWord*)chunk + chunk->size()), hr->get_type_str());
   tty->print("CHUNK " INTPTR_FORMAT " young: %d size: %d sp: %d num_frames: %d num_oops: %d parent: " INTPTR_FORMAT, 
-    p2i((oopDesc*)chunk), is_young(chunk),
+    p2i((oopDesc*)chunk), !requires_barriers(chunk),
     jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::sp(chunk), 
     jdk_internal_misc_StackChunk::numFrames(chunk), jdk_internal_misc_StackChunk::numOops(chunk),
     p2i((oopDesc*)jdk_internal_misc_StackChunk::parent(chunk)));

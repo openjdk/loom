@@ -44,7 +44,7 @@ inline void ParallelScavengeHeap::invoke_scavenge() {
   PSScavenge::invoke();
 }
 
-inline bool ParallelScavengeHeap::is_in_young(oop p) {
+inline bool ParallelScavengeHeap::is_in_young(oop p) const {
   // Assumes the the old gen address range is lower than that of the young gen.
   bool result = ((HeapWord*)p) >= young_gen()->reserved().start();
   assert(result == young_gen()->is_in_reserved(p),
