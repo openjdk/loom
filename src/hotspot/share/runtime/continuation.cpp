@@ -2452,8 +2452,9 @@ public:
         if (UNLIKELY(!(mode == mode_fast && !ContinuationHelper::cached_metadata<mode>(f).empty()) &&
              Compiled::is_owning_locks(_cont.thread(), &_map, f))) return freeze_pinned_monitor;
       #else
-        if (UNLIKELY(Compiled::is_owning_locks(_cont.thread(), &_map, f))) return freeze_pinned_monitor;
+        if (UNLIKELY(mode != mode_fast && Compiled::is_owning_locks(_cont.thread(), &_map, f))) return freeze_pinned_monitor;
       #endif
+      assert (mode != mode_fast || !Compiled::is_owning_locks(_cont.thread(), &_map, f), "");
 
       // Keepalive info here...
       CompiledMethodKeepaliveT kd(f.cb()->as_compiled_method(), _keepalive, _thread);
@@ -3100,32 +3101,40 @@ int freeze0(JavaThread* thread, FrameInfo* fi) {
   return 0;
 }
 
-JRT_ENTRY(int, Continuation::freeze(JavaThread* thread, FrameInfo* fi, bool from_interpreter))
-  // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
-  // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
-  // We also clear thread->cont_fastpath in Deoptimize::deoptimize_single_frame and when we thaw interpreted frames
-  bool fast = UseContinuationFastPath && thread->cont_fastpath() && !from_interpreter;
-  // tty->print_cr(">>> freeze fast: %d thread->cont_fastpath(): %d from_interpreter: %d", fast, thread->cont_fastpath(), from_interpreter);
-  return fast ? freeze0<mode_fast>(thread, fi)
-              : freeze0<mode_slow>(thread, fi);
-JRT_END
-
 static freeze_result is_pinned(const frame& f, const RegisterMap* map) {
   if (f.is_interpreted_frame()) {
-    if (Interpreted::is_owning_locks(f)) {
-      return freeze_pinned_monitor;
-    }
-
+    if (Interpreted::is_owning_locks(f)) return freeze_pinned_monitor;
   } else if (f.is_compiled_frame()) {
-    if (Compiled::is_owning_locks(map->thread(), map, f)) {
-      return freeze_pinned_monitor;
-    }
-
+    if (Compiled::is_owning_locks(map->thread(), map, f)) return freeze_pinned_monitor;
   } else {
     return freeze_pinned_native;
   }
   return freeze_ok;
 }
+
+static bool monitors_on_stack(JavaThread* thread) {
+  oop cont = get_continuation(thread);
+  RegisterMap map(thread, false, false, false); // should first argument be true?
+  map.set_include_argument_oops(false);
+  frame f = thread->last_frame();
+  while (true) {
+    if (!Continuation::is_frame_in_continuation(f, cont)) break;
+    if (is_pinned(f, &map) == freeze_pinned_monitor) return true;
+    f = f.sender(&map);
+  }
+  return false;
+}
+
+JRT_ENTRY(int, Continuation::freeze(JavaThread* thread, FrameInfo* fi, bool from_interpreter))
+  assert (monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
+  // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
+  // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
+  // We also clear thread->cont_fastpath in Deoptimize::deoptimize_single_frame and when we thaw interpreted frames
+  bool fast = UseContinuationFastPath && thread->cont_fastpath() && !from_interpreter && thread->held_monitor_count() == 0;
+  // tty->print_cr(">>> freeze fast: %d thread->cont_fastpath(): %d from_interpreter: %d", fast, thread->cont_fastpath(), from_interpreter);
+  return fast ? freeze0<mode_fast>(thread, fi)
+              : freeze0<mode_slow>(thread, fi);
+JRT_END
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint) {
   oop cont = get_continuation(thread);
@@ -4049,6 +4058,7 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   assert (verify_continuation<2>(cont.mirror()), "");
 
   thread->set_cont_fastpath(res);
+  thread->reset_held_monitor_count();
 
   log_develop_trace(jvmcont)("fi->sp: " INTPTR_FORMAT " fi->fp: " INTPTR_FORMAT " fi->pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
 

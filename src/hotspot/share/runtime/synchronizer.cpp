@@ -225,6 +225,8 @@ bool ObjectSynchronizer::quick_enter(oop obj, Thread* self,
 
     if (owner == self) {
       m->_recursions++;
+      assert (self->is_Java_thread(), "");
+      ((JavaThread*)self)->inc_held_monitor_count();
       return true;
     }
 
@@ -242,6 +244,8 @@ bool ObjectSynchronizer::quick_enter(oop obj, Thread* self,
 
     if (owner == NULL && Atomic::replace_if_null(self, &(m->_owner))) {
       assert(m->_recursions == 0, "invariant");
+      assert (self->is_Java_thread(), "");
+      ((JavaThread*)self)->inc_held_monitor_count();
       return true;
     }
   }
@@ -271,6 +275,9 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, TRAPS) {
     }
   }
 
+  assert (THREAD->is_Java_thread(), "");
+  ((JavaThread*)THREAD)->inc_held_monitor_count();
+
   markWord mark = obj->mark();
   assert(!mark.has_bias_pattern(), "should not see bias pattern here");
 
@@ -299,6 +306,9 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, TRAPS) {
 }
 
 void ObjectSynchronizer::exit(oop object, BasicLock* lock, TRAPS) {
+  assert (THREAD->is_Java_thread(), "");
+  ((JavaThread*)THREAD)->dec_held_monitor_count();
+
   markWord mark = object->mark();
   // We cannot check for Biased Locking if we are racing an inflation.
   assert(mark == markWord::INFLATING() ||
@@ -391,6 +401,8 @@ void ObjectSynchronizer::jni_enter(Handle obj, TRAPS) {
     assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
   THREAD->set_current_pending_monitor_is_from_java(false);
+  assert (THREAD->is_Java_thread(), "");
+  ((JavaThread*)THREAD)->inc_held_monitor_count();
   inflate(THREAD, obj(), inflate_cause_jni_enter)->enter(THREAD);
   THREAD->set_current_pending_monitor_is_from_java(true);
 }
@@ -409,6 +421,8 @@ void ObjectSynchronizer::jni_exit(oop obj, Thread* THREAD) {
   // intentionally do not use CHECK here because we must exit the
   // monitor even if an exception is pending.
   if (monitor->check_owner(THREAD)) {
+    assert (THREAD->is_Java_thread(), "");
+    ((JavaThread*)THREAD)->dec_held_monitor_count();
     monitor->exit(true, THREAD);
   }
 }

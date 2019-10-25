@@ -1221,6 +1221,7 @@ class JavaThread: public Thread {
   bool _cont_preempt;
   FrameInfo _cont_frame;
   int _cont_fastpath;
+  int _held_monitor_count; // used by continuations for fast lock detection
 
   friend class VMThread;
   friend class ThreadWaitTransition;
@@ -1347,6 +1348,11 @@ class JavaThread: public Thread {
   bool cont_preempt() { return _cont_preempt; }
   void set_cont_preempt(bool x) { _cont_preempt = x; }
   FrameInfo* cont_frame() { return &_cont_frame; }
+  int held_monitor_count() { return _held_monitor_count; }
+  void reset_held_monitor_count() { _held_monitor_count = 0; }
+  void inc_held_monitor_count() { _held_monitor_count++; }
+  void dec_held_monitor_count() { /* assert (_held_monitor_count > 0, ""); -- TODO LOOM: currently this does not hold because we don't handle nesting well */ 
+                                  _held_monitor_count--; }
 
  private:
   // Support for thread handshake operations
@@ -1819,6 +1825,7 @@ class JavaThread: public Thread {
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }
   static ByteSize cont_frame_offset()         { return byte_offset_of(JavaThread, _cont_frame); }
   static ByteSize cont_preempt_offset()       { return byte_offset_of(JavaThread, _cont_preempt); }
+  static ByteSize held_monitor_count_offset() { return byte_offset_of(JavaThread, _held_monitor_count); }
 
   // Returns the jni environment for this thread
   JNIEnv* jni_environment()                      { return &_jni_environment; }

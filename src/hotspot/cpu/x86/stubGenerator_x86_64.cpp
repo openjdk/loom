@@ -6171,6 +6171,7 @@ RuntimeStub* generate_cont_doYield() {
     address start = __ pc();
 
     __ set_cont_fastpath(get_thread(), 1);
+    __ reset_held_monitor_count(get_thread());
     __ lea(rax, Address(rsp, wordSize));
     __ ret(0);
 

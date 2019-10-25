@@ -1301,13 +1301,17 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
     jcc(Assembler::zero, done);
 
     bind(slow_case);
-
     // Call the runtime routine for slow case
     call_VM(noreg,
             CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
             lock_reg);
+    Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
+    NOT_LP64(get_thread(rthread);)
+    dec_held_monitor_count(rthread);
 
     bind(done);
+    NOT_LP64(get_thread(rthread);)
+    inc_held_monitor_count(rthread);
   }
 }
 
@@ -1379,8 +1383,14 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
             CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit),
             lock_reg);
 
+    Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
+    NOT_LP64(get_thread(rthread);)
+    inc_held_monitor_count(rthread);
+
     bind(done);
 
+    NOT_LP64(get_thread(rthread);)
+    dec_held_monitor_count(rthread);
     restore_bcp();
   }
 }
