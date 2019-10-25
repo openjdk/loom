@@ -4323,33 +4323,37 @@ static frame chunk_top_frame(oop chunk) {
   intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
   address pc = *(address*)(sp - 1);
   intptr_t* fp = *(intptr_t**)(sp - 2); // TODO PD
-  return frame(sp, sp, fp, pc, NULL, NULL, true);
+  return frame(sp, sp, fp, pc, ContinuationCodeBlobLookup::find_blob(pc), NULL, true);
 }
 
-static frame continuation_top_frame(oop contOop, RegisterMap* map) {
-  ContMirror cont(NULL, contOop);
-
-  for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-    if (!cont.is_empty_chunk(chunk)) {
-      return chunk_top_frame(chunk);
-    }
-  }
-
+static frame continuation_body_top_frame(ContMirror& cont, RegisterMap* map) {
   hframe hf = cont.last_frame<mode_preempt>(); // here mode_preempt merely makes the fewest assumptions
   assert (!hf.is_empty(), "");
 
   // tty->print_cr(">>>> continuation_top_frame");
   // hf.print_on(cont, tty);
 
-  // if (!oopDesc::equals(map->cont(), contOop))
-  map->set_cont(contOop);
-  map->set_in_cont(true);
-
   if (map->update_map() && !hf.is_interpreted_frame()) { // TODO : what about forced preemption? see `if (callee_safepoint_stub != NULL)` in thaw_java_frame
     frame::update_map_with_saved_link(map, reinterpret_cast<intptr_t**>(-1));
   }
 
   return hf.to_frame(cont);
+}
+
+static frame continuation_top_frame(oop contOop, RegisterMap* map) {
+  ContMirror cont(NULL, contOop);
+
+  // if (!oopDesc::equals(map->cont(), contOop))
+  map->set_cont(contOop);
+  map->set_in_cont(true);
+
+  for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
+    if (!ContMirror::is_empty_chunk(chunk)) {
+      return chunk_top_frame(chunk);
+    }
+  }
+
+  return continuation_body_top_frame(cont, map);
 }
 
 static frame continuation_parent_frame(ContMirror& cont, RegisterMap* map) {
@@ -4411,17 +4415,20 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
 
   oop chunk = cont.find_chunk(f.unextended_sp());
   if (chunk != (oop)NULL) {
-    frame sender = f.sender(map);
-    if (ContMirror::is_in_chunk(chunk, sender.unextended_sp())) {
+    if (ContMirror::is_in_chunk(chunk, f.unextended_sp() + f.cb()->frame_size())) {
+      map->set_in_cont(false); // to prevent infinite recursion
+      frame sender = f.sender(map);
+      map->set_in_cont(true);
+    
       assert (ContMirror::is_usable_in_chunk(chunk, sender.unextended_sp()), "");
       return sender;
     }
     chunk = jdk_internal_misc_StackChunk::parent(chunk);
     if (chunk != (oop)NULL) {
       assert (!ContMirror::is_empty_chunk(chunk), "");
-      sender = chunk_top_frame(chunk);
-      return sender;
+      return chunk_top_frame(chunk);
     }
+    return continuation_body_top_frame(cont, map);
   }
 
   hframe hf = cont.from_frame(f);
@@ -5488,7 +5495,7 @@ bool Continuation::debug_is_stack_chunk(oop obj) {
 
 void Continuation::debug_print_stack_chunk(oop chunk) {
   assert (debug_is_stack_chunk(chunk), "");
-  print_chunk(chunk, NULL,false);
+  print_chunk(chunk, NULL, false);
 }
 
 bool Continuation::debug_is_continuation(Klass* klass) {
