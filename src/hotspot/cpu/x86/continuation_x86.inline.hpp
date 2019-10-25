@@ -1167,7 +1167,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure, boo
 
     if (do_metadata && cb->is_nmethod()) {
       nmethod* nm = cb->as_nmethod();
-      nm->mark_as_seen_on_stack();
+      nm->mark_as_seen_on_continuation();
       nm->oops_do(closure);
     }
 

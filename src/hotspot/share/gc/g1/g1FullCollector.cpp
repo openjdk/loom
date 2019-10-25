@@ -163,6 +163,8 @@ void G1FullCollector::prepare_collection() {
 }
 
 void G1FullCollector::collect() {
+  CodeCache::increment_marking_cycle();
+
   phase1_mark_live_objects();
   verify_after_marking();
 

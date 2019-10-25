@@ -317,6 +317,8 @@ CodeBlobClosure* NMethodSweeper::prepare_reset_hotness_counters() {
   */
 void NMethodSweeper::do_stack_scanning() {
   assert(!CodeCache_lock->owned_by_self(), "just checking");
+  // There are stacks in the heap that need to be scanned.
+  Universe::heap()->collect_for_codecache();
   if (wait_for_stack_scanning()) {
     if (ThreadLocalHandshakes) {
       CodeBlobClosure* code_cl;

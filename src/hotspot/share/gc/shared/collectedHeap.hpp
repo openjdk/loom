@@ -358,6 +358,7 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   virtual MetaWord* satisfy_failed_metadata_allocation(ClassLoaderData* loader_data,
                                                        size_t size,
                                                        Metaspace::MetadataType mdtype);
+  virtual void collect_for_codecache();
 
   // Returns "true" iff there is a stop-world GC in progress.  (I assume
   // that it should answer "false" for the concurrent part of a concurrent

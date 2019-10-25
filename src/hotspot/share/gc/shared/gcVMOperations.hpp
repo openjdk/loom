@@ -224,6 +224,16 @@ class VM_CollectForMetadataAllocation: public VM_GC_Operation {
   bool initiate_concurrent_GC();
 };
 
+class VM_CollectForCodeCacheAllocation: public VM_GC_Operation {
+public:
+  VM_CollectForCodeCacheAllocation(uint gc_count_before,
+                                   uint full_gc_count_before,
+                                   GCCause::Cause gc_cause);
+
+  virtual VMOp_Type type() const { return VMOp_CollectForCodeCacheAllocation; }
+  virtual void doit();
+};
+
 class SvcGCMarker : public StackObj {
  private:
   JvmtiGCMarker _jgcm;

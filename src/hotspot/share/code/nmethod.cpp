@@ -1128,7 +1128,15 @@ void nmethod::mark_as_seen_on_stack() {
   // Set the traversal mark to ensure that the sweeper does 2
   // cleaning passes before moving to zombie.
   set_stack_traversal_mark(NMethodSweeper::traversal_count());
+}
+
+void nmethod::mark_as_seen_on_continuation() {
+  assert(is_alive(), "Must be an alive method");
   _marking_cycle = CodeCache::marking_cycle();
+  BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+  if (bs_nm != NULL) {
+    bs_nm->disarm(this);
+  }
 }
 
 // Tell if a non-entrant method can be converted to a zombie (i.e.,
@@ -1141,8 +1149,8 @@ bool nmethod::can_convert_to_zombie() {
   // concurrent GC threads.
   assert(is_not_entrant() || is_unloading(), "must be a non-entrant method");
 
-  bool maybe_in_continuation = _marking_cycle + 1 < CodeCache::marking_cycle() ||
-                               is_on_continuation_stack();
+  bool not_on_young_fiber_stack = _marking_cycle + 1 < CodeCache::marking_cycle();
+  bool maybe_in_continuation = !not_on_young_fiber_stack || is_on_continuation_stack();
 
   // Since the nmethod sweeper only does partial sweep the sweeper's traversal
   // count can be greater than the stack traversal count before it hits the

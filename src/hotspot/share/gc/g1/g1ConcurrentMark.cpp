@@ -746,6 +746,8 @@ public:
 void G1ConcurrentMark::pre_initial_mark() {
   assert_at_safepoint_on_vm_thread();
 
+  CodeCache::increment_marking_cycle();
+
   // Reset marking state.
   reset();
 
