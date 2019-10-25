@@ -57,7 +57,6 @@ protected:
   CardTableBarrierSet(BarrierSetAssembler* barrier_set_assembler,
                       BarrierSetC1* barrier_set_c1,
                       BarrierSetC2* barrier_set_c2,
-                      BarrierSetNMethod* barrier_set_nmethod,
                       CardTable* card_table,
                       const BarrierSet::FakeRtti& fake_rtti);
 

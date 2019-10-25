@@ -98,12 +98,7 @@ protected:
              BarrierSetC1* barrier_set_c1,
              BarrierSetC2* barrier_set_c2,
              BarrierSetNMethod* barrier_set_nmethod,
-             const FakeRtti& fake_rtti) :
-    _fake_rtti(fake_rtti),
-    _barrier_set_assembler(barrier_set_assembler),
-    _barrier_set_c1(barrier_set_c1),
-    _barrier_set_c2(barrier_set_c2),
-    _barrier_set_nmethod(barrier_set_nmethod) {}
+             const FakeRtti& fake_rtti);
   ~BarrierSet() { }
 
   template <class BarrierSetAssemblerT>

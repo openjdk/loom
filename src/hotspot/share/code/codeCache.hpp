@@ -185,7 +185,7 @@ class CodeCache : AllStatic {
   static void do_unloading(BoolObjectClosure* is_alive, bool unloading_occurred);
   static uint8_t unloading_cycle() { return _unloading_cycle; }
   static void increment_unloading_cycle();
-  static void increment_marking_cycle() { ++_marking_cycle; }
+  static void increment_marking_cycle();
   static uint64_t marking_cycle() { return _marking_cycle; }
   static void release_exception_cache(ExceptionCache* entry);
   static void purge_exception_caches();

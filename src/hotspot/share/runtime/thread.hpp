@@ -147,6 +147,22 @@ class Thread: public ThreadShadow {
   static THREAD_LOCAL Thread* _thr_current;
 #endif
 
+  int _nmethod_disarm_value;
+
+ public:
+  int nmethod_disarm_value() {
+    return _nmethod_disarm_value;
+  }
+
+  void set_nmethod_disarm_value(int value) {
+    _nmethod_disarm_value = value;
+  }
+
+  static ByteSize nmethod_disarmed_offset() {
+    return byte_offset_of(Thread, _nmethod_disarm_value);
+  }
+
+ private:
   // Thread local data area available to the GC. The internal
   // structure and contents of this data area is GC-specific.
   // Only GC and GC barrier code should access this data area.

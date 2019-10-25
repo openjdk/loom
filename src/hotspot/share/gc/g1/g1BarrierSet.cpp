@@ -25,7 +25,6 @@
 #include "precompiled.hpp"
 #include "gc/g1/g1BarrierSet.inline.hpp"
 #include "gc/g1/g1BarrierSetAssembler.hpp"
-#include "gc/g1/g1BarrierSetNMethod.hpp"
 #include "gc/g1/g1CardTable.inline.hpp"
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "gc/g1/g1SATBMarkQueueSet.hpp"
@@ -50,15 +49,10 @@
 class G1BarrierSetC1;
 class G1BarrierSetC2;
 
-static BarrierSetNMethod* make_barrier_set_nmethod() {
-  return new G1BarrierSetNMethod();
-}
-
 G1BarrierSet::G1BarrierSet(G1CardTable* card_table) :
   CardTableBarrierSet(make_barrier_set_assembler<G1BarrierSetAssembler>(),
                       make_barrier_set_c1<G1BarrierSetC1>(),
                       make_barrier_set_c2<G1BarrierSetC2>(),
-                      make_barrier_set_nmethod(),
                       card_table,
                       BarrierSet::FakeRtti(BarrierSet::G1BarrierSet)),
   _satb_mark_queue_buffer_allocator("SATB Buffer Allocator", G1SATBBufferSize),

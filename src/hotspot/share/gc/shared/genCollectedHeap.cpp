@@ -1327,6 +1327,10 @@ void GenCollectedHeap::gc_prologue(bool full) {
   // Walk generations
   GenGCPrologueClosure blk(full);
   generation_iterate(&blk, false);  // not old-to-young.
+
+  if (full) {
+    CodeCache::increment_marking_cycle();
+  }
 };
 
 class GenGCEpilogueClosure: public GenCollectedHeap::GenClosure {
@@ -1345,6 +1349,10 @@ void GenCollectedHeap::gc_epilogue(bool full) {
   size_t actual_gap = pointer_delta((HeapWord*) (max_uintx-3), *(end_addr()));
   guarantee(is_client_compilation_mode_vm() || actual_gap > (size_t)FastAllocateSizeLimit, "inline allocation wraps");
 #endif // COMPILER2_OR_JVMCI
+
+  if (full) {
+    CodeCache::increment_marking_cycle();
+  }
 
   resize_all_tlabs();
 

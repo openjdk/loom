@@ -35,6 +35,7 @@
 #include "compiler/compileBroker.hpp"
 #include "compiler/compileTask.hpp"
 #include "gc/shared/barrierSet.hpp"
+#include "gc/shared/barrierSetNMethod.hpp"
 #include "gc/shared/gcId.hpp"
 #include "gc/shared/gcLocker.inline.hpp"
 #include "gc/shared/workgroup.hpp"
@@ -315,6 +316,8 @@ Thread::Thread() {
   BarrierSet* const barrier_set = BarrierSet::barrier_set();
   if (barrier_set != NULL) {
     barrier_set->on_thread_create(this);
+    BarrierSetNMethod* bs_nm = barrier_set->barrier_set_nmethod();
+    _nmethod_disarm_value = bs_nm->disarmed_value();
   } else {
     // Only the main thread should be created before the barrier set
     // and that happens just before Thread::current is set. No other thread
