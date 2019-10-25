@@ -1130,13 +1130,32 @@ void nmethod::mark_as_seen_on_stack() {
   set_stack_traversal_mark(NMethodSweeper::traversal_count());
 }
 
-void nmethod::mark_as_seen_on_continuation() {
+void nmethod::mark_as_maybe_on_continuation() {
   assert(is_alive(), "Must be an alive method");
   _marking_cycle = CodeCache::marking_cycle();
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
   if (bs_nm != NULL) {
     bs_nm->disarm(this);
   }
+}
+
+bool nmethod::is_not_on_continuation_stack() {
+  // Odd marking cycles are found during concurrent marking. Even numbers are found
+  // in nmethods that are marked when GC is inactive (e.g. nmethod entry barriers during
+  // normal execution). Therefore we align up by 2 so that nmethods encountered during
+  // concurrent marking are treated as if they were encountered in the inactive phase
+  // after that concurrent GC. Each GC increments the marking cycle twice - once when
+  // it starts and once when it ends. So we can only be sure there are no new continuations
+  // when they have not been encountered from before a GC to after a GC.
+  bool not_on_new_fiber_stack = CodeCache::marking_cycle() >= align_up(_marking_cycle, 2) + 2;
+
+  // As for old fiber stacks, they are kept alive by a WeakHandle.
+  bool not_on_old_fiber_stack = false;
+  if (_keepalive != NULL) {
+    WeakHandle<vm_nmethod_keepalive_data> wh = WeakHandle<vm_nmethod_keepalive_data>::from_raw(_keepalive);
+    not_on_old_fiber_stack = wh.resolve() == NULL;
+  }
+  return not_on_new_fiber_stack && not_on_old_fiber_stack;
 }
 
 // Tell if a non-entrant method can be converted to a zombie (i.e.,
@@ -1149,16 +1168,13 @@ bool nmethod::can_convert_to_zombie() {
   // concurrent GC threads.
   assert(is_not_entrant() || is_unloading(), "must be a non-entrant method");
 
-  bool not_on_young_fiber_stack = _marking_cycle + 1 < CodeCache::marking_cycle();
-  bool maybe_in_continuation = !not_on_young_fiber_stack || is_on_continuation_stack();
-
   // Since the nmethod sweeper only does partial sweep the sweeper's traversal
   // count can be greater than the stack traversal count before it hits the
   // nmethod for the second time.
   // If an is_unloading() nmethod is still not_entrant, then it is not safe to
   // convert it to zombie due to GC unloading interactions. However, if it
   // has become unloaded, then it is okay to convert such nmethods to zombie.
-  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && !maybe_in_continuation &&
+  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && is_not_on_continuation_stack() &&
           !is_locked_by_vm() && (!is_unloading() || is_unloaded());
 }
 

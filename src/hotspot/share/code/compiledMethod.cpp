@@ -724,11 +724,3 @@ bool CompiledMethod::has_evol_metadata() {
   }
   return check_evol.has_evol_dependency();
 }
-
-bool CompiledMethod::is_on_continuation_stack() {
-  if (_keepalive != NULL) {
-    WeakHandle<vm_nmethod_keepalive_data> wh = WeakHandle<vm_nmethod_keepalive_data>::from_raw(_keepalive);
-    return wh.resolve() != NULL;
-  }
-  return false;
-}

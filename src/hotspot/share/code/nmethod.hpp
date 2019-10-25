@@ -576,7 +576,8 @@ public:
 
   // See comment at definition of _last_seen_on_stack
   void mark_as_seen_on_stack();
-  void mark_as_seen_on_continuation();
+  void mark_as_maybe_on_continuation();
+  bool is_not_on_continuation_stack();
   bool can_convert_to_zombie();
 
   // Evolution support. We make old (discarded) compiled methods point to new Method*s.
