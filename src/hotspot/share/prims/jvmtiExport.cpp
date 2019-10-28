@@ -773,6 +773,9 @@ JvmtiExport::cv_external_thread_to_JavaThread(ThreadsList * t_list,
 
   JavaThread * java_thread = java_lang_Thread::thread(thread_oop);
   if (java_thread == NULL) {
+    if (java_lang_Fiber::is_instance(thread_oop)) {
+      return JVMTI_ERROR_INVALID_THREAD;
+    }
     // The java.lang.Thread does not contain a JavaThread * so it has
     // not yet run or it has died.
     return JVMTI_ERROR_THREAD_NOT_ALIVE;

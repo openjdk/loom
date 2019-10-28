@@ -286,7 +286,7 @@ test_GetThreadFiber(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jobject fiber,
   }
   printf("JVMTI GetThreadFiber with NULL thread (current) returned non-NULL fiber as expected\n");
 
-  // #2: Test JVMTI GetThreadFiber function a bad thread
+  // #2: Test JVMTI GetThreadFiber function with a bad thread
   err = (*jvmti)->GetThreadFiber(jvmti, fiber, &thread_fiber);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     fatal(jni, "event handler: JVMTI GetThreadFiber with bad thread failed to return JVMTI_ERROR_INVALID_THREAD");
@@ -423,7 +423,14 @@ test_GetFiberFrameLocation(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jobject
     }
     printf("JVMTI GetFiberFrameLocation for empty stack returned JVMTI_ERROR_NO_MORE_FRAMES as expected\n");
   } else {
-    err = (*jvmti)->GetFiberFrameLocation(jvmti, fiber, 0, &method, &location);
+    err = (*jvmti)->GetFiberFrameLocation(jvmti, fiber, frame_count, &method, &location);
+    if (err != JVMTI_ERROR_NO_MORE_FRAMES) {
+      printf("JVMTI GetFiberFrameLocation for bid depth == frame_count returned error: %d\n", err);
+      fatal(jni, "event handler: JVMTI GetFiberFrameLocation for too big depth failed to return JVMTI_ERROR_NO_MORE_FRAMES");
+    }
+    printf("JVMTI GetFiberFrameLocation for too big depth returned JVMTI_ERROR_NO_MORE_FRAMES as expected\n");
+
+    err = (*jvmti)->GetFiberFrameLocation(jvmti, fiber, 1, &method, &location);
     if (err != JVMTI_ERROR_NONE) {
       printf("JVMTI GetFiberFrameLocation with good fiber returned error: %d\n", err);
       fatal(jni, "event handler: failed during JVMTI GetFiberFrameCount call");

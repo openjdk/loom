@@ -1676,7 +1676,7 @@ VM_FiberGetFrameLocation::doit() {
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
   javaVFrame *jvf = get_fiber_jvf(cur_thread, _fiber_h());
-  int  depth = -1;
+  int depth = 0;
 
   while (jvf != NULL && depth < _depth) {
     Method* method = jvf->method();
@@ -1684,7 +1684,8 @@ VM_FiberGetFrameLocation::doit() {
     depth++;
   }
 
-  if (depth < _depth) {
+  assert(_depth >= depth, "ran out of frames too soon");
+  if (jvf == NULL) {
     _result = JVMTI_ERROR_NO_MORE_FRAMES;
     return;
   }
