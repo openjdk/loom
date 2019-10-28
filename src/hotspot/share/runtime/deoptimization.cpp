@@ -1318,6 +1318,7 @@ void Deoptimization::relock_objects(GrowableArray<MonitorInfo*>* monitors, JavaT
         BasicLock* lock = mon_info->lock();
         ObjectSynchronizer::enter(obj, lock, thread);
         assert(mon_info->owner()->is_locked(), "object must be locked now");
+        thread->inc_held_monitor_count();
       }
     }
   }

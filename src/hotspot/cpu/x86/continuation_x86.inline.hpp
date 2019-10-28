@@ -1110,9 +1110,6 @@ static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
   st->print_cr("-------");
 }
 
-
-static const int mask = OopMapValue::oop_value | OopMapValue::narrowoop_value;
-
 static inline void* reg_to_loc(VMReg reg, intptr_t* sp) {
   assert (!reg->is_reg() || reg == rbp->as_VMReg(), "");
   return reg->is_reg() ? (void*)(sp - frame::sender_sp_offset) // see frame::update_map_with_saved_link(&map, link_addr);
@@ -1165,7 +1162,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure, boo
     assert (cb->is_compiled(), "");
     assert (cb->frame_size() > 0, "");
 
-    if (do_metadata && cb->is_nmethod()) {
+    if (do_metadata && cb->is_nmethod()) { // Devirtualizer::do_metadata(closure)
       nmethod* nm = cb->as_nmethod();
       nm->mark_as_maybe_on_continuation();
       nm->oops_do(closure);
@@ -1203,7 +1200,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure, boo
         }
       }
     }
-    for (OopMapStream oms(oopmap,mask); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    for (OopMapStream oms(oopmap, OopMapValue::oop_value|OopMapValue::narrowoop_value); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
       DEBUG_ONLY(oops++;)
       OopMapValue omv = oms.current();
       assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
@@ -1253,6 +1250,46 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosure* closure, boo
   assert(Continuation::debug_verify_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack ------- end -------");
   // tty->print_cr("<<< stack_chunk_iterate_stack %p %p", (oopDesc*)chunk, Thread::current());
+}
+
+void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosure* closure, bool do_metadata, MemRegion mr) {
+  assert (false, ""); // TODO REMOVE
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded");
+  intptr_t* const l = (intptr_t*)mr.start();
+  intptr_t* const h = (intptr_t*)mr.end();
+
+  CodeBlob* cb = NULL;
+  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  if (end > h) end = h;
+  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+    intptr_t* next_sp = sp + cb->frame_size();
+    if (sp + cb->frame_size() >= l) {
+      sp += cb->frame_size();
+      continue;
+    }
+
+    address pc = *(address*)(sp - 1);
+    int slot;
+    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
+    assert (slot >= 0, "");
+
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded sp: %ld", sp - start);
+    if (log_develop_is_enabled(Trace, jvmcont)) cb->print_on(tty);
+
+    for (OopMapStream oms(oopmap, OopMapValue::oop_value|OopMapValue::narrowoop_value); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+      OopMapValue omv = oms.current();
+      oop* p = (oop*)reg_to_loc(omv.reg(), sp);
+      assert (p != NULL, "");
+
+      if ((intptr_t*)p < l || (intptr_t*)p >= end) continue;
+
+      log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded p: " INTPTR_FORMAT, p2i(p));
+      // if (!SkipNullValue::should_skip(*p))
+        omv.type() == OopMapValue::narrowoop_value ? closure->do_oop((narrowOop*)p) : closure->do_oop(p); // ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, p);
+    }
+  }
 }
 
 static void fix_stack_chunk(oop chunk) {
@@ -1328,46 +1365,6 @@ static void fix_stack_chunk(oop chunk) {
 
   log_develop_trace(jvmcont)("fix_stack_chunk ------- end -------");
   // tty->print_cr("<<< fix_stack_chunk %p %p", (oopDesc*)chunk, Thread::current());
-}
-
-void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosure* closure, bool do_metadata, MemRegion mr) {
-  assert (false, ""); // TODO REMOVE
-  log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded");
-  intptr_t* const l = (intptr_t*)mr.start();
-  intptr_t* const h = (intptr_t*)mr.end();
-
-  CodeBlob* cb = NULL;
-  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
-  if (end > h) end = h;
-  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
-    intptr_t* next_sp = sp + cb->frame_size();
-    if (sp + cb->frame_size() >= l) {
-      sp += cb->frame_size();
-      continue;
-    }
-
-    address pc = *(address*)(sp - 1);
-    int slot;
-    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
-    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
-    assert (slot >= 0, "");
-
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded sp: %ld", sp - start);
-    if (log_develop_is_enabled(Trace, jvmcont)) cb->print_on(tty);
-
-    for (OopMapStream oms(oopmap,mask); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
-      OopMapValue omv = oms.current();
-      oop* p = (oop*)reg_to_loc(omv.reg(), sp);
-      assert (p != NULL, "");
-
-      if ((intptr_t*)p < l || (intptr_t*)p >= end) continue;
-
-      log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded p: " INTPTR_FORMAT, p2i(p));
-      // if (!SkipNullValue::should_skip(*p))
-        omv.type() == OopMapValue::narrowoop_value ? closure->do_oop((narrowOop*)p) : closure->do_oop(p); // ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, p);
-    }
-  }
 }
 
 template <typename ConfigT, op_mode mode>
@@ -1466,7 +1463,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
     num_oops += oopmap->num_oops();
 
     DEBUG_ONLY(int oops = 0;)
-    for (OopMapStream oms(oopmap,mask); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    for (OopMapStream oms(oopmap, OopMapValue::oop_value|OopMapValue::narrowoop_value); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
       DEBUG_ONLY(oops++;)
       OopMapValue omv = oms.current();
       void* p = reg_to_loc(omv.reg(), sp);

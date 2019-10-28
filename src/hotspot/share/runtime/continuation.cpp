@@ -2098,15 +2098,15 @@ public:
 
     int sp;
     address pc;
-    intptr_t* fp;
+    // intptr_t* fp;
     bool allocated;
     // TODO The second disjunct means we don't squash old chunks, but let them be (Rickard's idea)
-    if (chunk == NULL || requires_barriers(chunk) || (requires_barriers(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
+    if (chunk == NULL || requires_barriers(chunk) || (!requires_barriers(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
       chunk = allocate_chunk(size);
       allocated = true;
       sp = jdk_internal_misc_StackChunk::sp(chunk);
       pc = NULL;
-      fp = NULL;
+      // fp = NULL;
       assert (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL || ContMirror::is_stack_chunk(jdk_internal_misc_StackChunk::parent(chunk)), "");
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
       // They'll then be stored twice: in the chunk and in the parent
@@ -2121,7 +2121,7 @@ public:
     } else {
       // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
       // if (requires_barriers(chunk)) {
-      //   log_develop_trace(jvmcont)("Young chunk: found old chunk");
+      //   log_develop_trace(jvmcont)("Freeze chunk: found old chunk");
       //   assert(_cont.chunk_invariant(), "");
       //   return false;
       // }
@@ -2130,7 +2130,6 @@ public:
       pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - SENDER_SP_RET_ADDRESS_OFFSET);
       // fp = *(intptr_t**)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - frame::sender_sp_offset); -- necessary?
       sp += argsize;
-      assert (sp < jdk_internal_misc_StackChunk::size(chunk), "");
       ContMirror::reset_chunk_counters(chunk);
     }
     
@@ -2138,9 +2137,11 @@ public:
     assert (ContMirror::is_stack_chunk(chunk), "");
     assert (!requires_barriers(chunk), "");
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
+    assert (sp <= jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset, "sp: %d size: %d", sp, jdk_internal_misc_StackChunk::size(chunk));
 
     // copy; no need to patch because of how we handle return address and link
     log_develop_trace(jvmcont)("freeze_chunk start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d", p2i((oopDesc*)chunk), jdk_internal_misc_StackChunk::size(chunk), sp, argsize);
+    assert (sp >= size, "");
     sp -= size;
     assert (size == (jdk_internal_misc_StackChunk::sp(chunk) - sp), "size: %d used chunk size: %d", size, (jdk_internal_misc_StackChunk::sp(chunk) - sp));
     jdk_internal_misc_StackChunk::set_sp(chunk, sp);
