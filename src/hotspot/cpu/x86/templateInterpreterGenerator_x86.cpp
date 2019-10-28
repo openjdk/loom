@@ -660,6 +660,10 @@ void TemplateInterpreterGenerator::lock_method() {
   const Register lockreg = NOT_LP64(rdx) LP64_ONLY(c_rarg1);
   __ movptr(lockreg, rsp); // object address
   __ lock_object(lockreg);
+
+  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
+  NOT_LP64(get_thread(rthread);)
+  __ inc_held_monitor_count(rthread);
 }
 
 // Generate a fixed interpreter frame. This is identical setup for
