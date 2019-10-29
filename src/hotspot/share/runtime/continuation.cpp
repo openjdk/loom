@@ -64,10 +64,6 @@
 
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 
-static bool requires_barriers(oop obj) {
-  return Universe::heap()->requires_barriers(obj);
-}
-
 #define SENDER_SP_RET_ADDRESS_OFFSET (frame::sender_sp_offset - frame::return_addr_offset)
 
 static void fix_stack_chunk(oop chunk);
@@ -2290,7 +2286,7 @@ public:
       num_chunks++;
       if (jdk_internal_misc_StackChunk::numFrames(chunk) < 0) {
         assert (!requires_barriers(chunk) && !jdk_internal_misc_StackChunk::gc_mode(chunk), "");
-        Continuation::stack_chunk_iterate_stack(chunk, (OopClosure*)NULL, false /* do_metadata */); // &do_nothing_cl
+        Continuation::stack_chunk_iterate_stack(chunk, (BasicOopIterateClosure*)NULL); // , false /* do_metadata */); // &do_nothing_cl
       }
 
       static const int metadata = 2;
@@ -5100,6 +5096,17 @@ NOINLINE void ContMirror::allocate_stacks_in_java(int size, int oops, int frames
   _ref_sp = java_lang_Continuation::refSP(_cont);
   _stack_length = _stack->length();
   /* We probably should handle OOM? */
+}
+
+void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops) {
+  EventContinuationIterateOops e;
+  if (e.should_commit()) {
+    e.set_id(cast_from_oop<u8>(chunk));
+    e.set_safepoint(SafepointSynchronize::is_at_safepoint());
+    e.set_numFrames((u2)num_frames);
+    e.set_numOops((u2)num_oops);
+    e.commit();
+  }
 }
 
 JVM_ENTRY(void, CONT_Clean(JNIEnv* env, jobject jcont)) {

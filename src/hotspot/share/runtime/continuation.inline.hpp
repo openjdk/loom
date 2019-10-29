@@ -29,18 +29,23 @@
 // #include "compiler/oopMap.hpp"
 // #include "logging/log.hpp"
 #include "runtime/continuation.hpp"
-// #include CPU_HEADER_INLINE(frame)
 
-template <class OopClosureType>
-void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure) {
-  // for now, we don't devirtualize for faster compilation
-  Continuation::stack_chunk_iterate_stack(chunk, (OopClosure*)closure, closure->do_metadata());
+static bool requires_barriers(oop obj) {
+  return Universe::heap()->requires_barriers(obj);
 }
 
-template <class OopClosureType>
-void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* closure, MemRegion mr) {
-  // for now, we don't devirtualize for faster compilation
-  Continuation::stack_chunk_iterate_stack_bounded(chunk, (OopClosure*)closure, closure->do_metadata(), mr);
-}
+#include CPU_HEADER_INLINE(continuationChunk)
+
+// template <class OopClosureType>
+// void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure) {
+//   // for now, we don't devirtualize for faster compilation
+//   Continuation::stack_chunk_iterate_stack(chunk, (OopClosure*)closure, closure->do_metadata());
+// }
+
+// template <class OopClosureType>
+// void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* closure, MemRegion mr) {
+//   // for now, we don't devirtualize for faster compilation
+//   Continuation::stack_chunk_iterate_stack_bounded(chunk, (OopClosure*)closure, closure->do_metadata(), mr);
+// }
 
 #endif // SHARE_VM_RUNTIME_CONTINUATION_INLINE_HPP

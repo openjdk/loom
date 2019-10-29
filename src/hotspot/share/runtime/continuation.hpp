@@ -142,13 +142,17 @@ private:
 
   friend class InstanceStackChunkKlass;
 
+public:
   template <class OopClosureType> static void stack_chunk_iterate_stack(oop obj, OopClosureType* closure);
   template <class OopClosureType> static void stack_chunk_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
-public:
-  // for now, we don't devirtualize the closure for faster compilation
-  static void stack_chunk_iterate_stack(oop obj, OopClosure* closure, bool do_metadata);
-  static void stack_chunk_iterate_stack_bounded(oop obj, OopClosure* closure, bool do_metadata, MemRegion mr);
+// public:
+//   // for now, we don't devirtualize the closure for faster compilation
+//   static void stack_chunk_iterate_stack(oop obj, OopClosure* closure, bool do_metadata);
+//   static void stack_chunk_iterate_stack_bounded(oop obj, OopClosure* closure, bool do_metadata, MemRegion mr);
+
+private:
+  static void emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops);
 
 #ifdef ASSERT
 public:
