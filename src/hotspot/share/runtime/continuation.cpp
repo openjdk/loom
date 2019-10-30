@@ -1391,8 +1391,24 @@ static int num_java_frames(const hframe& f) {
 static int num_java_frames(ContMirror& cont) {
   ResourceMark rm; // used for scope traversal in num_java_frames(CompiledMethod*, address)
   int count = 0;
-  for (hframe hf = cont.last_frame<mode_slow>(); !hf.is_empty(); hf = hf.sender<mode_slow>(cont))
+
+  for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
+    CodeBlob* cb = NULL;
+    intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+    intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
+    for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+      address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+      cb = ContinuationCodeBlobLookup::find_blob(pc);
+      CompiledMethod* cm = cb->as_compiled_method();
+
+      count += num_java_frames(cm, pc);
+    }
+  }
+
+  for (hframe hf = cont.last_frame<mode_slow>(); !hf.is_empty(); hf = hf.sender<mode_slow>(cont)) {
     count += num_java_frames(hf);
+  }
+  
   return count;
 }
 
