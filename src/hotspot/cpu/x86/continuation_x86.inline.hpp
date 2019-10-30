@@ -850,6 +850,19 @@ inline void Freeze<ConfigT, mode>::relativize_interpreted_frame_metadata(const f
 }
 
 template <typename ConfigT, op_mode mode>
+frame Freeze<ConfigT, mode>::chunk_start_frame_pd(oop chunk, intptr_t* sp) {
+  address pc = *(address*)(sp - 1);
+  intptr_t* fp = *(intptr_t**)(sp - 2); // TODO PERF -- unnecessary
+  return frame(sp, sp, fp, pc, NULL, NULL, true);
+}
+
+static frame chunk_top_frame_pd(oop chunk, intptr_t* sp) {
+  address pc = *(address*)(sp - 1);
+  intptr_t* fp = *(intptr_t**)(sp - 2);
+  return frame(sp, sp, fp, pc, ContinuationCodeBlobLookup::find_blob(pc), NULL, true);
+}
+
+template <typename ConfigT, op_mode mode>
 inline frame Thaw<ConfigT, mode>::new_entry_frame() {
   // if (Interpreter::contains(_cont.entryPC())) _cont.set_entrySP(_cont.entrySP() - 1);
   return frame(_cont.entrySP(), _cont.entryFP(), _cont.entryPC()); // TODO PERF: This finds code blob and computes deopt state
@@ -1110,6 +1123,11 @@ static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
   st->print_cr("-------");
 }
 
+static frame create_frame(intptr_t* sp) {
+  address pc = *(address*)(sp - 1);
+  intptr_t* fp = *(intptr_t**)(sp - 2);
+  return frame(sp, fp, pc);
+}
 static void fix_stack_chunk(oop chunk) {
   // see sender_for_compiled_frame  
   assert (ContMirror::is_stack_chunk(chunk), "");

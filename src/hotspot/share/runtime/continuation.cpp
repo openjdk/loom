@@ -2007,6 +2007,7 @@ private:
   inline void relativize_interpreted_frame_metadata(const frame& f, intptr_t* vsp, const hframe& hf);
   template<bool cont_empty> hframe new_bottom_hframe(int sp, int ref_sp, address pc, bool interpreted);
   template<typename FKind> hframe new_hframe(const frame& f, intptr_t* vsp, const hframe& caller, int fsize, int num_oops, int argsize);
+  static frame chunk_start_frame_pd(oop chunk, intptr_t* sp);
 
 public:
 
@@ -2029,7 +2030,7 @@ public:
     // this is only uaed to terminate the frame loop. 
     _bottom_address = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
     int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
-    _bottom_address += LIKELY(argsize == 0) ? 2 // TODO PD  We add 2 because the chunk does not include the bottommost 2 words (return pc and link)
+    _bottom_address += LIKELY(argsize == 0) ? frame::sender_sp_offset // We add 2 because the chunk does not include the bottommost 2 words (return pc and link)
                                             : -argsize;
 
     log_develop_trace(jvmcont)("freeze chunk bottom_address: " INTPTR_FORMAT " argsize: %d", p2i(_bottom_address), argsize);
@@ -2429,9 +2430,7 @@ public:
 
   static frame chunk_start_frame(oop chunk) {
     intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
-    address pc = *(address*)(sp - 1);
-    intptr_t* fp = *(intptr_t**)(sp - 2); // TODO PD PERF -- unnecessary
-    return frame(sp, sp, fp, pc, NULL, NULL, true);
+    return chunk_start_frame_pd(chunk, sp);
   }
 
   template<bool top>
@@ -4326,11 +4325,11 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
 //   return sender.is_empty();
 // }
 
+static frame chunk_top_frame_pd(oop chunk, intptr_t* sp);
+
 static frame chunk_top_frame(oop chunk) {
   intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
-  address pc = *(address*)(sp - 1);
-  intptr_t* fp = *(intptr_t**)(sp - 2); // TODO PD
-  return frame(sp, sp, fp, pc, ContinuationCodeBlobLookup::find_blob(pc), NULL, true);
+  return chunk_top_frame_pd(chunk, sp);
 }
 
 static frame continuation_body_top_frame(ContMirror& cont, RegisterMap* map) {
@@ -5657,10 +5656,8 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
     intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
     tty->print_cr("------ chunk frames end: " INTPTR_FORMAT, p2i(end));
     if (sp < end) {
-      address pc = *(address*)(sp - 1);
-      intptr_t* fp = *(intptr_t**)(sp - 2); // TODO PD
       RegisterMap map(NULL, false);
-      frame f(sp, fp, pc);
+      frame f = create_frame(sp);
       tty->print_cr("-- frame size: %d (words)", f.cb()->frame_size());
       f.print_on(tty);
       while (f.sp() + f.cb()->frame_size() < end) {
