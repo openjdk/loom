@@ -635,6 +635,7 @@ public:
 
   bool is_in_stack(void* p) const;
   bool is_in_ref_stack(void* p) const;
+  bool is_empty0();
   bool is_empty();
 
   static bool is_stack_chunk(oop obj);
@@ -976,8 +977,11 @@ void ContMirror::null_ref_stack(int start, int num) {
     _ref_stack->obj_at_put(start + i, NULL);
 }
 
-bool ContMirror::is_empty() {
+bool ContMirror::is_empty0() {
   assert ((_pc == NULL) == (_sp < 0 || _sp >= _stack->length()), "");
+  return _pc == NULL;
+}
+bool ContMirror::is_empty() {
   if (_tail != (oop)NULL) {
     if (!is_empty_chunk(_tail))
       return false;
@@ -986,7 +990,7 @@ bool ContMirror::is_empty() {
       return false;
     }
   }
-  return _pc == NULL;
+  return is_empty0();
 }
 
 template<op_mode mode>
@@ -2623,7 +2627,8 @@ public:
   #endif
 
     int argsize = 0;
-    if (_cont.is_empty()) {
+    if (_cont.is_empty0()) {
+      assert (_cont.is_empty(), "");
       caller = new_bottom_hframe<true>(_cont.sp(), _cont.refSP(), NULL, false);
     } else {
       assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
@@ -3457,7 +3462,7 @@ public:
       vsp = bot;
     }
 
-    const bool bottom = !full || _cont.is_empty();
+    const bool bottom = !full || (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL && _cont.is_empty0());
 
     bool partial;
     int argsize;
@@ -3563,7 +3568,7 @@ public:
   void patch_chunk(oop chunk, intptr_t* sp) {
     log_develop_trace(jvmcont)("thaw_chunk patching -- sp: " INTPTR_FORMAT, p2i(sp));
     address pc;
-    if (!_cont.is_empty()) { // TODO PERF
+    if (!ContMirror::is_empty_chunk(chunk) || jdk_internal_misc_StackChunk::parent(chunk) != (oop)NULL || !_cont.is_empty0()) {
       assert (_cont.tail() == chunk, "");
       pc = StubRoutines::cont_returnBarrier();
     } else {
@@ -3742,6 +3747,7 @@ public:
 
   template<typename FKind, bool top, bool bottom>
   inline void patch(frame& f, const frame& caller) {
+    assert (_cont.is_empty0() == _cont.is_empty(), "is_empty0: %d is_empty: %d", _cont.is_empty0(), _cont.is_empty());
     if (bottom && !_cont.is_empty()) {
       log_develop_trace(jvmcont)("Setting return address to return barrier: " INTPTR_FORMAT, p2i(StubRoutines::cont_returnBarrier()));
       FKind::interpreted ? Interpreted::patch_return_pc(f, StubRoutines::cont_returnBarrier())

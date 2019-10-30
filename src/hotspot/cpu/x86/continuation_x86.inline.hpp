@@ -447,7 +447,7 @@ inline void ContMirror::set_last_frame_pd(const hframe& f) {
  */
 template<op_mode mode /* = mode_slow*/> // TODO: add default when switching to C++11+
 const hframe ContMirror::last_frame() {
-  if (is_empty()) return hframe();
+  if (is_empty0()) return hframe();
 
   assert (mode != mode_fast || !Interpreter::contains(_pc), "");
   assert (Interpreter::contains(_pc) == is_flag(FLAG_LAST_FRAME_INTERPRETED), "");
@@ -813,7 +813,8 @@ inline void Freeze<ConfigT, mode>::patch_pd(const frame& f, hframe& hf, const hf
   }
   if (FKind::interpreted) {
     assert (mode != mode_fast, "");
-    if (bottom && _cont.is_empty()) { // dynamic test, but we don't care because we're interpreted
+    assert (_cont.is_empty() == _cont.is_empty0(), "is_empty: %d is_empty0: %d", _cont.is_empty(), _cont.is_empty0());
+    if (bottom && _cont.is_empty0()) { // dynamic test, but we don't care because we're interpreted
       hf.patch_interpreter_metadata_offset(frame::interpreter_frame_sender_sp_offset, 0);
     } else {
       hf.patch_sender_sp_relative(_cont.stack_address(caller.sp()));
