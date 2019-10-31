@@ -459,6 +459,7 @@ public class Continuation {
             // this.sp = -1;
             // this.refStack = null;
             // this.refSP = -1;
+            this.tail = null;
         } else {
             if (TRACE && origRefSP < refSP)
                 System.out.println("Nulling refs " + origRefSP + " (inclusive) - " + refSP + " (exclusive)");

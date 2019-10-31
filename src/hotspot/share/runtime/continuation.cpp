@@ -1348,7 +1348,7 @@ bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, const RegisterMap
     for (int index = (mons->length()-1); index >= 0; index--) { // see compiledVFrame::monitors()
       MonitorValue* mon = mons->at(index);
       if (mon->eliminated())
-        continue; // TODO: are we fine with this or should we return true?
+        continue; // we ignore scalar-replaced monitors
       ScopeValue* ov = mon->owner();
       StackValue* owner_sv = StackValue::create_stack_value(&f, map, ov); // it is an oop
       oop owner = owner_sv->get_obj()();
