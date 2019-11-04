@@ -583,6 +583,9 @@ bool vmIntrinsics::is_disabled_by_flags(vmIntrinsics::ID id) {
   case vmIntrinsics::_intBitsToFloat:
   case vmIntrinsics::_doubleToRawLongBits:
   case vmIntrinsics::_longBitsToDouble:
+  case vmIntrinsics::_ceil:
+  case vmIntrinsics::_floor:
+  case vmIntrinsics::_rint:
   case vmIntrinsics::_dabs:
   case vmIntrinsics::_fabs:
   case vmIntrinsics::_iabs:
@@ -975,7 +978,7 @@ const char* vmIntrinsics::short_name_as_C_string(vmIntrinsics::ID id, char* buf,
   case F_RNY:fname = "native synchronized "; break;
   default:   break;
   }
-  const char* kptr = strrchr(kname, '/');
+  const char* kptr = strrchr(kname, JVM_SIGNATURE_SLASH);
   if (kptr != NULL)  kname = kptr + 1;
   int len = jio_snprintf(buf, buflen, "%s: %s%s.%s%s",
                          str, fname, kname, mname, sname);

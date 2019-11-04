@@ -46,21 +46,22 @@ inline bool SkipNullValue::should_skip(oop val) {
 }
 
 template <typename OopFnT, typename DerivedOopFnT, typename ValueFilterT>
-template <typename OopMapStreamT, typename RegisterMapT>
+template <typename RegisterMapT>
 void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame *fr, const RegisterMapT *reg_map, const ImmutableOopMap* oopmap) {
   NOT_PRODUCT(if (TraceCodeBlobStacks) OopMapSet::trace_codeblob_maps(fr, reg_map->as_RegisterMap());)
 
   // handle derived pointers first (otherwise base pointer may be
   // changed before derived pointer offset has been collected)
   if (reg_map->validate_oops())
-    walk_derived_pointers<OopMapStreamT>(fr, oopmap, reg_map);
+    walk_derived_pointers(fr, oopmap, reg_map);
 
   OopMapValue omv;
   // We want coop and oop oop_types
-  int mask = OopMapValue::oop_value | OopMapValue::narrowoop_value;
   {
-    for (OopMapStreamT oms(oopmap,mask); !oms.is_done(); oms.next()) {
+    for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
       omv = oms.current();
+      if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+        continue;
       oop* loc = fr->oopmapreg_to_location(omv.reg(),reg_map);
       // It should be an error if no location can be found for a
       // register mentioned as contained an oop of some kind.  Maybe
@@ -128,14 +129,20 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
   // When thawing continuation frames, we want to walk derived pointers
   // after walking oops
   if (!reg_map->validate_oops())
-    walk_derived_pointers<OopMapStreamT>(fr, oopmap, reg_map);
+    walk_derived_pointers(fr, oopmap, reg_map);
 }
 
 template <typename OopMapFnT, typename DerivedOopFnT, typename ValueFilterT>
-template <typename OopMapStreamT, typename RegisterMapT>
+template <typename RegisterMapT>
 void OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers(const frame *fr, const ImmutableOopMap* map, const RegisterMapT *reg_map) {
-  OopMapStreamT oms(map,OopMapValue::derived_oop_value);
-  if (!oms.is_done()) {
+  assert (fr != NULL, "");
+  assert (_derived_oop_fn != NULL, "");
+  OopMapValue omv;
+  for (OopMapStream oms(map); !oms.is_done(); oms.next()) {
+    omv = oms.current();
+    if (omv.type() != OopMapValue::derived_oop_value)
+      continue;
+      
 #ifndef TIERED
     COMPILER1_PRESENT(ShouldNotReachHere();)
 #if INCLUDE_JVMCI
@@ -145,19 +152,7 @@ void OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers(con
 #endif
 #endif // !TIERED
 
-    walk_derived_pointers1<OopMapStreamT>(oms, fr, reg_map);
-  }
-}
-
-template <typename OopMapFnT, typename DerivedOopFnT, typename ValueFilterT>
-template <typename OopMapStreamT, typename RegisterMapT>
-void OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1(OopMapStreamT& oms, const frame *fr, const RegisterMapT *reg_map) {
-  assert (fr != NULL, "");
-  assert (_derived_oop_fn != NULL, "");
-  OopMapValue omv;
-  do {
-    omv = oms.current();
-    oop* loc = fr->oopmapreg_to_location(omv.reg(),reg_map);
+    oop* loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
 
     DEBUG_ONLY(if (reg_map->should_skip_missing()) continue;)
     guarantee(loc != NULL, "missing saved register");
@@ -171,19 +166,14 @@ void OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1(Oo
     if (base_loc != NULL && *base_loc != (oop)NULL && !CompressedOops::is_base(*base_loc)) {
       _derived_oop_fn->do_derived_oop(base_loc, derived_loc);
     }
-    oms.next();
-  } while (!oms.is_done());
+  }
 }
 
 
 template <typename OopFnT, typename DerivedOopFnT, typename ValueFilterT>
 template <typename RegisterMapT>
 void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::oops_do(const frame *fr, const RegisterMapT *reg_map, const ImmutableOopMap* oopmap) {
-  if (oopmap->_exploded != NULL) {
-    iterate_oops_do<ExplodedOopMapStream>(fr, reg_map, oopmap);
-  } else {
-    iterate_oops_do<OopMapStream>(fr, reg_map, oopmap);
-  }
+  iterate_oops_do(fr, reg_map, oopmap);
 }
 
 #endif

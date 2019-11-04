@@ -348,6 +348,12 @@ class Method : public Metadata {
   // InterpreterRuntime::exception_handler_for_exception.
   static int fast_exception_handler_bci_for(const methodHandle& mh, Klass* ex_klass, int throw_bci, TRAPS);
 
+  static bool register_native(Klass* k,
+                              Symbol* name,
+                              Symbol* signature,
+                              address entry,
+                              TRAPS);
+
   // method data access
   MethodData* method_data() const              {
     return _method_data;
@@ -607,7 +613,7 @@ public:
 
   void compute_size_of_parameters(Thread *thread); // word size of parameters (receiver if any + arguments)
   Symbol* klass_name() const;                    // returns the name of the method holder
-  BasicType result_type() const;                 // type of the method result
+  BasicType result_type() const                  { return constMethod()->result_type(); }
   bool is_returning_oop() const                  { BasicType r = result_type(); return is_reference_type(r); }
   bool is_returning_fp() const                   { BasicType r = result_type(); return (r == T_FLOAT || r == T_DOUBLE); }
 
@@ -1010,6 +1016,8 @@ public:
 
   // Deallocation function for redefine classes or if an error occurs
   void deallocate_contents(ClassLoaderData* loader_data);
+
+  void release_C_heap_structures();
 
   Method* get_new_method() const {
     InstanceKlass* holder = method_holder();

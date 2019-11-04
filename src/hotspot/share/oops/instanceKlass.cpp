@@ -69,6 +69,7 @@
 #include "prims/jvmtiThreadState.hpp"
 #include "prims/methodComparator.hpp"
 #include "runtime/atomic.hpp"
+#include "runtime/biasedLocking.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/javaCalls.hpp"
@@ -453,8 +454,14 @@ InstanceKlass::InstanceKlass(const ClassFileParser& parser, unsigned kind, Klass
   assert(is_instance_klass(), "is layout incorrect?");
   assert(size_helper() == parser.layout_size(), "incorrect size_helper?");
 
-  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
+  if (Arguments::is_dumping_archive()) {
     SystemDictionaryShared::init_dumptime_info(this);
+  }
+
+  // Set biased locking bit for all instances of this class; it will be
+  // cleared if revocation occurs too often for this type
+  if (UseBiasedLocking && BiasedLocking::enabled()) {
+    set_prototype_header(markWord::biased_locking_prototype());
   }
 }
 
@@ -603,7 +610,7 @@ void InstanceKlass::deallocate_contents(ClassLoaderData* loader_data) {
   }
   set_annotations(NULL);
 
-  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
+  if (Arguments::is_dumping_archive()) {
     SystemDictionaryShared::remove_dumptime_info(this);
   }
 }
@@ -1101,7 +1108,7 @@ Klass* InstanceKlass::implementor() const {
 
 
 void InstanceKlass::set_implementor(Klass* k) {
-  assert_lock_strong(Compile_lock);
+  assert_locked_or_safepoint(Compile_lock);
   assert(is_interface(), "not interface");
   Klass* volatile* addr = adr_implementor();
   assert(addr != NULL, "null addr");
@@ -2229,7 +2236,7 @@ bool InstanceKlass::should_store_fingerprint(bool is_unsafe_anonymous) {
     // (1) We are running AOT to generate a shared library.
     return true;
   }
-  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
+  if (Arguments::is_dumping_archive()) {
     // (2) We are running -Xshare:dump or -XX:ArchiveClassesAtExit to create a shared archive
     return true;
   }
@@ -2333,8 +2340,8 @@ void InstanceKlass::remove_unshareable_info() {
   // being added to class hierarchy (see SystemDictionary:::add_to_hierarchy()).
   _init_state = allocated;
 
-  {
-    MutexLocker ml(Compile_lock);
+  { // Otherwise this needs to take out the Compile_lock.
+    assert(SafepointSynchronize::is_at_safepoint(), "only called at safepoint");
     init_implementor();
   }
 
@@ -2408,6 +2415,11 @@ void InstanceKlass::restore_unshareable_info(ClassLoaderData* loader_data, Handl
     // --> see ArrayKlass::complete_create_array_klass()
     array_klasses()->restore_unshareable_info(ClassLoaderData::the_null_class_loader_data(), Handle(), CHECK);
   }
+
+  // Initialize current biased locking state.
+  if (UseBiasedLocking && BiasedLocking::enabled()) {
+    set_prototype_header(markWord::biased_locking_prototype());
+  }
 }
 
 // returns true IFF is_in_error_state() has been changed as a result of this call.
@@ -2477,7 +2489,7 @@ void InstanceKlass::unload_class(InstanceKlass* ik) {
   // notify ClassLoadingService of class unload
   ClassLoadingService::notify_class_unloaded(ik);
 
-  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
+  if (Arguments::is_dumping_archive()) {
     SystemDictionaryShared::remove_dumptime_info(ik);
   }
 
@@ -2497,10 +2509,18 @@ void InstanceKlass::unload_class(InstanceKlass* ik) {
 #endif
 }
 
+static void method_release_C_heap_structures(Method* m) {
+  m->release_C_heap_structures();
+}
+
 void InstanceKlass::release_C_heap_structures(InstanceKlass* ik) {
   // Clean up C heap
   ik->release_C_heap_structures();
   ik->constants()->release_C_heap_structures();
+
+  // Deallocate and call destructors for MDO mutexes
+  ik->methods_do(method_release_C_heap_structures);
+
 }
 
 void InstanceKlass::release_C_heap_structures() {
@@ -2586,7 +2606,7 @@ const char* InstanceKlass::signature_name() const {
 
   // Add L as type indicator
   int dest_index = 0;
-  dest[dest_index++] = 'L';
+  dest[dest_index++] = JVM_SIGNATURE_CLASS;
 
   // Add the actual class name
   for (int src_index = 0; src_index < src_length; ) {
@@ -2599,7 +2619,7 @@ const char* InstanceKlass::signature_name() const {
   }
 
   // Add the semicolon and the NULL
-  dest[dest_index++] = ';';
+  dest[dest_index++] = JVM_SIGNATURE_ENDCLASS;
   dest[dest_index] = '\0';
   return dest;
 }

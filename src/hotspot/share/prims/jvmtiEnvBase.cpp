@@ -659,10 +659,9 @@ JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThre
     // thread is not doing an Object.wait() call
     mon = java_thread->current_pending_monitor();
     if (mon != NULL) {
-      // The thread is trying to enter() or raw_enter() an ObjectMonitor.
+      // The thread is trying to enter() an ObjectMonitor.
       obj = (oop)mon->object();
-      // If obj == NULL, then ObjectMonitor is raw which doesn't count
-      // as contended for this API
+      assert(obj != NULL, "ObjectMonitor should have a valid object!");
     }
     // implied else: no contended ObjectMonitor
   } else {
@@ -1378,7 +1377,7 @@ JvmtiEnvBase::check_top_frame(JavaThread* current_thread, JavaThread* java_threa
     NULL_CHECK(ob_k, JVMTI_ERROR_INVALID_OBJECT);
 
     // Method return type signature.
-    char* ty_sign = 1 + strchr(signature->as_C_string(), ')');
+    char* ty_sign = 1 + strchr(signature->as_C_string(), JVM_SIGNATURE_ENDFUNC);
 
     if (!VM_GetOrSetLocal::is_assignable(ty_sign, ob_k, current_thread)) {
       return JVMTI_ERROR_TYPE_MISMATCH;

@@ -681,7 +681,7 @@ public:
         //_masm->movptr(rax, Address(rdx, 0));
 
         if (d != NULL) {
-          assert(_map.has_derived(), "");
+          assert(_map.has_any(OopMapValue::derived_oop_value), "");
           _masm->movptr(r14, rax);
         }
 
@@ -701,7 +701,7 @@ public:
         //_masm->movl(rax, Address(rdx, 0));
         if (d != NULL) {
           guarantee(false, "should not have narrow as base");
-          assert(_map.has_derived(), "");
+          assert(_map.has_any(OopMapValue::derived_oop_value), "");
           _masm->movptr(r14, rax);
           _masm->decode_heap_oop(r14);
         }
@@ -722,7 +722,7 @@ public:
         o->memory()->read_wide(_masm, sp_offset_in_bytes);
 
         if (d != NULL) {
-          assert(_map.has_derived(), "");
+          assert(_map.has_any(OopMapValue::derived_oop_value), "");
           _masm->movptr(r14, rax);
         }
 
@@ -745,7 +745,7 @@ public:
 
         if (d != NULL) {
           guarantee(false, "should not have narrow as base");
-          assert(_map.has_derived(), "");
+          assert(_map.has_any(OopMapValue::derived_oop_value), "");
           _masm->movptr(r14, rax);
           _masm->decode_heap_oop(r14);
         }
@@ -975,7 +975,8 @@ public:
 
     _masm->push(r13);
 
-    if (map.has_derived()) {
+    const bool has_derived = map.has_any(OopMapValue::derived_oop_value);
+    if (has_derived) {
       _masm->push(r14);
     }
 
@@ -989,7 +990,7 @@ public:
       }
     }
 
-    if (map.has_derived()) {
+    if (has_derived) {
       _masm->pop(r14);
     }
     _masm->pop(r13);
@@ -1069,9 +1070,11 @@ public:
 
     int pos = 0;
     {
-      int mask = OopMapValue::oop_value | OopMapValue::narrowoop_value;
-      for (OopMapStream oms(&map,mask); !oms.is_done(); oms.next()) {
+      for (OopMapStream oms(&map); !oms.is_done(); oms.next()) {
         OopMapValue omv = oms.current();
+        if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+          continue;
+        
         VMReg reg = omv.reg();
 
         // read value from array
@@ -1127,8 +1130,10 @@ public:
     }
 
     {
-      for (OopMapStream oms(&map,OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
+      for (OopMapStream oms(&map); !oms.is_done(); oms.next()) {
         OopMapValue omv = oms.current();
+        if (omv.type() != OopMapValue::derived_oop_value)
+          continue;
         VMReg reg = omv.reg();
         bool derived_is_reg = false;
         // read the derived value into rax
@@ -1218,9 +1223,10 @@ public:
 
     int pos = 0;
     {
-      int mask = OopMapValue::oop_value | OopMapValue::narrowoop_value;
-      for (OopMapStream oms(&map,mask); !oms.is_done(); oms.next()) {
+      for (OopMapStream oms(&map); !oms.is_done(); oms.next()) {
         OopMapValue omv = oms.current();
+        if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+          continue;
         VMReg reg = omv.reg();
 
         if (reg->is_reg()) {
@@ -1282,13 +1288,16 @@ public:
 
     {
       bool derived_init = false;
-      for (OopMapStream oms(&map,OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
+      for (OopMapStream oms(&map); !oms.is_done(); oms.next()) {
+        OopMapValue omv = oms.current();
+        if (omv.type() != OopMapValue::derived_oop_value)
+          continue;
+          
         if (!derived_init) {
           _masm->push(r11);
           derived_init = true;
         }
 
-        OopMapValue omv = oms.current();
         VMReg reg = omv.reg();
         bool derived_is_reg = false;
         // read the derived value into r11

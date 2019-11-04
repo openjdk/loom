@@ -1428,8 +1428,8 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
 
       if (oop_map() != NULL) {
         FrameValuesOopMapClosure valuesFn(this, reg_map, values, frame_no);
-        int mask = OopMapValue::callee_saved_value; // | OopMapValue::live_value;
-        oop_map()->all_do(this, mask, &valuesFn);
+        // also OopMapValue::live_value ??
+        oop_map()->all_type_do(this, OopMapValue::callee_saved_value, &valuesFn);
       }
     }
   } else if (is_native_frame()) {

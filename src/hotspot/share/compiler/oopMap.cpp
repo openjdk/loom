@@ -52,31 +52,27 @@
 
 // OopMapStream
 
-OopMapStream::OopMapStream(const OopMap* oop_map, int oop_types_mask)
+OopMapStream::OopMapStream(const OopMap* oop_map)
   : _stream(oop_map->write_stream()->buffer()) {
-  // _stream = new CompressedReadStream();
-  _mask = oop_types_mask;
+  // _stream = new CompressedReadStream(oop_map->write_stream()->buffer());
   _size = oop_map->omv_count();
   _position = 0;
   _valid_omv = false;
 }
 
-OopMapStream::OopMapStream(const ImmutableOopMap* oop_map, int oop_types_mask)
+OopMapStream::OopMapStream(const ImmutableOopMap* oop_map)
   : _stream(oop_map->data_addr()) {
   // _stream = new CompressedReadStream(oop_map->data_addr());
-  _mask = oop_types_mask;
   _size = oop_map->count();
   _position = 0;
   _valid_omv = false;
 }
 
 void OopMapStream::find_next() {
-  while(_position++ < _size) {
+  if (_position++ < _size) {
     _omv.read_from(&_stream);
-    if(((int)_omv.type() & _mask) > 0) {
-      _valid_omv = true;
-      return;
-    }
+    _valid_omv = true;
+    return;
   }
   _valid_omv = false;
 }
@@ -235,22 +231,28 @@ void OopMapSort::sort() {
     assert(omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value || omv.type() == OopMapValue::derived_oop_value || omv.type() == OopMapValue::callee_saved_value, "");
   }
 
-  for (OopMapStream oms(_map, OopMapValue::callee_saved_value); !oms.is_done(); oms.next()) {
-    insert(oms.current(), _count);
+  for (OopMapStream oms(_map); !oms.is_done(); oms.next()) {
+    if (oms.current().type() == OopMapValue::callee_saved_value) {
+      insert(oms.current(), _count);
+    }
   }
 
   int start = _count;
-  for (OopMapStream oms(_map, OopMapValue::oop_value | OopMapValue::narrowoop_value); !oms.is_done(); oms.next()) {
+  for (OopMapStream oms(_map); !oms.is_done(); oms.next()) {
     OopMapValue omv = oms.current();
-    int pos = find_position(omv, start);
-    insert(omv, pos);
+    if (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value) {
+      int pos = find_position(omv, start);
+      insert(omv, pos);
+    }
   }
 
-  for (OopMapStream oms(_map, OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
+  for (OopMapStream oms(_map); !oms.is_done(); oms.next()) {
     OopMapValue omv = oms.current();
-    int pos = find_derived_position(omv, start);
-    assert(pos > 0, "");
-    insert(omv, pos);
+    if (omv.type() == OopMapValue::derived_oop_value) {
+      int pos = find_derived_position(omv, start);
+      assert(pos > 0, "");
+      insert(omv, pos);
+    }
   }
 }
 
@@ -306,16 +308,7 @@ void OopMap::set_xxx(VMReg reg, OopMapValue::oop_types x, VMReg optional) {
   assert( _locs_used[reg->value()] == OopMapValue::unused_value, "cannot insert twice" );
   debug_only( _locs_used[reg->value()] = x; )
 
-  OopMapValue o(reg, x);
-
-  if(x == OopMapValue::callee_saved_value) {
-    // This can never be a stack location, so we don't need to transform it.
-    assert(optional->is_reg(), "Trying to callee save a stack location");
-    o.set_content_reg(optional);
-  } else if(x == OopMapValue::derived_oop_value) {
-    o.set_content_reg(optional);
-  }
-
+  OopMapValue o(reg, x, optional);
   o.write_on(write_stream());
   increment_count();
   if (x == OopMapValue::oop_value || x == OopMapValue::narrowoop_value)
@@ -328,10 +321,9 @@ void OopMap::set_oop(VMReg reg) {
 }
 
 
-void OopMap::set_value(VMReg reg) {
-  // At this time, we don't need value entries in our OopMap.
-  // set_xxx(reg, OopMapValue::live_value, VMRegImpl::Bad());
-}
+// void OopMap::set_value(VMReg reg) {
+//   set_xxx(reg, OopMapValue::live_value, VMRegImpl::Bad());
+// }
 
 
 void OopMap::set_narrowoop(VMReg reg) {
@@ -465,65 +457,7 @@ void OopMapSet::oops_do(const frame *fr, const RegisterMap* reg_map, OopClosure*
 //   find_map(fr)->oops_do(fr, reg_map, oop_fn, derived_oop_fn, value_fn);
 // }
 
-ExplodedOopMap::ExplodedOopMap(const ImmutableOopMap* oopMap) {
-  _oopValues = copyOopMapValues(oopMap, OopMapValue::oop_value | OopMapValue::narrowoop_value, &_nrOopValues);
-  _calleeSavedValues = copyOopMapValues(oopMap, OopMapValue::callee_saved_value, &_nrCalleeSavedValuesCount);
-  _derivedValues = copyOopMapValues(oopMap, OopMapValue::derived_oop_value, &_nrDerivedValues);
-}
 
-OopMapValue* ExplodedOopMap::values(int mask) {
-  if (mask == (OopMapValue::oop_value | OopMapValue::narrowoop_value)) {
-    return _oopValues;
-  } else if (mask == OopMapValue::callee_saved_value) {
-    return _calleeSavedValues;
-  } else if (mask == OopMapValue::derived_oop_value) {
-    return _derivedValues;
-  } else {
-    guarantee(false, "new type?");
-    return NULL;
-  }
-}
-
-int ExplodedOopMap::count(int mask) {
-  if (mask == (OopMapValue::oop_value | OopMapValue::narrowoop_value)) {
-    return _nrOopValues;
-  } else if (mask == OopMapValue::callee_saved_value) {
-    return _nrCalleeSavedValuesCount;
-  } else if (mask == OopMapValue::derived_oop_value) {
-    return _nrDerivedValues;
-  } else {
-    guarantee(false, "new type?");
-    return 0;
-  }
-}
-
-OopMapValue* ExplodedOopMap::copyOopMapValues(const ImmutableOopMap* oopMap, int mask, int* nr) {
-  OopMapValue omv;
-  int count = 0;
-  // We want coop and oop oop_types
-  for (OopMapStream oms(oopMap,mask); !oms.is_done(); oms.next()) {
-    ++count;
-  }
-  *nr = count;
-
-  OopMapValue* values = (OopMapValue*) NEW_C_HEAP_ARRAY(unsigned char, sizeof(OopMapValue) * count, mtCode);
-
-  int i = 0;
-  for (OopMapStream oms(oopMap,mask); !oms.is_done(); oms.next()) {
-    assert(i < count, "overflow");
-    values[i] = oms.current();
-    i++;
-  }
-
-  i = 0;
-  for (OopMapStream oms(oopMap,mask); !oms.is_done(); oms.next()) {
-    assert(i < count, "overflow");
-    assert(values[i].equals(oms.current()), "must");
-    i++;
-  }
-
-  return values;
-}
 
 // NULL, fail, success (address)
 void ImmutableOopMap::generate_stub(const CodeBlob* cb) const {
@@ -560,31 +494,35 @@ void ImmutableOopMap::oops_do(const frame *fr, const RegisterMap *reg_map,
   visitor.oops_do(fr, reg_map, this);
 }
 
-template<typename T>
-static void iterate_all_do(const frame *fr, int mask, OopMapClosure* fn, const ImmutableOopMap* oopmap) {
+void ImmutableOopMap::all_type_do(const frame *fr, OopMapClosure* fn) const {
   OopMapValue omv;
-  for (T oms(oopmap,mask); !oms.is_done(); oms.next()) {
-      omv = oms.current();
+  for (OopMapStream oms(this); !oms.is_done(); oms.next()) {
+    omv = oms.current();
+    if (fn->handle_type(omv.type())) {
       fn->do_value(omv.reg(), omv.type());
+    }
   }
 }
 
-void ImmutableOopMap::all_do(const frame *fr, int mask, OopMapClosure* fn) const {
-  if (_exploded != NULL) {
-    iterate_all_do<ExplodedOopMapStream>(fr, mask, fn, this);
-  } else {
-    iterate_all_do<OopMapStream>(fr, mask, fn, this);
+void ImmutableOopMap::all_type_do(const frame *fr, OopMapValue::oop_types type, OopMapClosure* fn) const {
+  OopMapValue omv;
+  for (OopMapStream oms(this); !oms.is_done(); oms.next()) {
+    omv = oms.current();
+    if (omv.type() == type) {
+      fn->do_value(omv.reg(), omv.type());
+    }
   }
 }
 
-template <typename T>
 static void update_register_map1(const ImmutableOopMap* oopmap, const frame* fr, RegisterMap* reg_map) {
-  for (T oms(oopmap, OopMapValue::callee_saved_value); !oms.is_done(); oms.next()) {
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
     OopMapValue omv = oms.current();
-    VMReg reg = omv.content_reg();
-    oop* loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
-    reg_map->set_location(reg, (address) loc);
-    //DEBUG_ONLY(nof_callee++;)
+    if (omv.type() == OopMapValue::callee_saved_value) {
+      VMReg reg = omv.content_reg();
+      oop* loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
+      reg_map->set_location(reg, (address) loc);
+      //DEBUG_ONLY(nof_callee++;)
+    }
   }
 }
 
@@ -607,11 +545,7 @@ void ImmutableOopMap::update_register_map(const frame *fr, RegisterMap *reg_map)
   // (we do not do update in place, since info could be overwritten)
 
   DEBUG_ONLY(int nof_callee = 0;)
-  if (_exploded != NULL) {
-    update_register_map1<ExplodedOopMapStream>(this, fr, reg_map);
-  } else {
-    update_register_map1<OopMapStream>(this, fr, reg_map);
-  }
+  update_register_map1(this, fr, reg_map);
 
   /*
   for (OopMapStream oms(this, OopMapValue::callee_saved_value); !oms.is_done(); oms.next()) {
@@ -651,20 +585,6 @@ void OopMapSet::update_register_map(const frame *fr, RegisterMap *reg_map) {
 // Non-Product code
 
 #ifndef PRODUCT
-
-bool ImmutableOopMap::has_derived_pointer() const {
-#if !defined(TIERED) && !INCLUDE_JVMCI
-  COMPILER1_PRESENT(return false);
-#endif // !TIERED
-#if COMPILER2_OR_JVMCI
-  OopMapStream oms(this,OopMapValue::derived_oop_value);
-  return oms.is_done();
-#else
-  return false;
-#endif // COMPILER2_OR_JVMCI
-}
-
-#ifndef PRODUCT
 void OopMapSet::trace_codeblob_maps(const frame *fr, const RegisterMap *reg_map) {
   // Print oopmap and regmap
   tty->print_cr("------ ");
@@ -693,9 +613,6 @@ void OopMapSet::trace_codeblob_maps(const frame *fr, const RegisterMap *reg_map)
 
 }
 #endif // PRODUCT
-
-
-#endif //PRODUCT
 
 // Printing code is present in product build for -XX:+PrintAssembly.
 
@@ -839,11 +756,19 @@ const ImmutableOopMap* ImmutableOopMapSet::find_map_at_offset(int pc_offset) con
   return last->get_from(this);
 }
 
-ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap) : _exploded(NULL), _freeze_stub(Continuations::default_freeze_oops_stub()), _thaw_stub(Continuations::default_thaw_oops_stub()), _count(oopmap->count()), _num_oops(oopmap->num_oops()) {
+ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap) : _freeze_stub(Continuations::default_freeze_oops_stub()), _thaw_stub(Continuations::default_thaw_oops_stub()), _count(oopmap->count()), _num_oops(oopmap->num_oops()) {
   _num_oops = oopmap->num_oops();
   address addr = data_addr();
   //oopmap->copy_data_to(addr);
   oopmap->copy_and_sort_data_to(addr);
+}
+
+bool ImmutableOopMap::has_any(OopMapValue::oop_types type) const {
+  for (OopMapStream oms(this); !oms.is_done(); oms.next()) {
+    if (oms.current().type() == type)
+      return true;
+  }
+  return false;
 }
 
 #ifdef ASSERT
@@ -855,6 +780,7 @@ int ImmutableOopMap::nr_of_bytes() const {
   }
   return sizeof(ImmutableOopMap) + oms.stream_position();
 }
+
 #endif
 
 ImmutableOopMapBuilder::ImmutableOopMapBuilder(const OopMapSet* set) : _set(set), _empty(NULL), _last(NULL), _empty_offset(-1), _last_offset(-1), _offset(0), _required(-1), _new_set(NULL) {

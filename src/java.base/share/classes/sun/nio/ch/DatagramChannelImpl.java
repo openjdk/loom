@@ -27,6 +27,8 @@ package sun.nio.ch;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.lang.ref.Cleaner.Cleanable;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -55,6 +57,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
+import jdk.internal.ref.CleanerFactory;
 import sun.net.ResourceManager;
 import sun.net.ext.ExtendedSocketOptions;
 import sun.net.util.IPAddressUtil;
@@ -68,7 +71,7 @@ class DatagramChannelImpl
     implements SelChImpl
 {
     // Used to make native read and write calls
-    private static NativeDispatcher nd = new DatagramDispatcher();
+    private static final NativeDispatcher nd = new DatagramDispatcher();
 
     // The protocol family of the socket
     private final ProtocolFamily family;
@@ -76,6 +79,7 @@ class DatagramChannelImpl
     // Our file descriptor
     private final FileDescriptor fd;
     private final int fdVal;
+    private final Cleanable cleaner;
 
     // Cached InetAddress and port for unconnected DatagramChannels
     // used by receive0
@@ -141,6 +145,7 @@ class DatagramChannelImpl
             ResourceManager.afterUdpClose();
             throw ioe;
         }
+        this.cleaner = CleanerFactory.cleaner().register(this, closerFor(fd));
     }
 
     public DatagramChannelImpl(SelectorProvider sp, ProtocolFamily family)
@@ -167,6 +172,7 @@ class DatagramChannelImpl
             ResourceManager.afterUdpClose();
             throw ioe;
         }
+        this.cleaner = CleanerFactory.cleaner().register(this, closerFor(fd));
     }
 
     public DatagramChannelImpl(SelectorProvider sp, FileDescriptor fd)
@@ -182,6 +188,7 @@ class DatagramChannelImpl
                 : StandardProtocolFamily.INET;
         this.fd = fd;
         this.fdVal = IOUtil.fdVal(fd);
+        this.cleaner = CleanerFactory.cleaner().register(this, closerFor(fd));
         synchronized (stateLock) {
             this.localAddress = Net.localAddress(fd);
         }
@@ -911,6 +918,11 @@ class DatagramChannelImpl
                     if (state == ST_CONNECTED)
                         throw new AlreadyConnectedException();
 
+                    // ensure that the socket is bound
+                    if (localAddress == null) {
+                        bindInternal(null);
+                    }
+
                     int n = Net.connect(family,
                                         fd,
                                         isa.getAddress(),
@@ -968,8 +980,21 @@ class DatagramChannelImpl
                     remoteAddress = null;
                     state = ST_UNCONNECTED;
 
-                    // refresh local address
-                    localAddress = Net.localAddress(fd);
+                    // check whether rebind is needed
+                    InetSocketAddress isa = Net.localAddress(fd);
+                    if (isa.getPort() == 0) {
+                        // On Linux, if bound to ephemeral port,
+                        // disconnect does not preserve that port.
+                        // In this case, try to rebind to the previous port.
+                        int port = localAddress.getPort();
+                        localAddress = isa; // in case Net.bind fails
+                        Net.bind(family, fd, isa.getAddress(), port);
+                        isa = Net.localAddress(fd); // refresh address
+                        assert isa.getPort() == port;
+                    }
+
+                    // refresh localAddress
+                    localAddress = isa;
                 }
             } finally {
                 writeLock.unlock();
@@ -1199,10 +1224,10 @@ class DatagramChannelImpl
         if ((readerThread == 0) && (writerThread == 0) && !isRegistered()) {
             state = ST_CLOSED;
             try {
-                nd.close(fd);
-            } finally {
-                // notify resource manager
-                ResourceManager.afterUdpClose();
+                // close socket
+                cleaner.clean();
+            } catch (UncheckedIOException ioe) {
+                throw ioe.getCause();
             }
             return true;
         } else {
@@ -1305,13 +1330,6 @@ class DatagramChannelImpl
         }
     }
 
-    @SuppressWarnings("deprecation")
-    protected void finalize() throws IOException {
-        // fd is null if constructor threw exception
-        if (fd != null)
-            close();
-    }
-
     /**
      * Translates native poll revent set into a ready operation set
      */
@@ -1399,6 +1417,21 @@ class DatagramChannelImpl
         return fdVal;
     }
 
+    /**
+     * Returns an action to close the given file descriptor.
+     */
+    private static Runnable closerFor(FileDescriptor fd) {
+        return () -> {
+            try {
+                nd.close(fd);
+            } catch (IOException ioe) {
+                throw new UncheckedIOException(ioe);
+            } finally {
+                // decrement
+                ResourceManager.afterUdpClose();
+            }
+        };
+    }
 
     // -- Native methods --
 

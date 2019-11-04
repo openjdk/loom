@@ -57,7 +57,6 @@
 #include "oops/symbol.hpp"
 #include "prims/jvm_misc.hpp"
 #include "runtime/arguments.hpp"
-#include "runtime/compilationPolicy.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/init.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
@@ -188,7 +187,7 @@ const char* ClassLoader::package_from_name(const char* const class_name, bool* b
     *bad_class_name = false;
   }
 
-  const char* const last_slash = strrchr(class_name, '/');
+  const char* const last_slash = strrchr(class_name, JVM_SIGNATURE_SLASH);
   if (last_slash == NULL) {
     // No package name
     return NULL;
@@ -196,16 +195,16 @@ const char* ClassLoader::package_from_name(const char* const class_name, bool* b
 
   char* class_name_ptr = (char*) class_name;
   // Skip over '['s
-  if (*class_name_ptr == '[') {
+  if (*class_name_ptr == JVM_SIGNATURE_ARRAY) {
     do {
       class_name_ptr++;
-    } while (*class_name_ptr == '[');
+    } while (*class_name_ptr == JVM_SIGNATURE_ARRAY);
 
     // Fully qualified class names should not contain a 'L'.
     // Set bad_class_name to true to indicate that the package name
     // could not be obtained due to an error condition.
     // In this situation, is_same_class_package returns false.
-    if (*class_name_ptr == 'L') {
+    if (*class_name_ptr == JVM_SIGNATURE_CLASS) {
       if (bad_class_name != NULL) {
         *bad_class_name = true;
       }
@@ -462,7 +461,7 @@ bool ClassPathImageEntry::is_modules_image() const {
 
 #if INCLUDE_CDS
 void ClassLoader::exit_with_path_failure(const char* error, const char* message) {
-  assert(DumpSharedSpaces || DynamicDumpSharedSpaces, "only called at dump time");
+  Arguments::assert_is_dumping_archive();
   tty->print_cr("Hint: enable -Xlog:class+path=info to diagnose the failure");
   vm_exit_during_initialization(error, message);
 }
@@ -532,7 +531,7 @@ void ClassLoader::setup_bootstrap_search_path() {
 
 #if INCLUDE_CDS
 void ClassLoader::setup_app_search_path(const char *class_path) {
-  assert(DumpSharedSpaces || DynamicDumpSharedSpaces, "Sanity");
+  Arguments::assert_is_dumping_archive();
 
   ResourceMark rm;
   ClasspathStream cp_stream(class_path);
@@ -546,7 +545,7 @@ void ClassLoader::setup_app_search_path(const char *class_path) {
 void ClassLoader::add_to_module_path_entries(const char* path,
                                              ClassPathEntry* entry) {
   assert(entry != NULL, "ClassPathEntry should not be NULL");
-  assert(DumpSharedSpaces || DynamicDumpSharedSpaces, "dump time only");
+  Arguments::assert_is_dumping_archive();
 
   // The entry does not exist, add to the list
   if (_module_path_entries == NULL) {
@@ -560,7 +559,7 @@ void ClassLoader::add_to_module_path_entries(const char* path,
 
 // Add a module path to the _module_path_entries list.
 void ClassLoader::update_module_path_entry_list(const char *path, TRAPS) {
-  assert(DumpSharedSpaces || DynamicDumpSharedSpaces, "dump time only");
+  Arguments::assert_is_dumping_archive();
   struct stat st;
   if (os::stat(path, &st) != 0) {
     tty->print_cr("os::stat error %d (%s). CDS dump aborted (path was \"%s\").",
@@ -656,7 +655,7 @@ void ClassLoader::setup_boot_search_path(const char *class_path) {
   bool set_base_piece = true;
 
 #if INCLUDE_CDS
-  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
+  if (Arguments::is_dumping_archive()) {
     if (!Arguments::has_jimage()) {
       vm_exit_during_initialization("CDS is not supported in exploded JDK build", NULL);
     }
@@ -1360,7 +1359,7 @@ char* ClassLoader::skip_uri_protocol(char* source) {
 // Record the shared classpath index and loader type for classes loaded
 // by the builtin loaders at dump time.
 void ClassLoader::record_result(InstanceKlass* ik, const ClassFileStream* stream, TRAPS) {
-  assert(DumpSharedSpaces || DynamicDumpSharedSpaces, "sanity");
+  Arguments::assert_is_dumping_archive();
   assert(stream != NULL, "sanity");
 
   if (ik->is_unsafe_anonymous()) {
@@ -1530,20 +1529,52 @@ void ClassLoader::initialize() {
 
   // lookup zip library entry points
   load_zip_library();
-  // lookup jimage library entry points
-  load_jimage_library();
+  // jimage library entry points are loaded below, in lookup_vm_options
   setup_bootstrap_search_path();
+}
+
+char* lookup_vm_resource(JImageFile *jimage, const char *jimage_version, const char *path) {
+  jlong size;
+  JImageLocationRef location = (*JImageFindResource)(jimage, "java.base", jimage_version, path, &size);
+  if (location == 0)
+    return NULL;
+  char *val = NEW_C_HEAP_ARRAY(char, size+1, mtClass);
+  (*JImageGetResource)(jimage, location, val, size);
+  val[size] = '\0';
+  return val;
+}
+
+// Lookup VM options embedded in the modules jimage file
+char* ClassLoader::lookup_vm_options() {
+  jint error;
+  char modules_path[JVM_MAXPATHLEN];
+  const char* fileSep = os::file_separator();
+
+  // Initialize jimage library entry points
+  load_jimage_library();
+
+  jio_snprintf(modules_path, JVM_MAXPATHLEN, "%s%slib%smodules", Arguments::get_java_home(), fileSep, fileSep);
+  JImageFile* jimage =(*JImageOpen)(modules_path, &error);
+  if (jimage == NULL) {
+    return NULL;
+  }
+
+  const char *jimage_version = get_jimage_version_string();
+  char *options = lookup_vm_resource(jimage, jimage_version, "jdk/internal/vm/options");
+
+  (*JImageClose)(jimage);
+  return options;
 }
 
 #if INCLUDE_CDS
 void ClassLoader::initialize_shared_path() {
-  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
+  if (Arguments::is_dumping_archive()) {
     ClassLoaderExt::setup_search_paths();
   }
 }
 
 void ClassLoader::initialize_module_path(TRAPS) {
-  if (DumpSharedSpaces || DynamicDumpSharedSpaces) {
+  if (Arguments::is_dumping_archive()) {
     ClassLoaderExt::setup_module_paths(THREAD);
     FileMapInfo::allocate_shared_path_table();
   }

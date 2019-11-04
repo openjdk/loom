@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2016, 2018 SAP SE. All rights reserved.
+ * Copyright (c) 2016, 2019, SAP SE. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -33,6 +33,7 @@
 #include "interpreter/interp_masm.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/compiledICHolder.hpp"
+#include "oops/klass.inline.hpp"
 #include "registerSaver_s390.hpp"
 #include "runtime/safepointMechanism.hpp"
 #include "runtime/sharedRuntime.hpp"
@@ -883,7 +884,7 @@ static void verify_oop_args(MacroAssembler *masm,
   if (!VerifyOops) { return; }
 
   for (int i = 0; i < total_args_passed; i++) {
-    if (sig_bt[i] == T_OBJECT || sig_bt[i] == T_ARRAY) {
+    if (is_reference_type(sig_bt[i])) {
       VMReg r = regs[i].first();
       assert(r->is_valid(), "bad oop arg");
 
@@ -2318,7 +2319,7 @@ nmethod *SharedRuntime::generate_native_wrapper(MacroAssembler *masm,
   __ reset_last_Java_frame();
 
   // Unpack oop result, e.g. JNIHandles::resolve result.
-  if (ret_type == T_OBJECT || ret_type == T_ARRAY) {
+  if (is_reference_type(ret_type)) {
     __ resolve_jobject(Z_RET, /* tmp1 */ Z_R13, /* tmp2 */ Z_R7);
   }
 
@@ -2621,7 +2622,7 @@ void SharedRuntime::gen_i2c_adapter(MacroAssembler *masm,
       } else {
         if (!r_2->is_valid()) {
           // Not sure we need to do this but it shouldn't hurt.
-          if (sig_bt[i] == T_OBJECT || sig_bt[i] == T_ADDRESS || sig_bt[i] == T_ARRAY) {
+          if (is_reference_type(sig_bt[i]) || sig_bt[i] == T_ADDRESS) {
             __ z_lg(r_1->as_Register(), ld_offset, ld_ptr);
           } else {
             __ z_l(r_1->as_Register(), ld_offset, ld_ptr);

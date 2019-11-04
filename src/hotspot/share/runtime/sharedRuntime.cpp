@@ -57,7 +57,6 @@
 #include "runtime/arguments.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/biasedLocking.hpp"
-#include "runtime/compilationPolicy.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/init.hpp"
@@ -1275,6 +1274,7 @@ bool SharedRuntime::resolve_sub_helper_internal(methodHandle callee_method, cons
     // will be supported.
     if (!callee_method->is_old() &&
         (callee == NULL || (callee->is_in_use() && callee_method->code() == callee))) {
+      NoSafepointVerifier nsv;
 #ifdef ASSERT
       // We must not try to patch to jump to an already unloaded method.
       if (dest_entry_point != 0) {
@@ -2996,28 +2996,28 @@ VMRegPair *SharedRuntime::find_callee_arguments(Symbol* sig, bool has_receiver, 
     sig_bt[cnt++] = T_OBJECT; // Receiver is argument 0; not in signature
   }
 
-  while (*s != ')') {          // Find closing right paren
-    switch (*s++) {            // Switch on signature character
-    case 'B': sig_bt[cnt++] = T_BYTE;    break;
-    case 'C': sig_bt[cnt++] = T_CHAR;    break;
-    case 'D': sig_bt[cnt++] = T_DOUBLE;  sig_bt[cnt++] = T_VOID; break;
-    case 'F': sig_bt[cnt++] = T_FLOAT;   break;
-    case 'I': sig_bt[cnt++] = T_INT;     break;
-    case 'J': sig_bt[cnt++] = T_LONG;    sig_bt[cnt++] = T_VOID; break;
-    case 'S': sig_bt[cnt++] = T_SHORT;   break;
-    case 'Z': sig_bt[cnt++] = T_BOOLEAN; break;
-    case 'V': sig_bt[cnt++] = T_VOID;    break;
-    case 'L':                   // Oop
-      while (*s++ != ';');   // Skip signature
+  while (*s != JVM_SIGNATURE_ENDFUNC) { // Find closing right paren
+    switch (*s++) {                     // Switch on signature character
+    case JVM_SIGNATURE_BYTE:    sig_bt[cnt++] = T_BYTE;    break;
+    case JVM_SIGNATURE_CHAR:    sig_bt[cnt++] = T_CHAR;    break;
+    case JVM_SIGNATURE_DOUBLE:  sig_bt[cnt++] = T_DOUBLE;  sig_bt[cnt++] = T_VOID; break;
+    case JVM_SIGNATURE_FLOAT:   sig_bt[cnt++] = T_FLOAT;   break;
+    case JVM_SIGNATURE_INT:     sig_bt[cnt++] = T_INT;     break;
+    case JVM_SIGNATURE_LONG:    sig_bt[cnt++] = T_LONG;    sig_bt[cnt++] = T_VOID; break;
+    case JVM_SIGNATURE_SHORT:   sig_bt[cnt++] = T_SHORT;   break;
+    case JVM_SIGNATURE_BOOLEAN: sig_bt[cnt++] = T_BOOLEAN; break;
+    case JVM_SIGNATURE_VOID:    sig_bt[cnt++] = T_VOID;    break;
+    case JVM_SIGNATURE_CLASS: // Oop
+      while (*s++ != JVM_SIGNATURE_ENDCLASS);   // Skip signature
       sig_bt[cnt++] = T_OBJECT;
       break;
-    case '[': {                 // Array
+    case JVM_SIGNATURE_ARRAY: { // Array
       do {                      // Skip optional size
         while (*s >= '0' && *s <= '9') s++;
-      } while (*s++ == '[');   // Nested arrays?
+      } while (*s++ == JVM_SIGNATURE_ARRAY);   // Nested arrays?
       // Skip element type
-      if (s[-1] == 'L')
-        while (*s++ != ';'); // Skip signature
+      if (s[-1] == JVM_SIGNATURE_CLASS)
+        while (*s++ != JVM_SIGNATURE_ENDCLASS); // Skip signature
       sig_bt[cnt++] = T_ARRAY;
       break;
     }

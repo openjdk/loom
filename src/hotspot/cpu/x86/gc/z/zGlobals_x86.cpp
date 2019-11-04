@@ -40,7 +40,7 @@
 //  +--------------------------------+ 0x0000014000000000 (20TB)
 //  |         Remapped View          |
 //  +--------------------------------+ 0x0000010000000000 (16TB)
-//  |     (Reserved, but unused)     |
+//  .                                .
 //  +--------------------------------+ 0x00000c0000000000 (12TB)
 //  |         Marked1 View           |
 //  +--------------------------------+ 0x0000080000000000 (8TB)
@@ -75,7 +75,7 @@
 //  +--------------------------------+ 0x0000280000000000 (40TB)
 //  |         Remapped View          |
 //  +--------------------------------+ 0x0000200000000000 (32TB)
-//  |     (Reserved, but unused)     |
+//  .                                .
 //  +--------------------------------+ 0x0000180000000000 (24TB)
 //  |         Marked1 View           |
 //  +--------------------------------+ 0x0000100000000000 (16TB)
@@ -110,7 +110,7 @@
 //  +--------------------------------+ 0x0000500000000000 (80TB)
 //  |         Remapped View          |
 //  +--------------------------------+ 0x0000400000000000 (64TB)
-//  |     (Reserved, but unused)     |
+//  .                                .
 //  +--------------------------------+ 0x0000300000000000 (48TB)
 //  |         Marked1 View           |
 //  +--------------------------------+ 0x0000200000000000 (32TB)
@@ -142,8 +142,7 @@ uintptr_t ZPlatformAddressBase() {
 size_t ZPlatformAddressOffsetBits() {
   const size_t min_address_offset_bits = 42; // 4TB
   const size_t max_address_offset_bits = 44; // 16TB
-  const size_t virtual_to_physical_ratio = 7; // 7:1
-  const size_t address_offset = ZUtils::round_up_power_of_2(MaxHeapSize * virtual_to_physical_ratio);
+  const size_t address_offset = ZUtils::round_up_power_of_2(MaxHeapSize * ZVirtualToPhysicalRatio);
   const size_t address_offset_bits = log2_intptr(address_offset);
   return MIN2(MAX2(address_offset_bits, min_address_offset_bits), max_address_offset_bits);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -265,7 +265,10 @@ public abstract class DatagramChannel
      * java.lang.SecurityManager#checkAccept checkAccept} and {@link
      * java.lang.SecurityManager#checkConnect checkConnect} methods permit
      * datagrams to be received from and sent to, respectively, the given
-     * remote address.
+     * remote address. Once connected, no further security checks are performed
+     * for datagrams received from, or sent to, the given remote address. Care
+     * should be taken to ensure that a connected datagram channel is not shared
+     * with untrusted code.
      *
      * <p> This method may be invoked at any time.  It will not have any effect
      * on read or write operations that are already in progress at the moment
@@ -302,8 +305,10 @@ public abstract class DatagramChannel
      *          If the type of the given remote address is not supported
      *
      * @throws  SecurityException
-     *          If a security manager has been installed
-     *          and it does not permit access to the given remote address
+     *          If a security manager has been installed and it does not
+     *          permit access to the given remote address, or if unbound,
+     *          the security manager {@link SecurityManager#checkListen checkListen}
+     *          method denies the operation
      *
      * @throws  IOException
      *          If some other I/O error occurs
@@ -324,6 +329,10 @@ public abstract class DatagramChannel
      *
      * <p> If this channel's socket is not connected, or if the channel is
      * closed, then invoking this method has no effect.  </p>
+     *
+     * @apiNote If this method throws an IOException, the channel's socket
+     * may be left in an unspecified state. It is strongly recommended that
+     * the channel be closed when disconnect fails.
      *
      * @return  This datagram channel
      *
@@ -369,9 +378,10 @@ public abstract class DatagramChannel
      * to a specific remote address and a security manager has been installed
      * then for each datagram received this method verifies that the source's
      * address and port number are permitted by the security manager's {@link
-     * java.lang.SecurityManager#checkAccept checkAccept} method.  The overhead
-     * of this security check can be avoided by first connecting the socket via
-     * the {@link #connect connect} method.
+     * java.lang.SecurityManager#checkAccept checkAccept} method. Datagrams
+     * that are not permitted by the security manager are silently discarded.
+     * The overhead of this security check can be avoided by first connecting
+     * the socket via the {@link #connect connect} method.
      *
      * <p> This method may be invoked at any time.  If another thread has
      * already initiated a read operation upon this channel, however, then an
@@ -402,9 +412,9 @@ public abstract class DatagramChannel
      *          interrupt status
      *
      * @throws  SecurityException
-     *          If a security manager has been installed
-     *          and it does not permit datagrams to be accepted
-     *          from the datagram's sender
+     *          If unbound, and a security manager has been installed and
+     *          its {@link SecurityManager#checkListen checkListen} method
+     *          denies the operation
      *
      * @throws  IOException
      *          If some other I/O error occurs
@@ -477,9 +487,10 @@ public abstract class DatagramChannel
      *          If the type of the given remote address is not supported
      *
      * @throws  SecurityException
-     *          If a security manager has been installed
-     *          and it does not permit datagrams to be sent
-     *          to the given address
+     *          If a security manager has been installed and it does not permit
+     *          datagrams to be sent to the given address, or if unbound, and
+     *          the security manager's {@link SecurityManager#checkListen checkListen}
+     *          method denies the operation
      *
      * @throws  IOException
      *          If some other I/O error occurs

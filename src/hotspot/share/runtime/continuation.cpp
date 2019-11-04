@@ -3750,6 +3750,9 @@ public:
   int index() { return _index; }
   int is_oop() { return _index >= 0; }
 
+  bool handle_type(OopMapValue::oop_types type) {
+    return type == OopMapValue::oop_value || type == OopMapValue::narrowoop_value;
+  }
   void do_value(VMReg reg, OopMapValue::oop_types type) {
     assert (type == OopMapValue::oop_value || type == OopMapValue::narrowoop_value, "");
     if (reg->is_reg()) {
@@ -3787,7 +3790,7 @@ static int find_oop_in_compiled_frame(const frame& fr, const RegisterMap* map, c
   const ImmutableOopMap* oop_map = fr.oop_map();
   assert (oop_map != NULL, "");
   OopIndexClosure ioc(usp_offset_in_bytes);
-  oop_map->all_do(&fr, OopMapValue::oop_value | OopMapValue::narrowoop_value, &ioc);
+  oop_map->all_type_do(&fr, &ioc);
   return ioc.index();
 }
 
@@ -3796,7 +3799,7 @@ static int find_oop_in_compiled_frame(const frame& fr, const RegisterMap* map, V
   const ImmutableOopMap* oop_map = fr.oop_map();
   assert (oop_map != NULL, "");
   OopIndexClosure ioc(reg);
-  oop_map->all_do(&fr, OopMapValue::oop_value | OopMapValue::narrowoop_value, &ioc);
+  oop_map->all_type_do(&fr, &ioc);
   return ioc.index();
 }
 

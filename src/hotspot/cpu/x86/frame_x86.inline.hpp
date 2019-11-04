@@ -423,7 +423,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     } else {
       assert (!_cb->caller_must_gc_arguments(map->thread()), "");
       assert (!map->include_argument_oops(), "");
-      assert (oop_map() == NULL || OopMapStream(oop_map(), OopMapValue::callee_saved_value).is_done(), "callee-saved value in compiled frame");
+      assert (oop_map() == NULL || !oop_map()->has_any(OopMapValue::callee_saved_value), "callee-saved value in compiled frame");
     }
 
     // Since the prolog does the save and restore of EBP there is no oopmap

@@ -88,6 +88,7 @@
 #include "runtime/globals.hpp"
 #include "runtime/java.hpp"
 #include "runtime/javaCalls.hpp"
+#include "runtime/notificationThread.hpp"
 #include "runtime/os.hpp"
 #include "runtime/perfMemory.hpp"
 #include "runtime/serviceThread.hpp"
@@ -1367,6 +1368,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
       declare_type(JavaThread, Thread)                                    \
         declare_type(JvmtiAgentThread, JavaThread)                        \
         declare_type(ServiceThread, JavaThread)                           \
+        declare_type(NotificationThread, JavaThread)                      \
         declare_type(CompilerThread, JavaThread)                          \
         declare_type(CodeCacheSweeperThread, JavaThread)                  \
   declare_toplevel_type(OSThread)                                         \
@@ -2611,6 +2613,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_constant(JVMFlag::ERGONOMIC)                                    \
   declare_constant(JVMFlag::ATTACH_ON_DEMAND)                             \
   declare_constant(JVMFlag::INTERNAL)                                     \
+  declare_constant(JVMFlag::JIMAGE_RESOURCE)                              \
   declare_constant(JVMFlag::VALUE_ORIGIN_MASK)                            \
   declare_constant(JVMFlag::ORIG_COMMAND_LINE)
 

@@ -32,6 +32,11 @@ class G1ParScanThreadState;
 // Simple holder object for a complete set of closures used by the G1 evacuation code.
 template <G1Mark Mark>
 class G1SharedClosures {
+  static bool needs_strong_processing() {
+    // Request strong code root processing when G1MarkFromRoot is passed in during
+    // initial mark.
+    return Mark == G1MarkFromRoot;
+  }
 public:
   G1ParCopyClosure<G1BarrierNone, Mark> _oops;
   G1ParCopyClosure<G1BarrierCLD,  Mark> _oops_in_cld;
@@ -44,5 +49,7 @@ public:
     _oops(g1h, pss),
     _oops_in_cld(g1h, pss),
     _clds(&_oops_in_cld, process_only_dirty),
-    _strong_codeblobs(&_oops, true), _weak_codeblobs(&_oops, false) {}
+    _strong_codeblobs(pss->worker_id(), &_oops, needs_strong_processing(), true),
+    _weak_codeblobs(pss->worker_id(), &_oops, needs_strong_processing(), false) 
+  {}
 };

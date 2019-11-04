@@ -192,6 +192,13 @@ JNIEXPORT void JNICALL
 JVM_InitStackTraceElement(JNIEnv* env, jobject element, jobject stackFrameInfo);
 
 /*
+ * java.lang.NullPointerException
+ */
+
+JNIEXPORT jstring JNICALL
+JVM_GetExtendedNPEMessage(JNIEnv *env, jthrowable throwable);
+
+/*
  * java.lang.StackWalker
  */
 enum {
@@ -1053,19 +1060,6 @@ JVM_IsSameClassPackage(JNIEnv *env, jclass class1, jclass class2);
 #include "classfile_constants.h"
 
 /*
- * A function defined by the byte-code verifier and called by the VM.
- * This is not a function implemented in the VM.
- *
- * Returns JNI_FALSE if verification fails. A detailed error message
- * will be places in msg_buf, whose length is specified by buf_len.
- */
-typedef jboolean (*verifier_fn_t)(JNIEnv *env,
-                                  jclass cb,
-                                  char * msg_buf,
-                                  jint buf_len);
-
-
-/*
  * Support for a VM-independent class format checker.
  */
 typedef struct {
@@ -1087,35 +1081,6 @@ typedef struct {
     method_size_info clinit;   /* memory used in clinit */
     method_size_info main;     /* used everywhere else */
 } class_size_info;
-
-/*
- * Functions defined in libjava.so to perform string conversions.
- *
- */
-
-typedef jstring (*to_java_string_fn_t)(JNIEnv *env, char *str);
-
-typedef char *(*to_c_string_fn_t)(JNIEnv *env, jstring s, jboolean *b);
-
-/* This is the function defined in libjava.so that performs class
- * format checks. This functions fills in size information about
- * the class file and returns:
- *
- *   0: good
- *  -1: out of memory
- *  -2: bad format
- *  -3: unsupported version
- *  -4: bad class name
- */
-
-typedef jint (*check_format_fn_t)(char *class_name,
-                                  unsigned char *data,
-                                  unsigned int data_size,
-                                  class_size_info *class_size,
-                                  char *message_buffer,
-                                  jint buffer_length,
-                                  jboolean measure_only,
-                                  jboolean check_relaxed);
 
 #define JVM_RECOGNIZED_CLASS_MODIFIERS (JVM_ACC_PUBLIC | \
                                         JVM_ACC_FINAL | \

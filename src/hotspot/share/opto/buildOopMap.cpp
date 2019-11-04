@@ -352,7 +352,7 @@ OopMap *OopFlow::build_oop_map( Node *n, int max_reg, PhaseRegAlloc *regalloc, i
 
     } else {
       // Other - some reaching non-oop value
-      omap->set_value( r);
+      // omap->set_value( r);
 #ifdef ASSERT
       if( t->isa_rawptr() && C->cfg()->_raw_oops.member(def) ) {
         def->dump();
@@ -377,11 +377,18 @@ OopMap *OopFlow::build_oop_map( Node *n, int max_reg, PhaseRegAlloc *regalloc, i
 #endif
 
 #ifdef ASSERT
-  for( OopMapStream oms1(omap, OopMapValue::derived_oop_value); !oms1.is_done(); oms1.next()) {
+  for( OopMapStream oms1(omap); !oms1.is_done(); oms1.next()) {
     OopMapValue omv1 = oms1.current();
+    if (omv1.type() != OopMapValue::derived_oop_value) {
+      continue;
+    }
     bool found = false;
-    for( OopMapStream oms2(omap,OopMapValue::oop_value); !oms2.is_done(); oms2.next()) {
-      if( omv1.content_reg() == oms2.current().reg() ) {
+    for( OopMapStream oms2(omap); !oms2.is_done(); oms2.next()) {
+      OopMapValue omv2 = oms2.current();
+      if (omv2.type() != OopMapValue::oop_value) {
+        continue;
+      }
+      if( omv1.content_reg() == omv2.reg() ) {
         found = true;
         break;
       }
@@ -390,8 +397,11 @@ OopMap *OopFlow::build_oop_map( Node *n, int max_reg, PhaseRegAlloc *regalloc, i
   }
 
   int num_oops = 0;
-  for (OopMapStream oms2(omap, OopMapValue::oop_value | OopMapValue::narrowoop_value); !oms2.is_done(); oms2.next())
-    num_oops++;
+  for (OopMapStream oms2(omap); !oms2.is_done(); oms2.next()) {
+    OopMapValue omv = oms2.current();
+    if (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value)
+      num_oops++;
+  }
   assert (num_oops == omap->num_oops(), "num_oops: %d omap->num_oops(): %d", num_oops, omap->num_oops());
 #endif
 

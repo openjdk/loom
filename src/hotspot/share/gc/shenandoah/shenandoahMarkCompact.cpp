@@ -110,7 +110,7 @@ void ShenandoahMarkCompact::do_it(GCCause::Cause gc_cause) {
     // b. Cancel concurrent mark, if in progress
     if (heap->is_concurrent_mark_in_progress()) {
       heap->concurrent_mark()->cancel();
-      heap->stop_concurrent_marking();
+      heap->set_concurrent_mark_in_progress(false);
     }
     assert(!heap->is_concurrent_mark_in_progress(), "sanity");
 
@@ -127,6 +127,9 @@ void ShenandoahMarkCompact::do_it(GCCause::Cause gc_cause) {
 
     // e. Set back forwarded objects bit back, in case some steps above dropped it.
     heap->set_has_forwarded_objects(has_forwarded_objects);
+
+    // f. Sync pinned region status from the CP marks
+    heap->sync_pinned_region_status();
 
     // The rest of prologue:
     BiasedLocking::preserve_marks();
@@ -240,8 +243,8 @@ void ShenandoahMarkCompact::phase1_mark_heap() {
   cm->update_roots(ShenandoahPhaseTimings::full_gc_roots);
   cm->mark_roots(ShenandoahPhaseTimings::full_gc_roots);
   cm->finish_mark_from_roots(/* full_gc = */ true);
-
   heap->mark_complete_marking_context();
+  heap->parallel_cleaning(true /* full_gc */);
 }
 
 class ShenandoahPrepareForCompactionObjectClosure : public ObjectClosure {
@@ -327,14 +330,25 @@ private:
   ShenandoahHeapRegion* next_from_region(ShenandoahHeapRegionSet* slice) {
     ShenandoahHeapRegion* from_region = _heap_regions.next();
 
-    while (from_region != NULL && (!from_region->is_move_allowed() || from_region->is_humongous())) {
+    // Look for next candidate for this slice:
+    while (from_region != NULL) {
+      // Empty region: get it into the slice to defragment the slice itself.
+      // We could have skipped this without violating correctness, but we really
+      // want to compact all live regions to the start of the heap, which sometimes
+      // means moving them into the fully empty regions.
+      if (from_region->is_empty()) break;
+
+      // Can move the region, and this is not the humongous region. Humongous
+      // moves are special cased here, because their moves are handled separately.
+      if (from_region->is_stw_move_allowed() && !from_region->is_humongous()) break;
+
       from_region = _heap_regions.next();
     }
 
     if (from_region != NULL) {
       assert(slice != NULL, "sanity");
       assert(!from_region->is_humongous(), "this path cannot handle humongous regions");
-      assert(from_region->is_move_allowed(), "only regions that can be moved in mark-compact");
+      assert(from_region->is_empty() || from_region->is_stw_move_allowed(), "only regions that can be moved in mark-compact");
       slice->add_region(from_region);
     }
 
@@ -408,7 +422,7 @@ void ShenandoahMarkCompact::calculate_target_humongous_objects() {
       continue;
     }
 
-    if (r->is_humongous_start() && r->is_move_allowed()) {
+    if (r->is_humongous_start() && r->is_stw_move_allowed()) {
       // From-region candidate: movable humongous region
       oop old_obj = oop(r->bottom());
       size_t words_size = old_obj->size();
@@ -493,6 +507,10 @@ void ShenandoahMarkCompact::phase2_calculate_target_addresses(ShenandoahHeapRegi
   ShenandoahGCPhase calculate_address_phase(ShenandoahPhaseTimings::full_gc_calculate_addresses);
 
   ShenandoahHeap* heap = ShenandoahHeap::heap();
+
+  // About to figure out which regions can be compacted, make sure pinning status
+  // had been updated in GC prologue.
+  heap->assert_pinned_region_status();
 
   {
     // Trash the immediately collectible regions before computing addresses
@@ -750,7 +768,7 @@ void ShenandoahMarkCompact::compact_humongous_objects() {
       size_t new_start = heap->heap_region_index_containing(old_obj->forwardee());
       size_t new_end   = new_start + num_regions - 1;
       assert(old_start != new_start, "must be real move");
-      assert (r->is_move_allowed(), "should be movable");
+      assert(r->is_stw_move_allowed(), "Region " SIZE_FORMAT " should be movable", r->region_number());
 
       Copy::aligned_conjoint_words(heap->get_region(old_start)->bottom(),
                                    heap->get_region(new_start)->bottom(),

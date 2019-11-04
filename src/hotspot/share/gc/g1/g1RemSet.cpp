@@ -487,9 +487,8 @@ G1RemSet::G1RemSet(G1CollectedHeap* g1h,
                    G1CardTable* ct,
                    G1HotCardCache* hot_card_cache) :
   _scan_state(new G1RemSetScanState()),
-  _prev_period_summary(),
+  _prev_period_summary(false),
   _g1h(g1h),
-  _num_conc_refined_cards(0),
   _ct(ct),
   _g1p(_g1h->policy()),
   _hot_card_cache(hot_card_cache) {
@@ -1377,7 +1376,6 @@ void G1RemSet::refine_card_concurrently(CardValue* card_ptr,
 
   G1ConcurrentRefineOopClosure conc_refine_cl(_g1h, worker_id);
   if (r->oops_on_memregion_seq_iterate_careful<false>(dirty_region, &conc_refine_cl) != NULL) {
-    _num_conc_refined_cards++; // Unsynchronized update, only used for logging.
     return;
   }
 
@@ -1406,7 +1404,7 @@ void G1RemSet::print_periodic_summary_info(const char* header, uint period_count
   if ((G1SummarizeRSetStatsPeriod > 0) && log_is_enabled(Trace, gc, remset) &&
       (period_count % G1SummarizeRSetStatsPeriod == 0)) {
 
-    G1RemSetSummary current(this);
+    G1RemSetSummary current;
     _prev_period_summary.subtract_from(&current);
 
     Log(gc, remset) log;
@@ -1423,7 +1421,7 @@ void G1RemSet::print_summary_info() {
   Log(gc, remset, exit) log;
   if (log.is_trace()) {
     log.trace(" Cumulative RS summary");
-    G1RemSetSummary current(this);
+    G1RemSetSummary current;
     ResourceMark rm;
     LogStream ls(log.trace());
     current.print_on(&ls);

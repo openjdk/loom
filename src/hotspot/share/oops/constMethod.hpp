@@ -26,6 +26,7 @@
 #define SHARE_OOPS_CONSTMETHOD_HPP
 
 #include "oops/oop.hpp"
+#include "runtime/arguments.hpp"
 #include "utilities/align.hpp"
 
 // An ConstMethod represents portions of a Java method which are not written to after
@@ -293,7 +294,7 @@ public:
     _adapter = adapter;
   }
   void set_adapter_trampoline(AdapterHandlerEntry** trampoline) {
-    assert(DumpSharedSpaces || DynamicDumpSharedSpaces, "must be");
+    Arguments::assert_is_dumping_archive();
     if (DumpSharedSpaces) {
       assert(*trampoline == NULL,
              "must be NULL during dump time, to be initialized at run time");
@@ -530,6 +531,10 @@ public:
   // size of parameters
   int  size_of_parameters() const                { return _size_of_parameters; }
   void set_size_of_parameters(int size)          { _size_of_parameters = size; }
+
+  // result type (basic type of return value)
+  BasicType result_type() const                  { assert(_result_type >= T_BOOLEAN, "Must be set");
+                                                   return (BasicType)_result_type; }
 
   void set_result_type(BasicType rt)             { assert(rt < 16, "result type too large");
                                                    _result_type = (u1)rt; }

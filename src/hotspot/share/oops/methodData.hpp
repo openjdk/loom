@@ -2011,7 +2011,7 @@ private:
   MethodData(const methodHandle& method, int size, TRAPS);
 public:
   static MethodData* allocate(ClassLoaderData* loader_data, const methodHandle& method, TRAPS);
-  MethodData() : _extra_data_lock(Monitor::leaf, "MDO extra data lock") {}; // For ciMethodData
+  MethodData() : _extra_data_lock(Mutex::leaf, "MDO extra data lock") {}; // For ciMethodData
 
   bool is_methodData() const volatile { return true; }
   void initialize();
@@ -2445,7 +2445,7 @@ public:
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
   virtual MetaspaceObj::Type type() const { return MethodDataType; }
 
-  // Deallocation support - no pointer fields to deallocate
+  // Deallocation support - no metaspace pointer fields to deallocate
   void deallocate_contents(ClassLoaderData* loader_data) {}
 
   // GC support

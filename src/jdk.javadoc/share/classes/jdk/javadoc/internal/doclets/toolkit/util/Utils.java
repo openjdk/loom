@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -417,15 +417,15 @@ public class Utils {
     }
 
     public SortedSet<VariableElement> serializableFields(TypeElement aclass) {
-        return configuration.workArounds.getSerializableFields(this, aclass);
+        return configuration.workArounds.getSerializableFields(aclass);
     }
 
     public SortedSet<ExecutableElement> serializationMethods(TypeElement aclass) {
-        return configuration.workArounds.getSerializationMethods(this, aclass);
+        return configuration.workArounds.getSerializationMethods(aclass);
     }
 
     public boolean definesSerializableFields(TypeElement aclass) {
-        return configuration.workArounds.definesSerializableFields(this, aclass);
+        return configuration.workArounds.definesSerializableFields( aclass);
     }
 
     public String modifiersToString(Element e, boolean trailingSpace) {
@@ -527,6 +527,10 @@ public class Utils {
             return false;
         }
         return true;
+    }
+
+    public boolean isUndocumentedEnclosure(TypeElement enclosingTypeElement) {
+        return isPackagePrivate(enclosingTypeElement) && !isLinkable(enclosingTypeElement);
     }
 
     public boolean isError(TypeElement te) {
@@ -1064,8 +1068,7 @@ public class Utils {
 
         // Allow for the behavior that members of undocumented supertypes
         // may be included in documented types
-        TypeElement enclElem = getEnclosingTypeElement(elem);
-        if (typeElem != enclElem && isSubclassOf(typeElem, enclElem)) {
+        if (isUndocumentedEnclosure(getEnclosingTypeElement(elem))) {
             return true;
         }
 

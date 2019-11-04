@@ -31,6 +31,7 @@
 #include "code/nmethod.hpp"
 #include "code/pcDesc.hpp"
 #include "code/scopeDesc.hpp"
+#include "compiler/compilationPolicy.hpp"
 #include "interpreter/bytecode.hpp"
 #include "interpreter/interpreter.hpp"
 #include "interpreter/oopMapCache.hpp"
@@ -48,7 +49,6 @@
 #include "oops/verifyOopClosure.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/biasedLocking.hpp"
-#include "runtime/compilationPolicy.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/fieldDescriptor.hpp"
@@ -298,7 +298,7 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
 
   // Reallocate the non-escaping objects and restore their fields. Then
   // relock objects if synchronization on them was eliminated.
-  if (jvmci_enabled || ((DoEscapeAnalysis || EliminateNestedLocks) && EliminateAllocations)) {
+  if (jvmci_enabled || (DoEscapeAnalysis && EliminateAllocations)) {
     realloc_failures = eliminate_allocations(thread, exec_mode, cm, deoptee, map, chunk);
   }
 #endif // COMPILER2_OR_JVMCI

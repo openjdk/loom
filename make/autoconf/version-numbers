@@ -23,7 +23,8 @@
 # questions.
 #
 
-# Default version numbers to use unless overridden by configure
+# Default version, product, and vendor information to use,
+# unless overridden by configure
 
 DEFAULT_VERSION_FEATURE=14
 DEFAULT_VERSION_INTERIM=0
@@ -35,7 +36,7 @@ DEFAULT_VERSION_EXTRA3=0
 DEFAULT_VERSION_DATE=2020-03-17
 DEFAULT_VERSION_CLASSFILE_MAJOR=58  # "`$EXPR $DEFAULT_VERSION_FEATURE + 44`"
 DEFAULT_VERSION_CLASSFILE_MINOR=0
-DEFAULT_ACCEPTABLE_BOOT_VERSIONS="12 13 14"
+DEFAULT_ACCEPTABLE_BOOT_VERSIONS="13 14"
 DEFAULT_JDK_SOURCE_TARGET_VERSION=14
 DEFAULT_PROMOTED_VERSION_PRE=ea
 
@@ -47,6 +48,7 @@ COMPANY_NAME=N/A
 HOTSPOT_VM_DISTRO="OpenJDK"
 VENDOR_URL=https://openjdk.java.net/
 VENDOR_URL_BUG=https://bugreport.java.com/bugreport/
+VENDOR_URL_VM_BUG=https://bugreport.java.com/bugreport/crash.jsp
 
 # Might need better names for these
 MACOSX_BUNDLE_NAME_BASE="OpenJDK"

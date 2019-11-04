@@ -877,8 +877,6 @@ jlong os::elapsed_frequency() {
 }
 
 bool os::supports_vtime() { return true; }
-bool os::enable_vtime()   { return false; }
-bool os::vtime_enabled()  { return false; }
 
 double os::elapsedVTime() {
   // better than nothing, but not much
@@ -3282,11 +3280,6 @@ void os::set_native_thread_name(const char *name) {
 #endif
 }
 
-bool os::distribute_processes(uint length, uint* distribution) {
-  // Not yet implemented.
-  return false;
-}
-
 bool os::bind_to_processor(uint processor_id) {
   // Not yet implemented.
   return false;
@@ -3671,7 +3664,7 @@ int os::loadavg(double loadavg[], int nelem) {
 void os::pause() {
   char filename[MAX_PATH];
   if (PauseAtStartupFile && PauseAtStartupFile[0]) {
-    jio_snprintf(filename, MAX_PATH, PauseAtStartupFile);
+    jio_snprintf(filename, MAX_PATH, "%s", PauseAtStartupFile);
   } else {
     jio_snprintf(filename, MAX_PATH, "./vm.paused.%d", current_process_id());
   }

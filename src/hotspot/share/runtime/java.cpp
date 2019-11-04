@@ -56,7 +56,6 @@
 #include "prims/jvmtiExport.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/biasedLocking.hpp"
-#include "runtime/compilationPolicy.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/flags/flagSetting.hpp"
@@ -696,6 +695,8 @@ void vm_shutdown_during_initialization(const char* error, const char* message) {
 JDK_Version JDK_Version::_current;
 const char* JDK_Version::_runtime_name;
 const char* JDK_Version::_runtime_version;
+const char* JDK_Version::_runtime_vendor_version;
+const char* JDK_Version::_runtime_vendor_vm_bug_url;
 
 void JDK_Version::initialize() {
   jdk_version_info info;
