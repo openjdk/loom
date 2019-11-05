@@ -1028,7 +1028,8 @@ public:
   bool walk_cont()     const { return false; }
   bool include_argument_oops() const { return false; }
   void set_include_argument_oops(bool f)  {}
-  bool in_cont()      const { return false; }
+  bool in_cont()       const { return false; }
+  bool in_chunk()      const { return false; }
 
 #ifdef ASSERT
   // void set_skip_missing(bool value) { _skip_missing = value; }

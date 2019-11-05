@@ -4351,6 +4351,7 @@ static frame chunk_top_frame_pd(oop chunk, intptr_t* sp);
 
 static frame chunk_top_frame(oop chunk) {
   intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
+  // tty->print_cr(">>> chunk_top_frame usp: %p", sp);
   return chunk_top_frame_pd(chunk, sp);
 }
 
@@ -4373,14 +4374,15 @@ static frame continuation_top_frame(oop contOop, RegisterMap* map) {
 
   // if (!oopDesc::equals(map->cont(), contOop))
   map->set_cont(contOop);
-  map->set_in_cont(true);
 
   for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
     if (!ContMirror::is_empty_chunk(chunk)) {
+      map->set_in_cont(true, true);
       return chunk_top_frame(chunk);
     }
   }
 
+  map->set_in_cont(true, false);
   return continuation_body_top_frame(cont, map);
 }
 
@@ -4397,7 +4399,7 @@ static frame continuation_parent_frame(ContMirror& cont, RegisterMap* map) {
 
   oop parent = java_lang_Continuation::parent(cont.mirror());
   map->set_cont(parent);
-  map->set_in_cont(false); // TODO parent != (oop)NULL; consider getting rid of set_in_cont altogether
+  map->set_in_cont(false, false); // TODO parent != (oop)NULL; consider getting rid of set_in_cont altogether
 
   if (!cont.is_mounted()) { // When we're walking an unmounted continuation and reached the end
     // tty->print_cr("continuation_parent_frame: no more");
@@ -4444,10 +4446,10 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
   oop chunk = cont.find_chunk(f.unextended_sp());
   if (chunk != (oop)NULL) {
     if (ContMirror::is_in_chunk(chunk, f.unextended_sp() + f.cb()->frame_size())) {
-      map->set_in_cont(false); // to prevent infinite recursion
+      map->set_in_cont(false, false); // to prevent infinite recursion
       frame sender = f.sender(map);
-      map->set_in_cont(true);
-    
+      map->set_in_cont(true, true);
+      // tty->print_cr(">>> sender_for_frame usp: %p", sender.unextended_sp());
       assert (ContMirror::is_usable_in_chunk(chunk, sender.unextended_sp()), "");
       return sender;
     }
@@ -4456,6 +4458,9 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
       assert (!ContMirror::is_empty_chunk(chunk), "");
       return chunk_top_frame(chunk);
     }
+    assert (map->in_cont(), "");
+    if (map->in_chunk()) map->set_in_cont(true, false);
+    assert (!map->in_chunk(), "");
     return continuation_body_top_frame(cont, map);
   }
 
@@ -4607,9 +4612,14 @@ address Continuation::usp_offset_to_location(const frame& fr, const RegisterMap*
   assert (fr.is_compiled_frame(), "");
   ContMirror cont(map);
 
+  assert(map->in_cont(), "");
+
   if (cont.find_chunk(fr.unextended_sp()) != (oop)NULL) {
+    assert(map->in_chunk(), "");
     return (address)fr.unextended_sp() + usp_offset_in_bytes;
   }
+
+  assert(!map->in_chunk(), "fr.unextended_sp: " INTPTR_FORMAT, p2i(fr.unextended_sp()));
 
   hframe hf = cont.from_frame(fr);
 
