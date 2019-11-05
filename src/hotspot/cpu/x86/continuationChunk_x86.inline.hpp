@@ -35,7 +35,9 @@ static inline void* reg_to_loc(VMReg reg, intptr_t* sp) {
 
 #ifdef ASSERT
 static bool is_in_oops(const ImmutableOopMap* oopmap, intptr_t* sp, void* p) {
-  for (OopMapStream oms(oopmap,OopMapValue::oop_value); !oms.is_done(); oms.next()) {
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
+    if (oms.current().type() != OopMapValue::oop_value)
+      continue;
     if (reg_to_loc(oms.current().reg(), sp) == p)
       return true;
   }
@@ -95,8 +97,11 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
 
     DEBUG_ONLY(int oops = 0;)
     if (first_safepoint_visit) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
-      for (OopMapStream oms(oopmap,OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
+      for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
         OopMapValue omv = oms.current();
+        if (omv.type() != OopMapValue::derived_oop_value)
+          continue;
+        
         oop* derived_loc = (oop*)reg_to_loc(omv.reg(), sp);
         oop* base_loc    = (oop*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
         assert (is_in_frame(cb, sp, base_loc), "");
@@ -118,11 +123,13 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
         }
       }
     }
-    for (OopMapStream oms(oopmap, OopMapValue::oop_value|OopMapValue::narrowoop_value); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
-      DEBUG_ONLY(oops++;)
+    for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
       OopMapValue omv = oms.current();
-      assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
+      if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+        continue;
+
       assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+      DEBUG_ONLY(oops++;)
 
       void* p = reg_to_loc(omv.reg(), sp);
       assert (p != NULL, "");
@@ -188,8 +195,11 @@ void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* 
     log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded sp: %ld", sp - start);
     if (log_develop_is_enabled(Trace, jvmcont)) cb->print_on(tty);
 
-    for (OopMapStream oms(oopmap, OopMapValue::oop_value|OopMapValue::narrowoop_value); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
       OopMapValue omv = oms.current();
+      if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+        continue;
+      
       oop* p = (oop*)reg_to_loc(omv.reg(), sp);
       assert (p != NULL, "");
 

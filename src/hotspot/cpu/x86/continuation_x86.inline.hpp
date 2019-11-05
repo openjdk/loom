@@ -1165,8 +1165,11 @@ static void fix_stack_chunk(oop chunk) {
     num_frames++;
     num_oops += oopmap->num_oops();
 
-    for (OopMapStream oms(oopmap,OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
+    for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
       OopMapValue omv = oms.current();
+      if (omv.type() != OopMapValue::derived_oop_value)
+        continue;
+      
       oop* derived_loc = (oop*)reg_to_loc(omv.reg(), sp);
       oop* base_loc    = (oop*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
       assert (base_loc != NULL, "");
@@ -1300,9 +1303,12 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
     num_oops += oopmap->num_oops();
 
     DEBUG_ONLY(int oops = 0;)
-    for (OopMapStream oms(oopmap, OopMapValue::oop_value|OopMapValue::narrowoop_value); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
-      DEBUG_ONLY(oops++;)
+    for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
       OopMapValue omv = oms.current();
+      if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+        continue;
+
+      DEBUG_ONLY(oops++;)
       void* p = reg_to_loc(omv.reg(), sp);
       assert (p != NULL, "");
       assert (is_in_frame(cb, sp, p), "");
@@ -1321,8 +1327,11 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
     assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
 
     if (SafepointSynchronize::is_at_safepoint()) { // don't try to race with fix
-      for (OopMapStream oms(oopmap,OopMapValue::derived_oop_value); !oms.is_done(); oms.next()) {
+      for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
         OopMapValue omv = oms.current();
+        if (omv.type() != OopMapValue::derived_oop_value)
+          continue;
+        
         void* base_loc    = reg_to_loc(omv.content_reg(), sp);
         void* derived_loc = reg_to_loc(omv.reg(), sp);
         assert (is_in_frame(cb, sp, base_loc), "");
