@@ -116,7 +116,13 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
     case Location::oop: {
       if (in_cont && UseCompressedOops) {
         narrowOop noop = *(narrowOop*) value_addr;
-        Handle h(Thread::current(), CompressedOops::decode(noop));
+        oop val = CompressedOops::decode(noop);
+#if INCLUDE_SHENANDOAHGC
+        if (UseShenandoahGC) {
+          val = ShenandoahBarrierSet::barrier_set()->load_reference_barrier(val);
+        }
+#endif
+        Handle h(Thread::current(), val);
         return new StackValue(h);
       } 
       
