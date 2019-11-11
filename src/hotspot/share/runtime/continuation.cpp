@@ -2028,6 +2028,7 @@ private:
   template<bool cont_empty> hframe new_bottom_hframe(int sp, int ref_sp, address pc, bool interpreted);
   template<typename FKind> hframe new_hframe(const frame& f, intptr_t* vsp, const hframe& caller, int fsize, int num_oops, int argsize);
   static frame chunk_start_frame_pd(oop chunk, intptr_t* sp);
+  void to_frame_info_chunk_pd(intptr_t* sp);
 
 public:
 
@@ -2259,11 +2260,12 @@ public:
   }
 
   void setup_chunk_jump(intptr_t* sp) {
+    assert (sp != NULL, "");
     _fi->sp = sp;
     _fi->pc = Continuation::is_return_barrier_entry(*(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET)) 
                   ? _cont.entryPC()
                   : *(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET); // Continuation.run may have been deoptimized
-    _fi->fp = (intptr_t*)(sp-frame::sender_sp_offset); // indirection
+    to_frame_info_chunk_pd(sp);
     log_develop_debug(jvmcont)("Jumping to frame (freeze): pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(_fi->pc), p2i(_fi->sp), p2i(*(intptr_t**)_fi->fp));
 
   #ifdef ASSERT

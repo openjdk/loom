@@ -857,6 +857,11 @@ frame Freeze<ConfigT, mode>::chunk_start_frame_pd(oop chunk, intptr_t* sp) {
   return frame(sp, sp, fp, pc, NULL, NULL, true);
 }
 
+template <typename ConfigT, op_mode mode>
+void Freeze<ConfigT, mode>::to_frame_info_chunk_pd(intptr_t* sp) {
+   _fi->fp = (intptr_t*)(sp-frame::sender_sp_offset); // indirection
+}
+
 static frame chunk_top_frame_pd(oop chunk, intptr_t* sp) {
   address pc = *(address*)(sp - 1);
   intptr_t* fp = *(intptr_t**)(sp - 2);
