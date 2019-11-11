@@ -1340,8 +1340,7 @@ class Thread implements Runnable {
             }
         }
         interrupted = true;
-        // inform VM of interrupt
-        interrupt0();
+        interrupt0();  // inform VM of interrupt
     }
 
     /**
@@ -1358,16 +1357,7 @@ class Thread implements Runnable {
      * @revised 6.0, 14
      */
     public static boolean interrupted() {
-        Thread t = currentThread();
-        boolean interrupted = t.interrupted;
-        // We may have been interrupted the moment after we read the field,
-        // so only clear the field if we saw that it was set and will return
-        // true; otherwise we could lose an interrupt.
-        if (interrupted) {
-            t.interrupted = false;
-            clearInterruptEvent();
-        }
-        return interrupted;
+        return currentThread().getAndClearInterrupt();
     }
 
     /**
@@ -1384,15 +1374,25 @@ class Thread implements Runnable {
     }
 
     final void setInterrupt() {
-        interrupt0();
+        interrupted = true;
+        interrupt0();  // inform VM of interrupt
     }
 
     final void clearInterrupt() {
-        getAndClearInterrupt();
+        interrupted = false;
+        clearInterruptEvent();
     }
 
     boolean getAndClearInterrupt() {
-        return isInterrupted(true);
+        boolean oldValue = interrupted;
+        // We may have been interrupted the moment after we read the field,
+        // so only clear the field if we saw that it was set and will return
+        // true; otherwise we could lose an interrupt.
+        if (oldValue) {
+            interrupted = false;
+            clearInterruptEvent();
+        }
+        return oldValue;
     }
 
     /**

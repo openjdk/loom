@@ -587,7 +587,7 @@ public class ThreadAPI {
     public void testInterrupt2() throws Exception {
         var thread = Thread.newLightWeightThread(0, () -> { });
         thread.interrupt();
-        assertFalse(thread.isInterrupted());
+        assertTrue(thread.isInterrupted());
     }
 
     // interrupt after terminated
@@ -596,7 +596,7 @@ public class ThreadAPI {
         thread.start();
         thread.join();
         thread.interrupt();
-        assertFalse(thread.isInterrupted());
+        assertTrue(thread.isInterrupted());
     }
 
     // terminate with interrupt status set
@@ -606,7 +606,7 @@ public class ThreadAPI {
         });
         thread.start();
         thread.join();
-        assertFalse(thread.isInterrupted());
+        assertTrue(thread.isInterrupted());
     }
 
     // interrupt when mounted
@@ -1329,16 +1329,6 @@ public class ThreadAPI {
         return Stream.of(stack)
                 .map(Object::toString)
                 .anyMatch(s -> s.contains(expected));
-    }
-
-
-    // -- countStackFrames --
-
-    public void testCountStackFrames() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
-            Thread me = Thread.currentThread();
-            assertThrows(IllegalThreadStateException.class, () -> me.countStackFrames());
-        });
     }
 
 

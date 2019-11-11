@@ -158,7 +158,7 @@ public class HotSpotGraphBuilderPlugins {
         if (InlineDuringParsing.getValue(options)) {
             plugins.appendInlineInvokePlugin(new InlineDuringParsingPlugin());
         }
-        registerContinuationPlugins(invocationPlugins, foreignCalls, replacements.getDefaultReplacementBytecodeProvider());
+        registerContinuationPlugins(invocationPlugins, foreignCalls, replacements);
         if (GeneratePIC.getValue(options)) {
             plugins.setClassInitializationPlugin(new HotSpotAOTClassInitializationPlugin());
             if (TieredAOT.getValue(options)) {
@@ -446,6 +446,14 @@ public class HotSpotGraphBuilderPlugins {
             r.registerMethodSubstitution(ThreadSubstitutions.class, "isInterrupted", Receiver.class, boolean.class);
         }
 
+    }
+
+    private static void registerContinuationPlugins(InvocationPlugins plugins,  ForeignCallsProvider foreignCalls, Replacements replacements) {
+        Registration r1 = new Registration(plugins, Continuation.class, replacements);
+        r1.registerMethodSubstitution(ContinuationSubstitutions.class, "getSP");
+        r1.register1("doContinue", Receiver.class, new ForeignCallPlugin(foreignCalls, ContinuationSubstitutions.CONTINUATION_DO_CONTINUE));
+        r1.register1("doYield", int.class, new ForeignCallPlugin(foreignCalls, ContinuationSubstitutions.CONTINUATION_YIELD));
+        r1.registerMethodSubstitution(ContinuationSubstitutions.class, "runLevel");
     }
 
     public static final String reflectionClass;

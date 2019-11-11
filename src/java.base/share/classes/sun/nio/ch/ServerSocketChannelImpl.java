@@ -276,7 +276,7 @@ class ServerSocketChannelImpl
             boolean blocking = isBlocking();
             try {
                 begin(blocking);
-                lockedconfigureNonBlockingIfNeeded();
+                lockedConfigureNonBlockingIfNeeded();
                 n = Net.accept(this.fd, newfd, isaa);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -380,7 +380,7 @@ class ServerSocketChannelImpl
     }
 
     /**
-     * Adjust the blocking. acceptLock must already be held.
+     * Adjusts the blocking mode.
      */
     private void lockedConfigureBlocking(boolean block) throws IOException {
         assert acceptLock.isHeldByCurrentThread();
@@ -394,35 +394,33 @@ class ServerSocketChannelImpl
     }
 
     /**
+     * Attempts to adjusts the blocking mode if the channel is open.
+     * @return {@code true} if the blocking mode was adjusted
+     */
+    private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
+        assert acceptLock.isHeldByCurrentThread();
+        synchronized (stateLock) {
+            // do nothing if lightweight thread has forced the socket to be non-blocking
+            if (!nonBlocking && isOpen()) {
+                IOUtil.configureBlocking(fd, block);
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    /**
      * Ensures that the socket is configured non-blocking when on a lightweight
      * thread.
      */
-    private void lockedconfigureNonBlockingIfNeeded() throws IOException {
+    private void lockedConfigureNonBlockingIfNeeded() throws IOException {
         assert acceptLock.isHeldByCurrentThread();
         if (!nonBlocking && (Thread.currentThread().isLightweight())) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
                 nonBlocking = true;
-            }
-        }
-    }
-
-    /**
-     * Adjusts the blocking mode if the channel is open. acceptLock must already
-     * be held.
-     *
-     * @return {@code true} if the blocking mode was adjusted, {@code false} if
-     *         the blocking mode was not adjusted because the channel is closed
-     */
-    private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
-        assert acceptLock.isHeldByCurrentThread();
-        synchronized (stateLock) {
-            if (isOpen()) {
-                IOUtil.configureBlocking(fd, block);
-                return true;
-            } else {
-                return false;
             }
         }
     }

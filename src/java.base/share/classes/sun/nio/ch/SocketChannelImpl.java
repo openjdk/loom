@@ -580,7 +580,7 @@ class SocketChannelImpl
     }
 
     /**
-     * Adjusts the blocking mode. readLock or writeLock must already be held.
+     * Adjust the blocking mode while holding readLock or writeLock.
      */
     private void lockedConfigureBlocking(boolean block) throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
@@ -589,6 +589,23 @@ class SocketChannelImpl
             // do nothing if lightweight thread has forced the socket to be non-blocking
             if (!nonBlocking) {
                 IOUtil.configureBlocking(fd, block);
+            }
+        }
+    }
+
+    /**
+     * Attempts to adjusts the blocking mode if the channel is open.
+     * @return {@code true} if the blocking mode was adjusted
+     */
+    private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
+        assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
+        synchronized (stateLock) {
+            // do nothing if lightweight thread has forced the socket to be non-blocking
+            if (!nonBlocking && isOpen()) {
+                IOUtil.configureBlocking(fd, block);
+                return true;
+            } else {
+                return false;
             }
         }
     }
@@ -604,25 +621,6 @@ class SocketChannelImpl
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
                 nonBlocking = true;
-            }
-        }
-    }
-
-    /**
-     * Adjusts the blocking mode if the channel is open. readLock or writeLock
-     * must already be held.
-     *
-     * @return {@code true} if the blocking mode was adjusted, {@code false} if
-     *         the blocking mode was not adjusted because the channel is closed
-     */
-    private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
-        assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
-        synchronized (stateLock) {
-            if (isOpen()) {
-                IOUtil.configureBlocking(fd, block);
-                return true;
-            } else {
-                return false;
             }
         }
     }

@@ -434,7 +434,7 @@ class DatagramChannelImpl
             int n = 0;
             try {
                 SocketAddress remote = beginRead(blocking, false);
-                lockedconfigureNonBlockingIfNeeded();
+                lockedConfigureNonBlockingIfNeeded();
                 boolean connected = (remote != null);
                 SecurityManager sm = System.getSecurityManager();
 
@@ -662,7 +662,7 @@ class DatagramChannelImpl
             int n = 0;
             try {
                 SocketAddress remote = beginWrite(blocking, false);
-                lockedconfigureNonBlockingIfNeeded();
+                lockedConfigureNonBlockingIfNeeded();
                 if (remote != null) {
                     // connected
                     if (!target.equals(remote)) {
@@ -789,7 +789,7 @@ class DatagramChannelImpl
             int n = 0;
             try {
                 beginRead(blocking, true);
-                lockedconfigureNonBlockingIfNeeded();
+                lockedConfigureNonBlockingIfNeeded();
                 n = IOUtil.read(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -819,7 +819,7 @@ class DatagramChannelImpl
             long n = 0;
             try {
                 beginRead(blocking, true);
-                lockedconfigureNonBlockingIfNeeded();
+                lockedConfigureNonBlockingIfNeeded();
                 n = IOUtil.read(fd, dsts, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -897,7 +897,7 @@ class DatagramChannelImpl
             int n = 0;
             try {
                 beginWrite(blocking, true);
-                lockedconfigureNonBlockingIfNeeded();
+                lockedConfigureNonBlockingIfNeeded();
                 n = IOUtil.write(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -927,7 +927,7 @@ class DatagramChannelImpl
             long n = 0;
             try {
                 beginWrite(blocking, true);
-                lockedconfigureNonBlockingIfNeeded();
+                lockedConfigureNonBlockingIfNeeded();
                 n = IOUtil.write(fd, srcs, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -967,25 +967,41 @@ class DatagramChannelImpl
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
         synchronized (stateLock) {
             ensureOpen();
-            IOUtil.configureBlocking(fd, block);
+            // do nothing if lightweight thread has forced the socket to be non-blocking
+            if (!nonBlocking) {
+                IOUtil.configureBlocking(fd, block);
+            }
         }
     }
 
     /**
-     * Adjusts the blocking mode if the channel is open. readLock or writeLock
-     * must already be held.
-     *
-     * @return {@code true} if the blocking mode was adjusted, {@code false} if
-     *         the blocking mode was not adjusted because the channel is closed
+     * Attempts to adjusts the blocking mode if the channel is open.
+     * @return {@code true} if the blocking mode was adjusted
      */
     private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
         synchronized (stateLock) {
-            if (isOpen()) {
+            if (!nonBlocking && isOpen()) {
                 IOUtil.configureBlocking(fd, block);
                 return true;
             } else {
                 return false;
+            }
+        }
+    }
+
+    /**
+     * Ensures that the socket is configured non-blocking when on a lightweight
+     * thread or a timeout is specified.
+     * @throws IOException if there is an I/O error changing the blocking mode
+     */
+    private void lockedConfigureNonBlockingIfNeeded() throws IOException {
+        assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
+        if (!nonBlocking && Thread.currentThread().isLightweight()) {
+            synchronized (stateLock) {
+                ensureOpen();
+                IOUtil.configureBlocking(fd, false);
+                nonBlocking = true;
             }
         }
     }
@@ -1116,7 +1132,7 @@ class DatagramChannelImpl
                         }
                     } finally {
                         if (blocking) {
-                            lockedConfigureBlocking(true);
+                            tryLockedConfigureBlocking(true);
                         }
                     }
                 }

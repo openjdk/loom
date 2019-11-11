@@ -102,9 +102,6 @@ class Fiber extends Thread {
     private Condition termination;        // created lazily
     private volatile boolean parkPermit;
 
-    // interrupt status
-    private volatile boolean interrupted;
-
     /**
      * Creates a new {@code Fiber} to run the given task with the given scheduler.
      *
@@ -540,8 +537,6 @@ class Fiber extends Thread {
     public void interrupt() {
         if (Thread.currentThread() != this) {
             checkAccess();
-            if (!isAlive())
-                return;
             synchronized (interruptLock) {
                 interrupted = true;
                 Interruptible b = nioBlocker;
@@ -562,8 +557,7 @@ class Fiber extends Thread {
 
     @Override
     public boolean isInterrupted() {
-        // return false when the thread is not alive
-        return isAlive() && interrupted;
+        return interrupted;
     }
 
     @Override
