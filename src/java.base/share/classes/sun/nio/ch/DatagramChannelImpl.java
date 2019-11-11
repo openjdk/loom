@@ -561,6 +561,7 @@ class DatagramChannelImpl
         try {
             SocketAddress remote = beginRead(true, false);
             boolean connected = (remote != null);
+            lockedConfigureNonBlockingIfNeeded();
             n = receive(dst, connected);
             while (n == IOStatus.UNAVAILABLE && isOpen()) {
                 park(Net.POLLIN);
@@ -608,7 +609,6 @@ class DatagramChannelImpl
                 // restore socket to blocking mode (if channel is open)
                 tryLockedConfigureBlocking(true);
             }
-
         } finally {
             endRead(true, completed);
             assert IOStatus.check(n);
