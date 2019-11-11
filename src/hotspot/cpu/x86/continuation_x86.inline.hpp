@@ -658,6 +658,8 @@ inline frame ContinuationHelper::to_frame(FrameInfo* fi) {
   address pc = fi->pc;
   int slot;
   CodeBlob* cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+  assert (cb != NULL, "");
+  assert (!indirect || fi->fp != NULL, "");
   return frame(fi->sp, fi->sp, 
     indirect ? *(intptr_t**)fi->fp : fi->fp, 
     pc, cb, slot == -1 ? NULL : cb->oop_map_for_slot(slot, pc));

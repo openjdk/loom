@@ -2260,6 +2260,7 @@ public:
   }
 
   void setup_chunk_jump(intptr_t* sp) {
+    // tty->print_cr(">>> setup_chunk_jump sp: %p", sp);
     assert (sp != NULL, "");
     _fi->sp = sp;
     _fi->pc = Continuation::is_return_barrier_entry(*(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET)) 
