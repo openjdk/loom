@@ -2096,6 +2096,7 @@ public:
 
     log_develop_trace(jvmcont)("freeze_chunk");
     assert (mode == mode_fast, "");
+    assert (!Interpreter::contains(_cont.entryPC()), "");
 
     oop chunk = _cont.tail();
 
@@ -2106,9 +2107,10 @@ public:
     if (argsize != 0) {
       assert (argsize > 0, "");
       bottom += argsize;
-    } else if (Interpreter::contains(_cont.entryPC())) {
-      bottom -= 2;
-    }
+    } 
+    // else if (Interpreter::contains(_cont.entryPC())) {
+    //   bottom -= 2;
+    // }
 
     int size = bottom - top; // in words
     log_develop_trace(jvmcont)("freeze_chunk size: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT, size, p2i(top), p2i(bottom));
@@ -2574,8 +2576,9 @@ public:
       assert (FKind::interpreted || entry.sp() == entry.unextended_sp(), "");
       assert (Frame::callee_link_address(entry) == slow_link_address<FKind>(callee), "");
 
+      assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()), ""); // we do not allow entry to be interpreted in fast mode
       assert (mode != mode_fast ||  Interpreter::contains(_cont.entryPC()) || entry.sp() == _cont.entrySP(), "f.sp: %p entrySP: %p", entry.sp(), _cont.entrySP());
-      assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()) || entry.sp() == _cont.entrySP() - 2, "f.sp: %p entrySP: %p", entry.sp(), _cont.entrySP());
+      // assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()) || entry.sp() == _cont.entrySP() - 2, "f.sp: %p entrySP: %p", entry.sp(), _cont.entrySP());
 
       setup_jump<FKind>(entry, callee);
     }
@@ -3398,7 +3401,7 @@ public:
     thaw<true>(num_frames);
 
     assert (_cont.num_frames() == orig_num_frames - _frames, "cont.is_empty: %d num_frames: %d orig_num_frames: %d frame_count: %d", _cont.is_empty(), _cont.num_frames(), orig_num_frames, _frames);
-    assert (mode != mode_fast || _fastpath, "");
+    // assert (mode != mode_fast || _fastpath, "");
     assert(_cont.chunk_invariant(), "");
     return _fastpath;
   }
@@ -3641,7 +3644,7 @@ public:
     PERFTEST_ONLY(if (PERFTEST_LEVEL <= 115) return;)
 
     entry = new_entry_frame();
-    // if (entry.is_interpreted_frame()) _fastpath = false; // set _fastpath if entry is interpreted ?
+    if (entry.is_interpreted_frame()) _fastpath = false; // set _fastpath if entry is interpreted ?
 
     assert (entry.sp() == _cont.entrySP(), "entry.sp: %p entrySP: %p", entry.sp(), _cont.entrySP());
     // assert (Interpreter::contains(_cont.entryPC()) 
