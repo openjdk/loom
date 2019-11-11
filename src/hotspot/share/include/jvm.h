@@ -251,14 +251,8 @@ JVM_Sleep(JNIEnv *env, jclass threadClass, jlong millis);
 JNIEXPORT jobject JNICALL
 JVM_CurrentThread(JNIEnv *env, jclass threadClass);
 
-JNIEXPORT jint JNICALL
-JVM_CountStackFrames(JNIEnv *env, jobject thread);
-
 JNIEXPORT void JNICALL
 JVM_Interrupt(JNIEnv *env, jobject thread);
-
-JNIEXPORT jboolean JNICALL
-JVM_IsInterrupted(JNIEnv *env, jobject thread, jboolean clearInterrupted);
 
 JNIEXPORT jboolean JNICALL
 JVM_HoldsLock(JNIEnv *env, jclass threadClass, jobject obj);
@@ -361,11 +355,6 @@ JVM_GetCallerClass(JNIEnv *env);
 JNIEXPORT jclass JNICALL
 JVM_FindPrimitiveClass(JNIEnv *env, const char *utf);
 
-/*
- * Link the 'arg' class
- */
-JNIEXPORT void JNICALL
-JVM_LinkClass(JNIEnv *env, jclass classClass, jclass arg);
 
 /*
  * Find a class from a boot class loader. Returns NULL if class not found.

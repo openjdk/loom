@@ -576,7 +576,6 @@ bool vmIntrinsics::is_disabled_by_flags(vmIntrinsics::ID id) {
     if (!InlineClassNatives) return true;
     break;
   case vmIntrinsics::_currentThread:
-  case vmIntrinsics::_isInterrupted:
     if (!InlineThreadNatives) return true;
     break;
   case vmIntrinsics::_floatToRawIntBits:
@@ -795,9 +794,6 @@ bool vmIntrinsics::is_disabled_by_flags(vmIntrinsics::ID id) {
 #endif // COMPILER1
 #ifdef COMPILER2
   case vmIntrinsics::_clone:
-#if INCLUDE_ZGC
-    if (UseZGC) return true;
-#endif
   case vmIntrinsics::_copyOf:
   case vmIntrinsics::_copyOfRange:
     // These intrinsics use both the objectcopy and the arraycopy

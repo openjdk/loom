@@ -336,8 +336,8 @@ class ServerSocketChannelImpl
                         n = Net.accept(fd, newfd, isaa);
                     }
                 } finally {
-                    // restore socket to blocking mode
-                    lockedConfigureBlocking(true);
+                    // restore socket to blocking mode (if channel is open)
+                    tryLockedConfigureBlocking(true);
                 }
             } finally {
                 end(true, n > 0);
@@ -380,7 +380,7 @@ class ServerSocketChannelImpl
     }
 
     /**
-     * Adjust the blocking mode while holding acceptLock.
+     * Adjust the blocking. acceptLock must already be held.
      */
     private void lockedConfigureBlocking(boolean block) throws IOException {
         assert acceptLock.isHeldByCurrentThread();
@@ -404,6 +404,25 @@ class ServerSocketChannelImpl
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
                 nonBlocking = true;
+            }
+        }
+    }
+
+    /**
+     * Adjusts the blocking mode if the channel is open. acceptLock must already
+     * be held.
+     *
+     * @return {@code true} if the blocking mode was adjusted, {@code false} if
+     *         the blocking mode was not adjusted because the channel is closed
+     */
+    private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
+        assert acceptLock.isHeldByCurrentThread();
+        synchronized (stateLock) {
+            if (isOpen()) {
+                IOUtil.configureBlocking(fd, block);
+                return true;
+            } else {
+                return false;
             }
         }
     }

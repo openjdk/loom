@@ -324,6 +324,8 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
     private CookieHandler cookieHandler;
     private final ResponseCache cacheHandler;
 
+    private volatile boolean usingProxy;
+
     // the cached response, and cached response headers and body
     protected CacheResponse cachedResponse;
     private MessageHeader cachedHeaders;
@@ -331,7 +333,6 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
 
     /* output stream to server */
     protected PrintStream ps = null;
-
 
     /* buffered error stream */
     private InputStream errorStream = null;
@@ -1267,6 +1268,7 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
                 }
             }
 
+            usingProxy = usingProxy || usingProxyInternal();
             ps = (PrintStream)http.getOutputStream();
         } catch (IOException e) {
             throw e;
@@ -2976,7 +2978,7 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
      * closed the connection to the web server.
      */
     private void disconnectWeb() throws IOException {
-        if (usingProxy() && http.isKeepingAlive()) {
+        if (usingProxyInternal() && http.isKeepingAlive()) {
             responseCode = -1;
             // clean up, particularly, skip the content part
             // of a 401 error response
@@ -3079,10 +3081,28 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
         }
     }
 
-    public boolean usingProxy() {
+    /**
+     * Returns true only if the established connection is using a proxy
+     */
+    boolean usingProxyInternal() {
         if (http != null) {
             return (http.getProxyHostUsed() != null);
         }
+        return false;
+    }
+
+    /**
+     * Returns true if the established connection is using a proxy
+     * or if a proxy is specified for the inactive connection
+     */
+    @Override
+    public boolean usingProxy() {
+        if (usingProxy || usingProxyInternal())
+            return true;
+
+        if (instProxy != null)
+            return instProxy.type().equals(Proxy.Type.HTTP);
+
         return false;
     }
 

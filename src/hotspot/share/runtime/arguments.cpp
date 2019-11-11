@@ -3147,7 +3147,13 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
   NOT_PRODUCT(UNSUPPORTED_OPTION(TraceProfileInterpreter));
 #endif
 
-#ifndef TIERED
+
+#ifdef TIERED
+  // Parse the CompilationMode flag
+  if (!CompilationModeFlag::initialize()) {
+    return JNI_ERR;
+  }
+#else
   // Tiered compilation is undefined.
   UNSUPPORTED_OPTION(TieredCompilation);
 #endif
@@ -4022,6 +4028,12 @@ jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
   }
   no_shared_spaces("CDS Disabled");
 #endif // INCLUDE_CDS
+
+#ifndef TIERED
+  if (FLAG_IS_CMDLINE(CompilationMode)) {
+    warning("CompilationMode has no effect in non-tiered VMs");
+  }
+#endif
 
   return JNI_OK;
 }
