@@ -39,7 +39,7 @@ public class Parking {
 
     // lightweight thread parks, unparked by dinosaur thread
     public void testPark1() throws Exception {
-        var thread = Thread.newLightWeightThread(0, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
         thread.start();
         Thread.sleep(1000); // give time for lightweight thread to park
         LockSupport.unpark(thread);
@@ -48,10 +48,10 @@ public class Parking {
 
     // lightweight thread parks, unparked by another lightweight thread
     public void testPark2() throws Exception {
-        var thread1 = Thread.newLightWeightThread(0, () -> LockSupport.park());
+        var thread1 = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
         thread1.start();
         Thread.sleep(1000); // give time for lightweight thread to park
-        var thread2 = Thread.newLightWeightThread(0, () -> LockSupport.unpark(thread1));
+        var thread2 = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.unpark(thread1));
         thread2.start();
         thread1.join();
         thread2.join();
@@ -59,7 +59,7 @@ public class Parking {
 
     // park while holding monitor
     public void testPark3() throws Exception {
-        var thread = Thread.newLightWeightThread(0, () -> {
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             var lock = new Object();
             synchronized (lock) {
                 LockSupport.park();
@@ -95,7 +95,7 @@ public class Parking {
 
     // unpark before park
     public void testPark5() throws Exception {
-        var thread = Thread.newLightWeightThread(0, () -> {
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             LockSupport.unpark(Thread.currentThread());
             LockSupport.park();
         });
@@ -105,7 +105,7 @@ public class Parking {
 
     // 2 x unpark before park
     public void testPark6() throws Exception {
-        var thread = Thread.newLightWeightThread(0, () -> {
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             Thread me = Thread.currentThread();
             LockSupport.unpark(me);
             LockSupport.unpark(me);
@@ -120,7 +120,7 @@ public class Parking {
 
     // 2 x park
     public void testPark7() throws Exception {
-        var thread = Thread.newLightWeightThread(0, () -> {
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             LockSupport.park();
             LockSupport.park();
         });
@@ -140,7 +140,7 @@ public class Parking {
 
     // interrupt before park
     public void testPark8() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Thread t = Thread.currentThread();
             t.interrupt();
             LockSupport.park();
@@ -150,7 +150,7 @@ public class Parking {
 
     // interrupt while parked
     public void testPark9() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 1000);
             LockSupport.park();
@@ -160,7 +160,7 @@ public class Parking {
 
     // interrupt before park (pinned park)
     public void testPark10() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Thread t = Thread.currentThread();
             t.interrupt();
             Object lock = new Object();
@@ -173,7 +173,7 @@ public class Parking {
 
     // interrupt while parked (pinned park)
     public void testPark11() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 1000);
             Object lock = new Object();
@@ -186,17 +186,17 @@ public class Parking {
 
     // parkNanos(-1) completes immediately
     public void testParkNanos1() throws Exception {
-        TestHelper.runInLightWeightThread(() -> LockSupport.parkNanos(-1));
+        TestHelper.runInLightweightThread(() -> LockSupport.parkNanos(-1));
     }
 
     // parkNanos(0) completes immediately
     public void testParkNanos2() throws Exception {
-        TestHelper.runInLightWeightThread(() -> LockSupport.parkNanos(0));
+        TestHelper.runInLightweightThread(() -> LockSupport.parkNanos(0));
     }
 
     // parkNanos(1000ms) completes quickly
     public void testParkNanos3() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             // park for 1000ms
             long nanos = TimeUnit.NANOSECONDS.convert(1000, TimeUnit.MILLISECONDS);
             long start = System.nanoTime();
@@ -211,7 +211,7 @@ public class Parking {
 
     // lightweight thread parks, unparked by dinosaur thread
     public void testParkNanos4() throws Exception {
-        var thread = Thread.newLightWeightThread(0, () -> {
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             long nanos = TimeUnit.NANOSECONDS.convert(30, TimeUnit.SECONDS);
             LockSupport.parkNanos(nanos);
         });
@@ -223,13 +223,13 @@ public class Parking {
 
     // lightweight thread parks, unparked by another lightweight thread
     public void testParkNanos5() throws Exception {
-        var thread1 = Thread.newLightWeightThread(0, () -> {
+        var thread1 = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             long nanos = TimeUnit.NANOSECONDS.convert(30, TimeUnit.SECONDS);
             LockSupport.parkNanos(nanos);
         });
         thread1.start();
         Thread.sleep(1000);  // give time for lightweight thread to park
-        var thread2 = Thread.newLightWeightThread(0, () -> LockSupport.unpark(thread1));
+        var thread2 = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.unpark(thread1));
         thread2.start();
         thread1.join();
         thread2.join();
@@ -237,7 +237,7 @@ public class Parking {
 
     // unpark before parkNanos
     public void testParkNanos6() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             LockSupport.unpark(Thread.currentThread());
             long nanos = TimeUnit.NANOSECONDS.convert(30, TimeUnit.SECONDS);
             LockSupport.parkNanos(nanos);
@@ -246,7 +246,7 @@ public class Parking {
 
     // unpark before parkNanos(0), should consume permit
     public void testParkNanos7() throws Exception {
-        var thread = Thread.newLightWeightThread(0, () -> {
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             LockSupport.unpark(Thread.currentThread());
             LockSupport.parkNanos(0);
             LockSupport.park(); // should block

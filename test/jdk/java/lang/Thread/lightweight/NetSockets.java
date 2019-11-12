@@ -50,7 +50,7 @@ public class NetSockets {
      * Socket read/write, no blocking.
      */
     public void testSocketReadWrite1() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -72,7 +72,7 @@ public class NetSockets {
      * Lightweight thread blocks in read.
      */
     public void testSocketReadWrite2() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -94,7 +94,7 @@ public class NetSockets {
      * Lightweight thread blocks in write.
      */
     public void testSocketReadWrite3() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -116,7 +116,7 @@ public class NetSockets {
      * Lightweight thread blocks in read, peer closes connection.
      */
     public void testSocketReadPeerClose1() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -133,7 +133,7 @@ public class NetSockets {
      * Lightweight thread blocks in read, peer closes connection abruptly.
      */
     public void testSocketReadPeerClose2() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
                 Socket s2 = connection.socket2();
@@ -155,7 +155,7 @@ public class NetSockets {
      * Socket close while lightweight thread blocked in read.
      */
     public void testSocketReadAsyncClose() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s = connection.socket1();
                 ScheduledCloser.schedule(s, DELAY);
@@ -171,7 +171,7 @@ public class NetSockets {
      * Socket close while lightweight thread blocked in write.
      */
     public void testSocketWriteAsyncClose() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 Socket s = connection.socket1();
                 ScheduledCloser.schedule(s, DELAY);
@@ -190,7 +190,7 @@ public class NetSockets {
      * ServerSocket accept, no blocking.
      */
     public void testServerSocketAccept1() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var listener = new ServerSocket(0)) {
                 var socket1 = new Socket(listener.getInetAddress(), listener.getLocalPort());
                 // accept should not block
@@ -205,7 +205,7 @@ public class NetSockets {
      * Lightweight thread blocks in accept.
      */
     public void testServerSocketAccept2() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var listener = new ServerSocket(0)) {
                 var socket1 = new Socket();
                 ScheduledConnector.schedule(socket1, listener.getLocalSocketAddress(), DELAY);
@@ -221,7 +221,7 @@ public class NetSockets {
      * ServerSocket close while lightweight thread blocked in accept.
      */
     public void testServerSocketAcceptAsyncClose() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var listener = new ServerSocket(0)) {
                 ScheduledCloser.schedule(listener, DELAY);
                 try {

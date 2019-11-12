@@ -65,9 +65,15 @@ public class DoContinueSingleStepTest {
     };
 
     public static void test1() throws Exception {
-        Thread.newLightWeightThread(0, PRODUCER).start();
-        Thread.newLightWeightThread(0, CONSUMER).start();
-        Thread.newLightWeightThread(0, CONSUMER).start();
+        Thread producer = Thread.newThread(Thread.LIGHTWEIGHT, PRODUCER);
+        Thread conusmer1 = Thread.newThread(Thread.LIGHTWEIGHT, CONSUMER);
+        Thread consumer2 = Thread.newThread(Thread.LIGHTWEIGHT, CONSUMER);
+        producer.start();
+        consumer1.start();
+        consumer2.start();
+        producer.join();
+        consumer1.join();
+        consumer2.join();
     }
 
     void runTest() throws Exception {

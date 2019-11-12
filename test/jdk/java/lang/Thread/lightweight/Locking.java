@@ -39,7 +39,7 @@ public class Locking {
 
     // lock/unlock
     public void testReentrantLock1() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             ReentrantLock lock = new ReentrantLock();
             assertFalse(lock.isHeldByCurrentThread());
             lock.lock();
@@ -51,7 +51,7 @@ public class Locking {
 
     // tryLock/unlock
     public void testReentrantLock2() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             ReentrantLock lock = new ReentrantLock();
             assertFalse(lock.isHeldByCurrentThread());
             boolean acquired = lock.tryLock();
@@ -64,7 +64,7 @@ public class Locking {
 
     // lock/lock/unlock/unlock
     public void testReentrantLock3() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             ReentrantLock lock = new ReentrantLock();
             assertFalse(lock.isHeldByCurrentThread());
             assertTrue(lock.getHoldCount() == 0);
@@ -93,7 +93,7 @@ public class Locking {
         // thread acquires lock
         lock.lock();
         try {
-            thread = Thread.newLightWeightThread(0, () -> {
+            thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
                 lock.lock();  // should block
                 holdsLock.set(true);
                 LockSupport.park();
@@ -122,7 +122,7 @@ public class Locking {
     // locked by lightweight thread, dinoasur thread tries to lock
     public void testReentrantLock5() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread = Thread.newLightWeightThread(0, () -> {
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -154,7 +154,7 @@ public class Locking {
     // lock by lightweight thread, another lightweight thread tries to lock
     public void testReentrantLock6() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread1 = Thread.newLightWeightThread(0, () -> {
+        var thread1 = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -170,7 +170,7 @@ public class Locking {
         }
 
         var holdsLock  = new AtomicBoolean();
-        var thread2 = Thread.newLightWeightThread(0, () -> {
+        var thread2 = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
             lock.lock();
             holdsLock.set(true);
             LockSupport.park();

@@ -56,7 +56,7 @@ public class NioChannels {
      * SocketChannel read/write, no blocking.
      */
     public void testSocketChannelReadWrite1() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -79,7 +79,7 @@ public class NioChannels {
      * Lightweight thread blocks in SocketChannel read.
      */
     public void testSocketChannelRead() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -101,7 +101,7 @@ public class NioChannels {
      * Lightweight thread blocks in SocketChannel write.
      */
     public void testSocketChannelWrite() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -124,7 +124,7 @@ public class NioChannels {
      * SocketChannel close while lightweight thread blocked in read.
      */
     public void testSocketChannelReadAsyncClose() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 ScheduledCloser.schedule(sc, DELAY);
@@ -140,7 +140,7 @@ public class NioChannels {
      * Lightweight thread interrupted while blocked in SocketChannel read.
      */
     public void testSocketChannelReadInterrupt() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
@@ -156,7 +156,7 @@ public class NioChannels {
      * SocketChannel close while lightweight thread blocked in write.
      */
     public void testSocketChannelWriteAsyncClose() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 ScheduledCloser.schedule(sc, DELAY);
@@ -176,7 +176,7 @@ public class NioChannels {
      * Lightweight thread interrupted while blocked in SocketChannel write.
      */
     public void testSocketChannelWriteInterrupt() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
@@ -196,7 +196,7 @@ public class NioChannels {
      * Lightweight thread blocks in SocketChannel read.
      */
     private void testSocketAdaptorRead(int timeout) throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -235,7 +235,7 @@ public class NioChannels {
      * ServerSocketChannel accept, no blocking.
      */
     public void testServerSocketChannelAccept1() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 ssc.bind(new InetSocketAddress(InetAddress.getLocalHost(), 0));
                 var sc1 = SocketChannel.open(ssc.getLocalAddress());
@@ -251,7 +251,7 @@ public class NioChannels {
      * Lightweight thread blocks in ServerSocketChannel accept.
      */
     public void testServerSocketChannelAccept2() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 ssc.bind(new InetSocketAddress(InetAddress.getLocalHost(), 0));
                 var sc1 = SocketChannel.open();
@@ -268,7 +268,7 @@ public class NioChannels {
      * SeverSocketChannel close while lightweight thread blocked in accept.
      */
     public void testServerSocketChannelAcceptAsyncClose() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 InetAddress lh = InetAddress.getLocalHost();
                 ssc.bind(new InetSocketAddress(lh, 0));
@@ -286,7 +286,7 @@ public class NioChannels {
      * Lightweight thread interrupted while blocked in ServerSocketChannel accept.
      */
     public void testServerSocketChannelAcceptInterrupt() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 InetAddress lh = InetAddress.getLocalHost();
                 ssc.bind(new InetSocketAddress(lh, 0));
@@ -301,7 +301,7 @@ public class NioChannels {
     }
 
     void testSocketChannelAdaptorAccept(int timeout) throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 ssc.bind(new InetSocketAddress(InetAddress.getLocalHost(), 0));
                 var sc1 = SocketChannel.open();
@@ -336,7 +336,7 @@ public class NioChannels {
      * DatagramChannel receive/send, no blocking.
      */
     public void testDatagramChannelSendReceive1() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
@@ -360,7 +360,7 @@ public class NioChannels {
      * Lightweight thread blocks in DatagramChannel receive.
      */
     public void testDatagramChannelSendReceive2() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
@@ -383,7 +383,7 @@ public class NioChannels {
      * DatagramChannel close while lightweight thread blocked in receive.
      */
     public void testDatagramChannelReceiveAsyncClose() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
                 InetAddress lh = InetAddress.getLocalHost();
                 dc.bind(new InetSocketAddress(lh, 0));
@@ -400,7 +400,7 @@ public class NioChannels {
      * Lightweight thread interrupted while blocked in DatagramChannel receive.
      */
     public void testDatagramChannelReceiveInterrupt() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
                 InetAddress lh = InetAddress.getLocalHost();
                 dc.bind(new InetSocketAddress(lh, 0));
@@ -414,7 +414,7 @@ public class NioChannels {
     }
 
     void testDatagramSocketAdaptorReceive(int timeout) throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
@@ -454,7 +454,7 @@ public class NioChannels {
      * Pipe read/write, no blocking.
      */
     public void testPipeReadWrite1() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -477,7 +477,7 @@ public class NioChannels {
      * Lightweight thread blocks in Pipe.SourceChannel read.
      */
     public void testPipeReadWrite2() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -499,7 +499,7 @@ public class NioChannels {
      * Lightweight thread blocks in Pipe.SinkChannel write.
      */
     public void testPipeReadWrite3() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -522,7 +522,7 @@ public class NioChannels {
      * Pipe.SourceChannel close while lightweight thread blocked in read.
      */
     public void testPipeReadAsyncClose() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SourceChannel source = p.source()) {
                 ScheduledCloser.schedule(source, DELAY);
@@ -538,7 +538,7 @@ public class NioChannels {
      * Lightweight thread interrupted while blocked in Pipe.SourceChannel read.
      */
     public void testPipeReadInterrupt() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SourceChannel source = p.source()) {
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
@@ -554,7 +554,7 @@ public class NioChannels {
      * Pipe.SinkChannel close while lightweight thread blocked in write.
      */
     public void testPipeWriteAsyncClose() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink()) {
                 ScheduledCloser.schedule(sink, DELAY);
@@ -574,7 +574,7 @@ public class NioChannels {
      * Lightweight thread interrupted while blocked in Pipe.SinkChannel write.
      */
     public void testPipeWriteInterrupt() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInLightweightThread(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink()) {
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);

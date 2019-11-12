@@ -38,7 +38,7 @@ public class Collectable {
 
     // ensure that an unstarted lightweight thread can be GC"ed
     public void testGC1() {
-        var thread = Thread.newLightWeightThread(0, () -> { });
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
         var ref = new WeakReference<>(thread);
         thread = null;
         waitUntilCleared(ref);
@@ -46,7 +46,7 @@ public class Collectable {
 
     // ensure that a parked lightweight thread can be GC'ed
     public void testGC2() {
-        var thread = Thread.newLightWeightThread(0, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
         thread.start();
         var ref = new WeakReference<>(thread);
         thread = null;
@@ -55,7 +55,7 @@ public class Collectable {
 
     // ensure that a terminated lightweight thread can be GC'ed
     public void testGC3() throws Exception {
-        var thread = Thread.newLightWeightThread(0, () -> { });
+        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
         thread.start();
         thread.join();
         var ref = new WeakReference<>(thread);
