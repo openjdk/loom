@@ -65,12 +65,12 @@ public class FiberTest {
     };
 
     public static void test1() throws Exception {
-        Thread producer = Thread.newThread(Thread.LIGHTWEIGHT, PRODUCER);
-        Thread consumer = Thread.newThread(Thread.LIGHTWEIGHT, CONSUMER);
-        producer.start();
-        consumer.start();
-        producer.join();
-        consumer.join();
+        Thread prod = Thread.newThread(Thread.LIGHTWEIGHT, PRODUCER);
+        Thread cons = Thread.newThread(Thread.LIGHTWEIGHT, CONSUMER);
+        prod.start();
+        cons.start();
+        prod.join();
+        cons.join();
     }
 
     void runTest() throws Exception {

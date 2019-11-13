@@ -154,6 +154,16 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
     return byte_offset_of(JvmtiEnvBase, _jvmti_external);
   };
 
+  static jvmtiError get_JavaThread(ThreadsListHandle tlh, jthread thread, JavaThread ** jt_pp) {
+    jvmtiError err = JVMTI_ERROR_NONE;
+    if (thread == NULL) {
+      *jt_pp = JavaThread::current();
+    } else {
+      err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, jt_pp, NULL);
+    }
+    return err;
+  }
+
   static JvmtiEnv* JvmtiEnv_from_jvmti_env(jvmtiEnv *env) {
     return (JvmtiEnv*)((intptr_t)env - in_bytes(jvmti_external_offset()));
   };
