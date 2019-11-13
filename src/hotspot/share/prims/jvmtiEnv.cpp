@@ -839,10 +839,10 @@ JvmtiEnv::GetJLocationFormat(jvmtiJlocationFormat* format_ptr) {
 // object - pre-checked for NULL
 // is_fiber_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::IsFiber(jobject object, jboolean* is_fiber_ptr) {
-  oop obj = JNIHandles::resolve_external_guard(object);
+JvmtiEnv::IsFiber(jthread thread, jboolean* is_fiber_ptr) {
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  *is_fiber_ptr = java_lang_Fiber::is_instance(obj);
+  *is_fiber_ptr = java_lang_Fiber::is_instance(thread_obj);
   return JVMTI_ERROR_NONE;
 } /* end IsFiber */
 
@@ -850,7 +850,7 @@ JvmtiEnv::IsFiber(jobject object, jboolean* is_fiber_ptr) {
 // java_thread - pre-checked
 // fiber_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetThreadFiber(JavaThread* java_thread, jobject* fiber_ptr) {
+JvmtiEnv::GetThreadFiber(JavaThread* java_thread, jthread* fiber_ptr) {
   JavaThread* current_thread  = JavaThread::current();
   ResourceMark rm(current_thread);
   oop fiber_oop = NULL;
@@ -864,19 +864,19 @@ JvmtiEnv::GetThreadFiber(JavaThread* java_thread, jobject* fiber_ptr) {
     return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
   }
   fiber_oop = java_lang_Thread::fiber(java_thread->threadObj());
-  *fiber_ptr = JNIHandles::make_local(current_thread, fiber_oop);
+  *fiber_ptr = (jthread)JNIHandles::make_local(current_thread, fiber_oop);
   return JVMTI_ERROR_NONE;
 } /* end GetThreadFiber */
 
 // thread_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetFiberThread(jobject fiber, jthread* thread_ptr) {
+JvmtiEnv::GetFiberThread(jthread fiber, jthread* thread_ptr) {
   JavaThread* current_thread  = JavaThread::current();
   HandleMark hm(current_thread);
   oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
 
   if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
+    return JVMTI_ERROR_INVALID_THREAD;
   }
 
   VM_FiberGetThread op(current_thread, Handle(current_thread, fiber_obj), thread_ptr);
@@ -884,198 +884,6 @@ JvmtiEnv::GetFiberThread(jobject fiber, jthread* thread_ptr) {
 
   return op.result();
 } /* end GetFiberThread */
-
-// max_frame_count - pre-checked to be greater than or equal to 0
-// frame_buffer - pre-checked for NULL
-// count_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::GetFiberStackTrace(jobject fiber, jint start_depth, jint max_frame_count, jvmtiFrameInfo* frame_buffer, jint* count_ptr) {
-  JavaThread* current_thread = JavaThread::current();
-  HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
-
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
-  }
-
-  VM_FiberGetStackTrace op(this, Handle(current_thread, fiber_obj),
-                           start_depth, max_frame_count, frame_buffer, count_ptr);
-  VMThread::execute(&op);
-
-  return op.result();
-} /* end GetFiberStackTrace */
-
-// count_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::GetFiberFrameCount(jobject fiber, jint* count_ptr) {
-  JavaThread* current_thread = JavaThread::current();
-  HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
-
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
-  }
-
-  VM_FiberGetFrameCount op(this, Handle(current_thread, fiber_obj), count_ptr);
-  VMThread::execute(&op);
-
-  return op.result();
-} /* end GetFiberFrameCount */
-
-// depth - pre-checked as non-negative
-// method_ptr - pre-checked for NULL
-// location_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::GetFiberFrameLocation(jobject fiber, jint depth, jmethodID* method_ptr, jlocation* location_ptr) {
-  JavaThread* current_thread  = JavaThread::current();
-  HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
-
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
-  }
-
-  VM_FiberGetFrameLocation op(this, Handle(current_thread, fiber_obj), depth, method_ptr, location_ptr);
-  VMThread::execute(&op);
-
-  return op.result();
-} /* end GetFiberFrameLocation */
-
-// depth - pre-checked as non-negative
-// value_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::GetFiberLocalObject(jobject fiber, jint depth, jint slot, jobject* value_ptr) {
-  JavaThread* current_thread = JavaThread::current();
-  // rm object is created to clean up the javaVFrame created in
-  // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm(current_thread);
-  HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
-
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
-  }
-  VM_FiberGetOrSetLocal op(this, Handle(current_thread, fiber_obj),
-                           current_thread, depth, slot);
-  VMThread::execute(&op);
-
-  jvmtiError err = op.result();
-  if (err == JVMTI_ERROR_NONE) {
-    *value_ptr = op.value().l;
-  }
-  return err;
-} /* end GetFiberLocalObject */
-
-// depth - pre-checked as non-negative
-// value_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::GetFiberLocalInstance(jobject fiber, jint depth, jobject* value_ptr){
-  JavaThread* current_thread = JavaThread::current();
-  // rm object is created to clean up the javaVFrame created in
-  // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm(current_thread);
-  HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
-
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
-  }
-
-  VM_FiberGetReceiver op(this, Handle(current_thread, fiber_obj),
-                         current_thread, depth);
-  VMThread::execute(&op);
-
-  jvmtiError err = op.result();
-  if (err == JVMTI_ERROR_NONE) {
-    *value_ptr = op.value().l;
-  }
-  return err;
-} /* end GetFiberLocalInstance */
-
-// depth - pre-checked as non-negative
-// value_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::GetFiberLocalInt(jobject fiber, jint depth, jint slot, jint* value_ptr) {
-  JavaThread* current_thread = JavaThread::current();
-  // rm object is created to clean up the javaVFrame created in
-  // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm(current_thread);
-  HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
-
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
-  }
-
-  VM_FiberGetOrSetLocal op(this, Handle(current_thread, fiber_obj), depth, slot, T_INT);
-  VMThread::execute(&op);
-  *value_ptr = op.value().i;
-  return op.result();
-} /* end GetFiberLocalInt */
-
-// depth - pre-checked as non-negative
-// value_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::GetFiberLocalLong(jobject fiber, jint depth, jint slot, jlong* value_ptr) {
-  JavaThread* current_thread = JavaThread::current();
-  // rm object is created to clean up the javaVFrame created in
-  // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm(current_thread);
-  HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
-
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
-  }
-
-  VM_FiberGetOrSetLocal op(this, Handle(current_thread, fiber_obj), depth, slot, T_LONG);
-  VMThread::execute(&op);
-  *value_ptr = op.value().j;
-  return op.result();
-} /* end GetFiberLocalLong */
-
-// depth - pre-checked as non-negative
-// value_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::GetFiberLocalFloat(jobject fiber, jint depth, jint slot, jfloat* value_ptr) {
-  JavaThread* current_thread = JavaThread::current();
-  // rm object is created to clean up the javaVFrame created in
-  // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm(current_thread);
-  HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
-
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
-  }
-
-  VM_FiberGetOrSetLocal op(this, Handle(current_thread, fiber_obj), depth, slot, T_FLOAT);
-  VMThread::execute(&op);
-  *value_ptr = op.value().f;
-  return op.result();
-} /* end GetFiberLocalFloat */
-
-// depth - pre-checked as non-negative
-// value_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::GetFiberLocalDouble(jobject fiber, jint depth, jint slot, jdouble* value_ptr) {
-  JavaThread* current_thread = JavaThread::current();
-  // rm object is created to clean up the javaVFrame created in
-  // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm(current_thread);
-  HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
-
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
-    return JVMTI_ERROR_INVALID_FIBER;
-  }
-
-  VM_FiberGetOrSetLocal op(this, Handle(current_thread, fiber_obj), depth, slot, T_DOUBLE);
-  VMThread::execute(&op);
-  *value_ptr = op.value().d;
-  return op.result();
-} /* end GetFiberLocalDouble */
-
 
   //
   // Thread functions
@@ -1762,13 +1570,31 @@ JvmtiEnv::GetThreadGroupChildren(jthreadGroup group, jint* thread_count_ptr, jth
   //
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
 // max_frame_count - pre-checked to be greater than or equal to 0
 // frame_buffer - pre-checked for NULL
 // count_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetStackTrace(JavaThread* java_thread, jint start_depth, jint max_frame_count, jvmtiFrameInfo* frame_buffer, jint* count_ptr) {
+JvmtiEnv::GetStackTrace(jthread thread, jint start_depth, jint max_frame_count, jvmtiFrameInfo* frame_buffer, jint* count_ptr) {
   jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
+  HandleMark hm(current_thread);
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+
+  // Support for fibers
+  if (java_lang_Fiber::is_instance(thread_obj)) {
+    VM_FiberGetStackTrace op(this, Handle(current_thread, thread_obj),
+                             start_depth, max_frame_count, frame_buffer, count_ptr);
+    VMThread::execute(&op);
+    return op.result();
+  }
+
+  // Support for ordinary threads
+  ThreadsListHandle tlh(current_thread);
+  err = get_JavaThread(tlh, thread, &java_thread);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
 
   // It is only safe to perform the direct operation on the current
   // thread. All other usage needs to use a vm-safepoint-op for safety.
@@ -1823,11 +1649,28 @@ JvmtiEnv::GetThreadListStackTraces(jint thread_count, const jthread* thread_list
 
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
 // count_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetFrameCount(JavaThread* java_thread, jint* count_ptr) {
+JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
   jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
+  HandleMark hm(current_thread);
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+
+  // Support for fibers
+  if (java_lang_Fiber::is_instance(thread_obj)) {
+    VM_FiberGetFrameCount op(this, Handle(current_thread, thread_obj), count_ptr);
+    VMThread::execute(&op);
+    return op.result();
+  }
+
+  // Support for ordinary threads
+  ThreadsListHandle tlh(current_thread);
+  err = get_JavaThread(tlh, thread, &java_thread);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
 
   // retrieve or create JvmtiThreadState.
   JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread);
@@ -1956,14 +1799,31 @@ JvmtiEnv::PopFrame(JavaThread* java_thread) {
 
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
-// java_thread - unchecked
 // depth - pre-checked as non-negative
 // method_ptr - pre-checked for NULL
 // location_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetFrameLocation(JavaThread* java_thread, jint depth, jmethodID* method_ptr, jlocation* location_ptr) {
+JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jlocation* location_ptr) {
   jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
+  HandleMark hm(current_thread);
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+
+  // Support for fibers
+  if (java_lang_Fiber::is_instance(thread_obj)) {
+    VM_FiberGetFrameLocation op(this, Handle(current_thread, thread_obj),
+                                depth, method_ptr, location_ptr);
+    VMThread::execute(&op);
+    return op.result();
+  }
+
+  // Support for ordinary threads
+  ThreadsListHandle tlh(current_thread);
+  err = get_JavaThread(tlh, thread, &java_thread);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
 
   // It is only safe to perform the direct operation on the current
   // thread. All other usage needs to use a vm-safepoint-op for safety.
@@ -2261,122 +2121,231 @@ JvmtiEnv::IterateOverInstancesOfClass(oop k_mirror, jvmtiHeapObjectFilter object
   //
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
-// java_thread - unchecked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetLocalObject(JavaThread* java_thread, jint depth, jint slot, jobject* value_ptr) {
+JvmtiEnv::GetLocalObject(jthread thread, jint depth, jint slot, jobject* value_ptr) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
   JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
   ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+  VM_BaseGetOrSetLocal* op = NULL;
 
-  VM_GetOrSetLocal op(java_thread, current_thread, depth, slot);
-  VMThread::execute(&op);
-  jvmtiError err = op.result();
+  if (java_lang_Fiber::is_instance(thread_obj)) {
+    // Support for fibers
+    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+                                   current_thread, depth, slot);
+    VMThread::execute(op);
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh, thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    op = new VM_GetOrSetLocal(java_thread, current_thread, depth, slot);
+    VMThread::execute(op);
+  }
+  err = op->result();
   if (err == JVMTI_ERROR_NONE) {
-    *value_ptr = op.value().l;
+    *value_ptr = op->value().l;
   }
   return err;
 } /* end GetLocalObject */
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
-// java_thread - unchecked
 // depth - pre-checked as non-negative
 // value - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetLocalInstance(JavaThread* java_thread, jint depth, jobject* value_ptr){
+JvmtiEnv::GetLocalInstance(jthread thread, jint depth, jobject* value_ptr){
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
   JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
   ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+  VM_BaseGetOrSetLocal* op = NULL;
 
-  VM_GetReceiver op(java_thread, current_thread, depth);
-  VMThread::execute(&op);
-  jvmtiError err = op.result();
-  if (err == JVMTI_ERROR_NONE) {
-    *value_ptr = op.value().l;
+  if (java_lang_Fiber::is_instance(thread_obj)) {
+    // Support for fibers
+    op = new VM_FiberGetReceiver(this, Handle(current_thread, thread_obj),
+                                 current_thread, depth);
+    VMThread::execute(op);
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh, thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    op = new VM_GetReceiver(java_thread, current_thread, depth);
+    VMThread::execute(op);
+  }
+  err = op->result();
+  if (err == JVMTI_ERROR_NONE) { 
+    *value_ptr = op->value().l;
   }
   return err;
 } /* end GetLocalInstance */
 
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
-// java_thread - unchecked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetLocalInt(JavaThread* java_thread, jint depth, jint slot, jint* value_ptr) {
+JvmtiEnv::GetLocalInt(jthread thread, jint depth, jint slot, jint* value_ptr) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm;
+  ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+  VM_BaseGetOrSetLocal* op = NULL;
 
-  VM_GetOrSetLocal op(java_thread, depth, slot, T_INT);
-  VMThread::execute(&op);
-  *value_ptr = op.value().i;
-  return op.result();
+  if (java_lang_Fiber::is_instance(thread_obj)) {
+    // Support for fibers
+    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+                                   depth, slot, T_INT);
+    VMThread::execute(op);
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh, thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    op = new VM_GetOrSetLocal(java_thread, depth, slot, T_INT);
+    VMThread::execute(op);
+  }
+  err = op->result();
+  if (err == JVMTI_ERROR_NONE) {
+    *value_ptr = op->value().i;
+  }
+  return err;
 } /* end GetLocalInt */
 
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
-// java_thread - unchecked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetLocalLong(JavaThread* java_thread, jint depth, jint slot, jlong* value_ptr) {
+JvmtiEnv::GetLocalLong(jthread thread, jint depth, jint slot, jlong* value_ptr) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm;
+  ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+  VM_BaseGetOrSetLocal* op = NULL;
 
-  VM_GetOrSetLocal op(java_thread, depth, slot, T_LONG);
-  VMThread::execute(&op);
-  *value_ptr = op.value().j;
-  return op.result();
+  if (java_lang_Fiber::is_instance(thread_obj)) {
+    // Support for fibers
+    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+                                   depth, slot, T_LONG);
+    VMThread::execute(op);
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh, thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    op = new VM_GetOrSetLocal(java_thread, depth, slot, T_LONG);
+    VMThread::execute(op);
+  }
+  err = op->result();
+  if (err == JVMTI_ERROR_NONE) {
+    *value_ptr = op->value().j;
+  }
+  return err;
 } /* end GetLocalLong */
 
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
-// java_thread - unchecked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetLocalFloat(JavaThread* java_thread, jint depth, jint slot, jfloat* value_ptr) {
+JvmtiEnv::GetLocalFloat(jthread thread, jint depth, jint slot, jfloat* value_ptr) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm;
+  ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+  VM_BaseGetOrSetLocal* op = NULL;
 
-  VM_GetOrSetLocal op(java_thread, depth, slot, T_FLOAT);
-  VMThread::execute(&op);
-  *value_ptr = op.value().f;
-  return op.result();
+  if (java_lang_Fiber::is_instance(thread_obj)) {
+    // Support for fibers
+    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+                                   depth, slot, T_FLOAT);
+    VMThread::execute(op);
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh, thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    op = new VM_GetOrSetLocal(java_thread, depth, slot, T_FLOAT);
+    VMThread::execute(op);
+  }
+  err = op->result();
+  if (err == JVMTI_ERROR_NONE) {
+    *value_ptr = op->value().f;
+  }
+  return err;
 } /* end GetLocalFloat */
 
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
-// java_thread - unchecked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetLocalDouble(JavaThread* java_thread, jint depth, jint slot, jdouble* value_ptr) {
+JvmtiEnv::GetLocalDouble(jthread thread, jint depth, jint slot, jdouble* value_ptr) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm;
+  ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+  VM_BaseGetOrSetLocal* op = NULL;
 
-  VM_GetOrSetLocal op(java_thread, depth, slot, T_DOUBLE);
-  VMThread::execute(&op);
-  *value_ptr = op.value().d;
-  return op.result();
+  if (java_lang_Fiber::is_instance(thread_obj)) {
+    // Support for fibers
+    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+                                   depth, slot, T_DOUBLE);
+    VMThread::execute(op);
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh, thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    op = new VM_GetOrSetLocal(java_thread, depth, slot, T_DOUBLE);
+    VMThread::execute(op);
+  }
+  err = op->result();
+  if (err == JVMTI_ERROR_NONE) {
+    *value_ptr = op->value().d;
+  }
+  return err;
 } /* end GetLocalDouble */
 
-  //
-  // Fiber Local Variable functions
-  //
 
 // Threads_lock NOT held, java_thread not protected by lock
 // java_thread - pre-checked

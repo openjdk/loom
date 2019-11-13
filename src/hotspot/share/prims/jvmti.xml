@@ -2243,7 +2243,7 @@ jvmtiEnv *jvmti;
     <function id="IsFiber" num="105" since="14">
       <synopsis>Is Fiber</synopsis>
       <description>
-        Determines whether a thread object reference represents a fiber.
+        Determines whether a thread reference represents a fiber.
         The <code>jboolean</code> result is
         <code>JNI_TRUE</code> if the "thread" is actually a fiber,
         <code>JNI_FALSE</code> otherwise.
@@ -2253,10 +2253,10 @@ jvmtiEnv *jvmti;
         <required id="can_support_fibers">Can support fibers</required>
       </capabilities>
       <parameters>
-        <param id="object">
-          <jobject/>
+        <param id="thread">
+	  <jthread impl="noconvert"/>
             <description>
-              The object reference.
+              The thread reference.
             </description>
         </param>
         <param id="is_fiber_ptr">
@@ -2310,7 +2310,7 @@ jvmtiEnv *jvmti;
       </capabilities>
       <parameters>
         <param id="fiber">
-          <jobject />
+          <jthread impl="noconvert"/>
             <description>
               The fiber to query.
             </description>
@@ -2324,166 +2324,7 @@ jvmtiEnv *jvmti;
         </param>
       </parameters>
       <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
-          <paramlink id="fiber"></paramlink> is not a fiber.
-        </error>
-      </errors>
-    </function>
-
-    <function id="GetFiberStackTrace" num="118" since="14">
-      <synopsis>Get Fiber Stack Trace</synopsis>
-      <description>
-        Get information about the stack of a fiber.
-        If <paramlink id="max_frame_count"></paramlink> is less than the depth of the stack,
-        the <paramlink id="max_frame_count"></paramlink> topmost frames are returned,
-        otherwise the entire stack is returned.
-        The topmost frames, those most recently invoked, are at the beginning of the returned buffer.
-        <p/>
-        The <paramlink id="fiber"></paramlink> need not be suspended to call this function.
-        <p/>
-        The <functionlink id="GetLineNumberTable"></functionlink>
-        function can be used to map locations to line numbers. Note that
-        this mapping can be done lazily.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_support_fibers">Can support fibers</required>
-      </capabilities>
-      <parameters>
-        <param id="fiber">
-          <jobject />
-            <description>
-              Fetch the stack trace of this fiber.
-            </description>
-        </param>
-        <param id="start_depth">
-          <jint/>
-          <description>
-            Begin retrieving frames at this depth.
-            If non-negative, count from the current frame,
-            the first frame retrieved is at depth <code>start_depth</code>.
-            For example, if zero, start from the current frame; if one, start from the
-            caller of the current frame; if two, start from the caller of the
-            caller of the current frame; and so on.
-            If negative, count from below the oldest frame,
-            the first frame retrieved is at depth <i>stackDepth</i><code> + start_depth</code>,
-            where <i>stackDepth</i> is the count of frames on the stack.
-            For example, if negative one, only the oldest frame is retrieved;
-            if negative two, start from the frame called by the oldest frame.
-          </description>
-        </param>
-        <param id="max_frame_count">
-          <jint min="0"/>
-          <description>
-            The maximum number of <datalink id="jvmtiFrameInfo"/> records to retrieve.
-          </description>
-        </param>
-        <param id="frame_buffer">
-          <outbuf incount="max_frame_count" outcount="count_ptr">
-            <struct>jvmtiFrameInfo</struct>
-          </outbuf>
-            <description>
-              On return, this agent allocated buffer is filled
-              with stack frame information.
-            </description>
-        </param>
-        <param id="count_ptr">
-          <outptr><jint/></outptr>
-          <description>
-            On return, points to the number of records filled in.
-            For non-negative <code>start_depth</code>, this will be
-            min(<code>max_frame_count</code>, <i>stackDepth</i><code> - start_depth</code>).
-            For negative <code>start_depth</code>, this will be
-            min(<code>max_frame_count</code>, <code>-start_depth</code>).
-          </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
-          <paramlink id="fiber"></paramlink> is not a fiber.
-        </error>
-        <error id="JVMTI_ERROR_ILLEGAL_ARGUMENT">
-          <paramlink id="start_depth"/> is positive and greater than or equal to <i>stackDepth</i>.
-          Or <paramlink id="start_depth"/> is negative and less than <i>-stackDepth</i>.
-        </error>
-      </errors>
-    </function>
-
-    <function id="GetFiberFrameCount" num="119" since="14">
-      <synopsis>Get Fiber Frame Count</synopsis>
-      <description>
-        Get the number of frames currently in the specified fiber's call stack.
-        <p/>
-        If this function is called for a fiber actively executing bytecodes (for example,
-        not on the current or suspended thread), the information returned is transient.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_support_fibers">Can support fibers</required>
-      </capabilities>
-      <parameters>
-        <param id="fiber">
-          <jobject />
-            <description>
-              The fiber to query.
-            </description>
-        </param>
-        <param id="count_ptr">
-          <outptr><jint/></outptr>
-          <description>
-            On return, points to the number of frames in the call stack.
-          </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
-          <paramlink id="fiber"></paramlink> is not a fiber.
-        </error>
-      </errors>
-    </function>
-
-    <function id="GetFiberFrameLocation" num="141" since="14">
-      <synopsis>Get Fiber Frame Location</synopsis>
-      <description>
-        <p/>
-        For a Java programming language frame, return the location of the instruction
-        currently executing.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_support_fibers">Can support fibers</required>
-      </capabilities>
-      <parameters>
-        <param id="fiber">
-          <jobject frame="frame"/>
-          <description>
-            The fiber of the frame to query.
-          </description>
-        </param>
-        <param id="depth">
-          <jframeID fiber="fiber"/>
-          <description>
-            The depth of the frame to query.
-          </description>
-        </param>
-        <param id="method_ptr">
-          <outptr><jmethodID/></outptr>
-            <description>
-              On return, points to the method for the current location.
-            </description>
-        </param>
-        <param id="location_ptr">
-          <outptr><jlocation/></outptr>
-          <description>
-            On return, points to the index of the currently
-            executing instruction.
-            Is set to <code>-1</code> if the frame is executing
-            a native method.
-          </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
+        <error id="JVMTI_ERROR_INVALID_THREAD">
           <paramlink id="fiber"></paramlink> is not a fiber.
         </error>
       </errors>
@@ -2741,7 +2582,7 @@ if (err == JVMTI_ERROR_NONE &amp;&amp; count &gt;= 1) {
       </capabilities>
       <parameters>
         <param id="thread">
-	  <jthread null="current"/>
+	  <jthread null="current" impl="noconvert"/>
 	    <description>
 	      Fetch the stack trace of this thread.
 	    </description>
@@ -3025,7 +2866,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
 	<param id="thread">
-	  <jthread null="current"/>
+	  <jthread null="current" impl="noconvert"/>
 	    <description>
 	      The thread to query.
 	    </description>
@@ -3129,7 +2970,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
  	<param id="thread">
-	  <jthread null="current" frame="frame"/>
+	  <jthread null="current" frame="frame" impl="noconvert"/>
 	  <description>
 	    The thread of the frame to query.
 	  </description>
@@ -5951,7 +5792,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
  	<param id="thread">
-	  <jthread null="current" frame="frame"/>
+	  <jthread null="current" frame="frame" impl="noconvert"/>
 	  <description>
 	    The thread of the frame containing the variable's value.
 	  </description>
@@ -6004,7 +5845,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
  	<param id="thread">
-	  <jthread null="current" frame="frame"/>
+	  <jthread null="current" frame="frame" impl="noconvert"/>
 	  <description>
 	    The thread of the frame containing the variable's value.
 	  </description>
@@ -6042,7 +5883,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
  	<param id="thread">
-	  <jthread null="current" frame="frame"/>
+	  <jthread null="current" frame="frame" impl="noconvert"/>
 	  <description>
 	    The thread of the frame containing the variable's value.
 	  </description>
@@ -6094,7 +5935,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
  	<param id="thread">
-	  <jthread null="current" frame="frame"/>
+	  <jthread null="current" frame="frame" impl="noconvert"/>
 	  <description>
 	    The thread of the frame containing the variable's value.
 	  </description>
@@ -6143,7 +5984,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
  	<param id="thread">
-	  <jthread null="current" frame="frame"/>
+	  <jthread null="current" frame="frame" impl="noconvert"/>
 	  <description>
 	    The thread of the frame containing the variable's value.
 	  </description>
@@ -6192,7 +6033,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
  	<param id="thread">
-	  <jthread null="current" frame="frame"/>
+	  <jthread null="current" frame="frame" impl="noconvert"/>
 	  <description>
 	    The thread of the frame containing the variable's value.
 	  </description>
@@ -6481,332 +6322,6 @@ class C2 extends C1 implements I2 {
 	<error id="JVMTI_ERROR_OPAQUE_FRAME">
 	  Not a visible frame
 	</error>
-      </errors>
-    </function>
-  </category>
-
-  <category id="fiberlocal" label="Fiber Local Variable">
-
-    <intro>
-      These functions are used to retrieve or set the value of a Fiber local variable.
-      The variable is identified by the depth of the frame containing its
-      value and the variable's slot number within that frame.
-      The mapping of variables to slot numbers can be obtained with the function
-      <functionlink id="GetLocalVariableTable"></functionlink>.
-    </intro>
-
-    <function id="GetFiberLocalObject" num="157" since="14">
-      <synopsis>Get Fiber Local Variable - Object</synopsis>
-      <description>
-        This function can be used to retrieve the value of a Fiber local
-        variable whose type is <code>Object</code> or a subclass of <code>Object</code>.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_access_local_variables"></required>
-        <required id="can_support_fibers">Can support fibers</required>
-      </capabilities>
-      <parameters>
-        <param id="fiber">
-          <jobject />
-            <description>
-              The fiber to query.
-            </description>
-        </param>
-        <param id="depth">
-          <jframeID fiber="fiber"/>
-          <description>
-            The depth of the frame containing the variable's value.
-          </description>
-        </param>
-        <param id="slot">
-          <jint/>
-          <description>
-            The variable's slot number.
-          </description>
-        </param>
-        <param id="value_ptr">
-          <outptr><jobject/></outptr>
-            <description>
-              On return, points to the variable's value.
-            </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
-          <paramlink id="fiber"></paramlink> is not a fiber.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_SLOT">
-          Invalid <code>slot</code>.
-        </error>
-        <error id="JVMTI_ERROR_TYPE_MISMATCH">
-          The variable type is not
-          <code>Object</code> or a subclass of <code>Object</code>.
-        </error>
-        <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not a visible frame
-        </error>
-      </errors>
-    </function>
-
-    <function id="GetFiberLocalInstance" num="158" since="14">
-      <synopsis>Get Fiber Local Instance</synopsis>
-      <description>
-        This function can be used to retrieve the value of the Fiber local object
-        variable at slot 0 (the "<code>this</code>" object) from non-static
-        frames.  This function can retrieve the "<code>this</code>" object from
-        native method frames, whereas <code>GetFiberLocalObject()</code> would
-        return <code>JVMTI_ERROR_OPAQUE_FRAME</code> in those cases.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_access_local_variables"></required>
-        <required id="can_support_fibers">Can support fibers</required>
-      </capabilities>
-      <parameters>
-        <param id="fiber">
-          <jobject />
-            <description>
-              The fiber to query.
-            </description>
-        </param>
-        <param id="depth">
-          <jframeID fiber="fiber"/>
-          <description>
-            The depth of the frame containing the variable's value.
-          </description>
-        </param>
-        <param id="value_ptr">
-          <outptr><jobject/></outptr>
-            <description>
-              On return, points to the variable's value.
-            </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
-          <paramlink id="fiber"></paramlink> is not a fiber.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_SLOT">
-          If the specified frame is a static method frame.
-        </error>
-      </errors>
-    </function>
-
-    <function id="GetFiberLocalInt" num="159" since="14">
-      <synopsis>Get Fiber Local Variable - Int</synopsis>
-      <description>
-        This function can be used to retrieve the value of a Fiber local
-        variable whose type is <code>int</code>,
-        <code>short</code>, <code>char</code>, <code>byte</code>, or
-        <code>boolean</code>.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_access_local_variables"></required>
-        <required id="can_support_fibers">Can support fibers</required>
-      </capabilities>
-      <parameters>
-        <param id="fiber">
-          <jobject />
-            <description>
-              The fiber to query.
-            </description>
-        </param>
-        <param id="depth">
-          <jframeID fiber="fiber"/>
-          <description>
-            The depth of the frame containing the variable's value.
-          </description>
-        </param>
-        <param id="slot">
-          <jint/>
-          <description>
-            The variable's slot number.
-          </description>
-        </param>
-        <param id="value_ptr">
-          <outptr><jint/></outptr>
-          <description>
-            On return, points to the variable's value.
-          </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
-          <paramlink id="fiber"></paramlink> is not a fiber.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_SLOT">
-          Invalid <code>slot</code>.
-        </error>
-        <error id="JVMTI_ERROR_TYPE_MISMATCH">
-          The variable type is not
-          <code>int</code>, <code>short</code>,
-          <code>char</code>, <code>byte</code>, or
-          <code>boolean</code>.
-        </error>
-        <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not a visible frame
-        </error>
-      </errors>
-    </function>
-
-    <function id="GetFiberLocalLong" num="160" since="14">
-      <synopsis>Get Fiber Local Variable - Long</synopsis>
-      <description>
-        This function can be used to retrieve the value of a Fiber local
-        variable whose type is <code>long</code>.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_access_local_variables"></required>
-        <required id="can_support_fibers">Can support fibers</required>
-      </capabilities>
-      <parameters>
-        <param id="fiber">
-          <jobject />
-            <description>
-              The fiber to query.
-            </description>
-        </param>
-        <param id="depth">
-          <jframeID fiber="fiber"/>
-          <description>
-            The depth of the frame containing the variable's value.
-          </description>
-        </param>
-        <param id="slot">
-          <jint/>
-          <description>
-            The variable's slot number.
-          </description>
-        </param>
-        <param id="value_ptr">
-          <outptr><jlong/></outptr>
-          <description>
-            On return, points to the variable's value.
-          </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
-          <paramlink id="fiber"></paramlink> is not a fiber.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_SLOT">
-          Invalid <code>slot</code>.
-        </error>
-        <error id="JVMTI_ERROR_TYPE_MISMATCH">
-          The variable type is not <code>long</code>.
-        </error>
-        <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not a visible frame
-        </error>
-      </errors>
-    </function>
-
-    <function id="GetFiberLocalFloat" num="161" since="14">
-      <synopsis>Get Fiber Local Variable - Float</synopsis>
-      <description>
-        This function can be used to retrieve the value of a Fiber local
-        variable whose type is <code>float</code>.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_access_local_variables"></required>
-        <required id="can_support_fibers">Can support fibers</required>
-      </capabilities>
-      <parameters>
-        <param id="fiber">
-          <jobject />
-            <description>
-              The fiber to query.
-            </description>
-        </param>
-        <param id="depth">
-          <jframeID fiber="fiber"/>
-          <description>
-            The depth of the frame containing the variable's value.
-          </description>
-        </param>
-        <param id="slot">
-          <jint/>
-          <description>
-            The variable's slot number.
-          </description>
-        </param>
-        <param id="value_ptr">
-          <outptr><jfloat/></outptr>
-          <description>
-            On return, points to the variable's value.
-          </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
-          <paramlink id="fiber"></paramlink> is not a fiber.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_SLOT">
-          Invalid <code>slot</code>.
-        </error>
-        <error id="JVMTI_ERROR_TYPE_MISMATCH">
-          The variable type is not <code>float</code>.
-        </error>
-        <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not a visible frame
-        </error>
-      </errors>
-    </function>
-
-    <function id="GetFiberLocalDouble" num="162" since="14">
-      <synopsis>Get Fiber Local Variable - Double</synopsis>
-      <description>
-        This function can be used to retrieve the value of a Fiber local
-        variable whose type is <code>long</code>.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_access_local_variables"></required>
-        <required id="can_support_fibers">Can support fibers</required>
-      </capabilities>
-      <parameters>
-        <param id="fiber">
-          <jobject />
-            <description>
-              The fiber to query.
-            </description>
-        </param>
-        <param id="depth">
-          <jframeID fiber="fiber"/>
-          <description>
-            The depth of the frame containing the variable's value.
-          </description>
-        </param>
-        <param id="slot">
-          <jint/>
-          <description>
-            The variable's slot number.
-          </description>
-        </param>
-        <param id="value_ptr">
-          <outptr><jdouble/></outptr>
-          <description>
-            On return, points to the variable's value.
-          </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_FIBER">
-          <paramlink id="fiber"></paramlink> is not a fiber.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_SLOT">
-          Invalid <code>slot</code>.
-        </error>
-        <error id="JVMTI_ERROR_TYPE_MISMATCH">
-          The variable type is not <code>double</code>.
-        </error>
-        <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not a visible frame
-        </error>
       </errors>
     </function>
   </category>
@@ -10963,16 +10478,17 @@ myInit() {
           If this capability is enabled then the following functions can be called:
           <functionlink id="IsFiber"></functionlink>, 
           <functionlink id="GetThreadFiber"></functionlink>, 
-          <functionlink id="GetFiberThread"></functionlink>
-          <functionlink id="GetFiberStackTrace"></functionlink>
-          <functionlink id="GetFiberFrameCount"></functionlink>
-          <functionlink id="GetFiberFrameLocation"></functionlink>
-          <functionlink id="GetFiberLocalObject"></functionlink>
-          <functionlink id="GetFiberLocalInstance"></functionlink>
-          <functionlink id="GetFiberLocalInt"></functionlink>
-          <functionlink id="GetFiberLocalLong"></functionlink>
-          <functionlink id="GetFiberLocalFloat"></functionlink>
-          <functionlink id="GetFiberLocalDouble"></functionlink>
+          <functionlink id="GetFiberThread"></functionlink>,
+          the following functions can be called with a fiber thread reference:
+          <functionlink id="GetStackTrace"></functionlink>
+          <functionlink id="GetFrameCount"></functionlink>
+          <functionlink id="GetFrameLocation"></functionlink>
+          <functionlink id="GetLocalObject"></functionlink>
+          <functionlink id="GetLocalInstance"></functionlink>
+          <functionlink id="GetLocalInt"></functionlink>
+          <functionlink id="GetLocalLong"></functionlink>
+          <functionlink id="GetLocalFloat"></functionlink>
+          <functionlink id="GetLocalDouble"></functionlink>
           and the following events can be enabled:
           <eventlink id="FiberScheduled"></eventlink>,
           <eventlink id="FiberTerminated"></eventlink>,
@@ -12340,9 +11856,6 @@ myInit() {
       An implementation is not required to detect these errors.
     </intro>
 
-    <errorid id="JVMTI_ERROR_INVALID_FIBER" num="9">
-      The passed fiber is not a valid fiber.
-    </errorid>
     <errorid id="JVMTI_ERROR_INVALID_THREAD" num="10">
       The passed thread is not a valid thread.
     </errorid>
@@ -13354,7 +12867,7 @@ myInit() {
           </description>
       </param>
       <param id="fiber">
-        <jobject/>
+        <jthread/>
           <description>
             Fiber scheduled for execution.
           </description>
@@ -13389,7 +12902,7 @@ myInit() {
           </description>
       </param>
       <param id="fiber">
-        <jobject/>
+        <jthread/>
           <description>
             Fiber being terminated.
           </description>
@@ -13424,7 +12937,7 @@ myInit() {
           </description>
       </param>
       <param id="fiber">
-        <jobject/>
+        <jthread/>
           <description>
             Fiber that is mounted.
           </description>
@@ -13459,7 +12972,7 @@ myInit() {
           </description>
       </param>
       <param id="fiber">
-        <jobject/>
+        <jthread/>
           <description>
             Fiber that is unmounted.
           </description>
