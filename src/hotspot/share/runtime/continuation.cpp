@@ -3155,7 +3155,6 @@ JRT_ENTRY(int, Continuation::freeze(JavaThread* thread, FrameInfo* fi, bool from
   // We also clear thread->cont_fastpath in Deoptimize::deoptimize_single_frame and when we thaw interpreted frames
   bool fast = UseContinuationFastPath && thread->cont_fastpath() && !from_interpreter;
 
-  if (fast && monitors_on_stack(thread) != (thread->held_monitor_count() > 0)) { print_frames(thread, NULL); }
   assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
   fast = fast && thread->held_monitor_count() == 0;
   // tty->print_cr(">>> freeze fast: %d thread->cont_fastpath(): %d from_interpreter: %d", fast, thread->cont_fastpath(), from_interpreter);
