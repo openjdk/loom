@@ -1591,7 +1591,7 @@ JvmtiEnv::GetStackTrace(jthread thread, jint start_depth, jint max_frame_count, 
 
   // Support for ordinary threads
   ThreadsListHandle tlh(current_thread);
-  err = get_JavaThread(tlh, thread, &java_thread);
+  err = get_JavaThread(tlh.list(), thread, &java_thread);
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
@@ -1667,7 +1667,7 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
 
   // Support for ordinary threads
   ThreadsListHandle tlh(current_thread);
-  err = get_JavaThread(tlh, thread, &java_thread);
+  err = get_JavaThread(tlh.list(), thread, &java_thread);
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
@@ -1820,7 +1820,7 @@ JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jl
 
   // Support for ordinary threads
   ThreadsListHandle tlh(current_thread);
-  err = get_JavaThread(tlh, thread, &java_thread);
+  err = get_JavaThread(tlh.list(), thread, &java_thread);
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
@@ -2143,7 +2143,7 @@ JvmtiEnv::GetLocalObject(jthread thread, jint depth, jint slot, jobject* value_p
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
-    err = get_JavaThread(tlh, thread, &java_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
@@ -2180,7 +2180,7 @@ JvmtiEnv::GetLocalInstance(jthread thread, jint depth, jobject* value_ptr){
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
-    err = get_JavaThread(tlh, thread, &java_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
@@ -2218,7 +2218,7 @@ JvmtiEnv::GetLocalInt(jthread thread, jint depth, jint slot, jint* value_ptr) {
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
-    err = get_JavaThread(tlh, thread, &java_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
@@ -2256,7 +2256,7 @@ JvmtiEnv::GetLocalLong(jthread thread, jint depth, jint slot, jlong* value_ptr) 
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
-    err = get_JavaThread(tlh, thread, &java_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
@@ -2294,7 +2294,7 @@ JvmtiEnv::GetLocalFloat(jthread thread, jint depth, jint slot, jfloat* value_ptr
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
-    err = get_JavaThread(tlh, thread, &java_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
@@ -2332,7 +2332,7 @@ JvmtiEnv::GetLocalDouble(jthread thread, jint depth, jint slot, jdouble* value_p
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
-    err = get_JavaThread(tlh, thread, &java_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
