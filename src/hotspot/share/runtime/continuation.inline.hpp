@@ -30,10 +30,6 @@
 // #include "logging/log.hpp"
 #include "runtime/continuation.hpp"
 
-static bool requires_barriers(oop obj) {
-  return Universe::heap()->requires_barriers(obj);
-}
-
 #include CPU_HEADER_INLINE(continuationChunk)
 
 // template <class OopClosureType>

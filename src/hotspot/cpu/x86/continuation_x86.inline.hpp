@@ -1132,11 +1132,14 @@ static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
   st->print_cr("-------");
 }
 
+#ifndef PRODUCT
 static frame create_frame(intptr_t* sp) {
   address pc = *(address*)(sp - 1);
   intptr_t* fp = *(intptr_t**)(sp - 2);
   return frame(sp, fp, pc);
 }
+#endif
+
 static void fix_stack_chunk(oop chunk) {
   // see sender_for_compiled_frame  
   assert (ContMirror::is_stack_chunk(chunk), "");

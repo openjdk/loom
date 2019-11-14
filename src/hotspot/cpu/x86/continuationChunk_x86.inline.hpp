@@ -25,6 +25,7 @@
 #ifndef CPU_X86_CONTINUATION_CHUNK_X86_INLINE_HPP
 #define CPU_X86_CONTINUATION_CHUNK_X86_INLINE_HPP
 
+#include "memory/iterator.inline.hpp"
 #include "runtime/frame.inline.hpp"
 
 static inline void* reg_to_loc(VMReg reg, intptr_t* sp) {
@@ -55,7 +56,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
     // see sender_for_compiled_frame
 
   assert (Continuation::debug_is_stack_chunk(chunk), "");
-  log_develop_trace(jvmcont)("stack_chunk_iterate_stack young: %d", !requires_barriers(chunk));
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack requires_barriers: %d", !Universe::heap()->requires_barriers(chunk));
 
   int num_frames = 0;
   int num_oops = 0;

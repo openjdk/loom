@@ -122,44 +122,30 @@
 
     <event name="jdk.ContinuationIterateOops">
       <setting name="enabled">true</setting>
-      <setting name="stackTrace">false</setting>
-      <setting name="threshold">0 ms</setting>
     </event>
 
     <event name="jdk.ContinuationFreezeYoung">
       <setting name="enabled">true</setting>
-      <setting name="stackTrace">false</setting>
-      <setting name="threshold">0 ms</setting>
     </event>
 
     <event name="jdk.ContinuationFreezeOld">
       <setting name="enabled">true</setting>
-      <setting name="stackTrace">false</setting>
-      <setting name="threshold">0 ms</setting>
     </event>
 
     <event name="jdk.ContinuationSquash">
       <setting name="enabled">true</setting>
-      <setting name="stackTrace">false</setting>
-      <setting name="threshold">0 ms</setting>
     </event>
 
     <event name="jdk.ContinuationThawYoung">
       <setting name="enabled">true</setting>
-      <setting name="stackTrace">false</setting>
-      <setting name="threshold">0 ms</setting>
     </event>
 
     <event name="jdk.ContinuationThawOld">
       <setting name="enabled">true</setting>
-      <setting name="stackTrace">false</setting>
-      <setting name="threshold">0 ms</setting>
     </event>
 
     <event name="jdk.ContinuationFix">
       <setting name="enabled">true</setting>
-      <setting name="stackTrace">false</setting>
-      <setting name="threshold">0 ms</setting>
     </event>
     
     <event name="jdk.ReservedStackActivation">

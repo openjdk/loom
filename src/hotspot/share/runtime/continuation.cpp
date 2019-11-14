@@ -47,7 +47,7 @@
 #include "oops/weakHandle.hpp"
 #include "oops/weakHandle.inline.hpp"
 #include "prims/jvmtiThreadState.hpp"
-#include "runtime/continuation.hpp"
+#include "runtime/continuation.inline.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/frame.hpp"
@@ -338,6 +338,10 @@ DEBUG_ONLY(const char* StubF::name = "Stub";)
 
 static bool is_stub(CodeBlob* cb) {
   return cb != NULL && (cb->is_safepoint_stub() || cb->is_runtime_stub());
+}
+
+static bool requires_barriers(oop obj) {
+  return Universe::heap()->requires_barriers(obj);
 }
 
 enum op_mode {
@@ -2585,8 +2589,8 @@ public:
 
     PERFTEST_ONLY(if (PERFTEST_LEVEL <= 15) return freeze_ok;)
 
-    DEBUG_ONLY(int orig_max_size = _cont.max_size());
-    assert ((orig_max_size == 0) == _cont.is_empty(), "");
+    // DEBUG_ONLY(size_t orig_max_size = _cont.max_size());
+    assert ((_cont.max_size() == 0) == _cont.is_empty(), "");
 
     DEBUG_ONLY(int pre_chunk_size = _size; int pre_chunk_oops = _oops;)
 
@@ -3136,6 +3140,7 @@ static freeze_result is_pinned(const frame& f, const RegisterMap* map) {
   return freeze_ok;
 }
 
+#ifdef ASSERT
 static bool monitors_on_stack(JavaThread* thread) {
   oop cont = get_continuation(thread);
   RegisterMap map(thread, false, false, false); // should first argument be true?
@@ -3148,6 +3153,7 @@ static bool monitors_on_stack(JavaThread* thread) {
   }
   return false;
 }
+#endif
 
 JRT_ENTRY(int, Continuation::freeze(JavaThread* thread, FrameInfo* fi, bool from_interpreter))
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
@@ -5356,7 +5362,7 @@ public:
   template <bool use_compressed, bool is_modref, bool gencode, bool g1gc, bool use_chunks>
   static void resolve() {
     typedef Config<use_compressed, is_modref, gencode, g1gc, use_chunks> SelectedConfigT;
-    SelectedConfigT::print();
+    // SelectedConfigT::print();
 
     cont_freeze_fast    = SelectedConfigT::template freeze<mode_fast>;
     cont_freeze_slow    = SelectedConfigT::template freeze<mode_slow>;
