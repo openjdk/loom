@@ -2534,7 +2534,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
     // Slow path will re-enter here
     __ bind(lock_done);
-    __ inc_held_monitor_count(r15_thread);
+    // __ inc_held_monitor_count(r15_thread);
   }
 
 
@@ -2704,7 +2704,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     }
 
     __ bind(done);
-    __ dec_held_monitor_count(r15_thread);
+    // __ dec_held_monitor_count(r15_thread);
   }
   {
     SkipIfEqual skip(masm, &DTraceMethodProbes, false);

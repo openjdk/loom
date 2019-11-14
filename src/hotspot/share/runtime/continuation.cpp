@@ -3117,6 +3117,7 @@ int freeze0(JavaThread* thread, FrameInfo* fi) {
   thread->cont_frame()->sp = NULL;
   DEBUG_ONLY(thread->_continuation = NULL;)
   thread->set_cont_yield(false);
+  // thread->reset_held_monitor_count();
 
   log_develop_debug(jvmcont)("ENTRY: sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
   log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
@@ -3149,11 +3150,14 @@ static bool monitors_on_stack(JavaThread* thread) {
 }
 
 JRT_ENTRY(int, Continuation::freeze(JavaThread* thread, FrameInfo* fi, bool from_interpreter))
-  assert (monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
   // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
   // We also clear thread->cont_fastpath in Deoptimize::deoptimize_single_frame and when we thaw interpreted frames
-  bool fast = UseContinuationFastPath && thread->cont_fastpath() && !from_interpreter && thread->held_monitor_count() == 0;
+  bool fast = UseContinuationFastPath && thread->cont_fastpath() && !from_interpreter;
+
+  if (fast && monitors_on_stack(thread) != (thread->held_monitor_count() > 0)) { print_frames(thread, NULL); }
+  assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
+  fast = fast && thread->held_monitor_count() == 0;
   // tty->print_cr(">>> freeze fast: %d thread->cont_fastpath(): %d from_interpreter: %d", fast, thread->cont_fastpath(), from_interpreter);
   return fast ? freeze0<mode_fast>(thread, fi)
               : freeze0<mode_slow>(thread, fi);

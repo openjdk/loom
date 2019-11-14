@@ -1427,6 +1427,7 @@ void Deoptimization::pop_frames_failed_reallocs(JavaThread* thread, vframeArray*
       for (int j = 0; j < monitors->number_of_monitors(); j++) {
         BasicObjectLock* src = monitors->at(j);
         if (src->obj() != NULL) {
+          thread->dec_held_monitor_count();
           ObjectSynchronizer::exit(src->obj(), src->lock(), thread);
         }
       }

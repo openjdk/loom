@@ -1698,6 +1698,7 @@ void JavaThread::initialize() {
   _cont_preempt = false;
   _cont_fastpath = 0;
   memset(&_cont_frame, 0, sizeof(FrameInfo));
+  _held_monitor_count = 0;
     
   // Setup safepoint state info for this thread
   ThreadSafepointState::create(this);

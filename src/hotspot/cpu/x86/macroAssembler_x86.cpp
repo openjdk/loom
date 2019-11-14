@@ -1879,7 +1879,6 @@ void MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmpReg
   
   Label FAILED;
   jcc(Assembler::notZero, FAILED);
-  inc_held_monitor_count(r15_thread);
   testl (boxReg, 0);                      // set ICC.ZF=1 to indicate success
   bind(FAILED);
 }
@@ -2081,7 +2080,6 @@ void MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register tmpR
   jmpb  (DONE_LABEL);
 
   bind  (LSuccess);
-  dec_held_monitor_count(r15_thread);
   testl (boxReg, 0);                      // set ICC.ZF=1 to indicate success
   jmpb  (DONE_LABEL);
 

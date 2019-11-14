@@ -715,6 +715,7 @@ JRT_ENTRY_NO_ASYNC(void, Runtime1::monitorenter(JavaThread* thread, oopDesc* obj
   }
   assert(obj == lock->obj(), "must match");
   ObjectSynchronizer::enter(h_obj, lock->lock(), THREAD);
+  // thread->inc_held_monitor_count();
 JRT_END
 
 
@@ -728,6 +729,7 @@ JRT_LEAF(void, Runtime1::monitorexit(JavaThread* thread, BasicObjectLock* lock))
   oop obj = lock->obj();
   assert(oopDesc::is_oop(obj), "must be NULL or an object");
   ObjectSynchronizer::exit(obj, lock->lock(), THREAD);
+  // thread->dec_held_monitor_count();
 JRT_END
 
 // Cf. OptoRuntime::deoptimize_caller_frame
