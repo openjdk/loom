@@ -418,8 +418,6 @@ public:
   bool unload_nmethod_caches(bool class_unloading_occurred);
   virtual void do_unloading(bool unloading_occurred) = 0;
 
-  bool is_on_continuation_stack();
-
   oop* get_keepalive();
   oop* set_keepalive(oop* keepalive);
   bool clear_keepalive(oop* old);

@@ -260,7 +260,7 @@ inline void G1CollectedHeap::reset_evacuation_should_fail() {
 }
 #endif  // #ifndef PRODUCT
 
-inline bool G1CollectedHeap::is_in_young(const oop obj) {
+inline bool G1CollectedHeap::is_in_young(const oop obj) const {
   if (obj == NULL) {
     return false;
   }

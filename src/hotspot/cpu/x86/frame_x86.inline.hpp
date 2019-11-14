@@ -29,6 +29,7 @@
 #include "code/codeCache.inline.hpp"
 #include "code/vmreg.inline.hpp"
 #include "compiler/oopMap.inline.hpp"
+#include "interpreter/interpreter.hpp"
 #include "runtime/sharedRuntime.hpp"
 
 // Inline functions for Intel frames:
@@ -447,7 +448,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   if (sender_cb != NULL) {
     return frame(sender_sp, unextended_sp, sender_fp, sender_pc, sender_cb);
   }
-  // tty->print_cr(">>>> NO CB:"); print_on(tty);
+  // tty->print_cr(">>>> NO CB sender_pc: %p", sender_pc); os::print_location(tty, (intptr_t)sender_pc); print_on(tty);
   return frame(sender_sp, unextended_sp, sender_fp, sender_pc);
 }
 

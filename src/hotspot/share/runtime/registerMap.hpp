@@ -75,7 +75,8 @@ class RegisterMap : public StackObj {
   bool        _include_argument_oops;   // Should include argument_oop marked locations for compiler
   JavaThread* _thread;                  // Reference to current thread
   Handle      _cont;                    // The current continuation, if any
-  bool        _on_hstack;               // Whether we're on the h-stack
+  unsigned    _on_hstack : 1;           // Whether we're on the h-stack
+  unsigned    _in_chunk  : 1;           // Whether we're on an h-stack chunk
   intptr_t**  _last_vstack_fp;          // The location of the continuation entry frame's fp when walking h-stacks
 
   bool        _update_map;              // Tells if the register map need to be
@@ -138,11 +139,12 @@ class RegisterMap : public StackObj {
   bool validate_oops() const { return _validate_oops; }
   bool walk_cont()     const { return _walk_cont; }
 
-  bool in_cont()       const { return _on_hstack; } // Whether we are currently on the hstack
+  bool in_cont()       const { return (bool)_on_hstack; } // Whether we are currently on the hstack
+  bool in_chunk()      const { return (bool)_in_chunk; }
   oop  cont()          const { return _cont(); }
   void set_cont(oop cont);
   void set_cont(Handle cont);
-  void set_in_cont(bool on_hstack);
+  void set_in_cont(bool on_hstack, bool in_chunk);
   intptr_t** last_vstack_fp()            { return _last_vstack_fp; }
   void set_last_vstack_fp(intptr_t** fp) { _last_vstack_fp = fp; }
 

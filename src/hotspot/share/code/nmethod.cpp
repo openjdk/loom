@@ -39,6 +39,8 @@
 #include "compiler/directivesParser.hpp"
 #include "compiler/disassembler.hpp"
 #include "compiler/oopMap.inline.hpp"
+#include "gc/shared/barrierSet.hpp"
+#include "gc/shared/barrierSetNMethod.hpp"
 #include "interpreter/bytecode.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
@@ -620,6 +622,7 @@ nmethod::nmethod(
     // values something that will never match a pc like the nmethod vtable entry
     _exception_offset        = 0;
     _orig_pc_offset          = 0;
+    _marking_cycle           = 0;
 
     _consts_offset           = data_offset();
     _stub_offset             = data_offset();
@@ -1127,6 +1130,34 @@ void nmethod::mark_as_seen_on_stack() {
   set_stack_traversal_mark(NMethodSweeper::traversal_count());
 }
 
+void nmethod::mark_as_maybe_on_continuation() {
+  assert(is_alive(), "Must be an alive method");
+  _marking_cycle = CodeCache::marking_cycle();
+  BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+  if (bs_nm != NULL) {
+    bs_nm->disarm(this);
+  }
+}
+
+bool nmethod::is_not_on_continuation_stack() {
+  // Odd marking cycles are found during concurrent marking. Even numbers are found
+  // in nmethods that are marked when GC is inactive (e.g. nmethod entry barriers during
+  // normal execution). Therefore we align up by 2 so that nmethods encountered during
+  // concurrent marking are treated as if they were encountered in the inactive phase
+  // after that concurrent GC. Each GC increments the marking cycle twice - once when
+  // it starts and once when it ends. So we can only be sure there are no new continuations
+  // when they have not been encountered from before a GC to after a GC.
+  bool not_on_new_fiber_stack = CodeCache::marking_cycle() >= align_up(_marking_cycle, 2) + 2;
+
+  // As for old fiber stacks, they are kept alive by a WeakHandle.
+  bool not_on_old_fiber_stack = false;
+  if (_keepalive != NULL) {
+    WeakHandle<vm_nmethod_keepalive_data> wh = WeakHandle<vm_nmethod_keepalive_data>::from_raw(_keepalive);
+    not_on_old_fiber_stack = wh.resolve() == NULL;
+  }
+  return not_on_new_fiber_stack && not_on_old_fiber_stack;
+}
+
 // Tell if a non-entrant method can be converted to a zombie (i.e.,
 // there are no activations on the stack, not in use by the VM,
 // and not in use by the ServiceThread)
@@ -1143,7 +1174,7 @@ bool nmethod::can_convert_to_zombie() {
   // If an is_unloading() nmethod is still not_entrant, then it is not safe to
   // convert it to zombie due to GC unloading interactions. However, if it
   // has become unloaded, then it is okay to convert such nmethods to zombie.
-  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && !is_on_continuation_stack() &&
+  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && is_not_on_continuation_stack() &&
           !is_locked_by_vm() && (!is_unloading() || is_unloaded());
 }
 
@@ -1178,8 +1209,6 @@ bool nmethod::try_transition(int new_state_int) {
 }
 
 void nmethod::make_unloaded() {
-  assert(!is_on_continuation_stack(), "can't be on continuation stack");
-
   post_compiled_method_unload();
 
   // This nmethod is being unloaded, make sure that dependencies
@@ -1816,6 +1845,10 @@ void nmethod::do_unloading(bool unloading_occurred) {
   } else {
     guarantee(unload_nmethod_caches(unloading_occurred),
               "Should not need transition stubs");
+    BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+    if (bs_nm != NULL) {
+      bs_nm->disarm(this);
+    }
   }
 }
 

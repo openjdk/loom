@@ -145,6 +145,8 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
   // Increment the invocation count
   heap->increment_total_collections(true /* full */);
 
+  CodeCache::increment_marking_cycle();
+
   // Save information needed to minimize mangling
   heap->record_gen_tops_before_GC();
 
@@ -340,6 +342,8 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     }
 
     heap->resize_all_tlabs();
+
+    CodeCache::increment_marking_cycle();
 
     // We collected the heap, recalculate the metaspace capacity
     MetaspaceGC::compute_new_size();

@@ -25,6 +25,7 @@
 #include "precompiled.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetAssembler.hpp"
+#include "gc/shared/barrierSetNMethod.hpp"
 #include "runtime/thread.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/macros.hpp"
@@ -47,6 +48,20 @@ void BarrierSet::set_barrier_set(BarrierSet* barrier_set) {
   assert(!JavaThread::current()->on_thread_list(),
          "Main thread already on thread list.");
   _barrier_set->on_thread_create(Thread::current());
+  BarrierSetNMethod* bs_nm = barrier_set->barrier_set_nmethod();
+  Thread::current()->set_nmethod_disarm_value(bs_nm->disarmed_value());
+}
+
+BarrierSet::BarrierSet(BarrierSetAssembler* barrier_set_assembler,
+                       BarrierSetC1* barrier_set_c1,
+                       BarrierSetC2* barrier_set_c2,
+                       BarrierSetNMethod* barrier_set_nmethod,
+                       const FakeRtti& fake_rtti) :
+  _fake_rtti(fake_rtti),
+  _barrier_set_assembler(barrier_set_assembler),
+  _barrier_set_c1(barrier_set_c1),
+  _barrier_set_c2(barrier_set_c2),
+  _barrier_set_nmethod(barrier_set_nmethod != NULL ? barrier_set_nmethod : new BarrierSetNMethod()) {
 }
 
 // Called from init.cpp

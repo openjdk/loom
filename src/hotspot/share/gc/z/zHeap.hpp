@@ -146,6 +146,9 @@ public:
   uintptr_t remap_object(uintptr_t addr);
   void relocate();
 
+  // Continuations
+  bool is_allocating(uintptr_t addr) const;
+
   // Iteration
   void object_iterate(ObjectClosure* cl, bool visit_weaks);
   void pages_do(ZPageClosure* cl);

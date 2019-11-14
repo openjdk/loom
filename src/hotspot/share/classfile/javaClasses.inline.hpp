@@ -183,6 +183,12 @@ inline oop java_lang_Continuation::yieldInfo(oop ref) {
 inline void java_lang_Continuation::set_yieldInfo(oop ref, oop value) {
   ref->obj_field_put(_yieldInfo_offset, value);
 }
+inline oop java_lang_Continuation::tail(oop ref) {
+  return ref->obj_field(_tail_offset);
+}
+inline void java_lang_Continuation::set_tail(oop ref, oop value) {
+  ref->obj_field_put(_tail_offset, value);
+}
 inline typeArrayOop java_lang_Continuation::stack(oop ref) {
   oop a = ref->obj_field(_stack_offset);
   return (typeArrayOop)a;
@@ -280,6 +286,56 @@ inline void* java_lang_Continuation::stack_base(oop ref) {
 }
 inline HeapWord* java_lang_Continuation::refStack_base(oop ref) {
   return refStack(ref)->base();
+}
+
+inline oop jdk_internal_misc_StackChunk::parent(oop ref) {
+  return ref->obj_field(_parent_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_parent(oop ref, oop value) {
+  ref->obj_field_put(_parent_offset, value);
+}
+template<typename P>
+inline void jdk_internal_misc_StackChunk::set_parent_raw(oop ref, oop value) {
+  RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr_raw(_parent_offset), value);
+}
+inline int jdk_internal_misc_StackChunk::size(oop ref) {
+  return ref->int_field(_size_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_size(HeapWord* ref, int value) {
+  *(jint*)((oop)ref)->field_addr_raw(_size_offset) = value; // ref->int_field_put(_size_offset, value);
+}
+inline int jdk_internal_misc_StackChunk::sp(oop ref) {
+  return ref->int_field(_sp_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_sp(oop ref, int value) {
+  ref->int_field_put(_sp_offset, value);
+}
+inline int jdk_internal_misc_StackChunk::argsize(oop ref) {
+  return ref->int_field(_argsize_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_argsize(oop ref, int value) {
+  ref->int_field_put(_argsize_offset, value);
+}
+inline bool jdk_internal_misc_StackChunk::gc_mode(oop ref) {
+  return (uint64_t)ref->long_field(_mode_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_gc_mode(oop ref, bool value) {
+  ref->long_field_put(_mode_offset, (jboolean)value);
+}
+inline int jdk_internal_misc_StackChunk::end(oop ref) {
+  return size(ref) - argsize(ref);
+}
+inline int jdk_internal_misc_StackChunk::numFrames(oop ref) {
+  return ref->int_field(_numFrames_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_numFrames(oop ref, int value) {
+  ref->int_field_put(_numFrames_offset, value);
+}
+inline int jdk_internal_misc_StackChunk::numOops(oop ref) {
+  return ref->int_field(_numOops_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_numOops(oop ref, int value) {
+  ref->int_field_put(_numOops_offset, value);
 }
 
 inline void java_lang_invoke_CallSite::set_target_volatile(oop site, oop target) {

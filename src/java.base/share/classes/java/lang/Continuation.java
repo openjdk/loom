@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -126,6 +126,8 @@ public class Continuation {
     private final ContinuationScope scope;
     private Continuation parent; // null for native stack
     private Continuation child; // non-null when we're yielded in a child continuation
+
+    private jdk.internal.misc.StackChunk tail;
 
     // The content of the stack arrays is extremely security-sensitive. Writing can lead to arbitrary code execution, and reading can leak sensitive data
     private int[] stack = null; // grows down
@@ -380,7 +382,7 @@ public class Continuation {
     }
 
     private boolean isStarted() {
-        return stack != null && sp < stack.length;
+        return tail != null || (stack != null && sp < stack.length);
     }
 
     /**
@@ -457,6 +459,7 @@ public class Continuation {
             // this.sp = -1;
             // this.refStack = null;
             // this.refSP = -1;
+            this.tail = null;
         } else {
             if (TRACE && origRefSP < refSP)
                 System.out.println("Nulling refs " + origRefSP + " (inclusive) - " + refSP + " (exclusive)");

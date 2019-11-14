@@ -2374,7 +2374,13 @@ void PhaseMacroExpand::expand_lock_node(LockNode *lock) {
   Node *memproj = transform_later(new ProjNode(call, TypeFunc::Memory));
   mem_phi->init_req(1, memproj );
   transform_later(mem_phi);
-  _igvn.replace_node(_memproj_fallthrough, mem_phi);
+
+  Node* thread = transform_later(new ThreadLocalNode());
+  Node* count = make_load(region, mem_phi, thread, in_bytes(JavaThread::held_monitor_count_offset()), TypeInt::INT, TypeInt::INT->basic_type());
+  Node* newcount = transform_later(new AddINode(count, intcon(1)));
+  Node *store = make_store(region, mem_phi, thread, in_bytes(JavaThread::held_monitor_count_offset()), newcount, T_INT);
+
+  _igvn.replace_node(_memproj_fallthrough, store);
 }
 
 //------------------------------expand_unlock_node----------------------
@@ -2443,7 +2449,12 @@ void PhaseMacroExpand::expand_unlock_node(UnlockNode *unlock) {
   mem_phi->init_req(1, memproj );
   mem_phi->init_req(2, mem);
   transform_later(mem_phi);
-  _igvn.replace_node(_memproj_fallthrough, mem_phi);
+
+  Node* count = make_load(region, mem_phi, thread, in_bytes(JavaThread::held_monitor_count_offset()), TypeInt::INT, TypeInt::INT->basic_type());
+  Node* newcount = transform_later(new SubINode(count, intcon(1)));
+  Node *store = make_store(region, mem_phi, thread, in_bytes(JavaThread::held_monitor_count_offset()), newcount, T_INT);
+
+  _igvn.replace_node(_memproj_fallthrough, store);
 }
 
 //---------------------------eliminate_macro_nodes----------------------

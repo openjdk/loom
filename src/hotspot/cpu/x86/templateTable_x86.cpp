@@ -4461,6 +4461,10 @@ void TemplateTable::monitorenter() {
   __ save_bcp();  // in case of exception
   __ generate_stack_overflow_check(0);
 
+  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
+  NOT_LP64(get_thread(rthread);)
+  __ inc_held_monitor_count(rthread);
+
   // The bcp has already been incremented. Just need to dispatch to
   // next instruction.
   __ dispatch_next(vtos);
@@ -4517,6 +4521,11 @@ void TemplateTable::monitorexit() {
   __ bind(found);
   __ push_ptr(rax); // make sure object is on stack (contract with oopMaps)
   __ unlock_object(rtop);
+  
+  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
+  NOT_LP64(get_thread(rthread);)
+  __ dec_held_monitor_count(rthread);
+
   __ pop_ptr(rax); // discard object
 }
 

@@ -327,6 +327,65 @@ MetaWord* CollectedHeap::satisfy_failed_metadata_allocation(ClassLoaderData* loa
   } while (true);  // Until a GC is done
 }
 
+void CollectedHeap::collect_for_codecache() {
+  uint loop_count = 0;
+  uint gc_count = 0;
+  uint full_gc_count = 0;
+
+  assert(!Heap_lock->owned_by_self(), "Should not be holding the Heap_lock");
+
+  do {
+    if (GCLocker::is_active_and_needs_gc()) {
+      // If the GCLocker is active, just expand and allocate.
+      // If that does not succeed, wait if this thread is not
+      // in a critical section itself.
+      JavaThread* jthr = JavaThread::current();
+      if (!jthr->in_critical()) {
+        // Wait for JNI critical section to be exited
+        GCLocker::stall_until_clear();
+        // The GC invoked by the last thread leaving the critical
+        // section will be a young collection and a full collection
+        // is (currently) needed for unloading classes so continue
+        // to the next iteration to get a full GC.
+        continue;
+      } else {
+        if (CheckJNICalls) {
+          fatal("Possible deadlock due to allocating while"
+                " in jni critical section");
+        }
+        return;
+      }
+    }
+
+    {  // Need lock to get self consistent gc_count's
+      MutexLocker ml(Heap_lock);
+      gc_count      = Universe::heap()->total_collections();
+      full_gc_count = Universe::heap()->total_full_collections();
+    }
+
+    // Generate a VM operation
+    VM_CollectForCodeCacheAllocation op(gc_count,
+                                        full_gc_count,
+                                        GCCause::_metadata_GC_threshold);
+    VMThread::execute(&op);
+
+    // If GC was locked out, try again. Check before checking success because the
+    // prologue could have succeeded and the GC still have been locked out.
+    if (op.gc_locked()) {
+      continue;
+    }
+
+    if (op.prologue_succeeded()) {
+      return;
+    }
+    loop_count++;
+    if ((QueuedAllocationWarningCount > 0) &&
+        (loop_count % QueuedAllocationWarningCount == 0)) {
+      log_warning(gc, ergo)("collect_for_codecache() retries %d times", loop_count);
+    }
+  } while (true);  // Until a GC is done
+}
+
 MemoryUsage CollectedHeap::memory_usage() {
   return MemoryUsage(InitialHeapSize, used(), capacity(), max_capacity());
 }

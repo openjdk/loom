@@ -44,11 +44,12 @@ enum KlassID {
   InstanceRefKlassID,
   InstanceMirrorKlassID,
   InstanceClassLoaderKlassID,
+  InstanceStackChunkKlassID,
   TypeArrayKlassID,
   ObjArrayKlassID
 };
 
-const uint KLASS_ID_COUNT = 6;
+const uint KLASS_ID_COUNT = 7;
 
 //
 // A Klass provides:

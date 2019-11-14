@@ -2164,6 +2164,10 @@ bool G1CollectedHeap::try_collect(GCCause::Cause cause, bool retry_on_gc_failure
   return gc_succeeded;
 }
 
+bool G1CollectedHeap::requires_barriers(oop obj) const {
+  return !is_in_young(obj);
+}
+
 bool G1CollectedHeap::is_in(const void* p) const {
   if (_hrm->reserved().contains(p)) {
     // Given that we know that p is in the reserved space,

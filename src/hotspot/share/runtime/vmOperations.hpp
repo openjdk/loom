@@ -57,6 +57,7 @@
   template(HeapDumper)                            \
   template(DeoptimizeTheWorld)                    \
   template(CollectForMetadataAllocation)          \
+  template(CollectForCodeCacheAllocation)         \
   template(GC_HeapInspection)                     \
   template(GenCollectFull)                        \
   template(GenCollectFullConcurrent)              \

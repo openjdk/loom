@@ -53,6 +53,7 @@
 #include "oops/instanceClassLoaderKlass.hpp"
 #include "oops/instanceMirrorKlass.hpp"
 #include "oops/instanceRefKlass.hpp"
+#include "oops/instanceStackChunkKlass.hpp"
 #include "oops/methodData.hpp"
 #include "oops/objArrayKlass.hpp"
 #include "oops/objArrayOop.hpp"
@@ -660,6 +661,7 @@ void MetaspaceShared::rewrite_nofast_bytecodes_and_calculate_fingerprints(Instan
   f(InstanceClassLoaderKlass) \
   f(InstanceMirrorKlass) \
   f(InstanceRefKlass) \
+  f(InstanceStackChunkKlass) \
   f(Method) \
   f(ObjArrayKlass) \
   f(TypeArrayKlass)
@@ -925,6 +927,8 @@ void MetaspaceShared::patch_cpp_vtable_pointers() {
         CppVtableCloner<InstanceRefKlass>::patch(ik);
       } else if (ik->is_mirror_instance_klass()) {
         CppVtableCloner<InstanceMirrorKlass>::patch(ik);
+      } else if (ik->is_stack_chunk_instance_klass()) {
+        CppVtableCloner<InstanceStackChunkKlass>::patch(ik);
       } else {
         CppVtableCloner<InstanceKlass>::patch(ik);
       }

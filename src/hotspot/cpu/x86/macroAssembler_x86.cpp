@@ -1872,11 +1872,15 @@ void MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmpReg
   // most efficient "long" NOP encodings.
   // Unfortunately none of our alignment mechanisms suffice.
   bind(DONE_LABEL);
-
   // At DONE_LABEL the icc ZFlag is set as follows ...
   // Fast_Unlock uses the same protocol.
   // ZFlag == 1 -> Success
   // ZFlag == 0 -> Failure - force control through the slow-path
+  
+  Label FAILED;
+  jcc(Assembler::notZero, FAILED);
+  testl (boxReg, 0);                      // set ICC.ZF=1 to indicate success
+  bind(FAILED);
 }
 
 // obj: object to unlock
@@ -3497,6 +3501,18 @@ void MacroAssembler::get_cont_fastpath(Register java_thread, Register dst) {
 
 void MacroAssembler::set_cont_fastpath(Register java_thread, int32_t imm) {
   movl(Address(java_thread, JavaThread::cont_fastpath_offset()), imm);
+}
+
+void MacroAssembler::inc_held_monitor_count(Register java_thread) {
+  incrementl(Address(java_thread, JavaThread::held_monitor_count_offset()));
+}
+
+void MacroAssembler::dec_held_monitor_count(Register java_thread) {
+  decrementl(Address(java_thread, JavaThread::held_monitor_count_offset()));
+}
+
+void MacroAssembler::reset_held_monitor_count(Register java_thread) {
+  movl(Address(java_thread, JavaThread::held_monitor_count_offset()), (int32_t)0);
 }
 
 #ifdef ASSERT

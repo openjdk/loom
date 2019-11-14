@@ -23,7 +23,7 @@
  */
 
 #include "precompiled.hpp"
-#include "classfile/javaClasses.hpp"
+#include "classfile/javaClasses.inline.hpp"
 #include "gc/shared/allocTracer.hpp"
 #include "gc/shared/collectedHeap.hpp"
 #include "gc/shared/memAllocator.hpp"
@@ -428,5 +428,12 @@ oop ClassAllocator::initialize(HeapWord* mem) const {
   assert(_word_size > 0, "oop_size must be positive.");
   mem_clear(mem);
   java_lang_Class::set_oop_size(mem, (int)_word_size);
+  return finish(mem);
+}
+
+oop StackChunkAllocator::initialize(HeapWord* mem) const {
+  assert(_stack_size > 0, "");
+  assert(_word_size > (size_t)_stack_size, "");
+  jdk_internal_misc_StackChunk::set_size(mem, _stack_size);
   return finish(mem);
 }

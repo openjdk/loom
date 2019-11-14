@@ -35,6 +35,7 @@
 #include "code/pcDesc.hpp"
 #include "compiler/compilationPolicy.hpp"
 #include "compiler/compileBroker.hpp"
+#include "gc/shared/barrierSetNMethod.hpp"
 #include "jfr/jfrEvents.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
@@ -789,6 +790,7 @@ void CodeCache::purge_exception_caches() {
 }
 
 uint8_t CodeCache::_unloading_cycle = 1;
+uint64_t CodeCache::_marking_cycle = 0;
 
 void CodeCache::increment_unloading_cycle() {
   // 2-bit value (see IsUnloadingState in nmethod.cpp for details)
@@ -797,6 +799,12 @@ void CodeCache::increment_unloading_cycle() {
   if (_unloading_cycle == 0) {
     _unloading_cycle = 1;
   }
+}
+
+void CodeCache::increment_marking_cycle() {
+  ++_marking_cycle;
+  BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+  bs_nm->arm_all_nmethods();
 }
 
 CodeCache::UnloadingScope::UnloadingScope(BoolObjectClosure* is_alive)

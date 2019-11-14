@@ -280,6 +280,30 @@ void VM_CollectForMetadataAllocation::doit() {
   }
 }
 
+VM_CollectForCodeCacheAllocation::VM_CollectForCodeCacheAllocation(uint gc_count_before,
+                                                                   uint full_gc_count_before,
+                                                                   GCCause::Cause gc_cause)
+    : VM_GC_Operation(gc_count_before, gc_cause, full_gc_count_before, true) {
+}
+
+void VM_CollectForCodeCacheAllocation::doit() {
+  SvcGCMarker sgcm(SvcGCMarker::FULL);
+
+  CollectedHeap* heap = Universe::heap();
+  GCCauseSetter gccs(heap, _gc_cause);
+
+  log_debug(gc)("Full GC for CodeCache");
+
+  // Don't clear the soft refs yet.
+  heap->collect_as_vm_thread(GCCause::_metadata_GC_threshold);
+
+  log_debug(gc)("After GC for CodeCache");
+
+  if (GCLocker::is_active_and_needs_gc()) {
+    set_gc_locked();
+  }
+}
+
 VM_CollectForAllocation::VM_CollectForAllocation(size_t word_size, uint gc_count_before, GCCause::Cause cause)
     : VM_GC_Operation(gc_count_before, cause), _word_size(word_size), _result(NULL) {
   // Only report if operation was really caused by an allocation.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,6 +26,7 @@
 #define SHARE_VM_RUNTIME_CONTINUATION_HPP
 
 #include "oops/oopsHierarchy.hpp"
+#include "memory/iterator.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/globals.hpp"
 #include "jni.h"
@@ -113,9 +114,9 @@ public:
   // access frame data
   static bool is_in_usable_stack(address addr, const RegisterMap* map);
   static int usp_offset_to_index(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes);
-  static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes);
+  // static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes);
   static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes, bool is_oop);
-  static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg);
+  // static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg);
   static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop);
   static address reg_to_location(oop cont, const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop);
   static address interpreter_frame_expression_stack_at(const frame& fr, const RegisterMap* map, const InterpreterOopMap& oop_mask, int index);
@@ -127,6 +128,7 @@ public:
   static oop continuation_scope(oop cont);
   static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
 
+
 #ifndef PRODUCT
   static void describe(FrameValues &values);
 #endif
@@ -137,6 +139,31 @@ private:
   // declared here as it's used in friend declarations
   static address oop_address(objArrayOop ref_stack, int ref_sp, int index);
   static address oop_address(objArrayOop ref_stack, int ref_sp, address stack_address);
+
+  friend class InstanceStackChunkKlass;
+
+public:
+  template <class OopClosureType> static void stack_chunk_iterate_stack(oop obj, OopClosureType* closure);
+  template <class OopClosureType> static void stack_chunk_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
+
+// public:
+//   // for now, we don't devirtualize the closure for faster compilation
+//   static void stack_chunk_iterate_stack(oop obj, OopClosure* closure, bool do_metadata);
+//   static void stack_chunk_iterate_stack_bounded(oop obj, OopClosure* closure, bool do_metadata, MemRegion mr);
+
+private:
+  static void emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops);
+
+#ifdef ASSERT
+public:
+  static bool debug_is_stack_chunk(Klass* klass);
+  static bool debug_is_stack_chunk(oop obj);
+  static bool debug_verify_stack_chunk(oop chunk, oop cont = (oop)NULL);
+  static void debug_print_stack_chunk(oop obj);
+  static bool debug_is_continuation(Klass* klass);
+  static bool debug_is_continuation(oop obj);
+  static bool debug_verify_continuation(oop cont);
+#endif
 };
 
 void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls);

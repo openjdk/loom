@@ -79,7 +79,7 @@ inline oop* frame::oopmapreg_to_location(VMReg reg, const RegisterMapT* reg_map)
       return reinterpret_cast<oop*>((uintptr_t)Continuation::usp_offset_to_index(*this, reg_map->as_RegisterMap(), sp_offset_in_bytes));
     }
     address usp = (address)unextended_sp();
-    assert(reg_map->thread()->is_in_usable_stack(usp), INTPTR_FORMAT, p2i(usp)); 
+    assert(reg_map->thread() == NULL || reg_map->thread()->is_in_usable_stack(usp), INTPTR_FORMAT, p2i(usp)); 
     return (oop*)(usp + sp_offset_in_bytes);
   }
 }

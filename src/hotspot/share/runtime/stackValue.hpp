@@ -111,7 +111,7 @@ class StackValue : public ResourceObj {
 
   template<typename RegisterMapT>
   static StackValue* create_stack_value(const frame* fr, const RegisterMapT* reg_map, ScopeValue* sv) {
-    return create_stack_value(sv, stack_value_address(fr, reg_map, sv), reg_map->in_cont());
+    return create_stack_value(sv, stack_value_address(fr, reg_map, sv), reg_map->in_cont() && !reg_map->in_chunk());
   }
 
   template<typename RegisterMapT>

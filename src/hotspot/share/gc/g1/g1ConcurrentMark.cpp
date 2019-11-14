@@ -745,6 +745,8 @@ public:
 void G1ConcurrentMark::pre_initial_mark() {
   assert_at_safepoint_on_vm_thread();
 
+  CodeCache::increment_marking_cycle();
+
   // Reset marking state.
   reset();
 
@@ -1239,6 +1241,7 @@ void G1ConcurrentMark::remark() {
   _remark_times.add((now - start) * 1000.0);
 
   policy->record_concurrent_mark_remark_end();
+  CodeCache::increment_marking_cycle();
 }
 
 class G1ReclaimEmptyRegionsTask : public AbstractGangTask {

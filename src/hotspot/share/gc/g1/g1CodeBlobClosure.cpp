@@ -75,6 +75,7 @@ void G1CodeBlobClosure::MarkingOopClosure::do_oop(narrowOop* o) {
 
 void G1CodeBlobClosure::do_evacuation_and_fixup(nmethod* nm) {
   _oc.set_nm(nm);
+  nm->mark_as_maybe_on_continuation();
   nm->oops_do_keepalive(&_oc, _keepalive_is_strong);
   nm->fix_oop_relocations();
 }

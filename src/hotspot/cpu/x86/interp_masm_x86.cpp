@@ -1043,7 +1043,7 @@ void InterpreterMacroAssembler::remove_activation(
   const Register rmon    = LP64_ONLY(c_rarg1) NOT_LP64(rcx);
                               // monitor pointers need different register
                               // because rdx may have the result in it
-  NOT_LP64(get_thread(rcx);)
+  NOT_LP64(get_thread(rthread);)
 
   // get the value of _do_not_unlock_if_synchronized into rdx
   const Address do_not_unlock_if_synchronized(rthread,
@@ -1099,6 +1099,9 @@ void InterpreterMacroAssembler::remove_activation(
 
   bind(unlock);
   unlock_object(robj);
+  NOT_LP64(get_thread(rthread);)
+  dec_held_monitor_count(rthread);
+
   pop(state);
 
   // Check that for block-structured locking (i.e., that all locked
@@ -1301,7 +1304,6 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
     jcc(Assembler::zero, done);
 
     bind(slow_case);
-
     // Call the runtime routine for slow case
     call_VM(noreg,
             CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
@@ -1380,7 +1382,6 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
             lock_reg);
 
     bind(done);
-
     restore_bcp();
   }
 }

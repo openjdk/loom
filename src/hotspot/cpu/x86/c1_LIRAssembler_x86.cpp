@@ -466,7 +466,7 @@ int LIR_Assembler::emit_unwind_handler() {
 
   // Fetch the exception from TLS and clear out exception related thread state
   Register thread = NOT_LP64(rsi) LP64_ONLY(r15_thread);
-  NOT_LP64(__ get_thread(rsi));
+  NOT_LP64(__ get_thread(thread));
   __ movptr(rax, Address(thread, JavaThread::exception_oop_offset()));
   __ movptr(Address(thread, JavaThread::exception_oop_offset()), (intptr_t)NULL_WORD);
   __ movptr(Address(thread, JavaThread::exception_pc_offset()), (intptr_t)NULL_WORD);
@@ -484,6 +484,8 @@ int LIR_Assembler::emit_unwind_handler() {
     stub = new MonitorExitStub(FrameMap::rax_opr, true, 0);
     __ unlock_object(rdi, rsi, rax, *stub->entry());
     __ bind(*stub->continuation());
+    NOT_LP64(__ get_thread(thread);)
+    __ dec_held_monitor_count(thread);
   }
 
   if (compilation()->env()->dtrace_method_probes()) {
@@ -3530,6 +3532,17 @@ void LIR_Assembler::emit_lock(LIR_OpLock* op) {
     Unimplemented();
   }
   __ bind(*op->stub()->continuation());
+  
+  NOT_LP64(Register scratch = op->scratch_opr()->as_register();)
+  Register thread = LP64_ONLY(r15_thread) NOT_LP64(scratch);
+  NOT_LP64(__ get_thread(thread);)
+  if (op->code() == lir_lock) {
+    __ inc_held_monitor_count(thread);
+  } else if (op->code() == lir_unlock) {
+    __ dec_held_monitor_count(thread);
+  } else {
+    Unimplemented();
+  }
 }
 
 

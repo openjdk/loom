@@ -29,6 +29,10 @@
 *
 * @run testng/othervm -Xint -XX:-UseContinuationLazyCopy Basic
 * @run testng/othervm -Xint -XX:+UseContinuationLazyCopy Basic
+*
+* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
+* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
+*
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,Basic.manyArgsDriver -XX:-UseContinuationLazyCopy Basic
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,java/lang/Continuation.enter -XX:-UseContinuationLazyCopy Basic
@@ -36,8 +40,6 @@
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
-* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
 */
 
 /*
@@ -334,7 +336,7 @@ public class Basic {
         return Integer.parseInt(r)+1;
     }
     
-    public void testNotPinnedMonitor() {
+    private void testNotPinnedMonitor() {
         System.out.println("testNotPinnedMonitor");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
         
@@ -364,7 +366,7 @@ public class Basic {
         return Integer.parseInt(r)+1;
     }
 
-    public void testPinnedNative() {
+    private void testPinnedNative() {
         System.out.println("testPinnedNative");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
         
@@ -403,7 +405,7 @@ public class Basic {
         return "" + r;
     }
 
-    public void testPinnedCriticalSection() {
+    private void testPinnedCriticalSection() {
         System.out.println("testPinnedCriticalSection");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
         

@@ -660,6 +660,10 @@ void TemplateInterpreterGenerator::lock_method() {
   const Register lockreg = NOT_LP64(rdx) LP64_ONLY(c_rarg1);
   __ movptr(lockreg, rsp); // object address
   __ lock_object(lockreg);
+
+  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
+  NOT_LP64(get_thread(rthread);)
+  __ inc_held_monitor_count(rthread);
 }
 
 // Generate a fixed interpreter frame. This is identical setup for
@@ -733,6 +737,7 @@ address TemplateInterpreterGenerator::generate_Continuation_getSP_entry(void) {
   const Register thread1 = NOT_LP64(rdi) LP64_ONLY(r15_thread);
   NOT_LP64(__ get_thread(thread1));
   __ set_cont_fastpath(thread1, 1);
+  __ reset_held_monitor_count(thread1);
   __ lea(rax, Address(rsp, wordSize)); // skip return address
   __ ret(0);
 

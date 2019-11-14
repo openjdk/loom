@@ -317,6 +317,8 @@ CodeBlobClosure* NMethodSweeper::prepare_reset_hotness_counters() {
   */
 void NMethodSweeper::do_stack_scanning() {
   assert(!CodeCache_lock->owned_by_self(), "just checking");
+  // There are stacks in the heap that need to be scanned.
+  Universe::heap()->collect_for_codecache();
   if (wait_for_stack_scanning()) {
     if (ThreadLocalHandshakes) {
       CodeBlobClosure* code_cl;
@@ -673,7 +675,7 @@ NMethodSweeper::MethodStateChange NMethodSweeper::process_compiled_method(Compil
   SWEEP(cm);
 
   // Skip methods that are currently referenced by the VM
-  if (cm->is_locked_by_vm() || cm->is_on_continuation_stack()) {
+  if (cm->is_locked_by_vm()) {
     // But still remember to clean-up inline caches for alive nmethods
     if (cm->is_alive()) {
       // Clean inline caches that point to zombie/non-entrant/unloaded nmethods

@@ -28,14 +28,17 @@
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "logging/log.hpp"
+#include "oops/access.inline.hpp"
 #include "runtime/thread.hpp"
 #include "utilities/debug.hpp"
 
-int BarrierSetNMethod::disarmed_value() const {
-  char* disarmed_addr = reinterpret_cast<char*>(Thread::current());
-  disarmed_addr += in_bytes(thread_disarmed_offset());
-  return *reinterpret_cast<int*>(disarmed_addr);
-}
+class LoadPhantomOopClosure : public OopClosure {
+public:
+  virtual void do_oop(oop* p) {
+    NativeAccess<ON_PHANTOM_OOP_REF>::oop_load(p);
+  }
+  virtual void do_oop(narrowOop* p) { ShouldNotReachHere(); }
+};
 
 bool BarrierSetNMethod::supports_entry_barrier(nmethod* nm) {
   if (nm->method()->is_method_handle_intrinsic()) {
@@ -47,6 +50,44 @@ bool BarrierSetNMethod::supports_entry_barrier(nmethod* nm) {
   }
 
   return true;
+}
+
+bool BarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
+  LoadPhantomOopClosure cl;
+  nm->oops_do(&cl);
+  disarm(nm);
+
+  return true;
+}
+
+int BarrierSetNMethod::disarmed_value() const {
+  return _current_phase;
+}
+
+ByteSize BarrierSetNMethod::thread_disarmed_offset() const {
+  return Thread::nmethod_disarmed_offset();
+}
+
+class BarrierSetNMethodArmClosure : public ThreadClosure {
+private:
+  int _disarm_value;
+
+public:
+  BarrierSetNMethodArmClosure(int disarm_value) :
+    _disarm_value(disarm_value) { }
+
+  virtual void do_thread(Thread* thread) {
+    thread->set_nmethod_disarm_value(_disarm_value);
+  }
+};
+
+void BarrierSetNMethod::arm_all_nmethods() {
+  ++_current_phase;
+  if (_current_phase == 4) {
+    _current_phase = 1;
+  }
+  BarrierSetNMethodArmClosure cl(_current_phase);
+  Threads::threads_do(&cl);
 }
 
 int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {
