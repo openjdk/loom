@@ -710,6 +710,12 @@ class Thread implements Runnable {
         Builder priority(int priority);
 
         /**
+         * The thread is <em>managed.</em>
+         * @return this builder
+         */
+        Builder managed();
+
+        /**
          * Sets the target object for the thread to run.
          * @param target the target object
          * @return this builder
@@ -849,6 +855,12 @@ class Thread implements Runnable {
             if (priority < Thread.MIN_PRIORITY || priority > Thread.MAX_PRIORITY)
                 throw new IllegalArgumentException();
             this.priority = priority;
+            return this;
+        }
+
+        @Override
+        public Builder managed() {
+            // TDB
             return this;
         }
 
@@ -1337,8 +1349,15 @@ class Thread implements Runnable {
      */
     public static final int INHERIT_THREAD_LOCALS = 1 << 2;
 
+    /**
+     * Characteristic value signifying that the thread is <em>managed.</em>
+     *
+     * @since 99
+     */
+    public static final int MANAGED = 1 << 3;
+
     private static int validCharacteristics() {
-        return (LIGHTWEIGHT | NO_THREAD_LOCALS | INHERIT_THREAD_LOCALS);
+        return (LIGHTWEIGHT | NO_THREAD_LOCALS | INHERIT_THREAD_LOCALS | MANAGED);
     }
 
     private static void checkCharacteristics(int characteristics) {
@@ -1356,7 +1375,7 @@ class Thread implements Runnable {
      *
      * By default, the thread is scheduled by the operating system, supports
      * {@link ThreadLocal thread-locals}, and does not inherit any initial values
-     * for {@link InheritableThreadLocal inhertiable-thread-locals}.
+     * for {@link InheritableThreadLocal inheritable-thread-locals}.
      * The {@link ThreadGroup ThreadGroup}, {@link #isDaemon() daemon status},
      * {@link #getPriority() priority}, and the {@link #getContextClassLoader()
      * context-class-loader} are inherited from the current thread.
@@ -1388,7 +1407,7 @@ class Thread implements Runnable {
      *
      * By default, the thread is scheduled by the operating system, supports
      * {@link ThreadLocal thread-locals}, and does not inherit any initial values
-     * for {@link InheritableThreadLocal inhertiable-thread-locals}.
+     * for {@link InheritableThreadLocal inheritable-thread-locals}.
      * The {@link ThreadGroup ThreadGroup}, {@link #isDaemon() daemon status},
      * {@link #getPriority() priority}, and the {@link #getContextClassLoader()
      * context-class-loader} are inherited from the current thread.
