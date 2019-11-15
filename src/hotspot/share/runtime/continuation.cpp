@@ -3400,6 +3400,8 @@ public:
   bool thaw(FrameInfo* fi, int num_frames) {
     _fi = fi;
 
+    if (Interpreter::contains(_cont.entryPC())) _fastpath = false; // set _fastpath to false if entry is interpreted
+
     assert (verify_continuation<1>(_cont.mirror()), "");
 
     assert (!_map.include_argument_oops(), "should be");
@@ -3653,7 +3655,6 @@ public:
     PERFTEST_ONLY(if (PERFTEST_LEVEL <= 115) return;)
 
     entry = new_entry_frame();
-    if (entry.is_interpreted_frame()) _fastpath = false; // set _fastpath if entry is interpreted ?
 
     assert (entry.sp() == _cont.entrySP(), "entry.sp: %p entrySP: %p", entry.sp(), _cont.entrySP());
     // assert (Interpreter::contains(_cont.entryPC()) 
