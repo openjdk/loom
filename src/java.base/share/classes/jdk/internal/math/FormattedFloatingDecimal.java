@@ -51,7 +51,7 @@ public class FormattedFloatingDecimal{
             };
 
     private static char[] getBuffer(){
-        if (Thread.currentThread().isLightweight()) {
+        if (Thread.currentThread().isVirtual()) {
             return new char[20];
         } else {
             return threadLocalCharBuffer.get();

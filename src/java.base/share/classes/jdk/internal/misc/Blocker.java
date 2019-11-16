@@ -50,7 +50,7 @@ public class Blocker {
     }
 
     public static <X extends Throwable> void runBlocking(BlockingRunnable<X> task) throws X {
-        if (Thread.currentThread().isLightweight()) {
+        if (Thread.currentThread().isVirtual()) {
             Callable<?> wrapper = () -> {
                 try {
                     task.run();
@@ -66,7 +66,7 @@ public class Blocker {
     }
 
     public static <V, X extends Throwable> V runBlocking(BlockingCallable<V, X> task) throws X {
-        if (Thread.currentThread().isLightweight()) {
+        if (Thread.currentThread().isVirtual()) {
             Callable<V> wrapper = () -> {
                 try {
                     return task.call();

@@ -616,7 +616,7 @@ class SocketChannelImpl
      */
     private void configureNonBlockingIfNeeded() throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
-        if (!nonBlocking && Thread.currentThread().isLightweight()) {
+        if (!nonBlocking && Thread.currentThread().isVirtual()) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
@@ -931,8 +931,8 @@ class SocketChannelImpl
                 long reader = readerThread;
                 long writer = writerThread;
                 if (reader != 0 || writer != 0) {
-                    if (NativeThread.isLightweightThread(reader)
-                            || NativeThread.isLightweightThread(writer)) {
+                    if (NativeThread.isVirtualThread(reader)
+                            || NativeThread.isVirtualThread(writer)) {
                         Poller.stopPoll(fdVal);
                     }
                     nd.preClose(fd);
@@ -1020,7 +1020,7 @@ class SocketChannelImpl
             if (!isInputClosed) {
                 Net.shutdown(fd, Net.SHUT_RD);
                 long reader = readerThread;
-                if (NativeThread.isLightweightThread(reader)) {
+                if (NativeThread.isVirtualThread(reader)) {
                     Poller.stopPoll(fdVal, Net.POLLIN);
                 } else if (NativeThread.isKernelThread(reader)) {
                     NativeThread.signal(reader);
@@ -1040,7 +1040,7 @@ class SocketChannelImpl
             if (!isOutputClosed) {
                 Net.shutdown(fd, Net.SHUT_WR);
                 long writer = writerThread;
-                if (NativeThread.isLightweightThread(writer)) {
+                if (NativeThread.isVirtualThread(writer)) {
                     Poller.stopPoll(fdVal, Net.POLLOUT);
                 } else if (NativeThread.isKernelThread(writer)) {
                     NativeThread.signal(writer);

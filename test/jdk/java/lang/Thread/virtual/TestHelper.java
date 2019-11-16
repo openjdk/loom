@@ -24,7 +24,7 @@
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Runs tasks in lightweight threads.
+ * Runs tasks in virtual threads.
  */
 
 class TestHelper {
@@ -36,7 +36,7 @@ class TestHelper {
     private static void run(String name, int characteristics, ThrowingRunnable task)
         throws Exception
     {
-        characteristics |= Thread.LIGHTWEIGHT;
+        characteristics |= Thread.VIRTUAL;
         AtomicReference<Exception> exc = new AtomicReference<>();
         Runnable target =  () -> {
             try {
@@ -61,19 +61,19 @@ class TestHelper {
         }
     }
 
-    static void runInLightweightThread(String name, int characteristics, ThrowingRunnable task)
+    static void runInVirtualThread(String name, int characteristics, ThrowingRunnable task)
         throws Exception
     {
         run(name, characteristics, task);
     }
 
-    static void runInLightweightThread(int characteristics, ThrowingRunnable task)
+    static void runInVirtualThread(int characteristics, ThrowingRunnable task)
         throws Exception
     {
         run(null, characteristics, task);
     }
 
-    static void runInLightweightThread(ThrowingRunnable task) throws Exception {
+    static void runInVirtualThread(ThrowingRunnable task) throws Exception {
         run(null, 0, task);
     }
 

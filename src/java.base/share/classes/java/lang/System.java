@@ -2306,15 +2306,15 @@ public final class System {
                 local.setCarrierThreadLocal(value);
             }
 
-            public void parkLightweightThread() {
+            public void parkVirtualThread() {
                 Fiber.park();
             }
 
-            public void parkLightweightThread(long nanos) {
+            public void parkVirtualThread(long nanos) {
                 Fiber.parkNanos(nanos);
             }
 
-            public void unparkLightweightThread(Thread thread) {
+            public void unparkVirtualThread(Thread thread) {
                 ((Fiber) thread).unpark();
             }
         });

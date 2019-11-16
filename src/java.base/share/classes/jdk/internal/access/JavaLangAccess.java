@@ -343,17 +343,17 @@ public interface JavaLangAccess {
     <T> void setCarrierThreadLocal(ThreadLocal<T> local, T value);
 
     /**
-     * Parks the current lightweight thread.
+     * Parks the current virtual thread.
      */
-    void parkLightweightThread();
+    void parkVirtualThread();
 
     /**
-     * Parks the current lightweight thread.for up to the given waiting time.
+     * Parks the current virtual thread.for up to the given waiting time.
      */
-    void parkLightweightThread(long nanos);
+    void parkVirtualThread(long nanos);
 
     /**
-     * Unparks the given lightweight thread.
+     * Unparks the given virtual thread.
      */
-    void unparkLightweightThread(Thread thread);
+    void unparkVirtualThread(Thread thread);
 }

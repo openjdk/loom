@@ -37,7 +37,7 @@ package java.util.concurrent.locks;
 
 import java.util.concurrent.TimeUnit;
 
-import jdk.internal.misc.LightweightThreads;
+import jdk.internal.misc.VirtualThreads;
 import jdk.internal.misc.Unsafe;
 
 /**
@@ -177,8 +177,8 @@ public class LockSupport {
      */
     public static void unpark(Thread thread) {
         if (thread != null) {
-            if (thread.isLightweight()) {
-                LightweightThreads.unpark(thread); // can throw RejectedExecutionException
+            if (thread.isVirtual()) {
+                VirtualThreads.unpark(thread); // can throw RejectedExecutionException
             } else {
                 U.unpark(thread);
             }
@@ -216,8 +216,8 @@ public class LockSupport {
     public static void park(Object blocker) {
         Thread t = Thread.currentThread();
         setBlocker(t, blocker);
-        if (t.isLightweight()) {
-            LightweightThreads.park();
+        if (t.isVirtual()) {
+            VirtualThreads.park();
         } else {
             U.park(false, 0L);
         }
@@ -261,8 +261,8 @@ public class LockSupport {
         if (nanos > 0) {
             Thread t = Thread.currentThread();
             setBlocker(t, blocker);
-            if (t.isLightweight()) {
-                LightweightThreads.park(nanos);
+            if (t.isVirtual()) {
+                VirtualThreads.park(nanos);
             } else {
                 U.park(false, nanos);
             }
@@ -306,10 +306,10 @@ public class LockSupport {
     public static void parkUntil(Object blocker, long deadline) {
         Thread t = Thread.currentThread();
         setBlocker(t, blocker);
-        if (t.isLightweight()) {
+        if (t.isVirtual()) {
             long millis = deadline - System.currentTimeMillis();
             long nanos = TimeUnit.NANOSECONDS.convert(millis, TimeUnit.MILLISECONDS);
-            LightweightThreads.park(nanos);
+            VirtualThreads.park(nanos);
         } else {
             U.park(true, deadline);
         }
@@ -360,8 +360,8 @@ public class LockSupport {
      * for example, the interrupt status of the thread upon return.
      */
     public static void park() {
-        if (Thread.currentThread().isLightweight()) {
-            LightweightThreads.park();
+        if (Thread.currentThread().isVirtual()) {
+            VirtualThreads.park();
         } else {
             U.park(false, 0L);
         }
@@ -399,8 +399,8 @@ public class LockSupport {
      */
     public static void parkNanos(long nanos) {
         if (nanos > 0) {
-            if (Thread.currentThread().isLightweight()) {
-                LightweightThreads.park(nanos);
+            if (Thread.currentThread().isVirtual()) {
+                VirtualThreads.park(nanos);
             } else {
                 U.park(false, nanos);
             }
@@ -438,10 +438,10 @@ public class LockSupport {
      *        to wait until
      */
     public static void parkUntil(long deadline) {
-        if (Thread.currentThread().isLightweight()) {
+        if (Thread.currentThread().isVirtual()) {
             long millis = deadline - System.currentTimeMillis();
             long nanos = TimeUnit.NANOSECONDS.convert(millis, TimeUnit.MILLISECONDS);
-            LightweightThreads.park(nanos);
+            VirtualThreads.park(nanos);
         } else {
             U.park(true, deadline);
         }

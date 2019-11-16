@@ -44,8 +44,8 @@ public class BuilderTest {
 
         // build
         AtomicBoolean done1 = new AtomicBoolean();
-        Thread thread1 = builder.target(() -> done1.set(true)).build();
-        assertFalse(thread1.isLightweight());
+        Thread thread1 = builder.task(() -> done1.set(true)).build();
+        assertFalse(thread1.isVirtual());
         assertTrue(thread1.getState() == Thread.State.NEW);
         assertFalse(thread1.getName().isEmpty());
         assertTrue(thread1.getThreadGroup() == parent.getThreadGroup());
@@ -58,8 +58,8 @@ public class BuilderTest {
 
         // start
         AtomicBoolean done2 = new AtomicBoolean();
-        Thread thread2 = builder.target(() -> done2.set(true)).start();
-        assertFalse(thread2.isLightweight());
+        Thread thread2 = builder.task(() -> done2.set(true)).start();
+        assertFalse(thread2.isVirtual());
         assertTrue(thread2.getState() != Thread.State.NEW);
         assertFalse(thread2.getName().isEmpty());
         assertTrue(thread2.getThreadGroup() == parent.getThreadGroup());
@@ -72,7 +72,7 @@ public class BuilderTest {
         // factory
         AtomicBoolean done3 = new AtomicBoolean();
         Thread thread3 = builder.factory().newThread(() -> done3.set(true));
-        assertFalse(thread3.isLightweight());
+        assertFalse(thread3.isVirtual());
         assertTrue(thread3.getState() == Thread.State.NEW);
         assertFalse(thread3.getName().isEmpty());
         assertTrue(thread3.getThreadGroup() == parent.getThreadGroup());
@@ -87,12 +87,12 @@ public class BuilderTest {
     // virtual thread
     public void testVirtualThread1() throws Exception {
         Thread parent = Thread.currentThread();
-        Thread.Builder builder = Thread.builder().lightweight();
+        Thread.Builder builder = Thread.builder().virtual();
 
         // build
         AtomicBoolean done1 = new AtomicBoolean();
-        Thread thread1 = builder.target(() -> done1.set(true)).build();
-        assertTrue(thread1.isLightweight());
+        Thread thread1 = builder.task(() -> done1.set(true)).build();
+        assertTrue(thread1.isVirtual());
         assertTrue(thread1.getState() == Thread.State.NEW);
         assertTrue(thread1.getName().isEmpty());
         assertTrue(thread1.getContextClassLoader() == parent.getContextClassLoader());
@@ -104,8 +104,8 @@ public class BuilderTest {
 
         // start
         AtomicBoolean done2 = new AtomicBoolean();
-        Thread thread2 = builder.target(() -> done2.set(true)).start();
-        assertTrue(thread2.isLightweight());
+        Thread thread2 = builder.task(() -> done2.set(true)).start();
+        assertTrue(thread2.isVirtual());
         assertTrue(thread2.getState() != Thread.State.NEW);
         assertTrue(thread2.getName().isEmpty());
         assertTrue(thread2.getContextClassLoader() == parent.getContextClassLoader());
@@ -117,7 +117,7 @@ public class BuilderTest {
         // factory
         AtomicBoolean done3 = new AtomicBoolean();
         Thread thread3 = builder.factory().newThread(() -> done3.set(true));
-        assertTrue(thread3.isLightweight());
+        assertTrue(thread3.isVirtual());
         assertTrue(thread3.getState() == Thread.State.NEW);
         assertTrue(thread3.getName().isEmpty());
         assertTrue(thread3.getContextClassLoader() == parent.getContextClassLoader());
@@ -132,8 +132,8 @@ public class BuilderTest {
     public void testName1() {
         Thread.Builder builder = Thread.builder().name("duke");
 
-        Thread thread1 = builder.target(() -> { }).build();
-        Thread thread2 = builder.target(() -> { }).start();
+        Thread thread1 = builder.task(() -> { }).build();
+        Thread thread2 = builder.task(() -> { }).start();
         Thread thread3 = builder.factory().newThread(() -> { });
 
         assertTrue(thread1.getName().equals("duke"));
@@ -142,10 +142,10 @@ public class BuilderTest {
     }
 
     public void testName2() {
-        Thread.Builder builder = Thread.builder().lightweight().name("duke");
+        Thread.Builder builder = Thread.builder().virtual().name("duke");
 
-        Thread thread1 = builder.target(() -> { }).build();
-        Thread thread2 = builder.target(() -> { }).start();
+        Thread thread1 = builder.task(() -> { }).build();
+        Thread thread2 = builder.task(() -> { }).start();
         Thread thread3 = builder.factory().newThread(() -> { });
 
         assertTrue(thread1.getName().equals("duke"));
@@ -156,9 +156,9 @@ public class BuilderTest {
     public void testName3() {
         Thread.Builder builder = Thread.builder().name("duke-", 100);
 
-        Thread thread1 = builder.target(() -> { }).build();
-        Thread thread2 = builder.target(() -> { }).build();
-        Thread thread3 = builder.target(() -> { }).build();
+        Thread thread1 = builder.task(() -> { }).build();
+        Thread thread2 = builder.task(() -> { }).build();
+        Thread thread3 = builder.task(() -> { }).build();
 
         assertTrue(thread1.getName().equals("duke-100"));
         assertTrue(thread2.getName().equals("duke-101"));
@@ -175,11 +175,11 @@ public class BuilderTest {
     }
 
     public void testName4() {
-        Thread.Builder builder = Thread.builder().lightweight().name("duke-", 100);
+        Thread.Builder builder = Thread.builder().virtual().name("duke-", 100);
 
-        Thread thread1 = builder.target(() -> { }).build();
-        Thread thread2 = builder.target(() -> { }).build();
-        Thread thread3 = builder.target(() -> { }).build();
+        Thread thread1 = builder.task(() -> { }).build();
+        Thread thread2 = builder.task(() -> { }).build();
+        Thread thread3 = builder.task(() -> { }).build();
 
         assertTrue(thread1.getName().equals("duke-100"));
         assertTrue(thread2.getName().equals("duke-101"));
@@ -200,10 +200,10 @@ public class BuilderTest {
         ThreadGroup group = new ThreadGroup("groupies");
         Thread.Builder builder = Thread.builder().group(group);
 
-        Thread thread1 = builder.target(() -> { }).build();
+        Thread thread1 = builder.task(() -> { }).build();
 
         AtomicBoolean done = new AtomicBoolean();
-        Thread thread2 = builder.target(() -> {
+        Thread thread2 = builder.task(() -> {
             while (!done.get()) {
                 LockSupport.park();
             }
@@ -223,11 +223,11 @@ public class BuilderTest {
     public void testThreadGroup2() {
         ThreadGroup group = new ThreadGroup("groupies");
 
-        Thread.Builder builder1 = Thread.builder().lightweight();
+        Thread.Builder builder1 = Thread.builder().virtual();
         assertThrows(IllegalStateException.class, () -> builder1.group(group));
 
         Thread.Builder builder2 = Thread.builder().group(group);
-        assertThrows(IllegalStateException.class, () -> builder2.lightweight());
+        assertThrows(IllegalStateException.class, () -> builder2.virtual());
 
     }
 
@@ -247,14 +247,14 @@ public class BuilderTest {
             });
 
             Thread.Builder builder = Thread.builder()
-                    .lightweight()
-                    .executor(wrapper::execute);
+                    .virtual()
+                    .scheduler(wrapper::execute);
 
-            Thread thread1 = builder.target(() -> { }).build();
+            Thread thread1 = builder.task(() -> { }).build();
             thread1.start();
             thread1.join();
 
-            Thread thread2 = builder.target(() -> { }).start();
+            Thread thread2 = builder.task(() -> { }).start();
             thread2.join();
 
             Thread thread3 = builder.factory().newThread(() -> { });
@@ -273,8 +273,8 @@ public class BuilderTest {
         int priority = Thread.currentThread().getThreadGroup().getMaxPriority();
         Thread.Builder builder = Thread.builder().priority(priority);
 
-        Thread thread1 = builder.target(() -> { }).build();
-        Thread thread2 = builder.target(() -> { }).start();
+        Thread thread1 = builder.task(() -> { }).build();
+        Thread thread2 = builder.task(() -> { }).start();
         Thread thread3 = builder.factory().newThread(() -> { });
 
         assertTrue(thread1.getPriority() == priority);
@@ -283,10 +283,10 @@ public class BuilderTest {
     }
 
     public void testPriority2() {
-        Thread.Builder builder = Thread.builder().lightweight().priority(Thread.MAX_PRIORITY);
+        Thread.Builder builder = Thread.builder().virtual().priority(Thread.MAX_PRIORITY);
 
-        Thread thread1 = builder.target(() -> { }).build();
-        Thread thread2 = builder.target(() -> { }).start();
+        Thread thread1 = builder.task(() -> { }).build();
+        Thread thread2 = builder.task(() -> { }).start();
         Thread thread3 = builder.factory().newThread(() -> { });
 
         assertTrue(thread1.getPriority() == Thread.NORM_PRIORITY);
@@ -298,8 +298,8 @@ public class BuilderTest {
     public void testDaemon1() {
         Thread.Builder builder = Thread.builder().daemon(false);
 
-        Thread thread1 = builder.target(() -> { }).build();
-        Thread thread2 = builder.target(() -> { }).start();
+        Thread thread1 = builder.task(() -> { }).build();
+        Thread thread2 = builder.task(() -> { }).start();
         Thread thread3 = builder.factory().newThread(() -> { });
 
         assertFalse(thread1.isDaemon());
@@ -310,8 +310,8 @@ public class BuilderTest {
     public void testDaemon2() {
         Thread.Builder builder = Thread.builder().daemon(true);
 
-        Thread thread1 = builder.target(() -> { }).build();
-        Thread thread2 = builder.target(() -> { }).start();
+        Thread thread1 = builder.task(() -> { }).build();
+        Thread thread2 = builder.task(() -> { }).start();
         Thread thread3 = builder.factory().newThread(() -> { });
 
         assertTrue(thread1.isDaemon());
@@ -320,10 +320,10 @@ public class BuilderTest {
     }
 
     public void testDaemo3() {
-        Thread.Builder builder = Thread.builder().lightweight().daemon(false);
+        Thread.Builder builder = Thread.builder().virtual().daemon(false);
 
-        Thread thread1 = builder.target(() -> { }).build();
-        Thread thread2 = builder.target(() -> { }).start();
+        Thread thread1 = builder.task(() -> { }).build();
+        Thread thread2 = builder.task(() -> { }).start();
         Thread thread3 = builder.factory().newThread(() -> { });
 
         assertTrue(thread1.isDaemon());
@@ -347,13 +347,13 @@ public class BuilderTest {
         };
 
         done.set(false);
-        Thread thread1 = builder.target(task).build();
+        Thread thread1 = builder.task(task).build();
         thread1.start();
         thread1.join();
         assertTrue(done.get());
 
         done.set(false);
-        Thread thread2 = builder.target(task).start();
+        Thread thread2 = builder.task(task).start();
         thread2.join();
         assertTrue(done.get());
 
@@ -385,13 +385,13 @@ public class BuilderTest {
         };
 
         done.set(false);
-        Thread thread1 = builder.target(task).build();
+        Thread thread1 = builder.task(task).build();
         thread1.start();
         thread1.join();
         assertTrue(done.get());
 
         done.set(false);
-        Thread thread2 = builder.target(task).start();
+        Thread thread2 = builder.task(task).start();
         thread2.join();
         assertTrue(done.get());
 
@@ -409,7 +409,7 @@ public class BuilderTest {
     }
 
     public void testThreadLocals2() throws Exception {
-        Thread.Builder builder = Thread.builder().lightweight();
+        Thread.Builder builder = Thread.builder().virtual();
         testThreadLocals(builder);
     }
 
@@ -419,7 +419,7 @@ public class BuilderTest {
     }
 
     public void testThreadLocals4() throws Exception {
-        Thread.Builder builder = Thread.builder().lightweight().disallowThreadLocals();
+        Thread.Builder builder = Thread.builder().virtual().disallowThreadLocals();
         testNoThreadLocals(builder);
     }
 
@@ -437,13 +437,13 @@ public class BuilderTest {
         };
 
         done.set(false);
-        Thread thread1 = builder.target(task).build();
+        Thread thread1 = builder.task(task).build();
         thread1.start();
         thread1.join();
         assertTrue(done.get());
 
         done.set(false);
-        Thread thread2 = builder.target(task).start();
+        Thread thread2 = builder.task(task).start();
         thread2.join();
         assertTrue(done.get());
 
@@ -466,13 +466,13 @@ public class BuilderTest {
         };
 
         done.set(false);
-        Thread thread1 = builder.target(task).build();
+        Thread thread1 = builder.task(task).build();
         thread1.start();
         thread1.join();
         assertTrue(done.get());
 
         done.set(false);
-        Thread thread2 = builder.target(task).start();
+        Thread thread2 = builder.task(task).start();
         thread2.join();
         assertTrue(done.get());
 
@@ -490,7 +490,7 @@ public class BuilderTest {
     }
 
     public void testInheritedThreadLocals2() throws Exception {
-        Thread.Builder builder = Thread.builder().lightweight().inheritThreadLocals();
+        Thread.Builder builder = Thread.builder().virtual().inheritThreadLocals();
         testInheritedThreadLocals(builder);
     }
 
@@ -500,7 +500,7 @@ public class BuilderTest {
     }
 
     public void testInheritedThreadLocals4() throws Exception {
-        Thread.Builder builder = Thread.builder().lightweight();
+        Thread.Builder builder = Thread.builder().virtual();
         testNoInheritedThreadLocals(builder);
     }
 
@@ -508,8 +508,8 @@ public class BuilderTest {
     public void testNulls() {
         Thread.Builder builder = Thread.builder();
         assertThrows(NullPointerException.class, () -> builder.group(null));
-        assertThrows(NullPointerException.class, () -> builder.executor(null));
+        assertThrows(NullPointerException.class, () -> builder.scheduler(null));
         assertThrows(NullPointerException.class, () -> builder.name(null));
-        assertThrows(NullPointerException.class, () -> builder.target(null));
+        assertThrows(NullPointerException.class, () -> builder.task(null));
     }
 }

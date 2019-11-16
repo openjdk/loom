@@ -24,7 +24,7 @@
 /**
  * @test
  * @run testng ThreadLocals
- * @summary Test Lightweight threads using thread locals
+ * @summary Test Virtual threads using thread locals
  */
 
 import org.testng.annotations.Test;
@@ -37,7 +37,7 @@ public class ThreadLocals {
 
     public void testThreadLocal1() throws Exception {
         for (int i = 0; i < 10; i++) {
-            TestHelper.runInLightweightThread(0, () -> {
+            TestHelper.runInVirtualThread(0, () -> {
                 assertTrue(LOCAL.get() == null);
                 Object obj = new Object();
                 LOCAL.set(obj);
@@ -47,7 +47,7 @@ public class ThreadLocals {
     }
 
     public void testThreadLocal2() throws Exception {
-        TestHelper.runInLightweightThread(0, () -> {
+        TestHelper.runInVirtualThread(0, () -> {
             assertTrue(LOCAL.get() == null);
             Object obj = new Object();
             LOCAL.set(obj);
@@ -58,7 +58,7 @@ public class ThreadLocals {
 
     // no thread locals
     public void testThreadLocal3() throws Exception {
-        TestHelper.runInLightweightThread(Thread.NO_THREAD_LOCALS, () -> {
+        TestHelper.runInVirtualThread(Thread.NO_THREAD_LOCALS, () -> {
             assertThrows(UnsupportedOperationException.class, () -> LOCAL.set(null));
             assertThrows(UnsupportedOperationException.class, () -> LOCAL.set(new Object()));
             assertThrows(UnsupportedOperationException.class, LOCAL::get);
@@ -74,7 +74,7 @@ public class ThreadLocals {
     public void testInheritedThreadLocal1() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         for (int i = 0; i < 10; i++) {
-            TestHelper.runInLightweightThread(Thread.INHERIT_THREAD_LOCALS, () -> {
+            TestHelper.runInVirtualThread(Thread.INHERIT_THREAD_LOCALS, () -> {
                 assertTrue(INHERITED_LOCAL.get() == null);
                 Object obj = new Object();
                 INHERITED_LOCAL.set(obj);
@@ -90,7 +90,7 @@ public class ThreadLocals {
         var obj = new Object();
         INHERITED_LOCAL.set(obj);
         try {
-            TestHelper.runInLightweightThread(Thread.INHERIT_THREAD_LOCALS, () -> {
+            TestHelper.runInVirtualThread(Thread.INHERIT_THREAD_LOCALS, () -> {
                 assertTrue(INHERITED_LOCAL.get() == obj);
             });
         } finally {
@@ -98,13 +98,13 @@ public class ThreadLocals {
         }
     }
 
-    // inherit thread local from Lightweight thread
+    // inherit thread local from Virtual thread
     public void testInheritedThreadLocal3() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
-        TestHelper.runInLightweightThread(0, () -> {
+        TestHelper.runInVirtualThread(0, () -> {
             var obj = new Object();
             INHERITED_LOCAL.set(obj);
-            TestHelper.runInLightweightThread(Thread.INHERIT_THREAD_LOCALS, () -> {
+            TestHelper.runInVirtualThread(Thread.INHERIT_THREAD_LOCALS, () -> {
                 assertTrue(INHERITED_LOCAL.get() == obj);
             });
             assertTrue(INHERITED_LOCAL.get() == obj);
@@ -119,7 +119,7 @@ public class ThreadLocals {
         var obj = new Object();
         INHERITED_LOCAL.set(obj);
         try {
-            TestHelper.runInLightweightThread(0, () -> {
+            TestHelper.runInVirtualThread(0, () -> {
                 assertTrue(INHERITED_LOCAL.get() == null);
             });
         } finally {
@@ -127,13 +127,13 @@ public class ThreadLocals {
         }
     }
 
-    // thread local not inherited from Lightweight thread
+    // thread local not inherited from Virtual thread
     public void testInheritedThreadLocal5() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
-        TestHelper.runInLightweightThread(0, () -> {
+        TestHelper.runInVirtualThread(0, () -> {
             var obj = new Object();
             INHERITED_LOCAL.set(obj);
-            TestHelper.runInLightweightThread(0, () -> {
+            TestHelper.runInVirtualThread(0, () -> {
                 assertTrue(INHERITED_LOCAL.get() == null);
             });
             assertTrue(INHERITED_LOCAL.get() == obj);

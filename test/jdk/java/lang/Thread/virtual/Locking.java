@@ -24,7 +24,7 @@
 /**
  * @test
  * @run testng Locking
- * @summary Test lightweight threads using java.util.concurrent locks
+ * @summary Test virtual threads using java.util.concurrent locks
  */
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,7 +39,7 @@ public class Locking {
 
     // lock/unlock
     public void testReentrantLock1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             ReentrantLock lock = new ReentrantLock();
             assertFalse(lock.isHeldByCurrentThread());
             lock.lock();
@@ -51,7 +51,7 @@ public class Locking {
 
     // tryLock/unlock
     public void testReentrantLock2() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             ReentrantLock lock = new ReentrantLock();
             assertFalse(lock.isHeldByCurrentThread());
             boolean acquired = lock.tryLock();
@@ -64,7 +64,7 @@ public class Locking {
 
     // lock/lock/unlock/unlock
     public void testReentrantLock3() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             ReentrantLock lock = new ReentrantLock();
             assertFalse(lock.isHeldByCurrentThread());
             assertTrue(lock.getHoldCount() == 0);
@@ -83,7 +83,7 @@ public class Locking {
         });
     }
 
-    // locked by dinoasur thread, lightweight thread tries to lock
+    // locked by dinoasur thread, virtual thread tries to lock
     public void testReentrantLock4() throws Exception {
         ReentrantLock lock = new ReentrantLock();
         var holdsLock = new AtomicBoolean();
@@ -93,7 +93,7 @@ public class Locking {
         // thread acquires lock
         lock.lock();
         try {
-            thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+            thread = Thread.newThread(Thread.VIRTUAL, () -> {
                 lock.lock();  // should block
                 holdsLock.set(true);
                 LockSupport.park();
@@ -101,14 +101,14 @@ public class Locking {
                 holdsLock.set(false);
             });
             thread.start();
-            // give time for lightweight thread to block
+            // give time for virtual thread to block
             Thread.sleep(500);
             assertFalse(holdsLock.get());
         } finally {
             lock.unlock();
         }
 
-        // lightweight thread should acquire lock, park, unpark, and then release lock
+        // virtual thread should acquire lock, park, unpark, and then release lock
         while (!holdsLock.get()) {
             Thread.sleep(20);
         }
@@ -119,10 +119,10 @@ public class Locking {
         thread.join();
     }
 
-    // locked by lightweight thread, dinoasur thread tries to lock
+    // locked by virtual thread, dinoasur thread tries to lock
     public void testReentrantLock5() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -132,7 +132,7 @@ public class Locking {
         });
         thread.start();
 
-        // wat for lightweight thread to acquire lock
+        // wat for virtual thread to acquire lock
         while (!lock.isLocked()) {
             Thread.sleep(20);
         }
@@ -141,7 +141,7 @@ public class Locking {
         try {
             assertFalse(lock.tryLock());
         } finally {
-            // lightweight thread should unlock
+            // virtual thread should unlock
             LockSupport.unpark(thread);
 
             // thread should be able to acquire lock
@@ -151,10 +151,10 @@ public class Locking {
         }
     }
 
-    // lock by lightweight thread, another lightweight thread tries to lock
+    // lock by virtual thread, another virtual thread tries to lock
     public void testReentrantLock6() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread1 = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread1 = Thread.newThread(Thread.VIRTUAL, () -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -164,13 +164,13 @@ public class Locking {
         });
         thread1.start();
 
-        // wat for lightweight thread to acquire lock
+        // wat for virtual thread to acquire lock
         while (!lock.isLocked()) {
             Thread.sleep(10);
         }
 
         var holdsLock  = new AtomicBoolean();
-        var thread2 = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread2 = Thread.newThread(Thread.VIRTUAL, () -> {
             lock.lock();
             holdsLock.set(true);
             LockSupport.park();
@@ -179,18 +179,18 @@ public class Locking {
         });
         thread2.start();
 
-        // lightweight thread2 should block
+        // virtual thread2 should block
         Thread.sleep(1000);
         assertFalse(holdsLock.get());
 
-        // unpark lightweight thread1
+        // unpark virtual thread1
         LockSupport.unpark(thread1);
 
-        // lightweight thread2 should acquire lock
+        // virtual thread2 should acquire lock
         while (!holdsLock.get()) {
             Thread.sleep(20);
         }
-        // unpark lightweight thread and it should release lock
+        // unpark virtual thread and it should release lock
         LockSupport.unpark(thread2);
         while (holdsLock.get()) {
             Thread.sleep(20);

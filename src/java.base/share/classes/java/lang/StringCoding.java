@@ -73,7 +73,7 @@ class StringCoding {
     private static final Charset UTF_8 = sun.nio.cs.UTF_8.INSTANCE;
 
     private static <T> T deref(ThreadLocal<SoftReference<T>> tl) {
-        if (!Thread.currentThread().isLightweight()) {
+        if (!Thread.currentThread().isVirtual()) {
             SoftReference<T> sr = tl.get();
             if (sr != null)
                 return sr.get();
@@ -82,7 +82,7 @@ class StringCoding {
     }
 
     private static <T> void set(ThreadLocal<SoftReference<T>> tl, T ob) {
-        if (!Thread.currentThread().isLightweight())
+        if (!Thread.currentThread().isVirtual())
             tl.set(new SoftReference<>(ob));
     }
 
@@ -533,7 +533,7 @@ class StringCoding {
             }};
     
     private static StringCoding.Result cachedResultObject() {
-        if (Thread.currentThread().isLightweight()) {
+        if (Thread.currentThread().isVirtual()) {
             return new StringCoding.Result();
         } else {
             return resultCached.get();

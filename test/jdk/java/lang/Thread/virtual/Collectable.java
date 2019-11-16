@@ -24,7 +24,7 @@
 /**
  * @test
  * @run testng Collectable
- * @summary Test that lightweight threads are GC'ed
+ * @summary Test that virtual threads are GC'ed
  */
 
 import java.lang.ref.WeakReference;
@@ -36,26 +36,26 @@ import static org.testng.Assert.*;
 @Test
 public class Collectable {
 
-    // ensure that an unstarted lightweight thread can be GC"ed
+    // ensure that an unstarted virtual thread can be GC"ed
     public void testGC1() {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         var ref = new WeakReference<>(thread);
         thread = null;
         waitUntilCleared(ref);
     }
 
-    // ensure that a parked lightweight thread can be GC'ed
+    // ensure that a parked virtual thread can be GC'ed
     public void testGC2() {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         var ref = new WeakReference<>(thread);
         thread = null;
         waitUntilCleared(ref);
     }
 
-    // ensure that a terminated lightweight thread can be GC'ed
+    // ensure that a terminated virtual thread can be GC'ed
     public void testGC3() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         thread.start();
         thread.join();
         var ref = new WeakReference<>(thread);

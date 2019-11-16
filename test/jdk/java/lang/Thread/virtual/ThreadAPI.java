@@ -24,7 +24,7 @@
 /**
  * @test
  * @run testng ThreadAPI
- * @summary Test Thread API with lightweight threads
+ * @summary Test Thread API with virtual threads
  */
 
 import java.time.Duration;
@@ -55,13 +55,13 @@ public class ThreadAPI {
     public void testCurrentThread1() throws Exception {
         var before = new AtomicReference<Thread>();
         var after = new AtomicReference<Thread>();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             before.set(Thread.currentThread());
             LockSupport.park();
             after.set(Thread.currentThread());
         });
         thread.start();
-        Thread.sleep(100); // give time for lightweight thread to park
+        Thread.sleep(100); // give time for virtual thread to park
         LockSupport.unpark(thread);
         thread.join();
         assertTrue(before.get() == thread);
@@ -74,7 +74,7 @@ public class ThreadAPI {
         var ref2 = new AtomicReference<Thread>();
         var ref3 = new AtomicReference<Thread>();
         var lock = new Object();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             ref1.set(Thread.currentThread());
             synchronized (lock) {
                 ref2.set(Thread.currentThread());
@@ -83,7 +83,7 @@ public class ThreadAPI {
         });
         synchronized (lock) {
             thread.start();
-            Thread.sleep(100); // give time for lightweight thread to block
+            Thread.sleep(100); // give time for virtual thread to block
         }
         thread.join();
         assertTrue(ref1.get() == thread);
@@ -97,7 +97,7 @@ public class ThreadAPI {
         var ref2 = new AtomicReference<Thread>();
         var ref3 = new AtomicReference<Thread>();
         var lock = new ReentrantLock();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             ref1.set(Thread.currentThread());
             lock.lock();
             try {
@@ -110,7 +110,7 @@ public class ThreadAPI {
         lock.lock();
         try {
             thread.start();
-            Thread.sleep(100); // give time for lightweight thread to block
+            Thread.sleep(100); // give time for virtual thread to block
         } finally {
             lock.unlock();
         }
@@ -125,7 +125,7 @@ public class ThreadAPI {
 
     public void testRun1() throws Exception {
         var ref = new AtomicBoolean();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> ref.set(true));
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> ref.set(true));
         thread.run();
         assertFalse(ref.get());
     }
@@ -135,7 +135,7 @@ public class ThreadAPI {
 
     // already started
     public void testStart1() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         try {
             assertThrows(IllegalThreadStateException.class, thread::start);
@@ -147,7 +147,7 @@ public class ThreadAPI {
 
     // already terminated
     public void testStart2() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         thread.start();
         thread.join();
         assertThrows(IllegalThreadStateException.class, thread::start);
@@ -157,7 +157,7 @@ public class ThreadAPI {
     // -- stop/suspend/resume --
 
     public void testStop1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             try {
                 t.stop();
@@ -169,7 +169,7 @@ public class ThreadAPI {
     }
 
     public void testStop2() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 Thread.sleep(20*1000);
             } catch (InterruptedException e) { }
@@ -184,7 +184,7 @@ public class ThreadAPI {
     }
 
     public void testSuspend1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             try {
                 t.suspend();
@@ -196,7 +196,7 @@ public class ThreadAPI {
     }
 
     public void testSuspend2() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 Thread.sleep(20*1000);
             } catch (InterruptedException e) { }
@@ -211,7 +211,7 @@ public class ThreadAPI {
     }
 
     public void testResume1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             try {
                 t.resume();
@@ -223,7 +223,7 @@ public class ThreadAPI {
     }
 
     public void testResume2() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 Thread.sleep(20*1000);
             } catch (InterruptedException e) { }
@@ -242,7 +242,7 @@ public class ThreadAPI {
 
     // join before start
     public void testJoin1() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
 
         // invoke join from dinosaur thread
         thread.join();
@@ -258,12 +258,12 @@ public class ThreadAPI {
 
     // join before start
     public void testJoin2() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin1);
+        TestHelper.runInVirtualThread(this::testJoin1);
     }
 
     // join where thread does not terminate
     public void testJoin3() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         try {
             thread.join(100);
@@ -279,12 +279,12 @@ public class ThreadAPI {
 
     // join where thread does not terminate
     public void testJoin4() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin3);
+        TestHelper.runInVirtualThread(this::testJoin3);
     }
 
     // join where thread terminates
     public void testJoin5() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) { }
@@ -296,12 +296,12 @@ public class ThreadAPI {
 
     // join where thread terminates
     public void testJoin6() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin5);
+        TestHelper.runInVirtualThread(this::testJoin5);
     }
 
     // join where thread terminates
     public void testJoin7() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) { }
@@ -313,12 +313,12 @@ public class ThreadAPI {
 
     // join where thread terminates
     public void testJoin8() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin7);
+        TestHelper.runInVirtualThread(this::testJoin7);
     }
 
     // join where thread terminates
     public void testJoin9() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) { }
@@ -330,12 +330,12 @@ public class ThreadAPI {
 
     // join where thread terminates
     public void testJoin10() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin9);
+        TestHelper.runInVirtualThread(this::testJoin9);
     }
 
     // join where thread terminates
     public void testJoin11() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) { }
@@ -347,12 +347,12 @@ public class ThreadAPI {
 
     // join where thread terminates
     public void testJoin12() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin11);
+        TestHelper.runInVirtualThread(this::testJoin11);
     }
 
     // join thread that has terminated
     public void testJoin13() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         thread.start();
         while (thread.isAlive()) {
             Thread.sleep(10);
@@ -366,12 +366,12 @@ public class ThreadAPI {
 
     // join where thread terminates
     public void testJoin14() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin13);
+        TestHelper.runInVirtualThread(this::testJoin13);
     }
 
     // interrupt status before join
     public void testJoin15() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         Thread.currentThread().interrupt();
         try {
@@ -388,12 +388,12 @@ public class ThreadAPI {
 
     // interrupt status before join
     public void testJoin16() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin15);
+        TestHelper.runInVirtualThread(this::testJoin15);
     }
 
     // interrupt status before join
     public void testJoin17() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         Thread.currentThread().interrupt();
         try {
@@ -410,12 +410,12 @@ public class ThreadAPI {
 
     // interrupt status before join
     public void testJoin18() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin17);
+        TestHelper.runInVirtualThread(this::testJoin17);
     }
 
     // interrupt status before join
     public void testJoin19() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         Thread.currentThread().interrupt();
         try {
@@ -432,12 +432,12 @@ public class ThreadAPI {
 
     // interrupt status before join
     public void testJoin20() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin19);
+        TestHelper.runInVirtualThread(this::testJoin19);
     }
 
     // interrupted when in join
     public void testJoin21() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         TestHelper.scheduleInterrupt(Thread.currentThread(), 100);
         try {
@@ -454,12 +454,12 @@ public class ThreadAPI {
 
     // interrupted when in join
     public void testJoin22() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin17);
+        TestHelper.runInVirtualThread(this::testJoin17);
     }
 
     // interrupted when in join
     public void testJoin23() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         TestHelper.scheduleInterrupt(Thread.currentThread(), 100);
         try {
@@ -476,12 +476,12 @@ public class ThreadAPI {
 
     // interrupted when in join
     public void testJoin24() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin23);
+        TestHelper.runInVirtualThread(this::testJoin23);
     }
 
     // interrupted when in join
     public void testJoin25() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         TestHelper.scheduleInterrupt(Thread.currentThread(), 100);
         try {
@@ -498,12 +498,12 @@ public class ThreadAPI {
 
     // interrupted when in join
     public void testJoin26() throws Exception {
-        TestHelper.runInLightweightThread(this::testJoin25);
+        TestHelper.runInVirtualThread(this::testJoin25);
     }
 
-    // join dinosaur thread from lightweight thread
+    // join dinosaur thread from virtual thread
     public void testJoin27() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             var thread = new Thread(() -> LockSupport.park());
             thread.start();
             try {
@@ -517,10 +517,10 @@ public class ThreadAPI {
         });
     }
 
-    // join dinosaur thread from lightweight thread
+    // join dinosaur thread from virtual thread
     public void testJoin28() throws Exception {
         long nanos = TimeUnit.NANOSECONDS.convert(2, TimeUnit.SECONDS);
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             var thread = new Thread(() -> LockSupport.parkNanos(nanos));
             thread.start();
             try {
@@ -533,9 +533,9 @@ public class ThreadAPI {
         });
     }
 
-    // join dinosaur thread from lightweight thread with interrupt status set
+    // join dinosaur thread from virtual thread with interrupt status set
     public void testJoin29() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             var thread = new Thread(() -> LockSupport.park());
             thread.start();
             Thread.currentThread().interrupt();
@@ -551,9 +551,9 @@ public class ThreadAPI {
         });
     }
 
-    // interrupt lightweight thread when in join of dinosaur thread
+    // interrupt virtual thread when in join of dinosaur thread
     public void testJoin30() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             var thread = new Thread(() -> LockSupport.park());
             thread.start();
             TestHelper.scheduleInterrupt(Thread.currentThread(), 100);
@@ -573,7 +573,7 @@ public class ThreadAPI {
     // -- interrupt --
 
     public void testInterrupt1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             assertFalse(me.isInterrupted());
             me.interrupt();
@@ -586,14 +586,14 @@ public class ThreadAPI {
 
     // interrupt before started
     public void testInterrupt2() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         thread.interrupt();
         assertTrue(thread.isInterrupted());
     }
 
     // interrupt after terminated
     public void testInterrupt3() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         thread.start();
         thread.join();
         thread.interrupt();
@@ -602,7 +602,7 @@ public class ThreadAPI {
 
     // terminate with interrupt status set
     public void testInterrupt4() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             Thread.currentThread().interrupt();
         });
         thread.start();
@@ -613,7 +613,7 @@ public class ThreadAPI {
     // interrupt when mounted
     public void testInterrupt5() throws Exception {
         var exception = new AtomicReference<Exception>();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 try (var sel = Selector.open()) {
                     sel.select();
@@ -633,7 +633,7 @@ public class ThreadAPI {
     // interrupt when mounted
     public void testInterrupt6() throws Exception {
         var exception = new AtomicReference<Exception>();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 try {
                     Thread.sleep(60*1000);
@@ -656,7 +656,7 @@ public class ThreadAPI {
     // interrupt when unmounted
     public void testInterrupt7() throws Exception {
         var exception = new AtomicReference<Exception>();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
                 LockSupport.park();
                 assertTrue(Thread.currentThread().isInterrupted());
@@ -673,14 +673,14 @@ public class ThreadAPI {
 
     // try to block with interrupt status set
     public void testInterrupt8() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.interrupt();
             LockSupport.park();
             assertTrue(Thread.interrupted());
         });
 
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.interrupt();
             Object lock = new Object();
@@ -694,7 +694,7 @@ public class ThreadAPI {
             }
         });
 
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.interrupt();
             try (Selector sel = Selector.open()) {
@@ -710,7 +710,7 @@ public class ThreadAPI {
     // create without a name
     public void testSetName1() throws Exception {
         // initially unnamed
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             assertEquals(me.getName(), "");
             me.setName("fred");
@@ -720,7 +720,7 @@ public class ThreadAPI {
 
     // create without a name
     public void testSetName2() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             LockSupport.park();
         });
         thread.start();
@@ -736,7 +736,7 @@ public class ThreadAPI {
 
     // create with a name
     public void testSetName3() throws Exception {
-        TestHelper.runInLightweightThread("fred", 0, () -> {
+        TestHelper.runInVirtualThread("fred", 0, () -> {
             Thread me = Thread.currentThread();
             assertEquals(me.getName(), "fred");
             me.setName("joe");
@@ -764,7 +764,7 @@ public class ThreadAPI {
     // -- setPriority/getPriority --
 
     public void testSetPriority1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             assertTrue(me.getPriority() == Thread.NORM_PRIORITY);
             me.setPriority(Thread.MIN_PRIORITY);
@@ -773,7 +773,7 @@ public class ThreadAPI {
     }
 
     public void testSetPriority2() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             LockSupport.park();
         });
         thread.start();
@@ -791,21 +791,21 @@ public class ThreadAPI {
     // -- setDaemon/isDaemon --
 
     public void testIsDaemon1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             assertTrue(me.isDaemon());
         });
     }
 
     public void testSetDaemon1() {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         assertTrue(thread.isDaemon());
         thread.setDaemon(false);
         assertTrue(thread.isDaemon());
     }
 
     public void testSetDaemon2() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         try {
             assertTrue(thread.isDaemon());
@@ -823,8 +823,8 @@ public class ThreadAPI {
         var list = new CopyOnWriteArrayList<String>();
         ExecutorService pool = Executors.newFixedThreadPool(1);
         ThreadFactory factory = Thread.builder()
-                .lightweight()
-                .executor(pool)
+                .virtual()
+                .scheduler(pool)
                 .factory();
         try {
             var thread = factory.newThread(() -> {
@@ -851,8 +851,8 @@ public class ThreadAPI {
         var list = new CopyOnWriteArrayList<String>();
         ExecutorService pool = Executors.newFixedThreadPool(1);
         ThreadFactory factory = Thread.builder()
-                .lightweight()
-                .executor(pool)
+                .virtual()
+                .scheduler(pool)
                 .factory();
         try {
             var thread = factory.newThread(() -> {
@@ -880,7 +880,7 @@ public class ThreadAPI {
     // -- Thread.onSpinWait --
 
     public void testOnSpinWait() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             Thread.onSpinWait();
             assertTrue(Thread.currentThread() == me);
@@ -892,7 +892,7 @@ public class ThreadAPI {
 
     // Thread.sleep(-1)
     public void testSleep1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             try {
                 Thread.sleep(-1);
                 assertTrue(false);
@@ -900,24 +900,24 @@ public class ThreadAPI {
                 // expected
             }
         });
-        TestHelper.runInLightweightThread(() -> Thread.sleep(Duration.ofMillis(-1)));
+        TestHelper.runInVirtualThread(() -> Thread.sleep(Duration.ofMillis(-1)));
     }
 
     // Thread.sleep(0)
     public void testSleep2() throws Exception {
-        TestHelper.runInLightweightThread(() -> Thread.sleep(0));
-        TestHelper.runInLightweightThread(() -> Thread.sleep(Duration.ofMillis(0)));
+        TestHelper.runInVirtualThread(() -> Thread.sleep(0));
+        TestHelper.runInVirtualThread(() -> Thread.sleep(Duration.ofMillis(0)));
     }
 
     // Thread.sleep(2000)
     public void testSleep3() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             long start = System.currentTimeMillis();
             Thread.sleep(2000);
             long elapsed = System.currentTimeMillis() - start;
             assertTrue(elapsed > 1900);
         });
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             long start = System.currentTimeMillis();
             Thread.sleep(Duration.ofMillis(2000));
             long elapsed = System.currentTimeMillis() - start;
@@ -927,7 +927,7 @@ public class ThreadAPI {
 
     // Thread.sleep with interrupt status set
     public void testSleep4() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.interrupt();
             try {
@@ -939,7 +939,7 @@ public class ThreadAPI {
             }
         });
 
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.interrupt();
             try {
@@ -951,14 +951,14 @@ public class ThreadAPI {
             }
         });
 
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.interrupt();
             Thread.sleep(Duration.ofMillis(-1000));  // does nothing
             assertTrue(me.isInterrupted());
         });
 
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.interrupt();
             try {
@@ -970,7 +970,7 @@ public class ThreadAPI {
             }
         });
 
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.interrupt();
             try {
@@ -985,7 +985,7 @@ public class ThreadAPI {
 
     // Thread.sleep interrupted while sleeping
     public void testSleep5() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 2000);
             try {
@@ -997,7 +997,7 @@ public class ThreadAPI {
             }
         });
 
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 2000);
             try {
@@ -1010,10 +1010,10 @@ public class ThreadAPI {
         });
     }
 
-    // Thread.sleep should not be disrupted by unparking lightweight thread
+    // Thread.sleep should not be disrupted by unparking virtual thread
     public void testSleep6() throws Exception {
         AtomicReference<Exception> exc = new AtomicReference<>();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             long start = System.currentTimeMillis();
             try {
                 Thread.sleep(2000);
@@ -1044,7 +1044,7 @@ public class ThreadAPI {
 
     public void testContextClassLoader1() throws Exception {
         ClassLoader loader = new ClassLoader() { };
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             t.setContextClassLoader(loader);
             assertTrue(t.getContextClassLoader() == loader);
@@ -1058,7 +1058,7 @@ public class ThreadAPI {
         ClassLoader savedLoader = t.getContextClassLoader();
         t.setContextClassLoader(loader);
         try {
-            TestHelper.runInLightweightThread(() -> {
+            TestHelper.runInVirtualThread(() -> {
                 assertTrue(Thread.currentThread().getContextClassLoader() == loader);
             });
         } finally {
@@ -1066,26 +1066,26 @@ public class ThreadAPI {
         }
     }
 
-    // inherit context class loader from creating lightweight thread
+    // inherit context class loader from creating virtual thread
     public void testContextClassLoader3() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             ClassLoader loader = new ClassLoader() { };
             Thread.currentThread().setContextClassLoader(loader);
-            TestHelper.runInLightweightThread(() -> {
+            TestHelper.runInVirtualThread(() -> {
                 assertTrue(Thread.currentThread().getContextClassLoader() == loader);
             });
         });
     }
 
-    // inherit context class loader from creating lightweight thread
+    // inherit context class loader from creating virtual thread
     public void testContextClassLoader4() throws Exception {
         ClassLoader loader = new ClassLoader() { };
         Thread t = Thread.currentThread();
         ClassLoader savedLoader = t.getContextClassLoader();
         t.setContextClassLoader(loader);
         try {
-            TestHelper.runInLightweightThread(() -> {
-                TestHelper.runInLightweightThread(() -> {
+            TestHelper.runInVirtualThread(() -> {
+                TestHelper.runInVirtualThread(() -> {
                     assertTrue(Thread.currentThread().getContextClassLoader() == loader);
                 });
             });
@@ -1102,7 +1102,7 @@ public class ThreadAPI {
         class FooException extends RuntimeException { }
         var exception = new AtomicReference<Throwable>();
         Thread.UncaughtExceptionHandler handler = (thread, exc) -> exception.set(exc);
-        Thread thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        Thread thread = Thread.newThread(Thread.VIRTUAL, () -> {
             Thread me = Thread.currentThread();
             assertTrue(me.getUncaughtExceptionHandler() == me.getThreadGroup());
             me.setUncaughtExceptionHandler(handler);
@@ -1122,7 +1122,7 @@ public class ThreadAPI {
         Thread.UncaughtExceptionHandler savedHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(handler);
         try {
-            Thread thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+            Thread thread = Thread.newThread(Thread.VIRTUAL, () -> {
                 Thread me = Thread.currentThread();
                 throw new FooException();
             });
@@ -1140,8 +1140,8 @@ public class ThreadAPI {
     public void testGetId() throws Exception {
         var ref1 = new AtomicReference<Long>();
         var ref2 = new AtomicReference<Long>();
-        TestHelper.runInLightweightThread(() -> ref1.set(Thread.currentThread().getId()));
-        TestHelper.runInLightweightThread(() -> ref2.set(Thread.currentThread().getId()));
+        TestHelper.runInVirtualThread(() -> ref1.set(Thread.currentThread().getId()));
+        TestHelper.runInVirtualThread(() -> ref2.set(Thread.currentThread().getId()));
         long id1 = ref1.get();
         long id2 = ref2.get();
         long id3 = Thread.currentThread().getId();
@@ -1155,13 +1155,13 @@ public class ThreadAPI {
 
     // NEW
     public void testGetState1() {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         assertTrue(thread.getState() == Thread.State.NEW);
     }
 
     // RUNNABLE
     public void testGetState2() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread.State state = Thread.currentThread().getState();
             assertTrue(state == Thread.State.RUNNABLE);
         });
@@ -1169,7 +1169,7 @@ public class ThreadAPI {
 
     // WAITING when parked
     public void testGetState3() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         while (thread.getState() != Thread.State.WAITING) {
             Thread.sleep(20);
@@ -1180,7 +1180,7 @@ public class ThreadAPI {
 
     // WAITING when parked and pinned
     public void testGetState4() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             var lock = new Object();
             synchronized (lock) {
                 LockSupport.park();
@@ -1196,7 +1196,7 @@ public class ThreadAPI {
 
     // WAITING when blocked in Object.wait
     public void testGetState5() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             var lock = new Object();
             synchronized (lock) {
                 try { lock.wait(); } catch (InterruptedException e) { }
@@ -1212,7 +1212,7 @@ public class ThreadAPI {
 
     // TERMINATED
     public void testGetState6() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         thread.start();
         thread.join();
         assertTrue(thread.getState() == Thread.State.TERMINATED);
@@ -1222,7 +1222,7 @@ public class ThreadAPI {
     // -- isAlive --
 
     public void testIsAlive1() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         assertFalse(thread.isAlive());
         thread.start();
         try {
@@ -1238,14 +1238,14 @@ public class ThreadAPI {
     // -- Thread.holdsLock --
 
     public void testHoldsLock1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             var lock = new Object();
             assertFalse(Thread.holdsLock(lock));
         });
     }
 
     public void testHoldsLock2() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             var lock = new Object();
             synchronized (lock) {
                 assertTrue(Thread.holdsLock(lock));
@@ -1259,7 +1259,7 @@ public class ThreadAPI {
     // runnable (mounted)
     public void testGetStackTrace1() throws Exception {
         var sel = Selector.open();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try { sel.select(); } catch (Exception e) { }
         });
         thread.start();
@@ -1277,7 +1277,7 @@ public class ThreadAPI {
     // waiting (mounted)
     public void testGetStackTrace2() throws Exception {
         var lock = new Object();
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             synchronized (lock) {
                 try { lock.wait(); } catch (InterruptedException e) { }
             }
@@ -1301,7 +1301,7 @@ public class ThreadAPI {
 
     // parked (unmounted)
     public void testGetStackTrace3() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
 
         // wait for thread to park
@@ -1320,14 +1320,14 @@ public class ThreadAPI {
 
     // not started
     public void testGetStackTrace4() {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         StackTraceElement[] stack = thread.getStackTrace();
         assertTrue(stack.length == 0);
     }
 
     // terminated
     public void testGetStackTrace5() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         thread.start();
         thread.join();
         StackTraceElement[] stack = thread.getStackTrace();
@@ -1344,9 +1344,9 @@ public class ThreadAPI {
     // -- Thread.getAllStackTraces --
 
     public void testGetAllStackTraces() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Set<Thread> threads = Thread.getAllStackTraces().keySet();
-            assertFalse(threads.stream().anyMatch(Thread::isLightweight));
+            assertFalse(threads.stream().anyMatch(Thread::isVirtual));
         });
     }
 
@@ -1354,7 +1354,7 @@ public class ThreadAPI {
     // -- ThreadGroup --
 
     public void testThreadGroup1() throws Exception {
-        var thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> LockSupport.park());
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         var group = thread.getThreadGroup();
         assertTrue(group != null);
         thread.start();
@@ -1375,17 +1375,17 @@ public class ThreadAPI {
     }
 
     public void testActiveCount1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             assertTrue(Thread.activeCount() == 0);
         });
     }
 
-    // Thread.enumerate should not enumerate lightweight threads
+    // Thread.enumerate should not enumerate virtual threads
     public void testEnumerate1() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread[] threads = new Thread[100];
             int n = Thread.enumerate(threads);
-            assertFalse(Arrays.stream(threads, 0, n).anyMatch(Thread::isLightweight));
+            assertFalse(Arrays.stream(threads, 0, n).anyMatch(Thread::isVirtual));
         });
     }
 
@@ -1394,14 +1394,14 @@ public class ThreadAPI {
 
     // not started
     public void testToString1() {
-        Thread thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> { });
+        Thread thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         thread.setName("fred");
         assertTrue(thread.toString().contains("fred"));
     }
 
     // mounted
     public void testToString2() throws Exception {
-        TestHelper.runInLightweightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.setName("fred");
             assertTrue(me.toString().contains("fred"));
@@ -1410,7 +1410,7 @@ public class ThreadAPI {
 
     // unmounted
     public void testToString3() throws Exception {
-        Thread thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        Thread thread = Thread.newThread(Thread.VIRTUAL, () -> {
             Thread me = Thread.currentThread();
             me.setName("fred");
             LockSupport.park();
@@ -1429,7 +1429,7 @@ public class ThreadAPI {
 
     // terminated
     public void testToString4() throws Exception {
-        Thread thread = Thread.newThread(Thread.LIGHTWEIGHT, () -> {
+        Thread thread = Thread.newThread(Thread.VIRTUAL, () -> {
             Thread me = Thread.currentThread();
             me.setName("fred");
         });
