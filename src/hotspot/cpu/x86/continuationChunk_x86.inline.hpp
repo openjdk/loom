@@ -109,7 +109,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
         assert (is_in_frame(cb, sp, derived_loc), "");
         assert(derived_loc != base_loc, "Base and derived in same location");
         assert (is_in_oops(oopmap, sp, base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
-        assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(base_loc));
+        assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
         
         oop base = *(oop*)base_loc;
         assert (oopDesc::is_oop_or_null(base), "not an oop");
@@ -145,7 +145,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
       
       DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) 
       omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
-      assert (SafepointSynchronize::is_at_safepoint() || (*(intptr_t*)p == old), "old: " INTPTR_FORMAT " new: " INTPTR_FORMAT, old, *(intptr_t*)p);
+      // assert (SafepointSynchronize::is_at_safepoint() || (*(intptr_t*)p == old), "old: " INTPTR_FORMAT " new: " INTPTR_FORMAT, old, *(intptr_t*)p);
     }
     assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
   }

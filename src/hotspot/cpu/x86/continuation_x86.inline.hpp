@@ -1347,9 +1347,14 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
         void* derived_loc = reg_to_loc(omv.reg(), sp);
         assert (is_in_frame(cb, sp, base_loc), "");
         assert (is_in_frame(cb, sp, derived_loc), "");
+        assert(derived_loc != base_loc, "Base and derived in same location");
+        assert (is_in_oops(oopmap, sp, base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
+        assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
         log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
+        /*
         oop base = (oop)RawAccess<>::oop_load((oop*)base_loc);
-        assert (oopDesc::is_oop_or_null(base), "not an oop");
+        assert (oopDesc::is_oop_or_null(base), "not an oop: " INTPTR_FORMAT, p2i(base));
+        assert (!CompressedOops::is_base(base), "");
         assert (Universe::heap()->is_in_or_null(base), "not an oop");
         if (base != (oop)NULL) {
           assert (!CompressedOops::is_base(base), "");
@@ -1360,6 +1365,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
         } else {
           assert (*(oop*)derived_loc == (oop)NULL, "");
         }
+        */
       }
     }
   }
