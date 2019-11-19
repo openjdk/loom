@@ -1001,9 +1001,4 @@ class Fiber extends Thread {
         }
         return 0;
     }
-
-    // remove when JDWP agent updated to not use it
-    Thread tryMountAndSuspend() {
-        return null;
-    }
 }

@@ -217,8 +217,6 @@ util_initialize(JNIEnv *env)
 
         gdata->fiberToString =
                 getMethod(env, gdata->fiberClass, "toString", "()Ljava/lang/String;");
-        gdata->fiberTryMountAndSuspend =
-                getMethod(env, gdata->fiberClass, "tryMountAndSuspend", "()Ljava/lang/Thread;");
         gdata->threadConstructor =
                 getMethod(env, gdata->threadClass,
                     "<init>", "(Ljava/lang/ThreadGroup;Ljava/lang/String;)V");

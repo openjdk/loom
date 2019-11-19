@@ -101,7 +101,6 @@ typedef struct {
     jclass              stringClass;
     jclass              systemClass;
     jmethodID           fiberToString;
-    jmethodID           fiberTryMountAndSuspend;
     jmethodID           threadConstructor;
     jmethodID           threadSetDaemon;
     jmethodID           threadResume;
