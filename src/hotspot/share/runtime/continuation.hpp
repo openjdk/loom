@@ -98,7 +98,7 @@ public:
   static bool is_frame_in_continuation(JavaThread* thread, const frame& f);
   static bool fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp, intptr_t** sender_fp);
   static bool fix_continuation_bottom_sender(RegisterMap* map, const frame& callee, address* sender_pc, intptr_t** sender_sp, intptr_t** sender_fp);
-  static frame fix_continuation_bottom_sender(const frame& callee, RegisterMap* map, frame f);
+  // static frame fix_continuation_bottom_sender(const frame& callee, RegisterMap* map, frame f);
   static address* get_continuation_entry_pc_for_sender(Thread* thread, const frame& f, address* pc_addr);
   static address get_top_return_pc_post_barrier(JavaThread* thread, address pc);
 
@@ -118,7 +118,6 @@ public:
   static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes, bool is_oop);
   // static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg);
   static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop);
-  static address reg_to_location(oop cont, const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop);
   static address interpreter_frame_expression_stack_at(const frame& fr, const RegisterMap* map, const InterpreterOopMap& oop_mask, int index);
   static address interpreter_frame_local_at(const frame& fr, const RegisterMap* map, const InterpreterOopMap& oop_mask, int index);
 

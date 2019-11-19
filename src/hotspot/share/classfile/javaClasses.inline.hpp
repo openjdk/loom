@@ -215,10 +215,10 @@ inline jint java_lang_Continuation::sp(oop ref) {
 inline void java_lang_Continuation::set_sp(oop ref, const jint i) {
   ref->int_field_put(_sp_offset, i);
 }
-inline void* java_lang_Continuation::pc(oop ref) {
-  return (void*)ref->long_field(_pc_offset);
+inline address java_lang_Continuation::pc(oop ref) {
+  return (address)ref->long_field(_pc_offset);
 }
-inline void java_lang_Continuation::set_pc(oop ref, const void* pc) {
+inline void java_lang_Continuation::set_pc(oop ref, const address pc) {
   ref->long_field_put(_pc_offset, (jlong)pc);
 }
 inline jint java_lang_Continuation::refSP(oop ref) {

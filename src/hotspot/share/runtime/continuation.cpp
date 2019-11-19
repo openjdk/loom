@@ -230,8 +230,7 @@ class CachedCompiledMetadata;
 #endif
 
 
-// TODO R remove
-template<typename FKind> static intptr_t** slow_link_address(const frame& f);
+DEBUG_ONLY(template<typename FKind> static intptr_t** slow_link_address(const frame& f);)
 
 class Frame {
 public:
@@ -897,7 +896,7 @@ void ContMirror::read() {
 
   _sp = java_lang_Continuation::sp(_cont);
   _fp = (intptr_t)java_lang_Continuation::fp(_cont);
-  _pc = (address)java_lang_Continuation::pc(_cont);
+  _pc = java_lang_Continuation::pc(_cont);
 
   _stack = java_lang_Continuation::stack(_cont);
   if (_stack != NULL) {
@@ -960,17 +959,6 @@ void ContMirror::write() {
 
   java_lang_Continuation::set_numFrames(_cont, _num_frames);
   java_lang_Continuation::set_numInterpretedFrames(_cont, _num_interpreted_frames);
-}
-
-void ContMirror::cleanup() {
-  // cleanup nmethods
-  /*
-  for (hframe hf = last_frame<mode_slow>(); !hf.is_empty(); hf = hf.sender<mode_slow>(*this)) {
-    if (!hf.is_interpreted_frame()) {
-      hf.cb()->as_compiled_method()->dec_on_continuation_stack();
-    }
-  }
-  */
 }
 
 void ContMirror::null_ref_stack(int start, int num) {
@@ -4301,25 +4289,25 @@ bool Continuation::fix_continuation_bottom_sender(RegisterMap* map, const frame&
   return res;
 }
 
-frame Continuation::fix_continuation_bottom_sender(const frame& callee, RegisterMap* map, frame f) {
-  if (!is_return_barrier_entry(f.pc())) {
-    return f;
-  }
+// frame Continuation::fix_continuation_bottom_sender(const frame& callee, RegisterMap* map, frame f) {
+//   if (!is_return_barrier_entry(f.pc())) {
+//     return f;
+//   }
 
-  if (map->walk_cont()) {
-    return top_frame(callee, map);
-  }
+//   if (map->walk_cont()) {
+//     return top_frame(callee, map);
+//   }
 
-  if (map->thread() != NULL) {
-    address   sender_pc = f.pc();
-    intptr_t* sender_sp = f.sp();
-    intptr_t* sender_fp = f.fp();
-    fix_continuation_bottom_sender(map, callee, &sender_pc, &sender_sp, &sender_fp);
-    return ContinuationHelper::frame_with(f, sender_sp, sender_pc, sender_fp);
-  }
+//   if (map->thread() != NULL) {
+//     address   sender_pc = f.pc();
+//     intptr_t* sender_sp = f.sp();
+//     intptr_t* sender_fp = f.fp();
+//     fix_continuation_bottom_sender(map, callee, &sender_pc, &sender_sp, &sender_fp);
+//     return ContinuationHelper::frame_with(f, sender_sp, sender_pc, sender_fp);
+//   }
 
-  return f;
-}
+//   return f;
+// }
 
 address Continuation::get_top_return_pc_post_barrier(JavaThread* thread, address pc) {
   oop cont;
@@ -4386,10 +4374,9 @@ static frame continuation_body_top_frame(ContMirror& cont, RegisterMap* map) {
 }
 
 static frame continuation_top_frame(oop contOop, RegisterMap* map) {
-  ContMirror cont(NULL, contOop);
-
   // if (!oopDesc::equals(map->cont(), contOop))
   map->set_cont(contOop);
+  ContMirror cont(map); // cont(NULL, contOop);
 
   for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
     if (!ContMirror::is_empty_chunk(chunk)) {
@@ -4683,20 +4670,22 @@ int Continuation::usp_offset_to_index(const frame& fr, const RegisterMap* map, c
 //   return reg_to_location(fr, map, reg, find_oop_in_compiled_frame(fr, map, reg) >= 0);
 // }
 
+// address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop) {
+//   assert (map != NULL, "");
+//   oop cont;
+//   assert (map->in_cont(), "");
+//   if (map->in_cont()) {
+//     cont = map->cont();
+//   } else {
+//     cont = get_continutation_for_frame(map->thread(), fr);
+//   }
+//   return reg_to_location(cont, fr, map, reg, is_oop);
+// }
+
 address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop) {
   assert (map != NULL, "");
-  oop cont;
-  if (map->in_cont()) {
-    cont = map->cont();
-  } else {
-    cont = get_continutation_for_frame(map->thread(), fr);
-  }
-  return reg_to_location(cont, fr, map, reg, is_oop);
-}
-
-address Continuation::reg_to_location(oop contOop, const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop) {
-  assert (map != NULL, "");
   assert (fr.is_compiled_frame(), "");
+  assert (map->in_cont(), "");
 
   // assert (!is_continuation_entry_frame(fr, map), "");
   // if (is_continuation_entry_frame(fr, map)) {
@@ -4704,9 +4693,7 @@ address Continuation::reg_to_location(oop contOop, const frame& fr, const Regist
   //   return map->location(reg); // see sender_for_frame, `if (sender.is_empty())`
   // }
 
-  assert (contOop != NULL, "");
-
-  ContMirror cont(map->thread(), contOop);
+  ContMirror cont(map);
   if (cont.find_chunk(fr.unextended_sp()) != (oop)NULL) {
     return map->location(reg);
   }
@@ -5156,14 +5143,6 @@ void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_o
   }
 }
 
-JVM_ENTRY(void, CONT_Clean(JNIEnv* env, jobject jcont)) {
-    JavaThread* thread = JavaThread::thread_from_jni_environment(env);
-    oop oopCont = JNIHandles::resolve_non_null(jcont);
-    ContMirror cont(thread, oopCont);
-    cont.cleanup();
-}
-JVM_END
-
 JVM_ENTRY(jint, CONT_isPinned0(JNIEnv* env, jobject cont_scope)) {
   JavaThread* thread = JavaThread::thread_from_jni_environment(env);
   return is_pinned0(thread, JNIHandles::resolve(cont_scope), false);
@@ -5224,7 +5203,6 @@ JVM_END
 #define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
 
 static JNINativeMethod CONT_methods[] = {
-    {CC"clean0",           CC"()V",                              FN_PTR(CONT_Clean)},
     {CC"tryForceYield0",   CC"(Ljava/lang/Thread;)I",            FN_PTR(CONT_TryForceYield0)},
     {CC"isPinned0",        CC"(Ljava/lang/ContinuationScope;)I", FN_PTR(CONT_isPinned0)},
 };

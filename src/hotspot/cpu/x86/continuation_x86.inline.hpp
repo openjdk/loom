@@ -481,6 +481,7 @@ static intptr_t* slow_real_fp(const frame& f) {
   return FKind::interpreted ? f.fp() : f.unextended_sp() + slow_get_cb(f)->frame_size();
 }
 
+#ifdef ASSERT
 template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
 static intptr_t** slow_link_address(const frame& f) {
   assert (FKind::is_instance(f), "");
@@ -488,6 +489,7 @@ static intptr_t** slow_link_address(const frame& f) {
             ? (intptr_t**)(f.fp() + frame::link_offset)
             : (intptr_t**)(slow_real_fp<FKind>(f) - frame::sender_sp_offset);
 }
+#endif
 
 template<typename FKind>
 static address* slow_return_pc_address(const frame& f) {
@@ -658,7 +660,7 @@ inline frame ContinuationHelper::to_frame(FrameInfo* fi) {
   address pc = fi->pc;
   int slot;
   CodeBlob* cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
-  assert (cb != NULL, "");
+  assert (cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
   assert (!indirect || fi->fp != NULL, "");
   return frame(fi->sp, fi->sp, 
     indirect ? *(intptr_t**)fi->fp : fi->fp, 

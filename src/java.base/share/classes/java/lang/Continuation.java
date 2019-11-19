@@ -557,8 +557,8 @@ public class Continuation {
     static private native int isPinned0(ContinuationScope scope);
 
     private void clean() {
-        if (!isStackEmpty())
-            clean0();
+        // if (!isStackEmpty())
+        //     clean0();
     }
 
     private boolean fence() {
@@ -863,7 +863,7 @@ public class Continuation {
         return Integer.toHexString(System.identityHashCode(this)) + " [" + currentCarrierThread().getId() + "]";
     }
 
-    private native void clean0();
+    // private native void clean0();
 
     /**
      * TBD

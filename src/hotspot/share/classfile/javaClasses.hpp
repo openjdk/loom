@@ -1084,8 +1084,8 @@ class java_lang_Continuation: AllStatic {
   static inline void set_fp(oop ref, const jlong i);
   static inline jint sp(oop ref);
   static inline void set_sp(oop ref, const jint i);
-  static inline void* pc(oop ref);
-  static inline void  set_pc(oop ref, const void* pc);
+  static inline address pc(oop ref);
+  static inline void  set_pc(oop ref, const address pc);
   static inline jint refSP(oop ref);
   static inline void set_refSP(oop ref, jint i);
   static inline intptr_t* entrySP(oop ref);
