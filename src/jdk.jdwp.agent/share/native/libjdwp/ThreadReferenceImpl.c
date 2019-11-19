@@ -245,15 +245,6 @@ validateSuspendedThread(PacketOutputStream *out, jthread thread)
         return NULL;
     }
 
-    if (isFiber(thread)) {
-        /* Make sure the Fiber is mounted on a thread that we can do stack operations on. */
-        result = threadControl_getFiberCarrierOrHelperThread(thread);
-        if (result == NULL) {
-            /* fiber fixme: this should never happen once we get proper unmounted fiber supported. */
-            (void)outStream_writeInt(out, 0);
-        }
-    }
-
     return result;
 }
 
@@ -419,6 +410,15 @@ ownedMonitors(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
+    // fiber fixme: for now fibers are assumed to have 0 owned monitors. However it is
+    // actually possible for them to own one or more. Currently that implies the fiber
+    // is pinned to a carrier thread, so we could attempt to get the count from it, but
+    // in the future this might not be the case, and we would need JVMTI support.
+    if (isFiber(thread)) {
+        (void)outStream_writeInt(out, 0);
+        return JNI_TRUE;
+    }
+
     WITH_LOCAL_REFS(env, 1) {
 
         jvmtiError error;
@@ -469,6 +469,15 @@ currentContendedMonitor(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
+    // fiber fixme: for now fibers are assumed to have 0 contended monitors. However it is
+    // actually possible for them to own one or more. Currently that implies the fiber
+    // is pinned to a carrier thread, so we could attempt to get the count from it, but
+    // in the future this might not be the case, and we would need JVMTI support.
+    if (isFiber(thread)) {
+        (void)outStream_writeInt(out, 0);
+        return JNI_TRUE;
+    }
+
     WITH_LOCAL_REFS(env, 1) {
 
         jobject monitor;
@@ -512,7 +521,6 @@ stop(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* fiber fixme: add fiber support */
     if (isFiber(thread)) {
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
@@ -599,6 +607,15 @@ ownedMonitorsWithStackDepth(PacketInputStream *in, PacketOutputStream *out)
 
     thread = validateSuspendedThread(out, thread);
     if (thread == NULL) {
+        return JNI_TRUE;
+    }
+
+    // fiber fixme: for now fibers are assumed to have 0 owned monitors. However it is
+    // actually possible for them to own one or more. Currently that implies the fiber
+    // is pinned to a carrier thread, so we could attempt to get the count from it, but
+    // in the future this might not be the case, and we would need JVMTI support.
+    if (isFiber(thread)) {
+        (void)outStream_writeInt(out, 0);
         return JNI_TRUE;
     }
 

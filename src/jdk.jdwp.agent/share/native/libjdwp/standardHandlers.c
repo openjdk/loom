@@ -106,6 +106,7 @@ handleFrameEvent(JNIEnv *env, EventInfo *evinfo,
     FrameNumber fnum = 0;
     jvalue returnValue;
 
+    JDI_ASSERT(!isFiber(evinfo->thread));
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
             (gdata->jvmti, evinfo->thread, fnum, &method, &location);
     if (error != JVMTI_ERROR_NONE) {

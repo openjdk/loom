@@ -90,6 +90,7 @@ getFrameLocation(jthread thread,
     *pmethod = NULL;
     *plocation = -1;
 
+    JDI_ASSERT(!isFiber(thread));
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
             (gdata->jvmti, thread, 0, pmethod, plocation);
     if (error == JVMTI_ERROR_NONE && *pmethod!=NULL ) {

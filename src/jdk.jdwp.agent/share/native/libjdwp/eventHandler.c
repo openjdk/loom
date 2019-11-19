@@ -687,22 +687,6 @@ event_callback_helper(JNIEnv *env, EventInfo *evinfo)
     LOG_MISC(("event_callback(): ei=%s", eventText(ei)));
     log_debugee_location("event_callback()", evinfo->thread, evinfo->method, evinfo->location);
 
-    if (evinfo->thread != NULL) {
-        /* fiber fixme: ignore all events on the fiber helper thread. Remove this when
-         * the need for helper threads goes away.
-         */
-        jclass threadClass = JNI_FUNC_PTR(env, GetObjectClass)(env, evinfo->thread);
-        if (JNI_FUNC_PTR(env, IsSameObject)(env, threadClass, gdata->innocuousThreadClass)) {
-            return;
-        }
-    }
-
-    /* fiber fixme: little hack to ignore THREAD_START events while we are creating a fiber
-     * helper thread. The need for this will eventually go away. */
-    if (gdata->ignoreEvents) {
-        return;
-    }
-
     /* We want to preserve any current exception that might get
      * wiped out during event handling (e.g. JNI calls). We have
      * to rely on space for the local reference on the current
@@ -1222,6 +1206,7 @@ cbMonitorContendedEnter(jvmtiEnv *jvmti_env, JNIEnv *env,
         info.thread     = thread;
         info.object     = object;
         /* get current location of contended monitor enter */
+        JDI_ASSERT(!isFiber(thread));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
                 (gdata->jvmti, thread, 0, &method, &location);
         if (error == JVMTI_ERROR_NONE) {
@@ -1255,6 +1240,7 @@ cbMonitorContendedEntered(jvmtiEnv *jvmti_env, JNIEnv *env,
         info.thread     = thread;
         info.object     = object;
         /* get current location of contended monitor enter */
+        JDI_ASSERT(!isFiber(thread));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
                 (gdata->jvmti, thread, 0, &method, &location);
         if (error == JVMTI_ERROR_NONE) {
@@ -1340,6 +1326,7 @@ cbMonitorWaited(jvmtiEnv *jvmti_env, JNIEnv *env,
         info.u.monitor.timed_out = timed_out;
 
         /* get location of monitor wait() method */
+        JDI_ASSERT(!isFiber(thread));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
                 (gdata->jvmti, thread, 0, &method, &location);
         if (error == JVMTI_ERROR_NONE) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2005, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -246,15 +246,6 @@ getValues(PacketInputStream *in, PacketOutputStream *out)
     if (serror != JDWP_ERROR(NONE)) {
         outStream_setError(out, serror);
         return JNI_TRUE;
-    }
-
-    if (isFiber(thread)) {
-        thread = threadControl_getFiberCarrierOrHelperThread(thread);
-        if (thread == NULL) {
-            /* fiber fixme: we failed to get the helper thread. Just return 0 locals. */
-            (void)outStream_writeInt(out, 0);
-            return JNI_TRUE;
-        }
     }
 
     (void)outStream_writeInt(out, variableCount);

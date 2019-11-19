@@ -349,6 +349,7 @@ eventInstance(EventInfo *evinfo)
                         (gdata->jvmti, thread, fnum, &object);
         } else {
             /* get slot zero object "this" */
+            JDI_ASSERT(!isFiber(thread));
             error = JVMTI_FUNC_PTR(gdata->jvmti,GetLocalObject)
                         (gdata->jvmti, thread, fnum, 0, &object);
         }
