@@ -1306,7 +1306,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
                     FormatBuffer<1024>("#%d method %s @ %d", frame_no, m->name_and_sig_as_C_string(), bci), 3);
     values.describe(-1, info_address,
                     err_msg("- %d locals %d max stack", m->max_locals(), m->max_stack()), 2);
-    values.describe(frame_no, (intptr_t*)sender_pc_addr(), "return address");
+    values.describe(frame_no, (intptr_t*)sender_pc_addr(), Continuation::is_return_barrier_entry(*sender_pc_addr()) ? "return address (return barrier)" : "return address");
 
     if (m->max_locals() > 0) {
       intptr_t* l0 = interpreter_frame_local_at(0);
