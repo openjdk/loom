@@ -60,7 +60,7 @@ public class ThreadLocalCoders {
 
         Object forName(Object name) {
             Object[] oa;
-            if (Thread.currentThread().isLightweight()) {
+            if (Thread.currentThread().isVirtual()) {
                 oa = new Object[size];
             } else {
                 oa = cache.get();

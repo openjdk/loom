@@ -31,7 +31,7 @@ import java.io.IOException;
 
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
-import jdk.internal.misc.LightweightThreads;
+import jdk.internal.misc.VirtualThreads;
 
 /**
  * An interface that allows translation (and more!).
@@ -85,14 +85,14 @@ public interface SelChImpl extends Channel {
      * @param nanos the timeout to wait; {@code <= 0} to wait indefinitely
      */
     default void park(int event, long nanos) throws IOException {
-        if (Thread.currentThread().isLightweight()) {
+        if (Thread.currentThread().isVirtual()) {
             Poller.register(getFDVal(), event);
             if (isOpen()) {
                 try {
                     if (nanos == 0) {
-                        LightweightThreads.park();
+                        VirtualThreads.park();
                     } else {
-                        LightweightThreads.park(nanos);
+                        VirtualThreads.park(nanos);
                     }
                 } finally {
                     Poller.deregister(getFDVal(), event);

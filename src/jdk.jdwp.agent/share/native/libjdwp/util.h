@@ -85,8 +85,6 @@ typedef struct {
     jboolean modifiedUtf8;
     jboolean quiet;
 
-    jboolean ignoreEvents;
-
     /* Debug flags (bit mask) */
     int      debugflags;
 
@@ -102,9 +100,7 @@ typedef struct {
     jclass              classLoaderClass;
     jclass              stringClass;
     jclass              systemClass;
-    jclass              innocuousThreadClass; /* fibers fixme: get rid of once helper threads go away */
     jmethodID           fiberToString;
-    jmethodID           fiberTryMountAndSuspend;
     jmethodID           threadConstructor;
     jmethodID           threadSetDaemon;
     jmethodID           threadResume;

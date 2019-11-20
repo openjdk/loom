@@ -50,7 +50,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-import jdk.internal.misc.LightweightThreads;
+import jdk.internal.misc.VirtualThreads;
 import jdk.internal.ref.CleanerFactory;
 import jdk.internal.access.SharedSecrets;
 import sun.net.ConnectionResetException;
@@ -173,15 +173,15 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
      */
     private void park(FileDescriptor fd, int event, long nanos) throws IOException {
         Thread t = Thread.currentThread();
-        if (t.isLightweight()) {
+        if (t.isVirtual()) {
             int fdVal = fdVal(fd);
             Poller.register(fdVal, event);
             if (isOpen()) {
                 try {
                     if (nanos == 0) {
-                        LightweightThreads.park();
+                        VirtualThreads.park();
                     } else {
-                        LightweightThreads.park(nanos);
+                        VirtualThreads.park(nanos);
                     }
                     // throw SocketException with interrupt status set for now
                     if (t.isInterrupted()) {
@@ -220,7 +220,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
         throws IOException
     {
         if (!nonBlocking
-            && (timed || Thread.currentThread().isLightweight())) {
+            && (timed || Thread.currentThread().isVirtual())) {
             assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
             IOUtil.configureBlocking(fd, false);
             nonBlocking = true;
@@ -901,8 +901,8 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             if (!tryClose()) {
                 long reader = readerThread;
                 long writer = writerThread;
-                if (NativeThread.isLightweightThread(reader)
-                        || NativeThread.isLightweightThread(writer))
+                if (NativeThread.isVirtualThread(reader)
+                        || NativeThread.isVirtualThread(writer))
                     Poller.stopPoll(fdVal(fd));
                 nd.preClose(fd);
                 if (NativeThread.isKernelThread(reader))
@@ -1149,7 +1149,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             ensureOpenAndConnected();
             if (!isInputClosed) {
                 Net.shutdown(fd, Net.SHUT_RD);
-                if (NativeThread.isLightweightThread(readerThread)) {
+                if (NativeThread.isVirtualThread(readerThread)) {
                     Poller.stopPoll(fdVal(fd), Net.POLLIN);
                 }
                 isInputClosed = true;
@@ -1163,7 +1163,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             ensureOpenAndConnected();
             if (!isOutputClosed) {
                 Net.shutdown(fd, Net.SHUT_WR);
-                if (NativeThread.isLightweightThread(writerThread)) {
+                if (NativeThread.isVirtualThread(writerThread)) {
                     Poller.stopPoll(fdVal(fd), Net.POLLOUT);
                 }
                 isOutputClosed = true;

@@ -29,10 +29,10 @@ import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
- * Supporting methods to park/unpark lightweight threads.
+ * Supporting methods to park/unpark virtual threads.
  */
 
-public final class LightweightThreads {
+public final class VirtualThreads {
     private static final JavaLangAccess JLA;
     static {
         JLA = SharedSecrets.getJavaLangAccess();
@@ -40,7 +40,7 @@ public final class LightweightThreads {
             throw new InternalError("JavaLangAccess not setup");
         }
     }
-    private LightweightThreads() { }
+    private VirtualThreads() { }
 
     /**
      * Returns the current carrier thread
@@ -50,23 +50,23 @@ public final class LightweightThreads {
     }
 
     /**
-     * Parks the current lightweight thread
+     * Parks the current virtual thread
      */
     public static void park() {
-        JLA.parkLightweightThread();
+        JLA.parkVirtualThread();
     }
 
     /**
-     * Parks the current lightweight thread for up to the given waiting time
+     * Parks the current virtual thread for up to the given waiting time
      */
     public static void park(long nanos) {
-        JLA.parkLightweightThread(nanos);
+        JLA.parkVirtualThread(nanos);
     }
 
     /**
-     * Unparks the given lightweight thread
+     * Unparks the given virtual thread
      */
     public static void unpark(Thread thread) {
-        JLA.unparkLightweightThread(thread);
+        JLA.unparkVirtualThread(thread);
     }
 }

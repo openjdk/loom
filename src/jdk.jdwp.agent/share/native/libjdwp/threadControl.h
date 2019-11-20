@@ -76,7 +76,6 @@ void threadControl_saveCLEInfo(JNIEnv *env, jthread thread, EventIndex ei,
 jlong threadControl_getFrameGeneration(jthread thread);
 
 jthread *threadControl_allFibers(jint *numFibers);
-jthread threadControl_getFiberCarrierOrHelperThread(jthread fiber);
 void threadControl_addFiber(jthread fiber);
 jboolean threadControl_isKnownFiber(jthread fiber);
 

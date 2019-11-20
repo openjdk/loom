@@ -79,7 +79,7 @@ public class TerminatingThreadLocal<T> extends ThreadLocal<T> {
      * @param tl the ThreadLocal to register
      */
     public static void register(TerminatingThreadLocal<?> tl) {
-        if (!Thread.currentThread().isLightweight())
+        if (!Thread.currentThread().isVirtual())
             REGISTRY.get().add(tl);
     }
 
@@ -89,7 +89,7 @@ public class TerminatingThreadLocal<T> extends ThreadLocal<T> {
      * @param tl the ThreadLocal to unregister
      */
     private static void unregister(TerminatingThreadLocal<?> tl) {
-        if (!Thread.currentThread().isLightweight())
+        if (!Thread.currentThread().isVirtual())
             REGISTRY.get().remove(tl);
     }
 

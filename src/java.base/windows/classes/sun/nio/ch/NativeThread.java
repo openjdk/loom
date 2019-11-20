@@ -29,11 +29,11 @@ package sun.nio.ch;
 // Signalling operations on native threads
 
 class NativeThread {
-    private static final long LIGHTWEIGHT_THREAD_ID = -1L;
+    private static final long VIRTUAL_THREAD_ID = -1L;
 
     static long current() {
-        if (Thread.currentThread().isLightweight()) {
-            return LIGHTWEIGHT_THREAD_ID;
+        if (Thread.currentThread().isVirtual()) {
+            return VIRTUAL_THREAD_ID;
         } else {
             return 0;
         }
@@ -48,7 +48,7 @@ class NativeThread {
     }
 
     static boolean isLightweightThread(long tid) {
-        return (tid == LIGHTWEIGHT_THREAD_ID);
+        return (tid == VIRTUAL_THREAD_ID);
     }
 
     static boolean isKernelThread(long tid) {

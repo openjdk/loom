@@ -347,7 +347,7 @@ public class Object {
             wait0(timeoutMillis);
         } catch (InterruptedException e) {
             Thread thread = Thread.currentThread();
-            if (thread.isLightweight()) {
+            if (thread.isVirtual()) {
                 thread.clearInterrupt();
             }
             throw e;

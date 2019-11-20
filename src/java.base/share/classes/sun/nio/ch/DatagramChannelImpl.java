@@ -997,7 +997,7 @@ class DatagramChannelImpl
      */
     private void lockedConfigureNonBlockingIfNeeded() throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
-        if (!nonBlocking && Thread.currentThread().isLightweight()) {
+        if (!nonBlocking && Thread.currentThread().isVirtual()) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
@@ -1449,8 +1449,8 @@ class DatagramChannelImpl
                 long reader = readerThread;
                 long writer = writerThread;
                 if (reader != 0 || writer != 0) {
-                    if (NativeThread.isLightweightThread(reader)
-                            || NativeThread.isLightweightThread(writer)) {
+                    if (NativeThread.isVirtualThread(reader)
+                            || NativeThread.isVirtualThread(writer)) {
                         Poller.stopPoll(fdVal);
                     }
                     nd.preClose(fd);

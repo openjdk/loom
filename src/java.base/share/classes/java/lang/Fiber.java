@@ -55,7 +55,8 @@ import static java.lang.StackWalker.Option.SHOW_REFLECT_FRAMES;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
- * Lightweight thread implementation.
+ * A thread that is scheduled by the Java virtual machine rather than the operating
+ * system.
  */
 
 class Fiber extends Thread {
@@ -110,11 +111,9 @@ class Fiber extends Thread {
      * @param characteristics characteristics
      * @param task the task to execute
      */
-    @SuppressWarnings("unchecked")
     Fiber(Executor scheduler, String name, int characteristics, Runnable task) {
         super(name, characteristics);
 
-        Objects.requireNonNull(scheduler);
         Objects.requireNonNull(task);
 
         Runnable target = () -> {
@@ -130,7 +129,7 @@ class Fiber extends Thread {
             }
         };
 
-        this.scheduler = scheduler;
+        this.scheduler = (scheduler != null) ? scheduler : DEFAULT_SCHEDULER;
         this.cont = new Continuation(FIBER_SCOPE, target) {
             @Override
             protected void onPinned(Continuation.Pinned reason) {
@@ -144,10 +143,6 @@ class Fiber extends Thread {
 
         // TBD create ForkJoinTask to avoid wrapping
         this.runContinuation = this::runContinuation;
-    }
-
-    Fiber(String name, int characteristics, Runnable task) {
-        this(DEFAULT_SCHEDULER, name, characteristics, task);
     }
 
     /**
@@ -632,7 +627,7 @@ class Fiber extends Thread {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("LightweightThread[");
+        StringBuilder sb = new StringBuilder("VirtualThread[");
         String name = getName();
         if (name.length() > 0) {
             sb.append(name);
@@ -1005,10 +1000,5 @@ class Fiber extends Thread {
                 return 2;
         }
         return 0;
-    }
-
-    // remove when JDWP agent updated to not use it
-    Thread tryMountAndSuspend() {
-        return null;
     }
 }

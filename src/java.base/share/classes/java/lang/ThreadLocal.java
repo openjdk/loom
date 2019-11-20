@@ -271,7 +271,7 @@ public class ThreadLocal<T> {
     ThreadLocalMap getMap(Thread t) {
         ThreadLocalMap map = t.threadLocals;
         if (map == ThreadLocalMap.NOT_SUPPORTED) {
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException("Thread locals not supported");
         }
         return map;
     }

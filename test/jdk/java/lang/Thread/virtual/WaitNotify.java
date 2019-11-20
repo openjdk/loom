@@ -24,7 +24,7 @@
 /**
  * @test
  * @run testng WaitNotify
- * @summary Test lightweight threads using Object.wait/notify
+ * @summary Test virtual threads using Object.wait/notify
  */
 
 import java.util.concurrent.Semaphore;
@@ -35,11 +35,11 @@ import static org.testng.Assert.*;
 @Test
 public class WaitNotify {
 
-    // lightweight thread waits, notified by dinosaur thread
+    // virtual thread waits, notified by dinosaur thread
     public void testWaitNotify1() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread = Thread.newLightWeightThread(0, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             synchronized (lock) {
                 ready.release();
                 try {
@@ -56,11 +56,11 @@ public class WaitNotify {
         thread.join();
     }
 
-    // dinosaur thread waits, notified by lightweight thread
+    // dinosaur thread waits, notified by virtual thread
     public void testWaitNotify2() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread = Thread.newLightWeightThread(0, () -> {
+        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             ready.acquireUninterruptibly();
             synchronized (lock) {
                 lock.notifyAll();
@@ -74,11 +74,11 @@ public class WaitNotify {
         thread.join();
     }
 
-    // lightweight thread waits, notified by other lightweight thread
+    // virtual thread waits, notified by other virtual thread
     public void testWaitNotify3() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread1 = Thread.newLightWeightThread(0, () -> {
+        var thread1 = Thread.newThread(Thread.VIRTUAL, () -> {
             synchronized (lock) {
                 ready.release();
                 try {
@@ -86,7 +86,7 @@ public class WaitNotify {
                 } catch (InterruptedException e) { }
             }
         });
-        var thread2 = Thread.newLightWeightThread(0, () -> {
+        var thread2 = Thread.newThread(Thread.VIRTUAL, () -> {
             ready.acquireUninterruptibly();
             synchronized (lock) {
                 lock.notifyAll();
@@ -98,7 +98,7 @@ public class WaitNotify {
 
     // interrupt before Object.wait
     public void testWaitNotify4() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             t.interrupt();
             Object lock = new Object();
@@ -116,7 +116,7 @@ public class WaitNotify {
 
     // interrupt while waiting in Object.wait
     public void testWaitNotify5() throws Exception {
-        TestHelper.runInLightWeightThread(() -> {
+        TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 1000);
             Object lock = new Object();

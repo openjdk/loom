@@ -416,7 +416,7 @@ class ServerSocketChannelImpl
      */
     private void lockedConfigureNonBlockingIfNeeded() throws IOException {
         assert acceptLock.isHeldByCurrentThread();
-        if (!nonBlocking && (Thread.currentThread().isLightweight())) {
+        if (!nonBlocking && (Thread.currentThread().isVirtual())) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
@@ -465,7 +465,7 @@ class ServerSocketChannelImpl
             if (!tryClose()) {
                 long th = thread;
                 if (th != 0) {
-                    if (NativeThread.isLightweightThread(th))
+                    if (NativeThread.isVirtualThread(th))
                         Poller.stopPoll(fdVal);
                     nd.preClose(fd);
                     if (NativeThread.isKernelThread(th))
