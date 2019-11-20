@@ -563,11 +563,15 @@ public:
 private:
   ContMirror(const ContMirror& cont); // no copy constructor
 
-  void read();
+  DEBUG_ONLY(bool sp_unread();)
 
 public:
-  ContMirror(JavaThread* thread, oop cont);
-  ContMirror(const RegisterMap* map);
+  ContMirror(JavaThread* thread, oop cont); // does not automatically read the continuation object
+  ContMirror(const RegisterMap* map); // automatically reads the continuation object
+
+  void read();
+  void read_minimal();
+  void read_rest();
 
   intptr_t hash() {
     #ifndef PRODUCT
@@ -577,6 +581,7 @@ public:
     #endif
   }
 
+  void write_minimal();
   void write();
 
   oop mirror() { return _cont; }
@@ -871,16 +876,30 @@ inline frame HFrameBase<SelfPD>::to_frame(ContMirror& cont) const {
   return self().to_frame(cont, pc, deopt);
 }
 
+#ifndef PRODUCT
+bool ContMirror::sp_unread() { return _sp == -10; }
+#endif
+
 ContMirror::ContMirror(JavaThread* thread, oop cont)
  : _thread(thread), _cont(cont),
+#ifndef PRODUCT
+  _entrySP(NULL), _entryFP(NULL), _entryPC(NULL), 
+  _tail(NULL),
+  _sp(-10), _fp(0), _pc(0), // -10 is a special value showing _sp has not been read
+  _stack(NULL), _hstack(NULL), _ref_stack(NULL),
+#endif
    _e_num_interpreted_frames(0), _e_num_frames(0), _e_num_refs(0), _e_size(0) {
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
-
-  read();
 }
 
 ContMirror::ContMirror(const RegisterMap* map)
  : _thread(map->thread()), _cont(map->cont()),
+#ifndef PRODUCT
+  _entrySP(NULL), _entryFP(NULL), _entryPC(NULL), 
+  _tail(NULL),
+  _sp(-10), _fp(0), _pc(0), // -10 is a special value showing _sp has not been read
+  _stack(NULL), _hstack(NULL), _ref_stack(NULL),
+#endif
    _e_num_interpreted_frames(0), _e_num_frames(0), _e_num_refs(0), _e_size(0) {
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
 
@@ -888,15 +907,32 @@ ContMirror::ContMirror(const RegisterMap* map)
 }
 
 void ContMirror::read() {
+    read_minimal();
+    read_rest();
+}
+void ContMirror::read_minimal() {
+  assert (_entryPC == NULL, "");
   _entrySP = java_lang_Continuation::entrySP(_cont);
-  _entryFP = java_lang_Continuation::entryFP(_cont);
   _entryPC = java_lang_Continuation::entryPC(_cont);
+  _entryFP = java_lang_Continuation::entryFP(_cont);
+  _tail    = java_lang_Continuation::tail(_cont);
+  _pc      = java_lang_Continuation::pc(_cont); // for is_empty0
+  _flags   = java_lang_Continuation::flags(_cont);
+  _max_size = java_lang_Continuation::maxSize(_cont);
 
-  _tail = java_lang_Continuation::tail(_cont);
+  if (log_develop_is_enabled(Trace, jvmcont)) {
+    log_develop_trace(jvmcont)("Reading continuation object:");
+    log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(_entrySP), p2i(_entryPC));
+    log_develop_trace(jvmcont)("\ttail: " INTPTR_FORMAT, p2i((oopDesc*)_tail));
+     log_develop_trace(jvmcont)("\tpc: " INTPTR_FORMAT, p2i(_pc));
+    log_develop_trace(jvmcont)("\tmax_size: %lu", _max_size);
+    log_develop_trace(jvmcont)("\tflags: %d", _flags);
+  }
+}
 
+void ContMirror::read_rest() {
   _sp = java_lang_Continuation::sp(_cont);
   _fp = (intptr_t)java_lang_Continuation::fp(_cont);
-  _pc = java_lang_Continuation::pc(_cont);
 
   _stack = java_lang_Continuation::stack(_cont);
   if (_stack != NULL) {
@@ -906,12 +942,9 @@ void ContMirror::read() {
     _stack_length = 0;
     _hstack = NULL;
   }
-  _max_size = java_lang_Continuation::maxSize(_cont);
 
   _ref_stack = java_lang_Continuation::refStack(_cont);
   _ref_sp = java_lang_Continuation::refSP(_cont);
-
-  _flags = java_lang_Continuation::flags(_cont);
 
   _num_frames = java_lang_Continuation::numFrames(_cont);
   _num_interpreted_frames = java_lang_Continuation::numInterpretedFrames(_cont);
@@ -923,10 +956,25 @@ void ContMirror::read() {
     log_develop_trace(jvmcont)("\tsp: %d fp: %ld 0x%lx pc: " INTPTR_FORMAT, _sp, _fp, _fp, p2i(_pc));
     log_develop_trace(jvmcont)("\tstack: " INTPTR_FORMAT " hstack: " INTPTR_FORMAT ", stack_length: %d max_size: " SIZE_FORMAT, p2i((oopDesc*)_stack), p2i(_hstack), _stack_length, _max_size);
     log_develop_trace(jvmcont)("\tref_stack: " INTPTR_FORMAT " ref_sp: %d", p2i((oopDesc*)_ref_stack), _ref_sp);
-    log_develop_trace(jvmcont)("\tflags: %d", _flags);
     log_develop_trace(jvmcont)("\tnum_frames: %d", _num_frames);
     log_develop_trace(jvmcont)("\tnum_interpreted_frames: %d", _num_interpreted_frames);
   }
+}
+
+void ContMirror::write_minimal() {
+  if (log_develop_is_enabled(Trace, jvmcont)) {
+    log_develop_trace(jvmcont)("Writing continuation object:");
+    log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(_entrySP), p2i(_entryFP), p2i(_entryPC));
+    log_develop_trace(jvmcont)("\tmax_size: " SIZE_FORMAT, _max_size);
+    log_develop_trace(jvmcont)("\tflags: %d", _flags);
+  }
+
+  java_lang_Continuation::set_entrySP(_cont, _entrySP);
+  java_lang_Continuation::set_entryFP(_cont, _entryFP);
+  java_lang_Continuation::set_entryPC(_cont, _entryPC);
+
+  java_lang_Continuation::set_maxSize(_cont, (jint)_max_size);
+  java_lang_Continuation::set_flags(_cont, _flags);
 }
 
 void ContMirror::write() {
@@ -970,7 +1018,7 @@ void ContMirror::null_ref_stack(int start, int num) {
 }
 
 bool ContMirror::is_empty0() {
-  assert ((_pc == NULL) == (_sp < 0 || _sp >= _stack->length()), "");
+  assert (sp_unread() || (_pc == NULL) == (_sp < 0 || _sp >= _stack->length()), "");
   return _pc == NULL;
 }
 bool ContMirror::is_empty() {
@@ -1430,9 +1478,9 @@ static inline void clear_anchor(JavaThread* thread) {
 }
 
 #ifdef ASSERT
-static void set_anchor(ContMirror& cont) {
-  FrameInfo fi = { cont.entryPC(), cont.entryFP(), cont.entrySP() };
-  set_anchor<false>(cont.thread(), &fi);
+static void set_anchor(JavaThread* thread, const FrameInfo* fi, address pc) {
+  FrameInfo fi0 = { pc, fi->fp, fi->sp };
+  set_anchor<false>(thread, &fi0);
 }
 #endif
 
@@ -2025,10 +2073,13 @@ private:
 public:
 
   Freeze(JavaThread* thread, ContMirror& mirror) :
-    _thread(thread), _cont(mirror), _bottom_address(mirror.entrySP()),
+    _thread(thread), _cont(mirror),
     _oops(0), _size(0), _frames(0), _cgrind_interpreted_frames(0),
     _fp_oop_info(), _map(thread, false, false, false),
     _safepoint_stub_caller(false), _keepalive(NULL) {
+
+    _cont.read_minimal();
+    _bottom_address = _cont.entrySP();
 
     _map.set_include_argument_oops(false);
   }
@@ -2040,6 +2091,8 @@ public:
     _safepoint_stub_caller(false), _keepalive(NULL) {
 
     assert (mode == mode_fast, "");
+    _cont.read_minimal();
+
     // this is only uaed to terminate the frame loop. 
     _bottom_address = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
     int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
@@ -2067,8 +2120,9 @@ public:
         e.commit();
       }
     }
-
     log_develop_trace(jvmcont)("no young freeze mode: %d #" INTPTR_FORMAT, mode, _cont.hash());
+
+    _cont.read_rest();
 
     HandleMark hm(_thread);
 
@@ -2078,7 +2132,12 @@ public:
     assert (!_map.include_argument_oops(), "should be");
     frame f = freeze_start_frame(_map);
     hframe caller;
-    return freeze<true>(f, caller, 0);
+    freeze_result res = freeze<true>(f, caller, 0);
+    
+    _cont.set_flag(FLAG_SAFEPOINT_YIELD, mode == mode_preempt);
+    _cont.write(); // commit the freeze
+
+    return res;
   }
 
   bool freeze_chunk() {
@@ -2088,7 +2147,7 @@ public:
 
     log_develop_trace(jvmcont)("freeze_chunk");
     assert (mode == mode_fast, "");
-    assert (!Interpreter::contains(_cont.entryPC()), "");
+    assert (!Interpreter::contains(java_lang_Continuation::entryPC(_cont.mirror())), "");
 
     oop chunk = _cont.tail();
 
@@ -2130,6 +2189,8 @@ public:
         assert (false, "ewhkjefdhksadf");
         return false;
       }
+      _cont.set_tail(chunk);
+      java_lang_Continuation::set_tail(_cont.mirror(), chunk);
     } else {
       // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
       // if (requires_barriers(chunk)) {
@@ -2178,9 +2239,11 @@ public:
       *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
       // *(intptr_t**)(bottom_sp - frame::sender_sp_offset) = fp; -- necessary ?
     }
-
-    _cont.set_tail(chunk);
+    
     _cont.add_size(size << LogBytesPerWord);
+    _cont.set_flag(FLAG_SAFEPOINT_YIELD, false);
+    _cont.write_minimal();
+
     log_develop_trace(jvmcont)("Young chunk success");
     if (log_develop_is_enabled(Debug, jvmcont)) print_chunk(chunk, _cont.mirror(), true);
 
@@ -2258,7 +2321,7 @@ public:
     assert (sp != NULL, "");
     _fi->sp = sp;
     _fi->pc = Continuation::is_return_barrier_entry(*(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET)) 
-                  ? _cont.entryPC()
+                  ? _cont.entryPC() // java_lang_Continuation::entryPC(_cont.mirror())
                   : *(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET); // Continuation.run may have been deoptimized
     to_frame_info_chunk_pd(sp);
     log_develop_debug(jvmcont)("Jumping to frame (freeze): pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(_fi->pc), p2i(_fi->sp), p2i(*(intptr_t**)_fi->fp));
@@ -2283,9 +2346,9 @@ public:
       break;
     }
     if (pc == NULL) {
-      assert ((_cont.pc() == NULL) == _cont.is_empty(), "(_cont.pc() == NULL): %d _cont.is_empty(): %d", (_cont.pc() == NULL), _cont.is_empty());
-      assert (Interpreter::contains(_cont.pc()) == _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED), "");
-      pc = _cont.pc();
+      pc = java_lang_Continuation::pc(_cont.mirror()); // may not have been read yet
+      // assert ((pc == NULL) == _cont.is_empty(), "(pc == NULL): %d _cont.is_empty(): %d", (pc == NULL), _cont.is_empty());
+      assert (Interpreter::contains(pc) == _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED), "");
       if (pc == NULL || _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED))
         return 0;
     }
@@ -3096,10 +3159,6 @@ int freeze0(JavaThread* thread, FrameInfo* fi) {
 
   PERFTEST_ONLY(if (PERFTEST_LEVEL <= 15) return freeze_ok;)
 
-  cont.set_flag(FLAG_SAFEPOINT_YIELD, mode == mode_preempt);
-
-  cont.write(); // commit the freeze
-
   assert (verify_continuation<2>(cont.mirror()), "");
 
   cont.post_jfr_event(&event);
@@ -3394,12 +3453,12 @@ public:
 
     assert (!_map.include_argument_oops(), "should be");
 
-    DEBUG_ONLY(int orig_num_frames = _cont.num_frames();)
+    DEBUG_ONLY(int orig_num_frames = java_lang_Continuation::numFrames(_cont.mirror());/*_cont.num_frames();*/)
     DEBUG_ONLY(_frames = 0;)
 
     thaw<true>(num_frames);
 
-    assert (_cont.num_frames() == orig_num_frames - _frames, "cont.is_empty: %d num_frames: %d orig_num_frames: %d frame_count: %d", _cont.is_empty(), _cont.num_frames(), orig_num_frames, _frames);
+    assert (java_lang_Continuation::numFrames(_cont.mirror()) == orig_num_frames - _frames, "num_frames: %d orig_num_frames: %d frame_count: %d", java_lang_Continuation::numFrames(_cont.mirror()), orig_num_frames, _frames);
     // assert (mode != mode_fast || _fastpath, "");
     assert(_cont.chunk_invariant(), "");
     return _fastpath;
@@ -3415,11 +3474,16 @@ public:
         e.commit();
       }
 
+      _cont.read_rest();
+
       hframe hf = _cont.last_frame<mode>();
       log_develop_trace(jvmcont)("top_hframe before (thaw):"); if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on(_cont, tty);
       frame caller;
       thaw<top>(hf, caller, num_frames);
       assert(_cont.chunk_invariant(), "");
+      
+      _cont.write();
+      
       return caller.sp();
     }
 
@@ -3458,6 +3522,7 @@ public:
     intptr_t* vsp;
     if (full) {
       _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
+      java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
       vsp = thaw<false>(num_frames);
     } else {
       intptr_t* bot = _cont.entrySP(); // _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
@@ -3539,10 +3604,13 @@ public:
     //   memset(from, 0, size << LogBytesPerWord);
     // }
 
-    _cont.sub_size(size << LogBytesPerWord);
-
     if (bottom) { // we're bottom
       patch_chunk(chunk, bottom_sp);
+    }
+
+    _cont.sub_size(size << LogBytesPerWord);
+    if (!full) {
+      _cont.write_minimal(); // must be done after patch
     }
 
     if (top) {
@@ -3589,6 +3657,7 @@ public:
 
   template<bool top>
   void thaw(const hframe& hf, frame& caller, int num_frames) {
+    assert(!_cont.is_empty(), "no more frames");
     assert (_cont.tail() == (oop)NULL, "");
     assert (num_frames > 0 && !hf.is_empty(), "");
 
@@ -4048,6 +4117,8 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   ContMirror cont(thread, oopCont);
   log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
+  cont.read_minimal();
+
   cont.set_entrySP(fi->sp);
   cont.set_entryFP(fi->fp);
   if (!return_barrier) { // not return barrier
@@ -4055,28 +4126,27 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   }
 
 #ifdef ASSERT
-  set_anchor(cont); // required for assert(thread->frame_anchor()->has_last_Java_frame()) in frame::deoptimize
+  set_anchor(thread, fi, return_barrier ? java_lang_Continuation::entryPC(oopCont) : fi->pc);
   print_frames(thread);
 #endif
 
   assert(num_frames > 0, "num_frames <= 0: %d", num_frames);
-  assert(!cont.is_empty(), "no more frames");
 
   int java_frame_count = -1;
   if (!return_barrier && JvmtiExport::should_post_continuation_run()) {
+    cont.read_rest();
     java_frame_count = num_java_frames(cont);
   }
 
   bool res; // whether only compiled frames are thawed
   if (cont.is_flag(FLAG_SAFEPOINT_YIELD)) {
     res = cont_thaw<mode_preempt>(thread, cont, fi, num_frames);
-  } else if (cont.num_interpreted_frames() == 0 && !thread->is_interp_only_mode()) {
+  } else if (java_lang_Continuation::numInterpretedFrames(oopCont) == 0 && !thread->is_interp_only_mode()) {
     res = cont_thaw<mode_fast>(thread, cont, fi, num_frames);
   } else {
     res = cont_thaw<mode_slow>(thread, cont, fi, num_frames);
   }
 
-  cont.write();
   assert (verify_continuation<2>(cont.mirror()), "");
 
   thread->set_cont_fastpath(res);
@@ -5553,6 +5623,7 @@ bool Continuation::debug_verify_continuation(oop contOop) {
   assert (contOop != (oop)NULL, "");
   assert (oopDesc::is_oop(contOop), "");
   ContMirror cont(NULL, contOop);
+  cont.read();
 
   bool nonempty_chunk = false;
   assert (oopDesc::is_oop_or_null(cont.tail()), "");
