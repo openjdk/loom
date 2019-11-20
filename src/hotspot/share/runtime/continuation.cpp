@@ -2152,7 +2152,8 @@ public:
     oop chunk = _cont.tail();
 
     intptr_t* const top = _fi->sp;
-    intptr_t* bottom = _cont.entrySP();
+    intptr_t* bottom = _bottom_address;
+    assert (bottom == _cont.entrySP(), "");
 
     int argsize = bottom_argsize();
     if (argsize != 0) {
@@ -2171,8 +2172,22 @@ public:
     address pc;
     // intptr_t* fp;
     bool allocated;
-    // TODO The second disjunct means we don't squash old chunks, but let them be (Rickard's idea)
-    if (chunk == NULL || requires_barriers(chunk) || (!requires_barriers(chunk) && remaining_in_chunk(chunk) < (size - argsize))) {
+    // TODO The second conjunct means we don't squash old chunks, but let them be (Rickard's idea)
+    if (LIKELY(chunk != NULL && !requires_barriers(chunk) && (sp = jdk_internal_misc_StackChunk::sp(chunk)) >= (frame::sender_sp_offset + size - argsize))) {
+      // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
+      // if (requires_barriers(chunk)) {
+      //   log_develop_trace(jvmcont)("Freeze chunk: found old chunk");
+      //   assert(_cont.chunk_invariant(), "");
+      //   return false;
+      // }
+      allocated = false;
+      pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - SENDER_SP_RET_ADDRESS_OFFSET);
+      // fp = *(intptr_t**)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - frame::sender_sp_offset); -- necessary?
+      sp += argsize;
+      ContMirror::reset_chunk_counters(chunk);
+    } else {
+      assert (_thread->thread_state() == _thread_in_vm, "");
+
       chunk = allocate_chunk(size);
       allocated = true;
       sp = jdk_internal_misc_StackChunk::sp(chunk);
@@ -2191,19 +2206,6 @@ public:
       }
       _cont.set_tail(chunk);
       java_lang_Continuation::set_tail(_cont.mirror(), chunk);
-    } else {
-      // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
-      // if (requires_barriers(chunk)) {
-      //   log_develop_trace(jvmcont)("Freeze chunk: found old chunk");
-      //   assert(_cont.chunk_invariant(), "");
-      //   return false;
-      // }
-      allocated = false;
-      sp = jdk_internal_misc_StackChunk::sp(chunk);
-      pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - SENDER_SP_RET_ADDRESS_OFFSET);
-      // fp = *(intptr_t**)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - frame::sender_sp_offset); -- necessary?
-      sp += argsize;
-      ContMirror::reset_chunk_counters(chunk);
     }
     
     NoSafepointVerifier nsv;
