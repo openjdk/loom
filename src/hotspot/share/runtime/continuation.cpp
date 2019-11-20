@@ -2249,7 +2249,7 @@ public:
 
     setup_chunk_jump(bottom);
 
-    log_develop_trace(jvmcont)("FREEZE CHUNK %d #" INTPTR_FORMAT, _cont.stack_length(), _cont.hash());
+    log_develop_trace(jvmcont)("FREEZE CHUNK #" INTPTR_FORMAT, _cont.hash());
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
     assert (_cont.chunk_invariant(), "");
     assert (Continuation::debug_verify_stack_chunk(chunk), "");

@@ -1324,7 +1324,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont) {
       DEBUG_ONLY(oops++;)
       void* p = reg_to_loc(omv.reg(), sp);
       assert (p != NULL, "");
-      assert (is_in_frame(cb, sp, p), "");
+      assert (is_in_frame(cb, sp, p), "reg: %s p: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " size: %d argsize: %d", omv.reg()->name(), p2i(p), p2i(sp), cb->frame_size(), (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord);
       assert ((intptr_t*)p >= start, "");
       if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
 

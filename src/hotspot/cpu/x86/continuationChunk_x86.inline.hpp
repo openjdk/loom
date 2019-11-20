@@ -47,7 +47,9 @@ static bool is_in_oops(const ImmutableOopMap* oopmap, intptr_t* sp, void* p) {
 
 static bool is_in_frame(CodeBlob* cb, intptr_t* sp, void* p0) {
   intptr_t* p = (intptr_t*)p0;
-  return p == sp - 2 || ((p - sp) >= 0 && (p - sp) < cb->frame_size());
+  int argsize = cb->is_compiled() ? (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord : 0;
+  int frame_size = cb->frame_size() + argsize;
+  return p == sp - frame::sender_sp_offset || ((p - sp) >= 0 && (p - sp) < frame_size);
 }
 #endif
 
