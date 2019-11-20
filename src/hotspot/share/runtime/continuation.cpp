@@ -3534,11 +3534,12 @@ public:
 
     const bool bottom = !full || (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL && _cont.is_empty0());
 
-    bool partial;
+    bool partial, empty;
     int argsize;
     int size = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + frame::sender_sp_offset; // this initial size could be reduced if it's a partial thaw
     if (full || size < threshold) {
       partial = false;
+      empty = true;
       log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d", partial, full, top, bottom);
       argsize = jdk_internal_misc_StackChunk::argsize(chunk);
 
@@ -3580,6 +3581,8 @@ public:
       bool last_frame_in_chunk = jdk_internal_misc_StackChunk::sp(chunk) + size >= jdk_internal_misc_StackChunk::end(chunk);
       assert (!last_frame_in_chunk || argsize == jdk_internal_misc_StackChunk::argsize(chunk), "");
       jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::sp(chunk) + size + (last_frame_in_chunk ? argsize : 0));
+
+      empty = last_frame_in_chunk;
     }
     
     // tty->print_cr("thaw_chunk partial: %d full: %d top: %d bottom: %d", partial, full, top, bottom);
@@ -3605,7 +3608,7 @@ public:
     // }
 
     if (bottom) { // we're bottom
-      patch_chunk(chunk, bottom_sp);
+      patch_chunk(chunk, bottom_sp, empty);
     }
 
     _cont.sub_size(size << LogBytesPerWord);
@@ -3638,16 +3641,15 @@ public:
     memcpy(to, from, sizeb);
   }
 
-  void patch_chunk(oop chunk, intptr_t* sp) {
+  void patch_chunk(oop chunk, intptr_t* sp, bool is_chunk_empty) {
     log_develop_trace(jvmcont)("thaw_chunk patching -- sp: " INTPTR_FORMAT, p2i(sp));
     address pc;
-    if (!ContMirror::is_empty_chunk(chunk) || jdk_internal_misc_StackChunk::parent(chunk) != (oop)NULL || !_cont.is_empty0()) {
+    if (!is_chunk_empty || jdk_internal_misc_StackChunk::parent(chunk) != (oop)NULL || !_cont.is_empty0()) {
       assert (_cont.tail() == chunk, "");
       pc = StubRoutines::cont_returnBarrier();
     } else {
       _thread->cont_frame()->sp = NULL;
-      frame entry = new_entry_frame(); // TODO PERF
-      pc = entry.raw_pc();
+      pc = (mode != mode_fast && should_deoptimize()) ? new_entry_frame().raw_pc() : _cont.entryPC();
     }
     *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
     log_develop_trace(jvmcont)("thaw_chunk patching pc at " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(sp - SENDER_SP_RET_ADDRESS_OFFSET), p2i(pc));
