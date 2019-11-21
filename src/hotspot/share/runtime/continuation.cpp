@@ -3528,17 +3528,21 @@ public:
         e.commit();
       }
 
-      _cont.read_rest();
+      if (!_cont.is_empty0()) {
+        _cont.read_rest();
 
-      hframe hf = _cont.last_frame<mode>();
-      log_develop_trace(jvmcont)("top_hframe before (thaw):"); if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on(_cont, tty);
-      frame caller;
-      thaw<top>(hf, caller, num_frames);
-      assert(_cont.chunk_invariant(), "");
-      
-      _cont.write();
-      
-      return caller.sp();
+        hframe hf = _cont.last_frame<mode>();
+        log_develop_trace(jvmcont)("top_hframe before (thaw):"); if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on(_cont, tty);
+        frame caller;
+        thaw<top>(hf, caller, num_frames);
+        assert(_cont.chunk_invariant(), "");
+        
+        _cont.write();
+
+        return caller.sp();
+      } else {
+        return _cont.entrySP();
+      }
     }
 
     assert (ConfigT::has_young, "");
@@ -3559,9 +3563,12 @@ public:
     log_develop_trace(jvmcont)("thaw_chunk");
     if (log_develop_is_enabled(Debug, jvmcont)) print_chunk(chunk, _cont.mirror(), true);
 
-    bool barriers = requires_barriers(chunk);
+    const bool barriers = requires_barriers(chunk);
+    const bool after_gc = jdk_internal_misc_StackChunk::gc_mode(chunk);
 
-    fix_stack_chunk(chunk);
+    if (after_gc) {
+      fix_stack_chunk(chunk);
+    }
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
     if (!barriers) {
       ContMirror::reset_chunk_counters(chunk);
@@ -5803,10 +5810,13 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
     else
       tty->print("%d", i+1);
   }
-  tty->cr();
+
+  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* end   = start + jdk_internal_misc_StackChunk::size(chunk);
+  
   if (verbose) {
-    intptr_t* end = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
-    intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
+    intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk);
+    tty->cr();
     tty->print_cr("------ chunk frames end: " INTPTR_FORMAT, p2i(end));
     if (sp < end) {
       RegisterMap map(NULL, false);
@@ -5820,6 +5830,15 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
       }
     }
     tty->print_cr("------");
+  } else {
+    int frames = 0;
+    CodeBlob* cb = NULL;
+    for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+      address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+      cb = ContinuationCodeBlobLookup::find_blob(pc);
+      frames++;
+    }
+    tty->print_cr(" frames: %d", frames);
   }
 }
 
