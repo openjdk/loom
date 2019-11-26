@@ -2337,7 +2337,6 @@ threadControl_applicationThreadStatus(jthread thread,
                     node, node->suspendCount, *pstatus, *statusFlags, node->name);
 #endif
     } else { /* It's a fiber */
-        int suspendCount;
         error = JVMTI_ERROR_NONE;
         // fiber fixme - threadState() needs to support fibers
         *pstatus = JDWP_THREAD_STATUS(RUNNING);
