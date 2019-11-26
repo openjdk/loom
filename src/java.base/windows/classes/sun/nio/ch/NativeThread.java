@@ -58,11 +58,7 @@ public class NativeThread {
         return (tid == VIRTUAL_THREAD_ID);
     }
 
-    /**
-     * Returns true if the token presents a kernel thread
-     */
     static boolean isKernelThread(long tid) {
-        return (tid != 0 && tid != VIRTUAL_THREAD_ID);
+        return false;
     }
-
 }
