@@ -29,6 +29,7 @@
 
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
 import org.testng.annotations.Test;
@@ -319,7 +320,7 @@ public class BuilderTest {
         assertTrue(thread3.isDaemon());
     }
 
-    public void testDaemo3() {
+    public void testDaemon3() {
         Thread.Builder builder = Thread.builder().virtual().daemon(false);
 
         Thread thread1 = builder.task(() -> { }).build();
@@ -330,6 +331,80 @@ public class BuilderTest {
         assertTrue(thread2.isDaemon());
         assertTrue(thread3.isDaemon());
     }
+
+    // uncaught exception handler
+    public void testUncaughtExceptionHandler1() throws Exception {
+        class FooException extends RuntimeException { }
+        AtomicReference<Thread> threadRef = new AtomicReference<>();
+        AtomicReference<Throwable> exceptionRef = new AtomicReference<>();
+        Thread thread = Thread.builder()
+                .task(() -> { throw new FooException(); })
+                .uncaughtExceptionHandler((t, e) -> {
+                    assertTrue(t == Thread.currentThread());
+                    threadRef.set(t);
+                    exceptionRef.set(e);
+                })
+                .start();
+        thread.join();
+        assertTrue(threadRef.get() == thread);
+        assertTrue(exceptionRef.get() instanceof FooException);
+    }
+
+    public void testUncaughtExceptionHandler2() throws Exception {
+        class FooException extends RuntimeException { }
+        AtomicReference<Thread> threadRef = new AtomicReference<>();
+        AtomicReference<Throwable> exceptionRef = new AtomicReference<>();
+        Thread thread = Thread.builder()
+                .virtual()
+                .task(() -> { throw new FooException(); })
+                .uncaughtExceptionHandler((t, e) -> {
+                    assertTrue(t == Thread.currentThread());
+                    threadRef.set(t);
+                    exceptionRef.set(e);
+                })
+                .start();
+        thread.join();
+        assertTrue(threadRef.get() == thread);
+        assertTrue(exceptionRef.get() instanceof FooException);
+    }
+
+    public void testUncaughtExceptionHandler3() throws Exception {
+        class FooException extends RuntimeException { }
+        AtomicReference<Thread> threadRef = new AtomicReference<>();
+        AtomicReference<Throwable> exceptionRef = new AtomicReference<>();
+        Thread thread = Thread.builder()
+                .uncaughtExceptionHandler((t, e) -> {
+                    assertTrue(t == Thread.currentThread());
+                    threadRef.set(t);
+                    exceptionRef.set(e);
+                })
+                .factory()
+                .newThread(() -> { throw new FooException(); });
+        thread.start();
+        thread.join();
+        assertTrue(threadRef.get() == thread);
+        assertTrue(exceptionRef.get() instanceof FooException);
+    }
+
+    public void testUncaughtExceptionHandler4() throws Exception {
+        class FooException extends RuntimeException { }
+        AtomicReference<Thread> threadRef = new AtomicReference<>();
+        AtomicReference<Throwable> exceptionRef = new AtomicReference<>();
+        Thread thread = Thread.builder()
+                .virtual()
+                .uncaughtExceptionHandler((t, e) -> {
+                    assertTrue(t == Thread.currentThread());
+                    threadRef.set(t);
+                    exceptionRef.set(e);
+                })
+                .factory()
+                .newThread(() -> { throw new FooException(); });
+        thread.start();
+        thread.join();
+        assertTrue(threadRef.get() == thread);
+        assertTrue(exceptionRef.get() instanceof FooException);
+    }
+
 
     static final ThreadLocal<Object> LOCAL = new ThreadLocal<>();
     static final ThreadLocal<Object> INHERITED_LOCAL = new InheritableThreadLocal<>();
@@ -510,6 +585,8 @@ public class BuilderTest {
         assertThrows(NullPointerException.class, () -> builder.group(null));
         assertThrows(NullPointerException.class, () -> builder.scheduler(null));
         assertThrows(NullPointerException.class, () -> builder.name(null));
+        assertThrows(NullPointerException.class, () -> builder.name(null, 0));
         assertThrows(NullPointerException.class, () -> builder.task(null));
+        assertThrows(NullPointerException.class, () -> builder.uncaughtExceptionHandler(null));
     }
 }

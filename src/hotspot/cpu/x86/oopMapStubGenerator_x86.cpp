@@ -1368,6 +1368,11 @@ bool OopMapStubGenerator::generate() {
 
   int size = 64 + (_oopmap.count() * 6 * 15) + (CheckCompressedOops ? (256 * _oopmap.count()) : 0); // worst case, 6 instructions per oop, 15 bytes per instruction;
 
+#ifdef _WINDOWS
+  // spill instructions and alignment
+  size += 16;
+#endif
+
   _blob = BufferBlob::create("oopmap stub", size);
   if (_blob == NULL) {
     return false;

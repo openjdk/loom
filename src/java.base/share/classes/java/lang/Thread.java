@@ -58,11 +58,10 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  * execution running concurrently.
  *
  * <p> {@code Thread} supports the creation of threads that are scheduled by the
- * operating system with preemptive scheduling. These threads are sometimes known
- * as <i>kernel threads</i> or <i>heavyweight threads</i> and will usually have
- * a large stack and other resources that are maintained by the operating system.
- * Kernel threads are suitable for executing all tasks but they are limited
- * resource.
+ * operating system. These threads are sometimes known as <i>kernel threads</i>
+ * or <i>heavyweight threads</i> and will usually have a large stack and other
+ * resources that are maintained by the operating system. Kernel threads are
+ * suitable for executing all tasks but they are limited resource.
  *
  * <p> {@code Thread} also supports the creation of <i>virtual threads</i> that
  * are scheduled by the Java virtual machine rather than the operating system.
@@ -674,7 +673,7 @@ class Thread implements Runnable {
         Builder virtual();
 
         /**
-         * Disallow threads locals
+         * Disallow threads locals.
          * @return this builder
          * @throws IllegalStateException if inheritThreadLocals has already been set
          */
@@ -698,13 +697,20 @@ class Thread implements Runnable {
         Builder daemon(boolean on);
 
         /**
-         * Sets the therad priority
+         * Sets the thread priority.
          * @param priority priority
          * @return this builder
          * @throws IllegalArgumentException if the priority is less than
          *        {@link Thread#MIN_PRIORITY} or greater than {@link Thread#MAX_PRIORITY}
          */
         Builder priority(int priority);
+
+        /**
+         * Sets the uncaught exception handler.
+         * @param ueh uncaught exception handler
+         * @return this builder
+         */
+        Builder uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
 
         /**
          * The thread is <em>managed</em>.
@@ -766,6 +772,7 @@ class Thread implements Runnable {
         private boolean daemon;
         private boolean daemonChanged;
         private int priority;
+        private UncaughtExceptionHandler uhe;
         private Runnable task;
 
         BuilderImpl() { }
@@ -856,6 +863,12 @@ class Thread implements Runnable {
         }
 
         @Override
+        public Builder uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
+            this.uhe = Objects.requireNonNull(ueh);
+            return this;
+        }
+
+        @Override
         public Builder managed() {
             // TDB
             return this;
@@ -868,6 +881,7 @@ class Thread implements Runnable {
                 throw new IllegalStateException("No task specified");
 
             int characteristics = characteristics();
+            Thread thread;
             if ((characteristics & Thread.VIRTUAL) != 0) {
                 String name = this.name;
                 if (name == null) {
@@ -875,7 +889,7 @@ class Thread implements Runnable {
                 } else if (counter >= 0) {
                     name = name + (counter++);
                 }
-                return new Fiber(scheduler, name, characteristics, task);
+                thread = new Fiber(scheduler, name, characteristics, task);
             } else {
                 String name = this.name;
                 if (name == null) {
@@ -883,13 +897,15 @@ class Thread implements Runnable {
                 } else if (counter >= 0) {
                     name = name + (counter++);
                 }
-                Thread thread = new Thread(group, name, characteristics, task, 0, null);
+                thread = new Thread(group, name, characteristics, task, 0, null);
                 if (daemonChanged)
-                    thread.setDaemon(daemon);
+                    thread.daemon(daemon);
                 if (priority != 0)
-                    thread.setPriority(priority);
-                return thread;
+                    thread.priority(priority);
             }
+            if (uhe != null)
+                thread.uncaughtExceptionHandler(uhe);
+            return thread;
         }
 
         @Override
@@ -902,9 +918,10 @@ class Thread implements Runnable {
         public ThreadFactory factory() {
             int characteristics = characteristics();
             if ((characteristics & Thread.VIRTUAL) != 0) {
-                return new VirtualThreadFactory(scheduler, name, counter, characteristics);
+                return new VirtualThreadFactory(scheduler, name, counter, characteristics, uhe);
             } else {
-                return new DinosaurThreadFactory(group, name, counter, characteristics, daemon, priority);
+                return new DinosaurThreadFactory(group, name, counter, characteristics,
+                                                 daemon, priority, uhe);
             }
         }
     }
@@ -944,12 +961,18 @@ class Thread implements Runnable {
         private final Executor scheduler;
         private String name;
         private final int characteristics;
+        private final UncaughtExceptionHandler uhe;
 
-        VirtualThreadFactory(Executor scheduler, String name, int start, int characteristics) {
+        VirtualThreadFactory(Executor scheduler,
+                             String name,
+                             int start,
+                             int characteristics,
+                             UncaughtExceptionHandler uhe) {
             super(start);
             this.scheduler = scheduler;
             this.name = name;
             this.characteristics = characteristics;
+            this.uhe = uhe;
         }
 
         @Override
@@ -961,7 +984,10 @@ class Thread implements Runnable {
             } else if (hasCounter()) {
                 name += next();
             }
-            return new Fiber(scheduler, name, characteristics, task);
+            Thread thread = new Fiber(scheduler, name, characteristics, task);
+            if (uhe != null)
+                thread.uncaughtExceptionHandler(uhe);
+            return thread;
         }
     }
 
@@ -971,19 +997,22 @@ class Thread implements Runnable {
         private final int characteristics;
         private final boolean daemon;
         private final int priority;
+        private final UncaughtExceptionHandler uhe;
 
         DinosaurThreadFactory(ThreadGroup group,
                               String name,
                               int start,
                               int characteristics,
                               boolean daemon,
-                              int priority) {
+                              int priority,
+                              UncaughtExceptionHandler uhe) {
             super(start);
             this.group = group;
             this.name = name;
             this.characteristics = characteristics;
             this.daemon = daemon;
             this.priority = priority;
+            this.uhe = uhe;
         }
 
         @Override
@@ -997,9 +1026,11 @@ class Thread implements Runnable {
             }
             Thread thread = new Thread(group, name, characteristics, task, 0, null);
             if (daemon)
-                thread.setDaemon(true);
+                thread.daemon(true);
             if (priority != 0)
-                thread.setPriority(priority);
+                thread.priority(priority);
+            if (uhe != null)
+                thread.uncaughtExceptionHandler(uhe);
             return thread;
         }
     }
@@ -1861,11 +1892,15 @@ class Thread implements Runnable {
      * @see        ThreadGroup#getMaxPriority()
      */
     public final void setPriority(int newPriority) {
-        ThreadGroup g;
-        checkAccess();
         if (newPriority > MAX_PRIORITY || newPriority < MIN_PRIORITY) {
             throw new IllegalArgumentException();
         }
+        checkAccess();
+        priority(newPriority);
+    }
+
+    void priority(int newPriority) {
+        ThreadGroup g;
         if (!isVirtual() && (g = getThreadGroup()) != null) {
             if (newPriority > g.getMaxPriority()) {
                 newPriority = g.getMaxPriority();
@@ -2203,6 +2238,10 @@ class Thread implements Runnable {
         checkAccess();
         if (isAlive())
             throw new IllegalThreadStateException();
+        daemon(on);
+    }
+
+    void daemon(boolean on) {
         if (!isVirtual())
             holder.daemon = on;
     }
@@ -2807,6 +2846,10 @@ class Thread implements Runnable {
      */
     public void setUncaughtExceptionHandler(UncaughtExceptionHandler eh) {
         checkAccess();
+        uncaughtExceptionHandler(eh);
+    }
+
+    private void uncaughtExceptionHandler(UncaughtExceptionHandler eh) {
         uncaughtExceptionHandler = eh;
     }
 

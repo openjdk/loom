@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2012, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,10 +28,14 @@ package sun.nio.ch;
 
 // Signalling operations on native threads
 
-class NativeThread {
+public class NativeThread {
     private static final long VIRTUAL_THREAD_ID = -1L;
 
-    static long current() {
+    /**
+     * Returns a token representing the current thread or -1 if called in the
+     * context of a virtual thread
+     */
+    public static long current() {
         if (Thread.currentThread().isVirtual()) {
             return VIRTUAL_THREAD_ID;
         } else {
@@ -47,12 +51,14 @@ class NativeThread {
         throw new UnsupportedOperationException();
     }
 
-    static boolean isLightweightThread(long tid) {
+    /**
+     * Returns true if the token presents a virtual thread
+     */
+    static boolean isVirtualThread(long tid) {
         return (tid == VIRTUAL_THREAD_ID);
     }
 
     static boolean isKernelThread(long tid) {
         return false;
     }
-
 }
