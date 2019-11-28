@@ -2964,9 +2964,7 @@ public:
       }
 
       // ref_sp: 3, oops 4  -> [ 3: oop, 4: oop, 5: oop, 6: nmethod ]
-      if (IsKeepalive) {
-        kd->write_at(_cont, hf.ref_sp() + oops - 1);
-      }
+      kd->write_at(_cont, hf.ref_sp() + oops - 1);
       //freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp() + 1, oops - 1, (void*)freeze_stub);
       freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp(), oops - 1, (void*)freeze_stub);
 
