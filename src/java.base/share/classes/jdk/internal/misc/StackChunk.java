@@ -26,9 +26,9 @@
 package jdk.internal.misc;
 
 public class StackChunk {
-     private StackChunk parent;
-     private int size; // in words
-     private int sp; // in words
+     public StackChunk parent;
+     public int size; // in words
+     public int sp; // in words
      private int argsize; // bottom stack-passed arguments, in words
 
      private int numFrames;

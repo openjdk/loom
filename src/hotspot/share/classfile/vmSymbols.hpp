@@ -396,6 +396,7 @@
   template(stack_name,                                "stack")                                    \
   template(maxSize_name,                              "maxSize")                                  \
   template(reset_name,                                "reset")                                    \
+  template(done_name,                                 "done")                                     \
   template(mounted_name,                              "mounted")                                  \
   template(numInterpretedFrames_name,                 "numInterpretedFrames")                     \
   template(fp_name,                                   "fp")                                       \

@@ -329,6 +329,7 @@ public class Continuation {
                     this.entrySP = getSP(); // now getSP also resets fastpath; this is also done in thaw for the doContinue branch
                     enter(); // make this an invokevirtual rather than invokeinterface. Otherwise it freaks out the interpreter (currently solved by patching in native)
                 } else {
+                    assert !isEmpty();
                     doContinue(); // intrinsic. Jumps into yield, as a return from doYield    
                 }
             } finally {
@@ -336,6 +337,7 @@ public class Continuation {
                 try {
                 if (TRACE) System.out.println("run (after) sp: " + sp + " refSP: " + refSP + " maxSize: " + maxSize);
 
+                assert isEmpty() == done : "empty: " + isEmpty() + " done: " + done + " cont: " + Integer.toHexString(System.identityHashCode(this));
                 currentCarrierThread().setContinuation(this.parent);
                 if (parent != null)
                     parent.child = null;
@@ -378,11 +380,25 @@ public class Continuation {
             // assert doneX;
             // System.out.println("-- done!  " + id());
             if (TRACE) System.out.println(">>>>>>>> DONE <<<<<<<<<<<<< " + id());
+            assert isEmpty();
         }
     }
 
     private boolean isStarted() {
         return tail != null || (stack != null && sp < stack.length);
+    }
+
+    private boolean isEmpty() {
+        if (pc != 0) return false;
+        for (jdk.internal.misc.StackChunk c = tail; c != null; c = c.parent) {
+            if (!isEmpty(c))
+                return false;
+        }
+        return true;
+    }
+
+    private boolean isEmpty(jdk.internal.misc.StackChunk c) {
+        return c.sp >= c.size;
     }
 
     /**

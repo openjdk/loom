@@ -1064,6 +1064,7 @@ class java_lang_Continuation: AllStatic {
   static int _flags_offset;
   static int _reset_offset;
   static int _mounted_offset;
+  static int _done_offset;
 
   static void compute_offsets();
  public:
@@ -1110,6 +1111,7 @@ class java_lang_Continuation: AllStatic {
   static bool on_local_stack(oop ref, address adr);
   static bool is_reset(oop ref);
   static bool is_mounted(oop ref);
+  static bool done(oop ref);
 };
 
 // Interface to jdk.internal.misc.StackChunk objects

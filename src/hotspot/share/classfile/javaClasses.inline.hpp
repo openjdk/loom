@@ -288,6 +288,10 @@ inline HeapWord* java_lang_Continuation::refStack_base(oop ref) {
   return refStack(ref)->base();
 }
 
+inline bool java_lang_Continuation::done(oop ref) {
+  return ref->bool_field(_done_offset);
+}
+
 inline oop jdk_internal_misc_StackChunk::parent(oop ref) {
   return ref->obj_field(_parent_offset);
 }
