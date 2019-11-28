@@ -317,10 +317,10 @@ inline void jdk_internal_misc_StackChunk::set_argsize(oop ref, int value) {
   ref->int_field_put(_argsize_offset, value);
 }
 inline bool jdk_internal_misc_StackChunk::gc_mode(oop ref) {
-  return (uint64_t)ref->long_field(_mode_offset);
+  return (bool)ref->bool_field(_mode_offset);
 }
 inline void jdk_internal_misc_StackChunk::set_gc_mode(oop ref, bool value) {
-  ref->long_field_put(_mode_offset, (jboolean)value);
+  ref->bool_field_put(_mode_offset, (jboolean)value);
 }
 inline int jdk_internal_misc_StackChunk::end(oop ref) {
   return size(ref) - argsize(ref);
