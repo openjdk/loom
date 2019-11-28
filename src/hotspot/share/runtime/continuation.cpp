@@ -2092,7 +2092,6 @@ public:
     _safepoint_stub_caller(false), _keepalive(NULL) {
 
     assert (mode == mode_fast, "");
-    _cont.read_minimal();
 
     _fi = NULL;
     // this is only uaed to terminate the frame loop. 
