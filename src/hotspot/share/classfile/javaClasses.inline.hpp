@@ -314,6 +314,12 @@ inline int jdk_internal_misc_StackChunk::sp(oop ref) {
 inline void jdk_internal_misc_StackChunk::set_sp(oop ref, int value) {
   ref->int_field_put(_sp_offset, value);
 }
+inline address jdk_internal_misc_StackChunk::pc(oop ref) {
+  return (address)ref->long_field(_pc_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_pc(oop ref, address value) {
+  ref->long_field_put(_pc_offset, (jlong)value);
+}
 inline int jdk_internal_misc_StackChunk::argsize(oop ref) {
   return ref->int_field(_argsize_offset);
 }

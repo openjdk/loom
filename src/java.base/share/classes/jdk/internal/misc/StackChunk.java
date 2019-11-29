@@ -30,6 +30,7 @@ public class StackChunk {
      public int size; // in words
      public int sp; // in words
      private int argsize; // bottom stack-passed arguments, in words
+     private long pc;
 
      private int numFrames;
      private int numOops;
