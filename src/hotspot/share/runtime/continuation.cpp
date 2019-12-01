@@ -613,6 +613,7 @@ public:
   void set_pc(address pc, bool interpreted)  { _pc = pc; set_flag(FLAG_LAST_FRAME_INTERPRETED, interpreted);
                                                assert (interpreted == Interpreter::contains(pc), ""); }
 
+  unsigned char flags() { return _flags; }
   bool is_flag(unsigned char flag) { return (_flags & flag) != 0; }
   void set_flag(unsigned char flag, bool v) { _flags = (v ? _flags |= flag : _flags &= ~flag); }
 
@@ -652,7 +653,7 @@ public:
   static inline bool is_empty_chunk(oop chunk);
   static bool is_in_chunk(oop chunk, void* p);
   static bool is_usable_in_chunk(oop chunk, void* p);
-  static void reset_chunk_counters(oop chunk);
+  static inline void reset_chunk_counters(oop chunk);
   oop find_chunk(void* p) const;
 
   template<op_mode mode> const hframe last_frame();
@@ -1184,7 +1185,7 @@ bool ContMirror::is_usable_in_chunk(oop chunk, void* p) {
   return (HeapWord*)p >= start && (HeapWord*)p < end;
 }
 
-void ContMirror::reset_chunk_counters(oop chunk) {
+inline void ContMirror::reset_chunk_counters(oop chunk) {
   jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
   jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
 }
@@ -2162,12 +2163,10 @@ public:
     assert (bottom == _cont.entrySP(), "");
 
     oop chunk = _cont.tail();
+    // TODO The second conjunct means we don't squash old chunks, but let them be (Rickard's idea)
     bool available = chunk != (oop)NULL && !requires_barriers(chunk) && jdk_internal_misc_StackChunk::sp(chunk) >= (frame::sender_sp_offset + size - argsize);
 
-    log_develop_trace(jvmcont)("is_chunk_available available: %d size: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT, available, size, p2i(top), p2i(bottom));
-    
-    // tty->print_cr(available ? "AVAILABLE!" : "unavailable!");
-    
+    log_develop_trace(jvmcont)("is_chunk_available available: %d size: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT, available, size, p2i(top), p2i(bottom));   
     return available;
   }
 
@@ -2210,12 +2209,10 @@ public:
     assert (size > 0, "");
 
     int sp;
-    if (chunk != (oop)NULL) sp = jdk_internal_misc_StackChunk::sp(chunk);
-
     bool allocated;
-    // TODO The second conjunct means we don't squash old chunks, but let them be (Rickard's idea)
-    if (LIKELY(chunk_available || (chunk != NULL && !requires_barriers(chunk) && sp >= (frame::sender_sp_offset + size - argsize)))) {
-      assert (!chunk_available || (chunk != NULL && !requires_barriers(chunk) && sp >= (frame::sender_sp_offset + size - argsize)), "");
+    if (LIKELY(chunk_available)) {
+      sp = jdk_internal_misc_StackChunk::sp(chunk);
+      assert ((chunk != NULL && !requires_barriers(chunk) && sp >= (frame::sender_sp_offset + size - argsize)), "");
       // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
       // if (requires_barriers(chunk)) {
       //   log_develop_trace(jvmcont)("Freeze chunk: found old chunk");
@@ -2226,6 +2223,7 @@ public:
       sp += argsize;
       ContMirror::reset_chunk_counters(chunk);
     } else {
+      assert (chunk == NULL || requires_barriers(chunk) || jdk_internal_misc_StackChunk::sp(chunk) < (frame::sender_sp_offset + size - argsize), "");
       assert (_thread->thread_state() == _thread_in_vm, "");
 
       chunk = allocate_chunk(size);
@@ -3525,7 +3523,7 @@ private:
   void deoptimize_frames_in_chunk(oop chunk);
   void deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb);
   void patch_chunk_pd(intptr_t* sp);
-  intptr_t* align_chunk(intptr_t* vsp, int argsize);
+  inline intptr_t* align_chunk(intptr_t* vsp, int argsize);
   void setup_jump(intptr_t* vsp, intptr_t* hsp);
 
   bool should_deoptimize() {
@@ -3602,7 +3600,8 @@ public:
     assert (ConfigT::has_young, "");
     assert (chunk != (oop) NULL, "");
     assert (chunk == _cont.tail(), "");
-    const bool full = num_frames > 2; // TODO
+
+    // const bool full = num_frames > 2;
     
     assert (num_frames > 0, "");
 
@@ -3611,7 +3610,10 @@ public:
     log_develop_trace(jvmcont)("thaw_chunk");
     if (log_develop_is_enabled(Debug, jvmcont)) print_chunk(chunk, _cont.mirror(), true);
 
-    if (ContMirror::is_empty_chunk(chunk)) {
+    int sp = jdk_internal_misc_StackChunk::sp(chunk);
+    int size = jdk_internal_misc_StackChunk::size(chunk) - sp + frame::sender_sp_offset; // this initial size could be reduced if it's a partial thaw
+
+    if (size <= 0) {
       _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
       return thaw<true>(num_frames); // we're still top, as no frames have been thawed
     }
@@ -3626,13 +3628,13 @@ public:
       fix_stack_chunk(chunk);
     }
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
-    if (!barriers) {
-      ContMirror::reset_chunk_counters(chunk);
-    }
+    // if (!barriers) { // TODO ????
+    //   ContMirror::reset_chunk_counters(chunk);
+    // }
 
-    intptr_t* hsp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
+    intptr_t* hsp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp;
     intptr_t* vsp;
-    if (full) {
+    if (ConfigT::full_stack) {
       _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
       java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
       vsp = thaw<false>(num_frames);
@@ -3646,8 +3648,7 @@ public:
 
     bool partial, empty;
     int argsize;
-    int size = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + frame::sender_sp_offset; // this initial size could be reduced if it's a partial thaw
-    if (LIKELY(full || (size < threshold /*&& !barriers*/))) {
+    if (LIKELY(ConfigT::full_stack || (size < threshold /*&& !barriers*/))) {
       partial = false;
       empty = true;
       argsize = jdk_internal_misc_StackChunk::argsize(chunk);
@@ -3667,10 +3668,10 @@ public:
     }
 
     const bool is_last_in_chunks = empty && jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL;
-    const bool is_last =  is_last_in_chunks && _cont.is_empty0();
-    const bool bottom = !full || is_last;
+    const bool is_last = is_last_in_chunks && _cont.is_empty0();
+    const bool bottom = !ConfigT::full_stack || is_last;
     
-    log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d is_last: %d empty: %d", partial, full, top, bottom, is_last, empty);
+    log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d is_last: %d empty: %d", partial, ConfigT::full_stack, top, bottom, is_last, empty);
 
     // if we're not in a full thaw, we're both top and bottom
     if (bottom) {
@@ -3701,14 +3702,16 @@ public:
     if (is_last_in_chunks && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
     }
-    
-    if (!full) {
-      _cont.write_minimal(); // must be done after patch
+    if (!ConfigT::full_stack) {
+      // _cont.write_minimal(); // must be done after patch; really only need to write max_size
+      java_lang_Continuation::set_maxSize(_cont.mirror(), (jint)_cont.max_size());
+      assert (java_lang_Continuation::flags(_cont.mirror()) == _cont.flags(), "");
     }
 
     assert (is_last == _cont.is_empty(), "is_last: %d _cont.is_empty(): %d", is_last, _cont.is_empty());
     
-    if (top) {
+    assert (top || ConfigT::full_stack, "");
+    if (LIKELY(!ConfigT::full_stack || top)) {
       setup_chunk_jump(vsp, hsp);
     }
 
@@ -5526,10 +5529,10 @@ public:
   }
 };
 
-template <bool compressed_oops, bool post_barrier, bool gen_stubs, bool g1gc, bool use_chunks>
+template <bool compressed_oops, bool post_barrier, bool gen_stubs, bool g1gc, bool use_chunks, bool full>
 class Config {
 public:
-  typedef Config<compressed_oops, post_barrier, gen_stubs, g1gc, use_chunks> SelfT;
+  typedef Config<compressed_oops, post_barrier, gen_stubs, g1gc, use_chunks, full> SelfT;
   typedef typename Conditional<compressed_oops, narrowOop, oop>::type OopT;
   typedef typename Conditional<post_barrier, RawOopWriter<SelfT>, NormalOopWriter<SelfT> >::type OopWriterT;
   typedef typename Conditional<g1gc, NoKeepalive, HandleKeepalive>::type KeepaliveObjectT;
@@ -5538,6 +5541,7 @@ public:
   static const bool _post_barrier = post_barrier;
   static const bool allow_stubs = gen_stubs && post_barrier && compressed_oops;
   static const bool has_young = use_chunks;
+  static const bool full_stack = full;
 
   template<op_mode mode>
   static int freeze(JavaThread* thread, FrameInfo* fi) {
@@ -5587,13 +5591,20 @@ public:
   template <bool use_compressed, bool is_modref, bool gencode, bool g1gc>
   static void resolve_use_chunks() {
     g1gc && UseContinuationChunks
-      ? resolve<use_compressed, is_modref, gencode, g1gc, true>()
-      : resolve<use_compressed, is_modref, gencode, g1gc, false>();
+      ? resolve_full_stack<use_compressed, is_modref, gencode, g1gc, true>()
+      : resolve_full_stack<use_compressed, is_modref, gencode, g1gc, false>();
   }
 
   template <bool use_compressed, bool is_modref, bool gencode, bool g1gc, bool use_chunks>
+  static void resolve_full_stack() {
+    !UseContinuationLazyCopy
+      ? resolve<use_compressed, is_modref, gencode, g1gc, use_chunks, true>()
+      : resolve<use_compressed, is_modref, gencode, g1gc, use_chunks, false>();
+  }
+
+  template <bool use_compressed, bool is_modref, bool gencode, bool g1gc, bool use_chunks, bool full>
   static void resolve() {
-    typedef Config<use_compressed, is_modref, gencode, g1gc, use_chunks> SelectedConfigT;
+    typedef Config<use_compressed, is_modref, gencode, g1gc, use_chunks, full> SelectedConfigT;
     // SelectedConfigT::print();
 
     cont_freeze_fast    = SelectedConfigT::template freeze<mode_fast>;
