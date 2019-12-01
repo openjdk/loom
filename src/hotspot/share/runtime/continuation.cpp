@@ -3417,30 +3417,22 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
 }
 /////////////// THAW ////
 
-typedef bool (*ThawContFnT)(JavaThread*, ContMirror&, FrameInfo*, int);
+typedef bool (*ThawContFnT)(JavaThread*, ContMirror&, FrameInfo*, bool);
 
 static ThawContFnT cont_thaw_fast = NULL;
 static ThawContFnT cont_thaw_slow = NULL;
 static ThawContFnT cont_thaw_preempt = NULL;
 
 template<op_mode mode>
-static bool cont_thaw(JavaThread* thread, ContMirror& cont, FrameInfo* fi, int num_frames) {
+static bool cont_thaw(JavaThread* thread, ContMirror& cont, FrameInfo* fi, bool return_barrier) {
   switch (mode) {
-    case mode_fast:    return cont_thaw_fast   (thread, cont, fi, num_frames);
-    case mode_slow:    return cont_thaw_slow   (thread, cont, fi, num_frames);
-    case mode_preempt: return cont_thaw_preempt(thread, cont, fi, num_frames);
+    case mode_fast:    return cont_thaw_fast   (thread, cont, fi, return_barrier);
+    case mode_slow:    return cont_thaw_slow   (thread, cont, fi, return_barrier);
+    case mode_preempt: return cont_thaw_preempt(thread, cont, fi, return_barrier);
     default:
       guarantee(false, "unreachable");
       return false;
   }
-}
-
-static inline int thaw_num_frames(bool return_barrier) {
-  if (CONT_FULL_STACK) {
-    assert (!return_barrier, "");
-    return 10000;
-  }
-  return return_barrier ? 1 : 2;
 }
 
 static bool stack_overflow_check(JavaThread* thread, int size, address sp) {
@@ -3463,9 +3455,7 @@ JRT_LEAF(int, Continuation::prepare_thaw(FrameInfo* fi, bool return_barrier))
 
   PERFTEST_ONLY(if (PERFTEST_LEVEL <= 110) return 0;)
 
-  int num_frames = thaw_num_frames(return_barrier);
-
-  log_develop_trace(jvmcont)("~~~~~~~~~ prepare_thaw return_barrier: %d num_frames: %d", return_barrier, num_frames);
+  log_develop_trace(jvmcont)("~~~~~~~~~ prepare_thaw return_barrier: %d", return_barrier);
   log_develop_trace(jvmcont)("prepare_thaw pc: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " sp: " INTPTR_FORMAT, p2i(fi->pc), p2i(fi->fp), p2i(fi->sp));
 
   JavaThread* thread = JavaThread::current();
@@ -3474,7 +3464,7 @@ JRT_LEAF(int, Continuation::prepare_thaw(FrameInfo* fi, bool return_barrier))
 
   // if the entry frame is interpreted, it may leave a parameter on the stack, which would be left there if the return barrier is hit
   // assert ((address)java_lang_Continuation::entrySP(cont) - bottom <= 8, "bottom: " INTPTR_FORMAT ", entrySP: " INTPTR_FORMAT, bottom, java_lang_Continuation::entrySP(cont));
-  int size = java_lang_Continuation::maxSize(cont); // frames_size(cont, num_frames);
+  int size = java_lang_Continuation::maxSize(cont);
   if (size == 0) { // no more frames
     return 0;
   }
@@ -3544,7 +3534,7 @@ public:
     _map.set_include_argument_oops(false);
   }
 
-  bool thaw(FrameInfo* fi, int num_frames) {
+  bool thaw(FrameInfo* fi, bool return_barrier) {
     _fi = fi;
 
     if (Interpreter::contains(_cont.entryPC())) _fastpath = false; // set _fastpath to false if entry is interpreted
@@ -3556,7 +3546,7 @@ public:
     DEBUG_ONLY(int orig_num_frames = java_lang_Continuation::numFrames(_cont.mirror());/*_cont.num_frames();*/)
     DEBUG_ONLY(_frames = 0;)
 
-    thaw<true>(num_frames);
+    thaw<true>(return_barrier);
 
     assert (java_lang_Continuation::numFrames(_cont.mirror()) == orig_num_frames - _frames, "num_frames: %d orig_num_frames: %d frame_count: %d", java_lang_Continuation::numFrames(_cont.mirror()), orig_num_frames, _frames);
     // assert (mode != mode_fast || _fastpath, "");
@@ -3565,7 +3555,7 @@ public:
   }
 
   template<bool top>
-  intptr_t* thaw(int num_frames) {
+  intptr_t* thaw(bool return_barrier) {
     oop chunk = _cont.tail();
     if (chunk == (oop)NULL) {
       EventContinuationThawOld e;
@@ -3581,6 +3571,9 @@ public:
         hframe hf = _cont.last_frame<mode>();
         log_develop_trace(jvmcont)("top_hframe before (thaw):"); if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on(_cont, tty);
         frame caller;
+        
+        int num_frames = ConfigT::full_stack ? 1000 : // TODO
+                                               (return_barrier ? 1 : 2);
         thaw<top>(hf, caller, num_frames);
         
         _cont.write();
@@ -3592,19 +3585,15 @@ public:
       }
     } else {
       assert (ConfigT::has_young, "");
-      return thaw_chunk(chunk, num_frames, top);
+      return thaw_chunk(chunk, top);
     }
   }
 
-  NOINLINE intptr_t* thaw_chunk(oop chunk, int num_frames, bool top) {
+  NOINLINE intptr_t* thaw_chunk(oop chunk, const bool top) {
     assert (ConfigT::has_young, "");
     assert (top || ConfigT::full_stack, "");
     assert (chunk != (oop) NULL, "");
     assert (chunk == _cont.tail(), "");
-
-    // const bool full = num_frames > 2;
-    
-    assert (num_frames > 0, "");
 
     static const int threshold = 500; // words
 
@@ -3616,7 +3605,7 @@ public:
 
     if (size <= 0) {
       _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
-      return thaw<true>(num_frames); // we're still top, as no frames have been thawed
+      return thaw<true>(true); // no harm if we're wrong about return_barrier
     }
 
     assert (verify_stack_chunk<1>(chunk), "");
@@ -3638,7 +3627,7 @@ public:
     if (ConfigT::full_stack) {
       _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
       java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
-      vsp = thaw<false>(num_frames);
+      vsp = thaw<false>(false);
     } else {
       intptr_t* bot = _cont.entrySP(); // _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
       if (Interpreter::contains(_cont.entryPC())) {
@@ -3818,6 +3807,7 @@ public:
 
   template<bool top>
   void thaw(const hframe& hf, frame& caller, int num_frames) {
+    log_develop_debug(jvmcont)("thaw num_frames: %d", num_frames);
     assert(!_cont.is_empty(), "no more frames");
     assert (_cont.tail() == (oop)NULL, "");
     assert (num_frames > 0 && !hf.is_empty(), "");
@@ -4258,12 +4248,11 @@ static void post_JVMTI_continue(JavaThread* thread, FrameInfo* fi, int java_fram
   invlidate_JVMTI_stack(thread);
 }
 
-static inline bool can_thaw_fast(ContMirror& cont, int num_frames) {
+static inline bool can_thaw_fast(ContMirror& cont) {
   if (cont.thread()->is_interp_only_mode()) 
     return false;
 
-  const bool full = num_frames > 2; // TODO
-  if (LIKELY(!full)) {
+  if (LIKELY(!CONT_FULL_STACK)) {
     for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
       if (!ContMirror::is_empty_chunk(chunk))
         return true;
@@ -4284,9 +4273,8 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   if (return_barrier) {
     log_develop_trace(jvmcont)("== RETURN BARRIER");
   }
-  const int num_frames = thaw_num_frames(return_barrier);
 
-  log_develop_trace(jvmcont)("~~~~~~~~~ thaw num_frames: %d", num_frames);
+  log_develop_trace(jvmcont)("~~~~~~~~~ thaw return_barrier: %d", return_barrier);
   log_develop_trace(jvmcont)("sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
 
   oop oopCont = get_continuation(thread);
@@ -4308,8 +4296,6 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   print_frames(thread);
 #endif
 
-  assert(num_frames > 0, "num_frames <= 0: %d", num_frames);
-
   int java_frame_count = -1;
   if (!return_barrier && JvmtiExport::should_post_continuation_run()) {
     cont.read_rest();
@@ -4318,11 +4304,11 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
 
   bool res; // whether only compiled frames are thawed
   if (cont.is_flag(FLAG_SAFEPOINT_YIELD)) {
-    res = cont_thaw<mode_preempt>(thread, cont, fi, num_frames);
-  } else if (can_thaw_fast(cont, num_frames)) {
-    res = cont_thaw<mode_fast>(thread, cont, fi, num_frames);
+    res = cont_thaw<mode_preempt>(thread, cont, fi, return_barrier);
+  } else if (can_thaw_fast(cont)) {
+    res = cont_thaw<mode_fast>(thread, cont, fi, return_barrier);
   } else {
-    res = cont_thaw<mode_slow>(thread, cont, fi, num_frames);
+    res = cont_thaw<mode_slow>(thread, cont, fi, return_barrier);
   }
 
   assert (verify_continuation<2>(cont.mirror()), "");
@@ -5549,8 +5535,8 @@ public:
   }
 
   template<op_mode mode>
-  static bool thaw(JavaThread* thread, ContMirror& cont, FrameInfo* fi, int num_frames) {
-    return Thaw<SelfT, mode>(thread, cont).thaw(fi, num_frames);
+  static bool thaw(JavaThread* thread, ContMirror& cont, FrameInfo* fi, bool return_barrier) {
+    return Thaw<SelfT, mode>(thread, cont).thaw(fi, return_barrier);
   }
 
   static void print() {
@@ -5597,7 +5583,7 @@ public:
 
   template <bool use_compressed, bool is_modref, bool gencode, bool g1gc, bool use_chunks>
   static void resolve_full_stack() {
-    !UseContinuationLazyCopy
+    (!UseContinuationLazyCopy)
       ? resolve<use_compressed, is_modref, gencode, g1gc, use_chunks, true>()
       : resolve<use_compressed, is_modref, gencode, g1gc, use_chunks, false>();
   }
