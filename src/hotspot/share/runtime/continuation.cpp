@@ -2221,7 +2221,7 @@ public:
       // }
       allocated = false;
       sp += argsize;
-      ContMirror::reset_chunk_counters(chunk);
+      // ContMirror::reset_chunk_counters(chunk);
     } else {
       assert (chunk == NULL || requires_barriers(chunk) || jdk_internal_misc_StackChunk::sp(chunk) < (frame::sender_sp_offset + size - argsize), "");
       assert (_thread->thread_state() == _thread_in_vm, "");
@@ -2431,10 +2431,10 @@ public:
 
     for (oop chunk = _cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
       num_chunks++;
-      if (jdk_internal_misc_StackChunk::numFrames(chunk) < 0) {
-        assert (!requires_barriers(chunk) && !jdk_internal_misc_StackChunk::gc_mode(chunk), "");
+      // if (jdk_internal_misc_StackChunk::numFrames(chunk) < 0) {
+      //   assert (!requires_barriers(chunk) && !jdk_internal_misc_StackChunk::gc_mode(chunk), "");
         Continuation::stack_chunk_iterate_stack(chunk, (BasicOopIterateClosure*)NULL); // , false /* do_metadata */); // &do_nothing_cl
-      }
+      // }
 
       static const int metadata = 2;
       int size = (jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + metadata) << LogBytesPerWord;
@@ -3598,6 +3598,7 @@ public:
 
   NOINLINE intptr_t* thaw_chunk(oop chunk, int num_frames, bool top) {
     assert (ConfigT::has_young, "");
+    assert (top || ConfigT::full_stack, "");
     assert (chunk != (oop) NULL, "");
     assert (chunk == _cont.tail(), "");
 
@@ -3702,7 +3703,7 @@ public:
     if (is_last_in_chunks && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
     }
-    if (!ConfigT::full_stack) {
+    if (!ConfigT::full_stack || top) {
       // _cont.write_minimal(); // must be done after patch; really only need to write max_size
       java_lang_Continuation::set_maxSize(_cont.mirror(), (jint)_cont.max_size());
       assert (java_lang_Continuation::flags(_cont.mirror()) == _cont.flags(), "");
@@ -3710,7 +3711,6 @@ public:
 
     assert (is_last == _cont.is_empty(), "is_last: %d _cont.is_empty(): %d", is_last, _cont.is_empty());
     
-    assert (top || ConfigT::full_stack, "");
     if (LIKELY(!ConfigT::full_stack || top)) {
       setup_chunk_jump(vsp, hsp);
     }
@@ -3754,23 +3754,23 @@ public:
         _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
         // java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
 
-        assert (0 == jdk_internal_misc_StackChunk::numFrames(chunk) - 1, "");
-        jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - 1);
+        // assert (0 == jdk_internal_misc_StackChunk::numFrames(chunk) - 1, "");
+        // jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - 1);
 
-        assert (0 == jdk_internal_misc_StackChunk::numOops(chunk) - cb->oop_map_for_slot(slot, pc)->num_oops(), "");
-        jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
+        // assert (0 == jdk_internal_misc_StackChunk::numOops(chunk) - cb->oop_map_for_slot(slot, pc)->num_oops(), "");
+        // jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
       }
     } else {
       jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::sp(chunk) + size);
     
-      if (barriers) {
-        assert (jdk_internal_misc_StackChunk::numFrames(chunk) > 0, "");
-        jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - 1);
+      // if (barriers) {
+      //   assert (jdk_internal_misc_StackChunk::numFrames(chunk) > 0, "");
+      //   jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - 1);
 
-        const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
-        assert (jdk_internal_misc_StackChunk::numOops(chunk) >= oopmap->num_oops(), "jdk_internal_misc_StackChunk::numOops(chunk): %d oopmap->num_oops() : %d", jdk_internal_misc_StackChunk::numOops(chunk), oopmap->num_oops());
-        jdk_internal_misc_StackChunk::set_numOops(chunk, jdk_internal_misc_StackChunk::numOops(chunk) - oopmap->num_oops());
-      }
+      //   const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
+      //   assert (jdk_internal_misc_StackChunk::numOops(chunk) >= oopmap->num_oops(), "jdk_internal_misc_StackChunk::numOops(chunk): %d oopmap->num_oops() : %d", jdk_internal_misc_StackChunk::numOops(chunk), oopmap->num_oops());
+      //   jdk_internal_misc_StackChunk::set_numOops(chunk, jdk_internal_misc_StackChunk::numOops(chunk) - oopmap->num_oops());
+      // }
     }
 
     *out_size = size;

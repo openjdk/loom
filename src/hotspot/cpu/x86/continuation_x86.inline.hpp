@@ -1380,10 +1380,10 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
       }
     }
   }
-  if (!concurrent) {
-    assert (jdk_internal_misc_StackChunk::numFrames(chunk) == -1 || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "young: %d num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", !requires_barriers(chunk), num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
-    assert (jdk_internal_misc_StackChunk::numOops(chunk)   == -1 || num_oops   == jdk_internal_misc_StackChunk::numOops(chunk),   "young: %d num_oops: %d jdk_internal_misc_StackChunk::numOops(chunk): %d",     !requires_barriers(chunk), num_oops,   jdk_internal_misc_StackChunk::numOops(chunk));
-  }
+  // if (!concurrent) {
+  //   assert (jdk_internal_misc_StackChunk::numFrames(chunk) == -1 || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "young: %d num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", !requires_barriers(chunk), num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
+  //   assert (jdk_internal_misc_StackChunk::numOops(chunk)   == -1 || num_oops   == jdk_internal_misc_StackChunk::numOops(chunk),   "young: %d num_oops: %d jdk_internal_misc_StackChunk::numOops(chunk): %d",     !requires_barriers(chunk), num_oops,   jdk_internal_misc_StackChunk::numOops(chunk));
+  // }
 
   if (out_frames != NULL) *out_frames += num_frames;
   if (out_oops   != NULL) *out_oops   += num_oops;
