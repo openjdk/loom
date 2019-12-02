@@ -51,16 +51,6 @@ import java.util.Objects;
 public abstract class Writer implements Appendable, Closeable, Flushable {
 
     /**
-     * Temporary buffer used to hold writes of strings and single characters
-     */
-    private char[] writeBuffer;
-
-    /**
-     * Size of writeBuffer, must be >= 1
-     */
-    private static final int WRITE_BUFFER_SIZE = 1024;
-
-    /**
      * Returns a new {@code Writer} which discards all characters.  The
      * returned stream is initially open.  The stream is closed by calling
      * the {@code close()} method.  Subsequent calls to {@code close()} have
@@ -191,13 +181,9 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      *          If an I/O error occurs
      */
     public void write(int c) throws IOException {
-        synchronized (lock) {
-            if (writeBuffer == null){
-                writeBuffer = new char[WRITE_BUFFER_SIZE];
-            }
-            writeBuffer[0] = (char) c;
-            write(writeBuffer, 0, 1);
-        }
+        var writeBuffer = new char[1];
+        writeBuffer[0] = (char) c;
+        write(writeBuffer, 0, 1);
     }
 
     /**
@@ -276,19 +262,9 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      *          If an I/O error occurs
      */
     public void write(String str, int off, int len) throws IOException {
-        synchronized (lock) {
-            char cbuf[];
-            if (len <= WRITE_BUFFER_SIZE) {
-                if (writeBuffer == null) {
-                    writeBuffer = new char[WRITE_BUFFER_SIZE];
-                }
-                cbuf = writeBuffer;
-            } else {    // Don't permanently allocate very large buffers.
-                cbuf = new char[len];
-            }
-            str.getChars(off, (off + len), cbuf, 0);
-            write(cbuf, 0, len);
-        }
+        char cbuf[] = new char[len];
+        str.getChars(off, (off + len), cbuf, 0);
+        write(cbuf, 0, len);
     }
 
     /**
