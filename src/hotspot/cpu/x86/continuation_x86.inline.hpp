@@ -942,7 +942,7 @@ inline intptr_t* Thaw<ConfigT, mode>::align(const hframe& hf, intptr_t* vsp, fra
       }
     }
   #ifdef _LP64
-    if ((intptr_t)vsp % 16 != 0) {
+    if (((intptr_t)vsp & 0xf) != 0) {
       log_develop_trace(jvmcont)("Aligning compiled frame 1: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(vsp), p2i(vsp - 1));
       assert(caller.is_interpreted_frame() 
         || (bottom && !FKind::stub && hf.compiled_frame_stack_argsize() % 16 != 0), "");
@@ -1265,7 +1265,7 @@ void Thaw<ConfigT, mode>::patch_chunk_pd(intptr_t* sp) {
 template <typename ConfigT, op_mode mode>
 inline intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp, int argsize) {
 #ifdef _LP64
-  if ((intptr_t)vsp % 16 != 0) { // TODO PERF
+  if (((intptr_t)vsp & 0xf) != 0) { // TODO PERF
     assert (argsize != 0 || Interpreter::contains(_cont.entryPC()), "");
     log_develop_trace(jvmcont)("Aligning compiled frame 1: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(vsp), p2i(vsp - 1));
     vsp--;

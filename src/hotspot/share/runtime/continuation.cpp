@@ -2386,7 +2386,7 @@ public:
     // tty->print_cr(">>> setup_chunk_jump sp: %p", sp);
     assert (sp != NULL, "");
     _fi->sp = sp;
-    _fi->pc = Continuation::is_return_barrier_entry(*(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET)) 
+    _fi->pc = Continuation::is_return_barrier_entry(*(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET)) // TODO PERF
                   ? _cont.entryPC() // java_lang_Continuation::entryPC(_cont.mirror())
                   : *(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET); // Continuation.run may have been deoptimized
     to_frame_info_chunk_pd(sp);
