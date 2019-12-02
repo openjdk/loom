@@ -157,11 +157,12 @@ private:
 public:
   static bool debug_is_stack_chunk(Klass* klass);
   static bool debug_is_stack_chunk(oop obj);
-  static bool debug_verify_stack_chunk(oop chunk, oop cont = (oop)NULL);
+  static bool debug_verify_stack_chunk(oop chunk, oop cont = (oop)NULL, size_t* out_size = NULL, int* out_frames = NULL, int* out_oops = NULL);
   static void debug_print_stack_chunk(oop obj);
   static bool debug_is_continuation(Klass* klass);
   static bool debug_is_continuation(oop obj);
   static bool debug_verify_continuation(oop cont);
+  static void debug_print_continuation(oop cont, outputStream* st = NULL);
 #endif
 };
 

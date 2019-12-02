@@ -4450,9 +4450,11 @@ int java_lang_Continuation::_cs_offset;
 int java_lang_Continuation::_flags_offset;
 int java_lang_Continuation::_reset_offset;
 int java_lang_Continuation::_mounted_offset;
+int java_lang_Continuation::_done_offset;
 int jdk_internal_misc_StackChunk::_parent_offset;
 int jdk_internal_misc_StackChunk::_size_offset;
 int jdk_internal_misc_StackChunk::_sp_offset;
+int jdk_internal_misc_StackChunk::_pc_offset;
 int jdk_internal_misc_StackChunk::_argsize_offset;
 int jdk_internal_misc_StackChunk::_mode_offset;
 int jdk_internal_misc_StackChunk::_numFrames_offset;
@@ -4663,6 +4665,7 @@ void java_lang_ContinuationScope::serialize_offsets(SerializeClosure* f) {
   macro(_cs_offset,        k, vmSymbols::cs_name(),        short_signature,             false); \
   macro(_reset_offset,     k, vmSymbols::reset_name(),     bool_signature,              false); \
   macro(_mounted_offset,   k, vmSymbols::mounted_name(),   bool_signature,              false); \
+  macro(_done_offset,      k, vmSymbols::done_name(),      bool_signature,              false); \
   macro(_numFrames_offset, k, vmSymbols::numFrames_name(), short_signature,             false); \
   macro(_numInterpretedFrames_offset, k, vmSymbols::numInterpretedFrames_name(), short_signature, false);
 
@@ -4683,6 +4686,7 @@ void java_lang_Continuation::serialize_offsets(SerializeClosure* f) {
   macro(_parent_offset,    k, vmSymbols::parent_name(),    stackchunk_signature, false); \
   macro(_size_offset,      k, vmSymbols::size_name(),      int_signature,        false); \
   macro(_sp_offset,        k, vmSymbols::sp_name(),        int_signature,        false); \
+  macro(_pc_offset,        k, vmSymbols::pc_name(),        long_signature,        false); \
   macro(_argsize_offset,   k, vmSymbols::argsize_name(),   int_signature,        false); \
   macro(_mode_offset,      k, vmSymbols::mode_name(),      bool_signature,       false); \
   macro(_numFrames_offset, k, vmSymbols::numFrames_name(), int_signature,        false); \

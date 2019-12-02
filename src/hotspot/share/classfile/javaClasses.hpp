@@ -1064,6 +1064,7 @@ class java_lang_Continuation: AllStatic {
   static int _flags_offset;
   static int _reset_offset;
   static int _mounted_offset;
+  static int _done_offset;
 
   static void compute_offsets();
  public:
@@ -1110,6 +1111,7 @@ class java_lang_Continuation: AllStatic {
   static bool on_local_stack(oop ref, address adr);
   static bool is_reset(oop ref);
   static bool is_mounted(oop ref);
+  static bool done(oop ref);
 };
 
 // Interface to jdk.internal.misc.StackChunk objects
@@ -1119,6 +1121,7 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static int _parent_offset;
   static int _size_offset;
   static int _sp_offset;
+  static int _pc_offset;
   static int _argsize_offset;
   static int _mode_offset;
   static int _numFrames_offset;
@@ -1137,6 +1140,8 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline void set_size(HeapWord* ref, int value);
   static inline int sp(oop ref);
   static inline void set_sp(oop ref, int value);
+  static inline address pc(oop ref);
+  static inline void set_pc(oop ref, address value);
   static inline int argsize(oop ref);
   static inline void set_argsize(oop ref, int value);
   static inline bool gc_mode(oop ref);

@@ -288,6 +288,10 @@ inline HeapWord* java_lang_Continuation::refStack_base(oop ref) {
   return refStack(ref)->base();
 }
 
+inline bool java_lang_Continuation::done(oop ref) {
+  return ref->bool_field(_done_offset);
+}
+
 inline oop jdk_internal_misc_StackChunk::parent(oop ref) {
   return ref->obj_field(_parent_offset);
 }
@@ -310,6 +314,12 @@ inline int jdk_internal_misc_StackChunk::sp(oop ref) {
 inline void jdk_internal_misc_StackChunk::set_sp(oop ref, int value) {
   ref->int_field_put(_sp_offset, value);
 }
+inline address jdk_internal_misc_StackChunk::pc(oop ref) {
+  return (address)ref->long_field(_pc_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_pc(oop ref, address value) {
+  ref->long_field_put(_pc_offset, (jlong)value);
+}
 inline int jdk_internal_misc_StackChunk::argsize(oop ref) {
   return ref->int_field(_argsize_offset);
 }
@@ -317,10 +327,10 @@ inline void jdk_internal_misc_StackChunk::set_argsize(oop ref, int value) {
   ref->int_field_put(_argsize_offset, value);
 }
 inline bool jdk_internal_misc_StackChunk::gc_mode(oop ref) {
-  return (uint64_t)ref->long_field(_mode_offset);
+  return (bool)ref->bool_field(_mode_offset);
 }
 inline void jdk_internal_misc_StackChunk::set_gc_mode(oop ref, bool value) {
-  ref->long_field_put(_mode_offset, (jboolean)value);
+  ref->bool_field_put(_mode_offset, (jboolean)value);
 }
 inline int jdk_internal_misc_StackChunk::end(oop ref) {
   return size(ref) - argsize(ref);
