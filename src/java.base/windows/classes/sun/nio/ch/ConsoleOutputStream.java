@@ -28,7 +28,7 @@ import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 
 public class ConsoleOutputStream extends FileOutputStream {
-    ConsoleOutputStream(FileDescriptor fd) {
+    public ConsoleOutputStream(FileDescriptor fd) {
         super (fd);
     }
 }
