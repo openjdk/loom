@@ -4238,7 +4238,17 @@ public:
 
 };
 
-static void post_JVMTI_continue(JavaThread* thread, FrameInfo* fi, int java_frame_count) {
+static int maybe_count_Java_frames(ContMirror& cont, bool return_barrier) {
+  if (!return_barrier && JvmtiExport::should_post_continuation_run()) {
+    cont.read_rest();
+    return num_java_frames(cont);
+  }
+  return -1;
+}
+
+static void post_JVMTI_continue(JavaThread* thread, FrameInfo* fi, int java_frame_count, bool return_barrier) {
+  if (!return_barrier) return;
+
   if (JvmtiExport::should_post_continuation_run()) {
     set_anchor<false>(thread, fi); // ensure thawed frames are visible
     JvmtiExport::post_continuation_run(JavaThread::current(), java_frame_count);
@@ -4296,25 +4306,23 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   print_frames(thread);
 #endif
 
-  int java_frame_count = -1;
-  if (!return_barrier && JvmtiExport::should_post_continuation_run()) {
-    cont.read_rest();
-    java_frame_count = num_java_frames(cont);
-  }
-
   bool res; // whether only compiled frames are thawed
-  if (cont.is_flag(FLAG_SAFEPOINT_YIELD)) {
+  if (UNLIKELY(cont.is_flag(FLAG_SAFEPOINT_YIELD))) {
+    int java_frame_count = maybe_count_Java_frames(cont, return_barrier);
     res = cont_thaw<mode_preempt>(thread, cont, fi, return_barrier);
-  } else if (can_thaw_fast(cont)) {
+    post_JVMTI_continue(thread, fi, java_frame_count, return_barrier);
+  } else if (LIKELY(can_thaw_fast(cont))) {
     res = cont_thaw<mode_fast>(thread, cont, fi, return_barrier);
   } else {
+    int java_frame_count = maybe_count_Java_frames(cont, return_barrier);
     res = cont_thaw<mode_slow>(thread, cont, fi, return_barrier);
+    post_JVMTI_continue(thread, fi, java_frame_count, return_barrier);
   }
-
-  assert (verify_continuation<2>(cont.mirror()), "");
 
   thread->set_cont_fastpath(res);
   thread->reset_held_monitor_count();
+
+  assert (verify_continuation<2>(cont.mirror()), "");
 
   log_develop_trace(jvmcont)("fi->sp: " INTPTR_FORMAT " fi->fp: " INTPTR_FORMAT " fi->pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
 
@@ -4333,9 +4341,6 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   DEBUG_ONLY(thread->_continuation = oopCont;)
 
   cont.post_jfr_event(&event);
-  if (!return_barrier) {
-    post_JVMTI_continue(thread, fi, java_frame_count);
-  }
 
   assert (verify_continuation<3>(cont.mirror()), "");
   log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
