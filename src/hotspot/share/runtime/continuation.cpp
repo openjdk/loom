@@ -2275,8 +2275,6 @@ public:
     
     if (UNLIKELY(argsize != 0)) { // patch pc + fp
       log_develop_trace(jvmcont)("freeze_chunk patch");
-      intptr_t* bottom_sp = chunk_top + size - argsize;
-      assert ((address)bottom_sp >= (address)InstanceStackChunkKlass::start_of_stack(chunk), "");
       address pc;
       // intptr_t* fp
       if (!allocated) {
@@ -2296,8 +2294,10 @@ public:
         }
       }
       guarantee (pc != NULL, "");
-      *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
-      
+
+      intptr_t* bottom_sp = chunk_top + size - argsize;
+      assert ((address)bottom_sp >= (address)InstanceStackChunkKlass::start_of_stack(chunk), "");
+      *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;      
       // *(intptr_t**)(bottom_sp - frame::sender_sp_offset) = fp; -- necessary ?
     }
     
@@ -2337,7 +2337,7 @@ public:
     // this value helps pop those stack-passed arguments.
     intptr_t* saved_sp = _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
     assert (saved_sp != NULL || top_stack_argsize() == 0, "");
-    int argsize = saved_sp == 0 ? 0 : saved_sp - _cont.entrySP(); // in words
+    int argsize = saved_sp == NULL ? 0 : saved_sp - _cont.entrySP(); // in words
     assert (argsize == top_stack_argsize(), "argsize: %d top_stack_argsize(): %d saved_sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, argsize, top_stack_argsize(), p2i(saved_sp), p2i(_cont.entrySP()));
     return argsize;
   }
@@ -3611,7 +3611,7 @@ public:
     assert (verify_stack_chunk<1>(chunk), "");
     // assert (verify_continuation<99>(_cont.mirror()), "");
 
-    const bool barriers = requires_barriers(chunk);
+    // const bool barriers = requires_barriers(chunk); // TODO PERF
     const bool after_gc = jdk_internal_misc_StackChunk::gc_mode(chunk);
 
     if (after_gc) {
@@ -3648,13 +3648,17 @@ public:
       }
 
       jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset);
-      if (barriers) {
-        jdk_internal_misc_StackChunk::set_numFrames(chunk, 0);
-        jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
-      }
+      // if (barriers) {
+      //   jdk_internal_misc_StackChunk::set_numFrames(chunk, 0);
+      //   jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
+      // }
     } else { // thaw a single frame
       partial = true;
-      thaw_one_frame_from_chunk(barriers, chunk, hsp, &size, &argsize, &empty);
+      empty = thaw_one_frame_from_chunk(chunk, hsp, &size, &argsize);
+      // if (empty && barriers) { // this is done in allocate_chunk; no need to do it here
+      //   _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
+      //   // java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
+      // }
     }
 
     const bool is_last_in_chunks = empty && jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL;
@@ -3719,7 +3723,7 @@ public:
     return vsp;
   }
   
-  NOINLINE void thaw_one_frame_from_chunk(bool barriers, oop chunk, intptr_t* hsp, int* out_size, int* out_argsize, bool *out_empty) {
+  NOINLINE bool thaw_one_frame_from_chunk(oop chunk, intptr_t* hsp, int* out_size, int* out_argsize) {
     address pc = *(address*)(hsp - SENDER_SP_RET_ADDRESS_OFFSET);
 
     int slot;
@@ -3739,16 +3743,13 @@ public:
       assert (jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset == jdk_internal_misc_StackChunk::sp(chunk) + size + argsize, "");
       jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset);
 
-      if (barriers) {
-        _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
-        // java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
-
+      // if (barriers) {
         // assert (0 == jdk_internal_misc_StackChunk::numFrames(chunk) - 1, "");
         // jdk_internal_misc_StackChunk::set_numFrames(chunk, jdk_internal_misc_StackChunk::numFrames(chunk) - 1);
 
         // assert (0 == jdk_internal_misc_StackChunk::numOops(chunk) - cb->oop_map_for_slot(slot, pc)->num_oops(), "");
         // jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
-      }
+      // }
     } else {
       jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::sp(chunk) + size);
     
@@ -3764,7 +3765,7 @@ public:
 
     *out_size = size;
     *out_argsize = argsize;
-    *out_empty = empty;
+    return empty;
   }
 
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size, int argsize, oop chunk) {
