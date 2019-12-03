@@ -5582,7 +5582,7 @@ public:
 
   template <bool use_compressed, bool is_modref, bool gencode, bool g1gc>
   static void resolve_use_chunks() {
-    g1gc && UseContinuationChunks
+    UseContinuationChunks
       ? resolve_full_stack<use_compressed, is_modref, gencode, g1gc, true>()
       : resolve_full_stack<use_compressed, is_modref, gencode, g1gc, false>();
   }
