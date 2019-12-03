@@ -311,6 +311,17 @@ struct FpOopInfo;
 typedef int (*FreezeFnT)(address, address, address, address, int, FpOopInfo*, void * /* FreezeCompiledOops::Extra */);
 typedef int (*ThawFnT)(address /* dst */, address /* objArray */, address /* map */, address /* ThawCompiledOops::Extra */);
 
+typedef void (*MemcpyFnT)(void* src, void* dst, int count);
+
+static inline void copy_chunk(void* from, void* to, size_t size) {
+  assert(((intptr_t)from & WordAlignmentMask) == 0, "");
+  assert(((intptr_t)to   & WordAlignmentMask) == 0, "");
+  assert((size           & WordAlignmentMask) == 0, "");
+  
+  // ((MemcpyFnT)StubRoutines::word_memcpy())(from, to, size);
+  memcpy(to, from, size);
+}
+
 class Compiled : public NonInterpreted<Compiled>  {
 public:
   DEBUG_ONLY(static const char* name;)
@@ -2261,6 +2272,13 @@ public:
     jdk_internal_misc_StackChunk::set_sp(chunk, sp);
     jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
 
+    if (UNLIKELY(argsize != 0)) { // patch pc + fp
+      // we're patching the thread stack, not the chunk, as it's hopefully still hot in the cache
+      intptr_t* bottom_sp = bottom - argsize;
+      assert (bottom_sp == _bottom_address, "");
+      patch_chunk(bottom_sp, chunk, allocated);
+    }
+
     // we copy the top frame's return address and link, but not the bottom's
     intptr_t* chunk_top = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp;
     log_develop_trace(jvmcont)("freeze_chunk start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT, p2i(InstanceStackChunkKlass::start_of_stack(chunk)), sp, p2i(chunk_top));
@@ -2272,34 +2290,6 @@ public:
     }
     copy_to_chunk(from, to, size, chunk);
     jdk_internal_misc_StackChunk::set_pc(chunk, *(address*)(top - SENDER_SP_RET_ADDRESS_OFFSET));
-    
-    if (UNLIKELY(argsize != 0)) { // patch pc + fp
-      log_develop_trace(jvmcont)("freeze_chunk patch");
-      address pc;
-      // intptr_t* fp
-      if (!allocated) {
-        pc = jdk_internal_misc_StackChunk::pc(chunk);
-        // the following causes a cache miss; that's why we have the StackChunk.pc field
-        // pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - SENDER_SP_RET_ADDRESS_OFFSET);
-        // fp = *(intptr_t**)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - frame::sender_sp_offset); -- necessary?
-      } else {
-        oop parent = jdk_internal_misc_StackChunk::parent(chunk);
-        if (parent != (oop)NULL) {
-          guarantee (!ContMirror::is_empty_chunk(parent), "");
-          pc = jdk_internal_misc_StackChunk::pc(parent);
-          // fp = ...
-        } else {
-          pc = _cont.pc();
-          // fp = _cont.fp();
-        }
-      }
-      guarantee (pc != NULL, "");
-
-      intptr_t* bottom_sp = chunk_top + size - argsize;
-      assert ((address)bottom_sp >= (address)InstanceStackChunkKlass::start_of_stack(chunk), "");
-      *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;      
-      // *(intptr_t**)(bottom_sp - frame::sender_sp_offset) = fp; -- necessary ?
-    }
     
     _cont.add_size(size << LogBytesPerWord);
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
@@ -2332,6 +2322,31 @@ public:
     return true;
   }
 
+  void patch_chunk(intptr_t* bottom_sp, oop chunk, bool allocated) {
+    log_develop_trace(jvmcont)("freeze_chunk patch");
+    address pc;
+    // intptr_t* fp
+    if (!allocated) {
+      pc = jdk_internal_misc_StackChunk::pc(chunk);
+      // the following causes a cache miss; that's why we have the StackChunk.pc field
+      // pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - SENDER_SP_RET_ADDRESS_OFFSET);
+      // fp = *(intptr_t**)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - frame::sender_sp_offset); -- necessary?
+    } else {
+      oop parent = jdk_internal_misc_StackChunk::parent(chunk);
+      if (parent != (oop)NULL) {
+        guarantee (!ContMirror::is_empty_chunk(parent), "");
+        pc = jdk_internal_misc_StackChunk::pc(parent);
+        // fp = ...
+      } else {
+        pc = _cont.pc();
+        // fp = _cont.fp();
+      }
+    }
+    guarantee (pc != NULL, "");
+
+    *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;      
+    // *(intptr_t**)(bottom_sp - frame::sender_sp_offset) = fp; -- necessary ?
+  }
   int bottom_argsize() {
     // _thread->cont_frame()->sp when we thaw, we put the sp in _thread->cont_frame()->sp; subsequent return barriers may thaw single frames with their stack-passed arguments.
     // this value helps pop those stack-passed arguments.
@@ -2349,7 +2364,8 @@ public:
     }
     assert (jdk_internal_misc_StackChunk::size(chunk) == size, "");
     assert (chunk->size() >= size, "");
-
+    assert ((intptr_t)InstanceStackChunkKlass::start_of_stack(chunk) % 8 == 0, "");
+    
     oop chunk0 = _cont.tail();
     if (chunk0 != (oop)NULL && ContMirror::is_empty_chunk(chunk0)) {
       chunk0 = jdk_internal_misc_StackChunk::parent(chunk0);
@@ -2374,8 +2390,8 @@ public:
     
     log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + sizeb), sizeb);
     log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + sizeb), sizeb);
-    
-    memcpy(to, from, sizeb);
+
+    copy_chunk(from, to, sizeb);
 
     assert ((address)to >= (address)InstanceStackChunkKlass::start_of_stack(chunk), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(InstanceStackChunkKlass::start_of_stack(chunk)));
     assert ((address)to + sizeb <= (address)(InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)), 
@@ -3176,7 +3192,7 @@ static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont, const FrameIn
   invlidate_JVMTI_stack(thread);
 }
 
-static int freeze_epilog(JavaThread* thread, FrameInfo* fi, ContMirror& cont, EventContinuationFreeze& event) {
+static inline int freeze_epilog(JavaThread* thread, FrameInfo* fi, ContMirror& cont, EventContinuationFreeze& event) {
   PERFTEST_ONLY(if (PERFTEST_LEVEL <= 15) return freeze_ok;)
 
   assert (verify_continuation<2>(cont.mirror()), "");
@@ -3772,7 +3788,8 @@ public:
     int sizeb = (size + (LIKELY(argsize == 0) ? 0 : argsize + frame::sender_sp_offset)) << LogBytesPerWord;
     log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + sizeb), sizeb);
     log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + sizeb), sizeb);
-    memcpy(to, from, sizeb);
+
+    copy_chunk(from, to, sizeb);
   }
 
   void patch_chunk(oop chunk, intptr_t* sp, bool is_last) {

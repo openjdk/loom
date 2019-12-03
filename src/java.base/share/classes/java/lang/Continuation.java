@@ -477,11 +477,9 @@ public class Continuation {
             // this.refSP = -1;
             this.tail = null;
         } else {
-            if (TRACE && origRefSP < refSP)
-                System.out.println("Nulling refs " + origRefSP + " (inclusive) - " + refSP + " (exclusive)");
-            for (int i = origRefSP; i < refSP; i++)
-                refStack[i] = null;
-
+            if (TRACE && origRefSP < refSP) System.out.println("Nulling refs " + origRefSP + " (inclusive) - " + refSP + " (exclusive)");
+            if (origRefSP < refSP)
+                Arrays.fill(refStack, origRefSP, refSP, null);
             maybeShrink();
         }
     }

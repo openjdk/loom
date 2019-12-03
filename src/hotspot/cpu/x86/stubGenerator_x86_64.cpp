@@ -3099,6 +3099,8 @@ class StubGenerator: public StubCodeGenerator {
 
     StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit    = StubRoutines::_oop_disjoint_arraycopy_uninit;
     StubRoutines::_arrayof_oop_arraycopy_uninit             = StubRoutines::_oop_arraycopy_uninit;
+
+    StubRoutines::_word_memcpy = StubRoutines::_jbyte_arraycopy;
   }
 
   // AES intrinsic stubs
