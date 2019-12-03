@@ -356,4 +356,9 @@ public interface JavaLangAccess {
      * Unparks the given virtual thread.
      */
     void unparkVirtualThread(Thread thread);
+
+    /**
+     * Returns true if the given virtual thread is parking.
+     */
+    boolean isVirtualThreadParking(Thread thread);
 }

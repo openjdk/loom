@@ -31,17 +31,24 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 
+import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.VirtualThreads;
 
 public class ConsoleOutputStream extends OutputStream {
-    // Holder class to avoid loading of NativeDispatcher during initPhase1
+
+    // Holder class to avoid loading during initPhase1
     private static class NativeDispatcherHolder {
-        static final NativeDispatcher nd = new FileDispatcherImpl();
+        static final NativeDispatcher ND = new FileDispatcherImpl();
+        static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     }
 
     private static NativeDispatcher nd() {
-        return NativeDispatcherHolder.nd;
+        return NativeDispatcherHolder.ND;
+    }
+
+    private static boolean isVirtualThreadParking(Thread thread) {
+        return NativeDispatcherHolder.JLA.isVirtualThreadParking(thread);
     }
 
     private final ReentrantLock writeLock = new ReentrantLock();
@@ -63,7 +70,7 @@ public class ConsoleOutputStream extends OutputStream {
 
     private void park(int event) throws IOException {
         Thread thread = Thread.currentThread();
-        if (thread.isVirtual()) {
+        if (thread.isVirtual() && !isVirtualThreadParking(thread)) {
             int fdVal = fdVal(fd);
             Poller.register(fdVal, event);
             try {
@@ -72,8 +79,10 @@ public class ConsoleOutputStream extends OutputStream {
                 Poller.deregister(fdVal, event);
             }
         } else {
+            // kernel thread, or virtual thread that is parking
             Net.poll(fd, event, -1);
         }
+
     }
 
     private int tryWrite(byte[] b, int off, int len) throws IOException {

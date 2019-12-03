@@ -44,15 +44,14 @@ public final class StreamEncoder extends Writer {
 
     private static final int DEFAULT_BYTE_BUFFER_SIZE = 8192;
 
+    private final ReentrantLock encoderLock;
+
     private volatile boolean closed;
 
     private void ensureOpen() throws IOException {
         if (closed)
             throw new IOException("Stream closed");
     }
-
-    private final ReentrantLock exLock;
-
 
     // Factories for java.io.OutputStreamWriter
     public static StreamEncoder forOutputStreamWriter(OutputStream out,
@@ -108,15 +107,15 @@ public final class StreamEncoder extends Writer {
     }
 
     public void flushBuffer() throws IOException {
-        if (exLock != null) {
-            exLock.lock();
+        if (encoderLock != null) {
+            encoderLock.lock();
             try {
                 lockedFlushBuffer();
             } finally {
-                exLock.unlock();
+                encoderLock.unlock();
             }
         } else {
-            synchronized (lock) {
+            synchronized (super.lock) {
                 lockedFlushBuffer();
             }
         }
@@ -136,15 +135,15 @@ public final class StreamEncoder extends Writer {
     }
 
     public void write(char cbuf[], int off, int len) throws IOException {
-        if (exLock != null) {
-            exLock.lock();
+        if (encoderLock != null) {
+            encoderLock.lock();
             try {
                 lockedWrite(cbuf, off, len);
             } finally {
-                exLock.unlock();
+                encoderLock.unlock();
             }
         } else {
-            synchronized (lock) {
+            synchronized (super.lock) {
                 lockedWrite(cbuf, off, len);
             }
         }
@@ -173,15 +172,15 @@ public final class StreamEncoder extends Writer {
     public void write(CharBuffer cb) throws IOException {
         int position = cb.position();
         try {
-            if (exLock != null) {
-                exLock.lock();
+            if (encoderLock != null) {
+                encoderLock.lock();
                 try {
                     lockedWrite(cb);
                 } finally {
-                    exLock.unlock();
+                    encoderLock.unlock();
                 }
             } else {
-                synchronized (lock) {
+                synchronized (super.lock) {
                     lockedWrite(cb);
                 }
             }
@@ -196,15 +195,15 @@ public final class StreamEncoder extends Writer {
     }
 
     public void flush() throws IOException {
-        if (exLock != null) {
-            exLock.lock();
+        if (encoderLock != null) {
+            encoderLock.lock();
             try {
                 lockedFlush();
             } finally {
-                exLock.unlock();
+                encoderLock.unlock();
             }
         } else {
-            synchronized (lock) {
+            synchronized (super.lock) {
                 lockedFlush();
             }
         }
@@ -216,15 +215,15 @@ public final class StreamEncoder extends Writer {
     }
 
     public void close() throws IOException {
-        if (exLock != null) {
-            exLock.lock();
+        if (encoderLock != null) {
+            encoderLock.lock();
             try {
                 lockedClose();
             } finally {
-                exLock.unlock();
+                encoderLock.unlock();
             }
         } else {
-            synchronized (lock) {
+            synchronized (super.lock) {
                 lockedClose();
             }
         }
@@ -284,11 +283,10 @@ public final class StreamEncoder extends Writer {
             bb = ByteBuffer.allocate(DEFAULT_BYTE_BUFFER_SIZE);
         }
 
-
         if (lock instanceof ReentrantLock) {
-            exLock = (ReentrantLock) lock;
+            encoderLock = (ReentrantLock) lock;
         } else {
-            exLock = null;
+            encoderLock = null;
         }
     }
 
@@ -300,7 +298,7 @@ public final class StreamEncoder extends Writer {
         this.bb = ByteBuffer.allocate(mbc < 0
                                   ? DEFAULT_BYTE_BUFFER_SIZE
                                   : mbc);
-        this.exLock = new ReentrantLock();
+        this.encoderLock = new ReentrantLock();
     }
 
     private void writeBytes() throws IOException {

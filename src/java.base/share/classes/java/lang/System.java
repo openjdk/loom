@@ -2020,8 +2020,8 @@ public final class System {
         lineSeparator = props.getProperty("line.separator");
 
         InputStream in = new sun.nio.ch.ConsoleInputStream(FileDescriptor.in);
-        OutputStream out =  new sun.nio.ch.ConsoleOutputStream(FileDescriptor.out);
-        OutputStream err =  new sun.nio.ch.ConsoleOutputStream(FileDescriptor.err);
+        OutputStream out = new sun.nio.ch.ConsoleOutputStream(FileDescriptor.out);
+        OutputStream err = new sun.nio.ch.ConsoleOutputStream(FileDescriptor.err);
         setIn0(new BufferedInputStream(in));
         setOut0(newPrintStream(out, props.getProperty("sun.stdout.encoding")));
         setErr0(newPrintStream(err, props.getProperty("sun.stderr.encoding")));
@@ -2315,6 +2315,10 @@ public final class System {
 
             public void unparkVirtualThread(Thread thread) {
                 ((Fiber) thread).unpark();
+            }
+
+            public boolean isVirtualThreadParking(Thread thread) {
+                return ((Fiber) thread).isParking();
             }
         });
     }
