@@ -3466,7 +3466,7 @@ static bool stack_overflow_check(JavaThread* thread, int size, address sp) {
 //      On failure: fi->sp - cont's entry SP
 //                  fi->fp - cont's entry FP
 //                  fi->pc - overflow? throw StackOverflowError : cont's entry PC
-JRT_LEAF(int, Continuation::prepare_thaw(FrameInfo* fi, bool return_barrier))
+JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, FrameInfo* fi, bool return_barrier))
   PERFTEST_ONLY(PERFTEST_LEVEL = ContPerfTest;)
 
   PERFTEST_ONLY(if (PERFTEST_LEVEL <= 110) return 0;)
@@ -3474,7 +3474,7 @@ JRT_LEAF(int, Continuation::prepare_thaw(FrameInfo* fi, bool return_barrier))
   log_develop_trace(jvmcont)("~~~~~~~~~ prepare_thaw return_barrier: %d", return_barrier);
   log_develop_trace(jvmcont)("prepare_thaw pc: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " sp: " INTPTR_FORMAT, p2i(fi->pc), p2i(fi->fp), p2i(fi->sp));
 
-  JavaThread* thread = JavaThread::current();
+  assert (thread == JavaThread::current(), "");
   oop cont = get_continuation(thread);
   assert (verify_continuation<1>(cont), "");
 
@@ -4369,18 +4369,19 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
 //      fi->fp = the FP " ...
 //      fi->pc = the PC " ...
 // JRT_ENTRY(void, Continuation::thaw(JavaThread* thread, FrameInfo* fi, int num_frames))
-JRT_LEAF(address, Continuation::thaw_leaf(FrameInfo* fi, bool return_barrier, bool exception))
+JRT_LEAF(address, Continuation::thaw_leaf(JavaThread* thread, FrameInfo* fi, bool return_barrier, bool exception))
   //callgrind();
   PERFTEST_ONLY(PERFTEST_LEVEL = ContPerfTest;)
 
-  thaw0(JavaThread::current(), fi, return_barrier);
-  // clear_anchor(JavaThread::current());
+  assert (thread == JavaThread::current(), "");
+  thaw0(thread, fi, return_barrier);
+  // clear_anchor(thread);
 
-  if (exception) {
+  if (exception) { 
     // TODO: handle deopt. see TemplateInterpreterGenerator::generate_throw_exception, OptoRuntime::handle_exception_C, OptoRuntime::handle_exception_helper
     // assert (!top.is_deoptimized_frame(), ""); -- seems to be handled
     address ret = fi->pc;
-    fi->pc = SharedRuntime::raw_exception_handler_for_return_address(JavaThread::current(), fi->pc);
+    fi->pc = SharedRuntime::raw_exception_handler_for_return_address(thread, fi->pc);
     return ret;
   } else {
     return reinterpret_cast<address>(Interpreter::contains(fi->pc)); // TODO PERF: really only necessary in the case of continuing from a forced yield

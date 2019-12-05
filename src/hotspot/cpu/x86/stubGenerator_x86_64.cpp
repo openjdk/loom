@@ -6050,10 +6050,10 @@ RuntimeStub* generate_cont_doYield() {
     if (return_barrier) {
       __ push(rax); __ push_d(xmm0); // preserve possible return value from a method returning to the return barrier
     }
-    __ movl(c_rarg1, return_barrier);
+    __ movl(c_rarg2, return_barrier);
     push_FrameInfo(_masm, fi, fi, rbp, c_rarg3);
     if (ContPerfTest > 105) {
-      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), fi, c_rarg1);
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, fi, c_rarg2);
     } else {
       __ xorq(rax, rax);
     }
@@ -6081,13 +6081,13 @@ RuntimeStub* generate_cont_doYield() {
       __ push(rdx); __ push_d(xmm0); // save original return value -- again
     }
     push_FrameInfo(_masm, fi, fi, rbp, c_rarg3);
-    __ movl(c_rarg1, return_barrier);
-    __ movl(c_rarg2, exception);
+    __ movl(c_rarg2, return_barrier);
+    __ movl(c_rarg3, exception);
     if (ContPerfTest > 112) {
       if (!return_barrier && JvmtiExport::can_support_continuations()) {
-        __ call_VM(noreg, CAST_FROM_FN_PTR(address, Continuation::thaw), fi, c_rarg1, c_rarg2);
+        __ call_VM(noreg, CAST_FROM_FN_PTR(address, Continuation::thaw), fi, c_rarg2, c_rarg3);
       } else {
-        __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw_leaf), fi, c_rarg1, c_rarg2);
+        __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw_leaf), r15_thread, fi, c_rarg2, c_rarg3);
       }
     }
     if (exception) {

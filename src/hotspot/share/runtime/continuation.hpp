@@ -84,8 +84,8 @@ public:
   static OopStorage* weak_storage() { return _weak_handles; }
 
   static int freeze(JavaThread* thread, FrameInfo* fi, bool from_interpreter);
-  static int prepare_thaw(FrameInfo* fi, bool return_barrier);
-  static address thaw_leaf(FrameInfo* fi, bool return_barrier, bool exception);
+  static int prepare_thaw(JavaThread* thread, FrameInfo* fi, bool return_barrier);
+  static address thaw_leaf(JavaThread* thread, FrameInfo* fi, bool return_barrier, bool exception);
   static address thaw(JavaThread* thread, FrameInfo* fi, bool return_barrier, bool exception);
   static int try_force_yield(JavaThread* thread, oop cont);
 
