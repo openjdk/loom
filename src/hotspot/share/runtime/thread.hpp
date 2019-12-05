@@ -1126,7 +1126,6 @@ class JavaThread: public Thread {
   volatile JNIAttachStates _jni_attach_state;
 
  public:
-  DEBUG_ONLY(oopDesc* _continuation;)
 
   // State of the stack guard pages for this thread.
   enum StackGuardState {
@@ -1222,6 +1221,9 @@ class JavaThread: public Thread {
   FrameInfo _cont_frame;
   int _cont_fastpath;
   int _held_monitor_count; // used by continuations for fast lock detection
+public:
+  oopDesc* _continuation; // a hack used to make continuation thaw a bit faster; see prepare_thaw
+private:
 
   friend class VMThread;
   friend class ThreadWaitTransition;

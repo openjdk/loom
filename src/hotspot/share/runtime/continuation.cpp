@@ -3170,7 +3170,6 @@ public:
 int early_return(int res, JavaThread* thread, FrameInfo* fi) {
   clear_frame_info(fi);
   thread->set_cont_yield(false);
-  DEBUG_ONLY(thread->_continuation = NULL;)
   log_develop_trace(jvmcont)("=== end of freeze (fail %d)", res);
   return res;
 }
@@ -3204,7 +3203,6 @@ static inline int freeze_epilog(JavaThread* thread, FrameInfo* fi, ContMirror& c
 
   // set_anchor(thread, fi);
   thread->cont_frame()->sp = NULL;
-  DEBUG_ONLY(thread->_continuation = NULL;)
   thread->set_cont_yield(false);
   // thread->reset_held_monitor_count();
 
@@ -3497,6 +3495,7 @@ JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, FrameInfo* fi, bool
   PERFTEST_ONLY(if (PERFTEST_LEVEL <= 120) return 0;)
   assert (verify_continuation<2>(cont), "");
 
+  thread->_continuation = cont; // avoid re-loading the oop from the heap again in thaw
   return size;
 JRT_END
 
@@ -4305,7 +4304,10 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   log_develop_trace(jvmcont)("~~~~~~~~~ thaw return_barrier: %d", return_barrier);
   log_develop_trace(jvmcont)("sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
 
-  oop oopCont = get_continuation(thread);
+  oop oopCont = thread->_continuation; // avoid re-loading the oop from the heap again
+  thread->_continuation = NULL;
+  assert (oopCont == get_continuation(thread), "");
+
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
   log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
@@ -4355,8 +4357,6 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
     frame f = frame(fi->sp, fi->fp, fi->pc);
     print_vframe(f, NULL);
   }
-
-  DEBUG_ONLY(thread->_continuation = oopCont;)
 
   cont.post_jfr_event(&event);
 
