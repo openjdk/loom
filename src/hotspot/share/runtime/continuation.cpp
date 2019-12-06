@@ -1563,7 +1563,8 @@ enum freeze_result {
   freeze_pinned_cs = 1,
   freeze_pinned_native = 2,
   freeze_pinned_monitor = 3,
-  freeze_exception = 4
+  freeze_exception = 4,
+  freeze_retry_slow = 5,
 };
 
 typedef int (*FreezeContFnT)(JavaThread*, FrameInfo*);
@@ -2135,6 +2136,9 @@ public:
       if (freeze_chunk(chunk_available)) {
         return freeze_ok;
       }
+      if (!_thread->cont_fastpath()) {
+        return freeze_retry_slow;  // things have deoptimized
+      }
       EventContinuationFreezeOld e;
       if (e.should_commit()) {
         e.set_id(cast_from_oop<u8>(_cont.mirror()));
@@ -2236,6 +2240,7 @@ public:
     } else {
       assert (chunk == NULL || requires_barriers(chunk) || jdk_internal_misc_StackChunk::sp(chunk) < (frame::sender_sp_offset + size - argsize), "");
       assert (_thread->thread_state() == _thread_in_vm, "");
+      assert (_thread->cont_fastpath(), "");
 
       chunk = allocate_chunk(size);
       allocated = true;
@@ -2245,6 +2250,9 @@ public:
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
       // They'll then be stored twice: in the chunk and in the parent
 
+      if (!_thread->cont_fastpath()) {
+        return false;
+      }
       if (requires_barriers(chunk)) {
         log_develop_trace(jvmcont)("Young chunk: allocated old! size: %d", size);
         tty->print_cr("Young chunk: allocated old! size: %d", size);
@@ -2701,6 +2709,7 @@ public:
   #endif
 
     assert (mode != mode_fast || !callee.is_interpreted_frame(), "");
+    assert (mode != mode_fast || _thread->cont_fastpath(), "");
 
     log_develop_trace(jvmcont)("bottom: " INTPTR_FORMAT " count %d size: %d, num_oops: %d", p2i(_bottom_address), nr_frames(), nr_bytes(), nr_oops());
 
@@ -2745,6 +2754,10 @@ public:
     }
 
     allocate_keepalive();
+
+    if (mode == mode_fast && !_thread->cont_fastpath()) {
+      return freeze_retry_slow; // things have deoptimized
+    }
 
     DEBUG_ONLY(int pre_chunk_sp = 0; int post_chunk_sp = 0);
     if (ConfigT::has_young && _thread != NULL) {
@@ -3278,7 +3291,11 @@ int freeze0(JavaThread* thread, FrameInfo* fi) {
     assert (thread->thread_state() == _thread_in_vm, "");
 
     freeze_result res = fr.freeze(false);
-    if (res != freeze_ok) {
+    if (UNLIKELY(res == freeze_retry_slow)) {
+      log_develop_trace(jvmcont)("-- RETRYING SLOW --");
+      res = Freeze<ConfigT, mode_slow>(thread, fi, cont).freeze(false);
+    }
+    if (UNLIKELY(res != freeze_ok)) {
       assert (verify_continuation<11>(cont.mirror()), "");
       return early_return(res, thread, fi);
     }

@@ -1305,23 +1305,34 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
       "young: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT, 
       !requires_barriers(chunk), jdk_internal_misc_StackChunk::numFrames(chunk), num_frames, p2i(sp), p2i(start), p2i(end));
 
+    num_frames++;
+
     int slot;
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
     assert (cb != NULL, "");
     log_develop_trace(jvmcont)("debug_verify_stack_chunk slot: %d codeblob:", slot);
     if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
-    assert (cb->is_nmethod(), "");
+    assert (cb->is_compiled(), "");
     assert (cb->frame_size() > 0, "");
-    
+    assert (!cb->as_compiled_method()->is_deopt_pc(pc), "");
+
     assert (slot >= 0, "");
     const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
+    // if (slot >= 0) {
+    //   oopmap = cb->oop_map_for_slot(slot, pc);
+    // } else {
+    //   CompiledMethod* cm = cb->as_compiled_method();
+    //   assert (cm->is_deopt_pc(pc), "");
+    //   pc = *(address*)((address)sp + cm->orig_pc_offset());
+    //   oopmap = cb->oop_map_for_return_address(pc);
+    // }
+
     assert (oopmap != NULL, "");
     assert (oopmap->num_oops() >= 0, "");
 
     // cb = CodeCache::find_blob(pc);
     // const ImmutableOopMap* oopmap = cb->oop_map_for_return_address(pc);
 
-    num_frames++;
     num_oops += oopmap->num_oops();
 
     int oops = 0;
