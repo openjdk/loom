@@ -1466,6 +1466,10 @@ private:
   void vmovdqu(XMMRegister dst, Address src);
   void vmovdqu(XMMRegister dst, XMMRegister src);
 
+  // Move Aligned 256bit Vector
+  void vmovdqa(Address dst, XMMRegister src);
+  void vmovdqa(XMMRegister dst, Address src);
+
    // Move Unaligned 512bit Vector
   void evmovdqub(Address dst, XMMRegister src, int vector_len);
   void evmovdqub(XMMRegister dst, Address src, int vector_len);
@@ -1481,6 +1485,19 @@ private:
   void evmovdquq(Address dst, XMMRegister src, int vector_len);
   void evmovdquq(XMMRegister dst, Address src, int vector_len);
   void evmovdquq(XMMRegister dst, XMMRegister src, int vector_len);
+
+  // Move Aligned 512bit Vector
+  void evmovdqab(Address dst, XMMRegister src, int vector_len);
+  void evmovdqab(XMMRegister dst, Address src, int vector_len);
+  void evmovdqab(XMMRegister dst, KRegister mask, Address src, int vector_len);
+  void evmovdqaw(Address dst, XMMRegister src, int vector_len);
+  void evmovdqaw(Address dst, KRegister mask, XMMRegister src, int vector_len);
+  void evmovdqaw(XMMRegister dst, Address src, int vector_len);
+  void evmovdqaw(XMMRegister dst, KRegister mask, Address src, int vector_len);
+  void evmovdqal(Address dst, XMMRegister src, int vector_len);
+  void evmovdqal(XMMRegister dst, Address src, int vector_len);
+  void evmovdqaq(Address dst, XMMRegister src, int vector_len);
+  void evmovdqaq(XMMRegister dst, Address src, int vector_len);
 
   // Move lower 64bit to high 64bit in 128bit register
   void movlhps(XMMRegister dst, XMMRegister src);
@@ -1505,6 +1522,13 @@ private:
 
   void movq(Address     dst, MMXRegister src );
   void movq(MMXRegister dst, Address src );
+
+  void movntq(Address dst, MMXRegister src);
+  void vmovntdq(Address dst, XMMRegister src);
+  void evmovntdq(Address dst, XMMRegister src, int vector_len);
+  void movntdqa(XMMRegister dst, Address src);
+  void vmovntdqa(XMMRegister dst, Address src);
+  void evmovdqnta(XMMRegister dst, Address src, int vector_len);
 
 #ifdef _LP64
   // These dummies prevent using movq from converting a zero (like NULL) into Register
