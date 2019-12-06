@@ -61,7 +61,7 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  * operating system. These threads are sometimes known as <i>kernel threads</i>
  * or <i>heavyweight threads</i> and will usually have a large stack and other
  * resources that are maintained by the operating system. Kernel threads are
- * suitable for executing all tasks but they are limited resource.
+ * suitable for executing all tasks but they are a limited resource.
  *
  * <p> {@code Thread} also supports the creation of <i>virtual threads</i> that
  * are scheduled by the Java virtual machine rather than the operating system.
