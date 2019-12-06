@@ -443,6 +443,14 @@ class Fiber extends Thread {
     }
 
     /**
+     * Returns true if parking.
+     */
+    boolean isParking() {
+        assert Thread.currentCarrierThread().getFiber() == this;
+        return state == ST_PARKING;
+    }
+
+    /**
      * If this fiber is parking then wait for it to exit the ST_PARKING state.
      * If the fiber is pinned then signal it to continue on the original carrier
      * thread.
@@ -483,13 +491,14 @@ class Fiber extends Thread {
         }
         return s;
     }
+
     /**
      * Attempts to yield. A no-op if the continuation is pinned.
      */
     void tryYield() {
-        assert Thread.currentCarrierThread().getFiber() == this && stateGet() == ST_RUNNABLE;
+        assert Thread.currentCarrierThread().getFiber() == this && state == ST_RUNNABLE;
         Continuation.yield(FIBER_SCOPE);
-        assert stateGet() == ST_RUNNABLE;
+        assert state == ST_RUNNABLE;
 
     }
     /**

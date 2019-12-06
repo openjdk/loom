@@ -28,10 +28,9 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.Console;
 import java.io.FileDescriptor;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.annotation.Annotation;
@@ -1924,13 +1923,13 @@ public final class System {
     /**
      * Create PrintStream for stdout/err based on encoding.
      */
-    private static PrintStream newPrintStream(FileOutputStream fos, String enc) {
+    private static PrintStream newPrintStream(OutputStream out, String enc) {
        if (enc != null) {
             try {
-                return new PrintStream(new BufferedOutputStream(fos, 128), true, enc);
+                return new PrintStream(new BufferedOutputStream(out, 128), true, enc);
             } catch (UnsupportedEncodingException uee) {}
         }
-        return new PrintStream(new BufferedOutputStream(fos, 128), true);
+        return new PrintStream(new BufferedOutputStream(out, 128), true);
     }
 
     /**
@@ -2020,12 +2019,12 @@ public final class System {
 
         lineSeparator = props.getProperty("line.separator");
 
-        FileInputStream fdIn = new FileInputStream(FileDescriptor.in);
-        FileOutputStream fdOut = new FileOutputStream(FileDescriptor.out);
-        FileOutputStream fdErr = new FileOutputStream(FileDescriptor.err);
-        setIn0(new BufferedInputStream(fdIn));
-        setOut0(newPrintStream(fdOut, props.getProperty("sun.stdout.encoding")));
-        setErr0(newPrintStream(fdErr, props.getProperty("sun.stderr.encoding")));
+        InputStream in = new sun.nio.ch.ConsoleInputStream(FileDescriptor.in);
+        OutputStream out = new sun.nio.ch.ConsoleOutputStream(FileDescriptor.out);
+        OutputStream err = new sun.nio.ch.ConsoleOutputStream(FileDescriptor.err);
+        setIn0(new BufferedInputStream(in));
+        setOut0(newPrintStream(out, props.getProperty("sun.stdout.encoding")));
+        setErr0(newPrintStream(err, props.getProperty("sun.stderr.encoding")));
 
         // Setup Java signal handlers for HUP, TERM, and INT (where available).
         Terminator.setup();
@@ -2316,6 +2315,10 @@ public final class System {
 
             public void unparkVirtualThread(Thread thread) {
                 ((Fiber) thread).unpark();
+            }
+
+            public boolean isVirtualThreadParking(Thread thread) {
+                return ((Fiber) thread).isParking();
             }
         });
     }

@@ -229,7 +229,6 @@ class CompiledMethodKeepalive;
 class CachedCompiledMetadata;
 #endif
 
-
 DEBUG_ONLY(template<typename FKind> static intptr_t** slow_link_address(const frame& f);)
 
 class Frame {
@@ -2064,6 +2063,24 @@ class FreezeFrame<Compiled> {
   }
 };
 
+class FreezeOopVerify {
+public:
+  template <typename T>
+    static void verify(T* t);
+};
+
+template <>
+void FreezeOopVerify::verify<narrowOop>(narrowOop* addr) {
+  oop obj = NativeAccess<>::oop_load(addr);
+  assert(oopDesc::is_oop_or_null(obj), "");
+}
+
+template<>
+void FreezeOopVerify::verify<oop>(oop* addr) {
+  oop obj = NativeAccess<>::oop_load(addr);
+  assert(oopDesc::is_oop_or_null(obj), "");
+}
+
 template <typename ConfigT, op_mode mode>
 class Freeze {
   typedef typename Conditional<mode == mode_preempt, RegisterMap, SmallRegisterMap>::type RegisterMapT;
@@ -2142,6 +2159,17 @@ public:
   int nr_bytes() const  { return _size; }
   int nr_frames() const { return _frames; }
 
+  void verify() {
+    if (_cont.refStack() == NULL) {
+      return;
+    }
+    int len = _cont.refStack()->length();
+    for (int i = 0; i < len; ++i) {
+      typename ConfigT::OopT* addr = _cont.refStack()->template obj_at_address<typename ConfigT::OopT>(i);
+      FreezeOopVerify::verify(addr);
+    }
+  }
+
   freeze_result freeze(bool chunk_available) {
     assert (!chunk_available || (ConfigT::has_young && mode == mode_fast), "");
     if (ConfigT::has_young && mode == mode_fast) {
@@ -2172,10 +2200,11 @@ public:
     frame f = freeze_start_frame(_map);
     hframe caller;
     freeze_result res = freeze<true>(f, caller, 0);
-    
+
     _cont.set_flag(FLAG_SAFEPOINT_YIELD, mode == mode_preempt);
     _cont.write(); // commit the freeze
 
+    DEBUG_ONLY(verify();)
     return res;
   }
 
@@ -2275,7 +2304,7 @@ public:
       _cont.set_tail(chunk);
       java_lang_Continuation::set_tail(_cont.mirror(), chunk);
     }
-    
+
     NoSafepointVerifier nsv;
     assert (ContMirror::is_stack_chunk(chunk), "");
     assert (!requires_barriers(chunk), "");
@@ -3045,9 +3074,19 @@ public:
         _safepoint_stub_h = freeze_safepoint_stub(hf);
       }
 
-      // ref_sp: 3, oops 4  -> [ 3: oop, 4: oop, 5: oop, 6: nmethod ]
-      kd->write_at(_cont, hf.ref_sp() + oops - 1);
-      //freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp() + 1, oops - 1, (void*)freeze_stub);
+      // The keepalive must always be written. If IsKeepalive is false it means that the
+      // keepalive object already existed, it must still be written.
+      // kd is always !null unless we are in mode_preempt which is handled above.
+      if (mode == mode_preempt) {
+        if (kd != NULL) {
+          kd->write_at(_cont, hf.ref_sp() + oops - 1);
+        }
+      } else {
+        assert(kd != NULL, "must exist");
+        // ref_sp: 3, oops 4  -> [ 3: oop, 4: oop, 5: oop, 6: nmethod ]
+        kd->write_at(_cont, hf.ref_sp() + oops - 1);
+      }
+
       freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp(), oops - 1, (void*)freeze_stub);
 
       if (mode == mode_preempt && _safepoint_stub_caller) {
@@ -5876,7 +5915,7 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
       nonempty_chunk = true;
   }
   
-  assert (cont.max_size() >= 0, "");
+  //assert (cont.max_size() >= 0, ""); // size_t can't be negative...
   assert (!nonempty_chunk || !cont.is_empty(), "");
   assert (cont.is_empty() == (cont.max_size() == 0), "cont.is_empty(): %d cont.max_size(): %lu cont: 0x%lx", cont.is_empty(), cont.max_size(), cont.mirror()->identity_hash());
   assert (cont.is_empty() == (!nonempty_chunk && cont.last_frame<mode_preempt>().is_empty()), "");

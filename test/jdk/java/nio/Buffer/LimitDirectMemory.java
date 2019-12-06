@@ -23,6 +23,7 @@
 
 /*
  * @test
+ * @ignore
  * @bug 4627316 6743526
  * @summary Test option to limit direct memory allocation
  * @requires (os.arch == "x86_64") | (os.arch == "amd64") | (os.arch == "sparcv9")

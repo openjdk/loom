@@ -43,6 +43,7 @@ import java.util.concurrent.CountDownLatch;
 
 /*
  * @test
+ * @ignore
  * @requires sun.arch.data.model == "64"
  * @modules java.management
  * @build TestMaxCachedBufferSize

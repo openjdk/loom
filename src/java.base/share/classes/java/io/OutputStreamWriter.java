@@ -28,6 +28,8 @@ package java.io;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
+import java.util.concurrent.locks.ReentrantLock;
+
 import sun.nio.cs.StreamEncoder;
 
 
@@ -77,6 +79,14 @@ public class OutputStreamWriter extends Writer {
 
     private final StreamEncoder se;
 
+    private static Object lockFor(OutputStreamWriter writer) {
+        if (writer.getClass() == OutputStreamWriter.class) {
+            return new ReentrantLock();
+        } else {
+            return writer;
+        }
+    }
+
     /**
      * Creates an OutputStreamWriter that uses the named charset.
      *
@@ -96,7 +106,7 @@ public class OutputStreamWriter extends Writer {
         super(out);
         if (charsetName == null)
             throw new NullPointerException("charsetName");
-        se = StreamEncoder.forOutputStreamWriter(out, this, charsetName);
+        se = StreamEncoder.forOutputStreamWriter(out, lockFor(this), charsetName);
     }
 
     /**
@@ -107,7 +117,7 @@ public class OutputStreamWriter extends Writer {
     public OutputStreamWriter(OutputStream out) {
         super(out);
         try {
-            se = StreamEncoder.forOutputStreamWriter(out, this, (String)null);
+            se = StreamEncoder.forOutputStreamWriter(out, lockFor(this), (String)null);
         } catch (UnsupportedEncodingException e) {
             throw new Error(e);
         }
@@ -129,7 +139,7 @@ public class OutputStreamWriter extends Writer {
         super(out);
         if (cs == null)
             throw new NullPointerException("charset");
-        se = StreamEncoder.forOutputStreamWriter(out, this, cs);
+        se = StreamEncoder.forOutputStreamWriter(out, lockFor(this), cs);
     }
 
     /**
@@ -148,7 +158,7 @@ public class OutputStreamWriter extends Writer {
         super(out);
         if (enc == null)
             throw new NullPointerException("charset encoder");
-        se = StreamEncoder.forOutputStreamWriter(out, this, enc);
+        se = StreamEncoder.forOutputStreamWriter(out, lockFor(this), enc);
     }
 
     /**

@@ -46,6 +46,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.Arrays;
+import java.util.concurrent.locks.ReentrantLock;
 
 import jdk.internal.access.JavaNetInetAddressAccess;
 import jdk.internal.access.SharedSecrets;
@@ -815,6 +816,7 @@ class InetAddress implements java.io.Serializable {
     private static final class NameServiceAddresses implements Addresses {
         private final String host;
         private final InetAddress reqAddr;
+        private final ReentrantLock lookupLock = new ReentrantLock();
 
         NameServiceAddresses(String host, InetAddress reqAddr) {
             this.host = host;
@@ -826,7 +828,8 @@ class InetAddress implements java.io.Serializable {
             Addresses addresses;
             // only one thread is doing lookup to name service
             // for particular host at any time.
-            synchronized (this) {
+            lookupLock.lock();
+            try {
                 // re-check that we are still us + re-install us if slot empty
                 addresses = cache.putIfAbsent(host, this);
                 if (addresses == null) {
@@ -874,6 +877,8 @@ class InetAddress implements java.io.Serializable {
                     return inetAddresses;
                 }
                 // else addresses != this
+            } finally {
+                lookupLock.unlock();
             }
             // delegate to different addresses when we are already replaced
             // but outside of synchronized block to avoid any chance of dead-locking
