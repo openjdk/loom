@@ -298,6 +298,12 @@ inline oop jdk_internal_misc_StackChunk::parent(oop ref) {
 inline void jdk_internal_misc_StackChunk::set_parent(oop ref, oop value) {
   ref->obj_field_put(_parent_offset, value);
 }
+
+template<typename P>
+inline bool jdk_internal_misc_StackChunk::is_parent_null(oop ref) {
+  return (oop)RawAccess<>::oop_load((P*)ref->field_addr_raw(_parent_offset)) == NULL;
+}
+
 template<typename P>
 inline void jdk_internal_misc_StackChunk::set_parent_raw(oop ref, oop value) {
   RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr_raw(_parent_offset), value);

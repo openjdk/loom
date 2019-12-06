@@ -166,7 +166,7 @@ PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 // For non-temporal load/store in clang (__builtin_nontemporal_load/store) see: https://clang.llvm.org/docs/LanguageExtensions.html
 
 #define YIELD_SIG  "java.lang.Continuation.yield(Ljava/lang/ContinuationScope;)V"
-#define YIELD0_SIG  "java.lang.Continuation.yield0(Ljava/lang/ContinuationScope;Ljava/lang/Continuation;)Z"
+#define YIELD0_SIG "java.lang.Continuation.yield0(Ljava/lang/ContinuationScope;Ljava/lang/Continuation;)Z"
 #define ENTER_SIG  "java.lang.Continuation.enter()V"
 #define RUN_SIG    "java.lang.Continuation.run()V"
 
@@ -581,10 +581,6 @@ public:
   ContMirror(JavaThread* thread, oop cont); // does not automatically read the continuation object
   ContMirror(const RegisterMap* map); // automatically reads the continuation object
 
-  void read();
-  void read_minimal();
-  void read_rest();
-
   intptr_t hash() {
     #ifndef PRODUCT
       return Thread::current()->is_Java_thread() ? _cont->identity_hash() : -1;
@@ -592,6 +588,11 @@ public:
       return 0;
     #endif
   }
+
+  void read();
+  void read_entry();
+  void read_minimal();
+  void read_rest();
 
   inline void write_minimal();
   inline void write_entry();
@@ -921,14 +922,24 @@ ContMirror::ContMirror(const RegisterMap* map)
 }
 
 void ContMirror::read() {
+    read_entry();
     read_minimal();
     read_rest();
 }
-void ContMirror::read_minimal() {
+
+void ContMirror::read_entry() {
   assert (_entryPC == NULL, "");
   _entrySP = java_lang_Continuation::entrySP(_cont);
   _entryPC = java_lang_Continuation::entryPC(_cont);
   _entryFP = java_lang_Continuation::entryFP(_cont);
+
+  if (log_develop_is_enabled(Trace, jvmcont)) {
+    log_develop_trace(jvmcont)("Reading continuation object:");
+    log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(_entrySP), p2i(_entryPC));
+  }
+}
+
+void ContMirror::read_minimal() {
   _tail    = java_lang_Continuation::tail(_cont);
   _pc      = java_lang_Continuation::pc(_cont); // for is_empty0
   _flags   = java_lang_Continuation::flags(_cont);
@@ -936,9 +947,8 @@ void ContMirror::read_minimal() {
 
   if (log_develop_is_enabled(Trace, jvmcont)) {
     log_develop_trace(jvmcont)("Reading continuation object:");
-    log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(_entrySP), p2i(_entryPC));
     log_develop_trace(jvmcont)("\ttail: " INTPTR_FORMAT, p2i((oopDesc*)_tail));
-     log_develop_trace(jvmcont)("\tpc: " INTPTR_FORMAT, p2i(_pc));
+    log_develop_trace(jvmcont)("\tpc: " INTPTR_FORMAT, p2i(_pc));
     log_develop_trace(jvmcont)("\tmax_size: %lu", _max_size);
     log_develop_trace(jvmcont)("\tflags: %d", _flags);
   }
@@ -1044,6 +1054,7 @@ bool ContMirror::is_empty() {
   if (_tail != (oop)NULL) {
     if (!is_empty_chunk(_tail))
       return false;
+    // if (!jdk_internal_misc_StackChunk::is_parent_null<HeapWord>(_tail)) {
     if (jdk_internal_misc_StackChunk::parent(_tail) != (oop)NULL) {
       assert (!is_empty_chunk(jdk_internal_misc_StackChunk::parent(_tail)), ""); // only topmost chunk can be empty
       return false;
@@ -2101,6 +2112,7 @@ public:
     _safepoint_stub_caller(false), _keepalive(NULL) {
 
     _fi = fi;
+    _cont.read_entry();
     _cont.read_minimal();
     _bottom_address = _cont.entrySP();
 
@@ -2301,7 +2313,7 @@ public:
     
     _cont.add_size(size << LogBytesPerWord);
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
-    if (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
+    if (jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk) && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.add_size(SP_WIGGLE << LogBytesPerWord);
     }
     _cont.set_flag(FLAG_SAFEPOINT_YIELD, false);
@@ -2340,14 +2352,14 @@ public:
       // pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - SENDER_SP_RET_ADDRESS_OFFSET);
       // fp = *(intptr_t**)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - frame::sender_sp_offset); -- necessary?
     } else {
-      oop parent = jdk_internal_misc_StackChunk::parent(chunk);
-      if (parent != (oop)NULL) {
+      if (LIKELY(jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk))) {
+        pc = _cont.pc();
+        // fp = _cont.fp();
+      } else {
+        oop parent = jdk_internal_misc_StackChunk::parent(chunk);
         guarantee (!ContMirror::is_empty_chunk(parent), "");
         pc = jdk_internal_misc_StackChunk::pc(parent);
         // fp = ...
-      } else {
-        pc = _cont.pc();
-        // fp = _cont.fp();
       }
     }
     guarantee (pc != NULL, "");
@@ -2376,6 +2388,7 @@ public:
     
     oop chunk0 = _cont.tail();
     if (chunk0 != (oop)NULL && ContMirror::is_empty_chunk(chunk0)) {
+      // chunk0 = jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk0) ? (oop)NULL : jdk_internal_misc_StackChunk::parent(chunk0);
       chunk0 = jdk_internal_misc_StackChunk::parent(chunk0);
       assert (chunk0 == (oop)NULL || !ContMirror::is_empty_chunk(chunk0), "");
     }
@@ -2409,10 +2422,19 @@ public:
   void setup_chunk_jump(intptr_t* sp) {
     // tty->print_cr(">>> setup_chunk_jump sp: %p", sp);
     assert (sp != NULL, "");
+  #ifdef ASSERT
+    address pc = *(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET);
+    if (_cont.entryPC() != NULL && !Continuation::is_return_barrier_entry(pc) && pc != _cont.entryPC()) {
+      tty->print(">>>> pc: ");       os::print_location(tty, (intptr_t)pc);
+      tty->print(">>>> entry_pc: "); os::print_location(tty, (intptr_t)_cont.entryPC());
+    }
+    assert (_cont.entryPC() == NULL || Continuation::is_return_barrier_entry(pc) || pc == _cont.entryPC(), "");
+  #endif
+    
     _fi->sp = sp;
-    _fi->pc = Continuation::is_return_barrier_entry(*(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET)) // TODO PERF
+    _fi->pc = _cont.entryPC() != NULL // Continuation::is_return_barrier_entry(pc) // TODO PERF
                   ? _cont.entryPC() // java_lang_Continuation::entryPC(_cont.mirror())
-                  : *(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET); // Continuation.run may have been deoptimized
+                  : *(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET); // Continuation.run may have been deoptimized TODO PERF: consider taking pc as an argument as well; it's far from the current sp, so might be a cache miss
     to_frame_info_chunk_pd(sp);
     log_develop_debug(jvmcont)("Jumping to frame (freeze): pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(_fi->pc), p2i(_fi->sp), p2i(*(intptr_t**)_fi->fp));
 
@@ -3693,7 +3715,7 @@ public:
       // }
     }
 
-    const bool is_last_in_chunks = empty && jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL;
+    const bool is_last_in_chunks = empty && jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk);
     const bool is_last = is_last_in_chunks && _cont.is_empty0();
     const bool bottom = !ConfigT::full_stack || is_last;
     
@@ -4333,9 +4355,7 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
 
   cont.set_entrySP(fi->sp);
   cont.set_entryFP(fi->fp);
-  if (!return_barrier) { // not return barrier
-    cont.set_entryPC(fi->pc);
-  }
+  cont.set_entryPC(return_barrier ? java_lang_Continuation::entryPC(oopCont) : fi->pc);
   cont.write_entry();
 
 #ifdef ASSERT

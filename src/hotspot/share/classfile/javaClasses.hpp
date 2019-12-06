@@ -1135,6 +1135,8 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline oop parent(oop ref);
   static inline void set_parent(oop ref, oop value);
   template<typename P>
+  static inline bool is_parent_null(oop ref); // bypasses barriers for a faster test
+  template<typename P>
   static inline void set_parent_raw(oop ref, oop value);
   static inline int size(oop ref);
   static inline void set_size(HeapWord* ref, int value);
