@@ -137,6 +137,7 @@ class GCTimer;
   do_klass(Finalizer_klass,                             java_lang_ref_Finalizer                               ) \
   do_klass(Thread_klass,                                java_lang_Thread                                      ) \
   do_klass(Thread_FieldHolder_klass,                    java_lang_Thread_FieldHolder                          ) \
+  do_klass(Thread_VirtualThreads_klass,                 java_lang_Thread_VirtualThreads                       ) \
   do_klass(ThreadGroup_klass,                           java_lang_ThreadGroup                                 ) \
   do_klass(Fiber_klass,                                 java_lang_Fiber                                       ) \
   do_klass(Properties_klass,                            java_util_Properties                                  ) \

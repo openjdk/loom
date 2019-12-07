@@ -1697,6 +1697,32 @@ java_lang_Thread::ThreadStatus java_lang_Thread_FieldHolder::get_thread_status(o
   return (java_lang_Thread::ThreadStatus)holder->int_field(_thread_status_offset);
 }
 
+
+int java_lang_Thread_VirtualThreads::_static_THREAD_GROUP_offset = 0;
+
+#define THREAD_VIRTUAL_THREADS_STATIC_FIELDS_DO(macro) \
+  macro(_static_THREAD_GROUP_offset, k, "THREAD_GROUP", threadgroup_signature, true);
+
+void java_lang_Thread_VirtualThreads::compute_offsets() {
+  assert(_static_THREAD_GROUP_offset == 0, "offsets should be initialized only once");
+
+  InstanceKlass* k = SystemDictionary::Thread_VirtualThreads_klass();
+  THREAD_VIRTUAL_THREADS_STATIC_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+}
+
+#if INCLUDE_CDS
+void java_lang_Thread_VirtualThreads::serialize_offsets(SerializeClosure* f) {
+  THREAD_VIRTUAL_THREADS_STATIC_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+}
+#endif
+
+oop java_lang_Thread_VirtualThreads::get_THREAD_GROUP() {
+  InstanceKlass* k = SystemDictionary::Thread_VirtualThreads_klass();
+  oop base = k->static_field_base_raw();
+  return base->obj_field(_static_THREAD_GROUP_offset);
+}
+
+
 int java_lang_Thread::_holder_offset = 0;
 int java_lang_Thread::_name_offset = 0;
 int java_lang_Thread::_contextClassLoader_offset = 0;
