@@ -46,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.misc.TerminatingThreadLocal;
+import jdk.internal.misc.Unsafe;
 import sun.nio.ch.Interruptible;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
@@ -108,11 +109,12 @@ class Thread implements Runnable {
     static {
         registerNatives();
     }
+    private static final Unsafe U = Unsafe.getUnsafe();
 
     /* Reserved for exclusive use by the JVM, TBD: move to FieldHolder */
     private long eetop;
 
-    // holds fields for heavyweight threads
+    // holds fields for kernel threads
     private static class FieldHolder {
         final ThreadGroup group;
         final Runnable task;
@@ -151,7 +153,7 @@ class Thread implements Runnable {
     // inherited AccessControlContext, TBD: move this to FieldHolder
     private AccessControlContext inheritedAccessControlContext;
 
-    /* For autonumbering anonymous threads. */
+    /* For autonumbering anonymous kernel threads. */
     private static int threadInitNumber;
     private static synchronized int nextThreadNum() {
         return threadInitNumber++;
@@ -168,10 +170,11 @@ class Thread implements Runnable {
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
     /* For generating thread ID */
-    private static long threadSeqNumber;
-
-    private static synchronized long nextThreadID() {
-        return ++threadSeqNumber;
+    private static volatile long threadSeqNumber;
+    private static final long threadSeqNumberOffset =
+        U.objectFieldOffset(Thread.class, "threadSeqNumber");
+    private static long nextThreadID() {
+        return U.getAndAddLong(Thread.class, threadSeqNumberOffset, 1) + 1;
     }
 
     /*
@@ -435,7 +438,7 @@ class Thread implements Runnable {
     }
 
     /**
-     * Initializes a heavyweight Thread.
+     * Initializes a kernel Thread.
      *
      * @param g the Thread group
      * @param name the name of the new Thread
@@ -522,18 +525,16 @@ class Thread implements Runnable {
     /**
      * Initializes a virtual Thread.
      *
-     * @param name thread name
+     * @param name thread name, can be null
      * @param characteristics thread characteristics
      * @throws IllegalArgumentException if invalid characteristics are specified
      */
     Thread(String name, int characteristics) {
-        if (name == null)
-            throw new NullPointerException("name cannot be null");
         checkCharacteristics(characteristics);
 
         Thread parent = currentThread();
 
-        this.name = name;
+        this.name = (name != null) ? name : "";
         this.tid = nextThreadID();
         this.contextClassLoader = contextClassLoader(parent);
         this.inheritedAccessControlContext = VirtualThreads.ACCESS_CONTROL_CONTEXT;
@@ -884,9 +885,7 @@ class Thread implements Runnable {
             Thread thread;
             if ((characteristics & Thread.VIRTUAL) != 0) {
                 String name = this.name;
-                if (name == null) {
-                    name = "";
-                } else if (counter >= 0) {
+                if (name != null && counter >= 0) {
                     name = name + (counter++);
                 }
                 thread = new Fiber(scheduler, name, characteristics, task);
@@ -920,8 +919,8 @@ class Thread implements Runnable {
             if ((characteristics & Thread.VIRTUAL) != 0) {
                 return new VirtualThreadFactory(scheduler, name, counter, characteristics, uhe);
             } else {
-                return new DinosaurThreadFactory(group, name, counter, characteristics,
-                                                 daemon, priority, uhe);
+                return new KernelThreadFactory(group, name, counter, characteristics,
+                                               daemon, priority, uhe);
             }
         }
     }
@@ -979,9 +978,7 @@ class Thread implements Runnable {
         public Thread newThread(Runnable task) {
             Objects.requireNonNull(task);
             String name = this.name;
-            if (name == null) {
-                name = "";
-            } else if (hasCounter()) {
+            if (name != null && hasCounter()) {
                 name += next();
             }
             Thread thread = new Fiber(scheduler, name, characteristics, task);
@@ -991,7 +988,7 @@ class Thread implements Runnable {
         }
     }
 
-    private static class DinosaurThreadFactory extends CountingThreadFactory {
+    private static class KernelThreadFactory extends CountingThreadFactory {
         private final ThreadGroup group;
         private final String name;
         private final int characteristics;
@@ -999,13 +996,13 @@ class Thread implements Runnable {
         private final int priority;
         private final UncaughtExceptionHandler uhe;
 
-        DinosaurThreadFactory(ThreadGroup group,
-                              String name,
-                              int start,
-                              int characteristics,
-                              boolean daemon,
-                              int priority,
-                              UncaughtExceptionHandler uhe) {
+        KernelThreadFactory(ThreadGroup group,
+                            String name,
+                            int start,
+                            int characteristics,
+                            boolean daemon,
+                            int priority,
+                            UncaughtExceptionHandler uhe) {
             super(start);
             this.group = group;
             this.name = name;
@@ -1423,7 +1420,7 @@ class Thread implements Runnable {
      */
     public static Thread newThread(int characteristics, Runnable task) {
         if ((characteristics & VIRTUAL) != 0) {
-            return new Fiber(null, "", characteristics, task);
+            return new Fiber(null, null, characteristics, task);
         } else {
             return new Thread(null, "Thread-" + nextThreadNum(), characteristics, task, 0, null);
         }
