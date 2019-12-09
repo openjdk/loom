@@ -109,7 +109,6 @@ class Thread implements Runnable {
     static {
         registerNatives();
     }
-    private static final Unsafe U = Unsafe.getUnsafe();
 
     /* Reserved for exclusive use by the JVM, TBD: move to FieldHolder */
     private long eetop;
@@ -153,7 +152,7 @@ class Thread implements Runnable {
     // inherited AccessControlContext, TBD: move this to FieldHolder
     private AccessControlContext inheritedAccessControlContext;
 
-    /* For autonumbering anonymous kernel threads. */
+    /* For autonumbering anonymous threads. */
     private static int threadInitNumber;
     private static synchronized int nextThreadNum() {
         return threadInitNumber++;
@@ -169,12 +168,19 @@ class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
-    /* For generating thread ID */
-    private static volatile long threadSeqNumber;
-    private static final long threadSeqNumberOffset =
-        U.objectFieldOffset(Thread.class, "threadSeqNumber");
-    private static long nextThreadID() {
-        return U.getAndAddLong(Thread.class, threadSeqNumberOffset, 1) + 1;
+    /**
+     * Helper class to generate unique thread identifiers. The identifiers start
+     * at 2 as this class cannot be used during early startup to generate the
+     * identifier for the primordial thread.
+     */
+    private static class ThreadIdentifiers {
+        private static final Unsafe U = Unsafe.getUnsafe();
+        private static final long nextTidOffset =
+            U.objectFieldOffset(ThreadIdentifiers.class, "nextTid");
+        private static volatile long nextTid = 2;
+        private static long next() {
+            return U.getAndAddLong(ThreadIdentifiers.class, nextTidOffset, 1);
+        }
     }
 
     /*
@@ -459,6 +465,7 @@ class Thread implements Runnable {
         checkCharacteristics(characteristics);
 
         Thread parent = currentThread();
+        boolean primordial = (parent == this);
 
         SecurityManager security = System.getSecurityManager();
         if (g == null) {
@@ -494,7 +501,7 @@ class Thread implements Runnable {
         g.addUnstarted();
 
         this.name = name;
-        this.tid = nextThreadID();
+        this.tid = primordial ? 1 : ThreadIdentifiers.next();
         this.contextClassLoader = contextClassLoader(parent);
         this.inheritedAccessControlContext = (acc != null) ? acc : AccessController.getContext();
 
@@ -511,7 +518,7 @@ class Thread implements Runnable {
 
         int priority;
         boolean daemon;
-        if (parent == this) {
+        if (primordial) {
             // primordial or attached thread
             priority = NORM_PRIORITY;
             daemon = false;
@@ -535,7 +542,7 @@ class Thread implements Runnable {
         Thread parent = currentThread();
 
         this.name = (name != null) ? name : "";
-        this.tid = nextThreadID();
+        this.tid = ThreadIdentifiers.next();
         this.contextClassLoader = contextClassLoader(parent);
         this.inheritedAccessControlContext = VirtualThreads.ACCESS_CONTROL_CONTEXT;
 
