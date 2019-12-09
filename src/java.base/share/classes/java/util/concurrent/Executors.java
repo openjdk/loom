@@ -238,6 +238,30 @@ public class Executors {
     }
 
     /**
+     * Creates an Executor that runs each task in its own thread. The number of
+     * threads is unbounded.
+     *
+     * @apiNote This is a prototype API. It is intended to be used to run tasks
+     * in virtual threads as in the following example:
+     * <pre> {@code
+     *     ThreadFactory factory = Thread.builder().virtual().factory();
+     *     try (ExecutorService executor = Executors.newUnboundedExecutor(factory)) {
+     *         executor.submit(task1);
+     *         executor.submit(task2);
+     *     }
+     * }</pre>
+     *
+     * @param threadFactory the factory to use when creating new threads
+     * @return a newly created executor
+     * @throws NullPointerException if factory is null
+
+     * @since 99
+     */
+    public static ExecutorService newUnboundedExecutor(ThreadFactory threadFactory) {
+        return new UnboundedExecutor(threadFactory);
+    }
+
+    /**
      * Creates a single-threaded executor that can schedule commands
      * to run after a given delay, or to execute periodically.
      * (Note however that if this single
