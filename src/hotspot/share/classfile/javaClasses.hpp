@@ -57,6 +57,7 @@
   f(java_lang_Throwable) \
   f(java_lang_Thread) \
   f(java_lang_Thread_FieldHolder) \
+  f(java_lang_Thread_VirtualThreads) \
   f(java_lang_ThreadGroup) \
   f(java_lang_Fiber) \
   f(java_lang_AssertionStatusDirectives) \
@@ -508,6 +509,21 @@ class java_lang_Thread_FieldHolder : AllStatic {
 
   friend class JavaClasses;
 };
+
+// Interface to java.lang.Thread$VirtualThreads objects
+
+class java_lang_Thread_VirtualThreads : AllStatic {
+ private:
+  static int _static_THREAD_GROUP_offset;
+
+  static void compute_offsets();
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+ public:
+  static oop get_THREAD_GROUP();
+
+  friend class JavaClasses;
+};
+
 
 // Interface to java.lang.ThreadGroup objects
 

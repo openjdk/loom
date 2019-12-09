@@ -1200,11 +1200,18 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
   Handle     thread_group;
   Handle context_class_loader;
   bool          is_daemon;
+  bool isFiber = java_lang_Fiber::is_instance(thread_obj());
 
   name = Handle(current_thread, java_lang_Thread::name(thread_obj()));
-  priority = java_lang_Thread::priority(thread_obj());
-  thread_group = Handle(current_thread, java_lang_Thread::threadGroup(thread_obj()));
-  is_daemon = java_lang_Thread::is_daemon(thread_obj());
+  if (isFiber) {
+    priority = (ThreadPriority)JVMTI_THREAD_NORM_PRIORITY;
+    is_daemon = true;
+    thread_group = Handle(current_thread, java_lang_Thread_VirtualThreads::get_THREAD_GROUP());
+  } else {
+    priority = java_lang_Thread::priority(thread_obj());
+    is_daemon = java_lang_Thread::is_daemon(thread_obj());
+    thread_group = Handle(current_thread, java_lang_Thread::threadGroup(thread_obj()));
+  }
 
   oop loader = java_lang_Thread::context_class_loader(thread_obj());
   context_class_loader = Handle(current_thread, loader);
