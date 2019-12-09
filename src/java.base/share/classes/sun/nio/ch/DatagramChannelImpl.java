@@ -967,7 +967,7 @@ class DatagramChannelImpl
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
         synchronized (stateLock) {
             ensureOpen();
-            // do nothing if lightweight thread has forced the socket to be non-blocking
+            // do nothing if virtual thread has forced the socket to be non-blocking
             if (!nonBlocking) {
                 IOUtil.configureBlocking(fd, block);
             }
@@ -991,7 +991,7 @@ class DatagramChannelImpl
     }
 
     /**
-     * Ensures that the socket is configured non-blocking when on a lightweight
+     * Ensures that the socket is configured non-blocking when on a virtual
      * thread or a timeout is specified.
      * @throws IOException if there is an I/O error changing the blocking mode
      */
