@@ -247,9 +247,7 @@ public class BuilderTest {
                 } catch (InterruptedException ignore) { }
             });
 
-            Thread.Builder builder = Thread.builder()
-                    .virtual()
-                    .scheduler(wrapper::execute);
+            Thread.Builder builder = Thread.builder().virtual(wrapper::execute);
 
             Thread thread1 = builder.task(() -> { }).build();
             thread1.start();
@@ -583,7 +581,7 @@ public class BuilderTest {
     public void testNulls() {
         Thread.Builder builder = Thread.builder();
         assertThrows(NullPointerException.class, () -> builder.group(null));
-        assertThrows(NullPointerException.class, () -> builder.scheduler(null));
+        assertThrows(NullPointerException.class, () -> builder.virtual(null));
         assertThrows(NullPointerException.class, () -> builder.name(null));
         assertThrows(NullPointerException.class, () -> builder.name(null, 0));
         assertThrows(NullPointerException.class, () -> builder.task(null));

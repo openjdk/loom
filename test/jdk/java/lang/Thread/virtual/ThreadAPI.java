@@ -822,10 +822,7 @@ public class ThreadAPI {
     public void testYield1() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         ExecutorService pool = Executors.newFixedThreadPool(1);
-        ThreadFactory factory = Thread.builder()
-                .virtual()
-                .scheduler(pool)
-                .factory();
+        ThreadFactory factory = Thread.builder().virtual(pool).factory();
         try {
             var thread = factory.newThread(() -> {
                 list.add("A");
@@ -850,10 +847,7 @@ public class ThreadAPI {
     public void testYield2() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         ExecutorService pool = Executors.newFixedThreadPool(1);
-        ThreadFactory factory = Thread.builder()
-                .virtual()
-                .scheduler(pool)
-                .factory();
+        ThreadFactory factory = Thread.builder().virtual(pool).factory();
         try {
             var thread = factory.newThread(() -> {
                 list.add("A");

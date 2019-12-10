@@ -593,7 +593,7 @@ class Thread implements Runnable {
      *
      *   // A ThreadFactory that creates virtual threads and uses a custom scheduler
      *   Executor scheduler = ...
-     *   ThreadFactory factory = Thread.builder().virtual().scheduler(scheduler).factory();
+     *   ThreadFactory factory = Thread.builder().virtual(scheduler).factory();
      * }</pre>
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
@@ -647,15 +647,6 @@ class Thread implements Runnable {
         Builder group(ThreadGroup group);
 
         /**
-         * Sets the scheduler.
-         * @param scheduler the scheduler
-         * @return this builder
-         * @throws IllegalStateException if this is a builder for a thread
-         *         that will be scheduled by the operating system
-         */
-        Builder scheduler(Executor scheduler);
-
-        /**
          * Sets the thread name.
          * @param name thread name
          * @return this builder
@@ -674,11 +665,20 @@ class Thread implements Runnable {
 
         /**
          * The thread will be scheduled by the Java virtual machine rather than
-         * the operating system.
+         * the operating system with the default scheduler.
          * @return this builder
          * @throws IllegalStateException if a thread group has been set
          */
         Builder virtual();
+
+        /**
+         * The thread will be scheduled by the Java virtual machine rather than
+         * the operating system with the given scheduler.
+         * @param scheduler the scheduler
+         * @return this builder
+         * @throws IllegalStateException if a thread group has been set
+         */
+        Builder virtual(Executor scheduler);
 
         /**
          * Disallow threads locals.
@@ -806,15 +806,6 @@ class Thread implements Runnable {
         }
 
         @Override
-        public Builder scheduler(Executor scheduler) {
-            Objects.requireNonNull(scheduler);
-            if (!virtual)
-                throw new IllegalStateException();
-            this.scheduler = scheduler;
-            return this;
-        }
-
-        @Override
         public Builder name(String name) {
             this.name = Objects.requireNonNull(name);
             this.counter = -1;
@@ -835,7 +826,18 @@ class Thread implements Runnable {
         public Builder virtual() {
             if (group != null)
                 throw new IllegalStateException();
-            virtual = true;
+            this.virtual = true;
+            this.scheduler = null;
+            return this;
+        }
+
+        @Override
+        public Builder virtual(Executor scheduler) {
+            Objects.requireNonNull(scheduler);
+            if (group != null)
+                throw new IllegalStateException();
+            this.virtual = true;
+            this.scheduler = scheduler;
             return this;
         }
 
