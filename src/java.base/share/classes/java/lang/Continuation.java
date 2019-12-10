@@ -27,7 +27,7 @@ package java.lang;
 
 import jdk.internal.HotSpotIntrinsicCandidate;
 import jdk.internal.vm.annotation.DontInline;
-import jdk.internal.vm.annotation.ForceInline;
+import sun.security.action.GetPropertyAction;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 /**
@@ -927,7 +926,7 @@ public class Continuation {
     }
 
     private static boolean isEmptyOrTrue(String property) {
-        final String value = System.getProperty(property);
+        String value = GetPropertyAction.privilegedGetProperty(property);
         if (value == null)
             return false;
         return value.isEmpty() || Boolean.parseBoolean(value);
