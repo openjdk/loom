@@ -541,7 +541,7 @@ class Thread implements Runnable {
 
         Thread parent = currentThread();
 
-        this.name = (name != null) ? name : "";
+        this.name = (name != null) ? name : "<unnamed>";
         this.tid = ThreadIdentifiers.next();
         this.contextClassLoader = contextClassLoader(parent);
         this.inheritedAccessControlContext = VirtualThreads.ACCESS_CONTROL_CONTEXT;

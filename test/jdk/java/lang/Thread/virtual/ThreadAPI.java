@@ -712,7 +712,7 @@ public class ThreadAPI {
         // initially unnamed
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
-            assertEquals(me.getName(), "");
+            assertEquals(me.getName(), "<unnamed>");
             me.setName("fred");
             assertEquals(me.getName(), "fred");
         });
@@ -725,7 +725,7 @@ public class ThreadAPI {
         });
         thread.start();
         try {
-            assertEquals(thread.getName(), "");
+            assertEquals(thread.getName(), "<unnamed>");
             thread.setName("fred");
             assertEquals(thread.getName(), "fred");
         } finally {
