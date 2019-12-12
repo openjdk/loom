@@ -425,6 +425,11 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * The {@code shutdownNow()} method may be invoked on a thread supporting the
      * deadline mechanism.
      *
+     * <p> If this method is invoked with a deadline that has already expired
+     * then the {@code shutdownNow()} method is invoked. If the deadline has
+     * already expired or the executor has already terminated then this Executor
+     * is returned (a new executor is not created).
+     *
      * @implSpec
      * The default implementation schedules a task to run when the deadline
      * expires. The task invokes the {@code shutdownNow()} method to stop all

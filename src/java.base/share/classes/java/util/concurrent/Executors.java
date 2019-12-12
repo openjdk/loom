@@ -259,7 +259,6 @@ public class Executors {
      * @param threadFactory the factory to use when creating new threads
      * @return a newly created executor
      * @throws NullPointerException if factory is null
-
      * @since 99
      */
     public static ExecutorService newUnboundedExecutor(ThreadFactory threadFactory) {
@@ -833,15 +832,15 @@ public class Executors {
             sm.checkPermission(TimedExecutorServiceHelper.MODIFY_THREAD);
         }
 
-        // nothing to do
-        if (delegate.isTerminated())
-            return delegate;
-
         // deadline has already expired
         if (timeout.isZero() || timeout.isNegative()) {
             delegate.shutdownNow();
             return delegate;
         }
+
+        // nothing to do
+        if (delegate.isTerminated())
+            return delegate;
 
         // timer task needs permission to invoke shutdownNow
         Callable<List<Runnable>> timerExpired = () -> {
