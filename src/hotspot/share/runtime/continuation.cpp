@@ -589,8 +589,8 @@ public:
   }
 
   void read();
-  void read_entry();
-  void read_minimal();
+  inline void read_entry();
+  inline void read_minimal();
   void read_rest();
 
   inline void write_minimal();
@@ -921,12 +921,12 @@ ContMirror::ContMirror(const RegisterMap* map)
 }
 
 void ContMirror::read() {
-    read_entry();
-    read_minimal();
-    read_rest();
+  read_entry();
+  read_minimal();
+  read_rest();
 }
 
-void ContMirror::read_entry() {
+inline void ContMirror::read_entry() {
   assert (_entryPC == NULL, "");
   _entrySP = java_lang_Continuation::entrySP(_cont);
   _entryPC = java_lang_Continuation::entryPC(_cont);
@@ -938,10 +938,10 @@ void ContMirror::read_entry() {
   }
 }
 
-void ContMirror::read_minimal() {
-  _tail    = java_lang_Continuation::tail(_cont);
-  _pc      = java_lang_Continuation::pc(_cont); // for is_empty0
-  _flags   = java_lang_Continuation::flags(_cont);
+inline void ContMirror::read_minimal() {
+  _tail  = java_lang_Continuation::tail(_cont);
+  _pc    = java_lang_Continuation::pc(_cont); // for is_empty0
+  _flags = java_lang_Continuation::flags(_cont);
   _max_size = java_lang_Continuation::maxSize(_cont);
 
   if (log_develop_is_enabled(Trace, jvmcont)) {
@@ -4159,7 +4159,7 @@ public:
     if (mode == mode_preempt || UNLIKELY(fsize == 0))
 #endif
       fsize = hf.compiled_frame_size();
-    assert(fsize == slow_size(hf), "argsize: %d slow_size: %d", fsize, slow_size(hf));
+    assert(fsize == slow_size(hf), "fsize: %d slow_size: %d", fsize, slow_size(hf));
     log_develop_trace(jvmcont)("fsize: %d", fsize);
 
     intptr_t* vsp = (intptr_t*)((address)caller.unextended_sp() - fsize);
@@ -4591,7 +4591,7 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
 
     if (callee.is_compiled_frame() && !Interpreter::contains(*sender_pc)) {
       // The callee's stack arguments (part of the caller frame) are also thawed to the stack when using lazy-copy
-      int argsize = callee.cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size;
+      int argsize = Compiled::stack_argsize(callee);
       assert ((argsize & WordAlignmentMask) == 0, "must be");
       argsize >>= LogBytesPerWord;
     #ifdef _LP64 // TODO PD
@@ -6094,11 +6094,11 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
     if (sp < end) {
       RegisterMap map(NULL, false);
       frame f = create_frame(sp);
-      tty->print_cr("-- frame size: %d (words)", f.cb()->frame_size());
+      tty->print_cr("-- frame size: %d argsize: %d", Compiled::size(f), Compiled::stack_argsize(f));
       f.print_on(tty);
-      while (f.sp() + f.cb()->frame_size() < end) {
+      while (f.sp() + ((Compiled::size(f) + Compiled::stack_argsize(f)) >> LogBytesPerWord) < end) {
         f = f.sender(&map);
-        tty->print_cr("-- frame size: %d (words)", f.cb()->frame_size());
+        tty->print_cr("-- frame size: %d argsize: %d", Compiled::size(f), Compiled::stack_argsize(f));
         f.print_on(tty);
       }
     }
