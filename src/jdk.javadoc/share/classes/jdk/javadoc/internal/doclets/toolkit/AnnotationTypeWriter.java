@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -36,9 +36,6 @@ import jdk.javadoc.internal.doclets.toolkit.util.DocFileIOException;
  *  If you write code that depends on this, you do so at your own risk.
  *  This code and its internal interfaces are subject to change or
  *  deletion without notice.</b>
- *
- * @author Jamie Ho
- * @author Bhavesh Patel (Modified)
  */
 
 public interface AnnotationTypeWriter {
@@ -112,10 +109,9 @@ public interface AnnotationTypeWriter {
     /**
      * Add the annotation content tree to the documentation content tree.
      *
-     * @param contentTree content tree to which the annotation content will be added
      * @param annotationContentTree annotation content tree which will be added to the content tree
      */
-    public void addAnnotationContentTree(Content contentTree, Content annotationContentTree);
+    public void addAnnotationContentTree(Content annotationContentTree);
 
     /**
      * Get the member tree.
@@ -143,10 +139,8 @@ public interface AnnotationTypeWriter {
 
     /**
      * Add the footer of the page.
-     *
-     * @param contentTree content tree to which the footer will be added
      */
-    public void addFooter(Content contentTree);
+    public void addFooter();
 
     /**
      * Print the document.

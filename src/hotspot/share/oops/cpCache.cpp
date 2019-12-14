@@ -44,7 +44,6 @@
 #include "prims/methodHandles.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/handles.inline.hpp"
-#include "runtime/orderAccess.hpp"
 #include "utilities/macros.hpp"
 
 // Implementation of ConstantPoolCacheEntry
@@ -97,7 +96,7 @@ void ConstantPoolCacheEntry::set_bytecode_1(Bytecodes::Code code) {
   assert(c == 0 || c == code || code == 0, "update must be consistent");
 #endif
   // Need to flush pending stores here before bytecode is written.
-  OrderAccess::release_store(&_indices, _indices | ((u_char)code << bytecode_1_shift));
+  Atomic::release_store(&_indices, _indices | ((u_char)code << bytecode_1_shift));
 }
 
 void ConstantPoolCacheEntry::set_bytecode_2(Bytecodes::Code code) {
@@ -107,17 +106,17 @@ void ConstantPoolCacheEntry::set_bytecode_2(Bytecodes::Code code) {
   assert(c == 0 || c == code || code == 0, "update must be consistent");
 #endif
   // Need to flush pending stores here before bytecode is written.
-  OrderAccess::release_store(&_indices, _indices | ((u_char)code << bytecode_2_shift));
+  Atomic::release_store(&_indices, _indices | ((u_char)code << bytecode_2_shift));
 }
 
 // Sets f1, ordering with previous writes.
 void ConstantPoolCacheEntry::release_set_f1(Metadata* f1) {
   assert(f1 != NULL, "");
-  OrderAccess::release_store(&_f1, f1);
+  Atomic::release_store(&_f1, f1);
 }
 
 void ConstantPoolCacheEntry::set_indy_resolution_failed() {
-  OrderAccess::release_store(&_flags, _flags | (1 << indy_resolution_failed_shift));
+  Atomic::release_store(&_flags, _flags | (1 << indy_resolution_failed_shift));
 }
 
 // Note that concurrent update of both bytecodes can leave one of them
@@ -159,7 +158,7 @@ void ConstantPoolCacheEntry::set_parameter_size(int value) {
   // sure that the final parameter size agrees with what was passed.
   if (_flags == 0) {
     intx newflags = (value & parameter_size_mask);
-    Atomic::cmpxchg(newflags, &_flags, (intx)0);
+    Atomic::cmpxchg(&_flags, (intx)0, newflags);
   }
   guarantee(parameter_size() == value,
             "size must not change: parameter_size=%d, value=%d", parameter_size(), value);
@@ -401,7 +400,7 @@ void ConstantPoolCacheEntry::set_method_handle_common(const constantPoolHandle& 
     return;
   }
 
-  const methodHandle adapter = call_info.resolved_method();
+  Method* adapter            = call_info.resolved_method();
   const Handle appendix      = call_info.resolved_appendix();
   const bool has_appendix    = appendix.not_null();
 
@@ -419,7 +418,7 @@ void ConstantPoolCacheEntry::set_method_handle_common(const constantPoolHandle& 
                   invoke_code,
                   p2i(appendix()),
                   (has_appendix ? "" : " (unused)"),
-                  p2i(adapter()));
+                  p2i(adapter));
     adapter->print();
     if (has_appendix)  appendix()->print();
   }
@@ -451,7 +450,7 @@ void ConstantPoolCacheEntry::set_method_handle_common(const constantPoolHandle& 
     resolved_references->obj_at_put(appendix_index, appendix());
   }
 
-  release_set_f1(adapter());  // This must be the last one to set (see NOTE above)!
+  release_set_f1(adapter);  // This must be the last one to set (see NOTE above)!
 
   // The interpreter assembly code does not check byte_2,
   // but it is used by is_resolved, method_if_resolved, etc.
@@ -723,10 +722,12 @@ void ConstantPoolCache::walk_entries_for_initialization(bool check_only) {
   bool* f2_used = NEW_RESOURCE_ARRAY(bool, length());
   memset(f2_used, 0, sizeof(bool) * length());
 
+  Thread* THREAD = Thread::current();
+
   // Find all the slots that we need to preserve f2
   for (int i = 0; i < ik->methods()->length(); i++) {
     Method* m = ik->methods()->at(i);
-    RawBytecodeStream bcs(m);
+    RawBytecodeStream bcs(methodHandle(THREAD, m));
     while (!bcs.is_last_bytecode()) {
       Bytecodes::Code opcode = bcs.raw_next();
       switch (opcode) {

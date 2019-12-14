@@ -92,8 +92,8 @@ class ObjectSynchronizer : AllStatic {
   // used by classloading to free classloader object lock,
   // wait on an internal lock, and reclaim original lock
   // with original recursion count
-  static intptr_t complete_exit(Handle obj, TRAPS);
-  static void reenter (Handle obj, intptr_t recursion, TRAPS);
+  static intx complete_exit(Handle obj, TRAPS);
+  static void reenter (Handle obj, intx recursions, TRAPS);
 
   // thread-specific and global ObjectMonitor free list accessors
   static ObjectMonitor* om_alloc(Thread* self);
@@ -138,6 +138,7 @@ class ObjectSynchronizer : AllStatic {
                               ObjectMonitor** free_head_p,
                               ObjectMonitor** free_tail_p);
   static bool is_cleanup_needed();
+  static bool needs_monitor_scavenge();
   static void oops_do(OopClosure* f);
   // Process oops in thread local used monitors
   static void thread_local_used_oops_do(Thread* thread, OopClosure* f);
@@ -209,8 +210,8 @@ class ObjectLocker : public StackObj {
   void wait_uninterruptibly(TRAPS) { ObjectSynchronizer::wait_uninterruptibly(_obj, 0, CHECK); }
   // complete_exit gives up lock completely, returning recursion count
   // reenter reclaims lock with original recursion count
-  intptr_t complete_exit(TRAPS)  { return ObjectSynchronizer::complete_exit(_obj, THREAD); }
-  void reenter(intptr_t recursion, TRAPS)  { ObjectSynchronizer::reenter(_obj, recursion, CHECK); }
+  intx complete_exit(TRAPS)  { return ObjectSynchronizer::complete_exit(_obj, THREAD); }
+  void reenter(intx recursions, TRAPS)  { ObjectSynchronizer::reenter(_obj, recursions, CHECK); }
 };
 
 #endif // SHARE_RUNTIME_SYNCHRONIZER_HPP

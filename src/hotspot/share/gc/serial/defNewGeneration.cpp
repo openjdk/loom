@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -43,7 +43,7 @@
 #include "gc/shared/referencePolicy.hpp"
 #include "gc/shared/referenceProcessorPhaseTimes.hpp"
 #include "gc/shared/space.inline.hpp"
-#include "gc/shared/spaceDecorator.hpp"
+#include "gc/shared/spaceDecorator.inline.hpp"
 #include "gc/shared/strongRootsScope.hpp"
 #include "gc/shared/weakProcessor.hpp"
 #include "logging/log.hpp"
@@ -51,7 +51,6 @@
 #include "memory/resourceArea.hpp"
 #include "oops/instanceRefKlass.hpp"
 #include "oops/oop.inline.hpp"
-#include "runtime/atomic.hpp"
 #include "runtime/java.hpp"
 #include "runtime/prefetch.inline.hpp"
 #include "runtime/thread.inline.hpp"
@@ -66,8 +65,7 @@
 // Methods of protected closure types.
 
 DefNewGeneration::IsAliveClosure::IsAliveClosure(Generation* young_gen) : _young_gen(young_gen) {
-  assert(_young_gen->kind() == Generation::ParNew ||
-         _young_gen->kind() == Generation::DefNew, "Expected the young generation here");
+  assert(_young_gen->kind() == Generation::DefNew, "Expected the young generation here");
 }
 
 bool DefNewGeneration::IsAliveClosure::do_object_b(oop p) {
@@ -393,7 +391,7 @@ void DefNewGeneration::compute_new_size() {
   size_t desired_new_size = adjust_for_thread_increase(new_size_candidate, new_size_before, alignment);
 
   // Adjust new generation size
-  desired_new_size = MAX2(MIN2(desired_new_size, max_new_size), min_new_size);
+  desired_new_size = clamp(desired_new_size, min_new_size, max_new_size);
   assert(desired_new_size <= max_new_size, "just checking");
 
   bool changed = false;
@@ -884,7 +882,6 @@ void DefNewGeneration::gc_epilogue(bool full) {
       log_trace(gc)("DefNewEpilogue: cause(%s), not full, seen_failed, will_clear_seen_failed",
                             GCCause::to_string(gch->gc_cause()));
       assert(gch->gc_cause() == GCCause::_scavenge_alot ||
-             (GCCause::is_user_requested_gc(gch->gc_cause()) && UseConcMarkSweepGC && ExplicitGCInvokesConcurrent) ||
              !gch->incremental_collection_failed(),
              "Twice in a row");
       seen_incremental_collection_failed = false;

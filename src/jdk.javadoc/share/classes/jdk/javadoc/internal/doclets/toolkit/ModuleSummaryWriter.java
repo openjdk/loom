@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,8 +34,6 @@ import jdk.javadoc.internal.doclets.toolkit.util.DocFileIOException;
  *  If you write code that depends on this, you do so at your own risk.
  *  This code and its internal interfaces are subject to change or
  *  deletion without notice.</b>
- *
- * @author Bhavesh Patel
  */
 
 public interface ModuleSummaryWriter {
@@ -111,17 +109,14 @@ public interface ModuleSummaryWriter {
     /**
      * Adds the module content tree to the documentation tree.
      *
-     * @param contentTree the tree to which the module content tree will be added
      * @param moduleContentTree the content tree that will be added
      */
-    public abstract void addModuleContent(Content contentTree, Content moduleContentTree);
+    public abstract void addModuleContent(Content moduleContentTree);
 
     /**
      * Adds the footer to the documentation tree.
-     *
-     * @param contentTree the tree to which the footer will be added
      */
-    public abstract void addModuleFooter(Content contentTree);
+    public abstract void addModuleFooter();
 
     /**
      * Print the module summary document.

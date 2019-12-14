@@ -276,7 +276,7 @@ public class Annotate {
         validate(() -> { //validate annotations
             JavaFileObject prev = log.useSource(localEnv.toplevel.sourcefile);
             try {
-                chk.validateAnnotations(annotations, s);
+                chk.validateAnnotations(annotations, TreeInfo.declarationFor(s, localEnv.tree), s);
             } finally {
                 log.useSource(prev);
             }
@@ -1119,6 +1119,13 @@ public class Annotate {
             } finally {
                 deferPos = prevPos;
             }
+        }
+
+        @Override
+        public void visitBindingPattern(JCTree.JCBindingPattern tree) {
+            //type binding pattern's type will be annotated separatelly, avoid
+            //adding its annotations into the owning method here (would clash
+            //with repeatable annotations).
         }
 
         @Override

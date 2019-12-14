@@ -37,10 +37,17 @@ class KlassClosure;
 class ClassLoaderData;
 class Symbol;
 class Metadata;
+class Thread;
 
 // The following classes are C++ `closures` for iterating over objects, roots and spaces
 
 class Closure : public StackObj { };
+
+// Thread iterator
+class ThreadClosure: public Closure {
+ public:
+  virtual void do_thread(Thread* thread) = 0;
+};
 
 // OopClosure is used for iterating through references to Java objects.
 class OopClosure : public Closure {
@@ -203,34 +210,6 @@ class ObjectToOopClosure: public ObjectClosure {
 public:
   void do_object(oop obj);
   ObjectToOopClosure(OopIterateClosure* cl) : _cl(cl) {}
-};
-
-// A version of ObjectClosure that is expected to be robust
-// in the face of possibly uninitialized objects.
-class ObjectClosureCareful : public ObjectClosure {
- public:
-  virtual size_t do_object_careful_m(oop p, MemRegion mr) = 0;
-  virtual size_t do_object_careful(oop p) = 0;
-};
-
-// The following are used in CompactibleFreeListSpace and
-// ConcurrentMarkSweepGeneration.
-
-// Blk closure (abstract class)
-class BlkClosure : public StackObj {
- public:
-  virtual size_t do_blk(HeapWord* addr) = 0;
-};
-
-// A version of BlkClosure that is expected to be robust
-// in the face of possibly uninitialized objects.
-class BlkClosureCareful : public BlkClosure {
- public:
-  size_t do_blk(HeapWord* addr) {
-    guarantee(false, "call do_blk_careful instead");
-    return 0;
-  }
-  virtual size_t do_blk_careful(HeapWord* addr) = 0;
 };
 
 // SpaceClosure is used for iterating over spaces

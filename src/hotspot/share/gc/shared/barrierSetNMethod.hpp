@@ -38,12 +38,13 @@ private:
   bool supports_entry_barrier(nmethod* nm);
   void deoptimize(nmethod* nm, address* return_addr_ptr);
 
-  virtual bool nmethod_entry_barrier(nmethod* nm);
-
 public:
   BarrierSetNMethod() : _current_phase(1) { }
-  virtual int disarmed_value() const;
+  virtual bool nmethod_entry_barrier(nmethod* nm);
   virtual ByteSize thread_disarmed_offset() const;
+  virtual int* disarmed_value_address() const;
+
+  int disarmed_value() const;
 
   static int nmethod_stub_entry_barrier(address* return_address_ptr);
   bool nmethod_osr_entry_barrier(nmethod* nm);

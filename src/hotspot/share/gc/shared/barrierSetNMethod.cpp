@@ -40,6 +40,10 @@ public:
   virtual void do_oop(narrowOop* p) { ShouldNotReachHere(); }
 };
 
+int BarrierSetNMethod::disarmed_value() const {
+  return *disarmed_value_address();
+}
+
 bool BarrierSetNMethod::supports_entry_barrier(nmethod* nm) {
   if (nm->method()->is_method_handle_intrinsic()) {
     return false;
@@ -60,8 +64,8 @@ bool BarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
   return true;
 }
 
-int BarrierSetNMethod::disarmed_value() const {
-  return _current_phase;
+int* BarrierSetNMethod::disarmed_value_address() const {
+  return (int*) &_current_phase;
 }
 
 ByteSize BarrierSetNMethod::thread_disarmed_offset() const {

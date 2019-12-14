@@ -35,12 +35,14 @@ package gc.g1;
  *          java.management
  * @build sun.hotspot.WhiteBox
  * @run driver ClassFileInstaller sun.hotspot.WhiteBox
- * @run main gc.g1.TestGCLogMessages
+ *                                sun.hotspot.WhiteBox$WhiteBoxPermission
+ * @run main/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
+ *                   gc.g1.TestGCLogMessages
  */
 
 import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
-import jdk.test.lib.Platform;
+import sun.hotspot.code.Compiler;
 
 public class TestGCLogMessages {
 
@@ -85,7 +87,7 @@ public class TestGCLogMessages {
         }
 
         public boolean isAvailable() {
-            return Platform.isGraal() || Platform.isServer();
+            return Compiler.isC2Enabled() || Compiler.isGraalEnabled();
         }
     }
 
@@ -116,6 +118,7 @@ public class TestGCLogMessages {
         new LogMessageWithLevel("Code Root Scan", Level.DEBUG),
         // Object Copy
         new LogMessageWithLevel("Object Copy", Level.DEBUG),
+        new LogMessageWithLevel("Copied Bytes", Level.DEBUG),
         new LogMessageWithLevel("LAB Waste", Level.DEBUG),
         new LogMessageWithLevel("LAB Undo Waste", Level.DEBUG),
         // Ext Root Scan

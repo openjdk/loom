@@ -1192,9 +1192,6 @@ class HandlerImpl {
   // predicate controlling translation of CompareAndSwapX
   bool needs_acquiring_load_exclusive(const Node *load);
 
-  // predicate controlling translation of StoreCM
-  bool unnecessary_storestore(const Node *storecm);
-
   // predicate controlling addressing modes
   bool size_fits_all_mem_uses(AddPNode* addp, int shift);
 %}
@@ -1583,29 +1580,6 @@ bool needs_acquiring_load_exclusive(const Node *n)
   return true;
 }
 
-// predicate controlling translation of StoreCM
-//
-// returns true if a StoreStore must precede the card write otherwise
-// false
-
-bool unnecessary_storestore(const Node *storecm)
-{
-  assert(storecm->Opcode()  == Op_StoreCM, "expecting a StoreCM");
-
-  // we need to generate a dmb ishst between an object put and the
-  // associated card mark when we are using CMS without conditional
-  // card marking
-
-  if (UseConcMarkSweepGC && !UseCondCardMark) {
-    return false;
-  }
-
-  // a storestore is unnecesary in all other cases
-
-  return true;
-}
-
-
 #define __ _masm.
 
 // advance declarations for helper functions to convert register
@@ -1883,13 +1857,14 @@ static enum RC rc_class(OptoReg::Name reg) {
 
   // we have 30 int registers * 2 halves
   // (rscratch1 and rscratch2 are omitted)
+  int slots_of_int_registers = RegisterImpl::max_slots_per_register * (RegisterImpl::number_of_registers - 2);
 
-  if (reg < 60) {
+  if (reg < slots_of_int_registers) {
     return rc_int;
   }
 
-  // we have 32 float register * 2 halves
-  if (reg < 60 + 128) {
+  // we have 32 float register * 4 halves
+  if (reg < slots_of_int_registers + FloatRegisterImpl::max_slots_per_register * FloatRegisterImpl::number_of_registers) {
     return rc_float;
   }
 
@@ -2318,6 +2293,24 @@ const bool Matcher::require_postalloc_expand = false;
 // Do we need to mask the count passed to shift instructions or does
 // the cpu only look at the lower 5/6 bits anyway?
 const bool Matcher::need_masked_shift_count = false;
+
+// No support for generic vector operands.
+const bool Matcher::supports_generic_vector_operands  = false;
+
+MachOper* Matcher::specialize_generic_vector_operand(MachOper* original_opnd, uint ideal_reg) {
+  ShouldNotReachHere(); // generic vector operands not supported
+  return NULL;
+}
+
+bool Matcher::is_generic_reg2reg_move(MachNode* m) {
+  ShouldNotReachHere();  // generic vector operands not supported
+  return false;
+}
+
+bool Matcher::is_generic_vector(MachOper* opnd)  {
+  ShouldNotReachHere();  // generic vector operands not supported
+  return false;
+}
 
 // This affects two different things:
 //  - how Decode nodes are matched
@@ -5665,7 +5658,6 @@ operand cmpOpU()
 operand cmpOpEqNe()
 %{
   match(Bool);
-  match(CmpOp);
   op_cost(0);
   predicate(n->as_Bool()->_test._test == BoolTest::ne
             || n->as_Bool()->_test._test == BoolTest::eq);
@@ -5689,7 +5681,6 @@ operand cmpOpEqNe()
 operand cmpOpLtGe()
 %{
   match(Bool);
-  match(CmpOp);
   op_cost(0);
 
   predicate(n->as_Bool()->_test._test == BoolTest::lt
@@ -5714,7 +5705,6 @@ operand cmpOpLtGe()
 operand cmpOpUEqNeLtGe()
 %{
   match(Bool);
-  match(CmpOp);
   op_cost(0);
 
   predicate(n->as_Bool()->_test._test == BoolTest::eq
@@ -7220,7 +7210,6 @@ instruct loadConD(vRegD dst, immD con) %{
 instruct storeimmCM0(immI0 zero, memory mem)
 %{
   match(Set mem (StoreCM mem zero));
-  predicate(unnecessary_storestore(n));
 
   ins_cost(INSN_COST);
   format %{ "storestore (elided)\n\t"

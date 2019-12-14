@@ -44,6 +44,7 @@
 #include "gc/shared/locationPrinter.inline.hpp"
 #include "gc/shared/scavengableNMethods.hpp"
 #include "logging/log.hpp"
+#include "memory/iterator.hpp"
 #include "memory/metaspaceCounters.hpp"
 #include "memory/universe.hpp"
 #include "oops/oop.inline.hpp"
@@ -212,6 +213,10 @@ bool ParallelScavengeHeap::is_in(const void* p) const {
 
 bool ParallelScavengeHeap::is_in_reserved(const void* p) const {
   return young_gen()->is_in_reserved(p) || old_gen()->is_in_reserved(p);
+}
+
+bool ParallelScavengeHeap::requires_barriers(oop p) const {
+  return !is_in_young(p);
 }
 
 // There are two levels of allocation policy here.

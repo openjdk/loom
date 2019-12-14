@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,11 +35,10 @@ public enum GC {
      */
     Serial(1),
     Parallel(2),
-    ConcMarkSweep(3),
-    G1(4),
-    Epsilon(5),
-    Z(6),
-    Shenandoah(7);
+    G1(3),
+    Epsilon(4),
+    Z(5),
+    Shenandoah(6);
 
     private static final WhiteBox WB = WhiteBox.getWhiteBox();
 
@@ -49,11 +48,28 @@ public enum GC {
         this.name = name;
     }
 
+    private boolean supportsOSVersion() {
+        if (this != Z) {
+            return true;
+        }
+
+        String osName = System.getProperty("os.name");
+
+        if (!osName.startsWith("Windows")) {
+            return true;
+        }
+
+        // ZGC has specific Windows version requirements (>= 1803).
+        // The following check should be made more precise to
+        // also catch the corresponding Windows 10 version.
+        return osName.equals("Windows Server 2019");
+    }
+
     /**
      * @return true if this GC is supported by the VM, i.e., it is built into the VM.
      */
     public boolean isSupported() {
-        return WB.isGCSupported(name);
+        return WB.isGCSupported(name) && supportsOSVersion();
     }
 
     /**

@@ -41,6 +41,7 @@
 #include "gc/g1/g1HRPrinter.hpp"
 #include "gc/g1/g1HeapRegionAttr.hpp"
 #include "gc/g1/g1MonitoringSupport.hpp"
+#include "gc/g1/g1NUMA.hpp"
 #include "gc/g1/g1RedirtyCardsQueue.hpp"
 #include "gc/g1/g1SurvivorRegions.hpp"
 #include "gc/g1/g1YCTypes.hpp"
@@ -132,6 +133,7 @@ class G1CollectedHeap : public CollectedHeap {
   friend class VM_CollectForMetadataAllocation;
   friend class VM_G1CollectForAllocation;
   friend class VM_G1CollectFull;
+  friend class VM_G1TryInitiateConcMark;
   friend class VMStructs;
   friend class MutatorAllocRegion;
   friend class G1FullCollector;
@@ -191,6 +193,9 @@ private:
   // Callback for region mapping changed events.
   G1RegionMappingChangedListener _listener;
 
+  // Handle G1 NUMA support.
+  G1NUMA* _numa;
+
   // The sequence of all heap regions in the heap.
   HeapRegionManager* _hrm;
 
@@ -208,6 +213,10 @@ private:
   void decrease_used(size_t bytes);
 
   void set_used(size_t bytes);
+
+  // Number of bytes used in all regions during GC. Typically changed when
+  // retiring a GC alloc region.
+  size_t _bytes_used_during_gc;
 
   // Class that handles archive allocation ranges.
   G1ArchiveAllocator* _archive_allocator;
@@ -255,15 +264,20 @@ private:
 
   G1HRPrinter _hr_printer;
 
-  // It decides whether an explicit GC should start a concurrent cycle
-  // instead of doing a STW GC. Currently, a concurrent cycle is
-  // explicitly started if:
-  // (a) cause == _gc_locker and +GCLockerInvokesConcurrent, or
-  // (b) cause == _g1_humongous_allocation
-  // (c) cause == _java_lang_system_gc and +ExplicitGCInvokesConcurrent.
-  // (d) cause == _dcmd_gc_run and +ExplicitGCInvokesConcurrent.
-  // (e) cause == _wb_conc_mark
+  // Return true if an explicit GC should start a concurrent cycle instead
+  // of doing a STW full GC. A concurrent cycle should be started if:
+  // (a) cause == _g1_humongous_allocation,
+  // (b) cause == _java_lang_system_gc and +ExplicitGCInvokesConcurrent,
+  // (c) cause == _dcmd_gc_run and +ExplicitGCInvokesConcurrent,
+  // (d) cause == _wb_conc_mark,
+  // (e) cause == _g1_periodic_collection and +G1PeriodicGCInvokesConcurrent.
   bool should_do_concurrent_full_gc(GCCause::Cause cause);
+
+  // Attempt to start a concurrent cycle with the indicated cause.
+  // precondition: should_do_concurrent_full_gc(cause)
+  bool try_collect_concurrently(GCCause::Cause cause,
+                                uint gc_counter,
+                                uint old_marking_started_before);
 
   // Return true if should upgrade to full gc after an incremental one.
   bool should_upgrade_to_full_gc(GCCause::Cause cause);
@@ -387,7 +401,10 @@ private:
   // attempt to expand the heap if necessary to satisfy the allocation
   // request. 'type' takes the type of region to be allocated. (Use constants
   // Old, Eden, Humongous, Survivor defined in HeapRegionType.)
-  HeapRegion* new_region(size_t word_size, HeapRegionType type, bool do_expand);
+  HeapRegion* new_region(size_t word_size,
+                         HeapRegionType type,
+                         bool do_expand,
+                         uint node_index = G1NUMA::AnyNodeIndex);
 
   // Initialize a contiguous set of free regions of length num_regions
   // and starting at index first so that they appear as a single
@@ -462,13 +479,13 @@ private:
   // These methods are the "callbacks" from the G1AllocRegion class.
 
   // For mutator alloc regions.
-  HeapRegion* new_mutator_alloc_region(size_t word_size, bool force);
+  HeapRegion* new_mutator_alloc_region(size_t word_size, bool force, uint node_index);
   void retire_mutator_alloc_region(HeapRegion* alloc_region,
                                    size_t allocated_bytes);
 
   // For GC alloc regions.
   bool has_more_regions(G1HeapRegionAttr dest);
-  HeapRegion* new_gc_alloc_region(size_t word_size, G1HeapRegionAttr dest);
+  HeapRegion* new_gc_alloc_region(size_t word_size, G1HeapRegionAttr dest, uint node_index);
   void retire_gc_alloc_region(HeapRegion* alloc_region,
                               size_t allocated_bytes, G1HeapRegionAttr dest);
 
@@ -523,6 +540,9 @@ private:
   // Merges the information gathered on a per-thread basis for all worker threads
   // during GC into global variables.
   void merge_per_thread_state_info(G1ParScanThreadStateSet* per_thread_states);
+
+  void verify_numa_regions(const char* desc);
+
 public:
   G1YoungRemSetSamplingThread* sampling_thread() const { return _young_gen_sampling_thread; }
 
@@ -547,11 +567,14 @@ public:
 
   void resize_heap_if_necessary();
 
+  G1NUMA* numa() const { return _numa; }
+
   // Expand the garbage-first heap by at least the given size (in bytes!).
   // Returns true if the heap was expanded by the requested amount;
   // false otherwise.
   // (Rounds up to a HeapRegion boundary.)
   bool expand(size_t expand_bytes, WorkGang* pretouch_workers = NULL, double* expand_time_ms = NULL);
+  bool expand_single_region(uint node_index);
 
   // Returns the PLAB statistics for a given destination.
   inline G1EvacStats* alloc_buffer_stats(G1HeapRegionAttr dest);
@@ -570,6 +593,7 @@ public:
   // These are only valid for starts_humongous regions.
   inline void set_humongous_reclaim_candidate(uint region, bool value);
   inline bool is_humongous_reclaim_candidate(uint region);
+  inline void set_has_humongous_reclaim_candidate(bool value);
 
   // Remove from the reclaim candidate set.  Also remove from the
   // collection set so that later encounters avoid the slow path.
@@ -577,8 +601,7 @@ public:
 
   // Register the given region to be part of the collection set.
   inline void register_humongous_region_with_region_attr(uint index);
-  // Update region attributes table with information about all regions.
-  void register_regions_with_region_attr();
+
   // We register a region with the fast "in collection set" test. We
   // simply set to true the array slot corresponding to this region.
   void register_young_region_with_region_attr(HeapRegion* r) {
@@ -617,7 +640,7 @@ public:
   // Full GC). If concurrent is true, the caller is the outer caller
   // in this nesting (i.e., the concurrent cycle). Further nesting is
   // not currently supported. The end of this call also notifies
-  // the FullGCCount_lock in case a Java thread is waiting for a full
+  // the G1OldGCCount_lock in case a Java thread is waiting for a full
   // GC to happen (e.g., it called System.gc() with
   // +ExplicitGCInvokesConcurrent).
   void increment_old_marking_cycles_completed(bool concurrent);
@@ -1075,10 +1098,9 @@ public:
   // "CollectedHeap" supports.
   virtual void collect(GCCause::Cause cause);
 
-  // Perform a collection of the heap with the given cause; if the VM operation
-  // fails to execute for any reason, retry only if retry_on_gc_failure is set.
+  // Perform a collection of the heap with the given cause.
   // Returns whether this collection actually executed.
-  bool try_collect(GCCause::Cause cause, bool retry_on_gc_failure);
+  bool try_collect(GCCause::Cause cause);
 
   // True iff an evacuation has failed in the most-recent collection.
   bool evacuation_failed() { return _evacuation_failed; }
@@ -1147,10 +1169,6 @@ public:
 
   // Iterate over all objects, calling "cl.do_object" on each.
   virtual void object_iterate(ObjectClosure* cl);
-
-  virtual void safe_object_iterate(ObjectClosure* cl) {
-    object_iterate(cl);
-  }
 
   // Iterate over heap regions, in address order, terminating the
   // iteration early if the "do_heap_region" method returns "true".
@@ -1275,7 +1293,9 @@ public:
   const G1SurvivorRegions* survivor() const { return &_survivor; }
 
   uint eden_regions_count() const { return _eden.length(); }
+  uint eden_regions_count(uint node_index) const { return _eden.regions_on_node(node_index); }
   uint survivor_regions_count() const { return _survivor.length(); }
+  uint survivor_regions_count(uint node_index) const { return _survivor.regions_on_node(node_index); }
   size_t eden_regions_used_bytes() const { return _eden.used_bytes(); }
   size_t survivor_regions_used_bytes() const { return _survivor.used_bytes(); }
   uint young_regions_count() const { return _eden.length() + _survivor.length(); }

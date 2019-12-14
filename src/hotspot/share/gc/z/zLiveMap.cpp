@@ -28,7 +28,6 @@
 #include "gc/z/zThread.inline.hpp"
 #include "logging/log.hpp"
 #include "runtime/atomic.hpp"
-#include "runtime/orderAccess.hpp"
 #include "utilities/debug.hpp"
 
 static const ZStatCounter ZCounterMarkSeqNumResetContention("Contention", "Mark SeqNum Reset Contention", ZStatUnitOpsPerSecond);
@@ -54,9 +53,11 @@ void ZLiveMap::reset(size_t index) {
 
   // Multiple threads can enter here, make sure only one of them
   // resets the marking information while the others busy wait.
-  for (uint32_t seqnum = _seqnum; seqnum != ZGlobalSeqNum; seqnum = _seqnum) {
+  for (uint32_t seqnum = Atomic::load_acquire(&_seqnum);
+       seqnum != ZGlobalSeqNum;
+       seqnum = Atomic::load_acquire(&_seqnum)) {
     if ((seqnum != seqnum_initializing) &&
-        (Atomic::cmpxchg(seqnum_initializing, &_seqnum, seqnum) == seqnum)) {
+        (Atomic::cmpxchg(&_seqnum, seqnum, seqnum_initializing) == seqnum)) {
       // Reset marking information
       _live_bytes = 0;
       _live_objects = 0;
@@ -65,13 +66,13 @@ void ZLiveMap::reset(size_t index) {
       segment_live_bits().clear();
       segment_claim_bits().clear();
 
-      // Make sure the newly reset marking information is
-      // globally visible before updating the page seqnum.
-      OrderAccess::storestore();
-
-      // Update seqnum
       assert(_seqnum == seqnum_initializing, "Invalid");
-      _seqnum = ZGlobalSeqNum;
+
+      // Make sure the newly reset marking information is ordered
+      // before the update of the page seqnum, such that when the
+      // up-to-date seqnum is load acquired, the bit maps will not
+      // contain stale information.
+      Atomic::release_store(&_seqnum, ZGlobalSeqNum);
       break;
     }
 
@@ -93,10 +94,6 @@ void ZLiveMap::reset_segment(BitMap::idx_t segment) {
   if (!claim_segment(segment)) {
     // Already claimed, wait for live bit to be set
     while (!is_segment_live(segment)) {
-      // Busy wait. The loadload barrier is needed to make
-      // sure we re-read the live bit every time we loop.
-      OrderAccess::loadload();
-
       // Mark reset contention
       if (!contention) {
         // Count contention once
@@ -122,7 +119,7 @@ void ZLiveMap::reset_segment(BitMap::idx_t segment) {
   }
 
   // Set live bit
-  const bool success = set_segment_live_atomic(segment);
+  const bool success = set_segment_live(segment);
   assert(success, "Should never fail");
 }
 

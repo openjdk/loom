@@ -407,7 +407,7 @@ class VM_RedefineClasses: public VM_Operation {
   void compute_added_deleted_matching_methods();
 
   // Change jmethodIDs to point to the new methods
-  void update_jmethod_ids();
+  void update_jmethod_ids(Thread* thread);
 
   // In addition to marking methods as old and/or obsolete, this routine
   // counts the number of methods that are EMCP (Equivalent Module Constant Pool).
@@ -472,6 +472,7 @@ class VM_RedefineClasses: public VM_Operation {
   bool rewrite_cp_refs_in_fields_annotations(
     InstanceKlass* scratch_class, TRAPS);
   bool rewrite_cp_refs_in_nest_attributes(InstanceKlass* scratch_class);
+  bool rewrite_cp_refs_in_record_attribute(InstanceKlass* scratch_class, TRAPS);
   void rewrite_cp_refs_in_method(methodHandle method,
     methodHandle * new_method_p, TRAPS);
   bool rewrite_cp_refs_in_methods(InstanceKlass* scratch_class, TRAPS);

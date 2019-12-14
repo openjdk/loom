@@ -30,6 +30,8 @@
 #include "oops/oop.hpp"
 #include "runtime/os.hpp"
 
+class RecordComponent;
+
 // Interface for manipulating the basic Java classes.
 //
 // All dependencies on layout of actual Java classes should be kept here.
@@ -69,12 +71,14 @@
   f(java_lang_invoke_LambdaForm) \
   f(java_lang_invoke_MethodType) \
   f(java_lang_invoke_CallSite) \
+  f(java_lang_invoke_ConstantCallSite) \
   f(java_lang_invoke_MethodHandleNatives_CallSiteContext) \
   f(java_security_AccessControlContext) \
   f(java_lang_reflect_AccessibleObject) \
   f(java_lang_reflect_Method) \
   f(java_lang_reflect_Constructor) \
   f(java_lang_reflect_Field) \
+  f(java_lang_reflect_RecordComponent) \
   f(java_nio_Buffer) \
   f(reflect_ConstantPool) \
   f(reflect_UnsafeStaticFieldAccessorImpl) \
@@ -287,6 +291,8 @@ class java_lang_Class : AllStatic {
                             Handle protection_domain, TRAPS);
   static void fixup_mirror(Klass* k, TRAPS);
   static oop  create_basic_type_mirror(const char* basic_type_name, BasicType type, TRAPS);
+  static void update_archived_primitive_mirror_native_pointers(oop archived_mirror) NOT_CDS_JAVA_HEAP_RETURN;
+  static void update_archived_mirror_native_pointers(oop archived_mirror) NOT_CDS_JAVA_HEAP_RETURN;
 
   // Archiving
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
@@ -643,7 +649,7 @@ class java_lang_Throwable: AllStatic {
   static oop message(oop throwable);
   static void set_message(oop throwable, oop value);
   static Symbol* detail_message(oop throwable);
-  static void print_stack_element(outputStream *st, const methodHandle& method, int bci);
+  static void print_stack_element(outputStream *st, Method* method, int bci);
   static void print_stack_usage(Handle stream);
 
   static void compute_offsets();
@@ -1436,6 +1442,28 @@ public:
   static int target_offset_in_bytes()           { return _target_offset; }
 };
 
+// Interface to java.lang.invoke.ConstantCallSite objects
+
+class java_lang_invoke_ConstantCallSite: AllStatic {
+  friend class JavaClasses;
+
+private:
+  static int _is_frozen_offset;
+
+  static void compute_offsets();
+
+public:
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+  // Accessors
+  static jboolean is_frozen(oop site);
+
+  // Testers
+  static bool is_subclass(Klass* klass) {
+    return klass->is_subclass_of(SystemDictionary::ConstantCallSite_klass());
+  }
+  static bool is_instance(oop obj);
+};
+
 // Interface to java.lang.invoke.MethodHandleNatives$CallSiteContext objects
 
 #define CALLSITECONTEXT_INJECTED_FIELDS(macro) \
@@ -1587,6 +1615,10 @@ class java_lang_StackTraceElement: AllStatic {
   static void set_declaringClassObject(oop element, oop value);
   static void set_contScopeName(oop element, oop value);
 
+  static void decode_file_and_line(Handle java_mirror, InstanceKlass* holder, int version,
+                                   const methodHandle& method, int bci,
+                                   Symbol*& source, oop& source_file, int& line_number, TRAPS);
+
  public:
   // Create an instance of StackTraceElement
   static oop create(const methodHandle& method, int bci, Handle contScope, TRAPS);
@@ -1598,8 +1630,7 @@ class java_lang_StackTraceElement: AllStatic {
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
 #if INCLUDE_JVMCI
-  static void decode(Handle mirror, int method, int version, int bci, int cpref, Symbol*& methodName, Symbol*& fileName, int& lineNumber);
-  static void decode(Handle mirror, methodHandle method, int bci, Symbol*& methodName, Symbol*& fileName, int& lineNumber);
+  static void decode(const methodHandle& method, int bci, Symbol*& fileName, int& lineNumber, TRAPS);
 #endif
 
   // Debugging
@@ -1616,7 +1647,7 @@ class Backtrace: AllStatic {
   static int version_at(unsigned int merged);
   static int mid_at(unsigned int merged);
   static int cpref_at(unsigned int merged);
-  static int get_line_number(const methodHandle& method, int bci);
+  static int get_line_number(Method* method, int bci);
   static Symbol* get_source_file_name(InstanceKlass* holder, int version);
 
   // Debugging
@@ -1673,6 +1704,39 @@ class java_lang_LiveStackFrameInfo: AllStatic {
   // Debugging
   friend class JavaClasses;
 };
+
+// Interface to java.lang.reflect.RecordComponent objects
+
+class java_lang_reflect_RecordComponent: AllStatic {
+ private:
+  static int clazz_offset;
+  static int name_offset;
+  static int type_offset;
+  static int accessor_offset;
+  static int signature_offset;
+  static int annotations_offset;
+  static int typeAnnotations_offset;
+
+  // Setters
+  static void set_clazz(oop element, oop value);
+  static void set_name(oop element, oop value);
+  static void set_type(oop element, oop value);
+  static void set_accessor(oop element, oop value);
+  static void set_signature(oop element, oop value);
+  static void set_annotations(oop element, oop value);
+  static void set_typeAnnotations(oop element, oop value);
+
+ public:
+  // Create an instance of RecordComponent
+  static oop create(InstanceKlass* holder, RecordComponent* component, TRAPS);
+
+  static void compute_offsets();
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+
+  // Debugging
+  friend class JavaClasses;
+};
+
 
 // Interface to java.lang.AssertionStatusDirectives objects
 
@@ -1878,6 +1942,7 @@ class JavaClasses : AllStatic {
   static void check_offsets() PRODUCT_RETURN;
   static void serialize_offsets(SerializeClosure* soc) NOT_CDS_RETURN;
   static InjectedField* get_injected(Symbol* class_name, int* field_count);
+  static bool is_supported_for_archiving(oop obj) NOT_CDS_JAVA_HEAP_RETURN_(false);
 };
 
 #undef DECLARE_INJECTED_FIELD_ENUM

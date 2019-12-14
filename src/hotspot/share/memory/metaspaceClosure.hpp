@@ -28,6 +28,7 @@
 #include "logging/log.hpp"
 #include "memory/allocation.hpp"
 #include "oops/array.hpp"
+#include "utilities/globalDefinitions.hpp"
 #include "utilities/growableArray.hpp"
 #include "utilities/hashtable.inline.hpp"
 
@@ -75,6 +76,10 @@ public:
     _default
   };
 
+  enum SpecialRef {
+    _method_entry_ref
+  };
+
   // class MetaspaceClosure::Ref --
   //
   // MetaspaceClosure can be viewed as a very simple type of copying garbage
@@ -104,9 +109,8 @@ public:
   class Ref : public CHeapObj<mtInternal> {
     Writability _writability;
     Ref* _next;
-    // Noncopyable.
-    Ref(const Ref&);
-    Ref& operator=(const Ref&);
+    NONCOPYABLE(Ref);
+
   protected:
     virtual void** mpp() const = 0;
     Ref(Writability w) : _writability(w), _next(NULL) {}
@@ -277,6 +281,16 @@ public:
   // this will be matched by default.
   template <class T> void push(T** mpp, Writability w = _default) {
     push_impl(new ObjectRef<T>(mpp, w));
+  }
+
+  template <class T> void push_method_entry(T** mpp, intptr_t* p) {
+    push_special(_method_entry_ref, new ObjectRef<T>(mpp, _default), (intptr_t*)p);
+  }
+
+  // This is for tagging special pointers that are not a reference to MetaspaceObj. It's currently
+  // used to mark the method entry points in Method/ConstMethod.
+  virtual void push_special(SpecialRef type, Ref* obj, intptr_t* p) {
+    assert(type == _method_entry_ref, "only special type allowed for now");
   }
 };
 

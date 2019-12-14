@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -40,8 +40,6 @@ import jdk.javadoc.internal.doclets.toolkit.util.DocFileIOException;
  *  If you write code that depends on this, you do so at your own risk.
  *  This code and its internal interfaces are subject to change or
  *  deletion without notice.</b>
- *
- * @author Jamie Ho
  */
 
 public interface SerializedFormWriter {
@@ -140,19 +138,16 @@ public interface SerializedFormWriter {
     public SerialMethodWriter getSerialMethodWriter(TypeElement typeElement);
 
     /**
-     * Get the serialized content.
+     * Add the serialized content to the body content.
      *
      * @param serializedTreeContent content for serialized data
-     * @return a content tree for serialized information
      */
-    public Content getSerializedContent(Content serializedTreeContent);
+    public void addSerializedContent(Content serializedTreeContent);
 
     /**
      * Add the footer.
-     *
-     * @param serializedTree the serialized tree to be added
      */
-    public void addFooter(Content serializedTree);
+    public void addFooter();
 
     /**
      * Print the serialized form document.
