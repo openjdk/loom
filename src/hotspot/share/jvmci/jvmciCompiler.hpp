@@ -25,6 +25,7 @@
 #define SHARE_JVMCI_JVMCICOMPILER_HPP
 
 #include "compiler/abstractCompiler.hpp"
+#include "runtime/atomic.hpp"
 
 class JVMCICompiler : public AbstractCompiler {
 private:
@@ -84,7 +85,7 @@ public:
   void bootstrap(TRAPS);
 
   // Should force compilation of method at CompLevel_simple?
-  bool force_comp_at_level_simple(Method* method);
+  bool force_comp_at_level_simple(const methodHandle& method);
 
   bool is_bootstrapping() const { return _bootstrapping; }
 

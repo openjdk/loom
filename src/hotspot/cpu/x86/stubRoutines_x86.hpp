@@ -55,13 +55,7 @@ class x86 {
   static address _double_sign_mask;
   static address _double_sign_flip;
 
-  static address _method_entry_barrier;
-
  public:
-
-  static address method_entry_barrier() {
-    return _method_entry_barrier;
-  }
 
   static address get_previous_fp_entry() {
     return _get_previous_fp_entry;
@@ -121,6 +115,8 @@ class x86 {
   //shuffle mask for big-endian 128-bit integers
   static address _counter_shuffle_mask_addr;
 
+  static address _method_entry_barrier;
+
   // masks and table for CRC32
   static uint64_t _crc_by128_masks[];
   static juint    _crc_table[];
@@ -154,6 +150,7 @@ class x86 {
   static address _k512_W_addr;
   // byte flip mask for sha512
   static address _pshuffle_byte_flip_mask_addr_sha512;
+  static address _counter_mask_addr;
   // Masks for base64
   static address _base64_charset;
   static address _bswap_mask;
@@ -220,6 +217,7 @@ class x86 {
   static address upper_word_mask_addr() { return _upper_word_mask_addr; }
   static address shuffle_byte_flip_mask_addr() { return _shuffle_byte_flip_mask_addr; }
   static address k256_addr()      { return _k256_adr; }
+  static address method_entry_barrier() { return _method_entry_barrier; }
 
   static address vector_short_to_byte_mask() {
     return _vector_short_to_byte_mask;
@@ -258,6 +256,7 @@ class x86 {
   static address base64_right_shift_mask_addr() { return _right_shift_mask; }
   static address base64_left_shift_mask_addr() { return _left_shift_mask; }
   static address base64_and_mask_addr() { return _and_mask; }
+  static address counter_mask_addr() { return _counter_mask_addr; }
 #endif
   static address pshuffle_byte_flip_mask_addr() { return _pshuffle_byte_flip_mask_addr; }
   static void generate_CRC32C_table(bool is_pclmulqdq_supported);

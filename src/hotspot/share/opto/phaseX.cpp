@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -39,6 +39,7 @@
 #include "opto/regalloc.hpp"
 #include "opto/rootnode.hpp"
 #include "utilities/macros.hpp"
+#include "utilities/powerOfTwo.hpp"
 
 //=============================================================================
 #define NODE_HASH_MINIMUM_SIZE    255
@@ -260,12 +261,9 @@ bool NodeHash::hash_delete( const Node *n ) {
 
 //------------------------------round_up---------------------------------------
 // Round up to nearest power of 2
-uint NodeHash::round_up( uint x ) {
-  x += (x>>2);                  // Add 25% slop
-  if( x <16 ) return 16;        // Small stuff
-  uint i=16;
-  while( i < x ) i <<= 1;       // Double to fit
-  return i;                     // Return hash table size
+uint NodeHash::round_up(uint x) {
+  x += (x >> 2);                  // Add 25% slop
+  return MAX2(16U, round_up_power_of_2(x));
 }
 
 //------------------------------grow-------------------------------------------
@@ -891,7 +889,10 @@ Node *PhaseGVN::transform_no_reclaim( Node *n ) {
 }
 
 bool PhaseGVN::is_dominator_helper(Node *d, Node *n, bool linear_only) {
-  if (d->is_top() || n->is_top()) {
+  if (d->is_top() || (d->is_Proj() && d->in(0)->is_top())) {
+    return false;
+  }
+  if (n->is_top() || (n->is_Proj() && n->in(0)->is_top())) {
     return false;
   }
   assert(d->is_CFG() && n->is_CFG(), "must have CFG nodes");
@@ -2135,7 +2136,7 @@ void Type_Array::grow( uint i ) {
     _types[0] = NULL;
   }
   uint old = _max;
-  while( i >= _max ) _max <<= 1;        // Double to fit
+  _max = next_power_of_2(i);
   _types = (const Type**)_a->Arealloc( _types, old*sizeof(Type*),_max*sizeof(Type*));
   memset( &_types[old], 0, (_max-old)*sizeof(Type*) );
 }

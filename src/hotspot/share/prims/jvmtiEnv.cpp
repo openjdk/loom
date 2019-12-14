@@ -809,14 +809,11 @@ JvmtiEnv::SetVerboseFlag(jvmtiVerboseFlag flag, jboolean value) {
     LogConfiguration::configure_stdout(level, false, LOG_TAGS(class, load));
     break;
   case JVMTI_VERBOSE_GC:
-    if (value == 0) {
-      LogConfiguration::configure_stdout(LogLevel::Off, true, LOG_TAGS(gc));
-    } else {
-      LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(gc));
-    }
+    LogConfiguration::configure_stdout(level, true, LOG_TAGS(gc));
     break;
   case JVMTI_VERBOSE_JNI:
-    PrintJNIResolving = value != 0;
+    level = value == 0 ? LogLevel::Off : LogLevel::Debug;
+    LogConfiguration::configure_stdout(level, true, LOG_TAGS(jni, resolve));
     break;
   default:
     return JVMTI_ERROR_ILLEGAL_ARGUMENT;
@@ -2140,13 +2137,16 @@ JvmtiEnv::GetLocalObject(jthread thread, jint depth, jint slot, jobject* value_p
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
-  VM_BaseGetOrSetLocal* op = NULL;
 
   if (java_lang_Fiber::is_instance(thread_obj)) {
     // Support for fibers
-    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    current_thread, depth, slot);
-    VMThread::execute(op);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().l;
+    }
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
@@ -2154,12 +2154,12 @@ JvmtiEnv::GetLocalObject(jthread thread, jint depth, jint slot, jobject* value_p
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
-    op = new VM_GetOrSetLocal(java_thread, current_thread, depth, slot);
-    VMThread::execute(op);
-  }
-  err = op->result();
-  if (err == JVMTI_ERROR_NONE) {
-    *value_ptr = op->value().l;
+    VM_GetOrSetLocal op(java_thread, current_thread, depth, slot);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().l;
+    }
   }
   return err;
 } /* end GetLocalObject */
@@ -2177,13 +2177,16 @@ JvmtiEnv::GetLocalInstance(jthread thread, jint depth, jobject* value_ptr){
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
-  VM_BaseGetOrSetLocal* op = NULL;
 
   if (java_lang_Fiber::is_instance(thread_obj)) {
     // Support for fibers
-    op = new VM_FiberGetReceiver(this, Handle(current_thread, thread_obj),
+    VM_FiberGetReceiver op(this, Handle(current_thread, thread_obj),
                                  current_thread, depth);
-    VMThread::execute(op);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) { 
+      *value_ptr = op.value().l;
+    }
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
@@ -2191,12 +2194,12 @@ JvmtiEnv::GetLocalInstance(jthread thread, jint depth, jobject* value_ptr){
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
-    op = new VM_GetReceiver(java_thread, current_thread, depth);
-    VMThread::execute(op);
-  }
-  err = op->result();
-  if (err == JVMTI_ERROR_NONE) { 
-    *value_ptr = op->value().l;
+    VM_GetReceiver op(java_thread, current_thread, depth);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) { 
+      *value_ptr = op.value().l;
+    }
   }
   return err;
 } /* end GetLocalInstance */
@@ -2215,13 +2218,16 @@ JvmtiEnv::GetLocalInt(jthread thread, jint depth, jint slot, jint* value_ptr) {
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
-  VM_BaseGetOrSetLocal* op = NULL;
 
   if (java_lang_Fiber::is_instance(thread_obj)) {
     // Support for fibers
-    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    depth, slot, T_INT);
-    VMThread::execute(op);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().i;
+    }
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
@@ -2229,12 +2235,12 @@ JvmtiEnv::GetLocalInt(jthread thread, jint depth, jint slot, jint* value_ptr) {
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
-    op = new VM_GetOrSetLocal(java_thread, depth, slot, T_INT);
-    VMThread::execute(op);
-  }
-  err = op->result();
-  if (err == JVMTI_ERROR_NONE) {
-    *value_ptr = op->value().i;
+    VM_GetOrSetLocal op(java_thread, depth, slot, T_INT);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().i;
+    }
   }
   return err;
 } /* end GetLocalInt */
@@ -2253,13 +2259,16 @@ JvmtiEnv::GetLocalLong(jthread thread, jint depth, jint slot, jlong* value_ptr) 
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
-  VM_BaseGetOrSetLocal* op = NULL;
 
   if (java_lang_Fiber::is_instance(thread_obj)) {
     // Support for fibers
-    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    depth, slot, T_LONG);
-    VMThread::execute(op);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().j;
+    }
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
@@ -2267,12 +2276,12 @@ JvmtiEnv::GetLocalLong(jthread thread, jint depth, jint slot, jlong* value_ptr) 
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
-    op = new VM_GetOrSetLocal(java_thread, depth, slot, T_LONG);
-    VMThread::execute(op);
-  }
-  err = op->result();
-  if (err == JVMTI_ERROR_NONE) {
-    *value_ptr = op->value().j;
+    VM_GetOrSetLocal op(java_thread, depth, slot, T_LONG);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().j;
+    }
   }
   return err;
 } /* end GetLocalLong */
@@ -2291,13 +2300,16 @@ JvmtiEnv::GetLocalFloat(jthread thread, jint depth, jint slot, jfloat* value_ptr
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
-  VM_BaseGetOrSetLocal* op = NULL;
 
   if (java_lang_Fiber::is_instance(thread_obj)) {
     // Support for fibers
-    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    depth, slot, T_FLOAT);
-    VMThread::execute(op);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().f;
+    }
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
@@ -2305,12 +2317,12 @@ JvmtiEnv::GetLocalFloat(jthread thread, jint depth, jint slot, jfloat* value_ptr
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
-    op = new VM_GetOrSetLocal(java_thread, depth, slot, T_FLOAT);
-    VMThread::execute(op);
-  }
-  err = op->result();
-  if (err == JVMTI_ERROR_NONE) {
-    *value_ptr = op->value().f;
+    VM_GetOrSetLocal op(java_thread, depth, slot, T_FLOAT);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().f;
+    }
   }
   return err;
 } /* end GetLocalFloat */
@@ -2329,13 +2341,16 @@ JvmtiEnv::GetLocalDouble(jthread thread, jint depth, jint slot, jdouble* value_p
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
-  VM_BaseGetOrSetLocal* op = NULL;
 
   if (java_lang_Fiber::is_instance(thread_obj)) {
     // Support for fibers
-    op = new VM_FiberGetOrSetLocal(this, Handle(current_thread, thread_obj),
+    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    depth, slot, T_DOUBLE);
-    VMThread::execute(op);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().d;
+    }
   } else {
     // Support for ordinary threads
     ThreadsListHandle tlh(current_thread);
@@ -2343,12 +2358,12 @@ JvmtiEnv::GetLocalDouble(jthread thread, jint depth, jint slot, jdouble* value_p
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
-    op = new VM_GetOrSetLocal(java_thread, depth, slot, T_DOUBLE);
-    VMThread::execute(op);
-  }
-  err = op->result();
-  if (err == JVMTI_ERROR_NONE) {
-    *value_ptr = op->value().d;
+    VM_GetOrSetLocal op(java_thread, depth, slot, T_DOUBLE);
+    VMThread::execute(&op);
+    err = op.result();
+    if (err == JVMTI_ERROR_NONE) {
+      *value_ptr = op.value().d;
+    }
   }
   return err;
 } /* end GetLocalDouble */
@@ -3375,7 +3390,7 @@ JvmtiEnv::GetBytecodes(Method* method_oop, jint* bytecode_count_ptr, unsigned ch
   NULL_CHECK(method_oop, JVMTI_ERROR_INVALID_METHODID);
 
   HandleMark hm;
-  methodHandle method(method_oop);
+  methodHandle method(Thread::current(), method_oop);
   jint size = (jint)method->code_size();
   jvmtiError err = allocate(size, bytecodes_ptr);
   if (err != JVMTI_ERROR_NONE) {
@@ -3556,35 +3571,8 @@ JvmtiEnv::RawMonitorExit(JvmtiRawMonitor * rmonitor) {
 // rmonitor - pre-checked for validity
 jvmtiError
 JvmtiEnv::RawMonitorWait(JvmtiRawMonitor * rmonitor, jlong millis) {
-  int r = 0;
   Thread* thread = Thread::current();
-
-  if (thread->is_Java_thread()) {
-    JavaThread* current_thread = (JavaThread*)thread;
-
-    /* Transition to thread_blocked without entering vm state          */
-    /* This is really evil. Normally you can't undo _thread_blocked    */
-    /* transitions like this because it would cause us to miss a       */
-    /* safepoint but since the thread was already in _thread_in_native */
-    /* the thread is not leaving a safepoint safe state and it will    */
-    /* block when it tries to return from native. We can't safepoint   */
-    /* block in here because we could deadlock the vmthread. Blech.    */
-
-    JavaThreadState state = current_thread->thread_state();
-    assert(state == _thread_in_native, "Must be _thread_in_native");
-    // frame should already be walkable since we are in native
-    assert(!current_thread->has_last_Java_frame() ||
-           current_thread->frame_anchor()->walkable(), "Must be walkable");
-    current_thread->set_thread_state(_thread_blocked);
-
-    r = rmonitor->raw_wait(millis, true, current_thread);
-    // restore state, still at a safepoint safe state
-    current_thread->set_thread_state(state);
-
-  } else {
-      r = rmonitor->raw_wait(millis, false, thread);
-      assert(r != JvmtiRawMonitor::M_INTERRUPTED, "non-JavaThread can't be interrupted");
-  }
+  int r = rmonitor->raw_wait(millis, thread);
 
   switch (r) {
   case JvmtiRawMonitor::M_INTERRUPTED:

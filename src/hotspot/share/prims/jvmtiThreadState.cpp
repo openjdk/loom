@@ -72,6 +72,8 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread)
   _earlyret_value.j = 0L;
   _earlyret_oop = NULL;
 
+  _jvmti_event_queue = NULL;
+
   // add all the JvmtiEnvThreadState to the new JvmtiThreadState
   {
     JvmtiEnvIterator it;
@@ -412,6 +414,36 @@ void JvmtiThreadState::process_pending_step_for_earlyret() {
   }
 }
 
-void JvmtiThreadState::oops_do(OopClosure* f) {
+void JvmtiThreadState::oops_do(OopClosure* f, CodeBlobClosure* cf) {
   f->do_oop((oop*) &_earlyret_oop);
+
+  // Keep nmethods from unloading on the event queue
+  if (_jvmti_event_queue != NULL) {
+    _jvmti_event_queue->oops_do(f, cf);
+  }
 }
+
+void JvmtiThreadState::nmethods_do(CodeBlobClosure* cf) {
+  // Keep nmethods from unloading on the event queue
+  if (_jvmti_event_queue != NULL) {
+    _jvmti_event_queue->nmethods_do(cf);
+  }
+}
+
+// Thread local event queue.
+void JvmtiThreadState::enqueue_event(JvmtiDeferredEvent* event) {
+  if (_jvmti_event_queue == NULL) {
+    _jvmti_event_queue = new JvmtiDeferredEventQueue();
+  }
+  // copy the event
+  _jvmti_event_queue->enqueue(*event);
+}
+
+void JvmtiThreadState::post_events(JvmtiEnv* env) {
+  if (_jvmti_event_queue != NULL) {
+    _jvmti_event_queue->post(env);  // deletes each queue node
+    delete _jvmti_event_queue;
+    _jvmti_event_queue = NULL;
+  }
+}
+

@@ -49,6 +49,7 @@
 #include "runtime/unhandledOops.hpp"
 #include "utilities/align.hpp"
 #include "utilities/exceptions.hpp"
+#include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 #ifdef ZERO
 # include "stack_zero.hpp"
@@ -497,6 +498,7 @@ class Thread: public ThreadShadow {
   virtual bool is_Java_thread()     const            { return false; }
   virtual bool is_Compiler_thread() const            { return false; }
   virtual bool is_Code_cache_sweeper_thread() const  { return false; }
+  virtual bool is_service_thread() const             { return false; }
   virtual bool is_hidden_from_external_view() const  { return false; }
   virtual bool is_jvmti_agent_thread() const         { return false; }
   // True iff the thread can perform GC operations at a safepoint.
@@ -746,7 +748,7 @@ protected:
 
   bool    on_local_stack(address adr) const {
     // QQQ this has knowledge of direction, ought to be a stack method
-    return (_stack_base >= adr && adr >= stack_end());
+    return (_stack_base > adr && adr >= stack_end());
   }
 
   int     lgrp_id() const        { return _lgrp_id; }
@@ -891,9 +893,7 @@ class NonJavaThread::Iterator : public StackObj {
   uint _protect_enter;
   NonJavaThread* _current;
 
-  // Noncopyable.
-  Iterator(const Iterator&);
-  Iterator& operator=(const Iterator&);
+  NONCOPYABLE(Iterator);
 
 public:
   Iterator();
@@ -1370,8 +1370,8 @@ class JavaThread: public Thread {
     _handshake.process_by_self(this);
   }
 
-  void handshake_process_by_vmthread() {
-    _handshake.process_by_vmthread(this);
+  bool handshake_try_process_by_vmThread() {
+    return _handshake.try_process_by_vmThread(this);
   }
 
   // Suspend/resume support for JavaThread
@@ -2337,13 +2337,6 @@ class Threads: AllStatic {
   static void deoptimized_wrt_marked_nmethods();
 
   struct Test;                  // For private gtest access.
-};
-
-
-// Thread iterator
-class ThreadClosure: public StackObj {
- public:
-  virtual void do_thread(Thread* thread) = 0;
 };
 
 class SignalHandlerMark: public StackObj {

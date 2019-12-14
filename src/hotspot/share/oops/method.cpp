@@ -36,6 +36,8 @@
 #include "interpreter/bytecodes.hpp"
 #include "interpreter/interpreter.hpp"
 #include "interpreter/oopMapCache.hpp"
+#include "logging/log.hpp"
+#include "logging/logTag.hpp"
 #include "memory/allocation.inline.hpp"
 #include "memory/heapInspection.hpp"
 #include "memory/metadataFactory.hpp"
@@ -56,6 +58,7 @@
 #include "prims/methodHandles.hpp"
 #include "prims/nativeLookup.hpp"
 #include "runtime/arguments.hpp"
+#include "runtime/atomic.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/init.hpp"
@@ -330,11 +333,9 @@ int Method::size(bool is_native) {
   return align_metadata_size(header_size() + extra_words);
 }
 
-
 Symbol* Method::klass_name() const {
   return method_holder()->name();
 }
-
 
 void Method::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(Method): %p", this);
@@ -342,6 +343,11 @@ void Method::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_constMethod);
   it->push(&_method_data);
   it->push(&_method_counters);
+
+  Method* this_ptr = this;
+  it->push_method_entry(&this_ptr, (intptr_t*)&_i2i_entry);
+  it->push_method_entry(&this_ptr, (intptr_t*)&_from_compiled_entry);
+  it->push_method_entry(&this_ptr, (intptr_t*)&_from_interpreted_entry);
 }
 
 // Attempt to return method oop to original state.  Clear any pointers
@@ -448,11 +454,11 @@ bool Method::register_native(Klass* k, Symbol* name, Symbol* signature, address 
   } else {
     method->clear_native_function();
   }
-  if (PrintJNIResolving) {
+  if (log_is_enabled(Debug, jni, resolve)) {
     ResourceMark rm(THREAD);
-    tty->print_cr("[Registering JNI native method %s.%s]",
-      method->method_holder()->external_name(),
-      method->name()->as_C_string());
+    log_debug(jni, resolve)("[Registering JNI native method %s.%s]",
+                            method->method_holder()->external_name(),
+                            method->name()->as_C_string());
   }
   return true;
 }
@@ -544,7 +550,7 @@ MethodCounters* Method::build_method_counters(Method* m, TRAPS) {
     return NULL;
   }
 
-  methodHandle mh(m);
+  methodHandle mh(THREAD, m);
   MethodCounters* counters = MethodCounters::allocate(mh, THREAD);
   if (HAS_PENDING_EXCEPTION) {
     CompileBroker::log_metaspace_failure();
@@ -564,7 +570,7 @@ MethodCounters* Method::build_method_counters(Method* m, TRAPS) {
 
 bool Method::init_method_counters(MethodCounters* counters) {
   // Try to install a pointer to MethodCounters, return true on success.
-  return Atomic::replace_if_null(counters, &_method_counters);
+  return Atomic::replace_if_null(&_method_counters, counters);
 }
 
 int Method::extra_stack_words() {
@@ -626,7 +632,7 @@ bool Method::is_vanilla_constructor() const {
 
 
 bool Method::compute_has_loops_flag() {
-  BytecodeStream bcs(this);
+  BytecodeStream bcs(methodHandle(Thread::current(), this));
   Bytecodes::Code bc;
 
   while ((bc = bcs.next()) >= 0) {
@@ -984,7 +990,7 @@ void Method::set_not_compilable(const char* reason, int comp_level, bool report)
       set_not_c2_compilable();
   }
   CompilationPolicy::policy()->disable_compilation(this);
-  assert(!CompilationPolicy::can_be_compiled(this, comp_level), "sanity check");
+  assert(!CompilationPolicy::can_be_compiled(methodHandle(Thread::current(), this), comp_level), "sanity check");
 }
 
 bool Method::is_not_osr_compilable(int comp_level) const {
@@ -1011,7 +1017,7 @@ void Method::set_not_osr_compilable(const char* reason, int comp_level, bool rep
       set_not_c2_osr_compilable();
   }
   CompilationPolicy::policy()->disable_compilation(this);
-  assert(!CompilationPolicy::can_be_osr_compiled(this, comp_level), "sanity check");
+  assert(!CompilationPolicy::can_be_osr_compiled(methodHandle(Thread::current(), this), comp_level), "sanity check");
 }
 
 // Revert to using the interpreter and clear out the nmethod
@@ -1056,7 +1062,7 @@ void Method::unlink_method() {
   Arguments::assert_is_dumping_archive();
   // Set the values to what they should be at run time. Note that
   // this Method can no longer be executed during dump time.
-  _i2i_entry = Interpreter::entry_for_cds_method(this);
+  _i2i_entry = Interpreter::entry_for_cds_method(methodHandle(Thread::current(), this));
   _from_interpreted_entry = _i2i_entry;
 
   if (DynamicDumpSharedSpaces) {
@@ -1244,7 +1250,7 @@ void Method::restore_unshareable_info(TRAPS) {
 }
 
 address Method::from_compiled_entry_no_trampoline() const {
-  CompiledMethod *code = OrderAccess::load_acquire(&_code);
+  CompiledMethod *code = Atomic::load_acquire(&_code);
   if (code) {
     return code->verified_entry_point();
   } else {
@@ -1270,7 +1276,7 @@ address Method::verified_code_entry() {
 // Not inline to avoid circular ref.
 bool Method::check_code() const {
   // cached in a register or local.  There's a race on the value of the field.
-  CompiledMethod *code = OrderAccess::load_acquire(&_code);
+  CompiledMethod *code = Atomic::load_acquire(&_code);
   return code == NULL || (code->method() == NULL) || (code->method() == (Method*)this && !code->is_osr_method());
 }
 
@@ -1570,14 +1576,14 @@ methodHandle Method::clone_with_new_data(const methodHandle& m, u_char* new_code
   if (m->has_stackmap_table()) {
     int code_attribute_length = m->stackmap_data()->length();
     Array<u1>* stackmap_data =
-      MetadataFactory::new_array<u1>(loader_data, code_attribute_length, 0, CHECK_NULL);
+      MetadataFactory::new_array<u1>(loader_data, code_attribute_length, 0, CHECK_(methodHandle()));
     memcpy((void*)stackmap_data->adr_at(0),
            (void*)m->stackmap_data()->adr_at(0), code_attribute_length);
     newm->set_stackmap_data(stackmap_data);
   }
 
   // copy annotations over to new method
-  newcm->copy_annotations_from(loader_data, cm, CHECK_NULL);
+  newcm->copy_annotations_from(loader_data, cm, CHECK_(methodHandle()));
   return newm;
 }
 
@@ -1741,12 +1747,15 @@ static int method_comparator(Method* a, Method* b) {
 
 // This is only done during class loading, so it is OK to assume method_idnum matches the methods() array
 // default_methods also uses this without the ordering for fast find_method
-void Method::sort_methods(Array<Method*>* methods, bool set_idnums) {
+void Method::sort_methods(Array<Method*>* methods, bool set_idnums, method_comparator_func func) {
   int length = methods->length();
   if (length > 1) {
+    if (func == NULL) {
+      func = method_comparator;
+    }
     {
       NoSafepointVerifier nsv;
-      QuickSort::sort(methods->data(), length, method_comparator, /*idempotent=*/false);
+      QuickSort::sort(methods->data(), length, func, /*idempotent=*/false);
     }
     // Reset method ordering
     if (set_idnums) {
@@ -2235,6 +2244,11 @@ jmethodID Method::make_jmethod_id(ClassLoaderData* loader_data, Method* m) {
     // jmethodID is a pointer to Method*
     return (jmethodID)cld->jmethod_ids()->add_method(m);
   }
+}
+
+jmethodID Method::jmethod_id() {
+  methodHandle mh(Thread::current(), this);
+  return method_holder()->get_jmethod_id(mh);
 }
 
 // Mark a jmethodID as free.  This is called when there is a data race in

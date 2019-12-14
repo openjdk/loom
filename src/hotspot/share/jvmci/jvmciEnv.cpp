@@ -898,12 +898,11 @@ JVMCIObject JVMCIEnv::get_jvmci_primitive_type(BasicType type) {
 
 JVMCIObject JVMCIEnv::new_StackTraceElement(const methodHandle& method, int bci, JVMCI_TRAPS) {
   JavaThread* THREAD = JavaThread::current();
-  Symbol* method_name_sym;
   Symbol* file_name_sym;
   int line_number;
-  Handle mirror (THREAD, method->method_holder()->java_mirror());
-  java_lang_StackTraceElement::decode(mirror, method, bci, method_name_sym, file_name_sym, line_number);
+  java_lang_StackTraceElement::decode(method, bci, file_name_sym, line_number, CHECK_(JVMCIObject()));
 
+  Symbol* method_name_sym = method->name();
   InstanceKlass* holder = method->method_holder();
   const char* declaring_class_str = holder->external_name();
 
@@ -952,7 +951,7 @@ JVMCIObject JVMCIEnv::new_StackTraceElement(const methodHandle& method, int bci,
 JVMCIObject JVMCIEnv::new_HotSpotNmethod(const methodHandle& method, const char* name, jboolean isDefault, jlong compileId, JVMCI_TRAPS) {
   JavaThread* THREAD = JavaThread::current();
 
-  JVMCIObject methodObject = get_jvmci_method(method(), JVMCI_CHECK_(JVMCIObject()));
+  JVMCIObject methodObject = get_jvmci_method(method, JVMCI_CHECK_(JVMCIObject()));
 
   if (is_hotspot()) {
     InstanceKlass* ik = InstanceKlass::cast(HotSpotJVMCI::HotSpotNmethod::klass());

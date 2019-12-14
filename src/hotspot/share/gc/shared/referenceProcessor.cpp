@@ -333,7 +333,7 @@ inline void log_enqueued_ref(const DiscoveredListIterator& iter, const char* rea
     log_develop_trace(gc, ref)("Enqueue %s reference (" INTPTR_FORMAT ": %s)",
                                reason, p2i(iter.obj()), iter.obj()->klass()->internal_name());
   }
-  assert(oopDesc::is_oop(iter.obj(), UseConcMarkSweepGC), "Adding a bad reference");
+  assert(oopDesc::is_oop(iter.obj()), "Adding a bad reference");
 }
 
 size_t ReferenceProcessor::process_soft_ref_reconsider_work(DiscoveredList&    refs_list,
@@ -1031,7 +1031,7 @@ ReferenceProcessor::add_to_discovered_list_mt(DiscoveredList& refs_list,
   // The last ref must have its discovered field pointing to itself.
   oop next_discovered = (current_head != NULL) ? current_head : obj;
 
-  oop retest = HeapAccess<AS_NO_KEEPALIVE>::oop_atomic_cmpxchg(next_discovered, discovered_addr, oop(NULL));
+  oop retest = HeapAccess<AS_NO_KEEPALIVE>::oop_atomic_cmpxchg(discovered_addr, oop(NULL), next_discovered);
 
   if (retest == NULL) {
     // This thread just won the right to enqueue the object.
@@ -1154,7 +1154,7 @@ bool ReferenceProcessor::discover_reference(oop obj, ReferenceType rt) {
       // Check assumption that an object is not potentially
       // discovered twice except by concurrent collectors that potentially
       // trace the same Reference object twice.
-      assert(UseConcMarkSweepGC || UseG1GC || UseShenandoahGC,
+      assert(UseG1GC || UseShenandoahGC,
              "Only possible with a concurrent marking collector");
       return true;
     }

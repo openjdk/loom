@@ -1024,7 +1024,7 @@ inline hrtime_t getTimeNanos() {
   if (now <= prev) {
     return prev;   // same or retrograde time;
   }
-  const hrtime_t obsv = Atomic::cmpxchg(now, &max_hrtime, prev);
+  const hrtime_t obsv = Atomic::cmpxchg(&max_hrtime, prev, now);
   assert(obsv >= prev, "invariant");   // Monotonicity
   // If the CAS succeeded then we're done and return "now".
   // If the CAS failed and the observed value "obsv" is >= now then
@@ -1584,6 +1584,8 @@ void os::print_os_info(outputStream* st) {
 
   os::Posix::print_uname_info(st);
 
+  os::Posix::print_uptime_info(st);
+
   os::Solaris::print_libversion_info(st);
 
   os::Posix::print_rlimit_info(st);
@@ -1984,7 +1986,7 @@ static int check_pending_signals() {
   while (true) {
     for (int i = 0; i < Sigexit + 1; i++) {
       jint n = pending_signals[i];
-      if (n > 0 && n == Atomic::cmpxchg(n - 1, &pending_signals[i], n)) {
+      if (n > 0 && n == Atomic::cmpxchg(&pending_signals[i], n, n - 1)) {
         return i;
       }
     }
@@ -2072,7 +2074,7 @@ int os::Solaris::commit_memory_impl(char* addr, size_t bytes, bool exec) {
   char *res = Solaris::mmap_chunk(addr, size, MAP_PRIVATE|MAP_FIXED, prot);
   if (res != NULL) {
     if (UseNUMAInterleaving) {
-      numa_make_global(addr, bytes);
+        numa_make_global(addr, bytes);
     }
     return 0;
   }
@@ -2265,6 +2267,10 @@ int os::numa_get_group_id() {
     return 0;
   }
   return ids[os::random() % r];
+}
+
+int os::numa_get_group_id_for_address(const void* address) {
+  return 0;
 }
 
 // Request information about the page.
@@ -3684,15 +3690,11 @@ void os::Solaris::install_signal_handlers() {
   // Log that signal checking is off only if -verbose:jni is specified.
   if (CheckJNICalls) {
     if (libjsig_is_loaded) {
-      if (PrintJNIResolving) {
-        tty->print_cr("Info: libjsig is activated, all active signal checking is disabled");
-      }
+      log_debug(jni, resolve)("Info: libjsig is activated, all active signal checking is disabled");
       check_signals = false;
     }
     if (AllowUserSignalHandlers) {
-      if (PrintJNIResolving) {
-        tty->print_cr("Info: AllowUserSignalHandlers is activated, all active signal checking is disabled");
-      }
+      log_debug(jni, resolve)("Info: AllowUserSignalHandlers is activated, all active signal checking is disabled");
       check_signals = false;
     }
   }
@@ -4710,7 +4712,7 @@ void os::PlatformEvent::park() {           // AKA: down()
   int v;
   for (;;) {
     v = _Event;
-    if (Atomic::cmpxchg(v-1, &_Event, v) == v) break;
+    if (Atomic::cmpxchg(&_Event, v, v-1) == v) break;
   }
   guarantee(v >= 0, "invariant");
   if (v == 0) {
@@ -4748,7 +4750,7 @@ int os::PlatformEvent::park(jlong millis) {
   int v;
   for (;;) {
     v = _Event;
-    if (Atomic::cmpxchg(v-1, &_Event, v) == v) break;
+    if (Atomic::cmpxchg(&_Event, v, v-1) == v) break;
   }
   guarantee(v >= 0, "invariant");
   if (v != 0) return OS_OK;
@@ -4797,7 +4799,7 @@ void os::PlatformEvent::unpark() {
   // from the first park() call after an unpark() call which will help
   // shake out uses of park() and unpark() without condition variables.
 
-  if (Atomic::xchg(1, &_Event) >= 0) return;
+  if (Atomic::xchg(&_Event, 1) >= 0) return;
 
   // If the thread associated with the event was parked, wake it.
   // Wait for the thread assoc with the PlatformEvent to vacate.
@@ -4896,7 +4898,7 @@ void Parker::park(bool isAbsolute, jlong time) {
   // Return immediately if a permit is available.
   // We depend on Atomic::xchg() having full barrier semantics
   // since we are doing a lock-free update to _counter.
-  if (Atomic::xchg(0, &_counter) > 0) return;
+  if (Atomic::xchg(&_counter, 0) > 0) return;
 
   // Optional fast-exit: Check interrupt before trying to wait
   Thread* thread = Thread::current();
@@ -4925,10 +4927,12 @@ void Parker::park(bool isAbsolute, jlong time) {
   // the ThreadBlockInVM() CTOR and DTOR may grab Threads_lock.
   ThreadBlockInVM tbivm(jt);
 
+  // Can't access interrupt state now that we are _thread_blocked. If we've
+  // been interrupted since we checked above then _counter will be > 0.
+
   // Don't wait if cannot get lock since interference arises from
-  // unblocking.  Also. check interrupt before trying wait
-  if (jt->is_interrupted(false) ||
-      os::Solaris::mutex_trylock(_mutex) != 0) {
+  // unblocking.
+  if (os::Solaris::mutex_trylock(_mutex) != 0) {
     return;
   }
 

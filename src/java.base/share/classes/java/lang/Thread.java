@@ -101,8 +101,7 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  * @see     Runtime#exit(int)
  * @since   1.0
  */
-public
-class Thread implements Runnable {
+public class Thread implements Runnable {
     /* Make sure registerNatives is the first thing <clinit> does. */
     private static native void registerNatives();
     static {

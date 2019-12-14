@@ -29,6 +29,7 @@
 #include "compiler/abstractCompiler.hpp"
 #include "compiler/compileTask.hpp"
 #include "compiler/compilerDirectives.hpp"
+#include "runtime/atomic.hpp"
 #include "runtime/perfData.hpp"
 #include "utilities/stack.hpp"
 #if INCLUDE_JVMCI
@@ -226,11 +227,10 @@ class CompileBroker: AllStatic {
   static volatile int _print_compilation_warning;
 
   static Handle create_thread_oop(const char* name, TRAPS);
-  static JavaThread* make_thread(jobject thread_oop, CompileQueue* queue, AbstractCompiler* comp, TRAPS);
+  static JavaThread* make_thread(jobject thread_oop, CompileQueue* queue, AbstractCompiler* comp, Thread* THREAD);
   static void init_compiler_sweeper_threads();
-  static void possibly_add_compiler_threads();
+  static void possibly_add_compiler_threads(Thread* THREAD);
   static bool compilation_is_prohibited(const methodHandle& method, int osr_bci, int comp_level, bool excluded);
-  static void preload_classes          (const methodHandle& method, TRAPS);
 
   static CompileTask* create_compile_task(CompileQueue*       queue,
                                           int                 compile_id,
@@ -292,7 +292,7 @@ public:
     CompileQueue *q = compile_queue(comp_level);
     return q != NULL ? q->size() : 0;
   }
-  static void compilation_init_phase1(TRAPS);
+  static void compilation_init_phase1(Thread* THREAD);
   static void compilation_init_phase2();
   static void init_compiler_thread_log();
   static nmethod* compile_method(const methodHandle& method,
@@ -336,7 +336,7 @@ public:
   static bool should_compile_new_jobs() { return UseCompiler && (_should_compile_new_jobs == run_compilation); }
   static bool set_should_compile_new_jobs(jint new_state) {
     // Return success if the current caller set it
-    jint old = Atomic::cmpxchg(new_state, &_should_compile_new_jobs, 1-new_state);
+    jint old = Atomic::cmpxchg(&_should_compile_new_jobs, 1-new_state, new_state);
     bool success = (old == (1-new_state));
     if (success) {
       if (new_state == run_compilation) {
@@ -351,7 +351,7 @@ public:
   static void disable_compilation_forever() {
     UseCompiler               = false;
     AlwaysCompileLoopMethods  = false;
-    Atomic::xchg(jint(shutdown_compilation), &_should_compile_new_jobs);
+    Atomic::xchg(&_should_compile_new_jobs, jint(shutdown_compilation));
   }
 
   static bool is_compilation_disabled_forever() {
@@ -360,7 +360,7 @@ public:
   static void handle_full_code_cache(int code_blob_type);
   // Ensures that warning is only printed once.
   static bool should_print_compiler_warning() {
-    jint old = Atomic::cmpxchg(1, &_print_compilation_warning, 0);
+    jint old = Atomic::cmpxchg(&_print_compilation_warning, 0, 1);
     return old == 0;
   }
   // Return total compilation ticks
@@ -394,6 +394,8 @@ public:
     assert(idx < _c2_count, "oob");
     return _compiler2_objects[idx];
   }
+
+  static bool can_remove(CompilerThread *ct, bool do_it);
 
   static CompileLog* get_log(CompilerThread* ct);
 

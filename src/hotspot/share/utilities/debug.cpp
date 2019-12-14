@@ -323,7 +323,7 @@ void report_java_out_of_memory(const char* message) {
   // same time. To avoid dumping the heap or executing the data collection
   // commands multiple times we just do it once when the first threads reports
   // the error.
-  if (Atomic::cmpxchg(1, &out_of_memory_reported, 0) == 0) {
+  if (Atomic::cmpxchg(&out_of_memory_reported, 0, 1) == 0) {
     // create heap dump before OnOutOfMemoryError commands are executed
     if (HeapDumpOnOutOfMemoryError) {
       tty->print_cr("java.lang.OutOfMemoryError: %s", message);
@@ -642,6 +642,7 @@ void help() {
   tty->print_cr("  pns(void* sp, void* fp, void* pc)  - print native (i.e. mixed) stack trace. E.g.");
   tty->print_cr("                   pns($sp, $rbp, $pc) on Linux/amd64 and Solaris/amd64 or");
   tty->print_cr("                   pns($sp, $ebp, $pc) on Linux/x86 or");
+  tty->print_cr("                   pns($sp, $fp, $pc)  on Linux/AArch64 or");
   tty->print_cr("                   pns($sp, 0, $pc)    on Linux/ppc64 or");
   tty->print_cr("                   pns($sp, $s8, $pc)  on Linux/mips or");
   tty->print_cr("                   pns($sp + 0x7ff, 0, $pc) on Solaris/SPARC");
@@ -761,7 +762,7 @@ bool handle_assert_poison_fault(const void* ucVoid, const void* faulting_address
     // Store Context away.
     if (ucVoid) {
       const intx my_tid = os::current_thread_id();
-      if (Atomic::cmpxchg(my_tid, &g_asserting_thread, (intx)0) == 0) {
+      if (Atomic::cmpxchg(&g_asserting_thread, (intx)0, my_tid) == 0) {
         store_context(ucVoid);
         g_assertion_context = &g_stored_assertion_context;
       }
@@ -771,4 +772,3 @@ bool handle_assert_poison_fault(const void* ucVoid, const void* faulting_address
   return false;
 }
 #endif // CAN_SHOW_REGISTERS_ON_ASSERT
-

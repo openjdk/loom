@@ -235,7 +235,7 @@ int StackWalk::fill_in_frames(jlong mode, BaseFrameStream& stream,
                 method->external_name()));
     }
     // fill in StackFrameInfo and initialize MemberName
-    stream.fill_frame(index, frames_array, method, CHECK_0);
+    stream.fill_frame(index, frames_array, methodHandle(THREAD, method), CHECK_0);
 
     if (lt.is_enabled()) {
       ResourceMark rm(THREAD);
