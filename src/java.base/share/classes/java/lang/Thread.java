@@ -46,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.misc.TerminatingThreadLocal;
+import jdk.internal.misc.Unsafe;
 import sun.nio.ch.Interruptible;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
@@ -61,7 +62,7 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  * operating system. These threads are sometimes known as <i>kernel threads</i>
  * or <i>heavyweight threads</i> and will usually have a large stack and other
  * resources that are maintained by the operating system. Kernel threads are
- * suitable for executing all tasks but they are limited resource.
+ * suitable for executing all tasks but they are a limited resource.
  *
  * <p> {@code Thread} also supports the creation of <i>virtual threads</i> that
  * are scheduled by the Java virtual machine rather than the operating system.
@@ -101,8 +102,7 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  * @see     Runtime#exit(int)
  * @since   1.0
  */
-public
-class Thread implements Runnable {
+public class Thread implements Runnable {
     /* Make sure registerNatives is the first thing <clinit> does. */
     private static native void registerNatives();
     static {
@@ -112,7 +112,7 @@ class Thread implements Runnable {
     /* Reserved for exclusive use by the JVM, TBD: move to FieldHolder */
     private long eetop;
 
-    // holds fields for heavyweight threads
+    // holds fields for kernel threads
     private static class FieldHolder {
         final ThreadGroup group;
         final Runnable task;
@@ -167,11 +167,19 @@ class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
-    /* For generating thread ID */
-    private static long threadSeqNumber;
-
-    private static synchronized long nextThreadID() {
-        return ++threadSeqNumber;
+    /**
+     * Helper class to generate unique thread identifiers. The identifiers start
+     * at 2 as this class cannot be used during early startup to generate the
+     * identifier for the primordial thread.
+     */
+    private static class ThreadIdentifiers {
+        private static final Unsafe U = Unsafe.getUnsafe();
+        private static final long nextTidOffset =
+            U.objectFieldOffset(ThreadIdentifiers.class, "nextTid");
+        private static volatile long nextTid = 2;
+        private static long next() {
+            return U.getAndAddLong(ThreadIdentifiers.class, nextTidOffset, 1);
+        }
     }
 
     /*
@@ -435,7 +443,7 @@ class Thread implements Runnable {
     }
 
     /**
-     * Initializes a heavyweight Thread.
+     * Initializes a kernel Thread.
      *
      * @param g the Thread group
      * @param name the name of the new Thread
@@ -456,6 +464,7 @@ class Thread implements Runnable {
         checkCharacteristics(characteristics);
 
         Thread parent = currentThread();
+        boolean primordial = (parent == this);
 
         SecurityManager security = System.getSecurityManager();
         if (g == null) {
@@ -491,7 +500,7 @@ class Thread implements Runnable {
         g.addUnstarted();
 
         this.name = name;
-        this.tid = nextThreadID();
+        this.tid = primordial ? 1 : ThreadIdentifiers.next();
         this.contextClassLoader = contextClassLoader(parent);
         this.inheritedAccessControlContext = (acc != null) ? acc : AccessController.getContext();
 
@@ -508,7 +517,7 @@ class Thread implements Runnable {
 
         int priority;
         boolean daemon;
-        if (parent == this) {
+        if (primordial) {
             // primordial or attached thread
             priority = NORM_PRIORITY;
             daemon = false;
@@ -522,19 +531,17 @@ class Thread implements Runnable {
     /**
      * Initializes a virtual Thread.
      *
-     * @param name thread name
+     * @param name thread name, can be null
      * @param characteristics thread characteristics
      * @throws IllegalArgumentException if invalid characteristics are specified
      */
     Thread(String name, int characteristics) {
-        if (name == null)
-            throw new NullPointerException("name cannot be null");
         checkCharacteristics(characteristics);
 
         Thread parent = currentThread();
 
-        this.name = name;
-        this.tid = nextThreadID();
+        this.name = (name != null) ? name : "<unnamed>";
+        this.tid = ThreadIdentifiers.next();
         this.contextClassLoader = contextClassLoader(parent);
         this.inheritedAccessControlContext = VirtualThreads.ACCESS_CONTROL_CONTEXT;
 
@@ -585,7 +592,7 @@ class Thread implements Runnable {
      *
      *   // A ThreadFactory that creates virtual threads and uses a custom scheduler
      *   Executor scheduler = ...
-     *   ThreadFactory factory = Thread.builder().virtual().scheduler(scheduler).factory();
+     *   ThreadFactory factory = Thread.builder().virtual(scheduler).factory();
      * }</pre>
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
@@ -639,15 +646,6 @@ class Thread implements Runnable {
         Builder group(ThreadGroup group);
 
         /**
-         * Sets the scheduler.
-         * @param scheduler the scheduler
-         * @return this builder
-         * @throws IllegalStateException if this is a builder for a thread
-         *         that will be scheduled by the operating system
-         */
-        Builder scheduler(Executor scheduler);
-
-        /**
          * Sets the thread name.
          * @param name thread name
          * @return this builder
@@ -666,11 +664,20 @@ class Thread implements Runnable {
 
         /**
          * The thread will be scheduled by the Java virtual machine rather than
-         * the operating system.
+         * the operating system with the default scheduler.
          * @return this builder
          * @throws IllegalStateException if a thread group has been set
          */
         Builder virtual();
+
+        /**
+         * The thread will be scheduled by the Java virtual machine rather than
+         * the operating system with the given scheduler.
+         * @param scheduler the scheduler
+         * @return this builder
+         * @throws IllegalStateException if a thread group has been set
+         */
+        Builder virtual(Executor scheduler);
 
         /**
          * Disallow threads locals.
@@ -798,15 +805,6 @@ class Thread implements Runnable {
         }
 
         @Override
-        public Builder scheduler(Executor scheduler) {
-            Objects.requireNonNull(scheduler);
-            if (!virtual)
-                throw new IllegalStateException();
-            this.scheduler = scheduler;
-            return this;
-        }
-
-        @Override
         public Builder name(String name) {
             this.name = Objects.requireNonNull(name);
             this.counter = -1;
@@ -827,7 +825,18 @@ class Thread implements Runnable {
         public Builder virtual() {
             if (group != null)
                 throw new IllegalStateException();
-            virtual = true;
+            this.virtual = true;
+            this.scheduler = null;
+            return this;
+        }
+
+        @Override
+        public Builder virtual(Executor scheduler) {
+            Objects.requireNonNull(scheduler);
+            if (group != null)
+                throw new IllegalStateException();
+            this.virtual = true;
+            this.scheduler = scheduler;
             return this;
         }
 
@@ -884,9 +893,7 @@ class Thread implements Runnable {
             Thread thread;
             if ((characteristics & Thread.VIRTUAL) != 0) {
                 String name = this.name;
-                if (name == null) {
-                    name = "";
-                } else if (counter >= 0) {
+                if (name != null && counter >= 0) {
                     name = name + (counter++);
                 }
                 thread = new Fiber(scheduler, name, characteristics, task);
@@ -920,8 +927,8 @@ class Thread implements Runnable {
             if ((characteristics & Thread.VIRTUAL) != 0) {
                 return new VirtualThreadFactory(scheduler, name, counter, characteristics, uhe);
             } else {
-                return new DinosaurThreadFactory(group, name, counter, characteristics,
-                                                 daemon, priority, uhe);
+                return new KernelThreadFactory(group, name, counter, characteristics,
+                                               daemon, priority, uhe);
             }
         }
     }
@@ -979,9 +986,7 @@ class Thread implements Runnable {
         public Thread newThread(Runnable task) {
             Objects.requireNonNull(task);
             String name = this.name;
-            if (name == null) {
-                name = "";
-            } else if (hasCounter()) {
+            if (name != null && hasCounter()) {
                 name += next();
             }
             Thread thread = new Fiber(scheduler, name, characteristics, task);
@@ -991,7 +996,7 @@ class Thread implements Runnable {
         }
     }
 
-    private static class DinosaurThreadFactory extends CountingThreadFactory {
+    private static class KernelThreadFactory extends CountingThreadFactory {
         private final ThreadGroup group;
         private final String name;
         private final int characteristics;
@@ -999,13 +1004,13 @@ class Thread implements Runnable {
         private final int priority;
         private final UncaughtExceptionHandler uhe;
 
-        DinosaurThreadFactory(ThreadGroup group,
-                              String name,
-                              int start,
-                              int characteristics,
-                              boolean daemon,
-                              int priority,
-                              UncaughtExceptionHandler uhe) {
+        KernelThreadFactory(ThreadGroup group,
+                            String name,
+                            int start,
+                            int characteristics,
+                            boolean daemon,
+                            int priority,
+                            UncaughtExceptionHandler uhe) {
             super(start);
             this.group = group;
             this.name = name;
@@ -1423,7 +1428,7 @@ class Thread implements Runnable {
      */
     public static Thread newThread(int characteristics, Runnable task) {
         if ((characteristics & VIRTUAL) != 0) {
-            return new Fiber(null, "", characteristics, task);
+            return new Fiber(null, null, characteristics, task);
         } else {
             return new Thread(null, "Thread-" + nextThreadNum(), characteristics, task, 0, null);
         }

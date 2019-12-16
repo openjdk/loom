@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -36,9 +36,6 @@ import jdk.javadoc.internal.doclets.toolkit.util.DocFileIOException;
  *  If you write code that depends on this, you do so at your own risk.
  *  This code and its internal interfaces are subject to change or
  *  deletion without notice.</b>
- *
- * @author Jamie Ho
- * @author Bhavesh Patel (Modified)
  */
 
 public interface ClassWriter {
@@ -73,11 +70,11 @@ public interface ClassWriter {
     public Content getClassInfoTreeHeader();
 
     /**
-     * Add the type parameter information.
+     * Add the type parameter and state component information.
      *
      * @param classInfoTree content tree to which the documentation will be added
      */
-    public void addTypeParamInfo(Content classInfoTree);
+    public void addParamInfo(Content classInfoTree);
 
     /**
      * Add all super interfaces if this is an interface.
@@ -177,17 +174,14 @@ public interface ClassWriter {
     /**
      * Add the class content tree.
      *
-     * @param contentTree content tree to which the class content will be added
      * @param classContentTree class content tree which will be added to the content tree
      */
-    public void addClassContentTree(Content contentTree, Content classContentTree);
+    public void addClassContentTree(Content classContentTree);
 
     /**
      * Add the footer of the page.
-     *
-     * @param contentTree content tree to which the footer will be added
      */
-    public void addFooter(Content contentTree);
+    public void addFooter();
 
     /**
      * Print the document.

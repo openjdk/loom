@@ -70,10 +70,10 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * including behavior and exceptions that are not specified by SocketImpl.
  *
  * The underlying socket used by this SocketImpl is initially configured blocking.
- * If a connect, accept or read is attempted with a timeout, or a lightweight
+ * If a connect, accept or read is attempted with a timeout, or a virtual
  * thread invokes a blocking operation, then the socket is changed to non-blocking
  * When in non-blocking mode, operations that don't complete immediately will
- * poll the socket (or park when invoked on a lightweight thread) and preserve
+ * poll the socket (or park when invoked on a virtual thread) and preserve
  * the semantics of blocking operations.
  */
 
@@ -212,7 +212,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
     }
 
     /**
-     * Ensures that the socket is configured non-blocking invoked on a lightweight
+     * Ensures that the socket is configured non-blocking invoked on a virtual
      * thread or the operation has a timeout
      * @throws IOException if there is an I/O error changing the blocking mode
      */

@@ -283,11 +283,6 @@ class MetaspaceObj {
     _shared_metaspace_top = top;
   }
 
-  static void expand_shared_metaspace_range(void* top) {
-    assert(top >= _shared_metaspace_top, "must be");
-    _shared_metaspace_top = top;
-  }
-
   static void* shared_metaspace_base() { return _shared_metaspace_base; }
   static void* shared_metaspace_top()  { return _shared_metaspace_top;  }
 
@@ -305,7 +300,8 @@ class MetaspaceObj {
   f(ConstantPool) \
   f(ConstantPoolCache) \
   f(Annotations) \
-  f(MethodCounters)
+  f(MethodCounters) \
+  f(RecordComponent)
 
 #define METASPACE_OBJ_TYPE_DECLARE(name) name ## Type,
 #define METASPACE_OBJ_TYPE_NAME_CASE(name) case name ## Type: return #name;

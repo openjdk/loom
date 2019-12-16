@@ -119,6 +119,7 @@ class GCTimer;
   do_klass(AccessController_klass,                      java_security_AccessController                        ) \
   do_klass(SecureClassLoader_klass,                     java_security_SecureClassLoader                       ) \
   do_klass(ClassNotFoundException_klass,                java_lang_ClassNotFoundException                      ) \
+  do_klass(Record_klass,                                java_lang_Record                                      ) \
   do_klass(NoClassDefFoundError_klass,                  java_lang_NoClassDefFoundError                        ) \
   do_klass(LinkageError_klass,                          java_lang_LinkageError                                ) \
   do_klass(ClassCastException_klass,                    java_lang_ClassCastException                          ) \
@@ -137,6 +138,7 @@ class GCTimer;
   do_klass(Finalizer_klass,                             java_lang_ref_Finalizer                               ) \
   do_klass(Thread_klass,                                java_lang_Thread                                      ) \
   do_klass(Thread_FieldHolder_klass,                    java_lang_Thread_FieldHolder                          ) \
+  do_klass(Thread_VirtualThreads_klass,                 java_lang_Thread_VirtualThreads                       ) \
   do_klass(ThreadGroup_klass,                           java_lang_ThreadGroup                                 ) \
   do_klass(Fiber_klass,                                 java_lang_Fiber                                       ) \
   do_klass(Properties_klass,                            java_util_Properties                                  ) \
@@ -222,6 +224,9 @@ class GCTimer;
                                                                                                                 \
   /* force inline of iterators */                                                                               \
   do_klass(Iterator_klass,                              java_util_Iterator                                    ) \
+                                                                                                                \
+  /* support for records */                                                                                     \
+  do_klass(RecordComponent_klass,                       java_lang_reflect_RecordComponent                     ) \
                                                                                                                 \
   /*end*/
 
@@ -470,17 +475,17 @@ public:
   // JSR 292
   // find a java.lang.invoke.MethodHandle.invoke* method for a given signature
   // (asks Java to compute it if necessary, except in a compiler thread)
-  static methodHandle find_method_handle_invoker(Klass* klass,
-                                                 Symbol* name,
-                                                 Symbol* signature,
-                                                 Klass* accessing_klass,
-                                                 Handle *appendix_result,
-                                                 TRAPS);
+  static Method* find_method_handle_invoker(Klass* klass,
+                                            Symbol* name,
+                                            Symbol* signature,
+                                            Klass* accessing_klass,
+                                            Handle *appendix_result,
+                                            TRAPS);
   // for a given signature, find the internal MethodHandle method (linkTo* or invokeBasic)
   // (does not ask Java, since this is a low-level intrinsic defined by the JVM)
-  static methodHandle find_method_handle_intrinsic(vmIntrinsics::ID iid,
-                                                   Symbol* signature,
-                                                   TRAPS);
+  static Method* find_method_handle_intrinsic(vmIntrinsics::ID iid,
+                                              Symbol* signature,
+                                              TRAPS);
 
   // compute java_mirror (java.lang.Class instance) for a type ("I", "[[B", "LFoo;", etc.)
   // Either the accessing_klass or the CL/PD can be non-null, but not both.

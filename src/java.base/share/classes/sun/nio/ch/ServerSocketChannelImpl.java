@@ -386,7 +386,7 @@ class ServerSocketChannelImpl
         assert acceptLock.isHeldByCurrentThread();
         synchronized (stateLock) {
             ensureOpen();
-            // do nothing if lightweight thread has forced the socket to be non-blocking
+            // do nothing if virtual thread has forced the socket to be non-blocking
             if (!nonBlocking) {
                 IOUtil.configureBlocking(fd, block);
             }
@@ -400,7 +400,7 @@ class ServerSocketChannelImpl
     private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
         assert acceptLock.isHeldByCurrentThread();
         synchronized (stateLock) {
-            // do nothing if lightweight thread has forced the socket to be non-blocking
+            // do nothing if virtual thread has forced the socket to be non-blocking
             if (!nonBlocking && isOpen()) {
                 IOUtil.configureBlocking(fd, block);
                 return true;
@@ -411,7 +411,7 @@ class ServerSocketChannelImpl
     }
 
     /**
-     * Ensures that the socket is configured non-blocking when on a lightweight
+     * Ensures that the socket is configured non-blocking when on a virtual
      * thread.
      */
     private void lockedConfigureNonBlockingIfNeeded() throws IOException {

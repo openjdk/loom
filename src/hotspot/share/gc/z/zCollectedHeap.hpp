@@ -74,6 +74,9 @@ public:
   virtual bool is_in(const void* p) const;
   virtual bool requires_barriers(oop obj) const;
 
+  // Continuation support
+  virtual void collect_for_codecache() {}
+
   virtual uint32_t hash_oop(oop obj) const;
 
   virtual oop array_allocate(Klass* klass, int size, int length, bool do_zero, TRAPS);
@@ -99,7 +102,6 @@ public:
   virtual GrowableArray<MemoryPool*> memory_pools();
 
   virtual void object_iterate(ObjectClosure* cl);
-  virtual void safe_object_iterate(ObjectClosure* cl);
 
   virtual void register_nmethod(nmethod* nm);
   virtual void unregister_nmethod(nmethod* nm);

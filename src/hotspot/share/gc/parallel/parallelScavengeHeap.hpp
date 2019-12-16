@@ -168,7 +168,7 @@ class ParallelScavengeHeap : public CollectedHeap {
   bool is_in_young(oop p) const;  // reserved part
   bool is_in_old(oop p);          // reserved part
 
-  virtual bool requires_barriers(oop obj) const { return !is_in_young(obj); }
+  virtual bool requires_barriers(oop obj) const;
 
   MemRegion reserved_region() const { return _reserved; }
   HeapWord* base() const { return _reserved.start(); }
@@ -215,7 +215,6 @@ class ParallelScavengeHeap : public CollectedHeap {
   size_t unsafe_max_tlab_alloc(Thread* thr) const;
 
   void object_iterate(ObjectClosure* cl);
-  void safe_object_iterate(ObjectClosure* cl) { object_iterate(cl); }
 
   HeapWord* block_start(const void* addr) const;
   bool block_is_obj(const HeapWord* addr) const;

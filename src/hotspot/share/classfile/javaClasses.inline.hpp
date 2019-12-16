@@ -370,6 +370,14 @@ inline bool java_lang_invoke_CallSite::is_instance(oop obj) {
   return obj != NULL && is_subclass(obj->klass());
 }
 
+inline jboolean java_lang_invoke_ConstantCallSite::is_frozen(oop site) {
+  return site->bool_field(_is_frozen_offset);
+}
+
+inline bool java_lang_invoke_ConstantCallSite::is_instance(oop obj) {
+  return obj != NULL && is_subclass(obj->klass());
+}
+
 inline bool java_lang_invoke_MethodHandleNatives_CallSiteContext::is_instance(oop obj) {
   return obj != NULL && is_subclass(obj->klass());
 }
@@ -455,7 +463,7 @@ inline int Backtrace::cpref_at(unsigned int merged) {
   return extract_low_short_from_int(merged);
 }
 
-inline int Backtrace::get_line_number(const methodHandle& method, int bci) {
+inline int Backtrace::get_line_number(Method* method, int bci) {
   int line_number = 0;
   if (method->is_native()) {
     // Negative value different from -1 below, enabling Java code in

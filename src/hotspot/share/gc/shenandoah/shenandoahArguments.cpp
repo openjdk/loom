@@ -71,7 +71,7 @@ void ShenandoahArguments::initialize() {
   // compromise here.
   bool ergo_conc = FLAG_IS_DEFAULT(ConcGCThreads);
   if (ergo_conc) {
-    FLAG_SET_DEFAULT(ConcGCThreads, MAX2(1, os::processor_count() / 4));
+    FLAG_SET_DEFAULT(ConcGCThreads, MAX2(1, os::initial_active_processor_count() / 4));
   }
 
   if (ConcGCThreads == 0) {
@@ -85,7 +85,7 @@ void ShenandoahArguments::initialize() {
   // the number of concurrent threads.
   bool ergo_parallel = FLAG_IS_DEFAULT(ParallelGCThreads);
   if (ergo_parallel) {
-    FLAG_SET_DEFAULT(ParallelGCThreads, MAX2(1, os::processor_count() / 2));
+    FLAG_SET_DEFAULT(ParallelGCThreads, MAX2(1, os::initial_active_processor_count() / 2));
   }
 
   if (ParallelGCThreads == 0) {
@@ -171,11 +171,7 @@ void ShenandoahArguments::initialize() {
   }
 
   // If class unloading is disabled, no unloading for concurrent cycles as well.
-  // If class unloading is enabled, users should opt-in for unloading during
-  // concurrent cycles.
-  if (!ClassUnloading || !FLAG_IS_CMDLINE(ClassUnloadingWithConcurrentMark)) {
-    log_info(gc)("Consider -XX:+ClassUnloadingWithConcurrentMark if large pause times "
-                 "are observed on class-unloading sensitive workloads");
+  if (!ClassUnloading) {
     FLAG_SET_DEFAULT(ClassUnloadingWithConcurrentMark, false);
   }
 

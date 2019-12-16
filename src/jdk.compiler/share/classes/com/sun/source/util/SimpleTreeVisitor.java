@@ -264,14 +264,6 @@ public class SimpleTreeVisitor <R,P> implements TreeVisitor<R,P> {
     }
 
     /**
-     * {@preview Associated with switch expressions, a preview feature of
-     *           the Java language.
-     *
-     *           This method is associated with <i>switch expressions</i>, a preview
-     *           feature of the Java language. Preview features
-     *           may be removed in a future release, or upgraded to permanent
-     *           features of the Java language.}
-     *
      * {@inheritDoc} This implementation calls {@code defaultAction}.
      *
      * @param node {@inheritDoc}
@@ -279,8 +271,6 @@ public class SimpleTreeVisitor <R,P> implements TreeVisitor<R,P> {
      * @return  the result of {@code defaultAction}
      */
     @Override
-    @jdk.internal.PreviewFeature(feature=jdk.internal.PreviewFeature.Feature.SWITCH_EXPRESSIONS)
-    @SuppressWarnings("preview")
     public R visitSwitchExpression(SwitchExpressionTree node, P p) {
         return defaultAction(node, p);
     }
@@ -567,6 +557,19 @@ public class SimpleTreeVisitor <R,P> implements TreeVisitor<R,P> {
      * @param node {@inheritDoc}
      * @param p {@inheritDoc}
      * @return  the result of {@code defaultAction}
+     * @since 14
+     */
+    @Override
+    public R visitBindingPattern(BindingPatternTree node, P p) {
+        return defaultAction(node, p);
+    }
+
+    /**
+     * {@inheritDoc} This implementation calls {@code defaultAction}.
+     *
+     * @param node {@inheritDoc}
+     * @param p {@inheritDoc}
+     * @return  the result of {@code defaultAction}
      */
     @Override
     public R visitArrayAccess(ArrayAccessTree node, P p) {
@@ -794,8 +797,6 @@ public class SimpleTreeVisitor <R,P> implements TreeVisitor<R,P> {
      * @return  the result of {@code defaultAction}
      */
     @Override
-    @jdk.internal.PreviewFeature(feature=jdk.internal.PreviewFeature.Feature.SWITCH_EXPRESSIONS)
-    @SuppressWarnings("preview")
     public R visitYield(YieldTree node, P p) {
         return defaultAction(node, p);
     }

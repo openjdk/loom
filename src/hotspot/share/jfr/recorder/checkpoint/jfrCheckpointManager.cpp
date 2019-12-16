@@ -42,6 +42,7 @@
 #include "jfr/utilities/jfrTypes.hpp"
 #include "jfr/writers/jfrJavaEventWriter.hpp"
 #include "logging/log.hpp"
+#include "memory/iterator.hpp"
 #include "memory/resourceArea.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/mutex.hpp"
@@ -461,7 +462,6 @@ bool JfrCheckpointManager::is_type_set_required() {
 }
 
 size_t JfrCheckpointManager::flush_type_set() {
-  assert(!SafepointSynchronize::is_at_safepoint(), "invariant");
   size_t elements = 0;
   {
     JfrCheckpointWriter writer(Thread::current());

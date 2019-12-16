@@ -32,6 +32,7 @@
 #include "gc/g1/heapRegionSet.hpp"
 #include "gc/shared/taskqueue.hpp"
 #include "gc/shared/verifyOption.hpp"
+#include "gc/shared/workgroup.hpp"
 #include "memory/allocation.hpp"
 #include "utilities/compilerWarnings.hpp"
 
@@ -44,6 +45,7 @@ class G1ConcurrentMark;
 class G1OldTracer;
 class G1RegionToSpaceMapper;
 class G1SurvivorRegions;
+class ThreadClosure;
 
 PRAGMA_DIAG_PUSH
 // warning C4522: multiple assignment operators specified

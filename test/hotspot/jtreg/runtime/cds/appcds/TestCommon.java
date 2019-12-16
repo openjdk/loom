@@ -343,6 +343,7 @@ public class TestCommon extends CDSTestUtils {
             newFile.renameTo(oldFile);
             System.out.println("firstJar = " + firstJar + " Modified");
         } else {
+            zipFile.close();
             System.out.println("firstJar = " + firstJar);
         }
     }
@@ -660,5 +661,25 @@ public class TestCommon extends CDSTestUtils {
              Files.createSymbolicLink(linkedJar.toPath(), origJar.toPath());
          }
          return linkedJar;
+    }
+
+    // Remove all UL log messages from a JVM's STDOUT (such as those printed by -Xlog:cds)
+    static Pattern logPattern = Pattern.compile("^\\[[0-9. ]*s\\].*");
+    public static String filterOutLogs(String stdout) {
+        StringBuilder sb = new StringBuilder();
+        String prefix = "";
+        for (String line : stdout.split("\n")) {
+            if (logPattern.matcher(line).matches()) {
+                continue;
+            }
+            sb.append(prefix);
+            sb.append(line);
+            prefix = "\n";
+        }
+        if (stdout.endsWith("\n")) {
+            // String.split("A\n") returns {"A"}, not {"A", ""}.
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 }

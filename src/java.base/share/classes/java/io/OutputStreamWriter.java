@@ -116,11 +116,8 @@ public class OutputStreamWriter extends Writer {
      */
     public OutputStreamWriter(OutputStream out) {
         super(out);
-        try {
-            se = StreamEncoder.forOutputStreamWriter(out, lockFor(this), (String)null);
-        } catch (UnsupportedEncodingException e) {
-            throw new Error(e);
-        }
+        se = StreamEncoder.forOutputStreamWriter(out, lockFor(this),
+            Charset.defaultCharset());
     }
 
     /**

@@ -374,6 +374,7 @@ class os: AllStatic {
   static size_t numa_get_leaf_groups(int *ids, size_t size);
   static bool   numa_topology_changed();
   static int    numa_get_group_id();
+  static int    numa_get_group_id_for_address(const void* address);
 
   // Page manipulation
   struct page_info {
@@ -630,6 +631,9 @@ class os: AllStatic {
   static void print_signal_handlers(outputStream* st, char* buf, size_t buflen);
   static void print_date_and_time(outputStream* st, char* buf, size_t buflen);
   static void print_instructions(outputStream* st, address pc, int unitsize);
+
+  // helper for output of seconds in days , hours and months
+  static void print_dhm(outputStream* st, const char* startStr, long sec);
 
   static void print_location(outputStream* st, intptr_t x, bool verbose = false);
   static size_t lasterror(char *buf, size_t len);

@@ -28,6 +28,7 @@
 #include "gc/z/zBarrierSetAssembler.hpp"
 #include "gc/z/zBarrierSetRuntime.hpp"
 #include "opto/arraycopynode.hpp"
+#include "opto/addnode.hpp"
 #include "opto/block.hpp"
 #include "opto/compile.hpp"
 #include "opto/graphKit.hpp"
@@ -37,7 +38,7 @@
 #include "opto/node.hpp"
 #include "opto/regalloc.hpp"
 #include "opto/rootnode.hpp"
-#include "opto/runtime.hpp"
+#include "opto/type.hpp"
 #include "utilities/growableArray.hpp"
 #include "utilities/macros.hpp"
 
@@ -178,52 +179,118 @@ int ZBarrierSetC2::estimate_stub_size() const {
   return size;
 }
 
-static bool barrier_needed(C2Access& access) {
-  return ZBarrierSet::barrier_needed(access.decorators(), access.type());
+static void set_barrier_data(C2Access& access) {
+  if (ZBarrierSet::barrier_needed(access.decorators(), access.type())) {
+    if (access.decorators() & ON_WEAK_OOP_REF) {
+      access.set_barrier_data(ZLoadBarrierWeak);
+    } else {
+      access.set_barrier_data(ZLoadBarrierStrong);
+    }
+  }
 }
 
 Node* ZBarrierSetC2::load_at_resolved(C2Access& access, const Type* val_type) const {
-  Node* result = BarrierSetC2::load_at_resolved(access, val_type);
-  if (barrier_needed(access) && access.raw_access()->is_Mem()) {
-    if ((access.decorators() & ON_WEAK_OOP_REF) != 0) {
-      access.raw_access()->as_Load()->set_barrier_data(ZLoadBarrierWeak);
-    } else {
-      access.raw_access()->as_Load()->set_barrier_data(ZLoadBarrierStrong);
-    }
-  }
-
-  return result;
+  set_barrier_data(access);
+  return BarrierSetC2::load_at_resolved(access, val_type);
 }
 
 Node* ZBarrierSetC2::atomic_cmpxchg_val_at_resolved(C2AtomicParseAccess& access, Node* expected_val,
                                                     Node* new_val, const Type* val_type) const {
-  Node* result = BarrierSetC2::atomic_cmpxchg_val_at_resolved(access, expected_val, new_val, val_type);
-  if (barrier_needed(access)) {
-    access.raw_access()->as_LoadStore()->set_barrier_data(ZLoadBarrierStrong);
-  }
-  return result;
+  set_barrier_data(access);
+  return BarrierSetC2::atomic_cmpxchg_val_at_resolved(access, expected_val, new_val, val_type);
 }
 
 Node* ZBarrierSetC2::atomic_cmpxchg_bool_at_resolved(C2AtomicParseAccess& access, Node* expected_val,
                                                      Node* new_val, const Type* value_type) const {
-  Node* result = BarrierSetC2::atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, value_type);
-  if (barrier_needed(access)) {
-    access.raw_access()->as_LoadStore()->set_barrier_data(ZLoadBarrierStrong);
-  }
-  return result;
+  set_barrier_data(access);
+  return BarrierSetC2::atomic_cmpxchg_bool_at_resolved(access, expected_val, new_val, value_type);
 }
 
 Node* ZBarrierSetC2::atomic_xchg_at_resolved(C2AtomicParseAccess& access, Node* new_val, const Type* val_type) const {
-  Node* result = BarrierSetC2::atomic_xchg_at_resolved(access, new_val, val_type);
-  if (barrier_needed(access)) {
-    access.raw_access()->as_LoadStore()->set_barrier_data(ZLoadBarrierStrong);
-  }
-  return result;
+  set_barrier_data(access);
+  return BarrierSetC2::atomic_xchg_at_resolved(access, new_val, val_type);
 }
 
 bool ZBarrierSetC2::array_copy_requires_gc_barriers(bool tightly_coupled_alloc, BasicType type,
                                                     bool is_clone, ArrayCopyPhase phase) const {
   return type == T_OBJECT || type == T_ARRAY;
+}
+
+// This TypeFunc assumes a 64bit system
+static const TypeFunc* clone_type() {
+  // Create input type (domain)
+  const Type** domain_fields = TypeTuple::fields(4);
+  domain_fields[TypeFunc::Parms + 0] = TypeInstPtr::NOTNULL;  // src
+  domain_fields[TypeFunc::Parms + 1] = TypeInstPtr::NOTNULL;  // dst
+  domain_fields[TypeFunc::Parms + 2] = TypeLong::LONG;        // size lower
+  domain_fields[TypeFunc::Parms + 3] = Type::HALF;            // size upper
+  const TypeTuple* domain = TypeTuple::make(TypeFunc::Parms + 4, domain_fields);
+
+  // Create result type (range)
+  const Type** range_fields = TypeTuple::fields(0);
+  const TypeTuple* range = TypeTuple::make(TypeFunc::Parms + 0, range_fields);
+
+  return TypeFunc::make(domain, range);
+}
+
+// Node n is pointing to the start of oop payload - return base pointer
+static Node* get_base_for_arracycopy_clone(PhaseMacroExpand* phase, Node* n) {
+  // This would normally be handled by optimizations, but the type system
+  // checks get confused when it thinks it already has a base pointer.
+  const int base_offset = BarrierSetC2::arraycopy_payload_base_offset(false);
+
+  if (n->is_AddP() &&
+      n->in(AddPNode::Offset)->is_Con() &&
+      n->in(AddPNode::Offset)->get_long() == base_offset) {
+    assert(n->in(AddPNode::Base) == n->in(AddPNode::Address), "Sanity check");
+    return n->in(AddPNode::Base);
+  } else {
+    return phase->basic_plus_adr(n, phase->longcon(-base_offset));
+  }
+}
+
+void ZBarrierSetC2::clone_at_expansion(PhaseMacroExpand* phase, ArrayCopyNode* ac) const {
+  Node* const src = ac->in(ArrayCopyNode::Src);
+  if (ac->is_clone_array()) {
+    // Clone primitive array
+    BarrierSetC2::clone_at_expansion(phase, ac);
+    return;
+  }
+
+  // Clone instance
+  assert(ac->is_clone_inst(), "Sanity check");
+
+  Node* const ctrl       = ac->in(TypeFunc::Control);
+  Node* const mem        = ac->in(TypeFunc::Memory);
+  Node* const dst        = ac->in(ArrayCopyNode::Dest);
+  Node* const src_offset = ac->in(ArrayCopyNode::SrcPos);
+  Node* const dst_offset = ac->in(ArrayCopyNode::DestPos);
+  Node* const size       = ac->in(ArrayCopyNode::Length);
+
+  assert(src_offset == NULL, "Should be null");
+  assert(dst_offset == NULL, "Should be null");
+  assert(size->bottom_type()->is_long(), "Should be long");
+
+  // The src and dst point to the object payload rather than the object base
+  Node* const src_base = get_base_for_arracycopy_clone(phase, src);
+  Node* const dst_base = get_base_for_arracycopy_clone(phase, dst);
+
+  // The size must also be increased to match the instance size
+  Node* const base_offset = phase->longcon(arraycopy_payload_base_offset(false) >> LogBytesPerLong);
+  Node* const full_size = phase->transform_later(new AddLNode(size, base_offset));
+
+  Node* const call = phase->make_leaf_call(ctrl,
+                                           mem,
+                                           clone_type(),
+                                           ZBarrierSetRuntime::clone_addr(),
+                                           "ZBarrierSetRuntime::clone",
+                                           TypeRawPtr::BOTTOM,
+                                           src_base,
+                                           dst_base,
+                                           full_size,
+                                           phase->top());
+  phase->transform_later(call);
+  phase->igvn().replace_node(ac, call);
 }
 
 // == Dominating barrier elision ==
@@ -303,7 +370,7 @@ void ZBarrierSetC2::analyze_dominating_barriers() const {
       MachNode* mem = mem_ops.at(j)->as_Mach();
       const TypePtr* mem_adr_type = NULL;
       intptr_t mem_offset = 0;
-      const Node* mem_obj = mem_obj = mem->get_base_and_disp(mem_offset, mem_adr_type);
+      const Node* mem_obj = mem->get_base_and_disp(mem_offset, mem_adr_type);
       Block* mem_block = cfg->get_block_for_node(mem);
       uint mem_index = block_index(mem_block, mem);
 
@@ -430,52 +497,5 @@ void ZBarrierSetC2::compute_liveness_at_stubs() const {
         worklist.push(pred);
       }
     }
-  }
-}
-
-const TypeFunc *oop_clone_Type() {
-  // create input type (domain)
-  const Type **fields = TypeTuple::fields(3);
-  fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL;  // src Object
-  fields[TypeFunc::Parms+1] = TypeInstPtr::NOTNULL;  // dst Object
-  fields[TypeFunc::Parms+2] = TypeInt::INT;          // Object size
-  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+3, fields);
-
-  // create result type (range)
-  fields = TypeTuple::fields(0);
-
-  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+0, fields);
-
-  return TypeFunc::make(domain, range);
-}
-
-void ZBarrierSetC2::clone_at_expansion(PhaseMacroExpand* phase, ArrayCopyNode* ac) const {
-  Node *ctrl = ac->in(TypeFunc::Control);
-  Node *mem = ac->in(TypeFunc::Memory);
-  Node *src = ac->in(ArrayCopyNode::Src);
-  Node *src_offset = ac->in(ArrayCopyNode::SrcPos);
-  Node *dest = ac->in(ArrayCopyNode::Dest);
-  Node *dest_offset = ac->in(ArrayCopyNode::DestPos);
-  Node *length = ac->in(ArrayCopyNode::Length);
-
-  assert (src_offset == NULL,  "for clone offsets should be null");
-  assert (dest_offset == NULL, "for clone offsets should be null");
-
-  if (src->bottom_type()->isa_instptr()) {
-    // Instances must have all oop fiels healed before cloning - call runtime leaf
-    const char *clonefunc_name = "clone_oop";
-    address clonefunc_addr = ZBarrierSetRuntime::clone_oop_addr();
-    const TypePtr *raw_adr_type = TypeRawPtr::BOTTOM;
-    const TypeFunc *call_type = oop_clone_Type();
-
-    Node *call = phase->make_leaf_call(ctrl, mem, call_type, clonefunc_addr, clonefunc_name, raw_adr_type, src, dest,
-                                       length);
-    phase->transform_later(call);
-    phase->igvn().replace_node(ac, call);
-  } else {
-    assert(src->bottom_type()->isa_aryptr() != NULL, "Only arrays");
-
-    // Clones of primitive arrays go here
-    BarrierSetC2::clone_at_expansion(phase, ac);
   }
 }

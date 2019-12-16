@@ -424,9 +424,9 @@ ZStatSamplerData ZStatSampler::collect_and_reset() const {
   for (uint32_t i = 0; i < ncpus; i++) {
     ZStatSamplerData* const cpu_data = get_cpu_local<ZStatSamplerData>(i);
     if (cpu_data->_nsamples > 0) {
-      const uint64_t nsamples = Atomic::xchg((uint64_t)0, &cpu_data->_nsamples);
-      const uint64_t sum = Atomic::xchg((uint64_t)0, &cpu_data->_sum);
-      const uint64_t max = Atomic::xchg((uint64_t)0, &cpu_data->_max);
+      const uint64_t nsamples = Atomic::xchg(&cpu_data->_nsamples, (uint64_t)0);
+      const uint64_t sum = Atomic::xchg(&cpu_data->_sum, (uint64_t)0);
+      const uint64_t max = Atomic::xchg(&cpu_data->_max, (uint64_t)0);
       all._nsamples += nsamples;
       all._sum += sum;
       if (all._max < max) {
@@ -459,7 +459,7 @@ void ZStatCounter::sample_and_reset() const {
   const uint32_t ncpus = ZCPU::count();
   for (uint32_t i = 0; i < ncpus; i++) {
     ZStatCounterData* const cpu_data = get_cpu_local<ZStatCounterData>(i);
-    counter += Atomic::xchg((uint64_t)0, &cpu_data->_counter);
+    counter += Atomic::xchg(&cpu_data->_counter, (uint64_t)0);
   }
 
   ZStatSample(_sampler, counter);
@@ -481,7 +481,7 @@ ZStatCounterData ZStatUnsampledCounter::collect_and_reset() const {
   const uint32_t ncpus = ZCPU::count();
   for (uint32_t i = 0; i < ncpus; i++) {
     ZStatCounterData* const cpu_data = get_cpu_local<ZStatCounterData>(i);
-    all._counter += Atomic::xchg((uint64_t)0, &cpu_data->_counter);
+    all._counter += Atomic::xchg(&cpu_data->_counter, (uint64_t)0);
   }
 
   return all;
@@ -761,8 +761,8 @@ THREAD_LOCAL uint32_t ZStatTimerDisable::_active = 0;
 //
 void ZStatSample(const ZStatSampler& sampler, uint64_t value) {
   ZStatSamplerData* const cpu_data = sampler.get();
-  Atomic::add(1u, &cpu_data->_nsamples);
-  Atomic::add(value, &cpu_data->_sum);
+  Atomic::add(&cpu_data->_nsamples, 1u);
+  Atomic::add(&cpu_data->_sum, value);
 
   uint64_t max = cpu_data->_max;
   for (;;) {
@@ -772,7 +772,7 @@ void ZStatSample(const ZStatSampler& sampler, uint64_t value) {
     }
 
     const uint64_t new_max = value;
-    const uint64_t prev_max = Atomic::cmpxchg(new_max, &cpu_data->_max, max);
+    const uint64_t prev_max = Atomic::cmpxchg(&cpu_data->_max, max, new_max);
     if (prev_max == max) {
       // Success
       break;
@@ -787,14 +787,14 @@ void ZStatSample(const ZStatSampler& sampler, uint64_t value) {
 
 void ZStatInc(const ZStatCounter& counter, uint64_t increment) {
   ZStatCounterData* const cpu_data = counter.get();
-  const uint64_t value = Atomic::add(increment, &cpu_data->_counter);
+  const uint64_t value = Atomic::add(&cpu_data->_counter, increment);
 
   ZTracer::tracer()->report_stat_counter(counter, increment, value);
 }
 
 void ZStatInc(const ZStatUnsampledCounter& counter, uint64_t increment) {
   ZStatCounterData* const cpu_data = counter.get();
-  Atomic::add(increment, &cpu_data->_counter);
+  Atomic::add(&cpu_data->_counter, increment);
 }
 
 //
@@ -1024,7 +1024,7 @@ public:
 //
 // Stat cycle
 //
-uint64_t  ZStatCycle::_ncycles = 0;
+uint64_t  ZStatCycle::_nwarmup_cycles = 0;
 Ticks     ZStatCycle::_start_of_last;
 Ticks     ZStatCycle::_end_of_last;
 NumberSeq ZStatCycle::_normalized_duration(0.3 /* alpha */);
@@ -1033,9 +1033,12 @@ void ZStatCycle::at_start() {
   _start_of_last = Ticks::now();
 }
 
-void ZStatCycle::at_end(double boost_factor) {
+void ZStatCycle::at_end(GCCause::Cause cause, double boost_factor) {
   _end_of_last = Ticks::now();
-  _ncycles++;
+
+  if (cause == GCCause::_z_warmup) {
+    _nwarmup_cycles++;
+  }
 
   // Calculate normalized cycle duration. The measured duration is
   // normalized using the boost factor to avoid artificial deflation
@@ -1045,16 +1048,18 @@ void ZStatCycle::at_end(double boost_factor) {
   _normalized_duration.add(normalized_duration);
 }
 
-bool ZStatCycle::is_first() {
-  return _ncycles == 0;
-}
-
 bool ZStatCycle::is_warm() {
-  return _ncycles >= 3;
+  return _nwarmup_cycles >= 3;
 }
 
-uint64_t ZStatCycle::ncycles() {
-  return _ncycles;
+uint64_t ZStatCycle::nwarmup_cycles() {
+  return _nwarmup_cycles;
+}
+
+bool ZStatCycle::is_normalized_duration_trustable() {
+  // The normalized duration is considered trustable if we have
+  // completed at least one warmup cycle
+  return _nwarmup_cycles > 0;
 }
 
 const AbsSeq& ZStatCycle::normalized_duration() {
@@ -1062,8 +1067,8 @@ const AbsSeq& ZStatCycle::normalized_duration() {
 }
 
 double ZStatCycle::time_since_last() {
-  if (_ncycles == 0) {
-    // Return time since VM start-up
+  if (_end_of_last.value() == 0) {
+    // No end recorded yet, return time since VM start
     return os::elapsedTime();
   }
 

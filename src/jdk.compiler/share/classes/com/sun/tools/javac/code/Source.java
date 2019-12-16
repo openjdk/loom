@@ -84,7 +84,7 @@ public enum Source {
     /** 1.11 local-variable syntax for lambda parameters */
     JDK11("11"),
 
-    /** 12, no language features; switch expression were in preview */
+    /** 12, no language features; switch expression in preview */
     JDK12("12"),
 
     /**
@@ -94,8 +94,7 @@ public enum Source {
     JDK13("13"),
 
     /**
-     * 14 covers the to be determined language features that will be
-     * added in JDK 14.
+     * 14, switch expressions
      */
     JDK14("14");
 
@@ -199,7 +198,11 @@ public enum Source {
         SWITCH_MULTIPLE_CASE_LABELS(JDK14, Fragments.FeatureMultipleCaseLabels, DiagKind.PLURAL),
         SWITCH_RULE(JDK14, Fragments.FeatureSwitchRules, DiagKind.PLURAL),
         SWITCH_EXPRESSION(JDK14, Fragments.FeatureSwitchExpressions, DiagKind.PLURAL),
-        TEXT_BLOCKS(JDK14, Fragments.FeatureTextBlocks, DiagKind.PLURAL);
+        TEXT_BLOCKS(JDK14, Fragments.FeatureTextBlocks, DiagKind.PLURAL),
+        PATTERN_MATCHING_IN_INSTANCEOF(JDK14, Fragments.FeaturePatternMatchingInstanceof, DiagKind.NORMAL),
+        REIFIABLE_TYPES_INSTANCEOF(JDK14, Fragments.FeatureReifiableTypesInstanceof, DiagKind.PLURAL),
+        RECORDS(JDK14, Fragments.FeatureRecords, DiagKind.PLURAL),
+        ;
 
         enum DiagKind {
             NORMAL,

@@ -63,7 +63,8 @@ public class BuilderTest {
         assertFalse(thread2.isVirtual());
         assertTrue(thread2.getState() != Thread.State.NEW);
         assertFalse(thread2.getName().isEmpty());
-        assertTrue(thread2.getThreadGroup() == parent.getThreadGroup());
+        ThreadGroup group2 = thread2.getThreadGroup();
+        assertTrue(group2 == parent.getThreadGroup() || group2 == null);
         assertTrue(thread2.isDaemon() == parent.isDaemon());
         assertTrue(thread2.getPriority() == parent.getPriority());
         assertTrue(thread2.getContextClassLoader() == parent.getContextClassLoader());
@@ -95,7 +96,7 @@ public class BuilderTest {
         Thread thread1 = builder.task(() -> done1.set(true)).build();
         assertTrue(thread1.isVirtual());
         assertTrue(thread1.getState() == Thread.State.NEW);
-        assertTrue(thread1.getName().isEmpty());
+        assertEquals(thread1.getName(), "<unnamed>");
         assertTrue(thread1.getContextClassLoader() == parent.getContextClassLoader());
         assertTrue(thread1.isDaemon());
         assertTrue(thread1.getPriority() == Thread.NORM_PRIORITY);
@@ -108,7 +109,7 @@ public class BuilderTest {
         Thread thread2 = builder.task(() -> done2.set(true)).start();
         assertTrue(thread2.isVirtual());
         assertTrue(thread2.getState() != Thread.State.NEW);
-        assertTrue(thread2.getName().isEmpty());
+        assertEquals(thread2.getName(), "<unnamed>");
         assertTrue(thread2.getContextClassLoader() == parent.getContextClassLoader());
         assertTrue(thread2.isDaemon());
         assertTrue(thread2.getPriority() == Thread.NORM_PRIORITY);
@@ -120,7 +121,7 @@ public class BuilderTest {
         Thread thread3 = builder.factory().newThread(() -> done3.set(true));
         assertTrue(thread3.isVirtual());
         assertTrue(thread3.getState() == Thread.State.NEW);
-        assertTrue(thread3.getName().isEmpty());
+        assertEquals(thread3.getName(), "<unnamed>");
         assertTrue(thread3.getContextClassLoader() == parent.getContextClassLoader());
         assertTrue(thread3.isDaemon());
         assertTrue(thread3.getPriority() == Thread.NORM_PRIORITY);
@@ -247,9 +248,7 @@ public class BuilderTest {
                 } catch (InterruptedException ignore) { }
             });
 
-            Thread.Builder builder = Thread.builder()
-                    .virtual()
-                    .scheduler(wrapper::execute);
+            Thread.Builder builder = Thread.builder().virtual(wrapper::execute);
 
             Thread thread1 = builder.task(() -> { }).build();
             thread1.start();
@@ -583,7 +582,7 @@ public class BuilderTest {
     public void testNulls() {
         Thread.Builder builder = Thread.builder();
         assertThrows(NullPointerException.class, () -> builder.group(null));
-        assertThrows(NullPointerException.class, () -> builder.scheduler(null));
+        assertThrows(NullPointerException.class, () -> builder.virtual(null));
         assertThrows(NullPointerException.class, () -> builder.name(null));
         assertThrows(NullPointerException.class, () -> builder.name(null, 0));
         assertThrows(NullPointerException.class, () -> builder.task(null));

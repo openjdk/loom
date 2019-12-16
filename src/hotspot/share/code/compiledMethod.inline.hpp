@@ -29,7 +29,6 @@
 #include "code/nativeInst.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/frame.hpp"
-#include "runtime/orderAccess.hpp"
 
 inline bool CompiledMethod::is_deopt_pc(address pc) { return is_deopt_entry(pc) || is_deopt_mh_entry(pc); }
 
@@ -62,16 +61,16 @@ inline address CompiledMethod::get_deopt_original_pc(const frame* fr) {
 inline oop* CompiledMethod::get_keepalive() { return _keepalive; }
 
 inline oop* CompiledMethod::set_keepalive(oop* obj) {
-  return Atomic::cmpxchg(obj, &_keepalive, (oop*) NULL);
+  return Atomic::cmpxchg(&_keepalive, (oop*) NULL, obj);
 }
 
 inline bool CompiledMethod::clear_keepalive(oop* old) {
-  return Atomic::cmpxchg((oop*) NULL, &_keepalive, (oop*) old) == old;
+  return Atomic::cmpxchg(&_keepalive, old, (oop*) NULL) == old;
 }
 
 // class ExceptionCache methods
 
-inline int ExceptionCache::count() { return OrderAccess::load_acquire(&_count); }
+inline int ExceptionCache::count() { return Atomic::load_acquire(&_count); }
 
 address ExceptionCache::pc_at(int index) {
   assert(index >= 0 && index < count(),"");
@@ -84,6 +83,6 @@ address ExceptionCache::handler_at(int index) {
 }
 
 // increment_count is only called under lock, but there may be concurrent readers.
-inline void ExceptionCache::increment_count() { OrderAccess::release_store(&_count, _count + 1); }
+inline void ExceptionCache::increment_count() { Atomic::release_store(&_count, _count + 1); }
 
 #endif // SHARE_CODE_COMPILEDMETHOD_INLINE_HPP

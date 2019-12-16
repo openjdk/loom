@@ -5573,7 +5573,7 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
     return -5;
   }
 
-  class ForceYieldClosure : public ThreadClosure {
+  class ForceYieldClosure : public HandshakeClosure {
     jobject _jcont;
     jint _result;
 
@@ -5594,7 +5594,7 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
     }
 
   public:
-    ForceYieldClosure(jobject jcont) : _jcont(jcont), _result(-1) {}
+    ForceYieldClosure(jobject jcont) : HandshakeClosure("ContinuationForceYieldClosure"), _jcont(jcont), _result(-1) {}
     jint result() const { return _result; }
   };
   ForceYieldClosure fyc(jcont);

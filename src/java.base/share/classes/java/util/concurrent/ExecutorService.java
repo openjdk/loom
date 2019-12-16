@@ -35,6 +35,8 @@
 
 package java.util.concurrent;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
@@ -374,13 +376,17 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * executed, but no new tasks will be accepted. This method waits until all
      * tasks have completed execution.
      *
-     * <p> If interrupted while waiting, this method invokes {@link #shutdownNow()}
-     * to stop all executing tasks. It then continues to wait until all actively
-     * executing tasks have completed. Tasks that were awaiting execution are
-     * not executed. The interrupt status will be re-asserted before this method
-     * returns.
+     * <p> If interrupted while waiting, this method stops all executing tasks as
+     * if by invoking {@link #shutdownNow()}. It then continues to wait until all
+     * actively executing tasks have completed. Tasks that were awaiting
+     * execution are not executed. The interrupt status will be re-asserted
+     * before this method returns.
      *
      * <p> If already terminated, invoking this method has no effect.
+     *
+     * @implSpec
+     * The default implementation invokes {@code shutdown()} and waits for tasks
+     * to complete execution with {@code awaitTermination}.
      *
      * @throws SecurityException if a security manager exists and
      *         shutting down this ExecutorService may manipulate
@@ -389,7 +395,6 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *         java.lang.RuntimePermission}{@code ("modifyThread")},
      *         or the security manager's {@code checkAccess} method
      *         denies access.
-     *
      * @since 99
      */
     @Override
@@ -413,4 +418,45 @@ public interface ExecutorService extends Executor, AutoCloseable {
             }
         }
     }
+
+    /**
+     * Returns an Executor that delegates to this Executor and stops all executing
+     * tasks, as if by invoking {@link #shutdownNow()}, when a deadline is reached.
+     * The {@code shutdownNow()} method may be invoked on a thread supporting the
+     * deadline mechanism.
+     *
+     * <p> If this method is invoked with a deadline that has already expired
+     * then the {@code shutdownNow()} method is invoked. If the deadline has
+     * already expired or the executor has already terminated then this Executor
+     * is returned (a new executor is not created).
+     *
+     * @implSpec
+     * The default implementation schedules a task to run when the deadline
+     * expires. The task invokes the {@code shutdownNow()} method to stop all
+     * executing tasks.
+     *
+     * @apiNote This is a prototype API. It is intended to be used with the
+     * try-with-resources construct to set a deadline for tasks submitted to
+     * execute in the try-with-resources block.
+     * <pre> {@code
+     *     ThreadFactory factory = Thread.builder().virtual().factory();
+     *     Instant deadline = Instant.now().plusSeconds(10);
+     *     try (ExecutorService executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
+     *         executor.submit(task1);
+     *         executor.submit(task2);
+     *     }
+     * }</pre>
+     *
+     * @param deadline the deadline
+     * @return a new Executor that delegates operations to this Executor
+     * @throws NullPointerException if deadline is null
+     * @throws SecurityException if a security manager exists and it denies
+     *         {@link java.lang.RuntimePermission}{@code ("modifyThread")}.
+     * @since 99
+     */
+    default ExecutorService withDeadline(Instant deadline) {
+        Duration timeout = Duration.between(Instant.now(), deadline);
+        return Executors.timedExecutorService(this, timeout);
+    }
 }
+

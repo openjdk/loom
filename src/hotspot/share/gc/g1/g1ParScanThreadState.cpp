@@ -56,18 +56,22 @@ G1ParScanThreadState::G1ParScanThreadState(G1CollectedHeap* g1h,
     _stack_trim_upper_threshold(GCDrainStackTargetSize * 2 + 1),
     _stack_trim_lower_threshold(GCDrainStackTargetSize),
     _trim_ticks(),
+    _surviving_young_words_base(NULL),
+    _surviving_young_words(NULL),
+    _surviving_words_length(young_cset_length + 1),
     _old_gen_is_full(false),
-    _num_optional_regions(optional_cset_length)
+    _num_optional_regions(optional_cset_length),
+    _numa(g1h->numa()),
+    _obj_alloc_stat(NULL)
 {
   // We allocate number of young gen regions in the collection set plus one
   // entries, since entry 0 keeps track of surviving bytes for non-young regions.
   // We also add a few elements at the beginning and at the end in
   // an attempt to eliminate cache contention
-  size_t real_length = young_cset_length + 1;
-  size_t array_length = PADDING_ELEM_NUM + real_length + PADDING_ELEM_NUM;
+  size_t array_length = PADDING_ELEM_NUM + _surviving_words_length + PADDING_ELEM_NUM;
   _surviving_young_words_base = NEW_C_HEAP_ARRAY(size_t, array_length, mtGC);
   _surviving_young_words = _surviving_young_words_base + PADDING_ELEM_NUM;
-  memset(_surviving_young_words, 0, real_length * sizeof(size_t));
+  memset(_surviving_young_words, 0, _surviving_words_length * sizeof(size_t));
 
   _plab_allocator = new G1PLABAllocator(_g1h->allocator());
 
@@ -79,19 +83,23 @@ G1ParScanThreadState::G1ParScanThreadState(G1CollectedHeap* g1h,
   _closures = G1EvacuationRootClosures::create_root_closures(this, _g1h);
 
   _oops_into_optional_regions = new G1OopStarChunkedList[_num_optional_regions];
+
+  initialize_numa_stats();
 }
 
-// Pass locally gathered statistics to global state.
-void G1ParScanThreadState::flush(size_t* surviving_young_words) {
+size_t G1ParScanThreadState::flush(size_t* surviving_young_words) {
   _rdcq.flush();
+  flush_numa_stats();
   // Update allocation statistics.
   _plab_allocator->flush_and_retire_stats();
   _g1h->policy()->record_age_table(&_age_table);
 
-  uint length = _g1h->collection_set()->young_region_length() + 1;
-  for (uint i = 0; i < length; i++) {
+  size_t sum = 0;
+  for (uint i = 0; i < _surviving_words_length; i++) {
     surviving_young_words[i] += _surviving_young_words[i];
+    sum += _surviving_young_words[i];
   }
+  return sum;
 }
 
 G1ParScanThreadState::~G1ParScanThreadState() {
@@ -99,6 +107,7 @@ G1ParScanThreadState::~G1ParScanThreadState() {
   delete _closures;
   FREE_C_HEAP_ARRAY(size_t, _surviving_young_words_base);
   delete[] _oops_into_optional_regions;
+  FREE_C_HEAP_ARRAY(size_t, _obj_alloc_stat);
 }
 
 size_t G1ParScanThreadState::lab_waste_words() const {
@@ -152,11 +161,11 @@ void G1ParScanThreadState::trim_queue() {
   } while (!_refs->is_empty());
 }
 
-HeapWord* G1ParScanThreadState::allocate_in_next_plab(G1HeapRegionAttr const region_attr,
-                                                      G1HeapRegionAttr* dest,
+HeapWord* G1ParScanThreadState::allocate_in_next_plab(G1HeapRegionAttr* dest,
                                                       size_t word_sz,
-                                                      bool previous_plab_refill_failed) {
-  assert(region_attr.is_in_cset_or_humongous(), "Unexpected region attr type: %s", region_attr.get_type_str());
+                                                      bool previous_plab_refill_failed,
+                                                      uint node_index) {
+
   assert(dest->is_in_cset_or_humongous(), "Unexpected dest: %s region attr", dest->get_type_str());
 
   // Right now we only have two types of regions (young / old) so
@@ -165,7 +174,8 @@ HeapWord* G1ParScanThreadState::allocate_in_next_plab(G1HeapRegionAttr const reg
     bool plab_refill_in_old_failed = false;
     HeapWord* const obj_ptr = _plab_allocator->allocate(G1HeapRegionAttr::Old,
                                                         word_sz,
-                                                        &plab_refill_in_old_failed);
+                                                        &plab_refill_in_old_failed,
+                                                        node_index);
     // Make sure that we won't attempt to copy any other objects out
     // of a survivor region (given that apparently we cannot allocate
     // any new ones) to avoid coming into this slow path again and again.
@@ -204,8 +214,8 @@ G1HeapRegionAttr G1ParScanThreadState::next_region_attr(G1HeapRegionAttr const r
 
 void G1ParScanThreadState::report_promotion_event(G1HeapRegionAttr const dest_attr,
                                                   oop const old, size_t word_sz, uint age,
-                                                  HeapWord * const obj_ptr) const {
-  PLAB* alloc_buf = _plab_allocator->alloc_buffer(dest_attr);
+                                                  HeapWord * const obj_ptr, uint node_index) const {
+  PLAB* alloc_buf = _plab_allocator->alloc_buffer(dest_attr, node_index);
   if (alloc_buf->contains(obj_ptr)) {
     _g1h->_gc_tracer_stw->report_promotion_in_new_plab_event(old->klass(), word_sz * HeapWordSize, age,
                                                              dest_attr.type() == G1HeapRegionAttr::Old,
@@ -228,24 +238,30 @@ oop G1ParScanThreadState::copy_to_survivor_space(G1HeapRegionAttr const region_a
   if (_old_gen_is_full && dest_attr.is_old()) {
     return handle_evacuation_failure_par(old, old_mark);
   }
-  HeapWord* obj_ptr = _plab_allocator->plab_allocate(dest_attr, word_sz);
+  HeapRegion* const from_region = _g1h->heap_region_containing(old);
+  uint node_index = from_region->node_index();
+
+  HeapWord* obj_ptr = _plab_allocator->plab_allocate(dest_attr, word_sz, node_index);
 
   // PLAB allocations should succeed most of the time, so we'll
   // normally check against NULL once and that's it.
   if (obj_ptr == NULL) {
     bool plab_refill_failed = false;
-    obj_ptr = _plab_allocator->allocate_direct_or_new_plab(dest_attr, word_sz, &plab_refill_failed);
+    obj_ptr = _plab_allocator->allocate_direct_or_new_plab(dest_attr, word_sz, &plab_refill_failed, node_index);
     if (obj_ptr == NULL) {
-      obj_ptr = allocate_in_next_plab(region_attr, &dest_attr, word_sz, plab_refill_failed);
+      assert(region_attr.is_in_cset(), "Unexpected region attr type: %s", region_attr.get_type_str());
+      obj_ptr = allocate_in_next_plab(&dest_attr, word_sz, plab_refill_failed, node_index);
       if (obj_ptr == NULL) {
         // This will either forward-to-self, or detect that someone else has
         // installed a forwarding pointer.
         return handle_evacuation_failure_par(old, old_mark);
       }
     }
+    update_numa_stats(node_index);
+
     if (_g1h->_gc_tracer_stw->should_report_promotion_events()) {
       // The events are checked individually as part of the actual commit
-      report_promotion_event(dest_attr, old, word_sz, age, obj_ptr);
+      report_promotion_event(dest_attr, old, word_sz, age, obj_ptr, node_index);
     }
   }
 
@@ -257,7 +273,7 @@ oop G1ParScanThreadState::copy_to_survivor_space(G1HeapRegionAttr const region_a
   if (_g1h->evacuation_should_fail()) {
     // Doing this after all the allocation attempts also tests the
     // undo_allocation() method too.
-    _plab_allocator->undo_allocation(dest_attr, obj_ptr, word_sz);
+    _plab_allocator->undo_allocation(dest_attr, obj_ptr, word_sz, node_index);
     return handle_evacuation_failure_par(old, old_mark);
   }
 #endif // !PRODUCT
@@ -270,7 +286,6 @@ oop G1ParScanThreadState::copy_to_survivor_space(G1HeapRegionAttr const region_a
   if (forward_ptr == NULL) {
     Copy::aligned_disjoint_words((HeapWord*) old, obj_ptr, word_sz);
 
-    HeapRegion* const from_region = _g1h->heap_region_containing(old);
     const uint young_index = from_region->young_index_in_cset();
 
     assert((from_region->is_young() && young_index >  0) ||
@@ -323,7 +338,7 @@ oop G1ParScanThreadState::copy_to_survivor_space(G1HeapRegionAttr const region_a
     }
     return obj;
   } else {
-    _plab_allocator->undo_allocation(dest_attr, obj_ptr, word_sz);
+    _plab_allocator->undo_allocation(dest_attr, obj_ptr, word_sz, node_index);
     return forward_ptr;
   }
 }
@@ -345,16 +360,27 @@ const size_t* G1ParScanThreadStateSet::surviving_young_words() const {
 void G1ParScanThreadStateSet::flush() {
   assert(!_flushed, "thread local state from the per thread states should be flushed once");
 
-  for (uint worker_index = 0; worker_index < _n_workers; ++worker_index) {
-    G1ParScanThreadState* pss = _states[worker_index];
+  for (uint worker_id = 0; worker_id < _n_workers; ++worker_id) {
+    G1ParScanThreadState* pss = _states[worker_id];
 
     if (pss == NULL) {
       continue;
     }
 
-    pss->flush(_surviving_young_words_total);
+    G1GCPhaseTimes* p = _g1h->phase_times();
+
+    // Need to get the following two before the call to G1ParThreadScanState::flush()
+    // because it resets the PLAB allocator where we get this info from.
+    size_t lab_waste_bytes = pss->lab_waste_words() * HeapWordSize;
+    size_t lab_undo_waste_bytes = pss->lab_undo_waste_words() * HeapWordSize;
+    size_t copied_bytes = pss->flush(_surviving_young_words_total) * HeapWordSize;
+
+    p->record_or_add_thread_work_item(G1GCPhaseTimes::MergePSS, worker_id, copied_bytes, G1GCPhaseTimes::MergePSSCopiedBytes);
+    p->record_or_add_thread_work_item(G1GCPhaseTimes::MergePSS, worker_id, lab_waste_bytes, G1GCPhaseTimes::MergePSSLABWasteBytes);
+    p->record_or_add_thread_work_item(G1GCPhaseTimes::MergePSS, worker_id, lab_undo_waste_bytes, G1GCPhaseTimes::MergePSSLABUndoWasteBytes);
+
     delete pss;
-    _states[worker_index] = NULL;
+    _states[worker_id] = NULL;
   }
   _flushed = true;
 }

@@ -471,15 +471,15 @@ void ImmutableOopMap::generate_stub(const CodeBlob* cb) const {
   if (_freeze_stub == default_value) {
     OopMapStubGenerator cgen(cb, *this);
     // lock this by putting the slow path in place
-    if (Atomic::cmpxchg(slow_value, &_freeze_stub, default_value) == default_value) {
+    if (Atomic::cmpxchg(&_freeze_stub, default_value, slow_value) == default_value) {
       if (!cgen.generate()) {
-        Atomic::store((address) Continuations::thaw_oops_slow(), &_thaw_stub);
+        Atomic::store(&_thaw_stub, (address) Continuations::thaw_oops_slow());
         cgen.free();
         return;
       }
 
-      Atomic::store(cgen.freeze_stub(), &_freeze_stub);
-      Atomic::store(cgen.thaw_stub(), &_thaw_stub);
+      Atomic::store(&_freeze_stub, cgen.freeze_stub());
+      Atomic::store(&_thaw_stub, cgen.thaw_stub());
     }
   }
 }
