@@ -3028,7 +3028,7 @@ void Assembler::movq( Address dst, MMXRegister src ) {
 void Assembler::movntq(Address dst, MMXRegister src) {
   assert( VM_Version::supports_mmx(), "" );
   emit_int8(0x0F);
-  emit_int8(0xE7);
+  emit_int8((unsigned char)0xE7);
   emit_operand(dst, src);
 }
 
@@ -3072,7 +3072,7 @@ void Assembler::vmovntdq(Address dst, XMMRegister src) {
   // swap src<->dst for encoding
   assert(src != xnoreg, "sanity");
   vex_prefix(dst, 0, src->encoding(), VEX_SIMD_66, VEX_OPCODE_0F, &attributes);
-  emit_int8(0xE7);
+  emit_int8((unsigned char)0xE7);
   emit_operand(src, dst);
 }
 
@@ -3085,7 +3085,7 @@ void Assembler::evmovntdq(Address dst, XMMRegister src, int vector_len) {
   attributes.reset_is_clear_context();
   attributes.set_is_evex_instruction();
   vex_prefix(dst, 0, src->encoding(), VEX_SIMD_66, VEX_OPCODE_0F, &attributes);
-  emit_int8(0xE7);
+  emit_int8((unsigned char)0xE7);
   emit_operand(src, dst);
 }
 
