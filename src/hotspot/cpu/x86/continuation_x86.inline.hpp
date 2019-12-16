@@ -29,6 +29,24 @@
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
 
+const int TwoWordAlignmentMask  = (1 << (LogBytesPerWord+1)) - 1;
+
+static inline void copy_from_stack(void* from, void* to, size_t size) {
+  assert(((intptr_t)from & TwoWordAlignmentMask) == 0, "");
+  assert(((intptr_t)to   & WordAlignmentMask)    == 0, "");
+  
+  // ((MemcpyFnT)StubRoutines::word_memcpy())(from, to, size << LogBytesPerWord);
+  memcpy(to, from, size << LogBytesPerWord);
+}
+
+static inline void copy_to_stack(void* from, void* to, size_t size) {
+  assert(((intptr_t)from & WordAlignmentMask)    == 0, "");
+  assert(((intptr_t)to   & TwoWordAlignmentMask) == 0, "");
+
+  // ((MemcpyFnT)StubRoutines::word_memcpy())(from, to, size << LogBytesPerWord);
+  memcpy(to, from, size << LogBytesPerWord);
+}
+
 template<bool indirect>
 static void set_anchor(JavaThread* thread, const FrameInfo* fi) {
   JavaFrameAnchor* anchor = thread->frame_anchor();

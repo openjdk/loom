@@ -332,14 +332,8 @@ typedef int (*ThawFnT)(address /* dst */, address /* objArray */, address /* map
 
 typedef void (*MemcpyFnT)(void* src, void* dst, int count);
 
-static inline void copy_chunk(void* from, void* to, size_t size) {
-  assert(((intptr_t)from & WordAlignmentMask) == 0, "");
-  assert(((intptr_t)to   & WordAlignmentMask) == 0, "");
-  assert((size           & WordAlignmentMask) == 0, "");
-  
-  // ((MemcpyFnT)StubRoutines::word_memcpy())(from, to, size);
-  memcpy(to, from, size);
-}
+static inline void copy_from_stack(void* from, void* to, size_t size);
+static inline void copy_to_stack(void* from, void* to, size_t size);
 
 class Compiled : public NonInterpreted<Compiled>  {
 public:
@@ -661,8 +655,8 @@ public:
 
   bool valid_stack_index(int idx) const { return idx >= 0 && idx < _stack_length; }
 
-  void copy_to_stack(void* from, void* to, int size);
   void copy_from_stack(void* from, void* to, int size);
+  void copy_to_stack(void* from, void* to, int size);
 
   objArrayOop refStack(int size);
   objArrayOop refStack() { return _ref_stack; }
@@ -1146,7 +1140,7 @@ inline void ContMirror::derelativize(intptr_t* const fp, int offset) {
   *(fp + offset) = (intptr_t)((address)fp + to_bytes(*(intptr_t*)(fp + offset)));
 }
 
-void ContMirror::copy_to_stack(void* from, void* to, int size) {
+void ContMirror::copy_from_stack(void* from, void* to, int size) {
   log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + size), size);
   log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d - %d)", p2i(to), p2i((address)to + size), to_index(_hstack, to), to_index(_hstack, (address)to + size));
 
@@ -1162,7 +1156,7 @@ void ContMirror::copy_to_stack(void* from, void* to, int size) {
   _e_size += size;
 }
 
-void ContMirror::copy_from_stack(void* from, void* to, int size) {
+void ContMirror::copy_to_stack(void* from, void* to, int size) {
   log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d - %d)", p2i(from), p2i((address)from + size), to_index(stack(), from), to_index(stack(), (address)from + size));
   log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + size), size);
 
@@ -2479,16 +2473,14 @@ public:
   }
 
   void copy_to_chunk(intptr_t* from, intptr_t* to, int size, oop chunk) {
-    int sizeb = size << LogBytesPerWord;
-    
-    log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + sizeb), sizeb);
-    log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + sizeb), sizeb);
+    log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i(from + size), size << LogBytesPerWord);
+    log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i(to + size), size << LogBytesPerWord);
 
-    copy_chunk(from, to, sizeb);
+    copy_from_stack(from, to, size);
 
-    assert ((address)to >= (address)InstanceStackChunkKlass::start_of_stack(chunk), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(InstanceStackChunkKlass::start_of_stack(chunk)));
-    assert ((address)to + sizeb <= (address)(InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)), 
-      "to + size: " INTPTR_FORMAT " end: " INTPTR_FORMAT, p2i((address)to + sizeb), p2i(InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)));
+    assert (to >= (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(InstanceStackChunkKlass::start_of_stack(chunk)));
+    assert (to + size <= (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk), 
+      "to + size: " INTPTR_FORMAT " end: " INTPTR_FORMAT, p2i(to + size), p2i((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)));
   }
 
   void setup_chunk_jump(intptr_t* bottom_sp, address pc) {
@@ -3252,7 +3244,7 @@ public:
 
   inline void freeze_raw_frame(intptr_t* vsp, intptr_t* hsp, int fsize) {
     log_develop_trace(jvmcont)("freeze_raw_frame: sp: %d", _cont.stack_index(hsp));
-    _cont.copy_to_stack(vsp, hsp, fsize);
+    _cont.copy_from_stack(vsp, hsp, fsize);
   }
 
 };
@@ -3940,11 +3932,10 @@ public:
   }
 
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
-    int sizeb = size << LogBytesPerWord;
-    log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i((address)from + sizeb), sizeb);
-    log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i((address)to + sizeb), sizeb);
+    log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i(from + size), size << LogBytesPerWord);
+    log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i(to + size), size << LogBytesPerWord);
 
-    copy_chunk(from, to, sizeb);
+    copy_to_stack(from, to, size);
   }
 
   void patch_chunk(oop chunk, intptr_t* sp, bool is_last, int argsize) {
@@ -4412,7 +4403,7 @@ public:
 
   inline void thaw_raw_frame(intptr_t* hsp, intptr_t* vsp, int fsize) {
     log_develop_trace(jvmcont)("thaw_raw_frame: sp: %d", _cont.stack_index(hsp));
-    _cont.copy_from_stack(hsp, vsp, fsize);
+    _cont.copy_to_stack(hsp, vsp, fsize);
   }
 
 };
