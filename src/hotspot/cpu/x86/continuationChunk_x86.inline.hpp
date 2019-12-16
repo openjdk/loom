@@ -68,7 +68,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
 
   CodeBlob* cb = NULL;
   intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
   for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - 1);
     log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
@@ -149,13 +149,11 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
       assert (is_in_frame(cb, sp, p), "");
       assert ((intptr_t*)p >= start, "");
 
-      if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
-
-      log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %d p: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, omv.reg()->is_reg(), p2i(p));
+      // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
 
       // if (!SkipNullValue::should_skip(*p))
-      
-      DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) 
+      log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
+      // DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) 
       omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
       // assert (SafepointSynchronize::is_at_safepoint() || (*(intptr_t*)p == old), "old: " INTPTR_FORMAT " new: " INTPTR_FORMAT, old, *(intptr_t*)p);
     }

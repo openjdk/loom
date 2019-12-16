@@ -267,7 +267,6 @@ public class Basic {
             int x = 3;
             String s = "abc"; 
 
-            // TODO: test when this method is interpreted but callee is compiled.
             r += fooMany(k,
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             1.0, 2.0, 3.0, 4.0, 5.0, 6.0f, 7.0f, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0f, 15.0f, 16.0f, 17.0, 18.0, 19.0, 20.0,
@@ -301,7 +300,9 @@ public class Basic {
     Object o11, Object o12, Object o13, Object o14, Object o15, Object o16, Object o17, Object o18, Object o19, Object o20) {
         double x = 9.99;
         String s = "zzz";
-        Continuation.yield(FOO);
+        for (int i=0; i<2; i++) {
+            Continuation.yield(FOO);
+        }
         long r = b+1;
         return "" + r;
     }

@@ -766,7 +766,7 @@ hframe Freeze<ConfigT, mode>::new_bottom_hframe(int sp, int ref_sp, address pc, 
 }
 
 template <typename ConfigT, op_mode mode>
-template<typename FKind> hframe Freeze<ConfigT, mode>::new_hframe(const frame& f, intptr_t* vsp, const hframe& caller, int fsize, int num_oops, int argsize) {
+template<typename FKind> hframe Freeze<ConfigT, mode>::new_hframe(const frame& f, intptr_t* vsp, const hframe& caller, int fsize, int num_oops) {
   assert (FKind::is_instance(f), "");
   assert (f.sp() <= vsp, "");
   assert (mode != mode_fast || f.sp() == f.unextended_sp(), "");
@@ -777,9 +777,6 @@ template<typename FKind> hframe Freeze<ConfigT, mode>::new_hframe(const frame& f
   int ref_sp = caller.ref_sp() - num_oops;
   assert (ref_sp >= 0, "ref_sp: %d caller.ref_sp(): %d num_oops: %d", ref_sp, caller.ref_sp(), num_oops);
 
-  if (mode != mode_fast && caller.is_interpreted_frame()) { // must be done after computing sp above
-    const_cast<hframe&>(caller).set_sp(caller.sp() - (argsize >> LogBytesPerElement));
-  }
   intptr_t fp;
   void* cb_imd;
   if (FKind::interpreted) {
@@ -952,7 +949,7 @@ inline intptr_t* Thaw<ConfigT, mode>::align(const hframe& hf, intptr_t* vsp, fra
     assert((intptr_t)vsp % 16 == 0, "");
   #endif
 
-   log_develop_trace(jvmcont)("Aligning sender sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(caller.sp()), p2i(caller.sp() - addedWords));
+    log_develop_trace(jvmcont)("Aligning sender sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(caller.sp()), p2i(caller.sp() - addedWords));
     caller.set_sp(caller.sp() - addedWords);
   }
 
@@ -1160,8 +1157,8 @@ static void fix_stack_chunk(oop chunk) {
   int num_oops = 0;
 
   CodeBlob* cb = NULL;
-  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
   for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - 1);
     log_develop_trace(jvmcont)("fix_stack_chunk sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
@@ -1263,13 +1260,18 @@ void Thaw<ConfigT, mode>::patch_chunk_pd(intptr_t* sp) {
 }
 
 template <typename ConfigT, op_mode mode>
+inline intptr_t* Freeze<ConfigT, mode>::align_bottom(intptr_t* bottom, int argsize) {
+#ifdef _LP64
+  bottom -= (argsize & 1);
+#endif
+  return bottom;
+}
+
+template <typename ConfigT, op_mode mode>
 inline intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp, int argsize) {
 #ifdef _LP64
-  if (((intptr_t)vsp & 0xf) != 0) { // TODO PERF
-    assert (argsize != 0 || Interpreter::contains(_cont.entryPC()), "");
-    log_develop_trace(jvmcont)("Aligning compiled frame 1: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(vsp), p2i(vsp - 1));
-    vsp--;
-  }
+  assert ((intptr_t)vsp % 16 == 0 || argsize != 0 || Interpreter::contains(_cont.entryPC()), "");
+  vsp = align_down(vsp, 16);
   assert((intptr_t)vsp % 16 == 0, "");
 #endif
   return vsp;
@@ -1280,32 +1282,41 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
   assert (oopDesc::is_oop(chunk), "");
   log_develop_trace(jvmcont)("debug_verify_stack_chunk young: %d", !requires_barriers(chunk));
   assert (ContMirror::is_stack_chunk(chunk), "");
-  assert (oopDesc::is_oop_or_null(jdk_internal_misc_StackChunk::parent(chunk)), "");
   assert (jdk_internal_misc_StackChunk::size(chunk) >= 0, "");
   assert (jdk_internal_misc_StackChunk::argsize(chunk) >= 0, "");
+  if (!SafepointSynchronize::is_at_safepoint()) {
+    assert (oopDesc::is_oop_or_null(jdk_internal_misc_StackChunk::parent(chunk)), "");
+  }
 
-  if (out_size != NULL) *out_size += (jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + frame::sender_sp_offset) << LogBytesPerWord;
-  
   const bool gc_mode = jdk_internal_misc_StackChunk::gc_mode(chunk);
   const bool concurrent = !SafepointSynchronize::is_at_safepoint() && !Thread::current()->is_Java_thread();
-
+  const bool is_last = jdk_internal_misc_StackChunk::parent(chunk) == NULL && (cont == (oop)NULL || java_lang_Continuation::pc(cont) == NULL);
   // const bool narrow = UseCompressedOops;
+
+  // if argsize == 0, the chunk contains the metadata (pc, fp -- frame::sender_sp_offset) for the top frame (below sp), and *not* for the bottom frame
+  int size = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk)
+              + ((jdk_internal_misc_StackChunk::argsize(chunk) == 0) ? frame::sender_sp_offset : 0);
+  if (cont != (oop)NULL && !is_last) size -= jdk_internal_misc_StackChunk::argsize(chunk);
+  size <<= LogBytesPerWord;
 
   int num_frames = 0;
   int num_oops = 0;
 
   CodeBlob* cb = NULL;
-  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
-  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
-    // assert (is_young(chunk) || num_frames <= jdk_internal_misc_StackChunk::numFrames(chunk), "");
+  intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
+  int size0 = 0;
+  intptr_t* sp;
+  for (sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+    // assert (!requires_barriers(chunk) || num_frames <= jdk_internal_misc_StackChunk::numFrames(chunk), "");
     address pc = *(address*)(sp - 1);
     log_develop_trace(jvmcont)("debug_verify_stack_chunk sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
     assert (pc != NULL, 
       "young: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT, 
       !requires_barriers(chunk), jdk_internal_misc_StackChunk::numFrames(chunk), num_frames, p2i(sp), p2i(start), p2i(end));
-
-    num_frames++;
+    if (num_frames == 0) {
+      assert (pc == jdk_internal_misc_StackChunk::pc(chunk), "");
+    }
 
     int slot;
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
@@ -1315,6 +1326,9 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
     assert (cb->is_compiled(), "");
     assert (cb->frame_size() > 0, "");
     assert (!cb->as_compiled_method()->is_deopt_pc(pc), "");
+
+    num_frames++;
+    size0 += cb->frame_size() << LogBytesPerWord;
 
     assert (slot >= 0, "");
     const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
@@ -1391,11 +1405,30 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
       }
     }
   }
+
+  if (cb != NULL) {
+    assert (jdk_internal_misc_StackChunk::argsize(chunk) == (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord, 
+      "chunk argsize: %d bottom frame argsize: %d", jdk_internal_misc_StackChunk::argsize(chunk), (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord);
+  } else {
+    assert (jdk_internal_misc_StackChunk::argsize(chunk) == 0, "");
+  }
+
+  if (cont == (oop)NULL || is_last) {
+    if (cont != (oop)NULL) {
+      assert (jdk_internal_misc_StackChunk::argsize(chunk) == 0, "");
+    } else {
+      size0 += jdk_internal_misc_StackChunk::argsize(chunk) << LogBytesPerWord;
+      sp    += cb != NULL ? ((cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord) : 0;
+    }
+  }
+  assert (size0 == size, "size: %d size0: %d end sp: %ld start sp: %d chunk size: %d argsize: %d", size, size0, sp - start, jdk_internal_misc_StackChunk::sp(chunk), jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::argsize(chunk));
+
   // if (!concurrent) {
   //   assert (jdk_internal_misc_StackChunk::numFrames(chunk) == -1 || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "young: %d num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", !requires_barriers(chunk), num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
   //   assert (jdk_internal_misc_StackChunk::numOops(chunk)   == -1 || num_oops   == jdk_internal_misc_StackChunk::numOops(chunk),   "young: %d num_oops: %d jdk_internal_misc_StackChunk::numOops(chunk): %d",     !requires_barriers(chunk), num_oops,   jdk_internal_misc_StackChunk::numOops(chunk));
   // }
 
+  if (out_size   != NULL) *out_size   += size;
   if (out_frames != NULL) *out_frames += num_frames;
   if (out_oops   != NULL) *out_oops   += num_oops;
 
