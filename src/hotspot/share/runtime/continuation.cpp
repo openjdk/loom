@@ -1422,13 +1422,13 @@ bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, RegisterMapT* map
     return false;
   }
 
+  ContinuationHelper::update_register_map_with_callee(map, f); // the monitor object could be stored in the link register
   ResourceMark rm;
   for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != NULL; scope = scope->sender()) {
     GrowableArray<MonitorValue*>* mons = scope->monitors();
     if (mons == NULL || mons->is_empty())
       continue;
 
-    ContinuationHelper::update_register_map_with_callee(map, f); // the monitor object could be stored in the link register
     for (int index = (mons->length()-1); index >= 0; index--) { // see compiledVFrame::monitors()
       MonitorValue* mon = mons->at(index);
       if (mon->eliminated())
