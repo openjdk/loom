@@ -312,7 +312,7 @@ public:
   static inline int num_oops(const frame& f);
 
   template <typename RegisterMapT>
-  static bool is_owning_locks(JavaThread* thread, const RegisterMapT* map, const frame& f);
+  static bool is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f);
 };
 
 class NonInterpretedUnknown : public NonInterpreted<NonInterpretedUnknown>  {
@@ -1411,7 +1411,7 @@ inline int NonInterpreted<Self>::num_oops(const frame& f) {
 
 template<typename Self>
 template<typename RegisterMapT>
-bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, const RegisterMapT* map, const frame& f) {
+bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f) {
   // if (!DetectLocksInCompiledFrames) return false;
   assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
 
@@ -1428,6 +1428,7 @@ bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, const RegisterMap
     if (mons == NULL || mons->is_empty())
       continue;
 
+    ContinuationHelper::update_register_map_with_callee(map, f); // the monitor object could be stored in the link register
     for (int index = (mons->length()-1); index >= 0; index--) { // see compiledVFrame::monitors()
       MonitorValue* mon = mons->at(index);
       if (mon->eliminated())
@@ -3402,7 +3403,7 @@ int freeze0(JavaThread* thread, FrameInfo* fi) {
   }
 }
 
-static freeze_result is_pinned(const frame& f, const RegisterMap* map) {
+static freeze_result is_pinned(const frame& f, RegisterMap* map) {
   if (f.is_interpreted_frame()) {
     if (Interpreted::is_owning_locks(f)) return freeze_pinned_monitor;
   } else if (f.is_compiled_frame()) {
