@@ -232,7 +232,7 @@ STATIC_ASSERT(elementSizeInBytes <<  LogElemsPerWord == wordSize);
 static const unsigned char FLAG_LAST_FRAME_INTERPRETED = 1;
 static const unsigned char FLAG_SAFEPOINT_YIELD = 1 << 1;
 
-static const int SP_WIGGLE = 4; // depends on the extra space between interpreted and compiled we add in Thaw::align; maybe needs to be Argument::n_int_register_parameters_j TODO PD
+static const int SP_WIGGLE = 3; // depends on the extra space between interpreted and compiled we add in Thaw::align; maybe needs to be Argument::n_int_register_parameters_j TODO PD
 
 void continuations_init() {
   Continuations::init();
@@ -2270,7 +2270,7 @@ public:
     }
     assert (size > 0, "");
 
-    bool available = jdk_internal_misc_StackChunk::sp(chunk) >= size;
+    bool available = jdk_internal_misc_StackChunk::sp(chunk) - frame::sender_sp_offset >= size;
     log_develop_trace(jvmcont)("is_chunk_available available: %d size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT, available, argsize, size, p2i(top), p2i(bottom));   
     return available;
   }
@@ -2307,16 +2307,19 @@ public:
     bool allocated;
     if (LIKELY(chunk_available)) {
       assert (chunk == _cont.tail() && is_chunk_available(), "");
+      allocated = false;
       sp = jdk_internal_misc_StackChunk::sp(chunk);
-      assert ((chunk != NULL && !requires_barriers(chunk) && sp >= (frame::sender_sp_offset + size - argsize)), "");
       // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
       // if (requires_barriers(chunk)) {
       //   log_develop_trace(jvmcont)("Freeze chunk: found old chunk");
       //   assert(_cont.chunk_invariant(), "");
       //   return false;
       // }
-      allocated = false;
-      sp += argsize;
+
+      if (sp < jdk_internal_misc_StackChunk::size(chunk)) {
+        sp += argsize;
+        assert (sp <= jdk_internal_misc_StackChunk::size(chunk), "");
+      }
       // ContMirror::reset_chunk_counters(chunk);
     } else {
       assert (!is_chunk_available(), "");
@@ -2356,7 +2359,7 @@ public:
     assert (chunk == _cont.tail(), "");
     assert (chunk == java_lang_Continuation::tail(_cont.mirror()), "");
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
-    assert (sp <= jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset, "sp: %d size: %d", sp, jdk_internal_misc_StackChunk::size(chunk));
+    assert (sp <= jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset, "sp: %d chunk size: %d size: %d argsize: %d allocated: %d", sp, jdk_internal_misc_StackChunk::size(chunk), size, argsize, allocated);
 
     _cont.add_size((size - argsize) << LogBytesPerWord);
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
@@ -2572,7 +2575,6 @@ public:
     NoSafepointVerifier nsv;
 
     assert (ConfigT::has_young, "");
-    log_develop_trace(jvmcont)("squash_chunks");
     oop chunk = _cont.tail();
     if (chunk == (oop)NULL)
       return;
@@ -4677,12 +4679,12 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
       log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(*sender_sp + argsize));
       *sender_sp += argsize;
     } else {
-      // intptr_t* new_sp = java_lang_Continuation::entrySP(cont);
+      intptr_t* new_sp = java_lang_Continuation::entrySP(cont);
       // if (Interpreter::contains(*sender_pc)) {
       //   new_sp -= 2;
       // }
-      // log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(new_sp));
-      // *sender_sp = new_sp;
+      log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(new_sp));
+      *sender_sp = new_sp;
     }
     return true;
   }
