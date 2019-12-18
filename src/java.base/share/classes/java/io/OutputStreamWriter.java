@@ -117,7 +117,7 @@ public class OutputStreamWriter extends Writer {
     public OutputStreamWriter(OutputStream out) {
         super(out);
         se = StreamEncoder.forOutputStreamWriter(out, lockFor(this),
-            Charset.defaultCharset());
+                Charset.defaultCharset());
     }
 
     /**

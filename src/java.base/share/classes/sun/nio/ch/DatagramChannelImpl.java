@@ -629,7 +629,6 @@ class DatagramChannelImpl
         try {
             SocketAddress remote = beginRead(true, false);
             boolean connected = (remote != null);
-
             lockedConfigureNonBlockingIfNeeded();
             int n = receive(dst, connected);
             while (IOStatus.okayToRetry(n) && isOpen()) {
