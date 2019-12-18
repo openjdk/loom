@@ -512,13 +512,13 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
 
   // TODO LOOM: consider *always* adjusting instead of the conditionals below. 
   // That would simplify the alignment code in continuation freeze and particularly thaw, but it makes hotspot/jtreg/vmTestbase/nsk/jvmti/PopFrame/popframe005 fail.
-  // caller_adjustment = last_frame_adjust(0, callee_locals);
-  if (deopt_sender.is_compiled_frame() || caller_was_method_handle || caller_was_continuation_entry) {
-    caller_adjustment = last_frame_adjust(0, callee_locals);
-  } else if (callee_locals > callee_parameters) {
-    // The caller frame may need extending to accommodate non-parameter locals of the first unpacked interpreted frame.
-    caller_adjustment = last_frame_adjust(callee_parameters, callee_locals);
-  }
+  caller_adjustment = last_frame_adjust(0, callee_locals);
+  // if (deopt_sender.is_compiled_frame() || caller_was_method_handle || caller_was_continuation_entry) {
+  //   caller_adjustment = last_frame_adjust(0, callee_locals);
+  // } else if (callee_locals > callee_parameters) {
+  //   // The caller frame may need extending to accommodate non-parameter locals of the first unpacked interpreted frame.
+  //   caller_adjustment = last_frame_adjust(callee_parameters, callee_locals);
+  // }
 
   // If the sender is deoptimized the we must retrieve the address of the handler
   // since the frame will "magically" show the original pc before the deopt
