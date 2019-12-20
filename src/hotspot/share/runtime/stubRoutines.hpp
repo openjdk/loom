@@ -177,7 +177,8 @@ class StubRoutines: AllStatic {
   static address _jlong_disjoint_arraycopy;
   static address _oop_disjoint_arraycopy, _oop_disjoint_arraycopy_uninit;
 
-  static address _word_memcpy;
+  static address _word_memcpy_up;
+  static address _word_memcpy_down;
 
   // arraycopy operands aligned on zero'th element boundary
   // These are identical to the ones aligned aligned on an
@@ -351,7 +352,8 @@ class StubRoutines: AllStatic {
   static address jint_arraycopy()   { return _jint_arraycopy; }
   static address jlong_arraycopy()  { return _jlong_arraycopy; }
 
-  static address word_memcpy() { return _word_memcpy; }
+  static address word_memcpy_up()   { return _word_memcpy_up; }
+  static address word_memcpy_down() { return _word_memcpy_down; }
 
   static address oop_arraycopy(bool dest_uninitialized = false) {
     return dest_uninitialized ? _oop_arraycopy_uninit : _oop_arraycopy;

@@ -1623,17 +1623,16 @@ class StubGenerator: public StubCodeGenerator {
   //   disjoint_byte_copy_entry is set to the no-overlap entry point
   //   used by generate_conjoint_byte_copy().
   //
-  address generate_disjoint_word_copy(const char *name) {
+  address generate_disjoint_word_copy_up(const char *name) {
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", name);
     address start = __ pc();
 
-    Label L_copy_bytes, L_copy_8_bytes, L_copy_4_bytes, L_copy_2_bytes;
+    Label L_copy_bytes, L_copy_8_bytes;
     Label L_copy_byte, L_exit;
     const Register from        = rdi;  // source array address
     const Register to          = rsi;  // destination array address
     const Register count       = rdx;  // elements count
-    const Register byte_count  = rcx;
     const Register qword_count = count;
     const Register end_from    = from; // source array end address
     const Register end_to      = to;   // destination array end address
@@ -1650,8 +1649,6 @@ class StubGenerator: public StubCodeGenerator {
       // UnsafeCopyMemory page error: continue after ucm
       // UnsafeCopyMemoryMark ucmm(this, true, true);
       // 'from', 'to' and 'count' are now valid
-      __ movptr(byte_count, count);
-      __ shrptr(count, 3); // count => qword_count
 
       // Copy from low to high addresses.  Use 'to' as scratch.
       __ lea(end_from, Address(from, qword_count, Address::times_8, -8));
@@ -1681,6 +1678,76 @@ class StubGenerator: public StubCodeGenerator {
       copy_bytes_forward(end_from, end_to, qword_count, rax, L_copy_bytes, L_copy_8_bytes);
       __ jmp(L_exit);
     }
+    return start;
+  }
+
+  // Arguments:
+  //   aligned - true => Input and output aligned on a HeapWord == 8-byte boundary
+  //             ignored
+  //   name    - stub name string
+  //
+  // Inputs:
+  //   c_rarg0   - source array address
+  //   c_rarg1   - destination array address
+  //   c_rarg2   - element count, treated as ssize_t, can be zero
+  //
+  // If 'from' and/or 'to' are aligned on 4- or 2-byte boundaries, we
+  // let the hardware handle it.  The two or four words within dwords
+  // or qwords that span cache line boundaries will still be loaded
+  // and stored atomically.
+  //
+  address generate_disjoint_word_copy_down(const char *name) {
+    __ align(CodeEntryAlignment);
+    StubCodeMark mark(this, "StubRoutines", name);
+    address start = __ pc();
+
+    Label L_copy_bytes, L_copy_8_bytes;
+    const Register from        = rdi;  // source array address
+    const Register to          = rsi;  // destination array address
+    const Register count       = rdx;  // elements count
+    const Register qword_count = count;
+
+    __ enter(); // required for proper stackwalking of RuntimeStub frame
+    assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
+
+    setup_arg_regs(); // from => rdi, to => rsi, count => rdx
+                      // r9 and r10 may be used to save non-volatile registers
+
+    {
+      // UnsafeCopyMemory page error: continue after ucm
+      // UnsafeCopyMemoryMark ucmm(this, true, true);
+      // 'from', 'to' and 'count' are now valid
+
+      // Copy from high to low addresses.  Use 'to' as scratch.
+      __ jmp(L_copy_bytes);
+
+      // Copy trailing qwords
+    __ BIND(L_copy_8_bytes);
+      __ movq(rax, Address(from, qword_count, Address::times_8, -8));
+      __ movq(Address(to, qword_count, Address::times_8, -8), rax);
+      __ decrement(qword_count);
+      __ jcc(Assembler::notZero, L_copy_8_bytes);
+    }
+    restore_arg_regs();
+
+    __ xorptr(rax, rax); // return 0
+    __ vzeroupper();
+    __ leave(); // required for proper stackwalking of RuntimeStub frame
+    __ ret(0);
+
+    {
+      // UnsafeCopyMemory page error: continue after ucm
+      // UnsafeCopyMemoryMark ucmm(this, !aligned, true); 
+      // Copy in multi-bytes chunks
+      copy_bytes_backward(from, to, qword_count, rax, L_copy_bytes, L_copy_8_bytes);
+    }
+    restore_arg_regs();
+    inc_counter_np(SharedRuntime::_jshort_array_copy_ctr); // Update counter after rscratch1 is free
+    __ xorptr(rax, rax); // return 0
+    __ vzeroupper();
+    __ leave(); // required for proper stackwalking of RuntimeStub frame
+    __ ret(0);
+
     return start;
   }
 
@@ -3184,7 +3251,8 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit    = StubRoutines::_oop_disjoint_arraycopy_uninit;
     StubRoutines::_arrayof_oop_arraycopy_uninit             = StubRoutines::_oop_arraycopy_uninit;
 
-    StubRoutines::_word_memcpy = generate_disjoint_word_copy("word_memcpy");
+    StubRoutines::_word_memcpy_up = generate_disjoint_word_copy_up("word_memcpy_up");
+    StubRoutines::_word_memcpy_up = generate_disjoint_word_copy_down("word_memcpy_down");
   }
 
   // AES intrinsic stubs
