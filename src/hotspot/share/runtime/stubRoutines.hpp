@@ -179,6 +179,8 @@ class StubRoutines: AllStatic {
 
   static address _word_memcpy_up;
   static address _word_memcpy_down;
+  static address _word_memcpy_up_nt;
+  static address _word_memcpy_down_nt;
 
   // arraycopy operands aligned on zero'th element boundary
   // These are identical to the ones aligned aligned on an
@@ -354,6 +356,8 @@ class StubRoutines: AllStatic {
 
   static address word_memcpy_up()   { return _word_memcpy_up; }
   static address word_memcpy_down() { return _word_memcpy_down; }
+  static address word_memcpy_up_nt()   { return _word_memcpy_up_nt; }
+  static address word_memcpy_down_nt() { return _word_memcpy_down_nt; }
 
   static address oop_arraycopy(bool dest_uninitialized = false) {
     return dest_uninitialized ? _oop_arraycopy_uninit : _oop_arraycopy;
