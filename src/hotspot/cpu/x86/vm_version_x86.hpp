@@ -304,7 +304,7 @@ protected:
   static address   _cpuinfo_segv_addr; // address of instruction which causes SEGV
   static address   _cpuinfo_cont_addr; // address of instruction after the one which causes SEGV
 
-  enum Feature_Flag : uint64_t {
+  enum Feature_Flag {
     CPU_CX8      = (1 << 0), // next bits are from cpuid 1 (EDX)
     CPU_CMOV     = (1 << 1),
     CPU_FXSR     = (1 << 2),
