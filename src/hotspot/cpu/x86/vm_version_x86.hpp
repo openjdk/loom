@@ -304,7 +304,7 @@ protected:
   static address   _cpuinfo_segv_addr; // address of instruction which causes SEGV
   static address   _cpuinfo_cont_addr; // address of instruction after the one which causes SEGV
 
-  enum Feature_Flag {
+  enum Feature_Flag : uint64_t {
     CPU_CX8      = (1 << 0), // next bits are from cpuid 1 (EDX)
     CPU_CMOV     = (1 << 1),
     CPU_FXSR     = (1 << 2),
@@ -338,11 +338,9 @@ protected:
     CPU_AVX512ER = (1 << 29),
     CPU_AVX512CD = (1 << 30),
     // Keeping sign bit 31 unassigned.
-    CPU_RDTSCP   = ((uint64_t)1 << 32),
-    CPU_RDPID    = ((uint64_t)1 << 33),
-    CPU_FSRM     = ((uint64_t)1 << 34)
   };
 
+// TODO: change the above to  `enum Feature_Flag : uint64_t` and add the following to the enum
 #define CPU_AVX512BW ((uint64_t)UCONST64(0x100000000)) // enums are limited to 31 bit
 #define CPU_AVX512VL ((uint64_t)UCONST64(0x200000000)) // EVEX instructions with smaller vector length
 #define CPU_SHA ((uint64_t)UCONST64(0x400000000))      // SHA instructions
@@ -352,10 +350,12 @@ protected:
 #define CPU_AVX512_VPCLMULQDQ ((uint64_t)UCONST64(0x4000000000)) //Vector carryless multiplication
 #define CPU_VAES ((uint64_t)UCONST64(0x8000000000))    // Vector AES instructions
 #define CPU_VNNI ((uint64_t)UCONST64(0x10000000000))   // Vector Neural Network Instructions
-
 #define CPU_FLUSH ((uint64_t)UCONST64(0x20000000000))  // flush instruction
 #define CPU_FLUSHOPT ((uint64_t)UCONST64(0x40000000000)) // flushopt instruction
 #define CPU_CLWB ((uint64_t)UCONST64(0x80000000000))   // clwb instruction
+#define CPU_RDTSCP ((uint64_t)UCONST64(0x100000000000)) // RDTSCP instruction
+#define CPU_RDPID  ((uint64_t)UCONST64(0x200000000000)) // RDPID instruction
+#define CPU_FSRM ((uint64_t)UCONST64(0x400000000000))   // Fast Short REP MOV
 
 enum Extended_Family {
     // AMD
