@@ -32,6 +32,7 @@
 const int TwoWordAlignmentMask  = (1 << (LogBytesPerWord+1)) - 1;
 
 static inline void copy_from_stack(void* from, void* to, size_t size) {
+  assert (size >= 2, ""); // one word for return address, another for rbp spill
   assert(((intptr_t)from & TwoWordAlignmentMask) == 0, "");
   assert(((intptr_t)to   & WordAlignmentMask)    == 0, "");
   
@@ -40,6 +41,7 @@ static inline void copy_from_stack(void* from, void* to, size_t size) {
 }
 
 static inline void copy_to_stack(void* from, void* to, size_t size) {
+  assert (size >= 2, ""); // one word for return address, another for rbp spill
   assert(((intptr_t)from & WordAlignmentMask)    == 0, "");
   assert(((intptr_t)to   & TwoWordAlignmentMask) == 0, "");
 

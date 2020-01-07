@@ -1604,6 +1604,24 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
+  // Fast memory copying for continuations
+  // See:
+  // - Intel 64 and IA-32 Architectures Optimization Reference Manual:
+  //   - 3.7.5 REP Prefix and Data Movement
+  //   - 3.7.6 Enhanced REP MOVSB and STOSB Operation
+  //   - 14.3, MIXING AVX CODE WITH SSE CODE + https://software.intel.com/en-us/articles/intel-avx-state-transitions-migrating-sse-code-to-avx
+  // - https://stackoverflow.com/q/26246040/750563 What's missing/sub-optimal in this memcpy implementation?
+  // - https://stackoverflow.com/q/43343231/750563 Enhanced REP MOVSB for memcpy
+  // - https://stackoverflow.com/q/1715224/750563  Very fast memcpy for image processing?
+  // - https://stackoverflow.com/q/17312823/750563 When program will benefit from prefetch & non-temporal load/store?
+  // - https://docs.roguewave.com/threadspotter/2011.2/manual_html_linux/manual_html/ch05s03.html
+  // - https://blogs.fau.de/hager/archives/2103
+  // - https://vgatherps.github.io/2018-09-02-nontemporal/
+  // - https://www.reddit.com/r/cpp/comments/9ccb88/optimizing_cache_usage_with_nontemporal_accesses/
+  // - https://lwn.net/Articles/255364/ Memory part 5: What programmers can do
+  // - https://software.intel.com/en-us/forums/intel-fortran-compiler/topic/275765#comment-1551057 Time to revisit REP;MOVS
+
+
   // Used by continuations to copy from stack
   // Arguments:
   //   name    - stub name string
@@ -1611,7 +1629,7 @@ class StubGenerator: public StubCodeGenerator {
   // Inputs:
   //   c_rarg0   - source array address       -- 16-byte aligned
   //   c_rarg1   - destination array address  --  8-byte aligned
-  //   c_rarg2   - element count, in qwords (8 bytes)
+  //   c_rarg2   - element count, in qwords (8 bytes), >= 2
   //
   // If 'from' and/or 'to' are aligned on 4-, 2-, or 1-byte boundaries,
   // we let the hardware handle it.  The one to eight bytes within words,
@@ -1704,7 +1722,7 @@ class StubGenerator: public StubCodeGenerator {
         __ BIND(L_copy_bytes);
         __ addptr(qword_count, 8);
         __ jcc(Assembler::lessEqual, L_loop);
-        __ subptr(qword_count, 4);  // sub(8) and add(4)
+        __ subptr(qword_count, 4);  // sub(8) and add(4); we added the extra 8 at the end of the loop; we'll subtract the extra 4 right before "copy trailing qwords"
         __ jccb(Assembler::greater, L_end);
       }
       // Copy trailing 32 bytes
@@ -1768,7 +1786,7 @@ class StubGenerator: public StubCodeGenerator {
   // Inputs:
   //   c_rarg0   - source array address      --  8-byte aligned
   //   c_rarg1   - destination array address -- 16-byte aligned
-  //   c_rarg2   - element count, in qwords (8 bytes)
+  //   c_rarg2   - element count, in qwords (8 bytes), >= 2
   //
   // If 'from' and/or 'to' are aligned on 4- or 2-byte boundaries, we
   // let the hardware handle it.  The two or four words within dwords
