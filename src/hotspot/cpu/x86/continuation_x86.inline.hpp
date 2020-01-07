@@ -35,7 +35,7 @@ static inline void copy_from_stack(void* from, void* to, size_t size) {
   assert(((intptr_t)from & TwoWordAlignmentMask) == 0, "");
   assert(((intptr_t)to   & WordAlignmentMask)    == 0, "");
   
-  // ((MemcpyFnT)StubRoutines::word_memcpy())(from, to, size << LogBytesPerWord);
+  // ((MemcpyFnT)StubRoutines::word_memcpy_up())(from, to, size);
   memcpy(to, from, size << LogBytesPerWord);
 }
 
@@ -43,7 +43,7 @@ static inline void copy_to_stack(void* from, void* to, size_t size) {
   assert(((intptr_t)from & WordAlignmentMask)    == 0, "");
   assert(((intptr_t)to   & TwoWordAlignmentMask) == 0, "");
 
-  // ((MemcpyFnT)StubRoutines::word_memcpy())(from, to, size << LogBytesPerWord);
+  // ((MemcpyFnT)StubRoutines::word_memcpy_down())(from, to, size);
   memcpy(to, from, size << LogBytesPerWord);
 }
 
@@ -847,6 +847,8 @@ template <typename ConfigT, op_mode mode>
 template <bool bottom>
 inline void Freeze<ConfigT, mode>::align(const hframe& caller) {
   assert (mode != mode_fast || bottom || !Interpreter::contains(caller.pc()), "");
+  // TODO: See AbstractAssembler::generate_stack_overflow_check (assembler.cpp), Compile::bang_size_in_bytes() (compile.cpp), m->as_SafePoint()->jvms()->interpreter_frame_size()
+  // when we stack-bang, we need to update a thread field with the lowest (farthest) bang point.
   if ((mode != mode_fast || bottom) && caller.is_interpreted_frame()) {
     _cont.add_size(SP_WIGGLE << LogBytesPerWord); // See Thaw::align
   }
@@ -1439,7 +1441,9 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
       sp    += cb != NULL ? ((cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord) : 0;
     }
   }
-  assert (size0 == size, "size: %d size0: %d end sp: %ld start sp: %d chunk size: %d argsize: %d", size, size0, sp - start, jdk_internal_misc_StackChunk::sp(chunk), jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::argsize(chunk));
+  if (!concurrent) {
+    assert (size0 == size, "size: %d size0: %d end sp: %ld start sp: %d chunk size: %d argsize: %d", size, size0, sp - start, jdk_internal_misc_StackChunk::sp(chunk), jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::argsize(chunk));
+  }
 
   // if (!concurrent) {
   //   assert (jdk_internal_misc_StackChunk::numFrames(chunk) == -1 || num_frames == jdk_internal_misc_StackChunk::numFrames(chunk), "young: %d num_frames: %d jdk_internal_misc_StackChunk::numFrames(chunk): %d", !requires_barriers(chunk), num_frames, jdk_internal_misc_StackChunk::numFrames(chunk));
