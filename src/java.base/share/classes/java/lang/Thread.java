@@ -812,11 +812,11 @@ public class Thread implements Runnable {
         }
 
         @Override
-        public Builder name(String name, int start) {
-            Objects.requireNonNull(name);
+        public Builder name(String prefix, int start) {
+            Objects.requireNonNull(prefix);
             if (start < 0)
                 throw new IllegalArgumentException("'start' is negative");
-            this.name = name;
+            this.name = prefix;
             this.counter = start;
             return this;
         }
@@ -947,7 +947,7 @@ public class Thread implements Runnable {
         private final boolean hasCounter;
 
         CountingThreadFactory(int start) {
-            if (start > 0) {
+            if (start >= 0) {
                 count = start;
                 hasCounter = true;
             } else {
