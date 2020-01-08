@@ -3419,6 +3419,74 @@ void MacroAssembler::movdqa(XMMRegister dst, AddressLiteral src) {
   }
 }
 
+  // Move Aligned, possibly non-temporal
+  void MacroAssembler::movqa(Address dst, Register src, bool nt) {
+    if (nt) {
+      Assembler::movntq(dst, src);
+    } else {
+      Assembler::movq(dst, src);
+    }
+  }
+
+  void MacroAssembler::movqa(Address dst, MMXRegister src, bool nt) {
+    if (nt) {
+      Assembler::movntq(dst, src);
+    } else {
+      Assembler::movq(dst, src);
+    }
+  }
+
+  void MacroAssembler::movdqa(Address dst, XMMRegister src, bool nt) {
+    if (nt) {
+      Assembler::movntdq(dst, src);
+    } else {
+      Assembler::movdqu(dst, src);
+    }
+  }
+  void MacroAssembler::vmovdqa(Address dst, XMMRegister src, bool nt) {
+    if (nt) {
+      Assembler::vmovntdq(dst, src);
+    } else {
+      Assembler::vmovdqu(dst, src);
+    }
+  }
+  void MacroAssembler::evmovdqa(Address dst, XMMRegister src, int vector_len, bool nt) {
+    if (nt) {
+      Assembler::evmovntdq(dst, src, vector_len);
+    } else {
+      Assembler::evmovdqal(dst, src, vector_len);
+    }
+  }
+
+  void MacroAssembler::movqa(MMXRegister dst, Address src, bool nt) {
+    if (nt) {
+      stop("unsupported"); // XXXX
+    } else {
+      Assembler::movq(dst, src);
+    }
+  }
+  void MacroAssembler::movdqa(XMMRegister dst, Address src, bool nt) {
+    if (nt) {
+      Assembler::movntdqa(dst, src);
+    } else {
+      Assembler::movdqa(dst, src);
+    }
+  }
+  void MacroAssembler::vmovdqa(XMMRegister dst, Address src, bool nt) {
+    if (nt) {
+      Assembler::vmovntdqa(dst, src);
+    } else {
+      Assembler::vmovdqa(dst, src);
+    }
+  }
+  void MacroAssembler::evmovdqa(XMMRegister dst, Address src, int vector_len, bool nt) {
+    if (nt) {
+      Assembler::evmovntdqa(dst, src, vector_len);
+    } else {
+      Assembler::evmovdqal(dst, src, vector_len);
+    }
+  }
+
 void MacroAssembler::movsd(XMMRegister dst, AddressLiteral src) {
   if (reachable(src)) {
     Assembler::movsd(dst, as_Address(src));

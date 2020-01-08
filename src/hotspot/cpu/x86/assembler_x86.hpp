@@ -1523,12 +1523,14 @@ private:
   void movq(Address     dst, MMXRegister src );
   void movq(MMXRegister dst, Address src );
 
+  void movntq(Address dst, Register src);
   void movntq(Address dst, MMXRegister src);
+  void movntdq(Address dst, XMMRegister src);
   void vmovntdq(Address dst, XMMRegister src);
   void evmovntdq(Address dst, XMMRegister src, int vector_len);
   void movntdqa(XMMRegister dst, Address src);
   void vmovntdqa(XMMRegister dst, Address src);
-  void evmovdqnta(XMMRegister dst, Address src, int vector_len);
+  void evmovntdqa(XMMRegister dst, Address src, int vector_len);
 
 #ifdef _LP64
   // These dummies prevent using movq from converting a zero (like NULL) into Register

@@ -3025,11 +3025,28 @@ void Assembler::movq( Address dst, MMXRegister src ) {
   emit_operand(dst, src);
 }
 
+void Assembler::movntq(Address dst, Register src) { // uses the MOVNTI operation
+  InstructionMark im(this);
+  prefixq(dst);
+  emit_int8(0x0F);
+  emit_int8((unsigned char)0xC3);
+  emit_operand(src, dst);
+}
+
 void Assembler::movntq(Address dst, MMXRegister src) {
   assert( VM_Version::supports_mmx(), "" );
   emit_int8(0x0F);
   emit_int8((unsigned char)0xE7);
   emit_operand(dst, src);
+}
+
+void Assembler::movntdq(Address dst, XMMRegister src) {
+  NOT_LP64(assert(VM_Version::supports_sse2(), ""));
+  InstructionMark im(this);
+  emit_int8((unsigned char)0x66);
+  emit_int8(0x0F);
+  emit_int8((unsigned char)0xE7);
+  emit_operand(src, dst);
 }
 
 void Assembler::movntdqa(XMMRegister dst, Address src) {
@@ -3052,7 +3069,7 @@ void Assembler::vmovntdqa(XMMRegister dst, Address src) {
   emit_operand(dst, src);
 }
 
-void Assembler::evmovdqnta(XMMRegister dst, Address src, int vector_len) {
+void Assembler::evmovntdqa(XMMRegister dst, Address src, int vector_len) {
   assert(VM_Version::supports_evex(), "");
   InstructionMark im(this);
   InstructionAttr attributes(vector_len, /* vex_w */ true, /* legacy_mode */ _legacy_mode_bw, /* no_mask_reg */ true, /* uses_vl */ true);
