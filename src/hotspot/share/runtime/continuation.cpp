@@ -4420,7 +4420,7 @@ static int maybe_count_Java_frames(ContMirror& cont, bool return_barrier) {
 }
 
 static void post_JVMTI_continue(JavaThread* thread, FrameInfo* fi, int java_frame_count, bool return_barrier) {
-  if (return_barrier) return;
+  if (!return_barrier) return;
 
   if (JvmtiExport::should_post_continuation_run()) {
     set_anchor<false>(thread, fi); // ensure thawed frames are visible
