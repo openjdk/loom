@@ -1290,6 +1290,13 @@ inline intptr_t* Freeze<ConfigT, mode>::align_bottom(intptr_t* bottom, int argsi
 }
 
 template <typename ConfigT, op_mode mode>
+inline void Thaw<ConfigT, mode>::prefetch_chunk_pd(void* start, int size) {
+  size <<= LogBytesPerWord;
+  Prefetch::read_streaming(start, size);
+  Prefetch::read_streaming(start, size - 64);
+}
+
+template <typename ConfigT, op_mode mode>
 inline intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp, int argsize) {
 #ifdef _LP64
   assert ((intptr_t)vsp % 16 == 0 || argsize != 0 || Interpreter::contains(_cont.entryPC()), "");

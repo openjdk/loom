@@ -1610,6 +1610,9 @@ class StubGenerator: public StubCodeGenerator {
   //   - 2.7.6 REP String Enhancement
   //   - 3.7.5 REP Prefix and Data Movement
   //   - 3.7.6 Enhanced REP MOVSB and STOSB Operation
+  //   - 8.1 GENERAL PREFETCH CODING GUIDELINES
+  //   - 8.4.1.2 Streaming Non-temporal Stores, 8.4.1.3 Memory Type and Non-temporal Stores
+  //   - 8.5 MEMORY OPTIMIZATION USING PREFETCH, 8.5.6 Software Prefetch Scheduling Distance, 8.5.7 Software Prefetch Concatenation
   //   - 14.3, MIXING AVX CODE WITH SSE CODE + https://software.intel.com/en-us/articles/intel-avx-state-transitions-migrating-sse-code-to-avx
   // - Optimizing subroutines in assembly language, 17.9 Moving blocks of data https://www.agner.org/optimize/optimizing_assembly.pdf
   // - StackOverflow
@@ -1621,9 +1624,9 @@ class StubGenerator: public StubCodeGenerator {
   //   - https://stackoverflow.com/q/17312823/750563 When program will benefit from prefetch & non-temporal load/store?
   //   - https://stackoverflow.com/q/40096894/750563 Do current x86 architectures support non-temporal loads (from “normal” memory)?
   //   - https://stackoverflow.com/q/32103968/750563 Non-temporal loads and the hardware prefetcher, do they work together?
-  // - https://docs.roguewave.com/threadspotter/2011.2/manual_html_linux/manual_html/ch05s03.html
-  // - https://blogs.fau.de/hager/archives/2103
-  // - https://vgatherps.github.io/2018-09-02-nontemporal/
+  // - https://docs.roguewave.com/threadspotter/2011.2/manual_html_linux/manual_html/ch05s03.html Non-Temporal Data
+  // - https://blogs.fau.de/hager/archives/2103 A case for the non-temporal store
+  // - https://vgatherps.github.io/2018-09-02-nontemporal/ Optimizing Cache Usage With Nontemporal Accesses
   // - https://www.reddit.com/r/cpp/comments/9ccb88/optimizing_cache_usage_with_nontemporal_accesses/
   // - https://lwn.net/Articles/255364/ Memory part 5: What programmers can do
   // - https://software.intel.com/en-us/forums/intel-isa-extensions/topic/597075 Do Non-Temporal Loads Prefetch?
@@ -1653,7 +1656,7 @@ class StubGenerator: public StubCodeGenerator {
     StubCodeMark mark(this, "StubRoutines", name);
     address start = __ pc();
 
-    Label L_copy_bytes, L_copy_8_bytes, L_loop, L_exit;
+    Label L_copy_bytes, L_copy_8_bytes, L_loop, L_end, L_exit;
     const Register from        = rdi;  // source array address
     const Register to          = rsi;  // destination array address
     const Register count       = rdx;  // elements count
@@ -1661,8 +1664,9 @@ class StubGenerator: public StubCodeGenerator {
     const Register end_from    = from; // source array end address
     const Register end_to      = to;   // destination array end address
     const Register scratch     = rax;
+    const Register align       = rbx;
 
-    const bool nt = true; // use non-temporal stores
+    const bool nt = false; // use non-temporal stores
 
     // End pointers are inclusive, and if count is not zero they point
     // to the last unit copied:  end_to[0] := end_from[0]
@@ -1674,56 +1678,56 @@ class StubGenerator: public StubCodeGenerator {
                       // r9 and r10 may be used to save non-volatile registers
 
     // Copy from low to high addresses.
+    // By pointing to the end and negating qword_count we:
+    // 1. only update count, not from/tp; 2. don't need another register to hold total count; 3. can jcc right after addptr without cmpptr
 
-    { // align
-      NearLabel L_aligned_128, L_aligned_256, L_aligned_512;
-      __ testl(to, 8);
-      __ jccb(Assembler::zero, L_aligned_128);
-      // no need to test because we know qword_count >= 2
-      __ movq(scratch, Address(from, 0));
-      __ movqa(Address(to, 0), scratch, nt);
-      __ subptr(qword_count, 1);
-      __ addq(from, 8);
-      __ addq(to, 8);
-
-      __ bind(L_aligned_128);
-      if (UseAVX >= 2) {
-        __ cmpptr(qword_count, 2);
-        __ jccb(Assembler::less, L_aligned_512); // TODO PERF
-        __ testl(to, 16);
-        __ jccb(Assembler::zero, L_aligned_256);
-        __ movdqu(xmm0, Address(from, 0));
-        __ movdqa(Address(to, 0), xmm0, nt);
-        __ subptr(qword_count, 2); // TODO PERFB
-        __ addq(from, 16);
-        __ addq(to, 16);
-      }
-
-      // we can move from SSE to AVX without penalty, but not the other way around
-      __ bind(L_aligned_256);
-      if (UseAVX > 2) {
-        __ cmpptr(qword_count, 4);
-        __ jccb(Assembler::less, L_aligned_512); // TODO PERF
-        __ testl(to, 32);
-        __ jccb(Assembler::zero, L_aligned_512);
-        __ vmovdqu(xmm0, Address(from, 0));
-        __ vmovdqa(Address(to, 0), xmm0, nt);
-        __ subptr(qword_count, 4); // TODO PERF
-        __ addq(from, 32);
-        __ addq(to, 32);
-      }
-      __ bind(L_aligned_512);
-    }
-
+    // __ movptr(align, to);
     __ lea(end_from, Address(from, qword_count, Address::times_8, -8));
     __ lea(end_to,   Address(to,   qword_count, Address::times_8, -8));
     __ negptr(qword_count); // make the count negative
-    __ jmp(L_copy_bytes);
+    // Address(end_from/to, qword_count, Address::times_8) now points 8 bytes *below* to original from/to
+    // i.e. orig to == Address(end_to, qword_count, Address::times_8, 8)
 
     // Copy in multi-bytes chunks
-    __ align(OptoLoopAlignment);
+    
     if (UseUnalignedLoadStores) {
-      Label L_end;
+      { // align target
+        NearLabel L_aligned_128, L_aligned_256, L_aligned_512;
+
+        __ lea(align, Address(end_to, qword_count, Address::times_8, 8)); // == original to
+        __ negptr(align); // we align by copying from the beginning of to, making it effectively larger
+
+        __ testl(align, 8);
+        __ jccb(Assembler::zero, L_aligned_128);
+        __ increment(qword_count, 1);
+        // no need to test because we know qword_count >= 2
+        __ movq(scratch, Address(end_from, qword_count, Address::times_8, -0));
+        __ movqa(Address(end_to, qword_count, Address::times_8, -0), scratch, nt);
+        __ bind(L_aligned_128);
+
+        if (UseAVX >= 2) {
+          __ testl(align, 16);
+          __ jccb(Assembler::zero, L_aligned_256);
+          __ cmpptr(qword_count, -2);
+          __ jccb(Assembler::greater, L_copy_8_bytes);
+          __ addptr(qword_count, 2);
+          __ movdqu(xmm0, Address(end_from, qword_count, Address::times_8, -8));
+          __ movdqa(Address(end_to, qword_count, Address::times_8, -8), xmm0, nt);
+          __ bind(L_aligned_256);
+          // we can move from SSE to AVX without penalty, but not the other way around
+        }
+
+        if (UseAVX > 2) {
+          __ testl(align, 32);
+          __ jccb(Assembler::zero, L_aligned_512);
+          __ addptr(qword_count, 4);
+          __ jccb(Assembler::less, L_end);
+          __ vmovdqu(xmm0, Address(end_from, qword_count, Address::times_8, -24));
+          __ vmovdqa(Address(end_to, qword_count, Address::times_8, -24), xmm0, nt);
+          __ bind(L_aligned_512);
+        }
+      }
+
       // Copy 64-bytes per iteration
       if (UseAVX > 2) {
         Label L_loop_avx512, L_loop_avx2, L_32_byte_head, L_above_threshold, L_below_threshold;
@@ -1733,6 +1737,7 @@ class StubGenerator: public StubCodeGenerator {
         __ jccb(Assembler::less, L_above_threshold);
         __ jmpb(L_below_threshold);
 
+        __ align(OptoLoopAlignment);
         __ bind(L_loop_avx512);
         __ evmovdqul(xmm0, Address(end_from, qword_count, Address::times_8, -56), Assembler::AVX_512bit);
         __ evmovdqa(Address(end_to, qword_count, Address::times_8, -56), xmm0, Assembler::AVX_512bit, nt);
@@ -1754,6 +1759,8 @@ class StubGenerator: public StubCodeGenerator {
         __ subptr(qword_count, 4);  // sub(8) and add(4)
         __ jccb(Assembler::greater, L_end);
       } else {
+        __ jmp(L_copy_bytes);
+        __ align(OptoLoopAlignment);
         __ BIND(L_loop);
         if (UseAVX == 2) {
           __ vmovdqu(xmm0, Address(end_from, qword_count, Address::times_8, -56));
@@ -1788,14 +1795,10 @@ class StubGenerator: public StubCodeGenerator {
         __ movdqa(Address(end_to, qword_count, Address::times_8, - 8), xmm1, nt);
       }
       __ addptr(qword_count, 4);
-      __ BIND(L_end);
-      if (UseAVX >= 2) {
-        // clean upper bits of YMM registers
-        __ vpxor(xmm0, xmm0);
-        __ vpxor(xmm1, xmm1);
-      }
     } else {
       // Copy 32-bytes per iteration
+      __ jmp(L_copy_bytes);
+      __ align(OptoLoopAlignment);
       __ BIND(L_loop);
       __ movq(scratch, Address(end_from, qword_count, Address::times_8, -24));
       __ movqa(Address(end_to, qword_count, Address::times_8, -24), scratch, nt);
@@ -1810,6 +1813,7 @@ class StubGenerator: public StubCodeGenerator {
       __ addptr(qword_count, 4);
       __ jcc(Assembler::lessEqual, L_loop);
     }
+    __ BIND(L_end);
     __ subptr(qword_count, 4);
     __ jcc(Assembler::less, L_copy_8_bytes); // Copy trailing qwords
 
@@ -1822,7 +1826,7 @@ class StubGenerator: public StubCodeGenerator {
 
     // Copy trailing qwords
     __ BIND(L_copy_8_bytes);
-    __ movq(rax, Address(end_from, qword_count, Address::times_8, 8));
+    __ movq(scratch, Address(end_from, qword_count, Address::times_8, 8));
     __ movqa(Address(end_to, qword_count, Address::times_8, 8), scratch, nt);
     __ increment(qword_count);
     __ jcc(Assembler::notZero, L_copy_8_bytes);
@@ -1857,6 +1861,8 @@ class StubGenerator: public StubCodeGenerator {
     const Register qword_count = count;
     const Register scratch     = rax;
 
+    const bool nt = false; // use non-temporal prefetches
+
     __ enter(); // required for proper stackwalking of RuntimeStub frame
     assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
@@ -1871,6 +1877,7 @@ class StubGenerator: public StubCodeGenerator {
     if (UseUnalignedLoadStores) {
       Label L_end;
       // Copy 64-bytes per iteration
+      const int prefetch_distance = 2 * 64; // prefetch distance of 2
       if (UseAVX > 2) {
         Label L_loop_avx512, L_loop_avx2, L_32_byte_head, L_above_threshold, L_below_threshold;
 
@@ -1880,6 +1887,9 @@ class StubGenerator: public StubCodeGenerator {
         __ jmpb(L_below_threshold);
 
         __ BIND(L_loop_avx512);
+        if (nt) {
+          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance)); 
+        }
         __ evmovdqul(xmm0, Address(from, qword_count, Address::times_8, 0), Assembler::AVX_512bit);
         __ evmovdqul(Address(to, qword_count, Address::times_8, 0), xmm0, Assembler::AVX_512bit);
         __ bind(L_above_threshold);
@@ -1888,6 +1898,9 @@ class StubGenerator: public StubCodeGenerator {
         __ jmpb(L_32_byte_head);
 
         __ bind(L_loop_avx2);
+        if (nt) {
+          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance)); 
+        }
         __ vmovdqu(xmm0, Address(from, qword_count, Address::times_8, 32));
         __ vmovdqu(Address(to, qword_count, Address::times_8, 32), xmm0);
         __ vmovdqu(xmm1, Address(from, qword_count, Address::times_8, 0));
@@ -1901,6 +1914,9 @@ class StubGenerator: public StubCodeGenerator {
         __ jccb(Assembler::less, L_end);
       } else {
         __ BIND(L_loop);
+        if (nt) {
+          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance)); 
+        }
         if (UseAVX == 2) {
           __ vmovdqu(xmm0, Address(from, qword_count, Address::times_8, 32));
           __ vmovdqu(Address(to, qword_count, Address::times_8, 32), xmm0);
@@ -1943,7 +1959,11 @@ class StubGenerator: public StubCodeGenerator {
       }
     } else {
       // Copy 32-bytes per iteration
+      const int prefetch_distance = 4 * 32; // prefetch distance of 4
       __ BIND(L_loop);
+      if (nt) {
+        __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance)); 
+      }
       __ movq(scratch, Address(from, qword_count, Address::times_8, 24));
       __ movq(Address(to, qword_count, Address::times_8, 24), scratch);
       __ movq(scratch, Address(from, qword_count, Address::times_8, 16));
@@ -1969,7 +1989,7 @@ class StubGenerator: public StubCodeGenerator {
 
     // Copy trailing qwords
     __ BIND(L_copy_8_bytes);
-    __ movq(rax, Address(from, qword_count, Address::times_8, -8));
+    __ movq(scratch, Address(from, qword_count, Address::times_8, -8));
     __ movq(Address(to, qword_count, Address::times_8, -8), scratch);
     __ decrement(qword_count);
     __ jcc(Assembler::notZero, L_copy_8_bytes);

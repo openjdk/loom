@@ -3648,6 +3648,7 @@ private:
   void deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb);
   void patch_chunk_pd(intptr_t* sp);
   inline intptr_t* align_chunk(intptr_t* vsp, int argsize);
+  inline void prefetch_chunk_pd(void* start, int size_words);
   void setup_jump(intptr_t* vsp, intptr_t* hsp);
 
   bool should_deoptimize() {
@@ -3785,6 +3786,9 @@ public:
 
     bool partial, empty;
     if (!TEST_THAW_ONE_CHUNK_FRAME && LIKELY(ConfigT::full_stack || (size < threshold /*&& !barriers*/))) {
+      // prefetch with anticipation of memcpy starting at highest address
+      prefetch_chunk_pd(InstanceStackChunkKlass::start_of_stack(chunk), size);
+
       partial = false;
       empty = true;
       size -= argsize;

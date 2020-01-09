@@ -29,5 +29,6 @@
 
 inline void Prefetch::read (void *loc, intx interval) {}
 inline void Prefetch::write(void *loc, intx interval) {}
+inline void Prefetch::read_streaming(void *loc, intx interval) {}
 
 #endif // OS_CPU_WINDOWS_X86_PREFETCH_WINDOWS_X86_INLINE_HPP
