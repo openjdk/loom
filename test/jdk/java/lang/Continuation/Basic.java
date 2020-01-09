@@ -40,12 +40,8 @@
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
 * @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
-*/
-
-/*
-Graal tests currently disabled until we can find the problem with monitor pinned tests.
-
-* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
+*
+* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
 * @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,Basic.manyArgsDriver -XX:-UseContinuationLazyCopy Basic
 * @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,java/lang/Continuation.enter -XX:-UseContinuationLazyCopy Basic
 * @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=inline,java/lang/Continuation.run -XX:-UseContinuationLazyCopy Basic
