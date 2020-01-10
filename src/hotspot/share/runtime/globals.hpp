@@ -2506,6 +2506,9 @@ const size_t minimumSymbolTableSize = 1024;
   product(bool, UseContinuationFastPath, true,                              \
       "Use fast-path frame walking in continuations")                       \
                                                                             \
+  product(bool, UseContinuationStreamingCopy, false,                        \
+      "Use streaming memory when copying continuation stack chunks")        \
+                                                                            \
   experimental(ccstr, AllocateOldGenAt, NULL,                               \
           "Path to the directoy where a temporary file will be "            \
           "created to use as the backing store for old generation."         \

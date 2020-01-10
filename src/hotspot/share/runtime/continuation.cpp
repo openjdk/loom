@@ -1582,6 +1582,13 @@ protected:
   }
 };
 
+static MemcpyFnT cont_freeze_chunk_memcpy = NULL;
+static MemcpyFnT cont_thaw_chunk_memcpy = NULL;
+
+static void default_memcpy(void* from, void* to, size_t size) {
+  memcpy(to, from, size << LogBytesPerWord);
+}
+
 ///////////// FREEZE ///////
 
 enum freeze_result {
@@ -5780,10 +5787,12 @@ public:
     cont_freeze_fast    = SelectedConfigT::template freeze<mode_fast>;
     cont_freeze_slow    = SelectedConfigT::template freeze<mode_slow>;
     cont_freeze_preempt = SelectedConfigT::template freeze<mode_preempt>;
+    cont_freeze_chunk_memcpy = resolve_freeze_chunk_memcpy();
 
     cont_thaw_fast    = SelectedConfigT::template thaw<mode_fast>;
     cont_thaw_slow    = SelectedConfigT::template thaw<mode_slow>;
     cont_thaw_preempt = SelectedConfigT::template thaw<mode_preempt>;
+    cont_thaw_chunk_memcpy = resolve_thaw_chunk_memcpy();
 
     cont_freeze_oops_slow = (FreezeFnT) FreezeCompiledOops<typename SelectedConfigT::OopWriterT>::slow_path;
     if (SelectedConfigT::allow_stubs) {

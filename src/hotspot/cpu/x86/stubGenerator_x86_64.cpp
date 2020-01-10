@@ -1635,23 +1635,17 @@ class StubGenerator: public StubCodeGenerator {
 
   // Used by continuations to copy from stack
   // Arguments:
-  //   name    - stub name string
+  //   name - stub name string
+  //   nt   -  use non-temporal stores
   //
   // Inputs:
   //   c_rarg0   - source array address       -- 16-byte aligned
   //   c_rarg1   - destination array address  --  8-byte aligned
   //   c_rarg2   - element count, in qwords (8 bytes), >= 2
   //
-  // If 'from' and/or 'to' are aligned on 4-, 2-, or 1-byte boundaries,
-  // we let the hardware handle it.  The one to eight bytes within words,
-  // dwords or qwords that span cache line boundaries will still be loaded
-  // and stored atomically.
-  //
-  // Side Effects:
-  //   disjoint_byte_copy_entry is set to the no-overlap entry point
-  //   used by generate_conjoint_byte_copy().
-  //
-  address generate_disjoint_word_copy_up(const char *name) {
+  address generate_disjoint_word_copy_up(bool nt, const char *name) {
+    const bool align = nt;
+
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", name);
     address start = __ pc();
@@ -1664,9 +1658,7 @@ class StubGenerator: public StubCodeGenerator {
     const Register end_from    = from; // source array end address
     const Register end_to      = to;   // destination array end address
     const Register scratch     = rax;
-    const Register align       = rbx;
-
-    const bool nt = false; // use non-temporal stores
+    const Register alignment   = rbx;
 
     // End pointers are inclusive, and if count is not zero they point
     // to the last unit copied:  end_to[0] := end_from[0]
@@ -1681,7 +1673,7 @@ class StubGenerator: public StubCodeGenerator {
     // By pointing to the end and negating qword_count we:
     // 1. only update count, not from/tp; 2. don't need another register to hold total count; 3. can jcc right after addptr without cmpptr
 
-    // __ movptr(align, to);
+    // __ movptr(alignment, to);
     __ lea(end_from, Address(from, qword_count, Address::times_8, -8));
     __ lea(end_to,   Address(to,   qword_count, Address::times_8, -8));
     __ negptr(qword_count); // make the count negative
@@ -1691,13 +1683,13 @@ class StubGenerator: public StubCodeGenerator {
     // Copy in multi-bytes chunks
     
     if (UseUnalignedLoadStores) {
-      { // align target
+      if (align) { // align target
         NearLabel L_aligned_128, L_aligned_256, L_aligned_512;
 
-        __ lea(align, Address(end_to, qword_count, Address::times_8, 8)); // == original to
-        __ negptr(align); // we align by copying from the beginning of to, making it effectively larger
+        __ lea(alignment, Address(end_to, qword_count, Address::times_8, 8)); // == original to
+        __ negptr(alignment); // we align by copying from the beginning of to, making it effectively larger
 
-        __ testl(align, 8);
+        __ testl(alignment, 8);
         __ jccb(Assembler::zero, L_aligned_128);
         __ increment(qword_count, 1);
         // no need to test because we know qword_count >= 2
@@ -1706,7 +1698,7 @@ class StubGenerator: public StubCodeGenerator {
         __ bind(L_aligned_128);
 
         if (UseAVX >= 2) {
-          __ testl(align, 16);
+          __ testl(alignment, 16);
           __ jccb(Assembler::zero, L_aligned_256);
           __ cmpptr(qword_count, -2);
           __ jccb(Assembler::greater, L_copy_8_bytes);
@@ -1718,7 +1710,7 @@ class StubGenerator: public StubCodeGenerator {
         }
 
         if (UseAVX > 2) {
-          __ testl(align, 32);
+          __ testl(alignment, 32);
           __ jccb(Assembler::zero, L_aligned_512);
           __ addptr(qword_count, 4);
           __ jccb(Assembler::less, L_end);
@@ -1837,19 +1829,15 @@ class StubGenerator: public StubCodeGenerator {
 
   // Used by continuations to copy to stack
   // Arguments:
-  //   name    - stub name string
+  //   name - stub name string
+  //   nt   - use non-temporal prefetches
   //
   // Inputs:
   //   c_rarg0   - source array address      --  8-byte aligned
   //   c_rarg1   - destination array address -- 16-byte aligned
   //   c_rarg2   - element count, in qwords (8 bytes), >= 2
   //
-  // If 'from' and/or 'to' are aligned on 4- or 2-byte boundaries, we
-  // let the hardware handle it.  The two or four words within dwords
-  // or qwords that span cache line boundaries will still be loaded
-  // and stored atomically.
-  //
-  address generate_disjoint_word_copy_down(const char *name) {
+  address generate_disjoint_word_copy_down(bool nt, const char *name) {
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", name);
     address start = __ pc();
@@ -1860,8 +1848,6 @@ class StubGenerator: public StubCodeGenerator {
     const Register count       = rdx;  // elements count
     const Register qword_count = count;
     const Register scratch     = rax;
-
-    const bool nt = false; // use non-temporal prefetches
 
     __ enter(); // required for proper stackwalking of RuntimeStub frame
     assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
@@ -3498,10 +3484,10 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit    = StubRoutines::_oop_disjoint_arraycopy_uninit;
     StubRoutines::_arrayof_oop_arraycopy_uninit             = StubRoutines::_oop_arraycopy_uninit;
 
-    StubRoutines::_word_memcpy_up   = generate_disjoint_word_copy_up("word_memcpy_up");
-    StubRoutines::_word_memcpy_down = generate_disjoint_word_copy_down("word_memcpy_down");
-    StubRoutines::_word_memcpy_up_nt   = generate_disjoint_word_copy_up("word_memcpy_up_nt");
-    StubRoutines::_word_memcpy_down_nt = generate_disjoint_word_copy_down("word_memcpy_down_nt");
+    StubRoutines::_word_memcpy_up      = generate_disjoint_word_copy_up  (false, "word_memcpy_up");
+    StubRoutines::_word_memcpy_up_nt   = generate_disjoint_word_copy_up  (true,  "word_memcpy_up_nt");
+    StubRoutines::_word_memcpy_down    = generate_disjoint_word_copy_down(false, "word_memcpy_down");
+    StubRoutines::_word_memcpy_down_nt = generate_disjoint_word_copy_down(true,  "word_memcpy_down_nt");
   }
 
   // AES intrinsic stubs
