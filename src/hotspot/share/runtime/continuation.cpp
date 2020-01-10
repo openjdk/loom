@@ -330,7 +330,7 @@ struct FpOopInfo;
 typedef int (*FreezeFnT)(address, address, address, address, int, FpOopInfo*, void * /* FreezeCompiledOops::Extra */);
 typedef int (*ThawFnT)(address /* dst */, address /* objArray */, address /* map */, address /* ThawCompiledOops::Extra */);
 
-typedef void (*MemcpyFnT)(void* src, void* dst, int count);
+typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
 
 static inline void copy_from_stack(void* from, void* to, size_t size);
 static inline void copy_to_stack(void* from, void* to, size_t size);
