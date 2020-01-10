@@ -1164,7 +1164,6 @@ public:
   void vmovdqa(Address dst, XMMRegister src, bool nt);  // 256-bit
   void evmovdqa(Address dst, XMMRegister src, int vector_len, bool nt); // 512-bit
 
-  void movqa(MMXRegister dst, Address src, bool nt);    // 64-bit
   void movdqa(XMMRegister dst, Address src, bool nt);   // 128-bit
   void vmovdqa(XMMRegister dst, Address src, bool nt);  // 256-bit
   void evmovdqa(XMMRegister dst, Address src, int vector_len, bool nt); // 512-bit

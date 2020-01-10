@@ -3050,13 +3050,20 @@ void Assembler::movntdq(Address dst, XMMRegister src) {
 }
 
 void Assembler::movntdqa(XMMRegister dst, Address src) {
-  NOT_LP64(assert(VM_Version::supports_sse2(), ""));
-  InstructionMark im(this);
-  InstructionAttr attributes(AVX_128bit, /* rex_w */ false, /* legacy_mode */ false, /* no_mask_reg */ true, /* uses_vl */ true);
-  attributes.set_address_attributes(/* tuple_type */ EVEX_FVM, /* input_size_in_bits */ EVEX_NObit);
-  simd_prefix(dst, xnoreg, src, VEX_SIMD_66, VEX_OPCODE_0F, &attributes);
+  NOT_LP64(assert(VM_Version::supports_sse4_1(), ""));
+  emit_int8((unsigned char)0x66);
+  emit_int8(0x0F);
   emit_int8(0x38);
+  emit_int8((unsigned char)0x2A);
   emit_operand(dst, src);
+
+  // Same thing, with AVX:
+  // assert(UseAVX > 0, "");
+  // InstructionMark im(this);
+  // InstructionAttr attributes(AVX_128bit, /* rex_w */ false, /* legacy_mode */ true, /* no_mask_reg */ true, /* uses_vl */ false);
+  // simd_prefix(dst, dst, src, VEX_SIMD_66, VEX_OPCODE_0F_38, &attributes);
+  // emit_int8((unsigned char)0x2A);
+  // emit_operand(dst, src);
 }
 
 void Assembler::vmovntdqa(XMMRegister dst, Address src) {

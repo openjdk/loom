@@ -3458,32 +3458,25 @@ void MacroAssembler::movdqa(XMMRegister dst, AddressLiteral src) {
     }
   }
 
-  void MacroAssembler::movqa(MMXRegister dst, Address src, bool nt) {
-    if (nt) {
-      stop("unsupported"); // XXXX
-    } else {
-      Assembler::movq(dst, src);
-    }
-  }
   void MacroAssembler::movdqa(XMMRegister dst, Address src, bool nt) {
     if (nt) {
       Assembler::movntdqa(dst, src);
     } else {
-      Assembler::movdqa(dst, src);
+      Assembler::movdqu(dst, src); // use unaligned load
     }
   }
   void MacroAssembler::vmovdqa(XMMRegister dst, Address src, bool nt) {
     if (nt) {
       Assembler::vmovntdqa(dst, src);
     } else {
-      Assembler::vmovdqa(dst, src);
+      Assembler::vmovdqu(dst, src); // use unaligned load
     }
   }
   void MacroAssembler::evmovdqa(XMMRegister dst, Address src, int vector_len, bool nt) {
     if (nt) {
       Assembler::evmovntdqa(dst, src, vector_len);
     } else {
-      Assembler::evmovdqal(dst, src, vector_len);
+      Assembler::evmovdqul(dst, src, vector_len); // use unaligned load
     }
   }
 
