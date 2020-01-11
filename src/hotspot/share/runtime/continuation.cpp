@@ -5583,7 +5583,7 @@ JVM_END
 JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)) {
   JavaThread* thread = JavaThread::thread_from_jni_environment(env);
 
-  if (!ThreadLocalHandshakes || !SafepointMechanism::uses_thread_local_poll()) {
+  if (!SafepointMechanism::uses_thread_local_poll()) {
     return -5;
   }
 

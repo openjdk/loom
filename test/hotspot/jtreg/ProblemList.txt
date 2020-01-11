@@ -71,6 +71,8 @@ compiler/rtm/locking/TestUseRTMDeopt.java 8183263 generic-x64
 compiler/rtm/locking/TestUseRTMXendForLockBusy.java 8183263 generic-x64
 compiler/rtm/print/TestPrintPreciseRTMLockingStatistics.java 8183263 generic-x64
 
+compiler/jsr292/ContinuousCallSiteTargetChange.java 8234146 solaris-sparcv9
+
 #############################################################################
 
 # :hotspot_gc
@@ -115,7 +117,7 @@ serviceability/sa/ClhsdbPrintAs.java 8193639 solaris-all
 serviceability/sa/ClhsdbPrintStatics.java 8193639 solaris-all
 serviceability/sa/ClhsdbPstack.java 8193639 solaris-all
 serviceability/sa/ClhsdbRegionDetailsScanOopsForG1.java 8193639 solaris-all
-serviceability/sa/ClhsdbScanOops.java 8193639 solaris-all
+serviceability/sa/ClhsdbScanOops.java 8193639,8235220,8230731 solaris-all,linux-x64,macosx-x64,windows-x64
 serviceability/sa/ClhsdbSource.java 8193639 solaris-all
 serviceability/sa/ClhsdbThread.java 8193639 solaris-all
 serviceability/sa/ClhsdbVmStructsDump.java 8193639 solaris-all

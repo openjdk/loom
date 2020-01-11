@@ -4213,7 +4213,10 @@ void MacroAssembler::vpxor(XMMRegister dst, XMMRegister nds, AddressLiteral src,
 #ifdef COMPILER2
 // Generic instructions support for use in .ad files C2 code generation
 
-void MacroAssembler::vabsnegd(int opcode, XMMRegister dst, Register scr) {
+void MacroAssembler::vabsnegd(int opcode, XMMRegister dst, XMMRegister src, Register scr) {
+  if (dst != src) {
+    movdqu(dst, src);
+  }
   if (opcode == Op_AbsVD) {
     andpd(dst, ExternalAddress(StubRoutines::x86::vector_double_sign_mask()), scr);
   } else {
@@ -4231,7 +4234,10 @@ void MacroAssembler::vabsnegd(int opcode, XMMRegister dst, XMMRegister src, int 
   }
 }
 
-void MacroAssembler::vabsnegf(int opcode, XMMRegister dst, Register scr) {
+void MacroAssembler::vabsnegf(int opcode, XMMRegister dst, XMMRegister src, Register scr) {
+  if (dst != src) {
+    movdqu(dst, src);
+  }
   if (opcode == Op_AbsVF) {
     andps(dst, ExternalAddress(StubRoutines::x86::vector_float_sign_mask()), scr);
   } else {

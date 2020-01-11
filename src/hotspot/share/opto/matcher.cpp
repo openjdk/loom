@@ -2064,11 +2064,8 @@ void Matcher::find_shared( Node *n ) {
       set_visited(n);   // Flag as visited now
       bool mem_op = false;
       int mem_addr_idx = MemNode::Address;
-      bool gc_handled = BarrierSet::barrier_set()->barrier_set_c2()->matcher_find_shared_visit(this, mstack, n, nop, mem_op, mem_addr_idx);
-      if (!gc_handled) {
-        if (find_shared_visit(mstack, n, nop, mem_op, mem_addr_idx)) {
-          continue;
-        }
+      if (find_shared_visit(mstack, n, nop, mem_op, mem_addr_idx)) {
+        continue;
       }
       for(int i = n->req() - 1; i >= 0; --i) { // For my children
         Node *m = n->in(i); // Get ith input
@@ -2542,7 +2539,7 @@ MachOper* Matcher::specialize_vector_operand_helper(MachNode* m, MachOper* origi
     int size_in_bytes = 4 * type2size[t->basic_type()];
     ideal_reg = Matcher::vector_ideal_reg(size_in_bytes);
   }
-  return Matcher::specialize_generic_vector_operand(original_opnd, ideal_reg);
+  return Matcher::specialize_generic_vector_operand(original_opnd, ideal_reg, false);
 }
 
 // Compute concrete vector operand for a generic TEMP vector mach node based on its user info.
@@ -2554,7 +2551,7 @@ void Matcher::specialize_temp_node(MachTempNode* tmp, MachNode* use, uint idx) {
     tmp->_opnds[0] = use->_opnds[0]->clone();
   } else {
     uint ideal_vreg = vector_ideal_reg(C->max_vector_size());
-    tmp->_opnds[0] = specialize_generic_vector_operand(tmp->_opnds[0], ideal_vreg);
+    tmp->_opnds[0] = specialize_generic_vector_operand(tmp->_opnds[0], ideal_vreg, true);
   }
 }
 

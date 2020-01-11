@@ -323,6 +323,8 @@
   static_field(StubRoutines,                _montgomeryMultiply,                              address)                               \
   static_field(StubRoutines,                _montgomerySquare,                                address)                               \
   static_field(StubRoutines,                _vectorizedMismatch,                              address)                               \
+  static_field(StubRoutines,                _bigIntegerRightShiftWorker,                      address)                               \
+  static_field(StubRoutines,                _bigIntegerLeftShiftWorker,                       address)                               \
   static_field(StubRoutines,                _cont_doYield,                                    address)                               \
   static_field(StubRoutines,                _cont_getSP,                                      address)                               \
   static_field(StubRoutines,                _cont_thaw,                                       address)                               \

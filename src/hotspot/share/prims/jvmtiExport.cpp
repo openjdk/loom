@@ -2839,7 +2839,6 @@ void JvmtiExport::clear_detected_exception(JavaThread* thread) {
 }
 
 void JvmtiExport::oops_do(OopClosure* f) {
-  JvmtiCurrentBreakpoints::oops_do(f);
   JvmtiObjectAllocEventCollector::oops_do_for_all_threads(f);
 }
 

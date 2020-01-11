@@ -250,7 +250,7 @@ void NMethodSweeper::mark_active_nmethods() {
 
 CodeBlobClosure* NMethodSweeper::prepare_mark_active_nmethods() {
 #ifdef ASSERT
-  if (ThreadLocalHandshakes) {
+  if (SafepointMechanism::uses_thread_local_poll()) {
     assert(Thread::current()->is_Code_cache_sweeper_thread(), "must be executed under CodeCache_lock and in sweeper thread");
     assert_lock_strong(CodeCache_lock);
   } else {
@@ -319,7 +319,7 @@ void NMethodSweeper::do_stack_scanning() {
   // There are stacks in the heap that need to be scanned.
   Universe::heap()->collect_for_codecache();
   if (wait_for_stack_scanning()) {
-    if (ThreadLocalHandshakes) {
+    if (SafepointMechanism::uses_thread_local_poll()) {
       CodeBlobClosure* code_cl;
       {
         MutexLocker ccl(CodeCache_lock, Mutex::_no_safepoint_check_flag);
