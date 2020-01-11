@@ -2040,11 +2040,13 @@ void java_lang_ThreadGroup::serialize_offsets(SerializeClosure* f) {
 int java_lang_Fiber::static_notify_jvmti_events_offset = 0;
 int java_lang_Fiber::_carrierThread_offset = 0;
 int java_lang_Fiber::_continuation_offset = 0;
+int java_lang_Fiber::_state_offset = 0;
 
 #define FIBER_FIELDS_DO(macro) \
   macro(static_notify_jvmti_events_offset,  k, "notifyJvmtiEvents",  bool_signature, true); \
   macro(_carrierThread_offset,  k, "carrierThread",  thread_signature, false); \
-  macro(_continuation_offset,  k, "cont",  continuation_signature, false)
+  macro(_continuation_offset,  k, "cont",  continuation_signature, false); \
+  macro(_state_offset,  k, "state",  short_signature, false)
 
 static jboolean fiber_notify_jvmti_events = JNI_FALSE;
 
@@ -2073,6 +2075,16 @@ oop java_lang_Fiber::carrier_thread(oop fiber) {
 oop java_lang_Fiber::continuation(oop fiber) {
   oop cont = fiber->obj_field(_continuation_offset);
   return cont;
+}
+
+// Read thread status value from state field in java.lang.Fiber java class.
+java_lang_Thread::ThreadStatus java_lang_Fiber::get_thread_status(oop fiber) {
+  // Make sure the caller is operating on behalf of the VM or is
+  // running VM code (state == _thread_in_vm).
+  assert(Threads_lock->owned_by_self() || Thread::current()->is_VM_thread() ||
+         JavaThread::current()->thread_state() == _thread_in_vm,
+         "Java Thread is not running in vm");
+  return (java_lang_Thread::ThreadStatus)fiber->short_field(_state_offset);
 }
 
 #if INCLUDE_CDS

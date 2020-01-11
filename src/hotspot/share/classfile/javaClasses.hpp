@@ -581,6 +581,7 @@ class java_lang_Fiber : AllStatic {
   static int static_notify_jvmti_events_offset;
   static int _carrierThread_offset;
   static int _continuation_offset;
+  static int _state_offset;
  public:
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
@@ -592,6 +593,7 @@ class java_lang_Fiber : AllStatic {
   static bool is_instance(oop obj);
   static oop carrier_thread(oop fiber);
   static oop continuation(oop fiber);
+  static java_lang_Thread::ThreadStatus get_thread_status(oop fiber);
   static void set_notify_jvmti_events(jboolean enable);
   static void init_static_notify_jvmti_events();
 };

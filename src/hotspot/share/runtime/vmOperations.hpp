@@ -91,6 +91,8 @@
   template(GetThreadListStackTraces)              \
   template(GetFrameCount)                         \
   template(GetFrameLocation)                      \
+  template(FiberGetCurrentContendedMonitor)       \
+  template(FiberGetOwnedMonitorInfo)              \
   template(FiberGetThread)                        \
   template(FiberGetStackTrace)                    \
   template(FiberGetFrameCount)                    \
