@@ -292,6 +292,8 @@ private:
 
   static const TypeFunc* mulAdd_Type();
 
+  static const TypeFunc* bigIntegerShift_Type();
+
   static const TypeFunc* vectorizedMismatch_Type();
 
   static const TypeFunc* ghash_processBlocks_Type();

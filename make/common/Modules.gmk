@@ -58,6 +58,7 @@ BOOT_MODULES += \
     java.rmi \
     java.security.sasl \
     java.xml \
+    jdk.incubator.foreign \
     jdk.internal.vm.ci \
     jdk.jfr \
     jdk.management \
@@ -129,7 +130,6 @@ endif
 JRE_TOOL_MODULES += \
     jdk.jdwp.agent \
     jdk.incubator.jpackage \
-    jdk.pack \
     jdk.scripting.nashorn.shell \
     #
 
@@ -163,6 +163,7 @@ DOCS_MODULES += \
     jdk.jsobject \
     jdk.jshell \
     jdk.jstatd \
+    jdk.incubator.foreign \
     jdk.localedata \
     jdk.management \
     jdk.management.agent \
@@ -170,7 +171,6 @@ DOCS_MODULES += \
     jdk.naming.dns \
     jdk.naming.rmi \
     jdk.net \
-    jdk.pack \
     jdk.rmic \
     jdk.scripting.nashorn \
     jdk.sctp \

@@ -330,7 +330,7 @@ struct FpOopInfo;
 typedef int (*FreezeFnT)(address, address, address, address, int, FpOopInfo*, void * /* FreezeCompiledOops::Extra */);
 typedef int (*ThawFnT)(address /* dst */, address /* objArray */, address /* map */, address /* ThawCompiledOops::Extra */);
 
-typedef void (*MemcpyFnT)(void* src, void* dst, int count);
+typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
 
 static inline void copy_from_stack(void* from, void* to, size_t size);
 static inline void copy_to_stack(void* from, void* to, size_t size);
@@ -1581,6 +1581,13 @@ protected:
     _count++;
   }
 };
+
+static MemcpyFnT cont_freeze_chunk_memcpy = NULL;
+static MemcpyFnT cont_thaw_chunk_memcpy = NULL;
+
+static void default_memcpy(void* from, void* to, size_t size) {
+  memcpy(to, from, size << LogBytesPerWord);
+}
 
 ///////////// FREEZE ///////
 
@@ -3648,6 +3655,7 @@ private:
   void deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb);
   void patch_chunk_pd(intptr_t* sp);
   inline intptr_t* align_chunk(intptr_t* vsp, int argsize);
+  inline void prefetch_chunk_pd(void* start, int size_words);
   void setup_jump(intptr_t* vsp, intptr_t* hsp);
 
   bool should_deoptimize() {
@@ -3785,6 +3793,9 @@ public:
 
     bool partial, empty;
     if (!TEST_THAW_ONE_CHUNK_FRAME && LIKELY(ConfigT::full_stack || (size < threshold /*&& !barriers*/))) {
+      // prefetch with anticipation of memcpy starting at highest address
+      prefetch_chunk_pd(InstanceStackChunkKlass::start_of_stack(chunk), size);
+
       partial = false;
       empty = true;
       size -= argsize;
@@ -4420,7 +4431,7 @@ static int maybe_count_Java_frames(ContMirror& cont, bool return_barrier) {
 }
 
 static void post_JVMTI_continue(JavaThread* thread, FrameInfo* fi, int java_frame_count, bool return_barrier) {
-  if (!return_barrier) return;
+  if (return_barrier) return;
 
   if (JvmtiExport::should_post_continuation_run()) {
     set_anchor<false>(thread, fi); // ensure thawed frames are visible
@@ -5572,7 +5583,7 @@ JVM_END
 JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)) {
   JavaThread* thread = JavaThread::thread_from_jni_environment(env);
 
-  if (!ThreadLocalHandshakes || !SafepointMechanism::uses_thread_local_poll()) {
+  if (!SafepointMechanism::uses_thread_local_poll()) {
     return -5;
   }
 
@@ -5719,6 +5730,8 @@ public:
 
   static void print() {
     tty->print_cr(">>> Config compressed_oops: %d post_barrier: %d allow_stubs: %d use_chunks: %d", _compressed_oops, _post_barrier, allow_stubs, has_young);
+    tty->print_cr(">>> Config UseAVX: %ld UseUnalignedLoadStores: %d Enhanced REP MOVSB: %d Fast Short REP MOVSB: %d rdtscp: %d rdpid: %d", UseAVX, UseUnalignedLoadStores, VM_Version::supports_erms(), VM_Version::supports_fsrm(), VM_Version::supports_rdtscp(), VM_Version::supports_rdpid());
+    tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
   }
 };
 
@@ -5774,10 +5787,12 @@ public:
     cont_freeze_fast    = SelectedConfigT::template freeze<mode_fast>;
     cont_freeze_slow    = SelectedConfigT::template freeze<mode_slow>;
     cont_freeze_preempt = SelectedConfigT::template freeze<mode_preempt>;
+    cont_freeze_chunk_memcpy = resolve_freeze_chunk_memcpy();
 
     cont_thaw_fast    = SelectedConfigT::template thaw<mode_fast>;
     cont_thaw_slow    = SelectedConfigT::template thaw<mode_slow>;
     cont_thaw_preempt = SelectedConfigT::template thaw<mode_preempt>;
+    cont_thaw_chunk_memcpy = resolve_thaw_chunk_memcpy();
 
     cont_freeze_oops_slow = (FreezeFnT) FreezeCompiledOops<typename SelectedConfigT::OopWriterT>::slow_path;
     if (SelectedConfigT::allow_stubs) {

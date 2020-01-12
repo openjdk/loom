@@ -464,14 +464,16 @@ public:
   void set_prev(HeapRegion* prev) { _prev = prev; }
   HeapRegion* prev()              { return _prev; }
 
+  void unlink_from_list();
+
   // Every region added to a set is tagged with a reference to that
   // set. This is used for doing consistency checking to make sure that
   // the contents of a set are as they should be and it's only
   // available in non-product builds.
 #ifdef ASSERT
   void set_containing_set(HeapRegionSetBase* containing_set) {
-    assert((containing_set == NULL && _containing_set != NULL) ||
-           (containing_set != NULL && _containing_set == NULL),
+    assert((containing_set != NULL && _containing_set == NULL) ||
+            containing_set == NULL,
            "containing_set: " PTR_FORMAT " "
            "_containing_set: " PTR_FORMAT,
            p2i(containing_set), p2i(_containing_set));
@@ -488,11 +490,10 @@ public:
 #endif // ASSERT
 
 
-  // Reset the HeapRegion to default values.
-  // If skip_remset is true, do not clear the remembered set.
+  // Reset the HeapRegion to default values and clear its remembered set.
   // If clear_space is true, clear the HeapRegion's memory.
-  // If locked is true, assume we are the only thread doing this operation.
-  void hr_clear(bool skip_remset, bool clear_space, bool locked = false);
+  // Callers must ensure this is not called by multiple threads at the same time.
+  void hr_clear(bool clear_space);
   // Clear the card table corresponding to this region.
   void clear_cardtable();
 
@@ -558,6 +559,9 @@ public:
   bool obj_allocated_since_next_marking(oop obj) const {
     return (HeapWord *) obj >= next_top_at_mark_start();
   }
+
+  // Update the region state after a failed evacuation.
+  void handle_evacuation_failure();
 
   // Iterate over the objects overlapping the given memory region, applying cl
   // to all references in the region.  This is a helper for

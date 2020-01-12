@@ -89,6 +89,9 @@ final class GraalHotSpotVMConfigVersioned extends HotSpotVMConfigAccess {
     // JDK-8186777
     int classMirrorOffset = getFieldOffset("Klass::_java_mirror", Integer.class, "OopHandle");
     boolean classMirrorIsHandle = true;
+
+    // JDK-8220049
+    boolean threadLocalHandshakes = true;
     
     long continuationThaw = getFieldValue("StubRoutines::_cont_thaw", Long.class, "address");
     long continuationGetSP = getFieldValue("StubRoutines::_cont_getSP", Long.class, "address");

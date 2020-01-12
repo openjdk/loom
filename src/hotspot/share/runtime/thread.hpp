@@ -1376,6 +1376,12 @@ private:
     return _handshake.try_process_by_vmThread(this);
   }
 
+#ifdef ASSERT
+  bool is_vmthread_processing_handshake() const {
+    return _handshake.is_vmthread_processing_handshake();
+  }
+#endif
+
   // Suspend/resume support for JavaThread
  private:
   inline void set_ext_suspended();

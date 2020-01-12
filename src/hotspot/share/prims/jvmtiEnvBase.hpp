@@ -303,9 +303,13 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static bool get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd);
 
   // JVMTI API helper functions which are called at safepoint or thread is suspended.
+  oop get_fiber_or_thread_oop(JavaThread* thread);
   jvmtiError get_frame_count(JvmtiThreadState *state, jint *count_ptr);
+  jvmtiError get_frame_count(oop frame_oop, jint *count_ptr);
   jvmtiError get_frame_location(JavaThread* java_thread, jint depth,
-                                              jmethodID* method_ptr, jlocation* location_ptr);
+                                jmethodID* method_ptr, jlocation* location_ptr);
+  jvmtiError get_frame_location(oop fiber_oop, jint depth,
+                                jmethodID* method_ptr, jlocation* location_ptr);
   jvmtiError get_object_monitor_usage(JavaThread *calling_thread,
                                                     jobject object, jvmtiMonitorUsage* info_ptr);
   jvmtiError get_stack_trace(javaVFrame *jvf,
@@ -318,6 +322,8 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
                                                          JavaThread *java_thread,
                                                          jobject *monitor_ptr);
   jvmtiError get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread,
+                          GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
+  jvmtiError get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread, javaVFrame* jvf,
                           GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
   jvmtiError check_top_frame(JavaThread* current_thread, JavaThread* java_thread,
                              jvalue value, TosState tos, Handle* ret_ob_h);
@@ -413,6 +419,30 @@ public:
   jvmtiError result() { return _result; }
 };
 
+// VM operation to get fiber monitor information with stack depth.
+class VM_FiberGetOwnedMonitorInfo : public VM_Operation {
+private:
+  JvmtiEnv *_env;
+  JavaThread* _calling_thread;
+  Handle _fiber_h;
+  jvmtiError _result;
+  GrowableArray<jvmtiMonitorStackDepthInfo*> *_owned_monitors_list;
+
+public:
+  VM_FiberGetOwnedMonitorInfo(JvmtiEnv* env,
+                              JavaThread* calling_thread,
+                              Handle fiber_h,
+                              GrowableArray<jvmtiMonitorStackDepthInfo*>* owned_monitor_list) {
+    _env = env;
+    _calling_thread = calling_thread;
+    _fiber_h = fiber_h;
+    _owned_monitors_list = owned_monitor_list;
+    _result = JVMTI_ERROR_NONE;
+  }
+  VMOp_Type type() const { return VMOp_FiberGetOwnedMonitorInfo; }
+  void doit();
+  jvmtiError result() { return _result; }
+};
 
 // VM operation to get object monitor usage.
 class VM_GetObjectMonitorUsage : public VM_Operation {
@@ -452,6 +482,27 @@ public:
     _env = env;
     _calling_thread = calling_thread;
     _java_thread = java_thread;
+    _owned_monitor_ptr = mon_ptr;
+  }
+  VMOp_Type type() const { return VMOp_GetCurrentContendedMonitor; }
+  jvmtiError result() { return _result; }
+  void doit();
+};
+
+// VM operation to get fiber current contended monitor.
+class VM_FiberGetCurrentContendedMonitor : public VM_Operation {
+private:
+  JvmtiEnv *_env;
+  JavaThread *_calling_thread;
+  Handle _fiber_h;
+  jobject *_owned_monitor_ptr;
+  jvmtiError _result;
+
+public:
+  VM_FiberGetCurrentContendedMonitor(JvmtiEnv *env, JavaThread *calling_thread, Handle fiber_h, jobject *mon_ptr) {
+    _env = env;
+    _calling_thread = calling_thread;
+    _fiber_h = fiber_h;
     _owned_monitor_ptr = mon_ptr;
   }
   VMOp_Type type() const { return VMOp_GetCurrentContendedMonitor; }
@@ -499,12 +550,12 @@ private:
   int _frame_count_total;
   struct StackInfoNode *_head;
 
-  JvmtiEnvBase *env()                 { return (JvmtiEnvBase *)_env; }
   jint max_frame_count()              { return _max_frame_count; }
   struct StackInfoNode *head()        { return _head; }
   void set_head(StackInfoNode *head)  { _head = head; }
 
 protected:
+  JvmtiEnvBase *env()                 { return (JvmtiEnvBase *)_env; }
   void set_result(jvmtiError result)  { _result = result; }
   void fill_frames(jthread jt, JavaThread *thr, oop thread_oop);
   void allocate_and_fill_stacks(jint thread_count);

@@ -1157,6 +1157,17 @@ public:
   void movdqa(XMMRegister dst, XMMRegister src)   { Assembler::movdqa(dst, src); }
   void movdqa(XMMRegister dst, AddressLiteral src);
 
+  // Move Aligned, possibly non-temporal
+  void movqa(Address dst, MMXRegister src, bool nt);    // 64-bit
+  void movqa(Address dst, Register src, bool nt);       // 64-bit
+  void movdqa(Address dst, XMMRegister src, bool nt);   // 128-bit
+  void vmovdqa(Address dst, XMMRegister src, bool nt);  // 256-bit
+  void evmovdqa(Address dst, XMMRegister src, int vector_len, bool nt); // 512-bit
+
+  void movdqa(XMMRegister dst, Address src, bool nt);   // 128-bit
+  void vmovdqa(XMMRegister dst, Address src, bool nt);  // 256-bit
+  void evmovdqa(XMMRegister dst, Address src, int vector_len, bool nt); // 512-bit
+
   void movsd(XMMRegister dst, XMMRegister src) { Assembler::movsd(dst, src); }
   void movsd(Address dst, XMMRegister src)     { Assembler::movsd(dst, src); }
   void movsd(XMMRegister dst, Address src)     { Assembler::movsd(dst, src); }
@@ -1656,9 +1667,9 @@ public:
 
 #ifdef COMPILER2
   // Generic instructions support for use in .ad files C2 code generation
-  void vabsnegd(int opcode, XMMRegister dst, Register scr);
+  void vabsnegd(int opcode, XMMRegister dst, XMMRegister src, Register scr);
   void vabsnegd(int opcode, XMMRegister dst, XMMRegister src, int vector_len, Register scr);
-  void vabsnegf(int opcode, XMMRegister dst, Register scr);
+  void vabsnegf(int opcode, XMMRegister dst, XMMRegister src, Register scr);
   void vabsnegf(int opcode, XMMRegister dst, XMMRegister src, int vector_len, Register scr);
   void vextendbw(bool sign, XMMRegister dst, XMMRegister src, int vector_len);
   void vextendbw(bool sign, XMMRegister dst, XMMRegister src);

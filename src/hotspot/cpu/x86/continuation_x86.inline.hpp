@@ -31,20 +31,38 @@
 
 const int TwoWordAlignmentMask  = (1 << (LogBytesPerWord+1)) - 1;
 
+MemcpyFnT resolve_freeze_chunk_memcpy() {
+  if (UseNewCode) {
+    // tty->print_cr(">> Config memcpy: default");
+    return (MemcpyFnT)default_memcpy;
+  }
+  // tty->print_cr(">> Config memcpy: %s", UseContinuationStreamingCopy ? "NT" : "T");
+  return UseContinuationStreamingCopy ? (MemcpyFnT)StubRoutines::word_memcpy_up_nt()
+                                      : (MemcpyFnT)StubRoutines::word_memcpy_up();
+}
+
+MemcpyFnT resolve_thaw_chunk_memcpy() {
+  if (UseNewCode) {
+    return (MemcpyFnT)default_memcpy;
+  }
+  return UseContinuationStreamingCopy ? (MemcpyFnT)StubRoutines::word_memcpy_down_nt()
+                                      : (MemcpyFnT)StubRoutines::word_memcpy_down();  
+}
+
 static inline void copy_from_stack(void* from, void* to, size_t size) {
+  assert (size >= 2, ""); // one word for return address, another for rbp spill
   assert(((intptr_t)from & TwoWordAlignmentMask) == 0, "");
   assert(((intptr_t)to   & WordAlignmentMask)    == 0, "");
-  
-  // ((MemcpyFnT)StubRoutines::word_memcpy_up())(from, to, size);
-  memcpy(to, from, size << LogBytesPerWord);
+
+  cont_freeze_chunk_memcpy(from, to, size);
 }
 
 static inline void copy_to_stack(void* from, void* to, size_t size) {
+  assert (size >= 2, ""); // one word for return address, another for rbp spill
   assert(((intptr_t)from & WordAlignmentMask)    == 0, "");
   assert(((intptr_t)to   & TwoWordAlignmentMask) == 0, "");
 
-  // ((MemcpyFnT)StubRoutines::word_memcpy_down())(from, to, size);
-  memcpy(to, from, size << LogBytesPerWord);
+  cont_thaw_chunk_memcpy(from, to, size);
 }
 
 template<bool indirect>
@@ -1285,6 +1303,13 @@ inline intptr_t* Freeze<ConfigT, mode>::align_bottom(intptr_t* bottom, int argsi
   bottom -= (argsize & 1);
 #endif
   return bottom;
+}
+
+template <typename ConfigT, op_mode mode>
+inline void Thaw<ConfigT, mode>::prefetch_chunk_pd(void* start, int size) {
+  size <<= LogBytesPerWord;
+  Prefetch::read_streaming(start, size);
+  Prefetch::read_streaming(start, size - 64);
 }
 
 template <typename ConfigT, op_mode mode>

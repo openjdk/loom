@@ -245,6 +245,8 @@ class StubRoutines: AllStatic {
   static address _mulAdd;
   static address _montgomeryMultiply;
   static address _montgomerySquare;
+  static address _bigIntegerRightShiftWorker;
+  static address _bigIntegerLeftShiftWorker;
 
   static address _vectorizedMismatch;
 
@@ -354,9 +356,9 @@ class StubRoutines: AllStatic {
   static address jint_arraycopy()   { return _jint_arraycopy; }
   static address jlong_arraycopy()  { return _jlong_arraycopy; }
 
-  static address word_memcpy_up()   { return _word_memcpy_up; }
-  static address word_memcpy_down() { return _word_memcpy_down; }
+  static address word_memcpy_up()      { return _word_memcpy_up; }
   static address word_memcpy_up_nt()   { return _word_memcpy_up_nt; }
+  static address word_memcpy_down()    { return _word_memcpy_down; }
   static address word_memcpy_down_nt() { return _word_memcpy_down_nt; }
 
   static address oop_arraycopy(bool dest_uninitialized = false) {
@@ -438,6 +440,8 @@ class StubRoutines: AllStatic {
   static address mulAdd()              { return _mulAdd; }
   static address montgomeryMultiply()  { return _montgomeryMultiply; }
   static address montgomerySquare()    { return _montgomerySquare; }
+  static address bigIntegerRightShift() { return _bigIntegerRightShiftWorker; }
+  static address bigIntegerLeftShift()  { return _bigIntegerLeftShiftWorker; }
 
   static address vectorizedMismatch()  { return _vectorizedMismatch; }
 

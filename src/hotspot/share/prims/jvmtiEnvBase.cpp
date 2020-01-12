@@ -605,6 +605,31 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
   return found;
 }
 
+static
+javaVFrame* get_fiber_jvf(Thread* cur_thread, oop fiber) {
+  oop cont = java_lang_Fiber::continuation(fiber);
+  javaVFrame* jvf = NULL;
+
+  assert(cont != NULL, "fiber continuation must not be NULL");
+  if (java_lang_Continuation::is_mounted(cont)) {
+    oop carrier_thread = java_lang_Fiber::carrier_thread(fiber);
+    JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
+    vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
+
+    if (!vfs.at_end()) {
+      jvf = vfs.asJavaVFrame();
+    }
+  } else {
+    Handle cont_h(cur_thread, cont);
+    vframeStream vfs(cont_h);
+
+    if (!vfs.at_end()) {
+      jvf = vfs.asJavaVFrame();
+    }
+  }
+  return jvf;
+}
+
 //
 // Object Monitor Information
 //
@@ -644,8 +669,6 @@ JvmtiEnvBase::count_locked_objects(JavaThread *java_thread, Handle hobj) {
   return ret;
 }
 
-
-
 jvmtiError
 JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThread *java_thread, jobject *monitor_ptr) {
 #ifdef ASSERT
@@ -683,7 +706,7 @@ JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThre
 
 
 jvmtiError
-JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread,
+JvmtiEnvBase::get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread, javaVFrame* jvf,
                                  GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list) {
   jvmtiError err = JVMTI_ERROR_NONE;
 #ifdef ASSERT
@@ -693,20 +716,13 @@ JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_th
           java_thread->is_thread_fully_suspended(false, &debug_bits)),
          "at safepoint or target thread is suspended");
 
-  if (java_thread->has_last_Java_frame()) {
-    ResourceMark rm;
-    HandleMark   hm;
-    RegisterMap  reg_map(java_thread, true, true);
-
-    int depth = 0;
-    for (javaVFrame *jvf = java_thread->last_java_vframe(&reg_map); jvf != NULL;
-         jvf = jvf->java_sender()) {
-      if (MaxJavaStackTraceDepth == 0 || depth++ < MaxJavaStackTraceDepth) {  // check for stack too deep
-        // add locked objects for this frame into list
-        err = get_locked_objects_in_frame(calling_thread, java_thread, jvf, owned_monitors_list, depth-1);
-        if (err != JVMTI_ERROR_NONE) {
-          return err;
-        }
+  int depth = 0;
+  for ( ; jvf != NULL; jvf = jvf->java_sender()) {
+    if (MaxJavaStackTraceDepth == 0 || depth++ < MaxJavaStackTraceDepth) {  // check for stack too deep
+      // add locked objects for this frame into list
+      err = get_locked_objects_in_frame(calling_thread, java_thread, jvf, owned_monitors_list, depth-1);
+      if (err != JVMTI_ERROR_NONE) {
+        return err;
       }
     }
   }
@@ -716,6 +732,20 @@ JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_th
   ObjectSynchronizer::monitors_iterate(&jmc);
   err = jmc.error();
 
+  return err;
+}
+
+jvmtiError
+JvmtiEnvBase::get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread,
+                                 GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  if (java_thread->has_last_Java_frame()) {
+    ResourceMark rm;
+    HandleMark   hm;
+    RegisterMap  reg_map(java_thread, true, true);
+    javaVFrame *jvf = java_thread->last_java_vframe(&reg_map);
+    err = get_owned_monitors(calling_thread, java_thread, jvf, owned_monitors_list);
+  }
   return err;
 }
 
@@ -884,7 +914,6 @@ JvmtiEnvBase::get_stack_trace(JavaThread *java_thread,
     Thread* current_thread = Thread::current();
     ResourceMark rm(current_thread);
     javaVFrame *jvf = java_thread->last_java_vframe(&reg_map);
-
     err = get_stack_trace(jvf, start_depth, max_count, frame_buffer, count_ptr);
   } else {
     *count_ptr = 0;
@@ -901,6 +930,23 @@ JvmtiEnvBase::get_frame_count(JvmtiThreadState *state, jint *count_ptr) {
   assert((state != NULL),
          "JavaThread should create JvmtiThreadState before calling this method");
   *count_ptr = state->count_frames();
+  return JVMTI_ERROR_NONE;
+}
+
+jvmtiError
+JvmtiEnvBase::get_frame_count(oop fiber_oop, jint *count_ptr) {
+  Thread* cur_thread = Thread::current();
+  ResourceMark rm(cur_thread);
+  HandleMark hm(cur_thread);
+  javaVFrame *jvf = get_fiber_jvf(cur_thread, fiber_oop);
+  int count = 0;
+
+  while (jvf != NULL) {
+    Method* method = jvf->method();
+    jvf = jvf->java_sender();
+    count++;
+  }
+  *count_ptr = count;
   return JVMTI_ERROR_NONE;
 }
 
@@ -945,6 +991,49 @@ JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
   return JVMTI_ERROR_NONE;
 }
 
+jvmtiError
+JvmtiEnvBase::get_frame_location(oop fiber_oop, jint depth,
+                                 jmethodID* method_ptr, jlocation* location_ptr) {
+  Thread* cur_thread = Thread::current();
+  ResourceMark rm(cur_thread);
+  HandleMark hm(cur_thread);
+  javaVFrame *jvf = get_fiber_jvf(cur_thread, fiber_oop);
+  int cur_depth = 0;
+
+  while (jvf != NULL && cur_depth < depth) {
+    Method* method = jvf->method();
+    jvf = jvf->java_sender();
+    cur_depth++;
+  }
+  assert(depth >= cur_depth, "ran out of frames too soon");
+  if (jvf == NULL) {
+    return JVMTI_ERROR_NO_MORE_FRAMES;
+  }
+  Method* method = jvf->method();
+  if (method->is_native()) {
+    *location_ptr = -1;
+  } else {
+    *location_ptr = jvf->bci();
+  }
+  *method_ptr = method->jmethod_id();
+
+  return JVMTI_ERROR_NONE;
+}
+
+
+// If can_support_fibers capability is enabled and there is a fiber mounted
+// to the JavaThread* then return fiber oop. Otherwise, return thread oop.
+oop
+JvmtiEnvBase::get_fiber_or_thread_oop(JavaThread* thread) {
+  oop thread_oop = thread->threadObj();
+  if (get_capabilities()->can_support_fibers) {
+    oop fiber_oop = java_lang_Thread::fiber(thread_oop);
+    if (fiber_oop != NULL) {
+      thread_oop = fiber_oop;
+    }
+  }
+  return thread_oop;
+}
 
 jvmtiError
 JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject object, jvmtiMonitorUsage* info_ptr) {
@@ -1111,7 +1200,7 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
             deallocate((unsigned char*)ret.notify_waiters);
             return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
           }
-          Handle th(current_thread, pending_thread->threadObj());
+          Handle th(current_thread, get_fiber_or_thread_oop(pending_thread));
           ret.waiters[i] = (jthread)jni_reference(calling_thread, th);
         }
       }
@@ -1131,7 +1220,7 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
             // If the thread was found on the ObjectWaiter list, then
             // it has not been notified. This thread can't change the
             // state of the monitor so it doesn't need to be suspended.
-            Handle th(current_thread, wjava_thread->threadObj());
+            Handle th(current_thread, get_fiber_or_thread_oop(wjava_thread));
             ret.waiters[offset + j] = (jthread)jni_reference(calling_thread, th);
             ret.notify_waiters[j++] = (jthread)jni_reference(calling_thread, th);
           }
@@ -1200,6 +1289,7 @@ struct StackInfoNode {
   jvmtiStackInfo info;
 };
 
+
 // Create a jvmtiStackInfo inside a linked list node and create a
 // buffer for the frame information, both allocated as resource objects.
 // Fill in both the jvmtiStackInfo and the jvmtiFrameInfo.
@@ -1212,11 +1302,24 @@ VM_GetMultipleStackTraces::fill_frames(jthread jt, JavaThread *thr, oop thread_o
   jint state = 0;
   struct StackInfoNode *node = NEW_RESOURCE_OBJ(struct StackInfoNode);
   jvmtiStackInfo *infop = &(node->info);
+  
   node->next = head();
   set_head(node);
   infop->frame_count = 0;
   infop->thread = jt;
 
+  // Support for fibers
+  if (java_lang_Fiber::is_instance(thread_oop)) {
+    // The can_support_fibers capability is checked by the caller.
+    // TBD: check fiber state
+    javaVFrame *jvf = get_fiber_jvf(Thread::current(), thread_oop);
+    infop->frame_buffer = NEW_RESOURCE_ARRAY(jvmtiFrameInfo, max_frame_count());
+    _result = env()->get_stack_trace(jvf, 0, max_frame_count(),
+                                     infop->frame_buffer, &(infop->frame_count));
+    return;
+  }
+
+  // Support for ordinary threads
   if (thread_oop != NULL) {
     // get most state bits
     state = (jint)java_lang_Thread::get_thread_status(thread_oop);
@@ -1239,8 +1342,8 @@ VM_GetMultipleStackTraces::fill_frames(jthread jt, JavaThread *thr, oop thread_o
 
   if (thr != NULL && (state & JVMTI_THREAD_STATE_ALIVE) != 0) {
     infop->frame_buffer = NEW_RESOURCE_ARRAY(jvmtiFrameInfo, max_frame_count());
-    env()->get_stack_trace(thr, 0, max_frame_count(),
-                           infop->frame_buffer, &(infop->frame_count));
+    _result = env()->get_stack_trace(thr, 0, max_frame_count(),
+                                     infop->frame_buffer, &(infop->frame_count));
   } else {
     infop->frame_buffer = NULL;
     infop->frame_count = 0;
@@ -1299,11 +1402,19 @@ VM_GetThreadListStackTraces::doit() {
       // We got an error code so we don't have a JavaThread *, but
       // only return an error from here if we didn't get a valid
       // thread_oop.
+      // In a fiber case the cv_external_thread_to_JavaThread is expected to correctly set
+      // the thread_oop and return JVMTI_ERROR_INVALID_THREAD which we ignore here.
       if (thread_oop == NULL) {
         set_result(err);
         return;
       }
       // We have a valid thread_oop.
+    }
+    if (java_lang_Fiber::is_instance(thread_oop)) {
+      if (!env()->get_capabilities()->can_support_fibers) {
+        set_result(JVMTI_ERROR_MUST_POSSESS_CAPABILITY);
+        return;
+      }
     }
     fill_frames(jt, java_thread, thread_oop);
   }
@@ -1563,8 +1674,38 @@ VM_GetOwnedMonitorInfo::doit() {
   ThreadsListHandle tlh;
   if (_java_thread != NULL && tlh.includes(_java_thread)
       && !_java_thread->is_exiting() && _java_thread->threadObj() != NULL) {
-    _result = ((JvmtiEnvBase *)_env)->get_owned_monitors(_calling_thread, _java_thread,
-                                                          _owned_monitors_list);
+    _result = ((JvmtiEnvBase *)_env)->get_owned_monitors(_calling_thread,
+                                                         _java_thread,
+                                                         _owned_monitors_list);
+  }
+}
+
+void
+VM_FiberGetOwnedMonitorInfo::doit() {
+  Thread* cur_thread = Thread::current();
+  ResourceMark rm(cur_thread);
+  HandleMark hm(cur_thread);
+
+  oop cont = java_lang_Fiber::continuation(_fiber_h());
+  assert(cont != NULL, "fiber continuation must not be NULL");
+
+  if (!java_lang_Continuation::is_mounted(cont)) {
+    // No monitor info to collect if fiber is unmounted
+    _result = JVMTI_ERROR_NONE;
+    return;
+  }
+  javaVFrame *jvf = get_fiber_jvf(cur_thread, _fiber_h());
+  oop carrier_thread = java_lang_Fiber::carrier_thread(_fiber_h());
+  JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
+
+  _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
+  ThreadsListHandle tlh;
+  if (java_thread != NULL && tlh.includes(java_thread)
+      && !java_thread->is_exiting() && java_thread->threadObj() != NULL) {
+    _result = ((JvmtiEnvBase *)_env)->get_owned_monitors(_calling_thread,
+                                                         java_thread,
+                                                         jvf,
+                                                         _owned_monitors_list);
   }
 }
 
@@ -1574,7 +1715,30 @@ VM_GetCurrentContendedMonitor::doit() {
   ThreadsListHandle tlh;
   if (_java_thread != NULL && tlh.includes(_java_thread)
       && !_java_thread->is_exiting() && _java_thread->threadObj() != NULL) {
-    _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor(_calling_thread,_java_thread,_owned_monitor_ptr);
+    _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor(_calling_thread,
+                                                                    _java_thread,
+                                                                    _owned_monitor_ptr);
+  }
+}
+
+void
+VM_FiberGetCurrentContendedMonitor::doit() {
+  oop carrier_thread = java_lang_Fiber::carrier_thread(_fiber_h());
+  if (carrier_thread == NULL) {
+    // Fiber is unmounted, so it can not be contended on a monitor
+    *_owned_monitor_ptr = NULL;
+    _result = JVMTI_ERROR_NONE;
+    return;
+  }
+  JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
+
+  _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
+  ThreadsListHandle tlh;
+  if (java_thread != NULL && tlh.includes(java_thread)
+      && !java_thread->is_exiting() && java_thread->threadObj() != NULL) {
+    _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor(_calling_thread,
+                                                                    java_thread,
+                                                                    _owned_monitor_ptr);
   }
 }
 
@@ -1617,31 +1781,6 @@ VM_FiberGetThread::doit() {
   *_carrier_thread_ptr = (jthread)JNIHandles::make_local(_current_thread, carrier_thread);
 }
 
-static
-javaVFrame* get_fiber_jvf(Thread* cur_thread, oop fiber) {
-  oop cont = java_lang_Fiber::continuation(fiber);
-  javaVFrame* jvf = NULL;
-
-  assert(cont != NULL, "fiber continuation must not be NULL");
-  if (java_lang_Continuation::is_mounted(cont)) {
-    oop carrier_thread = java_lang_Fiber::carrier_thread(fiber);
-    JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
-    vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
-    
-    if (!vfs.at_end()) {
-      jvf = vfs.asJavaVFrame();
-    }
-  } else {
-    Handle cont_h(cur_thread, cont);
-    vframeStream vfs(cont_h);
-
-    if (!vfs.at_end()) {
-      jvf = vfs.asJavaVFrame();
-    }
-  }
-  return jvf;
-}
-
 void
 VM_FiberGetStackTrace::doit() {
   Thread* cur_thread = Thread::current();
@@ -1655,45 +1794,11 @@ VM_FiberGetStackTrace::doit() {
 
 void
 VM_FiberGetFrameCount::doit() {
-  Thread* cur_thread = Thread::current();
-  ResourceMark rm(cur_thread);
-  HandleMark hm(cur_thread);
-  javaVFrame *jvf = get_fiber_jvf(cur_thread, _fiber_h());
-  int count = 0;
-
-  while (jvf != NULL) {
-    Method* method = jvf->method();
-    jvf = jvf->java_sender();
-    count++;
-  }
-  *_count_ptr = count;
+  _result = ((JvmtiEnvBase*)_env)->get_frame_count(_fiber_h(), _count_ptr);
 }
 
 void
 VM_FiberGetFrameLocation::doit() {
-  Thread* cur_thread = Thread::current();
-  ResourceMark rm(cur_thread);
-  HandleMark hm(cur_thread);
-  javaVFrame *jvf = get_fiber_jvf(cur_thread, _fiber_h());
-  int depth = 0;
-
-  while (jvf != NULL && depth < _depth) {
-    Method* method = jvf->method();
-    jvf = jvf->java_sender();
-    depth++;
-  }
-
-  assert(_depth >= depth, "ran out of frames too soon");
-  if (jvf == NULL) {
-    _result = JVMTI_ERROR_NO_MORE_FRAMES;
-    return;
-  }
-
-  Method* method = jvf->method();
-  if (method->is_native()) {
-    *_location_ptr = -1;
-  } else {
-    *_location_ptr = jvf->bci();
-  }
-  *_method_ptr = method->jmethod_id();
+  _result = ((JvmtiEnvBase*)_env)->get_frame_location(_fiber_h(), _depth,
+                                                      _method_ptr, _location_ptr);
 }

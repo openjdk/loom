@@ -34,6 +34,7 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import javax.xml.stream.XMLOutputFactory;
@@ -112,29 +113,11 @@ public class IOUtils {
 
     public static void copyFile(File sourceFile, File destFile)
             throws IOException {
-        destFile.getParentFile().mkdirs();
+        Files.createDirectories(destFile.getParentFile().toPath());
 
-        //recreate the file as existing copy may have weird permissions
-        destFile.delete();
-        destFile.createNewFile();
-
-        try (FileChannel source = new FileInputStream(sourceFile).getChannel();
-            FileChannel destination =
-                    new FileOutputStream(destFile).getChannel()) {
-
-            if (destination != null && source != null) {
-                destination.transferFrom(source, 0, source.size());
-            }
-        }
-
-        //preserve executable bit!
-        if (sourceFile.canExecute()) {
-            destFile.setExecutable(true, false);
-        }
-        if (!sourceFile.canWrite()) {
-            destFile.setReadOnly();
-        }
-        destFile.setReadable(true, false);
+        Files.copy(sourceFile.toPath(), destFile.toPath(),
+                   StandardCopyOption.REPLACE_EXISTING,
+                   StandardCopyOption.COPY_ATTRIBUTES);
     }
 
     // run "launcher paramfile" in the directory where paramfile is kept
@@ -150,20 +133,33 @@ public class IOUtils {
 
     public static void exec(ProcessBuilder pb)
             throws IOException {
-        exec(pb, false, null);
+        exec(pb, false, null, false);
     }
 
-    static void exec(ProcessBuilder pb, boolean testForPresenseOnly,
+    // Reading output from some processes (currently known "hdiutil attach" might hang even if process already
+    // exited. Only possible workaround found in "hdiutil attach" case is to wait for process to exit before
+    // reading output.
+    public static void exec(ProcessBuilder pb, boolean waitBeforeOutput)
+            throws IOException {
+        exec(pb, false, null, waitBeforeOutput);
+    }
+
+    static void exec(ProcessBuilder pb, boolean testForPresenceOnly,
             PrintStream consumer) throws IOException {
+        exec(pb, testForPresenceOnly, consumer, false);
+    }
+
+    static void exec(ProcessBuilder pb, boolean testForPresenceOnly,
+            PrintStream consumer, boolean waitBeforeOutput) throws IOException {
         List<String> output = new ArrayList<>();
-        Executor exec = Executor.of(pb).setOutputConsumer(lines -> {
+        Executor exec = Executor.of(pb).setWaitBeforeOutput(waitBeforeOutput).setOutputConsumer(lines -> {
             lines.forEach(output::add);
             if (consumer != null) {
                 output.forEach(consumer::println);
             }
         });
 
-        if (testForPresenseOnly) {
+        if (testForPresenceOnly) {
             exec.execute();
         } else {
             exec.executeExpectSuccess();

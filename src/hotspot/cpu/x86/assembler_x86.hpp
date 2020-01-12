@@ -1523,12 +1523,14 @@ private:
   void movq(Address     dst, MMXRegister src );
   void movq(MMXRegister dst, Address src );
 
+  void movntq(Address dst, Register src);
   void movntq(Address dst, MMXRegister src);
+  void movntdq(Address dst, XMMRegister src);
   void vmovntdq(Address dst, XMMRegister src);
   void evmovntdq(Address dst, XMMRegister src, int vector_len);
   void movntdqa(XMMRegister dst, Address src);
   void vmovntdqa(XMMRegister dst, Address src);
-  void evmovdqnta(XMMRegister dst, Address src, int vector_len);
+  void evmovntdqa(XMMRegister dst, Address src, int vector_len);
 
 #ifdef _LP64
   // These dummies prevent using movq from converting a zero (like NULL) into Register
@@ -1862,14 +1864,14 @@ private:
 
   void shldl(Register dst, Register src);
   void shldl(Register dst, Register src, int8_t imm8);
+  void shrdl(Register dst, Register src);
+  void shrdl(Register dst, Register src, int8_t imm8);
 
   void shll(Register dst, int imm8);
   void shll(Register dst);
 
   void shlq(Register dst, int imm8);
   void shlq(Register dst);
-
-  void shrdl(Register dst, Register src);
 
   void shrl(Register dst, int imm8);
   void shrl(Register dst);
@@ -2163,6 +2165,9 @@ private:
   void vpsrad(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void evpsraq(XMMRegister dst, XMMRegister src, int shift, int vector_len);
   void evpsraq(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
+
+  void vpshldvd(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
+  void vpshrdvd(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
 
   // And packed integers
   void pand(XMMRegister dst, XMMRegister src);

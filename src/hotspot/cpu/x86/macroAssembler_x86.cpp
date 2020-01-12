@@ -3419,6 +3419,67 @@ void MacroAssembler::movdqa(XMMRegister dst, AddressLiteral src) {
   }
 }
 
+  // Move Aligned, possibly non-temporal
+  void MacroAssembler::movqa(Address dst, Register src, bool nt) {
+    if (nt) {
+      Assembler::movntq(dst, src);
+    } else {
+      Assembler::movq(dst, src);
+    }
+  }
+
+  void MacroAssembler::movqa(Address dst, MMXRegister src, bool nt) {
+    if (nt) {
+      Assembler::movntq(dst, src);
+    } else {
+      Assembler::movq(dst, src);
+    }
+  }
+
+  void MacroAssembler::movdqa(Address dst, XMMRegister src, bool nt) {
+    if (nt) {
+      Assembler::movntdq(dst, src);
+    } else {
+      Assembler::movdqu(dst, src);
+    }
+  }
+  void MacroAssembler::vmovdqa(Address dst, XMMRegister src, bool nt) {
+    if (nt) {
+      Assembler::vmovntdq(dst, src);
+    } else {
+      Assembler::vmovdqu(dst, src);
+    }
+  }
+  void MacroAssembler::evmovdqa(Address dst, XMMRegister src, int vector_len, bool nt) {
+    if (nt) {
+      Assembler::evmovntdq(dst, src, vector_len);
+    } else {
+      Assembler::evmovdqal(dst, src, vector_len);
+    }
+  }
+
+  void MacroAssembler::movdqa(XMMRegister dst, Address src, bool nt) {
+    if (nt) {
+      Assembler::movntdqa(dst, src);
+    } else {
+      Assembler::movdqu(dst, src); // use unaligned load
+    }
+  }
+  void MacroAssembler::vmovdqa(XMMRegister dst, Address src, bool nt) {
+    if (nt) {
+      Assembler::vmovntdqa(dst, src);
+    } else {
+      Assembler::vmovdqu(dst, src); // use unaligned load
+    }
+  }
+  void MacroAssembler::evmovdqa(XMMRegister dst, Address src, int vector_len, bool nt) {
+    if (nt) {
+      Assembler::evmovntdqa(dst, src, vector_len);
+    } else {
+      Assembler::evmovdqul(dst, src, vector_len); // use unaligned load
+    }
+  }
+
 void MacroAssembler::movsd(XMMRegister dst, AddressLiteral src) {
   if (reachable(src)) {
     Assembler::movsd(dst, as_Address(src));
@@ -4152,7 +4213,10 @@ void MacroAssembler::vpxor(XMMRegister dst, XMMRegister nds, AddressLiteral src,
 #ifdef COMPILER2
 // Generic instructions support for use in .ad files C2 code generation
 
-void MacroAssembler::vabsnegd(int opcode, XMMRegister dst, Register scr) {
+void MacroAssembler::vabsnegd(int opcode, XMMRegister dst, XMMRegister src, Register scr) {
+  if (dst != src) {
+    movdqu(dst, src);
+  }
   if (opcode == Op_AbsVD) {
     andpd(dst, ExternalAddress(StubRoutines::x86::vector_double_sign_mask()), scr);
   } else {
@@ -4170,7 +4234,10 @@ void MacroAssembler::vabsnegd(int opcode, XMMRegister dst, XMMRegister src, int 
   }
 }
 
-void MacroAssembler::vabsnegf(int opcode, XMMRegister dst, Register scr) {
+void MacroAssembler::vabsnegf(int opcode, XMMRegister dst, XMMRegister src, Register scr) {
+  if (dst != src) {
+    movdqu(dst, src);
+  }
   if (opcode == Op_AbsVF) {
     andps(dst, ExternalAddress(StubRoutines::x86::vector_float_sign_mask()), scr);
   } else {
