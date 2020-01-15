@@ -1700,7 +1700,11 @@ class StubGenerator: public StubCodeGenerator {
           __ testl(alignment, 16);
           __ jccb(Assembler::zero, L_aligned_256);
           __ cmpptr(qword_count, -2);
-          __ jccb(Assembler::greater, L_copy_8_bytes);
+          if (UseAVX > 2) {
+            __ jcc(Assembler::greater, L_copy_8_bytes);
+          } else {
+            __ jccb(Assembler::greater, L_copy_8_bytes);
+          }
           __ addptr(qword_count, 2);
           __ movdqu(xmm0, Address(end_from, qword_count, Address::times_8, -8));
           __ movdqa(Address(end_to, qword_count, Address::times_8, -8), xmm0, nt);
@@ -1806,7 +1810,7 @@ class StubGenerator: public StubCodeGenerator {
     }
     __ BIND(L_end);
     __ subptr(qword_count, 4);
-    __ jcc(Assembler::less, L_copy_8_bytes); // Copy trailing qwords
+    __ jccb(Assembler::less, L_copy_8_bytes); // Copy trailing qwords
 
     __ BIND(L_exit);
     restore_arg_regs();
@@ -1883,7 +1887,11 @@ class StubGenerator: public StubCodeGenerator {
           __ testl(alignment, 16);
           __ jccb(Assembler::zero, L_aligned_256);
           __ cmpptr(qword_count, 2);
-          __ jccb(Assembler::less, L_copy_8_bytes);
+          if (UseAVX > 2) {
+            __ jcc(Assembler::less, L_copy_8_bytes);
+          } else {
+            __ jccb(Assembler::less, L_copy_8_bytes);
+          }
           __ subptr(qword_count, 2);
           __ movdqa(xmm0, Address(from, qword_count, Address::times_8, 0), nt);
           __ movdqu(Address(to, qword_count, Address::times_8, 0), xmm0);
@@ -2004,7 +2012,7 @@ class StubGenerator: public StubCodeGenerator {
     }
     __ BIND(L_end);
     __ addptr(qword_count, 4);
-    __ jcc(Assembler::greater, L_copy_8_bytes); // Copy trailing qwords
+    __ jccb(Assembler::greater, L_copy_8_bytes); // Copy trailing qwords
 
     __ BIND(L_exit);
     restore_arg_regs();
