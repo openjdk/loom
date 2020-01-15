@@ -825,7 +825,8 @@ public class Executors {
      * invoking its shutdownNow() method when a deadline is reached.
      */
     static ExecutorService timedExecutorService(ExecutorService delegate,
-                                                Duration timeout) {
+                                                Duration timeout,
+                                                Thread owner) {
         // need same permission as ExecutorService::shutdownNow
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
@@ -835,16 +836,24 @@ public class Executors {
         // deadline has already expired
         if (timeout.isZero() || timeout.isNegative()) {
             delegate.shutdownNow();
+            if (owner != null)
+               owner.interrupt();
             return delegate;
         }
 
         // nothing to do
-        if (delegate.isTerminated())
+        if (delegate.isTerminated()) {
             return delegate;
+        }
 
         // timer task needs permission to invoke shutdownNow
         Callable<List<Runnable>> timerExpired = () -> {
-            PrivilegedAction<List<Runnable>> pa = delegate::shutdownNow;
+            PrivilegedAction<List<Runnable>> pa = () -> {
+                List<Runnable> notRun = delegate.shutdownNow();
+                if (owner != null)
+                    owner.interrupt();
+                return notRun;
+            };
             return AccessController.doPrivileged(pa,
                     null,
                     TimedExecutorServiceHelper.MODIFY_THREAD);

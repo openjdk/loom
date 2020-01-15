@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -47,7 +47,7 @@ public class WithDeadlineTest {
     public void testDeadlineBeforeShutdown() throws Exception {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         var deadline = Instant.now().plusSeconds(3);
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline, null)) {
             // assume this is submitted before the deadline expires
             Future<?> result = executor.submit(() -> {
                 Thread.sleep(Duration.ofDays(1));
@@ -70,7 +70,7 @@ public class WithDeadlineTest {
     public void testDeadlineAfterShutdown() throws Exception {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         var deadline = Instant.now().plusSeconds(3);
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline, null)) {
             // assume this is submitted before the deadline expires
             Future<?> result = executor.submit(() -> {
                 Thread.sleep(Duration.ofDays(1));
@@ -94,7 +94,7 @@ public class WithDeadlineTest {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         var deadline = Instant.now().plusSeconds(60);
         Future<?> result;
-        var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline);
+        var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline, null);
         try (executor) {
             result = executor.submit(() -> {
                 Thread.sleep(Duration.ofMillis(500));
@@ -105,6 +105,71 @@ public class WithDeadlineTest {
         assertTrue(executor.isShutdown() && executor.isTerminated());
     }
 
+    /**
+     * Deadline expires before owner closes the executor.
+     */
+    public void testInterruptBeforeDeadline() throws Exception {
+        ThreadFactory factory = Thread.builder().daemon(true).factory();
+        var deadline = Instant.now().plusSeconds(3);
+        try (var executor = Executors.newUnboundedExecutor(factory)
+                                     .withDeadline(deadline, Thread.currentThread())) {
+            // sleep should be interrupted
+            try {
+                Thread.sleep(Duration.ofDays(1));
+                assertTrue(false);
+            } catch (InterruptedException expected) { }
+
+            // executor should be shutdown and should terminate almost immediately
+            assertTrue(executor.isShutdown());
+            assertTrue(executor.awaitTermination(1, TimeUnit.SECONDS));
+        } finally {
+            Thread.interrupted();  // ensure interrupt status is cleared
+        }
+    }
+
+    /**
+     * Deadline expires while the owner is waiting in close.
+     */
+    public void testInterruptDuringClose() {
+        ThreadFactory factory = Thread.builder().daemon(true).factory();
+        var deadline = Instant.now().plusSeconds(3);
+        try {
+            try (var executor = Executors.newUnboundedExecutor(factory)
+                                         .withDeadline(deadline, Thread.currentThread())) {
+                // assume this is submitted before the deadline expires
+                executor.submit(() -> {
+                    Thread.sleep(Duration.ofDays(1));
+                    return null;
+                });
+            }
+
+            // interrupt status should be set
+            assertTrue(Thread.interrupted());
+
+        } finally {
+            Thread.interrupted();  // ensure interrupt status is cleared
+        }
+
+    }
+
+    /**
+     * Deadline expires after the executor has terminated.
+     */
+    public void testInterruptAfterTerminate() throws Exception {
+        ThreadFactory factory = Thread.builder().daemon(true).factory();
+        var deadline = Instant.now().plusSeconds(3);
+        try {
+            Executors.newUnboundedExecutor(factory)
+                    .withDeadline(deadline, Thread.currentThread())
+                    .close();
+
+            // sleep should not be interrupted
+            Thread.sleep(Duration.between(Instant.now(), deadline));
+
+        } finally {
+            Thread.interrupted();  // ensure interrupt status is cleared
+        }
+    }
 
     /**
      * Deadline has already expired
@@ -113,12 +178,22 @@ public class WithDeadlineTest {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         // now
         Instant now = Instant.now();
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(now)) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(now, null)) {
+            assertTrue(executor.isTerminated());
+        }
+        try (var executor = Executors.newUnboundedExecutor(factory)
+                                     .withDeadline(now, Thread.currentThread())) {
+            assertTrue(Thread.interrupted());
             assertTrue(executor.isTerminated());
         }
         // in the past
         var yesterday = Instant.now().minus(Duration.ofDays(1));
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(yesterday)) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(yesterday, null)) {
+            assertTrue(executor.isTerminated());
+        }
+        try (var executor = Executors.newUnboundedExecutor(factory)
+                                     .withDeadline(yesterday, Thread.currentThread())) {
+            assertTrue(Thread.interrupted());
             assertTrue(executor.isTerminated());
         }
     }
