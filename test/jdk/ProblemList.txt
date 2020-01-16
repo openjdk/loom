@@ -616,6 +616,10 @@ java/net/DatagramSocket/SendDatagramToBadAddress.java           7143960 macosx-a
 
 java/net/ServerSocket/AcceptInheritHandle.java                  8211854 aix-ppc64
 
+# Tests DatagramSocket/DatagramSocketImpl internals, fixed in sandbox
+java/net/DatagramSocket/UnreferencedDatagramSockets.java        0000000 generic-all
+java/net/MulticastSocket/UnreferencedMulticastSockets.java      0000000 generic-all
+
 ############################################################################
 
 # jdk_nio
@@ -709,6 +713,8 @@ javax/security/auth/kerberos/KerberosTixDateTest.java           8039280 generic-
 sun/security/provider/PolicyFile/GrantAllPermToExtWhenNoPolicy.java 8039280 generic-all
 sun/security/provider/PolicyParser/ExtDirsChange.java           8039280 generic-all
 sun/security/provider/PolicyParser/PrincipalExpansionError.java 8039280 generic-all
+
+sun/security/krb5/IPv6.java                                     8235917 generic-all
 
 ############################################################################
 

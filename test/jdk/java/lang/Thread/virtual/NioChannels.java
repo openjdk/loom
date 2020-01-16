@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -193,8 +193,19 @@ public class NioChannels {
     }
 
     /**
-     * Virtual thread blocks in SocketChannel read.
+     * Virtual thread blocks in SocketChannel adaptor read.
      */
+    public void testSocketAdaptorRead1() throws Exception {
+        testSocketAdaptorRead(0);
+    }
+
+    /**
+     * Virtual thread blocks in SocketChannel adaptor read with timeout.
+     */
+    public void testSocketAdaptorRead2() throws Exception {
+        testSocketAdaptorRead(60_000);
+    }
+
     private void testSocketAdaptorRead(int timeout) throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -216,20 +227,6 @@ public class NioChannels {
             }
         });
     }
-
-    /**
-     * Virtual thread blocks in SocketChannel adaptor read.
-     */
-    public void testSocketAdaptorRead1() throws Exception {
-        testSocketAdaptorRead(0);
-    }
-
-    /**
-     * Virtual thread blocks in SocketChannel adaptor read with timeout.
-     */
-    public void testSocketAdaptorRead2() throws Exception {
-        testSocketAdaptorRead(60_000);
-    }
     
     /**
      * ServerSocketChannel accept, no blocking.
@@ -237,7 +234,7 @@ public class NioChannels {
     public void testServerSocketChannelAccept1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
-                ssc.bind(new InetSocketAddress(InetAddress.getLocalHost(), 0));
+                ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
                 var sc1 = SocketChannel.open(ssc.getLocalAddress());
                 // accept should not block
                 var sc2 = ssc.accept();
@@ -253,7 +250,7 @@ public class NioChannels {
     public void testServerSocketChannelAccept2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
-                ssc.bind(new InetSocketAddress(InetAddress.getLocalHost(), 0));
+                ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
                 var sc1 = SocketChannel.open();
                 ScheduledConnector.schedule(sc1, ssc.getLocalAddress(), DELAY);
                 // accept will block
@@ -270,7 +267,7 @@ public class NioChannels {
     public void testServerSocketChannelAcceptAsyncClose() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
-                InetAddress lh = InetAddress.getLocalHost();
+                InetAddress lh = InetAddress.getLoopbackAddress();
                 ssc.bind(new InetSocketAddress(lh, 0));
                 ScheduledCloser.schedule(ssc, DELAY);
                 try {
@@ -288,7 +285,7 @@ public class NioChannels {
     public void testServerSocketChannelAcceptInterrupt() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
-                InetAddress lh = InetAddress.getLocalHost();
+                InetAddress lh = InetAddress.getLoopbackAddress();
                 ssc.bind(new InetSocketAddress(lh, 0));
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
                 try {
@@ -296,24 +293,6 @@ public class NioChannels {
                     sc.close();
                     throw new RuntimeException("connection accepted???");
                 } catch (ClosedByInterruptException expected) { }
-            }
-        });
-    }
-
-    void testSocketChannelAdaptorAccept(int timeout) throws Exception {
-        TestHelper.runInVirtualThread(() -> {
-            try (var ssc = ServerSocketChannel.open()) {
-                ssc.bind(new InetSocketAddress(InetAddress.getLocalHost(), 0));
-                var sc1 = SocketChannel.open();
-                ScheduledConnector.schedule(sc1, ssc.getLocalAddress(), DELAY);
-
-                if (timeout > 0)
-                    ssc.socket().setSoTimeout(timeout);
-
-                // accept will block
-                Socket s = ssc.socket().accept();
-                sc1.close();
-                s.close();
             }
         });
     }
@@ -332,6 +311,24 @@ public class NioChannels {
         testSocketChannelAdaptorAccept(60_000);
     }
 
+    private void testSocketChannelAdaptorAccept(int timeout) throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (var ssc = ServerSocketChannel.open()) {
+                ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+                var sc1 = SocketChannel.open();
+                ScheduledConnector.schedule(sc1, ssc.getLocalAddress(), DELAY);
+
+                if (timeout > 0)
+                    ssc.socket().setSoTimeout(timeout);
+
+                // accept will block
+                Socket s = ssc.socket().accept();
+                sc1.close();
+                s.close();
+            }
+        });
+    }
+
     /**
      * DatagramChannel receive/send, no blocking.
      */
@@ -340,7 +337,7 @@ public class NioChannels {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
-                InetAddress lh = InetAddress.getLocalHost();
+                InetAddress lh = InetAddress.getLoopbackAddress();
                 dc2.bind(new InetSocketAddress(lh, 0));
 
                 // send should not block
@@ -364,7 +361,7 @@ public class NioChannels {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
-                InetAddress lh = InetAddress.getLocalHost();
+                InetAddress lh = InetAddress.getLoopbackAddress();
                 dc2.bind(new InetSocketAddress(lh, 0));
 
                 // schedule send
@@ -385,7 +382,7 @@ public class NioChannels {
     public void testDatagramChannelReceiveAsyncClose() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
-                InetAddress lh = InetAddress.getLocalHost();
+                InetAddress lh = InetAddress.getLoopbackAddress();
                 dc.bind(new InetSocketAddress(lh, 0));
                 ScheduledCloser.schedule(dc, DELAY);
                 try {
@@ -402,36 +399,13 @@ public class NioChannels {
     public void testDatagramChannelReceiveInterrupt() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
-                InetAddress lh = InetAddress.getLocalHost();
+                InetAddress lh = InetAddress.getLoopbackAddress();
                 dc.bind(new InetSocketAddress(lh, 0));
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
                 try {
                     dc.receive(ByteBuffer.allocate(100));
                     throw new RuntimeException("receive returned");
                 } catch (ClosedByInterruptException expected) { }
-            }
-        });
-    }
-
-    void testDatagramSocketAdaptorReceive(int timeout) throws Exception {
-        TestHelper.runInVirtualThread(() -> {
-            try (DatagramChannel dc1 = DatagramChannel.open();
-                 DatagramChannel dc2 = DatagramChannel.open()) {
-
-                InetAddress lh = InetAddress.getLocalHost();
-                dc2.bind(new InetSocketAddress(lh, 0));
-
-                // schedule send
-                ByteBuffer bb = ByteBuffer.wrap("XXX".getBytes("UTF-8"));
-                ScheduledSender.schedule(dc1, bb, dc2.getLocalAddress(), DELAY);
-
-                // receive should block
-                byte[] array = new byte[100];
-                DatagramPacket p = new DatagramPacket(array, 0, array.length);
-                if (timeout > 0)
-                    dc2.socket().setSoTimeout(timeout);
-                dc2.socket().receive(p);
-                assertTrue(p.getLength() == 3 && array[0] == 'X');
             }
         });
     }
@@ -449,6 +423,31 @@ public class NioChannels {
     public void testDatagramSocketAdaptorReceive2() throws Exception {
         testDatagramSocketAdaptorReceive(60_1000);
     }
+
+    private void testDatagramSocketAdaptorReceive(int timeout) throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (DatagramChannel dc1 = DatagramChannel.open();
+                 DatagramChannel dc2 = DatagramChannel.open()) {
+
+                InetAddress lh = InetAddress.getLoopbackAddress();
+                dc2.bind(new InetSocketAddress(lh, 0));
+
+                // schedule send
+                ByteBuffer bb = ByteBuffer.wrap("XXX".getBytes("UTF-8"));
+                ScheduledSender.schedule(dc1, bb, dc2.getLocalAddress(), DELAY);
+
+                // receive should block
+                byte[] array = new byte[100];
+                DatagramPacket p = new DatagramPacket(array, 0, array.length);
+                if (timeout > 0)
+                    dc2.socket().setSoTimeout(timeout);
+                dc2.socket().receive(p);
+                assertTrue(p.getLength() == 3 && array[0] == 'X');
+            }
+        });
+    }
+
+
 
     /**
      * Pipe read/write, no blocking.
@@ -600,7 +599,7 @@ public class NioChannels {
         private final SocketChannel sc1;
         private final SocketChannel sc2;
         Connection() throws IOException {
-            var lh = InetAddress.getLocalHost();
+            var lh = InetAddress.getLoopbackAddress();
             this.ssc = ServerSocketChannel.open().bind(new InetSocketAddress(lh, 0));
             this.sc1 = SocketChannel.open(ssc.getLocalAddress());
             this.sc2 = ssc.accept();

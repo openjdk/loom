@@ -1611,6 +1611,22 @@ class DatagramChannelImpl
     }
 
     /**
+     * Finds an existing membership of a multicast group. Returns null if this
+     * channel's socket is not a member of the group.
+     *
+     * @apiNote This method is for use by the socket adaptor
+     */
+    MembershipKey findMembership(InetAddress group, NetworkInterface interf) {
+        synchronized (stateLock) {
+            if (registry != null) {
+                return registry.checkMembership(group, interf, null);
+            } else {
+                return null;
+            }
+        }
+    }
+
+    /**
      * Block datagrams from the given source.
      */
     void block(MembershipKeyImpl key, InetAddress source)

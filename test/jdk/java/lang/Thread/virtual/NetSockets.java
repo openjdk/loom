@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,19 +24,22 @@
 /**
  * @test
  * @run testng NetSockets
- * @summary Basic tests for virtual threads using java.net.Socket/ServerSocket
+ * @summary Basic tests for virtual threads using java.net sockets.
  */
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
@@ -232,6 +235,130 @@ public class NetSockets {
         });
     }
 
+    /**
+     * DatagramSocket receive/send, no blocking.
+     */
+    public void testDatagramSocketSendReceive1() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (DatagramSocket s1 = new DatagramSocket(null);
+                 DatagramSocket s2 = new DatagramSocket(null)) {
+
+                InetAddress lh = InetAddress.getLoopbackAddress();
+                s1.bind(new InetSocketAddress(lh, 0));
+                s2.bind(new InetSocketAddress(lh, 0));
+
+                // send should not block
+                byte[] bytes = "XXX".getBytes("UTF-8");
+                DatagramPacket p1 = new DatagramPacket(bytes, bytes.length);
+                p1.setSocketAddress(s2.getLocalSocketAddress());
+                s1.send(p1);
+
+                // receive should not block
+                byte[] ba = new byte[100];
+                DatagramPacket p2 = new DatagramPacket(ba, ba.length);
+                s2.receive(p2);
+                assertEquals(p2.getSocketAddress(), s1.getLocalSocketAddress());
+                assertTrue(ba[0] == 'X');
+            }
+        });
+    }
+
+    /**
+     * Virtual thread blocks in DatagramSocket receive
+     */
+    public void testDatagramSocketSendReceive2() throws Exception {
+        testDatagramSocketSendReceive(0);
+    }
+
+    /**
+     * Virtual thread blocks in DatagramSocket receive with timeout
+     */
+    public void testDatagramSocketSendReceive3() throws Exception {
+        testDatagramSocketSendReceive(60_000);
+    }
+
+    private void testDatagramSocketSendReceive(int timeout) throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (DatagramSocket s1 = new DatagramSocket(null);
+                 DatagramSocket s2 = new DatagramSocket(null)) {
+
+                InetAddress lh = InetAddress.getLoopbackAddress();
+                s1.bind(new InetSocketAddress(lh, 0));
+                s2.bind(new InetSocketAddress(lh, 0));
+
+                // schedule send
+                byte[] bytes = "XXX".getBytes("UTF-8");
+                DatagramPacket p1 = new DatagramPacket(bytes, bytes.length);
+                p1.setSocketAddress(s2.getLocalSocketAddress());
+                ScheduledSender.schedule(s1, p1, DELAY);
+
+                // receive should block
+                if (timeout > 0)
+                    s2.setSoTimeout(timeout);
+                byte[] ba = new byte[100];
+                DatagramPacket p2 = new DatagramPacket(ba, ba.length);
+                s2.receive(p2);
+                assertEquals(p2.getSocketAddress(), s1.getLocalSocketAddress());
+                assertTrue(ba[0] == 'X');
+            }
+        });
+    }
+
+    /**
+     * Virtual thread blocks in DatagramSocket receive that times out
+     */
+    public void testDatagramSocketReceiveTimeout() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (DatagramSocket s = new DatagramSocket(null)) {
+                InetAddress lh = InetAddress.getLoopbackAddress();
+                s.bind(new InetSocketAddress(lh, 0));
+                s.setSoTimeout(2000);
+                byte[] ba = new byte[100];
+                DatagramPacket p = new DatagramPacket(ba, ba.length);
+                try {
+                    s.receive(p);
+                    assertTrue(false);
+                } catch (SocketTimeoutException expected) { }
+            }
+        });
+    }
+
+    /**
+     * DatagramSocket close while virtual thread blocked in receive.
+     */
+    public void testDatagramSocketReceiveAsyncClose1() throws Exception {
+        testDatagramSocketReceiveAsyncClose(0);
+    }
+
+    /**
+     * DatagramSocket close while virtual thread blocked with timeout.
+     */
+    public void testDatagramSocketReceiveAsyncClose2() throws Exception {
+        testDatagramSocketReceiveAsyncClose(60_000);
+    }
+
+    private void testDatagramSocketReceiveAsyncClose(int timeout) throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (DatagramSocket s = new DatagramSocket(null)) {
+                InetAddress lh = InetAddress.getLoopbackAddress();
+                s.bind(new InetSocketAddress(lh, 0));
+                if (timeout > 0)
+                    s.setSoTimeout(timeout);
+
+                // schedule close
+                ScheduledCloser.schedule(s, DELAY);
+
+                // receive
+                try {
+                    byte[] ba = new byte[100];
+                    DatagramPacket p = new DatagramPacket(ba, ba.length);
+                    s.receive(p);
+                    assertTrue(false);
+                } catch (SocketException expected) { }
+            }
+        });
+    }
+
     // -- supporting classes --
 
     /**
@@ -243,7 +370,7 @@ public class NetSockets {
         private final Socket s2;
         Connection() throws IOException {
             ServerSocket ss = new ServerSocket();
-            var lh = InetAddress.getLocalHost();
+            var lh = InetAddress.getLoopbackAddress();
             ss.bind(new InetSocketAddress(lh, 0));
             Socket s = new Socket();
             s.connect(ss.getLocalSocketAddress());
@@ -372,6 +499,33 @@ public class NetSockets {
 
         static void schedule(Socket socket, SocketAddress address, long delay) {
             new Thread(new ScheduledConnector(socket, address, delay)).start();
+        }
+    }
+
+    /**
+     * Sends a datagram to a target address after a delay
+     */
+    static class ScheduledSender implements Runnable {
+        private final DatagramSocket socket;
+        private final DatagramPacket packet;
+        private final long delay;
+
+        ScheduledSender(DatagramSocket socket, DatagramPacket packet, long delay) {
+            this.socket = socket;
+            this.packet = packet;
+            this.delay = delay;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Thread.sleep(delay);
+                socket.send(packet);
+            } catch (Exception e) { }
+        }
+
+        static void schedule(DatagramSocket socket, DatagramPacket packet, long delay) {
+            new Thread(new ScheduledSender(socket, packet, delay)).start();
         }
     }
 }
