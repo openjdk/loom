@@ -420,34 +420,34 @@ public interface ExecutorService extends Executor, AutoCloseable {
     }
 
     /**
-     * Returns an Executor that delegates to this Executor and stops all executing
-     * tasks, as if by invoking {@link #shutdownNow()}, when a deadline is reached.
-     * The Executor optionally has an <i>owner thread</i> that is {@linkplain
-     * Thread#interrupt() interrupted} when the deadline is reached.
-     * The {@code shutdownNow()} and {@code interrupt()} methods may be invoked
+     * Returns an Executor that interrupts the current thread and stops all tasks
+     * executing if a deadline is reached before the Executor has terminated.
+     * The newly created Executor delegates all operations to this Executor.
+     * The {@linkplain Thread#currentThread() current thread} is the <i>owner
+     * thread</i>. If the deadline is reached before the Executor has terminated
+     * then the owner thread is {@linkplain Thread#interrupt() interrupted} and
+     * the Executor shutdown, as if by invoking {@link #shutdownNow()}.
+     * The {@code interrupt()} and {@code shutdownNow()} methods may be invoked
      * on a thread supporting the deadline mechanism.
      *
      * <p> If this method is invoked with a deadline that has already expired
-     * then the {@code shutdownNow()} method is invoked and the owner is
-     * interrupted immediately. If the deadline has already expired or the
-     * executor has already terminated then this Executor is returned (a new
-     * Executor is not created).
+     * then the {@code shutdownNow()} method is invoked immediately and the owner
+     * is interrupted. If the deadline has already expired or the executor has
+     * already terminated then this Executor is returned (a new Executor is not
+     * created).
      *
      * @implSpec
      * The default implementation schedules a task to run when the deadline
      * expires. The task invokes the {@code shutdownNow()} method to stop all
-     * executing tasks, and interrupts the owner (if there is a thread owner).
+     * executing tasks and interrupts the owner thread.
      *
      * @apiNote This is a prototype API. It is intended to be used with the
      * try-with-resources construct to set a deadline for tasks submitted to
-     * execute in the try-with-resources block. The owner will typically be
-     * specified as the current thread so that a blocking operation in the
-     * try-with-resources is interrupted when the deadline expires.
+     * execute in the try-with-resources block.
      * <pre> {@code
      *     ThreadFactory factory = Thread.builder().virtual().factory();
      *     Instant deadline = Instant.now().plusSeconds(10);
-     *     try (ExecutorService executor = Executors.newUnboundedExecutor(factory)
-     *                                              .withDeadline(deadline, Thread.currentThread())) {
+     *     try (ExecutorService executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
      *         executor.submit(task1);
      *         executor.submit(task1);
      *         doSomethingThatMightBlock();
@@ -455,16 +455,15 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * }</pre>
      *
      * @param deadline the deadline
-     * @param owner the owner thread, can be null if there is no owner
      * @return a new Executor that delegates operations to this Executor
      * @throws NullPointerException if deadline is null
      * @throws SecurityException if a security manager exists and it denies
      *         {@link java.lang.RuntimePermission}{@code ("modifyThread")}.
      * @since 99
      */
-    default ExecutorService withDeadline(Instant deadline, Thread owner) {
+    default ExecutorService withDeadline(Instant deadline) {
         Duration timeout = Duration.between(Instant.now(), deadline);
-        return Executors.timedExecutorService(this, timeout, owner);
+        return Executors.timedExecutorService(this, timeout);
     }
 }
 

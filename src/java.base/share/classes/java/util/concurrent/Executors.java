@@ -824,9 +824,7 @@ public class Executors {
      * Returns an Executor that delegates and stops all executing tasks, by
      * invoking its shutdownNow() method when a deadline is reached.
      */
-    static ExecutorService timedExecutorService(ExecutorService delegate,
-                                                Duration timeout,
-                                                Thread owner) {
+    static ExecutorService timedExecutorService(ExecutorService delegate, Duration timeout) {
         // need same permission as ExecutorService::shutdownNow
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
@@ -836,8 +834,7 @@ public class Executors {
         // deadline has already expired
         if (timeout.isZero() || timeout.isNegative()) {
             delegate.shutdownNow();
-            if (owner != null)
-               owner.interrupt();
+            Thread.currentThread().interrupt();
             return delegate;
         }
 
@@ -847,12 +844,14 @@ public class Executors {
         }
 
         // timer task needs permission to invoke shutdownNow
-        Callable<List<Runnable>> timerExpired = () -> {
-            PrivilegedAction<List<Runnable>> pa = () -> {
-                List<Runnable> notRun = delegate.shutdownNow();
-                if (owner != null)
+        Thread owner = Thread.currentThread();
+        Callable<Void> timerExpired = () -> {
+            PrivilegedAction<Void> pa = () -> {
+                if (!delegate.isTerminated()) {
+                    delegate.shutdownNow();
                     owner.interrupt();
-                return notRun;
+                }
+                return null;
             };
             return AccessController.doPrivileged(pa,
                     null,
@@ -868,24 +867,19 @@ public class Executors {
             @Override
             public void shutdown() {
                 super.shutdown();
-                // eagerly cancel timer task if terminated
-                if (super.isTerminated())
-                    cancelTimer();
+                if (isTerminated()) cancelTimer();
             }
             @Override
             public List<Runnable> shutdownNow() {
                 List<Runnable> tasks = super.shutdownNow();
-                // cancel timer if shutdownNow completed successfully
-                cancelTimer();
+                if (isTerminated()) cancelTimer();
                 return tasks;
             }
             @Override
             public boolean awaitTermination(long timeout, TimeUnit unit)
                     throws InterruptedException {
                 boolean terminated = super.awaitTermination(timeout, unit);
-                // eagerly cancel timer task if terminated
-                if (terminated)
-                    cancelTimer();
+                if (terminated) cancelTimer();
                 return terminated;
             }
         };

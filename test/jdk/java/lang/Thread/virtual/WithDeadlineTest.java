@@ -47,20 +47,25 @@ public class WithDeadlineTest {
     public void testDeadlineBeforeShutdown() throws Exception {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         var deadline = Instant.now().plusSeconds(3);
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline, null)) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
             // assume this is submitted before the deadline expires
             Future<?> result = executor.submit(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
             });
 
-            // task should be interrupted when deadline expires
+            // current thread should be interrupted
+            expectThrows(InterruptedException.class, result::get);
+
+            // task should be interrupted
             Throwable e = expectThrows(ExecutionException.class, result::get);
             assertTrue(e.getCause() instanceof InterruptedException);
 
             // executor should be shutdown and should almost immediately
             assertTrue(executor.isShutdown());
             assertTrue(executor.awaitTermination(1, TimeUnit.SECONDS));
+        } finally {
+            Thread.interrupted();  // ensure interrupt status is cleared
         }
     }
 
@@ -70,7 +75,7 @@ public class WithDeadlineTest {
     public void testDeadlineAfterShutdown() throws Exception {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         var deadline = Instant.now().plusSeconds(3);
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline, null)) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
             // assume this is submitted before the deadline expires
             Future<?> result = executor.submit(() -> {
                 Thread.sleep(Duration.ofDays(1));
@@ -78,12 +83,45 @@ public class WithDeadlineTest {
             });
             executor.shutdown();
 
-            // task should be interrupted when deadline expires
+            // current thread should be interrupted
+            expectThrows(InterruptedException.class, result::get);
+
+            // task should be interrupted
             Throwable e = expectThrows(ExecutionException.class, result::get);
             assertTrue(e.getCause() instanceof InterruptedException);
 
-            // executor terminate immediately
+            // executor should almost terminate immediately
             assertTrue(executor.awaitTermination(1, TimeUnit.SECONDS));
+        } finally {
+            Thread.interrupted();  // ensure interrupt status is cleared
+        }
+    }
+
+    /**
+     * Deadline expires while the owner is waiting in close.
+     */
+    public void testDeadlineDuringClose() {
+        ThreadFactory factory = Thread.builder().daemon(true).factory();
+        var deadline = Instant.now().plusSeconds(3);
+        Future<?> result;
+        try {
+            try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
+                // assume this is submitted before the deadline expires
+                result = executor.submit(() -> {
+                    Thread.sleep(Duration.ofDays(1));
+                    return null;
+                });
+            }
+
+            // interrupt status should be set
+            assertTrue(Thread.interrupted());
+
+            // task should be interrupted
+            Throwable e = expectThrows(ExecutionException.class, result::get);
+            assertTrue(e.getCause() instanceof InterruptedException);
+
+        } finally {
+            Thread.interrupted();  // ensure interrupt status is cleared
         }
     }
 
@@ -94,81 +132,14 @@ public class WithDeadlineTest {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         var deadline = Instant.now().plusSeconds(60);
         Future<?> result;
-        var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline, null);
-        try (executor) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
             result = executor.submit(() -> {
                 Thread.sleep(Duration.ofMillis(500));
                 return null;
             });
         }
+        assertFalse(Thread.interrupted());
         assertTrue(result.get() == null);
-        assertTrue(executor.isShutdown() && executor.isTerminated());
-    }
-
-    /**
-     * Deadline expires before owner closes the executor.
-     */
-    public void testInterruptBeforeDeadline() throws Exception {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
-        var deadline = Instant.now().plusSeconds(3);
-        try (var executor = Executors.newUnboundedExecutor(factory)
-                                     .withDeadline(deadline, Thread.currentThread())) {
-            // sleep should be interrupted
-            try {
-                Thread.sleep(Duration.ofDays(1));
-                assertTrue(false);
-            } catch (InterruptedException expected) { }
-
-            // executor should be shutdown and should terminate almost immediately
-            assertTrue(executor.isShutdown());
-            assertTrue(executor.awaitTermination(1, TimeUnit.SECONDS));
-        } finally {
-            Thread.interrupted();  // ensure interrupt status is cleared
-        }
-    }
-
-    /**
-     * Deadline expires while the owner is waiting in close.
-     */
-    public void testInterruptDuringClose() {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
-        var deadline = Instant.now().plusSeconds(3);
-        try {
-            try (var executor = Executors.newUnboundedExecutor(factory)
-                                         .withDeadline(deadline, Thread.currentThread())) {
-                // assume this is submitted before the deadline expires
-                executor.submit(() -> {
-                    Thread.sleep(Duration.ofDays(1));
-                    return null;
-                });
-            }
-
-            // interrupt status should be set
-            assertTrue(Thread.interrupted());
-
-        } finally {
-            Thread.interrupted();  // ensure interrupt status is cleared
-        }
-
-    }
-
-    /**
-     * Deadline expires after the executor has terminated.
-     */
-    public void testInterruptAfterTerminate() throws Exception {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
-        var deadline = Instant.now().plusSeconds(3);
-        try {
-            Executors.newUnboundedExecutor(factory)
-                    .withDeadline(deadline, Thread.currentThread())
-                    .close();
-
-            // sleep should not be interrupted
-            Thread.sleep(Duration.between(Instant.now(), deadline));
-
-        } finally {
-            Thread.interrupted();  // ensure interrupt status is cleared
-        }
     }
 
     /**
@@ -176,23 +147,23 @@ public class WithDeadlineTest {
      */
     public void testDeadlineAlreadyExpired() {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
+
         // now
         Instant now = Instant.now();
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(now, null)) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(now)) {
             assertTrue(executor.isTerminated());
         }
-        try (var executor = Executors.newUnboundedExecutor(factory)
-                                     .withDeadline(now, Thread.currentThread())) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(now)) {
             assertTrue(Thread.interrupted());
             assertTrue(executor.isTerminated());
         }
+
         // in the past
         var yesterday = Instant.now().minus(Duration.ofDays(1));
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(yesterday, null)) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(yesterday)) {
             assertTrue(executor.isTerminated());
         }
-        try (var executor = Executors.newUnboundedExecutor(factory)
-                                     .withDeadline(yesterday, Thread.currentThread())) {
+        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(yesterday)) {
             assertTrue(Thread.interrupted());
             assertTrue(executor.isTerminated());
         }
