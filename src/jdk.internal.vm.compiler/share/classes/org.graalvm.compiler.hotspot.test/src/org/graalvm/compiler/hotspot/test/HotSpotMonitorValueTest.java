@@ -55,19 +55,17 @@ public class HotSpotMonitorValueTest extends GraalCompilerTest {
                 Call call = (Call) i;
                 if (call.target instanceof ResolvedJavaMethod) {
                     ResolvedJavaMethod target = (ResolvedJavaMethod) call.target;
-                    if (target.equals(lookupObjectWait())) {
+                    if (target.equals(lookupObjectWait0())) {
                         BytecodeFrame frame = call.debugInfo.frame();
                         BytecodeFrame caller = frame.caller();
                         assertNotNull(caller);
-                        assertNull(caller.caller());
-                        assertDeepEquals(2, frame.numLocks);
-                        assertDeepEquals(2, caller.numLocks);
-                        StackLockValue lock1 = (StackLockValue) frame.getLockValue(0);
-                        StackLockValue lock2 = (StackLockValue) frame.getLockValue(1);
-                        StackLockValue lock3 = (StackLockValue) caller.getLockValue(0);
-                        StackLockValue lock4 = (StackLockValue) caller.getLockValue(1);
+                        assertNotNull(caller.caller());
+                        assertDeepEquals(0, frame.numLocks);
+                        assertDeepEquals(2, caller.caller().numLocks);
+                        StackLockValue lock1 = (StackLockValue) caller.caller().getLockValue(0);
+                        StackLockValue lock2 = (StackLockValue) caller.caller().getLockValue(1);
 
-                        List<StackLockValue> locks = Arrays.asList(lock1, lock2, lock3, lock4);
+                        List<StackLockValue> locks = Arrays.asList(lock1, lock2);
                         for (StackLockValue lock : locks) {
                             for (StackLockValue other : locks) {
                                 if (other != lock) {
@@ -76,19 +74,18 @@ public class HotSpotMonitorValueTest extends GraalCompilerTest {
                                 }
                             }
                         }
-                        assertDeepEquals(lock3.getOwner(), lock4.getOwner());
-                        assertThat(lock1.getOwner(), not(lock2.getOwner()));
+                        assertDeepEquals(lock1.getOwner(), lock2.getOwner());
                         return super.addMethod(debug, method, compResult);
                     }
                 }
             }
         }
-        throw new AssertionError("Could not find debug info for call to Object.wait(long)");
+        throw new AssertionError("Could not find debug info for call to Object.wait0(long)");
     }
 
-    private ResolvedJavaMethod lookupObjectWait() {
+    private ResolvedJavaMethod lookupObjectWait0() {
         try {
-            return getMetaAccess().lookupJavaMethod(Object.class.getDeclaredMethod("wait", long.class));
+            return getMetaAccess().lookupJavaMethod(Object.class.getDeclaredMethod("wait0", long.class));
         } catch (Exception e) {
             throw new GraalError("Could not find Object.wait(long): %s", e);
         }
