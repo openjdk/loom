@@ -140,7 +140,7 @@ class GCTimer;
   do_klass(Thread_FieldHolder_klass,                    java_lang_Thread_FieldHolder                          ) \
   do_klass(Thread_VirtualThreads_klass,                 java_lang_Thread_VirtualThreads                       ) \
   do_klass(ThreadGroup_klass,                           java_lang_ThreadGroup                                 ) \
-  do_klass(Fiber_klass,                                 java_lang_Fiber                                       ) \
+  do_klass(VirtualThread_klass,                         java_lang_VirtualThread                               ) \
   do_klass(Properties_klass,                            java_util_Properties                                  ) \
   do_klass(Module_klass,                                java_lang_Module                                      ) \
   do_klass(reflect_AccessibleObject_klass,              java_lang_reflect_AccessibleObject                    ) \

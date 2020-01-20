@@ -381,38 +381,38 @@ class VM_GetReceiver : public VM_GetOrSetLocal {
   const char* name() const                       { return "get receiver"; }
 };
 
-// VM operation to get or set fiber local
-class VM_FiberGetOrSetLocal : public VM_BaseGetOrSetLocal {
+// VM operation to get or set virtual thread local
+class VM_VirtualThreadGetOrSetLocal : public VM_BaseGetOrSetLocal {
  protected:
   JvmtiEnv *_env;
-  Handle _fiber_h;
+  Handle _vthread_h;
 
   javaVFrame* get_java_vframe();
 
 public:
   // Constructor for non-object getter
-  VM_FiberGetOrSetLocal(JvmtiEnv* env, Handle fiber_h, jint depth, jint index, BasicType type);
+  VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Handle vthread_h, jint depth, jint index, BasicType type);
 
   // Constructor for object or non-object setter
-  VM_FiberGetOrSetLocal(JvmtiEnv* env, Handle fiber_h, jint depth,
+  VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Handle vthread_h, jint depth,
                         jint index, BasicType type, jvalue value);
 
   // Constructor for object getter
-  VM_FiberGetOrSetLocal(JvmtiEnv* env, Handle fiber_h, JavaThread* calling_thread,
+  VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Handle vthread_h, JavaThread* calling_thread,
                         jint depth, int index);
 
-  VMOp_Type type() const { return VMOp_FiberGetOrSetLocal; }
+  VMOp_Type type() const { return VMOp_VirtualThreadGetOrSetLocal; }
 
-  const char* name() const                       { return "fiber get/set locals"; }
+  const char* name() const                       { return "virtual thread get/set locals"; }
 };
 
-class VM_FiberGetReceiver : public VM_FiberGetOrSetLocal {
+class VM_VirtualThreadGetReceiver : public VM_VirtualThreadGetOrSetLocal {
  protected:
   virtual bool getting_receiver() const { return true; }
 
  public:
-  VM_FiberGetReceiver(JvmtiEnv* env, Handle fiber_h, JavaThread* calling_thread, jint depth);
-  const char* name() const                       { return "fiber get receiver"; }
+  VM_VirtualThreadGetReceiver(JvmtiEnv* env, Handle vthread_h, JavaThread* calling_thread, jint depth);
+  const char* name() const                       { return "virtual thread get receiver"; }
 };
 
 

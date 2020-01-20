@@ -61,7 +61,7 @@ class RecordComponent;
   f(java_lang_Thread_FieldHolder) \
   f(java_lang_Thread_VirtualThreads) \
   f(java_lang_ThreadGroup) \
-  f(java_lang_Fiber) \
+  f(java_lang_VirtualThread) \
   f(java_lang_AssertionStatusDirectives) \
   f(java_lang_ref_SoftReference) \
   f(java_lang_invoke_MethodHandle) \
@@ -387,7 +387,7 @@ class java_lang_Thread : AllStatic {
   static int _interrupted_offset;
   static int _tid_offset;
   static int _continuation_offset;
-  static int _fiber_offset;
+  static int _vthread_offset;
   static int _park_blocker_offset;
 
   static void compute_offsets();
@@ -434,8 +434,8 @@ class java_lang_Thread : AllStatic {
   // Continuation
   static oop  continuation(oop java_thread);
   static void set_continuation(oop java_thread, oop continuation);
-  // Fiber
-  static oop  fiber(oop java_thread);
+  // VirtualThread
+  static oop  vthread(oop java_thread);
 
   // Blocker object responsible for thread parking
   static oop park_blocker(oop java_thread);
@@ -574,9 +574,9 @@ class java_lang_ThreadGroup : AllStatic {
 };
 
 
-// Interface to java.lang.Fiber objects
+// Interface to java.lang.VirtualThread objects
 
-class java_lang_Fiber : AllStatic {
+class java_lang_VirtualThread : AllStatic {
  private:
   static int static_notify_jvmti_events_offset;
   static int _carrierThread_offset;
@@ -588,12 +588,12 @@ class java_lang_Fiber : AllStatic {
 
   // Testers
   static bool is_subclass(Klass* klass) {
-    return klass->is_subclass_of(SystemDictionary::Fiber_klass());
+    return klass->is_subclass_of(SystemDictionary::VirtualThread_klass());
   }
   static bool is_instance(oop obj);
-  static oop carrier_thread(oop fiber);
-  static oop continuation(oop fiber);
-  static java_lang_Thread::ThreadStatus get_thread_status(oop fiber);
+  static oop carrier_thread(oop vthread);
+  static oop continuation(oop vthread);
+  static java_lang_Thread::ThreadStatus get_thread_status(oop vthread);
   static void set_notify_jvmti_events(jboolean enable);
   static void init_static_notify_jvmti_events();
 };

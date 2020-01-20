@@ -2949,10 +2949,10 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
              * stack looked like:
              *    java.lang.Continuation.yield0
              *    java.lang.Continuation.yield
-             *    <fiber frames>  <-- if Fiber, otherwise just additional continuation frames
+             *    <virtual thread frames>  <-- if virtual thread, otherwise just additional continuation frames
              *    java.lang.Continuation.enter  <-- bottommost continuation frame
              *    java.lang.Continuation.run    <-- doContinue() call jumps into continuation
-             *    java.lang.Fiber.runContinuation  <-- if Fiber, otherwise will be different
+             *    java.lang.VirtualThread.runContinuation  <-- if virtual thread, otherwise will be different
              *    <scheduler frames>
              * All frames above run(), starting with enter(), are continuation frames. The
              * correct thing to do here is just enable single stepping. This will resume single

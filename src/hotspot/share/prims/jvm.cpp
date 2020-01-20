@@ -3698,30 +3698,30 @@ JVM_ENTRY_NO_ENV(jint, JVM_FindSignal(const char *name))
   return os::get_signal_number(name);
 JVM_END
 
-JVM_ENTRY(void, JVM_FiberStarted(JNIEnv* env, jclass fiber_class, jthread event_hread, jobject fiber))
-  JVMWrapper("JVM_FiberStarted");
+JVM_ENTRY(void, JVM_VirtualThreadStarted(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
+  JVMWrapper("JVM_VirtualThreadStarted");
   if (JvmtiExport::should_post_fiber_scheduled()) {
-    JvmtiExport::post_fiber_scheduled(event_hread, fiber);
+    JvmtiExport::post_fiber_scheduled(event_thread, vthread);
   }
 JVM_END
 
-JVM_ENTRY(void, JVM_FiberTerminated(JNIEnv* env, jclass fiber_class, jthread event_hread, jobject fiber))
-  JVMWrapper("JVM_FiberTerminated");
+JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
+  JVMWrapper("JVM_VirtualThreadTerminated");
   if (JvmtiExport::should_post_fiber_terminated()) {
-    JvmtiExport::post_fiber_terminated(event_hread, fiber);
+    JvmtiExport::post_fiber_terminated(event_thread, vthread);
   }
 JVM_END
 
-JVM_ENTRY(void, JVM_FiberMount(JNIEnv* env, jclass fiber_class, jthread event_hread, jobject fiber))
-  JVMWrapper("JVM_FiberMount");
+JVM_ENTRY(void, JVM_VirtualThreadMount(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
+  JVMWrapper("JVM_VirtualThreadMount");
   if (JvmtiExport::should_post_fiber_mount()) {
-    JvmtiExport::post_fiber_mount(event_hread, fiber);
+    JvmtiExport::post_fiber_mount(event_thread, vthread);
   }
 JVM_END
 
-JVM_ENTRY(void, JVM_FiberUnmount(JNIEnv* env, jclass fiber_class, jthread event_hread, jobject fiber))
-  JVMWrapper("JVM_FiberUnmount");
+JVM_ENTRY(void, JVM_VirtualThreadUnmount(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
+  JVMWrapper("JVM_VirtualThreadUnmount");
   if (JvmtiExport::should_post_fiber_unmount()) {
-    JvmtiExport::post_fiber_unmount(event_hread, fiber);
+    JvmtiExport::post_fiber_unmount(event_thread, vthread);
   }
 JVM_END

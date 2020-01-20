@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,19 +26,19 @@
 
 #include "jni.h"
 #include "jvm.h"
-#include "java_lang_Fiber.h"
+#include "java_lang_VirtualThread.h"
 
 #define THREAD "Ljava/lang/Thread;"
-#define FIBER  "Ljava/lang/Fiber;"
+#define VIRTUAL_THREAD  "Ljava/lang/VirtualThread;"
 
 static JNINativeMethod methods[] = {
-    { "notifyFiberStarted",   "(" THREAD FIBER ")V", (void *)&JVM_FiberStarted },
-    { "notifyFiberTerminated",  "(" THREAD FIBER ")V", (void *)&JVM_FiberTerminated },
-    { "notifyFiberMount",   "(" THREAD FIBER ")V", (void *)&JVM_FiberMount },
-    { "notifyFiberUnmount", "(" THREAD FIBER ")V", (void *)&JVM_FiberUnmount },
+    { "notifyStarted",    "(" THREAD VIRTUAL_THREAD ")V", (void *)&JVM_VirtualThreadStarted },
+    { "notifyTerminated", "(" THREAD VIRTUAL_THREAD ")V", (void *)&JVM_VirtualThreadTerminated },
+    { "notifyMount",      "(" THREAD VIRTUAL_THREAD ")V", (void *)&JVM_VirtualThreadMount },
+    { "notifyUnmount",    "(" THREAD VIRTUAL_THREAD ")V", (void *)&JVM_VirtualThreadUnmount },
 };
 
 JNIEXPORT void JNICALL
-Java_java_lang_Fiber_registerNatives(JNIEnv *env, jclass clazz) {
+Java_java_lang_VirtualThread_registerNatives(JNIEnv *env, jclass clazz) {
     (*env)->RegisterNatives(env, clazz, methods, (sizeof(methods)/sizeof(methods[0])));
 }

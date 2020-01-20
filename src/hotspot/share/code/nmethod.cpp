@@ -1150,15 +1150,15 @@ bool nmethod::is_not_on_continuation_stack() {
   // after that concurrent GC. Each GC increments the marking cycle twice - once when
   // it starts and once when it ends. So we can only be sure there are no new continuations
   // when they have not been encountered from before a GC to after a GC.
-  bool not_on_new_fiber_stack = CodeCache::marking_cycle() >= align_up(_marking_cycle, 2) + 2;
+  bool not_on_new_vthread_stack = CodeCache::marking_cycle() >= align_up(_marking_cycle, 2) + 2;
 
-  // As for old fiber stacks, they are kept alive by a WeakHandle.
-  bool not_on_old_fiber_stack = false;
+  // As for old vthread stacks, they are kept alive by a WeakHandle.
+  bool not_on_old_vthread_stack = false;
   if (_keepalive != NULL) {
     WeakHandle<vm_nmethod_keepalive_data> wh = WeakHandle<vm_nmethod_keepalive_data>::from_raw(_keepalive);
-    not_on_old_fiber_stack = wh.resolve() == NULL;
+    not_on_old_vthread_stack = wh.resolve() == NULL;
   }
-  return not_on_new_fiber_stack && not_on_old_fiber_stack;
+  return not_on_new_vthread_stack && not_on_old_vthread_stack;
 }
 
 // Tell if a non-entrant method can be converted to a zombie (i.e.,

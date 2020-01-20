@@ -91,15 +91,15 @@
   template(GetThreadListStackTraces)              \
   template(GetFrameCount)                         \
   template(GetFrameLocation)                      \
-  template(FiberGetCurrentContendedMonitor)       \
-  template(FiberGetOwnedMonitorInfo)              \
-  template(FiberGetThread)                        \
-  template(FiberGetStackTrace)                    \
-  template(FiberGetFrameCount)                    \
-  template(FiberGetFrameLocation)                 \
+  template(VirtualThreadGetCurrentContendedMonitor) \
+  template(VirtualThreadGetOwnedMonitorInfo)      \
+  template(VirtualThreadGetThread)                \
+  template(VirtualThreadGetStackTrace)            \
+  template(VirtualThreadGetFrameCount)            \
+  template(VirtualThreadGetFrameLocation)         \
   template(ChangeBreakpoints)                     \
   template(GetOrSetLocal)                         \
-  template(FiberGetOrSetLocal)                    \
+  template(VirtualThreadGetOrSetLocal)            \
   template(GetCurrentLocation)                    \
   template(EnterInterpOnlyMode)                   \
   template(ChangeSingleStep)                      \

@@ -303,12 +303,12 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static bool get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd);
 
   // JVMTI API helper functions which are called at safepoint or thread is suspended.
-  oop get_fiber_or_thread_oop(JavaThread* thread);
+  oop get_vthread_or_thread_oop(JavaThread* thread);
   jvmtiError get_frame_count(JvmtiThreadState *state, jint *count_ptr);
   jvmtiError get_frame_count(oop frame_oop, jint *count_ptr);
   jvmtiError get_frame_location(JavaThread* java_thread, jint depth,
                                 jmethodID* method_ptr, jlocation* location_ptr);
-  jvmtiError get_frame_location(oop fiber_oop, jint depth,
+  jvmtiError get_frame_location(oop vthread_oop, jint depth,
                                 jmethodID* method_ptr, jlocation* location_ptr);
   jvmtiError get_object_monitor_usage(JavaThread *calling_thread,
                                                     jobject object, jvmtiMonitorUsage* info_ptr);
@@ -419,27 +419,27 @@ public:
   jvmtiError result() { return _result; }
 };
 
-// VM operation to get fiber monitor information with stack depth.
-class VM_FiberGetOwnedMonitorInfo : public VM_Operation {
+// VM operation to get virtual thread monitor information with stack depth.
+class VM_VirtualThreadGetOwnedMonitorInfo : public VM_Operation {
 private:
   JvmtiEnv *_env;
   JavaThread* _calling_thread;
-  Handle _fiber_h;
+  Handle _vthread_h;
   jvmtiError _result;
   GrowableArray<jvmtiMonitorStackDepthInfo*> *_owned_monitors_list;
 
 public:
-  VM_FiberGetOwnedMonitorInfo(JvmtiEnv* env,
+  VM_VirtualThreadGetOwnedMonitorInfo(JvmtiEnv* env,
                               JavaThread* calling_thread,
-                              Handle fiber_h,
+                              Handle vthread_h,
                               GrowableArray<jvmtiMonitorStackDepthInfo*>* owned_monitor_list) {
     _env = env;
     _calling_thread = calling_thread;
-    _fiber_h = fiber_h;
+    _vthread_h = vthread_h;
     _owned_monitors_list = owned_monitor_list;
     _result = JVMTI_ERROR_NONE;
   }
-  VMOp_Type type() const { return VMOp_FiberGetOwnedMonitorInfo; }
+  VMOp_Type type() const { return VMOp_VirtualThreadGetOwnedMonitorInfo; }
   void doit();
   jvmtiError result() { return _result; }
 };
@@ -489,20 +489,20 @@ public:
   void doit();
 };
 
-// VM operation to get fiber current contended monitor.
-class VM_FiberGetCurrentContendedMonitor : public VM_Operation {
+// VM operation to get virtual thread current contended monitor.
+class VM_VirtualThreadGetCurrentContendedMonitor : public VM_Operation {
 private:
   JvmtiEnv *_env;
   JavaThread *_calling_thread;
-  Handle _fiber_h;
+  Handle _vthread_h;
   jobject *_owned_monitor_ptr;
   jvmtiError _result;
 
 public:
-  VM_FiberGetCurrentContendedMonitor(JvmtiEnv *env, JavaThread *calling_thread, Handle fiber_h, jobject *mon_ptr) {
+  VM_VirtualThreadGetCurrentContendedMonitor(JvmtiEnv *env, JavaThread *calling_thread, Handle vthread_h, jobject *mon_ptr) {
     _env = env;
     _calling_thread = calling_thread;
-    _fiber_h = fiber_h;
+    _vthread_h = vthread_h;
     _owned_monitor_ptr = mon_ptr;
   }
   VMOp_Type type() const { return VMOp_GetCurrentContendedMonitor; }
@@ -651,31 +651,31 @@ public:
   void doit();
 };
 
-// VM operation get to get fiber thread at safepoint.
-class VM_FiberGetThread : public VM_Operation {
+// VM operation get to get virtual thread thread at safepoint.
+class VM_VirtualThreadGetThread : public VM_Operation {
 private:
   JavaThread* _current_thread;
-  Handle _fiber_h;
+  Handle _vthread_h;
   jthread* _carrier_thread_ptr;
   jvmtiError _result;
 
 public:
-  VM_FiberGetThread(JavaThread* current_thread, Handle fiber_h, jthread* carrier_thread_ptr) {
+  VM_VirtualThreadGetThread(JavaThread* current_thread, Handle vthread_h, jthread* carrier_thread_ptr) {
     _current_thread = current_thread;
-    _fiber_h = fiber_h;
+    _vthread_h = vthread_h;
     _carrier_thread_ptr = carrier_thread_ptr;
     _result = JVMTI_ERROR_NONE;
   }
-  VMOp_Type type() const { return VMOp_FiberGetThread; }
+  VMOp_Type type() const { return VMOp_VirtualThreadGetThread; }
   jvmtiError result()    { return _result; }
   void doit();
 };
 
-// VM operation to get fiber stack trace at safepoint.
-class VM_FiberGetStackTrace : public VM_Operation {
+// VM operation to get virtual thread stack trace at safepoint.
+class VM_VirtualThreadGetStackTrace : public VM_Operation {
 private:
   JvmtiEnv *_env;
-  Handle _fiber_h;
+  Handle _vthread_h;
   jint _start_depth;
   jint _max_count;
   jvmtiFrameInfo *_frame_buffer;
@@ -683,11 +683,11 @@ private:
   jvmtiError _result;
 
 public:
-  VM_FiberGetStackTrace(JvmtiEnv *env, Handle fiber_h,
+  VM_VirtualThreadGetStackTrace(JvmtiEnv *env, Handle vthread_h,
                         jint start_depth, jint max_count,
                         jvmtiFrameInfo* frame_buffer, jint* count_ptr) {
     _env = env;
-    _fiber_h = fiber_h;
+    _vthread_h = vthread_h;
     _start_depth = start_depth;
     _max_count = max_count;
     _frame_buffer = frame_buffer;
@@ -695,51 +695,51 @@ public:
     _result = JVMTI_ERROR_NONE;
   }
   jvmtiError result() { return _result; }
-  VMOp_Type type() const { return VMOp_FiberGetStackTrace; }
+  VMOp_Type type() const { return VMOp_VirtualThreadGetStackTrace; }
   void doit();
 };
 
-// VM operation to count fiber stack frames at safepoint.
-class VM_FiberGetFrameCount : public VM_Operation {
+// VM operation to count virtual thread stack frames at safepoint.
+class VM_VirtualThreadGetFrameCount : public VM_Operation {
 private:
   JvmtiEnv *_env;
-  Handle _fiber_h;
+  Handle _vthread_h;
   jint *_count_ptr;
   jvmtiError _result;
 
 public:
-  VM_FiberGetFrameCount(JvmtiEnv *env, Handle fiber_h, jint *count_ptr) {
+  VM_VirtualThreadGetFrameCount(JvmtiEnv *env, Handle vthread_h, jint *count_ptr) {
     _env = env;
-    _fiber_h = fiber_h;
+    _vthread_h = vthread_h;
     _count_ptr = count_ptr;
     _result = JVMTI_ERROR_NONE;
   }
-  VMOp_Type type() const { return VMOp_FiberGetFrameCount; }
+  VMOp_Type type() const { return VMOp_VirtualThreadGetFrameCount; }
   jvmtiError result()    { return _result; }
   void doit();
 };
 
-// VM operation get to fiber frame location at safepoint.
-class VM_FiberGetFrameLocation : public VM_Operation {
+// VM operation get to virtual thread frame location at safepoint.
+class VM_VirtualThreadGetFrameLocation : public VM_Operation {
 private:
   JvmtiEnv *_env;
-  Handle _fiber_h;
+  Handle _vthread_h;
   jint _depth;
   jmethodID* _method_ptr;
   jlocation* _location_ptr;
   jvmtiError _result;
 
 public:
-  VM_FiberGetFrameLocation(JvmtiEnv *env, Handle fiber_h, jint depth,
+  VM_VirtualThreadGetFrameLocation(JvmtiEnv *env, Handle vthread_h, jint depth,
                            jmethodID* method_ptr, jlocation* location_ptr) {
     _env = env;
-    _fiber_h = fiber_h;
+    _vthread_h = vthread_h;
     _depth = depth;
     _method_ptr = method_ptr;
     _location_ptr = location_ptr;
     _result = JVMTI_ERROR_NONE;
   }
-  VMOp_Type type() const { return VMOp_FiberGetFrameLocation; }
+  VMOp_Type type() const { return VMOp_VirtualThreadGetFrameLocation; }
   jvmtiError result()    { return _result; }
   void doit();
 };

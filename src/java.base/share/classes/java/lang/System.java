@@ -2287,13 +2287,13 @@ public final class System {
                 return Thread.currentCarrierThread();
             }
             public <R> R executeOnCarrierThread(Callable<R> task) throws Exception {
-                Thread t = Thread.currentCarrierThread();
-                Fiber f = t.getFiber();
-                if (f != null) t.setFiber(null);
+                Thread carrier = Thread.currentCarrierThread();
+                VirtualThread vthread = carrier.getVirtualThread();
+                if (vthread != null) carrier.setVirtualThread(null);
                 try {
                     return task.call();
                 } finally {
-                    if (f != null) t.setFiber(f);
+                    if (vthread != null) carrier.setVirtualThread(vthread);
                 }
             }
 
@@ -2306,19 +2306,19 @@ public final class System {
             }
 
             public void parkVirtualThread() {
-                Fiber.park();
+                VirtualThread.park();
             }
 
             public void parkVirtualThread(long nanos) {
-                Fiber.parkNanos(nanos);
+                VirtualThread.parkNanos(nanos);
             }
 
             public void unparkVirtualThread(Thread thread) {
-                ((Fiber) thread).unpark();
+                ((VirtualThread) thread).unpark();
             }
 
             public boolean isVirtualThreadParking(Thread thread) {
-                return ((Fiber) thread).isParking();
+                return ((VirtualThread) thread).isParking();
             }
         });
     }

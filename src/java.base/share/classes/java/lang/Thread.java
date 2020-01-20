@@ -229,23 +229,23 @@ public class Thread implements Runnable {
     // current inner-most continuation
     private Continuation cont;
 
-    // the virtual thread/fiber mounted on this thread
-    private Fiber fiber;
+    // the virtual thread mounted on this thread
+    private VirtualThread vthread;
 
     /**
-     * Sets the virtual thread/fiber that is currently mounted on this thread.
+     * Sets the virtual thread that is currently mounted on this thread.
      */
-    void setFiber(Fiber fiber) {
+    void setVirtualThread(VirtualThread vthread) {
         // assert this == currentThread0();
-        this.fiber = fiber;
+        this.vthread = vthread;
     }
 
     /**
-     * Returns the virtual thread/fiber that is currently mounted on this thread.
+     * Returns the virtual thread that is currently mounted on this thread.
      */
-    Fiber getFiber() {
+    VirtualThread getVirtualThread() {
         // assert this == currentThread0();
-        return fiber;
+        return vthread;
     }
 
     /**
@@ -255,9 +255,9 @@ public class Thread implements Runnable {
      */
     public static Thread currentThread() {
         Thread t = currentThread0();
-        Fiber fiber = t.fiber;
-        if (fiber != null) {
-            return fiber;
+        VirtualThread vthread = t.vthread;
+        if (vthread != null) {
+            return vthread;
         } else {
             return t;
         }
@@ -290,9 +290,9 @@ public class Thread implements Runnable {
      * {@link java.util.concurrent.locks} package.
      */
     public static void yield() {
-        Fiber fiber = currentCarrierThread().getFiber();
-        if (fiber != null) {
-            fiber.tryYield();
+        VirtualThread vthread = currentCarrierThread().getVirtualThread();
+        if (vthread != null) {
+            vthread.tryYield();
         } else {
             yield0();
         }
@@ -320,9 +320,9 @@ public class Thread implements Runnable {
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
-        Fiber fiber = currentCarrierThread().getFiber();
-        if (fiber != null) {
-            fiber.sleepNanos(TimeUnit.MILLISECONDS.toNanos(millis));
+        VirtualThread vthread = currentCarrierThread().getVirtualThread();
+        if (vthread != null) {
+            vthread.sleepNanos(TimeUnit.MILLISECONDS.toNanos(millis));
         } else {
             sleep0(millis);
         }
@@ -896,7 +896,7 @@ public class Thread implements Runnable {
                 if (name != null && counter >= 0) {
                     name = name + (counter++);
                 }
-                thread = new Fiber(scheduler, name, characteristics, task);
+                thread = new VirtualThread(scheduler, name, characteristics, task);
             } else {
                 String name = this.name;
                 if (name == null) {
@@ -989,7 +989,7 @@ public class Thread implements Runnable {
             if (name != null && hasCounter()) {
                 name += next();
             }
-            Thread thread = new Fiber(scheduler, name, characteristics, task);
+            Thread thread = new VirtualThread(scheduler, name, characteristics, task);
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
             return thread;
@@ -1428,7 +1428,7 @@ public class Thread implements Runnable {
      */
     public static Thread newThread(int characteristics, Runnable task) {
         if ((characteristics & VIRTUAL) != 0) {
-            return new Fiber(null, null, characteristics, task);
+            return new VirtualThread(null, null, characteristics, task);
         } else {
             return new Thread(null, "Thread-" + nextThreadNum(), characteristics, task, 0, null);
         }
@@ -1463,7 +1463,7 @@ public class Thread implements Runnable {
      */
     public static Thread newThread(String name, int characteristics, Runnable task) {
         if ((characteristics & VIRTUAL) != 0) {
-            return new Fiber(null, name, characteristics, task);
+            return new VirtualThread(null, name, characteristics, task);
         } else {
             return new Thread(null, name, characteristics, task, 0, null);
         }
@@ -1485,7 +1485,7 @@ public class Thread implements Runnable {
      * @since 99
      */
     public final boolean isVirtual() {
-        return (this instanceof Fiber);
+        return (this instanceof VirtualThread);
     }
 
     /**
@@ -2080,7 +2080,7 @@ public class Thread implements Runnable {
         if (isVirtual()) {
             if (isAlive()) {
                 long nanos = TimeUnit.MILLISECONDS.toNanos(millis);
-                ((Fiber) this).joinNanos(nanos);
+                ((VirtualThread) this).joinNanos(nanos);
             }
             return;
         }
@@ -2201,7 +2201,7 @@ public class Thread implements Runnable {
 
         if (isVirtual()) {
             long nanos = TimeUnit.NANOSECONDS.convert(duration);
-            return ((Fiber) this).joinNanos(nanos);
+            return ((VirtualThread) this).joinNanos(nanos);
         } else {
             // ignore nano precision for now
             long millis = Long.max(TimeUnit.MILLISECONDS.convert(duration), 1);

@@ -271,9 +271,9 @@ jvmtiError JvmtiManageCapabilities::add_capabilities(const jvmtiCapabilities *cu
   // return the result
   either(current, desired, result);
 
-  // special case for Fiber events
+  // special case for virtual thread events
   if (result->can_support_fibers == 1) {
-    java_lang_Fiber::set_notify_jvmti_events(true);
+    java_lang_VirtualThread::set_notify_jvmti_events(true);
   }
 
   update();

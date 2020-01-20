@@ -830,16 +830,16 @@ JvmtiEnv::GetJLocationFormat(jvmtiJlocationFormat* format_ptr) {
 } /* end GetJLocationFormat */
 
   //
-  // Functions supporting Fibers
+  // Functions supporting virtual threads
   //
 
 // object - pre-checked for NULL
-// is_fiber_ptr - pre-checked for NULL
+// is_vthread_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::IsFiber(jthread thread, jboolean* is_fiber_ptr) {
+JvmtiEnv::IsFiber(jthread thread, jboolean* is_vthread_ptr) {
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  *is_fiber_ptr = java_lang_Fiber::is_instance(thread_obj);
+  *is_vthread_ptr = java_lang_VirtualThread::is_instance(thread_obj);
   return JVMTI_ERROR_NONE;
 } /* end IsFiber */
 
@@ -847,10 +847,10 @@ JvmtiEnv::IsFiber(jthread thread, jboolean* is_fiber_ptr) {
 // java_thread - pre-checked
 // fiber_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetThreadFiber(JavaThread* java_thread, jthread* fiber_ptr) {
+JvmtiEnv::GetThreadFiber(JavaThread* java_thread, jthread* vthread_ptr) {
   JavaThread* current_thread  = JavaThread::current();
   ResourceMark rm(current_thread);
-  oop fiber_oop = NULL;
+  oop vthread_oop = NULL;
   uint32_t debug_bits = 0;
 
   JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread);
@@ -860,23 +860,23 @@ JvmtiEnv::GetThreadFiber(JavaThread* java_thread, jthread* fiber_ptr) {
   if (!java_thread->is_thread_fully_suspended(true, &debug_bits)) {
     return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
   }
-  fiber_oop = java_lang_Thread::fiber(java_thread->threadObj());
-  *fiber_ptr = (jthread)JNIHandles::make_local(current_thread, fiber_oop);
+  vthread_oop = java_lang_Thread::vthread(java_thread->threadObj());
+  *vthread_ptr = (jthread)JNIHandles::make_local(current_thread, vthread_oop);
   return JVMTI_ERROR_NONE;
 } /* end GetThreadFiber */
 
 // thread_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetFiberThread(jthread fiber, jthread* thread_ptr) {
+JvmtiEnv::GetFiberThread(jthread vthread, jthread* thread_ptr) {
   JavaThread* current_thread  = JavaThread::current();
   HandleMark hm(current_thread);
-  oop fiber_obj = JNIHandles::resolve_external_guard(fiber);
+  oop vthread_obj = JNIHandles::resolve_external_guard(vthread);
 
-  if (!java_lang_Fiber::is_instance(fiber_obj)) {
+  if (!java_lang_VirtualThread::is_instance(vthread_obj)) {
     return JVMTI_ERROR_INVALID_THREAD;
   }
 
-  VM_FiberGetThread op(current_thread, Handle(current_thread, fiber_obj), thread_ptr);
+  VM_VirtualThreadGetThread op(current_thread, Handle(current_thread, vthread_obj), thread_ptr);
   VMThread::execute(&op);
 
   return op.result();
@@ -909,7 +909,7 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
       // We got an error code so we don't have a JavaThread *, but
       // only return an error from here if we didn't get a valid
       // thread_oop.
-      // In a fiber case the cv_external_thread_to_JavaThread is expected to correctly set
+      // In avthread case the cv_external_thread_to_JavaThread is expected to correctly set
       // the thread_oop and return JVMTI_ERROR_INVALID_THREAD which we ignore here.
       if (thread_oop == NULL) {
         return err;
@@ -918,12 +918,12 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
     }
   }
 
-  // Support for fibers
-  if (java_lang_Fiber::is_instance(thread_oop)) {
+  // Support for virtual thread
+  if (java_lang_VirtualThread::is_instance(thread_oop)) {
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    *thread_state_ptr = (jint)java_lang_Fiber::get_thread_status(thread_oop);
+    *thread_state_ptr = (jint)java_lang_VirtualThread::get_thread_status(thread_oop);
     return JVMTI_ERROR_NONE;
   }
 
@@ -1195,7 +1195,7 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
       // We got an error code so we don't have a JavaThread *, but
       // only return an error from here if we didn't get a valid
       // thread_oop.
-      // In a fiber case the cv_external_thread_to_JavaThread is expected to correctly set
+      // In the virtual thread case the cv_external_thread_to_JavaThread is expected to correctly set
       // the thread_oop and return JVMTI_ERROR_INVALID_THREAD which we ignore here.
       if (thread_oop == NULL) {
         return err;
@@ -1213,8 +1213,8 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
 
   name = Handle(current_thread, java_lang_Thread::name(thread_obj()));
 
-  // Support for fibers
-  if (java_lang_Fiber::is_instance(thread_obj())) {
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj())) {
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
@@ -1271,15 +1271,15 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
   GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list =
       new (ResourceObj::C_HEAP, mtInternal) GrowableArray<jvmtiMonitorStackDepthInfo*>(1, true);
 
-  // Support for fibers
-  if (java_lang_Fiber::is_instance(thread_obj)) {
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetOwnedMonitorInfo op(this,
-                                   calling_thread,
-                                   Handle(calling_thread, thread_obj),
-                                   owned_monitors_list);
+    VM_VirtualThreadGetOwnedMonitorInfo op(this,
+                                           calling_thread,
+                                           Handle(calling_thread, thread_obj),
+                                           owned_monitors_list);
     VMThread::execute(&op);
     err = op.result();
   } else {
@@ -1342,12 +1342,12 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
   GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list =
          new (ResourceObj::C_HEAP, mtInternal) GrowableArray<jvmtiMonitorStackDepthInfo*>(1, true);
 
-  // Support for fibers
-  if (java_lang_Fiber::is_instance(thread_obj)) {
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetOwnedMonitorInfo op(this,
+    VM_VirtualThreadGetOwnedMonitorInfo op(this,
                                    calling_thread,
                                    Handle(calling_thread, thread_obj),
                                    owned_monitors_list);
@@ -1411,12 +1411,12 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
   HandleMark hm(calling_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  // Support for fibers
-  if (java_lang_Fiber::is_instance(thread_obj)) {
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetCurrentContendedMonitor op(this, calling_thread,
+    VM_VirtualThreadGetCurrentContendedMonitor op(this, calling_thread,
                                           Handle(calling_thread, thread_obj),
                                           monitor_ptr);
     VMThread::execute(&op);
@@ -1674,12 +1674,12 @@ JvmtiEnv::GetStackTrace(jthread thread, jint start_depth, jint max_frame_count, 
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  // Support for fibers
-  if (java_lang_Fiber::is_instance(thread_obj)) {
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetStackTrace op(this, Handle(current_thread, thread_obj),
+    VM_VirtualThreadGetStackTrace op(this, Handle(current_thread, thread_obj),
                              start_depth, max_frame_count, frame_buffer, count_ptr);
     VMThread::execute(&op);
     return op.result();
@@ -1755,12 +1755,12 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  // Support for fibers
-  if (java_lang_Fiber::is_instance(thread_obj)) {
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetFrameCount op(this, Handle(current_thread, thread_obj), count_ptr);
+    VM_VirtualThreadGetFrameCount op(this, Handle(current_thread, thread_obj), count_ptr);
     VMThread::execute(&op);
     return op.result();
   }
@@ -1911,12 +1911,12 @@ JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jl
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  // Support for fibers
-  if (java_lang_Fiber::is_instance(thread_obj)) {
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetFrameLocation op(this, Handle(current_thread, thread_obj),
+    VM_VirtualThreadGetFrameLocation op(this, Handle(current_thread, thread_obj),
                                 depth, method_ptr, location_ptr);
     VMThread::execute(&op);
     return op.result();
@@ -2239,12 +2239,12 @@ JvmtiEnv::GetLocalObject(jthread thread, jint depth, jint slot, jobject* value_p
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  if (java_lang_Fiber::is_instance(thread_obj)) {
-    // Support for fibers
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    current_thread, depth, slot);
     VMThread::execute(&op);
     err = op.result();
@@ -2283,12 +2283,12 @@ JvmtiEnv::GetLocalInstance(jthread thread, jint depth, jobject* value_ptr){
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  if (java_lang_Fiber::is_instance(thread_obj)) {
-    // Support for fibers
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetReceiver op(this, Handle(current_thread, thread_obj),
+    VM_VirtualThreadGetReceiver op(this, Handle(current_thread, thread_obj),
                                  current_thread, depth);
     VMThread::execute(&op);
     err = op.result();
@@ -2328,12 +2328,12 @@ JvmtiEnv::GetLocalInt(jthread thread, jint depth, jint slot, jint* value_ptr) {
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  if (java_lang_Fiber::is_instance(thread_obj)) {
-    // Support for fibers
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    depth, slot, T_INT);
     VMThread::execute(&op);
     err = op.result();
@@ -2373,12 +2373,12 @@ JvmtiEnv::GetLocalLong(jthread thread, jint depth, jint slot, jlong* value_ptr) 
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  if (java_lang_Fiber::is_instance(thread_obj)) {
-    // Support for fibers
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    depth, slot, T_LONG);
     VMThread::execute(&op);
     err = op.result();
@@ -2418,12 +2418,12 @@ JvmtiEnv::GetLocalFloat(jthread thread, jint depth, jint slot, jfloat* value_ptr
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  if (java_lang_Fiber::is_instance(thread_obj)) {
-    // Support for fibers
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    depth, slot, T_FLOAT);
     VMThread::execute(&op);
     err = op.result();
@@ -2463,12 +2463,12 @@ JvmtiEnv::GetLocalDouble(jthread thread, jint depth, jint slot, jdouble* value_p
   HandleMark hm(current_thread);
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
-  if (java_lang_Fiber::is_instance(thread_obj)) {
-    // Support for fibers
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_FiberGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
                                    depth, slot, T_DOUBLE);
     VMThread::execute(&op);
     err = op.result();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -59,8 +59,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * system.
  */
 
-class Fiber extends Thread {
-    private static final ContinuationScope FIBER_SCOPE = new ContinuationScope("Fibers");
+class VirtualThread extends Thread {
+    private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
     private static final Executor DEFAULT_SCHEDULER = defaultScheduler();
     private static final ScheduledExecutorService UNPARKER = delayedTaskScheduler();
     private static final int TRACE_PINNING_MODE = tracePinningMode();
@@ -70,8 +70,8 @@ class Fiber extends Thread {
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
-            STATE = l.findVarHandle(Fiber.class, "state", short.class);
-            PARK_PERMIT = l.findVarHandle(Fiber.class, "parkPermit", boolean.class);
+            STATE = l.findVarHandle(VirtualThread.class, "state", short.class);
+            PARK_PERMIT = l.findVarHandle(VirtualThread.class, "parkPermit", boolean.class);
        } catch (Exception e) {
             throw new InternalError(e);
         }
@@ -85,7 +85,7 @@ class Fiber extends Thread {
     // carrier thread when mounted
     private volatile Thread carrierThread;
 
-    // fiber state
+    // virtual thread state
     private static final short ST_NEW      = 0;
     private static final short ST_STARTED  = 1;
     private static final short ST_RUNNABLE = 2;
@@ -104,14 +104,14 @@ class Fiber extends Thread {
     private volatile boolean parkPermit;
 
     /**
-     * Creates a new {@code Fiber} to run the given task with the given scheduler.
+     * Creates a new {@code VirtualThread} to run the given task with the given scheduler.
      *
      * @param scheduler the scheduler
      * @param name thread name
      * @param characteristics characteristics
      * @param task the task to execute
      */
-    Fiber(Executor scheduler, String name, int characteristics, Runnable task) {
+    VirtualThread(Executor scheduler, String name, int characteristics, Runnable task) {
         super(name, characteristics);
 
         Objects.requireNonNull(task);
@@ -130,19 +130,19 @@ class Fiber extends Thread {
         };
 
         this.scheduler = (scheduler != null) ? scheduler : DEFAULT_SCHEDULER;
-        this.cont = new Continuation(FIBER_SCOPE, target) {
+        this.cont = new Continuation(VTHREAD_SCOPE, target) {
             @Override
             protected void onPinned(Continuation.Pinned reason) {
                 if (TRACE_PINNING_MODE > 0) {
                     // switch to carrier thread as the printing may park
                     Thread thread = Thread.currentCarrierThread();
-                    Fiber fiber = thread.getFiber();
-                    thread.setFiber(null);
+                    VirtualThread vthread = thread.getVirtualThread();
+                    thread.setVirtualThread(null);
                     try {
                         boolean printAll = (TRACE_PINNING_MODE == 1);
                         PinnedThreadPrinter.printStackTrace(printAll);
                     } finally {
-                        thread.setFiber(fiber);
+                        thread.setVirtualThread(vthread);
                     }
                 }
                 yieldFailed();
@@ -154,9 +154,9 @@ class Fiber extends Thread {
     }
 
     /**
-     * Schedules this {@code Fiber} to execute.
+     * Schedules this {@code VirtualThread} to execute.
      *
-     * @throws IllegalThreadStateException if the fiber has already been started
+     * @throws IllegalThreadStateException if the thread has already been started
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     @Override
@@ -179,12 +179,12 @@ class Fiber extends Thread {
      * Runs or continues execution of the continuation on the current thread.
      */
     private void runContinuation() {
-        assert Thread.currentCarrierThread().getFiber() == null;
+        assert Thread.currentCarrierThread().getVirtualThread() == null;
 
         // set state to ST_RUNNING
         boolean firstRun = stateCompareAndSet(ST_STARTED, ST_RUNNABLE);
         if (!firstRun) {
-            // continue on this carrier thread if fiber was parked or it yielded
+            // continue on carrier thread if virtual thread was parked or it yielded
             if (stateCompareAndSet(ST_PARKED, ST_RUNNABLE)) {
                 parkPermitGetAndSet(false);  // consume parking permit
             } else if (!stateCompareAndSet(ST_YIELDED, ST_RUNNABLE)) {
@@ -206,8 +206,8 @@ class Fiber extends Thread {
     }
 
     /**
-     * Mounts this fiber. This method must be invoked before the continuation
-     * is run or continued. It binds the fiber to the current carrier thread.
+     * Mounts this virtual thread. This method must be invoked before the continuation
+     * is run or continued. It binds the virtual thread to the current carrier thread.
      */
     private void mount(boolean firstRun) {
         Thread thread = Thread.currentCarrierThread();
@@ -218,29 +218,29 @@ class Fiber extends Thread {
             thread.setInterrupt();
         }
 
-        // set the fiber so that Thread.currentThread() returns the Fiber object
-        assert thread.getFiber() == null;
-        thread.setFiber(this);
+        // set thread field so Thread.currentThread() returns the VirtualThread object
+        assert thread.getVirtualThread() == null;
+        thread.setVirtualThread(this);
 
         if (firstRun && notifyJvmtiEvents) {
-            notifyFiberStarted(thread, this);
-            notifyFiberMount(thread, this);
+            notifyStarted(thread, this);
+            notifyMount(thread, this);
         }
     }
 
     /**
-     * Unmounts this fiber. This method must be invoked after the continuation
-     * yields or terminates. It unbinds this fiber from the carrier thread.
+     * Unmounts this virtual thread. This method must be invoked after the continuation
+     * yields or terminates. It unbinds this virtual thread from the carrier thread.
      */
     private void unmount() {
         Thread thread = Thread.currentCarrierThread();
 
         if (notifyJvmtiEvents) {
-            notifyFiberUnmount(thread, this);
+            notifyUnmount(thread, this);
         }
 
-        // drop connection between this fiber and the carrier thread
-        thread.setFiber(null);
+        // drop connection between this virtual thread and the carrier thread
+        thread.setVirtualThread(null);
         synchronized (interruptLock) {   // synchronize with interrupt
             carrierThread = null;
         }
@@ -248,17 +248,17 @@ class Fiber extends Thread {
 
     /**
      * Invoke after yielding. If parking, sets the state to ST_PARKED and notifies
-     * anyone waiting for the fiber to park.
+     * anyone waiting for the virtual thread to park.
      */
     private void afterYield() {
         int s = stateGet();
         if (s == ST_PARKING) {
-            // signal anyone waiting for this fiber to park
+            // signal anyone waiting for this virtual thread to park
             stateGetAndSet(ST_PARKED);
             signalParking();
         } else if (s == ST_RUNNABLE) {
             // Thread.yield, submit task to continue
-            assert Thread.currentCarrierThread().getFiber() == null;
+            assert Thread.currentCarrierThread().getVirtualThread() == null;
             stateGetAndSet(ST_YIELDED);
             scheduler.execute(runContinuation);
         } else {
@@ -267,8 +267,8 @@ class Fiber extends Thread {
     }
 
     /**
-     * Invokes when the fiber terminates to set the state to ST_TERMINATED
-     * and notify anyone waiting for the fiber to terminate.
+     * Invokes when the virtual thread terminates to set the state to ST_TERMINATED
+     * and notify anyone waiting for the virtual thread to terminate.
      *
      * @param notifyAgents true to notify JVMTI agents
      */
@@ -279,17 +279,17 @@ class Fiber extends Thread {
         // notify JVMTI agents
         if (notifyAgents && notifyJvmtiEvents) {
             Thread thread = Thread.currentCarrierThread();
-            notifyFiberTerminated(thread, this);
+            notifyTerminated(thread, this);
         }
 
-        // notify anyone waiting for this fiber to terminate
+        // notify anyone waiting for this virtual thread to terminate
         signalTermination();
     }
 
     /**
-     * Invoked by onPinned when the continuation cannot yield due to a
-     * synchronized or native frame on the continuation stack. If the fiber is
-     * parking then its state is changed to ST_PINNED and carrier thread parks.
+     * Invoked by onPinned when the continuation cannot yield due to a synchronized
+     * or native frame on the continuation stack. If the virtuad thread is parking
+     * then its state is changed to ST_PINNED and carrier thread parks.
      */
     private void yieldFailed() {
         if (stateGet() == ST_RUNNABLE) {
@@ -299,7 +299,7 @@ class Fiber extends Thread {
 
         // switch to carrier thread
         Thread thread = Thread.currentCarrierThread();
-        thread.setFiber(null);
+        thread.setVirtualThread(null);
 
         boolean parkInterrupted = false;
         lock.lock();
@@ -309,7 +309,7 @@ class Fiber extends Thread {
 
             Condition parking = parkingCondition();
 
-            // signal anyone waiting for this fiber to park
+            // signal anyone waiting for this virtual thread to park
             parking.signalAll();
 
             // and wait to be unparked (may be interrupted)
@@ -327,8 +327,8 @@ class Fiber extends Thread {
             // consume parking permit
             parkPermitGetAndSet(false);
 
-            // switch back to fiber
-            thread.setFiber(this);
+            // switch back to virtual thread
+            thread.setVirtualThread(this);
         }
 
         // restore interrupt status
@@ -337,73 +337,73 @@ class Fiber extends Thread {
     }
 
     /**
-     * Disables the current fiber for scheduling purposes.
+     * Disables the current virtual thread for scheduling purposes.
      *
-     * <p> If this fiber has already been {@link #unpark() unparked} then the
+     * <p> If this virtual thread has already been {@link #unpark() unparked} then the
      * parking permit is consumed and this method completes immediately;
-     * otherwise the current fiber is disabled for scheduling purposes and lies
+     * otherwise the current virtual thread is disabled for scheduling purposes and lies
      * dormant until it is {@linkplain #unpark() unparked} or the thread is
      * {@link Thread#interrupt() interrupted}.
      *
-     * @throws IllegalCallerException if not called from a fiber
+     * @throws IllegalCallerException if not called from a virtual thread
      */
     static void park() {
-        Fiber fiber = Thread.currentCarrierThread().getFiber();
-        if (fiber == null)
-            throw new IllegalCallerException("not a fiber");
-        fiber.maybePark();
+        VirtualThread vthread = Thread.currentCarrierThread().getVirtualThread();
+        if (vthread == null)
+            throw new IllegalCallerException("not a virtual thread");
+        vthread.maybePark();
     }
 
     /**
-     * Disables the current fiber for scheduling purposes for up to the
+     * Disables the current virtual thread for scheduling purposes for up to the
      * given waiting time.
      *
-     * <p> If this fiber has already been {@link #unpark() unparked} then the
+     * <p> If this virtual thread has already been {@link #unpark() unparked} then the
      * parking permit is consumed and this method completes immediately;
-     * otherwise if the time to wait is greater than zero then the current fiber
+     * otherwise if the time to wait is greater than zero then the current virtual thread
      * is disabled for scheduling purposes and lies dormant until it is {@link
      * #unpark unparked}, the waiting time elapses or the thread is
      * {@linkplain Thread#interrupt() interrupted}.
      *
      * @param nanos the maximum number of nanoseconds to wait.
      *
-     * @throws IllegalCallerException if not called from a fiber
+     * @throws IllegalCallerException if not called from a virtual thread
      */
     static void parkNanos(long nanos) {
         Thread thread = Thread.currentCarrierThread();
-        Fiber fiber = thread.getFiber();
-        if (fiber == null)
-            throw new IllegalCallerException("not a fiber");
+        VirtualThread vthread = thread.getVirtualThread();
+        if (vthread == null)
+            throw new IllegalCallerException("not a virtual thread");
         if (nanos > 0) {
             // switch to carrier thread when submitting to avoid parking here
-            thread.setFiber(null);
+            thread.setVirtualThread(null);
             Future<?> unparker;
             try {
-                unparker = UNPARKER.schedule(fiber::unpark, nanos, NANOSECONDS);
+                unparker = UNPARKER.schedule(vthread::unpark, nanos, NANOSECONDS);
             } finally {
-                thread.setFiber(fiber);
+                thread.setVirtualThread(vthread);
             }
             // now park
             try {
-                fiber.maybePark();
+                vthread.maybePark();
             } finally {
                 unparker.cancel(false);
             }
         } else {
             // consume permit when not parking
-            fiber.tryYield();
-            fiber.parkPermitGetAndSet(false);
+            vthread.tryYield();
+            vthread.parkPermitGetAndSet(false);
         }
     }
 
     /**
      * Park or complete immediately.
      *
-     * <p> If this fiber has already been unparked or its interrupt status is
+     * <p> If this virtual thread has already been unparked or its interrupt status is
      * set then this method completes immediately; otherwise it yields.
      */
     private void maybePark() {
-        assert Thread.currentCarrierThread().getFiber() == this;
+        assert Thread.currentCarrierThread().getVirtualThread() == this;
 
         // prepare to park; important to do this before consuming the parking permit
         if (!stateCompareAndSet(ST_RUNNABLE, ST_PARKING))
@@ -414,34 +414,35 @@ class Fiber extends Thread {
             if (!stateCompareAndSet(ST_PARKING, ST_RUNNABLE))
                 throw new InternalError();
 
-            // signal anyone waiting for this fiber to park
+            // signal anyone waiting for this virtual thread to park
             signalParking();
             return;
         }
 
-        Continuation.yield(FIBER_SCOPE);
+        Continuation.yield(VTHREAD_SCOPE);
 
         // continued
         assert stateGet() == ST_RUNNABLE;
 
         // notify JVMTI mount event here so that stack is available to agents
         if (notifyJvmtiEvents) {
-            notifyFiberMount(Thread.currentCarrierThread(), this);
+            notifyMount(Thread.currentCarrierThread(), this);
         }
     }
 
     /**
-     * Re-enables this fiber for scheduling. If the fiber was {@link #park()
-     * parked} then it will be unblocked, otherwise its next call to {@code park}
-     * or {@linkplain #parkNanos(long) parkNanos} is guaranteed not to block.
+     * Re-enables this virtual thread for scheduling. If the virtual thread was
+     * {@link #park() parked} then it will be unblocked, otherwise its next call
+     * to {@code park} or {@linkplain #parkNanos(long) parkNanos} is guaranteed
+     * not to block.
      *
      * @throws RejectedExecutionException if the scheduler cannot accept a task
-     * @return this fiber
+     * @return this virtual thread
      */
-    Fiber unpark() {
+    VirtualThread unpark() {
         Thread thread = Thread.currentCarrierThread();
-        Fiber fiber = thread.getFiber();
-        if (!parkPermitGetAndSet(true) && fiber != this) {
+        VirtualThread vthread = thread.getVirtualThread();
+        if (!parkPermitGetAndSet(true) && vthread != this) {
             int s = waitIfParking();
             if (s == ST_PARKED) {
                 scheduler.execute(runContinuation);
@@ -454,16 +455,16 @@ class Fiber extends Thread {
      * Returns true if parking.
      */
     boolean isParking() {
-        assert Thread.currentCarrierThread().getFiber() == this;
+        assert Thread.currentCarrierThread().getVirtualThread() == this;
         return state == ST_PARKING;
     }
 
     /**
-     * If this fiber is parking then wait for it to exit the ST_PARKING state.
-     * If the fiber is pinned then signal it to continue on the original carrier
+     * If this virtual thread is parking then wait for it to exit the ST_PARKING state.
+     * If the virtual thread is pinned then signal it to continue on the original carrier
      * thread.
      *
-     * @return the fiber state
+     * @return the virtual thread state
      */
     private int waitIfParking() {
         int s;
@@ -475,8 +476,8 @@ class Fiber extends Thread {
         if (s == ST_PARKING || s == ST_PINNED) {
             boolean parkInterrupted = false;
             Thread thread = Thread.currentCarrierThread();
-            Fiber f = thread.getFiber();
-            if (f != null) thread.setFiber(null);
+            VirtualThread vthread = thread.getVirtualThread();
+            if (vthread != null) thread.setVirtualThread(null);
             lock.lock();
             try {
                 while ((s = stateGet()) == ST_PARKING) {
@@ -492,7 +493,7 @@ class Fiber extends Thread {
                 }
             } finally {
                 lock.unlock();
-                if (f != null) thread.setFiber(f);
+                if (vthread != null) thread.setVirtualThread(vthread);
             }
             if (parkInterrupted)
                 Thread.currentThread().interrupt();
@@ -504,19 +505,19 @@ class Fiber extends Thread {
      * Attempts to yield. A no-op if the continuation is pinned.
      */
     void tryYield() {
-        assert Thread.currentCarrierThread().getFiber() == this && state == ST_RUNNABLE;
-        Continuation.yield(FIBER_SCOPE);
+        assert Thread.currentCarrierThread().getVirtualThread() == this && state == ST_RUNNABLE;
+        Continuation.yield(VTHREAD_SCOPE);
         assert state == ST_RUNNABLE;
 
     }
     /**
-     * Waits up to {@code nanos} nanoseconds for this fiber to terminate.
+     * Waits up to {@code nanos} nanoseconds for this virtual thread to terminate.
      * A timeout of {@code 0} means to wait forever.
      *
      * @throws IllegalArgumentException if nanos is negative
      * @throws IllegalStateException if not started
      * @throws InterruptedException if interrupted while waiting
-     * @return true if the fiber has terminated
+     * @return true if the thread has terminated
      */
     boolean joinNanos(long nanos) throws InterruptedException {
         if (nanos < 0)
@@ -574,7 +575,7 @@ class Fiber extends Thread {
 
     @Override
     boolean getAndClearInterrupt() {
-        assert Thread.currentCarrierThread().getFiber() == this;
+        assert Thread.currentCarrierThread().getVirtualThread() == this;
         synchronized (interruptLock) {
             boolean oldValue = interrupted;
             if (oldValue)
@@ -586,11 +587,11 @@ class Fiber extends Thread {
     }
 
     /**
-     * Sleep the current fiber for the given sleep time (in nanoseconds)
+     * Sleep the current thread for the given sleep time (in nanoseconds)
      * @throws InterruptedException if interrupted while sleeping
      */
     void sleepNanos(long nanos) throws InterruptedException {
-        assert Thread.currentCarrierThread().getFiber() == this;
+        assert Thread.currentCarrierThread().getVirtualThread() == this;
         if (nanos >= 0) {
             if (getAndClearInterrupt())
                 throw new InterruptedException();
@@ -621,8 +622,8 @@ class Fiber extends Thread {
                 Thread t = carrierThread;
                 if (t != null) {
                     // if mounted then return state of carrier thread (although
-                    // it may not be correct if the fiber is rescheduled to the
-                    // same carrier thread)
+                    // it may not be correct if the virtual thread is rescheduled
+                    // to the same carrier thread)
                     Thread.State s = t.getState();
                     if (carrierThread == t) {
                         return s;
@@ -677,8 +678,8 @@ class Fiber extends Thread {
      */
     private void signalParking() {
         Thread t = Thread.currentCarrierThread();
-        boolean inFiber = t.getFiber() != null;
-        if (inFiber) t.setFiber(null);
+        boolean inVirtualThread = t.getVirtualThread() != null;
+        if (inVirtualThread) t.setVirtualThread(null);
         lock.lock();
         try {
             Condition parking = this.parking;
@@ -687,7 +688,7 @@ class Fiber extends Thread {
             }
         } finally {
             lock.unlock();
-            if (inFiber) t.setFiber(this);
+            if (inVirtualThread) t.setVirtualThread(this);
         }
     }
 
@@ -732,17 +733,17 @@ class Fiber extends Thread {
 
     // -- stack trace support --
 
-    private static final StackWalker STACK_WALKER = StackWalker.getInstance(FIBER_SCOPE);
+    private static final StackWalker STACK_WALKER = StackWalker.getInstance(VTHREAD_SCOPE);
     private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
 
     @Override
     public StackTraceElement[] getStackTrace() {
-        if (Thread.currentCarrierThread().getFiber() == this) {
+        if (Thread.currentCarrierThread().getVirtualThread() == this) {
             return STACK_WALKER
                     .walk(s -> s.map(StackFrame::toStackTraceElement)
                     .toArray(StackTraceElement[]::new));
         } else {
-            // target fiber may be mounted or unmounted
+            // target virtual thread may be mounted or unmounted
             StackTraceElement[] stackTrace;
             do {
                 Thread carrier = carrierThread;
@@ -762,8 +763,8 @@ class Fiber extends Thread {
     }
 
     /**
-     * Returns the stack trace for this fiber if it mounted on the given carrier
-     * thread. If the fiber parks or is re-scheduled to another thread then
+     * Returns the stack trace for this virtual thread if it mounted on the given carrier
+     * thread. If the virtual thread parks or is re-scheduled to another thread then
      * null is returned.
      */
     private StackTraceElement[] tryGetStackTrace(Thread carrier) {
@@ -772,8 +773,8 @@ class Fiber extends Thread {
         StackTraceElement[] stackTrace;
         carrier.suspendThread();
         try {
-            // get stack trace if fiber is still mounted on the suspended
-            // carrier thread. Skip if the fiber is parking as the
+            // get stack trace if virtual thread is still mounted on the suspended
+            // carrier thread. Skip if the virtual thread is parking as the
             // continuation frames may or may not be on the thread stack.
             if (carrierThread == carrier && stateGet() != ST_PARKING) {
                 PrivilegedAction<StackTraceElement[]> pa = carrier::getStackTrace;
@@ -786,13 +787,13 @@ class Fiber extends Thread {
         }
 
         if (stackTrace != null) {
-            // return stack trace elements up to Fiber.runContinuation frame
+            // return stack trace elements up to VirtualThread.runContinuation frame
             int index = 0;
             int runMethod = -1;
             while (index < stackTrace.length && runMethod < 0) {
                 StackTraceElement e = stackTrace[index];
                 if ("java.base".equals(e.getModuleName())
-                        && "java.lang.Fiber".equals(e.getClassName())
+                        && "java.lang.VirtualThread".equals(e.getClassName())
                         && "runContinuation".equals(e.getMethodName())) {
                     runMethod = index;
                 } else {
@@ -808,7 +809,7 @@ class Fiber extends Thread {
     }
 
     /**
-     * Returns the stack trace for this fiber if it parked (not mounted) or
+     * Returns the stack trace for this virtual thread if it parked (not mounted) or
      * null if not in the parked state.
      */
     private StackTraceElement[] tryGetStackTrace() {
@@ -821,7 +822,7 @@ class Fiber extends Thread {
                 int oldState = stateGetAndSet(ST_PARKED);
                 assert oldState == ST_WALKINGSTACK;
 
-                // fiber may have been unparked while obtaining the stack so we
+                // virtual thread may have been unparked while obtaining the stack so we
                 // unpark to avoid a lost unpark. This will appear as a spurious
                 // (but harmless) wakeup
                 unpark();
@@ -857,10 +858,10 @@ class Fiber extends Thread {
     // -- JVM TI support --
 
     private static volatile boolean notifyJvmtiEvents;  // set by VM
-    private static native void notifyFiberStarted(Thread carrierThread, Fiber fiber);
-    private static native void notifyFiberTerminated(Thread carrierThread, Fiber fiber);
-    private static native void notifyFiberMount(Thread carrierThread, Fiber fiber);
-    private static native void notifyFiberUnmount(Thread carrierThread, Fiber fiber);
+    private static native void notifyStarted(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyTerminated(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyMount(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyUnmount(Thread carrierThread, VirtualThread vthread);
     private static native void registerNatives();
     static {
         registerNatives();
@@ -961,7 +962,7 @@ class Fiber extends Thread {
                 AccessController.doPrivileged(new PrivilegedAction<>() {
                     public Thread run() {
                         Thread t = new Thread(r);
-                        t.setName("FiberUnparker");
+                        t.setName("VirtualThreadUnparker");
                         t.setDaemon(true);
                         return t;
                     }}));
@@ -970,19 +971,19 @@ class Fiber extends Thread {
     }
 
     /**
-     * Helper class to print the fiber stack trace when a carrier thread is
+     * Helper class to print the virtual thread stack trace when a carrier thread is
      * pinned.
      */
     private static class PinnedThreadPrinter {
         static final StackWalker INSTANCE;
         static {
             var options = Set.of(SHOW_REFLECT_FRAMES, RETAIN_CLASS_REFERENCE);
-            PrivilegedAction<StackWalker> pa = () -> LiveStackFrame.getStackWalker(options, FIBER_SCOPE);
+            PrivilegedAction<StackWalker> pa = () -> LiveStackFrame.getStackWalker(options, VTHREAD_SCOPE);
             INSTANCE = AccessController.doPrivileged(pa);
         }
 
         /**
-         * Prints a stack trace of the current fiber to the standard output stream.
+         * Prints a stack trace of the current virtual thread to the standard output stream.
          * This method is synchronized to reduce interference in the output.
          * @param printAll true to print all stack frames, false to only print the
          *        frames that are native or holding a monitor
@@ -1005,7 +1006,7 @@ class Fiber extends Thread {
 
     /**
      * Reads the value of the jdk.tracePinning property to determine if stack
-     * traces should be printed when a carrier thread is pinned when a fiber
+     * traces should be printed when a carrier thread is pinned when a virtual thread
      * attempts to park.
      */
     private static int tracePinningMode() {

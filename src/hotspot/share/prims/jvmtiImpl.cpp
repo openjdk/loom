@@ -781,44 +781,44 @@ VM_GetReceiver::VM_GetReceiver(
 
 ///////////////////////////////////////////////////////////////
 //
-// class VM_FiberGetOrSetLocal
+// class VM_VirtualThreadGetOrSetLocal
 //
 
 // Constructor for non-object getter
-VM_FiberGetOrSetLocal::VM_FiberGetOrSetLocal(JvmtiEnv* env, Handle fiber_h, jint depth,
-                                             jint index, BasicType type)
+VM_VirtualThreadGetOrSetLocal::VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Handle vthread_h, jint depth,
+                                                             jint index, BasicType type)
   : VM_BaseGetOrSetLocal((JavaThread*)NULL, depth, index, type, _DEFAULT_VALUE, false)
 {
   _env = env;
-  _fiber_h = fiber_h;
+  _vthread_h = vthread_h;
 }
 
 // Constructor for object or non-object setter
-VM_FiberGetOrSetLocal::VM_FiberGetOrSetLocal(JvmtiEnv* env, Handle fiber_h, jint depth,
-                                             jint index, BasicType type, jvalue value)
+VM_VirtualThreadGetOrSetLocal::VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Handle vthread_h, jint depth,
+                                                             jint index, BasicType type, jvalue value)
   : VM_BaseGetOrSetLocal((JavaThread*)NULL, depth, index, type, value, true)
 {
   _env = env;
-  _fiber_h = fiber_h;
+  _vthread_h = vthread_h;
 }
 
 // Constructor for object getter
-VM_FiberGetOrSetLocal::VM_FiberGetOrSetLocal(JvmtiEnv* env, Handle fiber_h, JavaThread* calling_thread,
-                                             jint depth, int index)
+VM_VirtualThreadGetOrSetLocal::VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Handle vthread_h, JavaThread* calling_thread,
+                                                             jint depth, int index)
   : VM_BaseGetOrSetLocal(calling_thread, depth, index, T_OBJECT, _DEFAULT_VALUE, false)
 {
   _env = env;
-  _fiber_h = fiber_h;
+  _vthread_h = vthread_h;
 }
 
-javaVFrame *VM_FiberGetOrSetLocal::get_java_vframe() {
+javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
   Thread* cur_thread = Thread::current();
-  oop cont = java_lang_Fiber::continuation(_fiber_h());
+  oop cont = java_lang_VirtualThread::continuation(_vthread_h());
   javaVFrame* jvf = NULL;
 
-  assert(cont != NULL, "fiber contintuation must not be NULL");
+  assert(cont != NULL, "vthread contintuation must not be NULL");
   if (java_lang_Continuation::is_mounted(cont)) {
-    oop carrier_thread = java_lang_Fiber::carrier_thread(_fiber_h());
+    oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
     vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
 
@@ -851,9 +851,9 @@ javaVFrame *VM_FiberGetOrSetLocal::get_java_vframe() {
   return jvf;
 }
 
-VM_FiberGetReceiver::VM_FiberGetReceiver(
-    JvmtiEnv* env, Handle fiber_h, JavaThread* caller_thread, jint depth)
-    : VM_FiberGetOrSetLocal(env, fiber_h, caller_thread, depth, 0) {}
+VM_VirtualThreadGetReceiver::VM_VirtualThreadGetReceiver(
+    JvmtiEnv* env, Handle vthread_h, JavaThread* caller_thread, jint depth)
+    : VM_VirtualThreadGetOrSetLocal(env, vthread_h, caller_thread, depth, 0) {}
 
 
 /////////////////////////////////////////////////////////////////////////////////////////

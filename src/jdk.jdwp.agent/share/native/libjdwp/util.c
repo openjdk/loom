@@ -195,7 +195,7 @@ util_initialize(JNIEnv *env)
         /* Find some standard classes */
 
         localClassClass         = findClass(env,"java/lang/Class");
-        localFiberClass         = findClass(env,"java/lang/Fiber");
+        localFiberClass         = findClass(env,"java/lang/VirtualThread");
         localThreadClass        = findClass(env,"java/lang/Thread");
         localThreadGroupClass   = findClass(env,"java/lang/ThreadGroup");
         localClassLoaderClass   = findClass(env,"java/lang/ClassLoader");

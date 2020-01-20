@@ -1751,7 +1751,7 @@ int java_lang_Thread::_eetop_offset = 0;
 int java_lang_Thread::_interrupted_offset = 0;
 int java_lang_Thread::_tid_offset = 0;
 int java_lang_Thread::_continuation_offset = 0;
-int java_lang_Thread::_fiber_offset = 0 ;
+int java_lang_Thread::_vthread_offset = 0;
 int java_lang_Thread::_park_blocker_offset = 0;
 
 #define THREAD_FIELDS_DO(macro) \
@@ -1764,7 +1764,7 @@ int java_lang_Thread::_park_blocker_offset = 0;
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
-  macro(_fiber_offset,         k, "fiber", fiber_signature, false)
+  macro(_vthread_offset,       k, "vthread", vthread_signature, false)
 
 void java_lang_Thread::compute_offsets() {
   assert(_holder_offset == 0, "offsets should be initialized only once");
@@ -1914,8 +1914,8 @@ void java_lang_Thread::set_continuation(oop java_thread, oop continuation) {
   return java_thread->obj_field_put(_continuation_offset, continuation);
 }
 
-oop java_lang_Thread::fiber(oop java_thread) {
-  return java_thread->obj_field(_fiber_offset);
+oop java_lang_Thread::vthread(oop java_thread) {
+  return java_thread->obj_field(_vthread_offset);
 }
 
 oop java_lang_Thread::park_blocker(oop java_thread) {
@@ -2027,12 +2027,12 @@ void java_lang_ThreadGroup::serialize_offsets(SerializeClosure* f) {
 #endif
 
 
-// java_lang_Fiber
+// java_lang_VirtualThread
 
-int java_lang_Fiber::static_notify_jvmti_events_offset = 0;
-int java_lang_Fiber::_carrierThread_offset = 0;
-int java_lang_Fiber::_continuation_offset = 0;
-int java_lang_Fiber::_state_offset = 0;
+int java_lang_VirtualThread::static_notify_jvmti_events_offset = 0;
+int java_lang_VirtualThread::_carrierThread_offset = 0;
+int java_lang_VirtualThread::_continuation_offset = 0;
+int java_lang_VirtualThread::_state_offset = 0;
 
 #define FIBER_FIELDS_DO(macro) \
   macro(static_notify_jvmti_events_offset,  k, "notifyJvmtiEvents",  bool_signature, true); \
@@ -2040,53 +2040,53 @@ int java_lang_Fiber::_state_offset = 0;
   macro(_continuation_offset,  k, "cont",  continuation_signature, false); \
   macro(_state_offset,  k, "state",  short_signature, false)
 
-static jboolean fiber_notify_jvmti_events = JNI_FALSE;
+static jboolean vthread_notify_jvmti_events = JNI_FALSE;
 
-void java_lang_Fiber::compute_offsets() {
-  InstanceKlass* k = SystemDictionary::Fiber_klass();
+void java_lang_VirtualThread::compute_offsets() {
+  InstanceKlass* k = SystemDictionary::VirtualThread_klass();
   FIBER_FIELDS_DO(FIELD_COMPUTE_OFFSET);
 }
 
-void java_lang_Fiber::init_static_notify_jvmti_events() {
-  if (fiber_notify_jvmti_events) {
-    InstanceKlass* ik = SystemDictionary::Fiber_klass();
+void java_lang_VirtualThread::init_static_notify_jvmti_events() {
+  if (vthread_notify_jvmti_events) {
+    InstanceKlass* ik = SystemDictionary::VirtualThread_klass();
     oop base = ik->static_field_base_raw();
-    base->release_bool_field_put(static_notify_jvmti_events_offset, fiber_notify_jvmti_events);
+    base->release_bool_field_put(static_notify_jvmti_events_offset, vthread_notify_jvmti_events);
   }
 }
 
-bool java_lang_Fiber::is_instance(oop obj) {
+bool java_lang_VirtualThread::is_instance(oop obj) {
   return obj != NULL && is_subclass(obj->klass());
 }
 
-oop java_lang_Fiber::carrier_thread(oop fiber) {
-  oop thread = fiber->obj_field(_carrierThread_offset);
+oop java_lang_VirtualThread::carrier_thread(oop vthread) {
+  oop thread = vthread->obj_field(_carrierThread_offset);
   return thread;
 }
  
-oop java_lang_Fiber::continuation(oop fiber) {
-  oop cont = fiber->obj_field(_continuation_offset);
+oop java_lang_VirtualThread::continuation(oop vthread) {
+  oop cont = vthread->obj_field(_continuation_offset);
   return cont;
 }
 
-// Read thread status value from state field in java.lang.Fiber java class.
-java_lang_Thread::ThreadStatus java_lang_Fiber::get_thread_status(oop fiber) {
+// Read thread status value from state field in java.lang.VirtualThread java class.
+java_lang_Thread::ThreadStatus java_lang_VirtualThread::get_thread_status(oop vthread) {
   // Make sure the caller is operating on behalf of the VM or is
   // running VM code (state == _thread_in_vm).
   assert(Threads_lock->owned_by_self() || Thread::current()->is_VM_thread() ||
          JavaThread::current()->thread_state() == _thread_in_vm,
          "Java Thread is not running in vm");
-  return (java_lang_Thread::ThreadStatus)fiber->short_field(_state_offset);
+  return (java_lang_Thread::ThreadStatus)vthread->short_field(_state_offset);
 }
 
 #if INCLUDE_CDS
-void java_lang_Fiber::serialize_offsets(SerializeClosure* f) {
+void java_lang_VirtualThread::serialize_offsets(SerializeClosure* f) {
    FIBER_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
 
-void java_lang_Fiber::set_notify_jvmti_events(jboolean enable) {
-  fiber_notify_jvmti_events = enable;
+void java_lang_VirtualThread::set_notify_jvmti_events(jboolean enable) {
+  vthread_notify_jvmti_events = enable;
 }
 
 
@@ -5300,6 +5300,6 @@ int InjectedField::compute_offset() {
 void javaClasses_init() {
   JavaClasses::compute_offsets();
   JavaClasses::check_offsets();
-  java_lang_Fiber::init_static_notify_jvmti_events();
+  java_lang_VirtualThread::init_static_notify_jvmti_events();
   FilteredFieldsMap::initialize();  // must be done after computing offsets.
 }

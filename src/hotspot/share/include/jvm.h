@@ -1195,19 +1195,19 @@ JVM_GetTemporaryDirectory(JNIEnv *env);
 JNIEXPORT jobjectArray JNICALL
 JVM_GetEnclosingMethodInfo(JNIEnv* env, jclass ofClass);
     
-/* Fiber support.
+/* Virtual thread support.
  */
 JNIEXPORT void JNICALL
-JVM_FiberStarted(JNIEnv* env, jclass fiber_class, jobject event_thread, jobject fiber);
+JVM_VirtualThreadStarted(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
 
 JNIEXPORT void JNICALL
-JVM_FiberTerminated(JNIEnv* env, jclass fiber_class, jobject event_hread, jobject fiber);
+JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, jobject event_hread, jobject vthread);
 
 JNIEXPORT void JNICALL
-JVM_FiberMount(JNIEnv* env, jclass fiber_class, jobject event_thread, jobject fiber);
+JVM_VirtualThreadMount(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
 
 JNIEXPORT void JNICALL
-JVM_FiberUnmount(JNIEnv* env, jclass fiber_class, jobject event_hread, jobject fiber);
+JVM_VirtualThreadUnmount(JNIEnv* env, jclass vthread_class, jobject event_hread, jobject vthread);
 
 /*
  * This structure is used by the launcher to get the default thread

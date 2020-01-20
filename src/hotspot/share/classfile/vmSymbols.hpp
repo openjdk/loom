@@ -64,7 +64,7 @@
   template(java_lang_Thread_FieldHolder,              "java/lang/Thread$FieldHolder")             \
   template(java_lang_Thread_VirtualThreads,           "java/lang/Thread$VirtualThreads")          \
   template(java_lang_ThreadGroup,                     "java/lang/ThreadGroup")                    \
-  template(java_lang_Fiber,                           "java/lang/Fiber")                          \
+  template(java_lang_VirtualThread,                   "java/lang/VirtualThread")                  \
   template(java_lang_Cloneable,                       "java/lang/Cloneable")                      \
   template(java_lang_Throwable,                       "java/lang/Throwable")                      \
   template(java_lang_ClassLoader,                     "java/lang/ClassLoader")                    \
@@ -545,7 +545,7 @@
   template(continuation_signature,                    "Ljava/lang/Continuation;")                 \
   template(continuationscope_signature,               "Ljava/lang/ContinuationScope;")            \
   template(stackchunk_signature,                      "Ljdk/internal/misc/StackChunk;")           \
-  template(fiber_signature,                           "Ljava/lang/Fiber;")                        \
+  template(vthread_signature,                         "Ljava/lang/VirtualThread;")                \
   template(object_void_signature,                     "(Ljava/lang/Object;)V")                    \
   template(object_int_signature,                      "(Ljava/lang/Object;)I")                    \
   template(object_boolean_signature,                  "(Ljava/lang/Object;)Z")                    \
