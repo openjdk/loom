@@ -565,6 +565,11 @@ public class CheckGraalIntrinsics extends GraalTest {
         if (!config.useSHA512Intrinsics()) {
             add(ignore, "sun/security/provider/SHA5." + shaCompressName + "([BI)V");
         }
+
+        // Continuations - prototype and debug intrinsics we haven't implemented.
+        add(ignore, "java/lang/Continuation.enter()V");
+        add(ignore, "java/lang/Continuation.getPC()J");
+        add(ignore, "java/lang/Continuation.jump(JJJ)V");
     }
 
     private static boolean isJDK9OrHigher() {
