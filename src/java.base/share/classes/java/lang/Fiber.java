@@ -134,8 +134,16 @@ class Fiber extends Thread {
             @Override
             protected void onPinned(Continuation.Pinned reason) {
                 if (TRACE_PINNING_MODE > 0) {
-                    boolean printAll = (TRACE_PINNING_MODE == 1);
-                    PinnedThreadPrinter.printStackTrace(printAll);
+                    // switch to carrier thread as the printing may park
+                    Thread thread = Thread.currentCarrierThread();
+                    Fiber fiber = thread.getFiber();
+                    thread.setFiber(null);
+                    try {
+                        boolean printAll = (TRACE_PINNING_MODE == 1);
+                        PinnedThreadPrinter.printStackTrace(printAll);
+                    } finally {
+                        thread.setFiber(fiber);
+                    }
                 }
                 yieldFailed();
             }
