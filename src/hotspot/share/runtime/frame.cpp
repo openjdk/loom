@@ -1319,6 +1319,11 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
       }
     }
 
+    if (interpreter_frame_monitor_begin() != interpreter_frame_monitor_end()) {
+      values.describe(frame_no, (intptr_t*)interpreter_frame_monitor_begin(), "monitors begin");
+      values.describe(frame_no, (intptr_t*)interpreter_frame_monitor_end(), "monitors end");
+    }
+
     // Compute the actual expression stack size
     InterpreterOopMap mask;
     OopMapCache::compute_one_oop_map(methodHandle(Thread::current(), m), bci, &mask);
@@ -1331,10 +1336,6 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
     }
     if (tos != NULL) {
       values.describe(-1, tos, err_msg("expression stack for #%d", frame_no), 2);
-    }
-    if (interpreter_frame_monitor_begin() != interpreter_frame_monitor_end()) {
-      values.describe(frame_no, (intptr_t*)interpreter_frame_monitor_begin(), "monitors begin");
-      values.describe(frame_no, (intptr_t*)interpreter_frame_monitor_end(), "monitors end");
     }
 
     if (reg_map != NULL) {
