@@ -1631,6 +1631,8 @@ class StubGenerator: public StubCodeGenerator {
   // - https://lwn.net/Articles/255364/ Memory part 5: What programmers can do
   // - https://software.intel.com/en-us/forums/intel-isa-extensions/topic/597075 Do Non-Temporal Loads Prefetch?
   // - https://software.intel.com/en-us/forums/intel-fortran-compiler/topic/275765#comment-1551057 Time to revisit REP;MOVS
+  // - https://lemire.me/blog/2018/09/07/avx-512-when-and-how-to-use-these-new-instructions/ AVX-512: when and how to use these new instructions (explains AVX3Threshold)
+  // - https://travisdowns.github.io/blog/2020/01/17/avxfreq1.html Gathering Intel on Intel AVX-512 Transitions
 
 
   // Used by continuations to copy from stack
