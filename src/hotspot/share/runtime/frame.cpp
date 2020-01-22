@@ -679,12 +679,12 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
     } else if (StubRoutines::contains(pc())) {
       StubCodeDesc* desc = StubCodeDesc::desc_for(pc());
       if (desc != NULL) {
-        st->print("v  ~StubRoutines::%s", desc->name());
+        st->print("v  ~StubRoutines::%s " PTR_FORMAT, desc->name(), p2i(pc()));
       } else {
         st->print("v  ~StubRoutines::" PTR_FORMAT, p2i(pc()));
       }
     } else if (_cb->is_buffer_blob()) {
-      st->print("v  ~BufferBlob::%s", ((BufferBlob *)_cb)->name());
+      st->print("v  ~BufferBlob::%s " PTR_FORMAT, ((BufferBlob *)_cb)->name(), p2i(pc()));
     } else if (_cb->is_compiled()) {
       CompiledMethod* cm = (CompiledMethod*)_cb;
       Method* m = cm->method();
@@ -722,21 +722,21 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
         st->print("J  " PTR_FORMAT, p2i(pc()));
       }
     } else if (_cb->is_runtime_stub()) {
-      st->print("v  ~RuntimeStub::%s", ((RuntimeStub *)_cb)->name());
+      st->print("v  ~RuntimeStub::%s " PTR_FORMAT, ((RuntimeStub *)_cb)->name(), p2i(pc()));
     } else if (_cb->is_deoptimization_stub()) {
-      st->print("v  ~DeoptimizationBlob");
+      st->print("v  ~DeoptimizationBlob " PTR_FORMAT, p2i(pc()));
     } else if (_cb->is_exception_stub()) {
-      st->print("v  ~ExceptionBlob");
+      st->print("v  ~ExceptionBlob " PTR_FORMAT, p2i(pc()));
     } else if (_cb->is_safepoint_stub()) {
-      st->print("v  ~SafepointBlob");
+      st->print("v  ~SafepointBlob " PTR_FORMAT, p2i(pc()));
     } else if (_cb->is_adapter_blob()) {
-      st->print("v  ~AdapterBlob");
+      st->print("v  ~AdapterBlob " PTR_FORMAT, p2i(pc()));
     } else if (_cb->is_vtable_blob()) {
-      st->print("v  ~VtableBlob");
+      st->print("v  ~VtableBlob " PTR_FORMAT, p2i(pc()));
     } else if (_cb->is_method_handles_adapter_blob()) {
-      st->print("v  ~MethodHandlesAdapterBlob");
+      st->print("v  ~MethodHandlesAdapterBlob " PTR_FORMAT, p2i(pc()));
     } else if (_cb->is_uncommon_trap_stub()) {
-      st->print("v  ~UncommonTrapBlob");
+      st->print("v  ~UncommonTrapBlob " PTR_FORMAT, p2i(pc()));
     } else {
       st->print("v  blob " PTR_FORMAT, p2i(pc()));
     }

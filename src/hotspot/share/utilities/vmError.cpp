@@ -230,7 +230,8 @@ void VMError::print_stack_trace(outputStream* st, JavaThread* jt,
 }
 
 void VMError::print_native_stack(outputStream* st, frame fr, Thread* t, char* buf, int buf_size) {
-
+  if (t != NULL) st->print_cr("Thread " INTPTR_FORMAT " [%ld]", p2i(t), (long) t->osthread()->thread_id());
+  
   // see if it's a valid frame
   if (fr.pc()) {
     st->print_cr("Native frames: (J=compiled Java code, A=aot compiled Java code, j=interpreted, Vv=VM code, C=native code)");
