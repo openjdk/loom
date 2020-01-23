@@ -582,6 +582,18 @@ class java_lang_VirtualThread : AllStatic {
   static int _carrierThread_offset;
   static int _continuation_offset;
   static int _state_offset;
+  // keep in sync with java.lang.VirtualThread
+  enum {
+    NEW          = 0,
+    STARTED      = 1,
+    RUNNABLE     = 2,
+    RUNNING      = 3,
+    PARKING      = 4,
+    PARKED       = 5,
+    PINNED       = 6,
+    WALKINGSTACK = 51,
+    TERMINATED   = 99,
+  };
  public:
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
@@ -591,9 +603,11 @@ class java_lang_VirtualThread : AllStatic {
     return klass->is_subclass_of(SystemDictionary::VirtualThread_klass());
   }
   static bool is_instance(oop obj);
+
   static oop carrier_thread(oop vthread);
   static oop continuation(oop vthread);
-  static java_lang_Thread::ThreadStatus get_thread_status(oop vthread);
+  static jshort state(oop vthread);
+  static java_lang_Thread::ThreadStatus map_state_to_thread_status(jshort state);
   static void set_notify_jvmti_events(jboolean enable);
   static void init_static_notify_jvmti_events();
 };

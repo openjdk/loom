@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -821,9 +821,8 @@ public class ThreadAPI {
 
     public void testYield1() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
-        ExecutorService pool = Executors.newFixedThreadPool(1);
-        ThreadFactory factory = Thread.builder().virtual(pool).factory();
-        try {
+        try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
+            ThreadFactory factory = Thread.builder().virtual(scheduler).factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -838,17 +837,14 @@ public class ThreadAPI {
             });
             thread.start();
             thread.join();
-        } finally {
-            pool.shutdown();
         }
         assertEquals(list, List.of("A", "B", "A", "B"));
     }
 
     public void testYield2() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
-        ExecutorService pool = Executors.newFixedThreadPool(1);
-        ThreadFactory factory = Thread.builder().virtual(pool).factory();
-        try {
+        try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
+            ThreadFactory factory = Thread.builder().virtual(scheduler).factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -864,12 +860,9 @@ public class ThreadAPI {
             });
             thread.start();
             thread.join();
-        } finally {
-            pool.shutdown();
         }
         assertEquals(list, List.of("A", "A", "B"));
     }
-
 
     // -- Thread.onSpinWait --
 
@@ -1153,7 +1146,7 @@ public class ThreadAPI {
         assertTrue(thread.getState() == Thread.State.NEW);
     }
 
-    // RUNNABLE
+    // RUNNABLE (mounted)
     public void testGetState2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread.State state = Thread.currentThread().getState();
@@ -1161,8 +1154,36 @@ public class ThreadAPI {
         });
     }
 
-    // WAITING when parked
+    // RUNNABLE (not mounted)
     public void testGetState3() throws Exception {
+        AtomicBoolean completed = new AtomicBoolean();
+        try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
+            Thread.Builder builder = Thread.builder().virtual(scheduler);
+            Thread t1 = builder.task(() -> {
+                Thread t2 = builder.task(LockSupport::park).build();
+                assertTrue(t2.getState() == Thread.State.NEW);
+
+                // runnable (not mounted)
+                t2.start();
+                assertTrue(t2.getState() == Thread.State.RUNNABLE);
+
+                // yield to allow t2 to run and park
+                Thread.yield();
+                assertTrue(t2.getState() == Thread.State.WAITING);
+
+                // unpark t2 and check runnable (not mounted)
+                LockSupport.unpark(t2);
+                assertTrue(t2.getState() == Thread.State.RUNNABLE);
+
+                completed.set(true);
+            }).start();
+            t1.join();
+        }
+        assertTrue(completed.get() == true);
+    }
+
+    // WAITING when parked
+    public void testGetState4() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
         while (thread.getState() != Thread.State.WAITING) {
@@ -1173,7 +1194,7 @@ public class ThreadAPI {
     }
 
     // WAITING when parked and pinned
-    public void testGetState4() throws Exception {
+    public void testGetState5() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             var lock = new Object();
             synchronized (lock) {
@@ -1189,7 +1210,7 @@ public class ThreadAPI {
     }
 
     // WAITING when blocked in Object.wait
-    public void testGetState5() throws Exception {
+    public void testGetState6() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             var lock = new Object();
             synchronized (lock) {
@@ -1205,7 +1226,7 @@ public class ThreadAPI {
     }
 
     // TERMINATED
-    public void testGetState6() throws Exception {
+    public void testGetState7() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
         thread.start();
         thread.join();

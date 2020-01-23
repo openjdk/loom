@@ -923,7 +923,12 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
     if (!get_capabilities()->can_support_fibers) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    *thread_state_ptr = (jint)java_lang_VirtualThread::get_thread_status(thread_oop);
+    jshort vthread_state = java_lang_VirtualThread::state(thread_oop);
+    jint state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
+    if (java_lang_Thread::interrupted(thread_oop)) {
+      state |= JVMTI_THREAD_STATE_INTERRUPTED;
+    }
+    *thread_state_ptr = state;
     return JVMTI_ERROR_NONE;
   }
 

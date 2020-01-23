@@ -2069,14 +2069,34 @@ oop java_lang_VirtualThread::continuation(oop vthread) {
   return cont;
 }
 
-// Read thread status value from state field in java.lang.VirtualThread java class.
-java_lang_Thread::ThreadStatus java_lang_VirtualThread::get_thread_status(oop vthread) {
-  // Make sure the caller is operating on behalf of the VM or is
-  // running VM code (state == _thread_in_vm).
-  assert(Threads_lock->owned_by_self() || Thread::current()->is_VM_thread() ||
-         JavaThread::current()->thread_state() == _thread_in_vm,
-         "Java Thread is not running in vm");
-  return (java_lang_Thread::ThreadStatus)vthread->short_field(_state_offset);
+jshort java_lang_VirtualThread::state(oop vthread) {
+  return vthread->short_field_acquire(_state_offset);
+}
+
+java_lang_Thread::ThreadStatus java_lang_VirtualThread::map_state_to_thread_status(jshort state) {
+  java_lang_Thread::ThreadStatus status = java_lang_Thread::NEW;
+  switch (state) {
+    case NEW :
+      status = java_lang_Thread::NEW;
+      break;
+    case STARTED :
+    case RUNNABLE :
+    case RUNNING :
+    case PARKING :
+      status = java_lang_Thread::RUNNABLE;
+      break;
+    case PARKED :
+    case PINNED :
+    case WALKINGSTACK :
+      status = java_lang_Thread::PARKED;
+      break;
+    case TERMINATED :
+      status = java_lang_Thread::TERMINATED;
+      break;
+    default:
+      ShouldNotReachHere();
+  }
+  return status;
 }
 
 #if INCLUDE_CDS

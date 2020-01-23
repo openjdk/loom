@@ -2717,7 +2717,16 @@ public class Thread implements Runnable {
      * @since 1.5
      */
     public State getState() {
-        // get current thread state
+        return threadState();
+    }
+
+    /**
+     * Returns the state of this thread.
+     *
+     * @apiNote For VirtualThread use as getState may be overridden and run
+     * arbitrary code.
+     */
+    State threadState() {
         return jdk.internal.misc.VM.toThreadState(holder.threadStatus);
     }
 
