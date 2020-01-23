@@ -71,9 +71,9 @@ void AbstractInterpreter::layout_activation(Method* method,
   // It is also guaranteed to be walkable even though it is in a
   // skeletal state
 
-  int max_locals = method->max_locals() * Interpreter::stackElementWords;
-  int extra_locals = (method->max_locals() - method->size_of_parameters()) *
-    Interpreter::stackElementWords;
+  const int max_locals = method->max_locals() * Interpreter::stackElementWords;
+  const int params = method->size_of_parameters() * Interpreter::stackElementWords;
+  const int extra_locals = max_locals - params;
 
   assert(caller->sp() == interpreter_frame->sender_sp(), "Frame not properly walkable");
 
@@ -82,7 +82,7 @@ void AbstractInterpreter::layout_activation(Method* method,
   // interpreter_frame_sender_sp interpreter_frame_sender_sp is
   // the original sp of the caller (the unextended_sp) and
   // sender_sp is fp+8/16 (32bit/64bit) XXX
-  intptr_t* locals = interpreter_frame->sender_sp() + max_locals - 1;
+  intptr_t* const locals = interpreter_frame->sender_sp() + max_locals - 1;
 
 #ifdef ASSERT
   if (caller->is_interpreted_frame()) {
@@ -115,6 +115,17 @@ void AbstractInterpreter::layout_activation(Method* method,
     interpreter_frame->set_interpreter_frame_sender_sp(caller->sp() +
                                                        extra_locals);
   }
+  if (is_bottom_frame && caller->is_interpreted_frame()) {
+    interpreter_frame->set_interpreter_frame_sender_sp(locals - params + 1);
+  }
+
+  assert (!caller->is_interpreted_frame() || interpreter_frame->interpreter_frame_sender_sp() == locals - params + 1, 
+    "is_bottom_frame: %d sender_sp: " INTPTR_FORMAT " locals: " INTPTR_FORMAT " params: %d locals-params+1: " INTPTR_FORMAT, 
+    is_bottom_frame, p2i(interpreter_frame->interpreter_frame_sender_sp()), p2i(locals), params, p2i(locals - params + 1));
+  assert (!caller->is_interpreted_frame() || interpreter_frame->interpreter_frame_sender_sp() == interpreter_frame->fp() + 1 + extra_locals + 1,
+    "is_bottom_frame: %d sender_sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " extra_locals: %d fp+1+extra_locals+1: " INTPTR_FORMAT, 
+    is_bottom_frame, p2i(interpreter_frame->interpreter_frame_sender_sp()), p2i(interpreter_frame->fp()), extra_locals, p2i(interpreter_frame->fp() + 1 + extra_locals + 1));
+
   *interpreter_frame->interpreter_frame_cache_addr() =
     method->constants()->cache();
   *interpreter_frame->interpreter_frame_mirror_addr() =

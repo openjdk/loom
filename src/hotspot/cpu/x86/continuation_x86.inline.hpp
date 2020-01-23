@@ -961,10 +961,10 @@ inline intptr_t* Thaw<ConfigT, mode>::align(const hframe& hf, intptr_t* vsp, fra
       addedWords = (SP_WIGGLE-1); // We subtract 1 for alignment, which we may add later
 
       // SharedRuntime::gen_i2c_adapter makes room that's twice as big as required for the stack-passed arguments by counting slots but subtracting words from rsp 
-      assert (VMRegImpl::stack_slot_size == 4, "");
-      int argsize = hf.compiled_frame_stack_argsize();
-      assert (argsize >= 0, "");
-      addedWords += (argsize /* / 2*/) >> LogBytesPerWord; // Not sure why dividing by 2 is not big enough.
+      // assert (VMRegImpl::stack_slot_size == 4, "");
+      // int argsize = hf.compiled_frame_stack_argsize();
+      // assert (argsize >= 0, "");
+      // addedWords += (argsize /* / 2*/) >> LogBytesPerWord; // Not sure why dividing by 2 is not big enough.
 
       if (!bottom || _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
         _cont.sub_size((1 + addedWords) << LogBytesPerWord); // we add one whether or not we've aligned because we add it in freeze_interpreted_frame

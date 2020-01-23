@@ -2159,9 +2159,9 @@ public:
     int argsize = bottom_argsize();
     _bottom_address = _cont.entrySP() - argsize;
     assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()), "");
-    if (mode != mode_fast && Interpreter::contains(_cont.entryPC())) {
-      _bottom_address -= argsize; // we subtract again; see Thaw::align
-    }
+    // if (mode != mode_fast && Interpreter::contains(_cont.entryPC())) {
+    //   _bottom_address -= argsize; // we subtract again; see Thaw::align
+    // }
   #ifdef _LP64
     if (((intptr_t)_bottom_address & 0xf) != 0) {
       _bottom_address--;
@@ -2876,7 +2876,7 @@ public:
 
         if (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
           log_develop_trace(jvmcont)("finalize _size: %d add argsize: %d", _size, argsize);
-          _size += argsize * 2; // twice the argsize; see Thaw::align
+          _size += argsize;
         } else {
           // the arguments of the bottom-most frame are part of the topmost compiled frame on the hstack; we overwrite that part
           // tty->print_cr(">>> BEFORE: sp: %d", sp);
@@ -3019,7 +3019,7 @@ public:
     int oops  = Interpreted::num_oops(f, &mask);
 
     log_develop_trace(jvmcont)("recurse_interpreted_frame _size: %d add fsize: %d callee_argsize: %d -- %d", _size, fsize, callee_argsize, fsize + callee_argsize);
-    _size += fsize + (callee_argsize * 2); // twice the argsize; see Thaw::align
+    _size += fsize + callee_argsize;
     _oops += oops;
     _frames++;
     _cgrind_interpreted_frames++;
@@ -6024,7 +6024,7 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
     assert (frames > 0 || ((!hf.is_interpreted_frame() && is_stub(hf.cb())) == cont.is_flag(FLAG_SAFEPOINT_YIELD)), "");
     if (hf.is_interpreted_frame()) {
       if (callee_compiled) { max_size += SP_WIGGLE << LogBytesPerWord; } // TODO PD
-      max_size += callee_argsize * 2; // see Thaw::align TODO PD
+      max_size += callee_argsize;
       max_size += hf.interpreted_frame_size();
       callee_argsize = 0;
       callee_compiled = false;

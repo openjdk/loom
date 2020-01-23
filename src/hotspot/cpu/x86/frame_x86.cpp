@@ -608,7 +608,7 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
   } else if (is_compiled_frame()) {
     address ret_pc = *(address*)(real_fp() - return_addr_offset);
     values.describe(frame_no, real_fp() - return_addr_offset, Continuation::is_return_barrier_entry(ret_pc) ? "return address (return barrier)" : "return address");
-    values.describe(frame_no, real_fp() - sender_sp_offset,   "saved fp", 2);
+    values.describe(-1, real_fp() - sender_sp_offset, "saved fp", 2);
 #ifdef AMD64
   } else if (is_entry_frame()) {
     // This could be more descriptive if we use the enum in

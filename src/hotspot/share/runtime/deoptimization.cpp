@@ -158,7 +158,7 @@ JRT_BLOCK_ENTRY(Deoptimization::UnrollBlock*, Deoptimization::fetch_unroll_info(
   // that can confuse an asynchronous stack walker. This counter is
   // decremented at the end of unpack_frames().
   if (TraceDeoptimization) {
-    tty->print_cr("Deoptimizing thread " INTPTR_FORMAT, p2i(thread));
+    tty->print_cr("Deoptimizing thread " INTPTR_FORMAT " [%ld]", p2i(thread), (long) thread->osthread()->thread_id());
   }
   thread->inc_in_deopt_handler();
 
@@ -251,8 +251,6 @@ static void eliminate_locks(JavaThread* thread, GrowableArray<compiledVFrame*>* 
   }
 }
 #endif // COMPILER2_OR_JVMCI
-
-extern "C" void pfl();
 
 // This is factored, since it is both called from a JRT_LEAF (deoptimization) and a JRT_ENTRY (uncommon_trap)
 Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread* thread, int exec_mode) {
@@ -510,15 +508,20 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   // QQQ I'd rather see this pushed down into last_frame_adjust
   // and have it take the sender (aka caller).
 
-  // TODO LOOM: consider *always* adjusting instead of the conditionals below. 
-  // That would simplify the alignment code in continuation freeze and particularly thaw, but it makes hotspot/jtreg/vmTestbase/nsk/jvmti/PopFrame/popframe005 fail.
-  caller_adjustment = last_frame_adjust(0, callee_locals);
+  // We always push the stack to make room for parameters, even if the caller is interpreted and has the parameters on the stack; this makes Loom continuation code simpler.
+  // ... except if we've already done it, which can happen if the deoptimized frame becomes OSR and then deoptimized again.
+  if (deopt_sender.is_interpreted_frame() && deopt_sender.interpreter_frame_last_sp() > deopt_sender.sp() + 1 && callee_locals > callee_parameters) {
+    caller_adjustment = last_frame_adjust(callee_parameters, callee_locals);
+  } else {
+    caller_adjustment = last_frame_adjust(0, callee_locals);
+  } 
   // if (deopt_sender.is_compiled_frame() || caller_was_method_handle || caller_was_continuation_entry) {
   //   caller_adjustment = last_frame_adjust(0, callee_locals);
   // } else if (callee_locals > callee_parameters) {
   //   // The caller frame may need extending to accommodate non-parameter locals of the first unpacked interpreted frame.
   //   caller_adjustment = last_frame_adjust(callee_parameters, callee_locals);
   // }
+  // tty->print_cr(">>>>> fetch_unroll_info_helper adjustment: %d locals: %d params: %d", caller_adjustment, callee_locals, callee_parameters);
 
   // If the sender is deoptimized the we must retrieve the address of the handler
   // since the frame will "magically" show the original pc before the deopt
