@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -50,51 +50,24 @@ name(PacketInputStream *in, PacketOutputStream *out)
     }
 
     WITH_LOCAL_REFS(env, 3) {
-        jboolean is_fiber = isFiber(thread);
-        if (!is_fiber) {
-            /* Get the thread name */
-            jvmtiThreadInfo info;
-            jvmtiError error;
+        /* Get the thread name */
+        jvmtiThreadInfo info;
+        jvmtiError error;
 
-            (void)memset(&info, 0, sizeof(info));
-            error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
-                (gdata->jvmti, thread, &info);
+        (void)memset(&info, 0, sizeof(info));
+        error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
+            (gdata->jvmti, thread, &info);
 
-            if (error != JVMTI_ERROR_NONE) {
-                outStream_setError(out, map2jdwpError(error));
-            } else {
-                (void)outStream_writeString(out, info.name);
-            }
-
-            if ( info.name != NULL ) {
-                threadControl_setName(thread, info.name);
-                jvmtiDeallocate(info.name);
-            }
+        if (error != JVMTI_ERROR_NONE) {
+            outStream_setError(out, map2jdwpError(error));
         } else {
-            /* Use Fiber.toString() instead of the Thread name. */
-            jstring fiberName = JNI_FUNC_PTR(env,CallObjectMethod)
-                (env, thread, gdata->fiberToString);
-            if (JNI_FUNC_PTR(env,ExceptionOccurred)(env)) {
-                JNI_FUNC_PTR(env,ExceptionClear)(env);
-                fiberName = NULL;
-            }
-
-            if (fiberName == NULL) {
-                (void)outStream_writeString(out, "<UNKNOWN FIBER>");
-            } else {
-                const char *utf;
-                /* Get the UTF8 encoding for this fiberName string. */
-                utf = JNI_FUNC_PTR(env,GetStringUTFChars)(env, fiberName, NULL);
-                if (!(*env)->ExceptionCheck(env)) {
-                    (void)outStream_writeString(out, (char*)utf);
-                    threadControl_setName(thread, utf);
-                    JNI_FUNC_PTR(env,ReleaseStringUTFChars)(env, fiberName, utf);
-                } else {
-                    (void)outStream_writeString(out, "<UNKNOWN FIBER>");
-                }
-            }
+            (void)outStream_writeString(out, info.name);
         }
 
+        if ( info.name != NULL ) {
+            threadControl_setName(thread, info.name);
+            jvmtiDeallocate(info.name);
+        }
     } END_WITH_LOCAL_REFS(env);
 
     return JNI_TRUE;

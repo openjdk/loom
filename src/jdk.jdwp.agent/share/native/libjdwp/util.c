@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -215,8 +215,6 @@ util_initialize(JNIEnv *env)
 
         /* Find some standard methods */
 
-        gdata->fiberToString =
-                getMethod(env, gdata->fiberClass, "toString", "()Ljava/lang/String;");
         gdata->threadConstructor =
                 getMethod(env, gdata->threadClass,
                     "<init>", "(Ljava/lang/ThreadGroup;Ljava/lang/String;)V");
@@ -2508,8 +2506,6 @@ log_debugee_location(const char *func,
         jvmtiError error;
         jvmtiThreadInfo info;
         jint state;
-
-        JDI_ASSERT(!isFiber(thread));
 
         /* Get thread information */
         info.name = NULL;
