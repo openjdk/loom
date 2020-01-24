@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -94,10 +94,6 @@ typedef struct ThreadNode {
 } ThreadNode;
 
 static jint suspendAllCount;
-
-// minimumSuspendAllCount takes into account threads that have had a resume done
-// on them. It represents the minimum suspend count any thread might have.
-static jint minimumSuspendAllCount;
 
 typedef struct ThreadList {
     ThreadNode *first;
@@ -605,7 +601,6 @@ threadControl_initialize(void)
     jvmtiError error;
 
     suspendAllCount = 0;
-    minimumSuspendAllCount = 0;
     runningThreads.first = NULL;
     otherThreads.first = NULL;
     runningFibers.first = NULL;
@@ -917,20 +912,6 @@ commonSuspendByNode(ThreadNode *node)
 }
 
 /*
- * Track the guaranteed minimum suspend count each Thread has after one or more
- * suspendAll() have been done, followed by selectively resuming some threads.
- * The idea is to figure out if any carrier threads *might* be running. If
- * minimumSuspendAllCount > 0, we know we can treat all fibers as being supended.
- */
-static void
-adjustMinimumSuspendAllCount(jint suspendCount) 
-{
-    if (minimumSuspendAllCount > suspendCount) {
-        minimumSuspendAllCount = suspendCount;
-    }
-}
-
-/*
  * Deferred suspends happen when the suspend is attempted on a thread
  * that is not started. Bookkeeping (suspendCount,etc.)
  * is handled by the original request, and once the thread actually
@@ -963,7 +944,6 @@ deferredSuspendThreadByNode(ThreadNode *node)
          */
         if (error != JVMTI_ERROR_NONE) {
             node->suspendCount--;
-            adjustMinimumSuspendAllCount(node->suspendCount);
         }
     }
 
@@ -1033,7 +1013,6 @@ resumeThreadByNode(ThreadNode *node)
 
     if (node->suspendCount > 0) {
         node->suspendCount--;
-        adjustMinimumSuspendAllCount(node->suspendCount);
         debugMonitorNotifyAll(threadLock);
         if ((node->suspendCount == 0) && node->toBeResumed &&
             !node->suspendOnStart) {
@@ -1152,7 +1131,6 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
 
     if (node->suspendCount > 1) {
         node->suspendCount--;
-        adjustMinimumSuspendAllCount(node->suspendCount);
         /* nested suspend so just undo one level */
         return JVMTI_ERROR_NONE;
     }
@@ -1174,7 +1152,6 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
      */
     if (node->suspendCount == 1 && (!node->toBeResumed || node->suspendOnStart)) {
         node->suspendCount--;
-        adjustMinimumSuspendAllCount(node->suspendCount);
         return JVMTI_ERROR_NONE;
     }
 
@@ -1316,7 +1293,6 @@ commonResumeList(JNIEnv *env)
          * the same here. We also don't clear the error.
          */
         node->suspendCount--;
-        adjustMinimumSuspendAllCount(node->suspendCount);
         node->toBeResumed = JNI_FALSE;
         node->frameGeneration++; /* Increment on each resume */
     }
@@ -1539,10 +1515,13 @@ threadControl_suspendCount(jthread thread, jint *count)
             *count = node->suspendCount;
         } else {
             jthread carrier_thread = getFiberThread(thread);
-            // fiber fixme: we might want to rethink this and just always return minimumSuspendAllCount
             if (carrier_thread == NULL) {
-              /* Not mounted, so use minimumSuspendAllCount. */
-              *count = minimumSuspendAllCount;
+              /* Not mounted, so use suspendAllCount. 
+               * fiber fixme: This might confuse debuggers because if a carrier thread
+               * is resumed, this fiber could potentially run. This is part of the reason
+               * we need a better fiber suspend/resume story. 
+               */
+              *count = suspendAllCount;
             } else {
               /* It's a mounted fiber, so the carrier thread tracks the suspend count. */
               node = findThread(&runningThreads, carrier_thread);
@@ -1653,7 +1632,6 @@ threadControl_suspendAll(void)
 
         if (error == JVMTI_ERROR_NONE) {
             suspendAllCount++;
-            minimumSuspendAllCount++;
         }
 
     err: ;
@@ -2308,12 +2286,21 @@ threadControl_applicationThreadStatus(jthread thread,
     jvmtiError  error;
     jint        state;
     jboolean    is_fiber = isFiber(thread);
+    jthread     carrier_thread = NULL;
 
     log_debugee_location("threadControl_applicationThreadStatus()", thread, NULL, 0);
 
     debugMonitorEnter(threadLock);
 
-    if (!is_fiber) {
+    if (is_fiber) {
+        carrier_thread = getFiberThread(thread);
+        if (carrier_thread != NULL) {
+            thread = carrier_thread;
+        }
+    }
+
+    if (!is_fiber || carrier_thread != NULL) {
+        /* It's a regular thread or a mounted fiber. Get the thread's state. */
         error = threadState(thread, &state);
         *pstatus = map2jdwpThreadStatus(state);
         *statusFlags = map2jdwpSuspendStatus(state);
@@ -2336,24 +2323,11 @@ threadControl_applicationThreadStatus(jthread thread,
         tty_message("status thread: node(%p) suspendCount(%d) %d %d %s",
                     node, node->suspendCount, *pstatus, *statusFlags, node->name);
 #endif
-    } else { /* It's a fiber */
+    } else { /* It's an unmounted fiber. Assume RUNNING state and SUSPENDED status.*/
         error = JVMTI_ERROR_NONE;
         // fiber fixme - threadState() needs to support fibers
         *pstatus = JDWP_THREAD_STATUS(RUNNING);
-        *statusFlags = 0;
-        // fiber fixme: we might want to rethink this and just always base result on minimumSuspendAllCount
-        if (minimumSuspendAllCount > 0) {
-            *statusFlags = JDWP_SUSPEND_STATUS(SUSPENDED);
-        } else {
-            /* If the fiber was not suspended, maybe its carrier thread was. */
-            jthread carrier_thread = getFiberThread(thread);
-            if (carrier_thread != NULL) {
-                node = findThread(&runningThreads, carrier_thread);
-                if (node->suspendCount > 0) {
-                    *statusFlags = JDWP_SUSPEND_STATUS(SUSPENDED);
-                }
-            }
-        }
+        *statusFlags = JDWP_SUSPEND_STATUS(SUSPENDED);
 #if 0
         tty_message("status thread: fiber(%p) suspendCount(%d) %d %d %s",
                     node, node->suspendCount, *pstatus, *statusFlags, node->name);
@@ -2556,7 +2530,6 @@ threadControl_reset(void)
     freeDeferredEventModes(env);
 
     suspendAllCount = 0;
-    minimumSuspendAllCount = 0;
 
     /* Everything should have been resumed */
     JDI_ASSERT(otherThreads.first == NULL);
@@ -2820,7 +2793,9 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
         JDI_ASSERT(fiberNode->isStarted);
         JDI_ASSERT(bagSize(fiberNode->eventBag) == 0);
 
-        /* If we are not single stepping in this fiber then there is nothing to do. */
+        fiberNode->frameGeneration++; /* Increment, since this is like a thread resume. */
+
+        /* If we are not single stepping in this fiber then there is nothing more to do. */
         if (!fiberNode->currentStep.pending) {
             debugMonitorExit(threadLock);
             return;
