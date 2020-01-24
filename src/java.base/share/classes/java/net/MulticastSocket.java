@@ -26,9 +26,6 @@
 package java.net;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.Set;
 
 /**
  * The multicast datagram socket class is useful for sending
@@ -126,12 +123,9 @@ import java.util.Set;
  */
 public class MulticastSocket extends DatagramSocket {
 
-    /**
-     * Create a MulticastSocket that delegates to the given delegate if not null.
-     * @param delegate the delegate, can be null.
-     */
-    MulticastSocket(MulticastSocket delegate) {
-        super(delegate);
+    @Override
+    MulticastSocket delegate() {
+        return (MulticastSocket) super.delegate();
     }
 
     /**
@@ -209,24 +203,7 @@ public class MulticastSocket extends DatagramSocket {
      * @since 1.4
      */
     public MulticastSocket(SocketAddress bindaddr) throws IOException {
-        super((SocketAddress) null);
-
-        // No further initialization when this is a DatagramChannel socket adaptor
-        if (this instanceof sun.nio.ch.DatagramSocketAdaptor)
-            return;
-
-        // Enable SO_REUSEADDR before binding
-        setReuseAddress(true);
-
-        if (bindaddr != null) {
-            try {
-                bind(bindaddr);
-            } finally {
-                if (!isBound()) {
-                    close();
-                }
-            }
-        }
+        super(bindaddr, /*multicast*/true);
     }
 
     /**

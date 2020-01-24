@@ -110,20 +110,41 @@ import sun.nio.ch.DefaultSelectorProvider;
  * @since 1.0
  */
 public class DatagramSocket implements java.io.Closeable {
-    private final MulticastSocket delegate;
+    private final DatagramSocket delegate;
 
-    final MulticastSocket delegate() {
+    DatagramSocket delegate() {
         return delegate;
     }
 
     /**
-     * Create a DatagramSocket that delegates to the given delegate if not null.
-     * @param delegate the delegate, can be null.
+     * Creates a datagram socket that is optionally bound to the specified
+     * socket address.
+     *
+     * @param bindaddr local socket address or null for an unbound socket
+     * @param multicast true for a multicast socket.
      */
-    DatagramSocket(MulticastSocket delegate) {
+    DatagramSocket(SocketAddress bindaddr, boolean multicast) throws SocketException {
+        DatagramSocket delegate;
+        if (this instanceof sun.nio.ch.DatagramSocketAdaptor) {
+            delegate = null; // socket adaptor does not delegate
+        } else {
+            delegate = createDelegate(multicast);
+            boolean initialized = false;
+            try {
+                if (multicast)
+                    delegate.setReuseAddress(true);
+                if (bindaddr != null)
+                    delegate.bind(bindaddr);
+                initialized = true;
+            } finally {
+                if (!initialized) {
+                    delegate.close();
+                }
+            }
+        }
         this.delegate = delegate;
     }
-    
+
     /**
      * Constructs a datagram socket and binds it to any available port
      * on the local host machine.  The socket will be bound to the
@@ -182,25 +203,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @since   1.4
      */
     public DatagramSocket(SocketAddress bindaddr) throws SocketException {
-        // Special case initialization for the DatagramChannel socket adaptor.
-        if (this instanceof sun.nio.ch.DatagramSocketAdaptor) {
-            this.delegate = null;  // socket adaptor does not delegate
-            return;
-        }
-
-        // Create the delegate
-        boolean multicast = (this instanceof MulticastSocket);
-        this.delegate = createDelegate(multicast);
-
-        // bind to local address
-        if (bindaddr != null) {
-            try {
-                bind(bindaddr);
-            } finally {
-                if (!isBound())
-                    close();
-            }
-        }
+        this(bindaddr, false);
     }
 
     /**
@@ -1005,28 +1008,36 @@ public class DatagramSocket implements java.io.Closeable {
     }
 
     /**
-     * Creates a MulticastSocket object that can be used as a delegate. The
-     * MulticastSocket is a DatagramChannel socket adaptor.
+     * Creates a datagram socket object that can be used as a delegate. The
+     * datagram socket is a DatagramChannel socket adaptor.
+     *
+     * Where possible, the socket's SO_BROADCAST socket option will be enabled.
      */
-    private static MulticastSocket createDelegate(boolean multicast)
+    private static DatagramSocket createDelegate(boolean multicast)
         throws SocketException
     {
-        MulticastSocket delegate;
-        try {
-            delegate = (MulticastSocket) DefaultSelectorProvider.get()
-                    .openUninterruptibleDatagramChannel()
-                    .socket();
-        } catch (SocketException e) {
-            throw e;
-        } catch (IOException e) {
-            throw new SocketException(e.getMessage());
+        DatagramSocketImplFactory factory = DatagramSocket.factory;
+        if (factory != null) {
+            throw new UnsupportedOperationException();
+        } else {
+            // Return a DatagramChannel socket adaptor
+            DatagramSocket delegate;
+            try {
+                delegate = DefaultSelectorProvider.get()
+                        .openUninterruptibleDatagramChannel()
+                        .socket();
+            } catch (SocketException e) {
+                throw e;
+            } catch (IOException e) {
+                throw new SocketException(e.getMessage());
+            }
+
+            // enable SO_BROADCAST if possible
+            try {
+                delegate.setOption(StandardSocketOptions.SO_BROADCAST, true);
+            } catch (IOException ioe) { }
+
+            return delegate;
         }
-
-        // enable SO_BROADCAST if possible
-        try {
-            delegate.setOption(StandardSocketOptions.SO_BROADCAST, true);
-        } catch (IOException ioe) { }
-
-        return delegate;
     }
 }
