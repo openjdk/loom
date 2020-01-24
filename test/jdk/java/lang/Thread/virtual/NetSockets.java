@@ -74,7 +74,18 @@ public class NetSockets {
     /**
      * Virtual thread blocks in read.
      */
-    public void testSocketReadWrite2() throws Exception {
+    public void testSocketRead1() throws Exception {
+        testSocketRead(0);
+    }
+
+    /**
+     * Virtual thread blocks in timed read.
+     */
+    public void testSocketRead2() throws Exception {
+        testSocketRead(60_000);
+    }
+
+    void testSocketRead(int timeout) throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
@@ -85,6 +96,10 @@ public class NetSockets {
                 ScheduledWriter.schedule(s1, ba, DELAY);
 
                 // read should block
+                if (timeout > 0) {
+                    assert timeout > DELAY;
+                    s2.setSoTimeout(timeout);
+                }
                 ba = new byte[10];
                 int n = s2.getInputStream().read(ba);
                 assertTrue(n > 0);
@@ -96,7 +111,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in write.
      */
-    public void testSocketReadWrite3() throws Exception {
+    public void testSockeWrite1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
@@ -157,15 +172,63 @@ public class NetSockets {
     /**
      * Socket close while virtual thread blocked in read.
      */
-    public void testSocketReadAsyncClose() throws Exception {
+    public void testSocketReadAsyncClose1() throws Exception {
+        testSocketReadAsyncClose(0);
+    }
+
+    /**
+     * Socket close while virtual thread blocked in timed read.
+     */
+    public void testSocketReadAsyncClose2() throws Exception {
+        testSocketReadAsyncClose(0);
+    }
+
+    void testSocketReadAsyncClose(int timeout) throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
                 Socket s = connection.socket1();
                 ScheduledCloser.schedule(s, DELAY);
                 try {
+                    if (timeout > 0) {
+                        assert timeout > DELAY;
+                        s.setSoTimeout(timeout);
+                    }
                     int n = s.getInputStream().read();
                     throw new RuntimeException("read returned " + n);
                 } catch (SocketException expected) { }
+            }
+        });
+    }
+
+    /**
+     * Virtual thread interrupted while blocked in Socket read.
+     */
+    public void testSocketReadInterrupt1() throws Exception {
+        testSocketReadInterrupt(0);
+    }
+
+    /**
+     * Virtual thread interrupted while blocked in Socket read with timeout
+     */
+    public void testSocketReadInterrupt2() throws Exception {
+        testSocketReadInterrupt(60_000);
+    }
+
+    void testSocketReadInterrupt(int timeout) throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (var connection = new Connection()) {
+                Socket s = connection.socket1();
+                ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
+                try {
+                    if (timeout > 0) {
+                        assert timeout > DELAY;
+                        s.setSoTimeout(timeout);
+                    }
+                    int n = s.getInputStream().read();
+                    throw new RuntimeException("read returned " + n);
+                } catch (SocketException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -190,6 +253,27 @@ public class NetSockets {
     }
 
     /**
+     * Virtual thread interrupted while blocked in Socket write
+     */
+    public void testSocketWriteInterrupt() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (var connection = new Connection()) {
+                Socket s = connection.socket1();
+                ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
+                try {
+                    byte[] ba = new byte[100*10024];
+                    OutputStream out = s.getOutputStream();
+                    for (;;) {
+                        out.write(ba);
+                    }
+                } catch (SocketException expected) {
+                    assertTrue(Thread.interrupted());
+                }
+            }
+        });
+    }
+
+    /**
      * ServerSocket accept, no blocking.
      */
     public void testServerSocketAccept1() throws Exception {
@@ -208,11 +292,26 @@ public class NetSockets {
      * Virtual thread blocks in accept.
      */
     public void testServerSocketAccept2() throws Exception {
+        testServerSocketAccept(0);
+    }
+
+    /**
+     * Virtual thread blocks in timed accept.
+     */
+    public void testServerSocketAccept3() throws Exception {
+        testServerSocketAccept(60_000);
+    }
+
+    void testServerSocketAccept(int timeout) throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var listener = new ServerSocket(0)) {
                 var socket1 = new Socket();
                 ScheduledConnector.schedule(socket1, listener.getLocalSocketAddress(), DELAY);
                 // accept will block
+                if (timeout > 0) {
+                    assert timeout > DELAY;
+                    listener.setSoTimeout(timeout);
+                }
                 var socket2 = listener.accept();
                 socket1.close();
                 socket2.close();
@@ -223,14 +322,61 @@ public class NetSockets {
     /**
      * ServerSocket close while virtual thread blocked in accept.
      */
-    public void testServerSocketAcceptAsyncClose() throws Exception {
+    public void testServerSocketAcceptAsyncClose1() throws Exception {
+        testServerSocketAcceptAsyncClose(0);
+    }
+
+    /**
+     * ServerSocket close while virtual thread blocked in timed accept.
+     */
+    public void testServerSocketAcceptAsyncClose2() throws Exception {
+        testServerSocketAcceptAsyncClose(60_000);
+    }
+
+    void testServerSocketAcceptAsyncClose(int timeout) throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var listener = new ServerSocket(0)) {
                 ScheduledCloser.schedule(listener, DELAY);
+                if (timeout > 0) {
+                    assert timeout > DELAY;
+                    listener.setSoTimeout(timeout);
+                }
                 try {
                     listener.accept().close();
                     throw new RuntimeException("connection accepted???");
                 } catch (SocketException expected) { }
+            }
+        });
+    }
+
+    /**
+     * Virtual thread interrupted while blocked in ServerSocket accept
+     */
+    public void testServerSocketAcceptInterrupt1() throws Exception {
+        testServerSocketAcceptInterrupt(0);
+    }
+
+    /**
+     * Virtual thread interrupted while blocked in ServerSocket accept with timeout
+     */
+    public void testServerSocketAcceptInterrupt2() throws Exception {
+        testServerSocketAcceptInterrupt(60_000);
+    }
+
+    void testServerSocketAcceptInterrupt(int timeout) throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (var listener = new ServerSocket(0)) {
+                ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
+                if (timeout > 0) {
+                    assert timeout > DELAY;
+                    listener.setSoTimeout(timeout);
+                }
+                try {
+                    listener.accept().close();
+                    throw new RuntimeException("connection accepted???");
+                } catch (SocketException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -293,8 +439,10 @@ public class NetSockets {
                 ScheduledSender.schedule(s1, p1, DELAY);
 
                 // receive should block
-                if (timeout > 0)
+                if (timeout > 0) {
+                    assert timeout > DELAY;
                     s2.setSoTimeout(timeout);
+                }
                 byte[] ba = new byte[100];
                 DatagramPacket p2 = new DatagramPacket(ba, ba.length);
                 s2.receive(p2);
@@ -342,11 +490,51 @@ public class NetSockets {
             try (DatagramSocket s = new DatagramSocket(null)) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 s.bind(new InetSocketAddress(lh, 0));
-                if (timeout > 0)
-                    s.setSoTimeout(timeout);
 
                 // schedule close
                 ScheduledCloser.schedule(s, DELAY);
+
+                // receive
+                if (timeout > 0) {
+                    assert timeout > DELAY;
+                    s.setSoTimeout(timeout);
+                }
+                try {
+                    byte[] ba = new byte[100];
+                    DatagramPacket p = new DatagramPacket(ba, ba.length);
+                    s.receive(p);
+                    assertTrue(false);
+                } catch (SocketException expected) { }
+            }
+        });
+    }
+
+    /**
+     * Virtual thread interrupted while blocked in DatagramSocket receive.
+     */
+    public void testDatagramSocketReceiveInterrupt1() throws Exception {
+        testDatagramSocketReceiveInterrupt(0);
+    }
+
+    /**
+     * Virtual thread interrupted while blocked in DatagramSocket receive with timeout
+     */
+    public void testDatagramSocketReceiveInterrupt2() throws Exception {
+        testDatagramSocketReceiveInterrupt(60_000);
+    }
+
+    private void testDatagramSocketReceiveInterrupt(int timeout) throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (DatagramSocket s = new DatagramSocket(null)) {
+                InetAddress lh = InetAddress.getLoopbackAddress();
+                s.bind(new InetSocketAddress(lh, 0));
+                if (timeout > 0) {
+                    assert timeout > DELAY;
+                    s.setSoTimeout(timeout);
+                }
+
+                // schedule interrupt
+                ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
 
                 // receive
                 try {
@@ -354,7 +542,9 @@ public class NetSockets {
                     DatagramPacket p = new DatagramPacket(ba, ba.length);
                     s.receive(p);
                     assertTrue(false);
-                } catch (SocketException expected) { }
+                } catch (SocketException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -412,6 +602,31 @@ public class NetSockets {
         }
         static void schedule(Closeable c, long delay) {
             new Thread(new ScheduledCloser(c, delay)).start();
+        }
+    }
+
+    /**
+     * Interrupts a thread after a delay
+     */
+    static class ScheduledInterrupter implements Runnable {
+        private final Thread thread;
+        private final long delay;
+
+        ScheduledInterrupter(Thread thread, long delay) {
+            this.thread = thread;
+            this.delay = delay;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Thread.sleep(delay);
+                thread.interrupt();
+            } catch (Exception e) { }
+        }
+
+        static void schedule(Thread thread, long delay) {
+            new Thread(new ScheduledInterrupter(thread, delay)).start();
         }
     }
 
