@@ -258,7 +258,7 @@ class VirtualThread extends Thread {
         } else if (s == ST_RUNNING) {
             // Thread.yield, submit task to continue
             stateGetAndSet(ST_RUNNABLE);
-            scheduler.execute(runContinuation);
+            scheduler.execute(runContinuation);   // TBD if REE is thrown
         } else {
             throw new InternalError();
         }
@@ -438,12 +438,18 @@ class VirtualThread extends Thread {
      * @return this virtual thread
      */
     VirtualThread unpark() {
-        Thread thread = Thread.currentCarrierThread();
-        VirtualThread vthread = thread.getVirtualThread();
-        if (!parkPermitGetAndSet(true) && vthread != this) {
+        if (!parkPermitGetAndSet(true) && Thread.currentThread() != this) {
             int s = waitIfParking();
             if (s == ST_PARKED && stateCompareAndSet(ST_PARKED, ST_RUNNABLE)) {
-                scheduler.execute(runContinuation);
+                boolean scheduled = false;
+                try {
+                    scheduler.execute(runContinuation);
+                    scheduled = true;
+                } finally {
+                    if (!scheduled) {
+                        stateCompareAndSet(ST_RUNNABLE, ST_PARKED);
+                    }
+                }
             }
         }
         return this;
