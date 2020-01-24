@@ -694,6 +694,7 @@ public:
   inline oop obj_at(int i);
   int num_oops();
   void null_ref_stack(int start, int num);
+  void zero_ref_stack_prefix();
 
   inline size_t max_size() { return _max_size; }
   inline void add_size(size_t s) { log_develop_trace(jvmcont)("add max_size: " SIZE_FORMAT " s: " SIZE_FORMAT, _max_size + s, s);
@@ -941,7 +942,6 @@ void ContMirror::read() {
 }
 
 inline void ContMirror::read_entry() {
-  assert (_entryPC == NULL, "");
   _entrySP = java_lang_Continuation::entrySP(_cont);
   _entryPC = java_lang_Continuation::entryPC(_cont);
   _entryFP = java_lang_Continuation::entryFP(_cont);
@@ -2153,7 +2153,7 @@ public:
     _safepoint_stub_caller(false), _keepalive(NULL) {
 
     _fi = fi;
-    _cont.read_entry();
+    _cont.read_entry(); // even when retrying, because deopt can change entryPC; see Continuation::get_continuation_entry_pc_for_sender
     _cont.read_minimal();
     
     int argsize = bottom_argsize();
@@ -2240,10 +2240,11 @@ public:
     hframe caller;
     freeze_result res = freeze<true>(f, caller, 0);
 
-    _cont.set_flag(FLAG_SAFEPOINT_YIELD, mode == mode_preempt);
-    _cont.write(); // commit the freeze
-
-    DEBUG_ONLY(verify();)
+    if (res == freeze_ok) {
+      _cont.set_flag(FLAG_SAFEPOINT_YIELD, mode == mode_preempt);
+      _cont.write(); // commit the freeze
+      DEBUG_ONLY(verify();)
+    }
     return res;
   }
 
@@ -2830,6 +2831,9 @@ public:
     allocate_keepalive();
 
     if (mode == mode_fast && !_thread->cont_fastpath()) {
+      if (ConfigT::_post_barrier) {
+        _cont.zero_ref_stack_prefix();
+      }
       return freeze_retry_slow; // things have deoptimized
     }
 
@@ -5263,8 +5267,7 @@ NOINLINE bool ContMirror::allocate_stacks_in_native(int size, int oops, bool nee
     }
 
     java_lang_Continuation::set_stack(_cont, _stack);
-
-    // TODO: may not be necessary because at this point we know that the freeze will succeed and these values will get written in ::write
+    // maybe we'll need to retry freeze
     java_lang_Continuation::set_sp(_cont, _sp);
     java_lang_Continuation::set_fp(_cont, _fp);
   }
@@ -5280,8 +5283,7 @@ NOINLINE bool ContMirror::allocate_stacks_in_native(int size, int oops, bool nee
       }
     }
     java_lang_Continuation::set_refStack(_cont, _ref_stack);
-
-    // TODO: may not be necessary because at this point we know that the freeze will succeed and this value will get written in ::write
+    // maybe we'll need to retry freeze:
     java_lang_Continuation::set_refSP(_cont, _ref_sp);
   }
 
@@ -5473,7 +5475,7 @@ void ContMirror::zero_ref_array(objArrayOop new_array, int new_length, int min_l
   if (ConfigT::_post_barrier) {
     // zero the bottom part of the array that won't be filled in the freeze
     HeapWord* new_base = new_array->base();
-    const uint OopsPerHeapWord = HeapWordSize/heapOopSize;
+    const uint OopsPerHeapWord = HeapWordSize/heapOopSize; // TODO PERF:  heapOopSize and OopsPerHeapWord can be constants in Config
     assert(OopsPerHeapWord >= 1 && (HeapWordSize % heapOopSize == 0), "");
     uint word_size = ((uint)extra_oops + OopsPerHeapWord - 1)/OopsPerHeapWord;
     Copy::fill_to_aligned_words(new_base, word_size, 0); // fill_to_words (we could be filling more than the elements if narrow, but we do this before copying)
@@ -5481,6 +5483,13 @@ void ContMirror::zero_ref_array(objArrayOop new_array, int new_length, int min_l
 
   DEBUG_ONLY(for (int i=0; i<extra_oops; i++) assert(new_array->obj_at(i) == (oop)NULL, "");)
 }
+
+void ContMirror::zero_ref_stack_prefix() {
+  if (_ref_stack != NULL && _ref_sp > 0) {
+    Copy::fill_to_bytes(_ref_stack->base(), _ref_sp * heapOopSize, 0);
+  }
+}
+
 
 template <typename ConfigT>
 void ContMirror::copy_ref_array(objArrayOop old_array, int old_start, objArrayOop new_array, int new_start, int count) {
