@@ -41,6 +41,7 @@ import java.net.NetworkInterface;
 import java.net.PortUnreachableException;
 import java.net.ProtocolFamily;
 import java.net.SocketAddress;
+import java.net.SocketException;
 import java.net.SocketOption;
 import java.net.SocketTimeoutException;
 import java.net.StandardProtocolFamily;
@@ -65,9 +66,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
+import jdk.internal.misc.VirtualThreads;
 import jdk.internal.ref.CleanerFactory;
 import sun.net.ResourceManager;
 import sun.net.ext.ExtendedSocketOptions;
@@ -470,6 +473,37 @@ class DatagramChannelImpl
     @Override
     public final Set<SocketOption<?>> supportedOptions() {
         return DefaultOptionsHolder.defaultOptions;
+    }
+
+    @Override
+    public void park(int event, long nanos) throws IOException {
+        Thread thread = Thread.currentThread();
+        if (thread.isVirtual()) {
+            Poller.register(getFDVal(), event);
+            if (isOpen()) {
+                try {
+                    if (nanos == 0) {
+                        VirtualThreads.park();
+                    } else {
+                        VirtualThreads.park(nanos);
+                    }
+                    // throw SocketException with interrupt status set for now
+                    if (!interruptible && thread.isInterrupted()) {
+                        throw new SocketException("I/O operation interrupted");
+                    }
+                } finally {
+                    Poller.deregister(getFDVal(), event);
+                }
+            }
+        } else {
+            long millis;
+            if (nanos == 0) {
+                millis = -1;
+            } else {
+                millis = TimeUnit.NANOSECONDS.toMillis(nanos);
+            }
+            Net.poll(getFD(), event, millis);
+        }
     }
 
     /**

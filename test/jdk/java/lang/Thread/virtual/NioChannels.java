@@ -147,7 +147,9 @@ public class NioChannels {
                 try {
                     int n = sc.read(ByteBuffer.allocate(100));
                     throw new RuntimeException("read returned " + n);
-                } catch (ClosedByInterruptException expected) { }
+                } catch (ClosedByInterruptException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -187,7 +189,9 @@ public class NioChannels {
                         assertTrue(n > 0);
                         bb.clear();
                     }
-                } catch (ClosedByInterruptException expected) { }
+                } catch (ClosedByInterruptException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -292,7 +296,9 @@ public class NioChannels {
                     SocketChannel sc = ssc.accept();
                     sc.close();
                     throw new RuntimeException("connection accepted???");
-                } catch (ClosedByInterruptException expected) { }
+                } catch (ClosedByInterruptException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -405,7 +411,9 @@ public class NioChannels {
                 try {
                     dc.receive(ByteBuffer.allocate(100));
                     throw new RuntimeException("receive returned");
-                } catch (ClosedByInterruptException expected) { }
+                } catch (ClosedByInterruptException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -544,7 +552,9 @@ public class NioChannels {
                 try {
                     int n = source.read(ByteBuffer.allocate(100));
                     throw new RuntimeException("read returned " + n);
-                } catch (ClosedByInterruptException expected) { }
+                } catch (ClosedByInterruptException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -584,7 +594,9 @@ public class NioChannels {
                         assertTrue(n > 0);
                         bb.clear();
                     }
-                } catch (ClosedByInterruptException expected) { }
+                } catch (ClosedByInterruptException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -641,7 +653,7 @@ public class NioChannels {
     }
 
     /**
-     * Interrupts a thread or virtual thread after a delay
+     * Interrupts a thread after a delay
      */
     static class ScheduledInterrupter implements Runnable {
         private final Thread thread;
