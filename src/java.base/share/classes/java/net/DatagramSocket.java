@@ -324,6 +324,7 @@ public class DatagramSocket implements java.io.Closeable {
      *         not permit access to the given remote address
      *
      * @see #disconnect
+     * @since 1.2
      */
     public void connect(InetAddress address, int port) {
         delegate.connect(address, port);
@@ -360,6 +361,7 @@ public class DatagramSocket implements java.io.Closeable {
      * then this method has no effect.
      *
      * @see #connect
+     * @since 1.2
      */
     public void disconnect() {
         delegate.disconnect();
@@ -402,6 +404,7 @@ public class DatagramSocket implements java.io.Closeable {
      * after the socket is closed.
      *
      * @return the address to which this socket is connected.
+     * @since 1.2
      */
     public InetAddress getInetAddress() {
         return delegate.getInetAddress();
@@ -416,6 +419,7 @@ public class DatagramSocket implements java.io.Closeable {
      * after the socket is closed.
      *
      * @return the port number to which this socket is connected.
+     * @since 1.2
      */
     public int getPort() {
         return delegate.getPort();
@@ -489,7 +493,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @throws     IllegalArgumentException if the socket is connected,
      *             and connected address and packet address differ, or
      *             if the socket is not connected and the packet address
-     *             is not set.
+     *             is not set or if its port is out of range.
      *
      * @see        java.net.DatagramPacket
      * @see        SecurityManager#checkMulticast(InetAddress)
@@ -634,6 +638,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @throws    IllegalArgumentException if the value is 0 or is
      * negative.
      * @see #getSendBufferSize()
+     * @since 1.2
      */
     public void setSendBufferSize(int size) throws SocketException {
         delegate.setSendBufferSize(size);
@@ -647,6 +652,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @throws    SocketException if there is an error in
      * the underlying protocol, such as an UDP error.
      * @see #setSendBufferSize
+     * @since 1.2
      */
     public int getSendBufferSize() throws SocketException {
         return delegate.getSendBufferSize();
@@ -679,6 +685,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @throws    IllegalArgumentException if the value is 0 or is
      * negative.
      * @see #getReceiveBufferSize()
+     * @since 1.2
      */
     public void setReceiveBufferSize(int size) throws SocketException {
         delegate.setReceiveBufferSize(size);
@@ -691,6 +698,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @return the value of the SO_RCVBUF option for this {@code DatagramSocket}
      * @throws    SocketException if there is an error in the underlying protocol, such as an UDP error.
      * @see #setReceiveBufferSize(int)
+     * @since 1.2
      */
     public int getReceiveBufferSize() throws SocketException {
         return delegate.getReceiveBufferSize();
@@ -888,7 +896,7 @@ public class DatagramSocket implements java.io.Closeable {
     /**
      * User defined factory for all datagram sockets.
      */
-    static DatagramSocketImplFactory factory;
+    private static volatile DatagramSocketImplFactory factory;
 
     /**
      * Sets the datagram socket implementation factory for the
