@@ -41,21 +41,23 @@ import static org.testng.Assert.*;
 @Test
 public class WithDeadlineTest {
 
+    private static final Duration ONE_DAY = Duration.ofDays(1);
+
     /**
      * Deadline expires with running tasks before the executor is shutdown.
      */
     public void testDeadlineBeforeShutdown() throws Exception {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
-        var deadline = Instant.now().plusSeconds(3);
+        var deadline = Instant.now().plusSeconds(5);
         try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
             // assume this is submitted before the deadline expires
             Future<?> result = executor.submit(() -> {
-                Thread.sleep(Duration.ofDays(1));
+                Thread.sleep(ONE_DAY);
                 return null;
             });
 
             // current thread should be interrupted
-            expectThrows(InterruptedException.class, result::get);
+            expectThrows(InterruptedException.class, () -> Thread.sleep(ONE_DAY));
 
             // task should be interrupted
             Throwable e = expectThrows(ExecutionException.class, result::get);
@@ -74,17 +76,17 @@ public class WithDeadlineTest {
      */
     public void testDeadlineAfterShutdown() throws Exception {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
-        var deadline = Instant.now().plusSeconds(3);
+        var deadline = Instant.now().plusSeconds(5);
         try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
             // assume this is submitted before the deadline expires
             Future<?> result = executor.submit(() -> {
-                Thread.sleep(Duration.ofDays(1));
+                Thread.sleep(ONE_DAY);
                 return null;
             });
             executor.shutdown();
 
             // current thread should be interrupted
-            expectThrows(InterruptedException.class, result::get);
+            expectThrows(InterruptedException.class, () -> Thread.sleep(ONE_DAY));
 
             // task should be interrupted
             Throwable e = expectThrows(ExecutionException.class, result::get);
@@ -102,13 +104,13 @@ public class WithDeadlineTest {
      */
     public void testDeadlineDuringClose() {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
-        var deadline = Instant.now().plusSeconds(3);
+        var deadline = Instant.now().plusSeconds(5);
         Future<?> result;
         try {
             try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
                 // assume this is submitted before the deadline expires
                 result = executor.submit(() -> {
-                    Thread.sleep(Duration.ofDays(1));
+                    Thread.sleep(ONE_DAY);
                     return null;
                 });
             }
@@ -159,7 +161,7 @@ public class WithDeadlineTest {
         }
 
         // in the past
-        var yesterday = Instant.now().minus(Duration.ofDays(1));
+        var yesterday = Instant.now().minus(ONE_DAY);
         try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(yesterday)) {
             assertTrue(executor.isTerminated());
         }
