@@ -503,14 +503,20 @@ public class ThreadAPI {
 
     // join dinosaur thread from virtual thread
     public void testJoin27() throws Exception {
+        AtomicBoolean done = new AtomicBoolean();
         TestHelper.runInVirtualThread(() -> {
-            var thread = new Thread(() -> LockSupport.park());
+            var thread = new Thread(() -> {
+                while (!done.get()) {
+                    LockSupport.park();
+                }
+            });
             thread.start();
             try {
                 assertFalse(thread.join(Duration.ofMillis(-100)));
                 assertFalse(thread.join(Duration.ofMillis(0)));
                 assertFalse(thread.join(Duration.ofMillis(100)));
             } finally {
+                done.set(true);
                 LockSupport.unpark(thread);
                 thread.join();
             }
