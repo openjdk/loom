@@ -738,6 +738,8 @@ public class Thread implements Runnable {
          *
          * @return a new unstarted Thread
          * @throws IllegalStateException if the task object to run object has not been set
+         * @throws SecurityException if a thread group has been set and the current thread
+         *         cannot create a thread in that thread group
          */
         Thread build();
 
@@ -760,6 +762,9 @@ public class Thread implements Runnable {
          * start} method to start it.
          *
          * @return The started thread
+         * @throws IllegalStateException if the task object to run object has not been set
+         * @throws SecurityException if a thread group has been set and the current thread
+         *         cannot create a thread in that thread group
          */
         default Thread start() {
             Thread thread = build();
