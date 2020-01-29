@@ -1033,6 +1033,7 @@ void ContMirror::write() {
     log_develop_trace(jvmcont)("\tend write");
   }
 
+  // assert (java_lang_Continuation::entryPC(_cont) == _entryPC, "java_lang_Continuation::entryPC: %p _entryPC: %p", java_lang_Continuation::entryPC(_cont), _entryPC);
   assert (java_lang_Continuation::entrySP(_cont) == _entrySP, "");
   assert (java_lang_Continuation::entryPC(_cont) == _entryPC, "");
   assert (java_lang_Continuation::entryFP(_cont) == _entryFP, "");
@@ -2924,13 +2925,17 @@ public:
   template<typename FKind> // the callee's type
   void setup_jump(const frame& f, const frame& callee, int argsize) {
     assert (f.pc() == Frame::real_pc(f) || (f.is_compiled_frame() && f.cb()->as_compiled_method()->is_deopt_pc(Frame::real_pc(f))), "");
+    // assert (_cont.entryPC() == NULL || Continuation::is_return_barrier_entry(f.pc()) || _cont.entryPC() == Frame::real_pc(f), 
+    //   "entryPC: " INTPTR_FORMAT " f.real_pc: " INTPTR_FORMAT " is_deopt(entryPC): %d is_deopt(f.real_pc): %d", 
+    //   p2i(_cont.entryPC()), p2i(Frame::real_pc(f)), is_deopt_pc(f, _cont.entryPC()), is_deopt_pc(f, Frame::real_pc(f)));
+    
     ContinuationHelper::to_frame_info_pd<FKind>(f, callee, _fi);
     // intptr_t* sp = f.unextended_sp() + (argsize > 0 ? (argsize >> LogBytesPerWord) + 1 : 0);
     // assert (sp == _cont.entrySP(), "sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(sp), p2i(_cont.entrySP()));
     _fi->sp = _cont.entrySP();
     _fi->pc = Continuation::is_return_barrier_entry(f.pc()) ? _cont.entryPC()
                                                             : Frame::real_pc(f); // Continuation.run may have been deoptimized
-
+    // _fi->pc = _cont.entryPC() != NULL ? _cont.entryPC() : Frame::real_pc(f); // fails because of the above commented assert w/ Skynet +DeoptimizeALot
   #ifdef ASSERT
     // if (f.pc() != real_pc(f)) tty->print_cr("Continuation.run deopted!");
     log_develop_debug(jvmcont)("Jumping to frame (freeze): [%ld] (%d)", java_tid(_thread), _thread->has_pending_exception());
