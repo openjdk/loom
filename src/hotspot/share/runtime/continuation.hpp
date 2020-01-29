@@ -163,6 +163,7 @@ public:
   static bool debug_is_continuation(oop obj);
   static bool debug_verify_continuation(oop cont);
   static void debug_print_continuation(oop cont, outputStream* st = NULL);
+  static bool debug_is_continuation_run_frame(const frame& f);
 #endif
 };
 

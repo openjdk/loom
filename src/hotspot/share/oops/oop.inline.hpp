@@ -98,6 +98,14 @@ Klass* oopDesc::klass() const {
 
 Klass* oopDesc::klass_or_null() const volatile {
   if (UseCompressedClassPointers) {
+    // narrowKlass v = _metadata._compressed_klass;
+    // if (!CompressedKlassPointers::is_null(v)) {
+    //   Klass* result = CompressedKlassPointers::decode_raw(v);
+    //   if(!check_alignment(result)) {
+    //     tty->print_cr("oop klass unaligned: %p oop: %p",  (void*) result, this);
+    //     return NULL;
+    //   }
+    // }
     return CompressedKlassPointers::decode(_metadata._compressed_klass);
   } else {
     return _metadata._klass;

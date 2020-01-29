@@ -204,6 +204,8 @@ static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) P
   static void print_frames(JavaThread* thread, outputStream* st = tty);
   static void print_blob(outputStream* st, address addr);
   static jlong java_tid(JavaThread* thread);
+  static bool is_deopt_pc(const frame& f, address pc);
+  static bool is_deopt_pc(address pc);
   // void static stop();
   // void static stop(const frame& f);
   // static void print_JavaThread_offsets();
@@ -6007,6 +6009,23 @@ bool Continuation::debug_is_continuation(oop obj) {
   return obj->is_a(SystemDictionary::Continuation_klass());
 }
 
+bool Continuation::debug_is_continuation_run_frame(const frame& f) {
+  bool is_continuation_run = false;
+  if (f.is_compiled_frame()) {
+    HandleMark hm;
+    ResourceMark rm;
+    Method* m = f.cb()->as_compiled_method()->scope_desc_at(f.pc())->method();
+    if (m != NULL) {
+      char buf[50];
+      if (0 == strcmp(RUN_SIG, m->name_and_sig_as_C_string(buf, 50))) {
+        is_continuation_run = true;
+      }
+    }
+  }
+  return is_continuation_run;
+}
+
+
 NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   assert (contOop != (oop)NULL, "");
   assert (oopDesc::is_oop(contOop), "");
@@ -6256,6 +6275,16 @@ static inline bool is_deopt_return(address pc, const frame& sender) {
   CompiledMethod* cm = sender.cb()->as_compiled_method();
   return cm->is_deopt_pc(pc);
 }
+
+#ifdef ASSERT
+static bool is_deopt_pc(const frame& f, address pc) {
+  return f.is_compiled_frame() && f.cb()->as_compiled_method()->is_deopt_pc(pc);
+}
+static bool is_deopt_pc(address pc) {
+  CodeBlob* cb = CodeCache::find_blob(pc);
+  return cb != NULL && cb->is_compiled() && cb->as_compiled_method()->is_deopt_pc(pc);
+}
+#endif
 
 template <typename FrameT>
 static CodeBlob* slow_get_cb(const FrameT& f) {
