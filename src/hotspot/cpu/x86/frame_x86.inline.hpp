@@ -410,6 +410,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
 
   // This is the saved value of EBP which may or may not really be an FP.
   // It is only an FP if the sender is an interpreter frame (or C1?).
+  // saved_fp_addr should be correct even for a bottom thawed frame (with a return barrier)
   intptr_t** saved_fp_addr = (intptr_t**) (sender_sp - frame::sender_sp_offset);
   intptr_t* sender_fp = *saved_fp_addr;
   if (map->update_map()) {

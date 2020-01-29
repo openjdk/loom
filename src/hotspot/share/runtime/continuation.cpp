@@ -4683,9 +4683,10 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
     assert (new_pc != NULL, "");
     *sender_pc = new_pc;
 
-    intptr_t* new_fp = java_lang_Continuation::entryFP(cont);
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_fp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_fp), p2i(new_fp));
-    *sender_fp = new_fp;
+    // We DO NOT want to fix FP. It could contain an oop that has changed on the stack, and its location should be OK anyway
+    // intptr_t* new_fp = java_lang_Continuation::entryFP(cont);
+    // log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_fp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_fp), p2i(new_fp));
+    // *sender_fp = new_fp;
 
     if (callee.is_compiled_frame() && !Interpreter::contains(*sender_pc)) {
       // The callee's stack arguments (part of the caller frame) are also thawed to the stack when using lazy-copy
