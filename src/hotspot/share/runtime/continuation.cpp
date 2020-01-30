@@ -4669,11 +4669,11 @@ address* Continuation::get_continuation_entry_pc_for_sender(Thread* thread, cons
   return pc_addr;
 }
 
-bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp, intptr_t** sender_fp) {
+bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
   // TODO : this code and its use sites, as well as get_continuation_entry_pc_for_sender, probably need more work
   if (thread != NULL && is_return_barrier_entry(*sender_pc)) {
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " sender_sp: " INTPTR_FORMAT " sender_fp: " INTPTR_FORMAT, p2i(*sender_pc), p2i(*sender_sp), p2i(*sender_fp));
+    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " sender_sp: " INTPTR_FORMAT, p2i(*sender_pc), p2i(*sender_sp));
 
     oop cont = get_continuation_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert (cont != NULL, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
@@ -4714,8 +4714,8 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
   return false;
 }
 
-bool Continuation::fix_continuation_bottom_sender(RegisterMap* map, const frame& callee, address* sender_pc, intptr_t** sender_sp, intptr_t** sender_fp) {
-  bool res = fix_continuation_bottom_sender(map->thread(), callee, sender_pc, sender_sp, sender_fp);
+bool Continuation::fix_continuation_bottom_sender(RegisterMap* map, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
+  bool res = fix_continuation_bottom_sender(map->thread(), callee, sender_pc, sender_sp);
   if (res && !callee.is_interpreted_frame()) {
     ContinuationHelper::set_last_vstack_frame(map, callee);
   } else {
@@ -4737,7 +4737,7 @@ bool Continuation::fix_continuation_bottom_sender(RegisterMap* map, const frame&
 //     address   sender_pc = f.pc();
 //     intptr_t* sender_sp = f.sp();
 //     intptr_t* sender_fp = f.fp();
-//     fix_continuation_bottom_sender(map, callee, &sender_pc, &sender_sp, &sender_fp);
+//     fix_continuation_bottom_sender(map, callee, &sender_pc, &sender_sp);
 //     return ContinuationHelper::frame_with(f, sender_sp, sender_pc, sender_fp);
 //   }
 
