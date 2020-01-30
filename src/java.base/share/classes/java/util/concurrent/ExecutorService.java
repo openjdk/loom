@@ -449,7 +449,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *     Instant deadline = Instant.now().plusSeconds(10);
      *     try (ExecutorService executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
      *         executor.submit(task1);
-     *         executor.submit(task1);
+     *         executor.submit(task2);
      *         doSomethingThatMightBlock();
      *     }
      * }</pre>
