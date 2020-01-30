@@ -117,24 +117,48 @@ public class DatagramSocket implements java.io.Closeable {
     }
 
     /**
+     * Create a DatagramSocket that delegates to the given delegate if not null.
+     *
+     * @param delegate the delegate, can be null.
+     */
+    DatagramSocket(DatagramSocket delegate) {
+        this.delegate = delegate;
+    }
+
+    /**
      * Creates a datagram socket that is optionally bound to the specified
      * socket address.
      *
      * @param bindaddr local socket address or null for an unbound socket
-     * @param multicast true for a multicast socket.
+     * @param multicast true for a multicast socket
      */
     DatagramSocket(SocketAddress bindaddr, boolean multicast) throws SocketException {
         DatagramSocket delegate;
         if (this instanceof sun.nio.ch.DatagramSocketAdaptor) {
-            delegate = null; // socket adaptor does not delegate
+            // socket adaptor does not delegate
+            delegate = null;
         } else {
+            // create delegate
             delegate = createDelegate(multicast);
+
             boolean initialized = false;
             try {
-                if (multicast)
+
+                // Enable SO_REUSEADDR for multicast sockets
+                if (multicast) {
                     delegate.setReuseAddress(true);
-                if (bindaddr != null)
+                }
+
+                // Bind socket if socket address specified
+                if (bindaddr != null) {
                     delegate.bind(bindaddr);
+                }
+
+                // Enable SO_BROADCAST if possible
+                try {
+                    delegate.setBroadcast(true);
+                } catch (SocketException ignore) { }
+
                 initialized = true;
             } finally {
                 if (!initialized) {
@@ -176,7 +200,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @since   1.4
      */
     protected DatagramSocket(DatagramSocketImpl impl) {
-        throw new UnsupportedOperationException();
+        this.delegate = new DatagramSocketImplWrapper(impl);   // throws NPE if null
     }
 
     /**
@@ -1017,16 +1041,16 @@ public class DatagramSocket implements java.io.Closeable {
 
     /**
      * Creates a datagram socket object that can be used as a delegate. The
-     * datagram socket is a DatagramChannel socket adaptor.
-     *
-     * Where possible, the socket's SO_BROADCAST socket option will be enabled.
+     * datagram socket is a DatagramChannel socket adaptor or an instance of
+     * DatagramSocketImplWrapper that uses a DatagramSocketImpl.
      */
     private static DatagramSocket createDelegate(boolean multicast)
         throws SocketException
     {
         DatagramSocketImplFactory factory = DatagramSocket.factory;
         if (factory != null) {
-            throw new UnsupportedOperationException();
+            DatagramSocketImpl impl = factory.createDatagramSocketImpl();
+            return new DatagramSocketImplWrapper(impl);
         } else {
             // Return a DatagramChannel socket adaptor
             DatagramSocket delegate;
@@ -1039,12 +1063,6 @@ public class DatagramSocket implements java.io.Closeable {
             } catch (IOException e) {
                 throw new SocketException(e.getMessage());
             }
-
-            // enable SO_BROADCAST if possible
-            try {
-                delegate.setOption(StandardSocketOptions.SO_BROADCAST, true);
-            } catch (IOException ioe) { }
-
             return delegate;
         }
     }

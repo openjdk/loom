@@ -620,10 +620,6 @@ java/net/ServerSocket/AcceptInheritHandle.java                  8211854 aix-ppc6
 java/net/DatagramSocket/UnreferencedDatagramSockets.java        0000000 generic-all
 java/net/MulticastSocket/UnreferencedMulticastSockets.java      0000000 generic-all
 
-# Uses custom DatagramSocketImpl
-java/net/DatagramSocket/SetDatagramSocketImplFactory/ADatagramSocket.java 0000000 generic-all
-java/net/MulticastSocket/SetLoopbackOption.java                 0000000 generic-all
-
 ############################################################################
 
 # jdk_nio

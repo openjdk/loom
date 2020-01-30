@@ -129,6 +129,14 @@ public class MulticastSocket extends DatagramSocket {
     }
 
     /**
+     * Create a MulticastSocket that delegates to the given delegate if not null.
+     * @param delegate the delegate, can be null.
+     */
+    MulticastSocket(MulticastSocket delegate) {
+        super(delegate);
+    }
+
+    /**
      * Create a multicast socket.
      *
      * <p>
@@ -550,4 +558,5 @@ public class MulticastSocket extends DatagramSocket {
     public void send(DatagramPacket p, byte ttl) throws IOException {
         delegate().send(p, ttl);
     }
+
 }
