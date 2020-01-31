@@ -6276,7 +6276,7 @@ static inline bool is_deopt_return(address pc, const frame& sender) {
   return cm->is_deopt_pc(pc);
 }
 
-#ifdef ASSERT
+#ifdef ASSERT_NOT_USED
 static bool is_deopt_pc(const frame& f, address pc) {
   return f.is_compiled_frame() && f.cb()->as_compiled_method()->is_deopt_pc(pc);
 }
