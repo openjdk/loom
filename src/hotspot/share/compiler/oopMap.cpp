@@ -972,7 +972,7 @@ void DerivedPointerTable::add(oop *derived_loc, oop *base_loc) {
         "Add derived pointer@" INTPTR_FORMAT
         " - Derived: " INTPTR_FORMAT
         " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
-        p2i(derived_loc), p2i((address)*derived_loc), p2i((address)*base_loc), p2i(base_loc), offset
+        p2i(derived_loc), p2i(*derived_loc), p2i(*base_loc), p2i(base_loc), offset
       );
     }
     // Set derived oop location to point to base.
@@ -994,13 +994,13 @@ void DerivedPointerTable::update_pointers() {
     oop base = **(oop**)derived_loc;
     assert(Universe::heap()->is_in_or_null(base), "must be an oop");
 
-    *derived_loc = (oop)(((address)base) + offset);
+    *derived_loc = (oop)(cast_from_oop<address>(base) + offset);
     assert(value_of_loc(derived_loc) - value_of_loc(&base) == offset, "sanity check");
 
     if (TraceDerivedPointers) {
       tty->print_cr("Updating derived pointer@" INTPTR_FORMAT
                     " - Derived: " INTPTR_FORMAT "  Base: " INTPTR_FORMAT " (Offset: " INTX_FORMAT ")",
-          p2i(derived_loc), p2i((address)*derived_loc), p2i((address)base), offset);
+          p2i(derived_loc), p2i(*derived_loc), p2i(base), offset);
     }
 
     // Delete entry

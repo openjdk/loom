@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -557,7 +557,7 @@ void DumpWriter::write_u8(u8 x) {
 }
 
 void DumpWriter::write_objectID(oop o) {
-  address a = (address)o;
+  address a = cast_from_oop<address>(o);
 #ifdef _LP64
   write_u8((u8)a);
 #else
@@ -1827,6 +1827,7 @@ void VM_HeapDumper::doit() {
   writer()->write_raw((void*)header, (int)strlen(header));
   writer()->write_u1(0); // terminator
   writer()->write_u4(oopSize);
+  // timestamp is current time in ms
   writer()->write_u8(os::javaTimeMillis());
 
   // HPROF_UTF8 records

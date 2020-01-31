@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -495,6 +495,8 @@ void SafepointSynchronize::disarm_safepoint() {
       assert(!cur_state->is_running(), "Thread not suspended at safepoint");
       cur_state->restart(); // TSS _running
       assert(cur_state->is_running(), "safepoint state has not been reset");
+
+      SafepointMechanism::disarm_if_needed(current, false /* NO release */);
     }
   } // ~JavaThreadIteratorWithHandle
 
@@ -744,6 +746,7 @@ static bool safepoint_safe_with(JavaThread *thread, JavaThreadState state) {
 }
 
 bool SafepointSynchronize::handshake_safe(JavaThread *thread) {
+  assert(Thread::current()->is_VM_thread(), "Must be VMThread");
   if (thread->is_ext_suspended() || thread->is_terminated()) {
     return true;
   }
@@ -1152,7 +1155,6 @@ jlong SafepointTracing::_last_safepoint_begin_time_ns = 0;
 jlong SafepointTracing::_last_safepoint_sync_time_ns = 0;
 jlong SafepointTracing::_last_safepoint_cleanup_time_ns = 0;
 jlong SafepointTracing::_last_safepoint_end_time_ns = 0;
-jlong SafepointTracing::_last_safepoint_end_time_epoch_ms = 0;
 jlong SafepointTracing::_last_app_time_ns = 0;
 int SafepointTracing::_nof_threads = 0;
 int SafepointTracing::_nof_running = 0;
@@ -1165,8 +1167,6 @@ uint64_t  SafepointTracing::_op_count[VM_Operation::VMOp_Terminating] = {0};
 void SafepointTracing::init() {
   // Application start
   _last_safepoint_end_time_ns = os::javaTimeNanos();
-  // amount of time since epoch
-  _last_safepoint_end_time_epoch_ms = os::javaTimeMillis();
 }
 
 // Helper method to print the header.
@@ -1266,8 +1266,6 @@ void SafepointTracing::cleanup() {
 
 void SafepointTracing::end() {
   _last_safepoint_end_time_ns = os::javaTimeNanos();
-  // amount of time since epoch
-  _last_safepoint_end_time_epoch_ms = os::javaTimeMillis();
 
   if (_max_sync_time < (_last_safepoint_sync_time_ns - _last_safepoint_begin_time_ns)) {
     _max_sync_time = _last_safepoint_sync_time_ns - _last_safepoint_begin_time_ns;

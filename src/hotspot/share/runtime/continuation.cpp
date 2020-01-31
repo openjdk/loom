@@ -1719,7 +1719,7 @@ public:
 
     log_develop_trace(jvmcont)(
         "Continuation thaw derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
-        p2i(derived_loc), p2i((address)*derived_loc), p2i((address)*base_loc), p2i(base_loc), offset);
+        p2i(derived_loc), p2i(*derived_loc), p2i(*base_loc), p2i(base_loc), offset);
 
     oop obj = cast_to_oop(cast_from_oop<intptr_t>(*base_loc) + offset);
     *derived_loc = obj;
@@ -1801,7 +1801,7 @@ public:
 
     log_develop_trace(jvmcont)(
         "Continuation freeze derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
-        p2i(derived_loc), p2i((address)*derived_loc), p2i((address)*base_loc), p2i(base_loc), offset);
+        p2i(derived_loc), p2i(*derived_loc), p2i(*base_loc), p2i(base_loc), offset);
 
     int hloc_offset = (address)derived_loc - (address)this->_vsp;
     if (hloc_offset < 0 && _stub_vsp == NULL) {
@@ -6196,7 +6196,7 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
   // tty->print_cr("CHUNK " INTPTR_FORMAT " ::", p2i((oopDesc*)chunk));
   assert(ContMirror::is_stack_chunk(chunk), "");
   HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
-  tty->print_cr("CHUNK " INTPTR_FORMAT " - " INTPTR_FORMAT " :: %s 0x%lx", p2i((oopDesc*)chunk), p2i((HeapWord*)chunk + chunk->size()), hr->get_type_str(), chunk->identity_hash());
+  tty->print_cr("CHUNK " INTPTR_FORMAT " - " INTPTR_FORMAT " :: %s 0x%lx", p2i((oopDesc*)chunk), p2i((HeapWord*)(chunk + chunk->size())), hr->get_type_str(), chunk->identity_hash());
   tty->print("CHUNK " INTPTR_FORMAT " young: %d size: %d sp: %d num_frames: %d num_oops: %d parent: " INTPTR_FORMAT, 
     p2i((oopDesc*)chunk), !requires_barriers(chunk),
     jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::sp(chunk), 

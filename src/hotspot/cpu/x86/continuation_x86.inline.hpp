@@ -1233,7 +1233,7 @@ static void fix_stack_chunk(oop chunk) {
         assert (oopDesc::is_oop(base), "");
         intptr_t offset = *(intptr_t*)derived_loc;
         assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
-        *derived_loc = (oop)(((address)base) + offset);
+        *derived_loc = (oop)(cast_from_oop<address>(base) + offset);
       } else {
         assert (*derived_loc == (oop)NULL, "");
       }

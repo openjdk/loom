@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,18 +25,17 @@
 /*
  * @test
  *
- * @summary converted from VM Testbase jit/tiered.
- * VM Testbase keywords: [jit, quick]
- * VM Testbase readme:
- * Description
- *     The test verifies that JVM prints tiered events with -XX:+PrintTieredEvents
- *     for tiered compilation explicitly enabled with -XX:+TieredCompilation.
- *     If tiered compilation is explicitly disabled the test verifies that there are no
- *     output from PrintTieredEvents.
+ * @summary converted from VM Testbase jit/escape/LockCoarsening/LockCoarsening001.
+ * VM Testbase keywords: [jit, quarantine]
+ * VM Testbase comments: 8148743
+ *
+ * @requires vm.flavor == "server"
  *
  * @library /vmTestbase
  *          /test/lib
- * @run driver jdk.test.lib.FileInstaller . .
- * @run shell tieredTest.sh
+ * @run main/othervm
+ *      -XX:+DoEscapeAnalysis -XX:+EliminateLocks
+ *      -Xcomp -XX:-TieredCompilation -XX:+IgnoreUnrecognizedVMOptions -XX:-DeoptimizeALot
+ *      jit.escape.LockCoarsening.LockCoarsening -eliminateLocks
  */
 

@@ -26,6 +26,8 @@
 package java.net;
 
 import java.io.IOException;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.MulticastChannel;
 
 /**
  * The multicast datagram socket class is useful for sending
@@ -117,6 +119,13 @@ import java.io.IOException;
  * </table>
  * </blockquote>
  * Additional (implementation specific) options may also be supported.
+ *
+ * @apiNote {@link DatagramChannel} implements the {@link MulticastChannel} interface
+ *          and provides an alternative API for sending and receiving multicast datagrams.
+ *          The {@link MulticastChannel} API supports both {@linkplain
+ *          MulticastChannel#join(InetAddress, NetworkInterface) any-source} and
+ *          {@linkplain MulticastChannel#join(InetAddress, NetworkInterface, InetAddress)
+ *          source-specific} multicast.
  *
  * @author Pavani Diwanji
  * @since 1.1
@@ -358,6 +367,7 @@ public class MulticastSocket extends DatagramSocket {
      * @throws IllegalArgumentException if mcastaddr is {@code null} or is a
      *         SocketAddress subclass not supported by this socket
      * @see    SecurityManager#checkMulticast(InetAddress)
+     * @see    DatagramChannel#join(InetAddress, NetworkInterface)
      * @since  1.4
      */
     public void joinGroup(SocketAddress mcastaddr, NetworkInterface netIf) throws IOException {

@@ -100,7 +100,7 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
           omv.print();
           tty->print_cr("register r");
           omv.reg()->print();
-          tty->print_cr("loc = %p *loc = %p\n", loc, (address)*loc);
+          tty->print_cr("loc = %p *loc = %p\n", loc, cast_from_oop<address>(*loc));
           // os::print_location(tty, (intptr_t)*loc);
           tty->print("pc: "); os::print_location(tty, (intptr_t)fr->pc());
           fr->print_value_on(tty, NULL);

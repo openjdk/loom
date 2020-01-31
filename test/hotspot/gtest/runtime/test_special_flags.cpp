@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -20,19 +20,17 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+#include "precompiled.hpp"
+#include "unittest.hpp"
+#include "runtime/arguments.hpp"
 
-
-/*
- * @test
- *
- * @summary converted from VM Testbase jit/escape/LockCoarsening/LockCoarsening002.
- * VM Testbase keywords: [jit, quick, quarantine]
- * VM Testbase comments: 8208259
- *
- * @library /vmTestbase
- *          /test/lib
- * @run driver jdk.test.lib.FileInstaller . .
- * @build jit.escape.LockCoarsening.LockCoarsening
- * @run shell ../run.sh
- */
-
+// Tests Arguments::verify_special_jvm_flags(true)
+// If this test fails it means that an obsoleted or expired flag
+// has not been removed from globals.hpp as it should have been.
+// The test will only fail late in the release cycle as a reminder,
+// in case it has been forgotten.
+#ifdef ASSERT
+TEST_VM(special_flags, verify_special_flags) {
+  ASSERT_TRUE(Arguments::verify_special_jvm_flags(true)) << "Special flag verification failed";
+}
+#endif

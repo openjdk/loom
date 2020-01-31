@@ -45,10 +45,9 @@ class DatagramSocketImplWrapper extends MulticastSocket {
     /**
      * Various states of this socket.
      */
-    private volatile boolean created;  // true if socket created
     private boolean bound = false;
     private boolean closed = false;
-
+    private volatile boolean created;
     private final Object closeLock = new Object();
 
     /*
@@ -95,11 +94,14 @@ class DatagramSocketImplWrapper extends MulticastSocket {
      * to a DatagramSocketImpl.
      *
      * @param impl a new DatagramSocketImpl
+     * @param created true if the impl's socket has been created
      * @throws NullPointerException if impl is null
      */
-    DatagramSocketImplWrapper(DatagramSocketImpl impl) {
+    DatagramSocketImplWrapper(DatagramSocketImpl impl, boolean created) {
         super((MulticastSocket) null);
-        this.impl = impl;
+        this.impl = Objects.requireNonNull(impl);
+        if (created)
+            this.created = true;
         this.oldImpl = checkOldImpl(impl);
     }
 
@@ -200,7 +202,7 @@ class DatagramSocketImplWrapper extends MulticastSocket {
      */
     DatagramSocketImpl getImpl() throws SocketException {
         if (!created) {
-            synchronized (impl) {
+            synchronized (this) {
                 if (!created) {
                     impl.create();
                     created = true;

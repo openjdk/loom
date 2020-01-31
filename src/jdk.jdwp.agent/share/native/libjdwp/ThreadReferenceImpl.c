@@ -727,20 +727,21 @@ forceEarlyReturn(PacketInputStream *in, PacketOutputStream *out)
     return JNI_TRUE;
 }
 
+Command ThreadReference_Commands[] = {
+    {name, "Name"},
+    {suspend, "Suspend"},
+    {resume, "Resume"},
+    {status, "Status"},
+    {threadGroup, "ThreadGroup"},
+    {frames, "Frames"},
+    {getFrameCount, "GetFrameCount"},
+    {ownedMonitors, "OwnedMonitors"},
+    {currentContendedMonitor, "CurrentContendedMonitor"},
+    {stop, "Stop"},
+    {interrupt, "Interrupt"},
+    {suspendCount, "SuspendCount"},
+    {ownedMonitorsWithStackDepth, "OwnedMonitorsWithStackDepth"},
+    {forceEarlyReturn, "ForceEarlyReturn"}
+};
 
-void *ThreadReference_Cmds[] = { (void *)14,
-    (void *)name,
-    (void *)suspend,
-    (void *)resume,
-    (void *)status,
-    (void *)threadGroup,
-    (void *)frames,
-    (void *)getFrameCount,
-    (void *)ownedMonitors,
-    (void *)currentContendedMonitor,
-    (void *)stop,
-    (void *)interrupt,
-    (void *)suspendCount,
-    (void *)ownedMonitorsWithStackDepth,
-    (void *)forceEarlyReturn
-    };
+DEBUG_DISPATCH_DEFINE_CMDSET(ThreadReference)

@@ -1718,7 +1718,6 @@ void JavaThread::initialize() {
     
   // Setup safepoint state info for this thread
   ThreadSafepointState::create(this);
-  _handshake.set_thread(this);
 
   debug_only(_java_call_counter = 0);
 
