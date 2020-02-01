@@ -204,8 +204,8 @@ static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) P
   static void print_frames(JavaThread* thread, outputStream* st = tty);
   static void print_blob(outputStream* st, address addr);
   static jlong java_tid(JavaThread* thread);
-  static bool is_deopt_pc(const frame& f, address pc);
-  static bool is_deopt_pc(address pc);
+  // static bool is_deopt_pc(const frame& f, address pc);
+  // static bool is_deopt_pc(address pc);
   // void static stop();
   // void static stop(const frame& f);
   // static void print_JavaThread_offsets();
@@ -6276,14 +6276,14 @@ static inline bool is_deopt_return(address pc, const frame& sender) {
   return cm->is_deopt_pc(pc);
 }
 
-#ifdef ASSERT_NOT_USED
-static bool is_deopt_pc(const frame& f, address pc) {
-  return f.is_compiled_frame() && f.cb()->as_compiled_method()->is_deopt_pc(pc);
-}
-static bool is_deopt_pc(address pc) {
-  CodeBlob* cb = CodeCache::find_blob(pc);
-  return cb != NULL && cb->is_compiled() && cb->as_compiled_method()->is_deopt_pc(pc);
-}
+#ifdef ASSERT
+//static bool is_deopt_pc(const frame& f, address pc) {
+//  return f.is_compiled_frame() && f.cb()->as_compiled_method()->is_deopt_pc(pc);
+//}
+//static bool is_deopt_pc(address pc) {
+//  CodeBlob* cb = CodeCache::find_blob(pc);
+//  return cb != NULL && cb->is_compiled() && cb->as_compiled_method()->is_deopt_pc(pc);
+//}
 #endif
 
 template <typename FrameT>
