@@ -169,7 +169,7 @@ class JfrEvent {
       writer.write(_end_time - _start_time);
     }
     if (T::hasThread) {
-      writer.write(tl->thread_id());
+      writer.write(JfrThreadLocal::thread_id(event_thread));
     }
     if (T::hasStackTrace) {
       if (is_stacktrace_enabled()) {

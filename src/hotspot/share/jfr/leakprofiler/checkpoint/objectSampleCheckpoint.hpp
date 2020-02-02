@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,7 +29,6 @@
 #include "jfr/utilities/jfrTypes.hpp"
 
 class EdgeStore;
-class JavaThread;
 class JfrCheckpointWriter;
 class JfrStackTrace;
 class JfrStackTraceRepository;
@@ -53,7 +52,7 @@ class ObjectSampleCheckpoint : AllStatic {
   static void on_klass_unload(const Klass* k);
   static void on_type_set(JfrCheckpointWriter& writer);
   static void on_type_set_unload(JfrCheckpointWriter& writer);
-  static void on_thread_exit(JavaThread* jt);
+  static void on_thread_exit(traceid tid);
   static void on_rotation(const ObjectSampler* sampler, JfrStackTraceRepository& repo);
 };
 

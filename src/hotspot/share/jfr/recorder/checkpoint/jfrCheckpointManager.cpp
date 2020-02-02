@@ -493,12 +493,12 @@ void JfrCheckpointManager::flush_static_type_set() {
   flush();
 }
 
-void JfrCheckpointManager::create_thread_blob(Thread* t) {
-  JfrTypeManager::create_thread_blob(t);
+JfrBlobHandle JfrCheckpointManager::create_blob(Thread* t, traceid tid, oop vthread) {
+  return JfrTypeManager::create_blob(t, tid, vthread);
 }
 
-void JfrCheckpointManager::write_thread_checkpoint(Thread* t) {
-  JfrTypeManager::write_thread_checkpoint(t);
+void JfrCheckpointManager::write_checkpoint(Thread* t, traceid tid, oop vthread) {
+  JfrTypeManager::write_checkpoint(t, tid, vthread);
 }
 
 class JfrNotifyClosure : public ThreadClosure {

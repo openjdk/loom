@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -45,7 +45,7 @@ class JfrStackFrame {
 
  public:
   JfrStackFrame(const traceid& id, int bci, int type, const Method* method);
-  JfrStackFrame(const traceid& id, int bci, int type, int lineno);
+  JfrStackFrame(const traceid& id, int bci, int type, int lineno, const Method* method);
 
   bool equals(const JfrStackFrame& rhs) const;
   void write(JfrChunkWriter& cw) const;
@@ -93,8 +93,9 @@ class JfrStackTrace : public JfrCHeapObj {
   void set_reached_root(bool reached_root) { _reached_root = reached_root; }
   void resolve_linenos() const;
 
-  bool record_thread(JavaThread& thread, frame& frame);
-  bool record_safe(JavaThread* thread, int skip);
+  bool record(JavaThread* current_thread, int skip);
+  bool record(JavaThread* thread, const frame& frame, int skip, bool asynch_mode, bool* virtual_thread);
+  bool record_async(JavaThread* other_thread, frame& frame, bool* virtual_thread);
 
   bool have_lineno() const { return _lineno; }
   bool full_stacktrace() const { return _reached_root; }

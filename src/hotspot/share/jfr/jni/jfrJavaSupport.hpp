@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -73,6 +73,14 @@ class JfrJavaSupport : public AllStatic {
   static jobject new_java_lang_Integer(jint value, TRAPS);
   static jobject new_java_lang_Long(jlong value, TRAPS);
 
+  // fields
+  static bool compute_field_offset(int &dest_offset,
+                                   Klass* klass,
+                                   Symbol* name_symbol,
+                                   Symbol* signature_symbol,
+                                   bool is_static = false,
+                                   bool allow_super = false);
+
   // misc
   static Klass* klass(const jobject handle);
   // caller needs ResourceMark
@@ -86,14 +94,17 @@ class JfrJavaSupport : public AllStatic {
   static void throw_class_format_error(const char* message, TRAPS);
   static void throw_runtime_exception(const char* message, TRAPS);
 
+  // visibility graph
   static bool is_jdk_jfr_module_available();
   static bool is_jdk_jfr_module_available(outputStream* stream, TRAPS);
 
-  static jlong jfr_thread_id(jobject thread);
-  static void exclude(jobject thread);
-  static void include(jobject thread);
-  static bool is_excluded(jobject thread);
-  static void on_thread_start(Thread* t);
+  // thread
+  static JavaThread* java_thread(jthread thread);
+  static jlong jfr_thread_id(jthread thread);
+  static void exclude(jthread thread);
+  static void include(jthread thread);
+  static bool is_excluded(jthread thread);
+  static bool on_thread_start(JavaThread* jt, jthread vthread = NULL);
 
   static jobject get_handler(jobject clazz, TRAPS);
   static bool set_handler(jobject clazz, jobject handler, TRAPS);

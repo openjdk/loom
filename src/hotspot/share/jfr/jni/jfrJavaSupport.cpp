@@ -61,10 +61,10 @@ void JfrJavaSupport::check_java_thread_in_native(Thread* t) {
   assert(((JavaThread*)t)->thread_state() == _thread_in_native, "invariant");
 }
 
-static void check_new_unstarted_java_thread(Thread* t) {
-  assert(t != NULL, "invariant");
-  assert(t->is_Java_thread(), "invariant");
-  assert(((JavaThread*)t)->thread_state() == _thread_new, "invariant");
+static void check_new_unstarted_java_thread(JavaThread* jt, jobject vthread = NULL) {
+  if (vthread != NULL) return;
+  assert(jt != NULL, "invariant");
+  assert(jt->thread_state() == _thread_new, "invariant");
 }
 #endif
 
@@ -656,7 +656,7 @@ static int find_exclusion_thread_idx(Handle thread) {
   return -1;
 }
 
-static Handle as_handle(jobject thread) {
+static Handle as_handle(jthread thread) {
   return Handle(Thread::current(), JfrJavaSupport::resolve_non_null(thread));
 }
 
@@ -664,11 +664,11 @@ static bool thread_is_not_excluded(Handle thread) {
   return -1 == find_exclusion_thread_idx(thread);
 }
 
-static bool thread_is_not_excluded(jobject thread) {
+static bool thread_is_not_excluded(jthread thread) {
   return thread_is_not_excluded(as_handle(thread));
 }
 
-static bool is_thread_excluded(jobject thread) {
+static bool is_thread_excluded(jthread thread) {
   return !thread_is_not_excluded(thread);
 }
 
@@ -678,7 +678,7 @@ static bool is_thread_excluded(Handle thread) {
 }
 #endif // ASSERT
 
-static int add_thread_to_exclusion_list(jobject thread) {
+static int add_thread_to_exclusion_list(jthread thread) {
   ThreadExclusionListAccess lock;
   if (exclusion_list == NULL) {
     exclusion_list = new (ResourceObj::C_HEAP, mtTracing) GrowableArray<jweak>(10, true, mtTracing);
@@ -707,61 +707,55 @@ static void remove_thread_from_exclusion_list(Handle thread) {
   }
 }
 
-static void remove_thread_from_exclusion_list(jobject thread) {
+static void remove_thread_from_exclusion_list(jthread thread) {
   ThreadExclusionListAccess lock;
   remove_thread_from_exclusion_list(as_handle(thread));
 }
 
 // includes removal
-static bool check_exclusion_state_on_thread_start(JavaThread* jt) {
-  Handle h_obj(jt, jt->threadObj());
+static bool check_exclusion_state_on_thread_start(Handle h_threadObj) {
   ThreadExclusionListAccess lock;
-  if (thread_is_not_excluded(h_obj)) {
+  if (thread_is_not_excluded(h_threadObj)) {
     return false;
   }
-  remove_thread_from_exclusion_list(h_obj);
+  remove_thread_from_exclusion_list(h_threadObj);
   return true;
 }
 
-jlong JfrJavaSupport::jfr_thread_id(jobject thread) {
+JavaThread* JfrJavaSupport::java_thread(jthread thread) {
   ThreadsListHandle tlh;
-  JavaThread* native_thread = NULL;
-  (void)tlh.cv_internal_thread_to_JavaThread(thread, &native_thread, NULL);
-  return native_thread != NULL ? JFR_THREAD_ID(native_thread) : 0;
+  JavaThread* t;
+  return tlh.cv_internal_thread_to_JavaThread(thread, &t, NULL) ? t : NULL;
 }
 
-void JfrJavaSupport::exclude(jobject thread) {
-  HandleMark hm;
-  ThreadsListHandle tlh;
-  JavaThread* native_thread = NULL;
-  (void)tlh.cv_internal_thread_to_JavaThread(thread, &native_thread, NULL);
-  if (native_thread != NULL) {
-    JfrThreadLocal::exclude(native_thread);
+jlong JfrJavaSupport::jfr_thread_id(jthread thread) {
+  JavaThread* const jt = java_thread(thread);
+  return jt != NULL ? JFR_THREAD_ID(jt) : 0;
+}
+
+void JfrJavaSupport::exclude(jthread thread) {
+  JavaThread* const jt = java_thread(thread);
+  if (jt != NULL) {
+    JfrThreadLocal::exclude(jt);
   } else {
     // not started yet, track the thread oop
     add_thread_to_exclusion_list(thread);
   }
 }
 
-void JfrJavaSupport::include(jobject thread) {
-  HandleMark hm;
-  ThreadsListHandle tlh;
-  JavaThread* native_thread = NULL;
-  (void)tlh.cv_internal_thread_to_JavaThread(thread, &native_thread, NULL);
-  if (native_thread != NULL) {
-    JfrThreadLocal::include(native_thread);
+void JfrJavaSupport::include(jthread thread) {
+  JavaThread* const jt = java_thread(thread);
+  if (jt != NULL) {
+    JfrThreadLocal::include(jt);
   } else {
     // not started yet, untrack the thread oop
     remove_thread_from_exclusion_list(thread);
   }
 }
 
-bool JfrJavaSupport::is_excluded(jobject thread) {
-  HandleMark hm;
-  ThreadsListHandle tlh;
-  JavaThread* native_thread = NULL;
-  (void)tlh.cv_internal_thread_to_JavaThread(thread, &native_thread, NULL);
-  return native_thread != NULL ? native_thread->jfr_thread_local()->is_excluded() : is_thread_excluded(thread);
+bool JfrJavaSupport::is_excluded(jthread thread) {
+  JavaThread* const jt = java_thread(thread);
+  return jt != NULL ? jt->jfr_thread_local()->is_excluded() : is_thread_excluded(thread);
 }
 
 jobject JfrJavaSupport::get_handler(jobject clazz, TRAPS) {
@@ -832,15 +826,46 @@ bool JfrJavaSupport::set_handler(jobject clazz, jobject handler, TRAPS) {
   return false;
 }
 
-void JfrJavaSupport::on_thread_start(Thread* t) {
-  assert(t != NULL, "invariant");
-  assert(Thread::current() == t, "invariant");
-  if (!t->is_Java_thread()) {
-    return;
+
+bool JfrJavaSupport::on_thread_start(JavaThread* jt, jthread vthread) {
+  assert(jt != NULL, "invariant");
+  assert(Thread::current() == jt, "invariant");
+  DEBUG_ONLY(check_new_unstarted_java_thread(jt, vthread);)
+  HandleMark hm(jt);
+  const oop threadObj = vthread != NULL ? resolve_non_null(vthread) : jt->threadObj();
+  Handle h_obj(jt, threadObj);
+  if (check_exclusion_state_on_thread_start(h_obj)) {
+    vthread != NULL ? exclude(vthread) : JfrThreadLocal::exclude(jt);
+    return false;
   }
-  DEBUG_ONLY(check_new_unstarted_java_thread(t);)
-  HandleMark hm;
-  if (check_exclusion_state_on_thread_start((JavaThread*)t)) {
-    JfrThreadLocal::exclude(t);
+  return true;
+}
+
+static bool find_field(const InstanceKlass* ik,
+                       Symbol* name_symbol,
+                       Symbol* signature_symbol,
+                       fieldDescriptor* fd,
+                       bool is_static = false,
+                       bool allow_super = false) {
+  assert(ik != NULL, "invariant");
+  if (allow_super || is_static) {
+    return ik->find_field(name_symbol, signature_symbol, is_static, fd) != NULL;
+  } else {
+    return ik->find_local_field(name_symbol, signature_symbol, fd);
   }
+}
+
+bool JfrJavaSupport::compute_field_offset(int &dest_offset,
+                                          Klass* klass,
+                                          Symbol* name_symbol,
+                                          Symbol* signature_symbol,
+                                          bool is_static,
+                                          bool allow_super) {
+  fieldDescriptor fd;
+  const InstanceKlass* const ik = InstanceKlass::cast(klass);
+  if (!find_field(ik, name_symbol, signature_symbol, &fd, is_static, allow_super)) {
+    return false;
+  }
+  dest_offset = fd.offset();
+  return true;
 }

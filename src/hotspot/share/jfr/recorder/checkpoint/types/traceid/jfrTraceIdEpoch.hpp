@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -54,6 +54,7 @@
 class JfrTraceIdEpoch : AllStatic {
   friend class JfrCheckpointManager;
  private:
+  static u2 _generation;
   static bool _epoch_state;
   static bool _synchronizing;
   static volatile bool _changed_tag_state;
@@ -80,6 +81,14 @@ class JfrTraceIdEpoch : AllStatic {
 
   static u1 current() {
     return _epoch_state ? (u1)1 : (u1)0;
+  }
+
+  static traceid epoch_generation() {
+    return _generation;
+  }
+
+  static bool is_current_epoch_generation(traceid generation) {
+    return _generation == generation;
   }
 
   static u1 previous() {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -58,5 +58,8 @@ enum JfrCheckpointType {
   STATICS = 4,
   THREADS = 8
 };
+
+const u4 THREAD_LOCAL_THREAD_ID_RANGE = 1 << 6; // 0n64
+const u4 THREAD_ID_RESERVATIONS = 1000; // low range for VM native threads
 
 #endif // SHARE_JFR_UTILITIES_JFRTYPES_HPP

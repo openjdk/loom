@@ -2028,13 +2028,13 @@ void java_lang_ThreadGroup::serialize_offsets(SerializeClosure* f) {
 
 
 // java_lang_VirtualThread
-
 int java_lang_VirtualThread::static_notify_jvmti_events_offset = 0;
 int java_lang_VirtualThread::_carrierThread_offset = 0;
 int java_lang_VirtualThread::_continuation_offset = 0;
 int java_lang_VirtualThread::_state_offset = 0;
+int java_lang_VirtualThread::_jfrTraceId_offset = 0;
 
-#define FIBER_FIELDS_DO(macro) \
+#define VTHREAD_FIELDS_DO(macro) \
   macro(static_notify_jvmti_events_offset,  k, "notifyJvmtiEvents",  bool_signature, true); \
   macro(_carrierThread_offset,  k, "carrierThread",  thread_signature, false); \
   macro(_continuation_offset,  k, "cont",  continuation_signature, false); \
@@ -2044,7 +2044,8 @@ static jboolean vthread_notify_jvmti_events = JNI_FALSE;
 
 void java_lang_VirtualThread::compute_offsets() {
   InstanceKlass* k = SystemDictionary::VirtualThread_klass();
-  FIBER_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+  VTHREAD_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+  VTHREAD_INJECTED_FIELDS(INJECTED_FIELD_COMPUTE_OFFSET);
 }
 
 void java_lang_VirtualThread::init_static_notify_jvmti_events() {
@@ -2063,7 +2064,7 @@ oop java_lang_VirtualThread::carrier_thread(oop vthread) {
   oop thread = vthread->obj_field(_carrierThread_offset);
   return thread;
 }
- 
+
 oop java_lang_VirtualThread::continuation(oop vthread) {
   oop cont = vthread->obj_field(_continuation_offset);
   return cont;
@@ -2101,7 +2102,8 @@ java_lang_Thread::ThreadStatus java_lang_VirtualThread::map_state_to_thread_stat
 
 #if INCLUDE_CDS
 void java_lang_VirtualThread::serialize_offsets(SerializeClosure* f) {
-   FIBER_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+   VTHREAD_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+   VTHREAD_INJECTED_FIELDS(INJECTED_FIELD_SERIALIZE_OFFSET);
 }
 #endif
 
@@ -2282,7 +2284,7 @@ class BacktraceBuilder: public StackObj {
     _has_hidden_top_frame = get_has_hidden_top_frame(backtrace);
     assert(_methods->length() == _bcis->length() &&
            _methods->length() == _mirrors->length() &&
-           _mirrors->length() == _names->length() && 
+           _mirrors->length() == _names->length() &&
            _names->length() == _conts->length(),
            "method and source information arrays should match");
 
@@ -2857,7 +2859,7 @@ void java_lang_Throwable::get_stack_trace_elements(Handle throwable,
                                          method,
                                          bte._version,
                                          bte._bci,
-                                         bte._name, 
+                                         bte._name,
                                          bte._cont,
                                          CHECK);
   }
@@ -4865,7 +4867,7 @@ bool java_lang_Continuation::on_local_stack(oop ref, address adr) {
   void* base = s->base(T_INT);
   return adr >= base && (char*)adr < ((char*)base + (s->length() * 4));
 }
- 
+
 bool java_lang_Continuation::is_mounted(oop ref) {
   return ref->bool_field(_mounted_offset) != 0;
 }

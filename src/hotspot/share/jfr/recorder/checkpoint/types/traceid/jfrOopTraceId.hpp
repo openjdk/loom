@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -22,21 +22,23 @@
 *
 */
 
-#ifndef SHARE_JFR_SUPPORT_JFRTHREADID_HPP
-#define SHARE_JFR_SUPPORT_JFRTHREADID_HPP
+#ifndef SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_HPP
+#define SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_HPP
 
-#include "utilities/macros.hpp"
-#include "utilities/globalDefinitions.hpp"
-
-#if INCLUDE_JFR
-#include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
-#define JFR_THREAD_ID(thread) (JfrThreadLocal::thread_id(thread))
-#define JFR_STATIC_THREAD_ID(thread) (JfrThreadLocal::static_thread_id(thread))
-#else
-typedef u8 traceid;
-#define JFR_THREAD_ID(thread) ((traceid)(thread)->osthread()->thread_id())
-#define JFR_STATIC_THREAD_ID(thread) ((traceid)(thread)->osthread()->thread_id())
-#endif
+#include "memory/allocation.hpp"
+#include "oops/oopsHierarchy.hpp"
 
-#endif // SHARE_JFR_SUPPORT_JFRTHREADID_HPP
+template <typename T>
+class JfrOopTraceId : AllStatic {
+ private:
+  static bool store(oop ref, traceid value);
+  static bool store_current_epoch(oop ref, traceid id);
+ public:
+  static traceid load(oop ref);
+  static traceid epoch(traceid value);
+  static traceid id(traceid value);
+  static bool should_write_checkpoint(oop ref, traceid value);
+};
+
+#endif // SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_HPP

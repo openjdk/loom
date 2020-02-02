@@ -24,6 +24,7 @@
 
 #include "precompiled.hpp"
 #include "jfr/jfr.hpp"
+#include "jfr/jni/jfrJavaSupport.hpp"
 #include "jfr/leakprofiler/leakProfiler.hpp"
 #include "jfr/periodic/sampling/jfrThreadSampler.hpp"
 #include "jfr/recorder/jfrRecorder.hpp"
@@ -73,8 +74,16 @@ void Jfr::on_thread_start(Thread* t) {
   JfrThreadLocal::on_start(t);
 }
 
+void Jfr::on_thread_start(jthread carrier_thread, jthread vthread) {
+  JfrThreadLocal::on_vthread_start(JfrJavaSupport::java_thread(carrier_thread), vthread);
+}
+
 void Jfr::on_thread_exit(Thread* t) {
   JfrThreadLocal::on_exit(t);
+}
+
+void Jfr::on_thread_exit(jthread carrier_thread, jthread vthread) {
+  JfrThreadLocal::on_vthread_exit(JfrJavaSupport::java_thread(carrier_thread), vthread);
 }
 
 void Jfr::exclude_thread(Thread* t) {
@@ -91,7 +100,7 @@ bool Jfr::is_excluded(Thread* t) {
 
 void Jfr::on_java_thread_dismantle(JavaThread* jt) {
   if (JfrRecorder::is_recording()) {
-    JfrCheckpointManager::write_thread_checkpoint(jt);
+    JfrCheckpointManager::write_checkpoint(jt);
   }
 }
 

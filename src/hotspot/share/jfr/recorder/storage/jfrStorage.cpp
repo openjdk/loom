@@ -260,7 +260,7 @@ bool JfrStorage::flush_regular_buffer(BufferPtr buffer, Thread* thread) {
     assert(buffer->empty(), "invariant");
     if (!thread_is_excluded) {
       // state change from exclusion to inclusion requires a thread checkpoint
-      JfrCheckpointManager::write_thread_checkpoint(thread);
+      JfrCheckpointManager::write_checkpoint(thread);
     }
     return true;
   }

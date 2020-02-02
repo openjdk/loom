@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -38,6 +38,7 @@
 #include "jfr/recorder/storage/jfrStorage.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTraceRepository.hpp"
 #include "jfr/recorder/stringpool/jfrStringPool.hpp"
+#include "jfr/support/jfrVirtualThread.hpp"
 #include "jfr/utilities/jfrTime.hpp"
 #include "jfr/writers/jfrJavaEventWriter.hpp"
 #include "logging/log.hpp"
@@ -278,6 +279,9 @@ bool JfrRecorder::create_components() {
   if (!create_thread_sampling()) {
     return false;
   }
+  if (!create_virtual_thread_support()) {
+    return false;
+  }
   return true;
 }
 
@@ -349,6 +353,12 @@ bool JfrRecorder::create_thread_sampling() {
   assert(_thread_sampling == NULL, "invariant");
   _thread_sampling = JfrThreadSampling::create();
   return _thread_sampling != NULL;
+}
+
+bool JfrRecorder::create_virtual_thread_support() {
+  // true (notifyJvmti) enables jvmti events related to VirtualThreads
+  // currently gives callbacks to JFR as well.
+  return JfrVirtualThread::initialize(true);
 }
 
 void JfrRecorder::destroy_components() {

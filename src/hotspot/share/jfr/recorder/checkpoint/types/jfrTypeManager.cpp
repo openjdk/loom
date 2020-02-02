@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -118,25 +118,23 @@ void JfrTypeManager::write_threads(JfrCheckpointWriter& writer) {
   serialize_thread_groups(writer);
 }
 
-void JfrTypeManager::create_thread_blob(Thread* t) {
+JfrBlobHandle JfrTypeManager::create_blob(Thread* t, traceid tid, oop vthread) {
   assert(t != NULL, "invariant");
-  ResourceMark rm(t);
-  HandleMark hm(t);
-  JfrThreadConstant type_thread(t);
-  JfrCheckpointWriter writer(t, true, THREADS);
+  ResourceMark rm;
+  HandleMark hm;
+  JfrThreadConstant type_thread(t, tid, vthread);
+  JfrCheckpointWriter writer(Thread::current(), true, THREADS);
   writer.write_type(TYPE_THREAD);
   type_thread.serialize(writer);
-  // create and install a checkpoint blob
-  t->jfr_thread_local()->set_thread_blob(writer.move());
-  assert(t->jfr_thread_local()->has_thread_blob(), "invariant");
+  return writer.move();
 }
 
-void JfrTypeManager::write_thread_checkpoint(Thread* t) {
+void JfrTypeManager::write_checkpoint(Thread* t, traceid tid, oop vthread) {
   assert(t != NULL, "invariant");
-  ResourceMark rm(t);
-  HandleMark hm(t);
-  JfrThreadConstant type_thread(t);
-  JfrCheckpointWriter writer(t, true, THREADS);
+  ResourceMark rm;
+  HandleMark hm;
+  JfrThreadConstant type_thread(t, tid, vthread);
+  JfrCheckpointWriter writer(Thread::current(), true, THREADS);
   writer.write_type(TYPE_THREAD);
   type_thread.serialize(writer);
 }

@@ -228,7 +228,7 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
   case vmIntrinsics::_Continuation_runLevel:
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:
-  case vmIntrinsics::_getEventWriter:
+  //case vmIntrinsics::_getEventWriter:
 #if defined(_LP64) || !defined(TRACE_ID_SHIFT)
   case vmIntrinsics::_getClassId:
 #endif

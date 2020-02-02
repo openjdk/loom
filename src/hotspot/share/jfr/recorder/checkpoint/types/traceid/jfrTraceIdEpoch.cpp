@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,6 +26,7 @@
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
 #include "runtime/safepoint.hpp"
 
+u2 JfrTraceIdEpoch::_generation = 0;
 bool JfrTraceIdEpoch::_epoch_state = false;
 bool JfrTraceIdEpoch::_synchronizing = false;
 volatile bool JfrTraceIdEpoch::_changed_tag_state = false;
@@ -40,6 +41,7 @@ void JfrTraceIdEpoch::end_epoch_shift() {
   assert(SafepointSynchronize::is_at_safepoint(), "invariant");
   assert(_synchronizing, "invariant");
   _epoch_state = !_epoch_state;
+  ++_generation;
   OrderAccess::storestore();
   _synchronizing = false;
 }

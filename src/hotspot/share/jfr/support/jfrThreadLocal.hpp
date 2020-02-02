@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,14 +34,17 @@ class JfrStackFrame;
 class Thread;
 
 class JfrThreadLocal {
+  friend class JfrVirtualThread;
  private:
   jobject _java_event_writer;
   mutable JfrBuffer* _java_buffer;
   mutable JfrBuffer* _native_buffer;
   JfrBuffer* _shelved_buffer;
   mutable JfrStackFrame* _stackframes;
-  mutable traceid _trace_id;
   JfrBlobHandle _thread;
+  mutable traceid _static_thread_id;
+  mutable traceid _thread_id_limit;
+  mutable traceid _next_thread_id;
   u8 _data_lost;
   traceid _stack_trace_id;
   jlong _user_time;
@@ -58,6 +61,8 @@ class JfrThreadLocal {
   JfrStackFrame* install_stackframes() const;
   void release(Thread* t);
   static void release(JfrThreadLocal* tl, Thread* t);
+  static traceid reinitialize_thread_local_ids(const JfrThreadLocal* tl);
+  traceid next_thread_local_id() const;
 
  public:
   JfrThreadLocal();
@@ -120,13 +125,13 @@ class JfrThreadLocal {
     _stackdepth = depth;
   }
 
-  traceid thread_id() const {
-    return _trace_id;
-  }
+  // runtime determined id (VirtualThreads etc)
+  static traceid thread_id(const Thread* t);
 
-  void set_thread_id(traceid thread_id) {
-    _trace_id = thread_id;
-  }
+  // statically determined id for real HW thread
+  static traceid static_thread_id(const Thread* t);
+
+  static void set_static_thread_id(const Thread* t, traceid thread_id);
 
   void set_cached_stack_trace_id(traceid id, unsigned int hash = 0) {
     _stack_trace_id = id;
@@ -193,15 +198,15 @@ class JfrThreadLocal {
   }
 
   traceid trace_id() const {
-    return _trace_id;
+    return _static_thread_id;
   }
 
   traceid* const trace_id_addr() const {
-    return &_trace_id;
+    return &_static_thread_id;
   }
 
   void set_trace_id(traceid id) const {
-    _trace_id = id;
+    _static_thread_id = id;
   }
 
   bool is_excluded() const {
@@ -220,7 +225,9 @@ class JfrThreadLocal {
   static void include(Thread* t);
 
   static void on_start(Thread* t);
+  static void on_vthread_start(JavaThread* jt, jthread vthread);
   static void on_exit(Thread* t);
+  static void on_vthread_exit(JavaThread* jt, jthread vthread);
 
   // Code generation
   static ByteSize trace_id_offset();

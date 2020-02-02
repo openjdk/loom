@@ -2964,6 +2964,7 @@ void LIRGenerator::do_ClassIDIntrinsic(Intrinsic* x) {
   __ move(id, rlock_result(x));
 }
 
+/*
 void LIRGenerator::do_getEventWriter(Intrinsic* x) {
   LabelObj* L_end = new LabelObj();
 
@@ -2981,6 +2982,7 @@ void LIRGenerator::do_getEventWriter(Intrinsic* x) {
 
   __ branch_destination(L_end->label());
 }
+*/
 
 #endif
 
@@ -3013,9 +3015,11 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
   case vmIntrinsics::_getClassId:
     do_ClassIDIntrinsic(x);
     break;
+  /*
   case vmIntrinsics::_getEventWriter:
     do_getEventWriter(x);
     break;
+  */
   case vmIntrinsics::_counterTime:
     do_RuntimeCall(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), x);
     break;

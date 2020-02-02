@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,8 +23,8 @@
  */
 
 #include "precompiled.hpp"
+#include "classfile/javaClasses.inline.hpp"
 #include "jfr/jfrEvents.hpp"
-#include "jfr/leakprofiler/sampling/objectSample.hpp"
 #include "jfr/leakprofiler/sampling/objectSampler.hpp"
 #include "jfr/leakprofiler/sampling/sampleList.hpp"
 #include "jfr/leakprofiler/sampling/samplePriorityQueue.hpp"
@@ -32,6 +32,7 @@
 #include "jfr/recorder/checkpoint/jfrCheckpointManager.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTraceRepository.hpp"
 #include "jfr/support/jfrThreadLocal.hpp"
+#include "jfr/support/jfrVirtualThread.hpp"
 #include "jfr/utilities/jfrTryLock.hpp"
 #include "logging/log.hpp"
 #include "memory/universe.hpp"
@@ -103,8 +104,9 @@ void ObjectSampler::release() {
   _lock = 0;
 }
 
-static traceid get_thread_id(JavaThread* thread) {
+static traceid get_thread_id(JavaThread* thread, bool* virtual_thread) {
   assert(thread != NULL, "invariant");
+  assert(virtual_thread != NULL, "invariant");
   if (thread->threadObj() == NULL) {
     return 0;
   }
@@ -113,11 +115,29 @@ static traceid get_thread_id(JavaThread* thread) {
   if (tl->is_excluded()) {
     return 0;
   }
-  if (!tl->has_thread_blob()) {
-    JfrCheckpointManager::create_thread_blob(thread);
+  const traceid vtid = JfrVirtualThread::thread_id(thread);
+  if (vtid != 0) {
+    *virtual_thread = true;
+    return vtid;
   }
-  assert(tl->has_thread_blob(), "invariant");
-  return tl->thread_id();
+  return JfrThreadLocal::static_thread_id(thread);
+}
+
+static JfrBlobHandle get_thread_blob(JavaThread* thread, traceid tid, bool virtual_thread) {
+  assert(thread != NULL, "invariant");
+  JfrThreadLocal* const tl = thread->jfr_thread_local();
+  assert(tl != NULL, "invariant");
+  assert(!tl->is_excluded(), "invariant");
+  if (virtual_thread) {
+    // TODO: blob cache for virtual threads
+    return JfrCheckpointManager::create_blob(thread, tid, java_lang_Thread::vthread(thread->threadObj()));
+  }
+  if (!tl->has_thread_blob()) {
+    // for regular threads, the blob is cached in the thread local data structure
+    tl->set_thread_blob(JfrCheckpointManager::create_blob(thread, tid));
+    assert(tl->has_thread_blob(), "invariant");
+  }
+  return tl->thread_blob();
 }
 
 static void record_stacktrace(JavaThread* thread) {
@@ -130,10 +150,13 @@ static void record_stacktrace(JavaThread* thread) {
 void ObjectSampler::sample(HeapWord* obj, size_t allocated, JavaThread* thread) {
   assert(thread != NULL, "invariant");
   assert(is_created(), "invariant");
-  const traceid thread_id = get_thread_id(thread);
+  bool virtual_thread = false;
+  const traceid thread_id = get_thread_id(thread, &virtual_thread);
   if (thread_id == 0) {
     return;
   }
+  const JfrBlobHandle bh = get_thread_blob(thread, thread_id, virtual_thread);
+  assert(bh.valid(), "invariant");
   record_stacktrace(thread);
   // try enter critical section
   JfrTryLock tryLock(&_lock);
@@ -141,14 +164,13 @@ void ObjectSampler::sample(HeapWord* obj, size_t allocated, JavaThread* thread) 
     log_trace(jfr, oldobject, sampling)("Skipping old object sample due to lock contention");
     return;
   }
-  instance().add(obj, allocated, thread_id, thread);
+  instance().add(obj, allocated, thread_id, virtual_thread, bh, thread);
 }
 
-void ObjectSampler::add(HeapWord* obj, size_t allocated, traceid thread_id, JavaThread* thread) {
+void ObjectSampler::add(HeapWord* obj, size_t allocated, traceid thread_id, bool virtual_thread, const JfrBlobHandle& bh, JavaThread* thread) {
   assert(obj != NULL, "invariant");
   assert(thread_id != 0, "invariant");
   assert(thread != NULL, "invariant");
-  assert(thread->jfr_thread_local()->has_thread_blob(), "invariant");
 
   if (_dead_samples) {
     scavenge();
@@ -172,10 +194,12 @@ void ObjectSampler::add(HeapWord* obj, size_t allocated, traceid thread_id, Java
 
   assert(sample != NULL, "invariant");
   sample->set_thread_id(thread_id);
+  if (virtual_thread) {
+    sample->set_thread_is_virtual();
+  }
+  sample->set_thread(bh);
 
   const JfrThreadLocal* const tl = thread->jfr_thread_local();
-  sample->set_thread(tl->thread_blob());
-
   const unsigned int stacktrace_hash = tl->cached_stack_trace_hash();
   if (stacktrace_hash != 0) {
     sample->set_stack_trace_id(tl->cached_stack_trace_id());

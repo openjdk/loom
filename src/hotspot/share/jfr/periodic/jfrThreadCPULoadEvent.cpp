@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -108,8 +108,7 @@ bool JfrThreadCPULoadEvent::update_event(EventThreadCPULoad& event, JavaThread* 
 
 void JfrThreadCPULoadEvent::send_events() {
   Thread* periodic_thread = Thread::current();
-  JfrThreadLocal* const periodic_thread_tl = periodic_thread->jfr_thread_local();
-  traceid periodic_thread_id = periodic_thread_tl->thread_id();
+  traceid periodic_thread_id = JfrThreadLocal::thread_id(periodic_thread);
   const int processor_count = JfrThreadCPULoadEvent::get_processor_count();
   JfrTicks event_time = JfrTicks::now();
   jlong cur_wallclock_time = JfrThreadCPULoadEvent::get_wallclock_time();
@@ -125,9 +124,9 @@ void JfrThreadCPULoadEvent::send_events() {
       event.set_starttime(event_time);
       if (jt != periodic_thread) {
         // Commit reads the thread id from this thread's trace data, so put it there temporarily
-        periodic_thread_tl->set_thread_id(JFR_THREAD_ID(jt));
+        JfrThreadLocal::set_static_thread_id(periodic_thread, JFR_THREAD_ID(jt));
       } else {
-        periodic_thread_tl->set_thread_id(periodic_thread_id);
+        JfrThreadLocal::set_static_thread_id(periodic_thread, periodic_thread_id);
       }
       event.commit();
     }
@@ -135,7 +134,7 @@ void JfrThreadCPULoadEvent::send_events() {
   log_trace(jfr)("Measured CPU usage for %d threads in %.3f milliseconds", number_of_threads,
     (double)(JfrTicks::now() - event_time).milliseconds());
   // Restore this thread's thread id
-  periodic_thread_tl->set_thread_id(periodic_thread_id);
+  JfrThreadLocal::set_static_thread_id(periodic_thread, periodic_thread_id);
 }
 
 void JfrThreadCPULoadEvent::send_event_for_thread(JavaThread* jt) {

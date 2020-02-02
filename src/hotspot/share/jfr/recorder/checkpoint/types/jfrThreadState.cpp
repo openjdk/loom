@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -84,14 +84,21 @@ void JfrThreadState::serialize(JfrCheckpointWriter& writer) {
   }
 }
 
-traceid JfrThreadId::id(const Thread* t) {
+traceid JfrThreadId::id(const Thread* t, oop vthread) {
   assert(t != NULL, "invariant");
   if (!t->is_Java_thread()) {
     return os_id(t);
   }
   const JavaThread* const jt = (JavaThread*)t;
-  const oop thread_obj = jt->threadObj();
-  return thread_obj != NULL ? java_lang_Thread::thread_id(thread_obj) : 0;
+  oop thread_obj = jt->threadObj();
+  if (thread_obj == NULL) {
+    return 0;
+  }
+  if (vthread != NULL) {
+    thread_obj = vthread;
+  }
+  assert(thread_obj != NULL, "invariant");
+  return java_lang_Thread::thread_id(thread_obj);
 }
 
 traceid JfrThreadId::os_id(const Thread* t) {
@@ -100,31 +107,36 @@ traceid JfrThreadId::os_id(const Thread* t) {
   return os_thread != NULL ? os_thread->thread_id() : 0;
 }
 
-traceid JfrThreadId::jfr_id(const Thread* t) {
+traceid JfrThreadId::jfr_id(const Thread* t, traceid tid) {
   assert(t != NULL, "invariant");
-  return t->jfr_thread_local()->thread_id();
+  return tid != 0 ? tid : JfrThreadLocal::static_thread_id(t);
 }
 
 // caller needs ResourceMark
-const char* get_java_thread_name(const Thread* t) {
+const char* get_java_thread_name(const Thread* t, oop vthread) {
   assert(t != NULL, "invariant");
   assert(t->is_Java_thread(), "invariant");
   const JavaThread* const jt = ((JavaThread*)t);
   const char* name_str = "<no-name - thread name unresolved>";
-  const oop thread_obj = jt->threadObj();
-  if (thread_obj != NULL) {
+  oop thread_obj = jt->threadObj();
+  if (thread_obj == NULL) {
+    if (jt->is_attaching_via_jni()) {
+      name_str = "<no-name - thread is attaching>";
+    }
+  } else {
+    if (vthread != NULL) {
+      thread_obj = vthread;
+    }
     const oop name = java_lang_Thread::name(thread_obj);
     if (name != NULL) {
       name_str = java_lang_String::as_utf8_string(name);
     }
-  } else if (jt->is_attaching_via_jni()) {
-    name_str = "<no-name - thread is attaching>";
   }
   assert(name_str != NULL, "unexpected NULL thread name");
   return name_str;
 }
 
-const char* JfrThreadName::name(const Thread* t) {
+const char* JfrThreadName::name(const Thread* t, oop vthread) {
   assert(t != NULL, "invariant");
-  return t->is_Java_thread() ? get_java_thread_name(t) : t->name();
+  return t->is_Java_thread() ? get_java_thread_name(t, vthread) : t->name();
 }

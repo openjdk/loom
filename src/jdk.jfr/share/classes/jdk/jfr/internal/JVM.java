@@ -447,7 +447,8 @@ public final class JVM {
      *
      * @return thread local EventWriter
      */
-    @HotSpotIntrinsicCandidate
+    //  TODO: LOOM - CONSTRUCT THE INTRINSIC TO SUPPORT VIRTUAL THREAD ID
+    // @HotSpotIntrinsicCandidate
     public static native Object getEventWriter();
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -290,6 +290,15 @@ inline HeapWord* java_lang_Continuation::refStack_base(oop ref) {
 
 inline bool java_lang_Continuation::done(oop ref) {
   return ref->bool_field(_done_offset);
+}
+
+inline jlong java_lang_VirtualThread::jfrTraceId(oop ref) {
+  return ref->long_field(_jfrTraceId_offset);
+}
+
+inline jlong java_lang_VirtualThread::set_jfrTraceId(oop ref, jlong id) {
+  ref->long_field_put(_jfrTraceId_offset, id);
+  return id;
 }
 
 inline oop jdk_internal_misc_StackChunk::parent(oop ref) {

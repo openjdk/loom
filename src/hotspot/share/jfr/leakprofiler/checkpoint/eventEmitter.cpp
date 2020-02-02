@@ -44,11 +44,11 @@ EventEmitter::EventEmitter(const JfrTicks& start_time, const JfrTicks& end_time)
   _end_time(end_time),
   _thread(Thread::current()),
   _jfr_thread_local(_thread->jfr_thread_local()),
-  _thread_id(_thread->jfr_thread_local()->thread_id()) {}
+  _thread_id(JfrThreadLocal::static_thread_id(_thread)) {}
 
 EventEmitter::~EventEmitter() {
   // restore / reset thread local stack trace and thread id
-  _jfr_thread_local->set_thread_id(_thread_id);
+  JfrThreadLocal::set_static_thread_id(_thread, _thread_id);
   _jfr_thread_local->clear_cached_stack_trace();
 }
 
@@ -153,6 +153,6 @@ void EventEmitter::write_event(const ObjectSample* sample, EdgeStore* edge_store
   // supplying information from where the actual sampling occurred.
   _jfr_thread_local->set_cached_stack_trace_id(sample->stack_trace_id());
   assert(sample->has_thread(), "invariant");
-  _jfr_thread_local->set_thread_id(sample->thread_id());
+  JfrThreadLocal::set_static_thread_id(_thread, sample->thread_id());
   e.commit();
 }

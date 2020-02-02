@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -92,6 +92,9 @@
 #include "utilities/utf8.hpp"
 #if INCLUDE_CDS
 #include "classfile/systemDictionaryShared.hpp"
+#endif
+#if INCLUDE_JFR
+#include "jfr/jfr.hpp"
 #endif
 
 #include <errno.h>
@@ -537,7 +540,7 @@ JVM_ENTRY(void, JVM_FillInStackTrace(JNIEnv *env, jobject receiver, jobject cont
   JVMWrapper("JVM_FillInStackTrace");
   Handle exception(thread, JNIHandles::resolve_non_null(receiver));
   Handle scope(thread, JNIHandles::resolve(contScope));
-  
+
   java_lang_Throwable::fill_in_stack_trace(exception, scope);
 JVM_END
 
@@ -621,7 +624,7 @@ JVM_END
 
 
 JVM_ENTRY(jint, JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, jlong anchor,
-                                  jint frame_count, jint start_index, 
+                                  jint frame_count, jint start_index,
                                   jobjectArray frames))
   JVMWrapper("JVM_MoreStackWalk");
 
@@ -637,7 +640,7 @@ JVM_ENTRY(jint, JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, 
   }
 
   Handle stackStream_h(THREAD, JNIHandles::resolve_non_null(stackStream));
-  return StackWalk::fetchNextBatch(stackStream_h, mode, anchor, frame_count, 
+  return StackWalk::fetchNextBatch(stackStream_h, mode, anchor, frame_count,
                                   start_index, frames_array_h, THREAD);
 JVM_END
 
@@ -3703,6 +3706,7 @@ JVM_ENTRY(void, JVM_VirtualThreadStarted(JNIEnv* env, jclass vthread_class, jthr
   if (JvmtiExport::should_post_fiber_scheduled()) {
     JvmtiExport::post_fiber_scheduled(event_thread, vthread);
   }
+  JFR_ONLY(Jfr::on_thread_start(event_thread, vthread));
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
@@ -3710,6 +3714,7 @@ JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, j
   if (JvmtiExport::should_post_fiber_terminated()) {
     JvmtiExport::post_fiber_terminated(event_thread, vthread);
   }
+  JFR_ONLY(Jfr::on_thread_exit(event_thread, vthread));
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMount(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))

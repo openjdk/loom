@@ -49,32 +49,6 @@ static int notified_offset = invalid_offset;
 static int thread_id_offset = invalid_offset;
 static int valid_offset = invalid_offset;
 
-static bool find_field(InstanceKlass* ik,
-                       Symbol* name_symbol,
-                       Symbol* signature_symbol,
-                       fieldDescriptor* fd,
-                       bool is_static = false,
-                       bool allow_super = false) {
-  if (allow_super || is_static) {
-    return ik->find_field(name_symbol, signature_symbol, is_static, fd) != NULL;
-  } else {
-    return ik->find_local_field(name_symbol, signature_symbol, fd);
-  }
-}
-
-static void compute_offset(int &dest_offset,
-                           Klass* klass,
-                           Symbol* name_symbol,
-                           Symbol* signature_symbol,
-                           bool is_static = false, bool allow_super = false) {
-  fieldDescriptor fd;
-  InstanceKlass* ik = InstanceKlass::cast(klass);
-  if (!find_field(ik, name_symbol, signature_symbol, &fd, is_static, allow_super)) {
-    assert(false, "invariant");
-  }
-  dest_offset = fd.offset();
-}
-
 static bool setup_event_writer_offsets(TRAPS) {
   const char class_name[] = "jdk/jfr/internal/EventWriter";
   Symbol* const k_sym = SymbolTable::new_symbol(class_name);
@@ -86,49 +60,56 @@ static bool setup_event_writer_offsets(TRAPS) {
   Symbol* const start_pos_sym = SymbolTable::new_symbol(start_pos_name);
   assert(start_pos_sym != NULL, "invariant");
   assert(invalid_offset == start_pos_offset, "invariant");
-  compute_offset(start_pos_offset, klass, start_pos_sym, vmSymbols::long_signature());
+  JfrJavaSupport::compute_field_offset(start_pos_offset, klass, start_pos_sym, vmSymbols::long_signature());
   assert(start_pos_offset != invalid_offset, "invariant");
 
   const char start_pos_address_name[] = "startPositionAddress";
   Symbol* const start_pos_address_sym = SymbolTable::new_symbol(start_pos_address_name);
   assert(start_pos_address_sym != NULL, "invariant");
   assert(invalid_offset == start_pos_address_offset, "invariant");
-  compute_offset(start_pos_address_offset, klass, start_pos_address_sym, vmSymbols::long_signature());
+  JfrJavaSupport::compute_field_offset(start_pos_address_offset, klass, start_pos_address_sym, vmSymbols::long_signature());
   assert(start_pos_address_offset != invalid_offset, "invariant");
 
   const char event_pos_name[] = "currentPosition";
   Symbol* const event_pos_sym = SymbolTable::new_symbol(event_pos_name);
   assert(event_pos_sym != NULL, "invariant");
   assert(invalid_offset == current_pos_offset, "invariant");
-  compute_offset(current_pos_offset, klass, event_pos_sym,vmSymbols::long_signature());
+  JfrJavaSupport::compute_field_offset(current_pos_offset, klass, event_pos_sym,vmSymbols::long_signature());
   assert(current_pos_offset != invalid_offset, "invariant");
 
   const char max_pos_name[] = "maxPosition";
   Symbol* const max_pos_sym = SymbolTable::new_symbol(max_pos_name);
   assert(max_pos_sym != NULL, "invariant");
   assert(invalid_offset == max_pos_offset, "invariant");
-  compute_offset(max_pos_offset, klass, max_pos_sym, vmSymbols::long_signature());
+  JfrJavaSupport::compute_field_offset(max_pos_offset, klass, max_pos_sym, vmSymbols::long_signature());
   assert(max_pos_offset != invalid_offset, "invariant");
 
   const char max_event_size_name[] = "maxEventSize";
   Symbol* const max_event_size_sym = SymbolTable::new_symbol(max_event_size_name);
   assert (max_event_size_sym != NULL, "invariant");
   assert(invalid_offset == max_event_size_offset, "invariant");
-  compute_offset(max_event_size_offset, klass, max_event_size_sym, vmSymbols::int_signature());
+  JfrJavaSupport::compute_field_offset(max_event_size_offset, klass, max_event_size_sym, vmSymbols::int_signature());
   assert(max_event_size_offset != invalid_offset, "invariant");
 
   const char notified_name[] = "notified";
   Symbol* const notified_sym = SymbolTable::new_symbol(notified_name);
   assert (notified_sym != NULL, "invariant");
   assert(invalid_offset == notified_offset, "invariant");
-  compute_offset(notified_offset, klass, notified_sym, vmSymbols::bool_signature());
+  JfrJavaSupport::compute_field_offset(notified_offset, klass, notified_sym, vmSymbols::bool_signature());
   assert(notified_offset != invalid_offset, "invariant");
+
+  const char threadID_name[] = "threadID";
+  Symbol * const threadID_sym = SymbolTable::new_symbol(threadID_name);
+  assert(threadID_sym != NULL, "invariant");
+  assert(invalid_offset == thread_id_offset, "invariant");
+  JfrJavaSupport::compute_field_offset(thread_id_offset, klass, threadID_sym, vmSymbols::long_signature());
+  assert(thread_id_offset != invalid_offset, "invariant");
 
   const char valid_name[] = "valid";
   Symbol* const valid_sym = SymbolTable::new_symbol(valid_name);
   assert (valid_sym != NULL, "invariant");
   assert(invalid_offset == valid_offset, "invariant");
-  compute_offset(valid_offset, klass, valid_sym, vmSymbols::bool_signature());
+  JfrJavaSupport::compute_field_offset(valid_offset, klass, valid_sym, vmSymbols::bool_signature());
   assert(valid_offset != invalid_offset, "invariant");
   return true;
 }
@@ -223,7 +204,14 @@ jobject JfrJavaEventWriter::event_writer(Thread* t) {
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(t));
   JfrThreadLocal* const tl = t->jfr_thread_local();
   assert(tl->shelved_buffer() == NULL, "invariant");
-  return tl->java_event_writer();
+  jobject event_writer = tl->java_event_writer();
+  if (event_writer != NULL) {
+    oop writer = JNIHandles::resolve_non_null(event_writer);
+    assert(writer != NULL, "invariant");
+    // VirtualThread support
+    writer->long_field_put(thread_id_offset, (jlong)JFR_THREAD_ID(t));
+  }
+  return event_writer;
 }
 
 jobject JfrJavaEventWriter::new_event_writer(TRAPS) {

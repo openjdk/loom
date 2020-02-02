@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -38,14 +38,14 @@
 #include "runtime/thread.inline.hpp"
 #include "utilities/debug.hpp"
 
- // returns updated value
-static traceid atomic_inc(traceid volatile* const dest) {
+// returns updated value
+static traceid atomic_inc(traceid volatile* const dest, traceid stride = 1) {
   assert(VM_Version::supports_cx8(), "invariant");
   traceid compare_value;
   traceid exchange_value;
   do {
     compare_value = *dest;
-    exchange_value = compare_value + 1;
+    exchange_value = compare_value + stride;
   } while (Atomic::cmpxchg(dest, compare_value, exchange_value) != compare_value);
   return exchange_value;
 }
@@ -56,8 +56,13 @@ static traceid next_class_id() {
 }
 
 static traceid next_thread_id() {
-  static volatile traceid thread_id_counter = 0;
+  static volatile traceid thread_id_counter = 1;
   return atomic_inc(&thread_id_counter);
+}
+
+static traceid next_thread_id_range() {
+  static volatile traceid thread_id_range_counter = THREAD_ID_RESERVATIONS;
+  return atomic_inc(&thread_id_range_counter, THREAD_LOCAL_THREAD_ID_RANGE);
 }
 
 static traceid next_module_id() {
@@ -149,6 +154,10 @@ void JfrTraceId::assign(const ClassLoaderData* cld) {
 
 traceid JfrTraceId::assign_thread_id() {
   return next_thread_id();
+}
+
+traceid JfrTraceId::assign_thread_id_range() {
+  return next_thread_id_range();
 }
 
 // used by CDS / APPCDS as part of "remove_unshareable_info"

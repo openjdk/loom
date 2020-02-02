@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -262,7 +262,7 @@ class LibraryCallKit : public GraphKit {
   bool inline_native_time_funcs(address method, const char* funcName);
 #ifdef JFR_HAVE_INTRINSICS
   bool inline_native_classID();
-  bool inline_native_getEventWriter();
+  // bool inline_native_getEventWriter();
 #endif
   bool inline_native_Class_query(vmIntrinsics::ID id);
   bool inline_native_subtype_check();
@@ -761,7 +761,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), "counterTime");
   case vmIntrinsics::_getClassId:               return inline_native_classID();
-  case vmIntrinsics::_getEventWriter:           return inline_native_getEventWriter();
+  // case vmIntrinsics::_getEventWriter:           return inline_native_getEventWriter();
 #endif
   case vmIntrinsics::_currentTimeMillis:        return inline_native_time_funcs(CAST_FROM_FN_PTR(address, os::javaTimeMillis), "currentTimeMillis");
   case vmIntrinsics::_nanoTime:                 return inline_native_time_funcs(CAST_FROM_FN_PTR(address, os::javaTimeNanos), "nanoTime");
@@ -2995,6 +2995,8 @@ bool LibraryCallKit::inline_native_classID() {
 
 }
 
+/*
+
 bool LibraryCallKit::inline_native_getEventWriter() {
   Node* tls_ptr = _gvn.transform(new ThreadLocalNode());
 
@@ -3031,6 +3033,8 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 
   return true;
 }
+
+*/
 
 #endif // JFR_HAVE_INTRINSICS
 
