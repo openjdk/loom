@@ -240,6 +240,10 @@ void continuations_init() {
   Continuations::init();
 }
 
+#define USE_STUBS (ConfigT::_compressed_oops && ConfigT::_post_barrier && (!ConfigT::_slow_flags || LoomGenCode))
+#define FULL_STACK (ConfigT::_slow_flags && !UseContinuationLazyCopy)
+#define USE_CHUNKS (UseContinuationChunks)
+
 class SmallRegisterMap;
 class ContMirror;
 class hframe;
@@ -569,12 +573,12 @@ private:
   typeArrayOop allocate_stack_array(size_t elements);
   bool grow_stack(int new_size);
   static void copy_primitive_array(typeArrayOop old_array, int old_start, typeArrayOop new_array, int new_start, int count);
-  template <typename ConfigT> bool allocate_ref_stack(int nr_oops);
-  template <typename ConfigT> objArrayOop  allocate_refstack_array(size_t nr_oops);
-  template <typename ConfigT> objArrayOop  allocate_keepalive_array(size_t nr_oops);
+  template <bool post_barrier> bool allocate_ref_stack(int nr_oops);
+  template <bool post_barrier> objArrayOop  allocate_refstack_array(size_t nr_oops);
   template <typename ConfigT> bool grow_ref_stack(int nr_oops);
   template <typename ConfigT> void copy_ref_array(objArrayOop old_array, int old_start, objArrayOop new_array, int new_start, int count);
-  template <typename ConfigT> void zero_ref_array(objArrayOop new_array, int new_length, int min_length);
+  template <bool post_barrier> void zero_ref_array(objArrayOop new_array, int new_length, int min_length);
+  objArrayOop  allocate_keepalive_array(size_t nr_oops);
   oop raw_allocate(Klass* klass, size_t words, size_t elements, bool zero);
 
 public:
@@ -2213,8 +2217,8 @@ public:
   }
 
   freeze_result freeze(bool chunk_available) {
-    assert (!chunk_available || (ConfigT::has_young && mode == mode_fast), "");
-    if (ConfigT::has_young && mode == mode_fast) {
+    assert (!chunk_available || (USE_CHUNKS && mode == mode_fast), "");
+    if (mode == mode_fast && USE_CHUNKS) {
       if (freeze_chunk(chunk_available)) {
         return freeze_ok;
       }
@@ -2271,7 +2275,7 @@ public:
   }
 
   bool is_chunk_available() {
-    if (!ConfigT::has_young || mode != mode_fast) return false;
+    if (mode != mode_fast || !USE_CHUNKS) return false;
 
     oop chunk = _cont.tail();
     // TODO The second conjunct means we don't squash old chunks, but let them be (Rickard's idea)
@@ -2305,7 +2309,7 @@ public:
     }
   #endif
 
-    assert (ConfigT::has_young, "");
+    assert (USE_CHUNKS, "");
     assert (_thread != NULL, "");
     assert(_cont.chunk_invariant(), "");
 
@@ -2554,7 +2558,6 @@ public:
 #endif
 
   void add_chunks_size() {
-    assert (ConfigT::has_young, "");
     int num_chunks = 0;
     int orig_frames = _frames;
 
@@ -2583,8 +2586,9 @@ public:
       log_develop_trace(jvmcont)("add_chunks_size frames: %d size: %d oops: %d", frames, size, oops);
       if (log_develop_is_enabled(Trace, jvmcont)) print_chunk(chunk, _cont.mirror(), false);
     }
+    assert (USE_CHUNKS || num_chunks == 0, "");
     EventContinuationSquash e;
-    if (e.should_commit()) {
+    if (e.should_commit() && USE_CHUNKS) {
       e.set_id(cast_from_oop<u8>(_cont.mirror()));
       e.set_numChunks(num_chunks);
       e.set_numFrames(_frames - orig_frames);
@@ -2595,7 +2599,6 @@ public:
   void squash_chunks() {
     NoSafepointVerifier nsv;
 
-    assert (ConfigT::has_young, "");
     oop chunk = _cont.tail();
     if (chunk == (oop)NULL)
       return;
@@ -2606,9 +2609,9 @@ public:
   }
 
   void squash_chunks(oop chunk) {
-    assert (ConfigT::has_young, "");
     if (chunk == (oop)NULL) return;
 
+    assert (USE_CHUNKS, "");
     squash_chunks(jdk_internal_misc_StackChunk::parent(chunk)); // recursion
     jdk_internal_misc_StackChunk::set_parent(chunk, (oop)NULL);
     _cont.set_tail(NULL);
@@ -2626,7 +2629,7 @@ public:
   }
 
   void squash_chunk(oop chunk) {
-    assert (ConfigT::has_young, "");
+    assert (USE_CHUNKS, "");
     assert (!ContMirror::is_empty_chunk(chunk), "");
 
     frame f = chunk_start_frame(chunk);
@@ -2828,7 +2831,7 @@ public:
 
     DEBUG_ONLY(int pre_chunk_size = _size; int pre_chunk_oops = _oops;)
 
-    if (ConfigT::has_young && _thread != NULL) {
+    if (_thread != NULL) {
       add_chunks_size();
     }
 
@@ -2855,7 +2858,7 @@ public:
     }
 
     DEBUG_ONLY(int pre_chunk_sp = 0; int post_chunk_sp = 0);
-    if (ConfigT::has_young && _thread != NULL) {
+    if (_thread != NULL) {
       DEBUG_ONLY(pre_chunk_sp = _cont.sp();)
       squash_chunks();
       DEBUG_ONLY(post_chunk_sp = _cont.sp();)
@@ -2871,7 +2874,7 @@ public:
     if (log_develop_is_enabled(Trace, jvmcont)) orig_top_frame.print_on(_cont, tty);
 
     log_develop_trace(jvmcont)("empty: %d", empty);
-    assert (!CONT_FULL_STACK || empty, "");
+    assert (!FULL_STACK || empty, "");
     assert (!empty || _cont.sp() >= _cont.stack_length() || _cont.sp() < 0, "sp: %d stack_length: %d", _cont.sp(), _cont.stack_length());
     assert (orig_top_frame.is_empty() == empty, "empty: %d f.sp: %d tail: %d", empty, orig_top_frame.sp(), (_cont.tail() != (oop)NULL));
     assert (!empty || assert_bottom_java_frame_name(callee, ENTER_SIG), "");
@@ -3271,7 +3274,7 @@ public:
   }
 
   inline FreezeFnT get_oopmap_stub(const frame& f) {
-    if (!ConfigT::allow_stubs) {
+    if (!USE_STUBS) {
       return OopStubs::freeze_oops_slow();
     }
     return ContinuationHelper::freeze_stub<mode>(f);
@@ -3750,9 +3753,9 @@ public:
         hframe hf = _cont.last_frame<mode>();
         log_develop_trace(jvmcont)("top_hframe before (thaw):"); if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on(_cont, tty);
         frame caller;
-
-        int num_frames = ConfigT::full_stack ? 1000 : // TODO
-                                               (return_barrier ? 1 : 2);
+        
+        int num_frames = FULL_STACK ? 1000 // TODO
+                                    : (return_barrier ? 1 : 2);
         thaw<top>(hf, caller, num_frames);
 
         _cont.write();
@@ -3763,14 +3766,14 @@ public:
         return _cont.entrySP();
       }
     } else {
-      assert (ConfigT::has_young, "");
+      assert (USE_CHUNKS, "");
       return thaw_chunk(chunk, top);
     }
   }
 
   NOINLINE intptr_t* thaw_chunk(oop chunk, const bool top) {
-    assert (ConfigT::has_young, "");
-    assert (top || ConfigT::full_stack, "");
+    assert (USE_CHUNKS, "");
+    assert (top || FULL_STACK, "");
     assert (chunk != (oop) NULL, "");
     assert (chunk == _cont.tail(), "");
 
@@ -3807,7 +3810,7 @@ public:
 
     intptr_t* const hsp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp;
     intptr_t* vsp;
-    if (ConfigT::full_stack) {
+    if (FULL_STACK) {
       _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
       java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
       vsp = thaw<false>(false);
@@ -3820,7 +3823,7 @@ public:
     }
 
     bool partial, empty;
-    if (!TEST_THAW_ONE_CHUNK_FRAME && LIKELY(ConfigT::full_stack || (size < threshold /*&& !barriers*/))) {
+    if (!TEST_THAW_ONE_CHUNK_FRAME && LIKELY(FULL_STACK || (size < threshold /*&& !barriers*/))) {
       // prefetch with anticipation of memcpy starting at highest address
       prefetch_chunk_pd(InstanceStackChunkKlass::start_of_stack(chunk), size);
 
@@ -3853,15 +3856,15 @@ public:
 
     const bool is_last_in_chunks = empty && jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk);
     const bool is_last = is_last_in_chunks && _cont.is_empty0();
-    const bool bottom = !ConfigT::full_stack || is_last;
+    const bool bottom = !FULL_STACK || is_last;
 
     _cont.sub_size((size - (UNLIKELY(argsize != 0) ? frame::sender_sp_offset : 0)) << LogBytesPerWord);
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
     if (is_last_in_chunks && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
     }
-
-    log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d is_last: %d empty: %d size: %d argsize: %d", partial, ConfigT::full_stack, top, bottom, is_last, empty, size, argsize);
+    
+    log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d is_last: %d empty: %d size: %d argsize: %d", partial, FULL_STACK, top, bottom, is_last, empty, size, argsize);
 
     // if we're not in a full thaw, we're both top and bottom
     if (bottom) {
@@ -3894,15 +3897,15 @@ public:
       patch_chunk(chunk, bottom_sp, is_last, argsize);
     }
 
-    if (!ConfigT::full_stack || top) {
+    if (!FULL_STACK || top) {
       // _cont.write_minimal(); // must be done after patch; really only need to write max_size
       java_lang_Continuation::set_maxSize(_cont.mirror(), (jint)_cont.max_size());
       assert (java_lang_Continuation::flags(_cont.mirror()) == _cont.flags(), "");
     }
 
     assert (is_last == _cont.is_empty(), "is_last: %d _cont.is_empty(): %d", is_last, _cont.is_empty());
-
-    if (LIKELY(!ConfigT::full_stack || top)) {
+    
+    if (LIKELY(!FULL_STACK || top)) {
       setup_chunk_jump(vsp, hsp);
     }
 
@@ -4366,7 +4369,7 @@ public:
 
     // _cont.set_last_frame(_last_frame);
 
-    assert (!CONT_FULL_STACK || _cont.is_empty(), "");
+    assert (!FULL_STACK || _cont.is_empty(), "");
     assert (_cont.is_empty() == _cont.last_frame<mode_slow>().is_empty(), "cont.is_empty: %d cont.last_frame().is_empty(): %d", _cont.is_empty(), _cont.last_frame<mode_slow>().is_empty());
     assert (_cont.is_empty() == (_cont.max_size() == 0), "cont.is_empty: %d cont.max_size: " SIZE_FORMAT " #" INTPTR_FORMAT, _cont.is_empty(), _cont.max_size(), _cont.hash());
     assert (_cont.is_empty() == (_cont.num_frames() == 0), "cont.is_empty: %d num_frames: %d", _cont.is_empty(), _cont.num_frames());
@@ -4390,7 +4393,7 @@ public:
 
     Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
 
-    assert ((mode == mode_slow &&_preempt) || !CONT_FULL_STACK || assert_top_java_frame_name(f, YIELD0_SIG), "");
+    assert ((mode == mode_slow &&_preempt) || !FULL_STACK || assert_top_java_frame_name(f, YIELD0_SIG), "");
   }
 
   void recurse_stub_frame(const hframe& hf, frame& caller, int num_frames) {
@@ -4437,7 +4440,7 @@ public:
   }
 
   inline ThawFnT get_oopmap_stub(const hframe& f) {
-    if (!ConfigT::allow_stubs) {
+    if (!USE_STUBS) {
       return OopStubs::thaw_oops_slow();
     }
     return ContinuationHelper::thaw_stub<mode>(f);
@@ -5234,7 +5237,7 @@ void ContMirror::make_keepalive(CompiledMethodKeepalive<ConfigT>* keepalive) {
   if (oops == 0) {
     oops = 1;
   }
-  oop keepalive_obj = allocate_keepalive_array<ConfigT>(oops);
+  oop keepalive_obj = allocate_keepalive_array(oops);
 
   uint64_t counter = SafepointSynchronize::safepoint_counter();
   // check gc cycle
@@ -5303,7 +5306,7 @@ NOINLINE bool ContMirror::allocate_stacks_in_native(int size, int oops, bool nee
 
   if (needs_refstack) {
     if (_ref_stack == NULL) {
-      if (!allocate_ref_stack<ConfigT>(oops)) {
+      if (!allocate_ref_stack<ConfigT::_post_barrier>(oops)) {
         return false;
       }
     } else {
@@ -5373,10 +5376,10 @@ bool ContMirror::grow_stack(int new_size) {
   return true;
 }
 
-template <typename ConfigT>
+template <bool post_barrier>
 bool ContMirror::allocate_ref_stack(int nr_oops) {
   // we don't zero the array because we allocate an array that exactly holds all the oops we'll fill in as we freeze
-  oop result = allocate_refstack_array<ConfigT>(nr_oops);
+  oop result = allocate_refstack_array<post_barrier>(nr_oops);
   if (result == NULL) {
     return false;
   }
@@ -5402,16 +5405,16 @@ bool ContMirror::grow_ref_stack(int nr_oops) {
     return false;
   }
 
-  objArrayOop new_ref_stack = allocate_refstack_array<ConfigT>(new_length);
+  objArrayOop new_ref_stack = allocate_refstack_array<ConfigT::_post_barrier>(new_length);
   if (new_ref_stack == NULL) {
     return false;
   }
   assert (new_ref_stack->length() == new_length, "");
   log_develop_trace(jvmcont)("grow_ref_stack old_length: %d new_length: %d", old_length, new_length);
 
-  zero_ref_array<ConfigT>(new_ref_stack, new_length, min_length);
+  zero_ref_array<ConfigT::_post_barrier>(new_ref_stack, new_length, min_length);
   if (old_oops > 0) {
-    assert(!CONT_FULL_STACK, "");
+    assert(!FULL_STACK, "");
     copy_ref_array<ConfigT>(_ref_stack, offset, new_ref_stack, fix_decreasing_index(offset, old_length, new_length), old_oops);
   }
 
@@ -5473,10 +5476,10 @@ void ContMirror::copy_primitive_array(typeArrayOop old_array, int old_start, typ
   // ArrayAccess<ARRAYCOPY_DISJOINT>::oop_arraycopy(_stack, offset * elementSizeInBytes, new_stack, (new_length - n) * elementSizeInBytes, n);
 }
 
-template <typename ConfigT>
+template <bool post_barrier>
 objArrayOop ContMirror::allocate_refstack_array(size_t nr_oops) {
   assert(nr_oops > 0, "");
-  bool zero = !ConfigT::_post_barrier; // !BarrierSet::barrier_set()->is_a(BarrierSet::ModRef);
+  bool zero = !post_barrier; // !BarrierSet::barrier_set()->is_a(BarrierSet::ModRef);
   log_develop_trace(jvmcont)("allocate_refstack_array nr_oops: %lu zero: %d", nr_oops, zero);
 
   ArrayKlass* klass = ArrayKlass::cast(Universe::objectArrayKlassObj());
@@ -5484,7 +5487,6 @@ objArrayOop ContMirror::allocate_refstack_array(size_t nr_oops) {
   return objArrayOop(raw_allocate(klass, size_in_words, nr_oops, zero));
 }
 
-template <typename ConfigT>
 objArrayOop ContMirror::allocate_keepalive_array(size_t nr_oops) {
   //assert(nr_oops > 0, "");
   bool zero = true; // !BarrierSet::barrier_set()->is_a(BarrierSet::ModRef);
@@ -5496,12 +5498,12 @@ objArrayOop ContMirror::allocate_keepalive_array(size_t nr_oops) {
 }
 
 
-template <typename ConfigT>
+template <bool post_barrier>
 void ContMirror::zero_ref_array(objArrayOop new_array, int new_length, int min_length) {
   assert (new_length == new_array->length(), "");
   int extra_oops = new_length - min_length;
 
-  if (ConfigT::_post_barrier) {
+  if (post_barrier) {
     // zero the bottom part of the array that won't be filled in the freeze
     HeapWord* new_base = new_array->base();
     const uint OopsPerHeapWord = HeapWordSize/heapOopSize; // TODO PERF:  heapOopSize and OopsPerHeapWord can be constants in Config
@@ -5742,23 +5744,24 @@ public:
   }
 };
 
-template <bool compressed_oops, bool post_barrier, bool gen_stubs, bool g1gc, bool use_chunks, bool full>
+template <bool compressed_oops, bool post_barrier, bool g1gc, bool slow_flags>
 class Config {
 public:
-  typedef Config<compressed_oops, post_barrier, gen_stubs, g1gc, use_chunks, full> SelfT;
+  typedef Config<compressed_oops, post_barrier, g1gc, slow_flags> SelfT;
   typedef typename Conditional<compressed_oops, narrowOop, oop>::type OopT;
   typedef typename Conditional<post_barrier, RawOopWriter<SelfT>, NormalOopWriter<SelfT> >::type OopWriterT;
   typedef typename Conditional<g1gc, NoKeepalive, HandleKeepalive>::type KeepaliveObjectT;
 
   static const bool _compressed_oops = compressed_oops;
   static const bool _post_barrier = post_barrier;
-  static const bool allow_stubs = gen_stubs && post_barrier && compressed_oops;
-  static const bool has_young = use_chunks;
-  static const bool full_stack = full;
+  static const bool _slow_flags = slow_flags;
+  // static const bool allow_stubs = gen_stubs && post_barrier && compressed_oops;
+  // static const bool has_young = use_chunks;
+  // static const bool full_stack = full;
 
   template<op_mode mode>
-  static int freeze(JavaThread* thread, FrameInfo* fi) {
-    return freeze0<SelfT, mode>(thread, fi);
+  static int freeze(JavaThread* thread, FrameInfo* fi, bool preempt) {
+    return freeze0<SelfT, mode>(thread, fi, preempt);
   }
 
   template<op_mode mode>
@@ -5767,7 +5770,7 @@ public:
   }
 
   static void print() {
-    tty->print_cr(">>> Config compressed_oops: %d post_barrier: %d allow_stubs: %d use_chunks: %d", _compressed_oops, _post_barrier, allow_stubs, has_young);
+    tty->print_cr(">>> Config compressed_oops: %d post_barrier: %d allow_stubs: %d use_chunks: %d slow_flags: %d", _compressed_oops, _post_barrier, LoomGenCode && _compressed_oops && _post_barrier, UseContinuationChunks, _slow_flags);
     tty->print_cr(">>> Config UseAVX: %ld UseUnalignedLoadStores: %d Enhanced REP MOVSB: %d Fast Short REP MOVSB: %d rdtscp: %d rdpid: %d", UseAVX, UseUnalignedLoadStores, VM_Version::supports_erms(), VM_Version::supports_fsrm(), VM_Version::supports_rdtscp(), VM_Version::supports_rdpid());
     tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
   }
@@ -5785,55 +5788,60 @@ public:
   template <bool use_compressed>
   static void resolve_modref() {
     BarrierSet::barrier_set()->is_a(BarrierSet::ModRef)
-      ? resolve_gencode<use_compressed, true>()
-      : resolve_gencode<use_compressed, false>();
+      ? resolve_g1<use_compressed, true>()
+      : resolve_g1<use_compressed, false>();
   }
 
   template <bool use_compressed, bool is_modref>
-  static void resolve_gencode() {
-    LoomGenCode
-      ? resolve_g1<use_compressed, is_modref, true>()
-      : resolve_g1<use_compressed, is_modref, false>();
-  }
-
-  template <bool use_compressed, bool is_modref, bool gencode>
   static void resolve_g1() {
     UseG1GC && UseContinuationStrong
-      ? resolve_use_chunks<use_compressed, is_modref, gencode, true>()
-      : resolve_use_chunks<use_compressed, is_modref, gencode, false>();
+      ? resolve_slow_flags<use_compressed, is_modref, true>()
+      : resolve_slow_flags<use_compressed, is_modref, false>();
   }
 
-  template <bool use_compressed, bool is_modref, bool gencode, bool g1gc>
-  static void resolve_use_chunks() {
-    UseContinuationChunks
-      ? resolve_full_stack<use_compressed, is_modref, gencode, g1gc, true>()
-      : resolve_full_stack<use_compressed, is_modref, gencode, g1gc, false>();
+  template <bool use_compressed, bool is_modref, bool g1gc>
+  static void resolve_slow_flags() {
+    (!LoomGenCode && use_compressed && is_modref)
+    || !UseContinuationLazyCopy
+      ? resolve<use_compressed, is_modref, g1gc, true>()
+      : resolve<use_compressed, is_modref, g1gc, false>();
   }
+  // template <bool use_compressed, bool is_modref, bool g1gc>
+  // static void resolve_gencode() {
+  //   LoomGenCode
+  //     ? resolve_use_chunks<use_compressed, is_modref, g1gc, true>()
+  //     : resolve_use_chunks<use_compressed, is_modref, g1gc, false>();
+  // }
 
-  template <bool use_compressed, bool is_modref, bool gencode, bool g1gc, bool use_chunks>
-  static void resolve_full_stack() {
-    (!UseContinuationLazyCopy)
-      ? resolve<use_compressed, is_modref, gencode, g1gc, use_chunks, true>()
-      : resolve<use_compressed, is_modref, gencode, g1gc, use_chunks, false>();
-  }
+  // template <bool use_compressed, bool is_modref, bool g1gc, bool gencode>
+  // static void resolve_use_chunks() {
+  //   UseContinuationChunks
+  //     ? resolve_full_stack<use_compressed, is_modref, g1gc, gencode, true>()
+  //     : resolve_full_stack<use_compressed, is_modref, g1gc, gencode, false>();
+  // }
 
-  template <bool use_compressed, bool is_modref, bool gencode, bool g1gc, bool use_chunks, bool full>
+  // template <bool use_compressed, bool is_modref, bool g1gc, bool gencode, bool use_chunks>
+  // static void resolve_full_stack() {
+  //   (!UseContinuationLazyCopy)
+  //     ? resolve<use_compressed, is_modref, gencode, use_chunks, g1gc, true>()
+  //     : resolve<use_compressed, is_modref, gencode, use_chunks, g1gc, false>();
+  // }
+
+  template <bool use_compressed, bool is_modref, bool g1gc, bool slow_flags>
   static void resolve() {
-    typedef Config<use_compressed, is_modref, gencode, g1gc, use_chunks, full> SelectedConfigT;
+    typedef Config<use_compressed, is_modref, g1gc, slow_flags> SelectedConfigT;
     // SelectedConfigT::print();
 
     cont_freeze_fast    = SelectedConfigT::template freeze<mode_fast>;
     cont_freeze_slow    = SelectedConfigT::template freeze<mode_slow>;
-    cont_freeze_preempt = SelectedConfigT::template freeze<mode_preempt>;
     cont_freeze_chunk_memcpy = resolve_freeze_chunk_memcpy();
 
     cont_thaw_fast    = SelectedConfigT::template thaw<mode_fast>;
     cont_thaw_slow    = SelectedConfigT::template thaw<mode_slow>;
-    cont_thaw_preempt = SelectedConfigT::template thaw<mode_preempt>;
     cont_thaw_chunk_memcpy = resolve_thaw_chunk_memcpy();
 
     cont_freeze_oops_slow = (FreezeFnT) FreezeCompiledOops<typename SelectedConfigT::OopWriterT>::slow_path;
-    if (SelectedConfigT::allow_stubs) {
+    if (LoomGenCode && SelectedConfigT::_compressed_oops && SelectedConfigT::_post_barrier) {
       cont_freeze_oops_generate = (FreezeFnT) FreezeCompiledOops<typename SelectedConfigT::OopWriterT>::generate_stub;
     } else {
       cont_freeze_oops_generate = cont_freeze_oops_slow;
