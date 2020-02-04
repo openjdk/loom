@@ -924,12 +924,21 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
     jshort vthread_state = java_lang_VirtualThread::state(thread_oop);
-    jint state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
-    if (java_lang_Thread::interrupted(thread_oop)) {
-      state |= JVMTI_THREAD_STATE_INTERRUPTED;
+
+    if (vthread_state != java_lang_VirtualThread::RUNNING) {
+      jint state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
+      if (java_lang_Thread::interrupted(thread_oop)) {
+        state |= JVMTI_THREAD_STATE_INTERRUPTED;
+      }
+      *thread_state_ptr = state;
+      return JVMTI_ERROR_NONE;
     }
-    *thread_state_ptr = state;
-    return JVMTI_ERROR_NONE;
+
+    // Need a coordination with carrier thread and state recheck in a VM op.
+    VM_VirtualThreadGetThreadState op(Handle(current_thread, thread_oop), thread_state_ptr);
+    VMThread::execute(&op);
+
+    return op.result();
   }
 
   // get most state bits

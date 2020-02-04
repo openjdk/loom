@@ -744,6 +744,24 @@ public:
   void doit();
 };
 
+// VM operation get to virtual thread state at safepoint.
+class VM_VirtualThreadGetThreadState : public VM_Operation {
+private:
+  Handle _vthread_h;
+  jint *_state_ptr;
+  jvmtiError _result;
+
+public:
+  VM_VirtualThreadGetThreadState(Handle vthread_h, jint *state_ptr) {
+    _vthread_h = vthread_h;
+    _state_ptr = state_ptr;
+    _result = JVMTI_ERROR_NONE;
+  }
+  VMOp_Type type() const { return VMOp_VirtualThreadGetThreadState; }
+  jvmtiError result()    { return _result; }
+  void doit();
+};
+
 
 // ResourceTracker
 //

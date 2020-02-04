@@ -587,6 +587,8 @@ class java_lang_VirtualThread : AllStatic {
   static int _state_offset;
   // keep in sync with java.lang.VirtualThread
   static int _jfrTraceId_offset;
+
+ public:
   enum {
     NEW          = 0,
     STARTED      = 1,
@@ -598,7 +600,6 @@ class java_lang_VirtualThread : AllStatic {
     WALKINGSTACK = 51,
     TERMINATED   = 99,
   };
- public:
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 

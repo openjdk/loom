@@ -93,6 +93,7 @@
   template(VirtualThreadGetCurrentContendedMonitor) \
   template(VirtualThreadGetOwnedMonitorInfo)      \
   template(VirtualThreadGetThread)                \
+  template(VirtualThreadGetThreadState)           \
   template(VirtualThreadGetStackTrace)            \
   template(VirtualThreadGetFrameCount)            \
   template(VirtualThreadGetFrameLocation)         \
