@@ -372,7 +372,6 @@ static bool requires_barriers(oop obj) {
 enum op_mode {
   mode_fast,   // only compiled frames
   mode_slow,   // possibly interpreted frames
-  mode_preempt // top frame is safepoint stub (forced preemption)
 };
 
 // Represents a stack frame on the horizontal stack, analogous to the frame class, for vertical-stack frames.
@@ -1604,14 +1603,13 @@ enum freeze_result {
   freeze_retry_slow = 5,
 };
 
-typedef int (*FreezeContFnT)(JavaThread*, FrameInfo*);
+typedef int (*FreezeContFnT)(JavaThread*, FrameInfo*, bool);
 
 static void freeze_compiled_frame_bp() {}
 static void thaw_compiled_frame_bp() {}
 
 static FreezeContFnT cont_freeze_fast = NULL;
 static FreezeContFnT cont_freeze_slow = NULL;
-static FreezeContFnT cont_freeze_preempt = NULL;
 
 static ThawFnT cont_thaw_oops_slow = NULL;
 
@@ -1626,11 +1624,10 @@ public:
 };
 
 template<op_mode mode>
-static int cont_freeze(JavaThread* thread, FrameInfo* fi) {
+static int cont_freeze(JavaThread* thread, FrameInfo* fi, bool preempt) {
   switch (mode) {
-    case mode_fast:    return cont_freeze_fast   (thread, fi);
-    case mode_slow:    return cont_freeze_slow   (thread, fi);
-    case mode_preempt: return cont_freeze_preempt(thread, fi);
+    case mode_fast:    return cont_freeze_fast   (thread, fi, preempt);
+    case mode_slow:    return cont_freeze_slow   (thread, fi, preempt);
     default:
       guarantee(false, "unreachable");
       return -1;
@@ -2110,7 +2107,7 @@ void FreezeOopVerify::verify<oop>(oop* addr) {
 
 template <typename ConfigT, op_mode mode>
 class Freeze {
-  typedef typename Conditional<mode == mode_preempt, RegisterMap, SmallRegisterMap>::type RegisterMapT;
+  typedef typename Conditional<mode == mode_slow, RegisterMap, SmallRegisterMap>::type RegisterMapT; // we need a full map to store the register dump for a safepoint stub during preemtion
   typedef Freeze<ConfigT, mode> SelfT;
   typedef CompiledMethodKeepalive<ConfigT> CompiledMethodKeepaliveT;
 
@@ -2129,6 +2126,7 @@ private:
 
   RegisterMapT _map;
 
+  bool _preempt;
   frame _safepoint_stub;
   hframe _safepoint_stub_h;
   bool  _safepoint_stub_caller;
@@ -2154,6 +2152,7 @@ public:
     _thread(thread), _cont(mirror),
     _oops(0), _size(0), _frames(0), _cgrind_interpreted_frames(0),
     _fp_oop_info(), _map(thread, false, false, false),
+    _preempt(false),
     _safepoint_stub_caller(false), _keepalive(NULL) {
 
     _fi = fi;
@@ -2228,8 +2227,18 @@ public:
         e.commit();
       }
     }
+    return freeze_no_chunk();
+  }
+
+  freeze_result freeze_preempt() {
+    _preempt = true;
+    return freeze_no_chunk();
+  }
+
+  freeze_result freeze_no_chunk() {
     log_develop_trace(jvmcont)("no young freeze mode: %d #" INTPTR_FORMAT, mode, _cont.hash());
 
+    assert (mode == mode_slow || !_preempt, "");
     assert (_thread->thread_state() == _thread_in_vm, "");
 
     _cont.read_rest();
@@ -2240,12 +2249,12 @@ public:
 
     // assert (map.update_map(), "RegisterMap not set to update");
     assert (!_map.include_argument_oops(), "should be");
-    frame f = freeze_start_frame(_map);
+    frame f = freeze_start_frame();
     hframe caller;
     freeze_result res = freeze<true>(f, caller, 0);
 
     if (res == freeze_ok) {
-      _cont.set_flag(FLAG_SAFEPOINT_YIELD, mode == mode_preempt);
+      _cont.set_flag(FLAG_SAFEPOINT_YIELD, _preempt);
       _cont.write(); // commit the freeze
       DEBUG_ONLY(verify();)
     }
@@ -2634,17 +2643,23 @@ public:
     return jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk);
   }
 
-  frame freeze_start_frame(SmallRegisterMap& ignored) {
-    // if (mode == mode_preempt) // TODO: we should really do partial specialization, but then we'll need to define this out-of-line
-    //   return freeze_start_frame_safepoint_stub();
+  frame freeze_start_frame() {
+    if (mode == mode_fast) {
+       // Note: if the doYield stub does not have its own frame, we may need to consider deopt here, especially if yield is inlinable
+      return freeze_start_frame_yield_stub(ContinuationHelper::last_frame(_thread)); // thread->last_frame();
+    }
 
-    assert (mode != mode_preempt, "");
+    frame f = _thread->last_frame();
+    if (LIKELY(!_preempt)) {
+      assert (StubRoutines::cont_doYield_stub()->contains(f.pc()), "");
+      return freeze_start_frame_yield_stub(f);
+    } else {
+      return freeze_start_frame_safepoint_stub(f);
+    }
+  }
 
+  frame freeze_start_frame_yield_stub(frame f) {
     log_develop_trace(jvmcont)("%s nop at freeze yield", nativePostCallNop_at(_fi->pc) != NULL ? "has" : "no");
-
-    // Note: if the doYield stub does not have its own frame, we may need to consider deopt here, especially if yield is inlinable
-    frame f = ContinuationHelper::last_frame(_thread); // thread->last_frame();
-
     assert(StubRoutines::cont_doYield_stub()->contains(f.pc()), "must be");
     assert (f.sp() + slow_get_cb(f)->frame_size() == _fi->sp, "f.sp: %p size: %d fi->sp: %p", f.sp(), slow_get_cb(f)->frame_size(), _fi->sp);
   #ifdef ASSERT
@@ -2666,11 +2681,9 @@ public:
     return f;
   }
 
-  frame freeze_start_frame(RegisterMap& ignored) {
-    assert (mode == mode_preempt, "");
+  frame freeze_start_frame_safepoint_stub(frame f) {
+    assert (mode == mode_slow, "");
 
-    // safepoint yield
-    frame f = _thread->last_frame();
     f.set_fp(f.real_fp()); // Instead of this, maybe in ContMirror::set_last_frame always use the real_fp? // TODO PD
     if (Interpreter::contains(f.pc())) {
       log_develop_trace(jvmcont)("INTERPRETER SAFEPOINT");
@@ -2684,7 +2697,7 @@ public:
       assert (is_stub(f.cb()), "must be");
       assert (f.oop_map() != NULL, "must be");
       ContinuationHelper::update_register_map<StubF>(&_map, f);
-      f.oop_map()->update_register_map(&f, &_map); // we have callee-save registers in this case
+      f.oop_map()->update_register_map(&f, (RegisterMap*)&_map); // we have callee-save registers in this case
     }
 
     // Log(jvmcont) logv; LogStream st(logv.debug()); f.print_on(st);
@@ -2701,7 +2714,7 @@ public:
   template<bool top>
   NOINLINE freeze_result freeze(const frame& f, hframe& caller, int callee_argsize) {
     assert (f.unextended_sp() < _bottom_address - SP_WIGGLE, ""); // see recurse_freeze_java_frame
-    assert (f.is_interpreted_frame() || ((top && mode == mode_preempt) == is_stub(f.cb())), "");
+    assert (f.is_interpreted_frame() || ((top && _preempt) == is_stub(f.cb())), "");
     assert (mode != mode_fast || (!f.is_interpreted_frame() && slow_get_cb(f)->is_compiled()), "");
     assert (mode != mode_fast || !f.is_deoptimized_frame(), "");
 
@@ -2729,7 +2742,7 @@ public:
       if (Interpreted::is_owning_locks(f)) return freeze_pinned_monitor;
 
       return recurse_freeze_interpreted_frame<top>(f, caller, callee_argsize);
-    } else if (mode == mode_preempt && top && is_stub(f.cb())) {
+    } else if (mode == mode_slow && _preempt && top && is_stub(f.cb())) {
       return recurse_freeze_stub_frame(f, caller);
     } else {
       return freeze_pinned_native;
@@ -2757,7 +2770,7 @@ public:
       }
     } else {
       bool safepoint_stub_caller; // the use of _safepoint_stub_caller is not nice, but given preemption being performance non-critical, we don't want to add either a template or a regular parameter
-      if (mode == mode_preempt) {
+      if (mode == mode_slow && _preempt) {
         safepoint_stub_caller = _safepoint_stub_caller;
         _safepoint_stub_caller = false;
       }
@@ -2770,7 +2783,7 @@ public:
       if (UNLIKELY(result != freeze_ok))
         return result;
 
-      if (mode == mode_preempt) _safepoint_stub_caller = safepoint_stub_caller; // restore _stub_caller
+      if (mode == mode_slow && _preempt) _safepoint_stub_caller = safepoint_stub_caller; // restore _stub_caller
 
       freeze_java_frame<FKind, top, false, IsKeepalive>(f, caller, fsize, argsize, oops, extra, kd);
     }
@@ -3130,14 +3143,14 @@ public:
     freeze_raw_frame(vsp, hsp, fsize);
 
     if (!FKind::stub) {
-      if (mode == mode_preempt && _safepoint_stub_caller) {
+      if (mode == mode_slow && _preempt && _safepoint_stub_caller) {
         _safepoint_stub_h = freeze_safepoint_stub(hf);
       }
 
       // The keepalive must always be written. If IsKeepalive is false it means that the
       // keepalive object already existed, it must still be written.
-      // kd is always !null unless we are in mode_preempt which is handled above.
-      if (mode == mode_preempt) {
+      // kd is always !null unless we are in preemption mode which is handled above.
+      if (mode == mode_slow && _preempt) {
         if (kd != NULL) {
           kd->write_at(_cont, hf.ref_sp() + oops - 1);
         }
@@ -3149,7 +3162,7 @@ public:
 
       freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp(), oops - 1, (void*)freeze_stub);
 
-      if (mode == mode_preempt && _safepoint_stub_caller) {
+      if (mode == mode_slow && _preempt && _safepoint_stub_caller) {
         assert (!_fp_oop_info._has_fp_oop, "must be");
         _safepoint_stub = frame();
       }
@@ -3172,7 +3185,7 @@ public:
   int freeze_compiled_oops(const frame& f, intptr_t* vsp, intptr_t* hsp, int starting_index, FreezeFnT stub) {
     typename FreezeCompiledOops <typename ConfigT::OopWriterT>::Extra extra(&f, &_cont, (address*) &_map);
 
-    if (mode == mode_preempt && _safepoint_stub_caller) {
+    if (mode == mode_slow && _preempt && _safepoint_stub_caller) {
       assert (!_safepoint_stub.is_empty(), "");
       extra.set_stub_vsp(StubF::frame_top(_safepoint_stub));
 #ifndef PRODUCT
@@ -3185,7 +3198,7 @@ public:
     int idx = _cont.refStack()->length() - starting_index; // RB: I think this is unused in the fast path...
     intptr_t** link_addr = Frame::callee_link_address(f); // Frame::map_link_address(map);
 
-    if (mode == mode_preempt) {
+    if (mode == mode_slow && _preempt) {
       return FreezeCompiledOops<typename ConfigT::OopWriterT>::slow_path_preempt((address) vsp, (address) addr, (address) link_addr, (address) hsp, idx, &_fp_oop_info, &extra, _safepoint_stub_caller);
     } else {
       return stub((address) vsp, (address) addr, (address) link_addr, (address) hsp, idx, &_fp_oop_info, (address) &extra);
@@ -3203,7 +3216,7 @@ public:
 
     if (log_develop_is_enabled(Trace, jvmcont)) {
       log_develop_trace(jvmcont)("top_hframe after (freeze):");
-      _cont.last_frame<mode_preempt>().print_on(_cont, tty);
+      _cont.last_frame<mode_slow>().print_on(_cont, tty);
     }
 
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == _cont.last_frame<mode>().is_interpreted_frame(), "");
@@ -3217,7 +3230,7 @@ public:
     _size += fsize;
     _frames++;
 
-    assert (mode == mode_preempt, "");
+    assert (mode == mode_slow && _preempt, "");
     _safepoint_stub = f;
 
   #ifdef ASSERT
@@ -3242,7 +3255,7 @@ public:
   NOINLINE hframe freeze_safepoint_stub(hframe& caller) {
     log_develop_trace(jvmcont)("== FREEZING STUB FRAME:");
 
-    assert(mode == mode_preempt, "");
+    assert(mode == mode_slow && _preempt, "");
     assert(!_safepoint_stub.is_empty(), "");
 
     int fsize = StubF::size(_safepoint_stub);
@@ -3356,7 +3369,7 @@ static inline int freeze_epilog(JavaThread* thread, FrameInfo* fi, ContMirror& c
 //      unless freezing has failed, in which case fi->pc = 0
 //      However, fi->fp points to the _address_ on the stack of the entry frame's link to its caller (so *(fi->fp) is the fp)
 template<typename ConfigT, op_mode mode>
-int freeze0(JavaThread* thread, FrameInfo* fi) {
+int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
   //callgrind();
   PERFTEST_ONLY(PERFTEST_LEVEL = ContPerfTest;)
 
@@ -3388,16 +3401,7 @@ int freeze0(JavaThread* thread, FrameInfo* fi) {
   }
 
   Freeze<ConfigT, mode> fr(thread, fi, cont);
-  if (mode == mode_preempt) {
-    assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "thread->thread_state(): %d", thread->thread_state());
-
-    freeze_result res = fr.freeze(false);
-    if (res != freeze_ok) {
-      assert (verify_continuation<12>(cont.mirror()), "");
-      return early_return(res, thread, fi);
-    }
-    return freeze_epilog(thread, fi, cont, event);
-  } else if (mode == mode_fast && fr.is_chunk_available()) {
+  if (mode == mode_fast && fr.is_chunk_available()) {
     // no transition
     log_develop_trace(jvmcont)("chunk available; no transition");
     freeze_result res = fr.freeze(true);
@@ -3411,10 +3415,16 @@ int freeze0(JavaThread* thread, FrameInfo* fi) {
     debug_only(VMEntryWrapper __vew;)
     assert (thread->thread_state() == _thread_in_vm, "");
 
-    freeze_result res = fr.freeze(false);
-    if (UNLIKELY(res == freeze_retry_slow)) {
-      log_develop_trace(jvmcont)("-- RETRYING SLOW --");
-      res = Freeze<ConfigT, mode_slow>(thread, fi, cont).freeze(false);
+    freeze_result res;
+    if (mode != mode_fast && UNLIKELY(preempt)) {
+      assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "thread->thread_state(): %d", thread->thread_state());
+      res = fr.freeze_preempt();
+    } else {
+      res = fr.freeze(false);
+      if (UNLIKELY(res == freeze_retry_slow)) {
+        log_develop_trace(jvmcont)("-- RETRYING SLOW --");
+        res = Freeze<ConfigT, mode_slow>(thread, fi, cont).freeze(false);
+      }
     }
     if (UNLIKELY(res != freeze_ok)) {
       assert (verify_continuation<11>(cont.mirror()), "");
@@ -3462,8 +3472,8 @@ int Continuation::freeze(JavaThread* thread, FrameInfo* fi, bool from_interprete
   assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
   fast = fast && thread->held_monitor_count() == 0;
   // tty->print_cr(">>> freeze fast: %d thread->cont_fastpath(): %d from_interpreter: %d", fast, thread->cont_fastpath(), from_interpreter);
-  return fast ? cont_freeze<mode_fast>(thread, fi)
-              : cont_freeze<mode_slow>(thread, fi);
+  return fast ? cont_freeze<mode_fast>(thread, fi, false)
+              : cont_freeze<mode_slow>(thread, fi, false);
 }
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint) {
@@ -3554,7 +3564,7 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
   // TODO: save return value
 
   FrameInfo fi;
-  int res = cont_freeze<mode_preempt>(thread, &fi); // CAST_TO_FN_PTR(DoYieldStub, StubRoutines::cont_doYield_C())(-1);
+  int res = cont_freeze<mode_slow>(thread, &fi, true); // CAST_TO_FN_PTR(DoYieldStub, StubRoutines::cont_doYield_C())(-1);
   if (res == 0) { // success
     thread->_cont_frame = fi;
     thread->set_cont_preempt(true);
@@ -3573,14 +3583,12 @@ typedef bool (*ThawContFnT)(JavaThread*, ContMirror&, FrameInfo*, bool);
 
 static ThawContFnT cont_thaw_fast = NULL;
 static ThawContFnT cont_thaw_slow = NULL;
-static ThawContFnT cont_thaw_preempt = NULL;
 
 template<op_mode mode>
 static bool cont_thaw(JavaThread* thread, ContMirror& cont, FrameInfo* fi, bool return_barrier) {
   switch (mode) {
     case mode_fast:    return cont_thaw_fast   (thread, cont, fi, return_barrier);
     case mode_slow:    return cont_thaw_slow   (thread, cont, fi, return_barrier);
-    case mode_preempt: return cont_thaw_preempt(thread, cont, fi, return_barrier);
     default:
       guarantee(false, "unreachable");
       return false;
@@ -3639,7 +3647,7 @@ JRT_END
 
 template <typename ConfigT, op_mode mode>
 class Thaw {
-  typedef typename Conditional<mode == mode_preempt, RegisterMap, SmallRegisterMap>::type RegisterMapT;
+  typedef typename Conditional<mode == mode_slow, RegisterMap, SmallRegisterMap>::type RegisterMapT; // we need a full map to store the register dump for a safepoint stub during preemtion
 
 private:
   JavaThread* _thread;
@@ -3650,6 +3658,7 @@ private:
 
   RegisterMapT _map; // map is only passed to thaw_compiled_frame for use in deoptimize, which uses it only for biased locks; we may not need deoptimize there at all -- investigate
 
+  bool _preempt;
   const hframe* _safepoint_stub;
   bool _safepoint_stub_caller;
   frame _safepoint_stub_f;
@@ -3683,6 +3692,7 @@ public:
     _thread(thread), _cont(mirror),
     _fastpath(true),
     _map(thread, false, false, false),
+    _preempt(false),
     _safepoint_stub(NULL), _safepoint_stub_caller(false) {
 
     _map.set_include_argument_oops(false);
@@ -3699,6 +3709,10 @@ public:
 
     DEBUG_ONLY(int orig_num_frames = java_lang_Continuation::numFrames(_cont.mirror());/*_cont.num_frames();*/)
     DEBUG_ONLY(_frames = 0;)
+
+    if (mode == mode_slow && _cont.is_flag(FLAG_SAFEPOINT_YIELD)) {
+      _preempt = true;
+    }
 
     thaw<true>(return_barrier);
 
@@ -3719,6 +3733,8 @@ public:
 
   template<bool top>
   intptr_t* thaw(bool return_barrier) {
+    assert (mode == mode_slow || !_preempt, "");
+
     oop chunk = _cont.tail();
     if (chunk == (oop)NULL) {
       EventContinuationThawOld e;
@@ -4005,7 +4021,7 @@ public:
     assert (num_frames > 0 && !hf.is_empty(), "");
 
     // Dynamically branch on frame type
-    if (mode == mode_preempt && top && !hf.is_interpreted_frame()) {
+    if (mode == mode_slow && _preempt && top && !hf.is_interpreted_frame()) {
       assert (is_stub(hf.cb()), "");
       recurse_stub_frame(hf, caller, num_frames);
     } else if (mode == mode_fast || !hf.is_interpreted_frame()) {
@@ -4031,14 +4047,14 @@ public:
       thaw_java_frame<FKind, top, true>(hf, caller, extra);
     } else {
       bool safepoint_stub_caller; // the use of _safepoint_stub_caller is not nice, but given preemption being performance non-critical, we don't want to add either a template or a regular parameter
-      if (mode == mode_preempt) {
+      if (mode == mode_slow && _preempt) {
         safepoint_stub_caller = _safepoint_stub_caller;
         _safepoint_stub_caller = false;
       }
 
       thaw<false>(hsender, caller, num_frames - 1); // recurse
 
-      if (mode == mode_preempt) _safepoint_stub_caller = safepoint_stub_caller; // restore _stub_caller
+      if (mode == mode_slow && _preempt) _safepoint_stub_caller = safepoint_stub_caller; // restore _stub_caller
 
       thaw_java_frame<FKind, top, false>(hf, caller, extra);
     }
@@ -4297,7 +4313,7 @@ public:
     thaw_raw_frame(hsp, vsp, fsize);
 
     if (!FKind::stub) {
-      if (mode == mode_preempt && _safepoint_stub_caller) {
+      if (mode == mode_slow && _preempt && _safepoint_stub_caller) {
         _safepoint_stub_f = thaw_safepoint_stub(f);
       }
 
@@ -4336,7 +4352,7 @@ public:
 
     ThawCompiledOops::Extra extra(&f, &_cont, (address*) &_map, starting_index);
     typename ConfigT::OopT* addr = _cont.refStack()->template obj_at_address<typename ConfigT::OopT>(starting_index);
-    if (mode == mode_preempt) {
+    if (mode == mode_slow && _preempt) {
       return ThawCompiledOops::slow_path_preempt((address) vsp, (address) addr, (address)frame_callee_info_address(f), &extra);
     } else {
       return stub((address) vsp, (address) addr, (address)frame_callee_info_address(f), (address) &extra);
@@ -4374,14 +4390,14 @@ public:
 
     Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
 
-    assert (mode == mode_preempt || !CONT_FULL_STACK || assert_top_java_frame_name(f, YIELD0_SIG), "");
+    assert ((mode == mode_slow &&_preempt) || !CONT_FULL_STACK || assert_top_java_frame_name(f, YIELD0_SIG), "");
   }
 
   void recurse_stub_frame(const hframe& hf, frame& caller, int num_frames) {
     log_develop_trace(jvmcont)("Found safepoint stub");
 
     assert (num_frames > 1, "");
-    assert (mode == mode_preempt, "");
+    assert (mode == mode_slow &&_preempt, "");
     assert(!hf.is_bottom<StubF>(_cont), "");
 
     assert (hf.compiled_frame_num_oops() == 0, "");
@@ -4406,7 +4422,7 @@ public:
     // before thawing the oops in its sender, as the oops will need to be written to that stub frame.
     log_develop_trace(jvmcont)("THAWING SAFEPOINT STUB");
 
-    assert(mode == mode_preempt, "");
+    assert(mode == mode_slow &&_preempt, "");
     assert (_safepoint_stub != NULL, "");
 
     hframe stubf = *_safepoint_stub;
@@ -4506,7 +4522,7 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   bool res; // whether only compiled frames are thawed
   if (UNLIKELY(cont.is_flag(FLAG_SAFEPOINT_YIELD))) {
     int java_frame_count = maybe_count_Java_frames(cont, return_barrier);
-    res = cont_thaw<mode_preempt>(thread, cont, fi, return_barrier);
+    res = cont_thaw<mode_slow>(thread, cont, fi, return_barrier);
     post_JVMTI_continue(thread, fi, java_frame_count, return_barrier);
   } else if (LIKELY(can_thaw_fast(cont))) {
     res = cont_thaw<mode_fast>(thread, cont, fi, return_barrier);
@@ -4800,7 +4816,7 @@ static frame chunk_top_frame(oop chunk) {
 }
 
 static frame continuation_body_top_frame(ContMirror& cont, RegisterMap* map) {
-  hframe hf = cont.last_frame<mode_preempt>(); // here mode_preempt merely makes the fewest assumptions
+  hframe hf = cont.last_frame<mode_slow>(); // here mode_slow merely makes the fewest assumptions
   assert (!hf.is_empty(), "");
 
   // tty->print_cr(">>>> continuation_top_frame");
@@ -6051,14 +6067,14 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   const bool is_empty = cont.is_empty();
   assert (!nonempty_chunk || !is_empty, "");
   assert (is_empty == (cont.max_size() == 0), "cont.is_empty(): %d cont.max_size(): %lu cont: 0x%lx", is_empty, cont.max_size(), cont.mirror()->identity_hash());
-  assert (is_empty == (!nonempty_chunk && cont.last_frame<mode_preempt>().is_empty()), "");
+  assert (is_empty == (!nonempty_chunk && cont.last_frame<mode_slow>().is_empty()), "");
 
   int frames = 0;
   int interpreted_frames = 0;
   int oops = 0;
   int callee_argsize = 0;
   bool callee_compiled = nonempty_chunk;
-  for (hframe hf = cont.last_frame<mode_preempt>(); !hf.is_empty(); hf = hf.sender<mode_preempt>(cont)) {
+  for (hframe hf = cont.last_frame<mode_slow>(); !hf.is_empty(); hf = hf.sender<mode_slow>(cont)) {
     assert (frames > 0 || (hf.is_interpreted_frame() == cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)), "");
     assert (frames > 0 || ((!hf.is_interpreted_frame() && is_stub(hf.cb())) == cont.is_flag(FLAG_SAFEPOINT_YIELD)), "");
     if (hf.is_interpreted_frame()) {
@@ -6114,7 +6130,7 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
 
   st->print_cr("frames: %d interpreted frames: %d oops: %d", cont.num_frames(), cont.num_interpreted_frames(), cont.num_oops());
   int frames = 0;
-  for (hframe hf = cont.last_frame<mode_preempt>(); !hf.is_empty(); hf = hf.sender<mode_preempt>(cont)) {
+  for (hframe hf = cont.last_frame<mode_slow>(); !hf.is_empty(); hf = hf.sender<mode_slow>(cont)) {
     if (hf.is_interpreted_frame()) {
       st->print_cr("* size: %d", hf.interpreted_frame_size());
     } else {

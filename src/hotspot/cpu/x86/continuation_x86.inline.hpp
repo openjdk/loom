@@ -480,9 +480,6 @@ inline void ContMirror::set_last_frame_pd(const hframe& f) {
   set_fp(f.fp());
 }
 
-/*
- * Here mode_preempt makes the fewest assumptions
- */
 template<op_mode mode /* = mode_slow*/> // TODO: add default when switching to C++11+
 const hframe ContMirror::last_frame() {
   if (is_empty0()) return hframe();
@@ -735,9 +732,9 @@ static inline frame sender_for_compiled_frame(const frame& f) {
   // tty->print_cr(">>> slow sender1");
 #endif
 
-  assert (mode == mode_preempt || !FKind::stub || StubRoutines::cont_doYield_stub()->contains(f.pc()), "must be");
-  assert (mode == mode_preempt || !FKind::stub || slow_get_cb(f)->frame_size() == 5, "must be");
-  intptr_t** link_addr = (mode != mode_preempt && FKind::stub) ? noninterpreted_link_address(f.unextended_sp(), 5) : link_address<FKind>(f);
+  assert (mode == mode_slow || !FKind::stub || StubRoutines::cont_doYield_stub()->contains(f.pc()), "must be");
+  assert (mode == mode_slow || !FKind::stub || slow_get_cb(f)->frame_size() == 5, "must be");
+  intptr_t** link_addr = (mode != mode_slow && FKind::stub) ? noninterpreted_link_address(f.unextended_sp(), 5) : link_address<FKind>(f);
 
   intptr_t* sender_sp = (intptr_t*)(link_addr + frame::sender_sp_offset); //  f.unextended_sp() + (fsize/wordSize); // 
   address sender_pc = (address) *(sender_sp-1);
