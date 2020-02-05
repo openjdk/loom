@@ -69,7 +69,7 @@ typedef struct ThreadNode {
     unsigned int pendingInterrupt : 1; /* true if thread is interrupted while handling an event. */
     unsigned int isDebugThread : 1;    /* true if this is one of our debug agent threads. */
     unsigned int suspendOnStart : 1;   /* true for new threads if we are currently in a VM.suspend(). */
-    unsigned int isStarted : 1;        /* THREAD_START or FIBER_SCHEDULED event received. */
+    unsigned int isStarted : 1;        /* THREAD_START or VIRTUAL_THREAD_SCHEDULED event received. */
     unsigned int is_fiber : 1;
     unsigned int popFrameEvent : 1;
     unsigned int popFrameProceed : 1;

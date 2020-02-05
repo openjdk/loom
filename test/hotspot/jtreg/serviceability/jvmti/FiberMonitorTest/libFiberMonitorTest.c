@@ -160,10 +160,10 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject moni
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetThreadFiber(jvmti, thread, &fiber);
+  err = (*jvmti)->GetVirtualThread(jvmti, thread, &fiber);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
-                     "error in JVMTI GetThreadFiber");
+                     "error in JVMTI GetVirtualThread");
     event_has_posted = JNI_TRUE;
     status = FAILED;
     return;
@@ -195,10 +195,10 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject mo
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetThreadFiber(jvmti, thread, &fiber);
+  err = (*jvmti)->GetVirtualThread(jvmti, thread, &fiber);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
-                     "error in JVMTI GetThreadFiber");
+                     "error in JVMTI GetVirtualThread");
     status = FAILED;
     return;
   }
@@ -292,7 +292,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     fprintf(stderr, "Warning: GetOwnedMonitorInfo is not implemented\n");
     return JNI_ERR;
   }
-  if (!caps.can_support_fibers) {
+  if (!caps.can_support_virtual_threads) {
     fprintf(stderr, "Warning: virtual threads are not supported\n");
     return JNI_ERR;
   }

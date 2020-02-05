@@ -3703,30 +3703,30 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadStarted(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadStarted");
-  if (JvmtiExport::should_post_fiber_scheduled()) {
-    JvmtiExport::post_fiber_scheduled(event_thread, vthread);
+  if (JvmtiExport::should_post_vthread_scheduled()) {
+    JvmtiExport::post_vthread_scheduled(event_thread, vthread);
   }
   JFR_ONLY(Jfr::on_thread_start(event_thread, vthread));
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadTerminated");
-  if (JvmtiExport::should_post_fiber_terminated()) {
-    JvmtiExport::post_fiber_terminated(event_thread, vthread);
+  if (JvmtiExport::should_post_vthread_terminated()) {
+    JvmtiExport::post_vthread_terminated(event_thread, vthread);
   }
   JFR_ONLY(Jfr::on_thread_exit(event_thread, vthread));
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMount(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadMount");
-  if (JvmtiExport::should_post_fiber_mount()) {
-    JvmtiExport::post_fiber_mount(event_thread, vthread);
+  if (JvmtiExport::should_post_vthread_mounted()) {
+    JvmtiExport::post_vthread_mounted(event_thread, vthread);
   }
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmount(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadUnmount");
-  if (JvmtiExport::should_post_fiber_unmount()) {
-    JvmtiExport::post_fiber_unmount(event_thread, vthread);
+  if (JvmtiExport::should_post_vthread_unmounted()) {
+    JvmtiExport::post_vthread_unmounted(event_thread, vthread);
   }
 JVM_END

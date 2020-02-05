@@ -446,15 +446,15 @@ handleEventCommandSingle(JNIEnv *env, PacketOutputStream *out,
         case EI_THREAD_END:
             writeThreadEvent(env, out, evinfo);
             break;
-        case EI_FIBER_SCHEDULED:
-        case EI_FIBER_TERMINATED:
+        case EI_VIRTUAL_THREAD_SCHEDULED:
+        case EI_VIRTUAL_THREAD_TERMINATED:
             /* Note that when we wrote the evinfo->ei byte above, it was mapped to an EI_THREAD_XXX event
-             * by eventIndex2jdwp(), so we didn't actually write the FIBER ei byte.
+             * by eventIndex2jdwp(), so we didn't actually write the VIRTUAL_THREAD ei byte.
              */
             writeThreadEvent(env, out, evinfo);
             break;
-        case EI_FIBER_MOUNT:
-        case EI_FIBER_UNMOUNT:
+        case EI_VIRTUAL_THREAD_MOUNTED:
+        case EI_VIRTUAL_THREAD_UNMOUNTED:
         case EI_CONTINUATION_RUN:
         case EI_CONTINUATION_YIELD:
             EXIT_ERROR(AGENT_ERROR_INVALID_EVENT_TYPE, "invalid event index");

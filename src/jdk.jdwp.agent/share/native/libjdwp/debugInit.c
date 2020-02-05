@@ -302,7 +302,7 @@ DEF_Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
     needed_capabilities.can_maintain_original_method_order      = 1;
     needed_capabilities.can_generate_monitor_events             = 1;
     needed_capabilities.can_tag_objects                         = 1;
-    needed_capabilities.can_support_fibers                      = 1;
+    needed_capabilities.can_support_virtual_threads             = 1;
     needed_capabilities.can_support_continuations               = 1;
 
     /* And what potential ones that would be nice to have */

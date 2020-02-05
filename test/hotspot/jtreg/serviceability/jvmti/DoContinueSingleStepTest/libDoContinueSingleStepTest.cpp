@@ -328,30 +328,30 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
 }
 
 static void JNICALL
-FiberScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
+VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
   lock_events();
-  //processFiberEvent(jvmti, jni, thread, fiber, "FiberScheduled");
+  //processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadScheduled");
   unlock_events();
 }
 
 static void JNICALL
-FiberTerminated(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
+VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
   lock_events();
-  //processFiberEvent(jvmti, jni, thread, fiber, "FiberTerminated");
+  //processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadTerminated");
   unlock_events();
 }
 
 static void JNICALL
-FiberMount(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
+VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
   lock_events();
-  //processFiberEvent(jvmti, jni, thread, fiber, "FiberMount");
+  //processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadMounted");
   unlock_events();
 }
 
 static void JNICALL
-FiberUnmount(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
+VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
   lock_events();
-  //processFiberEvent(jvmti, jni, thread, fiber, "FiberUnmount");
+  //processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadUnmounted");
   unlock_events();
 }
 
@@ -386,10 +386,10 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.FramePop    = &FramePop;
   callbacks.MethodEntry = &MethodEntry;
   callbacks.MethodExit = &MethodExit;
-  callbacks.FiberScheduled  = &FiberScheduled;
-  callbacks.FiberTerminated = &FiberTerminated;
-  callbacks.FiberMount   = &FiberMount;
-  callbacks.FiberUnmount = &FiberUnmount;
+  callbacks.VirtualThreadScheduled  = &VirtualThreadScheduled;
+  callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
+  callbacks.VirtualThreadMounted   = &VirtualThreadMounted;
+  callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
   callbacks.ContinuationRun   = &ContinuationRun;
   callbacks.ContinuationYield = &ContinuationYield;
 
@@ -399,7 +399,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   caps.can_generate_frame_pop_events = 1;
   caps.can_generate_method_entry_events = 1;
   caps.can_generate_method_exit_events = 1;
-  caps.can_support_fibers = 1;
+  caps.can_support_virtual_threads = 1;
   caps.can_support_continuations = 1;
 
   err = jvmti->AddCapabilities(&caps);
@@ -412,22 +412,22 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FIBER_SCHEDULED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FIBER_TERMINATED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FIBER_MOUNT, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FIBER_UNMOUNT, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }

@@ -90,7 +90,7 @@ class JvmtiExport : public AllStatic {
   JVMTI_SUPPORT_FLAG(can_post_frame_pop)
   JVMTI_SUPPORT_FLAG(can_pop_frame)
   JVMTI_SUPPORT_FLAG(can_force_early_return)
-  JVMTI_SUPPORT_FLAG(can_support_fibers)
+  JVMTI_SUPPORT_FLAG(can_support_virtual_threads)
   JVMTI_SUPPORT_FLAG(can_support_continuations)
 
   JVMTI_SUPPORT_FLAG(early_vmstart_recorded)
@@ -132,10 +132,10 @@ class JvmtiExport : public AllStatic {
   JVMTI_SUPPORT_FLAG(should_post_continuation_run)
   JVMTI_SUPPORT_FLAG(should_post_continuation_yield)
 
-  JVMTI_SUPPORT_FLAG(should_post_fiber_scheduled)
-  JVMTI_SUPPORT_FLAG(should_post_fiber_terminated)
-  JVMTI_SUPPORT_FLAG(should_post_fiber_mount)
-  JVMTI_SUPPORT_FLAG(should_post_fiber_unmount)
+  JVMTI_SUPPORT_FLAG(should_post_vthread_scheduled)
+  JVMTI_SUPPORT_FLAG(should_post_vthread_terminated)
+  JVMTI_SUPPORT_FLAG(should_post_vthread_mounted)
+  JVMTI_SUPPORT_FLAG(should_post_vthread_unmounted)
 
   // If flag cannot be implemented, give an error if on=true
   static void report_unsupported(bool on);
@@ -337,10 +337,10 @@ class JvmtiExport : public AllStatic {
   static void post_thread_start          (JavaThread *thread) NOT_JVMTI_RETURN;
   static void post_thread_end            (JavaThread *thread) NOT_JVMTI_RETURN;
 
-  static void post_fiber_scheduled       (jthread thread, jobject fiber) NOT_JVMTI_RETURN;
-  static void post_fiber_terminated      (jthread thread, jobject fiber) NOT_JVMTI_RETURN;
-  static void post_fiber_mount           (jthread thread, jobject fiber) NOT_JVMTI_RETURN;
-  static void post_fiber_unmount         (jthread thread, jobject fiber) NOT_JVMTI_RETURN;
+  static void post_vthread_scheduled     (jthread thread, jthread vthread) NOT_JVMTI_RETURN;
+  static void post_vthread_terminated    (jthread thread, jthread vthread) NOT_JVMTI_RETURN;
+  static void post_vthread_mounted       (jthread thread, jthread vthread) NOT_JVMTI_RETURN;
+  static void post_vthread_unmounted     (jthread thread, jthread vthread) NOT_JVMTI_RETURN;
   
   static void post_continuation_run      (JavaThread* thread, jint continuation_frame_count) NOT_JVMTI_RETURN;
   static void post_continuation_yield    (JavaThread* thread, jint continuation_frame_count) NOT_JVMTI_RETURN;

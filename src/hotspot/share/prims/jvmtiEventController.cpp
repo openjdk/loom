@@ -86,10 +86,10 @@ static const jlong  OBJECT_FREE_BIT = (((jlong)1) << (JVMTI_EVENT_OBJECT_FREE - 
 static const jlong  RESOURCE_EXHAUSTED_BIT = (((jlong)1) << (JVMTI_EVENT_RESOURCE_EXHAUSTED - TOTAL_MIN_EVENT_TYPE_VAL));
 static const jlong  VM_OBJECT_ALLOC_BIT = (((jlong)1) << (JVMTI_EVENT_VM_OBJECT_ALLOC - TOTAL_MIN_EVENT_TYPE_VAL));
 static const jlong  SAMPLED_OBJECT_ALLOC_BIT = (((jlong)1) << (JVMTI_EVENT_SAMPLED_OBJECT_ALLOC - TOTAL_MIN_EVENT_TYPE_VAL));
-static const jlong  FIBER_SCHEDULED_BIT = (((jlong)1) << (JVMTI_EVENT_FIBER_SCHEDULED - TOTAL_MIN_EVENT_TYPE_VAL));
-static const jlong  FIBER_TERMINATED_BIT = (((jlong)1) << (JVMTI_EVENT_FIBER_TERMINATED - TOTAL_MIN_EVENT_TYPE_VAL));
-static const jlong  FIBER_MOUNT_BIT = (((jlong)1) << (JVMTI_EVENT_FIBER_MOUNT - TOTAL_MIN_EVENT_TYPE_VAL));
-static const jlong  FIBER_UNMOUNT_BIT = (((jlong)1) << (JVMTI_EVENT_FIBER_UNMOUNT - TOTAL_MIN_EVENT_TYPE_VAL));
+static const jlong  VTHREAD_SCHEDULED_BIT = (((jlong)1) << (JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED - TOTAL_MIN_EVENT_TYPE_VAL));
+static const jlong  VTHREAD_TERMINATED_BIT = (((jlong)1) << (JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED - TOTAL_MIN_EVENT_TYPE_VAL));
+static const jlong  VTHREAD_MOUNTED_BIT = (((jlong)1) << (JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED - TOTAL_MIN_EVENT_TYPE_VAL));
+static const jlong  VTHREAD_UNMOUNTED_BIT = (((jlong)1) << (JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED - TOTAL_MIN_EVENT_TYPE_VAL));
 static const jlong  CONTINUATION_RUN_BIT = (((jlong)1) << (JVMTI_EVENT_CONTINUATION_RUN - TOTAL_MIN_EVENT_TYPE_VAL));
 static const jlong  CONTINUATION_YIELD_BIT = (((jlong)1) << (JVMTI_EVENT_CONTINUATION_YIELD - TOTAL_MIN_EVENT_TYPE_VAL));
 
@@ -97,14 +97,14 @@ static const jlong  CONTINUATION_YIELD_BIT = (((jlong)1) << (JVMTI_EVENT_CONTINU
 static const jlong  CLASS_UNLOAD_BIT = (((jlong)1) << (EXT_EVENT_CLASS_UNLOAD - TOTAL_MIN_EVENT_TYPE_VAL));
 
 
-static const jlong  FIBER_BITS = FIBER_SCHEDULED_BIT | FIBER_TERMINATED_BIT | FIBER_MOUNT_BIT | FIBER_UNMOUNT_BIT;
+static const jlong  VTHREAD_BITS = VTHREAD_SCHEDULED_BIT | VTHREAD_TERMINATED_BIT | VTHREAD_MOUNTED_BIT | VTHREAD_UNMOUNTED_BIT;
 static const jlong  CONTINUATION_BITS = CONTINUATION_RUN_BIT | CONTINUATION_YIELD_BIT;
 static const jlong  MONITOR_BITS = MONITOR_CONTENDED_ENTER_BIT | MONITOR_CONTENDED_ENTERED_BIT |
                           MONITOR_WAIT_BIT | MONITOR_WAITED_BIT;
 static const jlong  EXCEPTION_BITS = EXCEPTION_THROW_BIT | EXCEPTION_CATCH_BIT;
 static const jlong  INTERP_EVENT_BITS =  SINGLE_STEP_BIT | METHOD_ENTRY_BIT | METHOD_EXIT_BIT |
                                 FRAME_POP_BIT | FIELD_ACCESS_BIT | FIELD_MODIFICATION_BIT;
-static const jlong  THREAD_FILTERED_EVENT_BITS = INTERP_EVENT_BITS | EXCEPTION_BITS | MONITOR_BITS | FIBER_BITS | CONTINUATION_BITS |
+static const jlong  THREAD_FILTERED_EVENT_BITS = INTERP_EVENT_BITS | EXCEPTION_BITS | MONITOR_BITS | VTHREAD_BITS | CONTINUATION_BITS |
                                         BREAKPOINT_BIT | CLASS_LOAD_BIT | CLASS_PREPARE_BIT | THREAD_END_BIT |
                                         SAMPLED_OBJECT_ALLOC_BIT;
 static const jlong  NEED_THREAD_LIFE_EVENTS = THREAD_FILTERED_EVENT_BITS | THREAD_START_BIT;
@@ -630,10 +630,10 @@ JvmtiEventControllerPrivate::recompute_enabled() {
     JvmtiExport::set_should_post_compiled_method_unload((any_env_thread_enabled & COMPILED_METHOD_UNLOAD_BIT) != 0);
     JvmtiExport::set_should_post_vm_object_alloc((any_env_thread_enabled & VM_OBJECT_ALLOC_BIT) != 0);
     JvmtiExport::set_should_post_sampled_object_alloc((any_env_thread_enabled & SAMPLED_OBJECT_ALLOC_BIT) != 0);
-    JvmtiExport::set_should_post_fiber_scheduled((any_env_thread_enabled & FIBER_SCHEDULED_BIT) != 0);
-    JvmtiExport::set_should_post_fiber_terminated((any_env_thread_enabled & FIBER_TERMINATED_BIT) != 0);
-    JvmtiExport::set_should_post_fiber_mount((any_env_thread_enabled & FIBER_MOUNT_BIT) != 0);
-    JvmtiExport::set_should_post_fiber_unmount((any_env_thread_enabled & FIBER_UNMOUNT_BIT) != 0);
+    JvmtiExport::set_should_post_vthread_scheduled((any_env_thread_enabled & VTHREAD_SCHEDULED_BIT) != 0);
+    JvmtiExport::set_should_post_vthread_terminated((any_env_thread_enabled & VTHREAD_TERMINATED_BIT) != 0);
+    JvmtiExport::set_should_post_vthread_mounted((any_env_thread_enabled & VTHREAD_MOUNTED_BIT) != 0);
+    JvmtiExport::set_should_post_vthread_unmounted((any_env_thread_enabled & VTHREAD_UNMOUNTED_BIT) != 0);
     JvmtiExport::set_should_post_continuation_run((any_env_thread_enabled & CONTINUATION_RUN_BIT) != 0);
     JvmtiExport::set_should_post_continuation_yield((any_env_thread_enabled & CONTINUATION_YIELD_BIT) != 0);
 

@@ -152,10 +152,10 @@ standardHandlers_defaultHandler(EventIndex ei)
         case EI_MONITOR_CONTENDED_ENTERED:
         case EI_MONITOR_WAIT:
         case EI_MONITOR_WAITED:
-        case EI_FIBER_SCHEDULED:
-        case EI_FIBER_TERMINATED:
-        case EI_FIBER_MOUNT:
-        case EI_FIBER_UNMOUNT:
+        case EI_VIRTUAL_THREAD_SCHEDULED:
+        case EI_VIRTUAL_THREAD_TERMINATED:
+        case EI_VIRTUAL_THREAD_MOUNTED:
+        case EI_VIRTUAL_THREAD_UNMOUNTED:
         case EI_CONTINUATION_RUN:
         case EI_CONTINUATION_YIELD:
             return &genericHandler;

@@ -854,10 +854,10 @@ getThreadFiber(jthread thread)
     if ( thread == NULL ) {
         return NULL;
     }
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadFiber)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetVirtualThread)
         (gdata->jvmti, thread, &fiber);
     if ( error != JVMTI_ERROR_NONE ) {
-        EXIT_ERROR(error,"Error calling GetThreadFiber()");
+        EXIT_ERROR(error,"Error calling GetVirtualThread()");
         return JNI_FALSE;
     }
     return fiber;
@@ -876,10 +876,10 @@ getFiberThread(jthread fiber)
     if ( fiber == NULL ) {
         return NULL;
     }
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetFiberThread)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
         (gdata->jvmti, fiber, &thread);
     if ( error != JVMTI_ERROR_NONE ) {
-        EXIT_ERROR(error,"Error calling GetFiberThread()");
+        EXIT_ERROR(error,"Error calling GetCarrierThread()");
         return NULL;
     }
     return thread;
@@ -2047,10 +2047,10 @@ eventIndexInit(void)
     index2jvmti[EI_MONITOR_WAITED     -EI_min] = JVMTI_EVENT_MONITOR_WAITED;
     index2jvmti[EI_VM_INIT            -EI_min] = JVMTI_EVENT_VM_INIT;
     index2jvmti[EI_VM_DEATH           -EI_min] = JVMTI_EVENT_VM_DEATH;
-    index2jvmti[EI_FIBER_SCHEDULED    -EI_min] = JVMTI_EVENT_FIBER_SCHEDULED;
-    index2jvmti[EI_FIBER_TERMINATED   -EI_min] = JVMTI_EVENT_FIBER_TERMINATED;
-    index2jvmti[EI_FIBER_MOUNT        -EI_min] = JVMTI_EVENT_FIBER_MOUNT;
-    index2jvmti[EI_FIBER_UNMOUNT      -EI_min] = JVMTI_EVENT_FIBER_UNMOUNT;
+    index2jvmti[EI_VIRTUAL_THREAD_SCHEDULED    -EI_min] = JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED;
+    index2jvmti[EI_VIRTUAL_THREAD_TERMINATED   -EI_min] = JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED;
+    index2jvmti[EI_VIRTUAL_THREAD_MOUNTED      -EI_min] = JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED;
+    index2jvmti[EI_VIRTUAL_THREAD_UNMOUNTED    -EI_min] = JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED;
     index2jvmti[EI_CONTINUATION_RUN   -EI_min] = JVMTI_EVENT_CONTINUATION_RUN;
     index2jvmti[EI_CONTINUATION_YIELD -EI_min] = JVMTI_EVENT_CONTINUATION_YIELD;
 
@@ -2074,13 +2074,13 @@ eventIndexInit(void)
     index2jdwp[EI_MONITOR_WAITED      -EI_min] = JDWP_EVENT(MONITOR_WAITED);
     index2jdwp[EI_VM_INIT             -EI_min] = JDWP_EVENT(VM_INIT);
     index2jdwp[EI_VM_DEATH            -EI_min] = JDWP_EVENT(VM_DEATH);
-    /* Just map FIBER_SCHEDULED/TERMINATED to THREAD_START/END. */
-    index2jdwp[EI_FIBER_SCHEDULED     -EI_min] = JDWP_EVENT(THREAD_START);
-    index2jdwp[EI_FIBER_TERMINATED    -EI_min] = JDWP_EVENT(THREAD_END);
+    /* Just map VIRTUAL_THREAD_SCHEDULED/TERMINATED to THREAD_START/END. */
+    index2jdwp[EI_VIRTUAL_THREAD_SCHEDULED     -EI_min] = JDWP_EVENT(THREAD_START);
+    index2jdwp[EI_VIRTUAL_THREAD_TERMINATED    -EI_min] = JDWP_EVENT(THREAD_END);
     /* fiber fixme: these don't actually map to anything in JDWP. Need a way to make them
      * produce an error if referenced. */
-    index2jdwp[EI_FIBER_MOUNT         -EI_min] = -1;
-    index2jdwp[EI_FIBER_UNMOUNT       -EI_min] = -1;
+    index2jdwp[EI_VIRTUAL_THREAD_MOUNTED       -EI_min] = -1;
+    index2jdwp[EI_VIRTUAL_THREAD_UNMOUNTED     -EI_min] = -1;
     index2jdwp[EI_CONTINUATION_RUN    -EI_min] = -1;
     index2jdwp[EI_CONTINUATION_YIELD  -EI_min] = -1;
 }
@@ -2148,14 +2148,14 @@ eventIndex2EventName(EventIndex ei)
             return "EI_VM_INIT";
         case EI_VM_DEATH:
             return "EI_VM_DEATH";
-        case EI_FIBER_SCHEDULED:
-            return "EI_FIBER_SCHEDULED";
-        case EI_FIBER_TERMINATED:
-            return "EI_FIBER_TERMINATED";
-        case EI_FIBER_MOUNT:
-            return "EI_FIBER_MOUNT";
-        case EI_FIBER_UNMOUNT:
-            return "EI_FIBER_UNMOUNT";
+        case EI_VIRTUAL_THREAD_SCHEDULED:
+            return "EI_VIRTUAL_THREAD_SCHEDULED";
+        case EI_VIRTUAL_THREAD_TERMINATED:
+            return "EI_VIRTUAL_THREAD_TERMINATED";
+        case EI_VIRTUAL_THREAD_MOUNTED:
+            return "EI_VIRTUAL_THREAD_MOUNTED";
+        case EI_VIRTUAL_THREAD_UNMOUNTED:
+            return "EI_VIRTUAL_THREAD_UNMOUNTED";
         case EI_CONTINUATION_RUN:
             return "EI_CONTINUATION_RUN";
         case EI_CONTINUATION_YIELD:
@@ -2272,14 +2272,14 @@ jvmti2EventIndex(jvmtiEvent kind)
         case JVMTI_EVENT_VM_DEATH:
             return EI_VM_DEATH;
         /* fiber events */
-        case JVMTI_EVENT_FIBER_SCHEDULED:
-            return EI_FIBER_SCHEDULED;
-        case JVMTI_EVENT_FIBER_TERMINATED:
-            return EI_FIBER_TERMINATED;
-        case JVMTI_EVENT_FIBER_MOUNT:
-            return EI_FIBER_MOUNT;
-        case JVMTI_EVENT_FIBER_UNMOUNT:
-            return EI_FIBER_UNMOUNT;
+        case JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED:
+            return EI_VIRTUAL_THREAD_SCHEDULED;
+        case JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED:
+            return EI_VIRTUAL_THREAD_TERMINATED;
+        case JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED:
+            return EI_VIRTUAL_THREAD_MOUNTED;
+        case JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED:
+            return EI_VIRTUAL_THREAD_UNMOUNTED;
         /* continuation events */
         case JVMTI_EVENT_CONTINUATION_RUN:
             return EI_CONTINUATION_RUN;

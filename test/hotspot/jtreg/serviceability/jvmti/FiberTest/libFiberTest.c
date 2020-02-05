@@ -167,32 +167,32 @@ print_fiber_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fib
 
   Tinfo* inf = find_tinfo(jni, thr_name); // Find slot with named worker thread
 
-  if (strcmp(event_name, "FiberScheduled") == 0) {
+  if (strcmp(event_name, "VirtualThreadScheduled") == 0) {
     inf->just_scheduled = JNI_TRUE;
   }
   else {
-    if (inf->thr_name == NULL && strcmp(event_name, "FiberTerminated") != 0) {
+    if (inf->thr_name == NULL && strcmp(event_name, "VirtualThreadTerminated") != 0) {
       fatal(jni, "Fiber event: worker thread not found!");
     }
-    if (strcmp(event_name, "FiberMount") == 0) {
+    if (strcmp(event_name, "VirtualThreadMounted") == 0) {
       if (!inf->just_scheduled) { // There is no ContinuationRun for just scheduled fibers
         if (inf->was_yield) {
-          fatal(jni, "FiberMount: event with ContinuationYield before!");
+          fatal(jni, "VirtualThreadMounted: event with ContinuationYield before!");
         }
         if (continuation_events_enabled && !inf->was_run) {
-          fatal(jni, "FiberMount: event without ContinuationRun before!");
+          fatal(jni, "VirtualThreadMounted: event without ContinuationRun before!");
         }
       }
     }
-    if (strcmp(event_name, "FiberUnmount") == 0) {
+    if (strcmp(event_name, "VirtualThreadUnmounted") == 0) {
       if (inf->just_scheduled) {
-        fatal(jni, "FiberUnmount: event without FiberMount before!");
+        fatal(jni, "VirtualThreadUnmounted: event without VirtualThreadMounted before!");
       }
       if (inf->was_run) {
-        fatal(jni, "FiberUnmount: event with ContinuationRun before!");
+        fatal(jni, "VirtualThreadUnmounted: event with ContinuationRun before!");
       }
       if (continuation_events_enabled && !inf->was_yield) {
-        fatal(jni, "FiberUnmount: event without ContinuationYield before!");
+        fatal(jni, "VirtualThreadUnmounted: event without ContinuationYield before!");
       }
     }
     inf->just_scheduled = JNI_FALSE;
@@ -232,105 +232,105 @@ print_cont_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jint frames_
 }
 
 static void
-test_IsFiber(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber, char* event_name) {
+test_IsVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber, char* event_name) {
   jboolean is_fiber = JNI_FALSE;
   jvmtiError err;
 
   printf("\n");
 
-  // #1: Test JVMTI IsFiber function with NULL fiber
-  err = (*jvmti)->IsFiber(jvmti, NULL, &is_fiber);
+  // #1: Test JVMTI IsVirtualThread function with NULL fiber
+  err = (*jvmti)->IsVirtualThread(jvmti, NULL, &is_fiber);
   if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler: failed during JVMTI IsFiber call");
+    fatal(jni, "event handler: failed during JVMTI IsVirtualThread call");
   }
   if (is_fiber != JNI_FALSE) {
-    fatal(jni, "event handler: JVMTI IsFiber with NULL fiber failed to return JNI_FALSE");
+    fatal(jni, "event handler: JVMTI IsVirtualThread with NULL fiber failed to return JNI_FALSE");
   }
-  printf("JVMTI IsFiber with NULL fiber returned JNI_FALSE as expected\n");
+  printf("JVMTI IsVirtualThread with NULL fiber returned JNI_FALSE as expected\n");
 
-  // #2: Test JVMTI IsFiber function with a bad fiber
-  err = (*jvmti)->IsFiber(jvmti, thread, &is_fiber);
+  // #2: Test JVMTI IsVirtualThread function with a bad fiber
+  err = (*jvmti)->IsVirtualThread(jvmti, thread, &is_fiber);
   if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler: failed during JVMTI IsFiber call");
+    fatal(jni, "event handler: failed during JVMTI IsVirtualThread call");
   }
   if (is_fiber != JNI_FALSE) {
-    fatal(jni, "event handler: JVMTI IsFiber with bad fiber failed to return JNI_FALSE");
+    fatal(jni, "event handler: JVMTI IsVirtualThread with bad fiber failed to return JNI_FALSE");
   }
-  printf("JVMTI IsFiber with bad fiber returned JNI_FALSE as expected\n");
+  printf("JVMTI IsVirtualThread with bad fiber returned JNI_FALSE as expected\n");
 
-  // #3: Test JVMTI IsFiber function with a good fiber
-  err = (*jvmti)->IsFiber(jvmti, fiber, &is_fiber);
+  // #3: Test JVMTI IsVirtualThread function with a good fiber
+  err = (*jvmti)->IsVirtualThread(jvmti, fiber, &is_fiber);
   if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler: failed during JVMTI IsFiber call");
+    fatal(jni, "event handler: failed during JVMTI IsVirtualThread call");
   }
   if (is_fiber != JNI_TRUE) {
-    fatal(jni, "event handler: JVMTI IsFiber with good fiber failed to return JNI_TRUE");
+    fatal(jni, "event handler: JVMTI IsVirtualThread with good fiber failed to return JNI_TRUE");
   }
-  printf("JVMTI IsFiber with good fiber returned JNI_TRUE as expected\n");
+  printf("JVMTI IsVirtualThread with good fiber returned JNI_TRUE as expected\n");
 }
 
 static void
-test_GetThreadFiber(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber, char* event_name) {
+test_GetVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber, char* event_name) {
   jobject thread_fiber = NULL;
   jvmtiError err;
 
   printf("\n");
 
-  // #1: Test JVMTI GetThreadFiber function NULL thread (current)
-  err = (*jvmti)->GetThreadFiber(jvmti, NULL, &thread_fiber);
+  // #1: Test JVMTI GetVirtualThread function NULL thread (current)
+  err = (*jvmti)->GetVirtualThread(jvmti, NULL, &thread_fiber);
   if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler: JVMTI GetThreadFiber with NULL thread (current) returned error status");
+    fatal(jni, "event handler: JVMTI GetVirtualThread with NULL thread (current) returned error status");
   }
   if (thread_fiber == NULL) {
-    fatal(jni, "event handler: JVMTI GetThreadFiber with NULL thread (current) failed to return non-NULL fiber");
+    fatal(jni, "event handler: JVMTI GetVirtualThread with NULL thread (current) failed to return non-NULL fiber");
   }
-  printf("JVMTI GetThreadFiber with NULL thread (current) returned non-NULL fiber as expected\n");
+  printf("JVMTI GetVirtualThread with NULL thread (current) returned non-NULL fiber as expected\n");
 
-  // #2: Test JVMTI GetThreadFiber function with a bad thread
-  err = (*jvmti)->GetThreadFiber(jvmti, fiber, &thread_fiber);
+  // #2: Test JVMTI GetVirtualThread function with a bad thread
+  err = (*jvmti)->GetVirtualThread(jvmti, fiber, &thread_fiber);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
-    fatal(jni, "event handler: JVMTI GetThreadFiber with bad thread failed to return JVMTI_ERROR_INVALID_THREAD");
+    fatal(jni, "event handler: JVMTI GetVirtualThread with bad thread failed to return JVMTI_ERROR_INVALID_THREAD");
   }
 
-  // #3: Test JVMTI GetThreadFiber function with a good thread
-  err = (*jvmti)->GetThreadFiber(jvmti, thread, &thread_fiber);
+  // #3: Test JVMTI GetVirtualThread function with a good thread
+  err = (*jvmti)->GetVirtualThread(jvmti, thread, &thread_fiber);
   if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler: failed during JVMTI GetThreadFiber call");
+    fatal(jni, "event handler: failed during JVMTI GetVirtualThread call");
   }
   if (thread_fiber == NULL) {
-    fatal(jni, "event handler: JVMTI GetThreadFiber with good thread failed to return non-NULL fiber");
+    fatal(jni, "event handler: JVMTI GetVirtualThread with good thread failed to return non-NULL fiber");
   }
-  printf("JVMTI GetThreadFiber with good thread returned non-NULL fiber as expected\n");
+  printf("JVMTI GetVirtualThread with good thread returned non-NULL fiber as expected\n");
 }
 
 static void
-test_GetFiberThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber, char* event_name) {
+test_GetCarrierThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber, char* event_name) {
   jthread fiber_thread = NULL;
   jvmtiError err;
 
   printf("\n");
 
-  // #1: Test JVMTI GetFiberThread function with NULL fiber
-  err = (*jvmti)->GetFiberThread(jvmti, NULL, &fiber_thread);
+  // #1: Test JVMTI GetCarrierThread function with NULL fiber
+  err = (*jvmti)->GetCarrierThread(jvmti, NULL, &fiber_thread);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
-    fatal(jni, "event handler: JVMTI GetFiberThread with NULL fiber failed to return JVMTI_ERROR_INVALID_THREAD");
+    fatal(jni, "event handler: JVMTI GetCarrierThread with NULL fiber failed to return JVMTI_ERROR_INVALID_THREAD");
   }
 
-  // #2: Test JVMTI GetFiberThread function with a bad fiber
-  err = (*jvmti)->GetFiberThread(jvmti, thread, &fiber_thread);
+  // #2: Test JVMTI GetCarrierThread function with a bad fiber
+  err = (*jvmti)->GetCarrierThread(jvmti, thread, &fiber_thread);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
-    fatal(jni, "event handler: JVMTI GetFiberThread with bad fiber failed to return JVMTI_ERROR_INVALID_THREAD");
+    fatal(jni, "event handler: JVMTI GetCarrierThread with bad fiber failed to return JVMTI_ERROR_INVALID_THREAD");
   }
 
-  // #3: Test JVMTI GetFiberThread function with a good fiber
-  err = (*jvmti)->GetFiberThread(jvmti, fiber, &fiber_thread);
+  // #3: Test JVMTI GetCarrierThread function with a good fiber
+  err = (*jvmti)->GetCarrierThread(jvmti, fiber, &fiber_thread);
   if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler: failed during JVMTI GetFiberThread call");
+    fatal(jni, "event handler: failed during JVMTI GetCarrierThread call");
   }
   if (fiber_thread == NULL) {
-    fatal(jni, "event handler: JVMTI GetFiberThread with good fiber failed to return non-NULL carrier thread");
+    fatal(jni, "event handler: JVMTI GetCarrierThread with good fiber failed to return non-NULL carrier thread");
   }
-  printf("JVMTI GetFiberThread with good fiber returned non-NULL carrier thread as expected\n");
+  printf("JVMTI GetCarrierThread with good fiber returned non-NULL carrier thread as expected\n");
 }
 
 static void
@@ -546,8 +546,8 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread fiber, char* event_name, int
   jint depth = -1;
   jvmtiError err;
 
-  if (strcmp(event_name, "FiberMount") != 0 && strcmp(event_name, "FiberUnmount") != 0) {
-    return; // Check GetLocal at FiberMount/FiberUnmount events only
+  if (strcmp(event_name, "VirtualThreadMounted") != 0 && strcmp(event_name, "VirtualThreadUnmounted") != 0) {
+    return; // Check GetLocal at VirtualThreadMounted/VirtualThreadUnmounted events only
   }
 
   depth = find_method_depth(jvmti, jni, fiber, "producer");
@@ -658,26 +658,26 @@ static void
 processFiberEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber, char* event_name) {
   static int fiber_events_cnt = 0;
 
-  if (strcmp(event_name, "FiberTerminated") != 0 &&
-      strcmp(event_name, "FiberScheduled")  != 0) {
+  if (strcmp(event_name, "VirtualThreadTerminated") != 0 &&
+      strcmp(event_name, "VirtualThreadScheduled")  != 0) {
     if (fiber_events_cnt++ > MAX_EVENTS_TO_PROCESS) {
       return; // No need to test all events
     }
   }
 
   print_fiber_event_info(jvmti, jni, thread, fiber, event_name);
-  test_IsFiber(jvmti, jni, thread, fiber, event_name);
+  test_IsVirtualThread(jvmti, jni, thread, fiber, event_name);
 
-  if (strcmp(event_name, "FiberTerminated") == 0) {
-    return; // skip further testing as GetThreadFiber can return NULL
+  if (strcmp(event_name, "VirtualThreadTerminated") == 0) {
+    return; // skip further testing as GetVirtualThread can return NULL
   }
 
-  test_GetThreadFiber(jvmti, jni, thread, fiber, event_name);
-  test_GetFiberThread(jvmti, jni, thread, fiber, event_name);
+  test_GetVirtualThread(jvmti, jni, thread, fiber, event_name);
+  test_GetCarrierThread(jvmti, jni, thread, fiber, event_name);
 
-  if (strcmp(event_name, "FiberScheduled") == 0) {
+  if (strcmp(event_name, "VirtualThreadScheduled") == 0) {
     test_GetThreadInfo(jvmti, jni, fiber, event_name);
-    return; // skip testing of GetFrame* for FiberScheduled events
+    return; // skip testing of GetFrame* for VirtualThreadScheduled events
   }
   int frame_count = test_GetFrameCount(jvmti, jni, fiber, event_name);
   test_GetFrameLocation(jvmti, jni, fiber, event_name, frame_count);
@@ -686,56 +686,56 @@ processFiberEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber, c
 }
 
 static void JNICALL
-FiberScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber) {
+VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber) {
   jobject mounted_fiber = NULL;
   jvmtiError err;
 
   lock_events();
 
-  processFiberEvent(jvmti, jni, thread, fiber, "FiberScheduled");
+  processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadScheduled");
 
-  err = (*jvmti)->GetThreadFiber(jvmti, thread, &mounted_fiber);
+  err = (*jvmti)->GetVirtualThread(jvmti, thread, &mounted_fiber);
   if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "FiberScheduled event handler: failed during JVMTI GetThreadFiber call");
+    fatal(jni, "VirtualThreadScheduled event handler: failed during JVMTI GetVirtualThread call");
   }
   if (!(*jni)->IsSameObject(jni, mounted_fiber, fiber)) {
-    fatal(jni, "FiberScheduled event handler: JVMTI GetThreadFiber failed to return proper fiber");
+    fatal(jni, "VirtualThreadScheduled event handler: JVMTI GetVirtualThread failed to return proper fiber");
   }
 
   unlock_events();
 }
 
 static void JNICALL
-FiberTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber) {
+VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber) {
   jobject mounted_fiber = NULL;
   jvmtiError err;
 
   lock_events();
 
-  processFiberEvent(jvmti, jni, thread, fiber, "FiberTerminated");
+  processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadTerminated");
 
-  err = (*jvmti)->GetThreadFiber(jvmti, thread, &mounted_fiber);
+  err = (*jvmti)->GetVirtualThread(jvmti, thread, &mounted_fiber);
   if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "FiberTerminated event handler: failed during JVMTI GetThreadFiber call");
+    fatal(jni, "VirtualThreadTerminated event handler: failed during JVMTI GetVirtualThread call");
   }
   if (mounted_fiber != NULL) {
-    fatal(jni, "FiberTerminated event handler: JVMTI GetThreadFiber failed to return NULL fiber");
+    fatal(jni, "VirtualThreadTerminated event handler: JVMTI GetVirtualThread failed to return NULL fiber");
   }
 
   unlock_events();
 }
 
 static void JNICALL
-FiberMount(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber) {
+VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber) {
   lock_events();
-  processFiberEvent(jvmti, jni, thread, fiber, "FiberMount");
+  processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadMounted");
   unlock_events();
 }
 
 static void JNICALL
-FiberUnmount(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber) {
+VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread fiber) {
   lock_events();
-  processFiberEvent(jvmti, jni, thread, fiber, "FiberUnmount");
+  processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadUnmounted");
   unlock_events();
 }
 
@@ -774,15 +774,15 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
   }
 
   memset(&callbacks, 0, sizeof(callbacks));
-  callbacks.FiberScheduled  = &FiberScheduled;
-  callbacks.FiberTerminated = &FiberTerminated;
-  callbacks.FiberMount      = &FiberMount;
-  callbacks.FiberUnmount    = &FiberUnmount;
+  callbacks.VirtualThreadScheduled  = &VirtualThreadScheduled;
+  callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
+  callbacks.VirtualThreadMounted   = &VirtualThreadMounted;
+  callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
   callbacks.ContinuationRun   = &ContinuationRun;
   callbacks.ContinuationYield = &ContinuationYield;
 
   memset(&caps, 0, sizeof(caps));
-  caps.can_support_fibers = 1;
+  caps.can_support_virtual_threads = 1;
   caps.can_access_local_variables = 1;
   if (continuation_events_enabled) {
     caps.can_support_continuations = 1;
@@ -797,22 +797,22 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
     printf("error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_FIBER_SCHEDULED, NULL);
+  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_FIBER_TERMINATED, NULL);
+  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_FIBER_MOUNT, NULL);
+  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_FIBER_UNMOUNT, NULL);
+  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }

@@ -1207,7 +1207,7 @@ bool              JvmtiExport::_can_post_method_exit                      = fals
 bool              JvmtiExport::_can_post_frame_pop                        = false;
 bool              JvmtiExport::_can_pop_frame                             = false;
 bool              JvmtiExport::_can_force_early_return                    = false;
-bool              JvmtiExport::_can_support_fibers                        = false;
+bool              JvmtiExport::_can_support_virtual_threads               = false;
 bool              JvmtiExport::_can_support_continuations                 = false;
 bool              JvmtiExport::_can_get_owned_monitor_info                = false;
 
@@ -1239,10 +1239,10 @@ bool              JvmtiExport::_should_post_sampled_object_alloc          = fals
 bool              JvmtiExport::_should_post_on_exceptions                 = false;
 bool              JvmtiExport::_should_post_continuation_run              = false;
 bool              JvmtiExport::_should_post_continuation_yield            = false;
-bool              JvmtiExport::_should_post_fiber_scheduled               = false;
-bool              JvmtiExport::_should_post_fiber_terminated              = false;
-bool              JvmtiExport::_should_post_fiber_mount                   = false;
-bool              JvmtiExport::_should_post_fiber_unmount                 = false;
+bool              JvmtiExport::_should_post_vthread_scheduled             = false;
+bool              JvmtiExport::_should_post_vthread_terminated            = false;
+bool              JvmtiExport::_should_post_vthread_mounted               = false;
+bool              JvmtiExport::_should_post_vthread_unmounted             = false;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1477,11 +1477,11 @@ void JvmtiExport::post_thread_end(JavaThread *thread) {
 }
 
 
-void JvmtiExport::post_fiber_scheduled(jthread thread, jobject vthread) {
+void JvmtiExport::post_vthread_scheduled(jthread thread, jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_FIBER_SCHEDULED, ("[%p] Trg Fiber Scheduled event triggered", vthread));
+  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, ("[%p] Trg Virtual Thread Scheduled event triggered", vthread));
 
   JavaThread *cur_thread = JavaThread::current();
   JvmtiThreadState *state = cur_thread->jvmti_thread_state();
@@ -1489,20 +1489,20 @@ void JvmtiExport::post_fiber_scheduled(jthread thread, jobject vthread) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_FIBER_SCHEDULED)) {
+  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
-      if (ets->is_enabled(JVMTI_EVENT_FIBER_SCHEDULED)) {
+      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED)) {
         JvmtiEnv *env = ets->get_env();
         if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
           continue;
         }
-        EVT_TRACE(JVMTI_EVENT_FIBER_SCHEDULED, ("[%p] Evt Fiber Scheduled event sent", vthread));
+        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, ("[%p] Evt Virtual Thread Scheduled event sent", vthread));
 
         JvmtiThreadEventMark jem(cur_thread);
         JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventFiberScheduled callback = env->callbacks()->FiberScheduled;
+        jvmtiEventVirtualThreadScheduled callback = env->callbacks()->VirtualThreadScheduled;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), thread, vthread);
         }
@@ -1511,11 +1511,11 @@ void JvmtiExport::post_fiber_scheduled(jthread thread, jobject vthread) {
   }
 }
 
-void JvmtiExport::post_fiber_terminated(jthread thread, jobject vthread) {
+void JvmtiExport::post_vthread_terminated(jthread thread, jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_FIBER_TERMINATED, ("[%p] Trg Fiber Terminated event triggered", vthread));
+  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, ("[%p] Trg Virtual Thread Terminated event triggered", vthread));
 
   JavaThread *cur_thread = JavaThread::current();
   JvmtiThreadState *state = cur_thread->jvmti_thread_state();
@@ -1523,20 +1523,20 @@ void JvmtiExport::post_fiber_terminated(jthread thread, jobject vthread) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_FIBER_TERMINATED)) {
+  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
-      if (ets->is_enabled(JVMTI_EVENT_FIBER_TERMINATED)) {
+      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED)) {
         JvmtiEnv *env = ets->get_env();
         if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
           continue;
         }
-        EVT_TRACE(JVMTI_EVENT_FIBER_TERMINATED, ("[%p] Evt Fiber Terminated event sent", vthread));
+        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, ("[%p] Evt Virtual Thread Terminated event sent", vthread));
 
         JvmtiThreadEventMark jem(cur_thread);
         JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventFiberTerminated callback = env->callbacks()->FiberTerminated;
+        jvmtiEventVirtualThreadTerminated callback = env->callbacks()->VirtualThreadTerminated;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), thread, vthread);
         }
@@ -1545,11 +1545,11 @@ void JvmtiExport::post_fiber_terminated(jthread thread, jobject vthread) {
   }
 }
 
-void JvmtiExport::post_fiber_mount(jthread thread, jobject vthread) {
+void JvmtiExport::post_vthread_mounted(jthread thread, jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_FIBER_MOUNT, ("[%p] Trg Fiber Mount event triggered", vthread));
+  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, ("[%p] Trg Virtual Thread Mounted event triggered", vthread));
 
   JavaThread *cur_thread = JavaThread::current();
   JvmtiThreadState *state = cur_thread->jvmti_thread_state();
@@ -1557,20 +1557,20 @@ void JvmtiExport::post_fiber_mount(jthread thread, jobject vthread) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_FIBER_MOUNT)) {
+  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
-      if (ets->is_enabled(JVMTI_EVENT_FIBER_MOUNT)) {
+      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED)) {
         JvmtiEnv *env = ets->get_env();
         if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
           continue;
         }
-        EVT_TRACE(JVMTI_EVENT_FIBER_MOUNT, ("[%p] Evt Fiber Mount event sent", vthread));
+        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, ("[%p] Evt Virtual Thread Mounted event sent", vthread));
 
         JvmtiThreadEventMark jem(cur_thread);
         JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventFiberMount callback = env->callbacks()->FiberMount;
+        jvmtiEventVirtualThreadMounted callback = env->callbacks()->VirtualThreadMounted;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), thread, vthread);
         }
@@ -1579,11 +1579,11 @@ void JvmtiExport::post_fiber_mount(jthread thread, jobject vthread) {
   }
 }
 
-void JvmtiExport::post_fiber_unmount(jthread thread, jobject vthread) {
+void JvmtiExport::post_vthread_unmounted(jthread thread, jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_FIBER_UNMOUNT, ("[%p] Trg Fiber Unmount event triggered", vthread));
+  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, ("[%p] Trg Virtual Thread Unmounted event triggered", vthread));
 
   JavaThread *cur_thread = JavaThread::current();
   JvmtiThreadState *state = cur_thread->jvmti_thread_state();
@@ -1591,20 +1591,20 @@ void JvmtiExport::post_fiber_unmount(jthread thread, jobject vthread) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_FIBER_UNMOUNT)) {
+  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
-      if (ets->is_enabled(JVMTI_EVENT_FIBER_UNMOUNT)) {
+      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED)) {
         JvmtiEnv *env = ets->get_env();
         if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
           continue;
         }
-        EVT_TRACE(JVMTI_EVENT_FIBER_UNMOUNT, ("[%p] Evt Fiber Unmount event sent", vthread));
+        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, ("[%p] Evt Virtual Thread Unmounted event sent", vthread));
 
         JvmtiThreadEventMark jem(cur_thread);
         JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventFiberUnmount callback = env->callbacks()->FiberUnmount;
+        jvmtiEventVirtualThreadUnmounted callback = env->callbacks()->VirtualThreadUnmounted;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), thread, vthread);
         }

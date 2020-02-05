@@ -379,8 +379,8 @@ preferDeliverEventOnFiber(EventIndex ei)
         case EI_FIELD_MODIFICATION:
         case EI_MONITOR_CONTENDED_ENTER:
         case EI_MONITOR_CONTENDED_ENTERED:
-        case EI_FIBER_TERMINATED:
-        case EI_FIBER_SCHEDULED:
+        case EI_VIRTUAL_THREAD_TERMINATED:
+        case EI_VIRTUAL_THREAD_SCHEDULED:
             return JNI_TRUE;
         /* Not delivering the following events on fibers helps keep down the number of
          * fibers we need to notify the debugger about. */
@@ -394,8 +394,8 @@ preferDeliverEventOnFiber(EventIndex ei)
         case EI_MONITOR_WAITED:
         case EI_VM_DEATH:
             return gdata->notifyDebuggerOfAllFibers; /* Only deliver on fiber if notifying of all fibers. */
-        case EI_FIBER_MOUNT:        /* Not passed to event_callback(). */
-        case EI_FIBER_UNMOUNT:      /* Not passed to event_callback(). */
+        case EI_VIRTUAL_THREAD_MOUNTED:      /* Not passed to event_callback(). */
+        case EI_VIRTUAL_THREAD_UNMOUNTED:    /* Not passed to event_callback(). */
         case EI_CONTINUATION_RUN:   /* Not passed to event_callback(). */
         case EI_CONTINUATION_YIELD: /* Not passed to event_callback(). */
             EXIT_ERROR(AGENT_ERROR_INVALID_EVENT_TYPE, "invalid event index");
@@ -1376,10 +1376,10 @@ enableEvents(HandlerNode *node)
         case EI_VM_DEATH:
         case EI_CLASS_PREPARE:
         case EI_GC_FINISH:
-        case EI_FIBER_SCHEDULED:
-        case EI_FIBER_TERMINATED:
-        case EI_FIBER_MOUNT:
-        case EI_FIBER_UNMOUNT:
+        case EI_VIRTUAL_THREAD_SCHEDULED:
+        case EI_VIRTUAL_THREAD_TERMINATED:
+        case EI_VIRTUAL_THREAD_MOUNTED:
+        case EI_VIRTUAL_THREAD_UNMOUNTED:
         case EI_CONTINUATION_RUN:
         case EI_CONTINUATION_YIELD:
             return error;
@@ -1441,10 +1441,10 @@ disableEvents(HandlerNode *node)
         case EI_VM_DEATH:
         case EI_CLASS_PREPARE:
         case EI_GC_FINISH:
-        case EI_FIBER_SCHEDULED:
-        case EI_FIBER_TERMINATED:
-        case EI_FIBER_MOUNT:
-        case EI_FIBER_UNMOUNT:
+        case EI_VIRTUAL_THREAD_SCHEDULED:
+        case EI_VIRTUAL_THREAD_TERMINATED:
+        case EI_VIRTUAL_THREAD_MOUNTED:
+        case EI_VIRTUAL_THREAD_UNMOUNTED:
         case EI_CONTINUATION_RUN:
         case EI_CONTINUATION_YIELD:
             return error;

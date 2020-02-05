@@ -120,8 +120,7 @@
                     field  CDATA #IMPLIED>
 
    <!ELEMENT jframeID EMPTY>
-   <!ATTLIST jframeID thread CDATA #IMPLIED
-                      fiber  CDATA #IMPLIED>
+   <!ATTLIST jframeID thread CDATA #IMPLIED>
 
    <!ELEMENT jrawMonitorID EMPTY>
 
@@ -2236,21 +2235,21 @@ jvmtiEnv *jvmti;
 
   </category>
 
-  <category id="fiberCategory" label="Fiber">
+  <category id="virtualTheadCategory" label="VirtualThread">
     <intro>
     </intro>
 
-    <function id="IsFiber" num="105" since="14">
-      <synopsis>Is Fiber</synopsis>
+    <function id="IsVirtualThread" num="105" since="14">
+      <synopsis>Is Virtual Thread</synopsis>
       <description>
-        Determines whether a thread reference represents a fiber.
+        Determines whether a thread reference represents a virtual thread.
         The <code>jboolean</code> result is
-        <code>JNI_TRUE</code> if the "thread" is actually a fiber,
+        <code>JNI_TRUE</code> if the "thread" is actually a virtual thread,
         <code>JNI_FALSE</code> otherwise.
       </description>
       <origin>new</origin>
       <capabilities>
-        <required id="can_support_fibers">Can support fibers</required>
+        <required id="can_support_virtual_threads">Can support virtual threads</required>
       </capabilities>
       <parameters>
         <param id="thread">
@@ -2259,7 +2258,7 @@ jvmtiEnv *jvmti;
               The thread reference.
             </description>
         </param>
-        <param id="is_fiber_ptr">
+        <param id="is_virtual_thread_ptr">
           <outptr><jboolean/></outptr>
           <description>
             On return, points to the boolean result of this function.
@@ -2270,15 +2269,15 @@ jvmtiEnv *jvmti;
       </errors>
     </function>
 
-    <function id="GetThreadFiber" num="113" since="14">
-      <synopsis>Get Thread Fiber</synopsis>
+    <function id="GetVirtualThread" num="113" since="14">
+      <synopsis>Get Virtual Thread</synopsis>
       <description>
-        Get the fiber mounted to the specified thread.
-        If no fiber is mounted, <code>NULL</code> is returned.
+        Get the virtual thread mounted to the specified thread.
+        If no virtual thread is mounted, <code>NULL</code> is returned.
       </description>
       <origin>new</origin>
       <capabilities>
-        <required id="can_support_fibers">Can support fibers</required>
+        <required id="can_support_virtual_threads">Can support virtual threads</required>
       </capabilities>
       <parameters>
         <param id="thread">
@@ -2287,10 +2286,10 @@ jvmtiEnv *jvmti;
               The thread to query.
             </description>
         </param>
-        <param id="fiber_ptr">
+        <param id="virtual_thread_ptr">
           <outptr><jobject/></outptr>
           <description>
-            On return, points to the fiber mounted to the specified thread, or <code>NULL</code>.
+            On return, points to the virtual thread mounted to the specified thread, or <code>NULL</code>.
           </description>
         </param>
       </parameters>
@@ -2298,34 +2297,35 @@ jvmtiEnv *jvmti;
       </errors>
     </function>
 
-    <function id="GetFiberThread" num="117" since="14">
-      <synopsis>Get Fiber Thread</synopsis>
+    <function id="GetCarrierThread" num="117" since="14">
+      <synopsis>Get Carrier Thread</synopsis>
       <description>
-        Get the thread the specified fiber is mounted to.
-        If the fiber is unmounted, <code>NULL</code> is returned.
+        Get the thread the specified virtual thread is mounted to.
+        If the virtual thread is unmounted, <code>NULL</code> is returned.
       </description>
       <origin>new</origin>
       <capabilities>
-        <required id="can_support_fibers">Can support fibers</required>
+        <required id="can_support_virtual_threads">Can support virtual threads</required>
       </capabilities>
       <parameters>
-        <param id="fiber">
+        <param id="virtual_thread">
           <jthread impl="noconvert"/>
             <description>
-              The fiber to query.
+              The virtual thread to query.
             </description>
         </param>
         <param id="thread_ptr">
           <outptr><jthread/></outptr>
           <description>
-            On return, points to the thread the fiber is mounted to, or <code>NULL</code>.
-            The result is transient if not all carrier threads are suspended.
+            On return, points to the thread the virtual thread is mounted to, or <code>NULL</code>.
+            The result is transient if current thread is not the virtual thread carrier thread
+            and not all carrier threads are suspended.
           </description>
         </param>
       </parameters>
       <errors>
         <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="fiber"></paramlink> is not a fiber.
+          <paramlink id="virtual_thread"></paramlink> is not a virtual thread.
         </error>
       </errors>
     </function>
@@ -10472,14 +10472,14 @@ myInit() {
           called and <eventlink id="SampledObjectAlloc"></eventlink> events can be generated.
         </description>
       </capabilityfield>
-      <capabilityfield id="can_support_fibers" since="14">
+      <capabilityfield id="can_support_virtual_threads" since="14">
         <description>
-          Can support fibers.
+          Can support virtual threads.
           If this capability is enabled then the following functions can be called:
-          <functionlink id="IsFiber"></functionlink>, 
-          <functionlink id="GetThreadFiber"></functionlink>, 
-          <functionlink id="GetFiberThread"></functionlink>,
-          the following functions can be called with a fiber thread reference:
+          <functionlink id="IsVirtualThread"></functionlink>, 
+          <functionlink id="GetVirtualThread"></functionlink>, 
+          <functionlink id="GetCarrierThread"></functionlink>,
+          the following functions can be called with a virtual thread reference:
           <functionlink id="GetStackTrace"></functionlink>
           <functionlink id="GetFrameCount"></functionlink>
           <functionlink id="GetFrameLocation"></functionlink>
@@ -10490,10 +10490,10 @@ myInit() {
           <functionlink id="GetLocalFloat"></functionlink>
           <functionlink id="GetLocalDouble"></functionlink>
           and the following events can be enabled:
-          <eventlink id="FiberScheduled"></eventlink>,
-          <eventlink id="FiberTerminated"></eventlink>,
-          <eventlink id="FiberMount"></eventlink> and
-          <eventlink id="FiberUnmount"></eventlink>.
+          <eventlink id="VirtualThreadScheduled"></eventlink>,
+          <eventlink id="VirtualThreadTerminated"></eventlink>,
+          <eventlink id="VirtualThreadMounted"></eventlink> and
+          <eventlink id="VirtualThreadUnmounted"></eventlink>.
         </description>
       </capabilityfield>
       <capabilityfield id="can_support_continuations" since="14">
@@ -12840,16 +12840,16 @@ myInit() {
     </parameters>
   </event>
 
- <event label="Fiber Scheduled"
-         id="FiberScheduled" const="JVMTI_EVENT_FIBER_SCHEDULED" filtered="thread" num="87" phase="start" since="14">
+ <event label="Virtual Thread Scheduled"
+         id="VirtualThreadScheduled" const="JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED" filtered="thread" num="87" phase="start" since="14">
     <description>
-      Fiber scheduled events are generated before its initial method executes.
+      Virtual thread scheduled events are generated before its initial method executes.
       <p/>
       The event is sent on the <paramlink id="thread"></paramlink>.
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_fibers">Can support fibers</required>
+      <required id="can_support_virtual_threads">Can support virtual threads</required>
     </capabilities>
     <parameters>
       <param id="jni_env">
@@ -12863,28 +12863,28 @@ myInit() {
       <param id="thread">
         <jthread/>
           <description>
-            Thread scheduling this fiber.
+            Thread scheduling this virtual thread.
           </description>
       </param>
-      <param id="fiber">
+      <param id="virtual_thread">
         <jthread/>
           <description>
-            Fiber scheduled for execution.
+            Virtual thread scheduled for execution.
           </description>
       </param>
     </parameters>
   </event>
 
-  <event label="Fiber Terminated"
-         id="FiberTerminated" const="JVMTI_EVENT_FIBER_TERMINATED" filtered="thread" num="88" phase="start" since="14">
+  <event label="Virtual Thread Terminated"
+         id="VirtualThreadTerminated" const="JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED" filtered="thread" num="88" phase="start" since="14">
     <description>
-      Fiber terminated events are generated after its initial method has finished execution.
+      Virtual thread terminated events are generated after its initial method has finished execution.
       <p/>
       The event is sent on the <paramlink id="thread"></paramlink>.
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_fibers">Can support fibers</required>
+      <required id="can_support_virtual_threads">Can support virtual threads</required>
     </capabilities>
     <parameters>
       <param id="jni_env">
@@ -12898,28 +12898,28 @@ myInit() {
       <param id="thread">
         <jthread/>
           <description>
-            Thread terminating this fiber.
+            Thread terminating this virtual thread.
           </description>
       </param>
-      <param id="fiber">
+      <param id="virtual_thread">
         <jthread/>
           <description>
-            Fiber being terminated.
+            Virtual thread being terminated.
           </description>
       </param>
     </parameters>
   </event>
 
-  <event label="Fiber Mount"
-         id="FiberMount" const="JVMTI_EVENT_FIBER_MOUNT" filtered="thread" num="89" phase="start" since="14">
+  <event label="Virtual Thread Mount"
+         id="VirtualThreadMounted" const="JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED" filtered="thread" num="89" phase="start" since="14">
     <description>
-      Fiber mount events are generated before its method continue to execute on the mounted thread.
+      Virtual thread mount events are generated before its method continue to execute on the mounted thread.
       <p/>
-      The event is sent on the <paramlink id="thread"></paramlink> the fiber is mounted to.
+      The event is sent on the <paramlink id="thread"></paramlink> the virtual thread is mounted to.
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_fibers">Can support fibers</required>
+      <required id="can_support_virtual_threads">Can support virtual threads</required>
     </capabilities>
     <parameters>
       <param id="jni_env">
@@ -12933,28 +12933,28 @@ myInit() {
       <param id="thread">
         <jthread/>
           <description>
-            Thread the fiber is mounted to.
+            Thread the virtual thread is mounted to.
           </description>
       </param>
-      <param id="fiber">
+      <param id="virtual_thread">
         <jthread/>
           <description>
-            Fiber that is mounted.
+            Virtual thread that is mounted.
           </description>
       </param>
     </parameters>
   </event>
 
-  <event label="Fiber Unmount"
-         id="FiberUnmount" const="JVMTI_EVENT_FIBER_UNMOUNT" filtered="thread" num="90" phase="start" since="14">
+  <event label="Virtual Thread Unmount"
+         id="VirtualThreadUnmounted" const="JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED" filtered="thread" num="90" phase="start" since="14">
     <description>
-      Fiber unmount events are generated when the fiber is about to be unmounted from the carrier thread.
+      Virtual thread unmount events are generated when the virtual thread is about to be unmounted from the carrier thread.
       <p/>
-      The event is sent on the <paramlink id="thread"></paramlink> the fiber is unmounted from.
+      The event is sent on the <paramlink id="thread"></paramlink> the virtual thread is unmounted from.
     </description>
     <origin>new</origin>
     <capabilities>
-      <required id="can_support_fibers">Can support fibers</required>
+      <required id="can_support_virtual_threads">Can support virtual threads</required>
     </capabilities>
     <parameters>
       <param id="jni_env">
@@ -12968,13 +12968,13 @@ myInit() {
       <param id="thread">
         <jthread/>
           <description>
-            Thread the fiber is unmounted from.
+            Thread the virtual thread is unmounted from.
           </description>
       </param>
-      <param id="fiber">
+      <param id="virtual_thread">
         <jthread/>
           <description>
-            Fiber that is unmounted.
+            Virtual thread that is unmounted.
           </description>
       </param>
     </parameters>
