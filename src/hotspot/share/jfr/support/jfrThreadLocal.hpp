@@ -225,9 +225,9 @@ class JfrThreadLocal {
   static void include(Thread* t);
 
   static void on_start(Thread* t);
-  static void on_vthread_start(JavaThread* jt, jthread vthread);
+  static void on_vthread_start(JavaThread* jt, jobject vthread);
   static void on_exit(Thread* t);
-  static void on_vthread_exit(JavaThread* jt, jthread vthread);
+  static void on_vthread_exit(JavaThread* jt, jobject vthread);
 
   // Code generation
   static ByteSize trace_id_offset();

@@ -656,7 +656,7 @@ static int find_exclusion_thread_idx(Handle thread) {
   return -1;
 }
 
-static Handle as_handle(jthread thread) {
+static Handle as_handle(jobject thread) {
   return Handle(Thread::current(), JfrJavaSupport::resolve_non_null(thread));
 }
 
@@ -664,11 +664,11 @@ static bool thread_is_not_excluded(Handle thread) {
   return -1 == find_exclusion_thread_idx(thread);
 }
 
-static bool thread_is_not_excluded(jthread thread) {
+static bool thread_is_not_excluded(jobject thread) {
   return thread_is_not_excluded(as_handle(thread));
 }
 
-static bool is_thread_excluded(jthread thread) {
+static bool is_thread_excluded(jobject thread) {
   return !thread_is_not_excluded(thread);
 }
 
@@ -678,7 +678,7 @@ static bool is_thread_excluded(Handle thread) {
 }
 #endif // ASSERT
 
-static int add_thread_to_exclusion_list(jthread thread) {
+static int add_thread_to_exclusion_list(jobject thread) {
   ThreadExclusionListAccess lock;
   if (exclusion_list == NULL) {
     exclusion_list = new (ResourceObj::C_HEAP, mtTracing) GrowableArray<jweak>(10, true, mtTracing);
@@ -707,7 +707,7 @@ static void remove_thread_from_exclusion_list(Handle thread) {
   }
 }
 
-static void remove_thread_from_exclusion_list(jthread thread) {
+static void remove_thread_from_exclusion_list(jobject thread) {
   ThreadExclusionListAccess lock;
   remove_thread_from_exclusion_list(as_handle(thread));
 }
@@ -722,18 +722,18 @@ static bool check_exclusion_state_on_thread_start(Handle h_threadObj) {
   return true;
 }
 
-JavaThread* JfrJavaSupport::java_thread(jthread thread) {
+JavaThread* JfrJavaSupport::java_thread(jobject thread) {
   ThreadsListHandle tlh;
   JavaThread* t;
   return tlh.cv_internal_thread_to_JavaThread(thread, &t, NULL) ? t : NULL;
 }
 
-jlong JfrJavaSupport::jfr_thread_id(jthread thread) {
+jlong JfrJavaSupport::jfr_thread_id(jobject thread) {
   JavaThread* const jt = java_thread(thread);
   return jt != NULL ? JFR_THREAD_ID(jt) : 0;
 }
 
-void JfrJavaSupport::exclude(jthread thread) {
+void JfrJavaSupport::exclude(jobject thread) {
   JavaThread* const jt = java_thread(thread);
   if (jt != NULL) {
     JfrThreadLocal::exclude(jt);
@@ -743,7 +743,7 @@ void JfrJavaSupport::exclude(jthread thread) {
   }
 }
 
-void JfrJavaSupport::include(jthread thread) {
+void JfrJavaSupport::include(jobject thread) {
   JavaThread* const jt = java_thread(thread);
   if (jt != NULL) {
     JfrThreadLocal::include(jt);
@@ -753,7 +753,7 @@ void JfrJavaSupport::include(jthread thread) {
   }
 }
 
-bool JfrJavaSupport::is_excluded(jthread thread) {
+bool JfrJavaSupport::is_excluded(jobject thread) {
   JavaThread* const jt = java_thread(thread);
   return jt != NULL ? jt->jfr_thread_local()->is_excluded() : is_thread_excluded(thread);
 }
@@ -827,7 +827,7 @@ bool JfrJavaSupport::set_handler(jobject clazz, jobject handler, TRAPS) {
 }
 
 
-bool JfrJavaSupport::on_thread_start(JavaThread* jt, jthread vthread) {
+bool JfrJavaSupport::on_thread_start(JavaThread* jt, jobject vthread) {
   assert(jt != NULL, "invariant");
   assert(Thread::current() == jt, "invariant");
   DEBUG_ONLY(check_new_unstarted_java_thread(jt, vthread);)

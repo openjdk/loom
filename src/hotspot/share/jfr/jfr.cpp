@@ -74,7 +74,7 @@ void Jfr::on_thread_start(Thread* t) {
   JfrThreadLocal::on_start(t);
 }
 
-void Jfr::on_thread_start(jthread carrier_thread, jthread vthread) {
+void Jfr::on_thread_start(jobject carrier_thread, jobject vthread) {
   JfrThreadLocal::on_vthread_start(JfrJavaSupport::java_thread(carrier_thread), vthread);
 }
 
@@ -82,7 +82,7 @@ void Jfr::on_thread_exit(Thread* t) {
   JfrThreadLocal::on_exit(t);
 }
 
-void Jfr::on_thread_exit(jthread carrier_thread, jthread vthread) {
+void Jfr::on_thread_exit(jobject carrier_thread, jobject vthread) {
   JfrThreadLocal::on_vthread_exit(JfrJavaSupport::java_thread(carrier_thread), vthread);
 }
 

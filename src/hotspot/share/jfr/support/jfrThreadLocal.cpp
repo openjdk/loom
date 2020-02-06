@@ -195,7 +195,7 @@ void JfrThreadLocal::on_exit(Thread* t) {
   release(tl, Thread::current()); // because it could be that Thread::current() != t
 }
 
-void JfrThreadLocal::on_vthread_exit(JavaThread* jt, jthread vthread) {
+void JfrThreadLocal::on_vthread_exit(JavaThread* jt, jobject vthread) {
   assert(vthread != NULL, "invariant");
   const traceid static_tid = JfrThreadLocal::static_thread_id(jt);
   const traceid id = JfrVirtualThread::thread_id(JfrJavaSupport::resolve_non_null(vthread), jt);
