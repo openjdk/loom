@@ -200,7 +200,7 @@ class DatagramSocketImplWrapper extends MulticastSocket {
      * @throws SocketException if creating the socket fails
      * @since 1.4
      */
-    DatagramSocketImpl getImpl() throws SocketException {
+    final DatagramSocketImpl getImpl() throws SocketException {
         if (!created) {
             synchronized (this) {
                 if (!created) {

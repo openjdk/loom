@@ -79,6 +79,7 @@
 #include "gc/shared/preservedMarks.inline.hpp"
 #include "gc/shared/suspendibleThreadSet.hpp"
 #include "gc/shared/referenceProcessor.inline.hpp"
+#include "gc/shared/taskTerminator.hpp"
 #include "gc/shared/taskqueue.inline.hpp"
 #include "gc/shared/weakProcessor.inline.hpp"
 #include "gc/shared/workerPolicy.hpp"
@@ -1131,9 +1132,6 @@ void G1CollectedHeap::print_heap_after_full_collection(G1HeapTransition* heap_tr
   heap_transition->print();
   print_heap_after_gc();
   print_heap_regions();
-#ifdef TRACESPINNING
-  ParallelTaskTerminator::print_termination_counts();
-#endif
 }
 
 bool G1CollectedHeap::do_full_collection(bool explicit_gc,
@@ -3143,10 +3141,6 @@ void G1CollectedHeap::do_collection_pause_at_safepoint_helper(double target_paus
 
       verify_after_young_collection(verify_type);
 
-#ifdef TRACESPINNING
-      ParallelTaskTerminator::print_termination_counts();
-#endif
-
       gc_epilogue(false);
     }
 
@@ -3480,14 +3474,14 @@ class G1STWRefProcTaskProxy: public AbstractGangTask {
   G1CollectedHeap* _g1h;
   G1ParScanThreadStateSet* _pss;
   RefToScanQueueSet* _task_queues;
-  ParallelTaskTerminator* _terminator;
+  TaskTerminator* _terminator;
 
 public:
   G1STWRefProcTaskProxy(ProcessTask& proc_task,
                         G1CollectedHeap* g1h,
                         G1ParScanThreadStateSet* per_thread_states,
                         RefToScanQueueSet *task_queues,
-                        ParallelTaskTerminator* terminator) :
+                        TaskTerminator* terminator) :
     AbstractGangTask("Process reference objects in parallel"),
     _proc_task(proc_task),
     _g1h(g1h),
@@ -3532,7 +3526,7 @@ void G1STWRefProcTaskExecutor::execute(ProcessTask& proc_task, uint ergo_workers
          "Ergonomically chosen workers (%u) should be less than or equal to active workers (%u)",
          ergo_workers, _workers->active_workers());
   TaskTerminator terminator(ergo_workers, _queues);
-  G1STWRefProcTaskProxy proc_task_proxy(proc_task, _g1h, _pss, _queues, terminator.terminator());
+  G1STWRefProcTaskProxy proc_task_proxy(proc_task, _g1h, _pss, _queues, &terminator);
 
   _workers->run_task(&proc_task_proxy, ergo_workers);
 }
@@ -3828,7 +3822,7 @@ protected:
     G1GCPhaseTimes* p = _g1h->phase_times();
 
     Ticks start = Ticks::now();
-    G1ParEvacuateFollowersClosure cl(_g1h, pss, _task_queues, _terminator.terminator(), objcopy_phase);
+    G1ParEvacuateFollowersClosure cl(_g1h, pss, _task_queues, &_terminator, objcopy_phase);
     cl.do_void();
 
     assert(pss->queue_is_empty(), "should be empty");

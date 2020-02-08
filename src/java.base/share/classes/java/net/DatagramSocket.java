@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,8 +28,11 @@ package java.net;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.channels.DatagramChannel;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.Set;
 
+import sun.net.NetProperties;
 import sun.nio.ch.DefaultSelectorProvider;
 
 /**
@@ -1061,6 +1064,13 @@ public class DatagramSocket implements java.io.Closeable {
         return delegate.supportedOptions();
     }
 
+    private static final boolean USE_PLAINDATAGRAMSOCKETIMPL;
+    static {
+        PrivilegedAction<String> pa = () -> NetProperties.get("jdk.net.usePlainDatagramSocketImpl");
+        String s = AccessController.doPrivileged(pa);
+        USE_PLAINDATAGRAMSOCKETIMPL = (s != null) && !s.equalsIgnoreCase("false");
+    }
+
     /**
      * Creates a datagram socket object that can be used as a delegate. The
      * datagram socket is a DatagramChannel socket adaptor or an instance of
@@ -1070,8 +1080,13 @@ public class DatagramSocket implements java.io.Closeable {
         throws SocketException
     {
         DatagramSocketImplFactory factory = DatagramSocket.factory;
-        if (factory != null) {
-            DatagramSocketImpl impl = factory.createDatagramSocketImpl();
+        if (USE_PLAINDATAGRAMSOCKETIMPL || factory != null) {
+            DatagramSocketImpl impl;
+            if (factory != null) {
+                impl = factory.createDatagramSocketImpl();
+            } else {
+                impl = DefaultDatagramSocketImplFactory.createDatagramSocketImpl(multicast);
+            }
             impl.create(); // create socket
             return new DatagramSocketImplWrapper(impl, /*created*/true);
         } else {

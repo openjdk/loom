@@ -27,8 +27,10 @@
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceId.inline.hpp"
 #include "jfr/recorder/repository/jfrChunkWriter.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTrace.hpp"
+#include "jfr/support/jfrMethodLookup.hpp"
 #include "jfr/support/jfrVirtualThread.hpp"
 #include "memory/allocation.inline.hpp"
+#include "oops/instanceKlass.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/vframe.inline.hpp"
 
@@ -41,11 +43,11 @@ static void copy_frames(JfrStackFrame** lhs_frames, u4 length, const JfrStackFra
   }
 }
 
-JfrStackFrame::JfrStackFrame(const traceid& id, int bci, int type, const Method* method) :
-  _method(method), _methodid(id), _line(0), _bci(bci), _type(type) {}
+JfrStackFrame::JfrStackFrame(const traceid& id, int bci, int type, const InstanceKlass* ik) :
+  _klass(ik), _method(NULL), _methodid(id), _line(0), _bci(bci), _type(type) {}
 
-JfrStackFrame::JfrStackFrame(const traceid& id, int bci, int type, int lineno, const Method* method) :
-  _method(method), _methodid(id), _line(lineno), _bci(bci), _type(type) {}
+JfrStackFrame::JfrStackFrame(const traceid& id, int bci, int type, int lineno, const Method* method, const InstanceKlass* ik) :
+  _klass(ik), _method(method), _methodid(id), _line(lineno), _bci(bci), _type(type) {}
 
 JfrStackTrace::JfrStackTrace(JfrStackFrame* frames, u4 max_frames) :
   _next(NULL),
@@ -295,7 +297,7 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool as
     }
     // Can we determine if it's inlined?
     _hash = (_hash << 2) + (unsigned int)(((size_t)mid >> 2) + (bci << 4) + type);
-    _frames[count] = JfrStackFrame(mid, bci, type, async_mode ? method->line_number_from_bci(bci) : 0, method);
+    _frames[count] = JfrStackFrame(mid, bci, type, async_mode ? method->line_number_from_bci(bci) : 0, method, method->method_holder());
     vfs.next_vframe();
     count++;
   }
@@ -327,9 +329,12 @@ bool JfrStackTrace::record(JavaThread* current_thread, int skip) {
 }
 
 void JfrStackFrame::resolve_lineno() const {
-  assert(_method, "no method pointer");
+  assert(_klass, "no klass pointer");
   assert(_line == 0, "already have linenumber");
-  _line = _method->line_number_from_bci(_bci);
+  const Method* const method = JfrMethodLookup::lookup(_klass, _methodid);
+  assert(method != NULL, "invariant");
+  assert(method->method_holder() == _klass, "invariant");
+  _line = method->line_number_from_bci(_bci);
 }
 
 void JfrStackTrace::resolve_linenos() const {

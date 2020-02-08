@@ -2806,7 +2806,7 @@ void jio_print(const char* s, size_t len) {
   if (Arguments::vfprintf_hook() != NULL) {
     jio_fprintf(defaultStream::output_stream(), "%.*s", (int)len, s);
   } else {
-    // Make an unused local variable to avoid warning from gcc 4.x compiler.
+    // Make an unused local variable to avoid warning from gcc compiler.
     size_t count = ::write(defaultStream::output_fd(), s, (int)len);
   }
 }

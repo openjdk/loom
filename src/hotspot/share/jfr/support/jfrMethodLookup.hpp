@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,26 +19,25 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
+ *
  */
 
+#ifndef SHARE_JFR_SUPPORT_JFRMETHODLOOKUP_HPP
+#define SHARE_JFR_SUPPORT_JFRMETHODLOOKUP_HPP
 
-/*
- * @test
- *
- * @summary converted from VM Testbase vm/compiler/CodeCacheInfoOnCompilation.
- * VM Testbase readme:
- * DESCRIPTION
- *     Test calls java class with one method call in main. Test checks output
- *     format of the -XX:+PrintCodeCacheOnCompilation vm option during this method
- *     call.
- *
- *     Test will be skipped if java has not "-Xcomp" option
- *
- *
- * @library /vmTestbase
- *          /test/lib
- * @run driver jdk.test.lib.FileInstaller . .
- * @build vm.compiler.CodeCacheInfoOnCompilation.PrintOnCall
- * @run shell run.sh
- */
+#include "jfr/utilities/jfrTypes.hpp"
+#include "memory/allocation.hpp"
 
+class InstanceKlass;
+class Method;
+
+class JfrMethodLookup : AllStatic {
+ public:
+  static const Method* lookup(const InstanceKlass* ik, traceid method_id);
+  static traceid method_id(const Method* method);
+  static int method_id_num(traceid method_id);
+  static traceid klass_id(const Method* method);
+  static traceid klass_id(traceid method_id);
+};
+
+#endif // SHARE_JFR_SUPPORT_JFRMETHODLOOKUP_HPP

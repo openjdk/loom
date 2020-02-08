@@ -7141,6 +7141,16 @@ RuntimeStub* generate_cont_doYield() {
 
     StubRoutines::x86::_verify_mxcsr_entry    = generate_verify_mxcsr();
 
+    StubRoutines::x86::_f2i_fixup             = generate_f2i_fixup();
+    StubRoutines::x86::_f2l_fixup             = generate_f2l_fixup();
+    StubRoutines::x86::_d2i_fixup             = generate_d2i_fixup();
+    StubRoutines::x86::_d2l_fixup             = generate_d2l_fixup();
+
+    StubRoutines::x86::_float_sign_mask       = generate_fp_mask("float_sign_mask",  0x7FFFFFFF7FFFFFFF);
+    StubRoutines::x86::_float_sign_flip       = generate_fp_mask("float_sign_flip",  0x8000000080000000);
+    StubRoutines::x86::_double_sign_mask      = generate_fp_mask("double_sign_mask", 0x7FFFFFFFFFFFFFFF);
+    StubRoutines::x86::_double_sign_flip      = generate_fp_mask("double_sign_flip", 0x8000000000000000);
+
     // Build this early so it's available for the interpreter.
     StubRoutines::_throw_StackOverflowError_entry =
       generate_throw_exception("StackOverflowError throw_exception",
@@ -7164,7 +7174,7 @@ RuntimeStub* generate_cont_doYield() {
       StubRoutines::_crc32c_table_addr = (address)StubRoutines::x86::_crc32c_table;
       StubRoutines::_updateBytesCRC32C = generate_updateBytesCRC32C(supports_clmul);
     }
-    if (VM_Version::supports_sse2() && UseLibmIntrinsic && InlineIntrinsics) {
+    if (UseLibmIntrinsic && InlineIntrinsics) {
       if (vmIntrinsics::is_intrinsic_available(vmIntrinsics::_dsin) ||
           vmIntrinsics::is_intrinsic_available(vmIntrinsics::_dcos) ||
           vmIntrinsics::is_intrinsic_available(vmIntrinsics::_dtan)) {
@@ -7245,15 +7255,6 @@ RuntimeStub* generate_cont_doYield() {
                                                 throw_NullPointerException_at_call));
 
     // entry points that are platform specific
-    StubRoutines::x86::_f2i_fixup = generate_f2i_fixup();
-    StubRoutines::x86::_f2l_fixup = generate_f2l_fixup();
-    StubRoutines::x86::_d2i_fixup = generate_d2i_fixup();
-    StubRoutines::x86::_d2l_fixup = generate_d2l_fixup();
-
-    StubRoutines::x86::_float_sign_mask  = generate_fp_mask("float_sign_mask",  0x7FFFFFFF7FFFFFFF);
-    StubRoutines::x86::_float_sign_flip  = generate_fp_mask("float_sign_flip",  0x8000000080000000);
-    StubRoutines::x86::_double_sign_mask = generate_fp_mask("double_sign_mask", 0x7FFFFFFFFFFFFFFF);
-    StubRoutines::x86::_double_sign_flip = generate_fp_mask("double_sign_flip", 0x8000000000000000);
     StubRoutines::x86::_vector_float_sign_mask = generate_vector_mask("vector_float_sign_mask", 0x7FFFFFFF7FFFFFFF);
     StubRoutines::x86::_vector_float_sign_flip = generate_vector_mask("vector_float_sign_flip", 0x8000000080000000);
     StubRoutines::x86::_vector_double_sign_mask = generate_vector_mask("vector_double_sign_mask", 0x7FFFFFFFFFFFFFFF);

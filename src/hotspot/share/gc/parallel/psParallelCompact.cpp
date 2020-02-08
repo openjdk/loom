@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -53,6 +53,7 @@
 #include "gc/shared/referenceProcessor.hpp"
 #include "gc/shared/referenceProcessorPhaseTimes.hpp"
 #include "gc/shared/spaceDecorator.inline.hpp"
+#include "gc/shared/taskTerminator.hpp"
 #include "gc/shared/weakProcessor.hpp"
 #include "gc/shared/workerPolicy.hpp"
 #include "gc/shared/workgroup.hpp"
@@ -1972,10 +1973,6 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
                          marking_start.ticks(), compaction_start.ticks(),
                          collection_exit.ticks());
 
-#ifdef TRACESPINNING
-  ParallelTaskTerminator::print_termination_counts();
-#endif
-
   AdaptiveSizePolicyOutput::print(size_policy, heap->total_collections());
 
   _gc_timer.register_gc_end();
@@ -2153,7 +2150,7 @@ static void mark_from_roots_work(ParallelRootType::Value root_type, uint worker_
   cm->follow_marking_stacks();
 }
 
-static void steal_marking_work(ParallelTaskTerminator& terminator, uint worker_id) {
+static void steal_marking_work(TaskTerminator& terminator, uint worker_id) {
   assert(ParallelScavengeHeap::heap()->is_gc_active(), "called outside gc");
 
   ParCompactionManager* cm =
@@ -2201,7 +2198,7 @@ public:
     Threads::possibly_parallel_threads_do(true /*parallel */, &closure);
 
     if (_active_workers > 1) {
-      steal_marking_work(*_terminator.terminator(), worker_id);
+      steal_marking_work(_terminator, worker_id);
     }
   }
 };
@@ -2231,7 +2228,7 @@ public:
     _task.work(worker_id, *PSParallelCompact::is_alive_closure(),
                mark_and_push_closure, follow_stack_closure);
 
-    steal_marking_work(*_terminator.terminator(), worker_id);
+    steal_marking_work(_terminator, worker_id);
   }
 };
 
@@ -2590,7 +2587,7 @@ void PSParallelCompact::write_block_fill_histogram()
 }
 #endif // #ifdef ASSERT
 
-static void compaction_with_stealing_work(ParallelTaskTerminator* terminator, uint worker_id) {
+static void compaction_with_stealing_work(TaskTerminator* terminator, uint worker_id) {
   assert(ParallelScavengeHeap::heap()->is_gc_active(), "called outside gc");
 
   ParCompactionManager* cm =
@@ -2648,7 +2645,7 @@ public:
 
     // Once a thread has drained it's stack, it should try to steal regions from
     // other threads.
-    compaction_with_stealing_work(_terminator.terminator(), worker_id);
+    compaction_with_stealing_work(&_terminator, worker_id);
   }
 };
 

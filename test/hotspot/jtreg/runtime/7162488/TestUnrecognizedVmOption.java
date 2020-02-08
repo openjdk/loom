@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,15 +21,25 @@
  * questions.
  */
 
-
 /*
  * @test
- *
- * @summary converted from VM Testbase metaspace/flags/maxMetaspaceSize.
- *
- * @library /vmTestbase /test/lib
- * @run driver jdk.test.lib.FileInstaller . .
- * @build metaspace.flags.maxMetaspaceSize.maxMetaspaceSize
- * @run shell maxMetaspaceSize.sh
+ * @bug 7162488
+ * @summary VM should print unrecognized -XX option
+ * @library /test/lib
+ * @run driver TestUnrecognizedVmOption
  */
+import jdk.test.lib.process.OutputAnalyzer;
+import jdk.test.lib.process.ProcessTools;
 
+public class TestUnrecognizedVmOption {
+    static final String OPTION="this_is_not_an_option";
+
+    public static void main(String[] args) throws Exception {
+        ProcessBuilder pb =
+            ProcessTools.createJavaProcessBuilder(true, "-showversion", "-XX:" + OPTION);
+        new OutputAnalyzer(pb.start())
+            .shouldNotHaveExitValue(0)
+            .shouldContain("Unrecognized VM option")
+            .shouldContain(OPTION);
+    }
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,23 +19,26 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#include <jni.h>
+/*
+ * @test
+ * @summary Test the native process builder API.
+ * @library /test/lib
+ * @build Test
+ * @run main/native TestNativeProcessBuilder
+ */
 
-#ifdef WINDOWS
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
-JNIEXPORT void JNICALL Java_jdk_jfr_event_sampling_TestNative_longTime
-  (JNIEnv *env, jclass jc)
-{
-#ifdef WINDOWS
-  Sleep(2*1000);
-#else
-  usleep(2*1000*1000);
-#endif
+import jdk.test.lib.Utils;
+import jdk.test.lib.process.ProcessTools;
+import jdk.test.lib.process.OutputAnalyzer;
+
+public class TestNativeProcessBuilder {
+    public static void main(String args[]) throws Exception {
+        ProcessBuilder pb = ProcessTools.createNativeTestProcessBuilder("jvm-test-launcher");
+        pb.environment().put("CLASSPATH", Utils.TEST_CLASS_PATH);
+        new OutputAnalyzer(pb.start())
+            .shouldHaveExitValue(0);
+    }
 }
