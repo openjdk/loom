@@ -33,13 +33,11 @@ class InstanceKlass;
 class JavaThread;
 class JfrCheckpointWriter;
 class JfrChunkWriter;
-class Method;
 
 class JfrStackFrame {
   friend class ObjectSampleCheckpoint;
  private:
   const InstanceKlass* _klass;
-  const Method* _method;
   traceid _methodid;
   mutable int _line;
   int _bci;
@@ -47,7 +45,7 @@ class JfrStackFrame {
 
  public:
   JfrStackFrame(const traceid& id, int bci, int type, const InstanceKlass* klass);
-  JfrStackFrame(const traceid& id, int bci, int type, int lineno, const Method* method, const InstanceKlass* klass);
+  JfrStackFrame(const traceid& id, int bci, int type, int lineno, const InstanceKlass* klass);
 
   bool equals(const JfrStackFrame& rhs) const;
   void write(JfrChunkWriter& cw) const;

@@ -44,10 +44,10 @@ static void copy_frames(JfrStackFrame** lhs_frames, u4 length, const JfrStackFra
 }
 
 JfrStackFrame::JfrStackFrame(const traceid& id, int bci, int type, const InstanceKlass* ik) :
-  _klass(ik), _method(NULL), _methodid(id), _line(0), _bci(bci), _type(type) {}
+  _klass(ik), _methodid(id), _line(0), _bci(bci), _type(type) {}
 
-JfrStackFrame::JfrStackFrame(const traceid& id, int bci, int type, int lineno, const Method* method, const InstanceKlass* ik) :
-  _klass(ik), _method(method), _methodid(id), _line(lineno), _bci(bci), _type(type) {}
+JfrStackFrame::JfrStackFrame(const traceid& id, int bci, int type, int lineno, const InstanceKlass* ik) :
+  _klass(ik), _methodid(id), _line(lineno), _bci(bci), _type(type) {}
 
 JfrStackTrace::JfrStackTrace(JfrStackFrame* frames, u4 max_frames) :
   _next(NULL),
@@ -297,7 +297,7 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool as
     }
     // Can we determine if it's inlined?
     _hash = (_hash << 2) + (unsigned int)(((size_t)mid >> 2) + (bci << 4) + type);
-    _frames[count] = JfrStackFrame(mid, bci, type, async_mode ? method->line_number_from_bci(bci) : 0, method, method->method_holder());
+    _frames[count] = JfrStackFrame(mid, bci, type, async_mode ? method->line_number_from_bci(bci) : 0, method->method_holder());
     vfs.next_vframe();
     count++;
   }
