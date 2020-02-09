@@ -204,7 +204,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @since   1.4
      */
     protected DatagramSocket(DatagramSocketImpl impl) {
-        this.delegate = new DatagramSocketImplWrapper(impl, /*created*/false);   // throws NPE if null
+        this.delegate = new DatagramSocketImplWrapper(impl);  // throws NPE if null
     }
 
     /**
@@ -1087,13 +1087,13 @@ public class DatagramSocket implements java.io.Closeable {
             } else {
                 impl = DefaultDatagramSocketImplFactory.createDatagramSocketImpl(multicast);
             }
-            impl.create(); // create socket
-            return new DatagramSocketImplWrapper(impl, /*created*/true);
+            DatagramSocketImplWrapper delegate = new DatagramSocketImplWrapper(impl);
+            delegate.getImpl();  // create UDP socket
+            return delegate;
         } else {
             // Return a DatagramChannel socket adaptor
-            DatagramSocket delegate;
             try {
-                delegate = DefaultSelectorProvider.get()
+                return DefaultSelectorProvider.get()
                         .openUninterruptibleDatagramChannel()
                         .socket();
             } catch (SocketException e) {
@@ -1101,7 +1101,7 @@ public class DatagramSocket implements java.io.Closeable {
             } catch (IOException e) {
                 throw new SocketException(e.getMessage());
             }
-            return delegate;
         }
+
     }
 }

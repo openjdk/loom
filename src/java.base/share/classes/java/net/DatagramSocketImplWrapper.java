@@ -94,14 +94,11 @@ class DatagramSocketImplWrapper extends MulticastSocket {
      * to a DatagramSocketImpl.
      *
      * @param impl a new DatagramSocketImpl
-     * @param created true if the impl's socket has been created
      * @throws NullPointerException if impl is null
      */
-    DatagramSocketImplWrapper(DatagramSocketImpl impl, boolean created) {
+    DatagramSocketImplWrapper(DatagramSocketImpl impl) {
         super((MulticastSocket) null);
         this.impl = Objects.requireNonNull(impl);
-        if (created)
-            this.created = true;
         this.oldImpl = checkOldImpl(impl);
     }
 
