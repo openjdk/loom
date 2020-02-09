@@ -44,4 +44,4 @@ class JfrVirtualThread : public AllStatic {
   static traceid thread_id(oop vthread, const JavaThread* jt);
 };
 
-#endif //SHARE_JFR_SUPPORT_JFRFIBER_HPP
+#endif //SHARE_JFR_SUPPORT_JFRVIRTUALTHREAD_HPP
