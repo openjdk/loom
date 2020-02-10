@@ -170,6 +170,8 @@ JVM_RegisterContinuationMethods
 JVM_RegisterSignal
 JVM_ReleaseUTF
 JVM_ResumeThread
+JVM_ScopedCache
+JVM_SetScopedCache
 JVM_SetArrayElement
 JVM_SetClassSigners
 JVM_SetNativeThreadName

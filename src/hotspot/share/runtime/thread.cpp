@@ -1733,6 +1733,8 @@ void JavaThread::initialize() {
 
   _class_to_be_initialized = NULL;
 
+  _scopedCache = NULL;
+
   pd_initialize();
 }
 
@@ -3032,6 +3034,8 @@ void JavaThread::oops_do(OopClosure* f, CodeBlobClosure* cf) {
   if (jvmti_thread_state() != NULL) {
     jvmti_thread_state()->oops_do(f, cf);
   }
+
+  f->do_oop(&_scopedCache);
 }
 
 #ifdef ASSERT
@@ -5119,4 +5123,10 @@ void Threads::verify() {
   }
   VMThread* thread = VMThread::vm_thread();
   if (thread != NULL) thread->verify();
+}
+
+void JavaThread::allocate_scoped_hash_table(int count) {
+  if (count > 0) {
+    _scopedCache = oopFactory::new_objectArray(count, this);
+  }
 }

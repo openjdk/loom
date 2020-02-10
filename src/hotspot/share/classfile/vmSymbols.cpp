@@ -363,6 +363,8 @@ bool vmIntrinsics::preserves_state(vmIntrinsics::ID id) {
   case vmIntrinsics::_getClass:
   case vmIntrinsics::_isInstance:
   case vmIntrinsics::_currentThread:
+  case vmIntrinsics::_scopedCache:
+  case vmIntrinsics::_setScopedCache:
   case vmIntrinsics::_dabs:
   case vmIntrinsics::_fabs:
   case vmIntrinsics::_iabs:
@@ -411,6 +413,8 @@ bool vmIntrinsics::can_trap(vmIntrinsics::ID id) {
   case vmIntrinsics::_doubleToRawLongBits:
   case vmIntrinsics::_longBitsToDouble:
   case vmIntrinsics::_currentThread:
+  case vmIntrinsics::_scopedCache:
+  case vmIntrinsics::_setScopedCache:
   case vmIntrinsics::_dabs:
   case vmIntrinsics::_fabs:
   case vmIntrinsics::_iabs:
@@ -578,6 +582,8 @@ bool vmIntrinsics::is_disabled_by_flags(vmIntrinsics::ID id) {
   case vmIntrinsics::_currentThread:
     if (!InlineThreadNatives) return true;
     break;
+  case vmIntrinsics::_scopedCache:
+  case vmIntrinsics::_setScopedCache:
   case vmIntrinsics::_floatToRawIntBits:
   case vmIntrinsics::_intBitsToFloat:
   case vmIntrinsics::_doubleToRawLongBits:

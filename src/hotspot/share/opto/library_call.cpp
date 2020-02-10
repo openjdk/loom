@@ -258,6 +258,8 @@ class LibraryCallKit : public GraphKit {
   bool inline_unsafe_writebackSync0(bool is_pre);
   bool inline_unsafe_copyMemory();
   bool inline_native_currentThread();
+  bool inline_native_scopedCache();
+  bool inline_native_setScopedCache();
 
   bool inline_native_time_funcs(address method, const char* funcName);
 #ifdef JFR_HAVE_INTRINSICS
@@ -757,6 +759,9 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_onSpinWait:               return inline_onspinwait();
 
   case vmIntrinsics::_currentThread:            return inline_native_currentThread();
+
+  case vmIntrinsics::_scopedCache:              return inline_native_scopedCache();
+  case vmIntrinsics::_setScopedCache:           return inline_native_setScopedCache();
 
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), "counterTime");
@@ -3042,6 +3047,40 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 bool LibraryCallKit::inline_native_currentThread() {
   Node* junk = NULL;
   set_result(generate_current_thread(junk));
+  return true;
+}
+
+//------------------------inline_native_scopedCache------------------
+bool LibraryCallKit::inline_native_scopedCache() {
+  ciKlass *objects_klass = ciObjArrayKlass::make(env()->Object_klass());
+  const TypeOopPtr *etype = TypeOopPtr::make_from_klass(env()->Object_klass());
+
+  // It might be nice to eliminate the bounds check on the cache array
+  // by replacing TypeInt::POS here with
+  // TypeInt::make(ScopedCacheSize*2), but this causes a performance
+  // regression in some test cases.
+  const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
+  bool xk = etype->klass_is_exact();
+
+  // Because we create the scoped cache lazily we have to make the
+  // type of the result BotPTR.
+  const Type* objects_type = TypeAryPtr::make(TypePtr::BotPTR, arr0, objects_klass, xk, 0);
+  Node* thread = _gvn.transform(new ThreadLocalNode());
+  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::scopedCache_offset()));
+  Node* threadObj = make_load(NULL, p, objects_type, T_OBJECT, MemNode::unordered);
+  set_result(threadObj);
+
+  return true;
+}
+
+//------------------------inline_native_setScopedCache------------------
+bool LibraryCallKit::inline_native_setScopedCache() {
+  Node* arr = argument(0);
+  Node* thread = _gvn.transform(new ThreadLocalNode());
+  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::scopedCache_offset()));
+  const TypePtr *adr_type = _gvn.type(p)->isa_ptr();
+  store_to_memory(control(), p, arr, T_OBJECT, adr_type, MemNode::unordered);
+
   return true;
 }
 

@@ -213,6 +213,12 @@ JVM_CallStackWalk(JNIEnv *env, jobject stackStream, jlong mode,
                   jint skip_frames, jobject contScope, jobject cont,
                   jint frame_count, jint start_index, jobjectArray frames);
 
+JNIEXPORT jobject JNICALL
+JVM_ScopedCache(JNIEnv *env, jclass threadClass);
+
+JNIEXPORT void JNICALL
+JVM_SetScopedCache(JNIEnv *env, jclass threadClass, jobject theCache);
+
 JNIEXPORT jint JNICALL
 JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, jlong anchor, 
                   jint frame_count, jint start_index, 

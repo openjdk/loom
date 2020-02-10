@@ -55,6 +55,8 @@ static JNINativeMethod methods[] = {
     {"getThreads",        "()[" THD,   (void *)&JVM_GetAllThreads},
     {"dumpThreads",      "([" THD ")[[" STE, (void *)&JVM_DumpThreads},
     {"setNativeName",    "(" STR ")V", (void *)&JVM_SetNativeThreadName},
+    {"scopedCache",      "()[" OBJ,    (void *)&JVM_ScopedCache},
+    {"setScopedCache",   "([" OBJ ")V", (void *)&JVM_SetScopedCache},
 };
 
 #undef THD

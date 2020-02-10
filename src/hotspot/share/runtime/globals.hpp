@@ -2483,6 +2483,10 @@ const size_t minimumSymbolTableSize = 1024;
   product(bool, UseContinuationStreamingCopy, false,                        \
       "Use streaming memory when copying continuation stack chunks")        \
                                                                             \
+  product(intx, ScopedCacheSize, 16,                                        \
+      "Size of the cache for scoped values")                                \
+          range(0, max_intx)                                                \
+                                                                            \
   experimental(ccstr, AllocateOldGenAt, NULL,                               \
           "Path to the directoy where a temporary file will be "            \
           "created to use as the backing store for old generation."         \

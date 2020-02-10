@@ -1229,6 +1229,13 @@ private:
   friend class ThreadWaitTransition;
   friend class VM_Exit;
 
+public:
+
+  oop _scopedCache;
+  jlong _scoped_hash_table_shift;
+
+  void allocate_scoped_hash_table(int count);
+
   void initialize();                             // Initialized the instance variables
 
  public:
@@ -1784,6 +1791,8 @@ private:
   void set_do_not_unlock(void)                   { _do_not_unlock_if_synchronized = true; }
   void clr_do_not_unlock(void)                   { _do_not_unlock_if_synchronized = false; }
   bool do_not_unlock(void)                       { return _do_not_unlock_if_synchronized; }
+
+static ByteSize scopedCache_offset()             { return byte_offset_of(JavaThread, _scopedCache); }
 
   // For assembly stub generation
   static ByteSize threadObj_offset()             { return byte_offset_of(JavaThread, _threadObj); }
