@@ -720,12 +720,6 @@ public class Thread implements Runnable {
         Builder uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
 
         /**
-         * The thread is <em>managed</em>.
-         * @return this builder
-         */
-        Builder managed();
-
-        /**
          * Sets the task for the thread to run.
          * @param task the task to run
          * @return this builder
@@ -879,12 +873,6 @@ public class Thread implements Runnable {
         @Override
         public Builder uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
             this.uhe = Objects.requireNonNull(ueh);
-            return this;
-        }
-
-        @Override
-        public Builder managed() {
-            // TDB
             return this;
         }
 
@@ -1384,15 +1372,8 @@ public class Thread implements Runnable {
      */
     public static final int INHERIT_THREAD_LOCALS = 1 << 2;
 
-    /**
-     * Characteristic value signifying that the thread is <em>managed.</em>
-     *
-     * @since 99
-     */
-    public static final int MANAGED = 1 << 3;
-
     private static int validCharacteristics() {
-        return (VIRTUAL | NO_THREAD_LOCALS | INHERIT_THREAD_LOCALS | MANAGED);
+        return (VIRTUAL | NO_THREAD_LOCALS | INHERIT_THREAD_LOCALS);
     }
 
     private static void checkCharacteristics(int characteristics) {
