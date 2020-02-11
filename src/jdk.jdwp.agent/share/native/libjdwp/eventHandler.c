@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -560,7 +560,7 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
             HandlerNode *next = NEXT(node);
             jboolean shouldDelete;
 
-            /* passesFilter() will set evinfo->matchesFiber true if appropriate. */
+            /* passesFilter() will set evinfo->matchesVThread true if appropriate. */
             if (eventFilterRestricted_passesFilter(env, classname,
                                                    evinfo, node,
                                                    &shouldDelete, JNI_FALSE /* filterOnly */)) {
@@ -591,24 +591,24 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
 }
 
 /*
- * Called when we are not notifying the debugging of all fibers, and we are seeing an event
- * on a fiber that we have not notified the debugger about yet. If the event passes the event
+ * Called when we are not notifying the debugging of all vthreads, and we are seeing an event
+ * on a vthread that we have not notified the debugger about yet. If the event passes the event
  * filters, then we will notify the debugger with a THREAD_START and add it to our list of
- * fibers. Otherwise we ignore it.
+ * vthreads. Otherwise we ignore it.
  */
 static void
-filterAndAddFiber(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSessionID,
-                  jthread thread, jthread fiber)
+filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSessionID,
+                    jthread thread, jthread vthread)
 {
-    jboolean needToAddFiber = JNI_FALSE; /* Assume we won't need to add the fiber. */;
+    jboolean needToAddVThread = JNI_FALSE; /* Assume we won't need to add the vthread. */;
 
     /*
-     * Although we have received a JVMTI event for a fiber that we have not added yet,
-     * we only need to add it if we are going to pass the fiber on to the debugger. This
+     * Although we have received a JVMTI event for a vthread that we have not added yet,
+     * we only need to add it if we are going to pass the vthread on to the debugger. This
      * might not end up happening due to event filtering. For example, we got a breakpoint
-     * on a carrier thread running a fiber, but the breakpoint HandlerNode specifies that
+     * on a carrier thread running a vthread, but the breakpoint HandlerNode specifies that
      * event must be on a certain thread, so the event may end up being dropped. Therefore
-     * we need to do a dry run with the filtering to see if we really need to add this fiber.
+     * we need to do a dry run with the filtering to see if we really need to add this vthread.
      */
     {
         HandlerNode *node = getHandlerChain(ei)->first;
@@ -622,14 +622,14 @@ filterAndAddFiber(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSess
             HandlerNode *next = NEXT(node);
             jboolean shouldDelete;
 
-            /* passesFilter() will set evinfo->matchesFiber true if appropriate. */
+            /* passesFilter() will set evinfo->matchesVThread true if appropriate. */
             if (eventFilterRestricted_passesFilter(env, classname,
                                                    evinfo, node,
                                                    &shouldDelete, JNI_TRUE /* filterOnly */)) {
-                if (evinfo->matchesFiber) {
-                    /* If we match even one filter and it matches on the fiber, then we need
-                     * to add the fiber. */
-                    needToAddFiber = JNI_TRUE;
+                if (evinfo->matchesVThread) {
+                    /* If we match even one filter and it matches on the vthread, then we need
+                     * to add the vthread. */
+                    needToAddVThread = JNI_TRUE;
                     break;
                 }
             }
@@ -641,27 +641,27 @@ filterAndAddFiber(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSess
         jvmtiDeallocate(classname);
     }
 
-    if (needToAddFiber) {
-        /* Make sure this fiber gets added to the fibers list. */
-        threadControl_addFiber(fiber);
+    if (needToAddVThread) {
+        /* Make sure this vthread gets added to the vthreads list. */
+        threadControl_addVThread(vthread);
 
         /*
-         * When the VIRTUAL_THREAD_SCHEDULED event arrived for this fiber, we ignored it since we don't
-         * want to notify the debugger about fibers until there is a non-fiber event that
+         * When the VIRTUAL_THREAD_SCHEDULED event arrived for this vthread, we ignored it since we don't
+         * want to notify the debugger about vthreads until there is a non-vthread event that
          * arrives on it (like a breakpoint). Now that this has happened, we need to send
          * a VIRTUAL_THREAD_SCHEDULED event (which will be converted into a THREAD_START event) so
-         * the debugger will know about the fiber. Otherwise it will be unhappy when it gets
-         * an event for a fiber that it never got a THREAD_START event for.
+         * the debugger will know about the vthread. Otherwise it will be unhappy when it gets
+         * an event for a vthread that it never got a THREAD_START event for.
          */
         EventInfo info;
         struct bag *eventBag = eventHelper_createEventBag();
 
-        JDI_ASSERT(evinfo->fiber != NULL);
+        JDI_ASSERT(evinfo->vthread != NULL);
         (void)memset(&info,0,sizeof(info));
         info.ei         = EI_VIRTUAL_THREAD_SCHEDULED;
         info.thread     = thread;
-        info.fiber      = fiber;
-        info.matchesFiber = JNI_TRUE;
+        info.vthread    = vthread;
+        info.matchesVThread = JNI_TRUE;
 
         /* Note: filterAndHandleEvent() expects EI_THREAD_START instead of EI_VIRTUAL_THREAD_SCHEDULED. */
         filterAndHandleEvent(env, &info, EI_THREAD_START, eventBag, eventSessionID);
@@ -733,13 +733,13 @@ event_callback_helper(JNIEnv *env, EventInfo *evinfo)
 
     thread = evinfo->thread;
     if (thread != NULL) {
-        if (gdata->fibersSupported) {
+        if (gdata->vthreadsSupported) {
             /*
-             * Get the event fiber if one is running on this thread and has not already
-             * been set, which is the case for fiber related JVMTI events.
+             * Get the event vthread if one is running on this thread and has not already
+             * been set, which is the case for vthread related JVMTI events.
              */
-            if (evinfo->fiber == NULL) {
-                evinfo->fiber = getThreadFiber(thread);
+            if (evinfo->vthread == NULL) {
+                evinfo->vthread = getThreadVThread(thread);
             }
         }
 
@@ -781,7 +781,7 @@ event_callback_helper(JNIEnv *env, EventInfo *evinfo)
         }
     }
 
-    /* We want the fiber scheduled/terminated events to mimic thread start/end events */
+    /* We want the vthread scheduled/terminated events to mimic thread start/end events */
     if (ei == EI_VIRTUAL_THREAD_SCHEDULED) {
         ei = EI_THREAD_START;
     }
@@ -789,15 +789,15 @@ event_callback_helper(JNIEnv *env, EventInfo *evinfo)
         ei = EI_THREAD_END;
     }
 
-    if (gdata->fibersSupported) {
-        /* Add the fiber if we haven't added it before. */
-        if (evinfo->fiber != NULL && !threadControl_isKnownFiber(evinfo->fiber)) {
-            if (gdata->notifyDebuggerOfAllFibers) {
-                /* Make sure this fiber gets added to the fibers list. */
-                threadControl_addFiber(evinfo->fiber);
+    if (gdata->vthreadsSupported) {
+        /* Add the vthread if we haven't added it before. */
+        if (evinfo->vthread != NULL && !threadControl_isKnownVThread(evinfo->vthread)) {
+            if (gdata->notifyDebuggerOfAllVThreads) {
+                /* Make sure this vthread gets added to the vthreads list. */
+                threadControl_addVThread(evinfo->vthread);
             } else {
-                /* Add this fiber if it passes the event filters. */
-                filterAndAddFiber(env, evinfo, ei, eventSessionID, thread, evinfo->fiber);
+                /* Add this vthread if it passes the event filters. */
+                filterAndAddVThread(env, evinfo, ei, eventSessionID, thread, evinfo->vthread);
             }
         }
     }
@@ -839,7 +839,7 @@ event_callback_helper(JNIEnv *env, EventInfo *evinfo)
 static void
 event_callback(JNIEnv *env, EventInfo *evinfo)
 {
-    /* fiber fixme: There are a bunch of WITH_LOCAL_REFS that we can remove now that
+    /* vthread fixme: There are a bunch of WITH_LOCAL_REFS that we can remove now that
      * we are doing one here. */
     WITH_LOCAL_REFS(env, 64) {
         event_callback_helper(env, evinfo);
@@ -1206,7 +1206,7 @@ cbMonitorContendedEnter(jvmtiEnv *jvmti_env, JNIEnv *env,
         info.thread     = thread;
         info.object     = object;
         /* get current location of contended monitor enter */
-        JDI_ASSERT(!isFiber(thread));
+        JDI_ASSERT(!isVThread(thread));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
                 (gdata->jvmti, thread, 0, &method, &location);
         if (error == JVMTI_ERROR_NONE) {
@@ -1240,7 +1240,7 @@ cbMonitorContendedEntered(jvmtiEnv *jvmti_env, JNIEnv *env,
         info.thread     = thread;
         info.object     = object;
         /* get current location of contended monitor enter */
-        JDI_ASSERT(!isFiber(thread));
+        JDI_ASSERT(!isVThread(thread));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
                 (gdata->jvmti, thread, 0, &method, &location);
         if (error == JVMTI_ERROR_NONE) {
@@ -1326,7 +1326,7 @@ cbMonitorWaited(jvmtiEnv *jvmti_env, JNIEnv *env,
         info.u.monitor.timed_out = timed_out;
 
         /* get location of monitor wait() method */
-        JDI_ASSERT(!isFiber(thread));
+        JDI_ASSERT(!isVThread(thread));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
                 (gdata->jvmti, thread, 0, &method, &location);
         if (error == JVMTI_ERROR_NONE) {
@@ -1436,24 +1436,24 @@ cbVMDeath(jvmtiEnv *jvmti_env, JNIEnv *env)
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED */
 static void JNICALL
 cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
-                   jthread thread, jthread fiber)
+                   jthread thread, jthread vthread)
 {
     EventInfo info;
 
     LOG_CB(("cbVThreadScheduled: thread=%p", thread));
     /*tty_message("cbVThreadScheduled: thread=%p", thread);*/
-    JDI_ASSERT(gdata->fibersSupported);
+    JDI_ASSERT(gdata->vthreadsSupported);
 
     /*
-     * Now would be a good time to cache the ThreadGroup for fibers (carrier threads)
+     * Now would be a good time to cache the ThreadGroup for vthreads (carrier threads)
      * if we haven't already.
      *
-     * fiber fixme: the is kind of a hack. What happens if custom
+     * vthread fixme: the is kind of a hack. What happens if custom
      * scheduler uses carrier threads in multple group? What if as a result of this a
-     * Fiber can move between thread groups? We should have a dedicated
-     * thread group for all fibers, or allow a fiber to set its ThreadGroup.
+     * VThread can move between thread groups? We should have a dedicated
+     * thread group for all vthreads, or allow a vthread to set its ThreadGroup.
      */
-    if (gdata->fiberThreadGroup == NULL) {
+    if (gdata->vthreadThreadGroup == NULL) {
         jvmtiThreadInfo info;
         jvmtiError error;
 
@@ -1462,20 +1462,20 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
             (gdata->jvmti, thread, &info);
 
         if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error, "could not get fiber ThreadGroup");
+            EXIT_ERROR(error, "could not get vthread ThreadGroup");
         } else {
-            debugMonitorEnter(callbackBlock); /* fiber fixme: any monitor will do, but there probably is a better choice. */
+            debugMonitorEnter(callbackBlock); /* vthread fixme: any monitor will do, but there probably is a better choice. */
             /* Make sure there wasn't a race before setting. saveGlobalRef() will assert if the
              * target is not NULL. */
-            if (gdata->fiberThreadGroup == NULL) {
-                saveGlobalRef(env, info.thread_group, &gdata->fiberThreadGroup);
+            if (gdata->vthreadThreadGroup == NULL) {
+                saveGlobalRef(env, info.thread_group, &gdata->vthreadThreadGroup);
             }
             debugMonitorExit(callbackBlock);
         }
     }
 
-    /* Ignore VIRTUAL_THREAD_SCHEDULED events unless we are notifying the debugger of all fibers. */
-    if (!gdata->notifyDebuggerOfAllFibers) {
+    /* Ignore VIRTUAL_THREAD_SCHEDULED events unless we are notifying the debugger of all vthreads. */
+    if (!gdata->notifyDebuggerOfAllVThreads) {
         return;
     }
 
@@ -1483,7 +1483,7 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
         (void)memset(&info,0,sizeof(info));
         info.ei         = EI_VIRTUAL_THREAD_SCHEDULED;
         info.thread     = thread;
-        info.fiber      = fiber;
+        info.vthread    = vthread;
         event_callback(env, &info);
     } END_CALLBACK();
 
@@ -1493,17 +1493,17 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED */
 static void JNICALL
 cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
-                    jthread thread, jthread fiber)
+                    jthread thread, jthread vthread)
 {
 
     EventInfo info;
 
     LOG_CB(("cbVThreadTerminated: thread=%p", thread));
     /*tty_message("cbVThreadTerminated: thread=%p", thread);*/
-    JDI_ASSERT(gdata->fibersSupported);
+    JDI_ASSERT(gdata->vthreadsSupported);
 
-    if (!gdata->notifyDebuggerOfAllFibers && !threadControl_isKnownFiber(fiber)) {
-        /* This is not a fiber we are tracking, so don't deliver a VIRTUAL_THREAD_TERMINATED event for it. */
+    if (!gdata->notifyDebuggerOfAllVThreads && !threadControl_isKnownVThread(vthread)) {
+        /* This is not a vthread we are tracking, so don't deliver a VIRTUAL_THREAD_TERMINATED event for it. */
         return;
     }
 
@@ -1511,7 +1511,7 @@ cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
         (void)memset(&info,0,sizeof(info));
         info.ei         = EI_VIRTUAL_THREAD_TERMINATED;
         info.thread     = thread;
-        info.fiber      = fiber;
+        info.vthread    = vthread;
         event_callback(env, &info);
     } END_CALLBACK();
 
@@ -1521,18 +1521,18 @@ cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED */
 static void JNICALL
 cbVThreadMounted(jvmtiEnv *jvmti_env, JNIEnv *env,
-                 jthread thread, jthread fiber)
+                 jthread thread, jthread vthread)
 {
     LOG_CB(("cbVThreadMounted: thread=%p", thread));
     /*tty_message("cbVThreadMounted: thread=%p", thread);*/
-    JDI_ASSERT(gdata->fibersSupported);
+    JDI_ASSERT(gdata->vthreadsSupported);
 
-    /* Ignore VIRTUAL_THREAD_MOUNTED events unless we are doing fiber debugging. */
-    if (!gdata->fibersSupported) {
+    /* Ignore VIRTUAL_THREAD_MOUNTED events unless we are doing vthread debugging. */
+    if (!gdata->vthreadsSupported) {
         return;
     }
 
-    threadControl_mountFiber(fiber, thread, currentSessionID);
+    threadControl_mountVThread(vthread, thread, currentSessionID);
 
     LOG_MISC(("END cbVThreadMounted"));
 }
@@ -1540,18 +1540,18 @@ cbVThreadMounted(jvmtiEnv *jvmti_env, JNIEnv *env,
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED */
 static void JNICALL
 cbVThreadUnmounted(jvmtiEnv *jvmti_env, JNIEnv *env,
-                   jthread thread, jthread fiber)
+                   jthread thread, jthread vthread)
 {
     LOG_CB(("cbVThreadUnmounted: thread=%p", thread));
     /*tty_message("cbVThreadUnmounted: thread=%p", thread);*/
-    JDI_ASSERT(gdata->fibersSupported);
+    JDI_ASSERT(gdata->vthreadsSupported);
 
-    /* Ignore VIRTUAL_THREAD_UNMOUNTED events unless we are doing fiber debugging. */
-    if (!gdata->fibersSupported) {
+    /* Ignore VIRTUAL_THREAD_UNMOUNTED events unless we are doing vthread debugging. */
+    if (!gdata->vthreadsSupported) {
         return;
     }
 
-    threadControl_unmountFiber(fiber, thread);
+    threadControl_unmountVThread(vthread, thread);
 
     LOG_MISC(("END cbVThreadUnmounted"));
 }
@@ -1563,7 +1563,7 @@ cbContinuationRun(jvmtiEnv *jvmti_env, JNIEnv *env,
 {
     LOG_CB(("cbContinuationRun: thread=%p", thread));
     //tty_message("cbContinuationRun: thread=%p continuation_frame_count=%d", thread, continuation_frame_count);
-    JDI_ASSERT(gdata->fibersSupported);
+    JDI_ASSERT(gdata->vthreadsSupported);
 
     threadControl_continuationRun(thread, continuation_frame_count);
 
@@ -1577,7 +1577,7 @@ cbContinuationYield(jvmtiEnv *jvmti_env, JNIEnv *env,
 {
     LOG_CB(("cbContinuationYield: thread=%p", thread));
     //tty_message("cbContinuationYield: thread=%p continuation_frame_count=%d", thread, continuation_frame_count);
-    JDI_ASSERT(gdata->fibersSupported);
+    JDI_ASSERT(gdata->vthreadsSupported);
 
     threadControl_continuationYield(thread, continuation_frame_count);
 
@@ -1772,27 +1772,27 @@ eventHandler_initialize(jbyte sessionID)
     if (error != JVMTI_ERROR_NONE) {
         EXIT_ERROR(error,"Can't enable garbage collection finish events");
     }
-    /* Only enable fiber events if fiber support is enabled. */
-    if (gdata->fibersSupported) {
+    /* Only enable vthread events if vthread support is enabled. */
+    if (gdata->vthreadsSupported) {
         error = threadControl_setEventMode(JVMTI_ENABLE,
                                            EI_VIRTUAL_THREAD_SCHEDULED, NULL);
         if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable fiber scheduled events");
+            EXIT_ERROR(error,"Can't enable vthread scheduled events");
         }
         error = threadControl_setEventMode(JVMTI_ENABLE,
                                            EI_VIRTUAL_THREAD_TERMINATED, NULL);
         if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable fiber terminated events");
+            EXIT_ERROR(error,"Can't enable vthread terminated events");
         }
         error = threadControl_setEventMode(JVMTI_ENABLE,
                                            EI_VIRTUAL_THREAD_MOUNTED, NULL);
         if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable fiber mount events");
+            EXIT_ERROR(error,"Can't enable vthread mount events");
         }
         error = threadControl_setEventMode(JVMTI_ENABLE,
                                            EI_VIRTUAL_THREAD_UNMOUNTED, NULL);
         if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable fiber unmount events");
+            EXIT_ERROR(error,"Can't enable vthread unmount events");
         }
         error = threadControl_setEventMode(JVMTI_ENABLE,
                                            EI_CONTINUATION_RUN, NULL);

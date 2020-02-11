@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -53,7 +53,7 @@ typedef struct LocationFilter {
 
 typedef struct ThreadFilter {
     jthread thread;
-    jboolean is_fiber; /* true if the filter thread is actually a fiber. */
+    jboolean is_vthread; /* true if the filter thread is actually a vthread. */
 } ThreadFilter;
 
 typedef struct CountFilter {
@@ -83,7 +83,7 @@ typedef struct StepFilter {
     jint size;
     jint depth;
     jthread thread;
-    jboolean is_fiber; /* true if the step filter thread is actually a fiber. */
+    jboolean is_vthread; /* true if the step filter thread is actually a vthread. */
 } StepFilter;
 
 typedef struct MatchFilter {
@@ -349,7 +349,7 @@ eventInstance(EventInfo *evinfo)
                         (gdata->jvmti, thread, fnum, &object);
         } else {
             /* get slot zero object "this" */
-            JDI_ASSERT(!isFiber(thread));
+            JDI_ASSERT(!isVThread(thread));
             error = JVMTI_FUNC_PTR(gdata->jvmti,GetLocalObject)
                         (gdata->jvmti, thread, fnum, 0, &object);
         }
@@ -362,12 +362,12 @@ eventInstance(EventInfo *evinfo)
 }
 
 /*
- * Return true if this an event that we prefer to deliver on the fiber if it arrived on a carrier thread.
+ * Return true if this an event that we prefer to deliver on the vthread if it arrived on a carrier thread.
  */
 static jboolean
-preferDeliverEventOnFiber(EventIndex ei)
+preferDeliverEventOnVThread(EventIndex ei)
 {
-    /* Determine if this is an event that should be delivered on the fiber.*/
+    /* Determine if this is an event that should be delivered on the vthread.*/
     switch(ei) {
         case EI_SINGLE_STEP:
         case EI_BREAKPOINT:
@@ -382,8 +382,8 @@ preferDeliverEventOnFiber(EventIndex ei)
         case EI_VIRTUAL_THREAD_TERMINATED:
         case EI_VIRTUAL_THREAD_SCHEDULED:
             return JNI_TRUE;
-        /* Not delivering the following events on fibers helps keep down the number of
-         * fibers we need to notify the debugger about. */
+        /* Not delivering the following events on vthreads helps keep down the number of
+         * vthreads we need to notify the debugger about. */
         case EI_CLASS_PREPARE:
         case EI_FRAME_POP:
         case EI_GC_FINISH:
@@ -393,7 +393,7 @@ preferDeliverEventOnFiber(EventIndex ei)
         case EI_MONITOR_WAIT:
         case EI_MONITOR_WAITED:
         case EI_VM_DEATH:
-            return gdata->notifyDebuggerOfAllFibers; /* Only deliver on fiber if notifying of all fibers. */
+            return gdata->notifyDebuggerOfAllVThreads; /* Only deliver on vthread if notifying of all vthreads. */
         case EI_VIRTUAL_THREAD_MOUNTED:      /* Not passed to event_callback(). */
         case EI_VIRTUAL_THREAD_UNMOUNTED:    /* Not passed to event_callback(). */
         case EI_CONTINUATION_RUN:   /* Not passed to event_callback(). */
@@ -408,26 +408,26 @@ preferDeliverEventOnFiber(EventIndex ei)
 }
 
 static jboolean
-matchesThreadOrFiber(JNIEnv* env,
-                     jthread thread, jthread fiber,
-                     jthread filterThread, jboolean filter_is_fiber,
-                     jboolean *matchesFiber)
+matchesThreadOrVThread(JNIEnv* env,
+                       jthread thread, jthread vthread,
+                       jthread filterThread, jboolean filter_is_vthread,
+                       jboolean *matchesVThread)
 {
     jboolean matchesThread = JNI_FALSE;
-    *matchesFiber = JNI_FALSE;
+    *matchesVThread = JNI_FALSE;
 
     /*
-     * First check if it matches the fiber. If not, then check if it
-     * matches the thread. Only one of matchesFiber and matchesThread 
-     * will be set true, with the fiber check coming first. true is returned
+     * First check if it matches the vthread. If not, then check if it
+     * matches the thread. Only one of matchesVThread and matchesThread 
+     * will be set true, with the vthread check coming first. true is returned
      * if either matches, false otherwise.
      */
-    if (filter_is_fiber) {
-        *matchesFiber = isSameObject(env, fiber, filterThread);
+    if (filter_is_vthread) {
+        *matchesVThread = isSameObject(env, vthread, filterThread);
     } else {
         matchesThread = isSameObject(env, thread, filterThread);
     }
-    return matchesThread || *matchesFiber;
+    return matchesThread || *matchesVThread;
 }
 
 /*
@@ -439,8 +439,8 @@ matchesThreadOrFiber(JNIEnv* env,
  * eventFilterRestricted_passesUnloadFilter and
  * eventFilter_predictFiltering as well.
  *
- * evinfo->matchesFiber will be set if the handler matched based on
- * the fiber specified in the evinfo.
+ * evinfo->matchesVThread will be set if the handler matched based on
+ * the vthread specified in the evinfo.
  *
  * If shouldDelete is returned true, a count filter has expired
  * and the corresponding node should be deleted.
@@ -457,19 +457,19 @@ eventFilterRestricted_passesFilter(JNIEnv *env,
                                    jboolean filterOnly)
 {
     jthread thread;
-    jthread fiber;
+    jthread vthread;
     jclass clazz;
     jmethodID method;
     Filter *filter = FILTERS_ARRAY(node);
     int i;
-    jboolean mustDeliverEventOnFiber = JNI_FALSE;
+    jboolean mustDeliverEventOnVThread = JNI_FALSE;
 
     *shouldDelete = JNI_FALSE;
     thread = evinfo->thread;
-    fiber = evinfo->fiber;
+    vthread = evinfo->vthread;
     clazz = evinfo->clazz;
     method = evinfo->method;
-    evinfo->matchesFiber = fiber != NULL; /* Assume it matches the fiber. Will be cleared below if not. */
+    evinfo->matchesVThread = vthread != NULL; /* Assume it matches the vthread. Will be cleared below if not. */
 
     /*
      * Suppress most events if they happen in debug threads
@@ -484,12 +484,12 @@ eventFilterRestricted_passesFilter(JNIEnv *env,
     for (i = 0; i < FILTER_COUNT(node); ++i, ++filter) {
         switch (filter->modifier) {
             case JDWP_REQUEST_MODIFIER(ThreadOnly):
-                if (!matchesThreadOrFiber(env, thread, fiber,
-                                          filter->u.ThreadOnly.thread, filter->u.ThreadOnly.is_fiber,
-                                          &evinfo->matchesFiber)) {
+                if (!matchesThreadOrVThread(env, thread, vthread,
+                                            filter->u.ThreadOnly.thread, filter->u.ThreadOnly.is_vthread,
+                                            &evinfo->matchesVThread)) {
                     return JNI_FALSE;
                 }
-                mustDeliverEventOnFiber = evinfo->matchesFiber;
+                mustDeliverEventOnVThread = evinfo->matchesVThread;
                 break;
 
             case JDWP_REQUEST_MODIFIER(ClassOnly):
@@ -602,20 +602,20 @@ eventFilterRestricted_passesFilter(JNIEnv *env,
         }
 
         case JDWP_REQUEST_MODIFIER(Step):
-            if (!matchesThreadOrFiber(env, thread, fiber,
-                                      filter->u.Step.thread, filter->u.Step.is_fiber,
-                                      &evinfo->matchesFiber)) {
+            if (!matchesThreadOrVThread(env, thread, vthread,
+                                        filter->u.Step.thread, filter->u.Step.is_vthread,
+                                        &evinfo->matchesVThread)) {
                 return JNI_FALSE;
             }
-            mustDeliverEventOnFiber = evinfo->matchesFiber;
+            mustDeliverEventOnVThread = evinfo->matchesVThread;
             /*
              * Don't call handleStep() if filterOnly is true. It's too complicated to see if the step
              * would be completed without actually changing the state, so we just assume it will be.
-             * No harm can come from this since the fiber is already a known one, and that's the
+             * No harm can come from this since the vthread is already a known one, and that's the
              * only reason this "filterOnly" request is being made.
              */
             if (!filterOnly) {
-                if (!stepControl_handleStep(env, thread, fiber, evinfo->matchesFiber, clazz, method)) {
+                if (!stepControl_handleStep(env, thread, vthread, evinfo->matchesVThread, clazz, method)) {
                     return JNI_FALSE;
                 }
             }
@@ -650,9 +650,9 @@ eventFilterRestricted_passesFilter(JNIEnv *env,
             return JNI_FALSE;
         }
     }
-    /* Update matchesFiber based on whether or not we prefer to deliver this event on the fiber. */
-    if (evinfo->matchesFiber && !mustDeliverEventOnFiber) {
-        evinfo->matchesFiber = preferDeliverEventOnFiber(evinfo->ei);
+    /* Update matchesVThread based on whether or not we prefer to deliver this event on the vthread. */
+    if (evinfo->matchesVThread && !mustDeliverEventOnVThread) {
+        evinfo->matchesVThread = preferDeliverEventOnVThread(evinfo->ei);
     }
     return JNI_TRUE;
 }
@@ -849,8 +849,8 @@ eventFilter_setThreadOnlyFilter(HandlerNode *node, jint index,
         return AGENT_ERROR_ILLEGAL_ARGUMENT;
     }
 
-    /* The thread we are filtering on might be a fiber. */
-    filter->is_fiber = isFiber(thread);
+    /* The thread we are filtering on might be a vthread. */
+    filter->is_vthread = isVThread(thread);
 
     /* Create a thread ref that will live beyond */
     /* the end of this call */
@@ -1040,8 +1040,8 @@ eventFilter_setStepFilter(HandlerNode *node, jint index,
         return AGENT_ERROR_ILLEGAL_ARGUMENT;
     }
 
-    /* The thread we are filtering on might be a fiber. */
-    filter->is_fiber = isFiber(thread);
+    /* The thread we are filtering on might be a vthread. */
+    filter->is_vthread = isVThread(thread);
 
     /* Create a thread ref that will live beyond */
     /* the end of this call */
@@ -1059,7 +1059,7 @@ eventFilter_setStepFilter(HandlerNode *node, jint index,
 
 /*
  * Finds the step filter in a node, and sets the thread for that filter.
- * fiber fixme: not used. delete once we know for sure we'll never need it.
+ * vthread fixme: not used. delete once we know for sure we'll never need it.
  */
 void
 eventFilter_setStepFilterThread(HandlerNode *node, jthread thread)
@@ -1488,9 +1488,9 @@ eventFilter_dumpHandlerFilters(HandlerNode *node)
     for (i = 0; i < FILTER_COUNT(node); ++i, ++filter) {
         switch (filter->modifier) {
             case JDWP_REQUEST_MODIFIER(ThreadOnly):
-                tty_message("ThreadOnly: thread(%p) is_fiber(%d)",
+                tty_message("ThreadOnly: thread(%p) is_vthread(%d)",
                             filter->u.ThreadOnly.thread,
-                            filter->u.ThreadOnly.is_fiber);
+                            filter->u.ThreadOnly.is_vthread);
                 break;
             case JDWP_REQUEST_MODIFIER(ClassOnly): {
                 char *class_name;
@@ -1545,11 +1545,11 @@ eventFilter_dumpHandlerFilters(HandlerNode *node)
                             filter->u.ClassExclude.classPattern);
                 break;
             case JDWP_REQUEST_MODIFIER(Step):
-                tty_message("Step: size(%d) depth(%d) thread(%p) is_fiber(%d)",
+                tty_message("Step: size(%d) depth(%d) thread(%p) is_vthread(%d)",
                             filter->u.Step.size,
                             filter->u.Step.depth,
                             filter->u.Step.thread,
-                            filter->u.Step.is_fiber);
+                            filter->u.Step.is_vthread);
                 break;
             case JDWP_REQUEST_MODIFIER(SourceNameMatch): 
                 tty_message("SourceNameMatch: sourceNamePattern(%s)",

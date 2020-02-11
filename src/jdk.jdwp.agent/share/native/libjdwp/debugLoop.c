@@ -159,7 +159,7 @@ debugLoop_run(void)
                 outStream_setError(&out, JDWP_ERROR(VM_DEAD));
             } else {
               /* Provide 64 localrefs by default. */
-              /* fiber fixme: Now that this default set of localrefs is in place, we can remove a
+              /* vthread fixme: Now that this default set of localrefs is in place, we can remove a
                * bunch of WITH_LOCAL_REFS/END_WITH_LOCAL_REFS blocks. The only ones needed are
                * ones that could potentially go over 64, likes ones within loops. Note this only
                * refers to command handlers called from here, not all uses of WITH_LOCAL_REFS. */

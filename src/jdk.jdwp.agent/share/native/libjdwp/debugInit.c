@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -875,7 +875,7 @@ printUsage(void)
  "onthrow=<exception name>         debug on throw                    none\n"
  "onuncaught=y|n                   debug on any uncaught?            n\n"
  "timeout=<timeout value>          for listen/attach in milliseconds n\n"
- "fibers=y|n|all                   support for debugging fibers      y\n"
+ "virtualthreads=y|n|all           support debugging virtual threads y\n"
  "mutf8=y|n                        output modified utf-8             n\n"
  "quiet=y|n                        control over terminal messages    n\n"));
 
@@ -1022,9 +1022,9 @@ parseOptions(char *options)
     gdata->assertFatal  = DEFAULT_ASSERT_FATAL;
     logfile             = DEFAULT_LOGFILE;
 
-    /* Set fiber debugging level. */
-    gdata->fibersSupported = JNI_TRUE;
-    gdata->notifyDebuggerOfAllFibers = JNI_FALSE;
+    /* Set vthread debugging level. */
+    gdata->vthreadsSupported = JNI_TRUE;
+    gdata->notifyDebuggerOfAllVThreads = JNI_FALSE;
 
     /* Options being NULL will end up being an error. */
     if (options == NULL) {
@@ -1128,19 +1128,19 @@ parseOptions(char *options)
             }
             currentTransport->timeout = atol(current);
             current += strlen(current) + 1;
-        } else if (strcmp(buf, "fibers") == 0) {
+        } else if (strcmp(buf, "virtualthreads") == 0) {
             if (!get_tok(&str, current, (int)(end - current), ',')) {
                 goto syntax_error;
             }
             if (strcmp(current, "y") == 0) {
-                gdata->fibersSupported = JNI_TRUE;
-                gdata->notifyDebuggerOfAllFibers = JNI_FALSE;
+                gdata->vthreadsSupported = JNI_TRUE;
+                gdata->notifyDebuggerOfAllVThreads = JNI_FALSE;
             } else if (strcmp(current, "all") == 0) {
-                gdata->fibersSupported = JNI_TRUE;
-                gdata->notifyDebuggerOfAllFibers = JNI_TRUE;
+                gdata->vthreadsSupported = JNI_TRUE;
+                gdata->notifyDebuggerOfAllVThreads = JNI_TRUE;
             } else if (strcmp(current, "n") == 0) {
-                gdata->fibersSupported = JNI_FALSE;
-                gdata->notifyDebuggerOfAllFibers = JNI_FALSE;
+                gdata->vthreadsSupported = JNI_FALSE;
+                gdata->notifyDebuggerOfAllVThreads = JNI_FALSE;
             } else {
                 goto syntax_error;
             }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -258,7 +258,7 @@ inStream_readThreadRef(JNIEnv *env, PacketInputStream *stream)
          */
         return NULL;
     }
-    if (!isThread(object) && !isFiber(object)) {
+    if (!isThread(object) && !isVThread(object)) {
         stream->error = JDWP_ERROR(INVALID_THREAD);
         return NULL;
     }

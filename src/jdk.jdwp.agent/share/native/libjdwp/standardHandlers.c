@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -106,7 +106,7 @@ handleFrameEvent(JNIEnv *env, EventInfo *evinfo,
     FrameNumber fnum = 0;
     jvalue returnValue;
 
-    JDI_ASSERT(!isFiber(evinfo->thread));
+    JDI_ASSERT(!isVThread(evinfo->thread));
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
             (gdata->jvmti, evinfo->thread, fnum, &method, &location);
     if (error != JVMTI_ERROR_NONE) {

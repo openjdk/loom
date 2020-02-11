@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -284,28 +284,28 @@ void eventHelper_releaseEvents(void)
 }
 
 static void
-writeThreadOrFiber(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
+writeThreadOrVThread(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
     /*
-     * Write the fiber ref if the event matched a fiber filter, or if the event was not
-     * filtered by thread, and came in on a carrier thread running a fiber. In either
-     * case evinfo->matchesFiber will be true.
+     * Write the vthread ref if the event matched a vthread filter, or if the event was not
+     * filtered by thread, and came in on a carrier thread running a vthread. In either
+     * case evinfo->matchesVThread will be true.
      */
-    jthread thread = (evinfo->matchesFiber ? evinfo->fiber : evinfo->thread);
+    jthread thread = (evinfo->matchesVThread ? evinfo->vthread : evinfo->thread);
     (void)outStream_writeObjectRef(env, out, thread);
 }
 
 static void
 writeSingleStepEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
-    writeThreadOrFiber(env, out, evinfo);
+    writeThreadOrVThread(env, out, evinfo);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
 }
 
 static void
 writeBreakpointEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
-    writeThreadOrFiber(env, out, evinfo);
+    writeThreadOrVThread(env, out, evinfo);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
 }
 
@@ -316,7 +316,7 @@ writeFieldAccessEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 
     fieldClassTag = referenceTypeTag(evinfo->u.field_access.field_clazz);
 
-    writeThreadOrFiber(env, out, evinfo);
+    writeThreadOrVThread(env, out, evinfo);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
     (void)outStream_writeByte(out, fieldClassTag);
     (void)outStream_writeObjectRef(env, out, evinfo->u.field_access.field_clazz);
@@ -333,7 +333,7 @@ writeFieldModificationEvent(JNIEnv *env, PacketOutputStream *out,
 
     fieldClassTag = referenceTypeTag(evinfo->u.field_modification.field_clazz);
 
-    writeThreadOrFiber(env, out, evinfo);
+    writeThreadOrVThread(env, out, evinfo);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
     (void)outStream_writeByte(out, fieldClassTag);
     (void)outStream_writeObjectRef(env, out, evinfo->u.field_modification.field_clazz);
@@ -347,7 +347,7 @@ writeFieldModificationEvent(JNIEnv *env, PacketOutputStream *out,
 static void
 writeExceptionEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
-    writeThreadOrFiber(env, out, evinfo);
+    writeThreadOrVThread(env, out, evinfo);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
     (void)outStream_writeObjectTag(env, out, evinfo->object);
     (void)outStream_writeObjectRef(env, out, evinfo->object);
@@ -358,14 +358,14 @@ writeExceptionEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 static void
 writeThreadEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
-    writeThreadOrFiber(env, out, evinfo);
+    writeThreadOrVThread(env, out, evinfo);
 }
 
 static void
 writeMonitorEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
     jclass klass;
-    writeThreadOrFiber(env, out, evinfo);
+    writeThreadOrVThread(env, out, evinfo);
     (void)outStream_writeObjectTag(env, out, evinfo->object);
     (void)outStream_writeObjectRef(env, out, evinfo->object);
     if (evinfo->ei == EI_MONITOR_WAIT || evinfo->ei == EI_MONITOR_WAITED) {
@@ -404,7 +404,7 @@ writeClassEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
     }
     status = classStatus(evinfo->clazz);
 
-    writeThreadOrFiber(env, out, evinfo);
+    writeThreadOrVThread(env, out, evinfo);
     (void)outStream_writeByte(out, classTag);
     (void)outStream_writeObjectRef(env, out, evinfo->clazz);
     (void)outStream_writeString(out, signature);
@@ -839,11 +839,11 @@ static void
 saveEventInfoRefs(JNIEnv *env, EventInfo *evinfo)
 {
     jthread *pthread;
-    jthread *pfiber;
+    jthread *pvthread;
     jclass *pclazz;
     jobject *pobject;
     jthread thread;
-    jthread fiber;
+    jthread vthread;
     jclass clazz;
     jobject object;
     char sig;
@@ -856,11 +856,11 @@ saveEventInfoRefs(JNIEnv *env, EventInfo *evinfo)
         *pthread = NULL;
         saveGlobalRef(env, thread, pthread);
     }
-    if ( evinfo->fiber != NULL ) {
-        pfiber = &(evinfo->fiber);
-        fiber = *pfiber;
-        *pfiber = NULL;
-        saveGlobalRef(env, fiber, pfiber);
+    if ( evinfo->vthread != NULL ) {
+        pvthread = &(evinfo->vthread);
+        vthread = *pvthread;
+        *pvthread = NULL;
+        saveGlobalRef(env, vthread, pvthread);
     }
     if ( evinfo->clazz != NULL ) {
         pclazz = &(evinfo->clazz);
@@ -925,8 +925,8 @@ tossEventInfoRefs(JNIEnv *env, EventInfo *evinfo)
     if ( evinfo->thread != NULL ) {
         tossGlobalRef(env, &(evinfo->thread));
     }
-    if ( evinfo->fiber != NULL ) {
-        tossGlobalRef(env, &(evinfo->fiber));
+    if ( evinfo->vthread != NULL ) {
+        tossGlobalRef(env, &(evinfo->vthread));
     }
     if ( evinfo->clazz != NULL ) {
         tossGlobalRef(env, &(evinfo->clazz));

@@ -537,29 +537,29 @@ getAllThreads(PacketInputStream *in, PacketOutputStream *out)
 
         int i;
         jint threadCount;
-        jint fiberCount;
+        jint vthreadCount;
         jthread *theThreads;
-        jthread *theFibers;
+        jthread *theVThreads;
 
         theThreads = allThreads(&threadCount);
-        theFibers = threadControl_allFibers(&fiberCount);
+        theVThreads = threadControl_allVThreads(&vthreadCount);
 
-        if (theThreads == NULL || (theFibers == NULL && fiberCount != 0)) {
+        if (theThreads == NULL || (theVThreads == NULL && vthreadCount != 0)) {
             outStream_setError(out, JDWP_ERROR(OUT_OF_MEMORY));
         } else {
             /* Squish out all of the debugger-spawned threads */
             threadCount = filterDebugThreads(theThreads, threadCount);
 
-            (void)outStream_writeInt(out, threadCount + fiberCount);
-            for (i = 0; i < fiberCount; i++) {
-                (void)outStream_writeObjectRef(env, out, theFibers[i]);
+            (void)outStream_writeInt(out, threadCount + vthreadCount);
+            for (i = 0; i < vthreadCount; i++) {
+                (void)outStream_writeObjectRef(env, out, theVThreads[i]);
             }
             for (i = 0; i < threadCount; i++) {
                 (void)outStream_writeObjectRef(env, out, theThreads[i]);
             }
 
             jvmtiDeallocate(theThreads);
-            jvmtiDeallocate(theFibers);
+            jvmtiDeallocate(theVThreads);
         }
 
     } END_WITH_LOCAL_REFS(env);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -90,7 +90,7 @@ getFrameLocation(jthread thread,
     *pmethod = NULL;
     *plocation = -1;
 
-    JDI_ASSERT(!isFiber(thread));
+    JDI_ASSERT(!isVThread(thread));
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
             (gdata->jvmti, thread, 0, pmethod, plocation);
     if (error == JVMTI_ERROR_NONE && *pmethod!=NULL ) {
@@ -557,7 +557,7 @@ completeStep(JNIEnv *env, jthread thread, StepRequest *step)
 }
 
 jboolean
-stepControl_handleStep(JNIEnv *env, jthread thread, jthread fiber, jboolean matchesFiber,
+stepControl_handleStep(JNIEnv *env, jthread thread, jthread vthread, jboolean matchesVThread,
                        jclass clazz, jmethodID method)
 {
     jboolean completed = JNI_FALSE;
@@ -584,8 +584,8 @@ stepControl_handleStep(JNIEnv *env, jthread thread, jthread fiber, jboolean matc
 
     LOG_STEP(("stepControl_handleStep: thread=%p", thread));
 
-    /* Make sure the StepRequest is in agreement as to whether or not we are stepping in a fiber. */
-    JDI_ASSERT(step->is_fiber == matchesFiber);
+    /* Make sure the StepRequest is in agreement as to whether or not we are stepping in a vthread. */
+    JDI_ASSERT(step->is_vthread == matchesVThread);
 
     /*
      * We never filter step into instruction. It's always over on the
@@ -648,7 +648,7 @@ stepControl_handleStep(JNIEnv *env, jthread thread, jthread fiber, jboolean matc
                 step->methodEnterHandlerNode =
                     eventHandler_createInternalThreadOnly(
                                        EI_METHOD_ENTRY,
-                                       handleMethodEnterEvent, matchesFiber ? fiber : thread);
+                                       handleMethodEnterEvent, matchesVThread ? vthread : thread);
                 if (step->methodEnterHandlerNode == NULL) {
                     EXIT_ERROR(AGENT_ERROR_INVALID_EVENT_TYPE,
                                 "installing event method enter handler");
@@ -845,17 +845,17 @@ stepControl_beginStep(JNIEnv *env, jthread filter_thread,  jint size, jint depth
     jvmtiError error;
     jvmtiError error2;
     jthread thread;
-    jboolean is_fiber;
+    jboolean is_vthread;
 
-    /* filter_thread could be a fiber. Get the carrier thread it is mounted on. */
-    is_fiber = isFiber(filter_thread);
-    if (is_fiber) {
-        thread = getFiberThread(filter_thread);
+    /* filter_thread could be a vthread. Get the carrier thread it is mounted on. */
+    is_vthread = isVThread(filter_thread);
+    if (is_vthread) {
+        thread = getVThreadThread(filter_thread);
         if (thread == NULL) {
-            /* fiber fixme: It is possible for the StepRequest to have been made on an unmounted
-             * fiber, and currently we don't support this. 
+            /* vthread fixme: It is possible for the StepRequest to have been made on an unmounted
+             * vthread, and currently we don't support this. 
              */
-            LOG_STEP(("stepControl_beginStep: thread is an unmounted fiber(%p)", filter_thread));
+            LOG_STEP(("stepControl_beginStep: thread is an unmounted vthread(%p)", filter_thread));
             return JVMTI_ERROR_INVALID_THREAD;
         }
     }  else {
@@ -868,21 +868,21 @@ stepControl_beginStep(JNIEnv *env, jthread filter_thread,  jint size, jint depth
     eventHandler_lock(); /* for proper lock order */
     stepControl_lock();
 
-    /* fiber fixme: we should consider getting the StepRequest from the fiber instead of the thread.
-     * That way we don't need to copy back and forth in threadControl_mountFiber and
-     * threadControl_unmountFiber. It would require some additional changes in the step event 
-     * support to always pass the fiber to threadControl_getStepRequest(). We also need to 
-     * deal with node->instructionStepMode, referenceing the fiber copy when appropriate. Note
-     * this will get tricky if you try to single step in both the fiber and thread. With the
-     * current impl, if you single step in the fiber first, hit a breakpoint while stepping over
+    /* vthread fixme: we should consider getting the StepRequest from the vthread instead of the thread.
+     * That way we don't need to copy back and forth in threadControl_continuationRun and
+     * threadControl_continuationYield. It would require some additional changes in the step event 
+     * support to always pass the vthread to threadControl_getStepRequest(). We also need to 
+     * deal with node->instructionStepMode, referenceing the vthread copy when appropriate. Note
+     * this will get tricky if you try to single step in both the vthread and thread. With the
+     * current impl, if you single step in the vthread first, hit a breakpoint while stepping over
      * a method call, and then switch to the carrier thread and start to single step there,
-     * that will clear out the fiber single stepping. If we get the StepRequest
-     * from the fiber instead, it won't automatically clear out the fiber single stepping
+     * that will clear out the vthread single stepping. If we get the StepRequest
+     * from the vthread instead, it won't automatically clear out the vthread single stepping
      * when you start single stepping in the carrier thread, but it won't work as expected either
      * because JVMTI single stepping on the carrier thread will be disabled once the single
-     * step is complete. We'd need to detect that we were single stepping on the fiber and
+     * step is complete. We'd need to detect that we were single stepping on the vthread and
      * keep JVMTI single stepping enabled, or we need to clear the single stepping state of
-     * the fiber.
+     * the vthread.
      */
     step = threadControl_getStepRequest(thread);
     if (step == NULL) {
@@ -901,7 +901,7 @@ stepControl_beginStep(JNIEnv *env, jthread filter_thread,  jint size, jint depth
              */
             step->granularity = size;
             step->depth = depth;
-            step->is_fiber = is_fiber;
+            step->is_vthread = is_vthread;
             step->catchHandlerNode = NULL;
             step->framePopHandlerNode = NULL;
             step->methodEnterHandlerNode = NULL;
@@ -974,9 +974,9 @@ stepControl_endStep(jthread thread)
     eventHandler_lock(); /* for proper lock order */
     stepControl_lock();
 
-    if (isFiber(thread)) {
-        jthread carrier_thread = getFiberThread(thread);
-        /* During termination the fiber might not be mounted, so a NULL carrier thead is ok in that case. */
+    if (isVThread(thread)) {
+        jthread carrier_thread = getVThreadThread(thread);
+        /* During termination the vthread might not be mounted, so a NULL carrier thead is ok in that case. */
         if (carrier_thread != NULL) {
             thread = carrier_thread;
         }

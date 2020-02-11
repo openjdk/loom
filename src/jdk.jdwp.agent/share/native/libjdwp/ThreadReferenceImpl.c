@@ -170,12 +170,12 @@ threadGroup(PacketInputStream *in, PacketOutputStream *out)
 
         jvmtiThreadInfo info;
         jvmtiError error;
-        jboolean is_fiber = isFiber(thread);
+        jboolean is_vthread = isVThread(thread);
         
-        if (is_fiber) {
-            /* If it's a fiber, use the well known thread group for Fibers. */
-            JDI_ASSERT(gdata->fiberThreadGroup != NULL);
-            (void)outStream_writeObjectRef(env, out, gdata->fiberThreadGroup);
+        if (is_vthread) {
+            /* If it's a vthread, use the well known thread group for vthreads. */
+            JDI_ASSERT(gdata->vthreadThreadGroup != NULL);
+            (void)outStream_writeObjectRef(env, out, gdata->vthreadThreadGroup);
         } else {
             (void)memset(&info, 0, sizeof(info));
             error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
@@ -197,8 +197,8 @@ threadGroup(PacketInputStream *in, PacketOutputStream *out)
 }
 
 /*
- * Validate that the thread or fiber is suspended, and returns a thread that can
- * be used for stack operations, even for unmounted fibers.
+ * Validate that the thread or vthread is suspended, and returns a thread that can
+ * be used for stack operations, even for unmounted vthreads.
  */
 static jthread
 validateSuspendedThread(PacketOutputStream *out, jthread thread)
@@ -383,11 +383,11 @@ ownedMonitors(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    // fiber fixme: for now fibers are assumed to have 0 owned monitors. However it is
-    // actually possible for them to own one or more. Currently that implies the fiber
+    // vthread fixme: for now vthreads are assumed to have 0 owned monitors. However it is
+    // actually possible for them to own one or more. Currently that implies the vthread
     // is pinned to a carrier thread, so we could attempt to get the count from it, but
     // in the future this might not be the case, and we would need JVMTI support.
-    if (isFiber(thread)) {
+    if (isVThread(thread)) {
         (void)outStream_writeInt(out, 0);
         return JNI_TRUE;
     }
@@ -442,11 +442,11 @@ currentContendedMonitor(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    // fiber fixme: for now fibers are assumed to have 0 contended monitors. However it is
-    // actually possible for them to own one or more. Currently that implies the fiber
+    // vthread fixme: for now vthreads are assumed to have 0 contended monitors. However it is
+    // actually possible for them to own one or more. Currently that implies the vthread
     // is pinned to a carrier thread, so we could attempt to get the count from it, but
     // in the future this might not be the case, and we would need JVMTI support.
-    if (isFiber(thread)) {
+    if (isVThread(thread)) {
         (void)outStream_writeInt(out, 0);
         return JNI_TRUE;
     }
@@ -494,7 +494,7 @@ stop(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    if (isFiber(thread)) {
+    if (isVThread(thread)) {
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
     }
@@ -522,8 +522,8 @@ interrupt(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* fiber fixme: add fiber support */
-    if (isFiber(thread)) {
+    /* vthread fixme: add vthread support */
+    if (isVThread(thread)) {
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
     }
@@ -583,11 +583,11 @@ ownedMonitorsWithStackDepth(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    // fiber fixme: for now fibers are assumed to have 0 owned monitors. However it is
-    // actually possible for them to own one or more. Currently that implies the fiber
+    // vthread fixme: for now vthreads are assumed to have 0 owned monitors. However it is
+    // actually possible for them to own one or more. Currently that implies the vthread
     // is pinned to a carrier thread, so we could attempt to get the count from it, but
     // in the future this might not be the case, and we would need JVMTI support.
-    if (isFiber(thread)) {
+    if (isVThread(thread)) {
         (void)outStream_writeInt(out, 0);
         return JNI_TRUE;
     }
@@ -644,8 +644,8 @@ forceEarlyReturn(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* fiber fixme: add fiber support */
-    if (isFiber(thread)) {
+    /* vthread fixme: add vthread support */
+    if (isVThread(thread)) {
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
     }

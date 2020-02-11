@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -75,12 +75,12 @@ void threadControl_saveCLEInfo(JNIEnv *env, jthread thread, EventIndex ei,
                                jlocation location);
 jlong threadControl_getFrameGeneration(jthread thread);
 
-jthread *threadControl_allFibers(jint *numFibers);
-void threadControl_addFiber(jthread fiber);
-jboolean threadControl_isKnownFiber(jthread fiber);
+jthread *threadControl_allVThreads(jint *numVThreads);
+void threadControl_addVThread(jthread vthread);
+jboolean threadControl_isKnownVThread(jthread vthread);
 
-void threadControl_unmountFiber(jthread fiber, jthread thread);
-void threadControl_mountFiber(jthread fiber, jthread thread, jbyte sessionID);
+void threadControl_unmountVThread(jthread vthread, jthread thread);
+void threadControl_mountVThread(jthread vthread, jthread thread, jbyte sessionID);
 
 void threadControl_continuationRun(jthread thread, jint frames_count);
 void threadControl_continuationYield(jthread thread, jint frames_count);

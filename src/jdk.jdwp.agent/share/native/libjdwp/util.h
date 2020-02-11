@@ -77,10 +77,10 @@ typedef struct {
     volatile jboolean vmDead; /* Once VM is dead it stays that way - don't put in init */
     jboolean assertOn;
     jboolean assertFatal;
-    jboolean fibersSupported;      /* If true, debugging support for fibers is enabled.*/
-    jboolean notifyDebuggerOfAllFibers; /* If true, the debugger will be notified of all known fibers.
-                                         * If false the debugger is only notified of fibers for which
-                                         * certain events have been received. */
+    jboolean vthreadsSupported;      /* If true, debugging support for vthreads is enabled.*/
+    jboolean notifyDebuggerOfAllVThreads; /* If true, the debugger will be notified of all known vthreads.
+                                           * If false the debugger is only notified of vthreads for which
+                                           * certain events have been received. */
     jboolean doerrorexit;
     jboolean modifiedUtf8;
     jboolean quiet;
@@ -94,7 +94,7 @@ typedef struct {
     char * options;
 
     jclass              classClass;
-    jclass              fiberClass;
+    jclass              virtualThreadClass;
     jclass              threadClass;
     jclass              threadGroupClass;
     jclass              classLoaderClass;
@@ -106,7 +106,7 @@ typedef struct {
     jmethodID           systemGetProperty;
     jmethodID           setProperty;
     jthreadGroup        systemThreadGroup;
-    jthreadGroup        fiberThreadGroup;
+    jthreadGroup        vthreadThreadGroup;
     jobject             agent_properties;
 
     jint                cachedJvmtiVersion;
@@ -214,10 +214,10 @@ typedef struct {
 
     EventIndex  ei;
     jthread     thread;
-    jthread     fiber;        /* NULL if not running on a fiber. */
-    jboolean    matchesFiber; /* true if the matching HandlerNode specified a fiber that matched,
-                                 or the HandlerNode specified no thread and the event came in on a
-                                 carrier thread running a fiber. */
+    jthread     vthread;      /* NULL if not running on a vthread. */
+    jboolean    matchesVThread; /* true if the matching HandlerNode specified a vthread that matched,
+                                   or the HandlerNode specified no thread and the event came in on a
+                                   carrier thread running a vthread. */
     jclass      clazz;
     jmethodID   method;
     jlocation   location;
@@ -342,7 +342,7 @@ jvmtiError classLoader(jclass, jobject *);
  */
 JNIEnv *getEnv(void);
 jboolean isClass(jobject object);
-jboolean isFiber(jobject object);
+jboolean isVThread(jobject object);
 jboolean isThread(jobject object);
 jboolean isThreadGroup(jobject object);
 jboolean isString(jobject object);
@@ -386,8 +386,8 @@ jvmtiError isFieldSynthetic(jclass, jfieldID, jboolean*);
 
 jboolean isSameObject(JNIEnv *env, jobject o1, jobject o2);
 
-jthread  getThreadFiber(jthread thread);
-jthread  getFiberThread(jthread fiber);
+jthread  getThreadVThread(jthread thread);
+jthread  getVThreadThread(jthread vthread);
 
 jint getThreadFrameCount(jthread thread);
 
