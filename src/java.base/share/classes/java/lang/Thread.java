@@ -270,8 +270,41 @@ public class Thread implements Runnable {
         return currentThread0();
     }
 
+    // Scoped support:
+
+    /**
+     * TBD
+     * @return TBD
+     */
     @HotSpotIntrinsicCandidate
-    private static native Thread currentThread0();
+    static native Object[] scopedCache();
+
+    @HotSpotIntrinsicCandidate
+    static native void setScopedCache(Object[] cache);
+
+    // A simple (not very) random string of bits to use when evicting
+    // cache entries.
+    int victims
+        = 0b1100_1001_0000_1111_1101_1010_1010_0010;
+
+    private ScopedMap scopedMap;
+
+    final ScopedMap scopedMap() {
+        var map = scopedMap;
+        if (map == null) {
+            map = scopedMap = new ScopedMap();
+        }
+        return map;
+    }
+
+    // end Scoped support
+
+    /**
+     * TBD
+     * @return TBD
+     */
+    @HotSpotIntrinsicCandidate
+    static native Thread currentThread0();
 
     /**
      * A hint to the scheduler that the current thread is willing to yield
@@ -2966,6 +2999,11 @@ public class Thread implements Runnable {
 
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
     int threadLocalRandomSecondarySeed;
+
+    /**
+     * TBD
+     */
+    public Object userObject;
 
     /* Some private helper methods */
     private native void setPriority0(int newPriority);

@@ -3124,6 +3124,25 @@ JVM_ENTRY(void, JVM_Interrupt(JNIEnv* env, jobject jthread))
   }
 JVM_END
 
+JVM_ENTRY(jobject, JVM_ScopedCache(JNIEnv* env, jclass threadClass))
+  JVMWrapper("JVM_ScopedCache");
+  oop theCache = thread->_scopedCache;
+  if (theCache) {
+    arrayOop objs = arrayOop(theCache);
+    assert(objs->length() == ScopedCacheSize * 2, "wrong length");
+  }
+  return JNIHandles::make_local(env, theCache);
+JVM_END
+
+JVM_ENTRY(void, JVM_SetScopedCache(JNIEnv* env, jclass threadClass,
+                                   jobject theCache))
+  JVMWrapper("JVM_SetScopedCache");
+  arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
+  if (objs != NULL) {
+    assert(objs->length() == ScopedCacheSize * 2, "wrong length");
+  }
+  thread->_scopedCache = objs;
+JVM_END
 
 // Return true iff the current thread has locked the object passed in
 
