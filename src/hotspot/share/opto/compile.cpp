@@ -1096,7 +1096,7 @@ void Compile::Init(int aliaslevel) {
   _matcher = NULL;  // filled in later
   _cfg     = NULL;  // filled in later
 
-  set_24_bit_selection_and_mode(Use24BitFP, false);
+  IA32_ONLY( set_24_bit_selection_and_mode(true, false); )
 
   _node_note_array = NULL;
   _default_node_notes = NULL;
@@ -2194,6 +2194,11 @@ void Compile::remove_root_to_sfpts_edges(PhaseIterGVN& igvn) {
         --i;
       }
     }
+    // Parsing may have added top inputs to the root node (Path
+    // leading to the Halt node proven dead). Make sure we get a
+    // chance to clean them up.
+    igvn._worklist.push(r);
+    igvn.optimize();
   }
 }
 
@@ -2290,7 +2295,7 @@ void Compile::Optimize() {
     if (has_loops()) {
       // Cleanup graph (remove dead nodes).
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
-      PhaseIdealLoop::optimize(igvn, LoopOptsNone);
+      PhaseIdealLoop::optimize(igvn, LoopOptsMaxUnroll);
       if (major_progress()) print_method(PHASE_PHASEIDEAL_BEFORE_EA, 2);
       if (failing())  return;
     }
@@ -3711,14 +3716,16 @@ bool Compile::final_graph_reshaping() {
     }
   }
 
+#ifdef IA32
   // If original bytecodes contained a mixture of floats and doubles
   // check if the optimizer has made it homogenous, item (3).
-  if( Use24BitFPMode && Use24BitFP && UseSSE == 0 &&
+  if (UseSSE == 0 &&
       frc.get_float_count() > 32 &&
       frc.get_double_count() == 0 &&
       (10 * frc.get_call_count() < frc.get_float_count()) ) {
-    set_24_bit_selection_and_mode( false,  true );
+    set_24_bit_selection_and_mode(false, true);
   }
+#endif // IA32
 
   set_java_calls(frc.get_java_call_count());
   set_inner_loops(frc.get_inner_loop_count());

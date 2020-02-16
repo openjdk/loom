@@ -437,7 +437,7 @@ void JfrThreadSampler::start_thread() {
 
 void JfrThreadSampler::enroll() {
   if (_disenrolled) {
-    log_info(jfr)("Enrolling thread sampler");
+    log_trace(jfr)("Enrolling thread sampler");
     _sample.signal();
     _disenrolled = false;
   }
@@ -447,7 +447,7 @@ void JfrThreadSampler::disenroll() {
   if (!_disenrolled) {
     _sample.wait();
     _disenrolled = true;
-    log_info(jfr)("Disenrolling thread sampler");
+    log_trace(jfr)("Disenrolling thread sampler");
   }
 }
 
@@ -585,12 +585,12 @@ JfrThreadSampling::~JfrThreadSampling() {
 }
 
 static void log(size_t interval_java, size_t interval_native) {
-  log_info(jfr)("Updated thread sampler for java: " SIZE_FORMAT "  ms, native " SIZE_FORMAT " ms", interval_java, interval_native);
+  log_trace(jfr)("Updated thread sampler for java: " SIZE_FORMAT "  ms, native " SIZE_FORMAT " ms", interval_java, interval_native);
 }
 
 void JfrThreadSampling::start_sampler(size_t interval_java, size_t interval_native) {
   assert(_sampler == NULL, "invariant");
-  log_info(jfr)("Enrolling thread sampler");
+  log_trace(jfr)("Enrolling thread sampler");
   _sampler = new JfrThreadSampler(interval_java, interval_native, JfrOptionSet::stackdepth());
   _sampler->start_thread();
   _sampler->enroll();
@@ -610,7 +610,7 @@ void JfrThreadSampling::set_sampling_interval(bool java_interval, size_t period)
   }
   if (interval_java > 0 || interval_native > 0) {
     if (_sampler == NULL) {
-      log_info(jfr)("Creating thread sampler for java:%zu ms, native %zu ms", interval_java, interval_native);
+      log_trace(jfr)("Creating thread sampler for java:%zu ms, native %zu ms", interval_java, interval_native);
       start_sampler(interval_java, interval_native);
     } else {
       _sampler->set_java_interval(interval_java);

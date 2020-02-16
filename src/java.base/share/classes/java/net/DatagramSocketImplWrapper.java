@@ -26,6 +26,7 @@
 package java.net;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.Enumeration;
@@ -252,7 +253,7 @@ class DatagramSocketImplWrapper extends MulticastSocket {
         try {
             connectInternal(address, port);
         } catch (SocketException se) {
-            throw new Error("connect failed", se);
+            throw new UncheckedIOException("connect failed", se);
         }
     }
 

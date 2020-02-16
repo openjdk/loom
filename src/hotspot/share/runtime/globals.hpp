@@ -267,7 +267,7 @@ const size_t minimumSymbolTableSize = 1024;
           "compilation")                                                    \
                                                                             \
   product(bool, PrintVMQWaitTime, false,                                    \
-          "Print out the waiting time in VM operation queue")               \
+          "(Deprecated) Print out the waiting time in VM operation queue")  \
                                                                             \
   product(bool, MethodFlushing, true,                                       \
           "Reclamation of zombie and not-entrant methods")                  \
@@ -996,9 +996,6 @@ const size_t minimumSymbolTableSize = 1024;
           "use stack banging for stack overflow checks (required for "      \
           "proper StackOverflow handling; disable only to measure cost "    \
           "of stackbanging)")                                               \
-                                                                            \
-  develop(bool, UseStrictFP, true,                                          \
-          "use strict fp if modifier strictfp is set")                      \
                                                                             \
   develop(bool, GenerateSynchronizationCode, true,                          \
           "generate locking/unlocking code for synchronized methods and "   \
@@ -2516,7 +2513,15 @@ const size_t minimumSymbolTableSize = 1024;
           "Start flight recording with options"))                           \
                                                                             \
   experimental(bool, UseFastUnorderedTimeStamps, false,                     \
-          "Use platform unstable time where supported for timestamps only")
+          "Use platform unstable time where supported for timestamps only") \
+                                                                            \
+  product(bool, UseNewFieldLayout, true,                                    \
+               "(Deprecated) Use new algorithm to compute field layouts")   \
+                                                                            \
+  product(bool, UseEmptySlotsInSupers, true,                                \
+                "Allow allocating fields in empty slots of super-classes")  \
+                                                                            \
+
 
 // Interface macros
 #define DECLARE_PRODUCT_FLAG(type, name, value, doc)      extern "C" type name;
