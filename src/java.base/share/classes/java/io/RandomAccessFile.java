@@ -29,6 +29,7 @@ import java.nio.channels.FileChannel;
 
 import jdk.internal.access.JavaIORandomAccessFileAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.Blocker;
 import sun.nio.ch.FileChannelImpl;
 
 
@@ -342,9 +343,12 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @param mode the mode flags, a combination of the O_ constants
      *             defined above
      */
-    private void open(String name, int mode)
-        throws FileNotFoundException {
-        open0(name, mode);
+    private void open(String name, int mode) throws FileNotFoundException {
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> open0(name, mode));
+        } else {
+            open0(name, mode);
+        }
     }
 
     // 'Read' primitives
@@ -365,7 +369,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      *                          end-of-file has been reached.
      */
     public int read() throws IOException {
-        return read0();
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> read0());
+        } else {
+            return read0();
+        }
     }
 
     private native int read0() throws IOException;
@@ -405,7 +413,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      *             {@code b.length - off}
      */
     public int read(byte b[], int off, int len) throws IOException {
-        return readBytes(b, off, len);
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> readBytes(b, off, len));
+        } else {
+            return readBytes(b, off, len);
+        }
     }
 
     /**
@@ -428,7 +440,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     NullPointerException If {@code b} is {@code null}.
      */
     public int read(byte b[]) throws IOException {
-        return readBytes(b, 0, b.length);
+        return read(b, 0, b.length);
     }
 
     /**
@@ -522,7 +534,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(int b) throws IOException {
-        write0(b);
+        Blocker.managedBlock(() -> write0(b));
     }
 
     private native void write0(int b) throws IOException;
@@ -545,7 +557,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(byte b[]) throws IOException {
-        writeBytes(b, 0, b.length);
+        write(b, 0, b.length);
     }
 
     /**
@@ -558,7 +570,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(byte b[], int off, int len) throws IOException {
-        writeBytes(b, off, len);
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> writeBytes(b, off, len));
+        } else {
+            writeBytes(b, off, len);
+        }
     }
 
     // 'Random access' stuff

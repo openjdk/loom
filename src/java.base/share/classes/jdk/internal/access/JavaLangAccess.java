@@ -331,7 +331,7 @@ public interface JavaLangAccess {
     /**
      * Executes the given value returning task on the current carrier thread.
      */
-    <R> R executeOnCarrierThread(Callable<R> task) throws Exception;
+    <V> V executeOnCarrierThread(Callable<V> task) throws Exception;
 
     /**
      * Returns the value of the current carrier thread's copy of a thread-local.

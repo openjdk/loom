@@ -28,6 +28,7 @@ package java.io;
 import java.nio.channels.FileChannel;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.access.JavaIOFileDescriptorAccess;
+import jdk.internal.misc.Blocker;
 import sun.nio.ch.FileChannelImpl;
 
 
@@ -286,9 +287,12 @@ public class FileOutputStream extends OutputStream
      * @param name name of file to be opened
      * @param append whether the file is to be opened in append mode
      */
-    private void open(String name, boolean append)
-        throws FileNotFoundException {
-        open0(name, append);
+    private void open(String name, boolean append) throws FileNotFoundException {
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> open0(name, append));
+        } else {
+            open0(name, append);
+        }
     }
 
     /**
@@ -308,7 +312,12 @@ public class FileOutputStream extends OutputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(int b) throws IOException {
-        write(b, fdAccess.getAppend(fd));
+        boolean append = fdAccess.getAppend(fd);
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> write(b, append));
+        } else {
+            write(b, append);
+        }
     }
 
     /**
@@ -331,7 +340,7 @@ public class FileOutputStream extends OutputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(byte b[]) throws IOException {
-        writeBytes(b, 0, b.length, fdAccess.getAppend(fd));
+        write(b, 0, b.length);
     }
 
     /**
@@ -344,7 +353,12 @@ public class FileOutputStream extends OutputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(byte b[], int off, int len) throws IOException {
-        writeBytes(b, off, len, fdAccess.getAppend(fd));
+        boolean append = fdAccess.getAppend(fd);
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> writeBytes(b, off, len, append));
+        } else {
+            writeBytes(b, off, len, append);
+        }
     }
 
     /**

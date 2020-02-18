@@ -47,6 +47,7 @@ import java.util.Objects;
 import jdk.internal.access.JavaIOFileDescriptorAccess;
 import jdk.internal.access.JavaNioAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.Blocker;
 import jdk.internal.misc.ExtendedMapMode;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
@@ -226,7 +227,12 @@ public class FileChannelImpl
                 if (!isOpen())
                     return 0;
                 do {
-                    n = IOUtil.read(fd, dst, -1, direct, alignment, nd);
+                    if (Thread.currentThread().isVirtual()) {
+                        n = Blocker.managedBlock(() ->
+                                IOUtil.read(fd, dst, -1, direct, alignment, nd));
+                    } else {
+                        n = IOUtil.read(fd, dst, -1, direct, alignment, nd);
+                    }
                 } while ((n == IOStatus.INTERRUPTED) && isOpen());
                 return IOStatus.normalize(n);
             } finally {
@@ -256,8 +262,12 @@ public class FileChannelImpl
                 if (!isOpen())
                     return 0;
                 do {
-                    n = IOUtil.read(fd, dsts, offset, length,
-                            direct, alignment, nd);
+                    if (Thread.currentThread().isVirtual()) {
+                        n = Blocker.managedBlock(() ->
+                                IOUtil.read(fd, dsts, offset, length, direct, alignment, nd));
+                    } else {
+                        n = IOUtil.read(fd, dsts, offset, length, direct, alignment, nd);
+                    }
                 } while ((n == IOStatus.INTERRUPTED) && isOpen());
                 return IOStatus.normalize(n);
             } finally {
@@ -283,7 +293,12 @@ public class FileChannelImpl
                 if (!isOpen())
                     return 0;
                 do {
-                    n = IOUtil.write(fd, src, -1, direct, alignment, nd);
+                    if (Thread.currentThread().isVirtual()) {
+                        n = Blocker.managedBlock(() ->
+                                IOUtil.write(fd, src, -1, direct, alignment, nd));
+                    } else {
+                        n = IOUtil.write(fd, src, -1, direct, alignment, nd);
+                    }
                 } while ((n == IOStatus.INTERRUPTED) && isOpen());
                 return IOStatus.normalize(n);
             } finally {
@@ -313,8 +328,12 @@ public class FileChannelImpl
                 if (!isOpen())
                     return 0;
                 do {
-                    n = IOUtil.write(fd, srcs, offset, length,
-                            direct, alignment, nd);
+                    if (Thread.currentThread().isVirtual()) {
+                        n = Blocker.managedBlock(() ->
+                                IOUtil.write(fd, srcs, offset, length, direct, alignment, nd));
+                    } else {
+                        n = IOUtil.write(fd, srcs, offset, length, direct, alignment, nd);
+                    }
                 } while ((n == IOStatus.INTERRUPTED) && isOpen());
                 return IOStatus.normalize(n);
             } finally {
@@ -1248,7 +1267,12 @@ public class FileChannelImpl
                 return null;
             int n;
             do {
-                n = nd.lock(fd, true, position, size, shared);
+                if (Thread.currentThread().isVirtual()) {
+                    n = Blocker.managedBlock(() ->
+                            nd.lock(fd, true, position, size, shared));
+                } else {
+                    n = nd.lock(fd, true, position, size, shared);
+                }
             } while ((n == FileDispatcher.INTERRUPTED) && isOpen());
             if (isOpen()) {
                 if (n == FileDispatcher.RET_EX_LOCK) {

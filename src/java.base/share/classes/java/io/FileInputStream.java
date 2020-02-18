@@ -26,6 +26,7 @@
 package java.io;
 
 import java.nio.channels.FileChannel;
+import jdk.internal.misc.Blocker;
 import sun.nio.ch.FileChannelImpl;
 
 
@@ -209,7 +210,11 @@ public class FileInputStream extends InputStream
      * @param name the name of the file
      */
     private void open(String name) throws FileNotFoundException {
-        open0(name);
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> open0(name));
+        } else {
+            open0(name);
+        }
     }
 
     /**
@@ -221,7 +226,11 @@ public class FileInputStream extends InputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public int read() throws IOException {
-        return read0();
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> read0());
+        } else {
+            return read0();
+        }
     }
 
     private native int read0() throws IOException;
@@ -247,7 +256,7 @@ public class FileInputStream extends InputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public int read(byte b[]) throws IOException {
-        return readBytes(b, 0, b.length);
+        return read(b, 0, b.length);
     }
 
     /**
@@ -269,7 +278,11 @@ public class FileInputStream extends InputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public int read(byte b[], int off, int len) throws IOException {
-        return readBytes(b, off, len);
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> readBytes(b, off, len));
+        } else {
+            return readBytes(b, off, len);
+        }
     }
 
     /**

@@ -935,13 +935,21 @@ public class InetAddress implements java.io.Serializable {
         public InetAddress[] lookupAllHostAddr(String host)
             throws UnknownHostException
         {
-            return Blocker.runBlocking(() -> impl.lookupAllHostAddr(host));
+            if (Thread.currentThread().isVirtual()) {
+                return Blocker.managedBlock(() -> impl.lookupAllHostAddr(host));
+            } else {
+                return impl.lookupAllHostAddr(host);
+            }
         }
 
         public String getHostByAddr(byte[] addr)
             throws UnknownHostException
         {
-            return Blocker.runBlocking(() -> impl.getHostByAddr(addr));
+            if (Thread.currentThread().isVirtual()) {
+                return Blocker.managedBlock(() ->  impl.getHostByAddr(addr));
+            } else {
+                return impl.getHostByAddr(addr);
+            }
         }
     }
 

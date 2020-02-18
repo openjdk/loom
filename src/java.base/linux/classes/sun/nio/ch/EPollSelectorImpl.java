@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import jdk.internal.misc.Blocker;
 
 import static sun.nio.ch.EPoll.EPOLLIN;
 import static sun.nio.ch.EPoll.EPOLL_CTL_ADD;
@@ -98,6 +99,10 @@ class EPollSelectorImpl extends SelectorImpl {
             throw new ClosedSelectorException();
     }
 
+    private int poll(int timeout) throws IOException {
+        return EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, timeout);
+    }
+
     @Override
     protected int doSelect(Consumer<SelectionKey> action, long timeout)
         throws IOException
@@ -117,7 +122,12 @@ class EPollSelectorImpl extends SelectorImpl {
 
             do {
                 long startTime = timedPoll ? System.nanoTime() : 0;
-                numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, to);
+                if (blocking && Thread.currentThread().isVirtual()) {
+                    int millis = to;
+                    numEntries = Blocker.managedBlock(() -> poll(millis));
+                } else {
+                    numEntries = poll(to);
+                }
                 if (numEntries == IOStatus.INTERRUPTED && timedPoll) {
                     // timed poll interrupted so need to adjust timeout
                     long adjust = System.nanoTime() - startTime;

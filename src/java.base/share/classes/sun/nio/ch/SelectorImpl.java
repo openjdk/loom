@@ -138,13 +138,11 @@ public abstract class SelectorImpl
     public final int select(long timeout) throws IOException {
         if (timeout < 0)
             throw new IllegalArgumentException("Negative timeout");
-        // TBD blocks virtual thread
         return lockAndDoSelect(null, (timeout == 0) ? -1 : timeout);
     }
 
     @Override
     public final int select() throws IOException {
-        // TBD blocks virtual thread
         return lockAndDoSelect(null, -1);
     }
 
@@ -160,14 +158,12 @@ public abstract class SelectorImpl
         Objects.requireNonNull(action);
         if (timeout < 0)
             throw new IllegalArgumentException("Negative timeout");
-        // TBD blocks virtual thread
         return lockAndDoSelect(action, (timeout == 0) ? -1 : timeout);
     }
 
     @Override
     public final int select(Consumer<SelectionKey> action) throws IOException {
         Objects.requireNonNull(action);
-        // TBD blocks virtual thread
         return lockAndDoSelect(action, -1);
     }
 
