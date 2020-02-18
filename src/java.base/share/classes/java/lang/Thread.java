@@ -62,22 +62,20 @@ import jdk.internal.HotSpotIntrinsicCandidate;
  * operating system. These threads are sometimes known as <i>kernel threads</i>
  * or <i>heavyweight threads</i> and will usually have a large stack and other
  * resources that are maintained by the operating system. Kernel threads are
- * suitable for executing all tasks but they are a limited resource.
+ * suitable for executing all types of tasks but they are a limited resource.
  *
  * <p> {@code Thread} also supports the creation of <i>virtual threads</i> that
- * are scheduled by the Java virtual machine rather than the operating system.
+ * are scheduled by the Java virtual machine using a small set of kernel threads.
  * Virtual threads will typically require few resources and a single Java virtual
  * machine may support millions of virtual threads. Virtual threads are suitable
  * for executing tasks that spend most of the time blocked, often waiting for
  * synchronous blocking I/O operations to complete.
- * Virtual threads execute on a pool of <i>carrier threads</i>, essentially
- * a pool of kernel threads that have been created and allocated to support the
- * execution of virtual threads. Locking and I/O operations are the <i>scheduling
- * points</i> where a carrier thread is re-scheduled from one virtual thread to
- * another. Code executing in virtual threads will usually not be aware of the
- * underlying carrier thread, and in particular, the {@linkplain Thread#currentThread()}
- * method, to obtain a reference to the <i>current thread</i>, will return the
- * {@code Thread} object for the virtual thread.
+ * Locking and I/O operations are the <i>scheduling points</i> where a kernel thread
+ * is re-scheduled from one virtual thread to another. Code executing in virtual
+ * threads will usually not be aware of the underlying kernel thread, and in
+ * particular, the {@linkplain Thread#currentThread()} method, to obtain a reference
+ * to the <i>current thread</i>, will return the {@code Thread} object for the virtual
+ * thread.
  *
  * <p> {@code Thread} defines factory methods, and a {@linkplain Builder} API,
  * for creating kernel or virtual threads. It also defines (for compatibility and
@@ -270,6 +268,9 @@ public class Thread implements Runnable {
         return currentThread0();
     }
 
+    @HotSpotIntrinsicCandidate
+    private static native Thread currentThread0();
+
     // Scoped support:
 
     /**
@@ -298,13 +299,6 @@ public class Thread implements Runnable {
     }
 
     // end Scoped support
-
-    /**
-     * TBD
-     * @return TBD
-     */
-    @HotSpotIntrinsicCandidate
-    static native Thread currentThread0();
 
     /**
      * A hint to the scheduler that the current thread is willing to yield
@@ -706,6 +700,9 @@ public class Thread implements Runnable {
         /**
          * The thread will be scheduled by the Java virtual machine rather than
          * the operating system with the given scheduler.
+         * The scheduler's {@link Executor#execute(Runnable) execute} method
+         * should execute tasks on a kernel thread. Executing the task on a
+         * virtual thread leads to unspecified behavior.
          * @param scheduler the scheduler
          * @return this builder
          * @throws IllegalStateException if a thread group has been set
@@ -2999,11 +2996,6 @@ public class Thread implements Runnable {
 
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
     int threadLocalRandomSecondarySeed;
-
-    /**
-     * TBD
-     */
-    public Object userObject;
 
     /* Some private helper methods */
     private native void setPriority0(int newPriority);

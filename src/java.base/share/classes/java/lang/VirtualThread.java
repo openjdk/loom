@@ -179,7 +179,15 @@ class VirtualThread extends Thread {
      * Runs or continues execution of the continuation on the current thread.
      */
     private void runContinuation() {
-        assert Thread.currentCarrierThread().getVirtualThread() == null;
+        // the carrier thread should be a kernel thread
+        if (Thread.currentThread().isVirtual()) {
+            if (stateGet() == ST_STARTED) {
+                afterTerminate(false);
+            } else {
+                // nothing to do
+            }
+            return;
+        }
 
         // set state to ST_RUNNING
         short initialState = stateGet();
