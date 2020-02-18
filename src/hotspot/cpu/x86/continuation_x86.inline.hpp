@@ -74,7 +74,7 @@ static void set_anchor(JavaThread* thread, const FrameInfo* fi) {
 
   assert (thread->has_last_Java_frame(), "");
   assert(thread->last_frame().cb() != NULL, "");
-  log_develop_trace(jvmcont)("set_anchor:");
+  log_develop_debug(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
   print_vframe(thread->last_frame());
 }
 

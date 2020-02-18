@@ -4251,6 +4251,7 @@ public:
 
   template<bool top>
   void recurse_compiled_frame(const hframe& hf, frame& caller, int num_frames) {
+    assert (!hf.is_interpreted_frame(), "");
     ThawFnT thaw_stub = get_oopmap_stub(hf); // try to do this early, so we wouldn't need to look at the oopMap again.
 
     return recurse_thaw_java_frame<Compiled, top>(hf, caller, num_frames, (void*)thaw_stub);
@@ -4482,6 +4483,7 @@ static inline bool can_thaw_fast(ContMirror& cont) {
       if (!ContMirror::is_empty_chunk(chunk))
         return true;
     }
+    // return !cont.is_flag(FLAG_LAST_FRAME_INTERPRETED);
   }
 
   return java_lang_Continuation::numInterpretedFrames(cont.mirror()) == 0;
@@ -4696,6 +4698,7 @@ address* Continuation::get_continuation_entry_pc_for_sender(Thread* thread, cons
 bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
   // TODO : this code and its use sites, as well as get_continuation_entry_pc_for_sender, probably need more work
   if (thread != NULL && is_return_barrier_entry(*sender_pc)) {
+    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " sender_sp: " INTPTR_FORMAT, p2i(*sender_pc), p2i(*sender_sp));
 
