@@ -151,6 +151,23 @@ public class Thread implements Runnable {
     // inherited AccessControlContext, TBD: move this to FieldHolder
     private AccessControlContext inheritedAccessControlContext;
 
+    private Thread parent;
+
+    /**
+     * @return The parent thread;
+     */
+    Thread getParent() {
+        return parent;
+    }
+
+    /**
+     * @param t
+     * Set the parent thread;
+     */
+    void setParent(Thread t) {
+        parent = t;
+    }
+
     /* For autonumbering anonymous threads. */
     private static int threadInitNumber;
     private static synchronized int nextThreadNum() {
@@ -304,7 +321,7 @@ public class Thread implements Runnable {
      * @return TBD
      */
     @HotSpotIntrinsicCandidate
-    static native Thread currentThread0();
+    private static native Thread currentThread0();
 
     /**
      * A hint to the scheduler that the current thread is willing to yield
@@ -2999,11 +3016,6 @@ public class Thread implements Runnable {
 
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
     int threadLocalRandomSecondarySeed;
-
-    /**
-     * TBD
-     */
-    public Object userObject;
 
     /* Some private helper methods */
     private native void setPriority0(int newPriority);

@@ -24,6 +24,9 @@
  */
 package java.util.concurrent;
 
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.List;
@@ -51,6 +54,8 @@ class UnboundedExecutor extends AbstractExecutorService {
         }
     }
     private volatile int state;
+
+    private static final JavaLangAccess jla = SharedSecrets.getJavaLangAccess();
 
     // states: RUNNING -> SHUTDOWN -> TERMINATED
     private static final int RUNNING    = 0;
@@ -164,6 +169,7 @@ class UnboundedExecutor extends AbstractExecutorService {
             }
         };
         Thread thread = factory.newThread(wrapper);
+        jla.setParent(thread, Thread.currentThread());
         threads.add(thread);
         boolean started = false;
         try {

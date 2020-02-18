@@ -148,6 +148,17 @@ public abstract class Scoped<T> {
         Cache.remove(this);
     }
 
+    private Object searchParents(Thread thread) {
+        for (Thread t = thread; t != null; t = t.getParent()) {
+            var value = t.scopedMap().get(hashCode(), this);
+            if (value != ScopedMap.NULL_PLACEHOLDER) {
+                return value;
+            }
+        }
+
+        return ScopedMap.NULL_PLACEHOLDER;
+    }
+
     /**
      * TBD
      *
@@ -167,26 +178,22 @@ public abstract class Scoped<T> {
             }
         }
 
-        var value = Thread.currentThread().scopedMap().get(hashCode(), this);
-
-        if (value == ScopedMap.NULL_PLACEHOLDER)
-            return false;
-
-        return true;
+        var value = searchParents(Thread.currentThread());
+        return value != ScopedMap.NULL_PLACEHOLDER;
     }
 
     @SuppressWarnings("unchecked")  // one map has entries for all types <T>
     private T slowGet(Thread thread) {
-        var value = Thread.currentThread().scopedMap().get(hashCode(), this);
+        var value = searchParents(thread);
 
-        if (value == ScopedMap.NULL_PLACEHOLDER)
+        if (value == ScopedMap.NULL_PLACEHOLDER) {
             throw new UnboundScopedException("Scoped<" + getType().getName() + "> is not bound");
-
-        if (USE_CACHE) {
-            Cache.put(thread, this, value);
+        } else {
+            if (USE_CACHE) {
+                Cache.put(this, value);
+            }
+            return (T) value;
         }
-
-        return (T) value;
     }
 
     // A Marsaglia xor-shift generator used to generate hashes.
@@ -309,11 +316,11 @@ public abstract class Scoped<T> {
 
         static final int TABLE_MASK = TABLE_SIZE - 1;
 
-        static void put(Thread t, Scoped<?> key, Object value) {
+        static void put(Scoped<?> key, Object value) {
             if (Thread.scopedCache() == null) {
                 Thread.setScopedCache(new Object[TABLE_SIZE * 2]);
             }
-            setKeyAndObjectAt(chooseVictim(t, key.hashCode()), key, value);
+            setKeyAndObjectAt(chooseVictim(Thread.currentCarrierThread(), key.hashCode()), key, value);
         }
 
         private static final void update(Object key, Object value) {

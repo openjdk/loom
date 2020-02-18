@@ -362,4 +362,15 @@ public interface JavaLangAccess {
      * Returns true if the given virtual thread is parking.
      */
     boolean isVirtualThreadParking(Thread thread);
+
+    /**
+     * @return The parent thread;
+     */
+    Thread getParent(Thread t);
+
+    /**
+     * @param t
+     * Set the parent thread;
+     */
+    void setParent(Thread t, Thread parent);
 }

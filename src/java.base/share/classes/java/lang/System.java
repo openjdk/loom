@@ -2319,6 +2319,10 @@ public final class System {
             public boolean isVirtualThreadParking(Thread thread) {
                 return ((VirtualThread) thread).isParking();
             }
+
+            public Thread getParent(Thread thread) { return thread.getParent(); }
+
+            public void setParent(Thread thread, Thread parent) { thread.setParent(parent); }
         });
     }
 }
