@@ -340,7 +340,12 @@ public class FileOutputStream extends OutputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(byte b[]) throws IOException {
-        write(b, 0, b.length);
+        boolean append = fdAccess.getAppend(fd);
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> writeBytes(b, 0, b.length, append));
+        } else {
+            writeBytes(b, 0, b.length, append);
+        }
     }
 
     /**

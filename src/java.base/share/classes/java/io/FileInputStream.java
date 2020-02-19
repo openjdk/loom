@@ -256,7 +256,11 @@ public class FileInputStream extends InputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public int read(byte b[]) throws IOException {
-        return read(b, 0, b.length);
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> readBytes(b, 0, b.length));
+        } else {
+            return readBytes(b, 0, b.length);
+        }
     }
 
     /**
