@@ -566,7 +566,6 @@ private:
   template <typename ConfigT> bool allocate_stacks_in_native(int size, int oops, bool needs_stack, bool needs_refstack);
   void allocate_stacks_in_java(int size, int oops, int frames);
   static int fix_decreasing_index(int index, int old_length, int new_length);
-  inline void post_safepoint(Handle conth);
   inline void post_safepoint_minimal(Handle conth);
   int ensure_capacity(int old, int min);
   bool allocate_stack(int size);
@@ -582,6 +581,7 @@ private:
   oop raw_allocate(Klass* klass, size_t words, size_t elements, bool zero);
 
 public:
+  inline void post_safepoint(Handle conth);
   oop allocate_stack_chunk(int stack_size);
 
 public:
@@ -3335,7 +3335,11 @@ static void invlidate_JVMTI_stack(JavaThread* thread) {
 static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont, const FrameInfo* fi) {
   if (JvmtiExport::should_post_continuation_yield() || JvmtiExport::can_post_frame_pop()) {
     set_anchor<true>(thread, fi); // ensure frozen frames are invisible
+
+    // The call to JVMTI can safepoint, so we need to restore oops.
+    Handle conth(thread, cont.mirror());
     JvmtiExport::post_continuation_yield(JavaThread::current(), num_java_frames(cont));
+    cont.post_safepoint(conth);
   }
 
   invlidate_JVMTI_stack(thread);
@@ -4462,12 +4466,17 @@ static int maybe_count_Java_frames(ContMirror& cont, bool return_barrier) {
   return -1;
 }
 
-static void post_JVMTI_continue(JavaThread* thread, FrameInfo* fi, int java_frame_count, bool return_barrier) {
+static void post_JVMTI_continue(JavaThread* thread, ContMirror& cont, FrameInfo* fi, int java_frame_count, bool return_barrier) {
   if (return_barrier) return;
 
   if (JvmtiExport::should_post_continuation_run()) {
     set_anchor<false>(thread, fi); // ensure thawed frames are visible
+
+    // The call to JVMTI can safepoint, so we need to restore oops.
+    Handle conth(thread, cont.mirror());
     JvmtiExport::post_continuation_run(JavaThread::current(), java_frame_count);
+    cont.post_safepoint(conth);
+    
     clear_anchor(thread);
   }
 
@@ -4528,13 +4537,13 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   if (UNLIKELY(cont.is_flag(FLAG_SAFEPOINT_YIELD))) {
     int java_frame_count = maybe_count_Java_frames(cont, return_barrier);
     res = cont_thaw<mode_slow>(thread, cont, fi, return_barrier);
-    post_JVMTI_continue(thread, fi, java_frame_count, return_barrier);
+    post_JVMTI_continue(thread, cont, fi, java_frame_count, return_barrier);
   } else if (LIKELY(can_thaw_fast(cont))) {
     res = cont_thaw<mode_fast>(thread, cont, fi, return_barrier);
   } else {
     int java_frame_count = maybe_count_Java_frames(cont, return_barrier);
     res = cont_thaw<mode_slow>(thread, cont, fi, return_barrier);
-    post_JVMTI_continue(thread, fi, java_frame_count, return_barrier);
+    post_JVMTI_continue(thread, cont, fi, java_frame_count, return_barrier);
   }
 
   thread->set_cont_fastpath(res);
