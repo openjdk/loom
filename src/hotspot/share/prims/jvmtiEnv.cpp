@@ -925,7 +925,7 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
     }
     jshort vthread_state = java_lang_VirtualThread::state(thread_oop);
 
-    if (vthread_state != java_lang_VirtualThread::RUNNING) {
+    if (!(vthread_state & java_lang_VirtualThread::RUNNING)) {
       jint state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
       if (java_lang_Thread::interrupted(thread_oop)) {
         state |= JVMTI_THREAD_STATE_INTERRUPTED;

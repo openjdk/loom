@@ -1809,7 +1809,7 @@ VM_VirtualThreadGetThreadState::doit() {
   oop carrier_thread_oop = java_lang_VirtualThread::carrier_thread(_vthread_h());
   jint state;
 
-  if (vthread_state == java_lang_VirtualThread::RUNNING && carrier_thread_oop != NULL) {
+  if ((vthread_state & java_lang_VirtualThread::RUNNING) && carrier_thread_oop != NULL) {
     state = java_lang_Thread::get_thread_status(carrier_thread_oop);
   } else {
     state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
