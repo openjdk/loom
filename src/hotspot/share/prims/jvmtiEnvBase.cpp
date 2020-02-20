@@ -1811,6 +1811,10 @@ VM_VirtualThreadGetThreadState::doit() {
 
   if ((vthread_state & java_lang_VirtualThread::RUNNING) && carrier_thread_oop != NULL) {
     state = java_lang_Thread::get_thread_status(carrier_thread_oop);
+    JavaThread* java_thread = java_lang_Thread::thread(carrier_thread_oop);
+    if (java_thread->is_being_ext_suspended()) {
+      state |= JVMTI_THREAD_STATE_SUSPENDED;
+    }
   } else {
     state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
   }
