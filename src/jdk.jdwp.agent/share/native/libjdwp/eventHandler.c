@@ -1447,11 +1447,6 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
     /*
      * Now would be a good time to cache the ThreadGroup for vthreads (carrier threads)
      * if we haven't already.
-     *
-     * vthread fixme: the is kind of a hack. What happens if custom
-     * scheduler uses carrier threads in multple group? What if as a result of this a
-     * VThread can move between thread groups? We should have a dedicated
-     * thread group for all vthreads, or allow a vthread to set its ThreadGroup.
      */
     if (gdata->vthreadThreadGroup == NULL) {
         jvmtiThreadInfo info;
@@ -1459,7 +1454,7 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
 
         (void)memset(&info, 0, sizeof(info));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
-            (gdata->jvmti, thread, &info);
+            (gdata->jvmti, vthread, &info);
 
         if (error != JVMTI_ERROR_NONE) {
             EXIT_ERROR(error, "could not get vthread ThreadGroup");

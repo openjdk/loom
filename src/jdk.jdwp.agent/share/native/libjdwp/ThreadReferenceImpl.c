@@ -170,26 +170,18 @@ threadGroup(PacketInputStream *in, PacketOutputStream *out)
 
         jvmtiThreadInfo info;
         jvmtiError error;
-        jboolean is_vthread = isVThread(thread);
-        
-        if (is_vthread) {
-            /* If it's a vthread, use the well known thread group for vthreads. */
-            JDI_ASSERT(gdata->vthreadThreadGroup != NULL);
-            (void)outStream_writeObjectRef(env, out, gdata->vthreadThreadGroup);
+        (void)memset(&info, 0, sizeof(info));
+        error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
+            (gdata->jvmti, thread, &info);
+
+        if (error != JVMTI_ERROR_NONE) {
+            outStream_setError(out, map2jdwpError(error));
         } else {
-            (void)memset(&info, 0, sizeof(info));
-            error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
-                                      (gdata->jvmti, thread, &info);
-
-            if (error != JVMTI_ERROR_NONE) {
-                outStream_setError(out, map2jdwpError(error));
-            } else {
-                (void)outStream_writeObjectRef(env, out, info.thread_group);
-            }
-
-            if ( info.name!=NULL )
-                jvmtiDeallocate(info.name);
+            (void)outStream_writeObjectRef(env, out, info.thread_group);
         }
+
+        if ( info.name!=NULL )
+            jvmtiDeallocate(info.name);
 
     } END_WITH_LOCAL_REFS(env);
 
