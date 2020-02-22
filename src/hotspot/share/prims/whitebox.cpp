@@ -834,11 +834,10 @@ class VM_WhiteBoxDeoptimizeFrames : public VM_WhiteBoxOperation {
   void doit() {
     for (JavaThreadIteratorWithHandle jtiwh; JavaThread *t = jtiwh.next(); ) {
       if (t->has_last_Java_frame()) {
-        for (StackFrameStream fst(t, UseBiasedLocking); !fst.is_done(); fst.next()) {
+        for (StackFrameStream fst(t, false); !fst.is_done(); fst.next()) {
           frame* f = fst.current();
           if (f->can_be_deoptimized() && !f->is_deoptimized_frame()) {
-            RegisterMap* reg_map = fst.register_map();
-            Deoptimization::deoptimize(t, *f, reg_map);
+            Deoptimization::deoptimize(t, *f);
             if (_make_not_entrant) {
                 CompiledMethod* cm = CodeCache::find_compiled(f->pc());
                 assert(cm != NULL, "sanity check");
@@ -1131,8 +1130,8 @@ WB_ENTRY(void, WB_MarkMethodProfiled(JNIEnv* env, jobject o, jobject method))
   InvocationCounter* icnt = mdo->invocation_counter();
   InvocationCounter* bcnt = mdo->backedge_counter();
   // set i-counter according to TieredThresholdPolicy::is_method_profiled
-  icnt->set(InvocationCounter::wait_for_compile, Tier4MinInvocationThreshold);
-  bcnt->set(InvocationCounter::wait_for_compile, Tier4CompileThreshold);
+  icnt->set(Tier4MinInvocationThreshold);
+  bcnt->set(Tier4CompileThreshold);
 WB_END
 
 WB_ENTRY(void, WB_ClearMethodState(JNIEnv* env, jobject o, jobject method))

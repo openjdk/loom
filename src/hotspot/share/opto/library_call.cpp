@@ -58,7 +58,7 @@
 #include "runtime/objectMonitor.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "utilities/macros.hpp"
-
+#include "utilities/powerOfTwo.hpp"
 
 class LibraryIntrinsic : public InlineCallGenerator {
   // Extend the set of intrinsics known to the runtime:
@@ -3760,8 +3760,7 @@ bool LibraryCallKit::inline_array_copyOf(bool is_copyOfRange) {
       // Reason_class_check rather than Reason_intrinsic because we
       // want to intrinsify even if this traps.
       if (!too_many_traps(Deoptimization::Reason_class_check)) {
-        Node* not_subtype_ctrl = gen_subtype_check(load_object_klass(original),
-                                                   klass_node);
+        Node* not_subtype_ctrl = gen_subtype_check(original, klass_node);
 
         if (not_subtype_ctrl != top()) {
           PreserveJVMState pjvms(this);
@@ -4827,16 +4826,17 @@ bool LibraryCallKit::inline_arraycopy() {
     }
 
     // (9) each element of an oop array must be assignable
-    Node* src_klass  = load_object_klass(src);
     Node* dest_klass = load_object_klass(dest);
-    Node* not_subtype_ctrl = gen_subtype_check(src_klass, dest_klass);
+    if (src != dest) {
+      Node* not_subtype_ctrl = gen_subtype_check(src, dest_klass);
 
-    if (not_subtype_ctrl != top()) {
-      PreserveJVMState pjvms(this);
-      set_control(not_subtype_ctrl);
-      uncommon_trap(Deoptimization::Reason_intrinsic,
-                    Deoptimization::Action_make_not_entrant);
-      assert(stopped(), "Should be stopped");
+      if (not_subtype_ctrl != top()) {
+        PreserveJVMState pjvms(this);
+        set_control(not_subtype_ctrl);
+        uncommon_trap(Deoptimization::Reason_intrinsic,
+                      Deoptimization::Action_make_not_entrant);
+        assert(stopped(), "Should be stopped");
+      }
     }
     {
       PreserveJVMState pjvms(this);
@@ -4913,8 +4913,6 @@ LibraryCallKit::tightly_coupled_allocation(Node* ptr,
 
   // This arraycopy must unconditionally follow the allocation of the ptr.
   Node* alloc_ctl = ptr->in(0);
-  assert(just_allocated_object(alloc_ctl) == ptr, "most recent allo");
-
   Node* ctl = control();
   while (ctl != alloc_ctl) {
     // There may be guards which feed into the slow_region.

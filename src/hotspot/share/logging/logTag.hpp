@@ -90,6 +90,7 @@
   LOG_TAG(jni) \
   LOG_TAG(jvmcont) \
   LOG_TAG(jvmti) \
+  LOG_TAG(library) \
   LOG_TAG(liveness) \
   LOG_TAG(load) /* Trace all classes loaded */ \
   LOG_TAG(loader) \

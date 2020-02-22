@@ -112,11 +112,6 @@
 
 ############################################################################
 
-# loom failures
-java/lang/Continuation/Scoped.java generic-all
-java/lang/Continuation/Preempt.java generic-all
-java/lang/Continuation/PreemptLiveFramesDriver.java generic-all
-
 # jdk_awt
 
 java/awt/event/MouseEvent/MouseClickTest/MouseClickTest.java 8168389 windows-all,macosx-all
@@ -580,6 +575,10 @@ java/lang/StringCoding/CheckEncodings.sh                        7008363 generic-
 java/lang/ProcessHandle/InfoTest.java                           8211847 aix-ppc64
 java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-all
 
+java/lang/Continuation/Scoped.java                              0000000 generic-all
+java/lang/Continuation/Preempt.java                             0000000 generic-all
+java/lang/Continuation/PreemptLiveFramesDriver.java             0000000 generic-all
+
 ############################################################################
 
 # jdk_instrument
@@ -632,9 +631,7 @@ java/net/DatagramSocket/SendDatagramToBadAddress.java           7143960 macosx-a
 
 java/net/ServerSocket/AcceptInheritHandle.java                  8211854 aix-ppc64
 
-# Tests DatagramSocket/DatagramSocketImpl internals, fixed in sandbox
-java/net/DatagramSocket/UnreferencedDatagramSockets.java        0000000 generic-all
-java/net/MulticastSocket/UnreferencedMulticastSockets.java      0000000 generic-all
+java/net/httpclient/HandshakeFailureTest.java                   8238990 windows-all
 
 ############################################################################
 
