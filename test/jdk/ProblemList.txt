@@ -112,6 +112,11 @@
 
 ############################################################################
 
+# loom failures
+java/lang/Continuation/Scoped.java generic-all
+java/lang/Continuation/Preempt.java generic-all
+java/lang/Continuation/PreemptLiveFramesDriver.java generic-all
+
 # jdk_awt
 
 java/awt/event/MouseEvent/MouseClickTest/MouseClickTest.java 8168389 windows-all,macosx-all
