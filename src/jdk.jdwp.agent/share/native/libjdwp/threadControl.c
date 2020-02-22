@@ -2118,6 +2118,15 @@ checkForPopFrameEvents(JNIEnv *env, EventIndex ei, jthread thread)
     return JNI_FALSE;
 }
 
+/*
+ * vthread fixme: We need to consider the impact of events being delivered on
+ * carrier threads, especially if it is handled on the vthread. It's unclear
+ * if any of this "onEvent" code is doing the right thing in that case, since
+ * it always deals with just the carrier thread. Things to look into are:
+ *  - the setting of node->current_ei, which the HANDLING_EVENT macro looks at
+ *  - the fact that we always return the eventBag for the thread, not the vthread
+ *  - always calling checkForPopFrameEvents() for the thread and not the vthread
+ */
 struct bag *
 threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject currentException)
 {
@@ -2286,27 +2295,23 @@ threadControl_applicationThreadStatus(jthread thread,
     jvmtiError  error;
     jint        state;
     jboolean    is_vthread = isVThread(thread);
-    jthread     carrier_thread = NULL;
 
     log_debugee_location("threadControl_applicationThreadStatus()", thread, NULL, 0);
 
     debugMonitorEnter(threadLock);
 
-    if (is_vthread) {
-        carrier_thread = getVThreadThread(thread);
-        if (carrier_thread != NULL) {
-            thread = carrier_thread;
-        }
-    }
+    error = threadState(thread, &state);
+    *pstatus = map2jdwpThreadStatus(state);
+    *statusFlags = map2jdwpSuspendStatus(state);
 
-    if (!is_vthread || carrier_thread != NULL) {
-        /* It's a regular thread or a mounted vthread. Get the thread's state. */
-        error = threadState(thread, &state);
-        *pstatus = map2jdwpThreadStatus(state);
-        *statusFlags = map2jdwpSuspendStatus(state);
-        node = findThread(&runningThreads, thread);
-
-        if (error == JVMTI_ERROR_NONE) {
+    if (error == JVMTI_ERROR_NONE) {
+        if (is_vthread) {
+            if (getVThreadThread(thread) == NULL) {
+                /* vthread fixme - for now always assume umounted vthreads are SUSPENDED. */
+                *statusFlags = JDWP_SUSPEND_STATUS(SUSPENDED);
+            }
+        } else {
+            node = findThread(&runningThreads, thread);
             if ((node != NULL) && HANDLING_EVENT(node)) {
                 /*
                  * While processing an event, an application thread is always
@@ -2319,20 +2324,12 @@ threadControl_applicationThreadStatus(jthread thread,
                 *pstatus = JDWP_THREAD_STATUS(RUNNING);
             }
         }
-#if 0
-        tty_message("status thread: node(%p) suspendCount(%d) %d %d %s",
-                    node, node->suspendCount, *pstatus, *statusFlags, node->name);
-#endif
-    } else { /* It's an unmounted vthread. Assume RUNNING state and SUSPENDED status.*/
-        error = JVMTI_ERROR_NONE;
-        // vthread fixme - threadState() needs to support vthreads
-        *pstatus = JDWP_THREAD_STATUS(RUNNING);
-        *statusFlags = JDWP_SUSPEND_STATUS(SUSPENDED);
-#if 0
-        tty_message("status thread: vthread(%p) suspendCount(%d) %d %d %s",
-                    node, node->suspendCount, *pstatus, *statusFlags, node->name);
-#endif
     }
+#if 0
+    tty_message("status %s: node(%p) suspendCount(%d) %d %d %s",
+                is_vthread ? "vthread" : "thread",
+                node, node->suspendCount, *pstatus, *statusFlags, node->name);
+#endif
 
     debugMonitorExit(threadLock);
 
@@ -2924,10 +2921,10 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
              * stack looked like:
              *    java.lang.Continuation.yield0
              *    java.lang.Continuation.yield
-             *    <virtual thread frames>  <-- if virtual thread, otherwise just additional continuation frames
+             *    <vthread frames>  <-- if vthread, otherwise just additional continuation frames
              *    java.lang.Continuation.enter  <-- bottommost continuation frame
              *    java.lang.Continuation.run    <-- doContinue() call jumps into continuation
-             *    java.lang.VirtualThread.runContinuation  <-- if virtual thread, otherwise will be different
+             *    java.lang.VirtualThread.runContinuation  <-- if vthread, otherwise will be different
              *    <scheduler frames>
              * All frames above run(), starting with enter(), are continuation frames. The
              * correct thing to do here is just enable single stepping. This will resume single
