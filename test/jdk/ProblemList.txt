@@ -633,6 +633,10 @@ java/net/ServerSocket/AcceptInheritHandle.java                  8211854 aix-ppc6
 
 java/net/httpclient/HandshakeFailureTest.java                   8238990 windows-all
 
+# Tests DatagramSocket/DatagramSocketImpl internals, fixed in sandbox
+java/net/DatagramSocket/UnreferencedDatagramSockets.java        0000000 generic-all
+java/net/MulticastSocket/UnreferencedMulticastSockets.java      0000000 generic-all
+
 ############################################################################
 
 # jdk_nio
