@@ -38,7 +38,7 @@ compiler/compilercontrol/jcmd/AddLogTest.java                   8181753   generi
 compiler/compilercontrol/mixed/RandomValidCommandsTest.java     8181753   generic-all
 compiler/compilercontrol/mixed/RandomCommandsTest.java          8181753   generic-all
 
-
+compiler/graalunit/HotspotTest.java                             0000000   generic-all
 compiler/graalunit/JttThreadsTest.java                          8207757   generic-all
 
 compiler/unsafe/UnsafeGetConstantField.java                     8181833   generic-all
