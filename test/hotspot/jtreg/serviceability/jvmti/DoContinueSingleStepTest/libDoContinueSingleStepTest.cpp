@@ -188,13 +188,14 @@ setOrClearBreakpoint(JNIEnv *jni, const char *methodName, jboolean set)
     check_jvmti_status(jni, err, "setupBreakpoint: error in JVMTI GetMethodName call");
 
     if (strcmp(mname, methodName) == 0) {
-      printf("setupBreakpoint: found method %s() to set a breakpoint\n", mname);
+      printf("setupBreakpoint: found method %s() to %s a breakpoint\n", mname, set ? "set" : "clear");
       fflush(0);
       method = meth;
     }
   }
   if (method == NULL) {
-      printf("setupBreakpoint: not found method %s() to set a breakpoint\n", methodName);
+      printf("setupBreakpoint: not found method %s() to %s a breakpoint\n",
+             methodName, set ? "set" : "clear");
       jni->FatalError("Error in setupBreakpoint: not found method");
   }
 
@@ -203,7 +204,7 @@ setOrClearBreakpoint(JNIEnv *jni, const char *methodName, jboolean set)
   } else {
       err = jvmti->ClearBreakpoint(method, location);
   }
-  check_jvmti_status(jni, err, "breakP: error in JVMTI SetBreakpoint");
+  check_jvmti_status(jni, err, "setupBreakpoint: error in JVMTI SetBreakpoint");
 }
 
 static void
