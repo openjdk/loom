@@ -247,6 +247,10 @@ public class MonitorSnippets implements Snippets {
 
         incCounter();
 
+        Word thread = registerAsWord(threadRegister);
+        int heldCount = thread.readInt(INJECTED_VMCONFIG.javaThreadHeldMonitorCounterOffset);
+        thread.writeInt(INJECTED_VMCONFIG.javaThreadHeldMonitorCounterOffset, heldCount + 1);
+
         if (useBiasedLocking(INJECTED_VMCONFIG)) {
             if (tryEnterBiased(object, hub, lock, mark, threadRegister, trace, counters)) {
                 return;
@@ -489,6 +493,11 @@ public class MonitorSnippets implements Snippets {
     public static void monitorexit(Object object, @ConstantParameter int lockDepth, @ConstantParameter Register threadRegister, @ConstantParameter boolean trace,
                     @ConstantParameter Counters counters) {
         trace(trace, "           object: 0x%016lx\n", Word.objectToTrackedPointer(object));
+
+        Word thread = registerAsWord(threadRegister);
+        int heldCount = thread.readInt(INJECTED_VMCONFIG.javaThreadHeldMonitorCounterOffset);
+        thread.writeInt(INJECTED_VMCONFIG.javaThreadHeldMonitorCounterOffset, heldCount - 1);
+
         final Word mark = loadWordFromObject(object, markOffset(INJECTED_VMCONFIG));
         if (useBiasedLocking(INJECTED_VMCONFIG)) {
             // Check for biased locking unlock case, which is a no-op
