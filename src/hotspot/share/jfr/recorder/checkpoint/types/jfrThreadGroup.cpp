@@ -280,6 +280,7 @@ void JfrThreadGroup::set_instance(JfrThreadGroup* new_instance) {
 }
 
 traceid JfrThreadGroup::thread_group_id(const JavaThread* jt, Thread* current) {
+  HandleMark hm(current);
   JfrThreadGroupsHelper helper(jt, current);
   return helper.is_valid() ? thread_group_id_internal(helper) : 0;
 }

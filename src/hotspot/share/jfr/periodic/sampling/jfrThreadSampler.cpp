@@ -190,7 +190,7 @@ void OSThreadSampler::protected_task(const os::SuspendedThreadTaskContext& conte
       EventExecutionSample *ev = _closure.next_event();
       ev->set_starttime(_suspend_time);
       ev->set_endtime(_suspend_time); // fake to not take an end time
-      ev->set_sampledThread(virtual_thread ? JFR_THREAD_ID(jt) : JFR_STATIC_THREAD_ID(jt));
+      ev->set_sampledThread(virtual_thread ? JFR_THREAD_ID(jt) : JFR_VM_THREAD_ID(jt));
       ev->set_state(java_lang_Thread::get_thread_status(jt->threadObj()));
     }
   }
@@ -219,7 +219,7 @@ class JfrNativeSamplerCallback : public os::CrashProtectionCallback {
 static void write_native_event(JfrThreadSampleClosure& closure, bool virtual_thread, JavaThread* jt) {
   EventNativeMethodSample *ev = closure.next_event_native();
   ev->set_starttime(JfrTicks::now());
-  ev->set_sampledThread(virtual_thread ? JFR_THREAD_ID(jt) : JFR_STATIC_THREAD_ID(jt));
+  ev->set_sampledThread(virtual_thread ? JFR_THREAD_ID(jt) : JFR_VM_THREAD_ID(jt));
   ev->set_state(java_lang_Thread::get_thread_status(jt->threadObj()));
 }
 

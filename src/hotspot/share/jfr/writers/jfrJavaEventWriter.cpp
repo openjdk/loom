@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -200,18 +200,22 @@ static jobject create_new_event_writer(JfrBuffer* buffer, TRAPS) {
   return result.get_jobject();
 }
 
-jobject JfrJavaEventWriter::event_writer(Thread* t) {
+jobject JfrJavaEventWriter::event_writer(Thread* t, traceid tid /* 0 */) {
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(t));
   JfrThreadLocal* const tl = t->jfr_thread_local();
   assert(tl->shelved_buffer() == NULL, "invariant");
-  jobject event_writer = tl->java_event_writer();
-  if (event_writer != NULL) {
-    oop writer = JNIHandles::resolve_non_null(event_writer);
+  jobject h_writer = tl->java_event_writer();
+  if (h_writer != NULL) {
+    oop writer = JNIHandles::resolve_non_null(h_writer);
     assert(writer != NULL, "invariant");
-    // VirtualThread support
-    writer->long_field_put(thread_id_offset, (jlong)JFR_THREAD_ID(t));
+    // primarily for supporting Virtual Threads
+    const jlong event_writer_tid = writer->long_field(thread_id_offset);
+    const jlong current_tid = tid != 0 ? tid : (jlong)JFR_THREAD_ID(t);
+    if (event_writer_tid != current_tid) {
+      writer->long_field_put(thread_id_offset, current_tid);
+    }
   }
-  return event_writer;
+  return h_writer;
 }
 
 jobject JfrJavaEventWriter::new_event_writer(TRAPS) {
@@ -224,8 +228,8 @@ jobject JfrJavaEventWriter::new_event_writer(TRAPS) {
     JfrJavaSupport::throw_out_of_memory_error("OOME for thread local buffer", THREAD);
     return NULL;
   }
-  jobject java_event_writer = create_new_event_writer(buffer, CHECK_NULL);
-  tl->set_java_event_writer(java_event_writer);
+  jobject h_writer = create_new_event_writer(buffer, CHECK_NULL);
+  tl->set_java_event_writer(h_writer);
   assert(tl->has_java_event_writer(), "invariant");
-  return java_event_writer;
+  return h_writer;
 }

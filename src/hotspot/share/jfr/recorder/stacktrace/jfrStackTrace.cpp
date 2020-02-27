@@ -28,7 +28,7 @@
 #include "jfr/recorder/repository/jfrChunkWriter.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTrace.hpp"
 #include "jfr/support/jfrMethodLookup.hpp"
-#include "jfr/support/jfrVirtualThread.hpp"
+
 #include "memory/allocation.inline.hpp"
 #include "oops/instanceKlass.inline.hpp"
 #include "runtime/handles.inline.hpp"

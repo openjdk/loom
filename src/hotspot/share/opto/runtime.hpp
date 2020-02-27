@@ -266,6 +266,8 @@ private:
   static const TypeFunc* continuation_doYield_Type();
   static const TypeFunc* continuation_jump_Type();
 
+  static const TypeFunc* jfr_write_checkpoint_Type();
+
   static const TypeFunc* flush_windows_Type();
 
   // arraycopy routine types

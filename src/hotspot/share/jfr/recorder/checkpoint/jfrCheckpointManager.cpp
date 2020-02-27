@@ -30,6 +30,7 @@
 #include "jfr/recorder/checkpoint/jfrCheckpointWriter.hpp"
 #include "jfr/recorder/checkpoint/types/jfrTypeManager.hpp"
 #include "jfr/recorder/checkpoint/types/jfrTypeSet.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrTraceId.hpp"
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
 #include "jfr/recorder/jfrRecorder.hpp"
 #include "jfr/recorder/repository/jfrChunkWriter.hpp"
@@ -100,6 +101,9 @@ static JfrCheckpointMspace* allocate_mspace(size_t size, size_t limit, size_t ca
 }
 
 bool JfrCheckpointManager::initialize() {
+  if (!JfrTraceId::initialize()) {
+    return false;
+  }
   assert(_free_list_mspace == NULL, "invariant");
   _free_list_mspace = allocate_mspace(checkpoint_buffer_size, unlimited_mspace_size, checkpoint_buffer_cache_count, this);
   if (_free_list_mspace == NULL) {

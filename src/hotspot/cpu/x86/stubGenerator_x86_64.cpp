@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -49,6 +49,9 @@
 #endif
 #if INCLUDE_ZGC
 #include "gc/z/zThreadLocalData.hpp"
+#endif
+#if INCLUDE_JFR
+#include "jfr/support/jfrIntrinsics.hpp"
 #endif
 
 // Declaration and definition of StubGenerator (no .hpp file).
@@ -1682,7 +1685,7 @@ class StubGenerator: public StubCodeGenerator {
     // i.e. orig to == Address(end_to, qword_count, Address::times_8, 8)
 
     // Copy in multi-bytes chunks
-    
+
     if (UseUnalignedLoadStores) {
       if (align) { // align target
         NearLabel L_aligned_128, L_aligned_256, L_aligned_512;
@@ -1925,7 +1928,7 @@ class StubGenerator: public StubCodeGenerator {
         __ align(OptoLoopAlignment);
         __ BIND(L_loop_avx512);
         if (prefetchnt) {
-          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance)); 
+          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance));
         }
         __ evmovdqa(xmm0, Address(from, qword_count, Address::times_8, 0), Assembler::AVX_512bit, nt);
         __ evmovdqul(Address(to, qword_count, Address::times_8, 0), xmm0, Assembler::AVX_512bit);
@@ -1936,7 +1939,7 @@ class StubGenerator: public StubCodeGenerator {
 
         __ bind(L_loop_avx2);
         if (prefetchnt) {
-          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance)); 
+          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance));
         }
         __ vmovdqa(xmm0, Address(from, qword_count, Address::times_8, 32), nt);
         __ vmovdqu(Address(to, qword_count, Address::times_8, 32), xmm0);
@@ -1954,7 +1957,7 @@ class StubGenerator: public StubCodeGenerator {
         __ align(OptoLoopAlignment);
         __ BIND(L_loop);
         if (prefetchnt) {
-          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance)); 
+          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance));
         }
         if (UseAVX == 2) {
           __ vmovdqa(xmm0, Address(from, qword_count, Address::times_8, 32), nt);
@@ -1997,7 +2000,7 @@ class StubGenerator: public StubCodeGenerator {
       __ align(OptoLoopAlignment);
       __ BIND(L_loop);
       if (prefetchnt) {
-        __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance)); 
+        __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance));
       }
       __ movq(rax, Address(from, qword_count, Address::times_8, 24));
       __ movq(Address(to, qword_count, Address::times_8, 24), rax);
@@ -2026,7 +2029,7 @@ class StubGenerator: public StubCodeGenerator {
     // Copy trailing qwords
     __ BIND(L_copy_8_bytes);
     if (nt) {
-      __ prefetchnta(Address(from, qword_count, Address::times_8, -8)); 
+      __ prefetchnta(Address(from, qword_count, Address::times_8, -8));
     }
     __ movq(rax, Address(from, qword_count, Address::times_8, -8));
     __ movq(Address(to, qword_count, Address::times_8, -8), rax);
@@ -6978,6 +6981,67 @@ RuntimeStub* generate_cont_doYield() {
     return start;
   }
 
+#if INCLUDE_JFR
+
+  static void jfr_set_last_java_frame(MacroAssembler* _masm, Register thread) {
+    Register last_java_pc = c_rarg0;
+    Register last_java_sp = c_rarg2;
+    __ movptr(last_java_pc, Address(rsp, 0));
+    __ lea(last_java_sp, Address(rsp, wordSize));
+    __ vzeroupper();
+    Address anchor_java_pc(thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::last_Java_pc_offset());
+    __ movptr(anchor_java_pc, last_java_pc);
+    __ movptr(Address(thread, JavaThread::last_Java_sp_offset()), last_java_sp);
+  }
+
+  static void jfr_prologue(MacroAssembler* _masm, Register thread) {
+    jfr_set_last_java_frame(_masm, thread);
+    NOT_LP64(__ push(thread));
+    LP64_ONLY(__ movptr(c_rarg0, thread));
+  }
+
+  // Handle is dereference here using correct load constructs.
+  static void jfr_epilogue(MacroAssembler* _masm, Register thread) {
+    NOT_LP64(__ pop(rdi));
+    __ reset_last_Java_frame(false);
+    Label null_jobject;
+    __ testq(rax, rax);
+    __ jcc(Assembler::zero, null_jobject);
+    DecoratorSet decorators = ACCESS_READ | IN_NATIVE;
+    BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
+    bs->load_at(_masm, decorators, T_OBJECT, rax, Address(rax, 0), c_rarg1, thread);
+    __ bind(null_jobject);
+  }
+
+  // For c2: c_rarg0 is junk, c_rarg1 is the thread id. Call to runtime to write a checkpoint.
+  // Runtime will return a jobject handle to the event writer. The handle is dereferenced and the return value
+  // is the event writer oop.
+  address generate_jfr_write_checkpoint() {
+    StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
+    address start = __ pc();
+    Register thread = get_thread();
+    jfr_prologue(_masm, thread);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
+    jfr_epilogue(_masm, thread);
+    __ ret(0);
+    return start;
+  }
+
+  // For c1: call the corresponding runtime routine, it returns a jobject handle to the event writer.
+  // The handle is dereferenced and the return value is the event writer oop.
+  address generate_jfr_get_event_writer() {
+    StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
+    address start = __ pc();
+    Register thread = get_thread();
+    jfr_prologue(_masm, thread);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
+    jfr_epilogue(_masm, thread);
+    __ ret(0);
+    return start;
+  }
+
+#endif // INCLUDE_JFR
+
 #undef __
 #define __ masm->
 
@@ -7228,6 +7292,9 @@ RuntimeStub* generate_cont_doYield() {
     StubRoutines::_cont_jump       = generate_cont_jump();
     StubRoutines::_cont_getSP      = generate_cont_getSP();
     StubRoutines::_cont_getPC      = generate_cont_getPC();
+
+    JFR_ONLY(StubRoutines::_jfr_write_checkpoint = generate_jfr_write_checkpoint();)
+    JFR_ONLY(StubRoutines::_jfr_get_event_writer = generate_jfr_get_event_writer();)
   }
 
   void generate_all() {

@@ -174,6 +174,7 @@ public class Thread implements Runnable {
         private static final Unsafe U = Unsafe.getUnsafe();
         private static final long nextTidOffset =
             U.objectFieldOffset(ThreadIdentifiers.class, "nextTid");
+        private static final long TID_MASK = (1L << 48) - 1; 
         private static volatile long nextTid = 2;
         private static long next() {
             return U.getAndAddLong(ThreadIdentifiers.class, nextTidOffset, 1);
@@ -2622,7 +2623,9 @@ public class Thread implements Runnable {
      * @since 1.5
      */
     public long getId() {
-        return tid;
+        // The 16 most significant bits can be used for tracing
+        // so these bits are excluded using TID_MASK.
+        return tid & ThreadIdentifiers.TID_MASK;
     }
 
     /**

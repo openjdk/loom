@@ -376,6 +376,7 @@ class java_lang_Class : AllStatic {
 // Interface to java.lang.Thread objects
 
 class java_lang_Thread : AllStatic {
+  friend class java_lang_VirtualThread;
  private:
   // Note that for this class the layout changed between JDK1.2 and JDK1.3,
   // so we compute the offsets at startup rather than hard-wiring them.
@@ -431,6 +432,7 @@ class java_lang_Thread : AllStatic {
   static jlong stackSize(oop java_thread);
   // Thread ID
   static jlong thread_id(oop java_thread);
+  static ByteSize thread_id_offset();
   // Continuation
   static oop  continuation(oop java_thread);
   static void set_continuation(oop java_thread, oop continuation);
@@ -576,17 +578,12 @@ class java_lang_ThreadGroup : AllStatic {
 
 // Interface to java.lang.VirtualThread objects
 
-#define VTHREAD_INJECTED_FIELDS(macro)                            \
-  macro(java_lang_VirtualThread, jfrTraceId,  long_signature, false)
-
 class java_lang_VirtualThread : AllStatic {
  private:
   static int static_notify_jvmti_events_offset;
   static int _carrierThread_offset;
   static int _continuation_offset;
   static int _state_offset;
-  // keep in sync with java.lang.VirtualThread
-  static int _jfrTraceId_offset;
 
  public:
   enum {
@@ -600,6 +597,7 @@ class java_lang_VirtualThread : AllStatic {
     WALKINGSTACK = 51,
     TERMINATED   = 99,
   };
+
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
@@ -615,7 +613,6 @@ class java_lang_VirtualThread : AllStatic {
   static java_lang_Thread::ThreadStatus map_state_to_thread_status(jshort state);
   static void set_notify_jvmti_events(jboolean enable);
   static void init_static_notify_jvmti_events();
-  static jlong jfrTraceId(oop vthread);
   static jlong set_jfrTraceId(oop vthread, jlong id);
 };
 
@@ -1944,8 +1941,7 @@ class InjectedField {
   MEMBERNAME_INJECTED_FIELDS(macro)         \
   CALLSITECONTEXT_INJECTED_FIELDS(macro)    \
   STACKFRAMEINFO_INJECTED_FIELDS(macro)     \
-  MODULE_INJECTED_FIELDS(macro)             \
-  VTHREAD_INJECTED_FIELDS(macro)
+  MODULE_INJECTED_FIELDS(macro)
 
 // Interface to hard-coded offset checking
 

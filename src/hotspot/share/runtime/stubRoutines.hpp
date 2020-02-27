@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -267,9 +267,12 @@ class StubRoutines: AllStatic {
   static address _cont_jump;
   static address _cont_thaw;
   static address _cont_returnBarrier;
-  static address _cont_returnBarrierExc;  
+  static address _cont_returnBarrierExc;
   static address _cont_getSP;
   static address _cont_getPC;
+
+  JFR_ONLY(static address _jfr_write_checkpoint;)
+  JFR_ONLY(static address _jfr_get_event_writer;)
 
   // Safefetch stubs.
   static address _safefetch32_entry;
@@ -468,6 +471,9 @@ class StubRoutines: AllStatic {
   static address cont_getSP()          { return _cont_getSP; }
   static address cont_getPC()          { return _cont_getPC; }
   static cont_jump_from_sp_t  cont_jump_from_sp_C() { return CAST_TO_FN_PTR(cont_jump_from_sp_t, _cont_jump_from_sp); }
+
+  static address jfr_write_checkpoint() { return _jfr_write_checkpoint; }
+  static address jfr_get_event_writer() { return _jfr_get_event_writer; }
 
 
   static address select_fill_function(BasicType t, bool aligned, const char* &name);

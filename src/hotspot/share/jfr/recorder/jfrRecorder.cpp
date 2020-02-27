@@ -38,7 +38,7 @@
 #include "jfr/recorder/storage/jfrStorage.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTraceRepository.hpp"
 #include "jfr/recorder/stringpool/jfrStringPool.hpp"
-#include "jfr/support/jfrVirtualThread.hpp"
+#include "jfr/support/jfrJavaThread.hpp"
 #include "jfr/utilities/jfrTime.hpp"
 #include "jfr/writers/jfrJavaEventWriter.hpp"
 #include "logging/log.hpp"
@@ -356,9 +356,9 @@ bool JfrRecorder::create_thread_sampling() {
 }
 
 bool JfrRecorder::create_virtual_thread_support() {
-  // true (notifyJvmti) enables jvmti events related to VirtualThreads
-  // currently gives callbacks to JFR as well.
-  return JfrVirtualThread::initialize(true);
+  // bool parameter, notifyJvmti, enables jvmti events related to VirtualThreads.
+  // Thread start events hooks into some of these callbacks for JFR.
+  return JfrJavaThread::initialize(false);
 }
 
 void JfrRecorder::destroy_components() {

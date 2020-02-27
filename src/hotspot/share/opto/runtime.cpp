@@ -732,6 +732,22 @@ const TypeFunc* OptoRuntime::void_void_Type() {
   return TypeFunc::make(domain, range);
  }
 
+
+ const TypeFunc* OptoRuntime::jfr_write_checkpoint_Type() {
+   // create input type (domain)
+   const Type **fields = TypeTuple::fields(2);
+   fields[TypeFunc::Parms + 0] = TypeLong::LONG;
+   fields[TypeFunc::Parms + 1] = Type::HALF;
+   const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms + 2, fields);
+
+   // create result type (range)
+   fields = TypeTuple::fields(0);
+   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms + 0, fields);
+
+   return TypeFunc::make(domain, range);
+ }
+
+
 // arraycopy stub variations:
 enum ArrayCopyType {
   ac_fast,                      // void(ptr, ptr, size_t)

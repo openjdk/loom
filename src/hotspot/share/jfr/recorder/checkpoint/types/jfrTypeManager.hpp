@@ -26,9 +26,11 @@
 
 #include "jfr/utilities/jfrAllocation.hpp"
 #include "jfr/utilities/jfrBlob.hpp"
+#include "jfr/utilities/jfrTypes.hpp"
+#include "oops/oopsHierarchy.hpp"
 
-class JavaThread;
 class JfrCheckpointWriter;
+class Thread;
 
 class JfrTypeManager : public AllStatic {
  public:

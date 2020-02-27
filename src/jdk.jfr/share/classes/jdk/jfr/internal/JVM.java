@@ -30,6 +30,7 @@ import java.util.List;
 
 import jdk.internal.HotSpotIntrinsicCandidate;
 import jdk.jfr.Event;
+import jdk.jfr.internal.EventWriter;
 import jdk.jfr.internal.handlers.EventHandler;
 
 /**
@@ -143,11 +144,7 @@ public final class JVM {
      *
      * @return a unique class identifier
      */
-   @HotSpotIntrinsicCandidate
     public static native long getClassId(Class<?> clazz);
-
-    // temporary workaround until we solve intrinsics supporting epoch shift tagging
-    public static native long getClassIdNonIntrinsic(Class<?> clazz);
 
     /**
      * Return process identifier.
@@ -447,9 +444,8 @@ public final class JVM {
      *
      * @return thread local EventWriter
      */
-    //  TODO: LOOM - CONSTRUCT THE INTRINSIC TO SUPPORT VIRTUAL THREAD ID
-    // @HotSpotIntrinsicCandidate
-    public static native Object getEventWriter();
+    @HotSpotIntrinsicCandidate
+    public static native EventWriter getEventWriter();
 
     /**
      * Create a new EventWriter

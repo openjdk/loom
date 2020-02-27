@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,7 +26,9 @@
 #define SHARE_JFR_WRITERS_JFRJAVAEVENTWRITER_HPP
 
 #include "jni.h"
+#include "jfr/utilities/jfrTypes.hpp"
 #include "memory/allocation.hpp"
+#include "utilities/exceptions.hpp"
 
 class JavaThread;
 class Thread;
@@ -42,7 +44,7 @@ class JfrJavaEventWriter : AllStatic {
 
  public:
   static void notify();
-  static jobject event_writer(Thread* t);
+  static jobject event_writer(Thread* t, traceid tid = 0);
   static jobject new_event_writer(TRAPS);
   static jboolean flush(jobject writer, jint used, jint requested, JavaThread* jt);
 };

@@ -34,7 +34,7 @@ class JfrStackFrame;
 class Thread;
 
 class JfrThreadLocal {
-  friend class JfrVirtualThread;
+ friend class JfrJavaThread;
  private:
   jobject _java_event_writer;
   mutable JfrBuffer* _java_buffer;
@@ -42,9 +42,8 @@ class JfrThreadLocal {
   JfrBuffer* _shelved_buffer;
   mutable JfrStackFrame* _stackframes;
   JfrBlobHandle _thread;
-  mutable traceid _static_thread_id;
-  mutable traceid _thread_id_limit;
-  mutable traceid _next_thread_id;
+  mutable traceid _thread_id;
+  mutable traceid _shelved_thread_id;
   u8 _data_lost;
   traceid _stack_trace_id;
   jlong _user_time;
@@ -53,6 +52,7 @@ class JfrThreadLocal {
   unsigned int _stack_trace_hash;
   mutable u4 _stackdepth;
   volatile jint _entering_suspend_flag;
+  mutable volatile int _critical_section;
   bool _excluded;
   bool _dead;
 
@@ -61,8 +61,8 @@ class JfrThreadLocal {
   JfrStackFrame* install_stackframes() const;
   void release(Thread* t);
   static void release(JfrThreadLocal* tl, Thread* t);
-  static traceid reinitialize_thread_local_ids(const JfrThreadLocal* tl);
-  traceid next_thread_local_id() const;
+  static traceid assign_thread_id(const Thread* t);
+  traceid cached_thread_id(const Thread* t) const;
 
  public:
   JfrThreadLocal();
@@ -125,13 +125,16 @@ class JfrThreadLocal {
     _stackdepth = depth;
   }
 
-  // runtime determined id (VirtualThreads etc)
-  static traceid thread_id(const Thread* t);
+  // jfr contextual thread id
+  static traceid thread_id(const Thread* t, bool* is_virtual = NULL);
 
-  // statically determined id for real HW thread
-  static traceid static_thread_id(const Thread* t);
+  static traceid virtual_thread_id(const Thread* t, oop vthread);
+  // jfr hardware thread id
+  static traceid vm_thread_id(const Thread* t);
 
-  static void set_static_thread_id(const Thread* t, traceid thread_id);
+  static void impersonate(const Thread* t, traceid other_thread_id);
+  static void stop_impersonating(const Thread* t);
+  static bool is_impersonating(const Thread* t);
 
   void set_cached_stack_trace_id(traceid id, unsigned int hash = 0) {
     _stack_trace_id = id;
@@ -198,15 +201,15 @@ class JfrThreadLocal {
   }
 
   traceid trace_id() const {
-    return _static_thread_id;
+    return _thread_id;
   }
 
   traceid* const trace_id_addr() const {
-    return &_static_thread_id;
+    return &_thread_id;
   }
 
   void set_trace_id(traceid id) const {
-    _static_thread_id = id;
+    _thread_id = id;
   }
 
   bool is_excluded() const {

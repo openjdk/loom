@@ -22,26 +22,25 @@
 *
 */
 
-#ifndef SHARE_JFR_SUPPORT_JFRVIRTUALTHREAD_HPP
-#define SHARE_JFR_SUPPORT_JFRVIRTUALTHREAD_HPP
+#ifndef SHARE_JFR_SUPPORT_JFRJAVATHREAD_HPP
+#define SHARE_JFR_SUPPORT_JFRJAVATHREAD_HPP
 
 #include "jfr/utilities/jfrTypes.hpp"
 #include "memory/allocation.hpp"
 #include "oops/oopsHierarchy.hpp"
 
-class Thread;
 class JavaThread;
 
-class JfrVirtualThread : public AllStatic {
+class JfrJavaThread : public AllStatic {
   friend class JfrRecorder;
  private:
-  static bool initialize(bool notify);
-  static traceid vthread_id(oop vthread, const JavaThread* jt);
-  static traceid assign_id(oop vthread, const JavaThread* jt);
+  static bool initialize(bool notify_virtual_threads);
  public:
-  static bool is_virtual(const Thread* t);
-  static traceid thread_id(const Thread* t);
-  static traceid thread_id(oop vthread, const JavaThread* jt);
+  static traceid contextual_thread_id(const JavaThread* jt, bool* is_virtual = NULL);
+  static traceid virtual_thread_id(oop vthread, const JavaThread* jt);
+  static traceid java_thread_id(const JavaThread* jt);
+  static bool is_virtual(const JavaThread* jt);
+  static oop virtual_thread(const JavaThread* jt);
 };
 
-#endif //SHARE_JFR_SUPPORT_JFRVIRTUALTHREAD_HPP
+#endif // SHARE_JFR_SUPPORT_JFRJAVATHREAD_HPP

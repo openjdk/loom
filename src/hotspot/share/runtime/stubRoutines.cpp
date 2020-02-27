@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -196,6 +196,9 @@ address StubRoutines::_cont_returnBarrier = NULL;
 address StubRoutines::_cont_returnBarrierExc = NULL;
 address StubRoutines::_cont_getSP         = NULL;
 address StubRoutines::_cont_getPC         = NULL;
+
+JFR_ONLY(address StubRoutines::_jfr_write_checkpoint = NULL;)
+JFR_ONLY(address StubRoutines::_jfr_get_event_writer = NULL;)
 
 // Initialization
 //

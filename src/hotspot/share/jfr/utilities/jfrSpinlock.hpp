@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,29 +22,29 @@
  *
  */
 
-#ifndef SHARE_JFR_UTILITIES_JFRSPINLOCKHELPER_HPP
-#define SHARE_JFR_UTILITIES_JFRSPINLOCKHELPER_HPP
+#ifndef SHARE_JFR_UTILITIES_JFRSPINLOCK_HPP
+#define SHARE_JFR_UTILITIES_JFRSPINLOCK_HPP
 
 #include "runtime/thread.hpp"
 
 // this utility could be useful for non cx8 platforms
 
-class JfrSpinlockHelper {
+class JfrSpinlock {
  private:
   volatile int* const _lock;
 
  public:
-  JfrSpinlockHelper(volatile int* lock) : _lock(lock) {
+  JfrSpinlock(volatile int* lock) : _lock(lock) {
     Thread::SpinAcquire(_lock, NULL);
   }
 
-  JfrSpinlockHelper(volatile int* const lock, const char* name) : _lock(lock) {
+  JfrSpinlock(volatile int* const lock, const char* name) : _lock(lock) {
     Thread::SpinAcquire(_lock, name);
   }
 
-  ~JfrSpinlockHelper() {
+  ~JfrSpinlock() {
     Thread::SpinRelease(_lock);
   }
 };
 
-#endif // SHARE_JFR_UTILITIES_JFRSPINLOCKHELPER_HPP
+#endif // SHARE_JFR_UTILITIES_JFRSPINLOCK_HPP

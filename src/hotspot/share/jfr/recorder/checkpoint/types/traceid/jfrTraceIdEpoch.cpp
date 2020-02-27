@@ -42,6 +42,10 @@ void JfrTraceIdEpoch::end_epoch_shift() {
   assert(_synchronizing, "invariant");
   _epoch_state = !_epoch_state;
   ++_generation;
+  if (0 == _generation) {
+    ++_generation;
+  }
+  assert(_generation != 0, "invariant");
   OrderAccess::storestore();
   _synchronizing = false;
 }

@@ -91,7 +91,9 @@ class JfrCheckpointThreadClosure : public ThreadClosure {
 void JfrCheckpointThreadClosure::do_thread(Thread* t) {
   assert(t != NULL, "invariant");
   ++_count;
-  _writer.write_key(JfrThreadId::jfr_id(t));
+  const traceid tid = JfrThreadId::jfr_id(t);
+  assert(tid != 0, "invariant");
+  _writer.write_key(tid);
   const char* const name = JfrThreadName::name(t);
   assert(name != NULL, "invariant");
   _writer.write(name);
@@ -102,7 +104,7 @@ void JfrCheckpointThreadClosure::do_thread(Thread* t) {
     _writer.write((traceid)0); // java thread group
   } else {
     _writer.write(name);
-    _writer.write(JfrThreadId::id(t));
+    _writer.write(tid);
     _writer.write(JfrThreadGroup::thread_group_id((JavaThread*)t, _curthread));
   }
   _writer.write<bool>(false); // isVirtual

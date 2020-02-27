@@ -52,7 +52,7 @@ public final class EventWriter {
     boolean notified;
 
     public static EventWriter getEventWriter() {
-        EventWriter ew = (EventWriter)JVM.getEventWriter();
+        EventWriter ew = JVM.getEventWriter();
         return ew != null ? ew : JVM.newEventWriter();
     }
 
@@ -162,7 +162,7 @@ public final class EventWriter {
         if (aClass == null) {
             putLong(0L);
         } else {
-            putLong(JVM.getClassIdNonIntrinsic(aClass));
+            putLong(JVM.getClassId(aClass));
         }
     }
 

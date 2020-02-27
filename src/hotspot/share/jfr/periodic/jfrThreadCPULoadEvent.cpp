@@ -124,17 +124,16 @@ void JfrThreadCPULoadEvent::send_events() {
       event.set_starttime(event_time);
       if (jt != periodic_thread) {
         // Commit reads the thread id from this thread's trace data, so put it there temporarily
-        JfrThreadLocal::set_static_thread_id(periodic_thread, JFR_THREAD_ID(jt));
+        JfrThreadLocal::impersonate(periodic_thread, JFR_THREAD_ID(jt));
       } else {
-        JfrThreadLocal::set_static_thread_id(periodic_thread, periodic_thread_id);
+        JfrThreadLocal::impersonate(periodic_thread, periodic_thread_id);
       }
       event.commit();
     }
   }
   log_trace(jfr)("Measured CPU usage for %d threads in %.3f milliseconds", number_of_threads,
     (double)(JfrTicks::now() - event_time).milliseconds());
-  // Restore this thread's thread id
-  JfrThreadLocal::set_static_thread_id(periodic_thread, periodic_thread_id);
+  JfrThreadLocal::stop_impersonating(periodic_thread);
 }
 
 void JfrThreadCPULoadEvent::send_event_for_thread(JavaThread* jt) {

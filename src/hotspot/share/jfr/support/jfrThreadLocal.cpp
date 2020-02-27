@@ -32,42 +32,14 @@
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceId.inline.hpp"
 #include "jfr/recorder/service/jfrOptionSet.hpp"
 #include "jfr/recorder/storage/jfrStorage.hpp"
+#include "jfr/support/jfrJavaThread.hpp"
 #include "jfr/support/jfrThreadLocal.hpp"
-#include "jfr/support/jfrVirtualThread.hpp"
+#include "jfr/utilities/jfrSpinlock.hpp"
 #include "memory/allocation.inline.hpp"
 #include "runtime/os.hpp"
 #include "runtime/thread.inline.hpp"
 #include "utilities/sizes.hpp"
 
-static traceid range_start(traceid limit) {
-  assert(limit >= THREAD_LOCAL_THREAD_ID_RANGE, "invariant");
-  return limit - (THREAD_LOCAL_THREAD_ID_RANGE - 1);
-}
-
-static traceid next_range_limit() {
-  return JfrTraceId::assign_thread_id_range(); // cas range
-}
-
-static bool is_reserved(traceid thread_id) {
-  return thread_id <= THREAD_ID_RESERVATIONS;
-}
-
-#ifdef ASSERT
-static bool in_range(traceid id, traceid limit) {
-  return id <= limit && id >= range_start(limit);
-}
-#endif
-
-traceid JfrThreadLocal::reinitialize_thread_local_ids(const JfrThreadLocal* tl) {
-  assert(tl != NULL, "invariant");
-  tl->_thread_id_limit = next_range_limit();
-  assert(tl->_thread_id_limit > 0, "invariant");
-  const traceid start_id = range_start(tl->_thread_id_limit);
-  tl->_next_thread_id = start_id + 1;
-  return start_id;
-}
-
-/* This data structure is per thread and only accessed by the thread itself, no locking required */
 JfrThreadLocal::JfrThreadLocal() :
   _java_event_writer(NULL),
   _java_buffer(NULL),
@@ -75,9 +47,8 @@ JfrThreadLocal::JfrThreadLocal() :
   _shelved_buffer(NULL),
   _stackframes(NULL),
   _thread(),
-  _static_thread_id(JfrTraceId::assign_thread_id()),
-  _thread_id_limit(0),
-  _next_thread_id(0),
+  _thread_id(0),
+  _shelved_thread_id(max_julong),
   _data_lost(0),
   _stack_trace_id(max_julong),
   _user_time(0),
@@ -86,14 +57,9 @@ JfrThreadLocal::JfrThreadLocal() :
   _stack_trace_hash(0),
   _stackdepth(0),
   _entering_suspend_flag(0),
+  _critical_section(0),
   _excluded(false),
-  _dead(false) {
-  assert(_static_thread_id != 0, "invariant");
-  if (!is_reserved(_static_thread_id)) {
-    _static_thread_id = reinitialize_thread_local_ids(this);
-  }
-  assert(_static_thread_id != 0, "invariant");
-}
+  _dead(false) {}
 
 u8 JfrThreadLocal::add_data_lost(u8 value) {
   _data_lost += value;
@@ -122,11 +88,11 @@ static void send_java_thread_start_event(JavaThread* jt, jobject vthread) {
   }
   if (JfrRecorder::is_recording()) {
     if (vthread == NULL) {
-      // explicit checkpoint, virtual threads write checkpoints implicitly
+      // eager checkpoint, virtual threads write checkpoints lazily
       JfrCheckpointManager::write_checkpoint(jt);
     }
     EventThreadStart event;
-    event.set_thread(JfrThreadLocal::thread_id(jt));
+    event.set_thread(vthread != NULL ? JfrThreadLocal::virtual_thread_id(jt, JfrJavaSupport::resolve_non_null(vthread)) : JfrThreadLocal::vm_thread_id(jt));
     event.commit();
   }
 }
@@ -197,11 +163,10 @@ void JfrThreadLocal::on_exit(Thread* t) {
 
 void JfrThreadLocal::on_vthread_exit(JavaThread* jt, jobject vthread) {
   assert(vthread != NULL, "invariant");
-  const traceid static_tid = JfrThreadLocal::static_thread_id(jt);
-  const traceid id = JfrVirtualThread::thread_id(JfrJavaSupport::resolve_non_null(vthread), jt);
-  JfrThreadLocal::set_static_thread_id(jt, id);
+  const traceid id = JfrJavaThread::virtual_thread_id(JfrJavaSupport::resolve_non_null(vthread), jt);
+  JfrThreadLocal::impersonate(jt, id);
   send_java_thread_end_event(jt, id);
-  JfrThreadLocal::set_static_thread_id(jt, static_tid);
+  JfrThreadLocal::stop_impersonating(jt);
 }
 
 static JfrBuffer* acquire_buffer(bool excluded) {
@@ -232,7 +197,7 @@ JfrStackFrame* JfrThreadLocal::install_stackframes() const {
 }
 
 ByteSize JfrThreadLocal::trace_id_offset() {
-  return in_ByteSize(offset_of(JfrThreadLocal, _static_thread_id));
+  return in_ByteSize(offset_of(JfrThreadLocal, _thread_id));
 }
 
 ByteSize JfrThreadLocal::java_event_writer_offset() {
@@ -255,28 +220,65 @@ u4 JfrThreadLocal::stackdepth() const {
   return _stackdepth != 0 ? _stackdepth : (u4)JfrOptionSet::stackdepth();
 }
 
-traceid JfrThreadLocal::next_thread_local_id() const {
-  traceid next_id = _next_thread_id++;
-  if (next_id == 0 || next_id > _thread_id_limit) {
-    next_id = reinitialize_thread_local_ids(this);
+bool JfrThreadLocal::is_impersonating(const Thread* t) {
+  return t->jfr_thread_local()->_shelved_thread_id != max_julong;
+}
+
+void JfrThreadLocal::impersonate(const Thread* t, traceid other_thread_id) {
+  assert(t != NULL, "invariant");
+  assert(other_thread_id != 0, "invariant");
+  JfrThreadLocal* const tl = t->jfr_thread_local();
+  if (!is_impersonating(t)) {
+    tl->_shelved_thread_id = tl->_thread_id;
   }
-  assert(in_range(next_id, _thread_id_limit), "invariant");
-  return next_id;
+  tl->_thread_id = other_thread_id;
 }
 
-traceid JfrThreadLocal::thread_id(const Thread* t) {
+void JfrThreadLocal::stop_impersonating(const Thread* t) {
   assert(t != NULL, "invariant");
-  const traceid id = JfrVirtualThread::thread_id(t);
-  return id != 0 ? id : static_thread_id(t);
+  JfrThreadLocal* const tl = t->jfr_thread_local();
+  if (is_impersonating(t)) {
+    tl->_thread_id = tl->_shelved_thread_id;
+    tl->_shelved_thread_id = max_julong;
+  }
+  assert(!is_impersonating(t), "invariant");
 }
 
-traceid JfrThreadLocal::static_thread_id(const Thread* t) {
+traceid JfrThreadLocal::assign_thread_id(const Thread* t) {
   assert(t != NULL, "invariant");
-  assert(t->jfr_thread_local()->_static_thread_id != 0, "invariant");
-  return t->jfr_thread_local()->_static_thread_id;
+  JfrThreadLocal* const tl = t->jfr_thread_local();
+  JfrSpinlock spinlock(&tl->_critical_section);
+  traceid tid = tl->_thread_id;
+  if (tid == 0) {
+    tid = t->is_Java_thread() ? JfrJavaThread::java_thread_id((JavaThread*)t) :
+                                JfrTraceId::assign_thread_id();
+    tl->_thread_id = tid;
+  }
+  assert(tid != 0, "invariant");
+  return tid;
 }
 
-void JfrThreadLocal::set_static_thread_id(const Thread* t, traceid thread_id) {
+traceid JfrThreadLocal::cached_thread_id(const Thread* t) const {
   assert(t != NULL, "invariant");
-  t->jfr_thread_local()->_static_thread_id = thread_id;
+  assert(!is_impersonating(t), "invariant");
+  return _thread_id != 0 ? _thread_id : JfrThreadLocal::assign_thread_id(t);
+}
+
+traceid JfrThreadLocal::vm_thread_id(const Thread* t) {
+  assert(t != NULL, "invariant");
+  return t->jfr_thread_local()->cached_thread_id(t);
+}
+
+traceid JfrThreadLocal::thread_id(const Thread* t, bool* is_virtual) {
+  assert(t != NULL, "invariant");
+  if (is_impersonating(t)) {
+    return t->jfr_thread_local()->_thread_id;
+  }
+  return t->is_Java_thread() ? JfrJavaThread::contextual_thread_id((JavaThread*)t, is_virtual) : vm_thread_id(t);
+}
+
+traceid JfrThreadLocal::virtual_thread_id(const Thread* t, oop vthread) {
+  assert(t != NULL, "invariant");
+  assert(vthread != NULL, "invariant");
+  return JfrJavaThread::virtual_thread_id(vthread, (JavaThread*)t);
 }

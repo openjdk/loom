@@ -32,7 +32,6 @@
 #include "jfr/recorder/checkpoint/jfrCheckpointManager.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTraceRepository.hpp"
 #include "jfr/support/jfrThreadLocal.hpp"
-#include "jfr/support/jfrVirtualThread.hpp"
 #include "jfr/utilities/jfrTryLock.hpp"
 #include "logging/log.hpp"
 #include "memory/universe.hpp"
@@ -115,12 +114,7 @@ static traceid get_thread_id(JavaThread* thread, bool* virtual_thread) {
   if (tl->is_excluded()) {
     return 0;
   }
-  const traceid vtid = JfrVirtualThread::thread_id(thread);
-  if (vtid != 0) {
-    *virtual_thread = true;
-    return vtid;
-  }
-  return JfrThreadLocal::static_thread_id(thread);
+  return JfrThreadLocal::thread_id(thread, virtual_thread);
 }
 
 static JfrBlobHandle get_thread_blob(JavaThread* thread, traceid tid, bool virtual_thread) {

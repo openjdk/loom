@@ -1245,7 +1245,7 @@ oop ContMirror::find_chunk(void* p) const {
 template<typename Event> void ContMirror::post_jfr_event(Event* e, JavaThread* jt) {
   if (e->should_commit()) {
     log_develop_trace(jvmcont)("JFR event: frames: %d iframes: %d size: %d refs: %d", _e_num_frames, _e_num_interpreted_frames, _e_size, _e_num_refs);
-    e->set_carrierThread(JFR_STATIC_THREAD_ID(jt));
+    e->set_carrierThread(JFR_VM_THREAD_ID(jt));
     e->set_contClass(_cont->klass());
     e->set_numFrames(_e_num_frames);
     e->set_numIFrames(_e_num_interpreted_frames);
@@ -3757,7 +3757,7 @@ public:
         hframe hf = _cont.last_frame<mode>();
         log_develop_trace(jvmcont)("top_hframe before (thaw):"); if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on(_cont, tty);
         frame caller;
-        
+
         int num_frames = FULL_STACK ? 1000 // TODO
                                     : (return_barrier ? 1 : 2);
         thaw<top>(hf, caller, num_frames);
@@ -3867,7 +3867,7 @@ public:
     if (is_last_in_chunks && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
     }
-    
+
     log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d is_last: %d empty: %d size: %d argsize: %d", partial, FULL_STACK, top, bottom, is_last, empty, size, argsize);
 
     // if we're not in a full thaw, we're both top and bottom
@@ -3908,7 +3908,7 @@ public:
     }
 
     assert (is_last == _cont.is_empty(), "is_last: %d _cont.is_empty(): %d", is_last, _cont.is_empty());
-    
+
     if (LIKELY(!FULL_STACK || top)) {
       setup_chunk_jump(vsp, hsp);
     }
@@ -4476,7 +4476,7 @@ static void post_JVMTI_continue(JavaThread* thread, ContMirror& cont, FrameInfo*
     Handle conth(thread, cont.mirror());
     JvmtiExport::post_continuation_run(JavaThread::current(), java_frame_count);
     cont.post_safepoint(conth);
-    
+
     clear_anchor(thread);
   }
 

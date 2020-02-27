@@ -49,22 +49,27 @@
 #include "classfile/vmSymbols.hpp"
 
 #ifdef ASSERT
-void JfrJavaSupport::check_java_thread_in_vm(Thread* t) {
+static void check_java_thread_state(Thread* t, JavaThreadState state) {
   assert(t != NULL, "invariant");
   assert(t->is_Java_thread(), "invariant");
-  assert(((JavaThread*)t)->thread_state() == _thread_in_vm, "invariant");
+  assert(((JavaThread*)t)->thread_state() == state, "invariant");
+}
+
+void JfrJavaSupport::check_java_thread_in_vm(Thread* t) {
+  check_java_thread_state(t, _thread_in_vm);
 }
 
 void JfrJavaSupport::check_java_thread_in_native(Thread* t) {
-  assert(t != NULL, "invariant");
-  assert(t->is_Java_thread(), "invariant");
-  assert(((JavaThread*)t)->thread_state() == _thread_in_native, "invariant");
+  check_java_thread_state(t, _thread_in_native);
+}
+
+void JfrJavaSupport::check_java_thread_in_java(Thread* t) {
+  check_java_thread_state(t, _thread_in_Java);
 }
 
 static void check_new_unstarted_java_thread(JavaThread* jt, jobject vthread = NULL) {
   if (vthread != NULL) return;
-  assert(jt != NULL, "invariant");
-  assert(jt->thread_state() == _thread_new, "invariant");
+  check_java_thread_state(jt, _thread_new);
 }
 #endif
 

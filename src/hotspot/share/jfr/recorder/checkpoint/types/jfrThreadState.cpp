@@ -89,15 +89,14 @@ traceid JfrThreadId::id(const Thread* t, oop vthread) {
   if (!t->is_Java_thread()) {
     return os_id(t);
   }
+  if (vthread != NULL) {
+    return java_lang_Thread::thread_id(vthread);
+  }
   const JavaThread* const jt = (JavaThread*)t;
   oop thread_obj = jt->threadObj();
   if (thread_obj == NULL) {
     return 0;
   }
-  if (vthread != NULL) {
-    thread_obj = vthread;
-  }
-  assert(thread_obj != NULL, "invariant");
   return java_lang_Thread::thread_id(thread_obj);
 }
 
@@ -109,7 +108,7 @@ traceid JfrThreadId::os_id(const Thread* t) {
 
 traceid JfrThreadId::jfr_id(const Thread* t, traceid tid) {
   assert(t != NULL, "invariant");
-  return tid != 0 ? tid : JfrThreadLocal::static_thread_id(t);
+  return tid != 0 ? tid : JfrThreadLocal::vm_thread_id(t);
 }
 
 // caller needs ResourceMark
@@ -118,15 +117,12 @@ const char* get_java_thread_name(const Thread* t, oop vthread) {
   assert(t->is_Java_thread(), "invariant");
   const JavaThread* const jt = ((JavaThread*)t);
   const char* name_str = "<no-name - thread name unresolved>";
-  oop thread_obj = jt->threadObj();
+  oop thread_obj = vthread != NULL ? vthread : jt->threadObj();
   if (thread_obj == NULL) {
     if (jt->is_attaching_via_jni()) {
       name_str = "<no-name - thread is attaching>";
     }
   } else {
-    if (vthread != NULL) {
-      thread_obj = vthread;
-    }
     const oop name = java_lang_Thread::name(thread_obj);
     if (name != NULL) {
       name_str = java_lang_String::as_utf8_string(name);

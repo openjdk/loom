@@ -38,6 +38,10 @@ const u4 STACK_DEPTH_DEFAULT = 64;
 const u4 MIN_STACK_DEPTH = 1;
 const u4 MAX_STACK_DEPTH = 2048;
 
+const int jfr_epoch_shift = 48;
+const traceid jfr_id_mask = ((((traceid)1) << jfr_epoch_shift) - 1);
+const traceid jfr_epoch_mask = ~jfr_id_mask;
+
 inline int compare_traceid(const traceid& lhs, const traceid& rhs) {
   return lhs > rhs ? 1 : (lhs < rhs) ? -1 : 0;
 }
@@ -59,7 +63,5 @@ enum JfrCheckpointType {
   THREADS = 8
 };
 
-const u4 THREAD_LOCAL_THREAD_ID_RANGE = 1 << 6; // 0n64
-const u4 THREAD_ID_RESERVATIONS = 1000; // low range for VM native threads
 
 #endif // SHARE_JFR_UTILITIES_JFRTYPES_HPP

@@ -25,18 +25,20 @@
 #ifndef SHARE_JFR_SUPPORT_JFRTHREADID_HPP
 #define SHARE_JFR_SUPPORT_JFRTHREADID_HPP
 
-#include "utilities/macros.hpp"
 #include "utilities/globalDefinitions.hpp"
+#include "utilities/macros.hpp"
 
 #if INCLUDE_JFR
 #include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
 #define JFR_THREAD_ID(thread) (JfrThreadLocal::thread_id(thread))
-#define JFR_STATIC_THREAD_ID(thread) (JfrThreadLocal::static_thread_id(thread))
+#define JFR_VIRTUAL_THREAD_ID(thread, vthread_oop) (JfrThreadLocal::thread_id(thread, vthread_oop))
+#define JFR_VM_THREAD_ID(thread) (JfrThreadLocal::vm_thread_id(thread))
 #else
 typedef u8 traceid;
 #define JFR_THREAD_ID(thread) ((traceid)(thread)->osthread()->thread_id())
-#define JFR_STATIC_THREAD_ID(thread) ((traceid)(thread)->osthread()->thread_id())
+#define JFR_VIRTUAL_THREAD_ID(thread, vthread_oop) ((traceid)(thread)->osthread()->thread_id())
+#define JFR_VM_THREAD_ID(thread) ((traceid)(thread)->osthread()->thread_id())
 #endif
 
 #endif // SHARE_JFR_SUPPORT_JFRTHREADID_HPP

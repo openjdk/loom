@@ -31,11 +31,9 @@
 #include "jfr/utilities/jfrDoublyLinkedList.hpp"
 #include "jfr/utilities/jfrIterator.hpp"
 #include "memory/resourceArea.hpp"
-#include "runtime/handles.inline.hpp"
-#include "runtime/safepoint.hpp"
 #include "runtime/semaphore.hpp"
 #include "runtime/thread.inline.hpp"
-#include "utilities/exceptions.hpp"
+#include "utilities/macros.hpp"
 
 class JfrSerializerRegistration : public JfrCHeapObj {
  private:
@@ -121,10 +119,9 @@ void JfrTypeManager::write_threads(JfrCheckpointWriter& writer) {
 JfrBlobHandle JfrTypeManager::create_blob(Thread* t, traceid tid, oop vthread) {
   assert(t != NULL, "invariant");
   ResourceMark rm;
-  HandleMark hm;
-  JfrThreadConstant type_thread(t, tid, vthread);
   JfrCheckpointWriter writer(Thread::current(), true, THREADS);
   writer.write_type(TYPE_THREAD);
+  JfrThreadConstant type_thread(t, tid, vthread);
   type_thread.serialize(writer);
   return writer.move();
 }
@@ -132,10 +129,9 @@ JfrBlobHandle JfrTypeManager::create_blob(Thread* t, traceid tid, oop vthread) {
 void JfrTypeManager::write_checkpoint(Thread* t, traceid tid, oop vthread) {
   assert(t != NULL, "invariant");
   ResourceMark rm;
-  HandleMark hm;
-  JfrThreadConstant type_thread(t, tid, vthread);
   JfrCheckpointWriter writer(Thread::current(), true, THREADS);
   writer.write_type(TYPE_THREAD);
+  JfrThreadConstant type_thread(t, tid, vthread);
   type_thread.serialize(writer);
 }
 

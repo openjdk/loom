@@ -116,6 +116,7 @@ class JfrJavaSupport : public AllStatic {
   // asserts
   DEBUG_ONLY(static void check_java_thread_in_vm(Thread* t);)
   DEBUG_ONLY(static void check_java_thread_in_native(Thread* t);)
+  DEBUG_ONLY(static void check_java_thread_in_java(Thread* t););
 
   enum CAUSE {
     VM_ERROR,

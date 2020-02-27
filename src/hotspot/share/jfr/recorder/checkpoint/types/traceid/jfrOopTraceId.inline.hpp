@@ -28,21 +28,17 @@
 #include "jfr/recorder/checkpoint/types/traceid/jfrOopTraceId.hpp"
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
 
-const int jfr_epoch_shift = 48;
-const traceid jfr_id_mask = ((((traceid)1) << jfr_epoch_shift) - 1);
-const traceid jfr_epoch_mask = ~jfr_id_mask;
-
 template <typename T>
 inline bool JfrOopTraceId<T>::store(oop ref, traceid value) {
   assert(ref != NULL, "invariant");
   assert(value != 0, "invariant");
-  return (traceid)T::set_jfrTraceId(ref, (jlong)value) == value;
+  return T::store(ref, value) == value;
 }
 
 template <typename T>
 inline traceid JfrOopTraceId<T>::load(oop ref) {
   assert(ref != NULL, "invariant");
-  return (traceid)T::jfrTraceId(ref);
+  return T::load(ref);
 }
 
 template <typename T>
