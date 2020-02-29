@@ -419,6 +419,8 @@ hotspot_tier2_runtime = \
 
 hotspot_tier2_serviceability = \
   serviceability/ \
+ -serviceability/sa \
+ -serviceability/tmtools \
  -:tier1_serviceability
 
 hotspot_tier2_runtime_platform_agnostic = \
