@@ -55,6 +55,7 @@ class JfrThreadLocal {
   mutable volatile int _critical_section;
   bool _excluded;
   bool _dead;
+  traceid _parent_trace_id;
 
   JfrBuffer* install_native_buffer() const;
   JfrBuffer* install_java_buffer() const;
@@ -135,6 +136,10 @@ class JfrThreadLocal {
   static void impersonate(const Thread* t, traceid other_thread_id);
   static void stop_impersonating(const Thread* t);
   static bool is_impersonating(const Thread* t);
+
+  traceid parent_thread_id() const {
+    return _parent_trace_id;
+  }
 
   void set_cached_stack_trace_id(traceid id, unsigned int hash = 0) {
     _stack_trace_id = id;

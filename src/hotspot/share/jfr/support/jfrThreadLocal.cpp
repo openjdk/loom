@@ -59,7 +59,11 @@ JfrThreadLocal::JfrThreadLocal() :
   _entering_suspend_flag(0),
   _critical_section(0),
   _excluded(false),
-  _dead(false) {}
+  _dead(false) {
+
+  Thread* thread = Thread::current_or_null();
+  _parent_trace_id = thread != NULL ? thread->jfr_thread_local()->trace_id() : (traceid)0;
+}
 
 u8 JfrThreadLocal::add_data_lost(u8 value) {
   _data_lost += value;
@@ -93,6 +97,7 @@ static void send_java_thread_start_event(JavaThread* jt, jobject vthread) {
     }
     EventThreadStart event;
     event.set_thread(vthread != NULL ? JfrThreadLocal::virtual_thread_id(jt, JfrJavaSupport::resolve_non_null(vthread)) : JfrThreadLocal::vm_thread_id(jt));
+    event.set_parentThread(jt->jfr_thread_local()->parent_thread_id());
     event.commit();
   }
 }
@@ -100,6 +105,9 @@ static void send_java_thread_start_event(JavaThread* jt, jobject vthread) {
 void JfrThreadLocal::on_start(Thread* t) {
   if (t->is_Java_thread()) {
     send_java_thread_start_event((JavaThread*)t, NULL);
+  }
+  if (t->jfr_thread_local()->has_cached_stack_trace()) {
+    t->jfr_thread_local()->clear_cached_stack_trace();
   }
 }
 
