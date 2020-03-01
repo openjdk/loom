@@ -30,6 +30,7 @@
 #include "jfr/periodic/sampling/jfrThreadSampler.hpp"
 #include "jfr/recorder/jfrRecorder.hpp"
 #include "jfr/recorder/checkpoint/jfrCheckpointManager.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrTraceId.hpp"
 #include "jfr/recorder/repository/jfrRepository.hpp"
 #include "jfr/recorder/service/jfrOptionSet.hpp"
 #include "jfr/recorder/service/jfrPostBox.hpp"
@@ -185,6 +186,9 @@ static bool is_cds_dump_requested() {
 bool JfrRecorder::on_create_vm_2() {
   if (is_cds_dump_requested()) {
     return true;
+  }
+  if (!JfrTraceId::initialize()) {
+    return false;
   }
   Thread* const thread = Thread::current();
   if (!JfrOptionSet::initialize(thread)) {

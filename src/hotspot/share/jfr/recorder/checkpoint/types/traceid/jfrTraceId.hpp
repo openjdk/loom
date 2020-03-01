@@ -78,7 +78,7 @@ class Thread;
  */
 
 class JfrTraceId : public AllStatic {
-  friend class JfrCheckpointManager;
+  friend class JfrRecorder;
  private:
   static bool initialize();
  public:
@@ -87,7 +87,6 @@ class JfrTraceId : public AllStatic {
   static void assign(const PackageEntry* package);
   static void assign(const ClassLoaderData* cld);
   static traceid assign_thread_id();
-  static traceid assign_thread_id_range();
 
   static traceid get(const Klass* klass);
   static traceid get(jclass jc);
