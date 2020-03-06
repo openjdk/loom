@@ -2643,11 +2643,11 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
   bool skip_throwableInit_check = false;
   bool skip_hidden = !ShowHiddenFrames;
   bool is_last = false;
-  Handle contHandle(THREAD, thread->last_continuation());
+  Handle cont_h(THREAD, thread->last_continuation());
   for (frame fr = thread->last_frame(); max_depth == 0 || max_depth != total_count;) {
     Method* method = NULL;
     int bci = 0;
-    oop contScopeName = (contHandle() != NULL) ? java_lang_ContinuationScope::name(java_lang_Continuation::scope(contHandle())) : (oop)NULL;
+    oop contScopeName = (cont_h() != NULL) ? java_lang_ContinuationScope::name(java_lang_Continuation::scope(cont_h())) : (oop)NULL;
 
     // Compiled java method case.
     if (decode_offset != 0) {
@@ -2658,9 +2658,9 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
     } else {
       if (fr.is_first_frame()) break;
 
-      assert (contScope.is_null() || contHandle() != NULL, "must be");
-      if (contHandle() != NULL && Continuation::is_continuation_entry_frame(fr, &map) &&  (*((juint*)contHandle()) != badHeapWordVal)) {
-        oop scope = java_lang_Continuation::scope(contHandle());
+      assert (contScope.is_null() || cont_h() != NULL, "must be");
+      if (cont_h() != NULL && Continuation::is_continuation_entry_frame(fr, &map)) {
+        oop scope = java_lang_Continuation::scope(cont_h());
         if (contScope.not_null() && (scope == contScope())) {
           is_last = true;
         } else {
@@ -2670,13 +2670,9 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
           //   tty->print_cr("<<<<<");
           //   pfl();
           // }
-          assert (Continuation::is_frame_in_continuation(fr, contHandle()), "must be");
-          Handle parent(THREAD, java_lang_Continuation::parent(contHandle()));
-          contHandle =  parent;
-          if (contHandle() != NULL &&  (*((juint*)contHandle()) == badHeapWordVal)) {
-             log_info(stacktrace)("Got bad continuation");
-              assert((*((juint*)contHandle()) != badHeapWordVal), "Got bad parentgrep Got  continuation");
-          }
+          assert (Continuation::is_frame_in_continuation(fr, cont_h()), "must be");
+          Handle parent_h(THREAD, java_lang_Continuation::parent(cont_h()));
+          cont_h =  parent_h;
         }
       }
 
