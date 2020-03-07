@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -45,7 +45,7 @@ extern "C" {
 #define PASSED 0
 #define FAILED 2
 
-#define TEST_CLASS "FiberMonitorTest"
+#define TEST_CLASS "VThreadMonitorTest"
 
 static jvmtiEnv *jvmti = NULL;
 static volatile jboolean event_has_posted = JNI_FALSE;
@@ -83,7 +83,7 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
   jint state = 0;
   jobject contended_monitor = NULL;
 
-  // Test GetCurrentContendedMonitor for a fiber.
+  // Test GetCurrentContendedMonitor for a vthread.
   err = (*jvmti)->GetCurrentContendedMonitor(jvmti, thread, &contended_monitor);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func, "error in JVMTI GetCurrentContendedMonitor");
@@ -104,14 +104,14 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
   }
   printf("%s: GetCurrentContendedMonitor returned expected monitor\n", func);
 
-  // Check GetThreadState for a fiber.
+  // Check GetThreadState for a vthread.
   err = (*jvmti)->GetThreadState(jvmti, thread, &state);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func, "error in JVMTI GetThreadState");
     status = FAILED;
     return;
   }
-  printf("%s: GetThreadState returned fiber thread state: %0x\n", func, state);
+  printf("%s: GetThreadState returned vthread thread state: %0x\n", func, state);
 }
 
 static void
@@ -139,28 +139,28 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
   }
   printf("%s: GetOwnedMonitorInfo: returned expected number of monitors\n", func);
 
-  // Check GetThreadState for a fiber.
+  // Check GetThreadState for a vthread.
   err = (*jvmti)->GetThreadState(jvmti, thread, &state);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func, "error in JVMTI GetThreadState");
     status = FAILED;
     return;
   }
-  printf("%s: GetThreadState returned fiber thread state: %0x\n", func, state);
+  printf("%s: GetThreadState returned vthread thread state: %0x\n", func, state);
 }
 
 JNIEXPORT void JNICALL
 MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject monitor) {
   jvmtiError err;
   jvmtiThreadInfo tinfo;
-  jthread fiber = NULL;
+  jthread vthread = NULL;
   jobject contended_monitor = NULL;
 
   if (CheckLockObject(env, monitor) == JNI_FALSE) {
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetVirtualThread(jvmti, thread, &fiber);
+  err = (*jvmti)->GetVirtualThread(jvmti, thread, &vthread);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
                      "error in JVMTI GetVirtualThread");
@@ -168,7 +168,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject moni
     status = FAILED;
     return;
   }
-  err = (*jvmti)->GetThreadInfo(jvmti, fiber, &tinfo);
+  err = (*jvmti)->GetThreadInfo(jvmti, vthread, &tinfo);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
                      "error in JVMTI GetThreadInfo");
@@ -176,8 +176,8 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject moni
     event_has_posted = JNI_TRUE;
     return;
   }
-  check_contended_monitor(jvmti, env, "MonitorContendedEnter", fiber, monitor);
-  check_owned_monitor(jvmti, env, "MonitorContendedEnter", fiber, tinfo.name,  monitor);
+  check_contended_monitor(jvmti, env, "MonitorContendedEnter", vthread, monitor);
+  check_owned_monitor(jvmti, env, "MonitorContendedEnter", vthread, tinfo.name,  monitor);
   event_has_posted = JNI_TRUE;
   (*jvmti)->Deallocate(jvmti, (unsigned char *)tinfo.name);
 }
@@ -188,14 +188,14 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject mo
   jvmtiThreadInfo tinfo;
   jint mcount = 0;
   jobject *owned_monitors = NULL;
-  jthread fiber = NULL;
+  jthread vthread = NULL;
   jobject contended_monitor = (jobject)thread; // init with a wrong monitor
 
   if (CheckLockObject(env, monitor) == JNI_FALSE) {
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetVirtualThread(jvmti, thread, &fiber);
+  err = (*jvmti)->GetVirtualThread(jvmti, thread, &vthread);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetVirtualThread");
@@ -203,14 +203,14 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject mo
     return;
   }
 
-  err = (*jvmti)->GetThreadInfo(jvmti, fiber, &tinfo);
+  err = (*jvmti)->GetThreadInfo(jvmti, vthread, &tinfo);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetThreadInfo");
     status = FAILED;
     return;
   }
-  check_contended_monitor(jvmti, env, "MonitorContendedEntered", fiber, NULL);
+  check_contended_monitor(jvmti, env, "MonitorContendedEntered", vthread, NULL);
   (*jvmti)->Deallocate(jvmti, (unsigned char *)tinfo.name);
 }
 
@@ -327,18 +327,18 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_FiberMonitorTest_hasEventPosted(JNIEnv *env, jclass cls) {
+Java_VThreadMonitorTest_hasEventPosted(JNIEnv *env, jclass cls) {
   return event_has_posted;
 }
 
 JNIEXPORT void JNICALL
-Java_FiberMonitorTest_checkContendedMonitor(JNIEnv *env, jclass cls,
-                                            jthread fiber, jobject monitor) {
-  check_contended_monitor(jvmti, env, "checkContendedMonitor", fiber, monitor);
+Java_VThreadMonitorTest_checkContendedMonitor(JNIEnv *env, jclass cls,
+                                            jthread vthread, jobject monitor) {
+  check_contended_monitor(jvmti, env, "checkContendedMonitor", vthread, monitor);
 }
 
 JNIEXPORT jint JNICALL
-Java_FiberMonitorTest_check(JNIEnv *env, jclass cls) {
+Java_VThreadMonitorTest_check(JNIEnv *env, jclass cls) {
   return status;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,19 +25,19 @@
 /**
  * @test
  * @summary Test JVMTI Monitor functions for fibers
- * @compile FiberMonitorTest.java
- * @run main/othervm/native -agentlib:FiberMonitorTest FiberMonitorTest
+ * @compile VThreadMonitorTest.java
+ * @run main/othervm/native -agentlib:VThreadMonitorTest VThreadMonitorTest
  */
 
 import java.io.PrintStream;
 
-public class FiberMonitorTest {
+public class VThreadMonitorTest {
 
     static {
         try {
-            System.loadLibrary("FiberMonitorTest");
+            System.loadLibrary("VThreadMonitorTest");
         } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load FiberMonitorTest library");
+            System.err.println("Could not load VThreadMonitorTest library");
             System.err.println("java.library.path: "
                                + System.getProperty("java.library.path"));
             throw ule;
@@ -50,7 +50,7 @@ public class FiberMonitorTest {
     private static void log(String str) { System.out.println(str); }
     private static String thrName() { return Thread.currentThread().getName(); }
 
-    private static final FiberMonitorTest lock0 = new FiberMonitorTest();
+    private static final VThreadMonitorTest lock0 = new VThreadMonitorTest();
     private static final Object lock1 = new Object();
     private static final Object lock2 = new Object();
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,20 +21,22 @@
  * questions.
  */
 
-package MyPackage;
+/**
+ * @test
+ * @summary Verifies JVMTI support for VThreads.
+ * @run main/othervm/native -agentlib:VThreadTest=DisableContinuationEvents VThreadTest
+ */
 
 /**
  * @test
- * @summary Verifies JVMTI support for Fibers.
- * @compile FiberTest.java
- * @run main/othervm/native -agentlib:FiberTest=EnableContinuationEvents MyPackage.FiberTest
- * @run main/othervm/native -agentlib:FiberTest=DisableContinuationEvents MyPackage.FiberTest
+ * @summary Verifies JVMTI support for VThreads.
+ * @run main/othervm/native -agentlib:VThreadTest=EnableContinuationEvents VThreadTest
  */
 
 import java.util.concurrent.*;
 
-public class FiberTest {
-    private static final String agentLib = "FiberTest";
+public class VThreadTest {
+    private static final String agentLib = "VThreadTest";
 
     static final int MSG_COUNT = 10*1000;
     static final SynchronousQueue<String> QUEUE = new SynchronousQueue<>();
@@ -86,7 +88,7 @@ public class FiberTest {
             throw ex;
         }
 
-        FiberTest obj = new FiberTest();
+        VThreadTest obj = new VThreadTest();
         obj.runTest();
     }
 }
