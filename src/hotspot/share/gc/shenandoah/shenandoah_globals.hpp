@@ -235,20 +235,6 @@
           "evacuation reserve/waste is incorrect, at the risk that "        \
           "application allocations run out of memory too early.")           \
                                                                             \
-  diagnostic(bool, ShenandoahAllocationTrace, false,                        \
-          "Trace allocation latencies and stalls. Can be expensive when "   \
-          "lots of allocations happen, and may introduce scalability "      \
-          "bottlenecks.")                                                   \
-                                                                            \
-  diagnostic(intx, ShenandoahAllocationStallThreshold, 10000,               \
-          "When allocation tracing is enabled, the allocation stalls "      \
-          "larger than this threshold would be reported as warnings. "      \
-          "Time is in microseconds.")                                       \
-                                                                            \
-  experimental(uintx, ShenandoahEvacAssist, 10,                             \
-          "How many objects to evacuate on LRB assist path. "               \
-          "Use zero to disable.")                                           \
-                                                                            \
   experimental(bool, ShenandoahPacing, true,                                \
           "Pace application allocations to give GC chance to start "        \
           "and complete before allocation failure is reached.")             \
@@ -308,9 +294,6 @@
   diagnostic(bool, ShenandoahAllocFailureALot, false,                       \
           "Make lots of artificial allocation failures.")                   \
                                                                             \
-  diagnostic(bool, ShenandoahTerminationTrace, false,                       \
-          "Tracing task termination timings")                               \
-                                                                            \
   diagnostic(bool, ShenandoahAlwaysPreTouch, false,                         \
           "Pre-touch heap memory, overrides global AlwaysPreTouch")         \
                                                                             \
@@ -333,9 +316,6 @@
   experimental(uintx, ShenandoahSATBBufferFlushInterval, 100,               \
           "Forcefully flush non-empty SATB buffers at this interval. "      \
           "Time is in milliseconds.")                                       \
-                                                                            \
-  experimental(uint, ShenandoahParallelSafepointThreads, 4,                 \
-          "Number of parallel threads used for safepoint prolog/epilog")    \
                                                                             \
   diagnostic(bool, ShenandoahPreclean, true,                                \
           "Do concurrent preclean phase before final mark: process "        \

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Red Hat, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,21 +21,32 @@
  * questions.
  */
 
-
-/*
+/**
  * @test
- * @key gc
+ * @bug 8238384
+ * @summary CTW: C2 compilation fails with "assert(store != load->find_exact_control(load->in(0))) failed: dependence cycle found"
  *
- * @summary converted from VM Testbase vm/gc/kind/parOld.
- * VM Testbase keywords: [quick, gc]
- * VM Testbase readme:
- * DESCRIPTION
- *     The test verifies that ParallelOldGC is used for the old generation by default when ParallelGC is selected by VM.
- *     (previously the Parallel Scavenger + PS MarkSweep pair was used)
+ * @run main/othervm -XX:-BackgroundCompilation TestCopyOfBrokenAntiDependency
  *
- * @library /vmTestbase
- *          /test/lib
- * @run driver jdk.test.lib.FileInstaller . .
- * @run shell test.sh
  */
 
+import java.util.Arrays;
+
+public class TestCopyOfBrokenAntiDependency {
+
+    public static void main(String[] args) {
+        for (int i = 0; i < 20_000; i++) {
+            test(100);
+        }
+    }
+
+    private static Object test(int length) {
+        Object[] src  = new Object[length]; // non escaping
+        final Object[] dst = Arrays.copyOf(src, 10); // can't be removed
+        final Object[] dst2 = Arrays.copyOf(dst, 100);
+        // load is control dependent on membar from previous copyOf
+        // but has memory edge to first copyOf.
+        final Object v = dst[0];
+        return v;
+    }
+}

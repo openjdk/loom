@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Red Hat, Inc. All rights reserved.
+ * Copyright (c) 2020, Azul Systems, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,29 +19,23 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-/*
- * @test TestSingleSafepointWorker
- * @key gc
- * @requires vm.gc.Shenandoah & !vm.graal.enabled
- *
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseShenandoahGC -XX:ShenandoahParallelSafepointThreads=1 -Xmx128m TestSafepointWorkers
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseShenandoahGC -XX:ShenandoahParallelSafepointThreads=2 -Xmx128m TestSafepointWorkers
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseShenandoahGC -XX:ShenandoahParallelSafepointThreads=4 -Xmx128m TestSafepointWorkers
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseShenandoahGC -XX:ShenandoahParallelSafepointThreads=8 -Xmx128m TestSafepointWorkers
+/* @test
+ * @bug 8239787
+ * @summary String.indexOf(char) for empty string must give -1
+ * @run main/othervm -XX:-CompactStrings StringIndexOfChar
  */
-
-public class TestSafepointWorkers {
-    static final long TARGET_MB = Long.getLong("target", 1000); // 1 Gb allocation
-
-    static volatile Object sink;
-
+public class StringIndexOfChar {
     public static void main(String[] args) throws Exception {
-        long count = TARGET_MB * 1024 * 1024 / 16;
-        for (long c = 0; c < count; c++) {
-            sink = new Object();
+        String emptyString = "";
+        for (int i = 0; i < 100; i++) {
+            for(int c = 0; c < 0xFFFF; c++) {
+                int result = emptyString.indexOf((char)c, -1);
+                if (result != -1) {
+                    throw new Exception("new String(\"\").indexOf(char, -1) must be -1, but got " + result);
+                }
+            }
         }
     }
 }

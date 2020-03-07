@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Red Hat, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,23 +21,33 @@
  * questions.
  */
 
-package pkg;
+/**
+ * @test
+ * @bug 8239367
+ * @summary Wiring of memory in SubTypeCheck macro node causes graph should be schedulable
+ *
+ * @run main/othervm -Xcomp -XX:CompileOnly=TestSubTypeCheckMacroNodeWrongMem::test -XX:-DoEscapeAnalysis TestSubTypeCheckMacroNodeWrongMem
+ *
+ */
 
-import java.io.*;
+public class TestSubTypeCheckMacroNodeWrongMem {
+    private static int stop = 100;
 
-public abstract class XReader extends FilterReader implements DataInput {
-
-   /**
-    * This tests overridding an external method.
-    */
-    public int read() throws IOException {
-       return 'W';
+    public static void main(String[] args) {
+        TestSubTypeCheckMacroNodeWrongMem o = new TestSubTypeCheckMacroNodeWrongMem();
+        test();
     }
 
-   /**
-    * This tests implementing an external method.
-    */
-    public int readInt() throws IOException {
-       return 'W';
+    private static void test() {
+        Object o1 = null;
+        for (int i = 0; i < stop; i++) {
+            try {
+                Object o = new TestSubTypeCheckMacroNodeWrongMem();
+                o1.equals(o);
+            } catch (NullPointerException npe) {
+            } catch (Exception e) {
+                throw new RuntimeException();
+            }
+        }
     }
 }
