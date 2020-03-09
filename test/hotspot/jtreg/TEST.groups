@@ -84,7 +84,7 @@ tier1_loom_serviceability = \
   serviceability/jvmti/ContStackDepthTest \
   serviceability/jvmti/ContYieldBreakPointTest \
   serviceability/jvmti/DoContinueSingleStepTest \
-  serviceability/jvmti/FiberTest \
+  serviceability/jvmti/vthread \
 
 tier1_common = \
   sanity/BasicVMTest.java \

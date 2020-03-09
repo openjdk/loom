@@ -155,7 +155,7 @@ java/awt/KeyboardFocusmanager/TypeAhead/TestDialogTypeAhead.java 8198626 macosx-
 java/awt/Mixing/AWT_Mixing/HierarchyBoundsListenerMixingTest.java 8049405 macosx-all
 java/awt/Mixing/AWT_Mixing/OpaqueOverlappingChoice.java 8048171 generic-all
 java/awt/Mixing/AWT_Mixing/JMenuBarOverlapping.java 8159451 linux-all,windows-all,macosx-all
-java/awt/Mixing/AWT_Mixing/JSplitPaneOverlapping.java 8194765 generic-all
+java/awt/Mixing/AWT_Mixing/JSplitPaneOverlapping.java 6986109 generic-all
 java/awt/Mixing/AWT_Mixing/JInternalFrameMoveOverlapping.java 6986109 windows-all
 java/awt/Mixing/AWT_Mixing/MixingPanelsResizing.java 8049405 generic-all
 java/awt/Mixing/AWT_Mixing/JComboBoxOverlapping.java 8049405 macosx-all
@@ -551,8 +551,6 @@ com/apple/eawt/DefaultMenuBar/DefaultMenuBarTest.java 8233648 macosx-all
 java/awt/Choice/ChoiceKeyEventReaction/ChoiceKeyEventReaction.java 7185258 macosx-all
 java/awt/TrayIcon/RightClickWhenBalloonDisplayed/RightClickWhenBalloonDisplayed.java 8238720 windows-all
 java/awt/PopupMenu/PopupMenuLocation.java 8238720 windows-all
-java/awt/Mixing/AWT_Mixing/MixingFrameResizing.java 8238720 windows-all
-java/awt/Mixing/AWT_Mixing/HierarchyBoundsListenerMixingTest.java 8238720 windows-all
 java/awt/GridLayout/ComponentPreferredSize/ComponentPreferredSize.java 8238720 windows-all
 java/awt/GridLayout/ChangeGridSize/ChangeGridSize.java   8238720 windows-all
 java/awt/event/MouseEvent/FrameMouseEventAbsoluteCoordsTest/FrameMouseEventAbsoluteCoordsTest.java
@@ -925,6 +923,8 @@ com/sun/jdi/RepStep.java                                        8043571 generic-
 
 com/sun/jdi/NashornPopFrameTest.java                            8225620 generic-all
 
+com/sun/jdi/InvokeHangTest.java                                 8218463 linux-all
+
 ############################################################################
 
 # jdk_time
@@ -955,6 +955,8 @@ com/sun/jndi/ldap/DeadSSLLdapTimeoutTest.java                   8169942 linux-i5
 com/sun/jndi/dns/ConfigTests/PortUnreachable.java               7164518 macosx-all
 
 javax/rmi/ssl/SSLSocketParametersTest.sh                        8162906 generic-all
+
+javax/script/Test7.java                                         8239361 generic-all
 
 ############################################################################
 
