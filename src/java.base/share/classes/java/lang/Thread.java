@@ -408,6 +408,8 @@ public class Thread implements Runnable {
      *          if the current thread is interrupted while sleeping. The
      *          <i>interrupted status</i> of the current thread is
      *          cleared when this exception is thrown.
+     * @throws  NullPointerException
+     *          if duration is null
      *
      * @since 99
      */
@@ -1439,6 +1441,7 @@ public class Thread implements Runnable {
      * @param task the object to run when the thread executes
      * @throws IllegalArgumentException if an unknown characteristic or an invalid
      *         combination of characteristic is specified
+     * @throws NullPointerException if task is null
      * @return an un-started virtual thread
      *
      * @since 99
@@ -1474,6 +1477,7 @@ public class Thread implements Runnable {
      * @param task the object to run when the thread executes
      * @throws IllegalArgumentException if an unknown characteristic or an invalid
      *         combination of characteristic is specified
+     * @throws NullPointerException if task is null
      * @return an un-started virtual thread
      *
      * @since 99

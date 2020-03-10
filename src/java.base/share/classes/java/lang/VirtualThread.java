@@ -294,7 +294,7 @@ class VirtualThread extends Thread {
 
     /**
      * Invoked by onPinned when the continuation cannot yield due to a synchronized
-     * or native frame on the continuation stack. If the virtuad thread is parking
+     * or native frame on the continuation stack. If the virtual thread is parking
      * then its state is changed to ST_PINNED and carrier thread parks.
      */
     private void yieldFailed() {
