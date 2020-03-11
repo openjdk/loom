@@ -228,7 +228,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_MyPackage_ContYieldBreakPointTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread, jclass contKlass) {
+Java_ContYieldBreakPointTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread, jclass contKlass) {
   jint method_count = 0;
   jmethodID* methods = NULL;
   jmethodID method = NULL;
@@ -270,7 +270,7 @@ Java_MyPackage_ContYieldBreakPointTest_enableEvents(JNIEnv *jni, jclass klass, j
 }
 
 JNIEXPORT jboolean JNICALL
-Java_MyPackage_ContYieldBreakPointTest_check(JNIEnv *jni, jclass cls) {
+Java_ContYieldBreakPointTest_check(JNIEnv *jni, jclass cls) {
   printf("\n");
   printf("check: started\n");
 

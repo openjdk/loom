@@ -320,7 +320,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_MyPackage_ContStackDepthTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread) {
+Java_ContStackDepthTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread) {
   jint method_count = 0;
   jmethodID* methods = NULL;
   jmethodID method = NULL;
@@ -363,7 +363,7 @@ Java_MyPackage_ContStackDepthTest_enableEvents(JNIEnv *jni, jclass klass, jthrea
 }
 
 JNIEXPORT jboolean JNICALL
-Java_MyPackage_ContStackDepthTest_check(JNIEnv *jni, jclass cls) {
+Java_ContStackDepthTest_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
   printf("\n");

@@ -21,13 +21,11 @@
  * questions.
  */
 
-package MyPackage;
-
 /**
  * @test
  * @summary Verifies JVMTI support for Continuations
  * @compile ContStackDepthTest.java
- * @run main/othervm/native -agentlib:ContStackDepthTest MyPackage.ContStackDepthTest
+ * @run main/othervm/native -agentlib:ContStackDepthTest ContStackDepthTest
  */
 
 import java.math.BigInteger;

@@ -21,13 +21,11 @@
  * questions.
  */
 
-package MyPackage;
-
 /**
  * @test
  * @summary Verifies JVMTI support for Continuations
  * @compile ContinuationTest.java
- * @run main/othervm/native -agentlib:ContinuationTest MyPackage.ContinuationTest
+ * @run main/othervm/native -agentlib:ContinuationTest ContinuationTest
  */
 
 public class ContinuationTest {

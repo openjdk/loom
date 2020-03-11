@@ -21,13 +21,11 @@
  * questions.
  */
 
-package MyPackage;
-
 /**
  * @test
  * @summary Verifies setting a breakpoint in Continuation.yield() followed by single stepping
  * @compile ContYieldBreakPointTest.java
- * @run main/othervm/native -agentlib:ContYieldBreakPointTest MyPackage.ContYieldBreakPointTest
+ * @run main/othervm/native -agentlib:ContYieldBreakPointTest ContYieldBreakPointTest
  */
 
 public class ContYieldBreakPointTest {

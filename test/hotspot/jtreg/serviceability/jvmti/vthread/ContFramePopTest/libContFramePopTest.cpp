@@ -256,7 +256,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_MyPackage_ContFramePopTest_enableEvents(JNIEnv *jni, jclass cls, jthread thread) {
+Java_ContFramePopTest_enableEvents(JNIEnv *jni, jclass cls, jthread thread) {
   jvmtiError err;
 
   printf("enableEvents: started\n");
@@ -276,7 +276,7 @@ Java_MyPackage_ContFramePopTest_enableEvents(JNIEnv *jni, jclass cls, jthread th
 }
 
 JNIEXPORT jboolean JNICALL
-Java_MyPackage_ContFramePopTest_check(JNIEnv *jni, jclass cls) {
+Java_ContFramePopTest_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
   printf("\n");

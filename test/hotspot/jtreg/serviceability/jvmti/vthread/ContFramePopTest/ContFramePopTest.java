@@ -21,13 +21,11 @@
  * questions.
  */
 
-package MyPackage;
-
 /**
  * @test
  * @summary Verifies JVMTI support for Continuations
  * @compile ContFramePopTest.java
- * @run main/othervm/native -agentlib:ContFramePopTest MyPackage.ContFramePopTest
+ * @run main/othervm/native -agentlib:ContFramePopTest ContFramePopTest
  */
 
 public class ContFramePopTest {
