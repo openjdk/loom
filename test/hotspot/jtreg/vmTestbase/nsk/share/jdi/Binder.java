@@ -187,7 +187,7 @@ public class Binder extends DebugeeBinder {
         Debugee debugee = null;
 
         String classPath = null;
-//        classPath = System.getProperty("java.class.path");
+        classPath = System.getProperty("java.class.path");
 
         prepareForPipeConnection(argumentHandler);
 
@@ -547,6 +547,7 @@ public class Binder extends DebugeeBinder {
     private Debugee remoteLaunchAndListenDebugee (VirtualMachineManager vmm,
                                                     String classToExecute,
                                                     String classPath) {
+
         display("Finding connector: " + argumentHandler.getConnectorName() );
         ListeningConnector connector =
             (ListeningConnector) findConnector(argumentHandler.getConnectorName(),
@@ -684,6 +685,7 @@ public class Binder extends DebugeeBinder {
     private Map<String,? extends Argument> setupLaunchingConnector(LaunchingConnector connector,
                                                 String classToExecute,
                                                 String classPath) {
+        display("ClassPath: " + classPath);
         display("LaunchingConnector:");
         display("    name: " + connector.name());
         display("    description: " + connector.description());
@@ -698,6 +700,12 @@ public class Binder extends DebugeeBinder {
 
         String cmdline = classToExecute + " " +
                 ArgumentHandler.joinArguments(argumentHandler.getRawArguments(), quote);
+
+        String wrapper = System.getProperty("main.wrapper");
+        if(wrapper != null) {
+            cmdline = nsk.share.MainWrapper.class.getName() + " " + wrapper + " " + classToExecute + " " +
+                ArgumentHandler.joinArguments(argumentHandler.getRawArguments(), quote);
+        }
 
         arg = (Connector.StringArgument) arguments.get("main");
         arg.setValue(cmdline);
@@ -732,11 +740,10 @@ public class Binder extends DebugeeBinder {
             vmArgs = vmUserArgs;
         }
 
-/*
+
         if (classPath != null) {
             vmArgs += " -classpath " + quote + classPath + quote;
         }
- */
 
         if (vmArgs.length() > 0) {
             arg = (Connector.StringArgument) arguments.get("options");

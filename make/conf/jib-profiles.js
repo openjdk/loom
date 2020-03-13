@@ -1051,7 +1051,7 @@ var getJibProfilesDependencies = function (input, common) {
             ext: "tar.gz",
             revision: "1.0118+1.0"
         },
-
+/*
         jtreg: {
             server: "jpg",
             product: "jtreg",
@@ -1059,6 +1059,15 @@ var getJibProfilesDependencies = function (input, common) {
             build_number: "b01",
             checksum_file: "MD5_VALUES",
             file: "bundles/jtreg_bin-5.0.zip",
+            environment_name: "JT_HOME",
+            environment_path: input.get("jtreg", "install_path") + "/jtreg/bin"
+        },
+*/
+
+        jtreg: {
+            organization: common.organization,
+            ext: "zip",
+            revision: "5.0-virtual-1.1",
             environment_name: "JT_HOME",
             environment_path: input.get("jtreg", "install_path") + "/jtreg/bin"
         },
