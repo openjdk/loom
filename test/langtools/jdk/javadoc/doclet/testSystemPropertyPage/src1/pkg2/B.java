@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Red Hat, Inc. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,31 +19,11 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#ifndef SHARE_GC_SHENANDOAH_SHENANDOAHALLOCTRACKER_HPP
-#define SHARE_GC_SHENANDOAH_SHENANDOAHALLOCTRACKER_HPP
+package pkg2;
 
-#include "gc/shenandoah/shenandoahAllocRequest.hpp"
-#include "gc/shenandoah/shenandoahNumberSeq.hpp"
-#include "memory/allocation.hpp"
-#include "utilities/ostream.hpp"
-
-class ShenandoahAllocTracker : public CHeapObj<mtGC> {
-private:
-  BinaryMagnitudeSeq _alloc_size[ShenandoahAllocRequest::_ALLOC_LIMIT];
-  BinaryMagnitudeSeq _alloc_latency[ShenandoahAllocRequest::_ALLOC_LIMIT];
-
-public:
-  void record_alloc_latency(size_t words_size,
-                            ShenandoahAllocRequest::Type _alloc_type,
-                            double latency_us) {
-    _alloc_size[_alloc_type].add(words_size);
-    _alloc_latency[_alloc_type].add((size_t)latency_us);
-  }
-
-  void print_on(outputStream* out) const;
-};
-
-#endif // SHARE_GC_SHENANDOAH_SHENANDOAHALLOCTRACKER_HPP
+/**
+ * test with {@systemProperty user.address}, {@index user.home System Property}
+ */
+public class B { }

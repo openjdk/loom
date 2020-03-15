@@ -107,7 +107,6 @@ public final class JVM {
     @HotSpotIntrinsicCandidate
     public static native long counterTime();
 
-
     /**
      * Emits native periodic event.
      *
@@ -119,8 +118,6 @@ public final class JVM {
      * @return true if the event was committed
      */
     public native boolean emitEvent(long eventTypeId, long timestamp, long when);
-
-
 
     /**
      * Return a list of all classes deriving from {@link jdk.internal.event.Event}
@@ -253,8 +250,6 @@ public final class JVM {
     public native void setMemorySize(long size) throws IllegalArgumentException;
 
     /**
-
-    /**
      * Set interval for method samples, in milliseconds.
      *
      * Setting interval to 0 turns off the method sampler.
@@ -263,7 +258,7 @@ public final class JVM {
      */
     public native void setMethodSamplingInterval(long type, long intervalMillis);
 
-      /**
+    /**
      * Sets the file where data should be written.
      *
      * Requires that JFR has been started with {@link #createNativeJFR()}
@@ -469,6 +464,7 @@ public final class JVM {
      *
      */
     public native void flush();
+
     /**
      * Sets the location of the disk repository, to be used at an emergency
      * dump.
@@ -477,10 +473,10 @@ public final class JVM {
      */
     public native void setRepositoryLocation(String dirText);
 
-    /**
+   /**
     * Access to VM termination support.
     *
-    *@param errorMsg descriptive message to be include in VM termination sequence
+    * @param errorMsg descriptive message to be include in VM termination sequence
     */
     public native void abort(String errorMsg);
 
@@ -496,6 +492,7 @@ public final class JVM {
      * @return the current epoch of this insertion attempt
      */
     public static native boolean addStringConstant(boolean epoch, long id, String s);
+
     /**
      * Gets the address of the jboolean epoch.
      *
@@ -506,6 +503,7 @@ public final class JVM {
     public native long getEpochAddress();
 
     public native void uncaughtException(Thread thread, Throwable t);
+
     /**
      * Sets cutoff for event.
      *
@@ -556,7 +554,7 @@ public final class JVM {
     /**
      * Get the start time in nanos from the header of the current chunk
      *
-     *@return start time of the recording in nanos, -1 in case of in-memory
+     * @return start time of the recording in nanos, -1 in case of in-memory
      */
     public native long getChunkStartNanos();
 
@@ -579,5 +577,4 @@ public final class JVM {
      * @return the handler, may be {@code null}
      */
     public native Object getHandler(Class<? extends jdk.internal.event.Event> eventClass);
-
 }

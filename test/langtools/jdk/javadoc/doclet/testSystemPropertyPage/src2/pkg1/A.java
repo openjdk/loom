@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,30 +21,9 @@
  * questions.
  */
 
-package gc.concurrent_phase_control;
+package pkg1;
 
-/*
- * @test TestConcurrentPhaseControlG1Basics
- * @bug 8169517
- * @requires vm.gc.G1
- * @summary Verify G1 supports concurrent phase control.
- * @key gc
- * @modules java.base
- * @library /test/lib /
- * @build sun.hotspot.WhiteBox
- * @run driver ClassFileInstaller sun.hotspot.WhiteBox
- *    sun.hotspot.WhiteBox$WhiteBoxPermission
- * @run main/othervm -XX:+UseG1GC
- *   -Xbootclasspath/a:.
- *   -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
- *   gc.concurrent_phase_control.TestConcurrentPhaseControlG1Basics
+/**
+ * Some class.
  */
-
-import gc.concurrent_phase_control.CheckSupported;
-
-public class TestConcurrentPhaseControlG1Basics {
-
-    public static void main(String[] args) throws Exception {
-        CheckSupported.check("G1");
-    }
-}
+public class A { }

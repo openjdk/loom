@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Red Hat, Inc. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,27 +19,26 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#ifndef SHARE_GC_SHENANDOAH_SHENANDOAHTIMINGTRACKER_HPP
-#define SHARE_GC_SHENANDOAH_SHENANDOAHTIMINGTRACKER_HPP
+#include <stdlib.h>
+#include <string.h>
 
-#include "jfr/jfrEvents.hpp"
-#include "gc/shenandoah/shenandoahPhaseTimings.hpp"
-#include "memory/allocation.hpp"
+#ifdef _WIN32
 
-class ShenandoahWorkerTimingsTracker : public StackObj {
-private:
-  double _start_time;
-  ShenandoahPhaseTimings::GCParPhases _phase;
-  ShenandoahWorkerTimings* _worker_times;
-  uint _worker_id;
+#include "jni.h"
+#include "jni_util.h"
+#include <windows.h>
 
-  EventGCPhaseParallel _event;
-public:
-    ShenandoahWorkerTimingsTracker(ShenandoahWorkerTimings* worker_times, ShenandoahPhaseTimings::GCParPhases phase, uint worker_id);
-    ~ShenandoahWorkerTimingsTracker();
-};
+JNIEXPORT jlong JNICALL Java_CheckHandles_getProcessHandleCount(JNIEnv *env)
+{
+    DWORD handleCount;
+    HANDLE handle = GetCurrentProcess();
+    if (GetProcessHandleCount(handle, &handleCount)) {
+        return (jlong)handleCount;
+    } else {
+        return -1L;
+    }
+}
 
-#endif // SHARE_GC_SHENANDOAH_SHENANDOAHTIMINGTRACKER_HPP
+#endif  /*  _WIN32 */

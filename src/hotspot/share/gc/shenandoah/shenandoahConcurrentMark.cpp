@@ -41,8 +41,8 @@
 #include "gc/shenandoah/shenandoahHeap.inline.hpp"
 #include "gc/shenandoah/shenandoahRootProcessor.inline.hpp"
 #include "gc/shenandoah/shenandoahOopClosures.inline.hpp"
+#include "gc/shenandoah/shenandoahPhaseTimings.hpp"
 #include "gc/shenandoah/shenandoahTaskqueue.inline.hpp"
-#include "gc/shenandoah/shenandoahTimingTracker.hpp"
 #include "gc/shenandoah/shenandoahUtils.hpp"
 
 #include "memory/iterator.inline.hpp"
@@ -311,17 +311,14 @@ class ShenandoahUpdateThreadRootsTask : public AbstractGangTask {
 private:
   ShenandoahThreadRoots           _thread_roots;
   ShenandoahPhaseTimings::Phase   _phase;
+  ShenandoahGCWorkerPhase         _worker_phase;
 public:
   ShenandoahUpdateThreadRootsTask(bool is_par, ShenandoahPhaseTimings::Phase phase) :
     AbstractGangTask("Shenandoah Update Thread Roots"),
     _thread_roots(is_par),
-    _phase(phase) {
-    ShenandoahHeap::heap()->phase_timings()->record_workers_start(_phase);
-  }
+    _phase(phase),
+    _worker_phase(phase) {}
 
-  ~ShenandoahUpdateThreadRootsTask() {
-    ShenandoahHeap::heap()->phase_timings()->record_workers_end(_phase);
-  }
   void work(uint worker_id) {
     ShenandoahUpdateRefsClosure cl;
     _thread_roots.oops_do(&cl, NULL, worker_id);
