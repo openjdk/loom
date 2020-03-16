@@ -41,10 +41,10 @@
 #include "gc/shenandoah/shenandoahHeuristics.hpp"
 #include "gc/shenandoah/shenandoahMarkingContext.inline.hpp"
 #include "gc/shenandoah/shenandoahOopClosures.inline.hpp"
+#include "gc/shenandoah/shenandoahPhaseTimings.hpp"
 #include "gc/shenandoah/shenandoahRootProcessor.inline.hpp"
 #include "gc/shenandoah/shenandoahStringDedup.hpp"
 #include "gc/shenandoah/shenandoahTaskqueue.inline.hpp"
-#include "gc/shenandoah/shenandoahTimingTracker.hpp"
 #include "gc/shenandoah/shenandoahTraversalGC.hpp"
 #include "gc/shenandoah/shenandoahUtils.hpp"
 #include "gc/shenandoah/shenandoahVerifier.hpp"
@@ -283,8 +283,7 @@ public:
     }
 
     {
-      ShenandoahWorkerTimings *worker_times = _heap->phase_timings()->worker_times();
-      ShenandoahWorkerTimingsTracker timer(worker_times, ShenandoahPhaseTimings::FinishQueues, worker_id);
+      ShenandoahWorkerTimingsTracker timer(ShenandoahPhaseTimings::FinishQueues, worker_id);
 
       // Step 3: Finally drain all outstanding work in queues.
       traversal_gc->main_loop(worker_id, _terminator, false);
@@ -605,8 +604,11 @@ void ShenandoahTraversalGC::final_traversal_collection() {
     // that results the TLAB/GCLAB not usable. Retire them here.
     _heap->make_parsable(true);
 
-    _heap->parallel_cleaning(false);
+    // Do this fixup before the call to parallel_cleaning to ensure that all
+    // forwarded objects (including those that are no longer in the cset) are
+    // updated by the time we do weak root processing.
     fixup_roots();
+    _heap->parallel_cleaning(false);
 
     _heap->set_has_forwarded_objects(false);
 

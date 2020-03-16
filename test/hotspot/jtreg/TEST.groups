@@ -79,11 +79,6 @@ tier1_loom = \
   :tier1_loom_serviceability
 
 tier1_loom_serviceability = \
-  serviceability/jvmti/ContFramePopTest \
-  serviceability/jvmti/ContinuationTest \
-  serviceability/jvmti/ContStackDepthTest \
-  serviceability/jvmti/ContYieldBreakPointTest \
-  serviceability/jvmti/DoContinueSingleStepTest \
   serviceability/jvmti/vthread \
 
 tier1_common = \

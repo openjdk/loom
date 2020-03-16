@@ -264,7 +264,7 @@ class InstanceKlass: public Klass {
     _misc_is_being_redefined                  = 1 << (_misc_kind_field_size + 14), // used for locking redefinition
     _misc_has_contended_annotations           = 1 << (_misc_kind_field_size + 15) // has @Contended annotation
   };
-  u2 loader_type_bits() {
+  u2 shared_loader_type_bits() const {
     return _misc_is_shared_boot_class|_misc_is_shared_platform_class|_misc_is_shared_app_class;
   }
   u1              _kind;
@@ -356,10 +356,7 @@ class InstanceKlass: public Klass {
   static bool _disable_method_binary_search;
 
  public:
-  u2 loader_type() {
-    return _misc_flags & loader_type_bits();
-  }
-
+  // The three BUILTIN class loader types
   bool is_shared_boot_class() const {
     return (_misc_flags & _misc_is_shared_boot_class) != 0;
   }
@@ -369,12 +366,16 @@ class InstanceKlass: public Klass {
   bool is_shared_app_class() const {
     return (_misc_flags & _misc_is_shared_app_class) != 0;
   }
-
-  void clear_class_loader_type() {
-    _misc_flags &= ~loader_type_bits();
+  // The UNREGISTERED class loader type
+  bool is_shared_unregistered_class() const {
+    return (_misc_flags & shared_loader_type_bits()) == 0;
   }
 
-  void set_class_loader_type(s2 loader_type);
+  void clear_shared_class_loader_type() {
+    _misc_flags &= ~shared_loader_type_bits();
+  }
+
+  void set_shared_class_loader_type(s2 loader_type);
 
   bool has_nonstatic_fields() const        {
     return (_misc_flags & _misc_has_nonstatic_fields) != 0;
@@ -1268,13 +1269,6 @@ public:
 
  public:
   u2 idnum_allocated_count() const      { return _idnum_allocated_count; }
-
-public:
-  void set_in_error_state() {
-    assert(DumpSharedSpaces, "only call this when dumping archive");
-    _init_state = initialization_error;
-  }
-  bool check_sharing_error_state();
 
 private:
   // initialization state

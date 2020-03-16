@@ -34,7 +34,6 @@
 #include "gc/shared/oopStorageSet.hpp"
 #include "gc/shared/plab.hpp"
 
-#include "gc/shenandoah/shenandoahAllocTracker.hpp"
 #include "gc/shenandoah/shenandoahBarrierSet.hpp"
 #include "gc/shenandoah/shenandoahClosures.inline.hpp"
 #include "gc/shenandoah/shenandoahCollectionSet.hpp"
@@ -1587,25 +1586,6 @@ void ShenandoahHeap::op_final_mark() {
   }
 }
 
-void ShenandoahHeap::op_final_evac() {
-  assert(ShenandoahSafepoint::is_at_shenandoah_safepoint(), "Should be at safepoint");
-
-  set_evacuation_in_progress(false);
-
-  {
-    ShenandoahGCPhase phase(ShenandoahPhaseTimings::final_evac_retire_gclabs);
-    retire_and_reset_gclabs();
-  }
-
-  if (ShenandoahVerify) {
-    verifier()->verify_after_evacuation();
-  }
-
-  if (VerifyAfterGC) {
-    Universe::verify();
-  }
-}
-
 void ShenandoahHeap::op_conc_evac() {
   ShenandoahEvacuationTask task(this, _collection_set, true);
   workers()->run_task(&task);
@@ -2176,23 +2156,16 @@ void ShenandoahHeap::stw_process_weak_roots(bool full_gc) {
   ShenandoahPhaseTimings::Phase timing_phase = full_gc ?
                                                ShenandoahPhaseTimings::full_gc_purge_par :
                                                ShenandoahPhaseTimings::purge_par;
-  // Cleanup weak roots
   ShenandoahGCPhase phase(timing_phase);
-  phase_timings()->record_workers_start(timing_phase);
+  ShenandoahGCWorkerPhase worker_phase(timing_phase);
+
+  // Cleanup weak roots
   if (has_forwarded_objects()) {
-    if (is_traversal_mode()) {
-      ShenandoahForwardedIsAliveClosure is_alive;
-      ShenandoahTraversalUpdateRefsClosure keep_alive;
-      ShenandoahParallelWeakRootsCleaningTask<ShenandoahForwardedIsAliveClosure, ShenandoahTraversalUpdateRefsClosure>
-        cleaning_task(&is_alive, &keep_alive, num_workers, !ShenandoahConcurrentRoots::should_do_concurrent_class_unloading());
-      _workers->run_task(&cleaning_task);
-    } else {
-      ShenandoahForwardedIsAliveClosure is_alive;
-      ShenandoahUpdateRefsClosure keep_alive;
-      ShenandoahParallelWeakRootsCleaningTask<ShenandoahForwardedIsAliveClosure, ShenandoahUpdateRefsClosure>
-        cleaning_task(&is_alive, &keep_alive, num_workers, !ShenandoahConcurrentRoots::should_do_concurrent_class_unloading());
-      _workers->run_task(&cleaning_task);
-    }
+    ShenandoahForwardedIsAliveClosure is_alive;
+    ShenandoahUpdateRefsClosure keep_alive;
+    ShenandoahParallelWeakRootsCleaningTask<ShenandoahForwardedIsAliveClosure, ShenandoahUpdateRefsClosure>
+      cleaning_task(&is_alive, &keep_alive, num_workers, !ShenandoahConcurrentRoots::should_do_concurrent_class_unloading());
+    _workers->run_task(&cleaning_task);
   } else {
     ShenandoahIsAliveClosure is_alive;
 #ifdef ASSERT
@@ -2205,7 +2178,6 @@ void ShenandoahHeap::stw_process_weak_roots(bool full_gc) {
 #endif
     _workers->run_task(&cleaning_task);
   }
-  phase_timings()->record_workers_end(timing_phase);
 }
 
 void ShenandoahHeap::parallel_cleaning(bool full_gc) {
@@ -2656,15 +2628,6 @@ void ShenandoahHeap::vmop_entry_final_mark() {
   VMThread::execute(&op); // jump to entry_final_mark under safepoint
 }
 
-void ShenandoahHeap::vmop_entry_final_evac() {
-  TraceCollectorStats tcs(monitoring_support()->stw_collection_counters());
-  ShenandoahGCPhase total(ShenandoahPhaseTimings::total_pause_gross);
-  ShenandoahGCPhase phase(ShenandoahPhaseTimings::final_evac_gross);
-
-  VM_ShenandoahFinalEvac op;
-  VMThread::execute(&op); // jump to entry_final_evac under safepoint
-}
-
 void ShenandoahHeap::vmop_entry_init_updaterefs() {
   TraceCollectorStats tcs(monitoring_support()->stw_collection_counters());
   ShenandoahGCPhase total(ShenandoahPhaseTimings::total_pause_gross);
@@ -2750,16 +2713,6 @@ void ShenandoahHeap::entry_final_mark() {
                               "final marking");
 
   op_final_mark();
-}
-
-void ShenandoahHeap::entry_final_evac() {
-  ShenandoahGCPhase total_phase(ShenandoahPhaseTimings::total_pause);
-  ShenandoahGCPhase phase(ShenandoahPhaseTimings::final_evac);
-  static const char* msg = "Pause Final Evac";
-  GCTraceTime(Info, gc) time(msg, gc_timer());
-  EventMark em("%s", msg);
-
-  op_final_evac();
 }
 
 void ShenandoahHeap::entry_init_updaterefs() {
@@ -3059,20 +3012,13 @@ void ShenandoahHeap::deduplicate_string(oop str) {
 }
 
 const char* ShenandoahHeap::init_mark_event_message() const {
-  bool update_refs = has_forwarded_objects();
+  assert(!has_forwarded_objects(), "Should not have forwarded objects here");
+
   bool proc_refs = process_references();
   bool unload_cls = unload_classes();
 
-  if (update_refs && proc_refs && unload_cls) {
-    return "Pause Init Mark (update refs) (process weakrefs) (unload classes)";
-  } else if (update_refs && proc_refs) {
-    return "Pause Init Mark (update refs) (process weakrefs)";
-  } else if (update_refs && unload_cls) {
-    return "Pause Init Mark (update refs) (unload classes)";
-  } else if (proc_refs && unload_cls) {
+  if (proc_refs && unload_cls) {
     return "Pause Init Mark (process weakrefs) (unload classes)";
-  } else if (update_refs) {
-    return "Pause Init Mark (update refs)";
   } else if (proc_refs) {
     return "Pause Init Mark (process weakrefs)";
   } else if (unload_cls) {
@@ -3083,20 +3029,13 @@ const char* ShenandoahHeap::init_mark_event_message() const {
 }
 
 const char* ShenandoahHeap::final_mark_event_message() const {
-  bool update_refs = has_forwarded_objects();
+  assert(!has_forwarded_objects(), "Should not have forwarded objects here");
+
   bool proc_refs = process_references();
   bool unload_cls = unload_classes();
 
-  if (update_refs && proc_refs && unload_cls) {
-    return "Pause Final Mark (update refs) (process weakrefs) (unload classes)";
-  } else if (update_refs && proc_refs) {
-    return "Pause Final Mark (update refs) (process weakrefs)";
-  } else if (update_refs && unload_cls) {
-    return "Pause Final Mark (update refs) (unload classes)";
-  } else if (proc_refs && unload_cls) {
+  if (proc_refs && unload_cls) {
     return "Pause Final Mark (process weakrefs) (unload classes)";
-  } else if (update_refs) {
-    return "Pause Final Mark (update refs)";
   } else if (proc_refs) {
     return "Pause Final Mark (process weakrefs)";
   } else if (unload_cls) {
@@ -3107,20 +3046,13 @@ const char* ShenandoahHeap::final_mark_event_message() const {
 }
 
 const char* ShenandoahHeap::conc_mark_event_message() const {
-  bool update_refs = has_forwarded_objects();
+  assert(!has_forwarded_objects(), "Should not have forwarded objects here");
+
   bool proc_refs = process_references();
   bool unload_cls = unload_classes();
 
-  if (update_refs && proc_refs && unload_cls) {
-    return "Concurrent marking (update refs) (process weakrefs) (unload classes)";
-  } else if (update_refs && proc_refs) {
-    return "Concurrent marking (update refs) (process weakrefs)";
-  } else if (update_refs && unload_cls) {
-    return "Concurrent marking (update refs) (unload classes)";
-  } else if (proc_refs && unload_cls) {
+  if (proc_refs && unload_cls) {
     return "Concurrent marking (process weakrefs) (unload classes)";
-  } else if (update_refs) {
-    return "Concurrent marking (update refs)";
   } else if (proc_refs) {
     return "Concurrent marking (process weakrefs)";
   } else if (unload_cls) {
