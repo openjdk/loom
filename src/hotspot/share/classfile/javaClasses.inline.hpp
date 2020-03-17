@@ -346,6 +346,16 @@ inline void jdk_internal_misc_StackChunk::set_gc_mode(oop ref, bool value) {
 inline int jdk_internal_misc_StackChunk::end(oop ref) {
   return size(ref) - argsize(ref);
 }
+inline oop jdk_internal_misc_StackChunk::cont(oop ref) {
+  return ref->obj_field(_cont_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_cont(oop ref, oop value) {
+  ref->obj_field_put(_cont_offset, value);
+}
+template<typename P>
+inline void jdk_internal_misc_StackChunk::set_cont_raw(oop ref, oop value) {
+  RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr_raw(_cont_offset), value);
+}
 inline int jdk_internal_misc_StackChunk::numFrames(oop ref) {
   return ref->int_field(_numFrames_offset);
 }

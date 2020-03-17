@@ -142,7 +142,7 @@ private:
   friend class InstanceStackChunkKlass;
 
 public:
-  template <class OopClosureType> static void stack_chunk_iterate_stack(oop obj, OopClosureType* closure);
+  template <class OopClosureType, bool concurrent_gc> static void stack_chunk_iterate_stack(oop obj, OopClosureType* closure);
   template <class OopClosureType> static void stack_chunk_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 // public:

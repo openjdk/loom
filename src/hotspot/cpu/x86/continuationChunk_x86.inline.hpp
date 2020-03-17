@@ -53,7 +53,95 @@ static bool is_in_frame(CodeBlob* cb, intptr_t* sp, void* p0) {
 }
 #endif
 
+static void set_gc_mode(oop chunk) {
+  // if (!jdk_internal_misc_StackChunk::gc_mode(chunk)) {
+    jdk_internal_misc_StackChunk::set_gc_mode(chunk, true);
+    OrderAccess::storestore(); // if you see any following writes, you'll see this
+  // }
+}
+
+// We replace derived pointers with offsets; the converse is done in fix_stack_chunk
+template <bool concurrent_gc>
+static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
+    OopMapValue omv = oms.current();
+    if (omv.type() != OopMapValue::derived_oop_value)
+      continue;
+    
+    intptr_t* derived_loc = (intptr_t*)reg_to_loc(omv.reg(), sp);
+    intptr_t* base_loc    = (intptr_t*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
+    assert (is_in_frame(cb, sp, base_loc), "");
+    assert (is_in_frame(cb, sp, derived_loc), "");
+    assert (derived_loc != base_loc, "Base and derived in same location");
+    assert (is_in_oops(oopmap, sp, base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
+    assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
+    
+    // The ordering in the following is crucial
+    intptr_t derived_int_val = Atomic::load(derived_loc); // *derived_loc;
+    if (derived_int_val < 0) {
+      continue;
+    }
+    
+    intptr_t base_raw = *base_loc;
+    intptr_t offset = derived_int_val - base_raw;
+
+    OrderAccess::loadload();
+    oop base = Atomic::load((oop*)base_loc);
+    assert (oopDesc::is_oop_or_null(base), "not an oop");
+    assert (Universe::heap()->is_in_or_null(base), "not an oop");
+    if (base != (oop)NULL) {
+      assert (!CompressedOops::is_base(base), "");
+
+      if (concurrent_gc) { 
+        OrderAccess::loadload();
+        derived_int_val = Atomic::load(derived_loc); // *derived_loc;
+      } else {
+        derived_int_val = *derived_loc;
+      }
+      if (derived_int_val < 0) {
+        continue;
+      }
+
+      set_gc_mode(chunk);
+
+      // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
+      // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
+      intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
+      assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
+      Atomic::store((intptr_t*)derived_loc, -offset); // there could be a benign race here; we write a negative offset to let the sign bit signify it's an offset rather than an address
+    } else {
+      assert (*derived_loc == 0, "");
+    }
+  }
+  OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
+}
+
 template <class OopClosureType>
+static void iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
+  DEBUG_ONLY(int oops = 0;)
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    OopMapValue omv = oms.current();
+    if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+      continue;
+
+    assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+    DEBUG_ONLY(oops++;)
+
+    void* p = reg_to_loc(omv.reg(), sp);
+    assert (p != NULL, "");
+    assert (is_in_frame(cb, sp, p), "");
+
+    // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
+
+    // if (!SkipNullValue::should_skip(*p))
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
+    // DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) 
+    omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
+  }
+  assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
+}
+
+template <class OopClosureType, bool concurrent_gc>
 void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure) {
     // see sender_for_compiled_frame
 
@@ -63,8 +151,18 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
   int num_frames = 0;
   int num_oops = 0;
 
-  bool first_safepoint_visit = SafepointSynchronize::is_at_safepoint() && !jdk_internal_misc_StackChunk::gc_mode(chunk);
-  assert (!SafepointSynchronize::is_at_safepoint() || first_safepoint_visit || jdk_internal_misc_StackChunk::gc_mode(chunk), "");
+  bool do_destructive_processing; // should really be `= closure.is_destructive()`, if we had such a thing
+  if (concurrent_gc) {
+    do_destructive_processing = true;
+  } else {
+    if (SafepointSynchronize::is_at_safepoint() && !jdk_internal_misc_StackChunk::gc_mode(chunk)) {
+      do_destructive_processing = true;
+      jdk_internal_misc_StackChunk::set_gc_mode(chunk, true);
+    } else {
+      do_destructive_processing = false;
+    }
+    assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
+  }
 
   CodeBlob* cb = NULL;
   intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
@@ -104,71 +202,22 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
     num_frames++;
     num_oops += oopmap->num_oops();
     if (closure == NULL) {
-      assert (!SafepointSynchronize::is_at_safepoint(), "");
       continue;
     }
-
-    DEBUG_ONLY(int oops = 0;)
-    if (first_safepoint_visit) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
-      for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
-        OopMapValue omv = oms.current();
-        if (omv.type() != OopMapValue::derived_oop_value)
-          continue;
-        
-        oop* derived_loc = (oop*)reg_to_loc(omv.reg(), sp);
-        oop* base_loc    = (oop*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
-        assert (is_in_frame(cb, sp, base_loc), "");
-        assert (is_in_frame(cb, sp, derived_loc), "");
-        assert(derived_loc != base_loc, "Base and derived in same location");
-        assert (is_in_oops(oopmap, sp, base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
-        assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
-        
-        oop base = *(oop*)base_loc;
-        assert (oopDesc::is_oop_or_null(base), "not an oop");
-        assert (Universe::heap()->is_in_or_null(base), "not an oop");
-        if (base != (oop)NULL) {
-          assert (!CompressedOops::is_base(base), "");
-          intptr_t offset = cast_from_oop<intptr_t>(*derived_loc) - cast_from_oop<intptr_t>(base);
-          assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
-          *(intptr_t*)derived_loc = offset;
-        } else {
-          assert (*derived_loc == (oop)NULL, "");
-        }
-      }
+    
+    if (do_destructive_processing) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
+      iterate_derived_pointers<concurrent_gc>(chunk, oopmap, sp, cb);
     }
-    for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
-      OopMapValue omv = oms.current();
-      if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
-        continue;
 
-      assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
-      DEBUG_ONLY(oops++;)
-
-      void* p = reg_to_loc(omv.reg(), sp);
-      assert (p != NULL, "");
-      assert (is_in_frame(cb, sp, p), "");
-      assert ((intptr_t*)p >= start, "");
-
-      // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
-
-      // if (!SkipNullValue::should_skip(*p))
-      log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
-      // DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) 
-      omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
-      // assert (SafepointSynchronize::is_at_safepoint() || (*(intptr_t*)p == old), "old: " INTPTR_FORMAT " new: " INTPTR_FORMAT, old, *(intptr_t*)p);
-    }
-    assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
+    iterate_oops(closure, oopmap, sp, cb);
   }
+
   assert (num_frames >= 0, "");
   assert (num_oops >= 0, "");
-  if (first_safepoint_visit || closure == NULL) {
+  if (do_destructive_processing || closure == NULL) {
     jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
     jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
   }
-  if (first_safepoint_visit) {
-    jdk_internal_misc_StackChunk::set_gc_mode(chunk, true);
-  }
-  assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
 
   if (closure != NULL) {
     Continuation::emit_chunk_iterate_event(chunk, num_frames, num_oops);

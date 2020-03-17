@@ -1179,22 +1179,77 @@ static frame create_frame(intptr_t* sp) {
 }
 #endif
 
-static void fix_stack_chunk(oop chunk) {
-  // see sender_for_compiled_frame  
+static void fix_oops(const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    OopMapValue omv = oms.current();
+    if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+      continue;
+
+    assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+
+    void* p = reg_to_loc(omv.reg(), sp);
+    assert (p != NULL, "");
+    assert (is_in_frame(cb, sp, p), "");
+
+    log_develop_trace(jvmcont)("fix_oops narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
+    // Does the barrier change the value, or do we need to write it back?
+    // oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)NativeAccess<>::oop_load((narrowOop*)p) : (oop)NativeAccess<>::oop_load((oop*)p);
+    if (omv.type() == OopMapValue::narrowoop_value) {
+      *(narrowOop*)p = CompressedOops::encode((oop)NativeAccess<>::oop_load((narrowOop*)p));
+    } else {
+      *(oop*)p = (oop)NativeAccess<>::oop_load((oop*)p);
+      assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(*(oop*)p)), "");
+    }
+  }
+}
+
+static void fix_derived_pointers(const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
+    OopMapValue omv = oms.current();
+    if (omv.type() != OopMapValue::derived_oop_value)
+      continue;
+    
+    oop* derived_loc = (oop*)reg_to_loc(omv.reg(), sp);
+    oop* base_loc    = (oop*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
+
+    assert (base_loc != NULL, "");
+    assert (is_in_frame(cb, sp, base_loc), "");
+    assert (is_in_frame(cb, sp, derived_loc), "");
+    oop base = (oop)NativeAccess<>::oop_load((oop*)base_loc); // *(oop*)base_loc;
+    if (base != (oop)NULL) {
+      assert (!CompressedOops::is_base(base), "");
+      assert (oopDesc::is_oop(base), "");
+      assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");
+      intptr_t offset = *(intptr_t*)derived_loc;
+      if (offset < 0) {
+        offset = -offset;
+        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
+        *derived_loc = (oop)(cast_from_oop<address>(base) + offset);
+      } else { // DEBUG ONLY
+        offset = offset - cast_from_oop<intptr_t>(base);
+        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
+      }
+    } else {
+      assert (*derived_loc == (oop)NULL, "");
+    }
+  }
+}
+
+NOINLINE static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end) {
   assert (ContMirror::is_stack_chunk(chunk), "");
-  assert (!SafepointSynchronize::is_at_safepoint(), "");
-  assert (jdk_internal_misc_StackChunk::gc_mode(chunk), "");
 
   log_develop_trace(jvmcont)("fix_stack_chunk young: %d", !requires_barriers(chunk));
   bool narrow = UseCompressedOops; // TODO PERF: templatize
 
   int num_frames = 0;
   int num_oops = 0;
-
   CodeBlob* cb = NULL;
-  intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
-  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+
+  // intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  // intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
+  // start += jdk_internal_misc_StackChunk::sp(chunk);
+
+  for (intptr_t* sp = start; sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - 1);
     log_develop_trace(jvmcont)("fix_stack_chunk sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
     assert (pc != NULL, "");
@@ -1214,35 +1269,13 @@ static void fix_stack_chunk(oop chunk) {
     num_frames++;
     num_oops += oopmap->num_oops();
 
-    for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
-      OopMapValue omv = oms.current();
-      if (omv.type() != OopMapValue::derived_oop_value)
-        continue;
-      
-      oop* derived_loc = (oop*)reg_to_loc(omv.reg(), sp);
-      oop* base_loc    = (oop*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
-      assert (base_loc != NULL, "");
-      assert (is_in_frame(cb, sp, base_loc), "");
-      assert (is_in_frame(cb, sp, derived_loc), "");
-      oop base = *(oop*)base_loc;
-      if (base != (oop)NULL) {
-        assert (!CompressedOops::is_base(base), "");
-        assert (oopDesc::is_oop(base), "");
-        intptr_t offset = *(intptr_t*)derived_loc;
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
-        *derived_loc = (oop)(cast_from_oop<address>(base) + offset);
-      } else {
-        assert (*derived_loc == (oop)NULL, "");
-      }
+    if (UseZGC) {
+      fix_oops(oopmap, sp, cb);
     }
+    fix_derived_pointers(oopmap, sp, cb);
   }
   assert (num_frames >= 0, "");
   assert (num_oops >= 0, "");
-  jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
-  jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
-
-  jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
-  assert(Continuation::debug_verify_stack_chunk(chunk), "");
 
   EventContinuationFix e;
   if (e.should_commit()) {
@@ -1408,42 +1441,40 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
       assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
       assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
       
-      oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)RawAccess<>::oop_load((narrowOop*)p) : (oop)RawAccess<>::oop_load((oop*)p);
+      oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)HeapAccess<>::oop_load((narrowOop*)p) : (oop)HeapAccess<>::oop_load((oop*)p);
       if (!SafepointSynchronize::is_at_safepoint()) {
         assert (oopDesc::is_oop_or_null(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
       }
     }
     assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
 
-    if (SafepointSynchronize::is_at_safepoint()) { // don't try to race with fix
-      for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
-        OopMapValue omv = oms.current();
-        if (omv.type() != OopMapValue::derived_oop_value)
-          continue;
-        
-        void* base_loc    = reg_to_loc(omv.content_reg(), sp);
-        void* derived_loc = reg_to_loc(omv.reg(), sp);
-        assert (is_in_frame(cb, sp, base_loc), "");
-        assert (is_in_frame(cb, sp, derived_loc), "");
-        assert (derived_loc != base_loc, "Base and derived in same location");
-        assert (is_in_oops(oopmap, sp, base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
-        assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
-        log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
-        /*
-        oop base = (oop)RawAccess<>::oop_load((oop*)base_loc);
-        assert (oopDesc::is_oop_or_null(base), "not an oop: " INTPTR_FORMAT, p2i(base));
+    for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
+      OopMapValue omv = oms.current();
+      if (omv.type() != OopMapValue::derived_oop_value)
+        continue;
+      
+      oop* derived_loc = (oop*)reg_to_loc(omv.reg(), sp);
+      oop* base_loc    = (oop*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
+
+      assert (base_loc != NULL, "");
+      assert (is_in_frame(cb, sp, base_loc), "");
+      assert (is_in_frame(cb, sp, derived_loc), "");
+      assert (derived_loc != base_loc, "Base and derived in same location");
+      assert (is_in_oops(oopmap, sp, base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
+      assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
+      log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
+      oop base = (oop)NativeAccess<>::oop_load((oop*)base_loc); // *(oop*)base_loc;
+      if (base != (oop)NULL) {
         assert (!CompressedOops::is_base(base), "");
-        assert (Universe::heap()->is_in_or_null(base), "not an oop");
-        if (base != (oop)NULL) {
-          assert (!CompressedOops::is_base(base), "");
-          assert (oopDesc::is_oop(base), "");
-          intptr_t offset = gc_mode ? *(intptr_t*)derived_loc
-                                    : cast_from_oop<intptr_t>(*(oop*)derived_loc) - cast_from_oop<intptr_t>(base);
-          assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld " INTPTR_FORMAT " size: %d gc_mode: %d safepoint: %d derived_loc: " INTPTR_FORMAT , offset, offset, base->size() << LogHeapWordSize, gc_mode, SafepointSynchronize::is_at_safepoint(), p2i(derived_loc));
-        } else {
-          assert (*(oop*)derived_loc == (oop)NULL, "");
-        }
-        */
+        assert (oopDesc::is_oop(base), "");
+        assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");
+        intptr_t offset = *(intptr_t*)derived_loc;
+        offset = offset < 0
+                   ? -offset
+                   : offset - cast_from_oop<intptr_t>(base);
+        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
+      } else {
+        assert (*derived_loc == (oop)NULL, "");
       }
     }
   }
