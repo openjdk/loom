@@ -28,6 +28,8 @@
 #include "memory/iterator.inline.hpp"
 #include "runtime/frame.inline.hpp"
 
+#define FIX_DERIVED_POINTERS true
+
 static inline void* reg_to_loc(VMReg reg, intptr_t* sp) {
   assert (!reg->is_reg() || reg == rbp->as_VMReg(), "");
   return reg->is_reg() ? (void*)(sp - frame::sender_sp_offset) // see frame::update_map_with_saved_link(&map, link_addr);
@@ -77,6 +79,11 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
     if (base != (oop)NULL) {
       assert (!CompressedOops::is_base(base), "");
 
+      if (concurrent_gc) {
+        if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) // TODO: this is a ZGC-specific optimization
+          continue;
+      }
+
       OrderAccess::loadload();
       intptr_t derived_int_val = Atomic::load(derived_loc); // *derived_loc;
       if (derived_int_val < 0) {
@@ -100,9 +107,50 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
   OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
 }
 
+static void fix_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
+    OopMapValue omv = oms.current();
+    if (omv.type() != OopMapValue::derived_oop_value)
+      continue;
+    
+    intptr_t* derived_loc = (intptr_t*)reg_to_loc(omv.reg(), sp);
+    intptr_t* base_loc    = (intptr_t*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
+    
+    // The ordering in the following is crucial
+    OrderAccess::loadload();
+    oop base = Atomic::load((oop*)base_loc);
+    if (base != (oop)NULL) {
+      assert (!CompressedOops::is_base(base), "");
+      assert (ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");
+
+      OrderAccess::loadload();
+      intptr_t offset = Atomic::load(derived_loc); // *derived_loc;
+      if (offset >= 0)
+        continue;
+
+      // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
+      // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
+      if (offset < 0) {
+        offset = -offset;
+        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
+        Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
+      }
+  #ifdef ASSERT 
+      else { // DEBUG ONLY
+        offset = offset - cast_from_oop<intptr_t>(base);
+        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
+      }
+  #endif
+    }
+  }
+  OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
+  jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
+}
+
 template <class OopClosureType>
-static void iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
+static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
   DEBUG_ONLY(int oops = 0;)
+  bool mutated = false;
   for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
     OopMapValue omv = oms.current();
     if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
@@ -119,10 +167,13 @@ static void iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap,
 
     // if (!SkipNullValue::should_skip(*p))
     log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
-    // DEBUG_ONLY(intptr_t old = *(intptr_t*)p;) 
+    // DEBUG_ONLY(intptr_t old = *(intptr_t*)p;)
+    intptr_t before = *(intptr_t*)p;
     omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
+    mutated |= before != *(intptr_t*)p;
   }
   assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
+  return mutated;
 }
 
 template <class OopClosureType, bool concurrent_gc>
@@ -193,7 +244,13 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
       iterate_derived_pointers<concurrent_gc>(chunk, oopmap, sp, cb);
     }
 
-    iterate_oops(closure, oopmap, sp, cb);
+    bool mutated_oops = iterate_oops(closure, oopmap, sp, cb);
+
+  #ifdef FIX_DERIVED_POINTERS
+    if (concurrent_gc && mutated_oops && jdk_internal_misc_StackChunk::gc_mode(chunk)) { // TODO: this is a ZGC-specific optimization that depends on the one in iterate_derived_pointers
+      fix_derived_pointers(chunk, oopmap, sp, cb);
+    }
+  #endif
   }
 
   assert (num_frames >= 0, "");
