@@ -1168,6 +1168,7 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static int _mode_offset;
   static int _numFrames_offset;
   static int _numOops_offset;
+  static int _cont_offset;
 
   static void compute_offsets();
  public:
@@ -1195,8 +1196,13 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline void set_numFrames(oop ref, int value);
   static inline int numOops(oop ref);
   static inline void set_numOops(oop ref, int value);
+  static inline oop cont(oop ref);
+  static inline void set_cont(oop ref, oop value);
+  template<typename P>
+  static inline void set_cont_raw(oop ref, oop value);
 
-  static int parent_offset() { return _parent_offset; }
+  static inline int parent_offset() { return _parent_offset; }
+  static inline int cont_offset()   { return _cont_offset; }
 };
 
 // Interface to java.lang.invoke.MethodHandle objects

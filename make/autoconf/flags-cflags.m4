@@ -576,13 +576,7 @@ AC_DEFUN([FLAGS_SETUP_CFLAGS_HELPER],
     TOOLCHAIN_CFLAGS_JVM="-qtbtable=full -qtune=balanced \
         -qalias=noansi -qstrict -qtls=default -qnortti -qnoeh -qignerrno -qstackprotect"
   elif test "x$TOOLCHAIN_TYPE" = xmicrosoft; then
-    #
-    # LOOM NOTE:
-    #   Parameter -bigobj increases the number of addressable sections in an object file to 2^32.
-    #   It is passed as a workaround to compile the now very large continuation.obj file.
-    #   Ensure to remove this parameter when the continuation module is refactored.
-    #
-    TOOLCHAIN_CFLAGS_JVM="-nologo -MD -MP -bigobj"
+    TOOLCHAIN_CFLAGS_JVM="-nologo -MD -MP"
     TOOLCHAIN_CFLAGS_JDK="-nologo -MD -Zc:wchar_t-"
   fi
 

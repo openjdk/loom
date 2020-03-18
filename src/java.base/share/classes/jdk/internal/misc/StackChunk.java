@@ -26,6 +26,7 @@
 package jdk.internal.misc;
 
 public class StackChunk {
+     private Continuation cont;
      public StackChunk parent;
      public int size; // in words
      public int sp; // in words
