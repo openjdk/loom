@@ -53,13 +53,6 @@ static bool is_in_frame(CodeBlob* cb, intptr_t* sp, void* p0) {
 }
 #endif
 
-static void set_gc_mode(oop chunk) {
-  // if (!jdk_internal_misc_StackChunk::gc_mode(chunk)) {
-    jdk_internal_misc_StackChunk::set_gc_mode(chunk, true);
-    OrderAccess::storestore(); // if you see any following writes, you'll see this
-  // }
-}
-
 // We replace derived pointers with offsets; the converse is done in fix_stack_chunk
 template <bool concurrent_gc>
 static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
@@ -77,14 +70,6 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
     assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
     
     // The ordering in the following is crucial
-    intptr_t derived_int_val = Atomic::load(derived_loc); // *derived_loc;
-    if (derived_int_val < 0) {
-      continue;
-    }
-    
-    intptr_t base_raw = *base_loc;
-    intptr_t offset = derived_int_val - base_raw;
-
     OrderAccess::loadload();
     oop base = Atomic::load((oop*)base_loc);
     assert (oopDesc::is_oop_or_null(base), "not an oop");
@@ -92,17 +77,16 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
     if (base != (oop)NULL) {
       assert (!CompressedOops::is_base(base), "");
 
-      if (concurrent_gc) { 
-        OrderAccess::loadload();
-        derived_int_val = Atomic::load(derived_loc); // *derived_loc;
-      } else {
-        derived_int_val = *derived_loc;
-      }
+      OrderAccess::loadload();
+      intptr_t derived_int_val = Atomic::load(derived_loc); // *derived_loc;
       if (derived_int_val < 0) {
         continue;
       }
 
-      set_gc_mode(chunk);
+      if (concurrent_gc) {
+        jdk_internal_misc_StackChunk::set_gc_mode(chunk, true);
+        OrderAccess::storestore(); // if you see any following writes, you'll see this
+      }
 
       // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
