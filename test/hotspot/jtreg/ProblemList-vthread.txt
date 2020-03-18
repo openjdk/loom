@@ -1,27 +1,14 @@
-# Failed in vthread branch even wihtout wrapper
-runtime/condy/escapeAnalysis/TestEscapeCondy.java 9999999 generic-all
-compiler/c2/Test6857159.java 9999999 generic-all
-
-
-
-#####
-# Vthread regression tests
-
-runtime/vthreads/TestNoAllocationsInHRegions.java
-runtime/vthreads/MaterializeVirtualObjectTest.java
-
-#####
-# Known issues with reproducers
-compiler/jvmci/compilerToVM/MaterializeVirtualObjectTest.java
 
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
 
+####
 # OOME in unexpected thread
 gc/g1/ihop/TestIHOPStatic.java
 
-
+####
 # Test failing because of incorrect stacktrace for main thread
+
 runtime/Throwable/TestThrowable.java
 runtime/handshake/HandshakeWalkStackTest.java
 runtime/handshake/HandshakeWalkStackFallbackTest.java
@@ -33,13 +20,15 @@ runtime/Throwable/StackTraceLogging.java
 runtime/Throwable/TestMaxJavaStackTraceDepth.java
 
 ####
-## TODO check what is the cds issues with vthread
+# TODO check what is the cds issues with vthread
+
 runtime/cds/serviceability/ReplaceCriticalClasses.java
 runtime/cds/serviceability/ReplaceCriticalClassesForSubgraphs.java
 runtime/cds/TestInterpreterMethodEntries.java#id0
 runtime/cds/TestInterpreterMethodEntries.java#id1
 
-### Something wrong with test.jdk/test.src properties
+####
+# Something wrong with test.jdk/test.src properties
 runtime/Dictionary/ProtectionDomainCacheTest.java
 runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
 runtime/Dictionary/ProtectionDomainCacheTest.java
@@ -48,71 +37,74 @@ runtime/Dictionary/ProtectionDomainCacheTest.java
 ##########################################
 ## Tests are executed when ProcessTools execute main() in separated vthread
 
+####
 # Fail intermitently?
-runtime/8176717/TestInheritFD.java 99999998 generic-all
+runtime/8176717/TestInheritFD.java
 
+####
 # Doesn't work with ProcessTools wrapper
+serviceability/sa/ClhsdbCDSCore.java
+serviceability/logging/TestLogRotation.java
+compiler/c2/Test8062950.java
 
-serviceability/sa/ClhsdbCDSCore.java 99999998 generic-all
-serviceability/logging/TestLogRotation.java 99999998 generic-all
 
-compiler/c2/Test8062950.java 99999998 generic-all # Test tries to load non-existing class and fails
-
+####
 # Custom cp adding (overriding -cp)
-runtime/verifier/TestMultiANewArray.java 99999998 generic-all
-runtime/verifier/OverriderMsg.java 99999998 generic-all
-runtime/verifier/TestANewArray.java 99999998 generic-all
-runtime/StackTrace/LargeClassTest.java 99999998 generic-all
-runtime/LocalVariableTable/TestLVT.java 99999998 generic-all
-runtime/duplAttributes/DuplAttributesTest.java 99999998 generic-all
-runtime/EnclosingMethodAttr/EnclMethodAttr.java 99999998 generic-all
 
-runtime/classFileParserBug/TestEmptyBootstrapMethodsAttr.java 99999998 generic-all
-runtime/classFileParserBug/ClassFileParserBug.java 99999998 generic-all
-runtime/ClassFile/UnsupportedClassFileVersion.java 99999998 generic-all
-runtime/ClassFile/JsrRewriting.java 99999998 generic-all
-runtime/ClassFile/OomWhileParsingRepeatedJsr.java 99999998 generic-all
+runtime/verifier/TestMultiANewArray.java
+runtime/verifier/OverriderMsg.java
+runtime/verifier/TestANewArray.java
+runtime/StackTrace/LargeClassTest.java
+runtime/LocalVariableTable/TestLVT.java
+runtime/duplAttributes/DuplAttributesTest.java
+runtime/EnclosingMethodAttr/EnclMethodAttr.java
+runtime/classFileParserBug/TestEmptyBootstrapMethodsAttr.java
+runtime/classFileParserBug/ClassFileParserBug.java
+runtime/ClassFile/UnsupportedClassFileVersion.java
+runtime/ClassFile/JsrRewriting.java
+runtime/ClassFile/OomWhileParsingRepeatedJsr.java
+runtime/cds/appcds/ClassLoaderTest.java
+runtime/cds/appcds/HelloTest.java
+runtime/cds/appcds/sharedStrings/SharedStringsBasic.java
+runtime/cds/BootAppendTests.java
+runtime/BootstrapMethod/BSMCalledTwice.java
 
-runtime/cds/appcds/ClassLoaderTest.java 99999998 generic-all
-runtime/cds/appcds/HelloTest.java 99999998 generic-all
-runtime/cds/appcds/sharedStrings/SharedStringsBasic.java 99999998 generic-all
-runtime/cds/BootAppendTests.java 99999998 generic-all
+compiler/aot/fingerprint/SelfChangedCDS.java
+compiler/aot/verification/ClassAndLibraryNotMatchTest.java
 
-runtime/BootstrapMethod/BSMCalledTwice.java 99999998 generic-all
-
-compiler/aot/fingerprint/SelfChangedCDS.java 99999998 generic-all
-compiler/aot/verification/ClassAndLibraryNotMatchTest.java 99999998 generic-all
-
-###### TODO re-check
+####
 # Most of tests failed because can't just run clas in wrapper
-compiler/aot/fingerprint/SelfChangedCDS.java 99999998 generic-all
-compiler/aot/verification/ClassAndLibraryNotMatchTest.java 99999998 generic-all
-gc/TestSmallHeap.java 99999998 generic-all
-gc/TestVerifySilently.java 99999998 generic-all
-gc/TestVerifySubSet.java 99999998 generic-all
-gc/arguments/TestNewSizeThreadIncrease.java 99999998 generic-all
-gc/cms/GuardShrinkWarning.java 99999998 generic-all
-gc/concurrent_phase_control/TestConcurrentPhaseControlG1.java 99999998 generic-all
-gc/ergonomics/TestDynamicNumberOfGCThreads.java 99999998 generic-all
-gc/g1/TestEagerReclaimHumongousRegions.java 99999998 generic-all
-gc/g1/TestEagerReclaimHumongousRegionsClearMarkBits.java 99999998 generic-all
-gc/g1/TestEagerReclaimHumongousRegionsWithRefs.java 99999998 generic-all
-gc/g1/TestHumongousAllocInitialMark.java 99999998 generic-all
-gc/g1/TestHumongousCodeCacheRoots.java 99999998 generic-all
-gc/g1/TestPLABSizeBounds.java 99999998 generic-all
-gc/g1/TestPrintRegionRememberedSetInfo.java 99999998 generic-all
-gc/g1/mixedgc/TestLogging.java 99999998 generic-all
-gc/logging/TestDeprecatedPrintFlags.java 99999998 generic-all
-gc/logging/TestMetaSpaceLog.java 99999998 generic-all
-gc/logging/TestPrintReferences.java 99999998 generic-all
-gc/serial/HeapChangeLogging.java 99999998 generic-all
-serviceability/sa/TestCpoolForInvokeDynamic.java 99999998 generic-all
+
+compiler/aot/fingerprint/SelfChangedCDS.java
+compiler/aot/verification/ClassAndLibraryNotMatchTest.java
+gc/TestSmallHeap.java
+gc/TestVerifySilently.java
+gc/TestVerifySubSet.java
+gc/arguments/TestNewSizeThreadIncrease.java
+gc/cms/GuardShrinkWarning.java
+gc/concurrent_phase_control/TestConcurrentPhaseControlG1.java
+gc/ergonomics/TestDynamicNumberOfGCThreads.java
+gc/g1/TestEagerReclaimHumongousRegions.java
+gc/g1/TestEagerReclaimHumongousRegionsClearMarkBits.java
+gc/g1/TestEagerReclaimHumongousRegionsWithRefs.java
+gc/g1/TestHumongousAllocInitialMark.java
+gc/g1/TestHumongousCodeCacheRoots.java
+gc/g1/TestPLABSizeBounds.java
+gc/g1/TestPrintRegionRememberedSetInfo.java
+gc/g1/mixedgc/TestLogging.java
+gc/logging/TestDeprecatedPrintFlags.java
+gc/logging/TestMetaSpaceLog.java
+gc/logging/TestPrintReferences.java
+gc/serial/HeapChangeLogging.java
+serviceability/sa/TestCpoolForInvokeDynamic.java
 gc/TestSmallHeap.java
 
+####
 # Sensitive to main class
-runtime/logging/VtablesTest.java 99999998 generic-all
-runtime/BootstrapMethod/TestLambdaExceptionInInitializer.java 99999998 generic-all
+runtime/logging/VtablesTest.java
+runtime/BootstrapMethod/TestLambdaExceptionInInitializer.java
 
+#####
 # Main class is not accessible, but could be fixed
 compiler/inlining/InlineAccessors.java
 compiler/jsr292/ContinuousCallSiteTargetChange.java
@@ -151,34 +143,17 @@ runtime/execstack/TestMT.java
 runtime/handshake/HandshakeTransitionTest.java
 runtime/logging/ClassLoadUnloadTest.java
 
-
+####
 # dont run classname (-version/empty)
-runtime/symboltable/ShortLivedSymbolCleanup.java 99999998 generic-all
-runtime/logging/LoaderConstraintsTest.java 99999998 generic-all
 
-# TBD
+runtime/symboltable/ShortLivedSymbolCleanup.java
+runtime/logging/LoaderConstraintsTest.java
+
+#####
 # Seems module patching doesn't work with wrapper
-runtime/modules/PatchModule/PatchModuleTestJarDir.java 99999998 generic-all
-runtime/modules/PatchModule/PatchModuleJavaBase.java 99999998 generic-all
-runtime/modules/PatchModule/PatchModuleTestJar.java 99999998 generic-all
-runtime/modules/PatchModule/PatchModuleTest.java 99999998 generic-all
-runtime/modules/PatchModule/PatchModuleClassList.java 99999998 generic-all
 
-
-
-#### Temporary excluded, failed with vthread but because of JDI wrapper
-vmTestbase/nsk/jdi/ClassPrepareEvent/referenceType/refType001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ClassPrepareEvent/thread/thread001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ClassUnloadEvent/className/classname001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ClassUnloadEvent/classSignature/signature001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ExceptionEvent/exception/exception001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ModificationWatchpointEvent/valueToBe/valuetobe001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ModificationWatchpointEvent/valueToBe/valuetobe002/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ThreadDeathEvent/thread/thread001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/ThreadStartEvent/thread/thread001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/VMStartEvent/thread/thread001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/WatchpointEvent/field/field001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/WatchpointEvent/object/object001/TestDescription.java 99999998 generic-all
-vmTestbase/nsk/jdi/WatchpointEvent/valueCurrent/valuecur001/TestDescription.java 99999998 generic-all
+runtime/modules/PatchModule/PatchModuleTestJarDir.java
+runtime/modules/PatchModule/PatchModuleJavaBase.java
+runtime/modules/PatchModule/PatchModuleTestJar.java
+runtime/modules/PatchModule/PatchModuleTest.java
+runtime/modules/PatchModule/PatchModuleClassList.java

@@ -1,18 +1,18 @@
 #
 # Failed in vthread branch even without wrapper
-# TODO: Should be removed
+# TODO: Should be removed when corresponding bugs fixed
 
-java/lang/StackWalker/StackWalkTest.java                9999999 generic-all
-java/lang/Continuation/PreemptLiveFramesDriver.java     9999999 generic-all
-java/lang/Continuation/Preempt.java                     9999999 generic-all
+java/lang/StackWalker/StackWalkTest.java
+java/lang/Continuation/PreemptLiveFramesDriver.java
+java/lang/Continuation/Preempt.java
 
 
 
 
 ####
-
 # Incorrect stackwalking epxectations for main thread stack trace
-jjava/lang/StackWalker/VerifyStackTrace.java
+
+java/lang/StackWalker/VerifyStackTrace.java
 java/lang/StackWalker/GetCallerClassTest.java
 java/lang/StackWalker/DumpStackTest.java
 java/lang/StackTraceElement/WithClassLoaderName.java
@@ -21,24 +21,35 @@ java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
 
 
-## ThreadGroup owner is not main
+####
+# ThreadGroup owner is not main
+
 java/lang/Thread/MainThreadTest.java
 
+
+####
 # JFR tests check events for test main thread only
+
 jdk/jfr/event/io/TestFileStreamEvents.java
 jdk/jfr/event/compiler/TestAllocInNewTLAB.java
 
+
+####
 # OOME in unextpected thread
 java/lang/ref/OOMEInReferenceHandler.java
 
 
+####
 # incorrect using of 'test.jdk' by wrapper
 runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
 
+####
 # jcoder fails
 java/lang/invoke/condy/CondyNestedResolutionTest.java
 
-######### Tests failing while setting custom Permissions ##################
+##########################################################################
+######### Tests failing while setting custom Permissions #################
+
 java/util/Properties/LoadAndStoreXML.java
 sun/reflect/ReflectionFactory/ReflectionFactoryTest.java
 java/lang/System/SecurityRace.java
@@ -109,33 +120,37 @@ java/lang/Class/getDeclaredField/ClassDeclaredFieldsTest.java
 java/lang/annotation/ParameterAnnotations.java
 
 
-######################
-##Tests failing because of ProcessTools wrapper
+#####
+# Tests failing because of ProcessTools wrapper
 
-com/sun/jdi/ProcessAttachTest.java 99999999 generic-all # classname sensitive
-java/util/ResourceBundle/modules/cache/CacheTest.java   99999999 generic-all # messed with import compiling processtools
-java/util/logging/modules/GetResourceBundleTest.java    99999999 generic-all # messed with import compiling processtools
-
-## Following tests failing of ProcessTools wrapper
-## cutom classpath, jars, no main class etc
-# TODO
-jdk/modules/etc/DefaultModules.java  99999999 generic-all
-jdk/internal/misc/VM/RuntimeArguments.java  99999999 generic-all
-java/lang/StackWalker/CallerFromMain.java 99999999 generic-all
-java/lang/Package/PackageFromManifest.java 99999999 generic-all
-java/lang/Package/IsCompatibleWithDriver.java 99999999 generic-all
-java/lang/invoke/condy/CondyNestedResolutionTest.java 99999999 generic-all
-java/lang/ClassLoader/GetSystemPackage.java 99999999 generic-all
-java/lang/ClassLoader/securityManager/ClassLoaderTest.java 99999999 generic-all
-java/lang/ClassLoader/getResource/modules/ResourcesTest.java 99999999 generic-al
-java/lang/ClassLoader/getResource/automaticmodules/Driver.java 99999999 generic-all
-java/lang/Class/getResource/ResourcesTest.java 99999999 generic-all
-java/lang/Class/forName/modules/TestDriver.java 99999999 generic-all
-
-java/lang/ClassLoader/getResource/modules/ResourcesTest.java 99999999 generic-all
+com/sun/jdi/ProcessAttachTest.java
+java/util/ResourceBundle/modules/cache/CacheTest.java
+java/util/logging/modules/GetResourceBundleTest.java
 
 
+
+
+#####
+# Following tests failing of ProcessTools wrapper
+# cutom classpath, jars, no main class etc
+
+jdk/modules/etc/DefaultModules.java
+jdk/internal/misc/VM/RuntimeArguments.java
+java/lang/StackWalker/CallerFromMain.java
+java/lang/Package/PackageFromManifest.java
+java/lang/Package/IsCompatibleWithDriver.java
+java/lang/invoke/condy/CondyNestedResolutionTest.java
+java/lang/ClassLoader/GetSystemPackage.java
+java/lang/ClassLoader/securityManager/ClassLoaderTest.java
+java/lang/ClassLoader/getResource/modules/ResourcesTest.java
+java/lang/ClassLoader/getResource/automaticmodules/Driver.java
+java/lang/Class/getResource/ResourcesTest.java
+java/lang/Class/forName/modules/TestDriver.java
+java/lang/ClassLoader/getResource/modules/ResourcesTest.java
+
+####
 # Main class is not public
+
 jdk/java/lang/invoke/condy/CondyNestedResolution.jcod
 jdk/java/util/logging/SystemLoggerConfigTest.java
 jdk/jdk/jfr/startupargs/TestDumpOnExit.java
