@@ -4364,6 +4364,7 @@ public:
     }
 
     patch<FKind, top, bottom>(f, caller);
+    hf.cb()->as_compiled_method()->run_nmethod_entry_barrier();
 
     _cont.dec_num_frames();
 

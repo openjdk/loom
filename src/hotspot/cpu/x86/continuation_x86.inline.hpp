@@ -1269,6 +1269,7 @@ NOINLINE static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end) 
     num_frames++;
     num_oops += oopmap->num_oops();
 
+    cb->as_compiled_method()->run_nmethod_entry_barrier();
     if (UseZGC) {
       fix_oops(oopmap, sp, cb);
     }
