@@ -1155,6 +1155,93 @@ AC_DEFUN_ONCE([TOOLCHAIN_SETUP_JTREG],
   AC_SUBST(JTREGEXE)
 ])
 
+# Setup the JTReg Regression Test Harness.
+AC_DEFUN_ONCE([TOOLCHAIN_SETUP_JTREG_MW],
+[
+  AC_ARG_WITH(jtregMW, [AS_HELP_STRING([--with-jtregMW],
+      [Regression Test Harness @<:@probed@:>@])])
+
+  if test "x$with_jtregMW" = xno; then
+    # jtreg disabled
+    AC_MSG_CHECKING([for jtreg test harness])
+    AC_MSG_RESULT([no, disabled])
+  elif test "x$with_jtregMW" != xyes && test "x$with_jtregMW" != x; then
+    # An explicit path is specified, use it.
+    JT_HOME_MW="$with_jtregMW"
+    UTIL_FIXUP_PATH([JT_HOME_MW])
+    if test ! -d "$JT_HOME_MW"; then
+      AC_MSG_ERROR([jtreg home directory from --with-jtregMW=$with_jtregMW does not exist])
+    fi
+
+    if test ! -e "$JT_HOME_MW/lib/jtreg.jar"; then
+      AC_MSG_ERROR([jtreg home directory from --with-jtregMW=$with_jtregMW is not a valid jtreg home])
+    fi
+
+    JTREGEXE_MW="$JT_HOME_MW/bin/jtreg"
+    if test ! -x "$JTREGEXE_MW"; then
+      AC_MSG_ERROR([jtreg home directory from --with-jtregMW=$with_jtregMW does not contain valid jtreg executable])
+    fi
+
+    AC_MSG_CHECKING([for jtreg test harness])
+    AC_MSG_RESULT([$JT_HOME_MW])
+  else
+    # Try to locate jtreg
+    if test "x$JT_HOME_MW" != x; then
+      # JT_HOME_MW set in environment, use it
+      if test ! -d "$JT_HOME_MW"; then
+        AC_MSG_WARN([Ignoring JT_HOME_MW pointing to invalid directory: $JT_HOME_MW])
+        JT_HOME_MW=
+      else
+        if test ! -e "$JT_HOME_MW/lib/jtreg.jar"; then
+          AC_MSG_WARN([Ignoring JT_HOME_MW which is not a valid jtreg home: $JT_HOME_MW])
+          JT_HOME_MW=
+        elif test ! -x "$JT_HOME_MW/bin/jtreg"; then
+          AC_MSG_WARN([Ignoring JT_HOME_MW which does not contain valid jtreg executable: $JT_HOME_MW])
+          JT_HOME_MW=
+        else
+          JTREGEXE_MW="$JT_HOME_MW/bin/jtreg"
+          AC_MSG_NOTICE([Located jtreg using JT_HOME_MW from environment])
+        fi
+      fi
+    fi
+
+    if test "x$JT_HOME_MW" = x; then
+      # JT_HOME_MW is not set in environment, or was deemed invalid.
+      # Try to find jtreg on path
+      UTIL_PATH_PROGS(JTREGEXE_MW, jtreg)
+      if test "x$JTREGEXE_MW" != x; then
+        # That's good, now try to derive JT_HOME_MW
+        JT_HOME_MW=`(cd $($DIRNAME $JTREGEXE_MW)/.. && pwd)`
+        if test ! -e "$JT_HOME_MW/lib/jtreg.jar"; then
+          AC_MSG_WARN([Ignoring jtreg from path since a valid jtreg home cannot be found])
+          JT_HOME_MW=
+          JTREGEXE_MW=
+        else
+          AC_MSG_NOTICE([Located jtreg using jtreg executable in path])
+        fi
+      fi
+    fi
+
+    AC_MSG_CHECKING([for jtreg test harness])
+    if test "x$JT_HOME_MW" != x; then
+      AC_MSG_RESULT([$JT_HOME_MW])
+    else
+      AC_MSG_RESULT([no, not found])
+
+      if test "x$with_jtregMW" = xyes; then
+        AC_MSG_ERROR([--with-jtregMW was specified, but no jtreg found.])
+      fi
+    fi
+  fi
+
+  UTIL_FIXUP_EXECUTABLE(JTREGEXE_MW)
+  UTIL_FIXUP_PATH(JT_HOME_MW)
+  AC_SUBST(JT_HOME_MW)
+  AC_SUBST(JTREGEXE_MW)
+])
+
+
+
 # Setup the JIB dependency resolver
 AC_DEFUN_ONCE([TOOLCHAIN_SETUP_JIB],
 [
