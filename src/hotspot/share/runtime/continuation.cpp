@@ -1699,7 +1699,7 @@ protected:
   template <class T> inline void do_oop_work(T* p) {
     this->process(p);
     oop obj = this->_cont->obj_at(_i); // does a HeapAccess<IN_HEAP_ARRAY> load barrier
-    assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(obj)), "");
+    ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(obj)), "");)
 
     assert (oopDesc::is_oop_or_null(obj), "invalid oop");
     log_develop_trace(jvmcont)("i: %d", _i); print_oop(p, obj);
@@ -1720,7 +1720,7 @@ public:
     DEBUG_ONLY(this->verify(base_loc);)
     DEBUG_ONLY(this->verify(derived_loc);)
     assert (oopDesc::is_oop_or_null(base), "invalid oop");
-    assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(base)), "");
+    ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(base)), "");)
 
     intptr_t offset = *(intptr_t*)derived_loc;
 

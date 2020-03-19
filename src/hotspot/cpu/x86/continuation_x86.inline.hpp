@@ -1198,7 +1198,7 @@ static void fix_oops(const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) 
       *(narrowOop*)p = CompressedOops::encode((oop)NativeAccess<>::oop_load((narrowOop*)p));
     } else {
       *(oop*)p = (oop)NativeAccess<>::oop_load((oop*)p);
-      assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(*(oop*)p)), "");
+      ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(*(oop*)p)), "");)
     }
   }
 }
@@ -1219,7 +1219,7 @@ static void fix_derived_pointers(const ImmutableOopMap* oopmap, intptr_t* sp, Co
     if (base != (oop)NULL) {
       assert (!CompressedOops::is_base(base), "");
       assert (oopDesc::is_oop(base), "");
-      assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");
+      ZGC_ONLY(assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
       intptr_t offset = *(intptr_t*)derived_loc;
       if (offset < 0) {
         offset = -offset;
@@ -1471,7 +1471,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
       if (base != (oop)NULL) {
         assert (!CompressedOops::is_base(base), "");
         assert (oopDesc::is_oop(base), "");
-        assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");
+        ZGC_ONLY(assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
         intptr_t offset = *(intptr_t*)derived_loc;
         offset = offset < 0
                    ? -offset
