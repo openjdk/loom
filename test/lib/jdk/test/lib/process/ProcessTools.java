@@ -304,9 +304,10 @@ public final class ProcessTools {
             }
         }
 
-        String[] doubleWordArgs = {"-cp", "-classpath", "--add-opens", "--class-path", "--upgrade-module-path", "--add-modules", "-d", "--add-exports", "--patch-module", "--module-path"};
+        String[] doubleWordArgs = {"-cp", "-classpath", "--add-opens", "--class-path", "--upgrade-module-path",
+                                   "--add-modules", "-d", "--add-exports", "--patch-module", "--module-path"};
 
-        if(noModule && System.getProperty("main.wrapper") != null) {
+        if (noModule && System.getProperty("main.wrapper") != null) {
             boolean skipNext = false;
             boolean added = false;
             for (String cmd : command) {
