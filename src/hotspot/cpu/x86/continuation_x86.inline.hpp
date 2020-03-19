@@ -1225,10 +1225,13 @@ static void fix_derived_pointers(const ImmutableOopMap* oopmap, intptr_t* sp, Co
         offset = -offset;
         assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
         *derived_loc = (oop)(cast_from_oop<address>(base) + offset);
-      } else { // DEBUG ONLY
+      }
+  #ifdef ASSERT 
+      else { // DEBUG ONLY
         offset = offset - cast_from_oop<intptr_t>(base);
         assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
       }
+  #endif
     } else {
       assert (*derived_loc == (oop)NULL, "");
     }
@@ -1269,6 +1272,7 @@ NOINLINE static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end) 
     num_frames++;
     num_oops += oopmap->num_oops();
 
+    cb->as_compiled_method()->run_nmethod_entry_barrier();
     if (UseZGC) {
       fix_oops(oopmap, sp, cb);
     }
