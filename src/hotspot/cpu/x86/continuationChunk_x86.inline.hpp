@@ -28,7 +28,10 @@
 #include "memory/iterator.inline.hpp"
 #include "runtime/frame.inline.hpp"
 
+#if INCLUDE_ZGC
+#include "gc/z/zAddress.inline.hpp"
 #define FIX_DERIVED_POINTERS true
+#endif
 
 static inline void* reg_to_loc(VMReg reg, intptr_t* sp) {
   assert (!reg->is_reg() || reg == rbp->as_VMReg(), "");
@@ -79,10 +82,12 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
     if (base != (oop)NULL) {
       assert (!CompressedOops::is_base(base), "");
 
-      if (concurrent_gc) {
-        if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) // TODO: this is a ZGC-specific optimization
+#if INCLUDE_ZGC
+      if (concurrent_gc) { //  && UseZGC // TODO: this is a ZGC-specific optimization
+        if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) 
           continue;
       }
+#endif
 
       OrderAccess::loadload();
       intptr_t derived_int_val = Atomic::load(derived_loc); // *derived_loc;
@@ -121,7 +126,7 @@ static void fix_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intpt
     oop base = Atomic::load((oop*)base_loc);
     if (base != (oop)NULL) {
       assert (!CompressedOops::is_base(base), "");
-      assert (ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");
+      ZGC_ONLY(assert (ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
 
       OrderAccess::loadload();
       intptr_t offset = Atomic::load(derived_loc); // *derived_loc;
