@@ -697,15 +697,12 @@ public final class ProcessTools {
         System.arraycopy(args, 2, classArgs, 0, args.length - 2);
         Class c = Class.forName(className);
         Method mainMethod = c.getMethod("main", new Class[] { String[].class });
-        //        System.out.println("PT: Running test with wrapper: " + wrapper);
 
         if (wrapper.equals("Virtual")) {
             MainThreadGroup tg = new MainThreadGroup();
+            // TODO fix to set virtual scheduler group when become available
             Thread vthread = Thread.builder().virtual().task(() -> {
                     try {
-                    //    System.out.println("Running test in thread: " + className);
-                    //new Exception().printstreamStackTrace(System.out);
-
                         mainMethod.invoke(null, new Object[] { classArgs });
                     } catch (Throwable error) {
                         tg.uncaughtThrowable = error;
@@ -717,9 +714,6 @@ public final class ProcessTools {
             MainThreadGroup tg = new MainThreadGroup();
             Thread t = new Thread(tg, () -> {
                     try {
-                    //    System.out.println("Running test in thread: " + className);
-                    //new Exception().printstreamStackTrace(System.out);
-
                         mainMethod.invoke(null, new Object[] { classArgs });
                     } catch (Throwable error) {
                         tg.uncaughtThrowable = error;
@@ -731,27 +725,22 @@ public final class ProcessTools {
                 throw new RuntimeException(tg.uncaughtThrowable);
             }
         } else {
-            //System.out.println("Running test in main: " + className);
-            //new Exception().printStackTrace(System.out);
-
             mainMethod.invoke(null, new Object[] { classArgs });
         }
     }
 
-    static class MainThreadGroup extends ThreadGroup
-    {
+    static class MainThreadGroup extends ThreadGroup {
         MainThreadGroup() {
             super("MainThreadGroup");
         }
 
         public void uncaughtException(Thread t, Throwable e) {
-            if (e instanceof ThreadDeath)
+            if (e instanceof ThreadDeath) {
                 return;
+            }
             e.printStackTrace(System.err);
             uncaughtThrowable = e;
         }
-
         Throwable uncaughtThrowable = null;
-
     }
 }

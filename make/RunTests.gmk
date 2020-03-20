@@ -858,7 +858,6 @@ define SetupRunJtregTestBody
 
   ifneq ($$(JTREG_MAIN_WRAPPER), )
     JT_HOME = $$(JT_HOME_MW)
-    $$(info Setting jtreg with main wrapper: . $$(JT_HOME_MW) )
     $1_JTREG_BASIC_OPTIONS += -mainWrapper:$$(JTREG_MAIN_WRAPPER)
   endif
 

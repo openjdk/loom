@@ -1,12 +1,6 @@
+##########
+## Tests failing when main() is executed in additional vthread or in vthread instead of thread
 #
-# Failed in vthread branch even without wrapper
-# TODO: Should be removed when corresponding bugs fixed
-
-java/lang/StackWalker/StackWalkTest.java
-java/lang/Continuation/PreemptLiveFramesDriver.java
-java/lang/Continuation/Preempt.java
-
-
 
 
 ####
@@ -36,19 +30,23 @@ jdk/jfr/event/compiler/TestAllocInNewTLAB.java
 
 ####
 # OOME in unextpected thread
+
 java/lang/ref/OOMEInReferenceHandler.java
 
 
 ####
 # incorrect using of 'test.jdk' by wrapper
+
 runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
+
 
 ####
 # jcoder fails
 java/lang/invoke/condy/CondyNestedResolutionTest.java
 
-##########################################################################
-######### Tests failing while setting custom Permissions #################
+
+####
+# Tests failing while setting custom Permissions
 
 java/util/Properties/LoadAndStoreXML.java
 sun/reflect/ReflectionFactory/ReflectionFactoryTest.java
@@ -128,8 +126,6 @@ java/util/ResourceBundle/modules/cache/CacheTest.java
 java/util/logging/modules/GetResourceBundleTest.java
 
 
-
-
 #####
 # Following tests failing of ProcessTools wrapper
 # cutom classpath, jars, no main class etc
@@ -147,6 +143,7 @@ java/lang/ClassLoader/getResource/automaticmodules/Driver.java
 java/lang/Class/getResource/ResourcesTest.java
 java/lang/Class/forName/modules/TestDriver.java
 java/lang/ClassLoader/getResource/modules/ResourcesTest.java
+
 
 ####
 # Main class is not public
