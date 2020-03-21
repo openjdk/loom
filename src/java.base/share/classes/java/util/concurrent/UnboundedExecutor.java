@@ -252,6 +252,8 @@ class UnboundedExecutor extends AbstractExecutorService {
                 throw new IllegalArgumentException();
             }
 
+            if (Thread.interrupted())
+                throw new InterruptedException();
             T result = holder.result();
             while (result == null && holder.exceptionCount() < count) {
                 if (timed) {
