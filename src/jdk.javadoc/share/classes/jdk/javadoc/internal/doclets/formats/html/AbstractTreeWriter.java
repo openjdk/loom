@@ -30,7 +30,7 @@ import java.util.*;
 import javax.lang.model.element.TypeElement;
 
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlStyle;
-import jdk.javadoc.internal.doclets.formats.html.markup.HtmlTag;
+import jdk.javadoc.internal.doclets.formats.html.markup.TagName;
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlTree;
 import jdk.javadoc.internal.doclets.toolkit.Content;
 import jdk.javadoc.internal.doclets.toolkit.util.ClassTree;
@@ -82,9 +82,9 @@ public abstract class AbstractTreeWriter extends HtmlDocletWriter {
     protected void addLevelInfo(TypeElement parent, Collection<TypeElement> collection,
             boolean isEnum, Content contentTree) {
         if (!collection.isEmpty()) {
-            Content ul = new HtmlTree(HtmlTag.UL);
+            Content ul = new HtmlTree(TagName.UL);
             for (TypeElement local : collection) {
-                HtmlTree li = new HtmlTree(HtmlTag.LI);
+                HtmlTree li = new HtmlTree(TagName.LI);
                 li.setStyle(HtmlStyle.circle);
                 addPartialInfo(local, li);
                 addExtendsImplements(parent, local, li);
@@ -114,7 +114,7 @@ public abstract class AbstractTreeWriter extends HtmlDocletWriter {
         if (!sset.isEmpty()) {
             TypeElement firstTypeElement = sset.first();
             Content headingContent = contents.getContent(heading);
-            Content sectionHeading = HtmlTree.HEADING(Headings.CONTENT_HEADING, true,
+            Content sectionHeading = HtmlTree.HEADING_TITLE(Headings.CONTENT_HEADING,
                     headingContent);
             HtmlTree htmlTree = HtmlTree.SECTION(HtmlStyle.hierarchy, sectionHeading);
             addLevelInfo(!utils.isInterface(firstTypeElement) ? firstTypeElement : null,

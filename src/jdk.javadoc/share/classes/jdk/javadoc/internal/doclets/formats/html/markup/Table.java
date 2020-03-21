@@ -106,7 +106,7 @@ public class Table extends Content {
      */
     public Table setCaption(Content captionContent) {
         if (captionContent instanceof HtmlTree
-                && ((HtmlTree) captionContent).htmlTag == HtmlTag.CAPTION) {
+                && ((HtmlTree) captionContent).tagName == TagName.CAPTION) {
             caption = captionContent;
         } else {
             caption = getCaption(captionContent);
@@ -208,7 +208,7 @@ public class Table extends Content {
      *
      * @param evenRowStyle  the style to use for even-numbered rows
      * @param oddRowStyle   the style to use for odd-numbered rows
-     * @return
+     * @return this object
      */
     public Table setStripedStyles(HtmlStyle evenRowStyle, HtmlStyle oddRowStyle) {
         stripedStyles = Arrays.asList(evenRowStyle, oddRowStyle);
@@ -353,11 +353,11 @@ public class Table extends Content {
             throw new NullPointerException();
         }
 
-        HtmlTree row = new HtmlTree(HtmlTag.TR);
+        HtmlTree row = new HtmlTree(TagName.TR);
 
         if (stripedStyles != null) {
             int rowIndex = bodyRows.size();
-            row.put(HtmlAttr.CLASS, stripedStyles.get(rowIndex % 2).name());
+            row.setStyle(stripedStyles.get(rowIndex % 2));
         }
         int colIndex = 0;
         for (Content c : contents) {
@@ -411,12 +411,12 @@ public class Table extends Content {
      * @return the HTML
      */
     private Content toContent() {
-        HtmlTree mainDiv = new HtmlTree(HtmlTag.DIV);
+        HtmlTree mainDiv = new HtmlTree(TagName.DIV);
         mainDiv.setStyle(tableStyle);
         if (id != null) {
             mainDiv.setId(id);
         }
-        HtmlTree table = new HtmlTree(HtmlTag.TABLE);
+        HtmlTree table = new HtmlTree(TagName.TABLE);
         if (tabMap == null || tabs.size() == 1) {
             if (tabMap == null) {
                 table.add(caption);
@@ -427,7 +427,7 @@ public class Table extends Content {
             table.add(getTableBody());
             mainDiv.add(table);
         } else {
-            HtmlTree tablist = new HtmlTree(HtmlTag.DIV)
+            HtmlTree tablist = new HtmlTree(TagName.DIV)
                     .put(HtmlAttr.ROLE, "tablist")
                     .put(HtmlAttr.ARIA_ORIENTATION, "horizontal");
 
@@ -443,8 +443,8 @@ public class Table extends Content {
                     tablist.add(tab);
                 }
             }
-            HtmlTree tabpanel = new HtmlTree(HtmlTag.DIV)
-                    .put(HtmlAttr.ID, tableStyle + "_tabpanel")
+            HtmlTree tabpanel = new HtmlTree(TagName.DIV)
+                    .put(HtmlAttr.ID, tableStyle.cssName() + "_tabpanel")
                     .put(HtmlAttr.ROLE, "tabpanel");
             table.add(getTableBody());
             tabpanel.add(table);
@@ -455,10 +455,10 @@ public class Table extends Content {
     }
 
     private HtmlTree createTab(String tabId, HtmlStyle style, boolean defaultTab, String tabName) {
-        HtmlTree tab = new HtmlTree(HtmlTag.BUTTON)
+        HtmlTree tab = new HtmlTree(TagName.BUTTON)
                 .put(HtmlAttr.ROLE, "tab")
                 .put(HtmlAttr.ARIA_SELECTED, defaultTab ? "true" : "false")
-                .put(HtmlAttr.ARIA_CONTROLS, tableStyle + "_tabpanel")
+                .put(HtmlAttr.ARIA_CONTROLS, tableStyle.cssName() + "_tabpanel")
                 .put(HtmlAttr.TABINDEX, defaultTab ? "0" : "-1")
                 .put(HtmlAttr.ONKEYDOWN, "switchTab(event)")
                 .put(HtmlAttr.ID, tabId)
@@ -469,10 +469,10 @@ public class Table extends Content {
 
     private Content getTableBody() {
         ContentBuilder tableContent = new ContentBuilder();
-        Content thead = new HtmlTree(HtmlTag.THEAD);
+        Content thead = new HtmlTree(TagName.THEAD);
         thead.add(header);
         tableContent.add(thead);
-        Content tbody = new HtmlTree(HtmlTag.TBODY);
+        Content tbody = new HtmlTree(TagName.TBODY);
         bodyRows.forEach(tbody::add);
         tableContent.add(tbody);
         return tableContent;
@@ -543,14 +543,14 @@ public class Table extends Content {
 
     private void appendStyleInfo(StringBuilder sb, HtmlStyle... styles) {
         for (HtmlStyle style : styles) {
-            sb.append("var ").append(style).append(" = \"").append(style).append("\";\n");
+            sb.append("var ").append(style.name()).append(" = \"").append(style.cssName()).append("\";\n");
         }
 
     }
 
     private HtmlTree getCaption(Content title) {
-        return new HtmlTree(HtmlTag.CAPTION,
-                HtmlTree.SPAN(title),
-                HtmlTree.SPAN(tabEnd, Entity.NO_BREAK_SPACE));
+        return new HtmlTree(TagName.CAPTION)
+                .add(HtmlTree.SPAN(title))
+                .add(HtmlTree.SPAN(tabEnd, Entity.NO_BREAK_SPACE));
     }
 }

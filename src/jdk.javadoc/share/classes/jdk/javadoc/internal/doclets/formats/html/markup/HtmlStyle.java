@@ -25,13 +25,24 @@
 
 package jdk.javadoc.internal.doclets.formats.html.markup;
 
+import java.util.Locale;
+import java.util.regex.Pattern;
+
 /**
- * Enum representing HTML styles. The name map to values in the CSS file.
+ * Enum representing HTML styles, with associated entries in the stylesheet files.
  *
  *  <p><b>This is NOT part of any supported API.
  *  If you write code that depends on this, you do so at your own risk.
  *  This code and its internal interfaces are subject to change or
  *  deletion without notice.</b>
+ *
+ * @apiNote
+ * Despite the name, the members of this enum provide values for the HTML {@code class} attribute,
+ * and <strong>not</strong> the HTML {@code style} attribute.
+ * This is to avoid confusion with the widespread use of the word "class" in the Java ecosystem,
+ * and the potential for clashes with methods called {@code setClass} instead of {@code setStyle}.
+ *
+ * @see <a href="https://html.spec.whatwg.org/#classes>WhatWG: {@code class} attribute</a>
  */
 public enum HtmlStyle {
     aboutLanguage,
@@ -118,6 +129,7 @@ public enum HtmlStyle {
     serializedClassDetails,
     servicesSummary,
     skipNav,
+    source,
     sourceContainer,
     sourceLineNo,
     subNav,
@@ -136,5 +148,25 @@ public enum HtmlStyle {
     typeSummary,
     useSummary,
     usesSummary,
-    verticalSeparator
+    verticalSeparator;
+
+    private final String cssName;
+
+    HtmlStyle() {
+        cssName = Pattern.compile("\\p{Upper}")
+                .matcher(toString())
+                .replaceAll(mr -> "-" + mr.group().toLowerCase(Locale.US));
+    }
+
+    HtmlStyle(String cssName) {
+        this.cssName = cssName;
+    }
+
+    /**
+     * Returns the CSS class name associated with this style.
+     * @return the CSS class name
+     */
+    public String cssName() {
+        return cssName;
+    }
 }

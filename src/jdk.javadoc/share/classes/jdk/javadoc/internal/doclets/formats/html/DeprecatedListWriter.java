@@ -39,7 +39,7 @@ import javax.lang.model.element.PackageElement;
 import com.sun.source.doctree.DocTree;
 import jdk.javadoc.internal.doclets.formats.html.markup.ContentBuilder;
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlStyle;
-import jdk.javadoc.internal.doclets.formats.html.markup.HtmlTag;
+import jdk.javadoc.internal.doclets.formats.html.markup.TagName;
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlTree;
 import jdk.javadoc.internal.doclets.formats.html.Navigation.PageMode;
 import jdk.javadoc.internal.doclets.formats.html.markup.StringContent;
@@ -329,13 +329,13 @@ public class DeprecatedListWriter extends SubWriterHolderWriter {
      */
     public Content getContentsList(DeprecatedAPIListBuilder deprapi) {
         Content headContent = contents.deprecatedAPI;
-        Content heading = HtmlTree.HEADING(Headings.PAGE_TITLE_HEADING, true,
+        Content heading = HtmlTree.HEADING_TITLE(Headings.PAGE_TITLE_HEADING,
                 HtmlStyle.title, headContent);
         Content div = HtmlTree.DIV(HtmlStyle.header, heading);
         Content headingContent = contents.contentsHeading;
-        div.add(HtmlTree.HEADING(Headings.CONTENT_HEADING, true,
+        div.add(HtmlTree.HEADING_TITLE(Headings.CONTENT_HEADING,
                 headingContent));
-        Content ul = new HtmlTree(HtmlTag.UL);
+        Content ul = new HtmlTree(TagName.UL);
         for (DeprElementKind kind : DeprElementKind.values()) {
             addIndexLink(deprapi, kind, ul);
         }

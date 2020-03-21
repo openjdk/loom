@@ -233,7 +233,6 @@ class GCTimer;
 class SystemDictionary : AllStatic {
   friend class BootstrapInfo;
   friend class VMStructs;
-  friend class SystemDictionaryHandles;
 
  public:
   enum WKID {

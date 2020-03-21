@@ -32,7 +32,7 @@ import javax.lang.model.element.TypeElement;
 import jdk.javadoc.internal.doclets.formats.html.markup.ContentBuilder;
 import jdk.javadoc.internal.doclets.formats.html.markup.Entity;
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlStyle;
-import jdk.javadoc.internal.doclets.formats.html.markup.HtmlTag;
+import jdk.javadoc.internal.doclets.formats.html.markup.TagName;
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlTree;
 import jdk.javadoc.internal.doclets.formats.html.Navigation.PageMode;
 import jdk.javadoc.internal.doclets.formats.html.markup.StringContent;
@@ -79,7 +79,7 @@ public class SerializedFormWriterImpl extends SubWriterHolderWriter
         navBar.setUserHeader(getUserHeaderFooter(true));
         headerContent.add(navBar.getContent(Navigation.Position.TOP));
         Content h1Content = new StringContent(header);
-        Content heading = HtmlTree.HEADING(Headings.PAGE_TITLE_HEADING, true,
+        Content heading = HtmlTree.HEADING_TITLE(Headings.PAGE_TITLE_HEADING,
                 HtmlStyle.title, h1Content);
         Content div = HtmlTree.DIV(HtmlStyle.header, heading);
         bodyContents.setHeader(headerContent)
@@ -94,7 +94,7 @@ public class SerializedFormWriterImpl extends SubWriterHolderWriter
      */
     @Override
     public Content getSerializedSummariesHeader() {
-        HtmlTree ul = new HtmlTree(HtmlTag.UL);
+        HtmlTree ul = new HtmlTree(TagName.UL);
         ul.setStyle(HtmlStyle.blockList);
         return ul;
     }
@@ -117,7 +117,7 @@ public class SerializedFormWriterImpl extends SubWriterHolderWriter
      */
     @Override
     public Content getPackageHeader(String packageName) {
-        Content heading = HtmlTree.HEADING(Headings.SerializedForm.PACKAGE_HEADING, true,
+        Content heading = HtmlTree.HEADING_TITLE(Headings.SerializedForm.PACKAGE_HEADING,
                 contents.packageLabel);
         heading.add(Entity.NO_BREAK_SPACE);
         heading.add(packageName);
@@ -131,7 +131,7 @@ public class SerializedFormWriterImpl extends SubWriterHolderWriter
      */
     @Override
     public Content getClassSerializedHeader() {
-        HtmlTree ul = new HtmlTree(HtmlTag.UL);
+        HtmlTree ul = new HtmlTree(TagName.UL);
         ul.setStyle(HtmlStyle.blockList);
         return ul;
     }
@@ -212,7 +212,7 @@ public class SerializedFormWriterImpl extends SubWriterHolderWriter
      */
     @Override
     public Content getClassContentHeader() {
-        HtmlTree ul = new HtmlTree(HtmlTag.UL);
+        HtmlTree ul = new HtmlTree(TagName.UL);
         ul.setStyle(HtmlStyle.blockList);
         return ul;
     }
