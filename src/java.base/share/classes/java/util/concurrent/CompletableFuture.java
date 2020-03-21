@@ -37,12 +37,18 @@ package java.util.concurrent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Objects;
+import java.util.Spliterator;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * A {@link Future} that may be explicitly completed (setting its
@@ -2961,5 +2967,134 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         // Reduce the risk of rare disastrous classloading in first call to
         // LockSupport.park: https://bugs.openjdk.java.net/browse/JDK-8074773
         Class<?> ensureLoaded = LockSupport.class;
+    }
+
+    /**
+     * Returns a stream that is lazily populated with the given CompletableFutures
+     * when they complete.
+     *
+     * <p> If a thread is interrupted while waiting for a task to complete then
+     * {@linkplain CancellationException} is thrown with the interrupt status set.
+     *
+     * @apiNote The following example has a list of CompletableFuture objects. It
+     * selects the result of the first to complete and then cancels the remaining
+     * (that have not completed).
+     * <pre> {@code
+     *     List<CompletableFuture<String>> cfs = ...
+     *     try {
+     *         String first = CompletableFuture.stream(cfs)
+     *                     .filter(Predicate.not(CompletableFuture::isCompletedExceptionally))
+     *                     .map(CompletableFuture::join)
+     *                     .findFirst()
+     *                     .orElse(null);
+     *     } finally {
+     *         cfs.forEach(cf -> cf.cancel(true));
+     *     }
+     * }</pre>
+     *
+     * @param cfs the CompletableFutures
+     * @param <T> the result type returned by completable future's {@code join}
+     * @return stream of completed CompletableFutures
+     * @throws NullPointerException if the collection or any of its elements are null
+     * @since 99
+     */
+    public static <T> Stream<CompletableFuture<T>> stream(Collection<? extends CompletableFuture<T>> cfs) {
+        int size = cfs.size();
+        if (size == 0)
+            return Stream.empty();
+        var queue = new ArrayBlockingQueue<CompletableFuture<T>>(size);
+        int count = 0;
+        Iterator<? extends CompletableFuture<T>> iterator = cfs.iterator();
+        while (count < size && iterator.hasNext()) {
+            CompletableFuture<T> cf = iterator.next();
+            cf.handle((result, exc) -> {
+                queue.add(cf);
+                return null;
+            });
+            count++;
+        }
+        Spliterator<CompletableFuture<T>> s = new BlockingQueueSpliterator<>(queue, count);
+        return StreamSupport.stream(s, false);
+    }
+
+    /**
+     * Returns a stream that is lazily populated with the given CompletableFutures
+     * when they complete.
+     *
+     * <p> If a thread is interrupted while waiting for a task to complete then
+     * {@linkplain CancellationException} is thrown with the interrupt status set.
+     *
+     * @param cfs the CompletableFutures
+     * @param <T> the result type returned by completable future's {@code join}
+     * @return stream of completed CompletableFutures
+     * @throws NullPointerException if the array or any of its elements are null
+     * @since 99
+     */
+    @SafeVarargs
+    @SuppressWarnings("varargs")
+    public static <T> Stream<CompletableFuture<T>> stream(CompletableFuture<T>... cfs) {
+        int size = cfs.length;
+        if (size == 0)
+            return Stream.empty();
+        var queue = new ArrayBlockingQueue<CompletableFuture<T>>(size);
+        for (CompletableFuture<T> cf : cfs) {
+            cf.handle((result, exc) -> {
+                queue.add(cf);
+                return null;
+            });
+        }
+        Spliterator<CompletableFuture<T>> s = new BlockingQueueSpliterator<>(queue, size);
+        return StreamSupport.stream(s, false);
+    }
+
+    /**
+     * Simple Spliterator with a BlockingQueue as its source. This implementation
+     * will be replaced if the APIs go forward beyond prototype.
+     */
+    private static class BlockingQueueSpliterator<T>
+            implements Spliterator<CompletableFuture<T>> {
+
+        final BlockingQueue<CompletableFuture<T>> queue;
+        final int size;
+        int taken;   // running count of the number of elements taken
+
+        BlockingQueueSpliterator(BlockingQueue<CompletableFuture<T>> queue, int size) {
+            this.queue = queue;
+            this.size = size;
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super CompletableFuture<T>> action) {
+            Objects.requireNonNull(action);
+            if (taken >= size) {
+                return false;
+            } else {
+                CompletableFuture<T> cf;
+                try {
+                    cf = queue.take();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new CancellationException("Thread interrupted");
+                }
+                taken++;
+                action.accept(cf);
+                return true;
+            }
+        }
+
+        @Override
+        public Spliterator<CompletableFuture<T>> trySplit() {
+            return null;
+        }
+
+        @Override
+        public int characteristics() {
+            return Spliterator.SIZED + Spliterator.NONNULL;
+        }
+
+        @Override
+        public long estimateSize() {
+            return size;
+        }
     }
 }
