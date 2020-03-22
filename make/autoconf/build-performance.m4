@@ -434,7 +434,7 @@ AC_DEFUN_ONCE([BPERF_SETUP_SMART_JAVAC],
   fi
 
   JAVAC_SERVER_AVAILABLE=true
-  SJAVAC_MEMORY_OPT=-Xms${MS_VALUE}M -Xmx${MX_VALUE}M
+  SJAVAC_MEMORY_OPT="-Xms${MS_VALUE}M -Xmx${MX_VALUE}M"
   UTIL_ADD_JVM_ARG_IF_OK([$SJAVAC_MEMORY_OPT],SJAVAC_SERVER_JAVA_FLAGS,[$SJAVAC_SERVER_JAVA])
   if test "x$JVM_ARG_OK" = "xfalse"; then
     AC_MSG_WARN([Could not set '$SJAVAC_MEMORY_OPT' on bootjdk, disabling sjavac and javac server])
@@ -447,12 +447,14 @@ AC_DEFUN_ONCE([BPERF_SETUP_SMART_JAVAC],
       CHECKING_MSG: [whether to use sjavac],
       IF_ENABLED: [ ENABLE_SJAVAC="yes" ],
       IF_DISABLED: [ ENABLE_SJAVAC="no" ])
+  AC_SUBST(ENABLE_SJAVAC)
 
   UTIL_ARG_ENABLE(NAME: javac-server, DEFAULT: true, AVAILABLE: $JAVAC_SERVER_AVAILABLE,
       DESC: [enable javac server],
       CHECKING_MSG: [whether to use javac server],
       IF_ENABLED: [ ENABLE_JAVAC_SERVER="yes" ],
       IF_DISABLED: [ ENABLE_JAVAC_SERVER="no" ])
+  AC_SUBST(ENABLE_JAVAC_SERVER)
 
   if test "x$ENABLE_JAVAC_SERVER" = "xyes" || test "x$ENABLE_SJAVAC" = "xyes"; then
     # When using a server javac, the small client instances do not need much
