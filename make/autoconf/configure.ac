@@ -180,6 +180,9 @@ TOOLCHAIN_MISC_CHECKS
 # Setup the JTReg Regression Test Harness.
 TOOLCHAIN_SETUP_JTREG
 
+# Setup the JTReg Regression Test Harness with Wrapper.
+TOOLCHAIN_SETUP_JTREG_MW
+
 # Setup the Java Microbenchmark Harness (JMH)
 LIB_TESTS_SETUP_JMH
 
