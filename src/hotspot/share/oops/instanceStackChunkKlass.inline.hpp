@@ -57,25 +57,48 @@
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
-  InstanceKlass::oop_oop_iterate<T>(obj, closure);
+  if (Devirtualizer::do_metadata(closure)) {
+    Devirtualizer::do_klass(closure, this);
+  }
+  // InstanceKlass::oop_oop_iterate<T>(obj, closure);
   oop_oop_iterate_stack<T>(obj, closure);
+  oop_oop_iterate_header<T>(obj, closure);
 }
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_reverse(oop obj, OopClosureType* closure) {
-  InstanceKlass::oop_oop_iterate_reverse<T>(obj, closure);
+  assert(!Devirtualizer::do_metadata(closure),
+      "Code to handle metadata is not implemented");
+  // InstanceKlass::oop_oop_iterate_reverse<T>(obj, closure);
   oop_oop_iterate_stack<T>(obj, closure);
+  oop_oop_iterate_header<T>(obj, closure);
 }
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr) {
-  InstanceKlass::oop_oop_iterate_bounded<T>(obj, closure, mr);
+  if (Devirtualizer::do_metadata(closure)) {
+    if (mr.contains(obj)) {
+      Devirtualizer::do_klass(closure, this);
+    }
+  }
+  // InstanceKlass::oop_oop_iterate_bounded<T>(obj, closure, mr);
   oop_oop_iterate_stack_bounded<T>(obj, closure, mr);
+  oop_oop_iterate_header<T>(obj, closure);
+}
+
+template <typename T, class OopClosureType>
+void InstanceStackChunkKlass::oop_oop_iterate_header(oop obj, OopClosureType* closure) {
+  OrderAccess::storestore();
+  Devirtualizer::do_oop(closure, (T*)obj->obj_field_addr_raw<T>(jdk_internal_misc_StackChunk::parent_offset()));
+  OrderAccess::storestore();
+  Devirtualizer::do_oop(closure, (T*)obj->obj_field_addr_raw<T>(jdk_internal_misc_StackChunk::cont_offset())); // must be last oop iterated
 }
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack(oop obj, OopClosureType* closure) {
-  Continuation::stack_chunk_iterate_stack<OopClosureType>(obj, closure);
+  UseZGC
+    ? Continuation::stack_chunk_iterate_stack<OopClosureType, true> (obj, closure)
+    : Continuation::stack_chunk_iterate_stack<OopClosureType, false>(obj, closure);
 }
 
 template <typename T, class OopClosureType>

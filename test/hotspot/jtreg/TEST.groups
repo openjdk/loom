@@ -79,12 +79,7 @@ tier1_loom = \
   :tier1_loom_serviceability
 
 tier1_loom_serviceability = \
-  serviceability/jvmti/ContFramePopTest \
-  serviceability/jvmti/ContinuationTest \
-  serviceability/jvmti/ContStackDepthTest \
-  serviceability/jvmti/ContYieldBreakPointTest \
-  serviceability/jvmti/DoContinueSingleStepTest \
-  serviceability/jvmti/FiberTest \
+  serviceability/jvmti/vthread \
 
 tier1_common = \
   sanity/BasicVMTest.java \
@@ -253,6 +248,7 @@ tier2_gc_shenandoah = \
   gc/ergonomics/TestInitialGCThreadLogging.java \
   gc/ergonomics/TestDynamicNumberOfGCThreads.java \
   gc/logging/TestGCId.java \
+  gc/logging/TestMetaSpaceLog.java \
   gc/metaspace/TestMetaspacePerfCounters.java \
   gc/metaspace/TestMetaspacePerfCounters.java \
   gc/startup_warnings/TestShenandoah.java \

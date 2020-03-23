@@ -96,11 +96,12 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 private:
-  // Iterate over the stack.
+  template <typename T, class OopClosureType>
+  inline void oop_oop_iterate_header(oop obj, OopClosureType* closure);
+
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_stack(oop obj, OopClosureType* closure);
 
-  // Iterate over the stack.
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 };

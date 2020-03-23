@@ -64,9 +64,11 @@
 
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 
+// #define NO_KEEPALIVE true // Temporary: Disable keepalive to test ZGC
+
 #define SENDER_SP_RET_ADDRESS_OFFSET (frame::sender_sp_offset - frame::return_addr_offset)
 
-static void fix_stack_chunk(oop chunk);
+static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end);
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time from chunks for testing purposes
 // #define PERFTEST 1
@@ -1697,6 +1699,7 @@ protected:
   template <class T> inline void do_oop_work(T* p) {
     this->process(p);
     oop obj = this->_cont->obj_at(_i); // does a HeapAccess<IN_HEAP_ARRAY> load barrier
+    ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(obj)), "");)
 
     assert (oopDesc::is_oop_or_null(obj), "invalid oop");
     log_develop_trace(jvmcont)("i: %d", _i); print_oop(p, obj);
@@ -1711,19 +1714,21 @@ public:
   void do_oop(narrowOop* p) { do_oop_work(p); }
 
   void do_derived_oop(oop *base_loc, oop *derived_loc) {
-    assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop: " INTPTR_FORMAT " (at " INTPTR_FORMAT ")", p2i((oopDesc*)*base_loc), p2i(base_loc));
+    oop base = NativeAccess<>::oop_load(base_loc);
+    assert(Universe::heap()->is_in_or_null(base), "not an oop: " INTPTR_FORMAT " (at " INTPTR_FORMAT ")", p2i((oopDesc*)base), p2i(base_loc));
     assert(derived_loc != base_loc, "Base and derived in same location");
     DEBUG_ONLY(this->verify(base_loc);)
     DEBUG_ONLY(this->verify(derived_loc);)
-    assert (oopDesc::is_oop_or_null(*base_loc), "invalid oop");
+    assert (oopDesc::is_oop_or_null(base), "invalid oop");
+    ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(base)), "");)
 
     intptr_t offset = *(intptr_t*)derived_loc;
 
     log_develop_trace(jvmcont)(
         "Continuation thaw derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
-        p2i(derived_loc), p2i(*derived_loc), p2i(*base_loc), p2i(base_loc), offset);
+        p2i(derived_loc), p2i(*derived_loc), p2i(base), p2i(base_loc), offset);
 
-    oop obj = cast_to_oop(cast_from_oop<intptr_t>(*base_loc) + offset);
+    oop obj = cast_to_oop(cast_from_oop<intptr_t>(base) + offset);
     *derived_loc = obj;
 
     assert(Universe::heap()->is_in_or_null(obj), "");
@@ -2378,6 +2383,8 @@ public:
       java_lang_Continuation::set_tail(_cont.mirror(), chunk);
     }
 
+    assert (chunk != NULL, "");
+
     NoSafepointVerifier nsv;
     assert (ContMirror::is_stack_chunk(chunk), "");
     assert (!requires_barriers(chunk), "");
@@ -2494,6 +2501,7 @@ public:
     jdk_internal_misc_StackChunk::set_argsize(chunk, 0); // TODO PERF unnecessary?
     jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
     jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, chunk0); // field is uninitialized
+    jdk_internal_misc_StackChunk::set_cont_raw<typename ConfigT::OopT>(chunk, _cont.mirror());
     ContMirror::reset_chunk_counters(chunk);
 
     // TODO Erik says: promote young chunks quickly
@@ -2565,7 +2573,7 @@ public:
       num_chunks++;
       // if (jdk_internal_misc_StackChunk::numFrames(chunk) < 0) {
       //   assert (!requires_barriers(chunk) && !jdk_internal_misc_StackChunk::gc_mode(chunk), "");
-        Continuation::stack_chunk_iterate_stack(chunk, (BasicOopIterateClosure*)NULL); // , false /* do_metadata */); // &do_nothing_cl
+        Continuation::stack_chunk_iterate_stack<BasicOopIterateClosure, false>(chunk, (BasicOopIterateClosure*)NULL); // , false /* do_metadata */); // &do_nothing_cl
       // }
 
       static const int metadata = 2;
@@ -2848,7 +2856,9 @@ public:
       return freeze_exception; // TODO: restore max size ???
     }
 
+#ifndef NO_KEEPALIVE
     allocate_keepalive();
+#endif
 
     if (mode == mode_fast && !_thread->cont_fastpath()) {
       if (ConfigT::_post_barrier) {
@@ -3153,15 +3163,19 @@ public:
       // The keepalive must always be written. If IsKeepalive is false it means that the
       // keepalive object already existed, it must still be written.
       // kd is always !null unless we are in preemption mode which is handled above.
+      const int keepalive_index = hf.ref_sp() + oops - 1;
+      _cont.add_oop<typename ConfigT::OopWriterT>(NULL, keepalive_index);
+#ifndef NO_KEEPALIVE
       if (mode == mode_slow && _preempt) {
         if (kd != NULL) {
-          kd->write_at(_cont, hf.ref_sp() + oops - 1);
+          kd->write_at(_cont, keepalive_index);
         }
       } else {
         assert(kd != NULL, "must exist");
         // ref_sp: 3, oops 4  -> [ 3: oop, 4: oop, 5: oop, 6: nmethod ]
-        kd->write_at(_cont, hf.ref_sp() + oops - 1);
+        kd->write_at(_cont, keepalive_index);
       }
+#endif
 
       freeze_oops<Compiled>(f, vsp, hsp, hf.ref_sp(), oops - 1, (void*)freeze_stub);
 
@@ -3170,9 +3184,11 @@ public:
         _safepoint_stub = frame();
       }
 
+#ifndef NO_KEEPALIVE
       if (IsKeepalive) {
         kd->persist_oops();
       }
+#endif
     } else { // stub frame has no oops
       _fp_oop_info._has_fp_oop = false;
     }
@@ -3802,12 +3818,7 @@ public:
     // assert (verify_continuation<99>(_cont.mirror()), "");
 
     // const bool barriers = requires_barriers(chunk); // TODO PERF
-    const bool after_gc = jdk_internal_misc_StackChunk::gc_mode(chunk);
 
-    if (after_gc) {
-      fix_stack_chunk(chunk);
-    }
-    assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
     // if (!barriers) { // TODO ????
     //   ContMirror::reset_chunk_counters(chunk);
     // }
@@ -3891,11 +3902,19 @@ public:
     size += argsize;
     intptr_t* from = hsp - frame::sender_sp_offset;
     intptr_t* to   = vsp - frame::sender_sp_offset;
-    copy_from_chunk(from, to, size);
+    copy_from_chunk(from, to, size); // TODO: maybe use a memcpy that cares about ordering because we're racing with the GC
 
     // if (barriers) {
     //   memset(from, 0, size << LogBytesPerWord);
     // }
+    OrderAccess::loadload(); // we must test the gc mode *after* the copy
+    if (UNLIKELY(should_fix(chunk))) {
+      fix_stack_chunk(chunk, vsp, vsp + size);
+      if (empty) {
+        // we've set 
+        jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
+      }
+    }
 
     if (bottom) {
       patch_chunk(chunk, bottom_sp, is_last, argsize);
@@ -3913,7 +3932,6 @@ public:
       setup_chunk_jump(vsp, hsp);
     }
 
-    assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
     assert(_cont.chunk_invariant(), "");
 
     EventContinuationThawYoung e;
@@ -3926,6 +3944,23 @@ public:
 
     // assert (verify_continuation<100>(_cont.mirror()), "");
     return vsp;
+  }
+
+  inline bool should_fix(oop chunk) {
+    if (UseZGC) {
+      return jdk_internal_misc_StackChunk::gc_mode(chunk) 
+              || !oop_fixed(chunk, jdk_internal_misc_StackChunk::cont_offset()); // this is the last oop traversed in this object -- see InstanceStackChunkKlass::oop_oop_iterate in instanceStackChunkKlass.inline.hpp
+    } else {
+      return jdk_internal_misc_StackChunk::gc_mode(chunk);
+    }
+  }
+
+  inline bool oop_fixed(oop obj, int offset) {
+    typedef typename ConfigT::OopT OopT;
+    OopT* loc = obj->obj_field_addr_raw<OopT>(offset);
+    intptr_t before = *(intptr_t*)loc;
+    intptr_t after = cast_from_oop<intptr_t>(HeapAccess<>::oop_load(loc));
+    return before == after;
   }
 
   NOINLINE bool thaw_one_frame_from_chunk(oop chunk, intptr_t* hsp, int* out_size, int* out_argsize) {
@@ -4329,6 +4364,7 @@ public:
     }
 
     patch<FKind, top, bottom>(f, caller);
+    hf.cb()->as_compiled_method()->run_nmethod_entry_barrier();
 
     _cont.dec_num_frames();
 

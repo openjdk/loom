@@ -296,7 +296,7 @@ Handle java_lang_String::create_from_unicode(const jchar* unicode, int length, T
 }
 
 oop java_lang_String::create_oop_from_unicode(const jchar* unicode, int length, TRAPS) {
-  Handle h_obj = create_from_unicode(unicode, length, CHECK_0);
+  Handle h_obj = create_from_unicode(unicode, length, CHECK_NULL);
   return h_obj();
 }
 
@@ -343,7 +343,7 @@ Handle java_lang_String::create_from_str(const char* utf8_str, TRAPS) {
 }
 
 oop java_lang_String::create_oop_from_str(const char* utf8_str, TRAPS) {
-  Handle h_obj = create_from_str(utf8_str, CHECK_0);
+  Handle h_obj = create_from_str(utf8_str, CHECK_NULL);
   return h_obj();
 }
 
@@ -1441,7 +1441,7 @@ void java_lang_Class::set_source_file(oop java_class, oop source_file) {
 oop java_lang_Class::create_basic_type_mirror(const char* basic_type_name, BasicType type, TRAPS) {
   // This should be improved by adding a field at the Java level or by
   // introducing a new VM klass (see comment in ClassFileParser)
-  oop java_class = InstanceMirrorKlass::cast(SystemDictionary::Class_klass())->allocate_instance(NULL, CHECK_0);
+  oop java_class = InstanceMirrorKlass::cast(SystemDictionary::Class_klass())->allocate_instance(NULL, CHECK_NULL);
   if (type != T_VOID) {
     Klass* aklass = Universe::typeArrayKlassObj(type);
     assert(aklass != NULL, "correct bootstrap");
@@ -2219,10 +2219,8 @@ class BacktraceBuilder: public StackObj {
   objArrayOop     _mirrors;
   typeArrayOop    _names; // Needed to insulate method name against redefinition.
   objArrayOop     _conts;
-  // This is set to a java.lang.Boolean(true) if the top frame
-  // of the backtrace is omitted because it shall be hidden.
-  // Else it is null.
-  oop             _has_hidden_top_frame;
+  // True if the top frame of the backtrace is omitted because it shall be hidden.
+  bool            _has_hidden_top_frame;
   int             _index;
   NoSafepointVerifier _nsv;
 
@@ -2264,15 +2262,15 @@ class BacktraceBuilder: public StackObj {
     assert(conts != NULL, "conts array should be initialized in backtrace");
     return conts;
   }
-  static oop get_has_hidden_top_frame(objArrayHandle chunk) {
+  static bool has_hidden_top_frame(objArrayHandle chunk) {
     oop hidden = chunk->obj_at(trace_hidden_offset);
-    return hidden;
+    return hidden != NULL;
   }
 
  public:
 
   // constructor for new backtrace
-  BacktraceBuilder(TRAPS): _head(NULL), _methods(NULL), _bcis(NULL), _mirrors(NULL), _names(NULL), _conts(NULL), _has_hidden_top_frame(NULL) {
+  BacktraceBuilder(TRAPS): _head(NULL), _methods(NULL), _bcis(NULL), _mirrors(NULL), _names(NULL), _conts(NULL), _has_hidden_top_frame(false) {
     expand(CHECK);
     _backtrace = Handle(THREAD, _head);
     _index = 0;
@@ -2284,7 +2282,7 @@ class BacktraceBuilder: public StackObj {
     _mirrors = get_mirrors(backtrace);
     _names = get_names(backtrace);
     _conts = get_conts(backtrace);
-    _has_hidden_top_frame = get_has_hidden_top_frame(backtrace);
+    _has_hidden_top_frame = has_hidden_top_frame(backtrace);
     assert(_methods->length() == _bcis->length() &&
            _methods->length() == _mirrors->length() &&
            _mirrors->length() == _names->length() &&
@@ -2373,19 +2371,17 @@ class BacktraceBuilder: public StackObj {
   }
 
   void set_has_hidden_top_frame(TRAPS) {
-    if (_has_hidden_top_frame == NULL) {
+    if (!_has_hidden_top_frame) {
       // It would be nice to add java/lang/Boolean::TRUE here
       // to indicate that this backtrace has a hidden top frame.
       // But this code is used before TRUE is allocated.
-      // Therefor let's just use an arbitrary legal oop
-      // available right here. We only test for != null
-      // anyways. _methods is a short[].
+      // Therefore let's just use an arbitrary legal oop
+      // available right here. _methods is a short[].
       assert(_methods != NULL, "we need a legal oop");
-      _has_hidden_top_frame = _methods;
-      _head->obj_at_put(trace_hidden_offset, _has_hidden_top_frame);
+      _has_hidden_top_frame = true;
+      _head->obj_at_put(trace_hidden_offset, _methods);
     }
   }
-
 };
 
 struct BacktraceElement : public StackObj {
@@ -2906,13 +2902,13 @@ oop java_lang_StackTraceElement::create(const methodHandle& method, int bci, Han
   InstanceKlass* k = SystemDictionary::StackTraceElement_klass();
   assert(k != NULL, "must be loaded in 1.4+");
   if (k->should_be_initialized()) {
-    k->initialize(CHECK_0);
+    k->initialize(CHECK_NULL);
   }
 
-  Handle element = k->allocate_instance_handle(CHECK_0);
+  Handle element = k->allocate_instance_handle(CHECK_NULL);
 
   int version = method->constants()->version();
-  fill_in(element, method->method_holder(), method, version, bci, method->name(), contScope, CHECK_0);
+  fill_in(element, method->method_holder(), method, version, bci, method->name(), contScope, CHECK_NULL);
   return element();
 }
 
@@ -3666,13 +3662,13 @@ oop java_lang_boxing_object::initialize_and_allocate(BasicType type, TRAPS) {
   Klass* k = SystemDictionary::box_klass(type);
   if (k == NULL)  return NULL;
   InstanceKlass* ik = InstanceKlass::cast(k);
-  if (!ik->is_initialized())  ik->initialize(CHECK_0);
+  if (!ik->is_initialized())  ik->initialize(CHECK_NULL);
   return ik->allocate_instance(THREAD);
 }
 
 
 oop java_lang_boxing_object::create(BasicType type, jvalue* value, TRAPS) {
-  oop box = initialize_and_allocate(type, CHECK_0);
+  oop box = initialize_and_allocate(type, CHECK_NULL);
   if (box == NULL)  return NULL;
   switch (type) {
     case T_BOOLEAN:
@@ -4303,9 +4299,9 @@ oop java_security_AccessControlContext::create(objArrayHandle context, bool isPr
   assert(_isPrivileged_offset != 0, "offsets should have been initialized");
   assert(_isAuthorized_offset != -1, "offsets should have been initialized");
   // Ensure klass is initialized
-  SystemDictionary::AccessControlContext_klass()->initialize(CHECK_0);
+  SystemDictionary::AccessControlContext_klass()->initialize(CHECK_NULL);
   // Allocate result
-  oop result = SystemDictionary::AccessControlContext_klass()->allocate_instance(CHECK_0);
+  oop result = SystemDictionary::AccessControlContext_klass()->allocate_instance(CHECK_NULL);
   // Fill in values
   result->obj_field_put(_context_offset, context());
   result->obj_field_put(_privilegedContext_offset, privileged_context());
@@ -4618,6 +4614,7 @@ int jdk_internal_misc_StackChunk::_argsize_offset;
 int jdk_internal_misc_StackChunk::_mode_offset;
 int jdk_internal_misc_StackChunk::_numFrames_offset;
 int jdk_internal_misc_StackChunk::_numOops_offset;
+int jdk_internal_misc_StackChunk::_cont_offset;
 int java_lang_ClassLoader::parent_offset;
 int java_lang_System::static_in_offset;
 int java_lang_System::static_out_offset;
@@ -4852,11 +4849,12 @@ void java_lang_Continuation::serialize_offsets(SerializeClosure* f) {
   macro(_parent_offset,    k, vmSymbols::parent_name(),    stackchunk_signature, false); \
   macro(_size_offset,      k, vmSymbols::size_name(),      int_signature,        false); \
   macro(_sp_offset,        k, vmSymbols::sp_name(),        int_signature,        false); \
-  macro(_pc_offset,        k, vmSymbols::pc_name(),        long_signature,        false); \
+  macro(_pc_offset,        k, vmSymbols::pc_name(),        long_signature,       false); \
   macro(_argsize_offset,   k, vmSymbols::argsize_name(),   int_signature,        false); \
   macro(_mode_offset,      k, vmSymbols::mode_name(),      bool_signature,       false); \
   macro(_numFrames_offset, k, vmSymbols::numFrames_name(), int_signature,        false); \
-  macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false);
+  macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false); \
+  macro(_cont_offset,      k, "cont",                      continuation_signature, false);
 
 void jdk_internal_misc_StackChunk::compute_offsets() {
   InstanceKlass* k = SystemDictionary::StackChunk_klass();
@@ -5179,9 +5177,9 @@ void JavaClasses::compute_hard_coded_offsets() {
 // Compute non-hard-coded field offsets of all the classes in this file
 void JavaClasses::compute_offsets() {
   if (UseSharedSpaces) {
-    assert(JvmtiExport::is_early_phase() && !(JvmtiExport::should_post_class_file_load_hook() &&
-                                              JvmtiExport::has_early_class_hook_env()),
-           "JavaClasses::compute_offsets() must be called in early JVMTI phase.");
+    JVMTI_ONLY(assert(JvmtiExport::is_early_phase() && !(JvmtiExport::should_post_class_file_load_hook() &&
+                                                         JvmtiExport::has_early_class_hook_env()),
+                      "JavaClasses::compute_offsets() must be called in early JVMTI phase."));
     // None of the classes used by the rest of this function can be replaced by
     // JMVTI ClassFileLoadHook.
     // We are safe to use the archived offsets, which have already been restored

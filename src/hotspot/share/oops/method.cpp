@@ -1175,9 +1175,11 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
   // If the code cache is full, we may reenter this function for the
   // leftover methods that weren't linked.
   if (is_shared()) {
+#ifdef ASSERT
     address entry = Interpreter::entry_for_cds_method(h_method);
     assert(entry != NULL && entry == _i2i_entry,
            "should be correctly set during dump time");
+#endif
     if (adapter() != NULL) {
       return;
     }
@@ -1682,7 +1684,6 @@ void Method::init_intrinsic_id() {
   }
 }
 
-// These two methods are static since a GC may move the Method
 bool Method::load_signature_classes(const methodHandle& m, TRAPS) {
   if (!THREAD->can_call_java()) {
     // There is nothing useful this routine can do from within the Compile thread.
@@ -1691,16 +1692,11 @@ bool Method::load_signature_classes(const methodHandle& m, TRAPS) {
     return false;
   }
   bool sig_is_loaded = true;
-  Handle class_loader(THREAD, m->method_holder()->class_loader());
-  Handle protection_domain(THREAD, m->method_holder()->protection_domain());
   ResourceMark rm(THREAD);
-  Symbol*  signature = m->signature();
-  for(SignatureStream ss(signature); !ss.is_done(); ss.next()) {
+  for (ResolvingSignatureStream ss(m()); !ss.is_done(); ss.next()) {
     if (ss.is_reference()) {
-      Symbol* sym = ss.as_symbol();
-      Symbol*  name  = sym;
-      Klass* klass = SystemDictionary::resolve_or_null(name, class_loader,
-                                             protection_domain, THREAD);
+      // load everything, including arrays "[Lfoo;"
+      Klass* klass = ss.as_klass(SignatureStream::ReturnNull, THREAD);
       // We are loading classes eagerly. If a ClassNotFoundException or
       // a LinkageError was generated, be sure to ignore it.
       if (HAS_PENDING_EXCEPTION) {
@@ -1718,14 +1714,13 @@ bool Method::load_signature_classes(const methodHandle& m, TRAPS) {
 }
 
 bool Method::has_unloaded_classes_in_signature(const methodHandle& m, TRAPS) {
-  Handle class_loader(THREAD, m->method_holder()->class_loader());
-  Handle protection_domain(THREAD, m->method_holder()->protection_domain());
   ResourceMark rm(THREAD);
-  Symbol*  signature = m->signature();
-  for(SignatureStream ss(signature); !ss.is_done(); ss.next()) {
+  for(ResolvingSignatureStream ss(m()); !ss.is_done(); ss.next()) {
     if (ss.type() == T_OBJECT) {
-      Symbol* name = ss.as_symbol();
-      Klass* klass = SystemDictionary::find(name, class_loader, protection_domain, THREAD);
+      // Do not use ss.is_reference() here, since we don't care about
+      // unloaded array component types.
+      Klass* klass = ss.as_klass_if_loaded(THREAD);
+      assert(!HAS_PENDING_EXCEPTION, "as_klass_if_loaded contract");
       if (klass == NULL) return true;
     }
   }

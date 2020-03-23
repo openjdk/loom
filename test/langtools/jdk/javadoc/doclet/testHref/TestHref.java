@@ -62,7 +62,7 @@ public class TestHref extends JavadocTester {
                 //{@link} test.
                 "Link: <a href=\"C1.html#method(int,int,java.util.ArrayList)\">",
                 //@see test.
-                "See Also:</span></dt>\n"
+                "See Also:</dt>\n"
                 + "<dd><a href=\"C1.html#method(int,int,java.util.ArrayList)\">"
         );
 
@@ -70,7 +70,7 @@ public class TestHref extends JavadocTester {
                 //Header does not link to the page itself.
                 "Class C4&lt;E extends C4&lt;E&gt;&gt;</h1>",
                 //Signature does not link to the page itself.
-                "public abstract class <span class=\"typeNameLabel\">C4&lt;E extends C4&lt;E&gt;&gt;</span>"
+                "public abstract class <span class=\"type-name-label\">C4&lt;E extends C4&lt;E&gt;&gt;</span>"
         );
 
         checkOutput(Output.OUT, false,

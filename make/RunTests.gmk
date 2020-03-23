@@ -45,7 +45,7 @@ ifneq ($(TEST_VM_OPTS), )
 endif
 
 $(eval $(call ParseKeywordVariable, TEST_OPTS, \
-    SINGLE_KEYWORDS := JOBS TIMEOUT_FACTOR JCOV, \
+    SINGLE_KEYWORDS := JOBS TIMEOUT_FACTOR JCOV JCOV_DIFF_CHANGESET, \
     STRING_KEYWORDS := VM_OPTIONS JAVA_OPTIONS AOT_MODULES, \
 ))
 
@@ -300,7 +300,7 @@ $(eval $(call SetTestOpt,FAILURE_HANDLER_TIMEOUT,JTREG))
 
 $(eval $(call ParseKeywordVariable, JTREG, \
     SINGLE_KEYWORDS := JOBS TIMEOUT_FACTOR FAILURE_HANDLER_TIMEOUT \
-        TEST_MODE ASSERT VERBOSE RETAIN MAX_MEM RUN_PROBLEM_LISTS \
+        TEST_MODE ASSERT VERBOSE RETAIN MAIN_WRAPPER MAX_MEM RUN_PROBLEM_LISTS \
         RETRY_COUNT, \
     STRING_KEYWORDS := OPTIONS JAVA_OPTIONS VM_OPTIONS KEYWORDS \
         EXTRA_PROBLEM_LISTS AOT_MODULES, \
@@ -852,8 +852,14 @@ define SetupRunJtregTestBody
   endif
   JTREG_VERBOSE ?= fail,error,summary
   JTREG_RETAIN ?= fail,error
+  JTREG_MAIN_WRAPPER ?=
   JTREG_RUN_PROBLEM_LISTS ?= false
   JTREG_RETRY_COUNT ?= 0
+
+  ifneq ($$(JTREG_MAIN_WRAPPER), )
+    JT_HOME = $$(JT_HOME_MW)
+    $1_JTREG_BASIC_OPTIONS += -mainWrapper:$$(JTREG_MAIN_WRAPPER)
+  endif
 
   ifneq ($$($1_JTREG_MAX_MEM), 0)
     $1_JTREG_BASIC_OPTIONS += -vmoption:-Xmx$$($1_JTREG_MAX_MEM)
@@ -1266,12 +1272,44 @@ ifeq ($(TEST_OPTS_JCOV), true)
   TARGETS += jcov-do-start-grabber jcov-start-grabber jcov-stop-grabber \
       jcov-gen-report
 
+  ifneq ($(TEST_OPTS_JCOV_DIFF_CHANGESET), )
+
+    JCOV_SOURCE_DIFF := $(JCOV_OUTPUT_DIR)/source_diff
+    JCOV_DIFF_COVERAGE_REPORT := $(JCOV_OUTPUT_DIR)/diff_coverage_report
+
+    ifneq ($(and $(HG), $(wildcard $(TOPDIR)/.hg)), )
+      DIFF_COMMAND := $(HG) -R $(TOPDIR) diff -r $(TEST_OPTS_JCOV_DIFF_CHANGESET) > $(JCOV_SOURCE_DIFF)
+    else ifneq ($(and $(GIT), $(wildcard $(TOPDIR)/.git)), )
+      DIFF_COMMAND := $(GIT) -C $(TOPDIR) diff $(TEST_OPTS_JCOV_DIFF_CHANGESET) > $(JCOV_SOURCE_DIFF)
+    else
+      $(info Error: Must be either hg or git source tree for diff coverage.)
+      $(error Neither hg nor git source tree.)
+    endif
+
+    jcov-gen-diffcoverage: jcov-stop-grabber
+	$(call LogWarn, Generating diff coverage with changeset $(TEST_OPTS_JCOV_DIFF_CHANGESET) ... )
+	$(DIFF_COMMAND)
+	$(JAVA) -Xmx4g -jar $(JCOV_HOME)/lib/jcov.jar \
+	  DiffCoverage -replaceDiff "src/.*/classes/:" -all \
+	    $(JCOV_RESULT_FILE) $(JCOV_SOURCE_DIFF) > \
+	    $(JCOV_DIFF_COVERAGE_REPORT)
+
+    TARGETS += jcov-gen-diffcoverage
+
+  endif
+
   # Hook this into the framework at appropriate places
   pre-run-test: jcov-start-grabber
 
   post-run-test: jcov-gen-report
 
-  jcov-gen-report: run-all-tests
+  ifneq ($(TEST_OPTS_JCOV_DIFF_CHANGESET), )
+
+    post-run-test: jcov-gen-diffcoverage
+
+  endif
+
+  jcov-stop-grabber: run-all-tests
 
 endif
 

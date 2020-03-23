@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,10 +37,12 @@ import jdk.jfr.events.ExceptionThrownEvent;
 import jdk.jfr.events.FileForceEvent;
 import jdk.jfr.events.FileReadEvent;
 import jdk.jfr.events.FileWriteEvent;
+import jdk.jfr.events.ProcessStartEvent;
 import jdk.jfr.events.SecurityPropertyModificationEvent;
 import jdk.jfr.events.SocketReadEvent;
 import jdk.jfr.events.SocketWriteEvent;
 import jdk.jfr.events.TLSHandshakeEvent;
+import jdk.jfr.events.ThreadSleepEvent;
 import jdk.jfr.events.X509CertificateEvent;
 import jdk.jfr.events.X509ValidationEvent;
 import jdk.jfr.internal.JVM;
@@ -56,7 +58,9 @@ public final class JDKEvents {
         SecurityPropertyModificationEvent.class,
         TLSHandshakeEvent.class,
         X509CertificateEvent.class,
-        X509ValidationEvent.class
+        X509ValidationEvent.class,
+        ProcessStartEvent.class,
+        ThreadSleepEvent.class
     };
 
     private static final Class<?>[] eventClasses = {
@@ -73,7 +77,9 @@ public final class JDKEvents {
         jdk.internal.event.SecurityPropertyModificationEvent.class,
         jdk.internal.event.TLSHandshakeEvent.class,
         jdk.internal.event.X509CertificateEvent.class,
-        jdk.internal.event.X509ValidationEvent.class
+        jdk.internal.event.X509ValidationEvent.class,
+        jdk.internal.event.ProcessStartEvent.class,
+        jdk.internal.event.ThreadSleepEvent.class
     };
 
     // This is a list of the classes with instrumentation code that should be applied.

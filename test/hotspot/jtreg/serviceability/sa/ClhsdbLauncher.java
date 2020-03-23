@@ -33,8 +33,6 @@ import jdk.test.lib.JDKToolLauncher;
 import jdk.test.lib.JDKToolFinder;
 import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.SA.SATestUtils;
-import jtreg.SkippedException;
-
 
 /**
  * This is a framework to run 'jhsdb clhsdb' commands.
@@ -45,11 +43,9 @@ import jtreg.SkippedException;
 public class ClhsdbLauncher {
 
     private Process toolProcess;
-    private boolean needPrivileges;
 
     public ClhsdbLauncher() {
         toolProcess = null;
-        needPrivileges = false;
     }
 
     /**
@@ -66,11 +62,7 @@ public class ClhsdbLauncher {
             System.out.println("Starting clhsdb against " + lingeredAppPid);
         }
 
-        List<String> cmdStringList = Arrays.asList(launcher.getCommand());
-        if (needPrivileges) {
-            cmdStringList = SATestUtils.addPrivileges(cmdStringList);
-        }
-        ProcessBuilder processBuilder = new ProcessBuilder(cmdStringList);
+        ProcessBuilder processBuilder = SATestUtils.createProcessBuilder(launcher);
         toolProcess = processBuilder.start();
     }
 
@@ -113,15 +105,22 @@ public class ClhsdbLauncher {
             throw new RuntimeException("CLHSDB command must be provided\n");
         }
 
-        // Enable verbose exception tracing so we see the full exception backtrace
-        // when there is a failure. We need to insert this command into the start
-        // of the commands list. We can't just issue the "verbose true" command seperately
+        // We want to execute clhsdb "echo" and "verbose" commands before the
+        // requested commands. We can't just issue these commands separately
         // because code below won't work correctly if all executed commands are
-        // not in the commands list. And since it's immutable, we need to allocate
-        // a mutable one.
+        // not in the commands list. Since the commands list is immutable, we
+        // need to allocate a mutable one that we can add the extra commands too.
         List<String> savedCommands = commands;
         commands = new java.util.LinkedList<String>();
+
+        // Enable echoing of all commands so we see them in the output.
+        commands.add("echo true");
+
+        // Enable verbose exception tracing so we see the full exception backtrace
+        // when there is a failure.
         commands.add("verbose true");
+
+        // Now add all the original commands after the "echo" and "verbose" commands.
         commands.addAll(savedCommands);
 
         try (OutputStream out = toolProcess.getOutputStream()) {
@@ -196,22 +195,7 @@ public class ClhsdbLauncher {
                       Map<String, List<String>> unExpectedStrMap)
         throws Exception {
 
-        if (!Platform.shouldSAAttach()) {
-            if (Platform.isOSX()) {
-                if (Platform.isSignedOSX()) {
-                    throw new SkippedException("SA attach not expected to work. JDK is signed.");
-                } else if (SATestUtils.canAddPrivileges()) {
-                    needPrivileges = true;
-                }
-            }
-            if (!needPrivileges)  {
-               // Skip the test if we don't have enough permissions to attach
-               // and cannot add privileges.
-               throw new SkippedException(
-                   "SA attach not expected to work. Insufficient privileges.");
-           }
-        }
-
+        SATestUtils.skipIfCannotAttach(); // throws SkippedException if attach not expected to work.
         attach(lingeredAppPid);
         return runCmd(commands, expectedStrMap, unExpectedStrMap);
     }

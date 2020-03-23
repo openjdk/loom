@@ -132,29 +132,17 @@ AC_DEFUN([FLAGS_SETUP_DEBUG_SYMBOLS],
 
 AC_DEFUN([FLAGS_SETUP_WARNINGS],
 [
-  AC_ARG_ENABLE([warnings-as-errors], [AS_HELP_STRING([--disable-warnings-as-errors],
-      [do not consider native warnings to be an error @<:@enabled@:>@])])
-
   # Set default value.
-  if test "x$TOOLCHAIN_TYPE" = xxlc; then
-    WARNINGS_AS_ERRORS=false
+  if test "x$TOOLCHAIN_TYPE" != xxlc; then
+    WARNINGS_AS_ERRORS_DEFAULT=true
   else
-    WARNINGS_AS_ERRORS=true
+    WARNINGS_AS_ERRORS_DEFAULT=false
   fi
 
-  AC_MSG_CHECKING([if native warnings are errors])
-  if test "x$enable_warnings_as_errors" = "xyes"; then
-    AC_MSG_RESULT([yes (explicitly set)])
-    WARNINGS_AS_ERRORS=true
-  elif test "x$enable_warnings_as_errors" = "xno"; then
-    AC_MSG_RESULT([no (explicitly set)])
-    WARNINGS_AS_ERRORS=false
-  elif test "x$enable_warnings_as_errors" = "x"; then
-    AC_MSG_RESULT([${WARNINGS_AS_ERRORS} (default)])
-  else
-    AC_MSG_ERROR([--enable-warnings-as-errors accepts no argument])
-  fi
-
+  UTIL_ARG_ENABLE(NAME: warnings-as-errors, DEFAULT: $WARNINGS_AS_ERRORS_DEFAULT,
+      RESULT: WARNINGS_AS_ERRORS,
+      DEFAULT_DESC: [auto],
+      DESC: [consider native warnings to be an error])
   AC_SUBST(WARNINGS_AS_ERRORS)
 
   case "${TOOLCHAIN_TYPE}" in
@@ -588,13 +576,7 @@ AC_DEFUN([FLAGS_SETUP_CFLAGS_HELPER],
     TOOLCHAIN_CFLAGS_JVM="-qtbtable=full -qtune=balanced \
         -qalias=noansi -qstrict -qtls=default -qnortti -qnoeh -qignerrno -qstackprotect"
   elif test "x$TOOLCHAIN_TYPE" = xmicrosoft; then
-    #
-    # LOOM NOTE:
-    #   Parameter -bigobj increases the number of addressable sections in an object file to 2^32.
-    #   It is passed as a workaround to compile the now very large continuation.obj file.
-    #   Ensure to remove this parameter when the continuation module is refactored.
-    #
-    TOOLCHAIN_CFLAGS_JVM="-nologo -MD -MP -bigobj"
+    TOOLCHAIN_CFLAGS_JVM="-nologo -MD -MP"
     TOOLCHAIN_CFLAGS_JDK="-nologo -MD -Zc:wchar_t-"
   fi
 

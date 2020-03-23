@@ -1,0 +1,20 @@
+##########
+## Tests failing when main() is executed in additional vthread or in vthread instead of thread
+
+
+####
+# Failed because jtreg wrapper can't catch exceptions in thread groups
+# or incorrently process negative tests
+
+tools/javac/NullQualifiedNew.java
+tools/javac/NullQualifiedSuper2.java
+tools/javac/generics/T5094318.java
+tools/javac/api/T6395981.java
+jdk/javadoc/tool/sourceOption/SourceOption.java
+
+####
+# result: Error. Agent communication error: java.io.EOFException; check console log for any additional details
+
+tools/javac/lambda/T8031967.java
+tools/javac/lambda/LambdaParserTest.java
+jdk/javadoc/doclet/testLinkOption/TestRedirectLinks.java

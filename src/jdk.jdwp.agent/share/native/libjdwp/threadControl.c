@@ -95,6 +95,10 @@ typedef struct ThreadNode {
 
 static jint suspendAllCount;
 
+// minimumSuspendAllCount takes into account threads that have had a resume done
+// on them. It represents the minimum suspend count any thread might have.
+static jint minimumSuspendAllCount;
+
 typedef struct ThreadList {
     ThreadNode *first;
 } ThreadList;
@@ -601,6 +605,7 @@ threadControl_initialize(void)
     jvmtiError error;
 
     suspendAllCount = 0;
+    minimumSuspendAllCount = 0;
     runningThreads.first = NULL;
     otherThreads.first = NULL;
     runningVThreads.first = NULL;
@@ -912,6 +917,25 @@ commonSuspendByNode(ThreadNode *node)
 }
 
 /*
+ * Track the guaranteed minimum suspend count each Thread has after one or more
+ * suspendAll() have been done, followed by selectively resuming some threads.
+ * The idea is to figure out if any carrier threads *might* be running. If
+ * minimumSuspendAllCount > 0, we know we can treat all vthreads as being supended.
+ *
+ * vthread fixme: We don't take into account doing a suspend of a thread that we
+ * previously had resumed, and that resulted in decrementing minimumSuspendAllCount.
+ * If we tracked these threads, we could have a more accureate minimumSuspendAllCount,
+ * one that can recover from a resume + suspend of an individual thread.
+ */
+static void
+adjustMinimumSuspendAllCount(jint suspendCount) 
+{
+    if (minimumSuspendAllCount > suspendCount) {
+        minimumSuspendAllCount = suspendCount;
+    }
+}
+
+/*
  * Deferred suspends happen when the suspend is attempted on a thread
  * that is not started. Bookkeeping (suspendCount,etc.)
  * is handled by the original request, and once the thread actually
@@ -944,6 +968,7 @@ deferredSuspendThreadByNode(ThreadNode *node)
          */
         if (error != JVMTI_ERROR_NONE) {
             node->suspendCount--;
+            adjustMinimumSuspendAllCount(node->suspendCount);
         }
     }
 
@@ -1013,6 +1038,18 @@ resumeThreadByNode(ThreadNode *node)
 
     if (node->suspendCount > 0) {
         node->suspendCount--;
+        /*
+         * Only adjust minimumSuspendAllCount if we are not suspending due an invoke request.
+         * The reason is because doing invokes under a SUSPEND_ALL is very common, and we don't
+         * want it to result in no longer considering all vthreads to be suspended. For the most
+         * part this is safe because under normal situations this thread could not be used
+         * to mount another vthread, although technically the code being invoked could do this.
+         * A safeguard is to catch this during the VIRTUAL_THREAD_MOUNTED event and no
+         * longer assume vthreads are suspended whenever one is received.
+         */
+        if (!node->currentInvoke.pending) {
+          adjustMinimumSuspendAllCount(node->suspendCount);
+        }
         debugMonitorNotifyAll(threadLock);
         if ((node->suspendCount == 0) && node->toBeResumed &&
             !node->suspendOnStart) {
@@ -1131,6 +1168,7 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
 
     if (node->suspendCount > 1) {
         node->suspendCount--;
+        adjustMinimumSuspendAllCount(node->suspendCount);
         /* nested suspend so just undo one level */
         return JVMTI_ERROR_NONE;
     }
@@ -1152,6 +1190,7 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
      */
     if (node->suspendCount == 1 && (!node->toBeResumed || node->suspendOnStart)) {
         node->suspendCount--;
+        adjustMinimumSuspendAllCount(node->suspendCount);
         return JVMTI_ERROR_NONE;
     }
 
@@ -1293,6 +1332,7 @@ commonResumeList(JNIEnv *env)
          * the same here. We also don't clear the error.
          */
         node->suspendCount--;
+        adjustMinimumSuspendAllCount(node->suspendCount);
         node->toBeResumed = JNI_FALSE;
         node->frameGeneration++; /* Increment on each resume */
     }
@@ -1516,12 +1556,8 @@ threadControl_suspendCount(jthread thread, jint *count)
         } else {
             jthread carrier_thread = getVThreadThread(thread);
             if (carrier_thread == NULL) {
-              /* Not mounted, so use suspendAllCount. 
-               * vthread fixme: This might confuse debuggers because if a carrier thread
-               * is resumed, this vthread could potentially run. This is part of the reason
-               * we need a better vthread suspend/resume story. 
-               */
-              *count = suspendAllCount;
+              /* Not mounted, so use minimumSuspendAllCount. */
+              *count = minimumSuspendAllCount;
             } else {
               /* It's a mounted vthread, so the carrier thread tracks the suspend count. */
               node = findThread(&runningThreads, carrier_thread);
@@ -1632,6 +1668,7 @@ threadControl_suspendAll(void)
 
         if (error == JVMTI_ERROR_NONE) {
             suspendAllCount++;
+            minimumSuspendAllCount++;
         }
 
     err: ;
@@ -2306,8 +2343,7 @@ threadControl_applicationThreadStatus(jthread thread,
 
     if (error == JVMTI_ERROR_NONE) {
         if (is_vthread) {
-            if (getVThreadThread(thread) == NULL) {
-                /* vthread fixme - for now always assume umounted vthreads are SUSPENDED. */
+            if (minimumSuspendAllCount > 0) {
                 *statusFlags = JDWP_SUSPEND_STATUS(SUSPENDED);
             }
         } else {
@@ -2527,6 +2563,7 @@ threadControl_reset(void)
     freeDeferredEventModes(env);
 
     suspendAllCount = 0;
+    minimumSuspendAllCount = 0;
 
     /* Everything should have been resumed */
     JDI_ASSERT(otherThreads.first == NULL);
@@ -2724,9 +2761,12 @@ threadControl_addVThread(jthread vthread)
 
 void
 threadControl_mountVThread(jthread vthread, jthread thread, jbyte sessionID) {
-    /* vthread fixme: this function no longer serves any purpose now that we rely on
-     * continuation events instead. Remove.
-     */
+  /* If we get a MOUNT event, there must be a carrier thread running. The only way this
+   * should happen when minimumSuspendAllCount is not already 0 is if the JDWP
+   * invoke support was used to invoke a method that triggered a vthread to be mounted,
+   * which should never happen unless someone writes a test to do this.
+   */
+  minimumSuspendAllCount = 0;
 }
 
 

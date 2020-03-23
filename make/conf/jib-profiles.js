@@ -246,7 +246,7 @@ var getJibProfilesCommon = function (input, data) {
 
     // These are the base setttings for all the main build profiles.
     common.main_profile_base = {
-        dependencies: ["boot_jdk", "gnumake", "jtreg", "jib", "autoconf", "jmh", "jcov"],
+        dependencies: ["boot_jdk", "gnumake", "jtreg", "jtregMW", "jib", "autoconf", "jmh", "jcov"],
         default_make_targets: ["product-bundles", "test-bundles", "static-libs-bundles"],
         configure_args: concat(["--enable-jtreg-failure-handler"],
             "--with-exclude-translations=de,es,fr,it,ko,pt_BR,sv,ca,tr,cs,sk,ja_JP_A,ja_JP_HA,ja_JP_HI,ja_JP_I,zh_TW,zh_HK",
@@ -466,8 +466,7 @@ var getJibProfilesProfiles = function (input, common, data) {
             build_cpu: "x64",
             dependencies: ["devkit", "build_devkit", "cups"],
             configure_args: [
-                "--openjdk-target=aarch64-linux-gnu", "--with-freetype=bundled",
-                "--disable-warnings-as-errors"
+                "--openjdk-target=aarch64-linux-gnu",
             ],
         },
 
@@ -539,7 +538,7 @@ var getJibProfilesProfiles = function (input, common, data) {
         });
 
     // Generate -gcov profiles
-    [ "linux-x64", "macosx-x64" ].forEach(function (name) {
+    [ "linux-aarch64", "linux-x64", "macosx-x64" ].forEach(function (name) {
         var gcovName = name + "-gcov";
         profiles[gcovName] = clone(profiles[name]);
         profiles[gcovName].default_make_targets = ["product-bundles", "test-bundles"];
@@ -626,7 +625,7 @@ var getJibProfilesProfiles = function (input, common, data) {
         });
 
     // JCov profiles build JCov-instrumented JDK image based on images provided through dependencies.
-    [ "linux-x64", "macosx-x64", "solaris-sparcv9", "windows-x64"]
+    [ "linux-aarch64", "linux-x64", "macosx-x64", "solaris-sparcv9", "windows-x64"]
         .forEach(function (name) {
             var jcovName = name + "-jcov";
             profiles[jcovName] = clone(common.main_profile_base);
@@ -783,7 +782,7 @@ var getJibProfilesProfiles = function (input, common, data) {
     });
 
     // Artifacts of JCov profiles
-    [ "linux-x64", "macosx-x64", "solaris-sparcv9", "windows-x64"]
+    [ "linux-aarch64", "linux-x64", "macosx-x64", "solaris-sparcv9", "windows-x64"]
         .forEach(function (name) {
             var o = artifactData[name]
             var jdk_subdir = (o.jdk_subdir != null ? o.jdk_subdir : "jdk-" + data.version);
@@ -803,7 +802,7 @@ var getJibProfilesProfiles = function (input, common, data) {
         });
 
     // Artifacts of gcov (native-code-coverage) profiles
-    [ "linux-x64", "macosx-x64" ].forEach(function (name) {
+    [ "linux-aarch64", "linux-x64", "macosx-x64" ].forEach(function (name) {
         var o = artifactData[name]
         var pf = o.platform
         var jdk_subdir = (o.jdk_subdir != null ? o.jdk_subdir : "jdk-" + data.version);
@@ -841,7 +840,7 @@ var getJibProfilesProfiles = function (input, common, data) {
         "run-test": {
             target_os: input.build_os,
             target_cpu: input.build_cpu,
-            dependencies: [ "jtreg", "gnumake", "boot_jdk", "devkit", "jib" ],
+            dependencies: [ "jtreg", "jtregMW", "gnumake", "boot_jdk", "devkit", "jib" ],
             labels: "test",
             environment: {
                 "JT_JAVA": common.boot_jdk_home
@@ -875,7 +874,7 @@ var getJibProfilesProfiles = function (input, common, data) {
             target_os: input.build_os,
             target_cpu: input.build_cpu,
             dependencies: [
-                "jtreg", "gnumake", "boot_jdk", "devkit", "jib", "jcov", testedProfileJdk,
+                "jtreg", "jtregMW", "gnumake", "boot_jdk", "devkit", "jib", "jcov", testedProfileJdk,
                 testedProfileTest
             ],
             src: "src.conf",
@@ -1060,6 +1059,14 @@ var getJibProfilesDependencies = function (input, common) {
             checksum_file: "MD5_VALUES",
             file: "bundles/jtreg_bin-5.0.zip",
             environment_name: "JT_HOME",
+            environment_path: input.get("jtreg", "install_path") + "/jtreg/bin"
+        },
+
+        jtregMW: {
+            organization: common.organization,
+            ext: "zip",
+            revision: "5.0-virtual-1.1",
+            environment_name: "JT_HOME_MW",
             environment_path: input.get("jtreg", "install_path") + "/jtreg/bin"
         },
 
