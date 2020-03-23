@@ -2348,8 +2348,10 @@ class BacktraceBuilder: public StackObj {
 
     if (_index >= trace_chunk_size) {
       methodHandle mhandle(THREAD, method);
+      Handle chandle(THREAD, contScopeName);
       expand(CHECK);
       method = mhandle();
+      contScopeName = chandle();
     }
 
     _methods->ushort_at_put(_index, method->orig_method_idnum());
@@ -3027,6 +3029,7 @@ void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const metho
   // set Method* or mid/cpref
   HandleMark hm(THREAD);
   Handle mname(Thread::current(), stackFrame->obj_field(_memberName_offset));
+  Handle cont_h (THREAD, cont);
   InstanceKlass* ik = method->method_holder();
   CallInfo info(method(), ik, CHECK);
   MethodHandles::init_method_MemberName(mname, info);
@@ -3037,7 +3040,7 @@ void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const metho
   assert((jushort)version == version, "version should be short");
   java_lang_StackFrameInfo::set_version(stackFrame(), (short)version);
 
-  oop contScope = cont != NULL ? java_lang_Continuation::scope(cont) : (oop)NULL;
+  oop contScope = cont_h() != NULL ? java_lang_Continuation::scope(cont_h()) : (oop)NULL;
   java_lang_StackFrameInfo::set_contScope(stackFrame(), contScope);
 }
 
