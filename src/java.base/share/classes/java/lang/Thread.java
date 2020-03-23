@@ -52,6 +52,7 @@ import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import sun.security.util.SecurityConstants;
 import jdk.internal.HotSpotIntrinsicCandidate;
+import jdk.internal.event.ThreadSleepEvent;
 
 /**
  * A <i>thread</i> is a thread of execution in a program. The Java
@@ -348,13 +349,29 @@ public class Thread implements Runnable {
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
-        VirtualThread vthread = currentCarrierThread().getVirtualThread();
+	    if (ThreadSleepEvent.isTurnedOn()) {
+			ThreadSleepEvent event = new ThreadSleepEvent();
+			try {
+				event.time = millis;
+				event.begin();
+				sleepMillis(millis);
+			} finally {
+				event.commit();
+			}
+        } else {
+            sleepMillis(millis);
+        }
+    }
+	
+	private static void sleepMillis(long millis) throws InterruptedException {
+		VirtualThread vthread = currentCarrierThread().getVirtualThread();
         if (vthread != null) {
             vthread.sleepNanos(TimeUnit.MILLISECONDS.toNanos(millis));
         } else {
             sleep0(millis);
         }
-    }
+	}	
+	
     private static native void sleep0(long millis) throws InterruptedException;
 
     /**

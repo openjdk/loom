@@ -3067,13 +3067,6 @@ JVM_ENTRY(void, JVM_Yield(JNIEnv *env, jclass threadClass))
   os::naked_yield();
 JVM_END
 
-static void post_thread_sleep_event(EventThreadSleep* event, jlong millis) {
-  assert(event != NULL, "invariant");
-  assert(event->should_commit(), "invariant");
-  event->set_time(millis);
-  event->commit();
-}
-
 JVM_ENTRY(void, JVM_Sleep(JNIEnv* env, jclass threadClass, jlong millis))
   JVMWrapper("JVM_Sleep");
 
@@ -3090,7 +3083,6 @@ JVM_ENTRY(void, JVM_Sleep(JNIEnv* env, jclass threadClass, jlong millis))
   JavaThreadSleepState jtss(thread);
 
   HOTSPOT_THREAD_SLEEP_BEGIN(millis);
-  EventThreadSleep event;
 
   if (millis == 0) {
     os::naked_yield();
@@ -3101,9 +3093,6 @@ JVM_ENTRY(void, JVM_Sleep(JNIEnv* env, jclass threadClass, jlong millis))
       // An asynchronous exception (e.g., ThreadDeathException) could have been thrown on
       // us while we were sleeping. We do not overwrite those.
       if (!HAS_PENDING_EXCEPTION) {
-        if (event.should_commit()) {
-          post_thread_sleep_event(&event, millis);
-        }
         HOTSPOT_THREAD_SLEEP_END(1);
 
         // TODO-FIXME: THROW_MSG returns which means we will not call set_state()
@@ -3112,9 +3101,6 @@ JVM_ENTRY(void, JVM_Sleep(JNIEnv* env, jclass threadClass, jlong millis))
       }
     }
     thread->osthread()->set_state(old_state);
-  }
-  if (event.should_commit()) {
-    post_thread_sleep_event(&event, millis);
   }
   HOTSPOT_THREAD_SLEEP_END(0);
 JVM_END

@@ -35,10 +35,6 @@
     <Field type="Thread" name="thread" label="Java Thread" />
   </Event>
 
-  <Event name="ThreadSleep" category="Java Application" label="Java Thread Sleep" thread="true" stackTrace="true">
-    <Field type="long" contentType="millis" name="time" label="Sleep Time" />
-  </Event>
-
   <Event name="ThreadPark" category="Java Application" label="Java Thread Park" thread="true" stackTrace="true">
     <Field type="Class" name="parkedClass" label="Class Parked On" />
     <Field type="long" contentType="nanos" name="timeout" label="Park Timeout" />
