@@ -24,7 +24,7 @@
 
 /**
  * @test
- * @summary Test JVMTI Monitor functions for fibers
+ * @summary Test JVMTI Monitor functions for virtual threads
  * @compile VThreadMonitorTest.java
  * @run main/othervm/native -agentlib:VThreadMonitorTest VThreadMonitorTest
  */
