@@ -2348,8 +2348,10 @@ class BacktraceBuilder: public StackObj {
 
     if (_index >= trace_chunk_size) {
       methodHandle mhandle(THREAD, method);
+      Handle chandle(THREAD, contScopeName);
       expand(CHECK);
       method = mhandle();
+      contScopeName = chandle();
     }
 
     _methods->ushort_at_put(_index, method->orig_method_idnum());
@@ -2596,6 +2598,7 @@ extern "C" void pfl();
 void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope, const methodHandle& method, TRAPS) {
   if (!StackTraceInThrowable) return;
   ResourceMark rm(THREAD);
+  HandleMark hm(THREAD);
 
   // Start out by clearing the backtrace for this object, in case the VM
   // runs out of memory while allocating the stack trace
@@ -2638,11 +2641,11 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
   bool skip_throwableInit_check = false;
   bool skip_hidden = !ShowHiddenFrames;
   bool is_last = false;
-  oop cont = thread->last_continuation();
+  Handle cont_h(THREAD, thread->last_continuation());
   for (frame fr = thread->last_frame(); max_depth == 0 || max_depth != total_count;) {
     Method* method = NULL;
     int bci = 0;
-    oop contScopeName = (cont != NULL) ? java_lang_ContinuationScope::name(java_lang_Continuation::scope(cont)) : (oop)NULL;
+    oop contScopeName = (cont_h() != NULL) ? java_lang_ContinuationScope::name(java_lang_Continuation::scope(cont_h())) : (oop)NULL;
 
     // Compiled java method case.
     if (decode_offset != 0) {
@@ -2653,9 +2656,9 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
     } else {
       if (fr.is_first_frame()) break;
 
-      assert (contScope.is_null() || cont != NULL, "must be");
-      if (cont != NULL && Continuation::is_continuation_entry_frame(fr, &map)) {
-        oop scope = java_lang_Continuation::scope(cont);
+      assert (contScope.is_null() || cont_h() != NULL, "must be");
+      if (cont_h() != NULL && Continuation::is_continuation_entry_frame(fr, &map)) {
+        oop scope = java_lang_Continuation::scope(cont_h());
         if (contScope.not_null() && (scope == contScope())) {
           is_last = true;
         } else {
@@ -2665,8 +2668,9 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
           //   tty->print_cr("<<<<<");
           //   pfl();
           // }
-          assert (Continuation::is_frame_in_continuation(fr, cont), "must be");
-          cont = java_lang_Continuation::parent(cont);
+          assert (Continuation::is_frame_in_continuation(fr, cont_h()), "must be");
+          Handle parent_h(THREAD, java_lang_Continuation::parent(cont_h()));
+          cont_h =  parent_h;
         }
       }
 
@@ -3025,6 +3029,7 @@ void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const metho
   // set Method* or mid/cpref
   HandleMark hm(THREAD);
   Handle mname(Thread::current(), stackFrame->obj_field(_memberName_offset));
+  Handle cont_h (THREAD, cont);
   InstanceKlass* ik = method->method_holder();
   CallInfo info(method(), ik, CHECK);
   MethodHandles::init_method_MemberName(mname, info);
@@ -3035,7 +3040,7 @@ void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const metho
   assert((jushort)version == version, "version should be short");
   java_lang_StackFrameInfo::set_version(stackFrame(), (short)version);
 
-  oop contScope = cont != NULL ? java_lang_Continuation::scope(cont) : (oop)NULL;
+  oop contScope = cont_h() != NULL ? java_lang_Continuation::scope(cont_h()) : (oop)NULL;
   java_lang_StackFrameInfo::set_contScope(stackFrame(), contScope);
 }
 
