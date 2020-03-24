@@ -2341,7 +2341,8 @@ bool G1CollectedHeap::try_collect(GCCause::Cause cause) {
 }
 
 bool G1CollectedHeap::requires_barriers(oop obj) const {
-  return !is_in_young(obj);
+  assert (obj != NULL, "");
+  return !heap_region_containing(obj)->is_young(); // is_in_young does an unnecessary NULL check
 }
 
 bool G1CollectedHeap::is_in(const void* p) const {

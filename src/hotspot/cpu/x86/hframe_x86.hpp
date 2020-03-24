@@ -37,6 +37,8 @@ public:
 public:
   hframe() : HFrameBase(), _fp(0) {}
 
+  hframe(bool dummy) : HFrameBase(dummy) {}
+
   hframe(const hframe& hf) : HFrameBase(hf), _fp(hf._fp) {}
 
   hframe(int sp, int ref_sp, intptr_t fp, address pc, const ContMirror& cont) // called by ContMirror::last_frame

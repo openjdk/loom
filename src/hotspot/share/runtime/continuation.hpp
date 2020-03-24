@@ -127,6 +127,7 @@ public:
   static oop continuation_scope(oop cont);
   static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
 
+  static void set_cont_fastpath_thread_state(JavaThread* thread);
 
 #ifndef PRODUCT
   static void describe(FrameValues &values);

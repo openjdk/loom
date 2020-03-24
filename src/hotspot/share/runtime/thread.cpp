@@ -1695,6 +1695,7 @@ void JavaThread::initialize() {
     
   _cont_yield = false;
   _cont_preempt = false;
+  _cont_fastpath_thread_state = 1;
   _cont_fastpath = 0;
   memset(&_cont_frame, 0, sizeof(FrameInfo));
   _held_monitor_count = 0;

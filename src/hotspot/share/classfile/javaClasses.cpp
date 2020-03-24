@@ -1911,15 +1911,6 @@ ByteSize java_lang_Thread::thread_id_offset() {
   return in_ByteSize(_tid_offset);
 }
 
-oop java_lang_Thread::continuation(oop java_thread) {
-  return java_thread->obj_field(_continuation_offset);
-}
-
-void java_lang_Thread::set_continuation(oop java_thread, oop continuation) {
-  tty->print_cr(">>> java_lang_Thread::set_continuation %p", (oopDesc*)continuation);
-  return java_thread->obj_field_put(_continuation_offset, continuation);
-}
-
 oop java_lang_Thread::vthread(oop java_thread) {
   return java_thread->obj_field(_vthread_offset);
 }

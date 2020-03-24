@@ -164,6 +164,10 @@ bool java_lang_ref_Reference::is_phantom(oop ref) {
   return InstanceKlass::cast(ref->klass())->reference_type() == REF_PHANTOM;
 }
 
+inline oop java_lang_Thread::continuation(oop java_thread) {
+  return java_thread->obj_field(_continuation_offset);
+}
+
 inline oop java_lang_ContinuationScope::name(oop ref) {
   return ref->obj_field(_name_offset);
 }

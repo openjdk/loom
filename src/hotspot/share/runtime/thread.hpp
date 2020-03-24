@@ -1241,6 +1241,7 @@ class JavaThread: public Thread {
   bool _cont_yield; // a continuation yield is in progress
   bool _cont_preempt;
   FrameInfo _cont_frame;
+  int _cont_fastpath_thread_state; // whether global thread state allows continuation fastpath (JVMTI)
   int _cont_fastpath;
   int _held_monitor_count; // used by continuations for fast lock detection
 public:
@@ -1374,8 +1375,10 @@ public:
   // Continuation support
   bool cont_yield() { return _cont_yield; }
   void set_cont_yield(bool x) { _cont_yield = x; }
-  bool cont_fastpath() { return _cont_fastpath != 0; }
   void set_cont_fastpath(bool x) { _cont_fastpath = (int)x; }
+  void set_cont_fastpath_thread_state(bool x) { _cont_fastpath_thread_state = (int)x; }
+  bool cont_fastpath() { return (_cont_fastpath & _cont_fastpath_thread_state) != 0; }
+  bool cont_fastpath_thread_state() { return _cont_fastpath_thread_state != 0; }
   bool cont_preempt() { return _cont_preempt; }
   void set_cont_preempt(bool x) { _cont_preempt = x; }
   FrameInfo* cont_frame() { return &_cont_frame; }
