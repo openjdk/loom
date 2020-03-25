@@ -74,6 +74,8 @@ class frame {
   // Constructors
   frame();
 
+  frame(bool dummy) {} // no initialization
+
 #ifndef PRODUCT
   // This is a generic constructor which is only used by pns() in debug.cpp.
   // pns (i.e. print native stack) uses this constructor to create a starting

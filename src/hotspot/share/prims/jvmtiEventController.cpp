@@ -554,6 +554,8 @@ JvmtiEventControllerPrivate::recompute_thread_enabled(JvmtiThreadState *state) {
     }
   }
 
+  Continuation::set_cont_fastpath_thread_state(state->get_thread());
+  
   return any_env_enabled;
 }
 

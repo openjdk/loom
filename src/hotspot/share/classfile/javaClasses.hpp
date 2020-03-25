@@ -434,8 +434,7 @@ class java_lang_Thread : AllStatic {
   static jlong thread_id(oop java_thread);
   static ByteSize thread_id_offset();
   // Continuation
-  static oop  continuation(oop java_thread);
-  static void set_continuation(oop java_thread, oop continuation);
+  static inline oop continuation(oop java_thread);
   // VirtualThread
   static oop  vthread(oop java_thread);
 

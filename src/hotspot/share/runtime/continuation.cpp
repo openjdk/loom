@@ -65,6 +65,7 @@
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 
 // #define NO_KEEPALIVE true // Temporary: Disable keepalive to test ZGC
+#define CONT_JFR false
 
 #define SENDER_SP_RET_ADDRESS_OFFSET (frame::sender_sp_offset - frame::return_addr_offset)
 
@@ -409,6 +410,8 @@ private:
   }
 
 protected:
+  HFrameBase(bool dummy) {}
+
   HFrameBase() : _sp(-1), _ref_sp(-1), _pc(NULL), _is_interpreted(true), _cb_imd(NULL), _oop_map(NULL) {}
 
   HFrameBase(const HFrameBase& hf) : _sp(hf._sp),_ref_sp(hf._ref_sp), _pc(hf._pc),
@@ -959,7 +962,7 @@ inline void ContMirror::read_entry() {
   }
 }
 
-inline void ContMirror::read_minimal() {
+ALWAYSINLINE void ContMirror::read_minimal() {
   _tail  = java_lang_Continuation::tail(_cont);
   _pc    = java_lang_Continuation::pc(_cont); // for is_empty0
   _flags = java_lang_Continuation::flags(_cont);
@@ -1455,6 +1458,14 @@ bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, RegisterMapT* map
 
 ////////////////////////////////////
 
+void Continuation::set_cont_fastpath_thread_state(JavaThread* thread) {
+  bool fast = 
+       !thread->is_interp_only_mode()
+    && !JvmtiExport::should_post_continuation_run()
+    && !JvmtiExport::should_post_continuation_yield();
+  thread->set_cont_fastpath_thread_state(fast);
+}
+
 void ContinuationHelper::to_frame_info(const frame& f, const frame& callee, FrameInfo* fi) {
   fi->sp = f.unextended_sp(); // java_lang_Continuation::entrySP(cont);
   fi->pc = Frame::real_pc(f); // Continuation.run may have been deoptimized
@@ -1539,7 +1550,8 @@ static void set_anchor(JavaThread* thread, const FrameInfo* fi, address pc) {
 
 static oop get_continuation(JavaThread* thread) {
   assert (thread != NULL, "");
-  return thread->last_continuation();
+  assert (thread->threadObj() != NULL, "");
+  return java_lang_Thread::continuation(thread->threadObj());
 }
 
 // static void set_continuation(JavaThread* thread, oop cont) {
@@ -2162,6 +2174,7 @@ public:
     _oops(0), _size(0), _frames(0), _cgrind_interpreted_frames(0),
     _fp_oop_info(), _map(thread, false, false, false),
     _preempt(false),
+    _safepoint_stub(false), _safepoint_stub_h(false), // don't intitialize
     _safepoint_stub_caller(false), _keepalive(NULL) {
 
     _fi = fi;
@@ -2439,6 +2452,7 @@ public:
     assert (_cont.chunk_invariant(), "");
     assert (Continuation::debug_verify_stack_chunk(chunk), "");
 
+  #if CONT_JFR
     EventContinuationFreezeYoung e;
     if (e.should_commit()) {
       e.set_id(cast_from_oop<u8>(chunk));
@@ -2446,6 +2460,7 @@ public:
       e.set_size(size << LogBytesPerWord);
       e.commit();
     }
+  #endif
 
     // assert(verify_continuation<222>(_cont.mirror()), "");
 
@@ -3361,13 +3376,10 @@ static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont, const FrameIn
   invlidate_JVMTI_stack(thread);
 }
 
-static inline int freeze_epilog(JavaThread* thread, FrameInfo* fi, ContMirror& cont, EventContinuationFreeze& event) {
+static inline int freeze_epilog(JavaThread* thread, FrameInfo* fi, ContMirror& cont) {
   PERFTEST_ONLY(if (PERFTEST_LEVEL <= 15) return freeze_ok;)
 
   assert (verify_continuation<2>(cont.mirror()), "");
-
-  cont.post_jfr_event(&event, thread);
-  post_JVMTI_yield(thread, cont, fi); // can safepoint
 
   assert (!cont.is_empty(), "");
 
@@ -3408,7 +3420,9 @@ int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
   assert (!thread->cont_yield(), "");
   assert (!thread->has_pending_exception(), ""); // if (thread->has_pending_exception()) return early_return(freeze_exception, thread, fi);
 
+#if CONT_JFR
   EventContinuationFreeze event;
+#endif
 
   thread->set_cont_yield(true);
 
@@ -3429,7 +3443,10 @@ int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
     log_develop_trace(jvmcont)("chunk available; no transition");
     freeze_result res = fr.freeze(true);
     assert (res == freeze_ok, "");
-    return freeze_epilog(thread, fi, cont, event);
+  #if CONT_JFR
+    cont.post_jfr_event(&event, thread);
+  #endif
+    return freeze_epilog(thread, fi, cont);
   } else {
     // manual transtion. see JRT_ENTRY in interfaceSupport.inline.hpp
     log_develop_trace(jvmcont)("chunk unavailable; transitioning to VM");
@@ -3453,7 +3470,11 @@ int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
       assert (verify_continuation<11>(cont.mirror()), "");
       return early_return(res, thread, fi);
     }
-    return freeze_epilog(thread, fi, cont, event);
+  #if CONT_JFR
+    cont.post_jfr_event(&event, thread);
+  #endif
+    post_JVMTI_yield(thread, cont, fi); // can safepoint
+    return freeze_epilog(thread, fi, cont);
   }
 }
 
@@ -3716,7 +3737,8 @@ public:
     _fastpath(true),
     _map(thread, false, false, false),
     _preempt(false),
-    _safepoint_stub(NULL), _safepoint_stub_caller(false) {
+    _safepoint_stub(NULL), _safepoint_stub_caller(false),
+    _safepoint_stub_f(false) { // don't intitialize
 
     _map.set_include_argument_oops(false);
   }
@@ -3831,7 +3853,7 @@ public:
       vsp = thaw<false>(false);
     } else {
       intptr_t* bot = _cont.entrySP(); // _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
-      if (Interpreter::contains(_cont.entryPC())) {
+      if (Interpreter::contains(_cont.entryPC())) { // TODO PERF: remove this when we have the entry nmethod/stub
         bot -= 1; // See Thaw<ConfigT, mode>::align SP_WIGGLE etc.
       }
       vsp = bot;
@@ -3934,6 +3956,7 @@ public:
 
     assert(_cont.chunk_invariant(), "");
 
+  #if CONT_JFR
     EventContinuationThawYoung e;
     if (e.should_commit()) {
       e.set_id(cast_from_oop<u8>(chunk));
@@ -3941,6 +3964,7 @@ public:
       e.set_full(!partial);
       e.commit();
     }
+  #endif
 
     // assert (verify_continuation<100>(_cont.mirror()), "");
     return vsp;
@@ -4502,9 +4526,7 @@ static int maybe_count_Java_frames(ContMirror& cont, bool return_barrier) {
   return -1;
 }
 
-static void post_JVMTI_continue(JavaThread* thread, ContMirror& cont, FrameInfo* fi, int java_frame_count, bool return_barrier) {
-  if (return_barrier) return;
-
+static void post_JVMTI_continue(JavaThread* thread, ContMirror& cont, FrameInfo* fi, int java_frame_count) {
   if (JvmtiExport::should_post_continuation_run()) {
     set_anchor<false>(thread, fi); // ensure thawed frames are visible
 
@@ -4520,8 +4542,11 @@ static void post_JVMTI_continue(JavaThread* thread, ContMirror& cont, FrameInfo*
 }
 
 static inline bool can_thaw_fast(ContMirror& cont) {
-  if (cont.thread()->is_interp_only_mode())
+  if (!cont.thread()->cont_fastpath_thread_state())
     return false;
+
+  assert (!cont.thread()->is_interp_only_mode(), "");
+  assert (!JvmtiExport::should_post_continuation_run(), "");
 
   if (LIKELY(!CONT_FULL_STACK)) {
     for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
@@ -4540,7 +4565,9 @@ static inline bool can_thaw_fast(ContMirror& cont) {
 // called after preparations (stack overflow check and making room)
 static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_barrier) {
   // NoSafepointVerifier nsv;
+#if CONT_JFR
   EventContinuationThaw event;
+#endif
 
   if (return_barrier) {
     log_develop_trace(jvmcont)("== RETURN BARRIER");
@@ -4573,13 +4600,13 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   if (UNLIKELY(cont.is_flag(FLAG_SAFEPOINT_YIELD))) {
     int java_frame_count = maybe_count_Java_frames(cont, return_barrier);
     res = cont_thaw<mode_slow>(thread, cont, fi, return_barrier);
-    post_JVMTI_continue(thread, cont, fi, java_frame_count, return_barrier);
+    if (!return_barrier) post_JVMTI_continue(thread, cont, fi, java_frame_count);
   } else if (LIKELY(can_thaw_fast(cont))) {
     res = cont_thaw<mode_fast>(thread, cont, fi, return_barrier);
   } else {
     int java_frame_count = maybe_count_Java_frames(cont, return_barrier);
     res = cont_thaw<mode_slow>(thread, cont, fi, return_barrier);
-    post_JVMTI_continue(thread, cont, fi, java_frame_count, return_barrier);
+    if (!return_barrier) post_JVMTI_continue(thread, cont, fi, java_frame_count);
   }
 
   thread->set_cont_fastpath(res);
@@ -4601,7 +4628,9 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
     print_vframe(f, NULL);
   }
 
+#if CONT_JFR
   cont.post_jfr_event(&event, thread);
+#endif
 
   assert (verify_continuation<3>(cont.mirror()), "");
   log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
