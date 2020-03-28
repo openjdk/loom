@@ -66,10 +66,7 @@ ShenandoahHeapRegion::ShenandoahHeapRegion(ShenandoahHeap* heap, HeapWord* start
   _tlab_allocs(0),
   _gclab_allocs(0),
   _shared_allocs(0),
-  _seqnum_first_alloc_mutator(0),
-  _seqnum_first_alloc_gc(0),
   _seqnum_last_alloc_mutator(0),
-  _seqnum_last_alloc_gc(0),
   _live_data(0),
   _critical_pins(0),
   _update_watermark(start) {
@@ -90,7 +87,7 @@ void ShenandoahHeapRegion::report_illegal_transition(const char *method) {
 }
 
 void ShenandoahHeapRegion::make_regular_allocation() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
 
   switch (_state) {
     case _empty_uncommitted:
@@ -106,7 +103,7 @@ void ShenandoahHeapRegion::make_regular_allocation() {
 }
 
 void ShenandoahHeapRegion::make_regular_bypass() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   assert (_heap->is_full_gc_in_progress() || _heap->is_degenerated_gc_in_progress(),
           "only for full or degen GC");
 
@@ -131,7 +128,7 @@ void ShenandoahHeapRegion::make_regular_bypass() {
 }
 
 void ShenandoahHeapRegion::make_humongous_start() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   switch (_state) {
     case _empty_uncommitted:
       do_commit();
@@ -144,7 +141,7 @@ void ShenandoahHeapRegion::make_humongous_start() {
 }
 
 void ShenandoahHeapRegion::make_humongous_start_bypass() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   assert (_heap->is_full_gc_in_progress(), "only for full GC");
 
   switch (_state) {
@@ -160,7 +157,7 @@ void ShenandoahHeapRegion::make_humongous_start_bypass() {
 }
 
 void ShenandoahHeapRegion::make_humongous_cont() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   switch (_state) {
     case _empty_uncommitted:
       do_commit();
@@ -173,7 +170,7 @@ void ShenandoahHeapRegion::make_humongous_cont() {
 }
 
 void ShenandoahHeapRegion::make_humongous_cont_bypass() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   assert (_heap->is_full_gc_in_progress(), "only for full GC");
 
   switch (_state) {
@@ -189,7 +186,7 @@ void ShenandoahHeapRegion::make_humongous_cont_bypass() {
 }
 
 void ShenandoahHeapRegion::make_pinned() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   assert(pin_count() > 0, "Should have pins: " SIZE_FORMAT, pin_count());
 
   switch (_state) {
@@ -211,7 +208,7 @@ void ShenandoahHeapRegion::make_pinned() {
 }
 
 void ShenandoahHeapRegion::make_unpinned() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   assert(pin_count() == 0, "Should not have pins: " SIZE_FORMAT, pin_count());
 
   switch (_state) {
@@ -233,7 +230,7 @@ void ShenandoahHeapRegion::make_unpinned() {
 }
 
 void ShenandoahHeapRegion::make_cset() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   switch (_state) {
     case _regular:
       set_state(_cset);
@@ -245,7 +242,7 @@ void ShenandoahHeapRegion::make_cset() {
 }
 
 void ShenandoahHeapRegion::make_trash() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   switch (_state) {
     case _cset:
       // Reclaiming cset regions
@@ -270,7 +267,7 @@ void ShenandoahHeapRegion::make_trash_immediate() {
 }
 
 void ShenandoahHeapRegion::make_empty() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   switch (_state) {
     case _trash:
       set_state(_empty_committed);
@@ -282,7 +279,7 @@ void ShenandoahHeapRegion::make_empty() {
 }
 
 void ShenandoahHeapRegion::make_uncommitted() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   switch (_state) {
     case _empty_committed:
       do_uncommit();
@@ -294,7 +291,7 @@ void ShenandoahHeapRegion::make_uncommitted() {
 }
 
 void ShenandoahHeapRegion::make_committed_bypass() {
-  _heap->assert_heaplock_owned_by_current_thread();
+  shenandoah_assert_heaplocked();
   assert (_heap->is_full_gc_in_progress(), "only for full GC");
 
   switch (_state) {
@@ -315,10 +312,7 @@ void ShenandoahHeapRegion::reset_alloc_metadata() {
   _tlab_allocs = 0;
   _gclab_allocs = 0;
   _shared_allocs = 0;
-  _seqnum_first_alloc_mutator = 0;
   _seqnum_last_alloc_mutator = 0;
-  _seqnum_first_alloc_gc = 0;
-  _seqnum_last_alloc_gc = 0;
 }
 
 void ShenandoahHeapRegion::reset_alloc_metadata_to_shared() {
@@ -326,14 +320,18 @@ void ShenandoahHeapRegion::reset_alloc_metadata_to_shared() {
     _tlab_allocs = 0;
     _gclab_allocs = 0;
     _shared_allocs = used() >> LogHeapWordSize;
-    uint64_t next = _alloc_seq_num.value++;
-    _seqnum_first_alloc_mutator = next;
-    _seqnum_last_alloc_mutator = next;
-    _seqnum_first_alloc_gc = 0;
-    _seqnum_last_alloc_gc = 0;
+    if (_heap->is_traversal_mode()) {
+      update_seqnum_last_alloc_mutator();
+    }
   } else {
     reset_alloc_metadata();
   }
+}
+
+void ShenandoahHeapRegion::update_seqnum_last_alloc_mutator() {
+  assert(_heap->is_traversal_mode(), "Sanity");
+  shenandoah_assert_heaplocked_or_safepoint();
+  _seqnum_last_alloc_mutator = _alloc_seq_num.value++;
 }
 
 size_t ShenandoahHeapRegion::get_shared_allocs() const {
@@ -415,15 +413,15 @@ void ShenandoahHeapRegion::print_on(outputStream* st) const {
             p2i(bottom()), p2i(top()), p2i(end()));
   st->print("|TAMS " INTPTR_FORMAT_W(12),
             p2i(_heap->marking_context()->top_at_mark_start(const_cast<ShenandoahHeapRegion*>(this))));
+  st->print("|UWM " INTPTR_FORMAT_W(12),
+            p2i(_update_watermark));
   st->print("|U " SIZE_FORMAT_W(5) "%1s", byte_size_in_proper_unit(used()),                proper_unit_for_byte_size(used()));
   st->print("|T " SIZE_FORMAT_W(5) "%1s", byte_size_in_proper_unit(get_tlab_allocs()),     proper_unit_for_byte_size(get_tlab_allocs()));
   st->print("|G " SIZE_FORMAT_W(5) "%1s", byte_size_in_proper_unit(get_gclab_allocs()),    proper_unit_for_byte_size(get_gclab_allocs()));
   st->print("|S " SIZE_FORMAT_W(5) "%1s", byte_size_in_proper_unit(get_shared_allocs()),   proper_unit_for_byte_size(get_shared_allocs()));
   st->print("|L " SIZE_FORMAT_W(5) "%1s", byte_size_in_proper_unit(get_live_data_bytes()), proper_unit_for_byte_size(get_live_data_bytes()));
   st->print("|CP " SIZE_FORMAT_W(3), pin_count());
-  st->print("|SN " UINT64_FORMAT_X_W(12) ", " UINT64_FORMAT_X_W(8) ", " UINT64_FORMAT_X_W(8) ", " UINT64_FORMAT_X_W(8),
-            seqnum_first_alloc_mutator(), seqnum_last_alloc_mutator(),
-            seqnum_first_alloc_gc(), seqnum_last_alloc_gc());
+  st->print("|SN " UINT64_FORMAT_X_W(12), _seqnum_last_alloc_mutator);
   st->cr();
 }
 

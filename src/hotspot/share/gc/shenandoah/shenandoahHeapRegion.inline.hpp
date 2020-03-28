@@ -31,8 +31,7 @@
 #include "runtime/atomic.hpp"
 
 HeapWord* ShenandoahHeapRegion::allocate(size_t size, ShenandoahAllocRequest::Type type) {
-  _heap->assert_heaplock_or_safepoint();
-
+  shenandoah_assert_heaplocked_or_safepoint();
   assert(is_object_aligned(size), "alloc size breaks alignment: " SIZE_FORMAT, size);
 
   HeapWord* obj = top();
@@ -53,29 +52,6 @@ HeapWord* ShenandoahHeapRegion::allocate(size_t size, ShenandoahAllocRequest::Ty
 }
 
 inline void ShenandoahHeapRegion::adjust_alloc_metadata(ShenandoahAllocRequest::Type type, size_t size) {
-  bool is_first_alloc = (top() == bottom());
-
-  switch (type) {
-    case ShenandoahAllocRequest::_alloc_shared:
-    case ShenandoahAllocRequest::_alloc_tlab:
-      _seqnum_last_alloc_mutator = _alloc_seq_num.value++;
-      if (is_first_alloc) {
-        assert (_seqnum_first_alloc_mutator == 0, "Region " SIZE_FORMAT " metadata is correct", _region_number);
-        _seqnum_first_alloc_mutator = _seqnum_last_alloc_mutator;
-      }
-      break;
-    case ShenandoahAllocRequest::_alloc_shared_gc:
-    case ShenandoahAllocRequest::_alloc_gclab:
-      _seqnum_last_alloc_gc = _alloc_seq_num.value++;
-      if (is_first_alloc) {
-        assert (_seqnum_first_alloc_gc == 0, "Region " SIZE_FORMAT " metadata is correct", _region_number);
-        _seqnum_first_alloc_gc = _seqnum_last_alloc_gc;
-      }
-      break;
-    default:
-      ShouldNotReachHere();
-  }
-
   switch (type) {
     case ShenandoahAllocRequest::_alloc_shared:
     case ShenandoahAllocRequest::_alloc_shared_gc:

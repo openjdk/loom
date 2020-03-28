@@ -1701,8 +1701,9 @@ bool Compile::must_alias(const TypePtr* adr_type, int alias_idx) {
 bool Compile::can_alias(const TypePtr* adr_type, int alias_idx) {
   if (alias_idx == AliasIdxTop)         return false; // the empty category
   if (adr_type == NULL)                 return false; // NULL serves as TypePtr::TOP
-  if (alias_idx == AliasIdxBot)         return true;  // the universal category
-  if (adr_type->base() == Type::AnyPtr) return true;  // TypePtr::BOTTOM or its twins
+  // Known instance doesn't alias with bottom memory
+  if (alias_idx == AliasIdxBot)         return !adr_type->is_known_instance();                   // the universal category
+  if (adr_type->base() == Type::AnyPtr) return !C->get_adr_type(alias_idx)->is_known_instance(); // TypePtr::BOTTOM or its twins
 
   // the only remaining possible overlap is identity
   int adr_idx = get_alias_index(adr_type);
@@ -3034,6 +3035,9 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
   case Op_MulReductionVD:
   case Op_MinReductionV:
   case Op_MaxReductionV:
+  case Op_AndReductionV:
+  case Op_OrReductionV:
+  case Op_XorReductionV:
     break;
 
   case Op_PackB:
