@@ -1,5 +1,13 @@
+### Filed bugs
+
+gc/g1/humongousObjects/TestNoAllocationsInHRegions.java             8241630 generic-all
+
+
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
+
+####
+# Virtual thread/Continuation tests
 
 
 ####
@@ -10,7 +18,6 @@ gc/g1/ihop/TestIHOPStatic.java
 ####
 # Test failing because of incorrect stacktrace for main thread
 
-runtime/Throwable/TestThrowable.java
 runtime/handshake/HandshakeWalkStackTest.java
 runtime/handshake/HandshakeWalkStackFallbackTest.java
 runtime/ErrorHandling/TestCrashOnOutOfMemoryError.java
@@ -19,10 +26,12 @@ runtime/ErrorHandling/TestHeapDumpPath.java
 runtime/ErrorHandling/TestOnOutOfMemoryError.java
 runtime/Throwable/StackTraceLogging.java
 runtime/Throwable/TestMaxJavaStackTraceDepth.java
-
+runtime/Throwable/TestThrowable.java
 
 ####
 # TODO check what are the cds issues with vthread
+runtime/cds/serviceability/transformRelatedClasses/TransformSuperAndSubClasses.java
+runtime/cds/serviceability/transformRelatedClasses/TransformSuperSubTwoPckgs.java
 runtime/cds/serviceability/ReplaceCriticalClasses.java
 runtime/cds/serviceability/ReplaceCriticalClassesForSubgraphs.java
 runtime/cds/TestInterpreterMethodEntries.java#id0
@@ -141,7 +150,7 @@ runtime/symboltable/ShortLivedSymbolCleanup.java
 runtime/logging/LoaderConstraintsTest.java
 
 
-#####
+####
 # Seems module patching doesn't work with wrapper
 
 runtime/modules/PatchModule/PatchModuleTestJarDir.java
@@ -149,3 +158,26 @@ runtime/modules/PatchModule/PatchModuleJavaBase.java
 runtime/modules/PatchModule/PatchModuleTestJar.java
 runtime/modules/PatchModule/PatchModuleTest.java
 runtime/modules/PatchModule/PatchModuleClassList.java
+
+
+####
+#
+# GC tests failing because test expected results differ with vthread
+gc/g1/TestStringDeduplicationYoungGC.java
+gc/g1/TestStringDeduplicationTableRehash.java
+gc/g1/TestStringDeduplicationTableResize.java
+gc/g1/TestStringDeduplicationPrintOptions.java
+gc/g1/TestStringDeduplicationFullGC.java
+gc/g1/TestStringDeduplicationAgeThreshold.java
+gc/g1/TestRemsetLoggingPerRegion.java
+gc/g1/TestRemsetLogging.java
+gc/arguments/TestUseCompressedOopsErgo.java#id0
+gc/arguments/TestUseCompressedOopsErgo.java#id1
+gc/arguments/TestUseCompressedOopsErgo.java#id2
+gc/arguments/TestSerialHeapSizeFlags.java
+gc/arguments/TestParallelHeapSizeFlags.java
+gc/arguments/TestMinInitialErgonomics.java
+gc/arguments/TestMaxRAMFlags.java
+gc/arguments/TestG1HeapSizeFlags.java
+gc/TestAgeOutput.java#id1
+gc/TestAgeOutput.java#id0

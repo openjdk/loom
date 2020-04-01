@@ -1,3 +1,8 @@
+# Filed bugs
+java/lang/Continuation/Basic.java                                   8241633 generic-all
+java/lang/Continuation/LiveFramesDriver.java                        8241633 generic-all
+
+
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
 #
@@ -6,14 +11,18 @@
 ####
 # Incorrect stackwalking epxectations for main thread stack trace
 
+java/lang/StackTraceElement/WithClassLoaderName.java
+java/lang/StackWalker/StackWalkTest.java
 java/lang/StackWalker/VerifyStackTrace.java
 java/lang/StackWalker/GetCallerClassTest.java
 java/lang/StackWalker/DumpStackTest.java
-java/lang/StackTraceElement/WithClassLoaderName.java
-runtime/Throwable/TestThrowable.java
 java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
 
+####
+# Thread-sensitive threads
+java/lang/Thread/BuilderTest.java
+jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
 
 ####
 # ThreadGroup owner is not main
@@ -131,11 +140,13 @@ java/util/logging/modules/GetResourceBundleTest.java
 # cutom classpath, jars, no main class etc
 
 jdk/modules/etc/DefaultModules.java
+jdk/modules/incubator/ServiceBinding.java
 jdk/internal/misc/VM/RuntimeArguments.java
 java/lang/StackWalker/CallerFromMain.java
 java/lang/Package/PackageFromManifest.java
 java/lang/Package/IsCompatibleWithDriver.java
 java/lang/invoke/condy/CondyNestedResolutionTest.java
+java/lang/ClassLoader/ExtDirs.java
 java/lang/ClassLoader/GetSystemPackage.java
 java/lang/ClassLoader/securityManager/ClassLoaderTest.java
 java/lang/ClassLoader/getResource/modules/ResourcesTest.java
