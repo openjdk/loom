@@ -2,6 +2,7 @@
 /dist/
 /.idea/
 nbproject/private/
+make/nb_native/nbproject/private
 /webrev
 /.src-rev
 /.jib/
