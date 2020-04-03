@@ -38,6 +38,14 @@
 #
 #############################################################################
 
+# loom specific failing tests
+
+compiler/graalunit/HotspotTest.java                              8242063 generic-all
+compiler/runtime/StackOverflowBug.java                           8242064 generic-all
+compiler/startup/SmallCodeCacheStartup.java                      8242064 generic-all
+compiler/exceptions/TestRecursiveReplacedException.java	         8242065 generic-all
+
+
 # :hotspot_compiler
 
 compiler/ciReplay/TestSAServer.java 8029528 generic-all
@@ -125,7 +133,7 @@ serviceability/sa/ClhsdbWhere.java 8193639 solaris-all
 serviceability/sa/DeadlockDetectionTest.java 8193639 solaris-all
 serviceability/sa/JhsdbThreadInfoTest.java 8193639 solaris-all
 serviceability/sa/jmap-hprof/JMapHProfLargeHeapTest.java 8193639 solaris-all
-serviceability/sa/sadebugd/DebugdConnectTest.java 8239062 macosx-x64 
+serviceability/sa/sadebugd/DebugdConnectTest.java 8239062 macosx-x64
 serviceability/sa/TestClassDump.java 8193639 solaris-all
 serviceability/sa/TestClhsdbJstackLock.java 8193639 solaris-all
 serviceability/sa/TestCpoolForInvokeDynamic.java 8193639 solaris-all
