@@ -77,11 +77,6 @@ class NarrowOopModeConstant : public JfrSerializer {
   void serialize(JfrCheckpointWriter& writer);
 };
 
-class CompilerPhaseTypeConstant : public JfrSerializer {
- public:
-  void serialize(JfrCheckpointWriter& writer);
-};
-
 class CodeBlobTypeConstant : public JfrSerializer {
  public:
   void serialize(JfrCheckpointWriter& writer);

@@ -1181,6 +1181,7 @@ public:
   Node* _debug_orig;                   // Original version of this, if any.
   Node*  debug_orig() const            { return _debug_orig; }
   void   set_debug_orig(Node* orig);   // _debug_orig = orig
+  void   dump_orig(outputStream *st, bool print_key = true) const;
 
   int        _hash_lock;               // Barrier to modifications of nodes in the hash table
   void  enter_hash_lock() { ++_hash_lock; assert(_hash_lock < 99, "in too many hash tables?"); }
@@ -1557,6 +1558,11 @@ public:
 
   // Used after parsing to remove useless nodes before Iterative GVN
   void remove_useless_nodes(VectorSet& useful);
+
+  bool contains(const Node* n) const {
+    fatal("use faster member() instead");
+    return false;
+  }
 
 #ifndef PRODUCT
   void print_set() const { _in_worklist.print(); }

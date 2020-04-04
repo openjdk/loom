@@ -470,97 +470,143 @@ bool Assembler::emit_compressed_disp_byte(int &disp) {
   return is8bit(disp);
 }
 
+static bool is_valid_encoding(int reg_enc) {
+  return reg_enc >= 0;
+}
 
-void Assembler::emit_operand(Register reg, Register base, Register index,
-                             Address::ScaleFactor scale, int disp,
-                             RelocationHolder const& rspec,
-                             int rip_relative_correction) {
+static int raw_encode(Register reg) {
+  assert(reg == noreg || reg->is_valid(), "sanity");
+  int reg_enc = (intptr_t)reg;
+  assert(reg_enc == -1 || is_valid_encoding(reg_enc), "sanity");
+  return reg_enc;
+}
+
+static int raw_encode(XMMRegister xmmreg) {
+  assert(xmmreg == xnoreg || xmmreg->is_valid(), "sanity");
+  int xmmreg_enc = (intptr_t)xmmreg;
+  assert(xmmreg_enc == -1 || is_valid_encoding(xmmreg_enc), "sanity");
+  return xmmreg_enc;
+}
+
+static int modrm_encoding(int mod, int dst_enc, int src_enc) {
+  return (mod & 3) << 6 | (dst_enc & 7) << 3 | (src_enc & 7);
+}
+
+static int sib_encoding(Address::ScaleFactor scale, int index_enc, int base_enc) {
+  return (scale & 3) << 6 | (index_enc & 7) << 3 | (base_enc & 7);
+}
+
+inline void Assembler::emit_modrm(int mod, int dst_enc, int src_enc) {
+  assert((mod & 3) != 0b11, "forbidden");
+  int modrm = modrm_encoding(mod, dst_enc, src_enc);
+  emit_int8(modrm);
+}
+
+inline void Assembler::emit_modrm_disp8(int mod, int dst_enc, int src_enc,
+                                        int disp) {
+  int modrm = modrm_encoding(mod, dst_enc, src_enc);
+  emit_int16(modrm, disp & 0xFF);
+}
+
+inline void Assembler::emit_modrm_sib(int mod, int dst_enc, int src_enc,
+                                      Address::ScaleFactor scale, int index_enc, int base_enc) {
+  int modrm = modrm_encoding(mod, dst_enc, src_enc);
+  int sib = sib_encoding(scale, index_enc, base_enc);
+  emit_int16(modrm, sib);
+}
+
+inline void Assembler::emit_modrm_sib_disp8(int mod, int dst_enc, int src_enc,
+                                            Address::ScaleFactor scale, int index_enc, int base_enc,
+                                            int disp) {
+  int modrm = modrm_encoding(mod, dst_enc, src_enc);
+  int sib = sib_encoding(scale, index_enc, base_enc);
+  emit_int24(modrm, sib, disp & 0xFF);
+}
+
+void Assembler::emit_operand_helper(int reg_enc, int base_enc, int index_enc,
+                                    Address::ScaleFactor scale, int disp,
+                                    RelocationHolder const& rspec,
+                                    int rip_relative_correction) {
   bool no_relocation = (rspec.type() == relocInfo::none);
 
-  // Encode the registers as needed in the fields they are used in
-  int regenc = encode(reg) << 3;
-  if (base->is_valid()) {
-    int baseenc = encode(base);
-    if (index->is_valid()) {
+  if (is_valid_encoding(base_enc)) {
+    if (is_valid_encoding(index_enc)) {
       assert(scale != Address::no_scale, "inconsistent address");
       // [base + index*scale + disp]
-      int indexenc = encode(index) << 3;
       if (disp == 0 && no_relocation &&
-          base != rbp LP64_ONLY(&& base != r13)) {
+          base_enc != rbp->encoding() LP64_ONLY(&& base_enc != r13->encoding())) {
         // [base + index*scale]
         // [00 reg 100][ss index base]
-        assert(index != rsp, "illegal addressing mode");
-        emit_int16((0x04 | regenc),
-                   (scale << 6 | indexenc | baseenc));
+        emit_modrm_sib(0b00, reg_enc, 0b100,
+                       scale, index_enc, base_enc);
       } else if (emit_compressed_disp_byte(disp) && no_relocation) {
         // [base + index*scale + imm8]
         // [01 reg 100][ss index base] imm8
-        assert(index != rsp, "illegal addressing mode");
-        emit_int24(0x44 | regenc,
-                   scale << 6 | indexenc | baseenc,
-                   disp & 0xFF);
+        emit_modrm_sib_disp8(0b01, reg_enc, 0b100,
+                             scale, index_enc, base_enc,
+                             disp);
       } else {
         // [base + index*scale + disp32]
         // [10 reg 100][ss index base] disp32
-        assert(index != rsp, "illegal addressing mode");
-        emit_int16(0x84 | regenc,
-                   scale << 6 | indexenc | baseenc);
+        emit_modrm_sib(0b10, reg_enc, 0b100,
+                       scale, index_enc, base_enc);
         emit_data(disp, rspec, disp32_operand);
       }
-    } else if (base == rsp LP64_ONLY(|| base == r12)) {
+    } else if (base_enc == rsp->encoding() LP64_ONLY(|| base_enc == r12->encoding())) {
       // [rsp + disp]
       if (disp == 0 && no_relocation) {
         // [rsp]
         // [00 reg 100][00 100 100]
-        emit_int16(0x04 | regenc,
-                   0x24);
+        emit_modrm_sib(0b00, reg_enc, 0b100,
+                       Address::times_1, 0b100, 0b100);
       } else if (emit_compressed_disp_byte(disp) && no_relocation) {
         // [rsp + imm8]
         // [01 reg 100][00 100 100] disp8
-        emit_int24(0x44 | regenc,
-                   0x24,
-                   disp & 0xFF);
+        emit_modrm_sib_disp8(0b01, reg_enc, 0b100,
+                             Address::times_1, 0b100, 0b100,
+                             disp);
       } else {
         // [rsp + imm32]
         // [10 reg 100][00 100 100] disp32
-        emit_int16(0x84 | regenc,
-                   0x24);
+        emit_modrm_sib(0b10, reg_enc, 0b100,
+                       Address::times_1, 0b100, 0b100);
         emit_data(disp, rspec, disp32_operand);
       }
     } else {
       // [base + disp]
-      assert(base != rsp LP64_ONLY(&& base != r12), "illegal addressing mode");
+      assert(base_enc != rsp->encoding() LP64_ONLY(&& base_enc != r12->encoding()), "illegal addressing mode");
       if (disp == 0 && no_relocation &&
-          base != rbp LP64_ONLY(&& base != r13)) {
+          base_enc != rbp->encoding() LP64_ONLY(&& base_enc != r13->encoding())) {
         // [base]
         // [00 reg base]
-        emit_int8(0x00 | regenc | baseenc);
+        emit_modrm(0, reg_enc, base_enc);
       } else if (emit_compressed_disp_byte(disp) && no_relocation) {
         // [base + disp8]
         // [01 reg base] disp8
-        emit_int16(0x40 | regenc | baseenc,
-                   disp & 0xFF);
+        emit_modrm_disp8(0b01, reg_enc, base_enc,
+                         disp);
       } else {
         // [base + disp32]
         // [10 reg base] disp32
-        emit_int8(0x80 | regenc | baseenc);
+        emit_modrm(0b10, reg_enc, base_enc);
         emit_data(disp, rspec, disp32_operand);
       }
     }
   } else {
-    if (index->is_valid()) {
+    if (is_valid_encoding(index_enc)) {
       assert(scale != Address::no_scale, "inconsistent address");
+      // base == noreg
       // [index*scale + disp]
       // [00 reg 100][ss index 101] disp32
-      assert(index != rsp, "illegal addressing mode");
-      emit_int16(0x04 | regenc,
-                 scale << 6 | (encode(index) << 3) | 0x05);
+      emit_modrm_sib(0b00, reg_enc, 0b100,
+                     scale, index_enc, 0b101 /* no base */);
       emit_data(disp, rspec, disp32_operand);
     } else if (!no_relocation) {
+      // base == noreg, index == noreg
       // [disp] (64bit) RIP-RELATIVE (32bit) abs
-      // [00 000 101] disp32
+      // [00 reg 101] disp32
 
-      emit_int8(0x05 | regenc);
+      emit_modrm(0b00, reg_enc, 0b101 /* no base */);
       // Note that the RIP-rel. correction applies to the generated
       // disp field, but _not_ to the target address in the rspec.
 
@@ -577,44 +623,43 @@ void Assembler::emit_operand(Register reg, Register base, Register index,
       emit_data((int32_t) adjusted, rspec, disp32_operand);
 
     } else {
+      // base == noreg, index == noreg, no_relocation == true
       // 32bit never did this, did everything as the rip-rel/disp code above
       // [disp] ABSOLUTE
       // [00 reg 100][00 100 101] disp32
-      emit_int16(0x04 | regenc,
-                 0x25);
+      emit_modrm_sib(0b00, reg_enc, 0b100 /* no base */,
+                     Address::times_1, 0b100, 0b101);
       emit_data(disp, rspec, disp32_operand);
     }
   }
 }
 
-void Assembler::emit_operand(XMMRegister reg, Register base, Register index,
+void Assembler::emit_operand(Register reg, Register base, Register index,
+                             Address::ScaleFactor scale, int disp,
+                             RelocationHolder const& rspec,
+                             int rip_relative_correction) {
+  assert(!index->is_valid() || index != rsp, "illegal addressing mode");
+  emit_operand_helper(raw_encode(reg), raw_encode(base), raw_encode(index),
+                      scale, disp, rspec, rip_relative_correction);
+
+}
+void Assembler::emit_operand(XMMRegister xmmreg, Register base, Register index,
                              Address::ScaleFactor scale, int disp,
                              RelocationHolder const& rspec) {
-  if (UseAVX > 2) {
-    int xreg_enc = reg->encoding();
-    if (xreg_enc > 15) {
-      XMMRegister new_reg = as_XMMRegister(xreg_enc & 0xf);
-      emit_operand((Register)new_reg, base, index, scale, disp, rspec);
-      return;
-    }
-  }
-  emit_operand((Register)reg, base, index, scale, disp, rspec);
+  assert(!index->is_valid() || index != rsp, "illegal addressing mode");
+  assert(xmmreg->encoding() < 16 || UseAVX > 2, "not supported");
+  emit_operand_helper(raw_encode(xmmreg), raw_encode(base), raw_encode(index),
+                      scale, disp, rspec);
 }
 
-void Assembler::emit_operand(XMMRegister reg, Register base, XMMRegister index,
+void Assembler::emit_operand(XMMRegister xmmreg, Register base, XMMRegister xmmindex,
                              Address::ScaleFactor scale, int disp,
                              RelocationHolder const& rspec) {
-  if (UseAVX > 2) {
-    int xreg_enc = reg->encoding();
-    int xmmindex_enc = index->encoding();
-    XMMRegister new_reg = as_XMMRegister(xreg_enc & 0xf);
-    XMMRegister new_index = as_XMMRegister(xmmindex_enc & 0xf);
-    emit_operand((Register)new_reg, base, (Register)new_index, scale, disp, rspec);
-  } else {
-    emit_operand((Register)reg, base, (Register)index, scale, disp, rspec);
-  }
+  assert(xmmreg->encoding() < 16 || UseAVX > 2, "not supported");
+  assert(xmmindex->encoding() < 16 || UseAVX > 2, "not supported");
+  emit_operand_helper(raw_encode(xmmreg), raw_encode(base), raw_encode(xmmindex),
+                      scale, disp, rspec, /* rip_relative_correction */ 0);
 }
-
 
 // Secret local extension to Assembler::WhichOperand:
 #define end_pc_operand (_WhichOperand_limit)
@@ -1102,13 +1147,6 @@ void Assembler::check_relocation(RelocationHolder const& rspec, int format) {
 }
 #endif // ASSERT
 
-void Assembler::emit_operand32(Register reg, Address adr) {
-  assert(reg->encoding() < 8, "no extended registers");
-  assert(!adr.base_needs_rex() && !adr.index_needs_rex(), "no extended registers");
-  emit_operand(reg, adr._base, adr._index, adr._scale, adr._disp,
-               adr._rspec);
-}
-
 void Assembler::emit_operand(Register reg, Address adr,
                              int rip_relative_correction) {
   emit_operand(reg, adr._base, adr._index, adr._scale, adr._disp,
@@ -1124,26 +1162,6 @@ void Assembler::emit_operand(XMMRegister reg, Address adr) {
        adr._rspec);
     }
 }
-
-// MMX operations
-void Assembler::emit_operand(MMXRegister reg, Address adr) {
-  assert(!adr.base_needs_rex() && !adr.index_needs_rex(), "no extended registers");
-  emit_operand((Register)reg, adr._base, adr._index, adr._scale, adr._disp, adr._rspec);
-}
-
-// work around gcc (3.2.1-7a) bug
-void Assembler::emit_operand(Address adr, MMXRegister reg) {
-  assert(!adr.base_needs_rex() && !adr.index_needs_rex(), "no extended registers");
-  emit_operand((Register)reg, adr._base, adr._index, adr._scale, adr._disp, adr._rspec);
-}
-
-
-void Assembler::emit_farith(int b1, int b2, int i) {
-  assert(isByte(b1) && isByte(b2), "wrong opcode");
-  assert(0 <= i &&  i < 8, "illegal stack offset");
-  emit_int16(b1, b2 + i);
-}
-
 
 // Now the Assembler instructions (identical for 32/64 bits)
 
@@ -1970,11 +1988,6 @@ void Assembler::divss(XMMRegister dst, XMMRegister src) {
   InstructionAttr attributes(AVX_128bit, /* rex_w */ false, /* legacy_mode */ false, /* no_mask_reg */ true, /* uses_vl */ false);
   int encode = simd_prefix_and_encode(dst, dst, src, VEX_SIMD_F3, VEX_OPCODE_0F, &attributes);
   emit_int16(0x5E, (0xC0 | encode));
-}
-
-void Assembler::emms() {
-  NOT_LP64(assert(VM_Version::supports_mmx(), ""));
-  emit_int16(0x0F, 0x77);
 }
 
 void Assembler::hlt() {
@@ -2898,37 +2911,12 @@ void Assembler::movlpd(XMMRegister dst, Address src) {
   emit_operand(dst, src);
 }
 
-void Assembler::movq( MMXRegister dst, Address src ) {
-  assert( VM_Version::supports_mmx(), "" );
-  emit_int16(0x0F, 0x6F);
-  emit_operand(dst, src);
-}
-
-void Assembler::movq( Address dst, MMXRegister src ) {
-  assert( VM_Version::supports_mmx(), "" );
-  emit_int16(0x0F, 0x7F);
-  // workaround gcc (3.2.1-7a) bug
-  // In that version of gcc with only an emit_operand(MMX, Address)
-  // gcc will tail jump and try and reverse the parameters completely
-  // obliterating dst in the process. By having a version available
-  // that doesn't need to swap the args at the tail jump the bug is
-  // avoided.
-  emit_operand(dst, src);
-}
-
 void Assembler::movntq(Address dst, Register src) { // uses the MOVNTI operation
   InstructionMark im(this);
   prefixq(dst);
   emit_int8(0x0F);
   emit_int8((unsigned char)0xC3);
   emit_operand(src, dst);
-}
-
-void Assembler::movntq(Address dst, MMXRegister src) {
-  assert( VM_Version::supports_mmx(), "" );
-  emit_int8(0x0F);
-  emit_int8((unsigned char)0xE7);
-  emit_operand(dst, src);
 }
 
 void Assembler::movntdq(Address dst, XMMRegister src) {
@@ -7076,6 +7064,11 @@ void Assembler::vzeroupper_uncached() {
 #ifndef _LP64
 // 32bit only pieces of the assembler
 
+void Assembler::emms() {
+  NOT_LP64(assert(VM_Version::supports_mmx(), ""));
+  emit_int16(0x0F, 0x77);
+}
+
 void Assembler::vzeroupper() {
   vzeroupper_uncached();
 }
@@ -7110,6 +7103,19 @@ void Assembler::decl(Register dst) {
 }
 
 // 64bit doesn't use the x87
+
+void Assembler::emit_operand32(Register reg, Address adr) {
+  assert(reg->encoding() < 8, "no extended registers");
+  assert(!adr.base_needs_rex() && !adr.index_needs_rex(), "no extended registers");
+  emit_operand(reg, adr._base, adr._index, adr._scale, adr._disp,
+               adr._rspec);
+}
+
+void Assembler::emit_farith(int b1, int b2, int i) {
+  assert(isByte(b1) && isByte(b2), "wrong opcode");
+  assert(0 <= i &&  i < 8, "illegal stack offset");
+  emit_int16(b1, b2 + i);
+}
 
 void Assembler::fabs() {
   emit_int16((unsigned char)0xD9, (unsigned char)0xE1);

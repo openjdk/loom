@@ -1824,7 +1824,7 @@ isMethodObsolete(jmethodID method)
 }
 
 /* Get the jvmti environment to be used with tags */
-static jvmtiEnv *
+jvmtiEnv *
 getSpecialJvmti(void)
 {
     jvmtiEnv  *jvmti;

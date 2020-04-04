@@ -32,6 +32,7 @@
 #include "gc/shenandoah/shenandoahAllocRequest.hpp"
 #include "gc/shenandoah/shenandoahLock.hpp"
 #include "gc/shenandoah/shenandoahEvacOOMHandler.hpp"
+#include "gc/shenandoah/shenandoahPadding.hpp"
 #include "gc/shenandoah/shenandoahSharedVariables.hpp"
 #include "gc/shenandoah/shenandoahUnload.hpp"
 #include "services/memoryManager.hpp"
@@ -66,9 +67,9 @@ class ShenandoahRegionIterator : public StackObj {
 private:
   ShenandoahHeap* _heap;
 
-  DEFINE_PAD_MINUS_SIZE(0, DEFAULT_CACHE_LINE_SIZE, sizeof(volatile size_t));
+  shenandoah_padding(0);
   volatile size_t _index;
-  DEFINE_PAD_MINUS_SIZE(1, DEFAULT_CACHE_LINE_SIZE, 0);
+  shenandoah_padding(1);
 
   // No implicit copying: iterators should be passed by reference to capture the state
   NONCOPYABLE(ShenandoahRegionIterator);
@@ -131,9 +132,11 @@ public:
 
 // ---------- Initialization, termination, identification, printing routines
 //
+private:
+  static ShenandoahHeap* _heap;
+
 public:
   static ShenandoahHeap* heap();
-  static ShenandoahHeap* heap_no_check();
 
   const char* name()          const { return "Shenandoah"; }
   ShenandoahHeap::Name kind() const { return CollectedHeap::Shenandoah; }
@@ -161,11 +164,11 @@ public:
 private:
            size_t _initial_size;
            size_t _minimum_size;
-  DEFINE_PAD_MINUS_SIZE(0, DEFAULT_CACHE_LINE_SIZE, sizeof(volatile size_t));
+  shenandoah_padding(0);
   volatile size_t _used;
   volatile size_t _committed;
   volatile size_t _bytes_allocated_since_gc_start;
-  DEFINE_PAD_MINUS_SIZE(1, DEFAULT_CACHE_LINE_SIZE, 0);
+  shenandoah_padding(1);
 
 public:
   void increase_used(size_t bytes);

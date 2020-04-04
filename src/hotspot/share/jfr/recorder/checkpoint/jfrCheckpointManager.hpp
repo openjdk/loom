@@ -81,11 +81,9 @@ class JfrCheckpointManager : public JfrCHeapObj {
   size_t write();
   size_t flush();
 
-  bool is_static_type_set_required();
   size_t write_static_type_set();
   size_t write_threads();
   size_t write_static_type_set_and_threads();
-  bool is_type_set_required();
   void clear_type_set();
   void write_type_set();
   static void write_type_set_for_unloaded_classes();
@@ -109,8 +107,8 @@ class JfrCheckpointManager : public JfrCHeapObj {
   static JfrBlobHandle create_blob(Thread* t, traceid tid = 0, oop vthread = NULL);
   static void write_checkpoint(Thread* t, traceid tid = 0, oop vthread = NULL);
 
+
   size_t flush_type_set();
-  void flush_static_type_set();
   void register_service_thread(const Thread* t);
 
   friend class Jfr;

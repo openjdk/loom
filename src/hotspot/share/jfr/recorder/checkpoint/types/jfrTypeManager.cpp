@@ -180,8 +180,6 @@ static void assert_not_registered_twice(JfrTypeId id, List& list) {
 }
 #endif
 
-static bool new_registration = false;
-
 static bool register_static_type(JfrTypeId id, bool permit_cache, JfrSerializer* serializer) {
   assert(serializer != NULL, "invariant");
   JfrSerializerRegistration* const registration = new JfrSerializerRegistration(id, permit_cache, serializer);
@@ -194,7 +192,6 @@ static bool register_static_type(JfrTypeId id, bool permit_cache, JfrSerializer*
   if (JfrRecorder::is_recording()) {
     JfrCheckpointWriter writer(STATICS);
     registration->invoke(writer);
-    new_registration = true;
   }
   types.prepend(registration);
   return true;
@@ -212,7 +209,6 @@ bool JfrTypeManager::initialize() {
   register_static_type(TYPE_METASPACEOBJECTTYPE, true, new MetaspaceObjectTypeConstant());
   register_static_type(TYPE_REFERENCETYPE, true, new ReferenceTypeConstant());
   register_static_type(TYPE_NARROWOOPMODE, true, new NarrowOopModeConstant());
-  register_static_type(TYPE_COMPILERPHASETYPE, true, new CompilerPhaseTypeConstant());
   register_static_type(TYPE_CODEBLOBTYPE, true, new CodeBlobTypeConstant());
   register_static_type(TYPE_VMOPERATIONTYPE, true, new VMOperationTypeConstant());
   register_static_type(TYPE_THREADSTATE, true, new ThreadStateConstant());
@@ -227,14 +223,6 @@ bool JfrSerializer::register_serializer(JfrTypeId id, bool permit_cache, JfrSeri
   return register_static_type(id, permit_cache, serializer);
 }
 
-bool JfrTypeManager::has_new_static_type() {
-  if (new_registration) {
-    SerializerRegistrationGuard guard;
-    new_registration = false;
-    return true;
-  }
-  return false;
-}
 
 void JfrTypeManager::write_static_types(JfrCheckpointWriter& writer) {
   SerializerRegistrationGuard guard;
@@ -242,5 +230,4 @@ void JfrTypeManager::write_static_types(JfrCheckpointWriter& writer) {
   while (iter.has_next()) {
     iter.next()->invoke(writer);
   }
-  new_registration = false;
 }

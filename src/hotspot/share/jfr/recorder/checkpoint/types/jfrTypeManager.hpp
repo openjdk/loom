@@ -40,7 +40,6 @@ class JfrTypeManager : public AllStatic {
   static void write_threads(JfrCheckpointWriter& writer);
   static JfrBlobHandle create_blob(Thread* t, traceid tid = 0, oop vthread = NULL);
   static void write_checkpoint(Thread* t, traceid tid = 0, oop vthread = NULL);
-  static bool has_new_static_type();
   static void write_static_types(JfrCheckpointWriter& writer);
 };
 

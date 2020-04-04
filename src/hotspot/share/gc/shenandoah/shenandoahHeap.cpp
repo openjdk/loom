@@ -54,6 +54,7 @@
 #include "gc/shenandoah/shenandoahNormalMode.hpp"
 #include "gc/shenandoah/shenandoahOopClosures.inline.hpp"
 #include "gc/shenandoah/shenandoahPacer.inline.hpp"
+#include "gc/shenandoah/shenandoahPadding.hpp"
 #include "gc/shenandoah/shenandoahParallelCleaning.inline.hpp"
 #include "gc/shenandoah/shenandoahPassiveMode.hpp"
 #include "gc/shenandoah/shenandoahRootProcessor.inline.hpp"
@@ -80,6 +81,8 @@
 #include "runtime/vmThread.hpp"
 #include "services/mallocTracker.hpp"
 #include "utilities/powerOfTwo.hpp"
+
+ShenandoahHeap* ShenandoahHeap::_heap = NULL;
 
 #ifdef ASSERT
 template <class T>
@@ -284,12 +287,10 @@ jint ShenandoahHeap::initialize() {
   {
     ShenandoahHeapLocker locker(lock());
 
-    size_t size_words = ShenandoahHeapRegion::region_size_words();
-
     for (size_t i = 0; i < _num_regions; i++) {
-      HeapWord* start = (HeapWord*)sh_rs.base() + size_words * i;
+      HeapWord* start = (HeapWord*)sh_rs.base() + ShenandoahHeapRegion::region_size_words() * i;
       bool is_committed = i < num_committed_regions;
-      ShenandoahHeapRegion* r = new ShenandoahHeapRegion(this, start, size_words, i, is_committed);
+      ShenandoahHeapRegion* r = new ShenandoahHeapRegion(start, i, is_committed);
 
       _marking_context->initialize_top_at_mark_start(r);
       _regions[i] = r;
@@ -462,6 +463,8 @@ ShenandoahHeap::ShenandoahHeap(ShenandoahCollectorPolicy* policy) :
   _liveness_cache(NULL),
   _collection_set(NULL)
 {
+  _heap = this;
+
   log_info(gc, init)("GC threads: " UINT32_FORMAT " parallel, " UINT32_FORMAT " concurrent", ParallelGCThreads, ConcGCThreads);
   log_info(gc, init)("Reference processing: %s", ParallelRefProcEnabled ? "parallel" : "serial");
 
@@ -776,18 +779,6 @@ HeapWord* ShenandoahHeap::allocate_new_gclab(size_t min_size,
     *actual_size = 0;
   }
   return res;
-}
-
-ShenandoahHeap* ShenandoahHeap::heap() {
-  CollectedHeap* heap = Universe::heap();
-  assert(heap != NULL, "Unitialized access to ShenandoahHeap::heap()");
-  assert(heap->kind() == CollectedHeap::Shenandoah, "not a shenandoah heap");
-  return (ShenandoahHeap*) heap;
-}
-
-ShenandoahHeap* ShenandoahHeap::heap_no_check() {
-  CollectedHeap* heap = Universe::heap();
-  return (ShenandoahHeap*) heap;
 }
 
 HeapWord* ShenandoahHeap::allocate_memory(ShenandoahAllocRequest& req) {
@@ -1127,16 +1118,16 @@ void ShenandoahHeap::do_full_collection(bool clear_all_soft_refs) {
 }
 
 HeapWord* ShenandoahHeap::block_start(const void* addr) const {
-  Space* sp = heap_region_containing(addr);
-  if (sp != NULL) {
-    return sp->block_start(addr);
+  ShenandoahHeapRegion* r = heap_region_containing(addr);
+  if (r != NULL) {
+    return r->block_start(addr);
   }
   return NULL;
 }
 
 bool ShenandoahHeap::block_is_obj(const HeapWord* addr) const {
-  Space* sp = heap_region_containing(addr);
-  return sp->block_is_obj(addr);
+  ShenandoahHeapRegion* r = heap_region_containing(addr);
+  return r->block_is_obj(addr);
 }
 
 bool ShenandoahHeap::print_location(outputStream* st, void* addr) const {
@@ -1321,9 +1312,9 @@ private:
   ShenandoahHeap* const _heap;
   ShenandoahHeapRegionClosure* const _blk;
 
-  DEFINE_PAD_MINUS_SIZE(0, DEFAULT_CACHE_LINE_SIZE, sizeof(volatile size_t));
+  shenandoah_padding(0);
   volatile size_t _index;
-  DEFINE_PAD_MINUS_SIZE(1, DEFAULT_CACHE_LINE_SIZE, 0);
+  shenandoah_padding(1);
 
 public:
   ShenandoahParallelHeapRegionTask(ShenandoahHeapRegionClosure* blk) :

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -30,9 +30,9 @@
 #include "code/debugInfoRec.hpp"
 #include "compiler/compilerOracle.hpp"
 #include "compiler/compileBroker.hpp"
+#include "compiler/compilerEvent.hpp"
 #include "libadt/dict.hpp"
 #include "libadt/vectset.hpp"
-#include "jfr/jfrEvents.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/methodData.hpp"
 #include "opto/idealGraphPrinter.hpp"
@@ -634,11 +634,7 @@ class Compile : public Phase {
   void print_method(CompilerPhaseType cpt, int level = 1, int idx = 0) {
     EventCompilerPhase event;
     if (event.should_commit()) {
-      event.set_starttime(C->_latest_stage_start_counter);
-      event.set_phase((u1) cpt);
-      event.set_compileId(C->_compile_id);
-      event.set_phaseLevel(level);
-      event.commit();
+      CompilerEvent::PhaseEvent::post(event, C->_latest_stage_start_counter, cpt, C->_compile_id, level);
     }
 
 #ifndef PRODUCT
@@ -658,12 +654,9 @@ class Compile : public Phase {
   void end_method(int level = 1) {
     EventCompilerPhase event;
     if (event.should_commit()) {
-      event.set_starttime(C->_latest_stage_start_counter);
-      event.set_phase((u1) PHASE_END);
-      event.set_compileId(C->_compile_id);
-      event.set_phaseLevel(level);
-      event.commit();
+      CompilerEvent::PhaseEvent::post(event, C->_latest_stage_start_counter, PHASE_END, C->_compile_id, level);
     }
+
 #ifndef PRODUCT
     if (_printer && _printer->should_print(level)) {
       _printer->end_method();
@@ -1182,6 +1175,9 @@ class Compile : public Phase {
   bool select_24_bit_instr() const { return _select_24_bit_instr; }
   bool in_24_bit_fp_mode() const   { return _in_24_bit_fp_mode; }
 #endif // IA32
+#ifdef ASSERT
+  bool _type_verify_symmetry;
+#endif
 };
 
 #endif // SHARE_OPTO_COMPILE_HPP
