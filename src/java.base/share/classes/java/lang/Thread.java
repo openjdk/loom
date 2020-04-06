@@ -1009,7 +1009,7 @@ public class Thread implements Runnable {
 
     private static class VirtualThreadFactory extends CountingThreadFactory {
         private final Executor scheduler;
-        private String name;
+        private final String name;
         private final int characteristics;
         private final UncaughtExceptionHandler uhe;
 
