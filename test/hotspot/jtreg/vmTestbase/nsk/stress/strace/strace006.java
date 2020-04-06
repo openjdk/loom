@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -77,6 +77,8 @@ public class strace006 {
             "java.lang.Object.wait",
             "java.lang.Thread.exit",
             "java.lang.Thread.yield",
+            "java.lang.Thread.currentCarrierThread",
+            "java.lang.Thread.currentThread",
             "java.lang.ThreadGroup.remove",
             "java.lang.ThreadGroup.threadTerminated",
             "nsk.stress.strace.strace006Thread.run",
@@ -242,7 +244,7 @@ public class strace006 {
             return true;
         String name = element.getClassName() + "." + element.getMethodName();
         for (int i = 0; i < EXPECTED_METHODS.length; i++) {
-            if (EXPECTED_METHODS[i].compareTo(name) == 0)
+            if (name.startsWith(EXPECTED_METHODS[i]))
                 return true;
         }
         return false;
