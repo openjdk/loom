@@ -833,8 +833,8 @@ public class Executors {
 
         // deadline has already expired
         if (timeout.isZero() || timeout.isNegative()) {
-            delegate.shutdownNow();
             Thread.currentThread().interrupt();
+            delegate.shutdownNow();
             return delegate;
         }
 
@@ -848,8 +848,8 @@ public class Executors {
         Callable<Void> timerExpired = () -> {
             PrivilegedAction<Void> pa = () -> {
                 if (!delegate.isTerminated()) {
-                    delegate.shutdownNow();
                     owner.interrupt();
+                    delegate.shutdownNow();
                 }
                 return null;
             };
