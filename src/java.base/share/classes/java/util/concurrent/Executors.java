@@ -246,15 +246,11 @@ public class Executors {
      * Creates an Executor that runs each task in its own thread. The number of
      * threads is unbounded.
      *
-     * @apiNote This is a prototype API. It is intended to be used to run tasks
-     * in virtual threads as in the following example:
-     * <pre> {@code
-     *     ThreadFactory factory = Thread.builder().virtual().factory();
-     *     try (ExecutorService executor = Executors.newUnboundedExecutor(factory)) {
-     *         executor.submit(task1);
-     *         executor.submit(task2);
-     *     }
-     * }</pre>
+     * <p> Tasks submitted with the {@linkplain ExecutorService#submitTask(Callable)
+     * submitTask} or {@linkplain ExecutorService#submitTasks(Collection) submitTasks}
+     * methods return {@linkplain CompletableFuture} objects that interrupt the
+     * thread when {@linkplain CompletableFuture#cancel(boolean) cancel(true)} is
+     * invoked.
      *
      * @param threadFactory the factory to use when creating new threads
      * @return a newly created executor
@@ -263,6 +259,34 @@ public class Executors {
      */
     public static ExecutorService newUnboundedExecutor(ThreadFactory threadFactory) {
         return new UnboundedExecutor(threadFactory);
+    }
+
+    /**
+     * Creates an Executor that runs each task in its own virtual thread. The
+     * threads support thread-locals but do not inherit inheritable thread-locals
+     * when created. The number of threads is unbounded.
+     *
+     * <p> Tasks submitted with the {@linkplain ExecutorService#submitTask(Callable)
+     * submitTask} or {@linkplain ExecutorService#submitTasks(Collection) submitTasks}
+     * methods return {@linkplain CompletableFuture} objects that interrupt the
+     * thread when {@linkplain CompletableFuture#cancel(boolean) cancel(true)} is
+     * invoked.
+     *
+     * @apiNote This is a prototype API. It is intended to be used to run tasks
+     * in virtual threads as in the following example:
+     * <pre> {@code
+     *     try (ExecutorService executor = Executors.newUnboundedVirtualThreadExecutor()) {
+     *         List<Callable<String>> tasks = ...
+     *         String result = executor.invokeAny(tasks);
+     *     }
+     * }</pre>
+     *
+     * @return a newly created executor
+     * @since 99
+     */
+    public static ExecutorService newUnboundedVirtualThreadExecutor() {
+        ThreadFactory factory = Thread.builder().virtual().factory();
+        return new UnboundedExecutor(factory);
     }
 
     /**
