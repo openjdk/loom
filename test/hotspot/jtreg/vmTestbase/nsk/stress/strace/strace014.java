@@ -175,7 +175,7 @@ public class strace014 {
         for (int i = 1; i < THRD_COUNT; i++) {
             all = (StackTraceElement[]) traces.get(threads[i]);
             int k = all.length;
-            if (count - k > 2) {
+            if (count - k > 4) {
                 complain("wrong lengths of stack traces:\n\t"
                         + threads[0].getName() + ": " + count
                         + "\t"

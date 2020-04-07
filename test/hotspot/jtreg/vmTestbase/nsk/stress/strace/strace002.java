@@ -80,6 +80,7 @@ public class strace002 {
             "java.lang.Thread.yield",
             "java.lang.Thread.currentCarrierThread",
             "java.lang.Thread.currentThread",
+            "java.lang.Thread.getVirtualThread",
             "java.lang.ThreadGroup.remove",
             "java.lang.ThreadGroup.threadTerminated",
             "nsk.stress.strace.strace002Thread.run",
