@@ -363,18 +363,8 @@ class UnboundedExecutor extends AbstractExecutorService {
         }
     }
 
-    /**
-     * Submits a value-returning task for execution and returns a
-     * CompletableFuture representing the pending results of the task.
-     *
-     * @param task the task to submit
-     * @param <T> the type of the task's result
-     * @return a CompletableFuture representing pending completion of the task
-     * @throws RejectedExecutionException if the task cannot be
-     *         scheduled for execution
-     * @throws NullPointerException if the task is null
-     */
-    private <T> CompletableFuture<T> submitTask(Callable<T> task) {
+    @Override
+    public <T> CompletableFuture<T> submitTask(Callable<T> task) {
         Objects.requireNonNull(task);
         ensureNotShutdown();
 

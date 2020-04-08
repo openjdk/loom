@@ -2992,6 +2992,16 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      *     }
      * }</pre>
      *
+     * <p> The following example partitions the pending results into two sets, one for
+     * the tasks that completed successfully, the other for the tasks that completed
+     * with an exception.
+     * <pre>{@code
+     *     List<CompletableFuture<String>> cfs = ...
+     *     Map<Boolean, Set<CompletableFuture<String>>> map = CompletableFuture.stream(cfs)
+     *             .collect(Collectors.partitioningBy(CompletableFuture::isCompletedExceptionally,
+     *                                                Collectors.toSet()));
+     * }</pre>
+     *
      * @param cfs the CompletableFutures
      * @param <T> the result type returned by completable future's {@code join}
      * @return stream of completed CompletableFutures

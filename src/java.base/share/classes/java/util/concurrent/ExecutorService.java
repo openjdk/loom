@@ -37,8 +37,12 @@ package java.util.concurrent;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * An {@link Executor} that provides methods to manage termination and
@@ -465,5 +469,74 @@ public interface ExecutorService extends Executor, AutoCloseable {
         Duration timeout = Duration.between(Instant.now(), deadline);
         return Executors.timedExecutorService(this, timeout);
     }
-}
 
+    /**
+     * Submits a value-returning task for execution and returns a
+     * CompletableFuture representing the pending result of the task.
+     *
+     * @implSpec
+     * The default implementation invokes the {@linkplain #execute(Runnable)
+     * execute(Runnable)} method with a task that completes the {@code
+     * CompletableFuture} when the given task completes.
+     *
+     * @param task the task to submit
+     * @param <T> the type of the task's result
+     * @return a CompletableFuture representing pending completion of the task
+     * @throws RejectedExecutionException if the task cannot be
+     *         scheduled for execution
+     * @throws NullPointerException if the task is null
+     * @since 99
+     */
+    default <T> CompletableFuture<T> submitTask(Callable<T> task) {
+        Objects.requireNonNull(task);
+        var future = new CompletableFuture<T>();
+        execute(() -> {
+            try {
+                T result = task.call();
+                future.complete(result);
+            } catch (Throwable e) {
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
+    }
+
+    /**
+     * Submits the given value-returning tasks for execution and returns a list
+     * of CompletableFutures representing the pending results of the tasks.
+     *
+     * @implSpec
+     * The default implementation invokes {@link #submitTask(Callable)} for each
+     * task and returns a list of the resulting CompletableFutures objects. If
+     * {@code submitTask} fails then it cancels the {@code CompletableFuture}
+     * objects corresponding to the tasks submitted prior to the failure.
+     *
+     * @apiNote This method is not atomic. RejectedExecutionException may
+     * be thrown after some tasks have been submitted for execution. This
+     * method makes a best effort attempt to cancel the tasks that it
+     * submitted when RejectedExecutionException is thrown.
+     *
+     * @param tasks the collection of tasks
+     * @param <T> the type of the values returned from the tasks
+     * @return a list of CompletableFuture representing the tasks, in the same
+     *         sequential order as produced by the iterator for the
+     *         given collection of tasks
+     * @throws RejectedExecutionException if any task cannot be
+     *         scheduled for execution
+     * @throws NullPointerException if tasks or any of its elements are {@code null}
+     * @since 99
+     * @see CompletableFuture#stream(Collection)
+     * @see CompletableFuture#stream(CompletableFuture[]) 
+     */
+    default <T> List<CompletableFuture<T>> submitTasks(Collection<? extends Callable<T>> tasks) {
+        List<CompletableFuture<T>> list = new ArrayList<>();
+        try {
+            return tasks.stream()
+                    .map(this::submitTask)
+                    .collect(Collectors.toCollection(() -> list));
+        } catch (Exception e) {
+            list.forEach(future -> future.cancel(true));
+            throw e;
+        }
+    }
+}
