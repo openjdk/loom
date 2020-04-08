@@ -1249,11 +1249,19 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
     }
     priority = (ThreadPriority)JVMTI_THREAD_NORM_PRIORITY;
     is_daemon = true;
-    thread_group = Handle(current_thread, java_lang_Thread_VirtualThreads::get_THREAD_GROUP());
+    if (java_lang_VirtualThread::state(thread_obj()) == java_lang_VirtualThread::TERMINATED) {
+      thread_group = Handle(current_thread, NULL);
+    } else {
+      thread_group = Handle(current_thread, java_lang_Thread_VirtualThreads::get_THREAD_GROUP());
+    }
   } else {
     priority = java_lang_Thread::priority(thread_obj());
     is_daemon = java_lang_Thread::is_daemon(thread_obj());
-    thread_group = Handle(current_thread, java_lang_Thread::threadGroup(thread_obj()));
+    if (java_lang_Thread::get_thread_status(thread_obj()) == java_lang_Thread::TERMINATED) {
+      thread_group = Handle(current_thread, NULL);
+    } else {
+      thread_group = Handle(current_thread, java_lang_Thread::threadGroup(thread_obj()));
+    }
   }
 
   oop loader = java_lang_Thread::context_class_loader(thread_obj());
@@ -2321,7 +2329,7 @@ JvmtiEnv::GetLocalInstance(jthread thread, jint depth, jobject* value_ptr){
                                  current_thread, depth);
     VMThread::execute(&op);
     err = op.result();
-    if (err == JVMTI_ERROR_NONE) { 
+    if (err == JVMTI_ERROR_NONE) {
       *value_ptr = op.value().l;
     }
   } else {
@@ -2334,7 +2342,7 @@ JvmtiEnv::GetLocalInstance(jthread thread, jint depth, jobject* value_ptr){
     VM_GetReceiver op(java_thread, current_thread, depth);
     VMThread::execute(&op);
     err = op.result();
-    if (err == JVMTI_ERROR_NONE) { 
+    if (err == JVMTI_ERROR_NONE) {
       *value_ptr = op.value().l;
     }
   }
