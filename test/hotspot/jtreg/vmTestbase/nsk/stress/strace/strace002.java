@@ -76,10 +76,13 @@ public class strace002 {
     static final String[] EXPECTED_METHODS = {
             "java.lang.System.arraycopy",
             "java.lang.Object.wait",
+            "java.lang.Object.wait0",
             "java.lang.Thread.exit",
             "java.lang.Thread.yield",
+            "java.lang.Thread.yield0",
             "java.lang.Thread.currentCarrierThread",
             "java.lang.Thread.currentThread",
+            "java.lang.Thread.currentThread0",
             "java.lang.Thread.getVirtualThread",
             "java.lang.ThreadGroup.remove",
             "java.lang.ThreadGroup.threadTerminated",

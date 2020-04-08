@@ -73,6 +73,7 @@ public class strace014 {
     static final int THRD_COUNT = 100;
     static final String[] EXPECTED_METHODS = {
             "java.lang.Object.wait",
+            "java.lang.Object.wait0",
             "nsk.stress.strace.strace014Thread.run",
             "nsk.stress.strace.strace014Thread.recursiveMethod"
     };

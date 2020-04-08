@@ -73,8 +73,15 @@ public class strace011 {
     static final int THRD_COUNT = 50;
     static final String[] EXPECTED_METHODS = {
             "java.lang.Thread.sleep",
+            "java.lang.Thread.sleep0",
+            "java.lang.Thread.getVirtualThread",
+            "jdk.internal.event.ThreadSleepEvent.<clinit>",
+            "jdk.internal.event.ThreadSleepEvent.isTurnedOn",
+            "jdk.internal.event.ThreadSleepEvent.isEnabled",
+            "java.lang.Thread.sleepMillis",
             "java.lang.Thread.currentCarrierThread",
             "java.lang.Thread.currentThread",
+            "java.lang.Thread.currentThread0",
             "nsk.stress.strace.strace011Thread.run",
             "nsk.stress.strace.strace011Thread.recursiveMethod"
     };
