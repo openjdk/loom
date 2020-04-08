@@ -74,6 +74,15 @@ public class thrinfo001 {
             t_b.join();
         } catch (InterruptedException e) {}
         checkInfo(t_b, t_b.getThreadGroup(), 2);
+
+        Thread t_c = Thread.builder().task(new thrinfo001c()).name("vthread").virtual().build();
+        checkInfo(t_c, t_c.getThreadGroup(), 3);
+        t_c.start();
+        try {
+            t_c.join();
+        } catch (InterruptedException e) {}
+        checkInfo(t_c, t_c.getThreadGroup(), 3);
+
         return getRes();
     }
 }
@@ -93,5 +102,12 @@ class thrinfo001b extends Thread {
     public void run() {
         Thread currThr = Thread.currentThread();
         thrinfo001.checkInfo(currThr, currThr.getThreadGroup(), 2);
+    }
+}
+
+class thrinfo001c implements Runnable {
+    public void run() {
+        Thread currThr = Thread.currentThread();
+        thrinfo001.checkInfo(currThr, currThr.getThreadGroup(), 3);
     }
 }
