@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -116,8 +116,14 @@ public class strace003 {
     static final String[] EXPECTED_METHODS = {
             "java.lang.System.arraycopy",
             "java.lang.Object.wait",
+            "java.lang.Object.wait0",
             "java.lang.Thread.exit",
             "java.lang.Thread.yield",
+            "java.lang.Thread.yield0",
+            "java.lang.Thread.getVirtualThread",
+            "java.lang.Thread.currentCarrierThread",
+            "java.lang.Thread.currentThread",
+            "java.lang.Thread.currentThread0",
             "java.lang.ThreadGroup.remove",
             "java.lang.ThreadGroup.threadTerminated",
             "nsk.stress.strace.strace003Thread.run",
@@ -267,7 +273,7 @@ public class strace003 {
     boolean checkElement(StackTraceElement element) {
         String name = element.getClassName() + "." + element.getMethodName();
         for (int i = 0; i < EXPECTED_METHODS.length; i++) {
-            if (EXPECTED_METHODS[i].compareTo(name) == 0)
+            if (name.startsWith(EXPECTED_METHODS[i]))
                 return true;
         }
         return false;
