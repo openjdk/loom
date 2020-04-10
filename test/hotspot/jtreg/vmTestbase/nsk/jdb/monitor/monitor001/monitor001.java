@@ -151,8 +151,9 @@ public class monitor001 extends JdbTest {
 
         grep = new Paragrep(reply);
 
-        // check 'threads'
-        v.add("java.lang.Thread");
+        // check 'threads', searching for java.lang.(Virtual)Thread main
+        v.add("java.lang");
+        v.add("Thread");
         v.add("main");
         if ((count = grep.find(v)) != 1) {
             log.complain("Wrong number of execution of monitored command: " + CHECKED_COMMANDS[0]);

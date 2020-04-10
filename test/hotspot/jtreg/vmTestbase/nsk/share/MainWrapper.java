@@ -41,6 +41,11 @@ public final class MainWrapper {
         Class c = Class.forName(className);
         Method mainMethod = c.getMethod("main", new Class[] { String[].class });
 
+        // It is needed to register finalizer thread in default thread group
+        // So FinalizerThread thread can't be in virtual threads group
+        Finalizer finalizer = new Finalizer(new FinalizableObject());
+        finalizer.activate();
+
         Thread.Builder tb = Thread.builder().task(() -> {
                 try {
                     mainMethod.invoke(null, new Object[] { classArgs });
@@ -51,7 +56,8 @@ public final class MainWrapper {
         if (wrapperName.equals("Virtual")) {
             tb = tb.virtual();
         }
-        Thread t = tb.build();
+        Thread t = tb.name("main").build();
+        Thread.currentThread().setName("old-m-a-i-n");
         t.start();
         t.join();
     }

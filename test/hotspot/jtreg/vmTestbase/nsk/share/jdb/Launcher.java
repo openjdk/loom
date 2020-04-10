@@ -217,6 +217,9 @@ public class Launcher extends DebugeeBinder {
                     }
                 }
                 String cmdline = classToExecute + " " + ArgumentHandler.joinArguments(argumentHandler.getArguments(), " ");
+                if (System.getProperty("main.wrapper") != null) {
+                    cmdline = MainWrapper.class.getName() + " " + System.getProperty("main.wrapper") +  " " + cmdline;
+                }
                 connect.append(",main=" + cmdline.trim());
 
             }
