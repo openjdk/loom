@@ -75,7 +75,11 @@ public class ThreadsRunner implements MultiRunner, LogAware, RunParamsAware {
         }
 
         public Thread newThread(Runnable runnable, String name, int num) {
-            return new Thread(runnable, name);
+            Thread.Builder tb = Thread.builder().task(runnable).name(name);
+            if (this.params.useVirtualThreads()) {
+                tb = tb.virtual();
+            }
+            return tb.build();
         }
     }
 
