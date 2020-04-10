@@ -65,15 +65,17 @@ import jdk.internal.event.ThreadSleepEvent;
  * resources that are maintained by the operating system. Kernel threads are
  * suitable for executing all types of tasks but they are a limited resource.
  *
+ * <a id="virtual-threads"></a>
  * <p> {@code Thread} also supports the creation of <i>virtual threads</i> that
- * are scheduled by the Java virtual machine using a small set of kernel threads.
+ * are scheduled by the Java virtual machine using a small set of kernel threads
+ * that are used as <em>carrier threads</em>.
  * Virtual threads will typically require few resources and a single Java virtual
  * machine may support millions of virtual threads. Virtual threads are suitable
  * for executing tasks that spend most of the time blocked, often waiting for
  * synchronous blocking I/O operations to complete.
- * Locking and I/O operations are the <i>scheduling points</i> where a kernel thread
+ * Locking and I/O operations are the <i>scheduling points</i> where a carrier thread
  * is re-scheduled from one virtual thread to another. Code executing in virtual
- * threads will usually not be aware of the underlying kernel thread, and in
+ * threads will usually not be aware of the underlying carrier thread, and in
  * particular, the {@linkplain Thread#currentThread()} method, to obtain a reference
  * to the <i>current thread</i>, will return the {@code Thread} object for the virtual
  * thread.
@@ -89,8 +91,8 @@ import jdk.internal.event.ThreadSleepEvent;
  * The Java virtual machine terminates when all non-daemon threads have terminated.
  * The Java virtual machine can also be terminated by invoking the
  * {@linkplain Runtime#exit(int)} method, in which case it will terminate even
- * if there are many non-daemon threads still running. The daemon status of
- * virtual threads is meaningless and have no influence on when the Java virtual
+ * if there are non-daemon threads still running. The daemon status of virtual
+ * threads is meaningless and have no influence on when the Java virtual
  * machine terminates.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
@@ -608,6 +610,47 @@ public class Thread implements Runnable {
     }
 
     /**
+     * The task {@link java.util.concurrent.Executor#execute(Runnable) submitted}
+     * to a custom {@link Thread.Builder#virtual(Executor) scheduler}.
+     *
+     * @apiNote The follow example creates a scheduler that uses a small set of
+     * kernel threads. It prints the name of each virtual thread before executing
+     * its task.
+     * <pre>{@code
+     *     ExecutorService pool = Executors.newFixedThreadPool(4);
+     *     Executor scheduler = (task) -> {
+     *         Thread vthread = ((VirtualThreadTask) task).thread();
+     *         System.out.println(vthread);
+     *         pool.execute(task);
+     *     };
+     * }</pre>
+     *
+     * @see Thread.Builder#virtual(Executor) 
+     * @since 99
+     */
+    public interface VirtualThreadTask {
+        /**
+         * Return the virtual thread that this task was submitted to run
+         * @return the virtual thread
+         */
+        Thread thread();
+
+        /**
+         * Attaches the given object to this task.
+         * @param att the object to attach
+         * @return the previously-attached object, if any, otherwise {@code null}
+         */
+        Object attach(Object att);
+
+        /**
+         * Retrieves the current attachment.
+         * @return the object currently attached to this task or {@code null} if
+         *         there is no attachment
+         */
+        Object attachment();
+    }
+
+    /**
      * Returns a builder for creating {@code Thread} or {@code ThreadFactory} objects.
      *
      * @apiNote The following are examples using the builder:
@@ -722,7 +765,8 @@ public class Thread implements Runnable {
          * the operating system with the given scheduler.
          * The scheduler's {@link Executor#execute(Runnable) execute} method
          * should execute tasks on a kernel thread. Executing the task on a
-         * virtual thread leads to unspecified behavior.
+         * virtual thread leads to unspecified behavior. The tasks submitted
+         * to the scheduler are of type {@link VirtualThreadTask}.
          * @param scheduler the scheduler
          * @return this builder
          * @throws IllegalStateException if a thread group has been set
