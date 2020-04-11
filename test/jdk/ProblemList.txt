@@ -608,9 +608,9 @@ java/io/pathNames/GeneralWin32.java                             8180264 windows-
 com/sun/management/OperatingSystemMXBean/GetProcessCpuLoad.java 8030957 aix-all
 com/sun/management/OperatingSystemMXBean/GetSystemCpuLoad.java  8030957 aix-all
 
-sun/management/jdp/JdpDefaultsTest.java                         8241530 macosx-all
-sun/management/jdp/JdpJmxRemoteDynamicPortTest.java             8241530 macosx-all
-sun/management/jdp/JdpSpecificAddressTest.java                  8241530 macosx-all
+sun/management/jdp/JdpDefaultsTest.java                         8241865 macosx-all
+sun/management/jdp/JdpJmxRemoteDynamicPortTest.java             8241865 macosx-all
+sun/management/jdp/JdpSpecificAddressTest.java                  8241865 macosx-all
 
 ############################################################################
 
@@ -930,9 +930,6 @@ com/sun/jdi/NashornPopFrameTest.java                            8225620 generic-
 
 com/sun/jdi/InvokeHangTest.java                                 8218463 linux-all
 
-com/sun/jdi/JdwpAttachTest.java                                 8241530 macosx-all
-com/sun/jdi/JdwpListenTest.java                                 8241530 macosx-all
-
 ############################################################################
 
 # jdk_time
@@ -949,8 +946,7 @@ com/sun/jdi/JdwpListenTest.java                                 8241530 macosx-a
 
 # svc_tools
 
-sun/tools/jhsdb/BasicLauncherTest.java                          8193639,8211767 solaris-all,linux-ppc64,linux-ppc64le
-sun/tools/jhsdb/HeapDumpTest.java                               8193639 solaris-all
+sun/tools/jhsdb/BasicLauncherTest.java                          8211767 linux-ppc64,linux-ppc64le
 sun/tools/jhsdb/HeapDumpTestWithActiveProcess.java              8231634,8230731,8001227 generic-all,windows-all
 
 

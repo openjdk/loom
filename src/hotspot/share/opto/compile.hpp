@@ -83,6 +83,7 @@ class TypeInt;
 class TypePtr;
 class TypeOopPtr;
 class TypeFunc;
+class TypeVect;
 class Unique_Node_List;
 class nmethod;
 class WarmCallInfo;
@@ -721,6 +722,8 @@ class Compile : public Phase {
   int   opaque4_count()       const { return _opaque4_nodes->length(); }
   void  remove_opaque4_nodes(PhaseIterGVN &igvn);
 
+  void sort_macro_nodes();
+
   // remove the opaque nodes that protect the predicates so that the unused checks and
   // uncommon traps will be eliminated from the graph.
   void cleanup_loop_predicates(PhaseIterGVN &igvn);
@@ -1106,6 +1109,15 @@ class Compile : public Phase {
   void final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& frc, uint nop);
   void final_graph_reshaping_walk( Node_Stack &nstack, Node *root, Final_Reshape_Counts &frc );
   void eliminate_redundant_card_marks(Node* n);
+
+  // Logic cone optimization.
+  void optimize_logic_cones(PhaseIterGVN &igvn);
+  void collect_logic_cone_roots(Unique_Node_List& list);
+  void process_logic_cone_root(PhaseIterGVN &igvn, Node* n, VectorSet& visited);
+  bool compute_logic_cone(Node* n, Unique_Node_List& partition, Unique_Node_List& inputs);
+  uint compute_truth_table(Unique_Node_List& partition, Unique_Node_List& inputs);
+  uint eval_macro_logic_op(uint func, uint op1, uint op2, uint op3);
+  Node* xform_to_MacroLogicV(PhaseIterGVN &igvn, const TypeVect* vt, Unique_Node_List& partitions, Unique_Node_List& inputs);
 
  public:
 

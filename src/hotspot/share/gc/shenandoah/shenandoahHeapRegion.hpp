@@ -36,7 +36,7 @@
 class VMStructs;
 class ShenandoahHeapRegionStateConstant;
 
-class ShenandoahHeapRegion : public CHeapObj<mtGC> {
+class ShenandoahHeapRegion {
   friend class VMStructs;
   friend class ShenandoahHeapRegionStateConstant;
 private:
@@ -222,23 +222,8 @@ private:
   static size_t MaxTLABSizeBytes;
   static size_t MaxTLABSizeWords;
 
-  // Global allocation counter, increased for each allocation under Shenandoah heap lock.
-  // Padded to avoid false sharing with the read-only fields above.
-  struct PaddedAllocSeqNum {
-    shenandoah_padding(0);
-    uint64_t value;
-    shenandoah_padding(1);
-
-    PaddedAllocSeqNum() {
-      // start with 1, reserve 0 for uninitialized value
-      value = 1;
-    }
-  };
-
-  static PaddedAllocSeqNum _alloc_seq_num;
-
   // Never updated fields
-  size_t const _region_number;
+  size_t const _index;
   HeapWord* const _bottom;
   HeapWord* const _end;
 
@@ -254,17 +239,11 @@ private:
 
   size_t _tlab_allocs;
   size_t _gclab_allocs;
-  size_t _shared_allocs;
-
-  uint64_t _seqnum_last_alloc_mutator;
 
   volatile size_t _live_data;
   volatile size_t _critical_pins;
 
   HeapWord* _update_watermark;
-
-  // Claim some space at the end to protect next region
-  shenandoah_padding(0);
 
 public:
   ShenandoahHeapRegion(HeapWord* start, size_t index, bool committed);
@@ -349,17 +328,14 @@ public:
     return ShenandoahHeapRegion::MaxTLABSizeWords;
   }
 
-  static uint64_t seqnum_current_alloc() {
-    // Last used seq number
-    return _alloc_seq_num.value - 1;
+  inline size_t index() const {
+    return _index;
   }
-
-  size_t region_number() const;
 
   // Allocation (return NULL if full)
   inline HeapWord* allocate(size_t word_size, ShenandoahAllocRequest::Type type);
 
-  void clear_live_data();
+  inline void clear_live_data();
   void set_live_data(size_t s);
 
   // Increase live data for newly allocated region
@@ -368,13 +344,13 @@ public:
   // Increase live data for region scanned with GC
   inline void increase_live_data_gc_words(size_t s);
 
-  bool has_live() const;
-  size_t get_live_data_bytes() const;
-  size_t get_live_data_words() const;
+  inline bool has_live() const;
+  inline size_t get_live_data_bytes() const;
+  inline size_t get_live_data_words() const;
+
+  inline size_t garbage() const;
 
   void print_on(outputStream* st) const;
-
-  size_t garbage() const;
 
   void recycle();
 
@@ -401,28 +377,21 @@ public:
   size_t free() const           { return byte_size(top(),    end()); }
 
   inline void adjust_alloc_metadata(ShenandoahAllocRequest::Type type, size_t);
-  void reset_alloc_metadata_to_shared();
   void reset_alloc_metadata();
   size_t get_shared_allocs() const;
   size_t get_tlab_allocs() const;
   size_t get_gclab_allocs() const;
 
-  inline uint64_t seqnum_last_alloc_mutator() const;
-  void update_seqnum_last_alloc_mutator();
-
   HeapWord* get_update_watermark() const {
-    // Updates to the update-watermark only happen at safepoints or, when pushing
-    // back the watermark for evacuation regions, under the Shenandoah heap-lock.
-    // Consequently, we should access the field under the same lock. However, since
-    // those updates are only monotonically increasing, possibly reading a stale value
-    // is only conservative - we would not miss to update any fields.
+    // Updates to the update-watermark only happen at safepoints.
+    // Since those updates are only monotonically increasing, possibly reading
+    // a stale value is only conservative - we would not miss to update any fields.
     HeapWord* watermark = _update_watermark;
     assert(bottom() <= watermark && watermark <= top(), "within bounds");
     return watermark;
   }
 
   void set_update_watermark(HeapWord* w) {
-    shenandoah_assert_heaplocked_or_safepoint();
     assert(bottom() <= w && w <= top(), "within bounds");
     _update_watermark = w;
   }

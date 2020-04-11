@@ -72,7 +72,7 @@ bool frame::safe_for_sender(JavaThread *thread) {
   // an fp must be within the stack and above (but not equal) sp
   // second evaluation on fp+ is added to handle situation where fp is -1
   bool fp_safe = thread->is_in_stack_range_excl(fp, sp) &&
-                 thread->is_in_full_stack(fp + (return_addr_offset * sizeof(void*)));
+                 thread->is_in_full_stack_checked(fp + (return_addr_offset * sizeof(void*)));
 
   // We know sp/unextended_sp are safe only fp is questionable here
 
@@ -134,7 +134,7 @@ bool frame::safe_for_sender(JavaThread *thread) {
 
       sender_sp = _unextended_sp + _cb->frame_size();
       // Is sender_sp safe?
-      if (!thread->is_in_full_stack((address)sender_sp)) {
+      if (!thread->is_in_full_stack_checked((address)sender_sp)) {
         return false;
       }
       sender_unextended_sp = sender_sp;
@@ -258,6 +258,7 @@ bool frame::safe_for_sender(JavaThread *thread) {
 
 
 void frame::patch_pc(Thread* thread, address pc) {
+  assert(_cb == CodeCache::find_blob(pc), "unexpected pc");
   address* pc_addr = &(((address*) sp())[-1]);
   pc_addr = Continuation::get_continuation_entry_pc_for_sender(thread, *this, pc_addr);
 
@@ -273,7 +274,6 @@ void frame::patch_pc(Thread* thread, address pc) {
   assert(_pc == *pc_addr || pc == *pc_addr || *pc_addr == 0, "must be (pc: " INTPTR_FORMAT " _pc: " INTPTR_FORMAT " pc_addr: " INTPTR_FORMAT " *pc_addr: " INTPTR_FORMAT  " sp: " INTPTR_FORMAT ")", p2i(pc), p2i(_pc), p2i(pc_addr), p2i(*pc_addr), p2i(sp()));
   DEBUG_ONLY(address old_pc = _pc;)
   *pc_addr = pc;
-  _cb = CodeCache::find_blob(pc);
   _pc = pc; // must be set before call to get_deopt_original_pc
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
   if (original_pc != NULL) {

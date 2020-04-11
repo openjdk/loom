@@ -58,7 +58,6 @@ class ShenandoahControlThread: public ConcurrentGCThread {
 private:
   typedef enum {
     none,
-    concurrent_traversal,
     concurrent_normal,
     stw_degenerated,
     stw_full
@@ -94,7 +93,6 @@ private:
   void service_concurrent_normal_cycle(GCCause::Cause cause);
   void service_stw_full_cycle(GCCause::Cause cause);
   void service_stw_degenerated_cycle(GCCause::Cause cause, ShenandoahHeap::ShenandoahDegenPoint point);
-  void service_concurrent_traversal_cycle(GCCause::Cause cause);
   void service_uncommit(double shrink_before);
 
   bool try_set_alloc_failure_gc();
@@ -115,7 +113,7 @@ public:
 
   // Handle allocation failure from normal allocation.
   // Blocks until memory is available.
-  void handle_alloc_failure(size_t words);
+  void handle_alloc_failure(ShenandoahAllocRequest& req);
 
   // Handle allocation failure from evacuation path.
   // Optionally blocks while collector is handling the failure.

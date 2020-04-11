@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -872,7 +872,6 @@ private:
   static address locate_next_instruction(address inst);
 
   // Utilities
-  static bool is_polling_page_far() NOT_LP64({ return false;});
   static bool query_compressed_disp_byte(int disp, bool is_evex_inst, int vector_len,
                                          int cur_tuple_type, int in_size_in_bits, int cur_encoding);
 
@@ -2224,6 +2223,9 @@ private:
   void evpxorq(XMMRegister dst, XMMRegister nds, XMMRegister src, int vector_len);
   void evpxorq(XMMRegister dst, XMMRegister nds, Address src, int vector_len);
 
+  // Ternary logic instruction.
+  void vpternlogd(XMMRegister dst, int imm8, XMMRegister src2, XMMRegister src3, int vector_len);
+  void vpternlogd(XMMRegister dst, int imm8, XMMRegister src2, Address     src3, int vector_len);
 
   // vinserti forms
   void vinserti128(XMMRegister dst, XMMRegister nds, XMMRegister src, uint8_t imm8);

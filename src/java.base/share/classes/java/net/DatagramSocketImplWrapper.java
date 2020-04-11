@@ -131,6 +131,9 @@ class DatagramSocketImplWrapper extends MulticastSocket {
             }
         }
 
+        if (port == 0) {
+            throw new SocketException("Can't connect to port 0");
+        }
         if (!isBound())
           bind(new InetSocketAddress(0));
 
@@ -348,6 +351,9 @@ class DatagramSocketImplWrapper extends MulticastSocket {
                         security.checkConnect(packetAddress.getHostAddress(),
                                 packetPort);
                     }
+                }
+                if (packetPort == 0) {
+                    throw new SocketException("Can't send to port 0");
                 }
             } else {
                 // we're connected
@@ -663,20 +669,27 @@ class DatagramSocketImplWrapper extends MulticastSocket {
         return getImpl().getOption(name);
     }
 
-    private Set<SocketOption<?>> options;
+    private volatile Set<SocketOption<?>> options;
+    private final Object optionsLock = new Object();
 
     @Override
     public Set<SocketOption<?>> supportedOptions() {
-        synchronized (this) {
-            if (options == null) {
-                try {
-                    DatagramSocketImpl impl = getImpl();
-                    options = Collections.unmodifiableSet(impl.supportedOptions());
-                } catch (IOException e) {
-                    options = Collections.emptySet();
-                }
-            }
+        Set<SocketOption<?>> options = this.options;
+        if (options != null)
             return options;
+
+        synchronized (optionsLock) {
+            options = this.options;
+            if (options != null)
+                return options;
+
+            try {
+                DatagramSocketImpl impl = getImpl();
+                options = Collections.unmodifiableSet(impl.supportedOptions());
+            } catch (IOException e) {
+                options = Collections.emptySet();
+            }
+            return this.options = options;
         }
     }
 

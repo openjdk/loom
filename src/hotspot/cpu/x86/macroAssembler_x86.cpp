@@ -2852,22 +2852,16 @@ void MacroAssembler::save_rax(Register tmp) {
 }
 
 void MacroAssembler::safepoint_poll(Label& slow_path, Register thread_reg, Register temp_reg) {
-  if (SafepointMechanism::uses_thread_local_poll()) {
 #ifdef _LP64
-    assert(thread_reg == r15_thread, "should be");
+  assert(thread_reg == r15_thread, "should be");
 #else
-    if (thread_reg == noreg) {
-      thread_reg = temp_reg;
-      get_thread(thread_reg);
-    }
-#endif
-    testb(Address(thread_reg, Thread::polling_page_offset()), SafepointMechanism::poll_bit());
-    jcc(Assembler::notZero, slow_path); // handshake bit set implies poll
-  } else {
-    cmp32(ExternalAddress(SafepointSynchronize::address_of_state()),
-        SafepointSynchronize::_not_synchronized);
-    jcc(Assembler::notEqual, slow_path);
+  if (thread_reg == noreg) {
+    thread_reg = temp_reg;
+    get_thread(thread_reg);
   }
+#endif
+  testb(Address(thread_reg, Thread::polling_page_offset()), SafepointMechanism::poll_bit());
+  jcc(Assembler::notZero, slow_path); // handshake bit set implies poll
 }
 
 // Calls to C land
@@ -3910,6 +3904,14 @@ void MacroAssembler::_verify_oop(Register reg, const char* s, const char* file, 
   BLOCK_COMMENT("} verify_oop");
 }
 
+void MacroAssembler::vallones(XMMRegister dst, int vector_len) {
+  if (UseAVX > 2 && (vector_len == Assembler::AVX_512bit || VM_Version::supports_avx512vl())) {
+    vpternlogd(dst, 0xFF, dst, dst, vector_len);
+  } else {
+    assert(UseAVX > 0, "");
+    vpcmpeqb(dst, dst, dst, vector_len);
+  }
+}
 
 RegisterOrConstant MacroAssembler::delayed_value_impl(intptr_t* delayed_value_addr,
                                                       Register tmp,

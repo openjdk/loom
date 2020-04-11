@@ -5700,10 +5700,6 @@ JVM_END
 JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)) {
   JavaThread* thread = JavaThread::thread_from_jni_environment(env);
 
-  if (!SafepointMechanism::uses_thread_local_poll()) {
-    return -5;
-  }
-
   class ForceYieldClosure : public HandshakeClosure {
     jobject _jcont;
     jint _result;

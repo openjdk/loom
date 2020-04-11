@@ -851,6 +851,8 @@ class DatagramChannelImpl
                     }
                     if (ia.isLinkLocalAddress())
                         isa = IPAddressUtil.toScopedAddress(isa);
+                    if (isa.getPort() == 0)
+                        throw new SocketException("Can't send to port 0");
                     n = send(fd, src, isa);
                     if (blocking) {
                         while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -1286,6 +1288,8 @@ class DatagramChannelImpl
                     ensureOpen();
                     if (check && state == ST_CONNECTED)
                         throw new AlreadyConnectedException();
+                    if (isa.getPort() == 0)
+                        throw new SocketException("Can't connect to port 0");
 
                     // ensure that the socket is bound
                     if (localAddress == null) {

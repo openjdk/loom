@@ -111,6 +111,7 @@ class ObjectSample : public JfrCHeapObj {
   }
 
   const oop object() const;
+  const oop object_raw() const;
   void set_object(oop object);
 
   const oop* object_addr() const {

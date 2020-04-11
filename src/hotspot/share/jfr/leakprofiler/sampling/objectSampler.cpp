@@ -241,7 +241,7 @@ void ObjectSampler::weak_oops_do(BoolObjectClosure* is_alive, OopClosure* f) {
   ObjectSample* current = sampler._list->last();
   while (current != NULL) {
     if (current->_object != NULL) {
-      if (is_alive->do_object_b(current->object())) {
+      if (is_alive->do_object_b(current->object_raw())) {
         // The weakly referenced object is alive, update pointer
         f->do_oop(const_cast<oop*>(current->object_addr()));
       } else {

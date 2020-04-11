@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -250,12 +250,8 @@ void NMethodSweeper::mark_active_nmethods() {
 
 CodeBlobClosure* NMethodSweeper::prepare_mark_active_nmethods() {
 #ifdef ASSERT
-  if (SafepointMechanism::uses_thread_local_poll()) {
-    assert(Thread::current()->is_Code_cache_sweeper_thread(), "must be executed under CodeCache_lock and in sweeper thread");
-    assert_lock_strong(CodeCache_lock);
-  } else {
-    assert(SafepointSynchronize::is_at_safepoint(), "must be executed at a safepoint");
-  }
+  assert(Thread::current()->is_Code_cache_sweeper_thread(), "must be executed under CodeCache_lock and in sweeper thread");
+  assert_lock_strong(CodeCache_lock);
 #endif
 
   // If we do not want to reclaim not-entrant or zombie methods there is no need
@@ -319,19 +315,14 @@ void NMethodSweeper::do_stack_scanning() {
   // There are stacks in the heap that need to be scanned.
   Universe::heap()->collect_for_codecache();
   if (wait_for_stack_scanning()) {
-    if (SafepointMechanism::uses_thread_local_poll()) {
-      CodeBlobClosure* code_cl;
-      {
-        MutexLocker ccl(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-        code_cl = prepare_mark_active_nmethods();
-      }
-      if (code_cl != NULL) {
-        NMethodMarkingClosure nm_cl(code_cl);
-        Handshake::execute(&nm_cl);
-      }
-    } else {
-      VM_MarkActiveNMethods op;
-      VMThread::execute(&op);
+    CodeBlobClosure* code_cl;
+    {
+      MutexLocker ccl(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+      code_cl = prepare_mark_active_nmethods();
+    }
+    if (code_cl != NULL) {
+      NMethodMarkingClosure nm_cl(code_cl);
+      Handshake::execute(&nm_cl);
     }
   }
 }

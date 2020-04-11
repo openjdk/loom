@@ -598,11 +598,6 @@ void LIR_Assembler::emit_op1(LIR_Op1* op) {
 
 void LIR_Assembler::emit_op0(LIR_Op0* op) {
   switch (op->code()) {
-    case lir_word_align: {
-      _masm->align(BytesPerWord);
-      break;
-    }
-
     case lir_nop:
       assert(op->info() == NULL, "not supported");
       _masm->nop();
@@ -610,10 +605,6 @@ void LIR_Assembler::emit_op0(LIR_Op0* op) {
 
     case lir_label:
       Unimplemented();
-      break;
-
-    case lir_build_frame:
-      build_frame();
       break;
 
     case lir_std_entry:

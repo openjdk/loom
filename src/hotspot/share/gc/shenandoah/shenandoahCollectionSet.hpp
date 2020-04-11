@@ -56,15 +56,6 @@ public:
 
   // Add region to collection set
   void add_region(ShenandoahHeapRegion* r);
-  bool add_region_check_for_duplicates(ShenandoahHeapRegion* r);
-
-  // Bring per-region statuses to consistency with this collection.
-  // TODO: This is a transitional interface that bridges the gap between
-  // region statuses and this collection. Should go away after we merge them.
-  void update_region_status();
-
-  // Remove region from collection set
-  void remove_region(ShenandoahHeapRegion* r);
 
   // MT version
   ShenandoahHeapRegion* claim_next();
@@ -80,7 +71,7 @@ public:
   }
 
   inline bool is_in(ShenandoahHeapRegion* r) const;
-  inline bool is_in(size_t region_number)    const;
+  inline bool is_in(size_t region_idx)       const;
   inline bool is_in(oop obj)                 const;
   inline bool is_in_loc(void* loc)           const;
 
