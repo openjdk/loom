@@ -183,6 +183,7 @@ public class ThreadAPI {
         }
     }
 
+    @SuppressWarnings({"deprecation", "removal"})
     public void testSuspend1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -195,6 +196,7 @@ public class ThreadAPI {
         });
     }
 
+    @SuppressWarnings({"deprecation", "removal"})
     public void testSuspend2() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
@@ -210,6 +212,7 @@ public class ThreadAPI {
         }
     }
 
+    @SuppressWarnings({"deprecation", "removal"})
     public void testResume1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -222,6 +225,7 @@ public class ThreadAPI {
         });
     }
 
+    @SuppressWarnings({"deprecation", "removal"})
     public void testResume2() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> {
             try {
@@ -1374,20 +1378,14 @@ public class ThreadAPI {
 
     // -- ThreadGroup --
 
+    @SuppressWarnings({"deprecation", "removal"})
     public void testThreadGroup1() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
-        var group = thread.getThreadGroup();
-        assertTrue(group != null);
+        var vgroup = thread.getThreadGroup();
+        assertTrue(vgroup.allowThreadSuspension(true) == false);
         thread.start();
         try {
-            assertTrue(thread.getThreadGroup() == group);
-
-            // no "active threads"
-            Thread[] threads = new Thread[100];
-            assertTrue(group.enumerate(threads) == 0);
-            assertTrue(group.activeGroupCount() == 0);
-
-            assertTrue(group.allowThreadSuspension(true) == false);
+            assertTrue(thread.getThreadGroup() == vgroup);
         } finally {
             LockSupport.unpark(thread);
             thread.join();
@@ -1395,21 +1393,35 @@ public class ThreadAPI {
         assertTrue(thread.getThreadGroup() == null);
     }
 
-    public void testActiveCount1() throws Exception {
+    // thread group of kernel threads created by virtual threads
+    public void testThreadGroup2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
-            assertTrue(Thread.activeCount() == 0);
+            ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
+            Thread child = new Thread(() -> { });
+            ThreadGroup group = child.getThreadGroup();
+            assertTrue(group != vgroup);
         });
     }
 
-    // Thread.enumerate should not enumerate virtual threads
+    // enumerate recurse=false
     public void testEnumerate1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
+            ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
             Thread[] threads = new Thread[100];
-            int n = Thread.enumerate(threads);
+            int n = vgroup.enumerate(threads, /*recurse*/false);
+            assertTrue(n == 0);
+        });
+    }
+
+    // enumerate recurse=true
+    public void testEnumerate2() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
+            Thread[] threads = new Thread[100];
+            int n = vgroup.enumerate(threads, /*recurse*/true);
             assertFalse(Arrays.stream(threads, 0, n).anyMatch(Thread::isVirtual));
         });
     }
-
 
     // -- toString --
 

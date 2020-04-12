@@ -54,8 +54,9 @@ import java.util.Arrays;
  */
 public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private final ThreadGroup parent;
-    private final boolean virtual;
-    String name;
+    private final String name;
+    private final boolean destroyable;
+
     int maxPriority;
     boolean destroyed;
     boolean daemon;
@@ -75,7 +76,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
         this.name = "system";
         this.maxPriority = Thread.MAX_PRIORITY;
         this.parent = null;
-        this.virtual = false;
+        this.destroyable = true;
     }
 
     /**
@@ -113,19 +114,19 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     public ThreadGroup(ThreadGroup parent, String name) {
-        this(checkParentAccess(parent), parent, name, false);
+        this(checkParentAccess(parent), parent, name, true);
     }
 
-    ThreadGroup(ThreadGroup parent, String name, boolean virtual) {
-        this(null, parent, name, virtual);
+    ThreadGroup(ThreadGroup parent, String name, boolean destroyable) {
+        this(null, parent, name, destroyable);
     }
 
-    private ThreadGroup(Void unused, ThreadGroup parent, String name, boolean virtual) {
+    private ThreadGroup(Void unused, ThreadGroup parent, String name, boolean destroyable) {
+        this.parent = parent;
         this.name = name;
+        this.destroyable = destroyable;
         this.maxPriority = parent.maxPriority;
         this.daemon = parent.daemon;
-        this.parent = parent;
-        this.virtual = virtual;
         parent.add(this);
     }
 
@@ -264,7 +265,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
         ThreadGroup[] groupsSnapshot;
         synchronized (this) {
             checkAccess();
-            if (virtual || (pri < Thread.MIN_PRIORITY || pri > Thread.MAX_PRIORITY)) {
+            if (pri < Thread.MIN_PRIORITY || pri > Thread.MAX_PRIORITY) {
                 return;
             }
             maxPriority = (parent != null) ? Math.min(pri, parent.maxPriority) : pri;
@@ -765,8 +766,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * First, the {@code checkAccess} method of this thread group is
      * called with no arguments; this may result in a security exception.
      *
-     * @throws     UnsupportedOperationException if this is the thread group
-     *               for virtual threads
+     * @throws     UnsupportedOperationException if this thread group is
+     *               not <em>destroyable</em>
      * @throws     IllegalThreadStateException  if the thread group is not
      *               empty or if the thread group has already been destroyed.
      * @throws     SecurityException  if the current thread cannot modify this
@@ -775,7 +776,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since      1.0
      */
     public final void destroy() {
-        if (virtual)
+        if (!destroyable)
             throw new UnsupportedOperationException();
         int ngroupsSnapshot;
         ThreadGroup[] groupsSnapshot;
@@ -951,7 +952,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
             if (nthreads == 0) {
                 notifyAll();
             }
-            if (daemon && (nthreads == 0) &&
+
+            if (destroyable && daemon && (nthreads == 0) &&
                 (nUnstartedThreads == 0) && (ngroups == 0))
             {
                 destroy();
@@ -1082,7 +1084,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     @Deprecated(since="1.2", forRemoval=true)
     public boolean allowThreadSuspension(boolean b) {
-        return (virtual) ? !b : true;
+        return true;
     }
 
     /**

@@ -47,6 +47,7 @@ import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.misc.VM;
 import sun.nio.ch.Interruptible;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
@@ -530,6 +531,11 @@ public class Thread implements Runnable {
             if (g == null) {
                 g = parent.getThreadGroup();
             }
+        }
+
+        /* can't create a kernel thread in the virtual thread group */
+        if ((VM.initLevel() >= 1) && g == VirtualThreads.THREAD_GROUP) {
+            g = VirtualThreads.THREAD_SUBGROUP;
         }
 
         /* checkAccess regardless of whether or not threadgroup is
@@ -3022,32 +3028,50 @@ public class Thread implements Runnable {
     }
 
     private static class VirtualThreads {
-        static final ThreadGroup THREAD_GROUP = threadGroup();
-        static final AccessControlContext ACCESS_CONTROL_CONTEXT = accessControlContext();
+        // Thread group for virtual threads.
+        static final ThreadGroup THREAD_GROUP;
 
-        /**
-         * The thread group for virtual threads.
-         */
-        private static ThreadGroup threadGroup() {
-            return AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
-                public ThreadGroup run() {
-                    ThreadGroup group = Thread.currentCarrierThread().getThreadGroup();
-                    for (ThreadGroup p; (p = group.getParent()) != null; )
-                        group = p;
-                    var newGroup = new ThreadGroup(group, "VirtualThreads", true);
-                    newGroup.setDaemon(true);
-                    return newGroup;
-                }});
-        }
+        // Thread group for kernel threads created by virtual threads
+        static final ThreadGroup THREAD_SUBGROUP;
 
-        /**
-         * Return an AccessControlContext that doesn't support any permissions.
-         */
-        private static AccessControlContext accessControlContext() {
-            return new AccessControlContext(new ProtectionDomain[] {
+        // AccessControlContext that doesn't support any permissions.
+        static final AccessControlContext ACCESS_CONTROL_CONTEXT;
+
+        static {
+            PrivilegedAction<ThreadGroup> pa = () -> {
+                ThreadGroup parent = Thread.currentCarrierThread().getThreadGroup();
+                for (ThreadGroup p; (p = parent.getParent()) != null; )
+                    parent = p;
+                return parent;
+            };
+            ThreadGroup root = AccessController.doPrivileged(pa);
+
+            var vgroup = new ThreadGroup(root, "VirtualThreads", false) {
+                @Override
+                @SuppressWarnings({"deprecation", "removal"})
+                public boolean allowThreadSuspension(boolean b) {
+                    return false;
+                }
+            };
+            vgroup.setDaemon(true);
+            vgroup.setMaxPriority(NORM_PRIORITY);
+            THREAD_GROUP = vgroup;
+
+            var subgroup = new ThreadGroup(vgroup, "other", false);
+            subgroup.setDaemon(true);
+            if (System.getSecurityManager() == null) {
+                subgroup.setMaxPriority(NORM_PRIORITY);
+            } else {
+                subgroup.setMaxPriority(MIN_PRIORITY);
+            }
+            THREAD_SUBGROUP = subgroup;
+
+            ACCESS_CONTROL_CONTEXT = new AccessControlContext(new ProtectionDomain[] {
                 new ProtectionDomain(null, null)
             });
         }
+
+
     }
 
     // The following three initially uninitialized fields are exclusively

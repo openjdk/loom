@@ -193,25 +193,11 @@ vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 
 
 ####
-## Hit UnsupportedOperationException/IllegalThreadStateException (uncaught)"thread=Thread-0", java.lang.ThreadGroup.threadTerminated
+## Exception wasn't caught by jdb
 
-vmTestbase/nsk/jdb/exclude/exclude001/exclude001.java
-vmTestbase/nsk/jdb/interrupt/interrupt001/interrupt001.java
-vmTestbase/nsk/jdb/kill/kill001/kill001.java
-vmTestbase/nsk/jdb/next/next001/next001.java
-vmTestbase/nsk/jdb/pop/pop001/pop001.java
-vmTestbase/nsk/jdb/read/read001/read001.java
-vmTestbase/nsk/jdb/reenter/reenter001/reenter001.java
-vmTestbase/nsk/jdb/resume/resume002/resume002.java
 vmTestbase/nsk/jdb/set/set002/set002.java
-vmTestbase/nsk/jdb/step_up/step_up001/step_up001.java
-vmTestbase/nsk/jdb/trace/trace001/trace001.java
 vmTestbase/nsk/jdb/threadgroups/threadgroups002/threadgroups002.java
 vmTestbase/nsk/jdb/threadgroup/threadgroup002/threadgroup002.java
-vmTestbase/nsk/jdb/threads/threads002/threads002.java
-vmTestbase/nsk/jdb/thread/thread002/thread002.java
-vmTestbase/nsk/jdb/where/where006/where006.java
-# Need to check uncaught_exception
 vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
 
 
