@@ -3038,11 +3038,14 @@ public class Thread implements Runnable {
         static final AccessControlContext ACCESS_CONTROL_CONTEXT;
 
         static {
-            PrivilegedAction<ThreadGroup> pa = () -> {
-                ThreadGroup parent = Thread.currentCarrierThread().getThreadGroup();
-                for (ThreadGroup p; (p = parent.getParent()) != null; )
-                    parent = p;
-                return parent;
+            PrivilegedAction<ThreadGroup> pa = new PrivilegedAction<>() {
+                @Override
+                public ThreadGroup run() {
+                    ThreadGroup parent = Thread.currentCarrierThread().getThreadGroup();
+                    for (ThreadGroup p; (p = parent.getParent()) != null; )
+                        parent = p;
+                    return parent;
+                }
             };
             ThreadGroup root = AccessController.doPrivileged(pa);
 
@@ -3070,8 +3073,6 @@ public class Thread implements Runnable {
                 new ProtectionDomain(null, null)
             });
         }
-
-
     }
 
     // The following three initially uninitialized fields are exclusively
