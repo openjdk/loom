@@ -269,7 +269,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
     Continuation::emit_chunk_iterate_event(chunk, num_frames, num_oops);
   }
 
-  assert(Continuation::debug_verify_stack_chunk(chunk), "");
+  // assert(Continuation::debug_verify_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack ------- end -------");
   // tty->print_cr("<<< stack_chunk_iterate_stack %p %p", (oopDesc*)chunk, Thread::current());
 }
