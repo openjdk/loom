@@ -51,8 +51,11 @@ public class threadgroup002a {
         Thread holder [] = new Thread[numThreads];
         Lock lock = new Lock();
 
-        for (int i = 0; i < numThreadGroups ; i++ )
+        for (int i = 0; i < numThreadGroups; i++) {
             tgHolder[i] = new ThreadGroup(THREADGROUP_NAME + i);
+        }
+
+        tgHolder[0].setDaemon(true);
 
         try {
             lock.setLock();

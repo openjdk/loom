@@ -191,13 +191,13 @@ gc/TestAgeOutput.java#id0
 
 vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 
+####
+## Functionality not supported for vthreads (incorrect resuls)
+vmTestbase/nsk/jdb/set/set002/set002.java
 
 ####
-## Exception wasn't caught by jdb
+## jdb caught InvocationTargetException caused by expected TenMultipleException
 
-vmTestbase/nsk/jdb/set/set002/set002.java
-vmTestbase/nsk/jdb/threadgroups/threadgroups002/threadgroups002.java
-vmTestbase/nsk/jdb/threadgroup/threadgroup002/threadgroup002.java
 vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
 
 

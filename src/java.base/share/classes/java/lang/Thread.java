@@ -137,7 +137,7 @@ public class Thread implements Runnable {
         }
     }
     private final FieldHolder holder;
-    
+
     // interrupt status (read/written by VM)
     volatile boolean interrupted;
 
@@ -178,7 +178,7 @@ public class Thread implements Runnable {
         private static final Unsafe U = Unsafe.getUnsafe();
         private static final long nextTidOffset =
             U.objectFieldOffset(ThreadIdentifiers.class, "nextTid");
-        private static final long TID_MASK = (1L << 48) - 1; 
+        private static final long TID_MASK = (1L << 48) - 1;
         private static volatile long nextTid = 2;
         private static long next() {
             return U.getAndAddLong(ThreadIdentifiers.class, nextTidOffset, 1);
@@ -365,7 +365,7 @@ public class Thread implements Runnable {
             sleepMillis(millis);
         }
     }
-	
+
 	private static void sleepMillis(long millis) throws InterruptedException {
 		VirtualThread vthread = currentCarrierThread().getVirtualThread();
         if (vthread != null) {
@@ -373,8 +373,8 @@ public class Thread implements Runnable {
         } else {
             sleep0(millis);
         }
-	}	
-	
+	}
+
     private static native void sleep0(long millis) throws InterruptedException;
 
     /**
@@ -631,7 +631,7 @@ public class Thread implements Runnable {
      *     };
      * }</pre>
      *
-     * @see Thread.Builder#virtual(Executor) 
+     * @see Thread.Builder#virtual(Executor)
      * @since 99
      */
     public interface VirtualThreadTask {
@@ -1656,7 +1656,7 @@ public class Thread implements Runnable {
             TerminatingThreadLocal.threadTerminated();
         }
         ThreadGroup group = holder.group;
-        if (group != null) {
+        if (group != null && !group.isDestroyed()) {
             group.threadTerminated(this);
         }
         /* Aggressively null out all reference fields: see bug 4006245 */
