@@ -205,3 +205,24 @@ vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception00
 ## Exception wasn't caught by jdb
 
 vmTestbase/nsk/jdb/where/where005/where005.java
+
+
+####
+## NSK JDWP Tests failing with wrapper
+
+####
+## Incorrect stack depth for wrapped thread
+
+vmTestbase/nsk/jdwp/ThreadReference/OwnedMonitorsStackDepthInfo/ownedMonitorsStackDepthInfo001/ownedMonitorsStackDepthInfo001.java
+
+
+####
+## Can't find virtual thread by it's name
+
+vmTestbase/nsk/jdwp/ReferenceType/Instances/instances001/instances001.java
+
+
+####
+## VirtualThread is not a JDWP.Tag.THREAD but JDWP.Tag.OBJECT
+
+vmTestbase/nsk/jdwp/ArrayReference/GetValues/getvalues002/TestDescription.java

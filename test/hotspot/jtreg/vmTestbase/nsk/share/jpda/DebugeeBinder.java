@@ -351,6 +351,11 @@ public class DebugeeBinder extends Log.Logger implements Finalizable {
 
         args.add(jdwpArgs);
 
+        if(System.getProperty("main.wrapper") != null) {
+            args.add(MainWrapper.class.getName());
+            args.add(System.getProperty("main.wrapper"));
+        }
+
         if (classToExecute != null) {
             StringTokenizer st = new StringTokenizer(classToExecute);
 
