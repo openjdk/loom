@@ -70,15 +70,8 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _pc = pc;
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob_fast(pc);
-  adjust_unextended_sp();
-
-  address original_pc = CompiledMethod::get_deopt_original_pc(this);
-  if (original_pc != NULL) {
-    _pc = original_pc;
-    _deopt_state = is_deoptimized;
-  } else {
-    _deopt_state = not_deoptimized;
-  }
+  
+  setup(pc);
 
   _oop_map = NULL;
 }
@@ -95,6 +88,8 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   assert(pc != NULL, "no pc?");
   _cb = cb;
   _oop_map = NULL;
+  assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
+
   setup(pc);
 }
 
@@ -106,6 +101,8 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   assert(pc != NULL, "no pc?");
   _cb = cb;
   _oop_map = oop_map;
+  assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
+
   setup(pc);
 }
 
@@ -134,21 +131,22 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _fp = fp;
   _pc = pc;
   assert(pc != NULL, "no pc?");
-  _cb = CodeCache::find_blob(pc); // TODO R find_blob_fast
+  _cb = CodeCache::find_blob_fast(pc);
   _oop_map = NULL;
+  assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
+
   setup(pc);
 }
 
 inline void frame::setup(address pc) {
   adjust_unextended_sp();
 
-  assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
   if (original_pc != NULL) {
     _pc = original_pc;
-    assert(_cb->as_compiled_method()->insts_contains_inclusive(_pc),
-           "original PC must be in the main code section of the the compiled method (or must be immediately following it)");
     _deopt_state = is_deoptimized;
+    assert(_cb == NULL || _cb->as_compiled_method()->insts_contains_inclusive(_pc),
+           "original PC must be in the main code section of the the compiled method (or must be immediately following it)");
   } else {
     if (_cb == SharedRuntime::deopt_blob()) {
       _deopt_state = is_deoptimized;
