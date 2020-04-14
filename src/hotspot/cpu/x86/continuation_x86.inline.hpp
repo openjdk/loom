@@ -749,7 +749,7 @@ static inline frame sender_for_compiled_frame(const frame& f) {
 
   // tty->print_cr("33333 fast: %d stub: %d", fast, FKind::stub); if (fast) f.print_on(tty);
   int slot = 0;
-  CodeBlob* sender_cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(sender_pc, slot);
+  CodeBlob* sender_cb = CodeCache::find_blob_and_oopmap(sender_pc, slot);
   if (mode == mode_fast) {
     // if (Interpreter::contains(sender_pc)) {
     //   tty->print_cr("oops sender_cb: %p slot: %d", sender_cb, slot);
@@ -912,7 +912,8 @@ void Thaw<ConfigT, mode>::to_frame_info_chunk_pd(intptr_t* sp) {
 template <typename ConfigT, op_mode mode>
 inline frame Thaw<ConfigT, mode>::new_entry_frame() {
   // if (Interpreter::contains(_cont.entryPC())) _cont.set_entrySP(_cont.entrySP() - 1);
-  return frame(_cont.entrySP(), _cont.entryFP(), _cont.entryPC()); // TODO PERF: This finds code blob and computes deopt state
+  intptr_t* sp = _cont.entrySP();
+  return frame(sp, sp, _cont.entryFP(), _cont.entryPC()); // TODO PERF: This finds code blob and computes deopt state
 }
 
 template <typename ConfigT, op_mode mode>

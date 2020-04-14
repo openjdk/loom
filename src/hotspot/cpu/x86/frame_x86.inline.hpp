@@ -69,7 +69,7 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _fp = fp;
   _pc = pc;
   assert(pc != NULL, "no pc?");
-  _cb = CodeCache::find_blob_fast(pc);
+  _cb = CodeCache::find_blob(pc); // not fast because this constructor can be used on native frames
   
   setup(pc);
 
