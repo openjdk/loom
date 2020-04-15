@@ -1652,20 +1652,25 @@ public class Thread implements Runnable {
      */
     private void exit() {
         // assert !isVirtual();
-        if (threadLocals != null && TerminatingThreadLocal.REGISTRY.isPresent()) {
-            TerminatingThreadLocal.threadTerminated();
+        try {
+            if (threadLocals != null && TerminatingThreadLocal.REGISTRY.isPresent()) {
+                TerminatingThreadLocal.threadTerminated();
+            }
+        } finally {
+            try {
+                ThreadGroup group = holder.group;
+                // assert group != null
+                group.threadTerminated(this);
+            } finally {
+                /* Aggressively null out all reference fields: see bug 4006245 */
+                /* Speed the release of some of these resources */
+                threadLocals = null;
+                inheritableThreadLocals = null;
+                inheritedAccessControlContext = null;
+                nioBlocker = null;
+                uncaughtExceptionHandler = null;
+            }
         }
-        ThreadGroup group = holder.group;
-        if (group != null) {
-            group.threadTerminated(this);
-        }
-        /* Aggressively null out all reference fields: see bug 4006245 */
-        /* Speed the release of some of these resources */
-        threadLocals = null;
-        inheritableThreadLocals = null;
-        inheritedAccessControlContext = null;
-        nioBlocker = null;
-        uncaughtExceptionHandler = null;
     }
 
     /**

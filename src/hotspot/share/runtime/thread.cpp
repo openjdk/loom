@@ -2068,22 +2068,17 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
     }
     JFR_ONLY(Jfr::on_java_thread_dismantle(this);)
 
-    // Call Thread.exit(). We try 3 times in case we got another Thread.stop during
-    // the execution of the method. If that is not enough, then we don't really care. Thread.stop
-    // is deprecated anyhow.
+    // Call Thread.exit()
     if (!is_Compiler_thread()) {
-      int count = 3;
-      while (java_lang_Thread::threadGroup(threadObj()) != NULL && (count-- > 0)) {
-        EXCEPTION_MARK;
-        JavaValue result(T_VOID);
-        Klass* thread_klass = SystemDictionary::Thread_klass();
-        JavaCalls::call_virtual(&result,
-                                threadObj, thread_klass,
-                                vmSymbols::exit_method_name(),
-                                vmSymbols::void_method_signature(),
-                                THREAD);
-        CLEAR_PENDING_EXCEPTION;
-      }
+      EXCEPTION_MARK;
+      JavaValue result(T_VOID);
+      Klass* thread_klass = SystemDictionary::Thread_klass();
+      JavaCalls::call_virtual(&result,
+                              threadObj, thread_klass,
+                              vmSymbols::exit_method_name(),
+                              vmSymbols::void_method_signature(),
+                              THREAD);
+      CLEAR_PENDING_EXCEPTION;
     }
     // notify JVMTI
     if (JvmtiExport::should_post_thread_life()) {

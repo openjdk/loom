@@ -196,8 +196,6 @@ vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 ## Exception wasn't caught by jdb
 
 vmTestbase/nsk/jdb/set/set002/set002.java
-vmTestbase/nsk/jdb/threadgroups/threadgroups002/threadgroups002.java
-vmTestbase/nsk/jdb/threadgroup/threadgroup002/threadgroup002.java
 vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
 
 
