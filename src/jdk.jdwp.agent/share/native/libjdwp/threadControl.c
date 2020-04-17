@@ -1048,7 +1048,7 @@ resumeThreadByNode(ThreadNode *node)
          * longer assume vthreads are suspended whenever one is received.
          */
         if (!node->currentInvoke.pending) {
-          adjustMinimumSuspendAllCount(node->suspendCount);
+            adjustMinimumSuspendAllCount(node->suspendCount);
         }
         debugMonitorNotifyAll(threadLock);
         if ((node->suspendCount == 0) && node->toBeResumed &&
