@@ -54,21 +54,23 @@ public:
   ~ShenandoahGCSession();
 };
 
-class ShenandoahPausePhase : public GCTraceTimeWrapper<LogLevel::Info, LOG_TAGS(gc)> {
+class ShenandoahPausePhase : public StackObj {
 private:
+  GCTraceTimeWrapper<LogLevel::Info, LOG_TAGS(gc)> _tracer;
   ConcurrentGCTimer* const _timer;
 
 public:
-  ShenandoahPausePhase(const char* title);
+  ShenandoahPausePhase(const char* title, bool log_heap_usage = false);
   ~ShenandoahPausePhase();
 };
 
-class ShenandoahConcurrentPhase : public GCTraceConcTimeImpl<LogLevel::Info, LOG_TAGS(gc)> {
+class ShenandoahConcurrentPhase : public StackObj {
 private:
+  GCTraceTimeWrapper<LogLevel::Info, LOG_TAGS(gc)> _tracer;
   ConcurrentGCTimer* const _timer;
 
 public:
-  ShenandoahConcurrentPhase(const char* title);
+  ShenandoahConcurrentPhase(const char* title, bool log_heap_usage = false);
   ~ShenandoahConcurrentPhase();
 };
 

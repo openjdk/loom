@@ -45,12 +45,12 @@ import java.nio.channels.WritableByteChannel;
 import java.util.Objects;
 
 import jdk.internal.access.JavaIOFileDescriptorAccess;
-import jdk.internal.access.JavaNioAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.Blocker;
 import jdk.internal.misc.ExtendedMapMode;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
+import jdk.internal.misc.VM.BufferPool;
 import jdk.internal.ref.Cleaner;
 import jdk.internal.ref.CleanerFactory;
 
@@ -246,8 +246,7 @@ public class FileChannelImpl
     public long read(ByteBuffer[] dsts, int offset, int length)
         throws IOException
     {
-        if ((offset < 0) || (length < 0) || (offset > dsts.length - length))
-            throw new IndexOutOfBoundsException();
+        Objects.checkFromIndexSize(offset, length, dsts.length);
         ensureOpen();
         if (!readable)
             throw new NonReadableChannelException();
@@ -312,8 +311,7 @@ public class FileChannelImpl
     public long write(ByteBuffer[] srcs, int offset, int length)
         throws IOException
     {
-        if ((offset < 0) || (length < 0) || (offset > srcs.length - length))
-            throw new IndexOutOfBoundsException();
+        Objects.checkFromIndexSize(offset, length, srcs.length);
         ensureOpen();
         if (!writable)
             throw new NonWritableChannelException();
@@ -808,11 +806,11 @@ public class FileChannelImpl
             throw new NullPointerException();
         if (position < 0)
             throw new IllegalArgumentException("Negative position");
+        ensureOpen();
         if (!readable)
             throw new NonReadableChannelException();
         if (direct)
             Util.checkChannelPositionAligned(position, alignment);
-        ensureOpen();
         if (nd.needsPositionLock()) {
             synchronized (positionLock) {
                 return readInternal(dst, position);
@@ -848,11 +846,11 @@ public class FileChannelImpl
             throw new NullPointerException();
         if (position < 0)
             throw new IllegalArgumentException("Negative position");
+        ensureOpen();
         if (!writable)
             throw new NonWritableChannelException();
         if (direct)
             Util.checkChannelPositionAligned(position, alignment);
-        ensureOpen();
         if (nd.needsPositionLock()) {
             synchronized (positionLock) {
                 return writeInternal(src, position);
@@ -1179,8 +1177,8 @@ public class FileChannelImpl
      * Invoked by sun.management.ManagementFactoryHelper to create the management
      * interface for mapped buffers.
      */
-    public static JavaNioAccess.BufferPool getMappedBufferPool() {
-        return new JavaNioAccess.BufferPool() {
+    public static BufferPool getMappedBufferPool() {
+        return new BufferPool() {
             @Override
             public String getName() {
                 return "mapped";
@@ -1204,8 +1202,8 @@ public class FileChannelImpl
      * Invoked by sun.management.ManagementFactoryHelper to create the management
      * interface for sync mapped buffers.
      */
-    public static JavaNioAccess.BufferPool getSyncMappedBufferPool() {
-        return new JavaNioAccess.BufferPool() {
+    public static BufferPool getSyncMappedBufferPool() {
+        return new BufferPool() {
             @Override
             public String getName() {
                 return "mapped - 'non-volatile memory'";

@@ -24,8 +24,6 @@
 
 package sun.jvm.hotspot.oops;
 
-import java.io.*;
-import java.util.*;
 import sun.jvm.hotspot.debugger.*;
 import sun.jvm.hotspot.memory.*;
 import sun.jvm.hotspot.runtime.*;

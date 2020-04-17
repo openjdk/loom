@@ -31,6 +31,7 @@ import java.util.List;
 import jdk.jfr.Event;
 import jdk.jfr.events.ActiveRecordingEvent;
 import jdk.jfr.events.ActiveSettingEvent;
+import jdk.jfr.events.DirectBufferStatisticsEvent;
 import jdk.jfr.events.ErrorThrownEvent;
 import jdk.jfr.events.ExceptionStatisticsEvent;
 import jdk.jfr.events.ExceptionThrownEvent;
@@ -79,6 +80,7 @@ public final class JDKEvents {
         jdk.internal.event.X509CertificateEvent.class,
         jdk.internal.event.X509ValidationEvent.class,
         jdk.internal.event.ProcessStartEvent.class,
+        DirectBufferStatisticsEvent.class,
         jdk.internal.event.ThreadSleepEvent.class
     };
 
@@ -96,6 +98,7 @@ public final class JDKEvents {
     private static final Class<?>[] targetClasses = new Class<?>[instrumentationClasses.length];
     private static final JVM jvm = JVM.getJVM();
     private static final Runnable emitExceptionStatistics = JDKEvents::emitExceptionStatistics;
+    private static final Runnable emitDirectBufferStatistics = JDKEvents::emitDirectBufferStatistics;
     private static boolean initializationTriggered;
 
     @SuppressWarnings("unchecked")
@@ -110,6 +113,7 @@ public final class JDKEvents {
                 }
                 initializationTriggered = true;
                 RequestEngine.addTrustedJDKHook(ExceptionStatisticsEvent.class, emitExceptionStatistics);
+                RequestEngine.addTrustedJDKHook(DirectBufferStatisticsEvent.class, emitDirectBufferStatistics);
             }
         } catch (Exception e) {
             Logger.log(LogTag.JFR_SYSTEM, LogLevel.WARN, "Could not initialize JDK events. " + e.getMessage());
@@ -166,5 +170,11 @@ public final class JDKEvents {
 
     public static void remove() {
         RequestEngine.removeHook(JDKEvents::emitExceptionStatistics);
+        RequestEngine.removeHook(emitDirectBufferStatistics);
+    }
+
+    private static void emitDirectBufferStatistics() {
+        DirectBufferStatisticsEvent e = new DirectBufferStatisticsEvent();
+        e.commit();
     }
 }
