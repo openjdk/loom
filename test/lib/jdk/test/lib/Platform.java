@@ -234,7 +234,7 @@ public class Platform {
         }
         // Other platforms expected to work:
         // Temporary disabled until SA is not fixed for loom changes
-        return false;
+        return true;
     }
 
     /**

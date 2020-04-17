@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -223,7 +223,6 @@ public class OopUtilities {
       SystemDictionary sysDict = VM.getVM().getSystemDictionary();
       InstanceKlass k = sysDict.getThreadKlass();
       threadNameField  = (OopField) k.findField("name", "Ljava/lang/String;");
-      threadGroupField = (OopField) k.findField("group", "Ljava/lang/ThreadGroup;");
       threadEETopField = (LongField) k.findField("eetop", "J");
       threadTIDField = (LongField) k.findField("tid", "J");
       threadStatusField = (IntField) k.findField("threadStatus", "I");
@@ -247,15 +246,9 @@ public class OopUtilities {
         // it is okay to miss threadStatusField, because this was
         // introduced only in 1.5 JDK.
         Assert.that(threadNameField   != null &&
-                    threadGroupField  != null &&
                     threadEETopField  != null, "must find all java.lang.Thread fields");
       }
     }
-  }
-
-  public static Oop threadOopGetThreadGroup(Oop threadOop) {
-    initThreadFields();
-    return threadGroupField.getValue(threadOop);
   }
 
   public static String threadOopGetName(Oop threadOop) {

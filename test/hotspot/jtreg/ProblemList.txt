@@ -115,6 +115,9 @@ serviceability/sa/TestInstanceKlassSize.java 8230664 linux-ppc64le,linux-ppc64
 serviceability/sa/TestInstanceKlassSizeForInterface.java 8230664 linux-ppc64le,linux-ppc64
 serviceability/sa/TestRevPtrsForInvokeDynamic.java 8241235 generic-all
 
+# Loom SA failures
+serviceability/sa/JhsdbThreadInfoTest.java 8243016 generic-all
+
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorStatIntervalTest.java 8214032 generic-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorStatArrayCorrectnessTest.java 8224150 generic-all
 
