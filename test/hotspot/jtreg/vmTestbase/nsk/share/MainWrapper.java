@@ -38,8 +38,6 @@ public final class MainWrapper {
         String className = args[1];
         String[] classArgs = new String[args.length - 2];
         System.arraycopy(args, 2, classArgs, 0, args.length - 2);
-        Class c = Class.forName(className);
-        Method mainMethod = c.getMethod("main", new Class[] { String[].class });
 
         // It is needed to register finalizer thread in default thread group
         // So FinalizerThread thread can't be in virtual threads group
@@ -48,8 +46,12 @@ public final class MainWrapper {
 
         Thread.Builder tb = Thread.builder().task(() -> {
                 try {
+                    Class c = Class.forName(className);
+                    Method mainMethod = c.getMethod("main", new Class[] { String[].class });
                     mainMethod.invoke(null, new Object[] { classArgs });
-                } catch (IllegalAccessException | InvocationTargetException e) {
+                } catch (InvocationTargetException e) {
+                    e.printStackTrace();
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             });
