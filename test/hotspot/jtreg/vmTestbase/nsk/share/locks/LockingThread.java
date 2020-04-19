@@ -487,8 +487,9 @@ public class LockingThread extends Thread {
     // calculate stack depth at which monitor was acquired
     int expectedDepth() {
         // for each monitor call 2 methods: createStackFrame() and method which acquire monitor
-        // + when stack creation is finished call 4 methods: createStackFrame()->doWait()->sleep()->sleep0()
-        return (stackFramesDescription.size() - currentIndex) * 2 + 4;
+        // + when stack creation is finished call 2 methods: createStackFrame()->doWait()->sleep()/wait()
+        // implementation of Object.wait() and Thread.sleep() are excluded from comparison
+        return (stackFramesDescription.size() - currentIndex) * 2 + 3;
     }
 
     private native void nativeJNIMonitorEnter(Object object);
