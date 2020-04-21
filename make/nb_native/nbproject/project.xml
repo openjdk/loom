@@ -5,7 +5,7 @@
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
             <name>OpenJDK (Native)</name>
             <c-extensions>c,m</c-extensions>
-            <cpp-extensions>cc,cpp</cpp-extensions>
+            <cpp-extensions>cc,cpp,mm</cpp-extensions>
             <header-extensions>ad,h,hh,hpp,in_out,map,txt</header-extensions>
             <sourceEncoding>UTF-8</sourceEncoding>
             <make-dep-projects/>
