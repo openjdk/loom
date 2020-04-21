@@ -23,6 +23,7 @@ java/lang/StackWalker/NativeMethod.java
 # Thread-sensitive threads
 java/lang/Thread/BuilderTest.java
 jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
+java/lang/ThreadGroup/Suspend.java
 
 ####
 # ThreadGroup owner is not main
@@ -47,11 +48,6 @@ java/lang/ref/OOMEInReferenceHandler.java
 # incorrect using of 'test.jdk' by wrapper
 
 runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
-
-
-####
-# jcoder fails
-java/lang/invoke/condy/CondyNestedResolutionTest.java
 
 
 ####
@@ -145,7 +141,6 @@ jdk/internal/misc/VM/RuntimeArguments.java
 java/lang/StackWalker/CallerFromMain.java
 java/lang/Package/PackageFromManifest.java
 java/lang/Package/IsCompatibleWithDriver.java
-java/lang/invoke/condy/CondyNestedResolutionTest.java
 java/lang/ClassLoader/ExtDirs.java
 java/lang/ClassLoader/GetSystemPackage.java
 java/lang/ClassLoader/securityManager/ClassLoaderTest.java
@@ -154,11 +149,3 @@ java/lang/ClassLoader/getResource/automaticmodules/Driver.java
 java/lang/Class/getResource/ResourcesTest.java
 java/lang/Class/forName/modules/TestDriver.java
 java/lang/ClassLoader/getResource/modules/ResourcesTest.java
-
-
-####
-# Main class is not public
-
-jdk/java/lang/invoke/condy/CondyNestedResolution.jcod
-jdk/java/util/logging/SystemLoggerConfigTest.java
-jdk/jdk/jfr/startupargs/TestDumpOnExit.java

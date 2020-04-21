@@ -25,15 +25,16 @@ package nsk.share;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-
+import java.util.concurrent.atomic.AtomicReference;
 
 
 public final class MainWrapper {
 
+    static AtomicReference<Throwable> ue = new AtomicReference<>();
     public MainWrapper() {
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws Throwable {
         String wrapperName = args[0];
         String className = args[1];
         String[] classArgs = new String[args.length - 2];
@@ -48,9 +49,11 @@ public final class MainWrapper {
                 try {
                     Class c = Class.forName(className);
                     Method mainMethod = c.getMethod("main", new Class[] { String[].class });
+                    mainMethod.setAccessible(true);
                     mainMethod.invoke(null, new Object[] { classArgs });
                 } catch (InvocationTargetException e) {
                     e.printStackTrace();
+                    ue.set(e.getCause());
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -62,5 +65,8 @@ public final class MainWrapper {
         Thread.currentThread().setName("old-m-a-i-n");
         t.start();
         t.join();
+        if (ue.get() != null) {
+            throw ue.get();
+        }
     }
 }

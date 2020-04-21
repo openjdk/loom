@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -715,6 +716,7 @@ public final class ProcessTools {
         System.arraycopy(args, 2, classArgs, 0, args.length - 2);
         Class c = Class.forName(className);
         Method mainMethod = c.getMethod("main", new Class[] { String[].class });
+        mainMethod.setAccessible(true);
 
         if (wrapper.equals("Virtual")) {
             MainThreadGroup tg = new MainThreadGroup();
@@ -722,6 +724,8 @@ public final class ProcessTools {
             Thread vthread = Thread.builder().virtual().task(() -> {
                     try {
                         mainMethod.invoke(null, new Object[] { classArgs });
+                    } catch (InvocationTargetException e) {
+                        tg.uncaughtThrowable = e.getCause();
                     } catch (Throwable error) {
                         tg.uncaughtThrowable = error;
                     }
@@ -733,6 +737,8 @@ public final class ProcessTools {
             Thread t = new Thread(tg, () -> {
                     try {
                         mainMethod.invoke(null, new Object[] { classArgs });
+                    } catch (InvocationTargetException e) {
+                        tg.uncaughtThrowable = e.getCause();
                     } catch (Throwable error) {
                         tg.uncaughtThrowable = error;
                     }
