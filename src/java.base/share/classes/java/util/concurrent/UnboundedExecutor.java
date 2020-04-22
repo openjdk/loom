@@ -24,6 +24,9 @@
  */
 package java.util.concurrent;
 
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Collection;
@@ -57,16 +60,30 @@ class UnboundedExecutor extends AbstractExecutorService {
     private final ReentrantLock terminationLock = new ReentrantLock();
     private final Condition terminationCondition = terminationLock.newCondition();
 
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+
     // states: RUNNING -> SHUTDOWN -> TERMINATED
     private static final int RUNNING    = 0;
     private static final int SHUTDOWN   = 1;
     private static final int TERMINATED = 2;
     private volatile int state;
 
-    UnboundedExecutor(ThreadFactory factory) {
-        this.factory = Objects.requireNonNull(factory);
+    private final Lifetime lifetime;
+
+    public UnboundedExecutor(ThreadFactory factory) {
+        Objects.requireNonNull(factory);
+        this.lifetime = Lifetime.start();
+        this.factory = task -> {
+            Thread t = factory.newThread(task);
+            JLA.unsafeSetLifetime(t, lifetime);
+            return t;
+        };
     }
 
+    public void close() {
+        super.close(); // waits for all threads to terminate
+        lifetime.close();
+    }
     /**
      * Sets the state to TERMINATED if there are no remaining threads.
      */

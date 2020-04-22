@@ -353,4 +353,11 @@ public interface JavaLangAccess {
      * Returns true if the given virtual thread is parking.
      */
     boolean isVirtualThreadParking(Thread thread);
+
+    /**
+     * Set the lifetime of a thread to lt.
+     * @param thread
+     * @param lt
+     */
+    void unsafeSetLifetime(Thread thread, Lifetime lt);
 }

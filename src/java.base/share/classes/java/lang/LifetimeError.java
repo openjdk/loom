@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,43 +25,24 @@
 
 package java.lang;
 
-import java.io.*;
-import jdk.internal.misc.UnsafeConstants;
-
 /**
  * TBD
  */
-public final class ScopedBinding
-    implements AutoCloseable {
-
-    final Scoped<?> referent;
-    final Lifetime lifetime;
-
-    final Object prev;
-
-    static String cannotBindMsg(Object obj, Class<?> klass) {
-        return "Cannot bind " + obj.getClass().getName() + " to " + klass.getName();
-    }
+public class LifetimeError extends Error {
+    static final long serialVersionUID = 1234L;
 
     /**
      * TBD
-     * @param v TBD
-     * @param t TBD
-     * @param prev TBD
+     * @param s String
      */
-    ScopedBinding(Scoped<?> v, Object t, Object prev, Lifetime lifetime) {
-        if (t != null && !v.getType().isInstance(t))
-            throw new ClassCastException(cannotBindMsg(t, v.getType()));
-        this.lifetime = lifetime;
-        this.prev = prev;
-        this.referent = v;
+    public LifetimeError(String s) {
+        super(s);
     }
 
     /**
      * TBD
      */
-    public final void close() {
-        referent.release(prev);
-        lifetime.close();
+    public LifetimeError() {
+        super();
     }
 }

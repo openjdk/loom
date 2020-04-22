@@ -2296,6 +2296,8 @@ public final class System {
             public boolean isVirtualThreadParking(Thread thread) {
                 return ((VirtualThread) thread).isParking();
             }
+
+            public void unsafeSetLifetime(Thread thread, Lifetime lt) { thread.unsafeSetLifetime(lt); }
         });
     }
 }

@@ -37,12 +37,14 @@ import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.annotation.ForceInline;
 import static jdk.internal.misc.UnsafeConstants.SCOPED_CACHE_SHIFT;
 import static jdk.internal.org.objectweb.asm.Opcodes.*;
+import static java.lang.ScopedMap.NULL_PLACEHOLDER;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.security.ProtectionDomain;
+import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
@@ -93,9 +95,12 @@ public abstract class Scoped<T> {
     public ScopedBinding bind(T t) {
         if (t != null && ! getType().isInstance(t))
             throw new ClassCastException(ScopedBinding.cannotBindMsg(t, getType()));
+        var lifetime = Lifetime.start();
         var map = Thread.currentThread().scopedMap();
         Object previousMapping = map.put(hashCode(), this, t);
-        var b = new ScopedBinding(this, t, previousMapping);
+
+        var b = new ScopedBinding(this, t, previousMapping, lifetime);
+
         Cache.update(this, t);
 
         return b;
@@ -140,7 +145,7 @@ public abstract class Scoped<T> {
 
     final void release(Object prev) {
         var map = Thread.currentThread().scopedMap();
-        if (prev != ScopedMap.NULL_PLACEHOLDER) {
+        if (prev != NULL_PLACEHOLDER) {
             map.put(hashCode(), this, prev);
         } else {
             map.remove(hashCode(), this);
@@ -169,7 +174,7 @@ public abstract class Scoped<T> {
 
         var value = Thread.currentThread().scopedMap().get(hashCode(), this);
 
-        if (value == ScopedMap.NULL_PLACEHOLDER)
+        if (value == NULL_PLACEHOLDER)
             return false;
 
         return true;
@@ -177,9 +182,20 @@ public abstract class Scoped<T> {
 
     @SuppressWarnings("unchecked")  // one map has entries for all types <T>
     private T slowGet(Thread thread) {
-        var value = Thread.currentThread().scopedMap().get(hashCode(), this);
+        Lifetime currentLifetime = thread.currentLifetime();
 
-        if (value == ScopedMap.NULL_PLACEHOLDER)
+        var value = NULL_PLACEHOLDER;
+
+        for (Lifetime aLifetime = currentLifetime;
+             aLifetime != null;
+             aLifetime = aLifetime.parent) {
+            var map = aLifetime.scopedMapOrNull();
+            if (map == null)  continue;
+            value = map.get(hashCode(), this);
+            if (value != NULL_PLACEHOLDER)  break;
+        }
+
+        if (value == NULL_PLACEHOLDER)
             throw new UnboundScopedException("Scoped<" + getType().getName() + "> is not bound");
 
         if (USE_CACHE) {
@@ -221,7 +237,7 @@ public abstract class Scoped<T> {
                                             "Ljava/lang/Class;", null, null);
         }
         {
-            MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
+            MethodVisitor mv = cw.visitMethod(ACC_PRIVATE, "<init>", "()V", null, null);
 
             mv.visitCode();
             mv.visitIntInsn(ALOAD, 0);
@@ -302,16 +318,78 @@ public abstract class Scoped<T> {
         }
     }
 
-    private static class Cache {
+    static class Cache {
+        static final boolean CACHE_LIFETIMES = false;
+
         static final int INDEX_BITS = SCOPED_CACHE_SHIFT;
 
         static final int TABLE_SIZE = 1 << INDEX_BITS;
 
         static final int TABLE_MASK = TABLE_SIZE - 1;
 
+        static boolean isActive(Lifetime lt) {
+            if (! CACHE_LIFETIMES)  return false;
+            Object[] objects = Thread.scopedCache();
+            if (objects == null)  return false;
+            int n = TABLE_SIZE;
+            return (objects[n] == lt || objects[n+1] == lt);
+        }
+
+        static void setActive(Lifetime lt) {
+            if (! CACHE_LIFETIMES)  return;
+            Object[] objects = Thread.scopedCache();
+            if (objects == null) {
+                objects = createCache();
+            }
+            int slot = TABLE_SIZE + (chooseVictim(Thread.currentCarrierThread()) & 1);
+            objects[slot] = lt;
+        }
+
+        static void clearActive() {
+            if (! CACHE_LIFETIMES)  return;
+            Object[] objects = Thread.scopedCache();
+            if (objects != null) {
+                int n = TABLE_SIZE;
+                objects[n] = objects[n + 1] = null;
+            }
+        }
+
+        // An alternative cache for lifetimes which uses two fields in Thread
+        // instead of utilizing the scoped cache. Looks like it should work
+        // well but performs spectacularly badly on a buffer copying test.
+
+        // static boolean isActive(Lifetime lt) {
+        //     if (! CACHE_LIFETIMES)  return false;
+        //     Thread t = Thread.currentCarrierThread();
+        //     return (t.lt0 == lt || t.lt1 == lt);
+        // }
+
+        // static void setActive(Lifetime lt) {
+        //     if (! CACHE_LIFETIMES)  return;
+        //     Thread t = Thread.currentCarrierThread();
+        //     int slot = TABLE_SIZE + (chooseVictim(t) & 1);
+        //     if (slot == 0) {
+        //         t.lt0 = lt;
+        //     } else {
+        //         t.lt1 = lt;
+        //     }
+        // }
+
+        // static void clearActive() {
+        //     if (! CACHE_LIFETIMES)  return;
+        //     Thread t = Thread.currentCarrierThread();
+        //     t.lt0 = t.lt1 = null;
+        // }
+
+        static Object[] createCache() {
+            Object[] objects = new Object[TABLE_SIZE * 2 + 2];
+            Thread.setScopedCache(objects);  // 2 extra slots for lifetimes
+            return objects;
+        }
+
         static void put(Thread t, Scoped<?> key, Object value) {
             if (Thread.scopedCache() == null) {
-                Thread.setScopedCache(new Object[TABLE_SIZE * 2]);
+                createCache();
             }
             setKeyAndObjectAt(chooseVictim(t, key.hashCode()), key, value);
         }
@@ -379,9 +457,28 @@ public abstract class Scoped<T> {
             int k2 = (hash >> INDEX_BITS) & TABLE_MASK;
             int tmp = thread.victims;
             thread.victims = (tmp << 31) | (tmp >>> 1);
-            return (tmp & 1) == 0 ? k1 : k2;
+            return (chooseVictim(thread) & 1) == 0 ? k1 : k2;
+        }
+
+        private static int chooseVictim(Thread thread) {
+            // Update the cache to replace one entry with the value we just looked up.
+            // Each value can be in one of two possible places in the cache.
+            // Pick a victim at (pseudo-)random.
+            int tmp = thread.victims;
+            thread.victims = (tmp << 31) | (tmp >>> 1);
+            return tmp & TABLE_MASK;
+        }
+
+        static void clearCache() {
+            // We need to do this when we yield a Continuation.
+            if (! USE_CACHE) return;
+            Object[] objects = Thread.scopedCache();
+            if (objects != null) {
+                Arrays.fill(objects, null);
+            }
         }
     }
+
 
 }
 

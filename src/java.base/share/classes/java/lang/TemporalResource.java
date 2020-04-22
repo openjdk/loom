@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,43 +25,29 @@
 
 package java.lang;
 
-import java.io.*;
-import jdk.internal.misc.UnsafeConstants;
-
 /**
  * TBD
+ * A TemporalResource is a Thing.
  */
-public final class ScopedBinding
-    implements AutoCloseable {
+public abstract class TemporalResource implements AutoCloseable {
+    private final Lifetime lt;
 
-    final Scoped<?> referent;
-    final Lifetime lifetime;
-
-    final Object prev;
-
-    static String cannotBindMsg(Object obj, Class<?> klass) {
-        return "Cannot bind " + obj.getClass().getName() + " to " + klass.getName();
-    }
-
-    /**
-     * TBD
-     * @param v TBD
-     * @param t TBD
-     * @param prev TBD
-     */
-    ScopedBinding(Scoped<?> v, Object t, Object prev, Lifetime lifetime) {
-        if (t != null && !v.getType().isInstance(t))
-            throw new ClassCastException(cannotBindMsg(t, v.getType()));
-        this.lifetime = lifetime;
-        this.prev = prev;
-        this.referent = v;
-    }
-
-    /**
+   /**
      * TBD
      */
-    public final void close() {
-        referent.release(prev);
-        lifetime.close();
+    protected TemporalResource() { lt = Lifetime.start(); }
+
+   /**
+     * TBD
+     */
+    protected void checkAccess() {
+        if (lt == null || Scoped.Cache.isActive(lt)) return;
+        if (!Thread.currentThread().isActive(lt))
+            throw new LifetimeError();
     }
+
+   /**
+     * TBD
+     */
+     public void close() { lt.close(); }
 }

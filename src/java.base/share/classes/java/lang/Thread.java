@@ -293,14 +293,18 @@ public class Thread implements Runnable {
     int victims
         = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
+    // V2:
     private ScopedMap scopedMap;
 
     final ScopedMap scopedMap() {
-        var map = scopedMap;
-        if (map == null) {
-            map = scopedMap = new ScopedMap();
+        if (Lifetime.version == Lifetime.Version.V1) {
+            return currentLifetime().scopedMap();
+        } else {
+            if (this.scopedMap == null) {
+                this.scopedMap = new ScopedMap();
+            }
+            return this.scopedMap;
         }
-        return map;
     }
 
     // end Scoped support
@@ -2981,6 +2985,126 @@ public class Thread implements Runnable {
         Reference<? extends Class<?>> ref;
         while((ref = queue.poll()) != null) {
             map.remove(ref);
+        }
+    }
+
+    Thread parentThread;
+    Lifetime lifetime; // the current innermost lifetime (or null)
+    int depth;
+    int parentDepth;
+
+    /**
+     * TBD
+     *
+     * @return Lifetime
+     */
+    public Lifetime currentLifetime() {
+        return lifetime;
+    }
+
+    /**
+     * TBD
+     *
+     * @param lt a Lifetime
+     */
+    // V1:
+    public void pushLifetime(Lifetime lt) {
+        assert lt.parent == this.lifetime;
+        this.lifetime = lt;
+    }
+
+    // V2:
+    Lifetime pushLifetime() {
+        assert this == Thread.currentThread();
+        var newDepth = ++depth;
+        return new Lifetime(this, newDepth);
+    }
+
+    /**
+     * TBD
+     *
+     * @param lt a Lifetime
+     */
+    public void popLifetime(Lifetime lt) {
+        if (Lifetime.version == Lifetime.Version.V1) {
+            if (this.lifetime != lt)
+                throw new LifetimeError("lt: [" + lt + "] this: [" + this.currentLifetime() + "]");
+            this.lifetime = lt.parent;
+        } else {
+            assert lt.thread == this;
+            if (this != Thread.currentThread()) throw new LifetimeError();
+            if (lt.depth() != this.depth) throw new LifetimeError();
+            assert depth > parentDepth;
+            depth--;
+        }
+        Scoped.Cache.clearActive();
+    }
+
+    /**
+     * TBD
+     *
+     * @param lt a Lifetime
+     * @return Previous lifetime
+     */
+    Lifetime unsafeSetLifetime(Lifetime lt) {
+        if (Lifetime.version == Lifetime.Version.V1) {
+            var old = this.lifetime;
+            this.lifetime = lt;
+            return old;
+        } else {
+            assert (!isAlive() && lt.thread == Thread.currentThread())
+                    || this == Thread.currentThread(); // this ensures that depth does not concurrently change here
+            assert depth == parentDepth;
+
+            var old = new Lifetime(parentThread, parentDepth);
+            this.parentThread = lt.thread;
+            this.parentDepth = lt.depth();
+            this.depth = parentDepth;
+            this.lifetime = lt;
+            return old;
+        }
+    }
+
+    boolean isActive(Lifetime lt) {
+        if (lt == null || Scoped.Cache.isActive(lt)) return true;
+        if (Lifetime.version == Lifetime.Version.V1) {
+            for (var x = this.lifetime; x != null; x = x.parent) {
+                if (x == lt) {
+                    Scoped.Cache.setActive(lt);
+                    return true;
+                }
+            }
+            return false;
+        } else {
+            assert this == Thread.currentThread();
+
+            // the thread that closes the lifetime must be the thread that owns it
+            // and the thread that sets this thread's parent must be that thread
+            // so either we're on the right thread and we'll see depth = MAX_VALUE due to mem ordering,
+            // or we're on a wrong thread, in which case the parent search will fail; either way, this will fail.
+            if (lt.thread == this) {
+                boolean result = lt.depth() <= this.depth;
+                if (Scoped.Cache.CACHE_LIFETIMES) {
+                    if (result) {
+                        Scoped.Cache.setActive(lt);
+                    }
+                }
+                return result;
+            }
+            for (Thread t = this; t != null; t = t.parentThread) {
+                if (Scoped.Cache.CACHE_LIFETIMES) {
+                    if (lt.thread == t.parentThread) {
+                        boolean result = lt.depth() <= t.parentDepth;
+                        if (result) {
+                            Scoped.Cache.setActive(lt);
+                        }
+                        return result;
+                    }
+                } else {
+                    if (lt.thread == t.parentThread) return lt.depth() <= t.parentDepth;
+                }
+            }
+            return false;
         }
     }
 
