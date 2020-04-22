@@ -42,6 +42,8 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import jdk.internal.access.JavaNetURLAccess;
 import jdk.internal.access.SharedSecrets;
@@ -1347,14 +1349,13 @@ public final class URL implements java.io.Serializable {
         };
     }
 
-    // Thread-local gate to prevent recursive provider lookups
-    private static ThreadLocal<Object> gate = new ThreadLocal<>();
+    // gate to prevent recursive provider lookups
+    private static final Set<Thread> threadsInLookup = ConcurrentHashMap.newKeySet();
 
     private static URLStreamHandler lookupViaProviders(final String protocol) {
-        if (gate.get() != null)
+        Thread me = Thread.currentThread();
+        if (!threadsInLookup.add(me))
             throw new Error("Circular loading of URL stream handler providers detected");
-
-        gate.set(gate);
         try {
             return AccessController.doPrivileged(
                 new PrivilegedAction<>() {
@@ -1370,7 +1371,7 @@ public final class URL implements java.io.Serializable {
                     }
                 });
         } finally {
-            gate.set(null);
+            threadsInLookup.remove(me);
         }
     }
 

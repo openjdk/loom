@@ -47,6 +47,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -371,9 +372,8 @@ public abstract class Charset
             };
     }
 
-    // Thread-local gate to prevent recursive provider lookups
-    private static ThreadLocal<ThreadLocal<?>> gate =
-            new ThreadLocal<ThreadLocal<?>>();
+    // gate to prevent recursive provider lookups
+    private static final Set<Thread> threadsInLookup = ConcurrentHashMap.newKeySet();
 
     private static Charset lookupViaProviders(final String charsetName) {
 
@@ -388,12 +388,11 @@ public abstract class Charset
         if (!VM.isBooted())
             return null;
 
-        if (gate.get() != null)
+        Thread me = Thread.currentThread();
+        if (!threadsInLookup.add(me))
             // Avoid recursive provider lookups
             return null;
         try {
-            gate.set(gate);
-
             return AccessController.doPrivileged(
                 new PrivilegedAction<>() {
                     public Charset run() {
@@ -409,7 +408,7 @@ public abstract class Charset
                 });
 
         } finally {
-            gate.set(null);
+            threadsInLookup.remove(me);
         }
     }
 
