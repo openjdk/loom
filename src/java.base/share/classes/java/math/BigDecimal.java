@@ -3921,7 +3921,12 @@ public class BigDecimal extends Number implements Comparable<BigDecimal> {
                     StringBuilderHelper.DIGIT_ONES[lowInt]) ;
         }
 
-        StringBuilderHelper sbHelper = threadLocalStringBuilderHelper.get();
+        StringBuilderHelper sbHelper;
+        if (Thread.currentThread().isVirtual()) {
+            sbHelper = new StringBuilderHelper();
+        } else {
+            sbHelper = threadLocalStringBuilderHelper.get();
+        }
         char[] coeff;
         int offset;  // offset is the starting index for coeff array
         // Get the significand as an absolute value
