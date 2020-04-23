@@ -45,6 +45,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * This is a inefficient/simple implementation for now, it will likely be replaced.
  */
 class UnboundedExecutor extends AbstractExecutorService {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final VarHandle STATE;
     static {
         try {
@@ -55,20 +56,17 @@ class UnboundedExecutor extends AbstractExecutorService {
         }
     }
 
+    private final Lifetime lifetime;
     private final ThreadFactory factory;
     private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
     private final ReentrantLock terminationLock = new ReentrantLock();
     private final Condition terminationCondition = terminationLock.newCondition();
-
-    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     // states: RUNNING -> SHUTDOWN -> TERMINATED
     private static final int RUNNING    = 0;
     private static final int SHUTDOWN   = 1;
     private static final int TERMINATED = 2;
     private volatile int state;
-
-    private final Lifetime lifetime;
 
     public UnboundedExecutor(ThreadFactory factory) {
         Objects.requireNonNull(factory);
@@ -80,9 +78,13 @@ class UnboundedExecutor extends AbstractExecutorService {
         };
     }
 
+    @Override
     public void close() {
-        super.close(); // waits for all threads to terminate
-        lifetime.close();
+        try {
+            super.close(); // waits for all threads to terminate
+        } finally {
+            lifetime.close();
+        }
     }
     /**
      * Sets the state to TERMINATED if there are no remaining threads.
