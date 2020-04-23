@@ -42,11 +42,10 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import jdk.internal.access.JavaNetURLAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.Gate;
 import jdk.internal.misc.VM;
 import sun.net.util.IPAddressUtil;
 import sun.security.util.SecurityConstants;
@@ -1350,11 +1349,10 @@ public final class URL implements java.io.Serializable {
     }
 
     // gate to prevent recursive provider lookups
-    private static final Set<Thread> threadsInLookup = ConcurrentHashMap.newKeySet();
+    private static final Gate LOOKUP_GATE = Gate.create();
 
     private static URLStreamHandler lookupViaProviders(final String protocol) {
-        Thread me = Thread.currentThread();
-        if (!threadsInLookup.add(me))
+        if (!LOOKUP_GATE.tryEnter())
             throw new Error("Circular loading of URL stream handler providers detected");
         try {
             return AccessController.doPrivileged(
@@ -1371,7 +1369,7 @@ public final class URL implements java.io.Serializable {
                     }
                 });
         } finally {
-            threadsInLookup.remove(me);
+            LOOKUP_GATE.exit();
         }
     }
 

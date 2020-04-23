@@ -27,6 +27,7 @@ package java.util.jar;
 
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.access.JavaUtilZipFileAccess;
+import jdk.internal.misc.Gate;
 import sun.security.action.GetPropertyAction;
 import sun.security.util.ManifestEntryVerifier;
 import sun.security.util.SignatureFileVerifier;
@@ -48,8 +49,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -153,6 +152,7 @@ public class JarFile extends ZipFile {
     private static final Runtime.Version RUNTIME_VERSION;
     private static final boolean MULTI_RELEASE_ENABLED;
     private static final boolean MULTI_RELEASE_FORCED;
+    private static final Gate INITIALIZING_GATE = Gate.create();
 
     private SoftReference<Manifest> manRef;
     private JarEntry manEntry;
@@ -1027,8 +1027,6 @@ public class JarFile extends ZipFile {
         }
     }
 
-    private static final Set<Thread> threadsInInitVerifier = ConcurrentHashMap.newKeySet();
-
     synchronized void ensureInitialization() {
         try {
             maybeInstantiateVerifier();
@@ -1036,19 +1034,18 @@ public class JarFile extends ZipFile {
             throw new RuntimeException(e);
         }
         if (jv != null && !jvInitialized) {
-            Thread me = Thread.currentThread();
-            threadsInInitVerifier.add(me);
+            INITIALIZING_GATE.enter();
             try {
                 initializeVerifier();
                 jvInitialized = true;
             } finally {
-                threadsInInitVerifier.remove(me);
+                INITIALIZING_GATE.exit();
             }
         }
     }
 
     static boolean isInitializing() {
-        return threadsInInitVerifier.contains(Thread.currentThread());
+        return INITIALIZING_GATE.inside();
     }
 
     /*

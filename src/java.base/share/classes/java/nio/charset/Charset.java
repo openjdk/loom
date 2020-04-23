@@ -25,6 +25,7 @@
 
 package java.nio.charset;
 
+import jdk.internal.misc.Gate;
 import jdk.internal.misc.VM;
 import sun.nio.cs.ThreadLocalCoders;
 import sun.security.action.GetPropertyAction;
@@ -47,7 +48,6 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -373,7 +373,7 @@ public abstract class Charset
     }
 
     // gate to prevent recursive provider lookups
-    private static final Set<Thread> threadsInLookup = ConcurrentHashMap.newKeySet();
+    private static final Gate LOOKUP_GATE = Gate.create();
 
     private static Charset lookupViaProviders(final String charsetName) {
 
@@ -388,8 +388,7 @@ public abstract class Charset
         if (!VM.isBooted())
             return null;
 
-        Thread me = Thread.currentThread();
-        if (!threadsInLookup.add(me))
+        if (!LOOKUP_GATE.tryEnter())
             // Avoid recursive provider lookups
             return null;
         try {
@@ -408,7 +407,7 @@ public abstract class Charset
                 });
 
         } finally {
-            threadsInLookup.remove(me);
+            LOOKUP_GATE.exit();
         }
     }
 
