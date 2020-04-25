@@ -520,6 +520,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   nonstatic_field(ClassLoaderData,             _class_loader,                                 OopHandle)                             \
   nonstatic_field(ClassLoaderData,             _next,                                         ClassLoaderData*)                      \
   volatile_nonstatic_field(ClassLoaderData,    _klasses,                                      Klass*)                                \
+  nonstatic_field(ClassLoaderData,             _has_class_mirror_holder,                      bool)                                  \
   volatile_nonstatic_field(ClassLoaderData,    _dictionary,                                   Dictionary*)                           \
                                                                                                                                      \
   static_ptr_volatile_field(ClassLoaderDataGraph, _head,                                      ClassLoaderData*)                      \
@@ -1586,7 +1587,6 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_c2_type(DecodeNKlassNode, TypeNode)                             \
   declare_c2_type(ConstraintCastNode, TypeNode)                           \
   declare_c2_type(CastIINode, ConstraintCastNode)                         \
-  declare_c2_type(CastLLNode, ConstraintCastNode)                         \
   declare_c2_type(CastPPNode, ConstraintCastNode)                         \
   declare_c2_type(CheckCastPPNode, TypeNode)                              \
   declare_c2_type(Conv2BNode, Node)                                       \
