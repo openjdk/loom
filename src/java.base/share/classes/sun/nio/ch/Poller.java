@@ -123,7 +123,7 @@ abstract class Poller implements Runnable {
     private void register(int fdVal) {
         Thread t = Thread.currentThread();
         Thread previous = map.putIfAbsent(fdVal, t);
-        if (previous != null && previous != t) {
+        if (previous != null) {
             throw new IllegalStateException();
         }
         implRegister(fdVal);
