@@ -24,7 +24,7 @@
 /**
  * @test
  * @run testng UnboundedExecutorTest
- * @summary Basic tests for Executors.newUnboundedExecutor
+ * @summary Basic tests for Executors.newUnboundedXXXExecutor
  */
 
 import java.time.Duration;
@@ -79,6 +79,24 @@ public class UnboundedExecutorTest {
         for (Future<?> result : results) {
             assertTrue(result.get() == null);
         }
+    }
+
+    /**
+     * Tests that newUnboundedVirtualThreadExecutor creates virtual threads
+     */
+    public void testNewUnboundedVirtualThreadExecutor() {
+        final int NUM_TASKS = 10;
+        AtomicInteger virtualThreadCount = new AtomicInteger();
+        try (var executor = Executors.newUnboundedVirtualThreadExecutor()) {
+            for (int i=0; i<NUM_TASKS; i++) {
+                executor.submit(() -> {
+                    if (Thread.currentThread().isVirtual()) {
+                        virtualThreadCount.addAndGet(1);
+                    }
+                });
+            }
+        }
+        assertTrue(virtualThreadCount.get() == NUM_TASKS);
     }
 
     /**
@@ -385,7 +403,6 @@ public class UnboundedExecutorTest {
         executor.invokeAny(Set.of(task1, task2));
     }
 
-
     /**
      * Test invokeAny with empty collection.
      */
@@ -407,6 +424,7 @@ public class UnboundedExecutorTest {
             executor.invokeAny(Set.of(), 1, TimeUnit.MINUTES);
         }
     }
+
     /**
      * Test invokeAny with null.
      */
