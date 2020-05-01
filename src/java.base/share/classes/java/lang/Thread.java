@@ -1552,17 +1552,39 @@ public class Thread implements Runnable {
      * @param task the object to run when the thread executes
      * @throws IllegalArgumentException if an unknown characteristic or an invalid
      *         combination of characteristic is specified
-     * @throws NullPointerException if task is null
+     * @throws NullPointerException if name or task is null
      * @return an un-started virtual thread
      *
      * @since 99
      */
     public static Thread newThread(String name, int characteristics, Runnable task) {
+        Objects.requireNonNull(name);
+        Objects.requireNonNull(task);
         if ((characteristics & VIRTUAL) != 0) {
             return new VirtualThread(null, name, characteristics, task);
         } else {
             return new Thread(null, name, characteristics, task, 0, null);
         }
+    }
+
+    /**
+     * Starts a new virtual thread to execute a task. The thread is scheduled
+     * by the Java virtual machine using the default scheduler. The resulting
+     * thread supports {@link ThreadLocal thread-locals} but does not inherit any
+     * initial values for {@link InheritableThreadLocal inheritable-thread-locals}.
+     * It inherits the {@link #getContextClassLoader() context-class-loader} from
+     * the current thread.
+     *
+     * @param task the object to run when the thread executes
+     * @throws NullPointerException if task is null
+     * @return a new, and started, virtual thread
+     * @since 99
+     */
+    public static Thread startVirtualThread(Runnable task) {
+        Objects.requireNonNull(task);
+        var thread = new VirtualThread(null, null, VIRTUAL, task);
+        thread.start();
+        return thread;
     }
 
     /**
@@ -1593,6 +1615,8 @@ public class Thread implements Runnable {
      * execution.
      *
      * @throws     IllegalThreadStateException  if the thread was already started.
+     * @throws     java.util.concurrent.RejectedExecutionException if the thread
+     *             is virtual and the scheduler cannot accept a task
      * @see        #run()
      * @see        Builder#start()
      */

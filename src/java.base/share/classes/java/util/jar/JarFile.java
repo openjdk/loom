@@ -27,6 +27,7 @@ package java.util.jar;
 
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.access.JavaUtilZipFileAccess;
+import jdk.internal.misc.Gate;
 import sun.security.action.GetPropertyAction;
 import sun.security.util.ManifestEntryVerifier;
 import sun.security.util.SignatureFileVerifier;
@@ -151,7 +152,7 @@ public class JarFile extends ZipFile {
     private static final Runtime.Version RUNTIME_VERSION;
     private static final boolean MULTI_RELEASE_ENABLED;
     private static final boolean MULTI_RELEASE_FORCED;
-    private static final ThreadLocal<Boolean> isInitializing = new ThreadLocal<>();
+    private static final Gate INITIALIZING_GATE = Gate.create();
 
     private SoftReference<Manifest> manRef;
     private JarEntry manEntry;
@@ -431,10 +432,6 @@ public class JarFile extends ZipFile {
         return man;
     }
 
-    private String[] getMetaInfEntryNames() {
-        return JUZFA.getMetaInfEntryNames((ZipFile)this);
-    }
-
     /**
      * Returns the {@code JarEntry} for the given base entry name or
      * {@code null} if not found.
@@ -504,11 +501,15 @@ public class JarFile extends ZipFile {
      * </div>
      */
     public ZipEntry getEntry(String name) {
-        JarFileEntry je = getEntry0(name);
         if (isMultiRelease()) {
-            return getVersionedEntry(name, je);
+            JarEntry je = getVersionedEntry(name, null);
+            if (je == null) {
+                je = getEntry0(name);
+            }
+            return je;
+        } else {
+            return getEntry0(name);
         }
-        return je;
     }
 
     /**
@@ -598,21 +599,29 @@ public class JarFile extends ZipFile {
         return name;
     }
 
-    private JarEntry getVersionedEntry(String name, JarEntry je) {
-        if (BASE_VERSION_FEATURE < versionFeature) {
-            if (!name.startsWith(META_INF)) {
+    private JarEntry getVersionedEntry(String name, JarEntry defaultEntry) {
+        if (!name.startsWith(META_INF)) {
+            int[] versions = JUZFA.getMetaInfVersions(this);
+            if (BASE_VERSION_FEATURE < versionFeature && versions.length > 0) {
                 // search for versioned entry
-                int v = versionFeature;
-                while (v > BASE_VERSION_FEATURE) {
-                    JarFileEntry vje = getEntry0(META_INF_VERSIONS + v + "/" + name);
+                for (int i = versions.length - 1; i >= 0; i--) {
+                    int version = versions[i];
+                    // skip versions above versionFeature
+                    if (version > versionFeature) {
+                        continue;
+                    }
+                    // skip versions below base version
+                    if (version < BASE_VERSION_FEATURE) {
+                        break;
+                    }
+                    JarFileEntry vje = getEntry0(META_INF_VERSIONS + version + "/" + name);
                     if (vje != null) {
                         return vje.withBasename(name);
                     }
-                    v--;
                 }
             }
         }
-        return je;
+        return defaultEntry;
     }
 
     // placeholder for now
@@ -707,7 +716,7 @@ public class JarFile extends ZipFile {
         }
 
         if (verify) {
-            String[] names = getMetaInfEntryNames();
+            String[] names = JUZFA.getMetaInfEntryNames(this);
             if (names != null) {
                 for (String nameLower : names) {
                     String name = nameLower.toUpperCase(Locale.ENGLISH);
@@ -738,7 +747,7 @@ public class JarFile extends ZipFile {
 
         // Verify "META-INF/" entries...
         try {
-            String[] names = getMetaInfEntryNames();
+            String[] names = JUZFA.getMetaInfEntryNames(this);
             if (names != null) {
                 for (String name : names) {
                     String uname = name.toUpperCase(Locale.ENGLISH);
@@ -932,7 +941,7 @@ public class JarFile extends ZipFile {
             if (manEntry == null) {
                 // If not found, then iterate through all the "META-INF/"
                 // entries to find a match.
-                String[] names = getMetaInfEntryNames();
+                String[] names = JUZFA.getMetaInfEntryNames(this);
                 if (names != null) {
                     for (String name : names) {
                         if (MANIFEST_NAME.equals(name.toUpperCase(Locale.ENGLISH))) {
@@ -1016,7 +1025,7 @@ public class JarFile extends ZipFile {
                         byte[] lbuf = new byte[512];
                         Attributes attr = new Attributes();
                         attr.read(new Manifest.FastInputStream(
-                            new ByteArrayInputStream(b)), lbuf);
+                                new ByteArrayInputStream(b)), lbuf);
                         isMultiRelease = Boolean.parseBoolean(
                             attr.getValue(Attributes.Name.MULTI_RELEASE));
                     }
@@ -1033,19 +1042,18 @@ public class JarFile extends ZipFile {
             throw new RuntimeException(e);
         }
         if (jv != null && !jvInitialized) {
-            isInitializing.set(Boolean.TRUE);
+            INITIALIZING_GATE.enter();
             try {
                 initializeVerifier();
                 jvInitialized = true;
             } finally {
-                isInitializing.set(Boolean.FALSE);
+                INITIALIZING_GATE.exit();
             }
         }
     }
 
     static boolean isInitializing() {
-        Boolean value = isInitializing.get();
-        return (value == null) ? false : value;
+        return INITIALIZING_GATE.inside();
     }
 
     /*
@@ -1068,7 +1076,7 @@ public class JarFile extends ZipFile {
      */
     JarEntry newEntry(String name) {
         if (isMultiRelease()) {
-            JarEntry vje = getVersionedEntry(name, (JarEntry)null);
+            JarEntry vje = getVersionedEntry(name, null);
             if (vje != null) {
                 return vje;
             }

@@ -25,6 +25,7 @@
 
 package java.nio.charset;
 
+import jdk.internal.misc.Gate;
 import jdk.internal.misc.VM;
 import sun.nio.cs.ThreadLocalCoders;
 import sun.security.action.GetPropertyAction;
@@ -371,9 +372,8 @@ public abstract class Charset
             };
     }
 
-    // Thread-local gate to prevent recursive provider lookups
-    private static ThreadLocal<ThreadLocal<?>> gate =
-            new ThreadLocal<ThreadLocal<?>>();
+    // gate to prevent recursive provider lookups
+    private static final Gate LOOKUP_GATE = Gate.create();
 
     private static Charset lookupViaProviders(final String charsetName) {
 
@@ -388,12 +388,10 @@ public abstract class Charset
         if (!VM.isBooted())
             return null;
 
-        if (gate.get() != null)
+        if (!LOOKUP_GATE.tryEnter())
             // Avoid recursive provider lookups
             return null;
         try {
-            gate.set(gate);
-
             return AccessController.doPrivileged(
                 new PrivilegedAction<>() {
                     public Charset run() {
@@ -409,7 +407,7 @@ public abstract class Charset
                 });
 
         } finally {
-            gate.set(null);
+            LOOKUP_GATE.exit();
         }
     }
 

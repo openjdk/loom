@@ -81,9 +81,7 @@
   template(RedefineClasses)                       \
   template(UpdateForPopTopFrame)                  \
   template(SetFramePop)                           \
-  template(GetOwnedMonitorInfo)                   \
   template(GetObjectMonitorUsage)                 \
-  template(GetCurrentContendedMonitor)            \
   template(GetStackTrace)                         \
   template(GetMultipleStackTraces)                \
   template(GetAllStackTraces)                     \

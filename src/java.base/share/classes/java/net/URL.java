@@ -45,6 +45,7 @@ import java.util.ServiceLoader;
 
 import jdk.internal.access.JavaNetURLAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.Gate;
 import jdk.internal.misc.VM;
 import sun.net.util.IPAddressUtil;
 import sun.security.util.SecurityConstants;
@@ -1347,14 +1348,12 @@ public final class URL implements java.io.Serializable {
         };
     }
 
-    // Thread-local gate to prevent recursive provider lookups
-    private static ThreadLocal<Object> gate = new ThreadLocal<>();
+    // gate to prevent recursive provider lookups
+    private static final Gate LOOKUP_GATE = Gate.create();
 
     private static URLStreamHandler lookupViaProviders(final String protocol) {
-        if (gate.get() != null)
+        if (!LOOKUP_GATE.tryEnter())
             throw new Error("Circular loading of URL stream handler providers detected");
-
-        gate.set(gate);
         try {
             return AccessController.doPrivileged(
                 new PrivilegedAction<>() {
@@ -1370,7 +1369,7 @@ public final class URL implements java.io.Serializable {
                     }
                 });
         } finally {
-            gate.set(null);
+            LOOKUP_GATE.exit();
         }
     }
 

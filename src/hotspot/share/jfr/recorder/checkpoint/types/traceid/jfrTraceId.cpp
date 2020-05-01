@@ -180,7 +180,7 @@ void JfrTraceId::assign(const PackageEntry* package) {
 
 void JfrTraceId::assign(const ClassLoaderData* cld) {
   assert(cld != NULL, "invariant");
-  if (cld->is_unsafe_anonymous()) {
+  if (cld->has_class_mirror_holder()) {
     cld->set_trace_id(0);
     return;
   }
