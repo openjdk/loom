@@ -633,7 +633,7 @@ public class Thread implements Runnable {
      * <pre>{@code
      *     ExecutorService pool = Executors.newFixedThreadPool(4);
      *     Executor scheduler = (task) -> {
-     *         Thread vthread = ((VirtualThreadTask) task).thread();
+     *         Thread vthread = ((Thread.VirtualThreadTask) task).thread();
      *         System.out.println(vthread);
      *         pool.execute(task);
      *     };
