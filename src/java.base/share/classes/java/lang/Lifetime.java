@@ -25,23 +25,22 @@
 
 package java.lang;
 
+import jdk.internal.vm.annotation.Stable;
+
 /**
  * TBD
  * A Lifetime is a Thing.
  */
 public class Lifetime {
     // v1:
-    final Lifetime parent;
+    @Stable final Lifetime parent;
+    @Stable ScopedMap scopedMap;
 
     // v2:
-    final Thread thread;
+    @Stable final Thread thread;
     private int depth;
 
-    ScopedMap scopedMap;
-
-    final int index;
-
-    private static boolean USE_CACHE = true;
+    @Stable final int index;
 
     enum Version { V1, V2 }
 

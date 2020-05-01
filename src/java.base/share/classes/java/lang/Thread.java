@@ -307,6 +307,10 @@ public class Thread implements Runnable {
         }
     }
 
+    final ScopedMap scopedMapOrNull () {
+        return this.scopedMap;
+    }
+
     // end Scoped support
 
     /**

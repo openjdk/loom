@@ -35,6 +35,8 @@ import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.FieldAccessor;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.annotation.ForceInline;
+import jdk.internal.vm.annotation.Stable;
+
 import static jdk.internal.misc.UnsafeConstants.SCOPED_CACHE_SHIFT;
 import static jdk.internal.org.objectweb.asm.Opcodes.*;
 import static java.lang.ScopedMap.NULL_PLACEHOLDER;
@@ -186,13 +188,22 @@ public abstract class Scoped<T> {
 
         var value = NULL_PLACEHOLDER;
 
-        for (Lifetime aLifetime = currentLifetime;
-             aLifetime != null;
-             aLifetime = aLifetime.parent) {
-            var map = aLifetime.scopedMapOrNull();
-            if (map == null)  continue;
-            value = map.get(hashCode(), this);
-            if (value != NULL_PLACEHOLDER)  break;
+        if (Lifetime.version == Lifetime.Version.V1) {
+            for (Lifetime aLifetime = currentLifetime;
+                 aLifetime != null;
+                 aLifetime = aLifetime.parent) {
+                var map = aLifetime.scopedMapOrNull();
+                if (map == null) continue;
+                value = map.get(hashCode(), this);
+                if (value != NULL_PLACEHOLDER) break;
+            }
+        } else {
+            for (var t = thread; t != null; t = t.parentThread) {
+                var map = t.scopedMapOrNull();
+                if (map == null) continue;
+                value = map.get(hashCode(), this);
+                if (value != NULL_PLACEHOLDER) break;
+            }
         }
 
         if (value == NULL_PLACEHOLDER)
@@ -319,7 +330,8 @@ public abstract class Scoped<T> {
     }
 
     static class Cache {
-        static final boolean CACHE_LIFETIMES = false;
+        static final boolean CACHE_LIFETIMES
+                = "true".equals(System.getProperty("java.lang.Lifetime.USE_CACHE"));
 
         static final int INDEX_BITS = SCOPED_CACHE_SHIFT;
 
