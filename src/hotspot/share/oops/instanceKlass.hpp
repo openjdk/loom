@@ -191,10 +191,6 @@ class InstanceKlass: public Klass {
   // has not been validated.
   Array<jushort>* _nest_members;
 
-  // The NestHost attribute. The class info index for the class
-  // that is the nest-host of this class. This data has not been validated.
-  jushort _nest_host_index;
-
   // Resolved nest-host klass: either true nest-host or self if we are not
   // nested, or an error occurred resolving or validating the nominated
   // nest-host. Can also be set directly by JDK API's that establish nest
@@ -209,71 +205,70 @@ class InstanceKlass: public Klass {
   // Specified as UTF-8 string without terminating zero byte in the classfile,
   // it is stored in the instanceklass as a NULL-terminated UTF-8 string
   const char*     _source_debug_extension;
-  // Array name derived from this class which needs unreferencing
-  // if this class is unloaded.
-  Symbol*         _array_name;
 
   // Number of heapOopSize words used by non-static fields in this klass
   // (including inherited fields but after header_size()).
   int             _nonstatic_field_size;
   int             _static_field_size;    // number words used by static fields (oop and non-oop) in this klass
-  // Constant pool index to the utf8 entry of the Generic signature,
-  // or 0 if none.
-  u2              _generic_signature_index;
-  // Constant pool index to the utf8 entry for the name of source file
-  // containing this klass, 0 if not specified.
-  u2              _source_file_name_index;
+
+  int             _nonstatic_oop_map_size;// size in words of nonstatic oop map blocks
+  int             _itable_len;           // length of Java itable (in words)
+
+  // The NestHost attribute. The class info index for the class
+  // that is the nest-host of this class. This data has not been validated.
+  u2              _nest_host_index;
+  u2              _this_class_index;              // constant pool entry
+
   u2              _static_oop_field_count;// number of static oop fields in this klass
   u2              _java_fields_count;    // The number of declared Java fields
-  int             _nonstatic_oop_map_size;// size in words of nonstatic oop map blocks
 
-  int             _itable_len;           // length of Java itable (in words)
+  volatile u2     _idnum_allocated_count;         // JNI/JVMTI: increments with the addition of methods, old ids don't change
+
   // _is_marked_dependent can be set concurrently, thus cannot be part of the
   // _misc_flags.
   bool            _is_marked_dependent;  // used for marking during flushing and deoptimization
 
-  // The low two bits of _misc_flags contains the kind field.
+  // Class states are defined as ClassState (see above).
+  // Place the _init_state here to utilize the unused 2-byte after
+  // _idnum_allocated_count.
+  u1              _init_state;                    // state of class
+
   // This can be used to quickly discriminate among the four kinds of
-  // InstanceKlass.
-
-  // static const unsigned _misc_kind_field_pos  = 0;
-  static const unsigned _misc_kind_field_size = 0;
-  // static const unsigned _misc_kind_field_mask = (1u << _misc_kind_field_size) - 1u;
-
-  static const unsigned _misc_kind_other        = 0; // concrete InstanceKlass
-  static const unsigned _misc_kind_reference    = 1; // InstanceRefKlass
-  static const unsigned _misc_kind_class_loader = 2; // InstanceClassLoaderKlass
-  static const unsigned _misc_kind_mirror       = 3; // InstanceMirrorKlass
+  // InstanceKlass. This should be an enum (?)
+  static const unsigned _kind_other        = 0; // concrete InstanceKlass
+  static const unsigned _kind_reference    = 1; // InstanceRefKlass
+  static const unsigned _kind_class_loader = 2; // InstanceClassLoaderKlass
+  static const unsigned _kind_mirror       = 3; // InstanceMirrorKlass
   static const unsigned _misc_kind_stack_chunk  = 4; // InstanceStackChunk
   static const unsigned _misc_kind_last  = _misc_kind_stack_chunk;
 
-  // Start after _misc_kind field.
+  u1              _reference_type;                // reference type
+  u1              _kind;                          // kind of InstanceKlass
+
   enum {
-    _misc_rewritten                           = 1 << (_misc_kind_field_size + 0),  // methods rewritten.
-    _misc_has_nonstatic_fields                = 1 << (_misc_kind_field_size + 1),  // for sizing with UseCompressedOops
-    _misc_should_verify_class                 = 1 << (_misc_kind_field_size + 2),  // allow caching of preverification
-    _misc_is_unsafe_anonymous                 = 1 << (_misc_kind_field_size + 3),  // has embedded _unsafe_anonymous_host field
-    _misc_is_contended                        = 1 << (_misc_kind_field_size + 4),  // marked with contended annotation
-    _misc_has_nonstatic_concrete_methods      = 1 << (_misc_kind_field_size + 5),  // class/superclass/implemented interfaces has non-static, concrete methods
-    _misc_declares_nonstatic_concrete_methods = 1 << (_misc_kind_field_size + 6),  // directly declares non-static, concrete methods
-    _misc_has_been_redefined                  = 1 << (_misc_kind_field_size + 7),  // class has been redefined
-    _misc_has_passed_fingerprint_check        = 1 << (_misc_kind_field_size + 8), // when this class was loaded, the fingerprint computed from its
+    _misc_rewritten                           = 1 << 0,  // methods rewritten.
+    _misc_has_nonstatic_fields                = 1 << 1,  // for sizing with UseCompressedOops
+    _misc_should_verify_class                 = 1 << 2,  // allow caching of preverification
+    _misc_is_unsafe_anonymous                 = 1 << 3,  // has embedded _unsafe_anonymous_host field
+    _misc_is_contended                        = 1 << 4,  // marked with contended annotation
+    _misc_has_nonstatic_concrete_methods      = 1 << 5,  // class/superclass/implemented interfaces has non-static, concrete methods
+    _misc_declares_nonstatic_concrete_methods = 1 << 6,  // directly declares non-static, concrete methods
+    _misc_has_been_redefined                  = 1 << 7,  // class has been redefined
+    _misc_has_passed_fingerprint_check        = 1 << 8,  // when this class was loaded, the fingerprint computed from its
                                                          // code source was found to be matching the value recorded by AOT.
-    _misc_is_scratch_class                    = 1 << (_misc_kind_field_size + 9), // class is the redefined scratch class
-    _misc_is_shared_boot_class                = 1 << (_misc_kind_field_size + 10), // defining class loader is boot class loader
-    _misc_is_shared_platform_class            = 1 << (_misc_kind_field_size + 11), // defining class loader is platform class loader
-    _misc_is_shared_app_class                 = 1 << (_misc_kind_field_size + 12), // defining class loader is app class loader
-    _misc_has_resolved_methods                = 1 << (_misc_kind_field_size + 13), // resolved methods table entries added for this class
-    _misc_is_being_redefined                  = 1 << (_misc_kind_field_size + 14), // used for locking redefinition
-    _misc_has_contended_annotations           = 1 << (_misc_kind_field_size + 15) // has @Contended annotation
+    _misc_is_scratch_class                    = 1 << 9,  // class is the redefined scratch class
+    _misc_is_shared_boot_class                = 1 << 10, // defining class loader is boot class loader
+    _misc_is_shared_platform_class            = 1 << 11, // defining class loader is platform class loader
+    _misc_is_shared_app_class                 = 1 << 12, // defining class loader is app class loader
+    _misc_has_resolved_methods                = 1 << 13, // resolved methods table entries added for this class
+    _misc_is_being_redefined                  = 1 << 14, // used for locking redefinition
+    _misc_has_contended_annotations           = 1 << 15  // has @Contended annotation
   };
   u2 shared_loader_type_bits() const {
     return _misc_is_shared_boot_class|_misc_is_shared_platform_class|_misc_is_shared_app_class;
   }
-  u1              _kind;
-  u4              _misc_flags;
-  u2              _minor_version;        // minor version number of class file
-  u2              _major_version;        // major version number of class file
+  u2              _misc_flags;           // There is more space in access_flags for more flags.
+
   Thread*         _init_thread;          // Pointer to current thread doing initialization (to handle recursive initialization)
   OopMapCache*    volatile _oop_map_cache;   // OopMapCache for all methods in the klass (allocated lazily)
   JNIid*          _jni_ids;              // First JNI identifier for static fields in this class
@@ -290,15 +285,6 @@ class InstanceKlass: public Klass {
   JvmtiCachedClassFileData* _cached_class_file;
 #endif
 
-  volatile u2     _idnum_allocated_count;         // JNI/JVMTI: increments with the addition of methods, old ids don't change
-
-  // Class states are defined as ClassState (see above).
-  // Place the _init_state here to utilize the unused 2-byte after
-  // _idnum_allocated_count.
-  u1              _init_state;                    // state of class
-  u1              _reference_type;                // reference type
-
-  u2              _this_class_index;              // constant pool entry
 #if INCLUDE_JVMTI
   JvmtiCachedClassFieldMap* _jvmti_cached_class_field_map;  // JVMTI: used during heap iteration
 #endif
@@ -733,30 +719,19 @@ public:
   }
 
   // source file name
-  Symbol* source_file_name() const               {
-    return (_source_file_name_index == 0) ?
-      (Symbol*)NULL : _constants->symbol_at(_source_file_name_index);
-  }
-  u2 source_file_name_index() const              {
-    return _source_file_name_index;
-  }
-  void set_source_file_name_index(u2 sourcefile_index) {
-    _source_file_name_index = sourcefile_index;
-  }
+  Symbol* source_file_name() const               { return _constants->source_file_name(); }
+  u2 source_file_name_index() const              { return _constants->source_file_name_index(); }
+  void set_source_file_name_index(u2 sourcefile_index) { _constants->set_source_file_name_index(sourcefile_index); }
 
   // minor and major version numbers of class file
-  u2 minor_version() const                 { return _minor_version; }
-  void set_minor_version(u2 minor_version) { _minor_version = minor_version; }
-  u2 major_version() const                 { return _major_version; }
-  void set_major_version(u2 major_version) { _major_version = major_version; }
+  u2 minor_version() const                 { return _constants->minor_version(); }
+  void set_minor_version(u2 minor_version) { _constants->set_minor_version(minor_version); }
+  u2 major_version() const                 { return _constants->major_version(); }
+  void set_major_version(u2 major_version) { _constants->set_major_version(major_version); }
 
   // source debug extension
   const char* source_debug_extension() const { return _source_debug_extension; }
   void set_source_debug_extension(const char* array, int length);
-
-  // symbol unloading support (refcount already added)
-  Symbol* array_name()                     { return _array_name; }
-  void set_array_name(Symbol* name)        { assert(_array_name == NULL  || name == NULL, "name already created"); _array_name = name; }
 
   // nonstatic oop-map blocks
   static int nonstatic_oop_map_size(unsigned int oop_map_count) {
@@ -855,26 +830,21 @@ public:
 private:
 
   void set_kind(unsigned kind) {
-    // assert(kind <= _misc_kind_field_mask, "Invalid InstanceKlass kind");
-    // unsigned fmask = _misc_kind_field_mask << _misc_kind_field_pos;
-    // unsigned flags = _misc_flags & ~fmask;
-    // _misc_flags = (flags | (kind << _misc_kind_field_pos));
     assert(kind <= _misc_kind_last, "Invalid InstanceKlass kind");
-    _kind = kind;
+    _kind = (u1)kind;
   }
 
   bool is_kind(unsigned desired) const {
-    // unsigned kind = (_misc_flags >> _misc_kind_field_pos) & _misc_kind_field_mask;
-    return _kind == desired;
+    return _kind == (u1)desired;
   }
 
 public:
 
   // Other is anything that is not one of the more specialized kinds of InstanceKlass.
-  bool is_other_instance_klass() const        { return is_kind(_misc_kind_other); }
-  bool is_reference_instance_klass() const    { return is_kind(_misc_kind_reference); }
-  bool is_mirror_instance_klass() const       { return is_kind(_misc_kind_mirror); }
-  bool is_class_loader_instance_klass() const { return is_kind(_misc_kind_class_loader); }
+  bool is_other_instance_klass() const        { return is_kind(_kind_other); }
+  bool is_reference_instance_klass() const    { return is_kind(_kind_reference); }
+  bool is_mirror_instance_klass() const       { return is_kind(_kind_mirror); }
+  bool is_class_loader_instance_klass() const { return is_kind(_kind_class_loader); }
   bool is_stack_chunk_instance_klass() const  { return is_kind(_misc_kind_stack_chunk); }
 
 #if INCLUDE_JVMTI
@@ -949,16 +919,9 @@ public:
   void set_initial_method_idnum(u2 value)             { _idnum_allocated_count = value; }
 
   // generics support
-  Symbol* generic_signature() const                   {
-    return (_generic_signature_index == 0) ?
-      (Symbol*)NULL : _constants->symbol_at(_generic_signature_index);
-  }
-  u2 generic_signature_index() const                  {
-    return _generic_signature_index;
-  }
-  void set_generic_signature_index(u2 sig_index)      {
-    _generic_signature_index = sig_index;
-  }
+  Symbol* generic_signature() const                   { return _constants->generic_signature(); }
+  u2 generic_signature_index() const                  { return _constants->generic_signature_index(); }
+  void set_generic_signature_index(u2 sig_index)      { _constants->set_generic_signature_index(sig_index); }
 
   u2 enclosing_method_data(int offset) const;
   u2 enclosing_method_class_index() const {
@@ -1227,7 +1190,8 @@ public:
 
   // callbacks for actions during class unloading
   static void unload_class(InstanceKlass* ik);
-  static void release_C_heap_structures(InstanceKlass* ik);
+
+  virtual void release_C_heap_structures();
 
   // Naming
   const char* signature_name() const;
@@ -1338,7 +1302,7 @@ private:
                                   PrivateLookupMode private_mode);
 
   // Free CHeap allocated fields.
-  void release_C_heap_structures();
+  void release_C_heap_structures_internal();
 
 #if INCLUDE_JVMTI
   // RedefineClasses support

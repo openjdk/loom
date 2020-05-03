@@ -1635,6 +1635,20 @@ void MachPrologNode::format(PhaseRegAlloc *ra_, outputStream *st) const {
     st->print("mov  rscratch1, #%d\n\t", framesize - 2 * wordSize);
     st->print("sub  sp, sp, rscratch1");
   }
+  if (C->stub_function() == NULL && BarrierSet::barrier_set()->barrier_set_nmethod() != NULL) {
+    st->print("\n\t");
+    st->print("ldr  rscratch1, [guard]\n\t");
+    st->print("dmb ishld\n\t");
+    st->print("ldr  rscratch2, [rthread, #thread_disarmed_offset]\n\t");
+    st->print("cmp  rscratch1, rscratch2\n\t");
+    st->print("b.eq skip");
+    st->print("\n\t");
+    st->print("blr #nmethod_entry_barrier_stub\n\t");
+    st->print("b skip\n\t");
+    st->print("guard: int\n\t");
+    st->print("\n\t");
+    st->print("skip:\n\t");
+  }
 }
 #endif
 
@@ -1666,6 +1680,11 @@ void MachPrologNode::emit(CodeBuffer &cbuf, PhaseRegAlloc *ra_) const {
     __ generate_stack_overflow_check(bangsize);
 
   __ build_frame(framesize);
+
+  if (C->stub_function() == NULL) {
+    BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
+    bs->nmethod_entry_barrier(&_masm);
+  }
 
   if (VerifyStackAtCalls) {
     Unimplemented();
@@ -16618,6 +16637,35 @@ instruct vsub2D(vecX dst, vecX src1, vecX src2)
 %}
 
 // --------------------------------- MUL --------------------------------------
+
+instruct vmul8B(vecD dst, vecD src1, vecD src2)
+%{
+  predicate(n->as_Vector()->length() == 4 ||
+            n->as_Vector()->length() == 8);
+  match(Set dst (MulVB src1 src2));
+  ins_cost(INSN_COST);
+  format %{ "mulv  $dst,$src1,$src2\t# vector (8B)" %}
+  ins_encode %{
+    __ mulv(as_FloatRegister($dst$$reg), __ T8B,
+            as_FloatRegister($src1$$reg),
+            as_FloatRegister($src2$$reg));
+  %}
+  ins_pipe(vmul64);
+%}
+
+instruct vmul16B(vecX dst, vecX src1, vecX src2)
+%{
+  predicate(n->as_Vector()->length() == 16);
+  match(Set dst (MulVB src1 src2));
+  ins_cost(INSN_COST);
+  format %{ "mulv  $dst,$src1,$src2\t# vector (16B)" %}
+  ins_encode %{
+    __ mulv(as_FloatRegister($dst$$reg), __ T16B,
+            as_FloatRegister($src1$$reg),
+            as_FloatRegister($src2$$reg));
+  %}
+  ins_pipe(vmul128);
+%}
 
 instruct vmul4S(vecD dst, vecD src1, vecD src2)
 %{

@@ -65,7 +65,6 @@ public class MacAppImageBuilder extends AbstractAppImageBuilder {
     private static final ResourceBundle I18N = ResourceBundle.getBundle(
             "jdk.incubator.jpackage.internal.resources.MacResources");
 
-    private static final String LIBRARY_NAME = "libapplauncher.dylib";
     private static final String TEMPLATE_BUNDLE_ICON = "java.icns";
     private static final String OS_TYPE_CODE = "APPL";
     private static final String TEMPLATE_INFO_PLIST_LITE =
@@ -265,11 +264,9 @@ public class MacAppImageBuilder extends AbstractAppImageBuilder {
 
         // create the main app launcher
         try (InputStream is_launcher =
-                getResourceAsStream("jpackageapplauncher");
-            InputStream is_lib = getResourceAsStream(LIBRARY_NAME)) {
+                getResourceAsStream("jpackageapplauncher")) {
             // Copy executable and library to MacOS folder
             writeEntry(is_launcher, executable);
-            writeEntry(is_lib, macOSDir.resolve(LIBRARY_NAME));
         }
         executable.toFile().setExecutable(true, false);
         // generate main app launcher config file
@@ -842,7 +839,6 @@ public class MacAppImageBuilder extends AbstractAppImageBuilder {
                 args.addAll(Arrays.asList("codesign",
                         "--timestamp",
                         "--options", "runtime",
-                        "--deep",
                         "--force",
                         "-s", signingIdentity, // sign with this key
                         "--prefix", identifierPrefix,
@@ -887,7 +883,6 @@ public class MacAppImageBuilder extends AbstractAppImageBuilder {
         args.addAll(Arrays.asList("codesign",
                 "--timestamp",
                 "--options", "runtime",
-                "--deep",
                 "--force",
                 "-s", signingIdentity,
                 "-vvvv"));

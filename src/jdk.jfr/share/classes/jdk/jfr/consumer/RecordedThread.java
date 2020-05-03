@@ -70,7 +70,7 @@ public final class RecordedThread extends RecordedObject {
     }
 
     /**
-     * Returns the Java thread name, or {@code null} if if doesn't exist.
+     * Returns the Java thread name, or {@code null} if doesn't exist.
      * <p>
      * Returns {@code java.lang.Thread.getName()} if the thread has a Java
      * representation. {@code null} otherwise.

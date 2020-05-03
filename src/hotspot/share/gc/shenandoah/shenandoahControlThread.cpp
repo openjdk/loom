@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2019, Red Hat, Inc. All rights reserved.
+ * Copyright (c) 2013, 2020, Red Hat, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -242,6 +242,22 @@ void ShenandoahControlThread::run_service() {
         heuristics->clear_metaspace_oom();
       }
 
+      // Commit worker statistics to cycle data
+      heap->phase_timings()->flush_par_workers_to_cycle();
+
+      // Print GC stats for current cycle
+      {
+        LogTarget(Info, gc, stats) lt;
+        if (lt.is_enabled()) {
+          ResourceMark rm;
+          LogStream ls(lt);
+          heap->phase_timings()->print_cycle_on(&ls);
+        }
+      }
+
+      // Commit statistics to globals
+      heap->phase_timings()->flush_cycle_to_global();
+
       // Print Metaspace change following GC (if logging is enabled).
       MetaspaceUtils::print_metaspace_change(meta_sizes);
 
@@ -265,6 +281,7 @@ void ShenandoahControlThread::run_service() {
                              current :
                              current - (ShenandoahUncommitDelay / 1000.0);
       service_uncommit(shrink_before);
+      heap->phase_timings()->flush_cycle_to_global();
       last_shrink_time = current;
     }
 
@@ -354,7 +371,7 @@ void ShenandoahControlThread::service_concurrent_normal_cycle(GCCause::Cause cau
 
   // Final mark might have reclaimed some immediate garbage, kick cleanup to reclaim
   // the space. This would be the last action if there is nothing to evacuate.
-  heap->entry_cleanup();
+  heap->entry_cleanup_early();
 
   {
     ShenandoahHeapLocker locker(heap->lock());
@@ -389,7 +406,7 @@ void ShenandoahControlThread::service_concurrent_normal_cycle(GCCause::Cause cau
     heap->vmop_entry_final_updaterefs();
 
     // Update references freed up collection set, kick the cleanup to reclaim the space.
-    heap->entry_cleanup();
+    heap->entry_cleanup_complete();
   }
 
   // Cycle is complete
