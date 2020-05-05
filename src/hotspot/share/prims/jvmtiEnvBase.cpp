@@ -707,9 +707,13 @@ JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThre
 #ifdef ASSERT
   uint32_t debug_bits = 0;
 #endif
-  assert((SafepointSynchronize::is_at_safepoint() ||
-          java_thread->is_thread_fully_suspended(false, &debug_bits)),
-         "at safepoint or target thread is suspended");
+/* The HandshakeState::process_self_inner() does not set the_active_handshaker
+ * as needed, so the assert below is temporarily disabled.
+ * Enable it after the issue in HandshakeState::process_self_inner() is fixed.
+ */ 
+ // assert(calling_thread == java_thread ||
+ //        calling_thread == calling_thread->active_handshaker(),
+ //       "call by myself or at direct handshake");
   oop obj = NULL;
   ObjectMonitor *mon = java_thread->current_waiting_monitor();
   if (mon == NULL) {
@@ -1722,56 +1726,6 @@ VM_SetFramePop::doit() {
 }
 
 void
-VM_VirtualThreadGetOwnedMonitorInfo::doit() {
-  Thread* cur_thread = Thread::current();
-  ResourceMark rm(cur_thread);
-  HandleMark hm(cur_thread);
-
-  oop cont = java_lang_VirtualThread::continuation(_vthread_h());
-  assert(cont != NULL, "virtual thread continuation must not be NULL");
-
-  if (!java_lang_Continuation::is_mounted(cont)) {
-    // No monitor info to collect if virtual thread is unmounted
-    _result = JVMTI_ERROR_NONE;
-    return;
-  }
-  javaVFrame *jvf = get_vthread_jvf(cur_thread, _vthread_h());
-  oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-  JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
-
-  _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
-  ThreadsListHandle tlh;
-  if (java_thread != NULL && tlh.includes(java_thread)
-      && !java_thread->is_exiting() && java_thread->threadObj() != NULL) {
-    _result = ((JvmtiEnvBase *)_env)->get_owned_monitors(_calling_thread,
-                                                         java_thread,
-                                                         jvf,
-                                                         _owned_monitors_list);
-  }
-}
-
-void
-VM_VirtualThreadGetCurrentContendedMonitor::doit() {
-  oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-  if (carrier_thread == NULL) {
-    // VirtualThread is unmounted, so it can not be contended on a monitor
-    *_owned_monitor_ptr = NULL;
-    _result = JVMTI_ERROR_NONE;
-    return;
-  }
-  JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
-
-  _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
-  ThreadsListHandle tlh;
-  if (java_thread != NULL && tlh.includes(java_thread)
-      && !java_thread->is_exiting() && java_thread->threadObj() != NULL) {
-    _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor(_calling_thread,
-                                                                    java_thread,
-                                                                    _owned_monitor_ptr);
-  }
-}
-
-void
 GetOwnedMonitorInfoClosure::do_thread(Thread *target) {
   _result = ((JvmtiEnvBase *)_env)->get_owned_monitors((JavaThread *)target, _owned_monitors_list);
 }
@@ -1815,13 +1769,60 @@ VM_GetFrameLocation::doit() {
 }
 
 void
-VM_VirtualThreadGetThread::doit() {
+VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
+  Thread* cur_thread = Thread::current();
+  ResourceMark rm(cur_thread);
+  HandleMark hm(cur_thread);
+
+  oop cont = java_lang_VirtualThread::continuation(_vthread_h());
+  assert(cont != NULL, "virtual thread continuation must not be NULL");
+
+  if (!java_lang_Continuation::is_mounted(cont)) {
+    // No monitor info to collect if virtual thread is unmounted
+    _result = JVMTI_ERROR_NONE;
+    return;
+  }
+  javaVFrame *jvf = get_vthread_jvf(cur_thread, _vthread_h());
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-  *_carrier_thread_ptr = (jthread)JNIHandles::make_local(_current_thread, carrier_thread);
+  JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
+
+  _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
+  ThreadsListHandle tlh;
+  if (java_thread != NULL && tlh.includes(java_thread)
+      && !java_thread->is_exiting() && java_thread->threadObj() != NULL) {
+    _result = ((JvmtiEnvBase *)_env)->get_owned_monitors((JavaThread*)target,
+                                                         java_thread,
+                                                         jvf,
+                                                         _owned_monitors_list);
+  }
 }
 
 void
-VM_VirtualThreadGetStackTrace::doit() {
+VThreadGetCurrentContendedMonitorClosure::do_thread(Thread *target) {
+  oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
+  if (carrier_thread == NULL) {
+    // virtual thread is unmounted, so it can not be contended on a monitor
+    *_owned_monitor_ptr = NULL;
+    _result = JVMTI_ERROR_NONE;
+    return;
+  }
+  JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
+  ThreadsListHandle tlh;
+  if (java_thread != NULL && tlh.includes(java_thread)
+      && !java_thread->is_exiting() && java_thread->threadObj() != NULL) {
+    _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor((JavaThread*)target,
+                                                                    java_thread,
+                                                                    _owned_monitor_ptr);
+  }
+}
+
+void
+VThreadGetThreadClosure::do_thread(Thread *target) {
+  oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
+  *_carrier_thread_ptr = (jthread)JNIHandles::make_local(target, carrier_thread);}
+
+void
+VThreadGetStackTraceClosure::do_thread(Thread *target) {
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
@@ -1832,18 +1833,18 @@ VM_VirtualThreadGetStackTrace::doit() {
 }
 
 void
-VM_VirtualThreadGetFrameCount::doit() {
+VThreadGetFrameCountClosure::do_thread(Thread *target) {
   _result = ((JvmtiEnvBase*)_env)->get_frame_count(_vthread_h(), _count_ptr);
 }
 
 void
-VM_VirtualThreadGetFrameLocation::doit() {
+VThreadGetFrameLocationClosure::do_thread(Thread *target) {
   _result = ((JvmtiEnvBase*)_env)->get_frame_location(_vthread_h(), _depth,
                                                       _method_ptr, _location_ptr);
 }
 
 void
-VM_VirtualThreadGetThreadState::doit() {
+VThreadGetThreadStateClosure::do_thread(Thread *target) {
   jshort vthread_state = java_lang_VirtualThread::state(_vthread_h());
   oop carrier_thread_oop = java_lang_VirtualThread::carrier_thread(_vthread_h());
   jint state;
@@ -1863,4 +1864,3 @@ VM_VirtualThreadGetThreadState::doit() {
   *_state_ptr = state;
   _result = JVMTI_ERROR_NONE;
 }
-

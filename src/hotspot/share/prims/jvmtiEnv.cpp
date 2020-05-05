@@ -890,10 +890,8 @@ JvmtiEnv::GetCarrierThread(jthread vthread, jthread* thread_ptr) {
   if (!java_lang_VirtualThread::is_instance(vthread_obj)) {
     return JVMTI_ERROR_INVALID_THREAD;
   }
-
-  VM_VirtualThreadGetThread op(current_thread, Handle(current_thread, vthread_obj), thread_ptr);
-  VMThread::execute(&op);
-
+  VThreadGetThreadClosure op(Handle(current_thread, vthread_obj), thread_ptr);
+  Handshake::execute_direct(&op, current_thread);
   return op.result();
 } /* end GetCarrierThread */
 
@@ -949,10 +947,9 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
       return JVMTI_ERROR_NONE;
     }
 
-    // Need a coordination with carrier thread and state recheck in a VM op.
-    VM_VirtualThreadGetThreadState op(Handle(current_thread, thread_oop), thread_state_ptr);
-    VMThread::execute(&op);
-
+    // Need a coordination with carrier thread and state recheck in a HandshakeClosure op.
+    VThreadGetThreadStateClosure op(Handle(current_thread, thread_oop), thread_state_ptr);
+    Handshake::execute_direct(&op, current_thread);
     return op.result();
   }
 
@@ -1313,11 +1310,10 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
     if (!get_capabilities()->can_support_virtual_threads) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_VirtualThreadGetOwnedMonitorInfo op(this,
-                                           calling_thread,
-                                           Handle(calling_thread, thread_obj),
-                                           owned_monitors_list);
-    VMThread::execute(&op);
+    VThreadGetOwnedMonitorInfoClosure op(this,
+                                         Handle(calling_thread, thread_obj),
+                                         owned_monitors_list);
+    Handshake::execute_direct(&op, calling_thread);
     err = op.result();
   } else {
     // Support for ordinary threads
@@ -1384,11 +1380,10 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
     if (!get_capabilities()->can_support_virtual_threads) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_VirtualThreadGetOwnedMonitorInfo op(this,
-                                   calling_thread,
-                                   Handle(calling_thread, thread_obj),
-                                   owned_monitors_list);
-    VMThread::execute(&op);
+    VThreadGetOwnedMonitorInfoClosure op(this,
+                                         Handle(calling_thread, thread_obj),
+                                         owned_monitors_list);
+    Handshake::execute_direct(&op, calling_thread);
     err = op.result();
   } else {
     // Support for ordinary threads
@@ -1452,10 +1447,10 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
     if (!get_capabilities()->can_support_virtual_threads) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_VirtualThreadGetCurrentContendedMonitor op(this, calling_thread,
-                                          Handle(calling_thread, thread_obj),
-                                          monitor_ptr);
-    VMThread::execute(&op);
+    VThreadGetCurrentContendedMonitorClosure op(this,
+                                                Handle(calling_thread, thread_obj),
+                                                monitor_ptr);
+    Handshake::execute_direct(&op, calling_thread);
     err = op.result();
     return err;
   }
@@ -1716,9 +1711,9 @@ JvmtiEnv::GetStackTrace(jthread thread, jint start_depth, jint max_frame_count, 
     if (!get_capabilities()->can_support_virtual_threads) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_VirtualThreadGetStackTrace op(this, Handle(current_thread, thread_obj),
-                             start_depth, max_frame_count, frame_buffer, count_ptr);
-    VMThread::execute(&op);
+    VThreadGetStackTraceClosure op(this, Handle(current_thread, thread_obj),
+                                   start_depth, max_frame_count, frame_buffer, count_ptr);
+    Handshake::execute_direct(&op, current_thread);
     return op.result();
   }
 
@@ -1797,8 +1792,8 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
     if (!get_capabilities()->can_support_virtual_threads) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_VirtualThreadGetFrameCount op(this, Handle(current_thread, thread_obj), count_ptr);
-    VMThread::execute(&op);
+    VThreadGetFrameCountClosure op(this, Handle(current_thread, thread_obj), count_ptr);
+    Handshake::execute_direct(&op, current_thread);
     return op.result();
   }
 
@@ -1953,9 +1948,9 @@ JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jl
     if (!get_capabilities()->can_support_virtual_threads) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VM_VirtualThreadGetFrameLocation op(this, Handle(current_thread, thread_obj),
-                                depth, method_ptr, location_ptr);
-    VMThread::execute(&op);
+    VThreadGetFrameLocationClosure op(this, Handle(current_thread, thread_obj),
+                                      depth, method_ptr, location_ptr);
+    Handshake::execute_direct(&op, current_thread);
     return op.result();
   }
 

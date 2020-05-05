@@ -339,6 +339,7 @@ void HandshakeState::process_self_inner() {
       HandleMark hm(self);
       CautiouslyPreserveExceptionMark pem(self);
       HandshakeOperation * op = _operation;
+      DEBUG_ONLY(_active_handshaker = Thread::current();)
       if (op != NULL) {
         // Disarm before executing the operation
         clear_handshake(/*is_direct*/ false);
@@ -350,6 +351,7 @@ void HandshakeState::process_self_inner() {
         clear_handshake(/*is_direct*/ true);
         op->do_handshake(self);
       }
+      DEBUG_ONLY(_active_handshaker = NULL;)
     }
     _processing_sem.signal();
   } while (has_operation());
