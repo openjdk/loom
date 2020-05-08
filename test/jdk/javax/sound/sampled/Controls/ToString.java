@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,26 +21,18 @@
  * questions.
  */
 
-/* @test
-   @bug 4173717
-   @summary Make sure that passing 0 in setReceiveBufferSize will throw
-   IllegalArgumentException
-   */
-import java.net.*;
+import javax.sound.sampled.Control;
 
-public class SetReceiveBufferSize {
+/**
+ * @test
+ * @bug 8236980
+ */
+public final class ToString {
 
-    public static void main(String args[]) throws Exception {
-        boolean error = true;
-
-        try (DatagramSocket soc = new DatagramSocket()) {
-            soc.setReceiveBufferSize(0);
-        } catch (IllegalArgumentException e) {
-            error = false;
-        }
-
-        if (error) {
-            throw new RuntimeException("Test with 0 buffer size failed!");
+    public static void main(String[] args) {
+        Control.Type type = new Control.Type("nameToTest") {};
+        if (!type.toString().equals("nameToTest")) {
+            throw new RuntimeException("wrong string: " + type);
         }
     }
 }

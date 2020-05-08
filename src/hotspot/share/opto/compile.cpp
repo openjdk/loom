@@ -2479,7 +2479,9 @@ uint Compile::compute_truth_table(Unique_Node_List& partition, Unique_Node_List&
 bool Compile::compute_logic_cone(Node* n, Unique_Node_List& partition, Unique_Node_List& inputs) {
   assert(partition.size() == 0, "not empty");
   assert(inputs.size() == 0, "not empty");
-  assert(!is_vector_ternary_bitwise_op(n), "not supported");
+  if (is_vector_ternary_bitwise_op(n)) {
+    return false;
+  }
 
   bool is_unary_op = is_vector_unary_bitwise_op(n);
   if (is_unary_op) {
@@ -2520,6 +2522,7 @@ bool Compile::compute_logic_cone(Node* n, Unique_Node_List& partition, Unique_No
   return (partition.size() == 2 || partition.size() == 3) &&
          (inputs.size()    == 2 || inputs.size()    == 3);
 }
+
 
 void Compile::process_logic_cone_root(PhaseIterGVN &igvn, Node *n, VectorSet &visited) {
   assert(is_vector_bitwise_op(n), "not a root");

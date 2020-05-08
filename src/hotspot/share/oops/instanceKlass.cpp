@@ -503,10 +503,6 @@ InstanceKlass::InstanceKlass(const ClassFileParser& parser, unsigned kind, Klass
   assert(is_instance_klass(), "is layout incorrect?");
   assert(size_helper() == parser.layout_size(), "incorrect size_helper?");
 
-  if (Arguments::is_dumping_archive()) {
-    SystemDictionaryShared::init_dumptime_info(this);
-  }
-
   // Set biased locking bit for all instances of this class; it will be
   // cleared if revocation occurs too often for this type
   if (UseBiasedLocking && BiasedLocking::enabled()) {
@@ -917,20 +913,22 @@ bool InstanceKlass::link_class_impl(TRAPS) {
       // fabricate new Method*s.
       // also does loader constraint checking
       //
-      // initialize_vtable and initialize_itable need to be rerun for
-      // a shared class if the class is not loaded by the NULL classloader.
-      ClassLoaderData * loader_data = class_loader_data();
-      if (!(is_shared() &&
-            loader_data->is_the_null_class_loader_data())) {
+      // initialize_vtable and initialize_itable need to be rerun
+      // for a shared class if
+      // 1) the class is loaded by custom class loader or
+      // 2) the class is loaded by built-in class loader but failed to add archived loader constraints
+      bool need_init_table = true;
+      if (is_shared() && SystemDictionaryShared::check_linking_constraints(this, THREAD)) {
+        need_init_table = false;
+      }
+      if (need_init_table) {
         vtable().initialize_vtable(true, CHECK_false);
         itable().initialize_itable(true, CHECK_false);
       }
 #ifdef ASSERT
-      else {
-        vtable().verify(tty, true);
-        // In case itable verification is ever added.
-        // itable().verify(tty, true);
-      }
+      vtable().verify(tty, true);
+      // In case itable verification is ever added.
+      // itable().verify(tty, true);
 #endif
       set_init_state(linked);
       if (JvmtiExport::should_post_class_prepare()) {
@@ -1376,14 +1374,14 @@ Klass* InstanceKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 
       // Check if update has already taken place
       if (array_klasses() == NULL) {
-        Klass*    k = ObjArrayKlass::allocate_objArray_klass(class_loader_data(), 1, this, CHECK_NULL);
+        ObjArrayKlass* k = ObjArrayKlass::allocate_objArray_klass(class_loader_data(), 1, this, CHECK_NULL);
         // use 'release' to pair with lock-free load
         release_set_array_klasses(k);
       }
     }
   }
   // _this will always be set at this point
-  ObjArrayKlass* oak = (ObjArrayKlass*)array_klasses();
+  ObjArrayKlass* oak = array_klasses();
   if (or_null) {
     return oak->array_klass_or_null(n);
   }
@@ -1622,12 +1620,12 @@ void InstanceKlass::do_nonstatic_fields(FieldClosure* cl) {
 
 void InstanceKlass::array_klasses_do(void f(Klass* k, TRAPS), TRAPS) {
   if (array_klasses() != NULL)
-    ArrayKlass::cast(array_klasses())->array_klasses_do(f, THREAD);
+    array_klasses()->array_klasses_do(f, THREAD);
 }
 
 void InstanceKlass::array_klasses_do(void f(Klass* k)) {
   if (array_klasses() != NULL)
-    ArrayKlass::cast(array_klasses())->array_klasses_do(f);
+    array_klasses()->array_klasses_do(f);
 }
 
 #ifdef ASSERT
@@ -2510,7 +2508,7 @@ void InstanceKlass::restore_unshareable_info(ClassLoaderData* loader_data, Handl
   if (array_klasses() != NULL) {
     // Array classes have null protection domain.
     // --> see ArrayKlass::complete_create_array_klass()
-    ArrayKlass::cast(array_klasses())->restore_unshareable_info(ClassLoaderData::the_null_class_loader_data(), Handle(), CHECK);
+    array_klasses()->restore_unshareable_info(ClassLoaderData::the_null_class_loader_data(), Handle(), CHECK);
   }
 
   // Initialize current biased locking state.
@@ -3712,9 +3710,6 @@ void InstanceKlass::verify_on(outputStream* st) {
   }
 
   // Verify other fields
-  if (array_klasses() != NULL) {
-    guarantee(array_klasses()->is_klass(), "should be klass");
-  }
   if (constants() != NULL) {
     guarantee(constants()->is_constantPool(), "should be constant pool");
   }

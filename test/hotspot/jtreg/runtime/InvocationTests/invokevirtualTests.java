@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,7 +34,7 @@
  *          shared/ByteArrayClassLoader.java shared/Checker.java shared/GenericClassGenerator.java
  * @compile invokevirtual/Checker.java invokevirtual/ClassGenerator.java invokevirtual/Generator.java
  *
- * @run main/othervm/timeout=1800 invokevirtualTests
+ * @run driver/timeout=1800 invokevirtualTests
  */
 
 import jdk.test.lib.process.ProcessTools;
@@ -43,10 +43,10 @@ import jdk.test.lib.compiler.InMemoryJavaCompiler;
 
 public class invokevirtualTests {
 
-    public static void runTest(String classFileVersion, String option) throws Exception {
+    public static void runTest(String classFileVersion, String option) throws Throwable {
         System.out.println("\ninvokevirtual invocation tests, option: " + option +
                            ", class file version: " + classFileVersion);
-        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(false, "-Xmx128M", option,
+        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder("-Xmx128M", option,
             "--add-exports", "java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED",
             "invokevirtual.Generator", "--classfile_version=" + classFileVersion);
         OutputAnalyzer output = new OutputAnalyzer(pb.start());
@@ -63,7 +63,8 @@ public class invokevirtualTests {
             System.out.println(
                 "\nAlso note that passing --dump to invokevirtual.Generator will" +
                 " dump the generated classes (for debugging purposes).\n");
-            System.exit(1);
+
+            throw e;
         }
     }
 
@@ -72,8 +73,7 @@ public class invokevirtualTests {
         byte klassbuf[] = InMemoryJavaCompiler.compile("blah", "public class blah { }");
         int major_version = klassbuf[6] << 8 | klassbuf[7];
         runTest(String.valueOf(major_version), "-Xint");
-// Uncomment the below test once JDK-8226588 is fixed
-//      runTest(String.valueOf(major_version), "-Xcomp");
+        runTest(String.valueOf(major_version), "-Xcomp");
 
         // Test old class file version.
         runTest("51", "-Xint"); // JDK-7

@@ -30,7 +30,7 @@
 #include "gc/shared/gcWhen.hpp"
 #include "gc/shenandoah/shenandoahCollectorPolicy.hpp"
 #include "gc/shenandoah/shenandoahMarkCompact.hpp"
-#include "gc/shenandoah/shenandoahHeap.hpp"
+#include "gc/shenandoah/shenandoahHeap.inline.hpp"
 #include "gc/shenandoah/shenandoahHeuristics.hpp"
 #include "gc/shenandoah/shenandoahUtils.hpp"
 #include "utilities/debug.hpp"
@@ -123,22 +123,6 @@ ShenandoahGCPhase::~ShenandoahGCPhase() {
 
 bool ShenandoahGCPhase::is_current_phase_valid() {
   return _current_phase < ShenandoahPhaseTimings::_num_phases;
-}
-
-bool ShenandoahGCPhase::is_root_work_phase() {
-  switch(current_phase()) {
-    case ShenandoahPhaseTimings::scan_roots:
-    case ShenandoahPhaseTimings::update_roots:
-    case ShenandoahPhaseTimings::init_evac:
-    case ShenandoahPhaseTimings::final_update_refs_roots:
-    case ShenandoahPhaseTimings::degen_gc_update_roots:
-    case ShenandoahPhaseTimings::full_gc_scan_roots:
-    case ShenandoahPhaseTimings::full_gc_update_roots:
-    case ShenandoahPhaseTimings::full_gc_adjust_roots:
-      return true;
-    default:
-      return false;
-  }
 }
 
 ShenandoahGCSubPhase::ShenandoahGCSubPhase(ShenandoahPhaseTimings::Phase phase) :
