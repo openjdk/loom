@@ -27,6 +27,7 @@
  * @summary Test virtual threads using a custom scheduler
  */
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -83,8 +84,9 @@ public class CustomScheduler {
             Thread.builder()
                     .virtual(scheduler)
                     .task(() -> {
-                        LockSupport.parkNanos(100L);
-                        LockSupport.parkNanos(100L);
+                        long nanos = Duration.ofSeconds(2).toNanos();
+                        LockSupport.parkNanos(nanos);
+                        LockSupport.parkNanos(nanos);
                     })
                     .start()
                     .join();
