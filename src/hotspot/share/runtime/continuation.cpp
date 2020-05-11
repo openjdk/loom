@@ -2500,7 +2500,7 @@ public:
       guarantee(false, "Unhandled OOM");
     }
     assert (jdk_internal_misc_StackChunk::size(chunk) == size, "");
-    assert (chunk->size() >= size, "");
+    assert (chunk->size() >= size, "chunk->size(): %d size: %d", chunk->size(), size);
     assert ((intptr_t)InstanceStackChunkKlass::start_of_stack(chunk) % 8 == 0, "");
 
     oop chunk0 = _cont.tail();
