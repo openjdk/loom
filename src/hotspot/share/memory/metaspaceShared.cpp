@@ -876,6 +876,8 @@ intptr_t* MetaspaceShared::fix_cpp_vtable_for_dynamic_archive(MetaspaceObj::Type
           kind = InstanceRefKlass_Kind;
         } else if (ik->is_mirror_instance_klass()) {
           kind = InstanceMirrorKlass_Kind;
+        } else if (ik->is_stack_chunk_instance_klass()) {
+          kind = InstanceStackChunkKlass_Kind;
         } else {
           kind = InstanceKlass_Kind;
         }
