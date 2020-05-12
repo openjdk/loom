@@ -41,6 +41,7 @@ import sun.invoke.util.Wrapper;
 
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -1730,6 +1731,35 @@ abstract class MethodHandleImpl {
 
     static {
         SharedSecrets.setJavaLangInvokeAccess(new JavaLangInvokeAccess() {
+
+            @Override
+            public MethodHandle privilegedUnreflect(Method method) {
+                try {
+                    return IMPL_LOOKUP.unreflect(method);
+                } catch (IllegalAccessException e) {
+                    throw new InternalError(e);
+                }
+            }
+
+            @Override
+            public MethodHandle privilegedUnreflect(Constructor<?> ctor) {
+                try {
+                    return IMPL_LOOKUP.unreflectConstructor(ctor);
+                } catch (IllegalAccessException e) {
+                    throw new InternalError(e);
+                }
+            }
+
+            @Override
+            public MethodHandle privilegedFindStatic(Class<?> refc, String name, MethodType type)
+                    throws NoSuchMethodException {
+                try {
+                    return IMPL_LOOKUP.findStatic(refc, name, type);
+                } catch (IllegalAccessException e) {
+                    throw new InternalError(e);
+                }
+            }
+
             @Override
             public Object newMemberName() {
                 return new MemberName();

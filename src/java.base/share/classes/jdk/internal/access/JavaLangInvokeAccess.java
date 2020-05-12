@@ -25,13 +25,32 @@
 
 package jdk.internal.access;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.nio.ByteOrder;
 import java.util.Map;
 
 public interface JavaLangInvokeAccess {
+
+    /**
+     * Creates a direct method handle that can invoke the reflected method
+     */
+    MethodHandle privilegedUnreflect(Method method);
+
+    /**
+     * Create a method handle for the reflected constructor.
+     */
+    MethodHandle privilegedUnreflect(Constructor<?> ctor);
+
+    /**
+     * Create a method handle for a static method
+     */
+    MethodHandle privilegedFindStatic(Class<?> refc, String name, MethodType type)
+        throws NoSuchMethodException;
+
     /**
      * Create a new MemberName instance. Used by {@code StackFrameInfo}.
      */
