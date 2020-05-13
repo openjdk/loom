@@ -34,6 +34,7 @@ import static java.lang.invoke.MethodType.methodType;
 
 import jdk.internal.access.JavaLangInvokeAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.Unsafe;
 
 /**
  * Factory to create MethodAccessor and ConstructorAccessor implementations
@@ -59,6 +60,9 @@ class NewAccessorImplFactory {
      */
     static MethodAccessorImpl newMethodAccessorImpl(Method method) {
         assert !Reflection.isCallerSensitive(method);
+
+        // ensure ExceptionInInitializerError is thrown
+        Unsafe.getUnsafe().ensureClassInitialized(method.getDeclaringClass());
 
         MethodHandle target = JLIA.privilegedUnreflect(method);
 
@@ -98,6 +102,9 @@ class NewAccessorImplFactory {
      * constructor.
      */
     static ConstructorAccessorImpl newConstructorAccessorImpl(Constructor<?> ctor) {
+        // ensure ExceptionInInitializerError is thrown
+        Unsafe.getUnsafe().ensureClassInitialized(ctor.getDeclaringClass());
+
         MethodHandle target = JLIA.privilegedUnreflect(ctor);
 
         // adapt to run with exception handler that throws InvocationTargetException
