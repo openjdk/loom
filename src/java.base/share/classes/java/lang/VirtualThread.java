@@ -72,7 +72,7 @@ class VirtualThread extends Thread {
             MethodHandles.Lookup l = MethodHandles.lookup();
             STATE = l.findVarHandle(VirtualThread.class, "state", short.class);
             PARK_PERMIT = l.findVarHandle(VirtualThread.class, "parkPermit", boolean.class);
-       } catch (Exception e) {
+        } catch (Exception e) {
             throw new InternalError(e);
         }
     }
