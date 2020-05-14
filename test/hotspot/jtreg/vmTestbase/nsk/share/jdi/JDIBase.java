@@ -39,6 +39,7 @@ import com.sun.jdi.request.EventRequest;
 import com.sun.jdi.request.EventRequestManager;
 import java.util.List;
 import nsk.share.Log;
+import nsk.share.MainWrapper;
 
 public class JDIBase {
 
@@ -117,7 +118,9 @@ public class JDIBase {
                 try {
                     breakpRequest = eventRManager.createBreakpointRequest(lineLocation);
                     breakpRequest.putProperty("number", property);
-                    breakpRequest.addThreadFilter(thread);
+                    if (thread != null && !"Virtual".equals(System.getProperty("main.wrapper"))) {
+                        breakpRequest.addThreadFilter(thread);
+                    }
                     breakpRequest.setSuspendPolicy(EventRequest.SUSPEND_EVENT_THREAD);
                 } catch (Exception e1) {
                     log3("ERROR: inner Exception within settingBreakpoint() : " + e1);
@@ -161,7 +164,7 @@ public class JDIBase {
             return;
         }
 
-        throw new JDITestRuntimeException("** event IS NOT a breakpoint **");
+        throw new JDITestRuntimeException("** event IS NOT a breakpoint ** Event: " + bpEvent.toString() + " <<<<<" + event.getClass().getName());
     }
 
 }
