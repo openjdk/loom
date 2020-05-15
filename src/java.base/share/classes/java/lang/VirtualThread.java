@@ -193,11 +193,15 @@ class VirtualThread extends Thread {
 
         // set state to ST_RUNNING
         short initialState = stateGet();
-        assert initialState == ST_STARTED || initialState == ST_RUNNABLE;
-        stateGetAndSet(ST_RUNNING);
-        if (initialState == ST_RUNNABLE) {
+        if (initialState == ST_STARTED
+                && stateCompareAndSet(ST_STARTED, ST_RUNNING)) {
+            // first run
+        } else if (initialState == ST_RUNNABLE
+                && stateCompareAndSet(ST_RUNNABLE, ST_RUNNING)) {
             // consume parking permit
-            parkPermitGetAndSet(false);
+            parkPermitSet(false);
+        } else {
+            throw new RuntimeException();
         }
 
         boolean firstRun = (initialState == ST_STARTED);
@@ -369,7 +373,7 @@ class VirtualThread extends Thread {
                 throw new InternalError();
 
             // consume parking permit
-            parkPermitGetAndSet(false);
+            parkPermitSet(false);
 
             // switch back to virtual thread
             thread.setVirtualThread(this);
@@ -436,7 +440,7 @@ class VirtualThread extends Thread {
         } else {
             // consume permit when not parking
             vthread.tryYield();
-            vthread.parkPermitGetAndSet(false);
+            vthread.parkPermitSet(false);
         }
     }
 
@@ -891,7 +895,7 @@ class VirtualThread extends Thread {
     // -- wrappers for VarHandle methods --
 
     private short stateGet() {
-        return (short) STATE.get(this);
+        return state;
     }
 
     private short stateGetAndSet(short newValue) {
@@ -900,6 +904,12 @@ class VirtualThread extends Thread {
 
     private boolean stateCompareAndSet(short expectedValue, short newValue) {
         return STATE.compareAndSet(this, expectedValue, newValue);
+    }
+
+    private void parkPermitSet(boolean newValue) {
+        if (parkPermit != newValue) {
+            parkPermit = newValue;
+        }
     }
 
     private boolean parkPermitGetAndSet(boolean newValue) {
