@@ -27,6 +27,7 @@ package jdk.internal.reflect;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import jdk.internal.misc.Unsafe;
 import sun.reflect.misc.ReflectUtil;
 
 /** Used only for the first few invocations of a Constructor;
@@ -53,6 +54,9 @@ class NativeConstructorAccessorImpl extends ConstructorAccessorImpl {
                 || Thread.currentThread().isVirtual())
                     && !c.getDeclaringClass().isHidden()
                     && !ReflectUtil.isVMAnonymousClass(c.getDeclaringClass())) {
+
+            // class initializer may not have run
+            Unsafe.getUnsafe().ensureClassInitialized(c.getDeclaringClass());
 
             ConstructorAccessorImpl acc = NewAccessorImplFactory.newConstructorAccessorImpl(c);
 

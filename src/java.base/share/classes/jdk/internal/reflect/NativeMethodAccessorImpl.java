@@ -27,6 +27,7 @@ package jdk.internal.reflect;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import jdk.internal.misc.Unsafe;
 import sun.reflect.misc.ReflectUtil;
 
 /** Used only for the first few invocations of a Method; afterward,
@@ -52,8 +53,12 @@ class NativeMethodAccessorImpl extends MethodAccessorImpl {
                     && !method.getDeclaringClass().isHidden()
                     && !ReflectUtil.isVMAnonymousClass(method.getDeclaringClass())) {
 
+            // class initializer may not have run
+            Unsafe.getUnsafe().ensureClassInitialized(method.getDeclaringClass());
+
             MethodAccessorImpl acc;
             if (Reflection.isCallerSensitive(method)) {
+                // use bytecode generated implementation for @CS methods for now
                 acc = (MethodAccessorImpl)
                         new MethodAccessorGenerator().
                                 generateMethod(method.getDeclaringClass(),

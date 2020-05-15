@@ -99,7 +99,6 @@ public class Reflection {
         static void foo() { }
     }
 
-
     // <clinit> throws Error, specified behavior?
     public void testInvokeStatic5() throws Exception {
         TestHelper.runInVirtualThread(() -> {
