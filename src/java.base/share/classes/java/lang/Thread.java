@@ -642,7 +642,7 @@ public class Thread implements Runnable {
      * @see Thread.Builder#virtual(Executor) 
      * @since 99
      */
-    public interface VirtualThreadTask {
+    public interface VirtualThreadTask extends Runnable {
         /**
          * Return the virtual thread that this task was submitted to run
          * @return the virtual thread

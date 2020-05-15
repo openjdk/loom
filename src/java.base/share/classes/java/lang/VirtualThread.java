@@ -217,7 +217,7 @@ class VirtualThread extends Thread {
     /**
      * The task to execute when using a custom scheduler.
      */
-    private static class Runner implements Runnable, VirtualThreadTask {
+    private static class Runner implements VirtualThreadTask {
         private final VirtualThread vthread;
         private static final VarHandle ATTACHMENT;
         static {
