@@ -30,12 +30,10 @@ import jdk.internal.misc.Unsafe;
 import jdk.internal.org.objectweb.asm.ClassWriter;
 import jdk.internal.org.objectweb.asm.FieldVisitor;
 import jdk.internal.org.objectweb.asm.MethodVisitor;
-import jdk.internal.org.objectweb.asm.Type;
 import jdk.internal.reflect.CallerSensitive;
-import jdk.internal.reflect.FieldAccessor;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.annotation.ForceInline;
-import jdk.internal.vm.annotation.Stable;
+import sun.security.action.GetPropertyAction;
 
 import static jdk.internal.misc.UnsafeConstants.SCOPED_CACHE_SHIFT;
 import static jdk.internal.org.objectweb.asm.Opcodes.*;
@@ -44,11 +42,8 @@ import static java.lang.ScopedMap.NULL_PLACEHOLDER;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.security.ProtectionDomain;
 import java.util.Arrays;
-import java.util.concurrent.Callable;
-import java.util.function.Supplier;
 
 /**
  * TBD
@@ -59,9 +54,11 @@ public abstract class Scoped<T> {
 
     private static final boolean USE_CACHE = Cache.INDEX_BITS > 0;
 
-    private static final boolean DEBUG
-        = System.getProperty("java.lang.Scoped.DEBUG") != null
-            && System.getProperty("java.lang.Scoped.DEBUG").equals("true");
+    private static final boolean DEBUG;
+    static {
+        String debug = GetPropertyAction.privilegedGetProperty("java.lang.Scoped.DEBUG");
+        DEBUG = "true".equals(debug);
+    }
 
     private static int nextKey = 0xf0f0_f0f0;
 
@@ -330,8 +327,9 @@ public abstract class Scoped<T> {
     }
 
     static class Cache {
-        static final boolean CACHE_LIFETIMES
-                = "true".equals(System.getProperty("java.lang.Lifetime.USE_CACHE"));
+
+        static final boolean CACHE_LIFETIMES =
+            "true".equals(GetPropertyAction.privilegedGetProperty("java.lang.Lifetime.USE_CACHE"));
 
         static final int INDEX_BITS = SCOPED_CACHE_SHIFT;
 
