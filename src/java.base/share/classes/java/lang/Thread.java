@@ -662,6 +662,15 @@ public class Thread implements Runnable {
          *         there is no attachment
          */
         Object attachment();
+
+        /**
+         * Runs the task on the current thread as the carrier thread.
+         * @throws IllegalStateException if the virtual thread is not in a state to
+         *         run on the current thread
+         * @throws IllegalCallerException if the current thread is a virtual thread
+         */
+        @Override
+        void run();
     }
 
     /**

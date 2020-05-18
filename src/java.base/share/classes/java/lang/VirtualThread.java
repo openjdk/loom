@@ -46,6 +46,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
@@ -183,12 +184,7 @@ class VirtualThread extends Thread {
     private void runContinuation() {
         // the carrier thread should be a kernel thread
         if (Thread.currentThread().isVirtual()) {
-            if (stateGet() == ST_STARTED) {
-                afterTerminate(false);
-            } else {
-                // nothing to do
-            }
-            return;
+            throw new IllegalCallerException();
         }
 
         // set state to ST_RUNNING
@@ -201,7 +197,7 @@ class VirtualThread extends Thread {
             // consume parking permit
             parkPermitSet(false);
         } else {
-            throw new RuntimeException();
+            throw new IllegalStateException();
         }
 
         boolean firstRun = (initialState == ST_STARTED);
@@ -1019,14 +1015,11 @@ class VirtualThread extends Thread {
      */
     private static ScheduledExecutorService delayedTaskScheduler() {
         ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
-            Executors.newScheduledThreadPool(1, r ->
-                AccessController.doPrivileged(new PrivilegedAction<>() {
-                    public Thread run() {
-                        Thread t = new Thread(r);
-                        t.setName("VirtualThreadUnparker");
-                        t.setDaemon(true);
-                        return t;
-                    }}));
+            Executors.newScheduledThreadPool(1, task -> {
+                var thread = InnocuousThread.newThread("VirtualThreadUnparker", task);
+                thread.setDaemon(true);
+                return thread;
+            });
         stpe.setRemoveOnCancelPolicy(true);
         return stpe;
     }

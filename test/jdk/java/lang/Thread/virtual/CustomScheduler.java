@@ -100,4 +100,43 @@ public class CustomScheduler {
         }
     }
 
+    /**
+     * Test running task on a virtual thread, should thrown IllegalCallerException.
+     */
+    public void testBadCarrier() {
+        Executor scheduler = (task) -> {
+            var exc = new AtomicReference<Throwable>();
+            try {
+                Thread.startVirtualThread(() -> {
+                    try {
+                        task.run();
+                        assertTrue(false);
+                    } catch (Throwable e) {
+                        exc.set(e);
+                    }
+                }).join();
+            } catch (InterruptedException e) {
+                assertTrue(false);
+            }
+            assertTrue(exc.get() instanceof IllegalCallerException);
+        };
+        Thread.builder().virtual(scheduler).task(LockSupport::park).start();
+    }
+
+    /**
+     * Test running task on a virtual thread, should thrown IllegalStateException.
+     */
+    public void testBadState() {
+        Executor scheduler = (task) -> {
+            // run on current thread, should park
+            task.run();
+
+            // run again, should throw IllegalStateException
+            try {
+                task.run();
+                assertTrue(false);
+            } catch (IllegalStateException expected) { }
+        };
+        Thread.builder().virtual(scheduler).task(LockSupport::park).start();
+    }
 }
