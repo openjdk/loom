@@ -805,7 +805,10 @@ public class Thread implements Runnable {
         Builder inheritThreadLocals();
 
         /**
-         * Sets the daemon status.
+         * Sets the daemon status. The daemon status of a virtual thread is
+         * meaningless. The {@linkplain #isDaemon() isDaemon} method always returns
+         * {@code true} for virtual threads.
+         *
          * @param on {@code true} to create daemon threads
          * @return this builder
          */
@@ -813,6 +816,10 @@ public class Thread implements Runnable {
 
         /**
          * Sets the thread priority.
+         *
+         * ??
+         * The {@linkplain #getPriority()} always returns {@linkplain Thread#NORM_PRIORITY}
+         *
          * @param priority priority
          * @return this builder
          * @throws IllegalArgumentException if the priority is less than
