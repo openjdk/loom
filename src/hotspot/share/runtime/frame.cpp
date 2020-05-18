@@ -1086,7 +1086,6 @@ void frame::oops_compiled_arguments_do(Symbol* signature, bool has_receiver, boo
   finder.oops_do();
 }
 
-
 // Get receiver out of callers frame, i.e. find parameter 0 in callers
 // frame.  Consult ADLC for where parameter 0 is to be found.  Then
 // check local reg_map for it being a callee-save register or argument

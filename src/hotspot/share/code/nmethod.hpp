@@ -394,7 +394,8 @@ class nmethod : public CompiledMethod {
                                      int frame_size,
                                      ByteSize receiver_sp_offset,
                                      ByteSize basic_lock_sp_offset,
-                                     OopMapSet* oop_maps);
+                                     OopMapSet* oop_maps,
+                                     int exception_handler = -1);
 
   // type info
   bool is_nmethod() const                         { return true; }

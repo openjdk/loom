@@ -775,6 +775,13 @@ public:
   static methodHandle make_method_handle_intrinsic(vmIntrinsics::ID iid, // _invokeBasic, _linkToVirtual
                                                    Symbol* signature, //anything at all
                                                    TRAPS);
+
+
+  // Continuation
+  bool is_continuation_enter_intrinsic() const { return intrinsic_id() == vmIntrinsics::_Continuation_enterSpecial; }
+
+  bool is_special_native_intrinsic() const { return is_method_handle_intrinsic() || is_continuation_enter_intrinsic(); }
+
   static Klass* check_non_bcp_klass(Klass* klass);
 
   enum {

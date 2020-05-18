@@ -26,6 +26,7 @@
 #define SHARE_JFR_JFR_HPP
 
 #include "jni.h"
+#include "jvmtifiles/jvmti.h"
 #include "memory/allocation.hpp"
 
 class BoolObjectClosure;

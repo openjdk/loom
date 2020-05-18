@@ -6619,8 +6619,10 @@ address generate_avx_ghash_processBlocks() {
 
   }
 
-void push_FrameInfo(MacroAssembler* _masm, Register fi, Register sp, Register fp, address pc) {
-  if (!sp->is_valid()) { __ push(0); } else {
+void push_FrameInfo(MacroAssembler* _masm, Register fi, Register sp, Register fp) {
+  if (!sp->is_valid()) {
+    __ push(0);
+  } else {
     if (sp == rsp) {
       __ movptr(fi, rsp);
       __ push(fi);
@@ -6629,7 +6631,15 @@ void push_FrameInfo(MacroAssembler* _masm, Register fi, Register sp, Register fp
     }
   }
 
-  if (!fp->is_valid()) __ push(0); else __ push(fp);
+  if (!fp->is_valid()) {
+    __ push(0);
+  } else {
+    __ push(fp);
+  }
+}
+
+void push_FrameInfo(MacroAssembler* _masm, Register fi, Register sp, Register fp, address pc) {
+  push_FrameInfo(_masm, fi, sp, fp);
 
   __ lea(fi, ExternalAddress(pc));
   __ push(fi);
@@ -6638,26 +6648,33 @@ void push_FrameInfo(MacroAssembler* _masm, Register fi, Register sp, Register fp
 }
 
 void push_FrameInfo(MacroAssembler* _masm, Register fi, Register sp, Register fp, Register pc) {
-  if (!sp->is_valid()) { __ push(0); } else {
-    if (sp == rsp) {
-      __ movptr(fi, rsp);
-      __ push(fi);
-    } else {
-      __ push(sp);
-    }
+  push_FrameInfo(_masm, fi, sp, fp);
+
+  if (!pc->is_valid()) {
+    __ push(0);
+  } else {
+    __ push(pc);
   }
-
-  if (!fp->is_valid()) __ push(0); else __ push(fp);
-
-  if (!pc->is_valid()) __ push(0); else __ push(pc);
 
   __ movptr(fi, rsp); // make fi point to the beginning of FramInfo
 }
 
 void pop_FrameInfo(MacroAssembler* _masm, Register sp, Register fp, Register pc) {
-  if (!pc->is_valid()) __ lea(rsp, Address(rsp, wordSize)); else __ pop(pc);
-  if (!fp->is_valid()) __ lea(rsp, Address(rsp, wordSize)); else __ pop(fp);
-  if (!sp->is_valid()) __ lea(rsp, Address(rsp, wordSize)); else __ pop(sp);
+  if (!pc->is_valid()) {
+    __ lea(rsp, Address(rsp, wordSize));
+  } else {
+    __ pop(pc);
+  }
+  if (!fp->is_valid()) {
+    __ lea(rsp, Address(rsp, wordSize));
+  } else {
+    __ pop(fp);
+  }
+  if (!sp->is_valid()) {
+    __ lea(rsp, Address(rsp, wordSize));
+  } else {
+    __ pop(sp);
+  }
 }
 
 static Register get_thread() {
@@ -6843,6 +6860,14 @@ RuntimeStub* generate_cont_doYield() {
       __ jcc(Assembler::zero, no_saved_sp);
       __ movptr(rsp, fi);
       __ bind(no_saved_sp);
+
+#ifndef PRODUCT
+      Label cont_label;
+      __ cmpl(Address(rsp, 16), 0xbf0fcf02);
+      __ jcc(Assembler::equal, cont_label);
+      __ stop("Invalid cookie");
+      __ bind(cont_label);
+#endif
     }
 
     Label thaw_success;
@@ -6922,7 +6947,6 @@ RuntimeStub* generate_cont_doYield() {
     }
 
     __ jmp(rbx);
-
     return start;
   }
 

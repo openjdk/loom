@@ -2664,7 +2664,6 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
   bool skip_fillInStackTrace_check = false;
   bool skip_throwableInit_check = false;
   bool skip_hidden = !ShowHiddenFrames;
-  bool is_last = false;
   Handle cont_h(THREAD, thread->last_continuation());
   for (frame fr = thread->last_frame(); max_depth == 0 || max_depth != total_count;) {
     Method* method = NULL;
@@ -2681,21 +2680,12 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
       if (fr.is_first_frame()) break;
 
       assert (contScope.is_null() || cont_h() != NULL, "must be");
-      if (cont_h() != NULL && Continuation::is_continuation_entry_frame(fr, &map)) {
+      if (cont_h() != NULL && Continuation::is_continuation_enterSpecial(fr, &map)) {
         oop scope = java_lang_Continuation::scope(cont_h());
-        if (contScope.not_null() && (scope == contScope())) {
-          is_last = true;
-        } else {
-          // if (!Continuation::is_frame_in_continuation(fr, cont)) {
-          //   tty->print_cr(">>>>>");
-          //   fr.print_on(tty);
-          //   tty->print_cr("<<<<<");
-          //   pfl();
-          // }
-          assert (Continuation::is_frame_in_continuation(fr, cont_h()), "must be");
-          Handle parent_h(THREAD, java_lang_Continuation::parent(cont_h()));
-          cont_h =  parent_h;
-        }
+        if (contScope.not_null() && (scope == contScope())) break;
+
+        Handle parent_h(THREAD, java_lang_Continuation::parent(cont_h()));
+        cont_h =  parent_h;
       }
 
       address pc = fr.pc();
@@ -2776,7 +2766,6 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
 
     bt.push(method, bci, contScopeName, CHECK);
     total_count++;
-    if (is_last) break;
   }
 
   log_info(stacktrace)("%s, %d", throwable->klass()->external_name(), total_count);

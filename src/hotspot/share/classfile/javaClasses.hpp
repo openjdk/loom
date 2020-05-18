@@ -1159,6 +1159,11 @@ class java_lang_Continuation: AllStatic {
   static bool is_reset(oop ref);
   static bool is_mounted(oop ref);
   static bool done(oop ref);
+
+  static int entrySP_offset_in_bytes()  {
+    assert(_entrySP_offset > 0, "Must be initialized");
+    return _entrySP_offset;
+  }
 };
 
 // Interface to jdk.internal.misc.StackChunk objects

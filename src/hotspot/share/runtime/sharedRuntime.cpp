@@ -476,7 +476,7 @@ address SharedRuntime::raw_exception_handler_for_return_address(JavaThread* thre
     // Set flag if return address is a method handle call site.
     thread->set_is_method_handle_return(nm->is_method_handle_return(return_address));
     // native nmethods don't have exception handlers
-    assert(!nm->is_native_method(), "no exception handler");
+    assert(!nm->is_native_method() || nm->method()->is_continuation_enter_intrinsic(), "no exception handler");
     assert(nm->header_begin() != nm->exception_begin(), "no exception handler");
     if (nm->is_deopt_pc(return_address)) {
       // If we come here because of a stack overflow, the stack may be
@@ -1056,6 +1056,12 @@ Handle SharedRuntime::find_callee_info_helper(JavaThread* thread,
   // Find caller and bci from vframe
   methodHandle caller(THREAD, vfst.method());
   int          bci   = vfst.bci();
+
+  if (caller->is_continuation_enter_intrinsic()) {
+    bc = Bytecodes::_invokestatic;
+    LinkResolver::resolve_continuation_enter(callinfo, CHECK_NH);
+    return receiver;
+  }
 
   Bytecode_invoke bytecode(caller, bci);
   int bytecode_index = bytecode.index();
@@ -2831,10 +2837,10 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
   address critical_entry = NULL;
 
   assert(method->is_native(), "must be native");
-  assert(method->is_method_handle_intrinsic() ||
+  assert(method->is_special_native_intrinsic() ||
          method->has_native_function(), "must have something valid to call!");
 
-  if (CriticalJNINatives && !method->is_method_handle_intrinsic()) {
+  if (CriticalJNINatives && !method->is_special_native_intrinsic()) {
     // We perform the I/O with transition to native before acquiring AdapterHandlerLibrary_lock.
     critical_entry = NativeLookup::lookup_critical_entry(method);
   }
@@ -2855,7 +2861,13 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
     BufferBlob*  buf = buffer_blob(); // the temporary code buffer in CodeCache
     if (buf != NULL) {
       CodeBuffer buffer(buf);
+
+      if (method->is_continuation_enter_intrinsic()) {
+        buffer.initialize_stubs_size(64);
+      }
+
       double locs_buf[20];
+      double stubs_locs_buf[20];
       buffer.insts()->initialize_shared_locs((relocInfo*)locs_buf, sizeof(locs_buf) / sizeof(relocInfo));
 #if defined(AARCH64)
       // On AArch64 with ZGC and nmethod entry barriers, we need all oops to be
@@ -2863,6 +2875,7 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
       // accesses. For native_wrappers we need a constant.
       buffer.initialize_consts_size(8);
 #endif
+      buffer.stubs()->initialize_shared_locs((relocInfo*)stubs_locs_buf, sizeof(stubs_locs_buf) / sizeof(relocInfo));
       MacroAssembler _masm(&buffer);
 
       // Fill in the signature array, for the calling-convention call.

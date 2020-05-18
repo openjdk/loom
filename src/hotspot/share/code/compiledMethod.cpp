@@ -359,29 +359,35 @@ int CompiledMethod::verify_icholder_relocations() {
 // Method that knows how to preserve outgoing arguments at call. This method must be
 // called with a frame corresponding to a Java invoke
 void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *reg_map, OopClosure* f) {
-  if (method() != NULL && !method()->is_native()) {
-    // handle the case of an anchor explicitly set in continuation code that doesn't have a callee
-    JavaThread* thread = reg_map->thread();
-    if (thread->has_last_Java_frame() && fr.sp() == thread->last_Java_sp())
-      return;
+  if (method() != NULL) {
+    if (!method()->is_native()) {
+      // handle the case of an anchor explicitly set in continuation code that doesn't have a callee
+      JavaThread* thread = reg_map->thread();
+      if (thread->has_last_Java_frame() && fr.sp() == thread->last_Java_sp())
+        return;
 
-    address pc = fr.pc();
-    SimpleScopeDesc ssd(this, pc);
-    Bytecode_invoke call(methodHandle(Thread::current(), ssd.method()), ssd.bci());
-    bool has_receiver = call.has_receiver();
-    bool has_appendix = call.has_appendix();
-    Symbol* signature = call.signature();
+      address pc = fr.pc();
+      SimpleScopeDesc ssd(this, pc);
+      Bytecode_invoke call(methodHandle(Thread::current(), ssd.method()), ssd.bci());
+      bool has_receiver = call.has_receiver();
+      bool has_appendix = call.has_appendix();
+      Symbol* signature = call.signature();
 
-    // The method attached by JIT-compilers should be used, if present.
-    // Bytecode can be inaccurate in such case.
-    Method* callee = attached_method_before_pc(pc);
-    if (callee != NULL) {
-      has_receiver = !(callee->access_flags().is_static());
-      has_appendix = false;
-      signature = callee->signature();
+      // The method attached by JIT-compilers should be used, if present.
+      // Bytecode can be inaccurate in such case.
+      Method* callee = attached_method_before_pc(pc);
+      if (callee != NULL) {
+        has_receiver = !(callee->access_flags().is_static());
+        has_appendix = false;
+        signature = callee->signature();
+      }
+
+      fr.oops_compiled_arguments_do(signature, has_receiver, has_appendix, reg_map, f);
+    } else if (method()->is_continuation_enter_intrinsic()) {
+      // This method only calls Continuation.enter()
+      Symbol* signature = vmSymbols::continuationEnter_signature();
+      fr.oops_compiled_arguments_do(signature, false, false, reg_map, f);
     }
-
-    fr.oops_compiled_arguments_do(signature, has_receiver, has_appendix, reg_map, f);
   }
 }
 

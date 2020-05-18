@@ -2452,6 +2452,9 @@ const size_t minimumSymbolTableSize = 1024;
   product(bool, LoomGenCode, true,                                          \
       "Generate oopmap code")                                               \
                                                                             \
+  develop(bool, LoomVerifyAfterThaw, false,                                 \
+          "Verify stack after thaw")                                        \
+                                                                            \
   product(bool, UseContinuationLazyCopy, true,                              \
       "Use lazy-copy in continuations")                                     \
                                                                             \

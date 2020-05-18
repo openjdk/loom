@@ -190,7 +190,8 @@ PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 
 #define YIELD_SIG  "java.lang.Continuation.yield(Ljava/lang/ContinuationScope;)V"
 #define YIELD0_SIG "java.lang.Continuation.yield0(Ljava/lang/ContinuationScope;Ljava/lang/Continuation;)Z"
-#define ENTER_SIG  "java.lang.Continuation.enter()V"
+#define ENTER_SIG  "java.lang.Continuation.enter(Ljava/lang/Continuation;Z)V"
+#define ENTER_SPECIAL_SIG "java.lang.Continuation.enterSpecial(Ljava/lang/Continuation;Z)V"
 #define RUN_SIG    "java.lang.Continuation.run()V"
 
 static bool is_stub(CodeBlob* cb);
@@ -199,6 +200,7 @@ static void set_anchor(JavaThread* thread, const FrameInfo* fi);
 // static void set_anchor(JavaThread* thread, const frame& f); -- unused
 
 // debugging functions
+void do_verify_after_thaw(JavaThread* thread, FrameInfo* fi, intptr_t **rbp_pos);
 static void print_oop(void *p, oop obj, outputStream* st = tty);
 static void print_vframe(frame f, const RegisterMap* map = NULL, outputStream* st = tty);
 static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) PRODUCT_RETURN;
@@ -1316,10 +1318,14 @@ public:
 
 inline Method* Frame::frame_method(const frame& f) {
   Method* m = NULL;
-  if (f.is_interpreted_frame())
+  if (f.is_interpreted_frame()) {
     m = f.interpreter_frame_method();
-  else if (f.is_compiled_frame())
+  } else if (f.is_compiled_frame()) {
     m = ((CompiledMethod*)f.cb())->method();
+  } else if (f.is_native_frame()) {
+    m = ((CompiledMethod*)f.cb())->method();
+  }
+
   return m;
 }
 
@@ -2126,6 +2132,14 @@ void FreezeOopVerify::verify<oop>(oop* addr) {
   assert(oopDesc::is_oop_or_null(obj), "");
 }
 
+static void verify_cookie(intptr_t *addr) {
+  unsigned int *cookie1 = (unsigned int *) addr + 4;
+  unsigned int *cookie2 = (unsigned int *) addr + 2 + 4;
+  unsigned int *rbp_value = (unsigned int *) addr + 4 + 4;
+  assert(*cookie1 == 0xbf0fcf02, "");
+  assert(*cookie2 == 0xbf0fcf01, "");
+}
+
 template <typename ConfigT, op_mode mode>
 class Freeze {
   typedef typename Conditional<mode == mode_slow, RegisterMap, SmallRegisterMap>::type RegisterMapT; // we need a full map to store the register dump for a safepoint stub during preemtion
@@ -2183,6 +2197,7 @@ public:
 
     int argsize = bottom_argsize();
     _bottom_address = _cont.entrySP() - argsize;
+    verify_cookie(_cont.entrySP());
     assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()), "");
     // if (mode != mode_fast && Interpreter::contains(_cont.entryPC())) {
     //   _bottom_address -= argsize; // we subtract again; see Thaw::align
@@ -2408,9 +2423,11 @@ public:
 
     _cont.add_size((size - argsize) << LogBytesPerWord);
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
+
     if (jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk) && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.add_size(SP_WIGGLE << LogBytesPerWord);
     }
+
     _cont.set_flag(FLAG_SAFEPOINT_YIELD, false);
     _cont.write_minimal();
 
@@ -2553,7 +2570,7 @@ public:
     log_develop_debug(jvmcont)("Jumping to frame (freeze): [%ld] (%d)", java_tid(_thread), _thread->has_pending_exception());
     frame f = ContinuationHelper::to_frame<true>(_fi);
     if (log_develop_is_enabled(Debug, jvmcont)) f.print_on(tty);
-    assert_top_java_frame_name(f, RUN_SIG);
+    assert_top_java_frame_name(f, ENTER_SPECIAL_SIG);
   #endif
   }
 
@@ -2785,8 +2802,9 @@ public:
     if (frame_bottom >= _bottom_address - SP_WIGGLE) { // dynamic branch
       // senderf is the entry frame
       freeze_result result = finalize<FKind>(f, caller, &argsize); // recursion end
-      if (UNLIKELY(result != freeze_ok))
+      if (UNLIKELY(result != freeze_ok)) {
         return result;
+      }
 
       freeze_java_frame<FKind, top, true, IsKeepalive>(f, caller, fsize, argsize, oops, extra, kd);
 
@@ -2978,14 +2996,14 @@ public:
     // assert (sp == _cont.entrySP(), "sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(sp), p2i(_cont.entrySP()));
     _fi->sp = _cont.entrySP();
     _fi->pc = Continuation::is_return_barrier_entry(f.pc()) ? _cont.entryPC()
-                                                            : Frame::real_pc(f); // Continuation.run may have been deoptimized
+                                                            : Frame::real_pc(f); // Continuation.run may have been deoptimized - no longer true with new nmethod
     // _fi->pc = _cont.entryPC() != NULL ? _cont.entryPC() : Frame::real_pc(f); // fails because of the above commented assert w/ Skynet +DeoptimizeALot
   #ifdef ASSERT
     // if (f.pc() != real_pc(f)) tty->print_cr("Continuation.run deopted!");
     log_develop_debug(jvmcont)("Jumping to frame (freeze): [%ld] (%d)", java_tid(_thread), _thread->has_pending_exception());
     frame f1 = ContinuationHelper::to_frame<true>(_fi);
     if (log_develop_is_enabled(Debug, jvmcont)) f1.print_on(tty);
-    assert_top_java_frame_name(f1, RUN_SIG);
+    assert_top_java_frame_name(f1, ENTER_SPECIAL_SIG);
   #endif
   }
 
@@ -3427,6 +3445,7 @@ int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
   thread->set_cont_yield(true);
 
   oop oopCont = get_continuation(thread);
+
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
@@ -3897,6 +3916,7 @@ public:
 
     _cont.sub_size((size - (UNLIKELY(argsize != 0) ? frame::sender_sp_offset : 0)) << LogBytesPerWord);
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
+
     if (is_last_in_chunks && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
     }
@@ -4151,7 +4171,7 @@ public:
   #ifdef ASSERT
     log_develop_trace(jvmcont)("Found entry:");
     print_vframe(entry);
-    assert_bottom_java_frame_name(entry, RUN_SIG);
+    assert_bottom_java_frame_name(entry, ENTER_SPECIAL_SIG);
   #endif
 
     assert (_thread->cont_frame()->sp == _cont.entrySP(), "cont_frame()->sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(_thread->cont_frame()->sp), p2i(_cont.entrySP()));
@@ -4573,14 +4593,19 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   EventContinuationThaw event;
 #endif
 
+  intptr_t *original_fi_sp = fi->sp;
+  verify_cookie(original_fi_sp);
+
   if (return_barrier) {
     log_develop_trace(jvmcont)("== RETURN BARRIER");
   }
 
   log_develop_trace(jvmcont)("~~~~~~~~~ thaw return_barrier: %d", return_barrier);
   log_develop_trace(jvmcont)("sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
-
   oop oopCont = thread->_continuation; // avoid re-loading the oop from the heap again
+
+  assert (!java_lang_Continuation::done(oopCont), "");
+
   thread->_continuation = NULL;
   assert (oopCont == get_continuation(thread), "");
 
@@ -4589,7 +4614,6 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
   cont.read_minimal();
-
   cont.set_entrySP(fi->sp);
   cont.set_entryFP(fi->fp);
   cont.set_entryPC(return_barrier ? java_lang_Continuation::entryPC(oopCont) : fi->pc);
@@ -4623,6 +4647,10 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
 #ifndef PRODUCT
   set_anchor<false>(thread, fi);
   print_frames(thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
+  if (LoomVerifyAfterThaw) {
+    intptr_t *v = 0;
+    do_verify_after_thaw(thread, fi, &v);
+  }
   clear_anchor(thread);
 #endif
 
@@ -4638,6 +4666,70 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
 
   assert (verify_continuation<3>(cont.mirror()), "");
   log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
+  verify_cookie(original_fi_sp);
+
+#ifndef PRODUCT
+  set_anchor<false>(thread, fi);
+  clear_anchor(thread);
+#endif
+}
+
+class ThawVerifyOopsClosure: public OopClosure {
+  intptr_t* _sp;
+  bool     _ok;
+public:
+  ThawVerifyOopsClosure(intptr_t* sp) : _sp(sp), _ok(true) { }
+  bool ok() { return _ok; }
+
+  void reset() { _ok = true; }
+
+  virtual void do_oop(oop* p) {
+    if ((intptr_t*) p < _sp) {
+      return;
+    }
+
+    if (oopDesc::is_oop_or_null(*p)) return;
+    // Print diagnostic information before calling print_nmethod().
+    // Assertions therein might prevent call from returning.
+    tty->print_cr("*** non-oop " PTR_FORMAT " found at " PTR_FORMAT,
+                  p2i(*p), p2i(p));
+    if (_ok) {
+      _ok = false;
+    }
+    assert(false, "");
+  }
+  virtual void do_oop(narrowOop* p) {
+    if ((intptr_t*) p < _sp) {
+      return;
+    }
+
+    oop obj = NativeAccess<>::oop_load(p);
+    if (oopDesc::is_oop_or_null(obj)) return;
+
+    tty->print_cr("*** (narrow) non-oop %x found at " PTR_FORMAT,
+                  *p, p2i(p));
+    if (_ok) {
+      _ok = false;
+    }
+    assert(false, "");
+  }
+};
+
+void do_verify_after_thaw(JavaThread* thread, FrameInfo* fi, intptr_t **rbp_pos) {
+  ThawVerifyOopsClosure cl(fi->sp);
+  // Traverse the execution stack
+  int i = 0;
+  StackFrameStream fst(thread);
+  frame::update_map_with_saved_link(fst.register_map(), rbp_pos);
+
+  for (; !fst.is_done(); fst.next()) {
+    fst.current()->oops_do(&cl, NULL, fst.register_map());
+    if (!cl.ok()) {
+      frame fr = fst.current();
+      tty->print_cr("Failed for frame %d, pc: %p, sp: %p, fp: %p", i, fr.pc(), fr.unextended_sp(), fr.fp());
+      cl.reset();
+    }
+  }
 }
 
 // IN:  fi->sp = the future SP of the topmost thawed frame (where we'll copy the thawed frames)
@@ -4656,6 +4748,7 @@ JRT_LEAF(address, Continuation::thaw_leaf(JavaThread* thread, FrameInfo* fi, boo
   assert (thread == JavaThread::current(), "");
   thaw0(thread, fi, return_barrier);
   // clear_anchor(thread);
+
 
   if (exception) {
     // TODO: handle deopt. see TemplateInterpreterGenerator::generate_throw_exception, OptoRuntime::handle_exception_C, OptoRuntime::handle_exception_helper
@@ -4687,6 +4780,16 @@ JRT_ENTRY(address, Continuation::thaw(JavaThread* thread, FrameInfo* fi, bool re
     return reinterpret_cast<address>(Interpreter::contains(fi->pc)); // TODO PERF: really only necessary in the case of continuing from a forced yield
   }
 JRT_END
+
+bool Continuation::is_continuation_enterSpecial(const frame& f, const RegisterMap* map) {
+  Method* m = (map->in_cont() && f.is_interpreted_frame()) ? Continuation::interpreter_frame_method(f, map)
+                                                           : Frame::frame_method(f);
+  if (m != NULL) {
+    return m->is_continuation_enter_intrinsic();
+  }
+
+  return false;
+}
 
 bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap* map) {
   Method* m = (map->in_cont() && f.is_interpreted_frame()) ? Continuation::interpreter_frame_method(f, map)
@@ -6123,7 +6226,7 @@ bool Continuation::debug_is_continuation_run_frame(const frame& f) {
     Method* m = f.cb()->as_compiled_method()->scope_desc_at(f.pc())->method();
     if (m != NULL) {
       char buf[50];
-      if (0 == strcmp(RUN_SIG, m->name_and_sig_as_C_string(buf, 50))) {
+      if (0 == strcmp(ENTER_SPECIAL_SIG, m->name_and_sig_as_C_string(buf, 50))) {
         is_continuation_run = true;
       }
     }
@@ -6182,6 +6285,7 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
       }
 
       max_size += hf.compiled_frame_size();
+      //c_size += hf.compiled_frame_size();
       callee_argsize = hf.compiled_frame_stack_argsize();
       callee_compiled = true;
 
@@ -6191,7 +6295,10 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   }
   assert (frames == cont.num_frames(), "");
   assert (interpreted_frames == cont.num_interpreted_frames(), "");
-  if (max_size != cont.max_size()) debug_print_continuation(cont.mirror());
+  /*if (max_size != cont.max_size()) {
+    debug_print_continuation(cont.mirror());
+    tty->print_cr("isize: %d, csize: %d", i_size, c_size);
+  }*/
   assert (max_size == cont.max_size(), "max_size: %lu cont.max_size(): %lu", max_size, cont.max_size());
   // assert (oops == cont.num_oops(), "");
   return true;
@@ -6289,6 +6396,8 @@ static inline Method* top_java_frame_method(const frame& f) {
     CompiledMethod* cm = f.cb()->as_compiled_method();
     ScopeDesc* scope = cm->scope_desc_at(f.pc());
     m = scope->method();
+  } else if (f.is_native_frame()) {
+    return f.cb()->as_nmethod()->method();
   }
   // m = ((CompiledMethod*)f.cb())->method();
   return m;

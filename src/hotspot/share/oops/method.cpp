@@ -873,10 +873,9 @@ bool Method::is_klass_loaded(int refinfo_index, bool must_be_resolved) const {
   return is_klass_loaded_by_klass_index(klass_index);
 }
 
-
 void Method::set_native_function(address function, bool post_event_flag) {
   assert(function != NULL, "use clear_native_function to unregister natives");
-  assert(!is_method_handle_intrinsic() || function == SharedRuntime::native_method_throw_unsatisfied_link_error_entry(), "");
+  assert(!is_special_native_intrinsic() || function == SharedRuntime::native_method_throw_unsatisfied_link_error_entry(), "");
   address* native_function = native_function_addr();
 
   // We can see racers trying to place the same native function into place. Once
@@ -906,7 +905,7 @@ void Method::set_native_function(address function, bool post_event_flag) {
 
 
 bool Method::has_native_function() const {
-  if (is_method_handle_intrinsic())
+  if (is_special_native_intrinsic())
     return false;  // special-cased in SharedRuntime::generate_native_wrapper
   address func = native_function();
   return (func != NULL && func != SharedRuntime::native_method_throw_unsatisfied_link_error_entry());

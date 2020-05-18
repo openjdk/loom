@@ -420,7 +420,12 @@ int nmethod::total_size() const {
 
 const char* nmethod::compile_kind() const {
   if (is_osr_method())     return "osr";
-  if (method() != NULL && is_native_method())  return "c2n";
+  if (method() != NULL && is_native_method()) {
+    if (method()->is_continuation_enter_intrinsic()) {
+      return "cnt";
+    }
+    return "c2n";
+  }
   return NULL;
 }
 
@@ -453,7 +458,8 @@ nmethod* nmethod::new_native_nmethod(const methodHandle& method,
   int frame_size,
   ByteSize basic_lock_owner_sp_offset,
   ByteSize basic_lock_sp_offset,
-  OopMapSet* oop_maps) {
+  OopMapSet* oop_maps,
+  int exception_handler) {
   code_buffer->finalize_oop_references(method);
   // create nmethod
   nmethod* nm = NULL;
@@ -464,6 +470,9 @@ nmethod* nmethod::new_native_nmethod(const methodHandle& method,
     CodeOffsets offsets;
     offsets.set_value(CodeOffsets::Verified_Entry, vep_offset);
     offsets.set_value(CodeOffsets::Frame_Complete, frame_complete);
+    if (exception_handler != -1) {
+      offsets.set_value(CodeOffsets::Exceptions, exception_handler);
+    }
     nm = new (native_nmethod_size, CompLevel_none)
     nmethod(method(), compiler_none, native_nmethod_size,
             compile_id, &offsets,
@@ -627,7 +636,7 @@ nmethod::nmethod(
     _marking_cycle           = 0;
 
     _consts_offset           = data_offset();
-    _stub_offset             = data_offset();
+    _stub_offset             = content_offset()      + code_buffer->total_offset_of(code_buffer->stubs());
     _oops_offset             = data_offset();
     _metadata_offset         = _oops_offset         + align_up(code_buffer->total_oop_size(), oopSize);
     scopes_data_offset       = _metadata_offset     + align_up(code_buffer->total_metadata_size(), wordSize);
@@ -650,6 +659,8 @@ nmethod::nmethod(
     _exception_cache         = NULL;
     _pc_desc_container.reset_to(NULL);
     _hotness_counter         = NMethodSweeper::hotness_counter_reset_val();
+
+    _exception_offset        = code_offset()          + offsets->value(CodeOffsets::Exceptions);
 
     _scopes_data_begin = (address) this + scopes_data_offset;
     _deopt_handler_begin = (address) this + deoptimize_offset;

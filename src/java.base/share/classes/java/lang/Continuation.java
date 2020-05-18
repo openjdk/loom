@@ -330,11 +330,12 @@ public class Continuation {
             try {
                 if (!isStarted()) { // is this the first run? (at this point we know !done)
                     if (TRACE) System.out.println("ENTERING " + id());
-                    this.entrySP = getSP(); // now getSP also resets fastpath; this is also done in thaw for the doContinue branch
-                    enter(); // make this an invokevirtual rather than invokeinterface. Otherwise it freaks out the interpreter (currently solved by patching in native)
+                    if (TRACE) System.out.println("start done: " + done);
+                    enterSpecial(this, false);
                 } else {
                     assert !isEmpty();
-                    doContinue(); // intrinsic. Jumps into yield, as a return from doYield    
+                    if (TRACE) System.out.println("continue done: " + done);
+                    enterSpecial(this, true);
                 }
             } finally {
                 fence();
@@ -371,21 +372,32 @@ public class Continuation {
         }
     }
 
+    @HotSpotIntrinsicCandidate
+    private native static void enterSpecial(Continuation c, boolean isContinue);
+
+    private void finish() {
+      done = true;
+      assert reset || fence() && isStackEmpty() : "sp: " + sp + " stack.length: " + (stack != null ? stack.length : "null");
+      // assert doneX;
+      // System.out.println("-- done!  " + id());
+      if (TRACE) System.out.println(">>>>>>>> DONE <<<<<<<<<<<<< " + id());
+      assert isEmpty();
+    }
+
     @DontInline
     @HotSpotIntrinsicCandidate
-    private void enter() {
-        // This method runs in the "entry frame".
-        // A yield jumps to this method's caller as if returning from this method.
-        try {
-            target.run();
-        } finally {
-            done = true;
-            assert reset || fence() && isStackEmpty() : "sp: " + sp + " stack.length: " + (stack != null ? stack.length : "null");
-            // assert doneX;
-            // System.out.println("-- done!  " + id());
-            if (TRACE) System.out.println(">>>>>>>> DONE <<<<<<<<<<<<< " + id());
-            assert isEmpty();
-        }
+    private static void enter(Continuation c, boolean isContinue) {
+      // This method runs in the "entry frame".
+      // A yield jumps to this method's caller as if returning from this method.
+      try {
+        c.enter0();
+      } finally {
+        c.finish();
+      }
+    }
+
+    private void enter0() {
+      target.run();
     }
 
     private boolean isStarted() {

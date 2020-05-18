@@ -43,7 +43,7 @@
 #include "oops/constantPool.hpp"
 #include "oops/cpCache.inline.hpp"
 #include "oops/instanceKlass.hpp"
-#include "oops/method.hpp"
+#include "oops/method.inline.hpp"
 #include "oops/objArrayKlass.hpp"
 #include "oops/objArrayOop.hpp"
 #include "oops/oop.inline.hpp"
@@ -614,6 +614,16 @@ void LinkResolver::check_method_accessability(Klass* ref_klass,
   }
 }
 
+void LinkResolver::resolve_continuation_enter(CallInfo& callinfo, TRAPS) {
+  Klass* resolved_klass = SystemDictionary::Continuation_klass();
+  Symbol* method_name = vmSymbols::enter_name();
+  Symbol* method_signature = vmSymbols::continuationEnter_signature();
+  Klass*  current_klass = resolved_klass;
+  LinkInfo link_info(resolved_klass, method_name, method_signature, current_klass);
+  Method* resolved_method = resolve_method(link_info, Bytecodes::_invokestatic, CHECK);
+  callinfo.set_static(resolved_klass, methodHandle(THREAD, resolved_method), CHECK);
+}
+
 Method* LinkResolver::resolve_method_statically(Bytecodes::Code code,
                                                 const constantPoolHandle& pool, int index, TRAPS) {
   // This method is used only
@@ -1089,6 +1099,14 @@ void LinkResolver::resolve_static_call(CallInfo& result,
                       link_info.current_klass(),
                       link_info.check_access() ? LinkInfo::needs_access_check : LinkInfo::skip_access_check);
     resolved_method = linktime_resolve_static_method(new_info, CHECK);
+  }
+
+  if (resolved_method->is_continuation_enter_intrinsic()) {
+    if (!resolved_method->has_compiled_code()) {
+      methodHandle mh(THREAD, resolved_method);
+      // Generate a compiled form of the enterSpecial intrinsic.
+      AdapterHandlerLibrary::create_native_wrapper(mh);
+    }
   }
 
   // setup result

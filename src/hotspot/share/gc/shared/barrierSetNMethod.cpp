@@ -49,6 +49,10 @@ bool BarrierSetNMethod::supports_entry_barrier(nmethod* nm) {
     return false;
   }
 
+  if (nm->method()->is_continuation_enter_intrinsic()) {
+    return false;
+  }
+
   if (!nm->is_native_method() && !nm->is_compiled_by_c2() && !nm->is_compiled_by_c1()) {
     return false;
   }

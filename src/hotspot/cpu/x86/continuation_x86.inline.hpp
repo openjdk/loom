@@ -370,7 +370,6 @@ template<typename FKind, op_mode mode>
 hframe hframe::sender(const ContMirror& cont, int num_oops) const {
   // tty->print_cr(">> sender of:");
   // print_on(cont, tty);
-
   int sender_ref_sp = _ref_sp + num_oops;
 
 #ifdef CONT_DOUBLE_NOP
@@ -392,8 +391,9 @@ hframe hframe::sender(const ContMirror& cont, int num_oops) const {
   int sender_sp = frame_bottom_index<FKind>();
   assert (sender_sp > _sp, "");
 
-  if (sender_sp >= cont.stack_length())
+  if (sender_sp >= cont.stack_length()) {
     return hframe(sender_sp, sender_ref_sp, 0, NULL, NULL, false); // hframe()
+  }
 
   int link_index = FKind::interpreted ? _fp
                                       : sender_sp - (frame::sender_sp_offset << LogElemsPerWord);

@@ -144,6 +144,9 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
   // Note: This test must come _before_ the test for intrinsic
   //       methods. See also comments below.
   if (m->is_native()) {
+    if (m->is_continuation_enter_intrinsic()) {
+      return zerolocals;
+    }
     assert(!m->is_method_handle_intrinsic(), "overlapping bits here, watch out");
     return m->is_synchronized() ? native_synchronized : native;
   }

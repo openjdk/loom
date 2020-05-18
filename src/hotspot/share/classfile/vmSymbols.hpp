@@ -383,6 +383,7 @@
   template(runLevel_name,                             "runLevel")                                 \
   template(getPC_name,                                "getPC")                                    \
   template(enter_name,                                "enter")                                    \
+  template(enterSpecial_name,                         "enterSpecial")                             \
   template(onContinue_name,                           "onContinue0")                              \
   template(getStacks_name,                            "getStacks")                                \
   template(onPinned_name,                             "onPinned0")                                \
@@ -1159,8 +1160,9 @@
                                                                                                                         \
   /* java/lang/Continuation */                                                                                                 \
   do_class(java_lang_Continuation,                      "java/lang/Continuation")                                              \
-  do_intrinsic(_Continuation_enter,  java_lang_Continuation,       enter_name,    continuationEnter_signature, F_R)            \
-    do_alias(continuationEnter_signature,                           void_method_signature)                                     \
+  do_intrinsic(_Continuation_enter,  java_lang_Continuation,       enter_name,    continuationEnter_signature, F_S)            \
+    do_signature(continuationEnter_signature,                        "(Ljava/lang/Continuation;Z)V")                                              \
+  do_intrinsic(_Continuation_enterSpecial, java_lang_Continuation, enterSpecial_name,    continuationEnter_signature, F_SN)     \
   do_signature(continuationGetStacks_signature,                   "(III)V")                                                    \
   do_alias(continuationOnPinned_signature,                        int_void_signature)                                          \
   do_intrinsic(_Continuation_getSP,  java_lang_Continuation,       getSP_name,    continuationGetSP_signature, F_S)            \
