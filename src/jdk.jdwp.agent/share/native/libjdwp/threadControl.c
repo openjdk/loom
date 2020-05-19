@@ -1034,7 +1034,7 @@ resumeThreadByNode(ThreadNode *node)
         return JVMTI_ERROR_NONE;
     }
 
-    JDI_ASSERT(!node->is_vthread);
+    //JDI_ASSERT(!node->is_vthread);
 
     if (node->suspendCount > 0) {
         node->suspendCount--;
@@ -1056,7 +1056,14 @@ resumeThreadByNode(ThreadNode *node)
             LOG_MISC(("thread=%p resumed", node->thread));
             error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeThread)
                         (gdata->jvmti, node->thread);
-            node->frameGeneration++; /* Increment on each resume */
+            /* Don't invalidate frameIDs for thread handling an invoke.
+             * vthread fixme: This probably is not JDWP spec compliant since the InvokeMethod commands
+             * say that they resume the thread(s), and ThreadReference.frames() says that the
+             * frameIDs are only valid while the thread is suspended.
+             */
+            if (!node->currentInvoke.pending) {
+              node->frameGeneration++; /* Increment on each resume */
+            }
             node->toBeResumed = JNI_FALSE;
             if (error == JVMTI_ERROR_THREAD_NOT_ALIVE && !node->isStarted) {
                 /*
@@ -1463,8 +1470,14 @@ commonResume(jthread thread)
     ThreadNode *node;
 
     if (isVThread(thread)) {
-      printf("commonResume: cannot resume vthread\n");
-      return JVMTI_ERROR_INVALID_THREAD;
+      /* Resume the carrier thread if mounted. Otherwise produce and error. */
+      jthread carrier_thread = getVThreadThread(thread);
+      if (carrier_thread == NULL) {
+        printf("commonResume: cannot resume unmounted vthread\n");
+        return JVMTI_ERROR_INVALID_THREAD;
+      } else {
+        thread = carrier_thread;
+      }
     }
 
     /*
@@ -2957,7 +2970,7 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
             total_frame_count == fromDepth) {
             /*
              * We were stepping over Continuation.doContinue() in Continuation.run(). This
-             * is a special case. Before the continuation was unmounted do to the yield, the
+             * is a special case. Before the continuation was unmounted due to the yield, the
              * stack looked like:
              *    java.lang.Continuation.yield0
              *    java.lang.Continuation.yield
