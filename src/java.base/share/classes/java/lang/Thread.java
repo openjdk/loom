@@ -814,10 +814,9 @@ public class Thread implements Runnable {
         Builder inheritThreadLocals();
 
         /**
-         * Sets the daemon status. The daemon status of a virtual thread is
-         * meaningless. The {@linkplain #isDaemon() isDaemon} method always returns
-         * {@code true} for virtual threads.
-         *
+         * Sets the daemon status.
+         * The {@link #isDaemon() daemon status} of virtual threads is always {@code true}.
+         * Setting the daemon status at build time has no effect.
          * @param on {@code true} to create daemon threads
          * @return this builder
          */
@@ -825,10 +824,8 @@ public class Thread implements Runnable {
 
         /**
          * Sets the thread priority.
-         *
-         * ??
-         * The {@linkplain #getPriority()} always returns {@linkplain Thread#NORM_PRIORITY}
-         *
+         * The priority of virtual threads is always {@linkplain Thread#NORM_PRIORITY}.
+         * Setting the priority of a virtual thread at build time has no effect.
          * @param priority priority
          * @return this builder
          * @throws IllegalArgumentException if the priority is less than
@@ -854,6 +851,12 @@ public class Thread implements Runnable {
          * Creates a new unstarted {@code Thread} from the current state of the
          * builder.
          *
+         * <p> When this method creates a kernel thread then it will inherit the
+         * {@linkplain ThreadGroup}, {@link #getPriority() priority}, and {@link
+         * #isDaemon() daemon status} of the current thread when these
+         * characteristics have not been set. When this method creates a virtual
+         * thread then will have no {@link java.security.Permission permissions}.
+         *
          * @return a new unstarted Thread
          * @throws IllegalStateException if the task object to run object has not been set
          * @throws SecurityException if a thread group has been set and the current thread
@@ -874,6 +877,12 @@ public class Thread implements Runnable {
          * Creates a new {@code Thread} from the current state of the builder
          * and starts it as if by invoking the {@linkplain Thread#start() start}
          * method.
+         *
+         * <p> When this method creates a kernel thread then it will inherit the
+         * {@linkplain ThreadGroup}, {@link #getPriority() priority}, and {@link
+         * #isDaemon() daemon status} of the current thread when these
+         * characteristics have not been set. When this method creates a virtual
+         * thread then will have no {@link java.security.Permission permissions}.
          *
          * @implSpec The default implementation invokes {@linkplain #build() build}
          * to create a {@code Thread} and then invokes its {@linkplain Thread#start()
@@ -1589,8 +1598,7 @@ public class Thread implements Runnable {
      * thread supports {@link ThreadLocal thread-locals} but does not inherit any
      * initial values for {@link InheritableThreadLocal inheritable-thread-locals}.
      * It inherits the {@link #getContextClassLoader() context-class-loader} from
-     * the current thread.
-     *
+     * the current thread. It has no {@link java.security.Permission permissions}.
      * @param task the object to run when the thread executes
      * @throws NullPointerException if task is null
      * @return a new, and started, virtual thread
