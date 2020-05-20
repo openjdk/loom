@@ -375,15 +375,6 @@ ownedMonitors(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    // vthread fixme: for now vthreads are assumed to have 0 owned monitors. However it is
-    // actually possible for them to own one or more. Currently that implies the vthread
-    // is pinned to a carrier thread, so we could attempt to get the count from it, but
-    // in the future this might not be the case, and we would need JVMTI support.
-    if (isVThread(thread)) {
-        (void)outStream_writeInt(out, 0);
-        return JNI_TRUE;
-    }
-
     WITH_LOCAL_REFS(env, 1) {
 
         jvmtiError error;
@@ -431,16 +422,6 @@ currentContendedMonitor(PacketInputStream *in, PacketOutputStream *out)
 
     thread = validateSuspendedThread(out, thread);
     if (thread == NULL) {
-        return JNI_TRUE;
-    }
-
-    // vthread fixme: for now vthreads are assumed not to have any contended monitors. However
-    // it is actually possible for them to have one. Currently that implies the vthread
-    // is pinned to a carrier thread, so we could attempt to get the count from it, but
-    // in the future this might not be the case, and we would need JVMTI support.
-    if (isVThread(thread)) {
-        (void)outStream_writeByte(out, specificTypeKey(env, NULL));
-        (void)outStream_writeObjectRef(env, out, NULL);
         return JNI_TRUE;
     }
 
@@ -573,15 +554,6 @@ ownedMonitorsWithStackDepth(PacketInputStream *in, PacketOutputStream *out)
 
     thread = validateSuspendedThread(out, thread);
     if (thread == NULL) {
-        return JNI_TRUE;
-    }
-
-    // vthread fixme: for now vthreads are assumed to have 0 owned monitors. However it is
-    // actually possible for them to own one or more. Currently that implies the vthread
-    // is pinned to a carrier thread, so we could attempt to get the count from it, but
-    // in the future this might not be the case, and we would need JVMTI support.
-    if (isVThread(thread)) {
-        (void)outStream_writeInt(out, 0);
         return JNI_TRUE;
     }
 
