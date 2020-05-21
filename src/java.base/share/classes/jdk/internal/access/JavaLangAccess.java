@@ -333,7 +333,12 @@ public interface JavaLangAccess {
      * Get a method handle of string concat helper method
      */
     MethodHandle stringConcatHelper(String name, MethodType methodType);
-    
+
+    /**
+     * Get the string concat initial coder
+     */
+    long stringConcatInitialCoder();
+
     /*
      * Get the class data associated with the given class.
      * @param c the class

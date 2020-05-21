@@ -269,13 +269,6 @@ typedef struct ObjectBatch {
 } ObjectBatch;
 
 /*
- * JNI signature constants, beyond those defined in JDWP_TAG(*)
- */
-#define SIGNATURE_BEGIN_ARGS    '('
-#define SIGNATURE_END_ARGS      ')'
-#define SIGNATURE_END_CLASS     ';'
-
-/*
  * Modifier flags for classes, fields, methods
  */
 #define MOD_PUBLIC       0x0001     /* visible to everyone */
@@ -308,7 +301,6 @@ jbyte referenceTypeTag(jclass clazz);
 jbyte specificTypeKey(JNIEnv *env, jobject object);
 jboolean isObjectTag(jbyte tag);
 jvmtiError spawnNewThread(jvmtiStartFunction func, void *arg, char *name);
-void convertSignatureToClassname(char *convert);
 void writeCodeLocation(struct PacketOutputStream *out, jclass clazz,
                        jmethodID method, jlocation location);
 

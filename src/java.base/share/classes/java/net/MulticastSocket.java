@@ -133,7 +133,7 @@ import java.nio.channels.MulticastChannel;
 public class MulticastSocket extends DatagramSocket {
 
     @Override
-    MulticastSocket delegate() {
+    final MulticastSocket delegate() {
         return (MulticastSocket) super.delegate();
     }
 
@@ -220,7 +220,7 @@ public class MulticastSocket extends DatagramSocket {
      * @since 1.4
      */
     public MulticastSocket(SocketAddress bindaddr) throws IOException {
-        super(bindaddr, /*multicast*/true);
+        this(createDelegate(bindaddr, MulticastSocket.class));
     }
 
     /**
@@ -370,7 +370,8 @@ public class MulticastSocket extends DatagramSocket {
      * @see    DatagramChannel#join(InetAddress, NetworkInterface)
      * @since  1.4
      */
-    public void joinGroup(SocketAddress mcastaddr, NetworkInterface netIf) throws IOException {
+    public void joinGroup(SocketAddress mcastaddr, NetworkInterface netIf)
+        throws IOException {
         delegate().joinGroup(mcastaddr, netIf);
     }
 
@@ -398,7 +399,8 @@ public class MulticastSocket extends DatagramSocket {
      * @see    SecurityManager#checkMulticast(InetAddress)
      * @since  1.4
      */
-    public void leaveGroup(SocketAddress mcastaddr, NetworkInterface netIf) throws IOException {
+    public void leaveGroup(SocketAddress mcastaddr, NetworkInterface netIf)
+        throws IOException {
         delegate().leaveGroup(mcastaddr, netIf);
      }
 
@@ -450,7 +452,8 @@ public class MulticastSocket extends DatagramSocket {
      * @see #getNetworkInterface()
      * @since 1.4
      */
-    public void setNetworkInterface(NetworkInterface netIf) throws SocketException {
+    public void setNetworkInterface(NetworkInterface netIf)
+        throws SocketException {
         delegate().setNetworkInterface(netIf);
     }
 
@@ -565,8 +568,8 @@ public class MulticastSocket extends DatagramSocket {
      * @see SecurityManager#checkConnect
      */
     @Deprecated
-    public void send(DatagramPacket p, byte ttl) throws IOException {
+    public void send(DatagramPacket p, byte ttl)
+        throws IOException {
         delegate().send(p, ttl);
     }
-
 }

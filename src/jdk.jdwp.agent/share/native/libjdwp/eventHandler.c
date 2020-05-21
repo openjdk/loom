@@ -67,6 +67,7 @@
 #include "classTrack.h"
 #include "commonRef.h"
 #include "debugLoop.h"
+#include "signature.h"
 
 static HandlerID requestIdCounter;
 static jbyte currentSessionID;

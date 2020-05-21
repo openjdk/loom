@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,6 +31,7 @@
 #include "jfr/recorder/checkpoint/jfrCheckpointManager.hpp"
 #include "jfr/recorder/repository/jfrEmergencyDump.hpp"
 #include "jfr/recorder/service/jfrOptionSet.hpp"
+#include "jfr/recorder/repository/jfrRepository.hpp"
 #include "jfr/support/jfrThreadLocal.hpp"
 #include "runtime/java.hpp"
 
@@ -107,6 +108,12 @@ void Jfr::on_java_thread_dismantle(JavaThread* jt) {
 void Jfr::on_vm_shutdown(bool exception_handler) {
   if (JfrRecorder::is_recording()) {
     JfrEmergencyDump::on_vm_shutdown(exception_handler);
+  }
+}
+
+void Jfr::on_vm_error_report(outputStream* st) {
+  if (JfrRecorder::is_recording()) {
+    JfrRepository::on_vm_error_report(st);
   }
 }
 

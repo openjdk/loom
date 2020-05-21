@@ -92,7 +92,9 @@ class outputStream;
   SHENANDOAH_PAR_PHASE_DO(evac_,                    "    E: ", f)                      \
                                                                                        \
   f(conc_weak_roots,                                "Concurrent Weak Roots")           \
-  SHENANDOAH_PAR_PHASE_DO(conc_weak_roots_,         "  CWR: ", f)                      \
+  f(conc_weak_roots_work,                           "  Roots")                         \
+  SHENANDOAH_PAR_PHASE_DO(conc_weak_roots_work_,    "    CWR: ", f)                    \
+  f(conc_weak_roots_rendezvous,                     "  Rendezvous")                    \
   f(conc_cleanup_early,                             "Concurrent Cleanup")              \
   f(conc_class_unload,                              "Concurrent Class Unloading")      \
   f(conc_class_unload_unlink,                       "  Unlink Stale")                  \
@@ -208,7 +210,7 @@ private:
   static double uninitialized() { return -1; }
 
 public:
-  ShenandoahPhaseTimings(uint _max_workers);
+  ShenandoahPhaseTimings(uint max_workers);
 
   void record_phase_time(Phase phase, double time);
 

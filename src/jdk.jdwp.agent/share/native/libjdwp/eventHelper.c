@@ -28,6 +28,7 @@
 #include "eventHandler.h"
 #include "threadControl.h"
 #include "invoker.h"
+#include "signature.h"
 
 
 #define COMMAND_LOOP_THREAD_NAME "JDWP Event Helper Thread"
@@ -504,7 +505,7 @@ handleFrameEventCommandSingle(JNIEnv* env, PacketOutputStream *out,
     writeCodeLocation(out, command->clazz, command->method, command->location);
     if (command->typeKey) {
         (void)outStream_writeValue(env, out, command->typeKey, command->returnValue);
-        if (isObjectTag(command->typeKey) &&
+        if (isReferenceTag(command->typeKey) &&
             command->returnValue.l != NULL) {
             tossGlobalRef(env, &(command->returnValue.l));
         }
@@ -884,7 +885,7 @@ saveEventInfoRefs(JNIEnv *env, EventInfo *evinfo)
                 saveGlobalRef(env, clazz, pclazz);
             }
             sig = evinfo->u.field_modification.signature_type;
-            if ((sig == JDWP_TAG(ARRAY)) || (sig == JDWP_TAG(OBJECT))) {
+            if (isReferenceTag(sig)) {
                 if ( evinfo->u.field_modification.new_value.l != NULL ) {
                     pobject = &(evinfo->u.field_modification.new_value.l);
                     object = *pobject;
@@ -940,7 +941,7 @@ tossEventInfoRefs(JNIEnv *env, EventInfo *evinfo)
                 tossGlobalRef(env, &(evinfo->u.field_modification.field_clazz));
             }
             sig = evinfo->u.field_modification.signature_type;
-            if ((sig == JDWP_TAG(ARRAY)) || (sig == JDWP_TAG(OBJECT))) {
+            if (isReferenceTag(sig)) {
                 if ( evinfo->u.field_modification.new_value.l != NULL ) {
                     tossGlobalRef(env, &(evinfo->u.field_modification.new_value.l));
                 }
@@ -1144,7 +1145,7 @@ eventHelper_recordFrameEvent(jint id, jbyte suspendPolicy, EventIndex ei,
         /*
          * V or B C D F I J S Z L <classname> ;    [ ComponentType
          */
-        if (isObjectTag(frameCommand->typeKey) &&
+        if (isReferenceTag(frameCommand->typeKey) &&
             returnValue.l != NULL) {
             saveGlobalRef(env, returnValue.l, &(frameCommand->returnValue.l));
         } else {

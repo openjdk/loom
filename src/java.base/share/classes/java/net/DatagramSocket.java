@@ -31,7 +31,6 @@ import java.nio.channels.DatagramChannel;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Set;
-
 import sun.net.NetProperties;
 import sun.nio.ch.DefaultSelectorProvider;
 
@@ -114,62 +113,25 @@ import sun.nio.ch.DefaultSelectorProvider;
  * @since 1.0
  */
 public class DatagramSocket implements java.io.Closeable {
+
+    // An instance of DatagramSocketAdaptor, NetMulticastSocket, or null
     private final DatagramSocket delegate;
 
     DatagramSocket delegate() {
+        if (delegate == null) {
+            throw new InternalError("Should not get here");
+        }
         return delegate;
     }
 
     /**
-     * Create a DatagramSocket that delegates to the given delegate if not null.
-     *
-     * @param delegate the delegate, can be null.
+     * All constructors eventually call this one.
+     * @param delegate The wrapped DatagramSocket implementation, or null.
      */
     DatagramSocket(DatagramSocket delegate) {
-        this.delegate = delegate;
-    }
-
-    /**
-     * Creates a datagram socket that is optionally bound to the specified
-     * socket address.
-     *
-     * @param bindaddr local socket address or null for an unbound socket
-     * @param multicast true for a multicast socket
-     */
-    DatagramSocket(SocketAddress bindaddr, boolean multicast) throws SocketException {
-        DatagramSocket delegate;
-        if (this instanceof sun.nio.ch.DatagramSocketAdaptor) {
-            // socket adaptor does not delegate
-            delegate = null;
-        } else {
-            // create delegate
-            delegate = createDelegate(multicast);
-
-            boolean initialized = false;
-            try {
-
-                // Enable SO_REUSEADDR for multicast sockets
-                if (multicast) {
-                    delegate.setReuseAddress(true);
-                }
-
-                // Bind socket if socket address specified
-                if (bindaddr != null) {
-                    delegate.bind(bindaddr);
-                }
-
-                // Enable SO_BROADCAST if possible
-                try {
-                    delegate.setBroadcast(true);
-                } catch (SocketException ignore) { }
-
-                initialized = true;
-            } finally {
-                if (!initialized) {
-                    delegate.close();
-                }
-            }
-        }
+        assert delegate == null
+                || delegate instanceof NetMulticastSocket
+                || delegate instanceof sun.nio.ch.DatagramSocketAdaptor;
         this.delegate = delegate;
     }
 
@@ -204,7 +166,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @since   1.4
      */
     protected DatagramSocket(DatagramSocketImpl impl) {
-        this.delegate = new DatagramSocketImplWrapper(impl);  // throws NPE if null
+        this(new NetMulticastSocket(impl));
     }
 
     /**
@@ -231,7 +193,7 @@ public class DatagramSocket implements java.io.Closeable {
      * @since   1.4
      */
     public DatagramSocket(SocketAddress bindaddr) throws SocketException {
-        this(bindaddr, false);
+        this(createDelegate(bindaddr, DatagramSocket.class));
     }
 
     /**
@@ -590,7 +552,7 @@ public class DatagramSocket implements java.io.Closeable {
     public void receive(DatagramPacket p) throws IOException {
         delegate().receive(p);
     }
-    
+
     /**
      * Gets the local address to which the socket is bound.
      *
@@ -975,7 +937,7 @@ public class DatagramSocket implements java.io.Closeable {
      */
     public static synchronized void
     setDatagramSocketImplFactory(DatagramSocketImplFactory fac)
-       throws IOException
+            throws IOException
     {
         if (factory != null) {
             throw new SocketException("factory already defined");
@@ -1064,44 +1026,114 @@ public class DatagramSocket implements java.io.Closeable {
         return delegate().supportedOptions();
     }
 
-    private static final boolean USE_PLAINDATAGRAMSOCKETIMPL;
-    static {
+    // Temporary solution until JDK-8237352 is addressed
+    private static final SocketAddress NO_DELEGATE = new SocketAddress() {};
+    private static final boolean USE_PLAINDATAGRAMSOCKET = usePlainDatagramSocketImpl();
+
+    private static boolean usePlainDatagramSocketImpl() {
         PrivilegedAction<String> pa = () -> NetProperties.get("jdk.net.usePlainDatagramSocketImpl");
         String s = AccessController.doPrivileged(pa);
-        USE_PLAINDATAGRAMSOCKETIMPL = (s != null) && !s.equalsIgnoreCase("false");
+        return (s != null) && (s.isEmpty() || s.equalsIgnoreCase("true"));
     }
 
     /**
-     * Creates a datagram socket object that can be used as a delegate. The
-     * datagram socket is a DatagramChannel socket adaptor or an instance of
-     * DatagramSocketImplWrapper that uses a DatagramSocketImpl.
+     * Best effort to convert an {@link IOException}
+     * into a {@link SocketException}.
+     *
+     * @param e an instance of {@link IOException}
+     * @return an instance of {@link SocketException}
      */
-    private static DatagramSocket createDelegate(boolean multicast)
-        throws SocketException
-    {
-        DatagramSocketImplFactory factory = DatagramSocket.factory;
-        if (USE_PLAINDATAGRAMSOCKETIMPL || factory != null) {
-            DatagramSocketImpl impl;
-            if (factory != null) {
-                impl = factory.createDatagramSocketImpl();
+    private static SocketException toSocketException(IOException e) {
+        if (e instanceof SocketException)
+            return (SocketException) e;
+        Throwable cause = e.getCause();
+        if (cause instanceof SocketException)
+            return (SocketException) cause;
+        SocketException se = new SocketException(e.getMessage());
+        se.initCause(e);
+        return se;
+    }
+
+    /**
+     * Creates a delegate for the specific requested {@code type}. This method should
+     * only be called by {@code DatagramSocket} and {@code MulticastSocket}
+     * public constructors.
+     *
+     * @param bindaddr An address to bind to, or {@code null} if creating an unbound
+     *                 socket.
+     * @param type     This is either {@code MulticastSocket.class}, if the delegate needs
+     *                 to support joining multicast groups, or {@code DatagramSocket.class},
+     *                 if it doesn't. Typically, this will be {@code DatagramSocket.class}
+     *                 when creating a delegate for {@code DatagramSocket}, and
+     *                 {@code MulticastSocket.class} when creating a delegate for
+     *                 {@code MulticastSocket}.
+     * @param <T>      The target type for which the delegate is created.
+     *                 This is either {@code java.net.DatagramSocket} or
+     *                 {@code java.net.MulticastSocket}.
+     * @return {@code null} if {@code bindaddr == NO_DELEGATE}, otherwise returns a
+     * delegate for the requested {@code type}.
+     * @throws SocketException if an exception occurs while creating or binding the
+     *                         the delegate.
+     */
+    static <T extends DatagramSocket> T createDelegate(SocketAddress bindaddr, Class<T> type)
+            throws SocketException {
+
+        // Temporary solution until JDK-8237352 is addressed
+        if (bindaddr == NO_DELEGATE) return null;
+
+        assert type == DatagramSocket.class || type == MulticastSocket.class;
+        boolean multicast = (type == MulticastSocket.class);
+        DatagramSocket delegate = null;
+        boolean initialized = false;
+        try {
+            DatagramSocketImplFactory factory = DatagramSocket.factory;
+            if (USE_PLAINDATAGRAMSOCKET || factory != null) {
+                // create legacy DatagramSocket delegate
+                DatagramSocketImpl impl;
+                if (factory != null) {
+                    impl = factory.createDatagramSocketImpl();
+                } else {
+                    impl = DefaultDatagramSocketImplFactory.createDatagramSocketImpl(multicast);
+                }
+                delegate = new NetMulticastSocket(impl);
+                ((NetMulticastSocket) delegate).getImpl(); // ensure impl.create() is called.
             } else {
-                impl = DefaultDatagramSocketImplFactory.createDatagramSocketImpl(multicast);
-            }
-            DatagramSocketImplWrapper delegate = new DatagramSocketImplWrapper(impl);
-            delegate.getImpl();  // create UDP socket
-            return delegate;
-        } else {
-            // Return a DatagramChannel socket adaptor
-            try {
-                return DefaultSelectorProvider.get()
+                // create NIO adaptor
+                delegate = DefaultSelectorProvider.get()
                         .openUninterruptibleDatagramChannel()
                         .socket();
-            } catch (SocketException e) {
-                throw e;
-            } catch (IOException e) {
-                throw new SocketException(e.getMessage());
+            }
+
+            if (multicast) {
+                // set reuseaddress if multicasting
+                // (must be set before binding)
+                delegate.setReuseAddress(true);
+            }
+
+            if (bindaddr != null) {
+                // bind if needed
+                delegate.bind(bindaddr);
+            }
+
+            // enable broadcast if possible
+            try {
+                delegate.setBroadcast(true);
+            } catch (IOException ioe) {
+            }
+
+            initialized = true;
+        } catch (IOException ioe) {
+            throw toSocketException(ioe);
+        } finally {
+            // make sure the delegate is closed if anything
+            // went wrong
+            if (!initialized && delegate != null) {
+                delegate.close();
             }
         }
-
+        @SuppressWarnings("unchecked")
+        T result = (T) delegate;
+        return result;
     }
+
 }

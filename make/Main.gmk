@@ -152,7 +152,7 @@ $(eval $(call DeclareRecipesForPhase, GENDATA, \
     FILE_PREFIX := Gendata, \
     MAKE_SUBDIR := gendata, \
     CHECK_MODULES := $(ALL_MODULES), \
-    USE_WRAPPER := true))
+))
 
 ALL_TARGETS += $(GENDATA_TARGETS)
 
@@ -163,7 +163,6 @@ $(eval $(call DeclareRecipesForPhase, COPY, \
     FILE_PREFIX := Copy, \
     MAKE_SUBDIR := copy, \
     CHECK_MODULES := $(ALL_MODULES), \
-    USE_WRAPPER := true, \
 ))
 
 ALL_COPY_MODULES += $(COPY_MODULES)
@@ -206,7 +205,7 @@ $(eval $(call DeclareRecipesForPhase, LIBS, \
     FILE_PREFIX := Lib, \
     MAKE_SUBDIR := lib, \
     CHECK_MODULES := $(ALL_MODULES), \
-    USE_WRAPPER := true))
+))
 
 ALL_TARGETS += $(LIBS_TARGETS)
 
@@ -219,7 +218,6 @@ $(eval $(call DeclareRecipesForPhase, STATIC_LIBS, \
     FILE_PREFIX := Lib, \
     MAKE_SUBDIR := lib, \
     CHECK_MODULES := $(STATIC_LIBS_MODULES), \
-    USE_WRAPPER := true, \
     EXTRA_ARGS := STATIC_LIBS=true, \
 ))
 
@@ -232,7 +230,7 @@ $(eval $(call DeclareRecipesForPhase, LAUNCHER, \
     FILE_PREFIX := Launcher, \
     MAKE_SUBDIR := launcher, \
     CHECK_MODULES := $(ALL_MODULES), \
-    USE_WRAPPER := true))
+))
 
 ALL_TARGETS += $(LAUNCHER_TARGETS)
 
@@ -261,8 +259,9 @@ endef
 $(foreach v, $(JVM_VARIANTS), $(eval $(call DeclareHotspotLibsRecipe,$v)))
 
 $(eval $(call SetupTarget, hotspot-ide-project, \
-    MAKEFILE := ide/CreateVSProject, \
+    MAKEFILE := ide/visualstudio/hotspot/CreateVSProject, \
     DEPS := hotspot exploded-image, \
+    ARGS := -I$(TOPDIR)/make/hotspot, \
 ))
 
 ALL_TARGETS += $(HOTSPOT_VARIANT_TARGETS) $(HOTSPOT_VARIANT_GENSRC_TARGETS) \
@@ -301,25 +300,25 @@ ALL_TARGETS += $(COMPILE_COMMANDS_TARGETS_HOTSPOT) $(COMPILE_COMMANDS_TARGETS_JD
 # VS Code projects
 
 $(eval $(call SetupTarget, vscode-project, \
-    MAKEFILE := CreateVSCodeProject, \
+    MAKEFILE := ide/vscode/hotspot/CreateVSCodeProject, \
     ARGS := VSCODE_INDEXER=cpptools, \
     DEPS := compile-commands, \
 ))
 
 $(eval $(call SetupTarget, vscode-project-clangd, \
-    MAKEFILE := CreateVSCodeProject, \
+    MAKEFILE := ide/vscode/hotspot/CreateVSCodeProject, \
     ARGS := VSCODE_INDEXER=clangd, \
     DEPS := compile-commands, \
 ))
 
 $(eval $(call SetupTarget, vscode-project-rtags, \
-    MAKEFILE := CreateVSCodeProject, \
+    MAKEFILE := ide/vscode/hotspot/CreateVSCodeProject, \
     ARGS := VSCODE_INDEXER=rtags, \
     DEPS := compile-commands, \
 ))
 
 $(eval $(call SetupTarget, vscode-project-ccls, \
-    MAKEFILE := CreateVSCodeProject, \
+    MAKEFILE := ide/vscode/hotspot/CreateVSCodeProject, \
     ARGS := VSCODE_INDEXER=ccls, \
     DEPS := compile-commands, \
 ))
@@ -1101,16 +1100,23 @@ endif
 # This target builds the documentation image
 docs-image: docs-jdk
 
-# If not already set, set the JVM specific targets to build the test image
-JVM_TEST_IMAGE_TARGETS ?= test-image-hotspot-jtreg-native test-image-hotspot-gtest
-
-ifeq ($(INCLUDE_GRAAL), true)
-  JVM_TEST_IMAGE_TARGETS += test-image-hotspot-jtreg-graal
-endif
-
 # This target builds the test image
-test-image: prepare-test-image test-image-jdk-jtreg-native \
-    test-image-demos-jdk $(JVM_TEST_IMAGE_TARGETS)
+test-image: prepare-test-image test-image-jdk-jtreg-native test-image-demos-jdk
+
+ifneq ($(JVM_TEST_IMAGE_TARGETS), )
+  # If JVM_TEST_IMAGE_TARGETS is externally defined, use it instead of the
+  # standard hotspot set of tests.
+  test-image: $(JVM_TEST_IMAGE_TARGETS)
+else
+  test-image: test-image-hotspot-jtreg-native
+  ifeq ($(BUILD_GTEST), true)
+    test-image: test-image-hotspot-gtest
+  endif
+
+  ifeq ($(INCLUDE_GRAAL), true)
+    test-image: test-image-hotspot-jtreg-graal
+  endif
+endif
 
 ifeq ($(BUILD_FAILURE_HANDLER), true)
   test-image: test-image-failure-handler

@@ -1,6 +1,7 @@
 /build/
 /dist/
 /.idea/
+/.vscode/
 nbproject/private/
 make/nb_native/nbproject/private
 /webrev
