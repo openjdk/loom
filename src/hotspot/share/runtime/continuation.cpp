@@ -6115,7 +6115,7 @@ void Continuations::print_statistics() {
 
 #ifndef PRODUCT
 void Continuation::describe(FrameValues &values) {
-  JavaThread* thread = JavaThread::current();
+  JavaThread* thread = JavaThread::active();
   if (thread != NULL) {
     for (oop cont = thread->last_continuation(); cont != (oop)NULL; cont = java_lang_Continuation::parent(cont)) {
       intptr_t* bottom = java_lang_Continuation::entrySP(cont);
