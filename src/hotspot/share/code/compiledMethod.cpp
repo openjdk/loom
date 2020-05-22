@@ -367,11 +367,8 @@ void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *
     
     if (!method()->is_native()) {
       address pc = fr.pc();
-      SimpleScopeDesc ssd(this, pc);
-      Bytecode_invoke call(methodHandle(Thread::current(), ssd.method()), ssd.bci());
-      bool has_receiver = call.has_receiver();
-      bool has_appendix = call.has_appendix();
-      Symbol* signature = call.signature();
+      bool has_receiver, has_appendix;
+      Symbol* signature;
 
       // The method attached by JIT-compilers should be used, if present.
       // Bytecode can be inaccurate in such case.
@@ -379,7 +376,13 @@ void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *
       if (callee != NULL) {
         has_receiver = !(callee->access_flags().is_static());
         has_appendix = false;
-        signature = callee->signature();
+        signature    = callee->signature();
+      } else {
+        SimpleScopeDesc ssd(this, pc);
+        Bytecode_invoke call(methodHandle(Thread::current(), ssd.method()), ssd.bci());
+        has_receiver = call.has_receiver();
+        has_appendix = call.has_appendix();
+        signature    = call.signature();
       }
 
       fr.oops_compiled_arguments_do(signature, has_receiver, has_appendix, reg_map, f);
