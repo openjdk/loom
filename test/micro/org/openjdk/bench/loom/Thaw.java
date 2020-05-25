@@ -21,7 +21,7 @@
  * questions.
  */
 
-package org.openjdk.benchmarks.cont;
+package org.openjdk.bench.loom;
 
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
@@ -32,7 +32,7 @@ import org.openjdk.jmh.annotations.*;
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
-public class FreezeAndThaw {
+public class Thaw {
     static final ContinuationScope SCOPE = new ContinuationScope() { };
 
     static class Arg {
@@ -89,9 +89,7 @@ public class FreezeAndThaw {
             if (depth > 0) {
                 run3(depth - 1, arg2, arg3);
             } if (depth == 0) {
-                if (yieldAtLimit) { 
-                    Continuation.yield(SCOPE);
-                }
+                if (yieldAtLimit) Continuation.yield(SCOPE);
             } else {
                 // never executed
                 arg2.field = 0;
@@ -113,34 +111,31 @@ public class FreezeAndThaw {
     public int stackDepth;
 
     Continuation cont;
-    Continuation cont0;
 
-    @Setup(Level.Invocation)
+    @Setup(Level.Iteration)
     public void setup() {
+        // we must warmup manually because the in justContinue, the Java methods only return and are never called, and so never compiled
+        for (int i=0; i<20000; i++) {
+            Continuation c = Yielder.continuation(paramCount, stackDepth, true);
+            c.run(); c.run();
+            assert c.isDone();
+        }
+        
         // System.out.println("pc = " + paramCount + " sd = " + stackDepth);
         cont = Yielder.continuation(paramCount, stackDepth, true);
-        cont0 = Yielder.continuation(paramCount, stackDepth, false);
-    }
-
-    /**
-     * Creates and runs a continuation that yields at a given stack depth.
-     */
-    @Benchmark
-    public void baseline() {
-        // Continuation cont0 = Yielder.continuation(paramCount, stackDepth, false);
-        cont0.run();
-        assert cont0.isDone();
-    }
-
-    /**
-     * Creates and runs a continuation that yields at a given stack depth.
-     */
-    @Benchmark
-    public void yieldAndContinue() {
-        // Continuation cont = Yielder.continuation(paramCount, stackDepth, true);
         cont.run();
         assert !cont.isDone();
+        cont.something_something_2();
+    }
+
+    /**
+     * Creates and runs a continuation that yields at a given stack depth.
+     */
+    @Benchmark
+    public void justContinue() {
         cont.run();
+
         assert cont.isDone();
+        cont.something_something_3();
     }
 }

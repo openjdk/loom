@@ -21,15 +21,10 @@
  * questions.
  */
 
-package org.openjdk.benchmarks.cont;
+package org.openjdk.bench.loom;
 
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
-
-/**
- *  java -XX:+UnlockDiagnosticVMOptions -XX:+UseNewCode -XX:-DetectLocksInCompiledFrames \
- *    -jar benchmarks.jar oscillate -p minDepth=5 -p maxDepth=10 -p repeat=100
- */
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)

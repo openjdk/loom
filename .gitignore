@@ -16,4 +16,5 @@ NashornProfile.txt
 **/JTreport/**
 **/JTwork/**
 /src/utils/hsdis/build/
-/microbenchmarks/loom/target/
+/test/micro/.idea/
+/test/micro/target/

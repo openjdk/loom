@@ -21,7 +21,7 @@
  * questions.
  */
 
-package org.openjdk.benchmarks.cont;
+package org.openjdk.bench.loom;
 
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;

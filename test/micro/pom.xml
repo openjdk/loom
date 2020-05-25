@@ -26,11 +26,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.openjdk</groupId>
-    <artifactId>contbenchmarks</artifactId>
+    <artifactId>bench</artifactId>
     <version>1.0</version>
     <packaging>jar</packaging>
 
-    <name>JMH benchmarks for continuations</name>
+    <name>JMH benchmarks</name>
 
     <dependencies>
         <dependency>
@@ -52,12 +52,12 @@
         <!--
             JMH version to use with this project.
           -->
-        <jmh.version>1.21</jmh.version>
+        <jmh.version>1.23</jmh.version>
 
         <!--
             Java source/target to use for compilation.
           -->
-        <javac.target>12</javac.target>
+        <javac.target>15</javac.target>
 
         <!--
             Name of the benchmark Uber-JAR to generate.
@@ -66,11 +66,14 @@
     </properties>
 
     <build>
+
+        <sourceDirectory>org</sourceDirectory>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.0</version>
+                <version>3.8.1</version>
                 <configuration>
                     <compilerVersion>${javac.target}</compilerVersion>
                     <source>${javac.target}</source>
@@ -80,7 +83,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.1</version>
+                <version>3.2.3</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
