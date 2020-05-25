@@ -67,7 +67,7 @@
 
     <build>
 
-        <sourceDirectory>org</sourceDirectory>
+        <sourceDirectory>.</sourceDirectory>
 
         <plugins>
             <plugin>

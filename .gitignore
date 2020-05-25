@@ -17,4 +17,5 @@ NashornProfile.txt
 **/JTwork/**
 /src/utils/hsdis/build/
 /test/micro/.idea/
+/test/micro/bench.iml
 /test/micro/target/
