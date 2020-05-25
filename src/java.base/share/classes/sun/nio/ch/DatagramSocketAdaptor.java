@@ -771,7 +771,7 @@ public class DatagramSocketAdaptor
     }
 
     /**
-     * Provides access non-public constants in DatagramSocket.
+     * Provides access to non-public constants in DatagramSocket.
      */
     private static class DatagramSockets {
         private static final SocketAddress NO_DELEGATE;
