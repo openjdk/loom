@@ -42,7 +42,7 @@ import org.openjdk.jmh.annotations.Warmup;
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(Scope.Thread)
-@Warmup(iterations = 20, time = 1, timeUnit = TimeUnit.SECONDS)
+@Warmup(iterations = 40, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 20, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 public class ContVsThread {

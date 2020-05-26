@@ -89,8 +89,8 @@ class VirtualThread extends Thread {
     // virtual thread state
     private static final short ST_NEW      = 0;
     private static final short ST_STARTED  = 1;
-    private static final short ST_RUNNABLE = 2;
-    private static final short ST_RUNNING  = 3;
+    private static final short ST_RUNNABLE = 2;    // runnable-unmounted
+    private static final short ST_RUNNING  = 3;    // runnable-mounted
     private static final short ST_PARKING  = 4;
     private static final short ST_PARKED   = 5;
     private static final short ST_PINNED   = 6;
@@ -167,12 +167,12 @@ class VirtualThread extends Thread {
         if (!stateCompareAndSet(ST_NEW, ST_STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
-        boolean scheduled = false;
+        boolean started = false;
         try {
             scheduler.execute(runContinuation);
-            scheduled = true;
+            started = true;
         } finally {
-            if (!scheduled) {
+            if (!started) {
                 afterTerminate(false);
             }
         }
@@ -299,12 +299,12 @@ class VirtualThread extends Thread {
         int s = stateGet();
         if (s == ST_PARKING) {
             // signal anyone waiting for this virtual thread to park
-            stateGetAndSet(ST_PARKED);
+            stateSet(ST_PARKED);
             signalParking();
         } else if (s == ST_RUNNING) {
             // Thread.yield, submit task to continue
-            stateGetAndSet(ST_RUNNABLE);
-            scheduler.execute(runContinuation);   // TBD if REE is thrown
+            stateSet(ST_RUNNABLE);
+            scheduler.execute(runContinuation);  // may throw RejectedExecutionException
         } else {
             throw new InternalError();
         }
@@ -317,8 +317,8 @@ class VirtualThread extends Thread {
      * @param notifyAgents true to notify JVMTI agents
      */
     private void afterTerminate(boolean notifyAgents) {
-        int oldState = stateGetAndSet(ST_TERMINATED);
-        assert oldState == ST_STARTED || oldState == ST_RUNNING;
+        assert state == ST_STARTED || state == ST_RUNNING;
+        stateSet(ST_TERMINATED);
 
         // notify JVMTI agents
         if (notifyAgents && notifyJvmtiEvents) {
@@ -894,6 +894,10 @@ class VirtualThread extends Thread {
         return state;
     }
 
+    private void stateSet(short newValue) {
+        state = newValue;
+    }
+
     private short stateGetAndSet(short newValue) {
         return (short) STATE.getAndSet(this, newValue);
     }
@@ -909,7 +913,11 @@ class VirtualThread extends Thread {
     }
 
     private boolean parkPermitGetAndSet(boolean newValue) {
-        return (boolean) PARK_PERMIT.getAndSet(this, newValue);
+        if (parkPermit != newValue) {
+            return (boolean) PARK_PERMIT.getAndSet(this, newValue);
+        } else {
+            return newValue;
+        }
     }
 
     // -- JVM TI support --
