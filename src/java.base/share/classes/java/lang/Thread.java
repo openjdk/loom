@@ -176,12 +176,12 @@ public class Thread implements Runnable {
      */
     private static class ThreadIdentifiers {
         private static final Unsafe U = Unsafe.getUnsafe();
-        private static final long nextTidOffset =
+        private static final long NEXT_TID_OFFSET =
             U.objectFieldOffset(ThreadIdentifiers.class, "nextTid");
         private static final long TID_MASK = (1L << 48) - 1; 
         private static volatile long nextTid = 2;
         private static long next() {
-            return U.getAndAddLong(ThreadIdentifiers.class, nextTidOffset, 1);
+            return U.getAndAddLong(ThreadIdentifiers.class, NEXT_TID_OFFSET, 1);
         }
     }
 
@@ -785,11 +785,14 @@ public class Thread implements Runnable {
 
         /**
          * The thread will be scheduled by the Java virtual machine rather than
-         * the operating system with the given scheduler.
-         * The scheduler's {@link Executor#execute(Runnable) execute} method
-         * should execute tasks on a kernel thread. Executing the task on a
-         * virtual thread leads to unspecified behavior. The tasks submitted
-         * to the scheduler are of type {@link VirtualThreadTask}.
+         * the operating system with the given scheduler. The scheduler's {@link
+         * Executor#execute(Runnable) execute} method is invoked with tasks of
+         * type {@link VirtualThreadTask}. The scheduler should arrange to execute
+         * these tasks on a kernel thread. Attempting to execute the task on a
+         * virtual thread causes an exception to be thrown (see {@link
+         * VirtualThreadTask#run()}). The {@code execute} method may be invoked at
+         * sensitive times (e.g. when unparking a thread) so care should be taken
+         * to not directly execute the task.
          * @param scheduler the scheduler
          * @return this builder
          * @throws IllegalStateException if a thread group has been set
