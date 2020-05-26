@@ -1314,6 +1314,8 @@ void Method::set_code(const methodHandle& mh, CompiledMethod *code) {
   // Instantly compiled code can execute.
   if (!mh->is_method_handle_intrinsic())
     mh->_from_interpreted_entry = mh->get_i2c_entry();
+  if (mh->is_continuation_enter_intrinsic())
+    mh->_i2i_entry = mh->get_i2c_entry(); // this is the entry used when we're in interpreter-only mode
 }
 
 

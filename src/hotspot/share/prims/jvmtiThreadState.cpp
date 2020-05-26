@@ -256,7 +256,7 @@ void JvmtiThreadState::incr_cur_stack_depth() {
     // heavy weight assert
     // fixme: remove this before merging loom with main jdk repo
     jint num_frames = count_frames();
-    assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync");
+    assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync _cur_stack_depth: %d num_frames: %d", _cur_stack_depth, num_frames);
 #endif
   }
 }
@@ -272,7 +272,7 @@ void JvmtiThreadState::decr_cur_stack_depth() {
     // heavy weight assert
     // fixme: remove this before merging loom with main jdk repo
     jint num_frames = count_frames();
-    assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync");
+    assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync _cur_stack_depth: %d num_frames: %d", _cur_stack_depth, num_frames);
 #endif
     --_cur_stack_depth;
     assert(_cur_stack_depth >= 0, "incr/decr_cur_stack_depth mismatch");
@@ -290,7 +290,7 @@ int JvmtiThreadState::cur_stack_depth() {
 #ifdef ASSERT
     // heavy weight assert
     jint num_frames = count_frames();
-    assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync");
+    assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync _cur_stack_depth: %d num_frames: %d", _cur_stack_depth, num_frames);
 #endif
   }
   return _cur_stack_depth;

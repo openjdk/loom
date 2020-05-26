@@ -106,7 +106,7 @@ vframe* vframe::top() const {
 javaVFrame* vframe::java_sender() const {
   vframe* f = sender();
   while (f != NULL) {
-    if (f->is_java_frame()) return javaVFrame::cast(f);
+    if (f->is_java_frame() && !javaVFrame::cast(f)->method()->is_continuation_enter_intrinsic()) return javaVFrame::cast(f);
     f = f->sender();
   }
   return NULL;

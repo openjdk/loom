@@ -380,7 +380,7 @@ frame frame::frame_sender(RegisterMap* map) const {
   assert(_cb == CodeCache::find_blob(pc()), "Must be the same");
 
   if (_cb != NULL) {
-    return is_compiled_frame() ? sender_for_compiled_frame<LOOKUP, false>(map) : sender_for_compiled_frame<LOOKUP, true>(map);
+    return _cb->is_compiled() ? sender_for_compiled_frame<LOOKUP, false>(map) : sender_for_compiled_frame<LOOKUP, true>(map);
   }
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
