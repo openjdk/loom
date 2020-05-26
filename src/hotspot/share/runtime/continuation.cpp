@@ -2198,6 +2198,8 @@ public:
     int argsize = bottom_argsize();
     _bottom_address = _cont.entrySP() - argsize;
     verify_cookie(_cont.entrySP());
+
+    assert (!Interpreter::contains(_cont.entryPC()), "");
     assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()), "");
     // if (mode != mode_fast && Interpreter::contains(_cont.entryPC())) {
     //   _bottom_address -= argsize; // we subtract again; see Thaw::align
@@ -3765,7 +3767,8 @@ public:
   bool thaw(FrameInfo* fi, bool return_barrier) {
     _fi = fi;
 
-    if (Interpreter::contains(_cont.entryPC())) _fastpath = false; // set _fastpath to false if entry is interpreted
+    assert (!Interpreter::contains(_cont.entryPC()), "");
+    // if (Interpreter::contains(_cont.entryPC())) _fastpath = false; // set _fastpath to false if entry is interpreted
 
     assert (verify_continuation<1>(_cont.mirror()), "");
     assert (!java_lang_Continuation::done(_cont.mirror()), "");
@@ -3872,9 +3875,7 @@ public:
       vsp = thaw<false>(false);
     } else {
       intptr_t* bot = _cont.entrySP(); // _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
-      if (Interpreter::contains(_cont.entryPC())) { // TODO PERF: remove this when we have the entry nmethod/stub
-        bot -= 1; // See Thaw<ConfigT, mode>::align SP_WIGGLE etc.
-      }
+      assert (!Interpreter::contains(_cont.entryPC()), "");
       vsp = bot;
     }
 
