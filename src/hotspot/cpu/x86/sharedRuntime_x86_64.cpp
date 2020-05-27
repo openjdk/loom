@@ -1834,6 +1834,60 @@ static void verify_oop_args(MacroAssembler* masm,
   }
 }
 
+// on entry rsi points to the continuation
+// on exit, rsp points to the ContinuationEntry
+static OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
+  const int data_size = align_up((int)sizeof(ContinuationEntry), 2*wordSize);
+
+  assert (data_size % VMRegImpl::stack_slot_size == 0, "");
+  assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
+  assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
+
+  stack_slots += data_size/wordSize;
+  __ subptr(rsp, data_size); // place Continuation metadata
+
+  OopMap* map = new OopMap((data_size + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
+  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::cont_offset())  / VMRegImpl::stack_slot_size));
+  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::chunk_offset()) / VMRegImpl::stack_slot_size));
+
+  __ movptr(rcx, Address(r15_thread,JavaThread::cont_entry_offset()));
+  __ movptr(Address(rsp, ContinuationEntry::parent_offset()), rcx);
+  __ movptr(Address(r15_thread, JavaThread::cont_entry_offset()), rsp);
+
+  return map;
+}
+
+// rsp points to ContinuationEntry
+static void fill_continuation_entry(MacroAssembler* masm) {
+  DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
+
+  __ movptr(Address(rsp, ContinuationEntry::cont_offset()), rsi);
+  __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
+  __ movptr(Address(rsp, ContinuationEntry::entry_sp_offset()), rsp);
+  __ movptr(Address(rsp, ContinuationEntry::entry_pc_offset()), (int32_t)0); // TODO
+}
+
+// on entry, rsp must point to the ContinuationEntry
+static void continuation_enter_cleanup(MacroAssembler* masm) {
+  const int data_size = align_up((int)sizeof(ContinuationEntry), 2*wordSize);
+
+#ifndef PRODUCT
+  Label OK1, OK2;
+  __ cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+  __ jcc(Assembler::equal, OK1);
+  __ stop("incorrect rsp1");
+  __ bind(OK1);
+  __ cmpptr(rsp, Address(rsp, ContinuationEntry::entry_sp_offset()));
+  __ jcc(Assembler::equal, OK2);
+  __ stop("incorrect rsp2");
+  __ bind(OK2);
+#endif
+   
+  __ movptr(rcx, Address(rsp, ContinuationEntry::parent_offset()));
+  __ movptr(Address(r15_thread, JavaThread::cont_entry_offset()), rcx);
+  __ addptr(rsp, data_size);
+}
+
 static void gen_continuation_enter(MacroAssembler* masm,
                                  const methodHandle& method,
                                  const BasicType* sig_bt,
@@ -1846,52 +1900,31 @@ static void gen_continuation_enter(MacroAssembler* masm,
   AddressLiteral resolve(SharedRuntime::get_resolve_static_call_stub(),
                          relocInfo::static_call_type);
 
-#ifndef PRODUCT
-  stack_slots = 6;
-#else
-  stack_slots = 2;
-#endif
-  OopMap* map = new OopMap(1, 0 /* arg_slots*/);
-  intptr_t start = (intptr_t)__ pc();
+  stack_slots = 2; // will be overwritten
+  address start = __ pc();
 
-  Label call_thaw;
-#ifndef PRODUCT
-  Label cookie_right, invalid_rsp;
-#endif
+  Label call_thaw, exit;
 
   // enterSpecial(Continuation c, boolean isContinue)
+
   __ push(rbp);
-
-#ifndef PRODUCT
-  __ push(0xbf0fcf01);
-  __ push(0xbf0fcf02);
-
-  __ push(0);
-  __ push(rsp);
-#endif
 
   //BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
   //bs->nmethod_entry_barrier(masm);
+  OopMap* map = continuation_enter_setup(masm, stack_slots);
 
   // Frame is now completed as far as size and linkage.
-  frame_complete = ((intptr_t)__ pc()) - start;
+  frame_complete =__ pc() - start;
   // if isContinue == 0
   //   _enterSP = sp
   // end
+ 
+  fill_continuation_entry(masm);
+
   __ cmpl(rdx, 0);
   __ jcc(Assembler::notEqual, call_thaw);
-  __ movptr(Address(rsi, java_lang_Continuation::entrySP_offset_in_bytes()), rsp);
-
-#ifndef PRODUCT
-  __ cmpl(Address(rsp, 16), 0xbf0fcf02);
-  __ jcc(Assembler::equal, cookie_right);
-  __ stop("incorrect cookie");
-
-  __ bind(cookie_right);
-#endif
 
   int up = align_up((intptr_t) __ pc() + 1, 4) - (intptr_t) (__ pc() + 1);
-
   if (up > 0) {
     __ nop(up);
   }
@@ -1899,56 +1932,29 @@ static void gen_continuation_enter(MacroAssembler* masm,
   address mark = __ pc();
   __ call(resolve);
 
-  intptr_t the_pc = (intptr_t) __ pc();
-  oop_maps->add_gc_map(the_pc - start, map);
+  oop_maps->add_gc_map(__ pc() - start, map);
   __ post_call_nop();
-
-
-#ifndef PRODUCT
-  __ lea(rax, Address(rsp,8));
-  __ cmpptr(rax, Address(rsp, 0));
-  __ jcc(Assembler::notEqual, invalid_rsp);
-
-  __ addptr(rsp, 4*wordSize);
-#endif
-  __ pop(rbp);
-  masm->ret(0);
+  __ jmp(exit);
 
   __ bind(call_thaw);
 
   __ movptr(rbx, (intptr_t) StubRoutines::cont_thaw());
   __ call(rbx);
 
-  map = new OopMap(1, 0 /* arg_slots*/);
-  the_pc = (intptr_t) __ pc();
-  oop_maps->add_gc_map(the_pc - start, map);
+  oop_maps->add_gc_map(__ pc() - start, map->deep_copy());
   __ post_call_nop();
 
-#ifndef PRODUCT
-  __ lea(rax, Address(rsp,8));
-  __ cmpptr(rax, Address(rsp, 0));
-  __ jcc(Assembler::notEqual, invalid_rsp);
-
-  __ addptr(rsp, 4*wordSize);
-#endif
+  __ bind(exit);
+  continuation_enter_cleanup(masm);
   __ pop(rbp);
   masm->ret(0);
 
-#ifndef PRODUCT
-  __ bind(invalid_rsp);
-// just make sure we don't overwrite the stack while making the call to make debugging easier
-  __ subptr(rsp, 5*wordSize);
-  __ stop("invalid rsp");
-#endif
-
   /// exception handling
 
-  exception_offset = ((intptr_t)__ pc()) - start;
-#ifndef PRODUCT
-  __ addptr(rsp, 5*wordSize);
-#else
+  exception_offset = __ pc() - start;
+
+  continuation_enter_cleanup(masm);
   __ addptr(rsp, 1*wordSize);
-#endif
 
   __ movptr(rbx, rax); // save the exception
   __ movptr(c_rarg0, Address(rsp, 0));

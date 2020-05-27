@@ -42,6 +42,8 @@ struct FrameInfo {
   intptr_t* sp;
 };
 
+class ContinuationEntry;
+
 class Continuations : public AllStatic {
 private:
   static volatile intptr_t _exploded_miss;
@@ -95,7 +97,7 @@ public:
   static bool is_cont_post_barrier_entry_frame(const frame& f);
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);
-  static bool is_frame_in_continuation(const frame& f, oop cont);
+  static bool is_frame_in_continuation(const frame& f, ContinuationEntry* cont);
   static bool is_frame_in_continuation(JavaThread* thread, const frame& f);
   static bool fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp);
   static bool fix_continuation_bottom_sender(RegisterMap* map, const frame& callee, address* sender_pc, intptr_t** sender_sp);
@@ -171,4 +173,53 @@ public:
 
 void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls);
 
+// Metadata stored in the continuation entry frame
+class ContinuationEntry {
+public:
+  DEBUG_ONLY(int cookie;)
+  DEBUG_ONLY(static ByteSize cookie_offset() { return byte_offset_of(ContinuationEntry, cookie); })
+private:
+  ContinuationEntry* _parent;
+  oopDesc* _cont;
+  oopDesc* _chunk;
+  int _parent_cont_fastpath;
+  int _parent_held_monitor_count;
+  
+  intptr_t* _entry_fp; // TODO PD
+  address   _entry_pc;
+  intptr_t* _entry_sp;
+
+public:
+  ContinuationEntry* parent() { return _parent; }
+
+  intptr_t* entry_sp() { return _entry_sp; }
+  address   entry_pc() { return _entry_pc; }
+  address*  entry_pc_addr() { return &_entry_pc; }
+  intptr_t* entry_fp() { return _entry_fp; } // TODO PD
+
+  void set_entry_sp(intptr_t* value) { _entry_sp = value; }
+  void set_entry_pc(address   value) { _entry_pc = value; }
+  void set_entry_fp(intptr_t* value) { _entry_fp = value; } // TODO PD
+
+  oop continuation() {
+    oop snapshot = _cont; 
+    return NativeAccess<>::oop_load(&snapshot);
+  }
+  oop cont_raw() { return _cont; }
+  oop chunk()        { return _chunk; }
+  void set_continuation(oop c) { _cont = c;  }
+  void set_chunk(oop c)        { _chunk = c; }
+
+public:
+  static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
+  static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
+  static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
+
+  static ByteSize entry_sp_offset() { return byte_offset_of(ContinuationEntry, _entry_sp); }
+  static ByteSize entry_pc_offset() { return byte_offset_of(ContinuationEntry, _entry_pc); }
+  static ByteSize entry_fp_offset() { return byte_offset_of(ContinuationEntry, _entry_fp); } // TODO PD
+
+  static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
+  static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
+};
 #endif // SHARE_VM_RUNTIME_CONTINUATION_HPP

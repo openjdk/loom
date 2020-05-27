@@ -1247,14 +1247,13 @@ class JavaThread: public Thread {
   // failed reallocations.
   int _frames_to_pop_failed_realloc;
 
+  ContinuationEntry* _cont_entry;
   bool _cont_yield; // a continuation yield is in progress
   bool _cont_preempt;
   FrameInfo _cont_frame;
   int _cont_fastpath_thread_state; // whether global thread state allows continuation fastpath (JVMTI)
   int _cont_fastpath;
   int _held_monitor_count; // used by continuations for fast lock detection
-public:
-  oopDesc* _continuation; // a hack used to make continuation thaw a bit faster; see prepare_thaw
 private:
 
   friend class VMThread;
@@ -1382,6 +1381,8 @@ public:
   inline volatile void* get_polling_page();
 
   // Continuation support
+  oop last_continuation() { return _cont_entry != NULL ? _cont_entry->continuation() : (oop)NULL; }
+  ContinuationEntry* cont_entry() { return _cont_entry; }
   bool cont_yield() { return _cont_yield; }
   void set_cont_yield(bool x) { _cont_yield = x; }
   void set_cont_fastpath(bool x) { _cont_fastpath = (int)x; }
@@ -1878,8 +1879,8 @@ static ByteSize scopedCache_offset()             { return byte_offset_of(JavaThr
     return byte_offset_of(JavaThread, _should_post_on_exceptions_flag);
   }
   static ByteSize doing_unsafe_access_offset() { return byte_offset_of(JavaThread, _doing_unsafe_access); }
-
-  DEBUG_ONLY(static ByteSize continuation_offset() { return byte_offset_of(JavaThread, _continuation); })
+  
+  static ByteSize cont_entry_offset()         { return byte_offset_of(JavaThread, _cont_entry); }
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }
   static ByteSize cont_frame_offset()         { return byte_offset_of(JavaThread, _cont_frame); }
   static ByteSize cont_preempt_offset()       { return byte_offset_of(JavaThread, _cont_preempt); }
@@ -1981,8 +1982,6 @@ static ByteSize scopedCache_offset()             { return byte_offset_of(JavaThr
     return pd_last_frame();
   }
   javaVFrame* last_java_vframe(RegisterMap* reg_map);
-
-  oop last_continuation();
   
   // Returns method at 'depth' java or native frames down the stack
   // Used for security checks

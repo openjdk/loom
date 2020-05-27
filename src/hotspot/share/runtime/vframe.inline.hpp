@@ -63,7 +63,6 @@ inline void vframeStreamCommon::next() {
       // *(_cont.raw_value()) = java_lang_Continuation::parent(_cont());
 
       if (_continuation_scope.not_null() && (scope == _continuation_scope())) {
-        assert (Continuation::is_frame_in_continuation(_frame, cont), "");
         _mode = at_end_mode;
         break;
       }

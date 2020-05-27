@@ -2779,7 +2779,7 @@ void MacroAssembler::reset_held_monitor_count(Register java_thread) {
 void MacroAssembler::stop_if_in_cont(Register cont, const char* name) {
 #ifdef _LP64
   Label no_cont;
-  movptr(cont, Address(r15_thread, in_bytes(JavaThread::continuation_offset())));
+  movptr(cont, Address(r15_thread, JavaThread::cont_entry_offset()));
   testl(cont, cont);
   jcc(Assembler::zero, no_cont);
   stop(name);

@@ -4650,9 +4650,6 @@ int java_lang_Continuation::_numInterpretedFrames_offset;
 int java_lang_Continuation::_refStack_offset;
 int java_lang_Continuation::_parent_offset;
 int java_lang_Continuation::_yieldInfo_offset;
-int java_lang_Continuation::_entrySP_offset;
-int java_lang_Continuation::_entryFP_offset;
-int java_lang_Continuation::_entryPC_offset;
 int java_lang_Continuation::_fp_offset;
 int java_lang_Continuation::_sp_offset;
 int java_lang_Continuation::_pc_offset;
@@ -4873,9 +4870,6 @@ void java_lang_ContinuationScope::serialize_offsets(SerializeClosure* f) {
   macro(_stack_offset,     k, vmSymbols::stack_name(),     int_array_signature,         false); \
   macro(_maxSize_offset,   k, vmSymbols::maxSize_name(),   int_signature,               false); \
   macro(_refStack_offset,  k, vmSymbols::refStack_name(),  object_array_signature,      false); \
-  macro(_entrySP_offset,   k, vmSymbols::entrySP_name(),   long_signature,              false); \
-  macro(_entryFP_offset,   k, vmSymbols::entryFP_name(),   long_signature,              false); \
-  macro(_entryPC_offset,   k, vmSymbols::entryPC_name(),   long_signature,              false); \
   macro(_fp_offset,        k, vmSymbols::fp_name(),        long_signature,              false); \
   macro(_sp_offset,        k, vmSymbols::sp_name(),        int_signature,               false); \
   macro(_pc_offset,        k, vmSymbols::pc_name(),        long_signature,              false); \
@@ -5317,9 +5311,6 @@ void JavaClasses::check_offsets() {
   // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, target,   "Ljava/lang/Runnable;");
   // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, stack,    "[I");
   // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, parent,   "Ljava/lang/Continuation;");
-  // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, entrySP,  "J");
-  // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, entryFP,  "J");
-  // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, entryPC,  "J");
   // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, lastFP,   "I");
   // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, lastSP,   "I");
 

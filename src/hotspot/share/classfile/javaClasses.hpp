@@ -1073,9 +1073,6 @@ class java_lang_Continuation: AllStatic {
   static int _target_offset;
   static int _parent_offset;
   static int _yieldInfo_offset;
-  static int _entrySP_offset;
-  static int _entryFP_offset;
-  static int _entryPC_offset;
   static int _tail_offset;
   static int _stack_offset;
   static int _maxSize_offset;
@@ -1115,13 +1112,6 @@ class java_lang_Continuation: AllStatic {
   static inline void  set_pc(oop ref, const address pc);
   static inline jint refSP(oop ref);
   static inline void set_refSP(oop ref, jint i);
-  static inline intptr_t* entrySP(oop ref);
-  static inline void set_entrySP(oop ref, intptr_t* sp);
-  static inline intptr_t* entryFP(oop ref);
-  static inline void set_entryFP(oop ref, intptr_t* fp);
-  static inline address entryPC(oop ref);
-  static inline void set_entryPC(oop ref, address pc);
-  static inline address* entryPC_addr(oop ref);
   static inline jint maxSize(oop ref);
   static inline void set_maxSize(oop ref, jint i);
   static inline jshort numFrames(oop ref);
@@ -1138,11 +1128,6 @@ class java_lang_Continuation: AllStatic {
   static bool is_reset(oop ref);
   static bool is_mounted(oop ref);
   static bool done(oop ref);
-
-  static int entrySP_offset_in_bytes()  {
-    assert(_entrySP_offset > 0, "Must be initialized");
-    return _entrySP_offset;
-  }
 };
 
 // Interface to jdk.internal.misc.StackChunk objects

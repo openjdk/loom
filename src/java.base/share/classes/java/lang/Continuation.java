@@ -146,12 +146,6 @@ public class Continuation {
 
     private boolean reset = false; // perftest only
 
-    // transient state
-    // addresses into vstack. only valid when mounted
-    private long entrySP = 0;
-    private long entryFP = 0;
-    private long entryPC = 0;
-
     // monitoring
     private short numFrames;
     private short numInterpretedFrames;
@@ -351,7 +345,6 @@ public class Continuation {
                 postYieldCleanup(origRefSP);
 
                 if (TRACE) System.out.println("clearing entryPC");
-                this.entryPC = 0; // cannot be done in native code, as a safpoint on the transition back to Java may want to walk the stack (with the still-mounted continuation)
 
                 unmount();
                 } catch (Throwable e) { e.printStackTrace(); System.exit(1); }
@@ -770,9 +763,6 @@ public class Continuation {
 
         this.fp = 0;
         this.pc = 0;
-        this.entrySP = 0;
-        this.entryFP = 0;
-        this.entryPC = 0;
 
         this.numFrames = 0;
         this.numInterpretedFrames = 0;

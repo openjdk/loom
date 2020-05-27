@@ -1661,7 +1661,6 @@ void JavaThread::initialize() {
   _in_deopt_handler = 0;
   _doing_unsafe_access = false;
   _stack_guard_state = stack_guard_unused;
-  DEBUG_ONLY(_continuation = NULL;)
 #if INCLUDE_JVMCI
   _pending_monitorenter = false;
   _pending_deoptimization = -1;
@@ -1693,7 +1692,8 @@ void JavaThread::initialize() {
   _cached_monitor_info = NULL;
   _parker = Parker::Allocate(this);
   _SleepEvent = ParkEvent::Allocate(this);
-    
+  
+  _cont_entry = NULL;
   _cont_yield = false;
   _cont_preempt = false;
   _cont_fastpath_thread_state = 1;
@@ -3413,12 +3413,6 @@ javaVFrame* JavaThread::last_java_vframe(RegisterMap *reg_map) {
     if (vf->is_java_frame()) return javaVFrame::cast(vf);
   }
   return NULL;
-}
-
-oop JavaThread::last_continuation() {
-  if (threadObj() == (oop)NULL) return (oop)NULL; // happens during initialization
-  
-  return java_lang_Thread::continuation(threadObj());
 }
 
 Klass* JavaThread::security_get_caller_class(int depth) {

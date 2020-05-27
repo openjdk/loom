@@ -389,9 +389,6 @@
   template(onPinned_name,                             "onPinned0")                                \
   template(scope_name,                                "scope")                                    \
   template(yieldInfo_name,                            "yieldInfo")                                \
-  template(entrySP_name,                              "entrySP")                                  \
-  template(entryFP_name,                              "entryFP")                                  \
-  template(entryPC_name,                              "entryPC")                                  \
   template(tail_name,                                 "tail")                                     \
   template(size_name,                                 "size")                                     \
   template(argsize_name,                              "argsize")                                  \

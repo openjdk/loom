@@ -231,27 +231,6 @@ inline jint java_lang_Continuation::refSP(oop ref) {
 inline void java_lang_Continuation::set_refSP(oop ref, jint i) {
   ref->int_field_put(_refSP_offset, i);
 }
-inline intptr_t* java_lang_Continuation::entrySP(oop ref) {
-  return (intptr_t*)ref->long_field(_entrySP_offset);
-}
-inline void java_lang_Continuation::set_entrySP(oop ref, intptr_t* sp) {
-  ref->long_field_put(_entrySP_offset, (jlong)sp);
-}
-inline intptr_t* java_lang_Continuation::entryFP(oop ref) {
-  return (intptr_t*)ref->long_field(_entryFP_offset);
-}
-inline void java_lang_Continuation::set_entryFP(oop ref, intptr_t* fp) {
-  ref->long_field_put(_entryFP_offset, (jlong)fp);
-}
-inline address java_lang_Continuation::entryPC(oop ref) {
-  return (address)ref->long_field(_entryPC_offset);
-}
-inline void java_lang_Continuation::set_entryPC(oop ref, address pc) {
-  ref->long_field_put(_entryPC_offset, (jlong)pc);
-}
-inline address* java_lang_Continuation::entryPC_addr(oop ref) {
-  return (address*)ref->field_addr(_entryPC_offset);
-}
 inline jint java_lang_Continuation::maxSize(oop ref) {
   return ref->int_field(_maxSize_offset);
 }

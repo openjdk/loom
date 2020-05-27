@@ -72,7 +72,7 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool walk_cont, bo
   _last_vstack_fp = NULL;
   if (walk_cont) {
     // we allocate the handle now (rather than in set_cont) because sometimes (StackWalker) the handle must live across HandleMarks
-    if (thread != NULL && thread->last_continuation() != NULL) {
+    if (thread != NULL && thread->cont_entry() != NULL) {
       _cont = Handle(Thread::current(), thread->last_continuation());
       *(_cont.raw_value()) = NULL; // TODO UGLY : we just need to allocate a NULL handle
     } else {

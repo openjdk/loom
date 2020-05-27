@@ -206,7 +206,6 @@ inline bool JfrVframeStream::at_continuation_scope_entry_frame() {
     return false;
   }
   if (_continuation_scope != (oop)NULL && java_lang_Continuation::scope(_continuation) == _continuation_scope) {
-    assert(Continuation::is_frame_in_continuation(_frame, _continuation), "");
     return true;
   }
   set_parent_continuation();

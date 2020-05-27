@@ -6860,14 +6860,6 @@ RuntimeStub* generate_cont_doYield() {
       __ jcc(Assembler::zero, no_saved_sp);
       __ movptr(rsp, fi);
       __ bind(no_saved_sp);
-
-#ifndef PRODUCT
-      Label cont_label;
-      __ cmpl(Address(rsp, 16), 0xbf0fcf02);
-      __ jcc(Assembler::equal, cont_label);
-      __ stop("Invalid cookie");
-      __ bind(cont_label);
-#endif
     }
 
     Label thaw_success;
