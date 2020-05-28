@@ -468,8 +468,6 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
          * fulfiller.
          */
         boolean shouldSpin(SNode s) {
-            if (Thread.currentThread().isVirtual())
-                return false;
             SNode h = head;
             return (h == s || h == null || isFulfilling(h.mode));
         }
@@ -735,7 +733,7 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
             /* Same idea as TransferStack.awaitFulfill */
             final long deadline = timed ? System.nanoTime() + nanos : 0L;
             Thread w = Thread.currentThread();
-            int spins = (head.next == s /*&& !Thread.currentThread().isVirtual()*/)
+            int spins = (head.next == s)
                 ? (timed ? MAX_TIMED_SPINS : MAX_UNTIMED_SPINS)
                 : 0;
             for (;;) {
