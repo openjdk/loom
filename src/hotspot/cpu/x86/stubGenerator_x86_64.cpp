@@ -71,6 +71,10 @@
 #define BIND(label) bind(label); BLOCK_COMMENT(#label ":")
 const int MXCSR_MASK = 0xFFC0;  // Mask out any pending exceptions
 
+OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots);
+void fill_continuation_entry(MacroAssembler* masm);
+void continuation_enter_cleanup(MacroAssembler* masm);
+
 // Stub Code definitions
 
 class StubGenerator: public StubCodeGenerator {
@@ -6769,10 +6773,12 @@ RuntimeStub* generate_cont_doYield() {
     __ jcc(Assembler::zero, pinned);
 
     __ pop(rbp); // not pinned -- jump to Continuation.run (the entry frame)
-    __ movptr(rbp, Address(rbp, 0)); // frame_info->fp has an indirection here. See Continuation::freeze for an explanation.
     __ pop(fi);
-    __ movptr(rsp, fi);
-    __ jmp(c_rarg2);
+
+    __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+    continuation_enter_cleanup(masm);
+    __ pop(rbp);
+    __ ret(0);
 
     __ bind(pinned); // pinned -- return to caller
     __ lea(rsp, Address(rsp, wordSize*2)); // "pop" the rest of the FrameInfo struct
@@ -7483,6 +7489,55 @@ RuntimeStub* generate_cont_doYield() {
     }
   }
 }; // end class declaration
+
+#undef __
+#define __ masm->
+
+// on entry rsi points to the continuation
+// on exit, rsp points to the ContinuationEntry
+OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
+  assert (ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
+  assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
+  assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
+
+  stack_slots += ContinuationEntry::size()/wordSize;
+  __ subptr(rsp, ContinuationEntry::size()); // place Continuation metadata
+
+  OopMap* map = new OopMap((ContinuationEntry::size() + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
+  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::cont_offset())  / VMRegImpl::stack_slot_size));
+  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::chunk_offset()) / VMRegImpl::stack_slot_size));
+
+  __ movptr(rcx, Address(r15_thread,JavaThread::cont_entry_offset()));
+  __ movptr(Address(rsp, ContinuationEntry::parent_offset()), rcx);
+  __ movptr(Address(r15_thread, JavaThread::cont_entry_offset()), rsp);
+
+  return map;
+}
+
+// rsp points to ContinuationEntry
+void fill_continuation_entry(MacroAssembler* masm) {
+  DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
+
+  __ movptr(Address(rsp, ContinuationEntry::cont_offset()), rsi);
+  __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
+}
+
+// on entry, rsp must point to the ContinuationEntry
+void continuation_enter_cleanup(MacroAssembler* masm) {
+#ifndef PRODUCT
+  Label OK;
+  __ cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+  __ jcc(Assembler::equal, OK);
+  __ stop("incorrect rsp1");
+  __ bind(OK);
+#endif
+   
+  __ movptr(rcx, Address(rsp, ContinuationEntry::parent_offset()));
+  __ movptr(Address(r15_thread, JavaThread::cont_entry_offset()), rcx);
+  __ addptr(rsp, ContinuationEntry::size());
+}
+
+#undef __
 
 #define UCM_TABLE_MAX_ENTRIES 16
 void StubGenerator_generate(CodeBuffer* code, int phase) {

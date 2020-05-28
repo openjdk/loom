@@ -65,11 +65,10 @@ static inline void copy_to_stack(void* from, void* to, size_t size) {
   cont_thaw_chunk_memcpy(from, to, size);
 }
 
-template<bool indirect>
 static void set_anchor(JavaThread* thread, const FrameInfo* fi) {
   JavaFrameAnchor* anchor = thread->frame_anchor();
   anchor->set_last_Java_sp((intptr_t*)fi->sp);
-  anchor->set_last_Java_fp(indirect ? *(intptr_t**)fi->fp : (intptr_t*)fi->fp); // there is an indirection in fi->fp in the FrameInfo created by Freeze::setup_jump
+  anchor->set_last_Java_fp((intptr_t*)fi->fp);
   anchor->set_last_Java_pc(fi->pc);
 
   assert (thread->has_last_Java_frame(), "");
@@ -696,9 +695,8 @@ inline frame ContinuationHelper::to_frame(FrameInfo* fi) {
   int slot;
   CodeBlob* cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
   assert (cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
-  assert (!indirect || fi->fp != NULL, "");
   return frame(fi->sp, fi->sp, 
-    indirect ? *(intptr_t**)fi->fp : fi->fp, 
+    indirect ? NULL : fi->fp, 
     pc, cb, slot == -1 ? NULL : cb->oop_map_for_slot(slot, pc));
 }
 
@@ -891,11 +889,6 @@ frame Freeze<ConfigT, mode>::chunk_start_frame_pd(oop chunk, intptr_t* sp) {
   address pc = *(address*)(sp - 1);
   intptr_t* fp = *(intptr_t**)(sp - 2); // TODO PERF -- unnecessary
   return frame(sp, sp, fp, pc, NULL, NULL, true);
-}
-
-template <typename ConfigT, op_mode mode>
-void Freeze<ConfigT, mode>::to_frame_info_chunk_pd(intptr_t* sp) {
-   _fi->fp = (intptr_t*)(sp-frame::sender_sp_offset); // indirection
 }
 
 static frame chunk_top_frame_pd(oop chunk, intptr_t* sp) {

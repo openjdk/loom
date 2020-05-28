@@ -260,7 +260,6 @@ bool frame::safe_for_sender(JavaThread *thread) {
 void frame::patch_pc(Thread* thread, address pc) {
   assert(_cb == CodeCache::find_blob(pc), "unexpected pc");
   address* pc_addr = &(((address*) sp())[-1]);
-  pc_addr = Continuation::get_continuation_entry_pc_for_sender(thread, *this, pc_addr);
 
   if (TracePcPatching) {
     tty->print_cr("patch_pc at address " INTPTR_FORMAT " [" INTPTR_FORMAT " -> " INTPTR_FORMAT "]",

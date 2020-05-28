@@ -131,6 +131,15 @@ template<int x> NOINLINE static bool verify_stack_chunk(oop chunk) { return Cont
 #endif
 
 int Continuations::_flags = 0;
+int ContinuationEntry::return_pc_offset = 0;
+nmethod* ContinuationEntry::continuation_enter = NULL;
+address ContinuationEntry::return_pc = NULL;
+
+void ContinuationEntry::set_enter_nmethod(nmethod* nm) {
+  assert (return_pc_offset != 0, "");
+  continuation_enter = nm;
+  return_pc = nm->code_begin() + return_pc_offset;
+}
 
 PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 // Freeze:
@@ -195,7 +204,6 @@ PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 #define RUN_SIG    "java.lang.Continuation.run()V"
 
 static bool is_stub(CodeBlob* cb);
-template<bool indirect>
 static void set_anchor(JavaThread* thread, const FrameInfo* fi);
 // static void set_anchor(JavaThread* thread, const frame& f); -- unused
 
@@ -627,10 +635,6 @@ public:
   intptr_t* entryFP() const { return _entry->entry_fp(); }
   address   entryPC() const { return _entry->entry_pc(); }
 
-  void set_entrySP(intptr_t* sp) { _entry->set_entry_sp(sp); }
-  void set_entryFP(intptr_t* fp) { _entry->set_entry_fp(fp); }
-  void set_entryPC(address pc)   { _entry->set_entry_pc(pc); log_develop_trace(jvmcont)("set_entryPC " INTPTR_FORMAT, p2i(pc)); }
-
   bool is_mounted() { return _entry != NULL; }
 
   oop tail() const         { return _tail; }
@@ -926,9 +930,6 @@ ContMirror::ContMirror(JavaThread* thread, oop cont)
 #endif
    _e_num_interpreted_frames(0), _e_num_frames(0), _e_num_refs(0), _e_size(0) {
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
-
-  if (_entry != NULL)
-    log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(entrySP()), p2i(entryFP()), p2i(entryPC()));
 }
 
 ContMirror::ContMirror(const RegisterMap* map)
@@ -940,9 +941,6 @@ ContMirror::ContMirror(const RegisterMap* map)
 #endif
    _e_num_interpreted_frames(0), _e_num_frames(0), _e_num_refs(0), _e_size(0) {
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
-
-  if (_entry != NULL)
-    log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(entrySP()), p2i(entryFP()), p2i(entryPC()));
 
   read();
 }
@@ -1521,7 +1519,7 @@ static inline void clear_anchor(JavaThread* thread) {
 #ifdef ASSERT
 static void set_anchor(JavaThread* thread, const FrameInfo* fi, address pc) {
   FrameInfo fi0 = { pc, fi->fp, fi->sp };
-  set_anchor<false>(thread, &fi0);
+  set_anchor(thread, &fi0);
 }
 #endif
 
@@ -2434,8 +2432,6 @@ public:
     log_develop_trace(jvmcont)("Young chunk success");
     if (log_develop_is_enabled(Debug, jvmcont)) print_chunk(chunk, _cont.mirror(), true);
 
-    setup_chunk_jump(bottom_sp, bottom_ret_pc);
-
     log_develop_trace(jvmcont)("FREEZE CHUNK #" INTPTR_FORMAT, _cont.hash());
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
     assert (_cont.chunk_invariant(), "");
@@ -2522,28 +2518,6 @@ public:
     assert (to >= (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(InstanceStackChunkKlass::start_of_stack(chunk)));
     assert (to + size <= (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk),
       "to + size: " INTPTR_FORMAT " end: " INTPTR_FORMAT, p2i(to + size), p2i((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)));
-  }
-
-  void setup_chunk_jump(intptr_t* bottom_sp, address pc) {
-    // tty->print_cr(">>> setup_chunk_jump sp: %p", sp);
-    // address pc = *(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET); -- problem, already patched
-    assert (_cont.entryPC() == NULL || Continuation::is_return_barrier_entry(pc) || pc == _cont.entryPC(), "");
-
-    _fi->sp = _cont.entrySP();
-    _fi->pc = _cont.entryPC() != NULL // Continuation::is_return_barrier_entry(pc) // TODO PERF
-                  ? _cont.entryPC()
-                  : pc;
-    to_frame_info_chunk_pd(bottom_sp);
-    assert (_fi->sp == _cont.entrySP(), "fi->sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(_fi->sp), p2i(_cont.entrySP()));
-    log_develop_debug(jvmcont)("Jumping to frame (freeze): pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(_fi->pc), p2i(_fi->sp), p2i(*(intptr_t**)_fi->fp));
-
-  #ifdef ASSERT
-    // if (f.pc() != real_pc(f)) tty->print_cr("Continuation.run deopted!");
-    log_develop_debug(jvmcont)("Jumping to frame (freeze): [%ld] (%d)", java_tid(_thread), _thread->has_pending_exception());
-    frame f = ContinuationHelper::to_frame<true>(_fi);
-    if (log_develop_is_enabled(Debug, jvmcont)) f.print_on(tty);
-    assert_top_java_frame_name(f, ENTER_SPECIAL_SIG);
-  #endif
   }
 
 #ifdef ASSERT
@@ -2949,34 +2923,9 @@ public:
       assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()), ""); // we do not allow entry to be interpreted in fast mode
       assert (mode != mode_fast || Interpreter::contains(_cont.entryPC()) || entry.sp() == _bottom_address, "f.sp: " INTPTR_FORMAT " _bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(entry.sp()), p2i(_bottom_address), p2i(_cont.entrySP()));
       // assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()) || entry.sp() == _cont.entrySP() - 2, "f.sp: %p entrySP: %p", entry.sp(), _cont.entrySP());
-
-      setup_jump<FKind>(entry, callee, argsize);
     }
 
     return freeze_ok;
-  }
-
-  template<typename FKind> // the callee's type
-  void setup_jump(const frame& f, const frame& callee, int argsize) {
-    assert (f.pc() == Frame::real_pc(f) || (f.is_compiled_frame() && f.cb()->as_compiled_method()->is_deopt_pc(Frame::real_pc(f))), "");
-    // assert (_cont.entryPC() == NULL || Continuation::is_return_barrier_entry(f.pc()) || _cont.entryPC() == Frame::real_pc(f),
-    //   "entryPC: " INTPTR_FORMAT " f.real_pc: " INTPTR_FORMAT " is_deopt(entryPC): %d is_deopt(f.real_pc): %d",
-    //   p2i(_cont.entryPC()), p2i(Frame::real_pc(f)), is_deopt_pc(f, _cont.entryPC()), is_deopt_pc(f, Frame::real_pc(f)));
-
-    ContinuationHelper::to_frame_info_pd<FKind>(f, callee, _fi);
-    // intptr_t* sp = f.unextended_sp() + (argsize > 0 ? (argsize >> LogBytesPerWord) + 1 : 0);
-    // assert (sp == _cont.entrySP(), "sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(sp), p2i(_cont.entrySP()));
-    _fi->sp = _cont.entrySP();
-    _fi->pc = Continuation::is_return_barrier_entry(f.pc()) ? _cont.entryPC()
-                                                            : Frame::real_pc(f); // Continuation.run may have been deoptimized - no longer true with new nmethod
-    // _fi->pc = _cont.entryPC() != NULL ? _cont.entryPC() : Frame::real_pc(f); // fails because of the above commented assert w/ Skynet +DeoptimizeALot
-  #ifdef ASSERT
-    // if (f.pc() != real_pc(f)) tty->print_cr("Continuation.run deopted!");
-    log_develop_debug(jvmcont)("Jumping to frame (freeze): [%ld] (%d)", java_tid(_thread), _thread->has_pending_exception());
-    frame f1 = ContinuationHelper::to_frame<true>(_fi);
-    if (log_develop_is_enabled(Debug, jvmcont)) f1.print_on(tty);
-    assert_top_java_frame_name(f1, ENTER_SPECIAL_SIG);
-  #endif
   }
 
   template <typename T>
@@ -3353,9 +3302,10 @@ static void invlidate_JVMTI_stack(JavaThread* thread) {
   }
 }
 
-static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont, const FrameInfo* fi) {
+static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont) {
   if (JvmtiExport::should_post_continuation_yield() || JvmtiExport::can_post_frame_pop()) {
-    set_anchor<true>(thread, fi); // ensure frozen frames are invisible
+    FrameInfo fi = { cont.entryPC(), cont.entryFP(), cont.entrySP() };
+    set_anchor(thread, &fi); // ensure frozen frames are invisible
 
     // The call to JVMTI can safepoint, so we need to restore oops.
     Handle conth(thread, cont.mirror());
@@ -3465,7 +3415,7 @@ int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
   #if CONT_JFR
     cont.post_jfr_event(&event, thread);
   #endif
-    post_JVMTI_yield(thread, cont, fi); // can safepoint
+    post_JVMTI_yield(thread, cont); // can safepoint
     return freeze_epilog(thread, fi, cont);
   }
 }
@@ -4524,7 +4474,7 @@ static int maybe_count_Java_frames(ContMirror& cont, bool return_barrier) {
 
 static void post_JVMTI_continue(JavaThread* thread, ContMirror& cont, FrameInfo* fi, int java_frame_count) {
   if (JvmtiExport::should_post_continuation_run()) {
-    set_anchor<false>(thread, fi); // ensure thawed frames are visible
+    set_anchor(thread, fi); // ensure thawed frames are visible
 
     // The call to JVMTI can safepoint, so we need to restore oops.
     Handle conth(thread, cont.mirror());
@@ -4585,13 +4535,6 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
   cont.read_minimal();
-  cont.set_entrySP(fi->sp);
-  cont.set_entryFP(fi->fp);
-  if (!return_barrier) {
-    cont.set_entryPC(fi->pc);
-  }
-
-  assert (thread->cont_entry()->entry_sp() == cont.entrySP(), "metadata sp: %p cont.entrySP(): %p", thread->cont_entry()->entry_sp(), cont.entrySP()); // 1111
 
 #ifdef ASSERT
   set_anchor(thread, fi, cont.entryPC());
@@ -4619,7 +4562,7 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   log_develop_trace(jvmcont)("fi->sp: " INTPTR_FORMAT " fi->fp: " INTPTR_FORMAT " fi->pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
 
 #ifndef PRODUCT
-  set_anchor<false>(thread, fi);
+  set_anchor(thread, fi);
   print_frames(thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
   if (LoomVerifyAfterThaw) {
     intptr_t *v = 0;
@@ -4643,7 +4586,7 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   verify_cookie(original_fi_sp);
 
 #ifndef PRODUCT
-  set_anchor<false>(thread, fi);
+  set_anchor(thread, fi);
   clear_anchor(thread);
 #endif
 }
@@ -4742,7 +4685,7 @@ JRT_ENTRY(address, Continuation::thaw(JavaThread* thread, FrameInfo* fi, bool re
   assert(thread == JavaThread::current(), "");
 
   thaw0(thread, fi, return_barrier);
-  set_anchor<false>(thread, fi); // we're in a full transition that expects last_java_frame
+  set_anchor(thread, fi); // we're in a full transition that expects last_java_frame
 
   if (exception) {
     // TODO: handle deopt. see TemplateInterpreterGenerator::generate_throw_exception, OptoRuntime::handle_exception_C, OptoRuntime::handle_exception_helper
@@ -4828,33 +4771,6 @@ bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) 
   return get_continuation_entry_for_frame(thread, f.unextended_sp()) != NULL;
 }
 
-address* Continuation::get_continuation_entry_pc_for_sender(Thread* thread, const frame& f, address* pc_addr0) {
-  if (!thread->is_Java_thread())
-    return pc_addr0;
-  ContinuationEntry* cont = get_continuation_entry_for_frame((JavaThread*)thread, f.unextended_sp() - 1);
-  if (cont == NULL)
-    return pc_addr0;
-  if (is_sp_in_continuation(f.unextended_sp(), cont))
-    return pc_addr0; // not the run frame
-  if (*pc_addr0 == f.raw_pc())
-    return pc_addr0;
-
-  address *pc_addr = cont->entry_pc_addr();
-  // If our callee is the entry frame, we can continue as usual becuse we use the ordinary return address; see Freeze::setup_jump
-  // If the entry frame is the callee, we set entryPC_addr to NULL in Thaw::finalize
-  // if (*pc_addr == NULL) {
-  //   assert (!is_return_barrier_entry(*pc_addr0), "");
-  //   return pc_addr0;
-  // }
-
-  // tty->print_cr(">>>> get_continuation_entry_pc_for_sender"); f.print_on(tty);
-  log_develop_trace(jvmcont)("get_continuation_entry_pc_for_sender pc_addr: " INTPTR_FORMAT " *pc_addr: " INTPTR_FORMAT, p2i(pc_addr), p2i(*pc_addr));
-  DEBUG_ONLY(if (log_develop_is_enabled(Trace, jvmcont)) { print_blob(tty, *pc_addr); print_blob(tty, *(address*)(f.sp()-1)); })
-  // if (log_develop_is_enabled(Trace, jvmcont)) { os::print_location(tty, (intptr_t)pc_addr); os::print_location(tty, (intptr_t)*pc_addr); }
-
-  return pc_addr;
-}
-
 bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
   // TODO : this code and its use sites, as well as get_continuation_entry_pc_for_sender, probably need more work
   if (thread != NULL && is_return_barrier_entry(*sender_pc)) {
@@ -4864,8 +4780,7 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
 
     ContinuationEntry* cont = get_continuation_entry_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert (cont != NULL, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: continuation entrySP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT,
-      p2i(cont->entry_sp()), p2i(cont->entry_pc()), p2i(cont->entry_fp()));
+    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: continuation entrySP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(cont->entry_sp()), p2i(cont->entry_pc()));
 
     address new_pc = cont->entry_pc();
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(new_pc));

@@ -102,7 +102,6 @@ public:
   static bool fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp);
   static bool fix_continuation_bottom_sender(RegisterMap* map, const frame& callee, address* sender_pc, intptr_t** sender_sp);
   // static frame fix_continuation_bottom_sender(const frame& callee, RegisterMap* map, frame f);
-  static address* get_continuation_entry_pc_for_sender(Thread* thread, const frame& f, address* pc_addr);
   static address get_top_return_pc_post_barrier(JavaThread* thread, address pc);
 
   static frame top_frame(const frame& callee, RegisterMap* map);
@@ -178,28 +177,30 @@ class ContinuationEntry {
 public:
   DEBUG_ONLY(int cookie;)
   DEBUG_ONLY(static ByteSize cookie_offset() { return byte_offset_of(ContinuationEntry, cookie); })
+
+public: 
+  static int return_pc_offset; // friend gen_continuation_enter
+  static void set_enter_nmethod(nmethod* nm); // friend SharedRuntime::generate_native_wrapper
+
+private:
+  static nmethod* continuation_enter;
+  static address return_pc;
+
 private:
   ContinuationEntry* _parent;
   oopDesc* _cont;
   oopDesc* _chunk;
   int _parent_cont_fastpath;
   int _parent_held_monitor_count;
-  
-  intptr_t* _entry_fp; // TODO PD
-  address   _entry_pc;
-  intptr_t* _entry_sp;
 
 public:
+  static size_t size() { return align_up((int)sizeof(ContinuationEntry), 2*wordSize); }
+
   ContinuationEntry* parent() { return _parent; }
 
-  intptr_t* entry_sp() { return _entry_sp; }
-  address   entry_pc() { return _entry_pc; }
-  address*  entry_pc_addr() { return &_entry_pc; }
-  intptr_t* entry_fp() { return _entry_fp; } // TODO PD
-
-  void set_entry_sp(intptr_t* value) { _entry_sp = value; }
-  void set_entry_pc(address   value) { _entry_pc = value; }
-  void set_entry_fp(intptr_t* value) { _entry_fp = value; } // TODO PD
+  static address entry_pc() { return return_pc; }
+  intptr_t* entry_sp() { return (intptr_t*)this; }
+  intptr_t* entry_fp() { return *(intptr_t**)((address)this + size()); } // TODO PD
 
   oop continuation() {
     oop snapshot = _cont; 
@@ -214,10 +215,6 @@ public:
   static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
   static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
   static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
-
-  static ByteSize entry_sp_offset() { return byte_offset_of(ContinuationEntry, _entry_sp); }
-  static ByteSize entry_pc_offset() { return byte_offset_of(ContinuationEntry, _entry_pc); }
-  static ByteSize entry_fp_offset() { return byte_offset_of(ContinuationEntry, _entry_fp); } // TODO PD
 
   static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
   static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }

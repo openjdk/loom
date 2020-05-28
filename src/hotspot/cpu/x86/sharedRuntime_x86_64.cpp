@@ -1834,59 +1834,10 @@ static void verify_oop_args(MacroAssembler* masm,
   }
 }
 
-// on entry rsi points to the continuation
-// on exit, rsp points to the ContinuationEntry
-static OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
-  const int data_size = align_up((int)sizeof(ContinuationEntry), 2*wordSize);
-
-  assert (data_size % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
-
-  stack_slots += data_size/wordSize;
-  __ subptr(rsp, data_size); // place Continuation metadata
-
-  OopMap* map = new OopMap((data_size + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
-  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::cont_offset())  / VMRegImpl::stack_slot_size));
-  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::chunk_offset()) / VMRegImpl::stack_slot_size));
-
-  __ movptr(rcx, Address(r15_thread,JavaThread::cont_entry_offset()));
-  __ movptr(Address(rsp, ContinuationEntry::parent_offset()), rcx);
-  __ movptr(Address(r15_thread, JavaThread::cont_entry_offset()), rsp);
-
-  return map;
-}
-
-// rsp points to ContinuationEntry
-static void fill_continuation_entry(MacroAssembler* masm) {
-  DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
-
-  __ movptr(Address(rsp, ContinuationEntry::cont_offset()), rsi);
-  __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
-  __ movptr(Address(rsp, ContinuationEntry::entry_sp_offset()), rsp);
-  __ movptr(Address(rsp, ContinuationEntry::entry_pc_offset()), (int32_t)0); // TODO
-}
-
-// on entry, rsp must point to the ContinuationEntry
-static void continuation_enter_cleanup(MacroAssembler* masm) {
-  const int data_size = align_up((int)sizeof(ContinuationEntry), 2*wordSize);
-
-#ifndef PRODUCT
-  Label OK1, OK2;
-  __ cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
-  __ jcc(Assembler::equal, OK1);
-  __ stop("incorrect rsp1");
-  __ bind(OK1);
-  __ cmpptr(rsp, Address(rsp, ContinuationEntry::entry_sp_offset()));
-  __ jcc(Assembler::equal, OK2);
-  __ stop("incorrect rsp2");
-  __ bind(OK2);
-#endif
-   
-  __ movptr(rcx, Address(rsp, ContinuationEntry::parent_offset()));
-  __ movptr(Address(r15_thread, JavaThread::cont_entry_offset()), rcx);
-  __ addptr(rsp, data_size);
-}
+// defined in stubGenerator_x86_64.cpp
+OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots);
+void fill_continuation_entry(MacroAssembler* masm);
+void continuation_enter_cleanup(MacroAssembler* masm);
 
 static void gen_continuation_enter(MacroAssembler* masm,
                                  const methodHandle& method,
@@ -1931,23 +1882,23 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   address mark = __ pc();
   __ call(resolve);
-
   oop_maps->add_gc_map(__ pc() - start, map);
   __ post_call_nop();
+
   __ jmp(exit);
 
   __ bind(call_thaw);
 
   __ movptr(rbx, (intptr_t) StubRoutines::cont_thaw());
   __ call(rbx);
-
   oop_maps->add_gc_map(__ pc() - start, map->deep_copy());
+  ContinuationEntry::return_pc_offset = __ pc() - start;
   __ post_call_nop();
 
   __ bind(exit);
   continuation_enter_cleanup(masm);
   __ pop(rbp);
-  masm->ret(0);
+  __ ret(0);
 
   /// exception handling
 
@@ -2090,16 +2041,18 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                          frame_complete,
                          stack_slots);
     __ flush();
-    return nmethod::new_native_nmethod(method,
-                                       compile_id,
-                                       masm->code(),
-                                       vep_offset,
-                                       frame_complete,
-                                       stack_slots,
-                                       in_ByteSize(-1),
-                                       in_ByteSize(-1),
-                                       oop_maps,
-                                       exception_offset);
+    nmethod* nm = nmethod::new_native_nmethod(method,
+                                              compile_id,
+                                              masm->code(),
+                                              vep_offset,
+                                              frame_complete,
+                                              stack_slots,
+                                              in_ByteSize(-1),
+                                              in_ByteSize(-1),
+                                              oop_maps,
+                                              exception_offset);
+    ContinuationEntry::set_enter_nmethod(nm);
+    return nm;
   }
 
   if (method->is_method_handle_intrinsic()) {
@@ -2123,6 +2076,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                                        in_ByteSize(-1),
                                        (OopMapSet*)NULL);
   }
+
   bool is_critical_native = true;
   address native_func = critical_entry;
   if (native_func == NULL) {
