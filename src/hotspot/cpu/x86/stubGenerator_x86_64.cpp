@@ -6791,19 +6791,10 @@ RuntimeStub* generate_cont_doYield() {
     __ get_thread(r15_thread);
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
 
-    __ lea(fi, Address(r15_thread, JavaThread::cont_frame_offset()));
-    __ movptr(rdx, Address(fi, wordSize*0)); // pc
-    __ movptr(rbp, Address(fi, wordSize*1)); // fp
-    __ movptr(rbp, Address(rbp, 0)); // fp is indirect. See Continuation::freeze for an explanation.
-    __ movptr(rsp, Address(fi, wordSize*2)); // sp
-
-    __ xorq(rax, rax);
-    __ movptr(Address(fi, wordSize*0), rax); // pc
-    __ movptr(Address(fi, wordSize*1), rax); // fp
-    __ movptr(Address(fi, wordSize*2), rax); // sp
-    __ movb(Address(r15_thread, JavaThread::cont_preempt_offset()), 0);
-
-    __ jmp(rdx);
+    __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+    continuation_enter_cleanup(_masm);
+    __ pop(rbp);
+    __ ret(0);
 
     return start;
   }
@@ -6835,17 +6826,8 @@ RuntimeStub* generate_cont_doYield() {
     if (!return_barrier) {
       __ pop(c_rarg3); // pop return address. if we don't do this, we get a drift, where the bottom-most frozen frame continuously grows
       // __ lea(rsp, Address(rsp, wordSize)); // pop return address. if we don't do this, we get a drift, where the bottom-most frozen frame continuously grows
-      // write sp to thread->_cont_frame.sp
-      __ lea(fi, Address(r15_thread, JavaThread::cont_frame_offset()));
-      __ movptr(Address(fi, wordSize*2), rsp); // sp
     } else {
-      Label no_saved_sp;
-      __ lea(fi, Address(r15_thread, JavaThread::cont_frame_offset()));
-      __ movptr(fi, Address(fi, wordSize*2)); // sp
-      __ testq(fi, fi);
-      __ jcc(Assembler::zero, no_saved_sp);
-      __ movptr(rsp, fi);
-      __ bind(no_saved_sp);
+      __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
     }
     #ifndef PRODUCT
       Label OK;
@@ -7512,6 +7494,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
 
   __ movptr(Address(rsp, ContinuationEntry::cont_offset()), rsi);
   __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
+  __ movptr(Address(rsp, ContinuationEntry::argsize_offset()), (int32_t)0);
 }
 
 // on entry, rsp must point to the ContinuationEntry

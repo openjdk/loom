@@ -1250,7 +1250,6 @@ class JavaThread: public Thread {
   ContinuationEntry* _cont_entry;
   bool _cont_yield; // a continuation yield is in progress
   bool _cont_preempt;
-  FrameInfo _cont_frame;
   int _cont_fastpath_thread_state; // whether global thread state allows continuation fastpath (JVMTI)
   int _cont_fastpath;
   int _held_monitor_count; // used by continuations for fast lock detection
@@ -1391,7 +1390,6 @@ public:
   bool cont_fastpath_thread_state() { return _cont_fastpath_thread_state != 0; }
   bool cont_preempt() { return _cont_preempt; }
   void set_cont_preempt(bool x) { _cont_preempt = x; }
-  FrameInfo* cont_frame() { return &_cont_frame; }
   int held_monitor_count() { return _held_monitor_count; }
   void reset_held_monitor_count() { _held_monitor_count = 0; }
   void inc_held_monitor_count() { _held_monitor_count++; }
@@ -1882,7 +1880,6 @@ static ByteSize scopedCache_offset()             { return byte_offset_of(JavaThr
   
   static ByteSize cont_entry_offset()         { return byte_offset_of(JavaThread, _cont_entry); }
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }
-  static ByteSize cont_frame_offset()         { return byte_offset_of(JavaThread, _cont_frame); }
   static ByteSize cont_preempt_offset()       { return byte_offset_of(JavaThread, _cont_preempt); }
   static ByteSize held_monitor_count_offset() { return byte_offset_of(JavaThread, _held_monitor_count); }
 

@@ -181,21 +181,6 @@ PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 //
 // The data structure invariants are defined by Continuation::debug_verify_continuation and Continuation::debug_verify_stack_chunk
 //
-// Thread::_cont_frame:
-//  1.
-//    - set in try_force_yield to point to entry
-//    - used in generate_cont_jump_from_safepoint (StubRoutines::cont_jump_from_sp()) patched in try_force_yield
-//  2.
-//    _cont_frame->sp/fp are also used to track the stack argsize of the bottom-most frame of a mounted continuation
-//    - _cont_frame->sp set in generate_cont_thaw to be the entry's sp (equal to entrySP) when not in return barrier
-//    - _cont_frame->sp read in generate_cont_thaw and copied to rsp when in return barrier
-//    - _cont_frame->sp reset in freeze_epilog after a freeze
-//    - _cont_frame->sp reset in Thaw::thaw when the continuation is emptied
-//    - _cont_frame->sp reset in Thaw::patch_chunk when the continuation is emptied
-//    - _cont_frame->fp set in thaw_compiled_frame for bottom frame to _cont_frame->sp - argsize.
-//    - _cont_frame->fp set in Thaw::patch_chunk for bottom frame to _cont_frame->sp - argsize.
-//    - _cont_frame->fp reset in Thaw::thaw, before thawing any frames
-//    - _cont_frame->fp set as _bottom_address in Freeze constructor
 
 #define YIELD_SIG  "java.lang.Continuation.yield(Ljava/lang/ContinuationScope;)V"
 #define YIELD0_SIG "java.lang.Continuation.yield0(Ljava/lang/ContinuationScope;Ljava/lang/Continuation;)Z"
@@ -635,6 +620,9 @@ public:
   intptr_t* entrySP() const { return _entry->entry_sp(); }
   intptr_t* entryFP() const { return _entry->entry_fp(); }
   address   entryPC() const { return _entry->entry_pc(); }
+
+  int argsize() const { return _entry->argsize(); }
+  void set_argsize(int value) { _entry->set_argsize(value); }
 
   bool is_mounted() { return _entry != NULL; }
 
@@ -2252,11 +2240,9 @@ public:
   }
 
   inline int bottom_argsize() {
-    intptr_t* saved_sp = _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
-    int argsize = saved_sp == NULL ? 0 :  saved_sp - _thread->cont_frame()->fp; // in words
-    log_develop_trace(jvmcont)("thread->cont_frame->sp: " INTPTR_FORMAT " thread->cont_frame->fp: " INTPTR_FORMAT " argsize: %d", p2i(_thread->cont_frame()->sp), p2i(_thread->cont_frame()->fp), argsize);
-    assert (saved_sp == NULL || saved_sp == _cont.entrySP(), "saved_sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(saved_sp), p2i(_cont.entrySP()));
-    assert (argsize >= 0, "");
+    int argsize = _cont.argsize(); // in words
+    log_develop_trace(jvmcont)("bottom_argsize: %d", argsize);
+    assert (argsize >= 0, "argsize: %d", argsize);
     return argsize;
   }
 
@@ -3309,7 +3295,6 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
   assert (!cont.is_empty(), "");
 
   // set_anchor(thread, fi);
-  thread->cont_frame()->sp = NULL;
   thread->set_cont_yield(false);
   // thread->reset_held_monitor_count();
 
@@ -3536,7 +3521,6 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
 
   int res = cont_freeze<mode_slow>(thread, true); // CAST_TO_FN_PTR(DoYieldStub, StubRoutines::cont_doYield_C())(-1);
   if (res == 0) { // success
-    // thread->_cont_frame = fi; // XXXXXXX <-- _cont_frame is actually the entry frame
     thread->set_cont_preempt(true);
 
     frame last = thread->last_frame();
@@ -3681,15 +3665,6 @@ public:
 
     thaw<true>(return_barrier);
 
-    if (_cont.is_empty0()) {
-      // This is part of the mechanism to pop stack-passed compiler arguments; see generate_cont_thaw's no_saved_sp label.
-      // we use thread->_cont_frame->sp rather than the continuations themselves (which allow nesting) b/c it's faser and simpler.
-      // for that to work, we rely on the fact that parent continuation's have at least Continuation.run on the stack, which does not require stack arguments
-      log_develop_trace(jvmcont)("resetting thread->cont_frame()");
-      _cont.thread()->cont_frame()->sp = NULL;
-      _cont.thread()->cont_frame()->fp = NULL;
-    }
-
     assert (java_lang_Continuation::numFrames(_cont.mirror()) == orig_num_frames - _frames, "num_frames: %d orig_num_frames: %d frame_count: %d", java_lang_Continuation::numFrames(_cont.mirror()), orig_num_frames, _frames);
     // assert (mode != mode_fast || _fastpath, "");
     assert(_cont.chunk_invariant(), "");
@@ -3772,7 +3747,7 @@ public:
       java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
       vsp = thaw<false>(false);
     } else {
-      intptr_t* bot = _cont.entrySP(); // _thread->cont_frame()->sp; // the real cont caller's sp, stored by generate_cont_thaw
+      intptr_t* bot = _cont.entrySP();
       assert (!Interpreter::contains(_cont.entryPC()), "");
       vsp = bot;
     }
@@ -3974,10 +3949,9 @@ public:
     address pc;
     if (!is_last) {
       pc = StubRoutines::cont_returnBarrier();
-      _thread->cont_frame()->fp = _thread->cont_frame()->sp - argsize;
+      _cont.set_argsize(argsize);
     } else {
-      _thread->cont_frame()->sp = NULL;
-      _thread->cont_frame()->fp = NULL;
+      _cont.set_argsize(0);
       pc = (mode != mode_fast && should_deoptimize()) ? new_entry_frame().raw_pc() : _cont.entryPC();
     }
     *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
@@ -4073,8 +4047,7 @@ public:
     assert_bottom_java_frame_name(entry, ENTER_SPECIAL_SIG);
   #endif
 
-    assert (_thread->cont_frame()->sp == _cont.entrySP(), "cont_frame()->sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(_thread->cont_frame()->sp), p2i(_cont.entrySP()));
-    _thread->cont_frame()->fp = _cont.thread()->cont_frame()->sp;
+    _cont.set_argsize(0);
     if (is_empty) {
       _cont.set_empty();
       // _cont.set_entryPC(NULL);
@@ -4285,10 +4258,9 @@ public:
       vsp = align<FKind, top, bottom>(hf, vsp, const_cast<frame&>(caller));
 
       if (bottom) {
-        assert (_thread->cont_frame()->sp == _cont.entrySP(), "thread->cont_frame->sp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(_thread->cont_frame()->sp), p2i(_cont.entrySP()));
-        assert (_thread->cont_frame()->fp == _thread->cont_frame()->sp, "cont_frame()->fp: " INTPTR_FORMAT " _thread->cont_frame()->sp: " INTPTR_FORMAT, p2i(_thread->cont_frame()->fp), p2i(_thread->cont_frame()->sp));
-        _thread->cont_frame()->fp -= argsize >> LogBytesPerWord;
-        log_develop_trace(jvmcont)("setting thread->cont_frame->fp: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: %d", p2i(_thread->cont_frame()->fp), p2i(_cont.entrySP()), argsize);
+        assert (_cont.argsize() == 0, "entry argsize: %d: ", _cont.argsize());
+        _cont.set_argsize(argsize >> LogBytesPerWord);
+        log_develop_trace(jvmcont)("setting entry argsize: %d", _cont.argsize());
       }
     }
 

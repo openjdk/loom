@@ -190,6 +190,7 @@ private:
   ContinuationEntry* _parent;
   oopDesc* _cont;
   oopDesc* _chunk;
+  int _argsize;
   int _parent_cont_fastpath;
   int _parent_held_monitor_count;
 
@@ -201,6 +202,9 @@ public:
   static address entry_pc() { return return_pc; }
   intptr_t* entry_sp() { return (intptr_t*)this; }
   intptr_t* entry_fp() { return *(intptr_t**)((address)this + size()); } // TODO PD
+
+  int argsize() { return _argsize; }
+  void set_argsize(int value) { _argsize = value; }
 
   oop continuation() {
     oop snapshot = _cont; 
@@ -215,6 +219,7 @@ public:
   static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
   static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
   static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
+  static ByteSize argsize_offset()  { return byte_offset_of(ContinuationEntry, _argsize); }
 
   static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
   static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
