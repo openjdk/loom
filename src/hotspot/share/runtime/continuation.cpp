@@ -928,7 +928,7 @@ ContMirror::ContMirror(JavaThread* thread, oop cont)
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
 
   if (_entry != NULL)
-    log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(entrySP()), p2i(entryFP()), p2i(entryPC()));
+    log_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(entrySP()), p2i(entryFP()), p2i(entryPC()));
 }
 
 ContMirror::ContMirror(const RegisterMap* map)
@@ -942,7 +942,7 @@ ContMirror::ContMirror(const RegisterMap* map)
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
 
   if (_entry != NULL)
-    log_develop_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(entrySP()), p2i(entryFP()), p2i(entryPC()));
+    log_trace(jvmcont)("\tentrySP: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(entrySP()), p2i(entryFP()), p2i(entryPC()));
 
   read();
 }
