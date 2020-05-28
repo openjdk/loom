@@ -631,6 +631,7 @@ public:
   oop parent() { return java_lang_Continuation::parent(_cont); }
   void cleanup();
 
+  ContinuationEntry* entry() const { return _entry; }
   intptr_t* entrySP() const { return _entry->entry_sp(); }
   intptr_t* entryFP() const { return _entry->entry_fp(); }
   address   entryPC() const { return _entry->entry_pc(); }
@@ -1257,7 +1258,6 @@ public:
 
   static inline frame frame_with(frame& f, intptr_t* sp, address pc, intptr_t* fp);
   static inline frame last_frame(JavaThread* thread);
-  static inline void to_frame_info(const frame& f, const frame& callee, FrameInfo* fi);
   template<typename FKind> static inline void to_frame_info_pd(const frame& f, const frame& callee, FrameInfo* fi);
   static inline void to_frame_info_pd(const frame& f, FrameInfo* fi);
   template<bool indirect>
@@ -1441,20 +1441,6 @@ void Continuation::set_cont_fastpath_thread_state(JavaThread* thread) {
   thread->set_cont_fastpath_thread_state(fast);
 }
 
-void ContinuationHelper::to_frame_info(const frame& f, const frame& callee, FrameInfo* fi) {
-  fi->sp = f.unextended_sp(); // entrySP;
-  fi->pc = Frame::real_pc(f); // Continuation.run may have been deoptimized
-  // callee.is_interpreted_frame() ? ContinuationHelper::to_frame_info_pd<Interpreted>(f, callee, fi)
-  //                               : ContinuationHelper::to_frame_info_pd<Compiled   >(f, callee, fi);
-  CHOOSE2(callee.is_interpreted_frame(), ContinuationHelper::to_frame_info_pd, f, callee, fi);
-}
-
-void clear_frame_info(FrameInfo* fi) {
-  fi->fp = NULL;
-  fi->sp = NULL;
-  fi->pc = NULL;
-}
-
 // works only in thaw
 static inline bool is_entry_frame(const ContMirror& cont, const frame& f) {
   return f.sp() == cont.entrySP();
@@ -1517,9 +1503,9 @@ static inline void clear_anchor(JavaThread* thread) {
 }
 
 #ifdef ASSERT
-static void set_anchor(JavaThread* thread, const FrameInfo* fi, address pc) {
-  FrameInfo fi0 = { pc, fi->fp, fi->sp };
-  set_anchor(thread, &fi0);
+static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
+  FrameInfo fi = { cont->entry_pc(), cont->entry_fp(), cont->entry_sp() };
+  set_anchor(thread, &fi);
 }
 #endif
 
@@ -1596,7 +1582,7 @@ enum freeze_result {
   freeze_retry_slow = 5,
 };
 
-typedef int (*FreezeContFnT)(JavaThread*, FrameInfo*, bool);
+typedef int (*FreezeContFnT)(JavaThread*, bool);
 
 static void freeze_compiled_frame_bp() {}
 static void thaw_compiled_frame_bp() {}
@@ -1617,10 +1603,10 @@ public:
 };
 
 template<op_mode mode>
-static int cont_freeze(JavaThread* thread, FrameInfo* fi, bool preempt) {
+static int cont_freeze(JavaThread* thread, bool preempt) {
   switch (mode) {
-    case mode_fast:    return cont_freeze_fast   (thread, fi, preempt);
-    case mode_slow:    return cont_freeze_slow   (thread, fi, preempt);
+    case mode_fast:    return cont_freeze_fast(thread, preempt);
+    case mode_slow:    return cont_freeze_slow(thread, preempt);
     default:
       guarantee(false, "unreachable");
       return -1;
@@ -2123,7 +2109,6 @@ private:
   int _cgrind_interpreted_frames;
 
   FpOopInfo _fp_oop_info;
-  FrameInfo* _fi;
 
   RegisterMapT _map;
 
@@ -2149,7 +2134,7 @@ private:
 
 public:
 
-  Freeze(JavaThread* thread, FrameInfo* fi, ContMirror& mirror) :
+  Freeze(JavaThread* thread, ContMirror& mirror) :
     _thread(thread), _cont(mirror),
     _oops(0), _size(0), _frames(0), _cgrind_interpreted_frames(0),
     _fp_oop_info(), _map(thread, false, false, false),
@@ -2157,7 +2142,6 @@ public:
     _safepoint_stub(false), _safepoint_stub_h(false), // don't intitialize
     _safepoint_stub_caller(false), _keepalive(NULL) {
 
-    _fi = fi;
     // _cont.read_entry(); // even when retrying, because deopt can change entryPC; see Continuation::get_continuation_entry_pc_for_sender
     _cont.read_minimal();
 
@@ -2193,7 +2177,6 @@ public:
 
     assert (mode == mode_fast, "");
 
-    _fi = NULL;
     // this is only uaed to terminate the frame loop.
     _bottom_address = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
     int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
@@ -2285,7 +2268,8 @@ public:
     if (chunk == (oop)NULL || requires_barriers(chunk))
       return false;
 
-    intptr_t* const top = _fi->sp;
+    assert (StubRoutines::cont_doYield_stub()->frame_size() == frame_metadata, "");
+    intptr_t* const top = _thread->frame_anchor()->last_Java_sp() + frame_metadata;// _fi->sp;
     const int argsize = bottom_argsize();
     intptr_t* const bottom = align_bottom(_cont.entrySP(), argsize);
     int size = bottom - top; // in words
@@ -2324,7 +2308,9 @@ public:
 
     oop chunk = _cont.tail();
 
-    intptr_t* const top = _fi->sp;
+    assert (StubRoutines::cont_doYield_stub()->frame_size() == frame_metadata, "");
+    intptr_t* const top = _thread->frame_anchor()->last_Java_sp() + frame_metadata;// _fi->sp;
+
     const int argsize = bottom_argsize();
     intptr_t* const bottom = align_bottom(_cont.entrySP(), argsize);
     int size = bottom - top; // in words
@@ -2648,9 +2634,9 @@ public:
   }
 
   frame freeze_start_frame_yield_stub(frame f) {
-    log_develop_trace(jvmcont)("%s nop at freeze yield", nativePostCallNop_at(_fi->pc) != NULL ? "has" : "no");
+    // log_develop_trace(jvmcont)("%s nop at freeze yield", nativePostCallNop_at(_fi->pc) != NULL ? "has" : "no");
     assert(StubRoutines::cont_doYield_stub()->contains(f.pc()), "must be");
-    assert (f.sp() + slow_get_cb(f)->frame_size() == _fi->sp, "f.sp: %p size: %d fi->sp: %p", f.sp(), slow_get_cb(f)->frame_size(), _fi->sp);
+    // assert (f.sp() + slow_get_cb(f)->frame_size() == _fi->sp, "f.sp: %p size: %d fi->sp: %p", f.sp(), slow_get_cb(f)->frame_size(), _fi->sp);
   #ifdef ASSERT
     hframe::callee_info my_info = slow_link_address<StubF>(f);
   #endif
@@ -2662,7 +2648,7 @@ public:
     // frame::update_map_with_saved_link(&map, (intptr_t **)&fi->fp);
     // frame f = ContinuationHelper::to_frame(fi); // the yield frame
 
-    assert (f.pc() == _fi->pc, "");
+    // assert (f.pc() == _fi->pc, "");
 
     // Log(jvmcont) logv; LogStream st(logv.debug()); f.print_on(st);
     if (log_develop_is_enabled(Debug, jvmcont)) f.print_on(tty);
@@ -3287,8 +3273,7 @@ public:
   }
 };
 
-int early_return(int res, JavaThread* thread, FrameInfo* fi) {
-  clear_frame_info(fi);
+int early_return(int res, JavaThread* thread) {
   thread->set_cont_yield(false);
   log_develop_trace(jvmcont)("=== end of freeze (fail %d)", res);
   return res;
@@ -3316,7 +3301,7 @@ static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont) {
   invlidate_JVMTI_stack(thread);
 }
 
-static inline int freeze_epilog(JavaThread* thread, FrameInfo* fi, ContMirror& cont) {
+static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
   PERFTEST_ONLY(if (PERFTEST_LEVEL <= 15) return freeze_ok;)
 
   assert (verify_continuation<2>(cont.mirror()), "");
@@ -3328,7 +3313,7 @@ static inline int freeze_epilog(JavaThread* thread, FrameInfo* fi, ContMirror& c
   thread->set_cont_yield(false);
   // thread->reset_held_monitor_count();
 
-  log_develop_debug(jvmcont)("ENTRY: sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
+  // log_develop_debug(jvmcont)("ENTRY: sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
   log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
 
   return 0;
@@ -3344,15 +3329,15 @@ static inline int freeze_epilog(JavaThread* thread, FrameInfo* fi, ContMirror& c
 //      unless freezing has failed, in which case fi->pc = 0
 //      However, fi->fp points to the _address_ on the stack of the entry frame's link to its caller (so *(fi->fp) is the fp)
 template<typename ConfigT, op_mode mode>
-int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
+int freeze0(JavaThread* thread, bool preempt) {
   //callgrind();
   PERFTEST_ONLY(PERFTEST_LEVEL = ContPerfTest;)
 
-  PERFTEST_ONLY(if (PERFTEST_LEVEL <= 10) return early_return(freeze_ok, thread, fi);)
+  PERFTEST_ONLY(if (PERFTEST_LEVEL <= 10) return early_return(freeze_ok, thread);)
   PERFTEST_ONLY(if (PERFTEST_LEVEL < 1000) thread->set_cont_yield(false);)
 
 #ifdef ASSERT
-  log_develop_trace(jvmcont)("~~~~~~~~~ freeze mode: %d fi->sp: " INTPTR_FORMAT " fi->fp: " INTPTR_FORMAT " fi->pc: " INTPTR_FORMAT, mode, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
+  log_develop_trace(jvmcont)("~~~~~~~~~ freeze mode: %d", mode);
   /* set_anchor(thread, fi); */ print_frames(thread);
 #endif
   // if (mode != mode_fast) tty->print_cr(">>> freeze0 mode: %d", mode);
@@ -3376,10 +3361,10 @@ int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
   if (java_lang_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
     assert (verify_continuation<10>(cont.mirror()), "");
-    return early_return(freeze_pinned_cs, thread, fi);
+    return early_return(freeze_pinned_cs, thread);
   }
 
-  Freeze<ConfigT, mode> fr(thread, fi, cont);
+  Freeze<ConfigT, mode> fr(thread, cont);
   if (mode == mode_fast && fr.is_chunk_available()) {
     // no transition
     log_develop_trace(jvmcont)("chunk available; no transition");
@@ -3388,7 +3373,7 @@ int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
   #if CONT_JFR
     cont.post_jfr_event(&event, thread);
   #endif
-    return freeze_epilog(thread, fi, cont);
+    return freeze_epilog(thread, cont);
   } else {
     // manual transtion. see JRT_ENTRY in interfaceSupport.inline.hpp
     log_develop_trace(jvmcont)("chunk unavailable; transitioning to VM");
@@ -3405,18 +3390,18 @@ int freeze0(JavaThread* thread, FrameInfo* fi, bool preempt) {
       res = fr.freeze(false);
       if (UNLIKELY(res == freeze_retry_slow)) {
         log_develop_trace(jvmcont)("-- RETRYING SLOW --");
-        res = Freeze<ConfigT, mode_slow>(thread, fi, cont).freeze(false);
+        res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(false);
       }
     }
     if (UNLIKELY(res != freeze_ok)) {
       assert (verify_continuation<11>(cont.mirror()), "");
-      return early_return(res, thread, fi);
+      return early_return(res, thread);
     }
   #if CONT_JFR
     cont.post_jfr_event(&event, thread);
   #endif
     post_JVMTI_yield(thread, cont); // can safepoint
-    return freeze_epilog(thread, fi, cont);
+    return freeze_epilog(thread, cont);
   }
 }
 
@@ -3447,8 +3432,8 @@ static bool monitors_on_stack(JavaThread* thread) {
 #endif
 
 // Entry point to freeze. Transitions are handled manually
-int Continuation::freeze(JavaThread* thread, FrameInfo* fi, bool from_interpreter) {
-  TRACE_CALL(int, Continuation::freeze(JavaThread* thread, FrameInfo* fi, bool from_interpreter))
+int Continuation::freeze(JavaThread* thread, bool from_interpreter) {
+  TRACE_CALL(int, Continuation::freeze(JavaThread* thread, bool from_interpreter))
   os::verify_stack_alignment();
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
   // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
@@ -3458,8 +3443,8 @@ int Continuation::freeze(JavaThread* thread, FrameInfo* fi, bool from_interprete
   assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
   fast = fast && thread->held_monitor_count() == 0;
   // tty->print_cr(">>> freeze fast: %d thread->cont_fastpath(): %d from_interpreter: %d", fast, thread->cont_fastpath(), from_interpreter);
-  return fast ? cont_freeze<mode_fast>(thread, fi, false)
-              : cont_freeze<mode_slow>(thread, fi, false);
+  return fast ? cont_freeze<mode_fast>(thread, false)
+              : cont_freeze<mode_slow>(thread, false);
 }
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint) {
@@ -3549,10 +3534,9 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
 // #endif
   // TODO: save return value
 
-  FrameInfo fi;
-  int res = cont_freeze<mode_slow>(thread, &fi, true); // CAST_TO_FN_PTR(DoYieldStub, StubRoutines::cont_doYield_C())(-1);
+  int res = cont_freeze<mode_slow>(thread, true); // CAST_TO_FN_PTR(DoYieldStub, StubRoutines::cont_doYield_C())(-1);
   if (res == 0) { // success
-    thread->_cont_frame = fi;
+    // thread->_cont_frame = fi; // XXXXXXX <-- _cont_frame is actually the entry frame
     thread->set_cont_preempt(true);
 
     frame last = thread->last_frame();
@@ -3591,18 +3575,13 @@ static bool stack_overflow_check(JavaThread* thread, int size, address sp) {
   return true;
 }
 
-// In: fi->sp = the sp of the entry frame
-// Out: returns the size of frames to thaw or 0 for no more frames or a stack overflow
-//      On failure: fi->sp - cont's entry SP
-//                  fi->fp - cont's entry FP
-//                  fi->pc - overflow? throw StackOverflowError : cont's entry PC
-JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, FrameInfo* fi, bool return_barrier))
+JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier))
   PERFTEST_ONLY(PERFTEST_LEVEL = ContPerfTest;)
 
   PERFTEST_ONLY(if (PERFTEST_LEVEL <= 110) return 0;)
 
   log_develop_trace(jvmcont)("~~~~~~~~~ prepare_thaw return_barrier: %d", return_barrier);
-  log_develop_trace(jvmcont)("prepare_thaw pc: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " sp: " INTPTR_FORMAT, p2i(fi->pc), p2i(fi->fp), p2i(fi->sp));
+  log_develop_trace(jvmcont)("prepare_thaw");
 
   assert (thread == JavaThread::current(), "");
   oop cont = get_continuation(thread);
@@ -3612,14 +3591,12 @@ JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, FrameInfo* fi, bool
   // if the entry frame is interpreted, it may leave a parameter on the stack, which would be left there if the return barrier is hit
   // assert ((address)java_lang_Continuation::entrySP(cont) - bottom <= 8, "bottom: " INTPTR_FORMAT ", entrySP: " INTPTR_FORMAT, bottom, java_lang_Continuation::entrySP(cont));
   int size = java_lang_Continuation::maxSize(cont); // TODO: we could use the top non-empty chunk size, but getting it might be too costly; consider.
-  if (size == 0) { // no more frames
-    return 0;
-  }
+  guarantee (size > 0, "");
+
   size += SP_WIGGLE << LogBytesPerWord; // just in case we have an interpreted entry after which we need to align
 
-  const address bottom = (address)fi->sp; // os::current_stack_pointer(); points to the entry frame
+  const address bottom = (address)thread->cont_entry()->entry_sp(); // os::current_stack_pointer(); points to the entry frame
   if (!stack_overflow_check(thread, size + 300, bottom)) {
-    fi->pc = StubRoutines::throw_StackOverflowError_entry();
     return 0;
   }
 
@@ -3875,7 +3852,7 @@ public:
     if (UNLIKELY(should_fix(chunk))) {
       intptr_t* end = vsp + size - argsize;
       if (argsize > 0) {
-        end -= 2; // RON FIXME, document!
+        end -= frame_metadata;
       }
       fix_stack_chunk(chunk, vsp, end);
       if (empty) {
@@ -4515,9 +4492,6 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   EventContinuationThaw event;
 #endif
 
-  intptr_t *original_fi_sp = fi->sp;
-  verify_cookie(original_fi_sp);
-
   if (return_barrier) {
     log_develop_trace(jvmcont)("== RETURN BARRIER");
   }
@@ -4537,7 +4511,7 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   cont.read_minimal();
 
 #ifdef ASSERT
-  set_anchor(thread, fi, cont.entryPC());
+  set_anchor_to_entry(thread, cont.entry());
   print_frames(thread);
 #endif
 
@@ -4583,7 +4557,6 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
 
   assert (verify_continuation<3>(cont.mirror()), "");
   log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
-  verify_cookie(original_fi_sp);
 
 #ifndef PRODUCT
   set_anchor(thread, fi);
@@ -5834,8 +5807,8 @@ public:
   // static const bool full_stack = full;
 
   template<op_mode mode>
-  static int freeze(JavaThread* thread, FrameInfo* fi, bool preempt) {
-    return freeze0<SelfT, mode>(thread, fi, preempt);
+  static int freeze(JavaThread* thread, bool preempt) {
+    return freeze0<SelfT, mode>(thread, preempt);
   }
 
   template<op_mode mode>

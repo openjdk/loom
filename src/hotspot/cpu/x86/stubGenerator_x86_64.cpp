@@ -6707,12 +6707,6 @@ RuntimeStub* generate_cont_doYield() {
     const char *name = "cont_doYield";
 
     enum layout {
-      frameinfo_11,
-      frameinfo_12,
-      frameinfo_21,
-      frameinfo_22,
-      frameinfo_31,
-      frameinfo_32,
       rbp_off,
       rbpH_off,
       return_off,
@@ -6730,23 +6724,13 @@ RuntimeStub* generate_cont_doYield() {
     // MacroAssembler* masm = _masm;
     // StubCodeMark mark(this, "StubRoutines", name);
 
-    // second argument is the FrameInfo
-    Register fi = c_rarg1;
-
     address start = __ pc();
-
-    __ movl(c_rarg2, c_rarg1);          // save from interpreter
-    __ movptr(rax, Address(rsp, 0));    // use return address as the frame pc // __ lea(rax, InternalAddress(pcxxxx));
-    __ lea(fi, Address(rsp, wordSize)); // skip return address
-    __ movptr(c_rarg3, rbp);
 
     // __ stop("FFFFF");
     __ enter();
 
     // // return address and rbp are already in place
     // __ subptr(rsp, (framesize-4) << LogBytesPerInt); // prolog
-
-    push_FrameInfo(masm, fi, fi, c_rarg3, rax);
 
     int frame_complete = __ pc() - start;
     address the_pc = __ pc();
@@ -6755,7 +6739,7 @@ RuntimeStub* generate_cont_doYield() {
 
     if (ContPerfTest > 5) {
       setup_freeze_invocation(_masm, the_pc);
-      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 3);
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
       teardown_freeze_invocation(_masm);
 
       // if (from_java) {
@@ -6767,13 +6751,10 @@ RuntimeStub* generate_cont_doYield() {
     }
 
     Label pinned;
-    __ pop(c_rarg2); // read the pc from the FrameInfo
-    if (ContPerfTest <= 5) { __ xorq(c_rarg2, c_rarg2); __ xorq(rax, rax); }
-    __ testq(c_rarg2, c_rarg2);
-    __ jcc(Assembler::zero, pinned);
 
-    __ pop(rbp); // not pinned -- jump to Continuation.run (the entry frame)
-    __ pop(fi);
+    if (ContPerfTest <= 5) { __ xorq(rax, rax); }
+    __ testq(rax, rax);
+    __ jcc(Assembler::notZero, pinned);
 
     __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
     continuation_enter_cleanup(masm);
@@ -6781,7 +6762,6 @@ RuntimeStub* generate_cont_doYield() {
     __ ret(0);
 
     __ bind(pinned); // pinned -- return to caller
-    __ lea(rsp, Address(rsp, wordSize*2)); // "pop" the rest of the FrameInfo struct
 
     __ leave();
     __ ret(0);
@@ -6867,32 +6847,43 @@ RuntimeStub* generate_cont_doYield() {
       __ movptr(rsp, fi);
       __ bind(no_saved_sp);
     }
+    #ifndef PRODUCT
+      Label OK;
+      __ cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+      __ jcc(Assembler::equal, OK);
+      __ stop("incorrect rsp1");
+      __ bind(OK);
+    #endif
 
     Label thaw_success;
     __ movptr(fi, rsp);
     if (return_barrier) {
       __ push(rax); __ push_d(xmm0); // preserve possible return value from a method returning to the return barrier
     }
-    __ movl(c_rarg2, return_barrier);
-    push_FrameInfo(_masm, fi, fi, rbp, c_rarg3);
+    __ movl(c_rarg1, return_barrier);
+
     if (ContPerfTest > 105) {
-      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, fi, c_rarg2);
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, c_rarg1);
     } else {
       __ xorq(rax, rax);
     }
     __ testq(rax, rax);           // rax contains the size of the frames to thaw, 0 if overflow or no more frames
     __ jcc(Assembler::notZero, thaw_success);
 
-    pop_FrameInfo(_masm, fi, rbp, rbx);
     if (return_barrier) {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
     }
-    __ movptr(rsp, fi); // we're now on the yield frame (which is in an address above us b/c rsp has been pushed down)
-    __ jmp(rbx); // a jump to StubRoutines::throw_StackOverflowError_entry
+    #ifndef PRODUCT
+      Label OK2;
+      __ cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+      __ jcc(Assembler::equal, OK2);
+      __ stop("incorrect rsp2");
+      __ bind(OK2);
+    #endif
+    __ jump(ExternalAddress(StubRoutines::throw_StackOverflowError_entry()));
 
     __ bind(thaw_success);
 
-    pop_FrameInfo(_masm, fi, rbp, c_rarg3); // c_rarg3 would still be our return address
     if (return_barrier) {
       __ pop_d(xmm0); __ pop(rdx);   // TEMPORARILY restore return value (we're going to push it again, but rsp is about to move)
     }
@@ -6900,6 +6891,7 @@ RuntimeStub* generate_cont_doYield() {
     __ subq(rsp, rax);             // make room for the thawed frames
     __ subptr(rsp, wordSize);      // make room for return address
     __ andptr(rsp, -16); // align
+    
     if (return_barrier) {
       __ push(rdx); __ push_d(xmm0); // save original return value -- again
     }

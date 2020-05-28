@@ -25,6 +25,8 @@
 #ifndef CPU_X86_HFRAME_X86_HPP
 #define CPU_X86_HFRAME_X86_HPP
 
+static const int frame_metadata = 2;
+
 class hframe : public HFrameBase<hframe> {
 private:
   // additional fields beyond _sp and _pc:

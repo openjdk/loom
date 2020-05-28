@@ -731,8 +731,8 @@ static inline frame sender_for_compiled_frame(const frame& f) {
 #endif
 
   assert (mode == mode_slow || !FKind::stub || StubRoutines::cont_doYield_stub()->contains(f.pc()), "must be");
-  assert (mode == mode_slow || !FKind::stub || slow_get_cb(f)->frame_size() == 5, "must be");
-  intptr_t** link_addr = (mode != mode_slow && FKind::stub) ? noninterpreted_link_address(f.unextended_sp(), 5) : link_address<FKind>(f);
+  assert (mode == mode_slow || !FKind::stub || slow_get_cb(f)->frame_size() == frame_metadata, "must be");
+  intptr_t** link_addr = (mode != mode_slow && FKind::stub) ? noninterpreted_link_address(f.unextended_sp(), frame_metadata) : link_address<FKind>(f);
 
   intptr_t* sender_sp = (intptr_t*)(link_addr + frame::sender_sp_offset); //  f.unextended_sp() + (fsize/wordSize); // 
   address sender_pc = (address) *(sender_sp-1);
