@@ -200,7 +200,7 @@ static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) P
 
 #ifdef ASSERT
   static void print_frames(JavaThread* thread, outputStream* st = tty);
-  static void print_blob(outputStream* st, address addr);
+  //static void print_blob(outputStream* st, address addr);
   static jlong java_tid(JavaThread* thread);
   // static bool is_deopt_pc(const frame& f, address pc);
   // static bool is_deopt_pc(address pc);
@@ -6383,15 +6383,15 @@ static int slow_num_oops(const FrameT& f) {
   return slow_get_oopmap(f)->num_oops();
 }
 
-static void print_blob(outputStream* st, address addr) {
-  CodeBlob* b = CodeCache::find_blob_unsafe(addr);
-  st->print("address: " INTPTR_FORMAT " blob: ", p2i(addr));
-  if (b != NULL) {
-    b->dump_for_addr(addr, st, false);
-  } else {
-    st->print_cr("NULL");
-  }
-}
+//static void print_blob(outputStream* st, address addr) {
+//  CodeBlob* b = CodeCache::find_blob_unsafe(addr);
+//  st->print("address: " INTPTR_FORMAT " blob: ", p2i(addr));
+//  if (b != NULL) {
+//    b->dump_for_addr(addr, st, false);
+//  } else {
+//    st->print_cr("NULL");
+//  }
+//}
 
 // void static stop() {
 //     print_frames(JavaThread::current(), NULL);
