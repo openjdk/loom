@@ -7474,10 +7474,10 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
   assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
 
-  stack_slots += ContinuationEntry::size()/wordSize;
-  __ subptr(rsp, ContinuationEntry::size()); // place Continuation metadata
+  stack_slots += (int)ContinuationEntry::size()/wordSize;
+  __ subptr(rsp, (int32_t)ContinuationEntry::size()); // place Continuation metadata
 
-  OopMap* map = new OopMap((ContinuationEntry::size() + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
+  OopMap* map = new OopMap(((int)ContinuationEntry::size() + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
   map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::cont_offset())  / VMRegImpl::stack_slot_size));
   map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::chunk_offset()) / VMRegImpl::stack_slot_size));
 
@@ -7509,7 +7509,7 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
    
   __ movptr(rcx, Address(rsp, ContinuationEntry::parent_offset()));
   __ movptr(Address(r15_thread, JavaThread::cont_entry_offset()), rcx);
-  __ addptr(rsp, ContinuationEntry::size());
+  __ addptr(rsp, (int32_t)ContinuationEntry::size());
 }
 
 #undef __
