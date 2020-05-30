@@ -162,12 +162,6 @@ jint init_globals() {
 
   continuations_init();
 
-#if INCLUDE_NMT
-  // Solaris stack is walkable only after stubRoutines are set up.
-  // On Other platforms, the stack is always walkable.
-  NMT_stack_walkable = true;
-#endif // INCLUDE_NMT
-
   // All the flags that get adjusted by VM_Version_init and os::init_2
   // have been set so dump the flags now.
   if (PrintFlagsFinal || PrintFlagsRanges) {

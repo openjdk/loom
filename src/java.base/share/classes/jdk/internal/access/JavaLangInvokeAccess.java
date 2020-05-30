@@ -31,6 +31,7 @@ import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.nio.ByteOrder;
+import java.util.List;
 import java.util.Map;
 
 public interface JavaLangInvokeAccess {
@@ -138,8 +139,14 @@ public interface JavaLangInvokeAccess {
      * Used by {@code jdk.internal.foreign.LayoutPath} and
      * {@code jdk.incubator.foreign.MemoryHandles}.
      */
-    VarHandle memoryAddressViewVarHandle(Class<?> carrier, long alignmentMask,
-                                         ByteOrder order, long offset, long[] strides);
+    VarHandle memoryAccessVarHandle(Class<?> carrier, long alignmentMask,
+                                    ByteOrder order, long offset, long[] strides);
+
+    /**
+     * Is {@code handle} a memory access varhandle?
+     * Used by {@code jdk.incubator.foreign.MemoryHandles}.
+     */
+    boolean isMemoryAccessVarHandle(VarHandle handle);
 
     /**
      * Returns the carrier associated with a memory access var handle.
@@ -170,4 +177,40 @@ public interface JavaLangInvokeAccess {
      * Used by {@code jdk.incubator.foreign.MemoryHandles}.
      */
     long[] memoryAddressStrides(VarHandle handle);
+
+    /**
+     * Var handle carrier combinator.
+     * Used by {@code jdk.incubator.foreign.MemoryHandles}.
+     */
+    VarHandle filterValue(VarHandle target, MethodHandle filterToTarget, MethodHandle filterFromTarget);
+
+    /**
+     * Var handle filter coordinates combinator.
+     * Used by {@code jdk.incubator.foreign.MemoryHandles}.
+     */
+    VarHandle filterCoordinates(VarHandle target, int pos, MethodHandle... filters);
+
+    /**
+     * Var handle drop coordinates combinator.
+     * Used by {@code jdk.incubator.foreign.MemoryHandles}.
+     */
+    VarHandle dropCoordinates(VarHandle target, int pos, Class<?>... valueTypes);
+
+    /**
+     * Var handle permute coordinates combinator.
+     * Used by {@code jdk.incubator.foreign.MemoryHandles}.
+     */
+    VarHandle permuteCoordinates(VarHandle target, List<Class<?>> newCoordinates, int... reorder);
+
+    /**
+     * Var handle collect coordinates combinator.
+     * Used by {@code jdk.incubator.foreign.MemoryHandles}.
+     */
+    VarHandle collectCoordinates(VarHandle target, int pos, MethodHandle filter);
+
+    /**
+     * Var handle insert coordinates combinator.
+     * Used by {@code jdk.incubator.foreign.MemoryHandles}.
+     */
+    VarHandle insertCoordinates(VarHandle target, int pos, Object... values);
 }

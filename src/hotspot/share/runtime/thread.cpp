@@ -354,12 +354,6 @@ void Thread::record_stack_base_and_size() {
   set_stack_base(os::current_stack_base());
   set_stack_size(os::current_stack_size());
 
-#ifdef SOLARIS
-  if (os::is_primordial_thread()) {
-    os::Solaris::correct_stack_boundaries_for_primordial_thread(this);
-  }
-#endif
-
   // Set stack limits after thread is initialized.
   if (is_Java_thread()) {
     ((JavaThread*) this)->set_stack_overflow_limit();
@@ -1675,7 +1669,7 @@ void JavaThread::initialize() {
   }
 #endif // INCLUDE_JVMCI
   _reserved_stack_activation = NULL;  // stack base not known yet
-  (void)const_cast<oop&>(_exception_oop = oop(NULL));
+  set_exception_oop(oop());
   _exception_pc  = 0;
   _exception_handler_pc = 0;
   _is_method_handle_return = 0;
@@ -2267,6 +2261,13 @@ bool JavaThread::is_lock_owned(address adr) const {
   return false;
 }
 
+oop JavaThread::exception_oop() const {
+  return Atomic::load(&_exception_oop);
+}
+
+void JavaThread::set_exception_oop(oop o) {
+  Atomic::store(&_exception_oop, o);
+}
 
 void JavaThread::add_monitor_chunk(MonitorChunk* chunk) {
   chunk->set_next(monitor_chunks());

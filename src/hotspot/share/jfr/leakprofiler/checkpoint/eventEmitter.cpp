@@ -51,7 +51,7 @@ EventEmitter::~EventEmitter() {
   JfrThreadLocal::stop_impersonating(_thread);
 }
 
-void EventEmitter::emit(ObjectSampler* sampler, int64_t cutoff_ticks, bool emit_all) {
+void EventEmitter::emit(ObjectSampler* sampler, int64_t cutoff_ticks, bool emit_all, bool skip_bfs) {
   assert(sampler != NULL, "invariant");
   ResourceMark rm;
   EdgeStore edge_store;
@@ -67,7 +67,7 @@ void EventEmitter::emit(ObjectSampler* sampler, int64_t cutoff_ticks, bool emit_
     return;
   }
   // events emitted with reference chains require a safepoint operation
-  PathToGcRootsOperation op(sampler, &edge_store, cutoff_ticks, emit_all);
+  PathToGcRootsOperation op(sampler, &edge_store, cutoff_ticks, emit_all, skip_bfs);
   VMThread::execute(&op);
 }
 

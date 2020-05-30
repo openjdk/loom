@@ -300,9 +300,6 @@
   diagnostic(bool, ShenandoahAllocFailureALot, false,                       \
           "Testing: make lots of artificial allocation failures.")          \
                                                                             \
-  diagnostic(bool, ShenandoahAlwaysPreTouch, false,                         \
-          "Pre-touch heap memory, overrides global AlwaysPreTouch.")        \
-                                                                            \
   experimental(intx, ShenandoahMarkScanPrefetch, 32,                        \
           "How many objects to prefetch ahead when traversing mark bitmaps."\
           "Set to 0 to disable prefetching.")                               \
@@ -347,9 +344,6 @@
                                                                             \
   diagnostic(bool, ShenandoahLoadRefBarrier, true,                          \
           "Turn on/off load-reference barriers in Shenandoah")              \
-                                                                            \
-  diagnostic(bool, ShenandoahConcurrentScanCodeRoots, true,                 \
-          "Scan code roots concurrently, instead of during a pause")        \
                                                                             \
   diagnostic(uintx, ShenandoahCodeRootsStyle, 2,                            \
           "Use this style to scan the code cache roots:"                    \

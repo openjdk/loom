@@ -237,16 +237,6 @@ TEST_JOBS_FACTOR_MACHINE ?= 1
 
 ifeq ($(TEST_JOBS), 0)
   CORES_DIVIDER := 2
-  ifeq ($(call isTargetCpuArch, sparc), true)
-    # For smaller SPARC machines we see reasonable scaling of throughput up to
-    # cpus/4 without affecting test reliability. On the bigger machines, cpus/4
-    # causes intermittent timeouts.
-    ifeq ($(shell $(EXPR) $(NUM_CORES) \> 16), 1)
-      CORES_DIVIDER := 5
-    else
-      CORES_DIVIDER := 4
-    endif
-  endif
   # For some big multi-core machines with low ulimit -u setting we hit the max
   # threads/process limit. In such a setup the memory/cores-only-guided
   # TEST_JOBS config is insufficient. From experience a concurrency setting of
@@ -690,8 +680,6 @@ define SetupRunMicroTestBody
 
   # Current tests needs to open java.io
   $1_MICRO_JAVA_OPTIONS += --add-opens=java.base/java.io=ALL-UNNAMED
-  # Set library path for native dependencies
-  $1_MICRO_JAVA_OPTIONS += -Djava.library.path=$$(TEST_IMAGE_DIR)/micro/native
 
   # Save output as JSON or CSV file
   ifneq ($$(MICRO_RESULTS_FORMAT), )
@@ -701,6 +689,8 @@ define SetupRunMicroTestBody
 
   ifneq ($$(MICRO_VM_OPTIONS)$$(MICRO_JAVA_OPTIONS), )
     JMH_JVM_ARGS := $$(MICRO_VM_OPTIONS) $$(MICRO_JAVA_OPTIONS)
+    # Set library path for native dependencies
+    JMH_JVM_ARGS += -Djava.library.path=$$(TEST_IMAGE_DIR)/micro/native
     $1_MICRO_VM_OPTIONS := -jvmArgs $(call ShellQuote,$$(JMH_JVM_ARGS))
   endif
 
@@ -843,12 +833,8 @@ define SetupRunJtregTestBody
   # we may end up with a lot of JVM's
   $1_JTREG_MAX_RAM_PERCENTAGE := $$(shell $$(EXPR) 25 / $$($1_JTREG_JOBS))
 
-  # SPARC is in general slower per core so need to scale up timeouts a bit.
-  ifeq ($(call isTargetCpuArch, sparc), true)
-    JTREG_TIMEOUT_FACTOR ?= 8
-  else
-    JTREG_TIMEOUT_FACTOR ?= 4
-  endif
+  JTREG_TIMEOUT_FACTOR ?= 4
+
   JTREG_VERBOSE ?= fail,error,summary
   JTREG_RETAIN ?= fail,error
   JTREG_MAIN_WRAPPER ?=

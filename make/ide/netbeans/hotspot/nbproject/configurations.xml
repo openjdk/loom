@@ -38859,27 +38859,6 @@
         </cTool>
       </folder>
     </conf>
-    <conf name="Solaris_64" type="0">
-      <toolsSet>
-        <compilerSet>default</compilerSet>
-        <dependencyChecking>false</dependencyChecking>
-        <rebuildPropChanged>false</rebuildPropChanged>
-      </toolsSet>
-      <codeAssistance>
-      </codeAssistance>
-      <makefileType>
-        <makeTool>
-          <buildCommandWorkingDir>../..</buildCommandWorkingDir>
-          <buildCommand>gmake -f Makefile images</buildCommand>
-          <cleanCommand>gmake -f Makefile clean</cleanCommand>
-          <executablePath></executablePath>
-        </makeTool>
-        <preBuild>
-          <preBuildCommandWorkingDir>../..</preBuildCommandWorkingDir>
-          <preBuildCommand>sh configure --with-debug-level=slowdebug</preBuildCommand>
-        </preBuild>
-      </makefileType>
-    </conf>
     <conf name="Windws64" type="0">
       <toolsSet>
         <compilerSet>default</compilerSet>

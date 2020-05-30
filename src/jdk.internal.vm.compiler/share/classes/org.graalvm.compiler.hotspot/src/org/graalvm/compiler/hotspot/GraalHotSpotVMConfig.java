@@ -213,7 +213,7 @@ public class GraalHotSpotVMConfig extends GraalHotSpotVMConfigBase {
     public final int stackShadowPages = getFlag("StackShadowPages", Integer.class);
     public final int stackReservedPages = getFlag("StackReservedPages", Integer.class, 0);
     public final boolean useStackBanging = getFlag("UseStackBanging", Boolean.class);
-    public final int stackBias = getConstant("STACK_BIAS", Integer.class);
+    public final int stackBias = getConstant("STACK_BIAS", Integer.class, 0);
     public final int vmPageSize = getFieldValue("CompilerToVM::Data::vm_page_size", Integer.class, "int");
 
     public final int markOffset = getFieldOffset("oopDesc::_mark", Integer.class, markWord);
@@ -417,11 +417,6 @@ public class GraalHotSpotVMConfig extends GraalHotSpotVMConfigBase {
     public int threadLastJavaFpOffset() {
         assert osArch.equals("aarch64") || osArch.equals("amd64");
         return javaThreadAnchorOffset + getFieldOffset("JavaFrameAnchor::_last_Java_fp", Integer.class, "intptr_t*");
-    }
-
-    public int threadJavaFrameAnchorFlagsOffset() {
-        assert osArch.equals("sparc");
-        return javaThreadAnchorOffset + getFieldOffset("JavaFrameAnchor::_flags", Integer.class, "int");
     }
 
     public final int runtimeCallStackSize = getConstant("frame::arg_reg_save_area_bytes", Integer.class, intRequiredOnAMD64);
