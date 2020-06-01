@@ -133,7 +133,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob_fast(pc);
   _oop_map = NULL;
-  assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
+  assert(_cb != NULL, "pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(pc), p2i(sp), p2i(unextended_sp), p2i(fp));
 
   setup(pc);
 }

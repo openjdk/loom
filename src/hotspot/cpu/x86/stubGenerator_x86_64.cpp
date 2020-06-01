@@ -6623,64 +6623,6 @@ address generate_avx_ghash_processBlocks() {
 
   }
 
-void push_FrameInfo(MacroAssembler* _masm, Register fi, Register sp, Register fp) {
-  if (!sp->is_valid()) {
-    __ push(0);
-  } else {
-    if (sp == rsp) {
-      __ movptr(fi, rsp);
-      __ push(fi);
-    } else {
-      __ push(sp);
-    }
-  }
-
-  if (!fp->is_valid()) {
-    __ push(0);
-  } else {
-    __ push(fp);
-  }
-}
-
-void push_FrameInfo(MacroAssembler* _masm, Register fi, Register sp, Register fp, address pc) {
-  push_FrameInfo(_masm, fi, sp, fp);
-
-  __ lea(fi, ExternalAddress(pc));
-  __ push(fi);
-
-  __ movptr(fi, rsp); // make fi point to the beginning of FramInfo
-}
-
-void push_FrameInfo(MacroAssembler* _masm, Register fi, Register sp, Register fp, Register pc) {
-  push_FrameInfo(_masm, fi, sp, fp);
-
-  if (!pc->is_valid()) {
-    __ push(0);
-  } else {
-    __ push(pc);
-  }
-
-  __ movptr(fi, rsp); // make fi point to the beginning of FramInfo
-}
-
-void pop_FrameInfo(MacroAssembler* _masm, Register sp, Register fp, Register pc) {
-  if (!pc->is_valid()) {
-    __ lea(rsp, Address(rsp, wordSize));
-  } else {
-    __ pop(pc);
-  }
-  if (!fp->is_valid()) {
-    __ lea(rsp, Address(rsp, wordSize));
-  } else {
-    __ pop(fp);
-  }
-  if (!sp->is_valid()) {
-    __ lea(rsp, Address(rsp, wordSize));
-  } else {
-    __ pop(sp);
-  }
-}
-
 static Register get_thread() {
 #ifdef _LP64
   return r15_thread;

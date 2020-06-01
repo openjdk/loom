@@ -344,8 +344,6 @@ public class Continuation {
                 if (reset) { maxSize = origMaxSize; sp = origSP; fp = origFP; pc = origPC; refSP = origRefSP; } // perftest only
                 postYieldCleanup(origRefSP);
 
-                if (TRACE) System.out.println("clearing entryPC");
-
                 unmount();
                 } catch (Throwable e) { e.printStackTrace(); System.exit(1); }
                 assert !hasLeak() : "hasLeak1 " + "refSP: " + refSP + " refStack: " + Arrays.toString(refStack);
