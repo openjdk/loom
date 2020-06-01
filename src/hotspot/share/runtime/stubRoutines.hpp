@@ -268,6 +268,7 @@ class StubRoutines: AllStatic {
   static address _cont_thaw;
   static address _cont_returnBarrier;
   static address _cont_returnBarrierExc;
+  static address _cont_interpreter_forced_preempt_return;
   static address _cont_getSP;
   static address _cont_getPC;
 
@@ -468,6 +469,7 @@ class StubRoutines: AllStatic {
   static address cont_thaw()           { return _cont_thaw; }
   static address cont_returnBarrier()  { return _cont_returnBarrier; }
   static address cont_returnBarrierExc(){return _cont_returnBarrierExc; }
+  static address cont_interpreter_forced_preempt_return() { return _cont_interpreter_forced_preempt_return; }
   static address cont_getSP()          { return _cont_getSP; }
   static address cont_getPC()          { return _cont_getPC; }
   static cont_jump_from_sp_t  cont_jump_from_sp_C() { return CAST_TO_FN_PTR(cont_jump_from_sp_t, _cont_jump_from_sp); }

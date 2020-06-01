@@ -188,8 +188,17 @@ PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 #define ENTER_SPECIAL_SIG "java.lang.Continuation.enterSpecial(Ljava/lang/Continuation;Z)V"
 #define RUN_SIG    "java.lang.Continuation.run()V"
 
+// The order of this struct matters as it's directly manipulated by assembly code (push/pop)
+struct FrameInfo {
+  address pc;
+  intptr_t* fp;
+  intptr_t* sp;
+};
+
 static bool is_stub(CodeBlob* cb);
 static void set_anchor(JavaThread* thread, const FrameInfo* fi);
+static void set_anchor(JavaThread* thread, intptr_t* sp);
+
 // static void set_anchor(JavaThread* thread, const frame& f); -- unused
 
 // debugging functions
@@ -3322,7 +3331,9 @@ int freeze0(JavaThread* thread, bool preempt) {
   PERFTEST_ONLY(if (PERFTEST_LEVEL < 1000) thread->set_cont_yield(false);)
 
 #ifdef ASSERT
-  log_develop_trace(jvmcont)("~~~~~~~~~ freeze mode: %d", mode);
+  log_develop_trace(jvmcont)("~~~~~~~~~ freeze mode: %d sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, 
+    mode, p2i(thread->cont_entry()->entry_sp()), p2i(thread->cont_entry()->entry_fp()), p2i(thread->cont_entry()->entry_pc()));
+
   /* set_anchor(thread, fi); */ print_frames(thread);
 #endif
   // if (mode != mode_fast) tty->print_cr(">>> freeze0 mode: %d", mode);
@@ -3577,6 +3588,7 @@ JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier
   int size = java_lang_Continuation::maxSize(cont); // TODO: we could use the top non-empty chunk size, but getting it might be too costly; consider.
   guarantee (size > 0, "");
 
+  size += (2*frame_metadata) << LogBytesPerWord; // twice, because we might want to add a frame for StubRoutines::cont_interpreter_forced_preempt_return()
   size += SP_WIGGLE << LogBytesPerWord; // just in case we have an interpreted entry after which we need to align
 
   const address bottom = (address)thread->cont_entry()->entry_sp(); // os::current_stack_pointer(); points to the entry frame
@@ -4022,11 +4034,11 @@ public:
       thaw_java_frame<FKind, top, false>(hf, caller, extra);
     }
 
+    DEBUG_ONLY(_frames++;)
+    
     if (top) {
       finish(caller); // caller is now the current frame
     }
-
-    DEBUG_ONLY(_frames++;)
   }
 
   template<typename FKind>
@@ -4354,6 +4366,8 @@ public:
     Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
 
     assert ((mode == mode_slow &&_preempt) || !FULL_STACK || assert_top_java_frame_name(f, YIELD0_SIG), "");
+
+    // TODO R if slow and preempt and exception, push frame for StubRoutines::cont_interpreter_forced_preempt_return()
   }
 
   void recurse_stub_frame(const hframe& hf, frame& caller, int num_frames) {
@@ -4454,9 +4468,7 @@ static inline bool can_thaw_fast(ContMirror& cont) {
   return java_lang_Continuation::numInterpretedFrames(cont.mirror()) == 0;
 }
 
-// fi->pc is the return address -- the entry
-// fi->sp is the top of the stack after thaw
-// fi->fp current rbp
+// returns new top sp
 // called after preparations (stack overflow check and making room)
 static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_barrier) {
   // NoSafepointVerifier nsv;
@@ -4469,7 +4481,8 @@ static inline void thaw0(JavaThread* thread, FrameInfo* fi, const bool return_ba
   }
 
   log_develop_trace(jvmcont)("~~~~~~~~~ thaw return_barrier: %d", return_barrier);
-  log_develop_trace(jvmcont)("sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
+  log_develop_trace(jvmcont)("sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, 
+    p2i(thread->cont_entry()->entry_sp()), p2i(thread->cont_entry()->entry_fp()), p2i(thread->cont_entry()->entry_pc()));
   oop oopCont = thread->cont_entry()->cont_raw();
 
   assert (!java_lang_Continuation::done(oopCont), "");
@@ -4598,8 +4611,8 @@ void do_verify_after_thaw(JavaThread* thread, FrameInfo* fi, intptr_t **rbp_pos)
 // Out: fi->sp = the SP of the topmost thawed frame -- the one we will resume at
 //      fi->fp = the FP " ...
 //      fi->pc = the PC " ...
-// JRT_ENTRY(void, Continuation::thaw(JavaThread* thread, FrameInfo* fi, int num_frames))
-JRT_LEAF(address, Continuation::thaw_leaf(JavaThread* thread, FrameInfo* fi, bool return_barrier, bool exception))
+// JRT_ENTRY(void, Continuation::thaw(JavaThread* thread, FrameInfo* int num_frames))
+JRT_LEAF(intptr_t*, Continuation::thaw_leaf(JavaThread* thread, bool return_barrier, bool exception))
   //callgrind();
   PERFTEST_ONLY(PERFTEST_LEVEL = ContPerfTest;)
   // TODO: JRT_LEAF and NoHandleMark is problematic for JFR events.
@@ -4607,40 +4620,31 @@ JRT_LEAF(address, Continuation::thaw_leaf(JavaThread* thread, FrameInfo* fi, boo
   // JRT_ENTRY instead?
   ResetNoHandleMark rnhm;
 
+  FrameInfo fi1 = { NULL, NULL, NULL };
+  FrameInfo *fi = &fi1;
   assert (thread == JavaThread::current(), "");
   thaw0(thread, fi, return_barrier);
   // clear_anchor(thread);
 
-
-  if (exception) {
-    // TODO: handle deopt. see TemplateInterpreterGenerator::generate_throw_exception, OptoRuntime::handle_exception_C, OptoRuntime::handle_exception_helper
-    // assert (!top.is_deoptimized_frame(), ""); -- seems to be handled
-    address ret = fi->pc;
-    fi->pc = SharedRuntime::raw_exception_handler_for_return_address(thread, fi->pc);
-    return ret;
-  } else {
-    return reinterpret_cast<address>(Interpreter::contains(fi->pc)); // TODO PERF: really only necessary in the case of continuing from a forced yield
-  }
+  *(address*)(fi->sp - SENDER_SP_RET_ADDRESS_OFFSET) = fi->pc;
+  *(intptr_t**)(fi->sp - frame::sender_sp_offset) = fi->fp;
+  return fi->sp;
 JRT_END
 
-JRT_ENTRY(address, Continuation::thaw(JavaThread* thread, FrameInfo* fi, bool return_barrier, bool exception))
+JRT_ENTRY(intptr_t*, Continuation::thaw(JavaThread* thread, bool return_barrier, bool exception))
   //callgrind();
   PERFTEST_ONLY(PERFTEST_LEVEL = ContPerfTest;)
 
   assert(thread == JavaThread::current(), "");
 
+  FrameInfo fi1 = { NULL, NULL, NULL };
+  FrameInfo *fi = &fi1;
   thaw0(thread, fi, return_barrier);
   set_anchor(thread, fi); // we're in a full transition that expects last_java_frame
 
-  if (exception) {
-    // TODO: handle deopt. see TemplateInterpreterGenerator::generate_throw_exception, OptoRuntime::handle_exception_C, OptoRuntime::handle_exception_helper
-    // assert (!top.is_deoptimized_frame(), ""); -- seems to be handled
-    address ret = fi->pc;
-    fi->pc = SharedRuntime::raw_exception_handler_for_return_address(JavaThread::current(), fi->pc);
-    return ret;
-  } else {
-    return reinterpret_cast<address>(Interpreter::contains(fi->pc)); // TODO PERF: really only necessary in the case of continuing from a forced yield
-  }
+  *(address*)(fi->sp - SENDER_SP_RET_ADDRESS_OFFSET) = fi->pc;
+  *(intptr_t**)(fi->sp - frame::sender_sp_offset) = fi->fp;
+  return fi->sp;
 JRT_END
 
 bool Continuation::is_continuation_enterSpecial(const frame& f, const RegisterMap* map) {
@@ -4652,6 +4656,10 @@ bool Continuation::is_continuation_enterSpecial(const frame& f, const RegisterMa
 
   return false;
 }
+
+JRT_ENTRY(address, Continuation::raw_exception_handler_for_return_address(JavaThread* thread, address pc))
+  return SharedRuntime::raw_exception_handler_for_return_address(thread, pc);
+JRT_END
 
 bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap* map) {
   Method* m = (map->in_cont() && f.is_interpreted_frame()) ? Continuation::interpreter_frame_method(f, map)

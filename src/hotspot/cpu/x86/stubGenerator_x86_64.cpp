@@ -6871,54 +6871,48 @@ RuntimeStub* generate_cont_doYield() {
     }
 
     __ subq(rsp, rax);             // make room for the thawed frames
-    __ subptr(rsp, wordSize);      // make room for return address
     __ andptr(rsp, -16); // align
     
     if (return_barrier) {
       __ push(rdx); __ push_d(xmm0); // save original return value -- again
     }
-    push_FrameInfo(_masm, fi, fi, rbp, c_rarg3);
-    __ movl(c_rarg2, return_barrier);
-    __ movl(c_rarg3, exception);
+
+    __ movl(c_rarg1, return_barrier);
+    __ movl(c_rarg2, exception);
     if (ContPerfTest > 112) {
       if (!return_barrier && JvmtiExport::can_support_continuations()) {
-        __ call_VM(noreg, CAST_FROM_FN_PTR(address, Continuation::thaw), fi, c_rarg2, c_rarg3);
+        __ call_VM(noreg, CAST_FROM_FN_PTR(address, Continuation::thaw), c_rarg1, c_rarg2);
       } else {
-        __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw_leaf), r15_thread, fi, c_rarg2, c_rarg3);
+        __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw_leaf), r15_thread, c_rarg1, c_rarg2);
       }
     }
-    if (exception) {
-      __ movptr(rdx, rax); // rdx must contain the original pc in the case of exception
-    }
-    pop_FrameInfo(_masm, fi, rbp, rbx);
+    __ movptr(rbx, rax); // rbx is now the sp of the yielding frame
+
     if (return_barrier) {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
     }
 
-    __ movptr(rsp, fi); // we're now on the yield frame (which is in an address above us b/c rsp has been pushed down)
+    __ movptr(rsp, rbx); // we're now on the yield frame (which is in an address above us b/c rsp has been pushed down)
+    __ subptr(rsp, 2*wordSize); // now pointing to rbp spill
 
-    if (!return_barrier) {
-      // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
-      // ... but it does no harm even for ordinary yields
-      // TODO: use InterpreterMacroAssembler
-      static const Register _locals_register = LP64_ONLY(r14) NOT_LP64(rdi);
-      static const Register _bcp_register    = LP64_ONLY(r13) NOT_LP64(rsi);
-
-      Label not_interpreter;
-      __ testq(rax, rax); // rax is true iff we're jumping into the interpreter
-      __ jcc(Assembler::zero, not_interpreter);
-
-      // see InterpreterMacroAssembler::restore_bcp/restore_locals
-      __ movptr(_bcp_register,    Address(rbp, frame::interpreter_frame_bcp_offset    * wordSize));
-      __ movptr(_locals_register, Address(rbp, frame::interpreter_frame_locals_offset * wordSize));
-      // __ reinit_heapbase();
-
-      __ bind(not_interpreter);
-
-      __ movl(rax, 0); // return 0 (success) from doYield
+    if (exception) {
+      __ movptr(c_rarg1, Address(rsp, wordSize)); // return address
+      __ push(rax); // save return value contaning the exception oop
+      __ call_VM(noreg, rbx, CAST_FROM_FN_PTR(address, Continuation::raw_exception_handler_for_return_address), c_rarg1, false);
+      __ movptr(rbx, rax); // the exception handler
+      __ pop(rax); // restore return value contaning the exception oop
+      __ pop(rbp);
+      __ pop(rdx); // rdx must contain the original pc in the case of exception; see OptoRuntime::generate_exception_blob
+      __ jmp(rbx); // the exception handler
     }
 
-    __ jmp(rbx);
+    __ pop(rbp);
+
+    if (!return_barrier) {
+      __ movl(rax, 0); // return 0 (success) from doYield
+    }
+    __ ret(0);
+
     return start;
   }
 
@@ -6953,6 +6947,27 @@ RuntimeStub* generate_cont_doYield() {
 
     return start;
   }
+
+  address generate_cont_interpreter_forced_preempt_return() {
+      StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
+      address start = __ pc();
+
+      // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
+      // see InterpreterMacroAssembler::restore_bcp/restore_locals
+      // TODO R: in this situation, have native code push another frame with a return address that points to a stub that does this !!!!!!
+      // TODO: use InterpreterMacroAssembler
+      static const Register _locals_register = LP64_ONLY(r14) NOT_LP64(rdi);
+      static const Register _bcp_register    = LP64_ONLY(r13) NOT_LP64(rsi);
+
+      __ movptr(_bcp_register,    Address(rbp, frame::interpreter_frame_bcp_offset    * wordSize));
+      __ movptr(_locals_register, Address(rbp, frame::interpreter_frame_locals_offset * wordSize));
+      // __ reinit_heapbase();
+
+      __ pop(rbp);
+      __ ret(0);
+
+      return start;
+    }
 
   address generate_cont_getPC() {
     StubCodeMark mark(this, "StubRoutines", "GetPC");
@@ -7292,6 +7307,7 @@ RuntimeStub* generate_cont_doYield() {
     StubRoutines::_cont_doYield_stub = generate_cont_doYield();
     StubRoutines::_cont_doYield    = StubRoutines::_cont_doYield_stub->entry_point();
     StubRoutines::_cont_jump_from_sp = generate_cont_jump_from_safepoint();
+    StubRoutines::_cont_interpreter_forced_preempt_return = generate_cont_interpreter_forced_preempt_return();
     StubRoutines::_cont_jump       = generate_cont_jump();
     StubRoutines::_cont_getSP      = generate_cont_getSP();
     StubRoutines::_cont_getPC      = generate_cont_getPC();

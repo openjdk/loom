@@ -77,6 +77,18 @@ static void set_anchor(JavaThread* thread, const FrameInfo* fi) {
   print_vframe(thread->last_frame());
 }
 
+static void set_anchor(JavaThread* thread, intptr_t* sp) {
+  JavaFrameAnchor* anchor = thread->frame_anchor();
+  anchor->set_last_Java_sp(sp);
+  anchor->set_last_Java_fp(*(intptr_t**)(sp-frame::sender_sp_offset));
+  anchor->set_last_Java_pc(*(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET));
+
+  assert (thread->has_last_Java_frame(), "");
+  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+  print_vframe(thread->last_frame());
+  assert(thread->last_frame().cb() != NULL, "");
+}
+
 // unused
 // static void set_anchor(JavaThread* thread, const frame& f) {
 //   JavaFrameAnchor* anchor = thread->frame_anchor();

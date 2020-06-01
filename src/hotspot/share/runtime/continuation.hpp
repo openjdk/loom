@@ -36,11 +36,6 @@
 #define CONT_FULL_STACK (!UseContinuationLazyCopy)
 
 // The order of this struct matters as it's directly manipulated by assembly code (push/pop)
-struct FrameInfo {
-  address pc;
-  intptr_t* fp;
-  intptr_t* sp;
-};
 
 class ContinuationEntry;
 
@@ -87,9 +82,10 @@ public:
 
   static int freeze(JavaThread* thread, bool from_interpreter);
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
-  static address thaw_leaf(JavaThread* thread, FrameInfo* fi, bool return_barrier, bool exception);
-  static address thaw(JavaThread* thread, FrameInfo* fi, bool return_barrier, bool exception);
+  static intptr_t* thaw_leaf(JavaThread* thread, bool return_barrier, bool exception);
+  static intptr_t* thaw(JavaThread* thread, bool return_barrier, bool exception);
   static int try_force_yield(JavaThread* thread, oop cont);
+  static address raw_exception_handler_for_return_address(JavaThread* thread, address pc);
 
   static oop  get_continutation_for_frame(JavaThread* thread, const frame& f);
   static bool is_continuation_enterSpecial(const frame& f, const RegisterMap* map);
