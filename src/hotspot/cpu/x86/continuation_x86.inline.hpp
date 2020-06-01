@@ -64,12 +64,11 @@ static inline void copy_to_stack(void* from, void* to, size_t size) {
 
   cont_thaw_chunk_memcpy(from, to, size);
 }
-
-static void set_anchor(JavaThread* thread, const FrameInfo* fi) {
+static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
   JavaFrameAnchor* anchor = thread->frame_anchor();
-  anchor->set_last_Java_sp((intptr_t*)fi->sp);
-  anchor->set_last_Java_fp((intptr_t*)fi->fp);
-  anchor->set_last_Java_pc(fi->pc);
+  anchor->set_last_Java_sp(cont->entry_sp());
+  anchor->set_last_Java_fp(cont->entry_fp());
+  anchor->set_last_Java_pc(cont->entry_pc());
 
   assert (thread->has_last_Java_frame(), "");
   assert(thread->last_frame().cb() != NULL, "");
@@ -87,6 +86,12 @@ static void set_anchor(JavaThread* thread, intptr_t* sp) {
   log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
   print_vframe(thread->last_frame());
   assert(thread->last_frame().cb() != NULL, "");
+}
+
+frame sp_to_frame(intptr_t* sp) {
+  return frame(sp,
+               *(intptr_t**)(sp-frame::sender_sp_offset),
+               *(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET));
 }
 
 // unused
@@ -689,27 +694,8 @@ inline void ContinuationHelper::clear_last_vstack_frame(RegisterMap* map) {
   map->set_last_vstack_fp(NULL);
 }
 
-template<typename FKind> // the callee's type
-inline void ContinuationHelper::to_frame_info_pd(const frame& f, const frame& callee, FrameInfo* fi) {
-  // we have an indirection for fp, because the link at the entry frame may hold a sender's oop, and it can be relocated
-  // at a safpoint on the VM->Java transition, so we point at an address where the GC would find it
-  assert (callee_link_address(f) == slow_link_address<FKind>(callee), "");
-  fi->fp = (intptr_t*)callee_link_address(f); // f.fp();
-}
-
-inline void ContinuationHelper::to_frame_info_pd(const frame& f, FrameInfo* fi) {
-  fi->fp = f.fp();
-}
-
-template<bool indirect>
-inline frame ContinuationHelper::to_frame(FrameInfo* fi) {
-  address pc = fi->pc;
-  int slot;
-  CodeBlob* cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
-  assert (cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
-  return frame(fi->sp, fi->sp, 
-    indirect ? NULL : fi->fp, 
-    pc, cb, slot == -1 ? NULL : cb->oop_map_for_slot(slot, pc));
+inline void ContinuationHelper::push_pd(const frame& f) {
+  *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
 }
 
 // creates the yield stub frame faster than JavaThread::last_frame
@@ -910,11 +896,6 @@ static frame chunk_top_frame_pd(oop chunk, intptr_t* sp) {
 }
 
 template <typename ConfigT, op_mode mode>
-void Thaw<ConfigT, mode>::to_frame_info_chunk_pd(intptr_t* sp) {
-   _fi->fp = *(intptr_t**)(sp-frame::sender_sp_offset);
-}
-
-template <typename ConfigT, op_mode mode>
 inline frame Thaw<ConfigT, mode>::new_entry_frame() {
   // if (Interpreter::contains(_cont.entryPC())) _cont.set_entrySP(_cont.entrySP() - 1);
   intptr_t* sp = _cont.entrySP();
@@ -1018,6 +999,19 @@ inline void Thaw<ConfigT, mode>::derelativize_interpreted_frame_metadata(const h
   }
   ContMirror::derelativize(vfp, frame::interpreter_frame_initial_sp_offset);
   ContMirror::derelativize(vfp, frame::interpreter_frame_locals_offset);
+}
+
+template <typename ConfigT, op_mode mode>
+intptr_t* Thaw<ConfigT, mode>::push_interpreter_return_frame(intptr_t* sp) {
+  assert (mode == mode_slow, "");
+
+  address pc = StubRoutines::cont_interpreter_forced_preempt_return();
+  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
+
+  sp -= frame_metadata;
+  *(address*)(_cont.entrySP() - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
+  *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
+  return sp;
 }
 
 ////////

@@ -82,8 +82,8 @@ public:
 
   static int freeze(JavaThread* thread, bool from_interpreter);
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
-  static intptr_t* thaw_leaf(JavaThread* thread, bool return_barrier, bool exception);
-  static intptr_t* thaw(JavaThread* thread, bool return_barrier, bool exception);
+  static intptr_t* thaw_leaf(JavaThread* thread, int kind);
+  static intptr_t* thaw(JavaThread* thread, int kind);
   static int try_force_yield(JavaThread* thread, oop cont);
   static address raw_exception_handler_for_return_address(JavaThread* thread, address pc);
 

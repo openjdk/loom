@@ -6784,7 +6784,8 @@ RuntimeStub* generate_cont_doYield() {
     if (return_barrier) {
       __ push(rax); __ push_d(xmm0); // preserve possible return value from a method returning to the return barrier
     }
-    __ movl(c_rarg1, return_barrier);
+
+    __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
 
     if (ContPerfTest > 105) {
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, c_rarg1);
@@ -6901,11 +6902,12 @@ RuntimeStub* generate_cont_doYield() {
       static const Register _locals_register = LP64_ONLY(r14) NOT_LP64(rdi);
       static const Register _bcp_register    = LP64_ONLY(r13) NOT_LP64(rsi);
 
+      __ pop(rbp);
+
       __ movptr(_bcp_register,    Address(rbp, frame::interpreter_frame_bcp_offset    * wordSize));
       __ movptr(_locals_register, Address(rbp, frame::interpreter_frame_locals_offset * wordSize));
       // __ reinit_heapbase();
 
-      __ pop(rbp);
       __ ret(0);
 
       return start;
