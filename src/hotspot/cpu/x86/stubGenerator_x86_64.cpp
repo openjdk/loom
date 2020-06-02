@@ -7450,11 +7450,13 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
 
 // rsp points to ContinuationEntry
 void fill_continuation_entry(MacroAssembler* masm) {
-  DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
+  __ set_cont_fastpath(r15_thread, 1);
+  __ reset_held_monitor_count(r15_thread);
 
   __ movptr(Address(rsp, ContinuationEntry::cont_offset()), rsi);
   __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
   __ movptr(Address(rsp, ContinuationEntry::argsize_offset()), (int32_t)0);
+  DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
 }
 
 // on entry, rsp must point to the ContinuationEntry
