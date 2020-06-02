@@ -138,7 +138,7 @@ public class Parking {
         thread.join();
     }
 
-    // interrupt before park
+    // park with interrupt status set
     public void testPark8() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -148,7 +148,7 @@ public class Parking {
         });
     }
 
-    // interrupt while parked
+    // interrupt when parked
     public void testPark9() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -158,7 +158,7 @@ public class Parking {
         });
     }
 
-    // interrupt before park (pinned park)
+    // park (pinned park) with interrupt status set
     public void testPark10() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -171,7 +171,7 @@ public class Parking {
         });
     }
 
-    // interrupt while parked (pinned park)
+    // interrupt when parked (pinned park)
     public void testPark11() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -256,5 +256,51 @@ public class Parking {
         assertTrue(isAlive);
         LockSupport.unpark(thread);
         thread.join();
+    }
+
+    // parkNanos with interrupt status set
+    public void testParkNanos8() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            Thread t = Thread.currentThread();
+            t.interrupt();
+            LockSupport.parkNanos(Duration.ofDays(1).toNanos());
+            assertTrue(t.isInterrupted());
+        });
+    }
+
+    // interrupt when parked in parkNanos
+    public void testParkNanos9() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            Thread t = Thread.currentThread();
+            TestHelper.scheduleInterrupt(t, 1000);
+            LockSupport.parkNanos(Duration.ofDays(1).toNanos());
+            assertTrue(t.isInterrupted());
+        });
+    }
+
+    // parkNanos (pinned park) with interrupt status set
+    public void testParkNanos10() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            Thread t = Thread.currentThread();
+            t.interrupt();
+            Object lock = new Object();
+            synchronized (lock) {
+                LockSupport.parkNanos(Duration.ofDays(1).toNanos());
+            }
+            assertTrue(t.isInterrupted());
+        });
+    }
+
+    // interrupt when parked in parkNanos (pinned park)
+    public void testParkNanos11() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            Thread t = Thread.currentThread();
+            TestHelper.scheduleInterrupt(t, 1000);
+            Object lock = new Object();
+            synchronized (lock) {
+                LockSupport.parkNanos(Duration.ofDays(1).toNanos());
+            }
+            assertTrue(t.isInterrupted());
+        });
     }
 }

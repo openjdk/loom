@@ -373,7 +373,7 @@ public class ThreadAPI {
         TestHelper.runInVirtualThread(this::testJoin13);
     }
 
-    // interrupt status before join
+    // join with interrupt status set
     public void testJoin15() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
@@ -390,12 +390,12 @@ public class ThreadAPI {
         }
     }
 
-    // interrupt status before join
+    // join with interrupt status set
     public void testJoin16() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin15);
     }
 
-    // interrupt status before join
+    // join with interrupt status set
     public void testJoin17() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
@@ -412,12 +412,12 @@ public class ThreadAPI {
         }
     }
 
-    // interrupt status before join
+    // join with interrupt status set
     public void testJoin18() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin17);
     }
 
-    // interrupt status before join
+    // join with interrupt status set
     public void testJoin19() throws Exception {
         var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
         thread.start();
@@ -434,7 +434,7 @@ public class ThreadAPI {
         }
     }
 
-    // interrupt status before join
+    // join with interrupt status set
     public void testJoin20() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin19);
     }
@@ -577,6 +577,48 @@ public class ThreadAPI {
                 thread.join();
             }
         });
+    }
+
+    // join thread that is being signalled
+    public void testJoin31() throws Exception {
+        Thread thread = Thread.startVirtualThread(() -> {
+            Object lock = new Object();
+            synchronized (lock) {
+                for (int i=0; i<10; i++) {
+                    LockSupport.parkNanos(Duration.ofMillis(100).toNanos());
+                }
+            }
+        });
+        thread.join();
+        assertFalse(thread.isAlive());
+    }
+
+    // join thread that is being signalled
+    public void testJoin32() throws Exception {
+        TestHelper.runInVirtualThread(this::testJoin31);
+    }
+
+    // join thread that is being signalled
+    public void testJoin33() throws Exception {
+        AtomicBoolean done = new AtomicBoolean();
+        Thread thread = Thread.startVirtualThread(() -> {
+            Object lock = new Object();
+            synchronized (lock) {
+                while (!done.get()) {
+                    LockSupport.parkNanos(Duration.ofMillis(100).toNanos());
+                }
+            }
+        });
+        try {
+            assertFalse(thread.join(Duration.ofSeconds(1)));
+        } finally {
+            done.set(true);
+        }
+    }
+
+    // join thread that is being signalled
+    public void testJoin34() throws Exception {
+        TestHelper.runInVirtualThread(this::testJoin33);
     }
 
 
