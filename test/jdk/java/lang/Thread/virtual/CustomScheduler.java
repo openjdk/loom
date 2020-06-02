@@ -128,8 +128,12 @@ public class CustomScheduler {
      */
     public void testBadState() {
         Executor scheduler = (task) -> {
-            // run on current thread, should park
+            // run on current thread
             task.run();
+
+            // should have terminated
+            Thread vthread = ((Thread.VirtualThreadTask) task).thread();
+            assertTrue(vthread.getState() == Thread.State.TERMINATED);
 
             // run again, should throw IllegalStateException
             try {
@@ -137,6 +141,6 @@ public class CustomScheduler {
                 assertTrue(false);
             } catch (IllegalStateException expected) { }
         };
-        Thread.builder().virtual(scheduler).task(LockSupport::park).start();
+        Thread.builder().virtual(scheduler).task(() -> { }).start();
     }
 }
