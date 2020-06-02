@@ -374,14 +374,14 @@ void LIRGenerator::do_continuation_doContinue(Intrinsic* x) {
 }
 
 void LIRGenerator::do_continuation_doYield(Intrinsic* x) {
-  BasicTypeList signature(1);
-  signature.append(T_INT);
+  BasicTypeList signature(0);
+  // signature.append(T_INT);
   CallingConvention* cc = frame_map()->java_calling_convention(&signature, true);
 
   // LIRItem value(x->argument_at(0), this);
   // value.load_item();
   // __ move(value.result(), cc->at(0)); // scopes
-  __ move(LIR_OprFact::intConst(0), cc->at(0)); // from interpreter
+  // __ move(LIR_OprFact::intConst(0), cc->at(0)); // from interpreter TODO unused
 
   const LIR_Opr result_reg = result_register_for(x->type());
   address entry = StubRoutines::cont_doYield();

@@ -80,7 +80,7 @@ public:
 
   static OopStorage* weak_storage() { return _weak_handles; }
 
-  static int freeze(JavaThread* thread, bool from_interpreter);
+  static int freeze(JavaThread* thread, intptr_t* sp);
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static intptr_t* thaw_leaf(JavaThread* thread, int kind);
   static intptr_t* thaw(JavaThread* thread, int kind);
@@ -203,7 +203,7 @@ public:
   void set_argsize(int value) { _argsize = value; }
 
   oop continuation() {
-    oop snapshot = _cont; 
+    oop snapshot = _cont;
     return NativeAccess<>::oop_load(&snapshot);
   }
   oop cont_raw() { return _cont; }

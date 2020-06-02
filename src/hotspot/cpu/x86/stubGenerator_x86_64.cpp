@@ -6644,7 +6644,6 @@ static void teardown_freeze_invocation(MacroAssembler* _masm) {
   NOT_LP64(__ pop(rdi));
 }
 
-// c_rarg1 is from interpreter
 RuntimeStub* generate_cont_doYield() {
     const char *name = "cont_doYield";
 
@@ -6668,11 +6667,11 @@ RuntimeStub* generate_cont_doYield() {
 
     address start = __ pc();
 
-    // __ stop("FFFFF");
     __ enter();
 
     // // return address and rbp are already in place
     // __ subptr(rsp, (framesize-4) << LogBytesPerInt); // prolog
+    __ movptr(c_rarg1, rsp);
 
     int frame_complete = __ pc() - start;
     address the_pc = __ pc();

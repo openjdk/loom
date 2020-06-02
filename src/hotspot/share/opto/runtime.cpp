@@ -705,9 +705,9 @@ const TypeFunc* OptoRuntime::void_void_Type() {
  }
 
  const TypeFunc* OptoRuntime::continuation_doYield_Type() {
-   const Type**fields = TypeTuple::fields(1);
-   fields[TypeFunc::Parms+0] = TypeInt::INT;
-   const TypeTuple *args = TypeTuple::make(TypeFunc::Parms+1, fields);
+   const Type **fields = TypeTuple::fields(0);
+  //  fields[TypeFunc::Parms+0] = TypeInt::INT;
+   const TypeTuple *args = TypeTuple::make(TypeFunc::Parms+0, fields);
 
    fields = TypeTuple::fields(1);
    fields[TypeFunc::Parms+0] = TypeInt::INT;
