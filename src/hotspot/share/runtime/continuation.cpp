@@ -3416,7 +3416,8 @@ int Continuation::freeze(JavaThread* thread, bool from_interpreter) {
 
   assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
   fast = fast && thread->held_monitor_count() == 0;
-  // tty->print_cr(">>> freeze fast: %d thread->cont_fastpath(): %d from_interpreter: %d", fast, thread->cont_fastpath(), from_interpreter);
+  // if (!fast) tty->print_cr(">>> freeze fast: %d thread.cont_fastpath: %d from_interpreter: %d held_monitor_count: %d", fast, thread->cont_fastpath(), from_interpreter, thread->held_monitor_count());
+
   return fast ? cont_freeze<mode_fast>(thread, false)
               : cont_freeze<mode_slow>(thread, false);
 }
