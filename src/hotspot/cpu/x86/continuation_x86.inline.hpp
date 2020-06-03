@@ -532,7 +532,6 @@ static intptr_t* slow_real_fp(const frame& f) {
   return FKind::interpreted ? f.fp() : f.unextended_sp() + slow_get_cb(f)->frame_size();
 }
 
-#ifdef ASSERT
 template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
 static intptr_t** slow_link_address(const frame& f) {
   assert (FKind::is_instance(f), "");
@@ -540,7 +539,6 @@ static intptr_t** slow_link_address(const frame& f) {
             ? (intptr_t**)(f.fp() + frame::link_offset)
             : (intptr_t**)(slow_real_fp<FKind>(f) - frame::sender_sp_offset);
 }
-#endif
 
 template<typename FKind>
 static address* slow_return_pc_address(const frame& f) {
@@ -1319,12 +1317,6 @@ void Thaw<ConfigT, mode>::deoptimize_frame_in_chunk(intptr_t* sp, address pc, Co
 }
 
 template <typename ConfigT, op_mode mode>
-void Thaw<ConfigT, mode>::setup_jump(intptr_t* vsp, intptr_t* hsp) {
-  frame topf(vsp, vsp, *(intptr_t**)(hsp - 2), *(address*)(hsp - 1), NULL, NULL, true);
-  setup_jump(topf);
-}
-
-template <typename ConfigT, op_mode mode>
 void Thaw<ConfigT, mode>::patch_chunk_pd(intptr_t* sp) {
   intptr_t* fp = _cont.entryFP();
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
@@ -1357,6 +1349,28 @@ inline intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp, int argsize) {
 }
 
 #ifdef ASSERT
+
+static bool assert_frame_laid_out(frame f) {
+  intptr_t* sp = f.sp();
+  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
+  assert (f.raw_pc() == pc, "f.ra_pc: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.raw_pc()), p2i(pc));
+  assert (f.fp() == fp, "f.fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.fp()), p2i(fp));
+  return f.raw_pc() == pc && f.fp() == fp;
+}
+
+static bool assert_entry_frame_laid_out(ContinuationEntry* cont) {
+  intptr_t* sp = cont->entry_sp();
+  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
+  CodeBlob* cb = CodeCache::find_blob(pc);
+
+  assert (cb->is_compiled(), "");
+  assert (cb->as_compiled_method()->method()->is_continuation_enter_intrinsic(), "");
+  assert (cont->entry_fp() == fp, "entry_fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(cont->entry_sp()), p2i(fp));
+  return cb->as_compiled_method()->method()->is_continuation_enter_intrinsic() && cont->entry_fp() == fp;
+}
+
 bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_size, int* out_frames, int* out_oops) {
   assert (oopDesc::is_oop(chunk), "");
   log_develop_trace(jvmcont)("debug_verify_stack_chunk young: %d", !requires_barriers(chunk));

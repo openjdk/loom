@@ -6770,13 +6770,7 @@ RuntimeStub* generate_cont_doYield() {
     } else {
       __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
     }
-    #ifndef PRODUCT
-      Label OK;
-      __ cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
-      __ jcc(Assembler::equal, OK);
-      __ stop("incorrect rsp1");
-      __ bind(OK);
-    #endif
+    assert_asm(_masm, cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
 
     Label thaw_success;
     __ movptr(fi, rsp);
@@ -6785,53 +6779,45 @@ RuntimeStub* generate_cont_doYield() {
     }
 
     __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
-
     if (ContPerfTest > 105) {
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, c_rarg1);
+      __ movptr(rbx, rax);
     } else {
-      __ xorq(rax, rax);
+      __ xorq(rbx, rbx);
     }
-    __ testq(rax, rax);           // rax contains the size of the frames to thaw, 0 if overflow or no more frames
-    __ jcc(Assembler::notZero, thaw_success);
-
     if (return_barrier) {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
     }
-    #ifndef PRODUCT
-      Label OK2;
-      __ cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
-      __ jcc(Assembler::equal, OK2);
-      __ stop("incorrect rsp2");
-      __ bind(OK2);
-    #endif
+    assert_asm(_masm, cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
+
+    __ testq(rbx, rbx);           // rax contains the size of the frames to thaw, 0 if overflow or no more frames
+    __ jcc(Assembler::notZero, thaw_success);
+
     __ jump(ExternalAddress(StubRoutines::throw_StackOverflowError_entry()));
 
     __ bind(thaw_success);
 
-    if (return_barrier) {
-      __ pop_d(xmm0); __ pop(rdx);   // TEMPORARILY restore return value (we're going to push it again, but rsp is about to move)
-    }
-
-    __ subq(rsp, rax);             // make room for the thawed frames
+    __ subq(rsp, rbx);             // make room for the thawed frames
     __ andptr(rsp, -16); // align
     
     if (return_barrier) {
-      __ push(rdx); __ push_d(xmm0); // save original return value -- again
+      __ push(rax); __ push_d(xmm0); // save original return value -- again
     }
 
-    __ movl(c_rarg1, return_barrier);
-    __ movl(c_rarg2, exception);
+    __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
     if (ContPerfTest > 112) {
       if (!return_barrier && JvmtiExport::can_support_continuations()) {
-        __ call_VM(noreg, CAST_FROM_FN_PTR(address, Continuation::thaw), c_rarg1, c_rarg2);
+        __ call_VM(noreg, CAST_FROM_FN_PTR(address, Continuation::thaw), c_rarg1);
       } else {
-        __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw_leaf), r15_thread, c_rarg1, c_rarg2);
+        __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw_leaf), r15_thread, c_rarg1);
       }
     }
     __ movptr(rbx, rax); // rbx is now the sp of the yielding frame
 
     if (return_barrier) {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
+    } else {
+      __ movl(rax, 0); // return 0 (success) from doYield
     }
 
     __ movptr(rsp, rbx); // we're now on the yield frame (which is in an address above us b/c rsp has been pushed down)
@@ -6848,11 +6834,8 @@ RuntimeStub* generate_cont_doYield() {
       __ jmp(rbx); // the exception handler
     }
 
+    // We're "returning" into the topmost thawed frame; see Thaw::push_return_frame
     __ pop(rbp);
-
-    if (!return_barrier) {
-      __ movl(rax, 0); // return 0 (success) from doYield
-    }
     __ ret(0);
 
     return start;

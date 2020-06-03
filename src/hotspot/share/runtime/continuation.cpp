@@ -203,6 +203,8 @@ static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) P
 
 #ifdef ASSERT
   static void print_frames(JavaThread* thread, outputStream* st = tty);
+  static bool assert_frame_laid_out(frame f);
+  static bool assert_entry_frame_laid_out(ContinuationEntry* cont);
   //static void print_blob(outputStream* st, address addr);
   static jlong java_tid(JavaThread* thread);
   // static bool is_deopt_pc(const frame& f, address pc);
@@ -2275,7 +2277,6 @@ public:
       return false;
 
     assert (StubRoutines::cont_doYield_stub()->frame_size() == frame_metadata, "");
-    assert (top_sp == _thread->frame_anchor()->last_Java_sp(), "");
     intptr_t* const top = top_sp + frame_metadata;
     const int argsize = bottom_argsize();
     intptr_t* const bottom = align_bottom(_cont.entrySP(), argsize);
@@ -2316,7 +2317,6 @@ public:
     oop chunk = _cont.tail();
 
     assert (StubRoutines::cont_doYield_stub()->frame_size() == frame_metadata, "");
-    assert (top_sp == _thread->frame_anchor()->last_Java_sp(), "");
     intptr_t* const top = top_sp + frame_metadata;
 
     const int argsize = bottom_argsize();
@@ -3438,11 +3438,12 @@ static bool monitors_on_stack(JavaThread* thread) {
 int Continuation::freeze(JavaThread* thread, intptr_t* sp) {
   TRACE_CALL(int, Continuation::freeze(JavaThread* thread, intptr_t* sp))
   os::verify_stack_alignment();
+  assert (sp == thread->frame_anchor()->last_Java_sp(), "");
+
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
   // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
   // We also clear thread->cont_fastpath in Deoptimize::deoptimize_single_frame and when we thaw interpreted frames
   bool fast = UseContinuationFastPath && thread->cont_fastpath();
-
   assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
   fast = fast && thread->held_monitor_count() == 0;
   // if (!fast) tty->print_cr(">>> freeze fast: %d thread.cont_fastpath: %d held_monitor_count: %d", fast, thread->cont_fastpath(), thread->held_monitor_count());
@@ -3648,7 +3649,6 @@ private:
   void patch_chunk_pd(intptr_t* sp);
   inline intptr_t* align_chunk(intptr_t* vsp, int argsize);
   inline void prefetch_chunk_pd(void* start, int size_words);
-  void setup_jump(intptr_t* vsp, intptr_t* hsp);
   intptr_t* push_interpreter_return_frame(intptr_t* sp);
 
   bool should_deoptimize() {
@@ -3741,9 +3741,7 @@ public:
 
         return caller.sp();
       } else {
-        assert (*(intptr_t**)(_cont.entrySP() - frame::sender_sp_offset) == _cont.entryFP(), "");  // TODO R PD
-        assert (CodeCache::find_blob(*(address*)(_cont.entrySP() - SENDER_SP_RET_ADDRESS_OFFSET))->as_compiled_method()->method()->is_continuation_enter_intrinsic(), "");
-
+        assert (assert_entry_frame_laid_out(_cont.entry()), "");
         return _cont.entrySP();
       }
     } else {
@@ -4348,7 +4346,7 @@ public:
   void finish(frame& f) {
     PERFTEST_ONLY(if (PERFTEST_LEVEL <= 115) return;)
 
-    setup_jump(f);
+    push_return_frame(f);
 
     // _cont.set_last_frame(_last_frame);
 
@@ -4364,7 +4362,7 @@ public:
     if (log_develop_is_enabled(Trace, jvmcont)) _cont.last_frame<mode_slow>().print_on(_cont, tty);
   }
 
-  void setup_jump(frame& f) {
+  void push_return_frame(frame& f) { // see generate_cont_thaw
     assert (!f.is_compiled_frame() || f.is_deoptimized_frame() == f.cb()->as_compiled_method()->is_deopt_pc(f.raw_pc()), "");
     assert (!f.is_compiled_frame() || f.is_deoptimized_frame() == (f.pc() != f.raw_pc()), "");
 
@@ -4375,8 +4373,7 @@ public:
 
     Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
 
-    assert (*(intptr_t**)(sp - frame::sender_sp_offset) == f.fp(), "");  // TODO R PD
-    assert (*(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) == pc, "");
+    assert(assert_frame_laid_out(f), "");
 
     assert ((mode == mode_slow &&_preempt) || !FULL_STACK || assert_top_java_frame_name(f, YIELD0_SIG), "");
   }
