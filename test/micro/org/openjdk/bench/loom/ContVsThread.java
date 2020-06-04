@@ -87,8 +87,16 @@ public class ContVsThread {
 
     // compare Continuation run+yield vs. virtual Thread unpark+park
 
+    static void yieldN(int depth) {
+        if (depth > 0) {
+            yieldN(depth - 1);
+        } else {
+            Continuation.yield(scope);
+        }
+    }
+
     static final Continuation yieldingCont = new Continuation(scope, () -> {
-        while (true) { Continuation.yield(scope); }
+        while (true) { yieldN(5); }
     });
 
     static final Thread parkingVThread = Thread.builder()
