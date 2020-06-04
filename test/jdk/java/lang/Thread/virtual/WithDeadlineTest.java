@@ -49,7 +49,7 @@ public class WithDeadlineTest {
     public void testDeadlineBeforeShutdown() throws Exception {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         var deadline = Instant.now().plusSeconds(5);
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
+        try (var executor = Executors.newThreadExecutor(factory).withDeadline(deadline)) {
             // assume this is submitted before the deadline expires
             Future<?> result = executor.submit(() -> {
                 Thread.sleep(ONE_DAY);
@@ -77,7 +77,7 @@ public class WithDeadlineTest {
     public void testDeadlineAfterShutdown() throws Exception {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         var deadline = Instant.now().plusSeconds(5);
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
+        try (var executor = Executors.newThreadExecutor(factory).withDeadline(deadline)) {
             // assume this is submitted before the deadline expires
             Future<?> result = executor.submit(() -> {
                 Thread.sleep(ONE_DAY);
@@ -107,7 +107,7 @@ public class WithDeadlineTest {
         var deadline = Instant.now().plusSeconds(5);
         Future<?> result;
         try {
-            try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
+            try (var executor = Executors.newThreadExecutor(factory).withDeadline(deadline)) {
                 // assume this is submitted before the deadline expires
                 result = executor.submit(() -> {
                     Thread.sleep(ONE_DAY);
@@ -134,7 +134,7 @@ public class WithDeadlineTest {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
         var deadline = Instant.now().plusSeconds(60);
         Future<?> result;
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
+        try (var executor = Executors.newThreadExecutor(factory).withDeadline(deadline)) {
             result = executor.submit(() -> {
                 Thread.sleep(Duration.ofMillis(500));
                 return null;
@@ -152,20 +152,20 @@ public class WithDeadlineTest {
 
         // now
         Instant now = Instant.now();
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(now)) {
+        try (var executor = Executors.newThreadExecutor(factory).withDeadline(now)) {
             assertTrue(executor.isTerminated());
         }
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(now)) {
+        try (var executor = Executors.newThreadExecutor(factory).withDeadline(now)) {
             assertTrue(Thread.interrupted());
             assertTrue(executor.isTerminated());
         }
 
         // in the past
         var yesterday = Instant.now().minus(ONE_DAY);
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(yesterday)) {
+        try (var executor = Executors.newThreadExecutor(factory).withDeadline(yesterday)) {
             assertTrue(executor.isTerminated());
         }
-        try (var executor = Executors.newUnboundedExecutor(factory).withDeadline(yesterday)) {
+        try (var executor = Executors.newThreadExecutor(factory).withDeadline(yesterday)) {
             assertTrue(Thread.interrupted());
             assertTrue(executor.isTerminated());
         }

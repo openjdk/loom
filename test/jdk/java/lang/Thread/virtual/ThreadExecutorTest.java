@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng UnboundedExecutorTest
- * @summary Basic tests for Executors.newUnboundedXXXExecutor
+ * @run testng ThreadExecutorTest
+ * @summary Basic tests for Executors.newThreadExecutor
  */
 
 import java.time.Duration;
@@ -47,7 +47,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
-public class UnboundedExecutorTest {
+public class ThreadExecutorTest {
 
     /**
      * Test that a new thread is created for each task.
@@ -63,7 +63,7 @@ public class UnboundedExecutorTest {
         };
 
         var results = new ArrayList<Future<?>>();
-        ExecutorService executor = Executors.newUnboundedExecutor(factory2);
+        ExecutorService executor = Executors.newThreadExecutor(factory2);
         try (executor) {
             for (int i=0; i<NUM_TASKS; i++) {
                 Future<?> result = executor.submit(() -> {
@@ -82,12 +82,12 @@ public class UnboundedExecutorTest {
     }
 
     /**
-     * Tests that newUnboundedVirtualThreadExecutor creates virtual threads
+     * Tests that newVirtualThreadExecutor creates virtual threads
      */
     public void testNewUnboundedVirtualThreadExecutor() {
         final int NUM_TASKS = 10;
         AtomicInteger virtualThreadCount = new AtomicInteger();
-        try (var executor = Executors.newUnboundedVirtualThreadExecutor()) {
+        try (var executor = Executors.newVirtualThreadExecutor()) {
             for (int i=0; i<NUM_TASKS; i++) {
                 executor.submit(() -> {
                     if (Thread.currentThread().isVirtual()) {
@@ -104,7 +104,7 @@ public class UnboundedExecutorTest {
      */
     public void testShutdownNow() {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
-        ExecutorService executor = Executors.newUnboundedExecutor(factory);
+        ExecutorService executor = Executors.newThreadExecutor(factory);
         Future<?> result;
         try {
             result = executor.submit(() -> {
@@ -124,7 +124,7 @@ public class UnboundedExecutorTest {
     public void testSubmitAfterShutdown() {
         Phaser barrier = new Phaser(2);
         ThreadFactory factory = Thread.builder().daemon(true).factory();
-        ExecutorService executor = Executors.newUnboundedExecutor(factory);
+        ExecutorService executor = Executors.newThreadExecutor(factory);
         try {
             // submit task to prevent executor from terminating
             executor.submit(barrier::arriveAndAwaitAdvance);
@@ -142,7 +142,7 @@ public class UnboundedExecutorTest {
      */
     public void testSubmitAfterTermination() {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
-        ExecutorService executor = Executors.newUnboundedExecutor(factory);
+        ExecutorService executor = Executors.newThreadExecutor(factory);
         executor.shutdown();
         assertTrue(executor.isShutdown() && executor.isTerminated());
         assertThrows(RejectedExecutionException.class, () -> executor.submit(() -> {}));
@@ -153,7 +153,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnyCompleteNormally1() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> "bar";
             String result = executor.invokeAny(Set.of(task1, task2));
@@ -166,7 +166,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnyCompleteNormally2() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
                 Thread.sleep(Duration.ofSeconds(60));
@@ -182,7 +182,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnyCompleteExceptionally1() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> { throw new FooException(); };
             Callable<String> task2 = () -> { throw new FooException(); };
@@ -201,7 +201,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnyCompleteExceptionally2() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> { throw new FooException(); };
             Callable<String> task2 = () -> {
@@ -223,7 +223,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnySomeCompleteNormally1() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> { throw new FooException(); };
@@ -237,7 +237,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnySomeCompleteNormally2() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> {
                 Thread.sleep(Duration.ofSeconds(2));
@@ -254,7 +254,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnyWithTimeout1() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> "bar";
             String result = executor.invokeAny(Set.of(task1, task2), 1, TimeUnit.MINUTES);
@@ -268,7 +268,7 @@ public class UnboundedExecutorTest {
     @Test(expectedExceptions = { TimeoutException.class })
     public void testInvokeAnyWithTimeout2() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             Callable<String> task1 = () -> {
                 Thread.sleep(Duration.ofMinutes(1));
                 return "foo";
@@ -288,7 +288,7 @@ public class UnboundedExecutorTest {
     @Test(expectedExceptions = { TimeoutException.class })
     public void testInvokeAnyWithTimeout3() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> { throw new FooException(); };
             Callable<String> task2 = () -> {
@@ -304,7 +304,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnyCanceRemaining() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             DelayedResult<String> task1 = new DelayedResult("foo", Duration.ofMillis(50));
             DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofSeconds(60));
             String result = executor.invokeAny(Set.of(task1, task2));
@@ -348,7 +348,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnyInterrupt1() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> "bar";
             Thread.currentThread().interrupt();
@@ -368,7 +368,7 @@ public class UnboundedExecutorTest {
      */
     public void testInvokeAnyInterrupt2() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             Callable<String> task1 = () -> {
                 Thread.sleep(Duration.ofMinutes(1));
                 return "foo";
@@ -395,7 +395,7 @@ public class UnboundedExecutorTest {
     @Test(expectedExceptions = { RejectedExecutionException.class })
     public void testInvokeAnyAfterShutdown() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        var executor = Executors.newUnboundedExecutor(factory);
+        var executor = Executors.newThreadExecutor(factory);
         executor.shutdown();
 
         Callable<String> task1 = () -> "foo";
@@ -409,7 +409,7 @@ public class UnboundedExecutorTest {
     @Test(expectedExceptions = { IllegalArgumentException.class })
     public void testInvokeAnyEmpty1() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             executor.invokeAny(Set.of());
         }
     }
@@ -420,7 +420,7 @@ public class UnboundedExecutorTest {
     @Test(expectedExceptions = { IllegalArgumentException.class })
     public void testInvokeAnyEmpty2() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             executor.invokeAny(Set.of(), 1, TimeUnit.MINUTES);
         }
     }
@@ -431,7 +431,7 @@ public class UnboundedExecutorTest {
     @Test(expectedExceptions = { NullPointerException.class })
     public void testInvokeAnyNull1() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             executor.invokeAny(null);
         }
     }
@@ -442,7 +442,7 @@ public class UnboundedExecutorTest {
     @Test(expectedExceptions = { NullPointerException.class })
     public void testInvokeAnyNull2() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        try (var executor = Executors.newUnboundedExecutor(factory)) {
+        try (var executor = Executors.newThreadExecutor(factory)) {
             List<Callable<String>> list = new ArrayList<>();
             list.add(() -> "foo");
             list.add(null);

@@ -243,8 +243,7 @@ public class Executors {
     }
 
     /**
-     * Creates an Executor that runs each task in its own thread. The number of
-     * threads is unbounded.
+     * Creates an Executor that starts a new thread for each task.
      *
      * <p> Tasks submitted with the {@linkplain ExecutorService#submitTask(Callable)
      * submitTask} or {@linkplain ExecutorService#submitTasks(Collection) submitTasks}
@@ -257,14 +256,14 @@ public class Executors {
      * @throws NullPointerException if factory is null
      * @since 99
      */
-    public static ExecutorService newUnboundedExecutor(ThreadFactory threadFactory) {
+    public static ExecutorService newThreadExecutor(ThreadFactory threadFactory) {
         return new UnboundedExecutor(threadFactory);
     }
 
     /**
-     * Creates an Executor that runs each task in its own virtual thread. The
+     * Creates an Executor that starts a new virtual thread for each task. The
      * threads support thread-locals but do not inherit inheritable thread-locals
-     * when created. The number of threads is unbounded.
+     * when created.
      *
      * <p> Tasks submitted with the {@linkplain ExecutorService#submitTask(Callable)
      * submitTask} or {@linkplain ExecutorService#submitTasks(Collection) submitTasks}
@@ -275,7 +274,7 @@ public class Executors {
      * @apiNote This is a prototype API. It is intended to be used to run tasks
      * in virtual threads as in the following example:
      * <pre> {@code
-     *     try (ExecutorService executor = Executors.newUnboundedVirtualThreadExecutor()) {
+     *     try (ExecutorService executor = Executors.newVirtualThreadExecutor()) {
      *         List<Callable<String>> tasks = ...
      *         String result = executor.invokeAny(tasks);
      *     }
@@ -284,7 +283,7 @@ public class Executors {
      * @return a newly created executor
      * @since 99
      */
-    public static ExecutorService newUnboundedVirtualThreadExecutor() {
+    public static ExecutorService newVirtualThreadExecutor() {
         ThreadFactory factory = Thread.builder().virtual().factory();
         return new UnboundedExecutor(factory);
     }
