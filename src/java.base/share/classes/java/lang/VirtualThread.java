@@ -69,12 +69,14 @@ class VirtualThread extends Thread {
     private static final VarHandle STATE;
     private static final VarHandle PARK_PERMIT;
     private static final VarHandle CARRIER_THREAD;
+    private static final VarHandle LOCK;
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
             STATE = l.findVarHandle(VirtualThread.class, "state", short.class);
             PARK_PERMIT = l.findVarHandle(VirtualThread.class, "parkPermit", boolean.class);
             CARRIER_THREAD = l.findVarHandle(VirtualThread.class, "carrierThread", Thread.class);
+            LOCK = l.findVarHandle(VirtualThread.class, "lock", ReentrantLock.class);
         } catch (Exception e) {
             throw new InternalError(e);
         }
@@ -84,9 +86,6 @@ class VirtualThread extends Thread {
     private final Executor scheduler;
     private final Continuation cont;
     private final Runnable runContinuation;
-
-    // carrier thread when mounted
-    private volatile Thread carrierThread;
 
     // virtual thread state
     private static final short NEW      = 0;
@@ -100,10 +99,15 @@ class VirtualThread extends Thread {
     private static final short TERMINATED   = 99;  // final state
     private volatile short state;
 
-    // park/unpark support
-    private final ReentrantLock lock = new ReentrantLock();
-    private Condition condition;        // created lazily when waiting
+    // parking permit
     private volatile boolean parkPermit;
+
+    // carrier thread when mounted
+    private volatile Thread carrierThread;
+
+    // lock/condition used when waiting (join or pinned)
+    private volatile ReentrantLock lock;   // created lazily
+    private Condition condition;           // created lazily while holding lock
 
     /**
      * Creates a new {@code VirtualThread} to run the given task with the given scheduler.
@@ -329,7 +333,15 @@ class VirtualThread extends Thread {
         }
 
         // notify anyone waiting for this virtual thread to terminate
-        signalWaiters();
+        ReentrantLock lock = this.lock;
+        if (lock != null) {
+            lock.lock();
+            try {
+                getCondition().signalAll();
+            } finally {
+                lock.unlock();
+            }
+        }
     }
 
     /**
@@ -343,6 +355,7 @@ class VirtualThread extends Thread {
         // switch to carrier thread
         Thread thread = Thread.currentCarrierThread();
         thread.setVirtualThread(null);
+        final ReentrantLock lock = getLock();
         lock.lock();
         try {
             assert state == PARKING;
@@ -350,7 +363,7 @@ class VirtualThread extends Thread {
 
             if (!parkPermit) {
                 // wait to be unparked or interrupted
-                condition().await();
+                getCondition().await();
             }
         } catch (InterruptedException e) {
             awaitInterrupted = true;
@@ -484,10 +497,11 @@ class VirtualThread extends Thread {
                         scheduler.execute(runContinuation);  // may throw REE
                     } else if (s == PINNED) {
                         // signal pinned thread so that execution continues
+                        final ReentrantLock lock = getLock();
                         lock.lock();
                         try {
                             if (state() == PINNED) {
-                                signalWaiters();
+                                getCondition().signalAll();
                             }
                         } finally {
                             lock.unlock();
@@ -539,18 +553,20 @@ class VirtualThread extends Thread {
         if (s == NEW)
             throw new IllegalStateException("Not started");
 
+        final ReentrantLock lock = getLock();
         lock.lock();
         try {
+            final Condition condition = getCondition();
             if (nanos == 0) {
                 while (state() != TERMINATED) {
-                    condition().await();
+                    condition.await();
                 }
                 return true;
             } else {
                 long startNanos = System.nanoTime();
                 long remainingNanos = nanos;
                 while (remainingNanos > 0 && state() != TERMINATED) {
-                    condition().await(remainingNanos, NANOSECONDS);
+                    condition.await(remainingNanos, NANOSECONDS);
                     remainingNanos = nanos - (System.nanoTime() - startNanos);
                 }
                 return (state() == TERMINATED);
@@ -689,30 +705,29 @@ class VirtualThread extends Thread {
     }
 
     /**
+     * Returns the lock object, creating it if needed.
+     */
+    private ReentrantLock getLock() {
+        ReentrantLock lock = this.lock;
+        if (lock == null) {
+            lock = new ReentrantLock();
+            if (!LOCK.compareAndSet(this, null, lock)) {
+                lock = this.lock;
+            }
+        }
+        return lock;
+    }
+
+    /**
      * Returns the condition object for signalling, creating it if needed.
      */
-    private Condition condition() {
-        assert lock.isHeldByCurrentThread();
+    private Condition getCondition() {
+        assert getLock().isHeldByCurrentThread();
         Condition condition = this.condition;
         if (condition == null) {
             this.condition = condition = lock.newCondition();
         }
         return condition;
-    }
-
-    /**
-     * Signal everyone waiting on the condition object.
-     */
-    private void signalWaiters() {
-        lock.lock();
-        try {
-            Condition condition = this.condition;
-            if (condition != null) {
-                condition.signalAll();
-            }
-        } finally {
-            lock.unlock();
-        }
     }
 
     // -- stack trace support --
