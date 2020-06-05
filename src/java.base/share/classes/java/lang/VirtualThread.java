@@ -61,10 +61,12 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  */
 
 class VirtualThread extends Thread {
-    private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
     private static final Executor DEFAULT_SCHEDULER = defaultScheduler();
     private static final ScheduledExecutorService UNPARKER = delayedTaskScheduler();
     private static final int TRACE_PINNING_MODE = tracePinningMode();
+
+    // scope used for the continuations
+    static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
 
     private static final VarHandle STATE;
     private static final VarHandle PARK_PERMIT;

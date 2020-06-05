@@ -290,7 +290,16 @@ public final class StackWalker {
          * reflection frames}. A {@code StackWalker} with this {@code SHOW_HIDDEN_FRAMES}
          * option will show all hidden frames (including reflection frames).
          */
-        SHOW_HIDDEN_FRAMES;
+        SHOW_HIDDEN_FRAMES,
+        /**
+         * Show carrier thread frames.
+         *
+         * <p>By default, carrier thread frames are hidden when walking the stack
+         * of a virtual thread.
+         *
+         * @since 99
+         */
+        SHOW_CARRIER_FRAMES;
     }
 
     enum ExtendedOption {

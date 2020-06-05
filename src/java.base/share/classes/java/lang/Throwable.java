@@ -28,6 +28,9 @@ package java.lang;
 import java.io.*;
 import java.util.*;
 
+import jdk.internal.misc.VM;
+import sun.security.action.GetPropertyAction;
+
 /**
  * The {@code Throwable} class is the superclass of all errors and
  * exceptions in the Java language. Only objects that are instances of this
@@ -153,6 +156,17 @@ public class Throwable implements Serializable {
          */
         public static final StackTraceElement[] STACK_TRACE_SENTINEL =
             new StackTraceElement[] {STACK_TRACE_ELEMENT_SENTINEL};
+    }
+
+    /**
+     * Holder class to defer initializing configuration.
+     */
+    private static class Configuration {
+        static final boolean SHOW_FULL_STACK_TRACE;
+        static {
+            String s = GetPropertyAction.privilegedGetProperty("jdk.showFullStackTrace");
+            SHOW_FULL_STACK_TRACE = (s != null && !s.equalsIgnoreCase("false"));
+        }
     }
 
     /**
@@ -794,7 +808,13 @@ public class Throwable implements Serializable {
      * @see     java.lang.Throwable#printStackTrace()
      */
     public synchronized Throwable fillInStackTrace() {
-        return fillInStackTrace(null);
+        ContinuationScope scope = null;
+        if (VM.isBooted()
+                && Thread.currentThread().isVirtual()
+                && !Configuration.SHOW_FULL_STACK_TRACE) {
+            scope = VirtualThread.VTHREAD_SCOPE;
+        }
+        return fillInStackTrace(scope);
     }
 
     /**

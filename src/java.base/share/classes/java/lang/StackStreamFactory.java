@@ -141,8 +141,16 @@ final class StackStreamFactory {
             this.walker = walker;
             this.maxDepth = maxDepth;
             this.depth = 0;
-            this.contScope = walker.getContScope();
-            this.continuation = walker.getContinuation();
+            ContinuationScope scope = walker.getContScope();
+            if (scope == null
+                    && thread.isVirtual()
+                    && !walker.hasOption(Option.SHOW_CARRIER_FRAMES)) {
+                this.contScope = VirtualThread.VTHREAD_SCOPE;
+                this.continuation = null;
+            } else {
+                this.contScope = walker.getContScope();
+                this.continuation = walker.getContinuation();
+            }
         }
 
         private int toStackWalkMode(StackWalker walker, int mode) {
