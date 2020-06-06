@@ -478,11 +478,11 @@ void LIRGenerator::array_range_check(LIR_Opr array, LIR_Opr index,
   if (index->is_constant()) {
     cmp_mem_int(lir_cond_belowEqual, array, arrayOopDesc::length_offset_in_bytes(),
                 index->as_jint(), null_check_info);
-    __ branch(lir_cond_belowEqual, T_INT, stub); // forward branch
+    __ branch(lir_cond_belowEqual, stub); // forward branch
   } else {
     cmp_reg_mem(lir_cond_aboveEqual, index, array,
                 arrayOopDesc::length_offset_in_bytes(), T_INT, null_check_info);
-    __ branch(lir_cond_aboveEqual, T_INT, stub); // forward branch
+    __ branch(lir_cond_aboveEqual, stub); // forward branch
   }
 }
 
@@ -491,11 +491,11 @@ void LIRGenerator::nio_range_check(LIR_Opr buffer, LIR_Opr index, LIR_Opr result
   CodeStub* stub = new RangeCheckStub(info, index);
   if (index->is_constant()) {
     cmp_mem_int(lir_cond_belowEqual, buffer, java_nio_Buffer::limit_offset(), index->as_jint(), info);
-    __ branch(lir_cond_belowEqual, T_INT, stub); // forward branch
+    __ branch(lir_cond_belowEqual, stub); // forward branch
   } else {
     cmp_reg_mem(lir_cond_aboveEqual, index, buffer,
                 java_nio_Buffer::limit_offset(), T_INT, info);
-    __ branch(lir_cond_aboveEqual, T_INT, stub); // forward branch
+    __ branch(lir_cond_aboveEqual, stub); // forward branch
   }
   __ move(index, result);
 }
@@ -686,7 +686,7 @@ void LIRGenerator::new_instance(LIR_Opr dst, ciInstanceKlass* klass, bool is_unr
                        oopDesc::header_size(), instance_size, klass_reg, !klass->is_initialized(), slow_path);
   } else {
     CodeStub* slow_path = new NewInstanceStub(klass_reg, dst, klass, info, Runtime1::new_instance_id);
-    __ branch(lir_cond_always, T_ILLEGAL, slow_path);
+    __ branch(lir_cond_always, slow_path);
     __ branch_destination(slow_path->continuation());
   }
 }
@@ -1220,8 +1220,7 @@ void LIRGenerator::do_Return(Return* x) {
 // Combination of LoadField and g1 pre-write barrier
 void LIRGenerator::do_Reference_get(Intrinsic* x) {
 
-  const int referent_offset = java_lang_ref_Reference::referent_offset;
-  guarantee(referent_offset > 0, "referent offset not initialized");
+  const int referent_offset = java_lang_ref_Reference::referent_offset();
 
   assert(x->number_of_arguments() == 1, "wrong type");
 
@@ -1307,7 +1306,7 @@ void LIRGenerator::do_isPrimitive(Intrinsic* x) {
     info = state_for(x);
   }
 
-  __ move(new LIR_Address(rcvr.result(), java_lang_Class::klass_offset_in_bytes(), T_ADDRESS), temp, info);
+  __ move(new LIR_Address(rcvr.result(), java_lang_Class::klass_offset(), T_ADDRESS), temp, info);
   __ cmp(lir_cond_notEqual, temp, LIR_OprFact::metadataConst(0));
   __ cmove(lir_cond_notEqual, LIR_OprFact::intConst(0), LIR_OprFact::intConst(1), result, T_BOOLEAN);
 }
@@ -1599,7 +1598,7 @@ void LIRGenerator::do_StoreIndexed(StoreIndexed* x) {
   if (GenerateRangeChecks && needs_range_check) {
     if (use_length) {
       __ cmp(lir_cond_belowEqual, length.result(), index.result());
-      __ branch(lir_cond_belowEqual, T_INT, new RangeCheckStub(range_check_info, index.result(), array.result()));
+      __ branch(lir_cond_belowEqual, new RangeCheckStub(range_check_info, index.result(), array.result()));
     } else {
       array_range_check(array.result(), index.result(), null_check_info, range_check_info);
       // range_check also does the null check
@@ -1788,11 +1787,11 @@ void LIRGenerator::do_NIOCheckIndex(Intrinsic* x) {
     LIR_Opr buf_obj = access_resolve(IS_NOT_NULL | ACCESS_READ, buf.result());
     if (index.result()->is_constant()) {
       cmp_mem_int(lir_cond_belowEqual, buf_obj, java_nio_Buffer::limit_offset(), index.result()->as_jint(), info);
-      __ branch(lir_cond_belowEqual, T_INT, stub);
+      __ branch(lir_cond_belowEqual, stub);
     } else {
       cmp_reg_mem(lir_cond_aboveEqual, index.result(), buf_obj,
                   java_nio_Buffer::limit_offset(), T_INT, info);
-      __ branch(lir_cond_aboveEqual, T_INT, stub);
+      __ branch(lir_cond_aboveEqual, stub);
     }
     __ move(index.result(), result);
   } else {
@@ -1866,12 +1865,12 @@ void LIRGenerator::do_LoadIndexed(LoadIndexed* x) {
 
   if (GenerateRangeChecks && needs_range_check) {
     if (StressLoopInvariantCodeMotion && range_check_info->deoptimize_on_exception()) {
-      __ branch(lir_cond_always, T_ILLEGAL, new RangeCheckStub(range_check_info, index.result(), array.result()));
+      __ branch(lir_cond_always, new RangeCheckStub(range_check_info, index.result(), array.result()));
     } else if (use_length) {
       // TODO: use a (modified) version of array_range_check that does not require a
       //       constant length to be loaded to a register
       __ cmp(lir_cond_belowEqual, length.result(), index.result());
-      __ branch(lir_cond_belowEqual, T_INT, new RangeCheckStub(range_check_info, index.result(), array.result()));
+      __ branch(lir_cond_belowEqual, new RangeCheckStub(range_check_info, index.result(), array.result()));
     } else {
       array_range_check(array.result(), index.result(), null_check_info, range_check_info);
       // The range check performs the null check, so clear it out for the load
@@ -2247,18 +2246,18 @@ void LIRGenerator::do_SwitchRanges(SwitchRangeArray* x, LIR_Opr value, BlockBegi
     BlockBegin* dest = one_range->sux();
     if (low_key == high_key) {
       __ cmp(lir_cond_equal, value, low_key);
-      __ branch(lir_cond_equal, T_INT, dest);
+      __ branch(lir_cond_equal, dest);
     } else if (high_key - low_key == 1) {
       __ cmp(lir_cond_equal, value, low_key);
-      __ branch(lir_cond_equal, T_INT, dest);
+      __ branch(lir_cond_equal, dest);
       __ cmp(lir_cond_equal, value, high_key);
-      __ branch(lir_cond_equal, T_INT, dest);
+      __ branch(lir_cond_equal, dest);
     } else {
       LabelObj* L = new LabelObj();
       __ cmp(lir_cond_less, value, low_key);
-      __ branch(lir_cond_less, T_INT, L->label());
+      __ branch(lir_cond_less, L->label());
       __ cmp(lir_cond_lessEqual, value, high_key);
-      __ branch(lir_cond_lessEqual, T_INT, dest);
+      __ branch(lir_cond_lessEqual, dest);
       __ branch_destination(L->label());
     }
   }
@@ -2378,7 +2377,7 @@ void LIRGenerator::do_TableSwitch(TableSwitch* x) {
   } else {
     for (int i = 0; i < len; i++) {
       __ cmp(lir_cond_equal, value, i + lo_key);
-      __ branch(lir_cond_equal, T_INT, x->sux_at(i));
+      __ branch(lir_cond_equal, x->sux_at(i));
     }
     __ jump(x->default_sux());
   }
@@ -2437,7 +2436,7 @@ void LIRGenerator::do_LookupSwitch(LookupSwitch* x) {
     int len = x->length();
     for (int i = 0; i < len; i++) {
       __ cmp(lir_cond_equal, value, x->key_at(i));
-      __ branch(lir_cond_equal, T_INT, x->sux_at(i));
+      __ branch(lir_cond_equal, x->sux_at(i));
     }
     __ jump(x->default_sux());
   }
@@ -2952,6 +2951,33 @@ void LIRGenerator::do_IfOp(IfOp* x) {
 }
 
 #ifdef JFR_HAVE_INTRINSICS
+void LIRGenerator::do_ClassIDIntrinsic(Intrinsic* x) {
+  CodeEmitInfo* info = state_for(x);
+  CodeEmitInfo* info2 = new CodeEmitInfo(info); // Clone for the second null check
+
+  assert(info != NULL, "must have info");
+  LIRItem arg(x->argument_at(0), this);
+
+  arg.load_item();
+  LIR_Opr klass = new_register(T_METADATA);
+  __ move(new LIR_Address(arg.result(), java_lang_Class::klass_offset(), T_ADDRESS), klass, info);
+  LIR_Opr id = new_register(T_LONG);
+  ByteSize offset = KLASS_TRACE_ID_OFFSET;
+  LIR_Address* trace_id_addr = new LIR_Address(klass, in_bytes(offset), T_LONG);
+
+  __ move(trace_id_addr, id);
+  __ logical_or(id, LIR_OprFact::longConst(0x01l), id);
+  __ store(id, trace_id_addr);
+
+#ifdef TRACE_ID_META_BITS
+  __ logical_and(id, LIR_OprFact::longConst(~TRACE_ID_META_BITS), id);
+#endif
+#ifdef TRACE_ID_SHIFT
+  __ unsigned_shift_right(id, TRACE_ID_SHIFT, id);
+#endif
+
+  __ move(id, rlock_result(x));
+}
 
 void LIRGenerator::do_getEventWriter(Intrinsic* x) {
   LabelObj* L_NULL = new LabelObj();
@@ -3339,7 +3365,7 @@ void LIRGenerator::decrement_age(CodeEmitInfo* info) {
     CodeStub* deopt = new DeoptimizeStub(info, Deoptimization::Reason_tenured,
                                          Deoptimization::Action_make_not_entrant);
     __ cmp(lir_cond_lessEqual, result, LIR_OprFact::intConst(0));
-    __ branch(lir_cond_lessEqual, T_INT, deopt);
+    __ branch(lir_cond_lessEqual, deopt);
   }
 }
 
@@ -3386,9 +3412,9 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     if (freq == 0) {
       if (!step->is_constant()) {
         __ cmp(lir_cond_notEqual, step, LIR_OprFact::intConst(0));
-        __ branch(lir_cond_notEqual, T_ILLEGAL, overflow);
+        __ branch(lir_cond_notEqual, overflow);
       } else {
-        __ branch(lir_cond_always, T_ILLEGAL, overflow);
+        __ branch(lir_cond_always, overflow);
       }
     } else {
       LIR_Opr mask = load_immediate(freq, T_INT);
@@ -3399,7 +3425,7 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
       }
       __ logical_and(result, mask, result);
       __ cmp(lir_cond_equal, result, LIR_OprFact::intConst(0));
-      __ branch(lir_cond_equal, T_INT, overflow);
+      __ branch(lir_cond_equal, overflow);
     }
     __ branch_destination(overflow->continuation());
   }
@@ -3513,7 +3539,7 @@ void LIRGenerator::do_RangeCheckPredicate(RangeCheckPredicate *x) {
     CodeStub* stub = new PredicateFailedStub(info);
 
     __ cmp(lir_cond(cond), left, right);
-    __ branch(lir_cond(cond), right->type(), stub);
+    __ branch(lir_cond(cond), stub);
   }
 }
 

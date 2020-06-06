@@ -63,14 +63,14 @@
           "This also caps the maximum TLAB size.")                          \
           range(1, 100)                                                     \
                                                                             \
-  experimental(ccstr, ShenandoahGCMode, "satb",                             \
+  product(ccstr, ShenandoahGCMode, "satb",                                  \
           "GC mode to use.  Among other things, this defines which "        \
           "barriers are in in use. Possible values are:"                    \
           " satb - snapshot-at-the-beginning concurrent GC (three pass mark-evac-update);"  \
           " iu - incremental-update concurrent GC (three pass mark-evac-update);"  \
           " passive - stop the world GC only (either degenerated or full)") \
                                                                             \
-  experimental(ccstr, ShenandoahGCHeuristics, "adaptive",                   \
+  product(ccstr, ShenandoahGCHeuristics, "adaptive",                        \
           "GC heuristics to use. This fine-tunes the GC mode selected, "    \
           "by choosing when to start the GC, how much to process on each "  \
           "cycle, and what other features to automatically enable. "        \
@@ -350,11 +350,6 @@
           " 0 - sequential iterator;"                                       \
           " 1 - parallel iterator;"                                         \
           " 2 - parallel iterator with cset filters;")                      \
-                                                                            \
-  diagnostic(bool, ShenandoahOptimizeStaticFinals, true,                    \
-          "Optimize barriers on static final fields. "                      \
-          "Turn it off for maximum compatibility with reflection or JNI "   \
-          "code that manipulates final fields.")                            \
                                                                             \
   develop(bool, ShenandoahVerifyOptoBarriers, false,                        \
           "Verify no missing barriers in C2.")                              \

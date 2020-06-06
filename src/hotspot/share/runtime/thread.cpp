@@ -4714,6 +4714,8 @@ GrowableArray<JavaThread*>* Threads::get_pending_threads(ThreadsList * t_list,
   DO_JAVA_THREADS(t_list, p) {
     if (!p->can_call_java()) continue;
 
+    // The first stage of async deflation does not affect any field
+    // used by this comparison so the ObjectMonitor* is usable here.
     address pending = (address)p->current_pending_monitor();
     if (pending == monitor) {             // found a match
       if (i < count) result->append(p);   // save the first count matches
@@ -4860,8 +4862,10 @@ void Threads::print_on_error(outputStream* st, Thread* current, char* buf,
   print_on_error(VMThread::vm_thread(), st, current, buf, buflen, &found_current);
   print_on_error(WatcherThread::watcher_thread(), st, current, buf, buflen, &found_current);
 
-  PrintOnErrorClosure print_closure(st, current, buf, buflen, &found_current);
-  Universe::heap()->gc_threads_do(&print_closure);
+  if (Universe::heap() != NULL) {
+    PrintOnErrorClosure print_closure(st, current, buf, buflen, &found_current);
+    Universe::heap()->gc_threads_do(&print_closure);
+  }
 
   if (!found_current) {
     st->cr();

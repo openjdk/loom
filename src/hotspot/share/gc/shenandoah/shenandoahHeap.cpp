@@ -1589,17 +1589,20 @@ void ShenandoahHeap::op_final_mark() {
       }
 
       if (ShenandoahVerify) {
-        ShenandoahRootVerifier::RootTypes types = ShenandoahRootVerifier::None;
-        if (ShenandoahConcurrentRoots::should_do_concurrent_roots()) {
-          types = ShenandoahRootVerifier::combine(ShenandoahRootVerifier::JNIHandleRoots, ShenandoahRootVerifier::WeakRoots);
-          types = ShenandoahRootVerifier::combine(types, ShenandoahRootVerifier::CLDGRoots);
-          types = ShenandoahRootVerifier::combine(types, ShenandoahRootVerifier::StringDedupRoots);
-        }
+        // If OOM while evacuating/updating of roots, there is no guarantee of their consistencies
+        if (!cancelled_gc()) {
+          ShenandoahRootVerifier::RootTypes types = ShenandoahRootVerifier::None;
+          if (ShenandoahConcurrentRoots::should_do_concurrent_roots()) {
+            types = ShenandoahRootVerifier::combine(ShenandoahRootVerifier::JNIHandleRoots, ShenandoahRootVerifier::WeakRoots);
+            types = ShenandoahRootVerifier::combine(types, ShenandoahRootVerifier::CLDGRoots);
+            types = ShenandoahRootVerifier::combine(types, ShenandoahRootVerifier::StringDedupRoots);
+          }
 
-        if (ShenandoahConcurrentRoots::should_do_concurrent_class_unloading()) {
-          types = ShenandoahRootVerifier::combine(types, ShenandoahRootVerifier::CodeRoots);
+          if (ShenandoahConcurrentRoots::should_do_concurrent_class_unloading()) {
+            types = ShenandoahRootVerifier::combine(types, ShenandoahRootVerifier::CodeRoots);
+          }
+          verifier()->verify_roots_no_forwarded_except(types);
         }
-        verifier()->verify_roots_no_forwarded_except(types);
         verifier()->verify_during_evacuation();
       }
     } else {
@@ -1660,7 +1663,7 @@ public:
   ShenandoahConcurrentRootsEvacUpdateTask(ShenandoahPhaseTimings::Phase phase) :
     AbstractGangTask("Shenandoah Evacuate/Update Concurrent Strong Roots Task"),
     _vm_roots(phase),
-    _cld_roots(phase) {}
+    _cld_roots(phase, ShenandoahHeap::heap()->workers()->active_workers()) {}
 
   void work(uint worker_id) {
     ShenandoahConcurrentWorkerSession worker_session(worker_id);
@@ -1781,7 +1784,7 @@ public:
     _string_table_roots(OopStorageSet::string_table_weak(), phase, ShenandoahPhaseTimings::StringTableRoots),
     _resolved_method_table_roots(OopStorageSet::resolved_method_table_weak(), phase, ShenandoahPhaseTimings::ResolvedMethodTableRoots),
     _vm_roots(OopStorageSet::vm_weak(), phase, ShenandoahPhaseTimings::VMWeakRoots),
-    _cld_roots(phase),
+    _cld_roots(phase, ShenandoahHeap::heap()->workers()->active_workers()),
     _nmethod_itr(ShenandoahCodeRoots::table()),
     _concurrent_class_unloading(ShenandoahConcurrentRoots::should_do_concurrent_class_unloading()) {
     StringTable::reset_dead_counter();

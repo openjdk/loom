@@ -250,14 +250,6 @@ class VM_GTestExecuteAtSafepoint: public VM_Operation {
   VM_GTestExecuteAtSafepoint() {}
 };
 
-class VM_MarkActiveNMethods: public VM_Operation {
- public:
-  VM_MarkActiveNMethods() {}
-  VMOp_Type type() const                         { return VMOp_MarkActiveNMethods; }
-  void doit();
-  bool allow_nested_vm_operations() const        { return true; }
-};
-
 // Deopt helper that can deoptimize frames in threads other than the
 // current thread.  Only used through Deoptimization::deoptimize_frame.
 class VM_DeoptimizeFrame: public VM_Operation {
@@ -422,6 +414,7 @@ class VM_Exit: public VM_Operation {
     }
   }
   VMOp_Type type() const { return VMOp_Exit; }
+  bool doit_prologue();
   void doit();
 };
 

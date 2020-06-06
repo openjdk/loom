@@ -324,7 +324,7 @@ class VirtualThread extends Thread {
      */
     private void afterTerminate(boolean notifyAgents) {
         assert state == STARTED || state == RUNNING;
-        setReleaseState(TERMINATED);   // final state
+        setState(TERMINATED);   // final state
 
         // notify JVMTI agents
         if (notifyAgents && notifyJvmtiEvents) {

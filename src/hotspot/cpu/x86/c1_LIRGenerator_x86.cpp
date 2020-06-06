@@ -550,7 +550,7 @@ void LIRGenerator::do_ArithmeticOp_Long(ArithmeticOp* x) {
     __ move(right.result(), cc->at(0));
 
     __ cmp(lir_cond_equal, right.result(), LIR_OprFact::longConst(0));
-    __ branch(lir_cond_equal, T_LONG, new DivByZeroStub(info));
+    __ branch(lir_cond_equal, new DivByZeroStub(info));
 
     address entry = NULL;
     switch (x->op()) {
@@ -634,7 +634,7 @@ void LIRGenerator::do_ArithmeticOp_Int(ArithmeticOp* x) {
 
     if (!ImplicitDiv0Checks) {
       __ cmp(lir_cond_equal, right.result(), LIR_OprFact::intConst(0));
-      __ branch(lir_cond_equal, T_INT, new DivByZeroStub(info));
+      __ branch(lir_cond_equal, new DivByZeroStub(info));
       // Idiv/irem cannot trap (passing info would generate an assertion).
       info = NULL;
     }
@@ -1572,9 +1572,9 @@ void LIRGenerator::do_If(If* x) {
   profile_branch(x, cond);
   move_to_phi(x->state());
   if (x->x()->type()->is_float_kind()) {
-    __ branch(lir_cond(cond), right->type(), x->tsux(), x->usux());
+    __ branch(lir_cond(cond), x->tsux(), x->usux());
   } else {
-    __ branch(lir_cond(cond), right->type(), x->tsux());
+    __ branch(lir_cond(cond), x->tsux());
   }
   assert(x->default_sux() == x->fsux(), "wrong destination above");
   __ jump(x->default_sux());
