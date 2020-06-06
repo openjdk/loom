@@ -449,9 +449,8 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * try-with-resources construct to set a deadline for tasks submitted to
      * execute in the try-with-resources block.
      * <pre> {@code
-     *     ThreadFactory factory = Thread.builder().virtual().factory();
      *     Instant deadline = Instant.now().plusSeconds(10);
-     *     try (ExecutorService executor = Executors.newUnboundedExecutor(factory).withDeadline(deadline)) {
+     *     try (ExecutorService executor = Executors.newVirtualThreadExecutor().withDeadline(deadline)) {
      *         executor.submit(task1);
      *         executor.submit(task2);
      *         doSomethingThatMightBlock();
