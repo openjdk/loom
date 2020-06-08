@@ -52,14 +52,12 @@ inline void vframeStreamCommon::next() {
 
   // handle general case
   do {
-    assert (_continuation_scope.is_null() || _cont.not_null(), "must be");
+    assert (_continuation_scope.is_null() || _cont() != (oop)NULL, "must be");
     bool cont_entry = false;
-    oop cont = (oop)NULL;
-    if (_cont.not_null() && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
+    oop cont = _cont();
+    if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
       cont_entry = true;
-      cont = _cont();
       oop scope = java_lang_Continuation::scope(cont);
-
       // *(_cont.raw_value()) = java_lang_Continuation::parent(_cont());
 
       if (_continuation_scope.not_null() && (scope == _continuation_scope())) {

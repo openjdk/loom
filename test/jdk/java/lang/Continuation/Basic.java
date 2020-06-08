@@ -184,7 +184,7 @@ public class Basic {
 
         List<String> expected0 = new ArrayList<>();
         IntStream.range(0, DEPTH).forEach(i -> { expected0.add("deep"); });
-        List<String> baseFrames = List.of("bar", "foo", "lambda$test1$0", "enter0", "enter", "enterSpecial", "run", "test1");
+        List<String> baseFrames = List.of("bar", "foo", "lambda$test1$0", "enter0", "enter", "run", "test1");
         expected0.addAll(baseFrames);
 
         assertEquals(frames.subList(0, DEPTH + baseFrames.size()), expected0);

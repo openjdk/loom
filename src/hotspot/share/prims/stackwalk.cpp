@@ -126,14 +126,16 @@ void LiveFrameStream::set_continuation(Handle cont) {
 
 void JavaFrameStream::next() { 
   _vfst.next(); 
+  if (_vfst.method()->is_continuation_enter_intrinsic()) 
+    _vfst.next();
 }
 
 void LiveFrameStream::next() {
-  assert (_cont_scope.is_null() || _cont.not_null(), "must be");
-  if (_cont.not_null() && Continuation::is_continuation_entry_frame(_jvf->fr(), _jvf->register_map())) {
-    oop cont = _cont();
-    oop scope = java_lang_Continuation::scope(cont);
+  assert (_cont_scope.is_null() || _cont() != (oop)NULL, "must be");
 
+  oop cont = _cont();
+  if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_jvf->fr(), _jvf->register_map())) {    
+    oop scope = java_lang_Continuation::scope(cont);
     *(_cont.raw_value()) = java_lang_Continuation::parent(cont);
     
     if (_cont_scope.not_null() && (scope == _cont_scope())) {
