@@ -361,27 +361,27 @@ public class Thread implements Runnable {
             throw new IllegalArgumentException("timeout value is negative");
         }
 	    if (ThreadSleepEvent.isTurnedOn()) {
-			ThreadSleepEvent event = new ThreadSleepEvent();
-			try {
-				event.time = millis;
-				event.begin();
-				sleepMillis(millis);
-			} finally {
-				event.commit();
-			}
+            ThreadSleepEvent event = new ThreadSleepEvent();
+            try {
+                event.time = millis;
+                event.begin();
+                sleepMillis(millis);
+            } finally {
+                event.commit();
+            }
         } else {
             sleepMillis(millis);
         }
     }
 	
-	private static void sleepMillis(long millis) throws InterruptedException {
-		VirtualThread vthread = currentCarrierThread().getVirtualThread();
+    private static void sleepMillis(long millis) throws InterruptedException {
+        VirtualThread vthread = currentCarrierThread().getVirtualThread();
         if (vthread != null) {
             vthread.sleepNanos(TimeUnit.MILLISECONDS.toNanos(millis));
         } else {
             sleep0(millis);
         }
-	}	
+    }
 	
     private static native void sleep0(long millis) throws InterruptedException;
 
@@ -665,6 +665,11 @@ public class Thread implements Runnable {
 
         /**
          * Runs the task on the current thread as the carrier thread.
+         *
+         * <p> Invoking this method with the interrupt status set will first
+         * clear the interrupt status. Interrupting the carrier thread while
+         * running the task leads to unspecified behavior.
+         *
          * @throws IllegalStateException if the virtual thread is not in a state to
          *         run on the current thread
          * @throws IllegalCallerException if the current thread is a virtual thread
@@ -1915,13 +1920,19 @@ public class Thread implements Runnable {
     }
 
     final void setInterrupt() {
-        interrupted = true;
-        interrupt0();  // inform VM of interrupt
+        // assert Thread.currentCarrierThread() == this;
+        if (!interrupted) {
+            interrupted = true;
+            interrupt0();  // inform VM of interrupt
+        }
     }
 
     final void clearInterrupt() {
-        interrupted = false;
-        clearInterruptEvent();
+        // assert Thread.currentCarrierThread() == this;
+        if (interrupted) {
+            interrupted = false;
+            clearInterruptEvent();
+        }
     }
 
     boolean getAndClearInterrupt() {

@@ -34,6 +34,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
@@ -42,7 +43,6 @@ import static org.testng.Assert.*;
 
 @Test
 public class CustomScheduler {
-
     /**
      * Test task is a VirtualThreadTask and that its thread() method returns
      * the Thread object for the virtual thread.
@@ -142,5 +142,103 @@ public class CustomScheduler {
             } catch (IllegalStateException expected) { }
         };
         Thread.builder().virtual(scheduler).task(() -> { }).start();
+    }
+
+    /**
+     * Test parking with the virtual thread interrupt set, should not leak to the
+     * carrier thread when the task completes.
+     */
+    public void testParkWithInterruptSet() {
+        Thread carrier = Thread.currentThread();
+        try {
+            Thread vthread = Thread.builder().virtual(Runnable::run).task(() -> {
+                Thread.currentThread().interrupt();
+                Thread.yield();
+            }).start();
+            assertTrue(vthread.isInterrupted());
+            assertFalse(carrier.isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    /**
+     * Test terminating with the virtual thread interrupt set, should not leak to
+     * the carrier thread when the task completes.
+     */
+    public void testTerminateWithInterruptSet() {
+        Thread carrier = Thread.currentThread();
+        try {
+            Thread vthread = Thread.builder().virtual(Runnable::run).task(() -> {
+                Thread.currentThread().interrupt();
+            }).start();
+            assertTrue(vthread.isInterrupted());
+            assertFalse(carrier.isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    /**
+     * Test running task with the carrier interrupt status set.
+     */
+    public void testInterruptBeforeRun() throws Exception {
+        Executor scheduler = (task) -> {
+            Thread.currentThread().interrupt();
+            task.run();
+        };
+        try {
+            AtomicBoolean interrupted = new AtomicBoolean();
+            Thread vthread = Thread.builder().virtual(scheduler).task(() -> {
+                interrupted.set(Thread.currentThread().isInterrupted());
+            }).start();
+            assertFalse(vthread.isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    /**
+     * Test carrier interrupt after running task.
+     */
+    public void testInterruptAfterRun() {
+        Executor scheduler = (task) -> {
+            task.run();
+            Thread.currentThread().interrupt();
+        };
+
+        Thread carrier = Thread.currentThread();
+        AtomicBoolean carrierInterrupted = new AtomicBoolean();
+        Runnable checkCarrierInterruptStatus = () -> {
+            if (carrier.isInterrupted()) {
+                carrierInterrupted.set(true);
+            }
+        };
+
+        Thread vthread1 = Thread.builder()
+                .virtual(scheduler)
+                .task(() -> {
+                    checkCarrierInterruptStatus.run();
+                    LockSupport.park();
+                    checkCarrierInterruptStatus.run();
+                })
+                .build();
+
+        Thread vthread2 = Thread.builder()
+                .virtual(scheduler)
+                .task(() -> {
+                    checkCarrierInterruptStatus.run();
+                    LockSupport.unpark(vthread1);
+                    checkCarrierInterruptStatus.run();
+                })
+                .build();
+
+        try {
+            vthread1.start();
+            vthread2.start();
+            assertFalse(carrierInterrupted.get());
+        } finally {
+            Thread.interrupted();
+        }
     }
 }

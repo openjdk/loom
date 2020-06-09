@@ -138,14 +138,14 @@ class VirtualThread extends Thread {
             protected void onPinned(Continuation.Pinned reason) {
                 if (TRACE_PINNING_MODE > 0) {
                     // switch to carrier thread as the printing may park
-                    Thread thread = Thread.currentCarrierThread();
-                    VirtualThread vthread = thread.getVirtualThread();
-                    thread.setVirtualThread(null);
+                    Thread carrier = Thread.currentCarrierThread();
+                    VirtualThread vthread = carrier.getVirtualThread();
+                    carrier.setVirtualThread(null);
                     try {
                         boolean printAll = (TRACE_PINNING_MODE == 1);
                         PinnedThreadPrinter.printStackTrace(printAll);
                     } finally {
-                        thread.setVirtualThread(vthread);
+                        carrier.setVirtualThread(vthread);
                     }
                 }
 
@@ -156,7 +156,6 @@ class VirtualThread extends Thread {
             }
         };
 
-        // TBD create ForkJoinTask to avoid wrapping
         this.runContinuation = (scheduler != null)
                 ? new Runner(this)
                 : this::runContinuation;
@@ -259,21 +258,29 @@ class VirtualThread extends Thread {
      * is run or continued. It binds the virtual thread to the current carrier thread.
      */
     private void mount(boolean firstRun) {
-        Thread thread = Thread.currentCarrierThread();
+        Thread carrier = Thread.currentCarrierThread();
         //assert carrierThread == null && thread.getVirtualThread() == null;
 
-        // sets the carrier thread and forward interrupt status if needed
-        CARRIER_THREAD.setRelease(this, thread);
-        if (interrupted) {
-            thread.setInterrupt();
-        }
+        // sets the carrier thread
+        CARRIER_THREAD.setRelease(this, carrier);
 
         // set thread field so Thread.currentThread() returns the VirtualThread object
-        thread.setVirtualThread(this);
+        carrier.setVirtualThread(this);
+
+        // sync up carrier thread interrupt status if needed
+        if (interrupted) {
+            carrier.setInterrupt();
+        } else if (carrier.isInterrupted()) {
+            synchronized (interruptLock) {
+                if (!interrupted) {
+                    carrier.clearInterrupt();
+                }
+            }
+        }
 
         if (firstRun && notifyJvmtiEvents) {
-            notifyStarted(thread, this);
-            notifyMount(thread, this);
+            notifyStarted(carrier, this);
+            notifyMount(carrier, this);
         }
     }
 
@@ -282,18 +289,21 @@ class VirtualThread extends Thread {
      * yields or terminates. It unbinds this virtual thread from the carrier thread.
      */
     private void unmount() {
-        Thread thread = Thread.currentCarrierThread();
+        Thread carrier = Thread.currentCarrierThread();
         //assert carrierThread == thread & thread.getVirtualThread() == this;
 
         if (notifyJvmtiEvents) {
-            notifyUnmount(thread, this);
+            notifyUnmount(carrier, this);
         }
 
         // drop connection between this virtual thread and the carrier thread
-        thread.setVirtualThread(null);
+        carrier.setVirtualThread(null);
         synchronized (interruptLock) {   // synchronize with interrupt
             CARRIER_THREAD.setRelease(this, null);
         }
+
+        // clear carrier thread interrupt status before exit
+        carrier.clearInterrupt();
     }
 
     /**
@@ -355,8 +365,8 @@ class VirtualThread extends Thread {
         boolean awaitInterrupted = false;
 
         // switch to carrier thread
-        Thread thread = Thread.currentCarrierThread();
-        thread.setVirtualThread(null);
+        Thread carrier = Thread.currentCarrierThread();
+        carrier.setVirtualThread(null);
         final ReentrantLock lock = getLock();
         lock.lock();
         try {
@@ -380,7 +390,7 @@ class VirtualThread extends Thread {
             setParkPermit(false);
 
             // switch back to virtual thread
-            thread.setVirtualThread(this);
+            carrier.setVirtualThread(this);
         }
 
         // restore interrupt status
@@ -422,18 +432,18 @@ class VirtualThread extends Thread {
      * @throws IllegalCallerException if not called from a virtual thread
      */
     static void parkNanos(long nanos) {
-        Thread thread = Thread.currentCarrierThread();
-        VirtualThread vthread = thread.getVirtualThread();
+        Thread carrier = Thread.currentCarrierThread();
+        VirtualThread vthread = carrier.getVirtualThread();
         if (vthread == null)
             throw new IllegalCallerException("not a virtual thread");
         if (nanos > 0) {
             // switch to carrier thread when submitting to avoid parking here
-            thread.setVirtualThread(null);
+            carrier.setVirtualThread(null);
             Future<?> unparker;
             try {
                 unparker = UNPARKER.schedule(vthread::unpark, nanos, NANOSECONDS);
             } finally {
-                thread.setVirtualThread(vthread);
+                carrier.setVirtualThread(vthread);
             }
             // now park
             try {
@@ -483,39 +493,57 @@ class VirtualThread extends Thread {
      * not to block.
      *
      * @throws RejectedExecutionException if the scheduler cannot accept a task
-     * @return this virtual thread
      */
-    VirtualThread unpark() {
-        if (!getAndSetParkPermit(true) && Thread.currentThread() != this) {
-            int s = state();
-            if (s == PARKED || s == PINNED) {
-                // switch to carrier thread to avoid unpark parking
-                Thread thread = Thread.currentCarrierThread();
-                VirtualThread vthread = thread.getVirtualThread();
-                if (vthread != null) thread.setVirtualThread(null);
+    void unpark() {
+        if (getAndSetParkPermit(true) || Thread.currentThread() == this) {
+            // already have parking permit or try to unpark self
+            return;
+        }
+
+        int s = state();
+        if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
+            // submit task so that thread continues
+            Thread carrier = Thread.currentCarrierThread();
+            VirtualThread vthread = carrier.getVirtualThread();
+            if (vthread == null) {
+                // called from plain thread
+                scheduler.execute(runContinuation);
+            } else if (scheduler == DEFAULT_SCHEDULER) {
+                // default scheduler is well-behaved but execute might park
+                carrier.setVirtualThread(null);
                 try {
-                    if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
-                        // submit task to continue
-                        scheduler.execute(runContinuation);  // may throw REE
-                    } else if (s == PINNED) {
-                        // signal pinned thread so that execution continues
-                        final ReentrantLock lock = getLock();
-                        lock.lock();
-                        try {
-                            if (state() == PINNED) {
-                                getCondition().signalAll();
-                            }
-                        } finally {
-                            lock.unlock();
-                        }
-                    }
+                    scheduler.execute(runContinuation);
                 } finally {
-                    // switch back to virtual thread if needed
-                    if (vthread != null) thread.setVirtualThread(vthread);
+                    carrier.setVirtualThread(vthread);
+                }
+            } else {
+                // custom scheduler so running arbitrary code
+                vthread.unmount();
+                try {
+                    scheduler.execute(runContinuation);
+                } finally {
+                    vthread.mount(false);
                 }
             }
+        } else if (s == PINNED) {
+            // signal pinned thread so that it continues
+            Thread carrier = Thread.currentCarrierThread();
+            VirtualThread vthread = carrier.getVirtualThread();
+            carrier.setVirtualThread(null);
+            try {
+                final ReentrantLock lock = getLock();
+                lock.lock();
+                try {
+                    if (state() == PINNED) {
+                        getCondition().signalAll();
+                    }
+                } finally {
+                    lock.unlock();
+                }
+            } finally {
+                carrier.setVirtualThread(vthread);
+            }
         }
-        return this;
     }
 
     /**
@@ -974,7 +1002,7 @@ class VirtualThread extends Thread {
     private static ScheduledExecutorService delayedTaskScheduler() {
         ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
             Executors.newScheduledThreadPool(1, task -> {
-                var thread = InnocuousThread.newThread("VirtualThreadUnparker", task);
+                var thread = InnocuousThread.newThread("VirtualThread-unparker", task);
                 thread.setDaemon(true);
                 return thread;
             });
