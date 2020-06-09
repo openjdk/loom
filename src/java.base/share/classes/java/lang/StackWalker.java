@@ -291,22 +291,20 @@ public final class StackWalker {
          * option will show all hidden frames (including reflection frames).
          */
         SHOW_HIDDEN_FRAMES,
-        /**
-         * Show carrier thread frames.
-         *
-         * <p>By default, carrier thread frames are hidden when walking the stack
-         * of a virtual thread.
-         *
-         * @since 99
-         */
-        SHOW_CARRIER_FRAMES;
     }
 
     enum ExtendedOption {
         /**
          * Obtain monitors, locals and operands.
          */
-        LOCALS_AND_OPERANDS
+        LOCALS_AND_OPERANDS,
+        /**
+         * Show carrier thread frames.
+         *
+         * <p>By default, carrier thread frames are hidden when walking the stack
+         * of a virtual thread.
+         */
+        SHOW_CARRIER_FRAMES
     };
 
     static final EnumSet<Option> DEFAULT_EMPTY_OPTION = EnumSet.noneOf(Option.class);
@@ -506,10 +504,17 @@ public final class StackWalker {
     private StackWalker(EnumSet<Option> options, int estimateDepth, ContinuationScope contScope) {
         this(options, estimateDepth, null, contScope, null);
     }
-    private StackWalker(EnumSet<Option> options, int estimateDepth, ContinuationScope contScope, Continuation continuation) {
+    private StackWalker(EnumSet<Option> options,
+                        int estimateDepth,
+                        ContinuationScope contScope,
+                        Continuation continuation) {
         this(options, estimateDepth, null, contScope, continuation);
     }
-    private StackWalker(EnumSet<Option> options, int estimateDepth, ExtendedOption extendedOption, ContinuationScope contScope, Continuation continuation) {
+    private StackWalker(EnumSet<Option> options,
+                        int estimateDepth,
+                        ExtendedOption extendedOption,
+                        ContinuationScope contScope,
+                        Continuation continuation) {
         this.options = options;
         this.estimateDepth = estimateDepth;
         this.extendedOption = extendedOption;
@@ -707,6 +712,10 @@ public final class StackWalker {
 
     // ---- package access ----
 
+    static StackWalker newInstance(Set<Option> options, ExtendedOption extendedOption) {
+        return newInstance(options, extendedOption, null);
+    }
+
     static StackWalker newInstance(Set<Option> options, ExtendedOption extendedOption, ContinuationScope contScope) {
         EnumSet<Option> optionSet = toEnumSet(options);
         checkPermission(optionSet);
@@ -729,6 +738,10 @@ public final class StackWalker {
 
     boolean hasLocalsOperandsOption() {
         return extendedOption == ExtendedOption.LOCALS_AND_OPERANDS;
+    }
+
+    boolean hasShowCarrierFramesOption() {
+        return extendedOption == ExtendedOption.SHOW_CARRIER_FRAMES;
     }
 
     ContinuationScope getContScope() {

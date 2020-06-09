@@ -144,7 +144,7 @@ final class StackStreamFactory {
             ContinuationScope scope = walker.getContScope();
             if (scope == null
                     && thread.isVirtual()
-                    && !walker.hasOption(Option.SHOW_CARRIER_FRAMES)) {
+                    && !walker.hasShowCarrierFramesOption()) {
                 this.contScope = VirtualThread.VTHREAD_SCOPE;
                 this.continuation = null;
             } else {

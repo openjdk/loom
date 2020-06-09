@@ -23,12 +23,15 @@
 
 /**
  * @test
+ * @modules java.base/java.lang:+open
  * @run testng StackTraces
  * @run testng/othervm -Djdk.showFullStackTrace=true StackTraces
  * @summary Test that the stack traces for carrier threads are hidden by
  *     exceptions and the StackWalker API
  */
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
@@ -63,16 +66,45 @@ public class StackTraces {
         });
     }
 
-    // carrier frames should not be hidden
     public void testStackWalker2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
-            var options = Set.of(RETAIN_CLASS_REFERENCE, SHOW_CARRIER_FRAMES);
-            StackWalker walker = StackWalker.getInstance(options);
+            var options = Set.of(RETAIN_CLASS_REFERENCE);
+            StackWalker walker = StackWalkers.newInstance(options, StackWalkers.SHOW_CARRIER_FRAMES);
             boolean found = walker.walk(sf ->
                     sf.map(StackWalker.StackFrame::getDeclaringClass)
                             .anyMatch(c -> c == ForkJoinPool.class));
-            assertTrue(found);
+            if (!found) {
+                throw new RuntimeException();
+            }
         });
+    }
+
+    static class StackWalkers {
+        static final Object SHOW_CARRIER_FRAMES;
+        static final Method NEW_INSTANCE;
+        static {
+            try {
+                Class<?> extendedOptionClass = Class.forName("java.lang.StackWalker$ExtendedOption");
+
+                Field f = extendedOptionClass.getDeclaredField("SHOW_CARRIER_FRAMES");
+                f.setAccessible(true);
+                SHOW_CARRIER_FRAMES = f.get(null);
+
+                Method m = StackWalker.class.getDeclaredMethod("newInstance", Set.class, extendedOptionClass);
+                m.setAccessible(true);
+                NEW_INSTANCE = m;
+            } catch (Exception e) {
+                throw new Error(e);
+            }
+        }
+
+        static StackWalker newInstance(Set<StackWalker.Option> options, Object extendedOption) {
+            try {
+                return (StackWalker) NEW_INSTANCE.invoke(null, options, extendedOption);
+            } catch (Exception e) {
+                throw new Error(e);
+            }
+        }
     }
 
 }
