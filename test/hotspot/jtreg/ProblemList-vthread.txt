@@ -9,6 +9,12 @@ gc/g1/humongousObjects/TestNoAllocationsInHRegions.java             8241630 gene
 ####
 # Virtual thread/Continuation tests
 
+serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id1
+serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id0
+serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
+serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
+serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java
+serviceability/jvmti/GetLocalVariable/GetLocalVars.java
 
 ####
 # OOME in unexpected thread
@@ -16,8 +22,9 @@ gc/g1/ihop/TestIHOPStatic.java
 
 
 ####
-# Test failing because of incorrect stacktrace for main thread
+# Test failing because of incorrect stacktrace or thread properties for main thread
 
+runtime/condy/staticInit/TestInitException.java
 runtime/handshake/HandshakeWalkStackTest.java
 runtime/handshake/HandshakeWalkStackFallbackTest.java
 runtime/ErrorHandling/TestCrashOnOutOfMemoryError.java
@@ -27,6 +34,8 @@ runtime/ErrorHandling/TestOnOutOfMemoryError.java
 runtime/Throwable/StackTraceLogging.java
 runtime/Throwable/TestMaxJavaStackTraceDepth.java
 runtime/Throwable/TestThrowable.java
+serviceability/tmtools/jstack/DaemonThreadTest.java
+
 
 ####
 # TODO check what are the cds issues with vthread
@@ -122,6 +131,11 @@ gc/arguments/TestMaxRAMFlags.java
 gc/arguments/TestG1HeapSizeFlags.java
 gc/TestAgeOutput.java#id1
 gc/TestAgeOutput.java#id0
+
+####
+# Expected exception is ignored
+
+runtime/condy/BadBSMUseTest.java
 
 
 ##########
