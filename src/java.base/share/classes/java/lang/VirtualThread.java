@@ -192,11 +192,9 @@ class VirtualThread extends Thread {
 
         // set state to RUNNING
         short initialState = state();
-        if (initialState == STARTED
-                && compareAndSetState(STARTED, RUNNING)) {
+        if (initialState == STARTED && compareAndSetState(STARTED, RUNNING)) {
             // first run
-        } else if (initialState == RUNNABLE
-                && compareAndSetState(RUNNABLE, RUNNING)) {
+        } else if (initialState == RUNNABLE && compareAndSetState(RUNNABLE, RUNNING)) {
             // consume parking permit
             setParkPermit(false);
         } else {
@@ -437,15 +435,7 @@ class VirtualThread extends Thread {
         if (vthread == null)
             throw new IllegalCallerException("not a virtual thread");
         if (nanos > 0) {
-            // switch to carrier thread when submitting to avoid parking here
-            carrier.setVirtualThread(null);
-            Future<?> unparker;
-            try {
-                unparker = UNPARKER.schedule(vthread::unpark, nanos, NANOSECONDS);
-            } finally {
-                carrier.setVirtualThread(vthread);
-            }
-            // now park
+            Future<?> unparker = UNPARKER.schedule(vthread::unpark, nanos, NANOSECONDS);
             try {
                 vthread.tryPark();
             } finally {
@@ -495,42 +485,12 @@ class VirtualThread extends Thread {
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     void unpark() {
-        if (getAndSetParkPermit(true) || Thread.currentThread() == this) {
-            // already have parking permit or try to unpark self
-            return;
-        }
-
-        int s = state();
-        if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
-            // submit task so that thread continues
-            Thread carrier = Thread.currentCarrierThread();
-            VirtualThread vthread = carrier.getVirtualThread();
-            if (vthread == null) {
-                // called from plain thread
+        if (!getAndSetParkPermit(true) && Thread.currentThread() != this) {
+            int s = state();
+            if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
                 scheduler.execute(runContinuation);
-            } else if (scheduler == DEFAULT_SCHEDULER) {
-                // default scheduler is well-behaved but execute might park
-                carrier.setVirtualThread(null);
-                try {
-                    scheduler.execute(runContinuation);
-                } finally {
-                    carrier.setVirtualThread(vthread);
-                }
-            } else {
-                // custom scheduler so running arbitrary code
-                vthread.unmount();
-                try {
-                    scheduler.execute(runContinuation);
-                } finally {
-                    vthread.mount(false);
-                }
-            }
-        } else if (s == PINNED) {
-            // signal pinned thread so that it continues
-            Thread carrier = Thread.currentCarrierThread();
-            VirtualThread vthread = carrier.getVirtualThread();
-            carrier.setVirtualThread(null);
-            try {
+            } else if (s == PINNED) {
+                // signal pinned thread so that it continues
                 final ReentrantLock lock = getLock();
                 lock.lock();
                 try {
@@ -540,8 +500,6 @@ class VirtualThread extends Thread {
                 } finally {
                     lock.unlock();
                 }
-            } finally {
-                carrier.setVirtualThread(vthread);
             }
         }
     }

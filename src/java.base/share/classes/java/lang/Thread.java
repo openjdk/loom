@@ -792,12 +792,13 @@ public class Thread implements Runnable {
          * The thread will be scheduled by the Java virtual machine rather than
          * the operating system with the given scheduler. The scheduler's {@link
          * Executor#execute(Runnable) execute} method is invoked with tasks of
-         * type {@link VirtualThreadTask}. The scheduler should arrange to execute
-         * these tasks on a kernel thread. Attempting to execute the task on a
-         * virtual thread causes an exception to be thrown (see {@link
-         * VirtualThreadTask#run()}). The {@code execute} method may be invoked at
-         * sensitive times (e.g. when unparking a thread) so care should be taken
-         * to not directly execute the task.
+         * type {@link VirtualThreadTask}. It may be invoked in the context of
+         * a virtual thread. The scheduler should arrange to execute these tasks
+         * on a kernel thread. Attempting to execute the task on a virtual thread
+         * causes an exception to be thrown (see {@link VirtualThreadTask#run()}).
+         * The {@code execute} method may be invoked at sensitive times (e.g. when
+         * unparking a thread) so care should be taken to not directly execute the
+         * task on the <em>current thread</em>.
          * @param scheduler the scheduler
          * @return this builder
          * @throws IllegalStateException if a thread group has been set
