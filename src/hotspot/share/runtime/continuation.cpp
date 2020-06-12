@@ -1267,14 +1267,11 @@ public:
   template<typename RegisterMapT> static inline void update_register_map_with_callee(RegisterMapT* map, const frame& f);
   template<typename RegisterMapT> static inline void update_register_map(RegisterMapT* map, hframe::callee_info callee_info);
   static void update_register_map(RegisterMap* map, const hframe& sender, const ContMirror& cont);
-  static void update_register_map_from_last_vstack_frame(RegisterMap* map);
+  static void update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map);
 
   static inline frame frame_with(frame& f, intptr_t* sp, address pc, intptr_t* fp);
   static inline frame last_frame(JavaThread* thread);
   static inline void push_pd(const frame& f);
-
-  static inline void set_last_vstack_frame(RegisterMap* map, const frame& callee);
-  static inline void clear_last_vstack_frame(RegisterMap* map);
 };
 
 #ifdef ASSERT
@@ -4747,13 +4744,7 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
 }
 
 bool Continuation::fix_continuation_bottom_sender(RegisterMap* map, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
-  bool res = fix_continuation_bottom_sender(map->thread(), callee, sender_pc, sender_sp);
-  if (res && !callee.is_interpreted_frame()) {
-    ContinuationHelper::set_last_vstack_frame(map, callee);
-  } else {
-    ContinuationHelper::clear_last_vstack_frame(map);
-  }
-  return res;
+  return fix_continuation_bottom_sender(map->thread(), callee, sender_pc, sender_sp);
 }
 
 // frame Continuation::fix_continuation_bottom_sender(const frame& callee, RegisterMap* map, frame f) {
@@ -4905,8 +4896,6 @@ javaVFrame* Continuation::last_java_vframe(Handle continuation, RegisterMap *map
 
 frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
   oop cont = get_continuation_for_frame(map->thread(), callee.sp());
-
-  ContinuationHelper::set_last_vstack_frame(map, callee);
   return continuation_top_frame(cont, map);
 }
 
@@ -4942,7 +4931,7 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
 
   if (map->update_map()) {
     if (sender.is_empty()) {
-      ContinuationHelper::update_register_map_from_last_vstack_frame(map);
+      ContinuationHelper::update_register_map_for_entry_frame(cont, map);
     } else { // if (!sender.is_interpreted_frame())
       if (is_stub(f.cb())) {
         f.oop_map()->update_register_map(&f, map); // we have callee-save registers in this case

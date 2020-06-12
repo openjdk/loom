@@ -671,25 +671,15 @@ void ContinuationHelper::update_register_map(RegisterMap* map, const hframe& cal
   frame::update_map_with_saved_link(map, reinterpret_cast<intptr_t**>(link_index0));
 }
 
-void ContinuationHelper::update_register_map_from_last_vstack_frame(RegisterMap* map) {
-  // we need to return the link address for the entry frame; it is saved in the bottom-most thawed frame
-  intptr_t** fp = (intptr_t**)(map->last_vstack_fp());
-  log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_from_last_vstack_frame: frame::update_map_with_saved_link: " INTPTR_FORMAT, p2i(fp));
+void ContinuationHelper::update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map) {
+  // we need to register the link address for the entry frame
+  intptr_t** fp = (intptr_t**)(cont.entrySP() - cont.argsize() - frame::sender_sp_offset);
+  log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: frame::update_map_with_saved_link: " INTPTR_FORMAT, p2i(fp));
   frame::update_map_with_saved_link(map, fp);
 }
 
 inline frame ContinuationHelper::frame_with(frame& f, intptr_t* sp, address pc, intptr_t* fp) {
   return frame(sp, f.unextended_sp(), fp, pc, CodeCache::find_blob(pc));
-}
-
-inline void ContinuationHelper::set_last_vstack_frame(RegisterMap* map, const frame& hf) {
-  log_develop_trace(jvmcont)("setting map->last_vstack_fp: " INTPTR_FORMAT, p2i(hf.real_fp()));
-  map->set_last_vstack_fp(link_address(hf));
-}
-
-inline void ContinuationHelper::clear_last_vstack_frame(RegisterMap* map) {
-  log_develop_trace(jvmcont)("clearing map->last_vstack_fp");
-  map->set_last_vstack_fp(NULL);
 }
 
 inline void ContinuationHelper::push_pd(const frame& f) {

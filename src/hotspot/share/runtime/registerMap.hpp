@@ -77,7 +77,6 @@ class RegisterMap : public StackObj {
   Handle      _cont;                    // The current continuation, if any
   unsigned    _on_hstack : 1;           // Whether we're on the h-stack
   unsigned    _in_chunk  : 1;           // Whether we're on an h-stack chunk
-  intptr_t**  _last_vstack_fp;          // The location of the continuation entry frame's fp when walking h-stacks
 
   bool        _update_map;              // Tells if the register map need to be
                                         // updated when traversing the stack
@@ -145,8 +144,6 @@ class RegisterMap : public StackObj {
   void set_cont(oop cont);
   void set_cont(Handle cont);
   void set_in_cont(bool on_hstack, bool in_chunk);
-  intptr_t** last_vstack_fp()            { return _last_vstack_fp; }
-  void set_last_vstack_fp(intptr_t** fp) { _last_vstack_fp = fp; }
 
   const RegisterMap* as_RegisterMap() const { return this; }
   RegisterMap* as_RegisterMap() { return this; }

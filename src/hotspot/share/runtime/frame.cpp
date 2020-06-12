@@ -69,7 +69,6 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool walk_cont, bo
 
   _on_hstack = false;
   _in_chunk = false;
-  _last_vstack_fp = NULL;
   if (walk_cont) {
     // we allocate the handle now (rather than in set_cont) because sometimes (StackWalker) the handle must live across HandleMarks
     if (thread != NULL && thread->cont_entry() != NULL) {
@@ -99,7 +98,6 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
   _cont = map->_cont;
   _on_hstack = map->_on_hstack;
   _in_chunk = map->_in_chunk;
-  _last_vstack_fp = map->_last_vstack_fp;
 
   pd_initialize_from(map);
   if (update_map()) {
@@ -125,8 +123,6 @@ void RegisterMap::set_in_cont(bool on_hstack, bool in_chunk) {
    assert (!in_chunk || on_hstack, "");
    _on_hstack = (int)on_hstack;
    _in_chunk = (int)in_chunk;
-   if (!on_hstack)
-    _last_vstack_fp = NULL;
 }
 
 void RegisterMap::set_cont(Handle cont) {
