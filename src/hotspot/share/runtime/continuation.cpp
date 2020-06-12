@@ -191,6 +191,7 @@ PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 static bool is_stub(CodeBlob* cb);
 static void set_anchor(JavaThread* thread, intptr_t* sp);
 static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont);
+static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
 
 // static void set_anchor(JavaThread* thread, const frame& f); -- unused
 
@@ -925,6 +926,7 @@ ContMirror::ContMirror(JavaThread* thread, oop cont)
 #endif
   _e_size(0) {
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
+  assert (_cont == _entry->cont_raw(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_raw()), p2i(entrySP()));
 }
 
 ContMirror::ContMirror(oop cont)
@@ -941,7 +943,7 @@ ContMirror::ContMirror(oop cont)
 }
 
 ContMirror::ContMirror(const RegisterMap* map)
- : _thread(map->thread()), _entry(_thread != NULL ? _thread->cont_entry() : NULL), _cont(map->cont()),
+ : _thread(map->thread()), _entry(get_continuation_entry_for_continuation(_thread, map->cont())), _cont(map->cont()),
 #ifndef PRODUCT
   _tail(NULL),
   _sp(-10), _fp(0), _pc(0), // -10 is a special value showing _sp has not been read
@@ -950,6 +952,7 @@ ContMirror::ContMirror(const RegisterMap* map)
   _e_size(0) {
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
 
+  assert (_entry == NULL || _cont == _entry->cont_raw(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_raw()), p2i(entrySP()));
   read();
 }
 
@@ -965,7 +968,7 @@ ALWAYSINLINE void ContMirror::read_minimal() {
   _max_size = java_lang_Continuation::maxSize(_cont);
 
   if (log_develop_is_enabled(Trace, jvmcont)) {
-    log_develop_trace(jvmcont)("Reading continuation object:");
+    log_develop_trace(jvmcont)("Reading continuation object: " INTPTR_FORMAT, p2i((oopDesc*)_cont));
     log_develop_trace(jvmcont)("\ttail: " INTPTR_FORMAT, p2i((oopDesc*)_tail));
     log_develop_trace(jvmcont)("\tpc: " INTPTR_FORMAT, p2i(_pc));
     log_develop_trace(jvmcont)("\tmax_size: %lu", _max_size);
@@ -998,7 +1001,6 @@ void ContMirror::read_rest() {
 
   if (log_develop_is_enabled(Trace, jvmcont)) {
     log_develop_trace(jvmcont)("Reading continuation object:");
-    log_develop_trace(jvmcont)("\ttail: " INTPTR_FORMAT, p2i((oopDesc*)_tail));
     log_develop_trace(jvmcont)("\tsp: %d fp: %ld 0x%lx pc: " INTPTR_FORMAT, _sp, _fp, _fp, p2i(_pc));
     log_develop_trace(jvmcont)("\tstack: " INTPTR_FORMAT " hstack: " INTPTR_FORMAT ", stack_length: %d max_size: " SIZE_FORMAT, p2i((oopDesc*)_stack), p2i(_hstack), _stack_length, _max_size);
     log_develop_trace(jvmcont)("\tref_stack: " INTPTR_FORMAT " ref_sp: %d", p2i((oopDesc*)_ref_stack), _ref_sp);
@@ -4696,7 +4698,7 @@ static ContinuationEntry* get_continuation_entry_for_frame(JavaThread* thread, i
   while (cont != NULL && !is_sp_in_continuation(sp, cont)) {
     cont = cont->parent();
   }
-  // tty->print_cr("get_continuation_for_frame cont: %p entrySP: %p", (oopDesc*)cont, cont != NULL ? java_lang_Continuation::entrySP(cont): NULL);
+  // if (cont != NULL) tty->print_cr(">>> get_continuation_entry_for_frame: %p entry.sp: %p oop: %p", sp, cont->entry_sp(), (oopDesc*)cont->continuation());
   return cont;
 }
 
@@ -4709,6 +4711,15 @@ oop Continuation::get_continutation_for_frame(JavaThread* thread, const frame& f
   return get_continuation_for_frame(thread, f.unextended_sp());
 }
 
+static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont) {
+  if (thread == NULL || cont == (oop)NULL) return NULL;
+  
+  for (ContinuationEntry* entry = thread->cont_entry(); entry != NULL; entry = entry->parent()) {
+    if (cont == entry->continuation()) return entry;
+  }
+  return NULL;
+}
+
 bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) {
   return get_continuation_entry_for_frame(thread, f.unextended_sp()) != NULL;
 }
@@ -4716,13 +4727,11 @@ bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) 
 bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
   // TODO : this code and its use sites, as well as get_continuation_entry_pc_for_sender, probably need more work
   if (thread != NULL && is_return_barrier_entry(*sender_pc)) {
-    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " sender_sp: " INTPTR_FORMAT, p2i(*sender_pc), p2i(*sender_sp));
-
     ContinuationEntry* cont = get_continuation_entry_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert (cont != NULL, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: continuation entrySP: " INTPTR_FORMAT " entryPC: " INTPTR_FORMAT, p2i(cont->entry_sp()), p2i(cont->entry_pc()));
+
+    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+    log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
 
     address new_pc = cont->entry_pc();
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(new_pc));
@@ -4734,6 +4743,7 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
     // log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_fp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_fp), p2i(new_fp));
     // *sender_fp = new_fp;
 
+    intptr_t* new_sp;
     if (callee.is_compiled_frame() && !Interpreter::contains(*sender_pc)) {
       // The callee's stack arguments (part of the caller frame) are also thawed to the stack when using lazy-copy
       int argsize = Compiled::stack_argsize(callee);
@@ -4743,16 +4753,17 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
       if (argsize % 2 != 0)
         argsize++; // 16-byte alignment for compiled frame sp
     #endif
-      log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(*sender_sp + argsize));
-      *sender_sp += argsize;
+      new_sp = *sender_sp + argsize;
     } else {
-      intptr_t* new_sp = cont->entry_sp();
+      new_sp = cont->entry_sp();
       // if (Interpreter::contains(*sender_pc)) {
       //   new_sp -= 2;
       // }
-      log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(new_sp));
-      *sender_sp = new_sp;
     }
+    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(new_sp));
+    assert (new_sp == cont->entry_sp(), "");
+    *sender_sp = new_sp;
+
     return true;
   }
   return false;

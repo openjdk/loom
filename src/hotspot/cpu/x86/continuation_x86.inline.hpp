@@ -461,7 +461,6 @@ void hframe::print_on(const ContMirror& cont, outputStream* st) const {
     Method** method_addr = (Method**)(fp + frame::interpreter_frame_method_offset);
     Method* method = *method_addr;
     st->print_cr("\tmethod: " INTPTR_FORMAT " (at " INTPTR_FORMAT ")", p2i(method), p2i(method_addr));
-    st->print("\tmethod: "); method->print_short_name(st); st->cr();
     st->print_cr("\tlink: %ld", *(intptr_t*) fp);
     st->print_cr("\tissp: %ld",             *(intptr_t*) (fp + frame::interpreter_frame_sender_sp_offset));
     st->print_cr("\tlast_sp: %ld",          *(intptr_t*) (fp + frame::interpreter_frame_last_sp_offset));
@@ -473,6 +472,7 @@ void hframe::print_on(const ContMirror& cont, outputStream* st) const {
     st->print_cr("\tbcp: " INTPTR_FORMAT,   p2i(*(void**)(fp + frame::interpreter_frame_bcp_offset)));
     st->print_cr("\tbci: %d",               method->bci_from(*(address*)(fp + frame::interpreter_frame_bcp_offset)));
     st->print_cr("\tmirror: " INTPTR_FORMAT, p2i(*(void**)(fp + frame::interpreter_frame_mirror_offset)));
+    st->print("\tmethod: "); method->print_short_name(st); st->cr();
     // st->print("\tmirror: "); os::print_location(st, *(intptr_t*)(fp + frame::interpreter_frame_mirror_offset), true);
   } else {
     if (_sp > 0) st->print_cr("\treal_pc: " INTPTR_FORMAT, p2i(real_pc(cont)));

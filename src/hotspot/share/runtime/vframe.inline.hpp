@@ -52,14 +52,11 @@ inline void vframeStreamCommon::next() {
 
   // handle general case
   do {
-    assert (_continuation_scope.is_null() || _cont() != (oop)NULL, "must be");
     bool cont_entry = false;
     oop cont = _cont();
     if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
       cont_entry = true;
       oop scope = java_lang_Continuation::scope(cont);
-      // *(_cont.raw_value()) = java_lang_Continuation::parent(_cont());
-
       if (_continuation_scope.not_null() && (scope == _continuation_scope())) {
         _mode = at_end_mode;
         break;
@@ -97,6 +94,9 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
     _frame = _frame.sender(&_reg_map);
   }
   _cont = cont != (oop)NULL ? Handle(Thread::current(), cont) : Handle();
+  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()),
+        "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
+        p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
 }
 
 inline bool vframeStreamCommon::fill_in_compiled_inlined_sender() {

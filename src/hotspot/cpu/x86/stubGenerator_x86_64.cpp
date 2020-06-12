@@ -7432,13 +7432,19 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
 
 // rsp points to ContinuationEntry
 void fill_continuation_entry(MacroAssembler* masm) {
-  __ set_cont_fastpath(r15_thread, 1);
-  __ reset_held_monitor_count(r15_thread);
+  DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
 
   __ movptr(Address(rsp, ContinuationEntry::cont_offset()), rsi);
   __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
   __ movptr(Address(rsp, ContinuationEntry::argsize_offset()), (int32_t)0);
-  DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
+
+  __ movptr(rbx, Address(r15_thread, JavaThread::cont_fastpath_offset()));
+  __ movptr(Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()), rbx);
+  __ movptr(rbx, Address(r15_thread, JavaThread::held_monitor_count_offset()));
+  __ movptr(Address(rsp, ContinuationEntry::parent_held_monitor_count_offset()), rbx);
+  
+  __ set_cont_fastpath(r15_thread, 1);
+  __ reset_held_monitor_count(r15_thread);
 }
 
 // on entry, rsp must point to the ContinuationEntry
@@ -7450,7 +7456,12 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
   __ stop("incorrect rsp1");
   __ bind(OK);
 #endif
-   
+  
+  __ movptr(rbx, Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()));
+  __ movptr(Address(r15_thread, JavaThread::cont_fastpath_offset()), rbx);
+  __ movptr(rbx, Address(rsp, ContinuationEntry::parent_held_monitor_count_offset()));
+  __ movptr(Address(r15_thread, JavaThread::held_monitor_count_offset()), rbx);
+
   __ movptr(rcx, Address(rsp, ContinuationEntry::parent_offset()));
   __ movptr(Address(r15_thread, JavaThread::cont_entry_offset()), rcx);
   __ addptr(rsp, (int32_t)ContinuationEntry::size());

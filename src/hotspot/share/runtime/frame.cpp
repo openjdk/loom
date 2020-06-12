@@ -1344,7 +1344,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
   } else if (is_entry_frame()) {
     // For now just label the frame
     values.describe(-1, info_address, err_msg("#%d entry frame", frame_no), 2);
-  } else if (is_compiled_frame()) {
+  } else if (cb()->is_compiled()) {
     // For now just label the frame
     CompiledMethod* cm = cb()->as_compiled_method();
     values.describe(-1, info_address,
@@ -1401,7 +1401,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
       }
     }
 
-    if (reg_map != NULL) {
+    if (reg_map != NULL && is_java_frame()) {
       int scope_no = 0;
       for (ScopeDesc* scope = cm->scope_desc_at(pc()); scope != NULL; scope = scope->sender(), scope_no++) {
         Method* m = scope->method();
@@ -1436,6 +1436,16 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
         // also OopMapValue::live_value ??
         oop_map()->all_type_do(this, OopMapValue::callee_saved_value, &valuesFn);
       }
+    }
+
+    if (cm->method()->is_continuation_enter_intrinsic()) {
+      address usp = (address)unextended_sp();
+      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_offset())), "parent");
+      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::cont_offset())),   "continuation");
+      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::chunk_offset())),   "chunk");
+      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::argsize_offset())), "argsize");
+      // values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_cont_fastpath_offset())),      "parent fastpath");
+      // values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_held_monitor_count_offset())), "parent held monitor count");
     }
   } else if (is_native_frame()) {
     // For now just label the frame
