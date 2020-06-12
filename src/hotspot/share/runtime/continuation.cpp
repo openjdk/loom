@@ -4725,44 +4725,21 @@ bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) 
 }
 
 bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
-  // TODO : this code and its use sites, as well as get_continuation_entry_pc_for_sender, probably need more work
   if (thread != NULL && is_return_barrier_entry(*sender_pc)) {
     ContinuationEntry* cont = get_continuation_entry_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert (cont != NULL, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
 
     log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
+    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(cont->entry_pc()));
+    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(cont->entry_sp()));
+    // log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
 
-    address new_pc = cont->entry_pc();
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(new_pc));
-    assert (new_pc != NULL, "");
-    *sender_pc = new_pc;
+    *sender_pc = cont->entry_pc();
+    *sender_sp = cont->entry_sp();
 
     // We DO NOT want to fix FP. It could contain an oop that has changed on the stack, and its location should be OK anyway
-    // intptr_t* new_fp = cont->entry_fp();
-    // log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_fp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_fp), p2i(new_fp));
-    // *sender_fp = new_fp;
-
-    intptr_t* new_sp;
-    if (callee.is_compiled_frame() && !Interpreter::contains(*sender_pc)) {
-      // The callee's stack arguments (part of the caller frame) are also thawed to the stack when using lazy-copy
-      int argsize = Compiled::stack_argsize(callee);
-      assert ((argsize & WordAlignmentMask) == 0, "must be");
-      argsize >>= LogBytesPerWord;
-    #ifdef _LP64 // TODO PD
-      if (argsize % 2 != 0)
-        argsize++; // 16-byte alignment for compiled frame sp
-    #endif
-      new_sp = *sender_sp + argsize;
-    } else {
-      new_sp = cont->entry_sp();
-      // if (Interpreter::contains(*sender_pc)) {
-      //   new_sp -= 2;
-      // }
-    }
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(new_sp));
-    assert (new_sp == cont->entry_sp(), "");
-    *sender_sp = new_sp;
+    // log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_fp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_fp), p2i(cont->entry_fp()));
+    // *sender_fp = cont->entry_fp();
 
     return true;
   }
