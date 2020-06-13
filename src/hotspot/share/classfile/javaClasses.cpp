@@ -2132,8 +2132,8 @@ java_lang_Thread::ThreadStatus java_lang_VirtualThread::map_state_to_thread_stat
       status = java_lang_Thread::RUNNABLE;
       break;
     case PARKED :
+    case PARKED_SUSPENDED :
     case PINNED :
-    case WALKINGSTACK :
       status = java_lang_Thread::PARKED;
       break;
     case TERMINATED :

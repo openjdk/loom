@@ -92,13 +92,17 @@ class VirtualThread extends Thread {
     // virtual thread state
     private static final short NEW      = 0;
     private static final short STARTED  = 1;
-    private static final short RUNNABLE = 2;    // runnable-unmounted
-    private static final short RUNNING  = 3;    // runnable-mounted
+    private static final short RUNNABLE = 2;     // runnable-unmounted
+    private static final short RUNNING  = 3;     // runnable-mounted
     private static final short PARKING  = 4;
-    private static final short PARKED   = 5;
-    private static final short PINNED   = 6;
-    private static final short WALKINGSTACK = 51;  // Thread.getStackTrace
-    private static final short TERMINATED   = 99;  // final state
+    private static final short PARKED   = 5;     // unmounted
+    private static final short PINNED   = 6;     // mounted
+    private static final short TERMINATED = 99;  // final state
+
+    // can be suspended from scheduling when parked
+    private static final short SUSPENDED = 1 << 8;
+    private static final short PARKED_SUSPENDED = (PARKED | SUSPENDED);
+
     private volatile short state;
 
     // parking permit
@@ -536,10 +540,10 @@ class VirtualThread extends Thread {
             throw new IllegalArgumentException();
 
         short s = state();
-        if (s == TERMINATED)
-            return true;
         if (s == NEW)
             throw new IllegalStateException("Not started");
+        if (s == TERMINATED)
+            return true;
 
         final ReentrantLock lock = getLock();
         lock.lock();
@@ -576,8 +580,8 @@ class VirtualThread extends Thread {
                 }
 
                 // interrupt carrier thread
-                Thread t = carrierThread;
-                if (t != null) t.setInterrupt();
+                Thread carrier = carrierThread;
+                if (carrier != null) carrier.setInterrupt();
             }
         } else {
             interrupted = true;
@@ -598,8 +602,8 @@ class VirtualThread extends Thread {
             boolean oldValue = interrupted;
             if (oldValue)
                 interrupted = false;
-            Thread t = carrierThread;
-            if (t != null) t.clearInterrupt();
+            Thread carrier = carrierThread;
+            if (carrier != null) carrier.clearInterrupt();
             return oldValue;
         }
     }
@@ -652,8 +656,8 @@ class VirtualThread extends Thread {
                 // runnable, mounted, not yet waiting
                 return Thread.State.RUNNABLE;
             case PARKED:
+            case PARKED_SUSPENDED:
             case PINNED:
-            case WALKINGSTACK:
                 return Thread.State.WAITING;
             case TERMINATED:
                 return Thread.State.TERMINATED;
@@ -673,10 +677,10 @@ class VirtualThread extends Thread {
             sb.append(Integer.toHexString(hashCode()));
         }
         sb.append(",");
-        Thread t = carrierThread;
-        if (t != null) {
-            sb.append(t.getName());
-            ThreadGroup g = t.getThreadGroup();
+        Thread carrier = carrierThread;
+        if (carrier != null) {
+            sb.append(carrier.getName());
+            ThreadGroup g = carrier.getThreadGroup();
             if (g != null) {
                 sb.append(",");
                 sb.append(g.getName());
@@ -725,7 +729,7 @@ class VirtualThread extends Thread {
 
     @Override
     public StackTraceElement[] getStackTrace() {
-        if (Thread.currentCarrierThread().getVirtualThread() == this) {
+        if (Thread.currentThread() == this) {
             return STACK_WALKER
                     .walk(s -> s.map(StackFrame::toStackTraceElement)
                     .toArray(StackTraceElement[]::new));
@@ -796,23 +800,25 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Returns the stack trace for this virtual thread if it parked (not mounted) or
-     * null if not in the parked state.
+     * Returns the stack trace for this virtual thread if it parked (not mounted),
+     * or null if not parked.
      */
     private StackTraceElement[] tryGetStackTrace() {
-        if (compareAndSetState(PARKED, WALKINGSTACK)) {
+        if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
             try {
                 return cont.stackWalker()
                         .walk(s -> s.map(StackFrame::toStackTraceElement)
                                     .toArray(StackTraceElement[]::new));
             } finally {
-                assert state == WALKINGSTACK;
+                assert state == PARKED_SUSPENDED;
                 setState(PARKED);
 
-                // virtual thread may have been unparked while obtaining the stack so we
-                // unpark to avoid a lost unpark. This will appear as a spurious
-                // (but harmless) wakeup
-                unpark();
+                // may have been unparked while suspended
+                if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
+                    try {
+                        scheduler.execute(runContinuation);
+                    } catch (RejectedExecutionException ignore) { }
+                }
             }
         } else {
             short state = state();
@@ -827,11 +833,11 @@ class VirtualThread extends Thread {
     // -- wrappers for VarHandle methods --
 
     private short state() {
-        return state;
+        return state;  // volatile read
     }
 
     private void setState(short newValue) {
-        state = newValue;
+        state = newValue;  // volatile write
     }
 
     private void setReleaseState(short newValue) {
