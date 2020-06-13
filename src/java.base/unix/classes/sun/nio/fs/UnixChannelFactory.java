@@ -32,6 +32,7 @@ import java.util.Set;
 
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.access.JavaIOFileDescriptorAccess;
+import jdk.internal.misc.Blocker;
 import sun.nio.ch.FileChannelImpl;
 import sun.nio.ch.ThreadPool;
 import sun.nio.ch.SimpleAsynchronousFileChannelImpl;
@@ -130,7 +131,14 @@ class UnixChannelFactory {
         if (flags.append && flags.truncateExisting)
             throw new IllegalArgumentException("APPEND + TRUNCATE_EXISTING not allowed");
 
-        FileDescriptor fdObj = open(dfd, path, pathForPermissionCheck, flags, mode);
+        FileDescriptor fdObj;
+        if (Thread.currentThread().isVirtual()) {
+            fdObj = Blocker.managedBlock(() ->
+                    open(dfd, path, pathForPermissionCheck, flags, mode));
+        } else {
+            fdObj = open(dfd, path, pathForPermissionCheck, flags, mode);
+        }
+
         return FileChannelImpl.open(fdObj, path.toString(), flags.read,
                 flags.write, flags.direct, null);
     }
@@ -175,11 +183,11 @@ class UnixChannelFactory {
      * Opens file based on parameters and options, returning a FileDescriptor
      * encapsulating the handle to the open file.
      */
-    protected static FileDescriptor open(int dfd,
-                                         UnixPath path,
-                                         String pathForPermissionCheck,
-                                         Flags flags,
-                                         int mode)
+    private static FileDescriptor open(int dfd,
+                                       UnixPath path,
+                                       String pathForPermissionCheck,
+                                       Flags flags,
+                                       int mode)
         throws UnixException
     {
         // map to oflags

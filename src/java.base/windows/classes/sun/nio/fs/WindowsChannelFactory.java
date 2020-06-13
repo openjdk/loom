@@ -36,6 +36,7 @@ import java.util.Set;
 
 import jdk.internal.access.JavaIOFileDescriptorAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.Blocker;
 import sun.nio.ch.FileChannelImpl;
 import sun.nio.ch.ThreadPool;
 import sun.nio.ch.WindowsAsynchronousFileChannelImpl;
@@ -165,7 +166,13 @@ class WindowsChannelFactory {
         if (flags.append && flags.truncateExisting)
             throw new IllegalArgumentException("APPEND + TRUNCATE_EXISTING not allowed");
 
-        FileDescriptor fdObj = open(pathForWindows, pathToCheck, flags, pSecurityDescriptor);
+        FileDescriptor fdObj;
+        if (Thread.currentThread().isVirtual()) {
+            fdObj = Blocker.managedBlock(() ->
+                    open(pathForWindows, pathToCheck, flags, pSecurityDescriptor));
+        } else {
+            fdObj = open(pathForWindows, pathToCheck, flags, pSecurityDescriptor);
+        }
         return FileChannelImpl.open(fdObj, pathForWindows, flags.read,
                 flags.write, flags.direct, null);
     }
