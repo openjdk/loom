@@ -24,9 +24,6 @@
  */
 package java.util.concurrent;
 
-import jdk.internal.access.JavaLangAccess;
-import jdk.internal.access.SharedSecrets;
-
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Collection;
@@ -38,25 +35,27 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
+
 /**
- * ExecutorService that executes each task in its own thread. Threads are not
- * re-used and the number of threads/tasks is unbounded.
+ * ExecutorService that executes each task in its own thread.
  *
  * This is a inefficient/simple implementation for now, it will likely be replaced.
  */
-class UnboundedExecutor extends AbstractExecutorService {
+class ThreadExecutor extends AbstractExecutorService {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final VarHandle STATE;
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
-            STATE = l.findVarHandle(UnboundedExecutor.class, "state", int.class);
+            STATE = l.findVarHandle(ThreadExecutor.class, "state", int.class);
         } catch (Exception e) {
             throw new InternalError(e);
         }
     }
 
-    private final Lifetime lifetime;
+    private final Lifetime lifetime;  // experimental
     private final ThreadFactory factory;
     private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
     private final ReentrantLock terminationLock = new ReentrantLock();
@@ -68,13 +67,13 @@ class UnboundedExecutor extends AbstractExecutorService {
     private static final int TERMINATED = 2;
     private volatile int state;
 
-    public UnboundedExecutor(ThreadFactory factory) {
+    public ThreadExecutor(ThreadFactory factory) {
         Objects.requireNonNull(factory);
         this.lifetime = Lifetime.start();
         this.factory = task -> {
-            Thread t = factory.newThread(task);
-            JLA.unsafeSetLifetime(t, lifetime);
-            return t;
+            Thread thread = factory.newThread(task);
+            JLA.unsafeSetLifetime(thread, lifetime);
+            return thread;
         };
     }
 

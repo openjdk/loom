@@ -257,7 +257,7 @@ public class Executors {
      * @since 99
      */
     public static ExecutorService newThreadExecutor(ThreadFactory threadFactory) {
-        return new UnboundedExecutor(threadFactory);
+        return new ThreadExecutor(threadFactory);
     }
 
     /**
@@ -285,7 +285,7 @@ public class Executors {
      */
     public static ExecutorService newVirtualThreadExecutor() {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        return new UnboundedExecutor(factory);
+        return new ThreadExecutor(factory);
     }
 
     /**
