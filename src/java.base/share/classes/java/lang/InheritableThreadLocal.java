@@ -76,6 +76,7 @@ public class InheritableThreadLocal<T> extends ThreadLocal<T> {
      *
      * @param t the current thread
      */
+    @Override
     ThreadLocalMap getMap(Thread t) {
         ThreadLocalMap map = t.inheritableThreadLocals;
         if (map == ThreadLocalMap.NOT_SUPPORTED) {
@@ -90,6 +91,7 @@ public class InheritableThreadLocal<T> extends ThreadLocal<T> {
      * @param t the current thread
      * @param firstValue value for the initial entry of the table.
      */
+    @Override
     void createMap(Thread t, T firstValue) {
         t.inheritableThreadLocals = new ThreadLocalMap(this, firstValue);
     }

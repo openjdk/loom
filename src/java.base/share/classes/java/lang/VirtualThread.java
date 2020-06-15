@@ -458,8 +458,7 @@ class VirtualThread extends Thread {
      * yielding.
      */
     private void tryPark() {
-        assert Thread.currentCarrierThread().getVirtualThread() == this
-                && state == RUNNING;
+        assert Thread.currentThread() == this && state == RUNNING;
 
         // continue if parking permit available or interrupted
         if (getAndSetParkPermit(false) || interrupted) {
@@ -471,8 +470,7 @@ class VirtualThread extends Thread {
         Continuation.yield(VTHREAD_SCOPE);
 
         // continued
-        assert Thread.currentCarrierThread().getVirtualThread() == this
-                && state == RUNNING;
+        assert Thread.currentThread() == this && state == RUNNING;
 
         // notify JVMTI mount event here so that stack is available to agents
         if (notifyJvmtiEvents) {
@@ -512,7 +510,7 @@ class VirtualThread extends Thread {
      * Returns true if parking.
      */
     boolean isParking() {
-        assert Thread.currentCarrierThread().getVirtualThread() == this;
+        assert Thread.currentThread() == this;
         return state == PARKING;
     }
 
@@ -520,10 +518,9 @@ class VirtualThread extends Thread {
      * Attempts to yield. A no-op if the continuation is pinned.
      */
     void tryYield() {
-        assert Thread.currentCarrierThread().getVirtualThread() == this
-                && state == RUNNING;
+        assert Thread.currentThread() == this && state == RUNNING;
         Continuation.yield(VTHREAD_SCOPE);
-        assert state == RUNNING;
+        assert Thread.currentThread() == this && state == RUNNING;
     }
 
     /**
@@ -538,13 +535,13 @@ class VirtualThread extends Thread {
     boolean joinNanos(long nanos) throws InterruptedException {
         if (nanos < 0)
             throw new IllegalArgumentException();
-
         short s = state();
         if (s == NEW)
             throw new IllegalStateException("Not started");
         if (s == TERMINATED)
             return true;
 
+        // timed or untimed wait for the thread to terminate
         final ReentrantLock lock = getLock();
         lock.lock();
         try {
@@ -597,7 +594,7 @@ class VirtualThread extends Thread {
 
     @Override
     boolean getAndClearInterrupt() {
-        assert Thread.currentCarrierThread().getVirtualThread() == this;
+        assert Thread.currentThread() == this;
         synchronized (interruptLock) {
             boolean oldValue = interrupted;
             if (oldValue)
@@ -613,7 +610,7 @@ class VirtualThread extends Thread {
      * @throws InterruptedException if interrupted while sleeping
      */
     void sleepNanos(long nanos) throws InterruptedException {
-        assert Thread.currentCarrierThread().getVirtualThread() == this;
+        assert Thread.currentThread() == this;
         if (nanos >= 0) {
             if (getAndClearInterrupt())
                 throw new InterruptedException();
@@ -746,7 +743,7 @@ class VirtualThread extends Thread {
                     stackTrace = tryGetStackTrace();
                 }
                 if (stackTrace == null) {
-                    Thread.onSpinWait();
+                    Thread.yield();
                 }
             } while (stackTrace == null);
             return stackTrace;
@@ -800,8 +797,8 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Returns the stack trace for this virtual thread if it parked (not mounted),
-     * or null if not parked.
+     * Returns the stack trace for this virtual thread if it newly created,
+     * parked, or terminated. Returns null if the thread is in other states.
      */
     private StackTraceElement[] tryGetStackTrace() {
         if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
@@ -884,16 +881,16 @@ class VirtualThread extends Thread {
         };
         PrivilegedAction<Executor> pa = () -> {
             int parallelism;
-            String s = System.getProperty("jdk.defaultScheduler.parallelism");
-            if (s != null) {
-                parallelism = Integer.parseInt(s);
+            String propValue = System.getProperty("jdk.defaultScheduler.parallelism");
+            if (propValue != null) {
+                parallelism = Integer.parseInt(propValue);
             } else {
                 parallelism = Runtime.getRuntime().availableProcessors();
             }
             Thread.UncaughtExceptionHandler ueh = (t, e) -> { };
             // use FIFO as default
-            s = System.getProperty("jdk.defaultScheduler.lifo");
-            boolean asyncMode = (s == null) || s.equalsIgnoreCase("false");
+            propValue = System.getProperty("jdk.defaultScheduler.lifo");
+            boolean asyncMode = (propValue == null) || propValue.equalsIgnoreCase("false");
             return new ForkJoinPool(parallelism, factory, ueh, asyncMode);
         };
         return AccessController.doPrivileged(pa);
@@ -1014,11 +1011,11 @@ class VirtualThread extends Thread {
      * attempts to park.
      */
     private static int tracePinningMode() {
-        String value = GetPropertyAction.privilegedGetProperty("jdk.tracePinnedThreads");
-        if (value != null) {
-            if (value.length() == 0 || "full".equalsIgnoreCase(value))
+        String propValue = GetPropertyAction.privilegedGetProperty("jdk.tracePinnedThreads");
+        if (propValue != null) {
+            if (propValue.length() == 0 || "full".equalsIgnoreCase(propValue))
                 return 1;
-            if ("short".equalsIgnoreCase(value))
+            if ("short".equalsIgnoreCase(propValue))
                 return 2;
         }
         return 0;
