@@ -7409,8 +7409,8 @@ RuntimeStub* generate_cont_doYield() {
 #undef __
 #define __ masm->
 
-// on entry rsi points to the continuation
 // on exit, rsp points to the ContinuationEntry
+// kills rax
 OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   assert (ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
   assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
@@ -7423,31 +7423,34 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::cont_offset())  / VMRegImpl::stack_slot_size));
   map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::chunk_offset()) / VMRegImpl::stack_slot_size));
 
-  __ movptr(rcx, Address(r15_thread,JavaThread::cont_entry_offset()));
-  __ movptr(Address(rsp, ContinuationEntry::parent_offset()), rcx);
+  __ movptr(rax, Address(r15_thread, JavaThread::cont_entry_offset()));
+  __ movptr(Address(rsp, ContinuationEntry::parent_offset()), rax);
   __ movptr(Address(r15_thread, JavaThread::cont_entry_offset()), rsp);
 
   return map;
 }
 
-// rsp points to ContinuationEntry
+// on entry c_rarg1 points to the continuation 
+//          rsp points to ContinuationEntry
+// kills rax
 void fill_continuation_entry(MacroAssembler* masm) {
   DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
 
-  __ movptr(Address(rsp, ContinuationEntry::cont_offset()), rsi);
+  __ movptr(Address(rsp, ContinuationEntry::cont_offset()), c_rarg1);
   __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
   __ movptr(Address(rsp, ContinuationEntry::argsize_offset()), (int32_t)0);
 
-  __ movptr(rbx, Address(r15_thread, JavaThread::cont_fastpath_offset()));
-  __ movptr(Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()), rbx);
-  __ movptr(rbx, Address(r15_thread, JavaThread::held_monitor_count_offset()));
-  __ movptr(Address(rsp, ContinuationEntry::parent_held_monitor_count_offset()), rbx);
+  __ movptr(rax, Address(r15_thread, JavaThread::cont_fastpath_offset()));
+  __ movptr(Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()), rax);
+  __ movptr(rax, Address(r15_thread, JavaThread::held_monitor_count_offset()));
+  __ movptr(Address(rsp, ContinuationEntry::parent_held_monitor_count_offset()), rax);
   
   __ set_cont_fastpath(r15_thread, 1);
   __ reset_held_monitor_count(r15_thread);
 }
 
-// on entry, rsp must point to the ContinuationEntry
+// on entry, rsp points to the ContinuationEntry
+// kills rbx, rcx
 void continuation_enter_cleanup(MacroAssembler* masm) {
 #ifndef PRODUCT
   Label OK;

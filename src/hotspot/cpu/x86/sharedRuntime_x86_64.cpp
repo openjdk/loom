@@ -1839,6 +1839,9 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots);
 void fill_continuation_entry(MacroAssembler* masm);
 void continuation_enter_cleanup(MacroAssembler* masm);
 
+// enterSpecial(Continuation c, boolean isContinue)
+// On entry: c_rarg1 -- the continuation object
+//           c_rarg2 -- isContinue
 static void gen_continuation_enter(MacroAssembler* masm,
                                  const methodHandle& method,
                                  const BasicType* sig_bt,
@@ -1856,13 +1859,11 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   Label call_thaw, exit;
 
-  // enterSpecial(Continuation c, boolean isContinue)
-
   __ push(rbp);
 
   //BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
   //bs->nmethod_entry_barrier(masm);
-  OopMap* map = continuation_enter_setup(masm, stack_slots);
+  OopMap* map = continuation_enter_setup(masm, stack_slots);  // kills rax
 
   // Frame is now completed as far as size and linkage.
   frame_complete =__ pc() - start;
@@ -1870,9 +1871,9 @@ static void gen_continuation_enter(MacroAssembler* masm,
   //   _enterSP = sp
   // end
  
-  fill_continuation_entry(masm);
+  fill_continuation_entry(masm); // kills rax
 
-  __ cmpl(rdx, 0);
+  __ cmpl(c_rarg2, 0);
   __ jcc(Assembler::notEqual, call_thaw);
 
   int up = align_up((intptr_t) __ pc() + 1, 4) - (intptr_t) (__ pc() + 1);
