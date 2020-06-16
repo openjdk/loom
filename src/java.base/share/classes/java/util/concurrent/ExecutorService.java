@@ -280,6 +280,10 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * The results of this method are undefined if the given
      * collection is modified while this operation is in progress.
      *
+     * @apiNote This method is equivalent to invoking {@linkplain
+     * #invokeAll(Collection, boolean)} with {@code cancelOnException} set
+     * to {@code false}.
+     *
      * @param tasks the collection of tasks
      * @param <T> the type of the values returned from the tasks
      * @return a list of Futures representing the tasks, in the same
@@ -293,6 +297,66 @@ public interface ExecutorService extends Executor, AutoCloseable {
      */
     <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
         throws InterruptedException;
+
+    /**
+     * Executes the given tasks, returning a list of Futures holding
+     * their status and results when all complete. {@link Future#isDone} is
+     * {@code true} for each element of the returned list.
+     *
+     * <p> The parameter {@code cancelOnException} determines if this
+     * method should wait for unfinished tasks to complete when a task
+     * completes with an exception. If {@code true}, unfinished tasks are
+     * cancelled, as if by invoking {@code cancel(true)}, when any task
+     * completes with an exception.
+     *
+     * @implSpec
+     * The default implementation invokes {@code submitTasks()} to submit all
+     * tasks and then waits until all tasks have completed, or in the case
+     * that {@code cancelOnException} is true, that a task completes with an
+     * exception.
+     *
+     * @param tasks the collection of tasks
+     * @param cancelOnException true to cancel unfinished tasks when
+     *         any task fails
+     * @param <T> the type of the values returned from the tasks
+     * @return a list of Futures representing the tasks, in the same
+     *         sequential order as produced by the iterator for the
+     *         given task list, each of which has completed
+     * @throws InterruptedException if interrupted while waiting, in
+     *         which case unfinished tasks are cancelled
+     * @throws NullPointerException if tasks or any of its elements are {@code null}
+     * @throws RejectedExecutionException if any task cannot be
+     *         scheduled for execution
+     * @since 99
+     */
+   default <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
+                                         boolean cancelOnException)
+           throws InterruptedException {
+
+       List<CompletableFuture<T>> futures = submitTasks(tasks);
+       try {
+           if (cancelOnException) {
+               // wait until a task fails or all tasks complete
+               CompletableFuture.stream(futures)
+                       .filter(CompletableFuture::isCompletedExceptionally)
+                       .findAny();
+           } else {
+               // wait until all tasks complete
+               long ignore = CompletableFuture.stream(futures).count();
+           }
+       } catch (CancellationException e) {
+           if (Thread.currentThread().isInterrupted()) {
+               throw new InterruptedException();
+           } else {
+               throw e;
+           }
+       } finally {
+           futures.forEach(f -> f.cancel(true));
+       }
+       @SuppressWarnings("unchecked")
+       List<Future<T>> result = (List) futures;
+       return result;
+   }
 
     /**
      * Executes the given tasks, returning a list of Futures holding

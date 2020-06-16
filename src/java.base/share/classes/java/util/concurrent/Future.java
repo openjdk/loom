@@ -143,6 +143,40 @@ public interface Future<V> {
     V get() throws InterruptedException, ExecutionException;
 
     /**
+     * Waits if necessary for the computation to complete, and then
+     * retrieves its result. This methods differs to {@linkplain #get()} in
+     * that it throws an unchecked exception if the computation completed
+     * with an exception. It also does not react to thread interrupt.
+     *
+     * @implSpec
+     * The default implementation invokes {@code get()} to wait for the
+     * computation to complete
+     *
+     * @return the computed result
+     * @throws CancellationException if the computation was cancelled
+     * @throws CompletionException if the computation threw an exception
+     * @since 99
+     */
+    default V join() {
+        boolean interrupted = false;
+        try {
+            while (true) {
+                try {
+                    return get();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                } catch (ExecutionException e){
+                    throw new CompletionException(e);
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    /**
      * Waits if necessary for at most the given time for the computation
      * to complete, and then retrieves its result, if available.
      *
