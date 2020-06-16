@@ -72,13 +72,23 @@ public class Preempt {
             try {
                 startLatch.await();
                 {
-                    var res = cont.tryPreempt(t0);
-                    assertEquals(res, Continuation.PreemptStatus.SUCCESS);
+                    Continuation.PreemptStatus res;
+                    int i = 0;
+                    do {
+                        res = cont.tryPreempt(t0);
+                        i++;
+                    } while (i < 10 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
+                    assertEquals(res, Continuation.PreemptStatus.SUCCESS, "res: " + res + " i: " + i);
                 }
                 preemptLatch.await();
                 {
-                    var res = cont.tryPreempt(t0);
-                    assertEquals(res, Continuation.PreemptStatus.SUCCESS);
+                    Continuation.PreemptStatus res;
+                    int i = 0;
+                    do {
+                        res = cont.tryPreempt(t0);
+                        i++;
+                    } while (i < 10 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
+                    assertEquals(res, Continuation.PreemptStatus.SUCCESS, "res: " + res + " i: " + i);
                 }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);

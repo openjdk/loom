@@ -2721,7 +2721,9 @@ public:
 
       return recurse_freeze_compiled_frame<top, false>(f, caller, &kd);
     } else if (f.is_interpreted_frame()) {
+      assert ((mode == mode_slow && _preempt && top) || !f.interpreter_frame_method()->is_native(), "");
       if (Interpreted::is_owning_locks(f)) return freeze_pinned_monitor;
+      if (mode == mode_slow && _preempt && top && f.interpreter_frame_method()->is_native()) return freeze_pinned_native; // interpreter native entry
 
       return recurse_freeze_interpreted_frame<top>(f, caller, callee_argsize);
     } else if (mode == mode_slow && _preempt && top && is_stub(f.cb())) {
@@ -2948,9 +2950,8 @@ public:
     _fp_oop_info._has_fp_oop = false;
 
     int frozen;
-    if (!FKind::interpreted) { // dynamic branch
+    if (!FKind::interpreted) {
       FreezeFnT freeze_stub = (FreezeFnT)extra;
-      // tty->print_cr(">>>>0000<<<<<");
       frozen = freeze_compiled_oops(f, vsp, hsp, index, freeze_stub); //freeze_compiled_oops_stub(freeze_stub, f, vsp, hsp, index);
     } else {
       if (num_oops == 0)
@@ -3324,6 +3325,18 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
   return 0;
 }
 
+static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res) {
+  if (UNLIKELY(res != freeze_ok)) {
+    assert (verify_continuation<11>(cont.mirror()), "");
+    return early_return(res, thread);
+  }
+#if CONT_JFR
+  cont.post_jfr_event(&event, thread);
+#endif
+  post_JVMTI_yield(thread, cont); // can safepoint
+  return freeze_epilog(thread, cont);
+}
+
 // returns the continuation yielding (based on context), or NULL for failure (due to pinning)
 // it freezes multiple continuations, depending on contex
 // it must set Continuation.stackSize
@@ -3376,6 +3389,10 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
     cont.post_jfr_event(&event, thread);
   #endif
     return freeze_epilog(thread, cont);
+  } else if (mode != mode_fast && UNLIKELY(preempt)) {
+    assert (thread->thread_state() == _thread_in_vm, "");
+    freeze_result res = fr.freeze_preempt();
+    return freeze_epilog(thread, cont, res);
   } else {
     // manual transtion. see JRT_ENTRY in interfaceSupport.inline.hpp
     log_develop_trace(jvmcont)("chunk unavailable; transitioning to VM");
@@ -3383,33 +3400,20 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
     HandleMarkCleaner __hm(thread);
     debug_only(VMEntryWrapper __vew;)
     assert (thread->thread_state() == _thread_in_vm, "");
-
-    freeze_result res;
-    if (mode != mode_fast && UNLIKELY(preempt)) {
-      assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "thread->thread_state(): %d", thread->thread_state());
-      res = fr.freeze_preempt();
-    } else {
-      res = fr.freeze(sp, false);
-      if (UNLIKELY(res == freeze_retry_slow)) {
-        log_develop_trace(jvmcont)("-- RETRYING SLOW --");
-        res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(sp, false);
-      }
+    
+    freeze_result res = fr.freeze(sp, false);
+    if (UNLIKELY(res == freeze_retry_slow)) {
+      log_develop_trace(jvmcont)("-- RETRYING SLOW --");
+      res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(sp, false);
     }
-    if (UNLIKELY(res != freeze_ok)) {
-      assert (verify_continuation<11>(cont.mirror()), "");
-      return early_return(res, thread);
-    }
-  #if CONT_JFR
-    cont.post_jfr_event(&event, thread);
-  #endif
-    post_JVMTI_yield(thread, cont); // can safepoint
-    return freeze_epilog(thread, cont);
+    return freeze_epilog(thread, cont, res);
   }
 }
 
 static freeze_result is_pinned(const frame& f, RegisterMap* map) {
   if (f.is_interpreted_frame()) {
-    if (Interpreted::is_owning_locks(f)) return freeze_pinned_monitor;
+    if (Interpreted::is_owning_locks(f))           return freeze_pinned_monitor;
+    if (f.interpreter_frame_method()->is_native()) return freeze_pinned_native; // interpreter native entry
   } else if (f.is_compiled_frame()) {
     if (Compiled::is_owning_locks(map->thread(), map, f)) return freeze_pinned_monitor;
   } else {
@@ -3498,24 +3502,24 @@ typedef int (*DoYieldStub)(int scopes);
 
 // called in a safepoint
 int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
-  // this is the only place where we traverse the continuatuion hierarchy in native code, as it needs to be done in a safepoint
-  oop scope = NULL;
-  oop innermost = get_continuation(thread);
-  for (oop c = innermost; c != NULL; c = java_lang_Continuation::parent(c)) {
-    if (c == cont) {
-      scope = java_lang_Continuation::scope(c);
-      break;
-    }
+  assert (thread->thread_state() == _thread_in_vm, "");
+  // assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "thread->thread_state(): %d", thread->thread_state());
+
+  ContinuationEntry* ce = thread->cont_entry();
+  oop innermost = ce->continuation();
+  while (ce != NULL && ce->continuation() != cont) {
+    ce = ce->parent();
   }
-  if (scope == NULL) {
+  if (ce == NULL) {
     return -1; // no continuation
   }
   if (thread->_cont_yield) {
     return -2; // during yield
   }
-  if (!(innermost == cont)) { // we have nested continuations
+  const oop scope = java_lang_Continuation::scope(cont);
+  if (innermost != cont) { // we have nested continuations
     // make sure none of the continuations in the hierarchy are pinned
-    freeze_result res_pinned = is_pinned0(thread, java_lang_Continuation::scope(cont), true);
+    freeze_result res_pinned = is_pinned0(thread, scope, true);
     if (res_pinned != freeze_ok)
       return res_pinned;
 
@@ -3685,8 +3689,10 @@ public:
     DEBUG_ONLY(int orig_num_frames = java_lang_Continuation::numFrames(_cont.mirror());/*_cont.num_frames();*/)
     DEBUG_ONLY(_frames = 0;)
 
+    bool last_interpreted = false;
     if (mode == mode_slow && _cont.is_flag(FLAG_SAFEPOINT_YIELD)) {
       _preempt = true;
+      last_interpreted = _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED);
       assert (_cont.tail() == (oop)NULL, "");
     }
 
@@ -3703,7 +3709,8 @@ public:
     if (log_develop_is_enabled(Debug, jvmcont)) f.print_on(tty);
   #endif
 
-    if (mode == mode_slow && _preempt && kind == thaw_exception) {
+    if (mode == mode_slow && _preempt && last_interpreted) {
+      assert (last_interpreted == Interpreter::contains(*(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET)), "last_interpreted: %d interpreted: %d", last_interpreted, Interpreter::contains(*(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET)));
       sp = push_interpreter_return_frame(sp);
     }
     
@@ -3734,11 +3741,15 @@ public:
         int num_frames = FULL_STACK ? 1000 // TODO
                                     : (return_barrier ? 1 : 2);
         thaw<top>(hf, caller, num_frames);
+        intptr_t* sp = caller.sp();
+        if (mode == mode_slow && _preempt && caller.is_compiled_frame()) {
+          sp = _safepoint_stub_f.sp();
+        }
 
         _cont.write();
         assert(_cont.chunk_invariant(), "");
 
-        return caller.sp();
+        return sp;
       } else {
         assert (assert_entry_frame_laid_out(_cont.entry()), "");
         return _cont.entrySP();
@@ -4303,11 +4314,12 @@ public:
     }
 
     patch<FKind, top, bottom>(f, caller);
-    hf.cb()->as_compiled_method()->run_nmethod_entry_barrier();
 
     _cont.dec_num_frames();
 
     if (!FKind::stub) {
+      hf.cb()->as_compiled_method()->run_nmethod_entry_barrier();
+
       if (f.is_deoptimized_frame()) { // TODO PERF
         _fastpath = false;
       } else if (should_deoptimize()
@@ -4368,9 +4380,8 @@ public:
     intptr_t* sp = f.sp();
     address pc = f.raw_pc();
     *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
-    ContinuationHelper::push_pd(f);
-
     Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
+    ContinuationHelper::push_pd(f);
 
     assert(assert_frame_laid_out(f), "");
 
@@ -4530,11 +4541,16 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   assert (verify_continuation<2>(cont.mirror()), "");
 
 #ifndef PRODUCT
-  set_anchor(thread, sp);
+  intptr_t* sp0 = sp;
+  address pc0 = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  if (pc0 == StubRoutines::cont_interpreter_forced_preempt_return()) {
+    sp0 += frame_metadata; // see push_interpreter_return_frame
+  }
+  set_anchor(thread, sp0);
   print_frames(thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
   if (LoomVerifyAfterThaw) {
     intptr_t *v = 0;
-    do_verify_after_thaw(thread, sp, &v);
+    do_verify_after_thaw(thread, sp0, &v);
   }
   clear_anchor(thread);
 #endif
@@ -4551,11 +4567,6 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   assert (verify_continuation<3>(cont.mirror()), "");
   log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
-
-#ifndef PRODUCT
-  set_anchor(thread, sp);
-  clear_anchor(thread);
-#endif
 
   return sp;
 }
@@ -6076,9 +6087,11 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   int callee_argsize = 0;
   bool callee_compiled = nonempty_chunk;
   for (hframe hf = cont.last_frame<mode_slow>(); !hf.is_empty(); hf = hf.sender<mode_slow>(cont)) {
-    assert (frames > 0 || (hf.is_interpreted_frame() == cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)), "");
-    assert (frames > 0 || ((!hf.is_interpreted_frame() && is_stub(hf.cb())) == cont.is_flag(FLAG_SAFEPOINT_YIELD)), "");
+    assert (frames > 0 || (hf.is_interpreted_frame() == cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)), "frames: %d interpreted: %d FLAG_LAST_FRAME_INTERPRETED: %d", frames, hf.is_interpreted_frame(), cont.is_flag(FLAG_LAST_FRAME_INTERPRETED));
+    assert (frames > 0 || ((!hf.is_interpreted_frame() && is_stub(hf.cb())) <= cont.is_flag(FLAG_SAFEPOINT_YIELD)), "frames: %d interpreted: %d stub: %d FLAG_SAFEPOINT_YIELD: %d", frames, hf.is_interpreted_frame(), !hf.is_interpreted_frame() && is_stub(hf.cb()), cont.is_flag(FLAG_SAFEPOINT_YIELD));
     if (hf.is_interpreted_frame()) {
+      interpreted_frames++;
+
       if (callee_compiled) { max_size += SP_WIGGLE << LogBytesPerWord; } // TODO PD
       max_size += callee_argsize;
       max_size += hf.interpreted_frame_size();
@@ -6088,19 +6101,17 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
       // InterpreterOopMap mask;
       // hf.interpreted_frame_oop_map(&mask);
       // oops += hf.interpreted_frame_num_oops(mask);
-
-      interpreted_frames++;
     } else {
-      if (frames == 0 && cont.is_flag(FLAG_SAFEPOINT_YIELD)) {
-        assert (is_stub(hf.cb()), "");
+      max_size += hf.compiled_frame_size();
+      callee_compiled = true;
+      assert ((frames == 0 && cont.is_flag(FLAG_SAFEPOINT_YIELD)) || !is_stub(hf.cb()), "");
+      // FLAG_SAFEPOINT_YIELD is kept on after thawing safepoint stub, so is_stub may not be true if we verify in thaw
+      if (frames == 0 && cont.is_flag(FLAG_SAFEPOINT_YIELD) && is_stub(hf.cb())) {
+        callee_argsize = 0;
       } else {
         assert (hf.cb() != NULL && hf.cb()->is_compiled(), "");
+        callee_argsize = hf.compiled_frame_stack_argsize();
       }
-
-      max_size += hf.compiled_frame_size();
-      //c_size += hf.compiled_frame_size();
-      callee_argsize = hf.compiled_frame_stack_argsize();
-      callee_compiled = true;
 
       // oops += hf.compiled_frame_num_oops();
     }

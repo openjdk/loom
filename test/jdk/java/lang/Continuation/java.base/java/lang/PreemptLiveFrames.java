@@ -60,6 +60,14 @@ public class PreemptLiveFrames {
         Thread t = new Thread(() -> {
             try {
                 startLatch.await();
+
+                // Continuation.PreemptStatus res;
+                // int i = 0;
+                // do {
+                //     res = cont.tryPreempt(t0);
+                //     i++;
+                // } while (i < 10 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
+                // assertEquals(res, Continuation.PreemptStatus.SUCCESS, "res: " + res + " i: " + i);
                 var res = cont.tryPreempt(t0);
                 assertEquals(res, Continuation.PreemptStatus.SUCCESS);
             } catch (InterruptedException e) {

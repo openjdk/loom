@@ -567,9 +567,6 @@ java/lang/StringCoding/CheckEncodings.sh                        7008363 generic-
 java/lang/ProcessHandle/InfoTest.java                           8211847 aix-ppc64
 java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-all
 
-java/lang/Continuation/Preempt.java                             0000000 generic-all
-java/lang/Continuation/PreemptLiveFramesDriver.java             0000000 generic-all
-
 ############################################################################
 
 # jdk_instrument

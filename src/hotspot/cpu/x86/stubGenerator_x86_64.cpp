@@ -6725,13 +6725,12 @@ RuntimeStub* generate_cont_doYield() {
   address generate_cont_jump_from_safepoint() {
     StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
 
-    Register fi = rbx;
-
     address start = __ pc();
 
     __ get_thread(r15_thread);
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
-
+    __ reinit_heapbase();
+    
     __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
     continuation_enter_cleanup(_masm);
     __ pop(rbp);
@@ -7450,6 +7449,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
 }
 
 // on entry, rsp points to the ContinuationEntry
+// on exit, rsp points to the spilled rbp in the entry frame
 // kills rbx, rcx
 void continuation_enter_cleanup(MacroAssembler* masm) {
 #ifndef PRODUCT

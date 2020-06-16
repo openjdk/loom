@@ -77,10 +77,14 @@ static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
 }
 
 static void set_anchor(JavaThread* thread, intptr_t* sp) {
+  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
+  address   pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  assert (pc != NULL, "");
+
   JavaFrameAnchor* anchor = thread->frame_anchor();
   anchor->set_last_Java_sp(sp);
-  anchor->set_last_Java_fp(*(intptr_t**)(sp-frame::sender_sp_offset));
-  anchor->set_last_Java_pc(*(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET));
+  anchor->set_last_Java_fp(fp);
+  anchor->set_last_Java_pc(pc);
 
   assert (thread->has_last_Java_frame(), "");
   log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
@@ -90,8 +94,8 @@ static void set_anchor(JavaThread* thread, intptr_t* sp) {
 
 frame sp_to_frame(intptr_t* sp) {
   return frame(sp,
-               *(intptr_t**)(sp-frame::sender_sp_offset),
-               *(address*)(sp-SENDER_SP_RET_ADDRESS_OFFSET));
+               *(intptr_t**)(sp - frame::sender_sp_offset),
+               *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET));
 }
 
 // unused
@@ -683,6 +687,8 @@ inline frame ContinuationHelper::frame_with(frame& f, intptr_t* sp, address pc, 
 }
 
 inline void ContinuationHelper::push_pd(const frame& f) {
+  log_develop_trace(jvmcont)("ContinuationHelper::push_pd: " INTPTR_FORMAT, p2i(f.fp()));
+  // os::print_location(tty, (intptr_t)f.fp());
   *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
 }
 
@@ -993,11 +999,13 @@ template <typename ConfigT, op_mode mode>
 intptr_t* Thaw<ConfigT, mode>::push_interpreter_return_frame(intptr_t* sp) {
   assert (mode == mode_slow, "");
 
+  log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp), p2i(sp - frame_metadata));
+
   address pc = StubRoutines::cont_interpreter_forced_preempt_return();
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
 
   sp -= frame_metadata;
-  *(address*)(_cont.entrySP() - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
+  *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
   return sp;
 }
