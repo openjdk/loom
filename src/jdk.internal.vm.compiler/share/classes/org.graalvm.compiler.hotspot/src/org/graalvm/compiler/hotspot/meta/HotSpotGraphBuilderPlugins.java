@@ -494,10 +494,7 @@ public class HotSpotGraphBuilderPlugins {
 
     private static void registerContinuationPlugins(InvocationPlugins plugins,  ForeignCallsProvider foreignCalls, Replacements replacements) {
         Registration r1 = new Registration(plugins, Continuation.class, replacements);
-        r1.registerMethodSubstitution(ContinuationSubstitutions.class, "getSP");
-        r1.register1("doContinue", Receiver.class, new ForeignCallPlugin(foreignCalls, ContinuationSubstitutions.CONTINUATION_DO_CONTINUE));
         r1.register1("doYield", int.class, new ForeignCallPlugin(foreignCalls, ContinuationSubstitutions.CONTINUATION_YIELD));
-        r1.registerMethodSubstitution(ContinuationSubstitutions.class, "runLevel");
     }
 
     public static final String reflectionClass;

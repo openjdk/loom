@@ -246,12 +246,7 @@ void TemplateInterpreterGenerator::generate_all() {
   method_entry(java_lang_Double_longBitsToDouble);
   method_entry(java_lang_Double_doubleToRawLongBits);
 
-  method_entry(java_lang_continuation_getSP)
-  method_entry(java_lang_continuation_getPC)
-  method_entry(java_lang_continuation_doContinue)
   method_entry(java_lang_continuation_doYield)
-  method_entry(java_lang_continuation_jump)
-  method_entry(java_lang_continuation_runLevel)
 
 #undef method_entry
 
@@ -457,18 +452,8 @@ address TemplateInterpreterGenerator::generate_method_entry(
   case Interpreter::java_lang_math_fmaF    : entry_point = generate_math_entry(kind);      break;
   case Interpreter::java_lang_ref_reference_get
                                            : entry_point = generate_Reference_get_entry(); break;
-  case Interpreter::java_lang_continuation_getSP
-                                           : entry_point = generate_Continuation_getSP_entry(); break;
-  case Interpreter::java_lang_continuation_getPC
-                                           : entry_point = generate_Continuation_getPC_entry(); break;
-  case Interpreter::java_lang_continuation_doContinue
-                                           : entry_point = generate_Continuation_doContinue_entry(); break;
   case Interpreter::java_lang_continuation_doYield
                                            : entry_point = generate_Continuation_doYield_entry(); break;
-  case Interpreter::java_lang_continuation_jump
-                                           : entry_point = generate_Continuation_jump_entry(); break;
-  case Interpreter::java_lang_continuation_runLevel
-                                           : entry_point = generate_Continuation_runLevel_entry(); break;
   case Interpreter::java_util_zip_CRC32_update
                                            : native = true; entry_point = generate_CRC32_update_entry();  break;
   case Interpreter::java_util_zip_CRC32_updateBytes

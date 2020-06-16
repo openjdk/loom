@@ -190,13 +190,10 @@ address StubRoutines::_safefetchN_continuation_pc        = NULL;
 RuntimeStub* StubRoutines::_cont_doYield_stub = NULL;
 address StubRoutines::_cont_doYield       = NULL;
 address StubRoutines::_cont_jump_from_sp  = NULL;
-address StubRoutines::_cont_jump          = NULL;
 address StubRoutines::_cont_thaw          = NULL;
 address StubRoutines::_cont_returnBarrier = NULL;
 address StubRoutines::_cont_returnBarrierExc = NULL;
 address StubRoutines::_cont_interpreter_forced_preempt_return = NULL;
-address StubRoutines::_cont_getSP         = NULL;
-address StubRoutines::_cont_getPC         = NULL;
 
 JFR_ONLY(address StubRoutines::_jfr_write_checkpoint = NULL;)
 JFR_ONLY(address StubRoutines::_jfr_get_event_writer = NULL;)

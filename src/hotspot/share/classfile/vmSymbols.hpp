@@ -378,11 +378,6 @@
   template(dispatchUncaughtException_name,            "dispatchUncaughtException")                \
   template(loadClass_name,                            "loadClass")                                \
   template(doYield_name,                              "doYield")                                  \
-  template(jump_name,                                 "jump")                                     \
-  template(doContinue_name,                           "doContinue")                               \
-  template(getSP_name,                                "getSP")                                    \
-  template(runLevel_name,                             "runLevel")                                 \
-  template(getPC_name,                                "getPC")                                    \
   template(enter_name,                                "enter")                                    \
   template(enterSpecial_name,                         "enterSpecial")                             \
   template(onContinue_name,                           "onContinue0")                              \
@@ -1164,18 +1159,8 @@
   do_intrinsic(_Continuation_enterSpecial, java_lang_Continuation, enterSpecial_name,    continuationEnter_signature, F_SN)     \
   do_signature(continuationGetStacks_signature,                   "(III)V")                                                    \
   do_alias(continuationOnPinned_signature,                        int_void_signature)                                          \
-  do_intrinsic(_Continuation_getSP,  java_lang_Continuation,       getSP_name,    continuationGetSP_signature, F_S)            \
-    do_alias(continuationGetSP_signature,                            void_long_signature)                                      \
-  do_intrinsic(_Continuation_getPC,  java_lang_Continuation,       getPC_name,    continuationGetPC_signature, F_S)            \
-    do_alias(continuationGetPC_signature,                            void_long_signature)                                      \
-  do_intrinsic(_Continuation_doContinue,  java_lang_Continuation,  doContinue_name,    continuationDoContinue_signature, F_R)  \
-    do_alias(continuationDoContinue_signature,                     void_method_signature)                                      \
   do_intrinsic(_Continuation_doYield,     java_lang_Continuation,  doYield_name,       continuationDoYield_signature, F_S)     \
     do_alias(continuationDoYield_signature,                          int_int_signature)                                        \
-  do_intrinsic(_Continuation_jump,     java_lang_Continuation,     jump_name,       continuationJump_signature, F_S)           \
-    do_signature(continuationJump_signature,                         "(JJJ)V")                                                 \
-  do_intrinsic(_Continuation_runLevel,    java_lang_Continuation,  runLevel_name,    continuationrunLevel_signature, F_S)      \
-    do_alias(continuationrunLevel_signature,                         void_int_signature)                                       \
                                                                                                                         \
   /* support for UnsafeConstants */                                                                                     \
   do_class(jdk_internal_misc_UnsafeConstants,      "jdk/internal/misc/UnsafeConstants")                                 \

@@ -715,54 +715,6 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
 
 // End of helpers
 
-address TemplateInterpreterGenerator::generate_Continuation_runLevel_entry(void) {
-#ifdef _LP64
-  address entry = __ pc();
-
-  __ movl(rax, 0);
-  __ ret(0);
-
-  return entry;
-#else
-  Unimplemented();
-  return NULL;
-#endif
-}
-
-// return current sp
-address TemplateInterpreterGenerator::generate_Continuation_getSP_entry(void) {
-#ifdef _LP64
-  address entry = __ pc();
-
-  const Register thread1 = NOT_LP64(rdi) LP64_ONLY(r15_thread);
-  NOT_LP64(__ get_thread(thread1));
-  __ set_cont_fastpath(thread1, 1);
-  __ reset_held_monitor_count(thread1);
-  __ lea(rax, Address(rsp, wordSize)); // skip return address
-  __ ret(0);
-
-  return entry;
-#else
-  Unimplemented();
-  return NULL;
-#endif
-}
-
-// return current pc
-address TemplateInterpreterGenerator::generate_Continuation_getPC_entry(void) {
-#ifdef _LP64
-  address entry = __ pc();
-
-  __ movptr(rax, Address(rsp, 0));
-  __ ret(0);
-
-  return entry;
-#else
-  Unimplemented();
-  return NULL;
-#endif
-}
-
 address TemplateInterpreterGenerator::generate_Continuation_doYield_entry(void) {
 #ifdef _LP64
   address entry = __ pc();
@@ -775,37 +727,6 @@ address TemplateInterpreterGenerator::generate_Continuation_doYield_entry(void) 
   
   __ jump(RuntimeAddress(CAST_FROM_FN_PTR(address, StubRoutines::cont_doYield())));
   // return value is in rax
-
-  return entry;
-#else
-  Unimplemented();
-  return NULL;
-#endif
-}
-
-address TemplateInterpreterGenerator::generate_Continuation_jump_entry(void) {
-#ifdef _LP64
-  address entry = __ pc();
-  assert(StubRoutines::cont_jump() != NULL, "stub not yet generated");
-
-  __ movl(c_rarg1, Address(rsp, wordSize*3)); // sp
-  __ movl(c_rarg2, Address(rsp, wordSize*2)); // fp
-  __ movl(c_rarg3, Address(rsp, wordSize*1)); // pc
-  __ jump(RuntimeAddress(CAST_FROM_FN_PTR(address, StubRoutines::cont_jump())));
-
-  return entry;
-#else
-  Unimplemented();
-  return NULL;
-#endif
-}
-
-address TemplateInterpreterGenerator::generate_Continuation_doContinue_entry(void) {
-#ifdef _LP64
-  address entry = __ pc();
-  assert(StubRoutines::cont_thaw() != NULL, "stub not yet generated");
-
-  __ jump(RuntimeAddress(CAST_FROM_FN_PTR(address, StubRoutines::cont_thaw())));
 
   return entry;
 #else

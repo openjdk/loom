@@ -6739,21 +6739,6 @@ RuntimeStub* generate_cont_doYield() {
     return start;
   }
 
-  // c_rarg1 - sp
-  // c_rarg2 - fp
-  // c_rarg3 - pc
-  address generate_cont_jump() {
-    StubCodeMark mark(this, "StubRoutines","Continuation Jump");
-    address start = __ pc();
-
-    __ movptr(rbp, c_rarg2);
-    __ movptr(rbp, Address(rbp, 0)); // rbp is indirect. See Continuation::freeze for an explanation.
-    __ movptr(rsp, c_rarg1);
-    __ jmp(c_rarg3);
-
-    return start;
-  }
-
   address generate_cont_thaw(bool return_barrier, bool exception) {
     assert (return_barrier || !exception, "must be");
 
@@ -6893,28 +6878,6 @@ RuntimeStub* generate_cont_doYield() {
 
       return start;
     }
-
-  address generate_cont_getPC() {
-    StubCodeMark mark(this, "StubRoutines", "GetPC");
-    address start = __ pc();
-
-    __ movptr(rax, Address(rsp, 0));
-    __ ret(0);
-
-    return start;
-  }
-
-  address generate_cont_getSP() { // used by C2
-    StubCodeMark mark(this, "StubRoutines", "getSP");
-    address start = __ pc();
-
-    __ set_cont_fastpath(get_thread(), 1);
-    __ reset_held_monitor_count(get_thread());
-    __ lea(rax, Address(rsp, wordSize));
-    __ ret(0);
-
-    return start;
-  }
 
 #if INCLUDE_JFR
 
@@ -7233,9 +7196,6 @@ RuntimeStub* generate_cont_doYield() {
     StubRoutines::_cont_doYield    = StubRoutines::_cont_doYield_stub->entry_point();
     StubRoutines::_cont_jump_from_sp = generate_cont_jump_from_safepoint();
     StubRoutines::_cont_interpreter_forced_preempt_return = generate_cont_interpreter_forced_preempt_return();
-    StubRoutines::_cont_jump       = generate_cont_jump();
-    StubRoutines::_cont_getSP      = generate_cont_getSP();
-    StubRoutines::_cont_getPC      = generate_cont_getPC();
 
     JFR_ONLY(StubRoutines::_jfr_write_checkpoint = generate_jfr_write_checkpoint();)
     JFR_ONLY(StubRoutines::_jfr_get_event_writer = generate_jfr_get_event_writer();)

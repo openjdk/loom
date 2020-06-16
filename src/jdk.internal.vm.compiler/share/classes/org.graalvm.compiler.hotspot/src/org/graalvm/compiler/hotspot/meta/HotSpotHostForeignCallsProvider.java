@@ -84,7 +84,6 @@ import static org.graalvm.compiler.hotspot.replacements.AssertionSnippets.ASSERT
 import static org.graalvm.compiler.hotspot.replacements.HotSpotG1WriteBarrierSnippets.G1WBPOSTCALL;
 import static org.graalvm.compiler.hotspot.replacements.HotSpotG1WriteBarrierSnippets.G1WBPRECALL;
 import static org.graalvm.compiler.hotspot.replacements.HotSpotG1WriteBarrierSnippets.VALIDATE_OBJECT;
-import static org.graalvm.compiler.hotspot.replacements.ContinuationSubstitutions.CONTINUATION_DO_CONTINUE;
 import static org.graalvm.compiler.hotspot.replacements.ContinuationSubstitutions.CONTINUATION_YIELD;
 import static org.graalvm.compiler.hotspot.replacements.HotSpotReplacementsUtil.MARK_WORD_LOCATION;
 import static org.graalvm.compiler.hotspot.replacements.HotSpotReplacementsUtil.TLAB_END_LOCATION;
@@ -427,7 +426,6 @@ public abstract class HotSpotHostForeignCallsProvider extends HotSpotForeignCall
         }
 
         if (c.continuationThaw != 0) {
-            registerForeignCall(CONTINUATION_DO_CONTINUE, c.continuationThaw, JavaCall, SAFEPOINT, NOT_REEXECUTABLE, any());
             registerForeignCall(CONTINUATION_YIELD, c.continuationDoYield, JavaCall, SAFEPOINT, NOT_REEXECUTABLE, any());
         }
 

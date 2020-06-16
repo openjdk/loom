@@ -100,6 +100,5 @@ final class GraalHotSpotVMConfigVersioned extends HotSpotVMConfigAccess {
     int javaThreadHeldMonitorCounterOffset = getFieldOffset("JavaThread::_held_monitor_count", Integer.class, "int");
 
     long continuationThaw = getFieldValue("StubRoutines::_cont_thaw", Long.class, "address");
-    long continuationGetSP = getFieldValue("StubRoutines::_cont_getSP", Long.class, "address");
     long continuationDoYield = getFieldValue("StubRoutines::_cont_doYield", Long.class, "address");
 }

@@ -364,6 +364,9 @@ public class Continuation {
     }
 
     @HotSpotIntrinsicCandidate
+    private static int doYield(int scopes) { throw new Error("Intrinsic not installed"); };
+
+    @HotSpotIntrinsicCandidate
     private native static void enterSpecial(Continuation c, boolean isContinue);
 
     private void finish() {
@@ -809,22 +812,6 @@ public class Continuation {
 
     }
 
-
-    @HotSpotIntrinsicCandidate
-    private static long getSP() { throw new Error("Intrinsic not installed"); };
-
-    @HotSpotIntrinsicCandidate
-    private static long getPC() { throw new Error("Intrinsic not installed"); };
-
-    @HotSpotIntrinsicCandidate
-    private void doContinue() { throw new Error("Intrinsic not installed"); };
-
-    @HotSpotIntrinsicCandidate
-    private static int doYield(int scopes) { throw new Error("Intrinsic not installed"); };
-
-    @HotSpotIntrinsicCandidate
-    private static void jump(long sp, long fp, long pc) { throw new Error("Intrinsic not installed"); };
-
     /**
      * TBD
      * @return TBD
@@ -856,13 +843,6 @@ public class Continuation {
     public int getNumRefs() {
         return (refStack != null ? refStack.length - refSP : 0);
     }
-
-    /**
-     * TBD
-     * @return value
-     */
-    @HotSpotIntrinsicCandidate
-    public static int runLevel() { return 0; }
 
     private boolean compareAndSetMounted(boolean expectedValue, boolean newValue) {
        boolean res = MOUNTED.compareAndSet(this, expectedValue, newValue);

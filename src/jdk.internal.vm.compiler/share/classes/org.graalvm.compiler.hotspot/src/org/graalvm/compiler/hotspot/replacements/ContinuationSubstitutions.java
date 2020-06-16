@@ -36,17 +36,5 @@ import org.graalvm.compiler.word.Word;
 
 @ClassSubstitution(value = java.lang.Continuation.class)
 public class ContinuationSubstitutions {
-    @MethodSubstitution(isStatic = true)
-    public static long getSP() {
-        Word stackPointer = CurrentStackPointerNode.get();
-        return stackPointer.rawValue();
-    }
-
-    @MethodSubstitution(isStatic = true)
-    public static int runLevel() {
-        return 3;
-    }
-
-    public static final ForeignCallDescriptor CONTINUATION_DO_CONTINUE = new ForeignCallDescriptor("contomiaton_do_continue", void.class, Continuation.class);
     public static final ForeignCallDescriptor CONTINUATION_YIELD = new ForeignCallDescriptor("continuation_do_yield", int.class, int.class);
 }

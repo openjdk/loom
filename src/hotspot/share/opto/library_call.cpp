@@ -339,11 +339,7 @@ class LibraryCallKit : public GraphKit {
 
   bool inline_profileBoolean();
   bool inline_isCompileConstant();
-  bool inline_continuation(vmIntrinsics::ID id);
   bool inline_continuation_do_yield();
-  bool inline_continuation_jump();
-  bool inline_continuation_runLevel();
-  bool inline_continuation_do_continue();
   void clear_upper_avx() {
 #ifdef X86
     if (UseAVX >= 2) {
@@ -904,17 +900,8 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_fmaF:
     return inline_fma(intrinsic_id());
 
-  case vmIntrinsics::_Continuation_getSP:
-  case vmIntrinsics::_Continuation_getPC:
-    return inline_continuation(intrinsic_id());
-  case vmIntrinsics::_Continuation_doContinue:
-    return inline_continuation_do_continue();
   case vmIntrinsics::_Continuation_doYield:
     return inline_continuation_do_yield();
-  case vmIntrinsics::_Continuation_jump:
-    return inline_continuation_jump();
-  case vmIntrinsics::_Continuation_runLevel:
-    return inline_continuation_runLevel();
 
   case vmIntrinsics::_isDigit:
   case vmIntrinsics::_isLowerCase:
@@ -6934,42 +6921,6 @@ Node* LibraryCallKit::inline_digestBase_implCompressMB_predicate(int predicate) 
   return instof_false;  // even if it is NULL
 }
 
-bool LibraryCallKit::inline_continuation(vmIntrinsics::ID id) {
-  address call_addr = NULL;
-  const char *name = NULL;
-
-  switch (id) {
-    case vmIntrinsics::_Continuation_getSP: call_addr = StubRoutines::cont_getSP(); name = "getSP"; break;
-    case vmIntrinsics::_Continuation_getPC: call_addr = StubRoutines::cont_getPC(); name = "getPC"; break;
-    default: fatal("error"); return false;
-  }
-
-  const TypeFunc* tf = OptoRuntime::void_long_Type();
-  const TypePtr* no_memory_effects = NULL;
-  Node* call = make_runtime_call(RC_LEAF, tf, call_addr, name, no_memory_effects);
-  Node* value = _gvn.transform(new ProjNode(call, TypeFunc::Parms+0));
-#ifdef ASSERT
-  Node* value_top = _gvn.transform(new ProjNode(call, TypeFunc::Parms+1));
-  assert(value_top == top(), "second value must be top");
-#endif
-  set_result(value);
-  return true;
-}
-
-bool LibraryCallKit::inline_continuation_runLevel() {
-  set_result(intcon(2));
-  return true;
-}
-
-bool LibraryCallKit::inline_continuation_do_continue() {
-  address call_addr = StubRoutines::cont_thaw();
-  const TypeFunc* tf = OptoRuntime::void_void_Type();
-  Node* call = make_runtime_call(RC_NO_LEAF, tf, call_addr, "doContinue", TypeRawPtr::BOTTOM);
-  assert (call->is_CallJava(), "");
-  Node* result = set_results_for_java_call((CallJavaNode*)call, false, /* deoptimize */ false);
-  return true;
-}
-
 bool LibraryCallKit::inline_continuation_do_yield() {
   address call_addr = StubRoutines::cont_doYield();
   // Node* arg0 = argument(0); // type int - scopes
@@ -6978,16 +6929,6 @@ bool LibraryCallKit::inline_continuation_do_yield() {
   Node* call = make_runtime_call(RC_NO_LEAF, tf, call_addr, "doYield", TypeRawPtr::BOTTOM);
   Node* result = _gvn.transform(new ProjNode(call, TypeFunc::Parms));
   set_result(result);
-  return true;
-}
-
-bool LibraryCallKit::inline_continuation_jump() {
-  address call_addr = StubRoutines::cont_jump();
-  Node* sp = argument(0); // type long
-  Node* fp = argument(2); // type long
-  Node* pc = argument(4); // type long
-  const TypeFunc* tf = OptoRuntime::continuation_jump_Type();
-  Node* call = make_runtime_call(RC_LEAF, tf, call_addr, "jump", TypeRawPtr::BOTTOM, sp, fp, pc);
   return true;
 }
 

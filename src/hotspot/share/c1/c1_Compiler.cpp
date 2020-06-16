@@ -221,12 +221,7 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
   case vmIntrinsics::_compareAndSetReference:
   case vmIntrinsics::_getCharStringU:
   case vmIntrinsics::_putCharStringU:
-  case vmIntrinsics::_Continuation_getSP:
-  case vmIntrinsics::_Continuation_getPC:
-  case vmIntrinsics::_Continuation_doContinue:
   case vmIntrinsics::_Continuation_doYield:
-  case vmIntrinsics::_Continuation_jump:
-  case vmIntrinsics::_Continuation_runLevel:
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:
   case vmIntrinsics::_getEventWriter:

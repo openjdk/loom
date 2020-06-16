@@ -186,18 +186,8 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
 
     case vmIntrinsics::_Reference_get
                               : return java_lang_ref_reference_get;
-    case vmIntrinsics::_Continuation_getSP
-                              : return java_lang_continuation_getSP;
-    case vmIntrinsics::_Continuation_getPC
-                              : return java_lang_continuation_getPC;
-    case vmIntrinsics::_Continuation_doContinue
-                              : return java_lang_continuation_doContinue;
     case vmIntrinsics::_Continuation_doYield
                               : return java_lang_continuation_doYield;
-    case vmIntrinsics::_Continuation_jump
-                              : return java_lang_continuation_jump;
-    case vmIntrinsics::_Continuation_runLevel
-                              : return java_lang_continuation_runLevel;
     default                   : break;
   }
 
