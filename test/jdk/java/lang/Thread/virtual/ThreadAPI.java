@@ -33,7 +33,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1343,26 +1345,51 @@ public class ThreadAPI {
 
     // waiting (mounted)
     public void testGetStackTrace2() throws Exception {
-        var lock = new Object();
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
-            synchronized (lock) {
-                try { lock.wait(); } catch (InterruptedException e) { }
+        try (ForkJoinPool pool = new ForkJoinPool(1)) {
+            AtomicReference<Thread> ref = new AtomicReference<>();
+            Executor scheduler = task -> {
+                pool.submit(() -> {
+                    ref.set(Thread.currentThread());
+                    task.run();
+                });
+            };
+
+            Object lock = new Object();
+            Thread vthread = Thread.builder().virtual(scheduler).task(() -> {
+                synchronized (lock) {
+                    try {
+                        lock.wait();
+                    } catch (Exception e) { }
+                }
+            }).start();
+
+            // get carrier Thread
+            Thread carrier;
+            while ((carrier = ref.get()) == null) {
+                Thread.sleep(20);
             }
-        });
-        thread.start();
 
-        // wait for carrier thread to block
-        while (thread.getState() != Thread.State.WAITING) {
-            Thread.sleep(20);
-        }
+            // wait for virtual thread to block in wait
+            while (vthread.getState() != Thread.State.WAITING) {
+                Thread.sleep(20);
+            }
 
-        try {
-            StackTraceElement[] stack = thread.getStackTrace();
-            assertTrue(contains(stack, "Object.wait"));
-        } finally {
+            // get stack trace of both carrier and virtual thread
+            StackTraceElement[] carrierStackTrace = carrier.getStackTrace();
+            StackTraceElement[] vthreadStackTrace = vthread.getStackTrace();
+
+            // allow virtual thread to terminate
             synchronized (lock) {
                 lock.notifyAll();
             }
+
+            // check carrier thread's stack trace
+            assertTrue(contains(carrierStackTrace, "java.util.concurrent.ForkJoinPool"));
+            assertFalse(contains(carrierStackTrace, "java.lang.Object.wait"));
+
+            // check virtual thread's stack trace
+            assertFalse(contains(vthreadStackTrace, "java.util.concurrent.ForkJoinPool"));
+            assertTrue(contains(vthreadStackTrace, "java.lang.Object.wait"));
         }
     }
 

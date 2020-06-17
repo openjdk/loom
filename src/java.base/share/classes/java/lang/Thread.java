@@ -2618,17 +2618,26 @@ public class Thread implements Runnable {
             if (!isAlive()) {
                 return EMPTY_STACK_TRACE;
             }
-            StackTraceElement[][] stackTraceArray = dumpThreads(new Thread[] {this});
-            StackTraceElement[] stackTrace = stackTraceArray[0];
-            // a thread that was alive during the previous isAlive call may have
-            // since terminated, therefore not having a stacktrace.
-            if (stackTrace == null) {
-                stackTrace = EMPTY_STACK_TRACE;
-            }
-            return stackTrace;
+
+            StackTraceElement[] stackTrace = getFullStackTrace();
+
+            // the thread may be a carrier thread
+            return VirtualThread.carrierThreadStackTrace(stackTrace);
         } else {
             return (new Exception()).getStackTrace();
         }
+    }
+
+    /**
+     * Returns an array of stack trace elements representing the stack dump
+     * of this thread. If the Thread is a carrier thread with a virtual thread
+     * mounted the the stack trace includes the frames for both. Returns the
+     * empty stack trace if the thread is not alive.
+     */
+    StackTraceElement[] getFullStackTrace() {
+        StackTraceElement[][] stackTraceArray = dumpThreads(new Thread[] { this });
+        StackTraceElement[] stackTrace = stackTraceArray[0];
+        return (stackTrace != null) ? stackTrace : EMPTY_STACK_TRACE;
     }
 
     /**
