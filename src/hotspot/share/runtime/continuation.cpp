@@ -130,6 +130,11 @@ template<int x> NOINLINE static bool verify_continuation(oop cont) { return Cont
 template<int x> NOINLINE static bool verify_stack_chunk(oop chunk) { return Continuation::debug_verify_stack_chunk(chunk); }
 #endif
 
+#ifdef ASSERT
+extern "C" void pns2();
+extern "C" void pfl();
+#endif
+
 int Continuations::_flags = 0;
 int ContinuationEntry::return_pc_offset = 0;
 nmethod* ContinuationEntry::continuation_enter = NULL;
@@ -657,7 +662,7 @@ public:
   template <typename ConfigT> inline bool allocate_stacks(int size, int oops, int frames);
 
   template <typename ConfigT>
-  void make_keepalive(CompiledMethodKeepalive<ConfigT>* keepalive);
+  void make_keepalive(Thread* thread, CompiledMethodKeepalive<ConfigT>* keepalive);
 
   inline bool in_hstack(void *p) { return (_hstack != NULL && p >= _hstack && p < (_hstack + _stack_length)); }
 
@@ -1972,7 +1977,7 @@ private:
   int _nr_oops;
   bool _required;
 
-  void store_keepalive(JavaThread* thread, oop* keepalive) { _keepalive = KeepaliveObjectT::make_keepalive(thread, keepalive); }
+  void store_keepalive(Thread* thread, oop* keepalive) { _keepalive = KeepaliveObjectT::make_keepalive(thread, keepalive); }
   oop read_keepalive() { return KeepaliveObjectT::read_keepalive(_keepalive); }
 
 public:
@@ -2199,6 +2204,11 @@ public:
   int nr_bytes() const  { return _size; }
   int nr_frames() const { return _frames; }
 
+  Thread* cur_thread() {
+    assert (_preempt || _thread == Thread::current(), ""); // could be VM thread in force preempt
+    return mode == mode_fast ? _thread : Thread::current();
+  }
+
   void verify() {
     if (_cont.refStack() == NULL) {
       return;
@@ -2230,6 +2240,9 @@ public:
 
   freeze_result freeze_preempt() {
     _preempt = true;
+    // if (!is_safe_to_preempt(_thread)) {
+    //   return freeze_pinned_native;
+    // }
     return freeze_no_chunk();
   }
 
@@ -2237,12 +2250,12 @@ public:
     log_develop_trace(jvmcont)("no young freeze mode: %d #" INTPTR_FORMAT, mode, _cont.hash());
 
     assert (mode == mode_slow || !_preempt, "");
-    assert (_thread->thread_state() == _thread_in_vm, "");
+    assert (_thread->thread_state() == _thread_in_vm || _thread->thread_state() == _thread_blocked, "");
 
     init_rest();
     _cont.read_rest();
 
-    HandleMark hm(_thread);
+    HandleMark hm(cur_thread());
 
     // tty->print_cr(">>> freeze mode: %d", mode);
 
@@ -2668,18 +2681,22 @@ public:
 
     f.set_fp(f.real_fp()); // Instead of this, maybe in ContMirror::set_last_frame always use the real_fp? // TODO PD
     if (Interpreter::contains(f.pc())) {
-      log_develop_trace(jvmcont)("INTERPRETER SAFEPOINT");
       ContinuationHelper::update_register_map<Interpreted>(&_map, f);
       // f.set_sp(f.sp() - 1); // state pushed to the stack
     } else {
-      log_develop_trace(jvmcont)("COMPILER SAFEPOINT");
   #ifdef ASSERT
       if (!is_stub(f.cb())) { f.print_value_on(tty, JavaThread::current()); }
   #endif
       assert (is_stub(f.cb()), "must be");
       assert (f.oop_map() != NULL, "must be");
-      ContinuationHelper::update_register_map<StubF>(&_map, f);
-      f.oop_map()->update_register_map(&f, (RegisterMap*)&_map); // we have callee-save registers in this case
+
+      if (Interpreter::contains(StubF::return_pc(f))) {
+        log_develop_trace(jvmcont)("Safepoint stub in interpreter");
+        f = sender<StubF>(f);
+      } else {
+        ContinuationHelper::update_register_map<StubF>(&_map, f);
+        f.oop_map()->update_register_map(&f, (RegisterMap*)&_map); // we have callee-save registers in this case
+      }
     }
 
     // Log(jvmcont) logv; LogStream st(logv.debug()); f.print_on(st);
@@ -2786,7 +2803,7 @@ public:
 
     CompiledMethodKeepaliveT* current = _keepalive;
     while (current != NULL) {
-      _cont.make_keepalive<ConfigT>(current);
+      _cont.make_keepalive<ConfigT>(cur_thread(), current);
       current = current->parent();
     }
   }
@@ -3300,7 +3317,7 @@ static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont) {
     set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible
 
     // The call to JVMTI can safepoint, so we need to restore oops.
-    Handle conth(thread, cont.mirror());
+    Handle conth(Thread::current(), cont.mirror());
     JvmtiExport::post_continuation_yield(JavaThread::current(), num_java_frames(cont));
     cont.post_safepoint(conth);
   }
@@ -3390,7 +3407,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   #endif
     return freeze_epilog(thread, cont);
   } else if (mode != mode_fast && UNLIKELY(preempt)) {
-    assert (thread->thread_state() == _thread_in_vm, "");
+    assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "");
     freeze_result res = fr.freeze_preempt();
     return freeze_epilog(thread, cont, res);
   } else {
@@ -3500,10 +3517,58 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
 
 typedef int (*DoYieldStub)(int scopes);
 
+static bool is_safe_to_preempt(JavaThread* thread) {
+  if (!thread->has_last_Java_frame()) {
+    log_develop_trace(jvmcont)("is_safe_to_preempt: no last Java frame");
+    return false;
+  }
+
+  // assert (thread->thread_state() == _thread_blocked || thread == Thread::current(), "state: %s thread == Thread::current(): %d", thread->thread_state_name(), thread == Thread::current());
+  // if (Thread::current()->is_VM_thread() && thread->thread_state() == _thread_blocked) {
+  //   log_develop_trace(jvmcont)("is_safe_to_preempt: thread blocked");
+  //   return false; // if we do this, we can assume in the freeze code that the given thread is also the current thread
+  // }
+
+  frame f = thread->last_frame();
+  if (log_develop_is_enabled(Trace, jvmcont)) {
+    log_develop_trace(jvmcont)("is_safe_to_preempt %sSAFEPOINT", Interpreter::contains(f.pc()) ? "INTERPRETER " : "");
+    f.cb()->print_on(tty); 
+    f.print_on(tty);
+  }
+
+  if (Interpreter::contains(f.pc())) {
+    InterpreterCodelet* desc = Interpreter::codelet_containing(f.pc());
+    if (desc != NULL) {
+      if (log_develop_is_enabled(Trace, jvmcont)) desc->print_on(tty);
+      // We allow preemption only when no bytecode (safepoint codelet) or a return byteocde
+      if (desc->bytecode() >= 0 && !Bytecodes::is_return(desc->bytecode())) {
+        log_develop_trace(jvmcont)("is_safe_to_preempt: unsafe bytecode: %s", Bytecodes::name(desc->bytecode()));
+        return false;
+      } else {
+        log_develop_trace(jvmcont)("is_safe_to_preempt: %s (safe)", desc->description());
+        // assert (Bytecodes::is_return(desc->bytecode()) || desc->description() != NULL && strncmp("safepoint", desc->description(), 9) == 0, "desc: %s", desc->description());
+      }
+    } else {
+      log_develop_trace(jvmcont)("is_safe_to_preempt: no codelet (safe?)");
+    }
+  } else {
+    // if (f.is_compiled_frame()) {
+    //   RelocIterator iter(f.cb()->as_compiled_method(), f.pc(), f.pc()+1);
+    //   while (iter.next()) {
+    //     iter.print_current();
+    //   }
+    // }
+    if (!f.cb()->is_safepoint_stub()) {
+      log_develop_trace(jvmcont)("is_safe_to_preempt: not safepoint stub");
+      return false;
+    }
+  }
+  return true;
+}
+
 // called in a safepoint
 int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
-  assert (thread->thread_state() == _thread_in_vm, "");
-  // assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "thread->thread_state(): %d", thread->thread_state());
+  assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "state: %s java: %d vm: %d", thread->thread_state_name(), thread->is_Java_thread(), thread->is_VM_thread());
 
   ContinuationEntry* ce = thread->cont_entry();
   oop innermost = ce->continuation();
@@ -3516,6 +3581,10 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
   if (thread->_cont_yield) {
     return -2; // during yield
   }
+  if (!is_safe_to_preempt(thread)) {
+    return freeze_pinned_native;
+  }
+
   const oop scope = java_lang_Continuation::scope(cont);
   if (innermost != cont) { // we have nested continuations
     // make sure none of the continuations in the hierarchy are pinned
@@ -5239,8 +5308,8 @@ oop Continuation::continuation_scope(oop cont) {
 ///// Allocation
 
 template <typename ConfigT>
-void ContMirror::make_keepalive(CompiledMethodKeepalive<ConfigT>* keepalive) {
-  Handle conth(_thread, _cont);
+void ContMirror::make_keepalive(Thread* thread, CompiledMethodKeepalive<ConfigT>* keepalive) {
+  Handle conth(thread, _cont);
   int oops = keepalive->nr_oops();
   if (oops == 0) {
     oops = 1;
@@ -5249,7 +5318,7 @@ void ContMirror::make_keepalive(CompiledMethodKeepalive<ConfigT>* keepalive) {
 
   uint64_t counter = SafepointSynchronize::safepoint_counter();
   // check gc cycle
-  Handle keepaliveHandle = Handle(_thread, keepalive_obj);
+  Handle keepaliveHandle = Handle(thread, keepalive_obj);
   keepalive->set_handle(keepaliveHandle);
   // check gc cycle and maybe reload
   //if (!SafepointSynchronize::is_same_safepoint(counter)) {
@@ -5560,7 +5629,7 @@ oop ContMirror::raw_allocate(Klass* klass, size_t size_in_words, size_t elements
     return allocator.initialize(start);
   } else {
     //HandleMark hm(_thread);
-    Handle conth(_thread, _cont);
+    Handle conth(Thread::current(), _cont);
     uint64_t counter = SafepointSynchronize::safepoint_counter();
     oop result = allocator.allocate();
     //if (!SafepointSynchronize::is_same_safepoint(counter)) {
@@ -5578,6 +5647,7 @@ oop ContMirror::allocate_stack_chunk(int stack_size) {
   if (start != NULL) {
     return allocator.initialize(start);
   } else {
+    assert (_thread == Thread::current(), "");
     //HandleMark hm(_thread);
     Handle conth(_thread, _cont);
     // uint64_t counter = SafepointSynchronize::safepoint_counter();
@@ -5726,7 +5796,7 @@ class HandleKeepalive {
 public:
   typedef Handle TypeT;
 
-  static Handle make_keepalive(JavaThread* thread, oop* keepalive) {
+  static Handle make_keepalive(Thread* thread, oop* keepalive) {
     return Handle(thread, WeakHandle<vm_nmethod_keepalive_data>::from_raw(keepalive).resolve());
   }
 
@@ -5739,7 +5809,7 @@ class NoKeepalive {
 public:
   typedef oop* TypeT;
 
-  static oop* make_keepalive(JavaThread* thread, oop* keepalive) {
+  static oop* make_keepalive(Thread* thread, oop* keepalive) {
     return keepalive;
   }
 

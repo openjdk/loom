@@ -77,7 +77,7 @@ public class Preempt {
                     do {
                         res = cont.tryPreempt(t0);
                         i++;
-                    } while (i < 10 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
+                    } while (i < 20 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
                     assertEquals(res, Continuation.PreemptStatus.SUCCESS, "res: " + res + " i: " + i);
                 }
                 preemptLatch.await();
@@ -87,7 +87,7 @@ public class Preempt {
                     do {
                         res = cont.tryPreempt(t0);
                         i++;
-                    } while (i < 10 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
+                    } while (i < 20 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
                     assertEquals(res, Continuation.PreemptStatus.SUCCESS, "res: " + res + " i: " + i);
                 }
             } catch (InterruptedException e) {

@@ -1295,10 +1295,16 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
   if (is_interpreted_frame()) {
     Method* m = interpreter_frame_method();
     int bci = interpreter_frame_bci();
+    InterpreterCodelet* desc = Interpreter::codelet_containing(pc());
 
     // Label the method and current bci
     values.describe(-1, info_address,
                     FormatBuffer<1024>("#%d method %s @ %d", frame_no, m->name_and_sig_as_C_string(), bci), 3);
+    if (desc != NULL) {
+      values.describe(-1, info_address, err_msg("- %s codelet: %s", 
+        desc->bytecode()    >= 0    ? Bytecodes::name(desc->bytecode()) : "",
+        desc->description() != NULL ? desc->description()               : "?"), 2);
+    }
     values.describe(-1, info_address,
                     err_msg("- %d locals %d max stack", m->max_locals(), m->max_stack()), 2);
     values.describe(frame_no, (intptr_t*)sender_pc_addr(), Continuation::is_return_barrier_entry(*sender_pc_addr()) ? "return address (return barrier)" : "return address");
