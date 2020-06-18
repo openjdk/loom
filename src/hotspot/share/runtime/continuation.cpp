@@ -3224,7 +3224,7 @@ public:
 
     assert (Frame::callee_link_address(senderf) == my_info, "");
     assert (senderf.unextended_sp() < _bottom_address - SP_WIGGLE, "");
-    assert (senderf.is_compiled_frame(), ""); // TODO has been seen to fail in Preempt.java with -XX:+DeoptimizeALot
+    assert (senderf.is_compiled_frame(), "");
     assert (senderf.oop_map() != NULL, "");
 
     // we can have stub_caller as a value template argument, but that's unnecessary
@@ -3518,16 +3518,15 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
 typedef int (*DoYieldStub)(int scopes);
 
 static bool is_safe_to_preempt(JavaThread* thread) {
+  // if (Thread::current()->is_VM_thread() && thread->thread_state() == _thread_blocked) {
+  //   log_develop_trace(jvmcont)("is_safe_to_preempt: thread blocked");
+  //   return false;
+  // }
+
   if (!thread->has_last_Java_frame()) {
     log_develop_trace(jvmcont)("is_safe_to_preempt: no last Java frame");
     return false;
   }
-
-  // assert (thread->thread_state() == _thread_blocked || thread == Thread::current(), "state: %s thread == Thread::current(): %d", thread->thread_state_name(), thread == Thread::current());
-  // if (Thread::current()->is_VM_thread() && thread->thread_state() == _thread_blocked) {
-  //   log_develop_trace(jvmcont)("is_safe_to_preempt: thread blocked");
-  //   return false; // if we do this, we can assume in the freeze code that the given thread is also the current thread
-  // }
 
   frame f = thread->last_frame();
   if (log_develop_is_enabled(Trace, jvmcont)) {
@@ -3568,7 +3567,7 @@ static bool is_safe_to_preempt(JavaThread* thread) {
 
 // called in a safepoint
 int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
-  assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "state: %s java: %d vm: %d", thread->thread_state_name(), thread->is_Java_thread(), thread->is_VM_thread());
+  log_develop_trace(jvmcont)("try_force_yield: thread state: %s VM thread: %d", thread->thread_state_name(), Thread::current()->is_VM_thread());
 
   ContinuationEntry* ce = thread->cont_entry();
   oop innermost = ce->continuation();
