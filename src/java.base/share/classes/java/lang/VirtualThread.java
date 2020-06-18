@@ -468,13 +468,13 @@ class VirtualThread extends Thread {
 
         setState(PARKING);
 
-        Continuation.yield(VTHREAD_SCOPE);
+        boolean yielded = Continuation.yield(VTHREAD_SCOPE);
 
         // continued
         assert Thread.currentThread() == this && state == RUNNING;
 
         // notify JVMTI mount event here so that stack is available to agents
-        if (notifyJvmtiEvents) {
+        if (yielded && notifyJvmtiEvents) {
             notifyMount(Thread.currentCarrierThread(), this);
         }
     }
@@ -520,7 +520,10 @@ class VirtualThread extends Thread {
      */
     void tryYield() {
         assert Thread.currentThread() == this && state == RUNNING;
-        Continuation.yield(VTHREAD_SCOPE);
+        boolean yielded = Continuation.yield(VTHREAD_SCOPE);
+        if (yielded && notifyJvmtiEvents) {
+            notifyMount(Thread.currentCarrierThread(), this);
+        }
         assert Thread.currentThread() == this && state == RUNNING;
     }
 
