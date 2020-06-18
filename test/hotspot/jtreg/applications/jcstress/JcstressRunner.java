@@ -42,7 +42,7 @@ import java.util.List;
  * jcstress tests wrapper
  */
 @Artifact(organization = "org.openjdk.jcstress", name = "jcstress-tests-all",
-        revision = "0.5", extension = "jar", unpack = false)
+        revision = "0.6-loom", extension = "jar", unpack = false)
 public class JcstressRunner {
 
     public static final String MAIN_CLASS = "org.openjdk.jcstress.Main";
@@ -55,7 +55,7 @@ public class JcstressRunner {
             throw new Error("TESTBUG: Can not resolve artifacts for "
                             + JcstressRunner.class.getName(), e);
         }
-        return artifacts.get("org.openjdk.jcstress.jcstress-tests-all-0.5")
+        return artifacts.get("org.openjdk.jcstress.jcstress-tests-all-0.6-loom")
                         .toAbsolutePath();
     }
 
