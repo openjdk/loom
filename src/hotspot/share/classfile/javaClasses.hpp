@@ -421,6 +421,9 @@ class java_lang_Thread : AllStatic {
   static inline oop continuation(oop java_thread);
   // VirtualThread
   static oop  vthread(oop java_thread);
+  static ByteSize vthread_offset() {
+    return in_ByteSize(_vthread_offset);
+  }
 
   // Blocker object responsible for thread parking
   static oop park_blocker(oop java_thread);

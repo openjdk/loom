@@ -256,6 +256,7 @@ public class Thread implements Runnable {
      *
      * @return  the current thread
      */
+    @HotSpotIntrinsicCandidate
     public static Thread currentThread() {
         Thread t = currentThread0();
         VirtualThread vthread = t.vthread;

@@ -259,7 +259,8 @@ class LibraryCallKit : public GraphKit {
   bool inline_unsafe_writeback0();
   bool inline_unsafe_writebackSync0(bool is_pre);
   bool inline_unsafe_copyMemory();
-  bool inline_native_currentThread();
+  bool inline_native_currentThread0();
+  bool inline_currentThread();
   bool inline_native_scopedCache();
   bool inline_native_setScopedCache();
 
@@ -756,7 +757,8 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 
   case vmIntrinsics::_onSpinWait:               return inline_onspinwait();
 
-  case vmIntrinsics::_currentThread:            return inline_native_currentThread();
+  case vmIntrinsics::_currentThread0:           return inline_native_currentThread0();
+  case vmIntrinsics::_currentThread:            return inline_currentThread();
 
   case vmIntrinsics::_scopedCache:              return inline_native_scopedCache();
   case vmIntrinsics::_setScopedCache:           return inline_native_setScopedCache();
@@ -3237,10 +3239,55 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 
 #endif // JFR_HAVE_INTRINSICS
 
-//------------------------inline_native_currentThread------------------
-bool LibraryCallKit::inline_native_currentThread() {
+//------------------------inline_native_currentThread0------------------
+bool LibraryCallKit::inline_native_currentThread0() {
   Node* junk = NULL;
   set_result(generate_current_thread(junk));
+  return true;
+}
+
+//------------------------inline_currentThread------------------
+bool LibraryCallKit::inline_currentThread() {
+  ciKlass* thread_klass = env()->Thread_klass();
+  const Type* thread0_type = TypeOopPtr::make_from_klass(thread_klass)->cast_to_ptr_type(TypePtr::NotNull);
+  const Type* thread_type = TypeOopPtr::make_from_klass(thread_klass);
+
+  Node* base_thread = _gvn.transform(new ThreadLocalNode());
+  Node* p0 = basic_plus_adr(top()/*!oop*/, base_thread, in_bytes(JavaThread::threadObj_offset()));
+  Node* thread0 = _gvn.transform
+    (LoadNode::make(_gvn, NULL, immutable_memory(), p0, p0->bottom_type()->is_ptr(),
+                    thread0_type, T_OBJECT, MemNode::unordered));
+
+  Node* p = basic_plus_adr(thread0, in_bytes(java_lang_Thread::vthread_offset()));
+  Node* vthread = _gvn.transform
+    (LoadNode::make(_gvn, NULL, immutable_memory(), p, p->bottom_type()->is_ptr(),
+                    thread_type, T_OBJECT, MemNode::unordered));
+
+  Node* cmp = _gvn.transform(new CmpPNode(vthread, null()));
+  Node* bol = _gvn.transform(new BoolNode(cmp, BoolTest::ne));
+
+  IfNode *if_ne_null = create_and_map_if(control(), bol, PROB_FAIR, COUNT_UNKNOWN);
+  Node* vthread_is_not_null = _gvn.transform(new IfTrueNode(if_ne_null));
+  Node* vthread_is_null = _gvn.transform(new IfFalseNode(if_ne_null));
+
+  RegionNode *r = new RegionNode(3);
+  PhiNode *phi = new PhiNode(r, thread0_type);
+  _gvn.set_type(phi, thread0_type);
+
+  set_control(vthread_is_null);
+
+  phi->init_req(1, thread0);
+  r->init_req(1, vthread_is_null);
+
+  set_control(vthread_is_not_null);
+
+  Node* vthread_cast = new CastPPNode(vthread, thread0_type);
+  _gvn.set_type(vthread_cast, thread0_type);
+
+  phi->init_req(2, vthread_cast);
+  r->init_req(2, vthread_is_not_null);
+
+  set_result(r, phi);
   return true;
 }
 
