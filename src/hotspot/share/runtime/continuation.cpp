@@ -2481,6 +2481,7 @@ public:
     }
     guarantee (pc != NULL, "");
 
+    // This removes the return barrier and breaks the integrity of the stack; we must set the anchor to the entry before a walk (see freeze0)
     *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc; // TODO R necessary ?
     // *(intptr_t**)(bottom_sp - frame::sender_sp_offset) = fp; -- necessary ?
   }
@@ -3421,6 +3422,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
       log_develop_trace(jvmcont)("-- RETRYING SLOW --");
       res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(sp, false);
     }
+    set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
     return freeze_epilog(thread, cont, res);
   }
 }
