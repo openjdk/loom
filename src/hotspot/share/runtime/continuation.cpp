@@ -2415,7 +2415,7 @@ public:
       // we're patching the thread stack, not the chunk, as it's hopefully still hot in the cache
       log_develop_trace(jvmcont)("patching bottom sp: " INTPTR_FORMAT, p2i(bottom_sp));
       assert (bottom_sp == _bottom_address, "");
-      patch_chunk(bottom_sp, chunk, allocated);
+      // patch_chunk(bottom_sp, chunk, allocated);
 
       size += frame::sender_sp_offset; // b/c when argsize > 0, we don't reach the caller's metadata
     }
@@ -2459,6 +2459,7 @@ public:
     return true;
   }
 
+  // UNUSED
   void patch_chunk(intptr_t* bottom_sp, oop chunk, bool allocated) {
     log_develop_trace(jvmcont)("freeze_chunk patch");
     address pc;
@@ -3718,7 +3719,7 @@ private:
   void deoptimize_frames_in_chunk(oop chunk);
   void deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb);
   void patch_chunk_pd(intptr_t* sp);
-  inline intptr_t* align_chunk(intptr_t* vsp, int argsize);
+  inline intptr_t* align_chunk(intptr_t* vsp);
   inline void prefetch_chunk_pd(void* start, int size_words);
   intptr_t* push_interpreter_return_frame(intptr_t* sp);
 
@@ -3867,9 +3868,7 @@ public:
       java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
       vsp = thaw<false>(false);
     } else {
-      intptr_t* bot = _cont.entrySP();
-      assert (!Interpreter::contains(_cont.entryPC()), "");
-      vsp = bot;
+      vsp = _cont.entrySP();
     }
 
     bool partial, empty;
@@ -3906,34 +3905,29 @@ public:
 
     const bool is_last_in_chunks = empty && jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk);
     const bool is_last = is_last_in_chunks && _cont.is_empty0();
-    const bool bottom = !FULL_STACK || is_last;
 
     _cont.sub_size((size - (UNLIKELY(argsize != 0) ? frame::sender_sp_offset : 0)) << LogBytesPerWord);
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
-
     if (is_last_in_chunks && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
     }
 
-    log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d bottom: %d is_last: %d empty: %d size: %d argsize: %d", partial, FULL_STACK, top, bottom, is_last, empty, size, argsize);
+    log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d is_last: %d empty: %d size: %d argsize: %d", partial, FULL_STACK, top, is_last, empty, size, argsize);
 
     // if we're not in a full thaw, we're both top and bottom
-    if (bottom) {
+    if (!FULL_STACK) {
       vsp -= argsize; // if not bottom, we're going to overwrite the args portion of the sender
-      vsp = align_chunk(vsp, argsize);
+      assert (argsize != 0 || vsp == align_chunk(vsp), "");
+      vsp = align_chunk(vsp);
     }
 
     intptr_t* bottom_sp = vsp;
-
-    #ifdef _LP64
-      assert((intptr_t)vsp % 16 == 0, "");
-      assert(size % 2 == 0, "");
-    #endif
 
     vsp -= size;
     if (UNLIKELY(argsize != 0)) {
       vsp += frame::sender_sp_offset;
     }
+    assert (vsp == align_chunk(vsp), "");
 
     size += argsize;
     intptr_t* from = hsp - frame::sender_sp_offset;
@@ -3956,8 +3950,13 @@ public:
       }
     }
 
-    if (bottom) {
-      patch_chunk(chunk, bottom_sp, is_last, argsize);
+    if (!FULL_STACK || is_last) {
+      assert (!is_last || argsize == 0, "");
+      _cont.set_argsize(argsize);
+      patch_chunk(chunk, bottom_sp, is_last);
+
+      address pc = *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET);
+      assert (is_last ? CodeCache::find_blob(pc)->as_compiled_method()->method()->is_continuation_enter_intrinsic() : pc == StubRoutines::cont_returnBarrier(), "is_last: %d", is_last);
     }
 
     if (!FULL_STACK || top) {
@@ -3967,7 +3966,6 @@ public:
     }
 
     assert (is_last == _cont.is_empty(), "is_last: %d _cont.is_empty(): %d", is_last, _cont.is_empty());
-    assert (!bottom || _cont.argsize() == 0 || !is_last, "");
     assert(_cont.chunk_invariant(), "");
 
   #if CONT_JFR
@@ -4060,20 +4058,14 @@ public:
     copy_to_stack(from, to, size);
   }
 
-  void patch_chunk(oop chunk, intptr_t* sp, bool is_last, int argsize) {
+  void patch_chunk(oop chunk, intptr_t* sp, bool is_last) {
     log_develop_trace(jvmcont)("thaw_chunk patching -- sp: " INTPTR_FORMAT, p2i(sp));
-    address pc;
-    if (!is_last) {
-      pc = StubRoutines::cont_returnBarrier();
-      _cont.set_argsize(argsize);
-    } else {
-      pc = (mode != mode_fast && should_deoptimize()) ? new_entry_frame().raw_pc() : _cont.entryPC();
-      _cont.set_argsize(0);
-    }
+
+    address pc = !is_last ? StubRoutines::cont_returnBarrier() : _cont.entryPC();
     *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
     log_develop_trace(jvmcont)("thaw_chunk is_last: %d sp: " INTPTR_FORMAT " patching pc at " INTPTR_FORMAT " to " INTPTR_FORMAT, is_last, p2i(sp), p2i(sp - SENDER_SP_RET_ADDRESS_OFFSET), p2i(pc));
 
-    patch_chunk_pd(sp);
+    // patch_chunk_pd(sp);
   }
 
   template<bool top>

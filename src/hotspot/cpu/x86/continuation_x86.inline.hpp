@@ -1337,9 +1337,8 @@ inline void Thaw<ConfigT, mode>::prefetch_chunk_pd(void* start, int size) {
 }
 
 template <typename ConfigT, op_mode mode>
-inline intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp, int argsize) {
+inline intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp) {
 #ifdef _LP64
-  assert ((intptr_t)vsp % 16 == 0 || argsize != 0 || Interpreter::contains(_cont.entryPC()), "");
   vsp = align_down(vsp, 16);
   assert((intptr_t)vsp % 16 == 0, "");
 #endif
