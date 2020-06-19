@@ -209,6 +209,7 @@ static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) P
 
 #ifdef ASSERT
   static void print_frames(JavaThread* thread, outputStream* st = tty);
+  // template<int x> static void walk_frames(JavaThread* thread);
   static bool assert_frame_laid_out(frame f);
   static bool assert_entry_frame_laid_out(ContinuationEntry* cont);
   //static void print_blob(outputStream* st, address addr);
@@ -3332,11 +3333,8 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
 
   assert (!cont.is_empty(), "");
 
-  // set_anchor(thread, fi);
   thread->set_cont_yield(false);
-  // thread->reset_held_monitor_count();
 
-  // log_develop_debug(jvmcont)("ENTRY: sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(fi->sp), p2i(fi->fp), p2i(fi->pc));
   log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
 
   return 0;
@@ -3967,7 +3965,7 @@ public:
     }
 
     assert (is_last == _cont.is_empty(), "is_last: %d _cont.is_empty(): %d", is_last, _cont.is_empty());
-
+    assert (!bottom || _cont.argsize() == 0 || !is_last, "");
     assert(_cont.chunk_invariant(), "");
 
   #if CONT_JFR
@@ -4067,8 +4065,8 @@ public:
       pc = StubRoutines::cont_returnBarrier();
       _cont.set_argsize(argsize);
     } else {
-      _cont.set_argsize(0);
       pc = (mode != mode_fast && should_deoptimize()) ? new_entry_frame().raw_pc() : _cont.entryPC();
+      _cont.set_argsize(0);
     }
     *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
     log_develop_trace(jvmcont)("thaw_chunk is_last: %d sp: " INTPTR_FORMAT " patching pc at " INTPTR_FORMAT " to " INTPTR_FORMAT, is_last, p2i(sp), p2i(sp - SENDER_SP_RET_ADDRESS_OFFSET), p2i(pc));
@@ -4633,6 +4631,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   cont.post_jfr_event(&event, thread);
 #endif
 
+  assert (thread->cont_entry()->argsize() == 0 || Continuation::is_return_barrier_entry(*(address*)(thread->cont_entry()->bottom_sender_sp() - SENDER_SP_RET_ADDRESS_OFFSET)), "");
   assert (verify_continuation<3>(cont.mirror()), "");
   log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
 
@@ -6237,6 +6236,12 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
 static jlong java_tid(JavaThread* thread) {
   return java_lang_Thread::thread_id(thread->threadObj());
 }
+
+// template<int x>
+// NOINLINE static void walk_frames(JavaThread* thread) {
+//   RegisterMap map(thread, false, false, false);
+//   for (frame f = thread->last_frame(); !f.is_first_frame(); f = f.sender(&map));
+// }
 
 static void print_frames(JavaThread* thread, outputStream* st) {
   if (st != NULL && !log_develop_is_enabled(Trace, jvmcont)) return;

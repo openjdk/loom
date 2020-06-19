@@ -202,6 +202,14 @@ public:
   int argsize() { return _argsize; }
   void set_argsize(int value) { _argsize = value; }
 
+  intptr_t* bottom_sender_sp() {
+    intptr_t* sp = entry_sp() - argsize();
+#ifdef _LP64
+    sp = align_down(sp, 16);
+#endif
+    return sp;
+  }
+
   oop continuation() {
     oop snapshot = _cont;
     return NativeAccess<>::oop_load(&snapshot);
