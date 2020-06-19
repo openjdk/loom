@@ -3937,18 +3937,6 @@ public:
     // if (barriers) {
     //   memset(from, 0, size << LogBytesPerWord);
     // }
-    OrderAccess::loadload(); // we must test the gc mode *after* the copy
-    if (UNLIKELY(should_fix(chunk))) {
-      intptr_t* end = vsp + size - argsize;
-      if (argsize > 0) {
-        end -= frame_metadata;
-      }
-      fix_stack_chunk(chunk, vsp, end);
-      if (empty) {
-        // we've set 
-        jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
-      }
-    }
 
     if (!FULL_STACK || is_last) {
       assert (!is_last || argsize == 0, "");
@@ -3965,6 +3953,19 @@ public:
       assert (java_lang_Continuation::flags(_cont.mirror()) == _cont.flags(), "");
     }
 
+    OrderAccess::loadload(); // we must test the gc mode *after* the copy
+    if (UNLIKELY(should_fix(chunk))) {
+      intptr_t* end = vsp + size - argsize;
+      if (argsize > 0) {
+        end -= frame_metadata;
+      }
+      fix_stack_chunk(chunk, vsp, end);
+      if (empty) {
+        // we've set 
+        jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
+      }
+    }
+    
     assert (is_last == _cont.is_empty(), "is_last: %d _cont.is_empty(): %d", is_last, _cont.is_empty());
     assert(_cont.chunk_invariant(), "");
 
