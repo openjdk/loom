@@ -2096,9 +2096,11 @@ static ByteSize scopedCache_offset()             { return byte_offset_of(JavaThr
 
   // Used by the interpreter in fullspeed mode for frame pop, method
   // entry, method exit and single stepping support. This field is
-  // only set to non-zero by the VM_EnterInterpOnlyMode VM operation.
-  // It can be set to zero asynchronously (i.e., without a VM operation
-  // or a lock) so we have to be very careful.
+  // only set to non-zero at a safepoint or using a direct handshake
+  // (see EnterInterpOnlyModeClosure).
+  // It can be set to zero asynchronously to this threads execution (i.e., without
+  // safepoint/handshake or a lock) so we have to be very careful.
+  // Accesses by other threads are synchronized using JvmtiThreadState_lock though.
   int               _interp_only_mode;
 
  public:

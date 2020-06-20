@@ -92,7 +92,6 @@
   template(GetOrSetLocal)                         \
   template(VirtualThreadGetOrSetLocal)            \
   template(GetCurrentLocation)                    \
-  template(EnterInterpOnlyMode)                   \
   template(ChangeSingleStep)                      \
   template(HeapWalkOperation)                     \
   template(HeapIterateOperation)                  \

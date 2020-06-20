@@ -871,7 +871,8 @@ HeapWord* G1CollectedHeap::attempt_allocation_humongous(size_t word_size) {
       result = humongous_obj_allocate(word_size);
       if (result != NULL) {
         size_t size_in_regions = humongous_obj_size_in_regions(word_size);
-        policy()->add_bytes_allocated_in_old_since_last_gc(size_in_regions * HeapRegion::GrainBytes);
+        policy()->old_gen_alloc_tracker()->
+          add_allocated_bytes_since_last_gc(size_in_regions * HeapRegion::GrainBytes);
         return result;
       }
 
@@ -2559,7 +2560,10 @@ void G1CollectedHeap::print_extended_on(outputStream* st) const {
   print_on(st);
 
   // Print the per-region information.
-  print_regions_on(st);
+  if (_hrm != NULL) {
+    st->cr();
+    print_regions_on(st);
+  }
 }
 
 void G1CollectedHeap::print_on_error(outputStream* st) const {
@@ -2568,18 +2572,6 @@ void G1CollectedHeap::print_on_error(outputStream* st) const {
   if (_cm != NULL) {
     st->cr();
     _cm->print_on_error(st);
-  }
-}
-
-void G1CollectedHeap::print_gc_threads_on(outputStream* st) const {
-  workers()->print_worker_threads_on(st);
-  _cm_thread->print_on(st);
-  st->cr();
-  _cm->print_worker_threads_on(st);
-  _cr->print_threads_on(st);
-  _young_gen_sampling_thread->print_on(st);
-  if (G1StringDedup::is_enabled()) {
-    G1StringDedup::print_worker_threads_on(st);
   }
 }
 
@@ -4097,7 +4089,8 @@ void G1CollectedHeap::post_evacuate_collection_set(G1EvacuationInfo& evacuation_
 }
 
 void G1CollectedHeap::record_obj_copy_mem_stats() {
-  policy()->add_bytes_allocated_in_old_since_last_gc(_old_evac_stats.allocated() * HeapWordSize);
+  policy()->old_gen_alloc_tracker()->
+    add_allocated_bytes_since_last_gc(_old_evac_stats.allocated() * HeapWordSize);
 
   _gc_tracer_stw->report_evacuation_statistics(create_g1_evac_summary(&_survivor_evac_stats),
                                                create_g1_evac_summary(&_old_evac_stats));
@@ -4198,7 +4191,7 @@ class G1FreeCollectionSetTask : public AbstractGangTask {
       g1h->alloc_buffer_stats(G1HeapRegionAttr::Old)->add_failure_used_and_waste(_failure_used_words, _failure_waste_words);
 
       G1Policy *policy = g1h->policy();
-      policy->add_bytes_allocated_in_old_since_last_gc(_bytes_allocated_in_old_since_last_gc);
+      policy->old_gen_alloc_tracker()->add_allocated_bytes_since_last_gc(_bytes_allocated_in_old_since_last_gc);
       policy->record_rs_length(_rs_length);
       policy->cset_regions_freed();
     }

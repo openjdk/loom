@@ -670,11 +670,15 @@ JvmtiEnvBase::count_locked_objects(JavaThread *java_thread, Handle hobj) {
 }
 
 jvmtiError
-JvmtiEnvBase::get_current_contended_monitor(JavaThread *java_thread, jobject *monitor_ptr) {
+JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThread *java_thread, jobject *monitor_ptr) {
   JavaThread *current_jt = JavaThread::current();
-  assert(current_jt == java_thread ||
-         current_jt == java_thread->active_handshaker(),
-         "call by myself or at direct handshake");
+/* The HandshakeState::process_self_inner() does not set the_active_handshaker
+ * as needed, so the assert below is temporarily disabled.
+ * Enable it after the issue in HandshakeState::process_self_inner() is fixed.
+ */
+  // assert(current_jt == java_thread ||
+  //        current_jt == java_thread->active_handshaker(),
+  //        "call by myself or at direct handshake");
   oop obj = NULL;
   // The ObjectMonitor* can't be async deflated since we are either
   // at a safepoint or the calling thread is operating on itself so
@@ -700,52 +704,13 @@ JvmtiEnvBase::get_current_contended_monitor(JavaThread *java_thread, jobject *mo
   } else {
     HandleMark hm;
     Handle     hobj(current_jt, obj);
-    *monitor_ptr = jni_reference(current_jt, hobj);
-  }
-  return JVMTI_ERROR_NONE;
-}
-
-jvmtiError
-JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThread *java_thread, jobject *monitor_ptr) {
-#ifdef ASSERT
-  uint32_t debug_bits = 0;
-#endif
-/* The HandshakeState::process_self_inner() does not set the_active_handshaker
- * as needed, so the assert below is temporarily disabled.
- * Enable it after the issue in HandshakeState::process_self_inner() is fixed.
- */ 
- // assert(calling_thread == java_thread ||
- //        calling_thread == calling_thread->active_handshaker(),
- //       "call by myself or at direct handshake");
-  oop obj = NULL;
-  ObjectMonitor *mon = java_thread->current_waiting_monitor();
-  if (mon == NULL) {
-    // thread is not doing an Object.wait() call
-    mon = java_thread->current_pending_monitor();
-    if (mon != NULL) {
-      // The thread is trying to enter() an ObjectMonitor.
-      obj = (oop)mon->object();
-      assert(obj != NULL, "ObjectMonitor should have a valid object!");
-    }
-    // implied else: no contended ObjectMonitor
-  } else {
-    // thread is doing an Object.wait() call
-    obj = (oop)mon->object();
-    assert(obj != NULL, "Object.wait() should have an object");
-  }
-
-  if (obj == NULL) {
-    *monitor_ptr = NULL;
-  } else {
-    HandleMark hm;
-    Handle     hobj(Thread::current(), obj);
     *monitor_ptr = jni_reference(calling_thread, hobj);
   }
   return JVMTI_ERROR_NONE;
 }
 
 jvmtiError
-JvmtiEnvBase::get_owned_monitors(JavaThread* java_thread,
+JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread,
                                  GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list) {
   jvmtiError err = JVMTI_ERROR_NONE;
   JavaThread *current_jt = JavaThread::current();
@@ -763,7 +728,7 @@ JvmtiEnvBase::get_owned_monitors(JavaThread* java_thread,
          jvf = jvf->java_sender()) {
       if (MaxJavaStackTraceDepth == 0 || depth++ < MaxJavaStackTraceDepth) {  // check for stack too deep
         // add locked objects for this frame into list
-        err = get_locked_objects_in_frame(current_jt, java_thread, jvf, owned_monitors_list, depth-1);
+        err = get_locked_objects_in_frame(calling_thread, java_thread, jvf, owned_monitors_list, depth-1);
         if (err != JVMTI_ERROR_NONE) {
           return err;
         }
@@ -772,7 +737,7 @@ JvmtiEnvBase::get_owned_monitors(JavaThread* java_thread,
   }
 
   // Get off stack monitors. (e.g. acquired via jni MonitorEnter).
-  JvmtiMonitorClosure jmc(java_thread, current_jt, owned_monitors_list, this);
+  JvmtiMonitorClosure jmc(java_thread, calling_thread, owned_monitors_list, this);
   ObjectSynchronizer::monitors_iterate(&jmc);
   err = jmc.error();
 
@@ -1736,12 +1701,12 @@ VM_SetFramePop::doit() {
 
 void
 GetOwnedMonitorInfoClosure::do_thread(Thread *target) {
-  _result = ((JvmtiEnvBase *)_env)->get_owned_monitors((JavaThread *)target, _owned_monitors_list);
+  _result = ((JvmtiEnvBase *)_env)->get_owned_monitors(_calling_thread, (JavaThread *)target, _owned_monitors_list);
 }
 
 void
 GetCurrentContendedMonitorClosure::do_thread(Thread *target) {
-  _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor((JavaThread *)target, _owned_monitor_ptr);
+  _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor(_calling_thread, (JavaThread *)target, _owned_monitor_ptr);
 }
 
 void

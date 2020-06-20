@@ -27,9 +27,9 @@
 #include "jfr/jni/jfrJavaSupport.hpp"
 #include "jfr/leakprofiler/checkpoint/objectSampleCheckpoint.hpp"
 #include "jfr/periodic/jfrThreadCPULoadEvent.hpp"
-#include "jfr/recorder/jfrRecorder.hpp"
 #include "jfr/recorder/checkpoint/jfrCheckpointManager.hpp"
-#include "jfr/recorder/checkpoint/types/traceid/jfrTraceId.inline.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
+#include "jfr/recorder/jfrRecorder.hpp"
 #include "jfr/recorder/service/jfrOptionSet.hpp"
 #include "jfr/recorder/storage/jfrStorage.hpp"
 #include "jfr/support/jfrJavaThread.hpp"
@@ -45,6 +45,8 @@ JfrThreadLocal::JfrThreadLocal() :
   _java_buffer(NULL),
   _native_buffer(NULL),
   _shelved_buffer(NULL),
+  _load_barrier_buffer_epoch_0(NULL),
+  _load_barrier_buffer_epoch_1(NULL),
   _stackframes(NULL),
   _thread(),
   _thread_id(0),
@@ -60,7 +62,6 @@ JfrThreadLocal::JfrThreadLocal() :
   _critical_section(0),
   _excluded(false),
   _dead(false) {
-
   Thread* thread = Thread::current_or_null();
   _parent_trace_id = thread != NULL ? thread->jfr_thread_local()->trace_id() : (traceid)0;
 }
@@ -132,6 +133,14 @@ void JfrThreadLocal::release(Thread* t) {
   if (_stackframes != NULL) {
     FREE_C_HEAP_ARRAY(JfrStackFrame, _stackframes);
     _stackframes = NULL;
+  }
+  if (_load_barrier_buffer_epoch_0 != NULL) {
+    _load_barrier_buffer_epoch_0->set_retired();
+    _load_barrier_buffer_epoch_0 = NULL;
+  }
+  if (_load_barrier_buffer_epoch_1 != NULL) {
+    _load_barrier_buffer_epoch_1->set_retired();
+    _load_barrier_buffer_epoch_1 = NULL;
   }
 }
 

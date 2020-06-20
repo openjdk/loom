@@ -54,7 +54,6 @@ private:
   ShenandoahSerialRoot  _universe_root;
   ShenandoahSerialRoot  _object_synchronizer_root;
   ShenandoahSerialRoot  _management_root;
-  ShenandoahSerialRoot  _system_dictionary_root;
   ShenandoahSerialRoot  _jvmti_root;
 public:
   ShenandoahSerialRoots(ShenandoahPhaseTimings::Phase phase);
@@ -205,8 +204,11 @@ public:
 };
 
 class ShenandoahConcurrentStringDedupRoots {
+private:
+  ShenandoahPhaseTimings::Phase _phase;
+
 public:
-  ShenandoahConcurrentStringDedupRoots();
+  ShenandoahConcurrentStringDedupRoots(ShenandoahPhaseTimings::Phase phase);
   ~ShenandoahConcurrentStringDedupRoots();
 
   void oops_do(BoolObjectClosure* is_alive, OopClosure* keep_alive, uint worker_id);
@@ -259,7 +261,6 @@ class ShenandoahRootScanner : public ShenandoahRootProcessor {
 private:
   ShenandoahSerialRoots                                     _serial_roots;
   ShenandoahThreadRoots                                     _thread_roots;
-  ShenandoahStringDedupRoots                                _dedup_roots;
 
 public:
   ShenandoahRootScanner(uint n_workers, ShenandoahPhaseTimings::Phase phase);
@@ -282,6 +283,7 @@ private:
   ShenandoahVMRoots<CONCURRENT>            _vm_roots;
   ShenandoahClassLoaderDataRoots<CONCURRENT, false /* single-threaded*/>
                                            _cld_roots;
+  ShenandoahConcurrentStringDedupRoots     _dedup_roots;
   ShenandoahNMethodTableSnapshot*          _codecache_snapshot;
   ShenandoahPhaseTimings::Phase            _phase;
 

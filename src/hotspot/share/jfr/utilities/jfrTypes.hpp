@@ -43,14 +43,6 @@ const int jfr_epoch_shift = 48;
 const traceid jfr_id_mask = ((((traceid)1) << jfr_epoch_shift) - 1);
 const traceid jfr_epoch_mask = ~jfr_id_mask;
 
-inline int compare_traceid(const traceid& lhs, const traceid& rhs) {
-  return lhs > rhs ? 1 : (lhs < rhs) ? -1 : 0;
-}
-
-inline int sort_traceid(traceid* lhs, traceid* rhs) {
-  return compare_traceid(*lhs, *rhs);
-}
-
 enum ReservedEvent {
   EVENT_METADATA = 0,
   EVENT_CHECKPOINT = 1

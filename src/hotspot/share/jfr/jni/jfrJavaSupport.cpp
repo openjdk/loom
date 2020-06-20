@@ -727,21 +727,22 @@ static bool check_exclusion_state_on_thread_start(Handle h_threadObj) {
   return true;
 }
 
-JavaThread* JfrJavaSupport::java_thread(jobject thread) {
+JavaThread* JfrJavaSupport::get_native(jobject thread) {
   ThreadsListHandle tlh;
-  JavaThread* t;
-  return tlh.cv_internal_thread_to_JavaThread(thread, &t, NULL) ? t : NULL;
+  JavaThread* native_thread = NULL;
+  (void)tlh.cv_internal_thread_to_JavaThread(thread, &native_thread, NULL);
+  return native_thread;
 }
 
 jlong JfrJavaSupport::jfr_thread_id(jobject thread) {
-  JavaThread* const jt = java_thread(thread);
-  return jt != NULL ? JFR_THREAD_ID(jt) : 0;
+  JavaThread* native_thread = get_native(thread);
+  return native_thread != NULL ? JFR_THREAD_ID(native_thread) : 0;
 }
 
 void JfrJavaSupport::exclude(jobject thread) {
-  JavaThread* const jt = java_thread(thread);
-  if (jt != NULL) {
-    JfrThreadLocal::exclude(jt);
+  JavaThread* native_thread = get_native(thread);
+  if (native_thread != NULL) {
+    JfrThreadLocal::exclude(native_thread);
   } else {
     // not started yet, track the thread oop
     add_thread_to_exclusion_list(thread);
@@ -749,9 +750,9 @@ void JfrJavaSupport::exclude(jobject thread) {
 }
 
 void JfrJavaSupport::include(jobject thread) {
-  JavaThread* const jt = java_thread(thread);
-  if (jt != NULL) {
-    JfrThreadLocal::include(jt);
+  JavaThread* native_thread = get_native(thread);
+  if (native_thread != NULL) {
+    JfrThreadLocal::include(native_thread);
   } else {
     // not started yet, untrack the thread oop
     remove_thread_from_exclusion_list(thread);
@@ -759,8 +760,8 @@ void JfrJavaSupport::include(jobject thread) {
 }
 
 bool JfrJavaSupport::is_excluded(jobject thread) {
-  JavaThread* const jt = java_thread(thread);
-  return jt != NULL ? jt->jfr_thread_local()->is_excluded() : is_thread_excluded(thread);
+  JavaThread* native_thread = get_native(thread);
+  return native_thread != NULL ? native_thread->jfr_thread_local()->is_excluded() : is_thread_excluded(thread);
 }
 
 jobject JfrJavaSupport::get_handler(jobject clazz, TRAPS) {

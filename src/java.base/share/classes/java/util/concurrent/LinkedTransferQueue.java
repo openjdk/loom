@@ -665,13 +665,9 @@ public class LinkedTransferQueue<E> extends AbstractQueue<E>
                 break;                   // recheck
             else if (!timed) {
                 LockSupport.setCurrentBlocker(this);
-                if (w.isVirtual()) {
-                    s.block();
-                } else {
-                    try {
-                        ForkJoinPool.managedBlock(s);
-                    } catch (InterruptedException cannotHappen) {  }
-                }
+                try {
+                    ForkJoinPool.managedBlock(s);
+                } catch (InterruptedException cannotHappen) {  }
                 LockSupport.setCurrentBlocker(null);
             }
             else {

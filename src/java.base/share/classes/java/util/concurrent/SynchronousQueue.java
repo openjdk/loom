@@ -393,13 +393,9 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
                                 }
                             } else if (!timed) {
                                 LockSupport.setCurrentBlocker(this);
-                                if (w.isVirtual()) {
-                                    s.block();
-                                } else {
-                                    try {
-                                        ForkJoinPool.managedBlock(s);
-                                    } catch (InterruptedException cannotHappen) { }
-                                }
+                                try {
+                                    ForkJoinPool.managedBlock(s);
+                                } catch (InterruptedException cannotHappen) { }
                                 LockSupport.setCurrentBlocker(null);
                             } else if (nanos > SPIN_FOR_TIMEOUT_THRESHOLD)
                                 LockSupport.parkNanos(this, nanos);
@@ -699,13 +695,9 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
                                 }
                             } else if (!timed) {
                                 LockSupport.setCurrentBlocker(this);
-                                if (w.isVirtual()) {
-                                    s.block();
-                                } else {
-                                    try {
-                                        ForkJoinPool.managedBlock(s);
-                                    } catch (InterruptedException cannotHappen) { }
-                                }
+                                try {
+                                    ForkJoinPool.managedBlock(s);
+                                } catch (InterruptedException cannotHappen) { }
                                 LockSupport.setCurrentBlocker(null);
                             }
                             else if (nanos > SPIN_FOR_TIMEOUT_THRESHOLD)

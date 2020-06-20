@@ -24,11 +24,15 @@
  */
 package org.graalvm.compiler.hotspot.replacements;
 
+import static org.graalvm.compiler.hotspot.meta.HotSpotForeignCallDescriptor.Reexecutability.NOT_REEXECUTABLE;
+import static org.graalvm.compiler.hotspot.meta.HotSpotForeignCallDescriptor.Transition.SAFEPOINT;
+import static jdk.internal.vm.compiler.word.LocationIdentity.any;
+
 import org.graalvm.compiler.api.replacements.ClassSubstitution;
 import org.graalvm.compiler.api.replacements.MethodSubstitution;
-import org.graalvm.compiler.core.common.spi.ForeignCallDescriptor;
 import org.graalvm.compiler.graph.Node.ConstantNodeParameter;
 import org.graalvm.compiler.graph.Node.NodeIntrinsic;
+import org.graalvm.compiler.hotspot.meta.HotSpotForeignCallDescriptor;
 import org.graalvm.compiler.hotspot.nodes.CurrentStackPointerNode;
 import org.graalvm.compiler.hotspot.nodes.StubForeignCallNode;
 import org.graalvm.compiler.nodes.extended.ForeignCallNode;
@@ -36,5 +40,6 @@ import org.graalvm.compiler.word.Word;
 
 @ClassSubstitution(value = java.lang.Continuation.class)
 public class ContinuationSubstitutions {
-    public static final ForeignCallDescriptor CONTINUATION_YIELD = new ForeignCallDescriptor("continuation_do_yield", int.class, int.class);
+    public static final HotSpotForeignCallDescriptor CONTINUATION_YIELD =
+        new HotSpotForeignCallDescriptor(SAFEPOINT, NOT_REEXECUTABLE, any(), "continuation_do_yield", int.class, int.class);
 }

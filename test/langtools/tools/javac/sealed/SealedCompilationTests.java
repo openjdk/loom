@@ -27,6 +27,7 @@
  * SealedCompilationTests
  *
  * @test
+ * @bug 8246353
  * @summary Negative compilation tests, and positive compilation (smoke) tests for sealed classes
  * @library /lib/combo /tools/lib
  * @modules
@@ -35,7 +36,8 @@
  *     jdk.compiler/com.sun.tools.javac.main
  * @build toolbox.ToolBox toolbox.JavacTask
  * @compile --enable-preview -source ${jdk.version} SealedCompilationTests.java
- * @run testng/othervm --enable-preview SealedCompilationTests
+ * @run testng/othervm -DuseAP=false --enable-preview SealedCompilationTests
+ * @run testng/othervm -DuseAP=true --enable-preview SealedCompilationTests
  */
 
 import java.lang.constant.ClassDesc;
@@ -52,10 +54,18 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.annotation.processing.AbstractProcessor;
+import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedAnnotationTypes;
+
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.SourceVersion;
+
 import com.sun.tools.javac.util.Assert;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 import org.testng.annotations.Test;
 import tools.javac.combo.CompilationTestCase;
 
@@ -70,12 +80,38 @@ public class SealedCompilationTests extends CompilationTestCase {
     ToolBox tb = new ToolBox();
 
     // When sealed classes become a permanent feature, we don't need these any more
-    private static String[] PREVIEW_OPTIONS = {"--enable-preview", "-source",
-                                               Integer.toString(Runtime.version().feature())};
+    private static String[] PREVIEW_OPTIONS = {
+            "--enable-preview",
+            "-source", Integer.toString(Runtime.version().feature())
+    };
 
-    {
+    private static String[] PREVIEW_OPTIONS_WITH_AP = {
+            "--enable-preview",
+            "-source", Integer.toString(Runtime.version().feature()),
+            "-processor", SimplestAP.class.getName()
+    };
+
+    /* simplest annotation processor just to force a round of annotation processing for all tests
+     */
+    @SupportedAnnotationTypes("*")
+    public static class SimplestAP extends AbstractProcessor {
+        @Override
+        public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+            return true;
+        }
+
+        @Override
+        public SourceVersion getSupportedSourceVersion() {
+            return SourceVersion.latest();
+        }
+
+    }
+
+    public SealedCompilationTests() {
+        boolean useAP = System.getProperty("useAP") == null ? false : System.getProperty("useAP").equals("true");
         setDefaultFilename("SealedTest.java");
-        setCompileOptions(PREVIEW_OPTIONS);
+        setCompileOptions(useAP ? PREVIEW_OPTIONS_WITH_AP : PREVIEW_OPTIONS);
+        System.out.println(useAP ? "running all tests using an annotation processor" : "running all tests without annotation processor");
     }
 
     private static final String NO_SHELL = """
@@ -231,6 +267,8 @@ public class SealedCompilationTests extends CompilationTestCase {
 
         for (String s : List.of(
                 "class sealed {}",
+                "enum sealed {}",
+                "record sealed() {}",
                 "interface sealed {}",
                 "@interface sealed {}"
         )) {
@@ -245,7 +283,36 @@ public class SealedCompilationTests extends CompilationTestCase {
             assertFail("compiler.err.restricted.type.not.allowed.here", s);
         }
 
+        for (String s : List.of(
+                "class SealedTest { String permits; }",
+                "class SealedTest { int permits = 0; }",
+                "class SealedTest { void test(String permits) { } }",
+                "class SealedTest { void permits(String permits) { } }",
+                "class SealedTest { void test() { String permits = null; } }"
+        )) {
+            assertOK(s);
+        }
+
+        for (String s : List.of(
+                "class permits {}",
+                "enum permits {}",
+                "record permits() {}",
+                "interface permits {}",
+                "@interface permits {}"
+        )) {
+            assertFail("compiler.err.restricted.type.not.allowed", s);
+        }
+
+        for (String s : List.of(
+                "class Foo { permits m() {} }",
+                "class Foo { permits i; }",
+                "class Foo { void m(permits i) {} }"
+        )) {
+            assertFail("compiler.err.restricted.type.not.allowed.here", s);
+        }
+
         String[] testOptions = {/* no options */};
+        String[] previousCompOptions = getCompileOptions();
         setCompileOptions(testOptions);
         // now testing with preview disabled
         for (String s : List.of(
@@ -258,7 +325,7 @@ public class SealedCompilationTests extends CompilationTestCase {
         )) {
             assertFail("compiler.err.preview.feature.disabled.plural", s);
         }
-        setCompileOptions(PREVIEW_OPTIONS);
+        setCompileOptions(previousCompOptions);
     }
 
     public void testRejectPermitsInNonSealedClass() {
@@ -666,6 +733,18 @@ public class SealedCompilationTests extends CompilationTestCase {
         }
     }
 
+    public void testNonSealedErroneousSuper() {
+        assertFail("compiler.err.cant.resolve",
+                   d -> {
+                       if (diags.keys().size() != 1) {
+                           fail("Unexpected errors: " + diags.toString());
+                       }
+                   },
+                   """
+                   non-sealed class C extends Undefined {}
+                   """);
+    }
+
     public void testIllFormedNonSealed() {
         for (String s : List.of(
             """
@@ -748,6 +827,85 @@ public class SealedCompilationTests extends CompilationTestCase {
                     }
                 }
             }
+        }
+    }
+
+    public void testSubClassBeforeSealedClassInSameCU() {
+        for (String s : List.of(
+            """
+            final class Sub extends Sealed {}
+
+            sealed class Sealed {}
+            """,
+            """
+            final class Sub extends Sealed {}
+
+            sealed class Sealed permits Sub {}
+            """,
+            """
+            final class Sub extends Outer.Super {}
+
+            class Outer {
+                sealed static class Super {}
+            }
+            """,
+            """
+            final class Sub extends Outer.Super {}
+
+            class Outer {
+                sealed static class Super permits Sub {}
+            }
+            """,
+            """
+            class Outer {
+                final class Sub extends Super {}
+            }
+
+            sealed class Super {}
+            """,
+            """
+            class Outer {
+                final class Sub extends Super {}
+            }
+
+            sealed class Super permits Outer.Sub{}
+            """,
+            """
+            class Outer1 {
+                final class Sub extends Outer2.Super {}
+            }
+
+            class Outer2 {
+                sealed static class Super {}
+            }
+            """,
+            """
+            class Outer1 {
+                final class Sub extends Outer2.Super {}
+            }
+
+            class Outer2 {
+                sealed static class Super permits Outer1.Sub {}
+            }
+            """,
+            """
+            class Outer {
+                final class Sub extends Outer.Inner.Super {}
+                static class Inner {
+                    sealed static class Super {}
+                }
+            }
+            """,
+            """
+            class Outer {
+                final class Sub extends Outer.Inner.Super {}
+                static class Inner {
+                    sealed static class Super permits Outer.Sub {}
+                }
+            }
+            """
+        )) {
+            assertOK(s);
         }
     }
 }

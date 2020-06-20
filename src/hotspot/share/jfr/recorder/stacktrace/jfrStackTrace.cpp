@@ -286,7 +286,7 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool as
         return false;
       }
     }
-    const traceid mid = JfrTraceId::use(method);
+    const traceid mid = JfrTraceId::load(method);
     int type = vfs.is_interpreted_frame() ? JfrStackFrame::FRAME_INTERPRETER : JfrStackFrame::FRAME_JIT;
     int bci = 0;
     if (method->is_native()) {

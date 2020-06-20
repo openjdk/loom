@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -95,7 +95,10 @@ public class AppImageFile {
      * @param appImageDir - path to application image
      */
     public static Path getPathInAppImage(Path appImageDir) {
-        return appImageDir.resolve(FILENAME);
+        return ApplicationLayout.platformAppImage()
+                .resolveAt(appImageDir)
+                .appDirectory()
+                .resolve(FILENAME);
     }
 
     /**
@@ -109,6 +112,10 @@ public class AppImageFile {
             xml.writeStartElement("jpackage-state");
             xml.writeAttribute("version", getVersion());
             xml.writeAttribute("platform", getPlatform());
+
+            xml.writeStartElement("app-version");
+            xml.writeCharacters(VERSION.fetchFrom(params));
+            xml.writeEndElement();
 
             xml.writeStartElement("main-launcher");
             xml.writeCharacters(APP_NAME.fetchFrom(params));
@@ -134,14 +141,7 @@ public class AppImageFile {
      */
     static AppImageFile load(Path appImageDir) throws IOException {
         try {
-            Path path = getPathInAppImage(appImageDir);
-            DocumentBuilderFactory dbf =
-                    DocumentBuilderFactory.newDefaultInstance();
-            dbf.setFeature(
-                   "http://apache.org/xml/features/nonvalidating/load-external-dtd",
-                    false);
-            DocumentBuilder b = dbf.newDocumentBuilder();
-            Document doc = b.parse(new FileInputStream(path.toFile()));
+            Document doc = readXml(appImageDir);
 
             XPath xPath = XPathFactory.newInstance().newXPath();
 
@@ -174,12 +174,26 @@ public class AppImageFile {
                 file = new AppImageFile();
             }
             return file;
-        } catch (ParserConfigurationException | SAXException ex) {
-            // Let caller sort this out
-            throw new IOException(ex);
         } catch (XPathExpressionException ex) {
             // This should never happen as XPath expressions should be correct
             throw new RuntimeException(ex);
+        }
+    }
+
+    public static Document readXml(Path appImageDir) throws IOException {
+        try {
+            Path path = getPathInAppImage(appImageDir);
+
+            DocumentBuilderFactory dbf =
+                    DocumentBuilderFactory.newDefaultInstance();
+            dbf.setFeature(
+                   "http://apache.org/xml/features/nonvalidating/load-external-dtd",
+                    false);
+            DocumentBuilder b = dbf.newDocumentBuilder();
+            return b.parse(new FileInputStream(path.toFile()));
+        } catch (ParserConfigurationException | SAXException ex) {
+            // Let caller sort this out
+            throw new IOException(ex);
         }
     }
 

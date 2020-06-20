@@ -319,12 +319,9 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   jvmtiError get_stack_trace(JavaThread *java_thread,
                                            jint stack_depth, jint max_count,
                                            jvmtiFrameInfo* frame_buffer, jint* count_ptr);
-  jvmtiError get_current_contended_monitor(JavaThread *java_thread,
+  jvmtiError get_current_contended_monitor(JavaThread* calling_thread, JavaThread *java_thread,
                                            jobject *monitor_ptr);
-  jvmtiError get_current_contended_monitor(JavaThread *calling_thread,
-                                           JavaThread *java_thread,
-                                           jobject *monitor_ptr);
-  jvmtiError get_owned_monitors(JavaThread* java_thread,
+  jvmtiError get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread,
                                 GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
   jvmtiError get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread, javaVFrame* jvf,
                           GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
@@ -390,9 +387,6 @@ public:
     _depth = depth;
     _result = JVMTI_ERROR_NONE;
   }
-  // Nested operation must be allowed for the VM_EnterInterpOnlyMode that is
-  // called from the JvmtiEventControllerPrivate::recompute_thread_enabled.
-  bool allow_nested_vm_operations() const { return true; }
   VMOp_Type type() const { return VMOp_SetFramePop; }
   jvmtiError result() { return _result; }
   void doit();
@@ -401,14 +395,16 @@ public:
 // HandshakeClosure to get monitor information with stack depth.
 class GetOwnedMonitorInfoClosure : public HandshakeClosure {
 private:
+  JavaThread* _calling_thread;
   JvmtiEnv *_env;
   jvmtiError _result;
   GrowableArray<jvmtiMonitorStackDepthInfo*> *_owned_monitors_list;
 
 public:
-  GetOwnedMonitorInfoClosure(JvmtiEnv* env,
+  GetOwnedMonitorInfoClosure(JavaThread* calling_thread, JvmtiEnv* env,
                              GrowableArray<jvmtiMonitorStackDepthInfo*>* owned_monitor_list)
     : HandshakeClosure("GetOwnedMonitorInfo"),
+      _calling_thread(calling_thread),
       _env(env),
       _result(JVMTI_ERROR_NONE),
       _owned_monitors_list(owned_monitor_list) {}
@@ -443,13 +439,15 @@ public:
 // HandshakeClosure to get current contended monitor.
 class GetCurrentContendedMonitorClosure : public HandshakeClosure {
 private:
+  JavaThread *_calling_thread;
   JvmtiEnv *_env;
   jobject *_owned_monitor_ptr;
   jvmtiError _result;
 
 public:
-  GetCurrentContendedMonitorClosure(JvmtiEnv *env, jobject *mon_ptr)
+  GetCurrentContendedMonitorClosure(JavaThread* calling_thread, JvmtiEnv *env, jobject *mon_ptr)
     : HandshakeClosure("GetCurrentContendedMonitor"),
+      _calling_thread(calling_thread),
       _env(env),
       _owned_monitor_ptr(mon_ptr),
       _result(JVMTI_ERROR_THREAD_NOT_ALIVE) {}

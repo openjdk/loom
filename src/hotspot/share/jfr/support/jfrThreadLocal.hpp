@@ -40,6 +40,8 @@ class JfrThreadLocal {
   mutable JfrBuffer* _java_buffer;
   mutable JfrBuffer* _native_buffer;
   JfrBuffer* _shelved_buffer;
+  JfrBuffer* _load_barrier_buffer_epoch_0;
+  JfrBuffer* _load_barrier_buffer_epoch_1;
   mutable JfrStackFrame* _stackframes;
   JfrBlobHandle _thread;
   mutable traceid _thread_id;
@@ -240,6 +242,9 @@ class JfrThreadLocal {
   // Code generation
   static ByteSize trace_id_offset();
   static ByteSize java_event_writer_offset();
+
+  template <typename>
+  friend class JfrEpochQueueKlassPolicy;
 };
 
 #endif // SHARE_JFR_SUPPORT_JFRTHREADLOCAL_HPP

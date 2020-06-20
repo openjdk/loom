@@ -39,7 +39,12 @@ class OopStorage;
 // This is the vm version of jweak but has different GC lifetimes and policies,
 // depending on the type.
 
-enum WeakHandleType { vm_class_loader_data, vm_string_table_data, vm_resolved_method_table_data, vm_nmethod_keepalive_data };
+enum WeakHandleType {
+  vm_weak_data,
+  vm_string_table_data,
+  vm_resolved_method_table_data,
+  vm_nmethod_keepalive_data
+};
 
 template <WeakHandleType T>
 class WeakHandle {

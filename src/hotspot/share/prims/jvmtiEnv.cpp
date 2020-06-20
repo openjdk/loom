@@ -1329,10 +1329,10 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
     // It is only safe to perform the direct operation on the current
     // thread. All other usage needs to use a direct handshake for safety.
     if (java_thread == calling_thread) {
-      err = get_owned_monitors(java_thread, owned_monitors_list);
+      err = get_owned_monitors(calling_thread, java_thread, owned_monitors_list);
     } else {
       // get owned monitors info with handshake
-      GetOwnedMonitorInfoClosure op(this, owned_monitors_list);
+      GetOwnedMonitorInfoClosure op(calling_thread, this, owned_monitors_list);
       Handshake::execute_direct(&op, java_thread);
       err = op.result();
     }
@@ -1399,10 +1399,10 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
     // It is only safe to perform the direct operation on the current
     // thread. All other usage needs to use a direct handshake for safety.
     if (java_thread == calling_thread) {
-      err = get_owned_monitors(java_thread, owned_monitors_list); 
+      err = get_owned_monitors(calling_thread, java_thread, owned_monitors_list); 
     } else {
       // get owned monitors info with handshake
-      GetOwnedMonitorInfoClosure op(this, owned_monitors_list);
+      GetOwnedMonitorInfoClosure op(calling_thread, this, owned_monitors_list);
       Handshake::execute_direct(&op, java_thread);
       err = op.result();
     }
@@ -1466,10 +1466,10 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
   // It is only safe to perform the direct operation on the current
   // thread. All other usage needs to use a direct handshake for safety.
   if (java_thread == calling_thread) {
-    err = get_current_contended_monitor(java_thread, monitor_ptr);
+    err = get_current_contended_monitor(calling_thread, java_thread, monitor_ptr);
   } else {
     // get contended monitor information with handshake
-    GetCurrentContendedMonitorClosure op(this, monitor_ptr);
+    GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr);
     Handshake::execute_direct(&op, java_thread);
     err = op.result();
   }

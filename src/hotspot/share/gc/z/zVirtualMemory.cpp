@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -43,7 +43,7 @@ ZVirtualMemoryManager::ZVirtualMemoryManager(size_t max_capacity) :
 
   // Reserve address space
   if (!reserve(max_capacity)) {
-    log_error_p(gc)("Failed to reserve enough address space for Java heap");
+    log_error_pd(gc)("Failed to reserve enough address space for Java heap");
     return;
   }
 
@@ -151,14 +151,14 @@ bool ZVirtualMemoryManager::is_initialized() const {
   return _initialized;
 }
 
-ZVirtualMemory ZVirtualMemoryManager::alloc(size_t size, bool alloc_from_front) {
+ZVirtualMemory ZVirtualMemoryManager::alloc(size_t size, bool force_low_address) {
   uintptr_t start;
 
-  if (alloc_from_front || size <= ZPageSizeSmall) {
-    // Small page
+  // Small pages are allocated at low addresses, while medium/large pages
+  // are allocated at high addresses (unless forced to be at a low address).
+  if (force_low_address || size <= ZPageSizeSmall) {
     start = _manager.alloc_from_front(size);
   } else {
-    // Medium/Large page
     start = _manager.alloc_from_back(size);
   }
 
