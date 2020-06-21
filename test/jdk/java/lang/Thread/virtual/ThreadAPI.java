@@ -953,16 +953,14 @@ public class ThreadAPI {
     // Thread.sleep(2000)
     public void testSleep3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
-            long start = System.currentTimeMillis();
+            long start = millisTime();
             Thread.sleep(2000);
-            long elapsed = System.currentTimeMillis() - start;
-            assertTrue(elapsed > 1900);
+            expectDuration(start, /*min*/1900, /*max*/4000);
         });
         TestHelper.runInVirtualThread(() -> {
-            long start = System.currentTimeMillis();
+            long start = millisTime();
             Thread.sleep(Duration.ofMillis(2000));
-            long elapsed = System.currentTimeMillis() - start;
-            assertTrue(elapsed > 1900);
+            expectDuration(start, /*min*/1900, /*max*/4000);
         });
     }
 
@@ -1051,14 +1049,28 @@ public class ThreadAPI {
         });
     }
 
-    // Thread.sleep should not be disrupted by unparking virtual thread
+    // Thread.sleep should not be disrupted by parking permit
     public void testSleep6() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            LockSupport.unpark(Thread.currentThread());
+
+            long start = millisTime();
+            Thread.sleep(2000);
+            expectDuration(start, /*min*/1900, /*max*/4000);
+
+            // check that parking permit was not consumed
+            LockSupport.park();
+        });
+    }
+
+    // Thread.sleep should not be disrupted by unparking virtual thread
+    public void testSleep7() throws Exception {
         AtomicReference<Exception> exc = new AtomicReference<>();
         var thread = Thread.newThread(Thread.VIRTUAL, () -> {
-            long start = System.currentTimeMillis();
+            long start = millisTime();
             try {
                 Thread.sleep(2000);
-                long elapsed = System.currentTimeMillis() - start;
+                long elapsed = millisTime() - start;
                 if (elapsed < 1900) {
                     exc.set(new RuntimeException("sleep too short"));
                 }
@@ -1078,6 +1090,29 @@ public class ThreadAPI {
         if (e != null) {
             throw e;
         }
+    }
+
+    /**
+     * Returns the current time in milliseconds.
+     */
+    private static long millisTime() {
+        long now = System.nanoTime();
+        return TimeUnit.MILLISECONDS.convert(now, TimeUnit.NANOSECONDS);
+    }
+
+    /**
+     * Check the duration of a task
+     * @param start start time, in milliseconds
+     * @param min minimum expected duration, in milliseconds
+     * @param max maximum expected duration, in milliseconds
+     * @return the duration (now - start), in milliseconds
+     */
+    private static void expectDuration(long start, long min, long max) {
+        long duration = millisTime() - start;
+        assertTrue(duration >= min,
+                "Duration " + duration + "ms, expected >= " + min + "ms");
+        assertTrue(duration <= max,
+                "Duration " + duration + "ms, expected <= " + max + "ms");
     }
 
 

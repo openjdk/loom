@@ -611,6 +611,13 @@ class VirtualThread extends Thread {
 
     /**
      * Sleep the current thread for the given sleep time (in nanoseconds)
+     *
+     * @implNote This implementation parks the thread for the given sleeping time
+     * and will therefore be observed in PARKED state during the sleep. Parking
+     * will consume the parking permit so this method makes available the parking
+     * permit after the sleep. This will observed as spurious, but benign, wakeup
+     * when the thread subsequently attempts to park.
+     *
      * @throws InterruptedException if interrupted while sleeping
      */
     void sleepNanos(long nanos) throws InterruptedException {
@@ -621,14 +628,20 @@ class VirtualThread extends Thread {
             if (nanos == 0) {
                 tryYield();
             } else {
-                long remainingNanos = nanos;
-                long startNanos = System.nanoTime();
-                while (remainingNanos > 0) {
-                    parkNanos(remainingNanos);
-                    if (getAndClearInterrupt()) {
-                        throw new InterruptedException();
+                // park for the sleep time
+                try {
+                    long remainingNanos = nanos;
+                    long startNanos = System.nanoTime();
+                    while (remainingNanos > 0) {
+                        parkNanos(remainingNanos);
+                        if (getAndClearInterrupt()) {
+                            throw new InterruptedException();
+                        }
+                        remainingNanos = nanos - (System.nanoTime() - startNanos);
                     }
-                    remainingNanos = nanos - (System.nanoTime() - startNanos);
+                } finally {
+                    // may have been unparked while sleeping
+                    setParkPermit(true);
                 }
             }
         }
