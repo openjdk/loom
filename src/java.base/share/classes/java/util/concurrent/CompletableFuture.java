@@ -2973,8 +2973,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * Returns a stream that is lazily populated with the given CompletableFutures
      * when they complete.
      *
-     * <p> If a thread is interrupted while waiting for a task to complete then
-     * {@linkplain CancellationException} is thrown with the interrupt status set.
+     * <p> If a thread is interrupted while waiting on the stream for a task to
+     * complete then {@linkplain CancellationException} is thrown with the
+     * interrupt status set.
      *
      * @apiNote The following example has a list of CompletableFuture objects. It
      * selects the result of the first to complete and then cancels the remaining
@@ -2982,7 +2983,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * <pre> {@code
      *     List<CompletableFuture<String>> cfs = ...
      *     try {
-     *         String first = CompletableFuture.stream(cfs)
+     *         String first = CompletableFuture.completed(cfs)
      *                     .filter(Predicate.not(CompletableFuture::isCompletedExceptionally))
      *                     .map(CompletableFuture::join)
      *                     .findFirst()
@@ -2992,12 +2993,12 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      *     }
      * }</pre>
      *
-     * <p> The following example partitions the pending results into two sets, one for
-     * the tasks that completed successfully, the other for the tasks that completed
-     * with an exception.
+     * <p> The following example partitions the CompletableFutures into two sets,
+     * one for the tasks that completed successfully, the other for the tasks that
+     * completed with an exception.
      * <pre>{@code
      *     List<CompletableFuture<String>> cfs = ...
-     *     Map<Boolean, Set<CompletableFuture<String>>> map = CompletableFuture.stream(cfs)
+     *     Map<Boolean, Set<CompletableFuture<String>>> map = CompletableFuture.completed(cfs)
      *             .collect(Collectors.partitioningBy(CompletableFuture::isCompletedExceptionally,
      *                                                Collectors.toSet()));
      * }</pre>
@@ -3008,7 +3009,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * @throws NullPointerException if the collection or any of its elements are null
      * @since 99
      */
-    public static <T> Stream<CompletableFuture<T>> stream(Collection<? extends CompletableFuture<T>> cfs) {
+    public static <T> Stream<CompletableFuture<T>> completed(Collection<? extends CompletableFuture<T>> cfs) {
         int size = cfs.size();
         if (size == 0)
             return Stream.empty();
@@ -3031,8 +3032,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * Returns a stream that is lazily populated with the given CompletableFutures
      * when they complete.
      *
-     * <p> If a thread is interrupted while waiting for a task to complete then
-     * {@linkplain CancellationException} is thrown with the interrupt status set.
+     * <p> If a thread is interrupted while waiting on the stream for a task to
+     * complete then {@linkplain CancellationException} is thrown with the
+     * interrupt status set.
      *
      * @param cfs the CompletableFutures
      * @param <T> the result type returned by completable future's {@code join}
@@ -3042,7 +3044,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      */
     @SafeVarargs
     @SuppressWarnings("varargs")
-    public static <T> Stream<CompletableFuture<T>> stream(CompletableFuture<T>... cfs) {
+    public static <T> Stream<CompletableFuture<T>> completed(CompletableFuture<T>... cfs) {
         int size = cfs.length;
         if (size == 0)
             return Stream.empty();

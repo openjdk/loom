@@ -337,12 +337,12 @@ public interface ExecutorService extends Executor, AutoCloseable {
        try {
            if (cancelOnException) {
                // wait until a task fails or all tasks complete
-               CompletableFuture.stream(futures)
+               CompletableFuture.completed(futures)
                        .filter(CompletableFuture::isCompletedExceptionally)
                        .findAny();
            } else {
                // wait until all tasks complete
-               long ignore = CompletableFuture.stream(futures).count();
+               long ignore = CompletableFuture.completed(futures).count();
            }
        } catch (CancellationException e) {
            if (Thread.currentThread().isInterrupted()) {
@@ -588,8 +588,8 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *         scheduled for execution
      * @throws NullPointerException if tasks or any of its elements are {@code null}
      * @since 99
-     * @see CompletableFuture#stream(Collection)
-     * @see CompletableFuture#stream(CompletableFuture[]) 
+     * @see CompletableFuture#completed(Collection)
+     * @see CompletableFuture#completed(CompletableFuture[])
      */
     default <T> List<CompletableFuture<T>> submitTasks(Collection<? extends Callable<T>> tasks) {
         List<CompletableFuture<T>> list = new ArrayList<>();
