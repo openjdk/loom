@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -58,16 +58,40 @@ public class ThreadLocals {
 
     // no thread locals
     public void testThreadLocal3() throws Exception {
+        Object INITIAL_VALUE = new Object();
+        ThreadLocal<Object> LOCAL2 = new ThreadLocal<>() {
+            @Override
+            protected Object initialValue() {
+                return INITIAL_VALUE;
+            }
+        };
+        ThreadLocal<Object> INHERITED_LOCAL2 = new InheritableThreadLocal<>()  {
+            @Override
+            protected Object initialValue() {
+                return INITIAL_VALUE;
+            }
+        };
+
         TestHelper.runInVirtualThread(Thread.NO_THREAD_LOCALS, () -> {
             assertThrows(UnsupportedOperationException.class, () -> LOCAL.set(null));
             assertThrows(UnsupportedOperationException.class, () -> LOCAL.set(new Object()));
-            assertThrows(UnsupportedOperationException.class, LOCAL::get);
-            assertThrows(UnsupportedOperationException.class, LOCAL::remove);
+            assertTrue(LOCAL.get() == null);
+            LOCAL.remove();  // should not throw
+
+            assertThrows(UnsupportedOperationException.class, () -> LOCAL2.set(null));
+            assertThrows(UnsupportedOperationException.class, () -> LOCAL2.set(new Object()));
+            assertTrue(LOCAL2.get() == INITIAL_VALUE);
+            LOCAL2.remove();  // should not throw
 
             assertThrows(UnsupportedOperationException.class, () -> INHERITED_LOCAL.set(null));
             assertThrows(UnsupportedOperationException.class, () -> INHERITED_LOCAL.set(new Object()));
-            assertThrows(UnsupportedOperationException.class, INHERITED_LOCAL::get);
-            assertThrows(UnsupportedOperationException.class, INHERITED_LOCAL::remove);
+            assertTrue(INHERITED_LOCAL.get() == null);
+            INHERITED_LOCAL.remove();  // should not throw
+
+            assertThrows(UnsupportedOperationException.class, () -> INHERITED_LOCAL2.set(null));
+            assertThrows(UnsupportedOperationException.class, () -> INHERITED_LOCAL2.set(new Object()));
+            assertTrue(INHERITED_LOCAL2.get() == INITIAL_VALUE);
+            INHERITED_LOCAL2.remove();  // should not throw
         });
     }
 

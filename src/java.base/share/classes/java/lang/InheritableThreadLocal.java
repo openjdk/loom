@@ -78,11 +78,7 @@ public class InheritableThreadLocal<T> extends ThreadLocal<T> {
      */
     @Override
     ThreadLocalMap getMap(Thread t) {
-        ThreadLocalMap map = t.inheritableThreadLocals;
-        if (map == ThreadLocalMap.NOT_SUPPORTED) {
-            throw new UnsupportedOperationException();
-        }
-        return map;
+        return t.inheritableThreadLocals;
     }
 
     /**

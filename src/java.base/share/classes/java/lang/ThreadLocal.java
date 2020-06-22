@@ -173,7 +173,7 @@ public class ThreadLocal<T> {
 
     private T get(Thread t) {
         ThreadLocalMap map = getMap(t);
-        if (map != null) {
+        if (map != null && map != ThreadLocalMap.NOT_SUPPORTED) {
             ThreadLocalMap.Entry e = map.getEntry(this);
             if (e != null) {
                 @SuppressWarnings("unchecked")
@@ -194,7 +194,11 @@ public class ThreadLocal<T> {
     boolean isPresent() {
         Thread t = Thread.currentThread();
         ThreadLocalMap map = getMap(t);
-        return map != null && map.getEntry(this) != null;
+        if (map != null && map != ThreadLocalMap.NOT_SUPPORTED) {
+            return map.getEntry(this) != null;
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -206,6 +210,9 @@ public class ThreadLocal<T> {
     private T setInitialValue(Thread t) {
         T value = initialValue();
         ThreadLocalMap map = getMap(t);
+        if (map == ThreadLocalMap.NOT_SUPPORTED) {
+            return value;
+        }
         if (map != null) {
             map.set(this, value);
         } else {
@@ -236,6 +243,9 @@ public class ThreadLocal<T> {
 
     private void set(Thread t, T value) {
         ThreadLocalMap map = getMap(t);
+        if (map == ThreadLocalMap.NOT_SUPPORTED) {
+            throw new UnsupportedOperationException();
+        }
         if (map != null) {
             map.set(this, value);
         } else {
@@ -256,7 +266,7 @@ public class ThreadLocal<T> {
      */
      public void remove() {
          ThreadLocalMap m = getMap(Thread.currentThread());
-         if (m != null) {
+         if (m != null && m != ThreadLocalMap.NOT_SUPPORTED) {
              m.remove(this);
          }
      }
@@ -269,11 +279,7 @@ public class ThreadLocal<T> {
      * @return the map
      */
     ThreadLocalMap getMap(Thread t) {
-        ThreadLocalMap map = t.threadLocals;
-        if (map == ThreadLocalMap.NOT_SUPPORTED) {
-            throw new UnsupportedOperationException("Thread locals not supported");
-        }
-        return map;
+        return t.threadLocals;
     }
 
     /**
