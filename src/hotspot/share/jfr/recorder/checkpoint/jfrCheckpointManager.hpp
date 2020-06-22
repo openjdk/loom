@@ -30,6 +30,7 @@
 #include "jfr/recorder/storage/jfrMemorySpaceRetrieval.hpp"
 #include "jfr/utilities/jfrBlob.hpp"
 #include "jfr/utilities/jfrLinkedList.hpp"
+#include "jfr/utilities/jfrTypes.hpp"
 
 class JfrCheckpointManager;
 class JfrChunkWriter;
