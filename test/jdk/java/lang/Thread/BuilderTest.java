@@ -445,17 +445,11 @@ public class BuilderTest {
     private void testNoThreadLocals(Thread.Builder builder) throws Exception {
         AtomicBoolean done = new AtomicBoolean();
         Runnable task = () -> {
-            boolean failed = false;
-            try {
-                LOCAL.get();
-                failed = true;
-            } catch (UnsupportedOperationException e) { }
             try {
                 LOCAL.set(new Object());
-                failed = true;
-            } catch (UnsupportedOperationException e) { }
-            if (!failed)
+            } catch (UnsupportedOperationException expected) {
                 done.set(true);
+            }
         };
 
         done.set(false);
@@ -468,7 +462,6 @@ public class BuilderTest {
         Thread thread2 = builder.task(task).start();
         thread2.join();
         assertTrue(done.get());
-
 
         done.set(false);
         Thread thread3 = builder.factory().newThread(task);
