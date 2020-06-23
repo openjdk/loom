@@ -144,7 +144,7 @@ public interface Future<V> {
 
     /**
      * Waits if necessary for the computation to complete, and then
-     * retrieves its result. This methods differs to {@linkplain #get()} in
+     * retrieves its result. This method differs to {@linkplain #get()} in
      * that it throws an unchecked exception if the computation completed
      * with an exception. It also does not react to thread interrupt.
      *

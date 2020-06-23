@@ -128,7 +128,6 @@ class VirtualThread extends Thread {
         super(name, characteristics);
 
         Objects.requireNonNull(task);
-
         Runnable target = () -> {
             try {
                 task.run();
