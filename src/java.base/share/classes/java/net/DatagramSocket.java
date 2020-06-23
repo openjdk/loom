@@ -543,6 +543,10 @@ public class DatagramSocket implements java.io.Closeable {
      * the length of the received message. If the message is longer than
      * the packet's length, the message is truncated.
      * <p>
+     * If a {@linkplain Thread#isVirtual() virtual thread} blocked in this
+     * method is {@linkplain Thread#interrupt() interrupted} then {@link
+     * SocketException} is thrown with the interrupt status set.
+     * <p>
      * If there is a security manager, and the socket is not currently
      * connected to a remote address, a packet cannot be received if the
      * security manager's {@code checkAccept} method does not allow it.

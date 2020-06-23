@@ -925,6 +925,10 @@ public class Socket implements java.io.Closeable {
      *
      * </ul>
      *
+     * <p> If a {@linkplain Thread#isVirtual() virtual thread} blocked in a
+     * {@code read} method is {@linkplain Thread#interrupt() interrupted} then
+     * {@link SocketException} is thrown with the interrupt status set.
+     *
      * <p> Closing the returned {@link java.io.InputStream InputStream}
      * will close the associated socket.
      *
@@ -965,7 +969,6 @@ public class Socket implements java.io.Closeable {
     private static class SocketInputStream extends InputStream {
         private final Socket parent;
         private final InputStream in;
-
         SocketInputStream(Socket parent, InputStream in) {
             this.parent = parent;
             this.in = in;
@@ -984,7 +987,6 @@ public class Socket implements java.io.Closeable {
         public int available() throws IOException {
             return in.available();
         }
-
         @Override
         public void close() throws IOException {
             parent.close();
@@ -999,6 +1001,10 @@ public class Socket implements java.io.Closeable {
      * is in non-blocking mode then the output stream's {@code write}
      * operations will throw an {@link
      * java.nio.channels.IllegalBlockingModeException}.
+     *
+     * <p> If a {@linkplain Thread#isVirtual() virtual thread} blocked in a
+     * {@code write} method is {@linkplain Thread#interrupt() interrupted}
+     * then {@link SocketException} is thrown with the interrupt status set.
      *
      * <p> Closing the returned {@link java.io.OutputStream OutputStream}
      * will close the associated socket.
@@ -1050,7 +1056,6 @@ public class Socket implements java.io.Closeable {
         public void write(byte b[], int off, int len) throws IOException {
             out.write(b, off, len);
         }
-
         @Override
         public void close() throws IOException {
             parent.close();

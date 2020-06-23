@@ -490,7 +490,6 @@ public class ServerSocket implements java.io.Closeable {
      * @see SecurityManager#checkConnect
      * @since 1.4
      */
-
     public SocketAddress getLocalSocketAddress() {
         if (!isBound())
             return null;
@@ -501,7 +500,11 @@ public class ServerSocket implements java.io.Closeable {
      * Listens for a connection to be made to this socket and accepts
      * it. The method blocks until a connection is made.
      *
-     * <p>A new Socket {@code s} is created and, if there
+     * <p> If a {@linkplain Thread#isVirtual() virtual thread} blocked in this
+     * method is {@linkplain Thread#interrupt() interrupted} then {@link
+     * SocketException} is thrown with the interrupt status set.
+     *
+     * <p> A new Socket {@code s} is created and, if there
      * is a security manager,
      * the security manager's {@code checkAccept} method is called
      * with {@code s.getInetAddress().getHostAddress()} and
