@@ -85,6 +85,7 @@ class ThreadExecutor extends AbstractExecutorService {
             lifetime.close();
         }
     }
+
     /**
      * Sets the state to TERMINATED if there are no remaining threads.
      */
