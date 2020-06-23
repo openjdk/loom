@@ -156,8 +156,12 @@ public class ThreadLocal<T> {
      * thread-local variable.  If the variable has no value for the
      * current thread, it is first initialized to the value returned
      * by an invocation of the {@link #initialValue} method.
+     * If the current thread does not support thread locals then
+     * this method returns its {@link #initialValue} (or {@code null}
+     * if the {@code initialValue} method is not overridden).
      *
      * @return the current thread's value of this thread-local
+     * @see Thread.Builder#disallowThreadLocals()
      */
     public T get() {
         return get(Thread.currentThread());
@@ -232,6 +236,11 @@ public class ThreadLocal<T> {
      *
      * @param value the value to be stored in the current thread's copy of
      *        this thread-local.
+     *
+     * @throws UnsupportedOperationException if the current thread does not
+     *         support thread locals
+     *
+     * @see Thread.Builder#disallowThreadLocals()
      */
     public void set(T value) {
         set(Thread.currentThread(), value);

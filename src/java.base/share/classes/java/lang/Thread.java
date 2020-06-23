@@ -807,14 +807,17 @@ public class Thread implements Runnable {
         Builder virtual(Executor scheduler);
 
         /**
-         * Disallow threads locals.
+         * Disallow threads locals. If the thread attempts to set a value for
+         * a thread-local with the {@link ThreadLocal#set(Object)} method then
+         * {@code UnsupportedOperationException} is thrown.
          * @return this builder
          * @throws IllegalStateException if inheritThreadLocals has already been set
+         * @see ThreadLocal#set(Object)
          */
         Builder disallowThreadLocals();
 
         /**
-         * Inherit threads locals. Thread locals are inherited when the {@code Thread}
+         * Inherit threads-locals. Thread locals are inherited when the {@code Thread}
          * is created with the {@link #build() build} method or when the thread
          * factory {@link ThreadFactory#newThread(Runnable) newThread} method
          * is invoked.
