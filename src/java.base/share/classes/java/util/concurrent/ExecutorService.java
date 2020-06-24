@@ -329,34 +329,34 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *         scheduled for execution
      * @since 99
      */
-   default <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
-                                         boolean cancelOnException)
-           throws InterruptedException {
+    default <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
+                                          boolean cancelOnException)
+            throws InterruptedException {
 
-       List<CompletableFuture<T>> futures = submitTasks(tasks);
-       try {
-           if (cancelOnException) {
-               // wait until a task fails or all tasks complete
-               CompletableFuture.completed(futures)
-                       .filter(CompletableFuture::isCompletedExceptionally)
-                       .findAny();
-           } else {
-               // wait until all tasks complete
-               long ignore = CompletableFuture.completed(futures).count();
-           }
-       } catch (CancellationException e) {
-           if (Thread.currentThread().isInterrupted()) {
-               throw new InterruptedException();
-           } else {
-               throw e;
-           }
-       } finally {
-           futures.forEach(f -> f.cancel(true));
-       }
-       @SuppressWarnings("unchecked")
-       List<Future<T>> result = (List) futures;
-       return result;
-   }
+        List<CompletableFuture<T>> futures = submitTasks(tasks);
+        try {
+            if (cancelOnException) {
+                // wait until a task fails or all tasks complete
+                CompletableFuture.completed(futures)
+                        .filter(CompletableFuture::isCompletedExceptionally)
+                        .findAny();
+            } else {
+                // wait until all tasks complete
+                long ignore = CompletableFuture.completed(futures).count();
+            }
+        } catch (CancellationException e) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException();
+            } else {
+                throw e;
+            }
+        } finally {
+            futures.forEach(f -> f.cancel(true));
+        }
+        @SuppressWarnings("unchecked")
+        List<Future<T>> result = (List) futures;
+        return result;
+    }
 
     /**
      * Executes the given tasks, returning a list of Futures holding
