@@ -2974,8 +2974,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * when they complete.
      *
      * <p> If a thread is interrupted while waiting on the stream for a task to
-     * complete then {@linkplain CancellationException} is thrown with the
-     * interrupt status set.
+     * complete then {@link CancellationException} is thrown with the interrupt
+     * status set.
      *
      * @apiNote The following example has a list of CompletableFuture objects. It
      * selects the result of the first to complete and then cancels the remaining
@@ -3033,8 +3033,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * when they complete.
      *
      * <p> If a thread is interrupted while waiting on the stream for a task to
-     * complete then {@linkplain CancellationException} is thrown with the
-     * interrupt status set.
+     * complete then {@link CancellationException} is thrown with the interrupt
+     * status set.
      *
      * @param cfs the CompletableFutures
      * @param <T> the result type returned by completable future's {@code join}
