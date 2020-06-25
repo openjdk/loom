@@ -199,6 +199,8 @@ public:
   int argsize() { return _argsize; }
   void set_argsize(int value) { _argsize = value; }
 
+  frame to_frame();
+
   intptr_t* bottom_sender_sp() {
     intptr_t* sp = entry_sp() - argsize();
 #ifdef _LP64

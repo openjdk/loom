@@ -64,6 +64,12 @@ static inline void copy_to_stack(void* from, void* to, size_t size) {
 
   cont_thaw_chunk_memcpy(from, to, size);
 }
+
+frame ContinuationEntry::to_frame() {
+  static CodeBlob* cb = CodeCache::find_blob(entry_pc());
+  return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);
+}
+
 static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
   JavaFrameAnchor* anchor = thread->frame_anchor();
   anchor->set_last_Java_sp(cont->entry_sp());
