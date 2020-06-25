@@ -196,7 +196,6 @@ PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 static bool is_stub(CodeBlob* cb);
 static void set_anchor(JavaThread* thread, intptr_t* sp);
 static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont);
-static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
 
 // static void set_anchor(JavaThread* thread, const frame& f); -- unused
 
@@ -949,7 +948,7 @@ ContMirror::ContMirror(oop cont)
 }
 
 ContMirror::ContMirror(const RegisterMap* map)
- : _thread(map->thread()), _entry(get_continuation_entry_for_continuation(_thread, map->cont())), _cont(map->cont()),
+ : _thread(map->thread()), _entry(Continuation::get_continuation_entry_for_continuation(_thread, map->cont())), _cont(map->cont()),
 #ifndef PRODUCT
   _tail(NULL),
   _sp(-10), _fp(0), _pc(0), // -10 is a special value showing _sp has not been read
@@ -2415,7 +2414,6 @@ public:
       // we're patching the thread stack, not the chunk, as it's hopefully still hot in the cache
       log_develop_trace(jvmcont)("patching bottom sp: " INTPTR_FORMAT, p2i(bottom_sp));
       assert (bottom_sp == _bottom_address, "");
-      // patch_chunk(bottom_sp, chunk, allocated);
 
       size += frame::sender_sp_offset; // b/c when argsize > 0, we don't reach the caller's metadata
     }
@@ -2457,34 +2455,6 @@ public:
     // assert(verify_continuation<222>(_cont.mirror()), "");
 
     return true;
-  }
-
-  // UNUSED
-  void patch_chunk(intptr_t* bottom_sp, oop chunk, bool allocated) {
-    log_develop_trace(jvmcont)("freeze_chunk patch");
-    address pc;
-    // intptr_t* fp
-    if (!allocated) {
-      pc = jdk_internal_misc_StackChunk::pc(chunk);
-      // the following causes a cache miss; that's why we have the StackChunk.pc field
-      // pc = *(address*)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - SENDER_SP_RET_ADDRESS_OFFSET);
-      // fp = *(intptr_t**)((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp - frame::sender_sp_offset); -- necessary?
-    } else {
-      if (LIKELY(jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk))) {
-        pc = _cont.pc();
-        // fp = _cont.fp();
-      } else {
-        oop parent = jdk_internal_misc_StackChunk::parent(chunk);
-        guarantee (!ContMirror::is_empty_chunk(parent), "");
-        pc = jdk_internal_misc_StackChunk::pc(parent);
-        // fp = ...
-      }
-    }
-    guarantee (pc != NULL, "");
-
-    // This removes the return barrier and breaks the integrity of the stack; we must set the anchor to the entry before a walk (see freeze0)
-    *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc; // TODO R necessary ?
-    // *(intptr_t**)(bottom_sp - frame::sender_sp_offset) = fp; -- necessary ?
   }
 
   oop allocate_chunk(int size) {
@@ -3447,7 +3417,7 @@ static bool monitors_on_stack(JavaThread* thread) {
   map.set_include_argument_oops(false);
   frame f = thread->last_frame();
   while (true) {
-    if (!Continuation::is_frame_in_continuation(f, cont)) break;
+    if (!Continuation::is_frame_in_continuation(cont, f)) break;
     if (is_pinned(f, &map) == freeze_pinned_monitor) return true;
     f = f.sender(&map);
   }
@@ -3502,7 +3472,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
       return res;
 
     f = f.frame_sender<ContinuationCodeBlobLookup>(&map);
-    if (!Continuation::is_frame_in_continuation(f, cont)) {
+    if (!Continuation::is_frame_in_continuation(cont, f)) {
       oop scope = java_lang_Continuation::scope(cont->continuation());
       if (scope == cont_scope)
         break;
@@ -3941,7 +3911,7 @@ public:
     if (!FULL_STACK || is_last) {
       assert (!is_last || argsize == 0, "");
       _cont.set_argsize(argsize);
-      patch_chunk(chunk, bottom_sp, is_last);
+      patch_chunk(bottom_sp, is_last);
 
       address pc = *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET);
       assert (is_last ? CodeCache::find_blob(pc)->as_compiled_method()->method()->is_continuation_enter_intrinsic() : pc == StubRoutines::cont_returnBarrier(), "is_last: %d", is_last);
@@ -4059,7 +4029,7 @@ public:
     copy_to_stack(from, to, size);
   }
 
-  void patch_chunk(oop chunk, intptr_t* sp, bool is_last) {
+  void patch_chunk(intptr_t* sp, bool is_last) {
     log_develop_trace(jvmcont)("thaw_chunk patching -- sp: " INTPTR_FORMAT, p2i(sp));
 
     address pc = !is_last ? StubRoutines::cont_returnBarrier() : _cont.entryPC();
@@ -4732,9 +4702,9 @@ bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap
   return m->intrinsic_id() == vmIntrinsics::_Continuation_enter;
 }
 
-bool Continuation::is_cont_post_barrier_entry_frame(const frame& f) {
-  return is_return_barrier_entry(Frame::real_pc(f));
-}
+// bool Continuation::is_cont_post_barrier_entry_frame(const frame& f) {
+//   return is_return_barrier_entry(Frame::real_pc(f));
+// }
 
 // When walking the virtual stack, this method returns true
 // iff the frame is a thawed continuation frame whose
@@ -4754,18 +4724,18 @@ bool Continuation::is_return_barrier_entry(const address pc) {
   return pc == StubRoutines::cont_returnBarrier();
 }
 
-static inline bool is_sp_in_continuation(intptr_t* const sp, ContinuationEntry* cont) {
+static inline bool is_sp_in_continuation(ContinuationEntry* cont, intptr_t* const sp) {
   // tty->print_cr(">>>> is_sp_in_continuation cont: %p sp: %p entry: %p in: %d", (oopDesc*)cont, sp, java_lang_Continuation::entrySP(cont), java_lang_Continuation::entrySP(cont) > sp);
   return cont->entry_sp() > sp;
 }
 
-bool Continuation::is_frame_in_continuation(const frame& f, ContinuationEntry* cont) {
-  return is_sp_in_continuation(f.unextended_sp(), cont);
+bool Continuation::is_frame_in_continuation(ContinuationEntry* cont, const frame& f) {
+  return is_sp_in_continuation(cont, f.unextended_sp());
 }
 
 static ContinuationEntry* get_continuation_entry_for_frame(JavaThread* thread, intptr_t* const sp) {
   ContinuationEntry* cont = thread->cont_entry();
-  while (cont != NULL && !is_sp_in_continuation(sp, cont)) {
+  while (cont != NULL && !is_sp_in_continuation(cont, sp)) {
     cont = cont->parent();
   }
   // if (cont != NULL) tty->print_cr(">>> get_continuation_entry_for_frame: %p entry.sp: %p oop: %p", sp, cont->entry_sp(), (oopDesc*)cont->continuation());
@@ -4781,7 +4751,7 @@ oop Continuation::get_continutation_for_frame(JavaThread* thread, const frame& f
   return get_continuation_for_frame(thread, f.unextended_sp());
 }
 
-static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont) {
+ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThread* thread, oop cont) {
   if (thread == NULL || cont == (oop)NULL) return NULL;
   
   for (ContinuationEntry* entry = thread->cont_entry(); entry != NULL; entry = entry->parent()) {
@@ -4814,10 +4784,6 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
     return true;
   }
   return false;
-}
-
-bool Continuation::fix_continuation_bottom_sender(RegisterMap* map, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
-  return fix_continuation_bottom_sender(map->thread(), callee, sender_pc, sender_sp);
 }
 
 // frame Continuation::fix_continuation_bottom_sender(const frame& callee, RegisterMap* map, frame f) {

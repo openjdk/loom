@@ -2642,8 +2642,6 @@ void java_lang_Throwable::java_printStackTrace(Handle throwable, TRAPS) {
                           THREAD);
 }
 
-extern "C" void pfl();
-
 void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope, const methodHandle& method, TRAPS) {
   if (!StackTraceInThrowable) return;
   ResourceMark rm(THREAD);

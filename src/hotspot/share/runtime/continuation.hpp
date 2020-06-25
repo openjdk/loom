@@ -90,14 +90,11 @@ public:
   static oop  get_continutation_for_frame(JavaThread* thread, const frame& f);
   static bool is_continuation_enterSpecial(const frame& f, const RegisterMap* map);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap* map);
-  static bool is_cont_post_barrier_entry_frame(const frame& f);
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);
-  static bool is_frame_in_continuation(const frame& f, ContinuationEntry* cont);
+  static bool is_frame_in_continuation(ContinuationEntry* cont, const frame& f);
   static bool is_frame_in_continuation(JavaThread* thread, const frame& f);
   static bool fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp);
-  static bool fix_continuation_bottom_sender(RegisterMap* map, const frame& callee, address* sender_pc, intptr_t** sender_sp);
-  // static frame fix_continuation_bottom_sender(const frame& callee, RegisterMap* map, frame f);
   static address get_top_return_pc_post_barrier(JavaThread* thread, address pc);
 
   static frame top_frame(const frame& callee, RegisterMap* map);
@@ -112,13 +109,11 @@ public:
   // access frame data
   static bool is_in_usable_stack(address addr, const RegisterMap* map);
   static int usp_offset_to_index(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes);
-  // static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes);
   static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes, bool is_oop);
-  // static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg);
   static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop);
+
   static address interpreter_frame_expression_stack_at(const frame& fr, const RegisterMap* map, const InterpreterOopMap& oop_mask, int index);
   static address interpreter_frame_local_at(const frame& fr, const RegisterMap* map, const InterpreterOopMap& oop_mask, int index);
-
   static Method* interpreter_frame_method(const frame& fr, const RegisterMap* map);
   static address interpreter_frame_bcp(const frame& fr, const RegisterMap* map);
 
@@ -126,6 +121,8 @@ public:
   static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
 
   static void set_cont_fastpath_thread_state(JavaThread* thread);
+
+  static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
 
 #ifndef PRODUCT
   static void describe(FrameValues &values);
