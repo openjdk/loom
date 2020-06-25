@@ -165,7 +165,7 @@ public interface Future<V> {
                     return get();
                 } catch (InterruptedException e) {
                     interrupted = true;
-                } catch (ExecutionException e){
+                } catch (ExecutionException e) {
                     throw new CompletionException(e);
                 }
             }
