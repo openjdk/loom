@@ -55,6 +55,9 @@ import sun.security.util.SecurityConstants;
 import jdk.internal.HotSpotIntrinsicCandidate;
 import jdk.internal.event.ThreadSleepEvent;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
+
 /**
  * A <i>thread</i> is a thread of execution in a program. The Java
  * virtual machine allows an application to have multiple threads of
@@ -364,7 +367,7 @@ public class Thread implements Runnable {
 	    if (ThreadSleepEvent.isTurnedOn()) {
             ThreadSleepEvent event = new ThreadSleepEvent();
             try {
-                event.time = millis;
+                event.time = NANOSECONDS.convert(millis, MILLISECONDS);
                 event.begin();
                 sleepMillis(millis);
             } finally {
@@ -374,16 +377,16 @@ public class Thread implements Runnable {
             sleepMillis(millis);
         }
     }
-	
+
     private static void sleepMillis(long millis) throws InterruptedException {
         VirtualThread vthread = currentCarrierThread().getVirtualThread();
         if (vthread != null) {
-            vthread.sleepNanos(TimeUnit.MILLISECONDS.toNanos(millis));
+            vthread.sleepNanos(NANOSECONDS.convert(millis, MILLISECONDS));
         } else {
             sleep0(millis);
         }
     }
-	
+
     private static native void sleep0(long millis) throws InterruptedException;
 
     /**
@@ -414,7 +417,8 @@ public class Thread implements Runnable {
         }
 
         if (nanos < 0 || nanos > 999999) {
-            throw new IllegalArgumentException("nanosecond timeout value out of range");
+            throw new IllegalArgumentException(
+                    "nanosecond timeout value out of range");
         }
 
         if (nanos > 0 && millis < Long.MAX_VALUE) {
@@ -443,10 +447,30 @@ public class Thread implements Runnable {
      * @since 99
      */
     public static void sleep(Duration duration) throws InterruptedException {
-        if (!duration.isNegative()) {
-            // ignore nano precision for now
-            long millis = Long.max(TimeUnit.MILLISECONDS.convert(duration), 1);
-            sleep(millis);
+        long nanos = duration.toNanos();
+        if (nanos >= 0) {
+            VirtualThread vthread = currentCarrierThread().getVirtualThread();
+            if (vthread != null) {
+                if (ThreadSleepEvent.isTurnedOn()) {
+                    ThreadSleepEvent event = new ThreadSleepEvent();
+                    try {
+                        event.time = nanos;
+                        event.begin();
+                        vthread.sleepNanos(nanos);
+                    } finally {
+                        event.commit();
+                    }
+                } else {
+                    vthread.sleepNanos(nanos);
+                }
+            } else {
+                // convert to milliseconds, ceiling rounding mode
+                long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
+                if (nanos > NANOSECONDS.convert(millis, MILLISECONDS)) {
+                    millis += 1L;
+                }
+                sleep(millis);
+            }
         }
     }
 

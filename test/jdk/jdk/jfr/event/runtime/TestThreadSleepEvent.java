@@ -77,11 +77,11 @@ public class TestThreadSleepEvent {
                 System.out.println(event.getStackTrace());
                 if (event.getThread().getJavaThreadId() == Thread.currentThread().getId()) {
                     threadCount--;
-                    Events.assertField(event, "time").equal(SLEEP_TIME_MS);
+                    Events.assertDuration(event, "time", Duration.ofMillis(SLEEP_TIME_MS));
                 }
                 if (event.getThread().getJavaThreadId() == virtualThread.getId()) {
                     threadCount--;
-                    Events.assertField(event, "time").equal(SLEEP_TIME_MS);
+                    Events.assertDuration(event, "time", Duration.ofMillis(SLEEP_TIME_MS));
                 }
             }
             Asserts.assertEquals(threadCount, 0, "Could not find all expected events");

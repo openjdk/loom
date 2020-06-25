@@ -39,6 +39,6 @@ import jdk.jfr.internal.Type;
 @MirrorEvent(className = "jdk.internal.event.ThreadSleepEvent")
 public final class ThreadSleepEvent extends AbstractJDKEvent {
     @Label("SLeep Time")
-    @Timespan(Timespan.MILLISECONDS)
+    @Timespan(Timespan.NANOSECONDS)
     public long time;
 }
