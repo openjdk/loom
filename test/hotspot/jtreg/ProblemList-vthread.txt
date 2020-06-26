@@ -9,6 +9,7 @@ gc/g1/humongousObjects/TestNoAllocationsInHRegions.java             8241630 gene
 ####
 # Virtual thread/Continuation tests
 
+java/lang/Thread/virtual/WithDeadlineTest.java
 serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id1
 serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id0
 serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
@@ -24,6 +25,7 @@ gc/g1/ihop/TestIHOPStatic.java
 ####
 # Test failing because of incorrect stacktrace or thread properties for main thread
 
+java/lang/ThreadGroup/SetMaxPriority.java
 runtime/condy/staticInit/TestInitException.java
 runtime/handshake/HandshakeWalkStackTest.java
 runtime/handshake/HandshakeWalkStackFallbackTest.java
