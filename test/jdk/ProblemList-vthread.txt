@@ -19,11 +19,16 @@ java/lang/StackWalker/DumpStackTest.java
 java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
 
+
 ####
 # Thread-sensitive threads
+
 java/lang/Thread/BuilderTest.java
-jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
+java/lang/ThreadGroup/SetMaxPriority.java
 java/lang/ThreadGroup/Suspend.java
+java/lang/Thread/virtual/CustomScheduler.java
+jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
+
 
 ####
 # ThreadGroup owner is not main
