@@ -12,6 +12,12 @@ tools/javac/generics/T5094318.java
 tools/javac/api/T6395981.java
 jdk/javadoc/tool/sourceOption/SourceOption.java
 
+
+####
+# Incorrect stacktrace epxectectations
+tools/javac/launcher/SourceLauncherTest.java
+
+
 ####
 # result: Error. Agent communication error: java.io.EOFException; check console log for any additional details
 
