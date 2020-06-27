@@ -486,20 +486,18 @@ void vframeStreamCommon::found_bad_method_frame() const {
 
 // top-frame will be skipped
 vframeStream::vframeStream(JavaThread* thread, frame top_frame,
-  bool stop_at_java_call_stub) : vframeStreamCommon(RegisterMap(thread, false, true)) {
+  bool stop_at_java_call_stub) : vframeStreamCommon(RegisterMap(thread, true, true)) {
   _stop_at_java_call_stub = stop_at_java_call_stub;
 
   // skip top frame, as it may not be at safepoint
-  _prev_frame = top_frame;
   _frame  = top_frame.sender(&_reg_map);
   while (!fill_from_frame()) {
-    _prev_frame = _frame;
     _frame = _frame.sender(&_reg_map);
   }
 }
 
 vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool stop_at_java_call_stub) 
- : vframeStreamCommon(RegisterMap(thread, false, true)) {
+ : vframeStreamCommon(RegisterMap(thread, true, true)) {
 
   _stop_at_java_call_stub = stop_at_java_call_stub;
   _continuation_scope = continuation_scope;
@@ -525,7 +523,7 @@ vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool s
 }
 
 vframeStream::vframeStream(Handle continuation) 
- : vframeStreamCommon(RegisterMap(NULL, false, true)) {
+ : vframeStreamCommon(RegisterMap(NULL, true, true)) {
 
   _stop_at_java_call_stub = false;
   _continuation_scope = Handle();
@@ -626,20 +624,13 @@ javaVFrame* vframeStreamCommon::asJavaVFrame() {
   javaVFrame* result = NULL;
   if (_mode == compiled_mode) {
     guarantee(_frame.is_compiled_frame(), "expected compiled Java frame");
+    guarantee(_reg_map.update_map(), "");
 
-    // lazy update to register map
-    bool update_map = true;
-    RegisterMap map(_thread, update_map);
-    frame f = _prev_frame.sender(&map);
-
-    guarantee(f.is_compiled_frame(), "expected compiled Java frame");
-
-    compiledVFrame* cvf = compiledVFrame::cast(vframe::new_vframe(&f, &map, _thread));
+    compiledVFrame* cvf = compiledVFrame::cast(vframe::new_vframe(&_frame, &_reg_map, _thread));
 
     guarantee(cvf->cb() == cb(), "wrong code blob");
 
-    // get the same scope as this stream
-    cvf = cvf->at_scope(_decode_offset, _vframe_id);
+    cvf = cvf->at_scope(_decode_offset, _vframe_id); // get the same scope as this stream
 
     guarantee(cvf->scope()->decode_offset() == _decode_offset, "wrong scope");
     guarantee(cvf->scope()->sender_decode_offset() == _sender_decode_offset, "wrong scope");

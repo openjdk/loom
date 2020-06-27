@@ -683,9 +683,14 @@ void ContinuationHelper::update_register_map(RegisterMap* map, const hframe& cal
 
 void ContinuationHelper::update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map) {
   // we need to register the link address for the entry frame
-  intptr_t** fp = (intptr_t**)(cont.entry()->bottom_sender_sp() - frame::sender_sp_offset);
-  log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: frame::update_map_with_saved_link: " INTPTR_FORMAT, p2i(fp));
-  frame::update_map_with_saved_link(map, fp);
+  if (cont.entry() != NULL) {
+    intptr_t** fp = (intptr_t**)(cont.entry()->bottom_sender_sp() - frame::sender_sp_offset);
+    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: frame::update_map_with_saved_link: " INTPTR_FORMAT, p2i(fp));
+    frame::update_map_with_saved_link(map, fp);
+  } else {
+    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: clearing register map.");
+    map->clear();
+  }
 }
 
 inline frame ContinuationHelper::frame_with(frame& f, intptr_t* sp, address pc, intptr_t* fp) {

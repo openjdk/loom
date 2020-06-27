@@ -58,7 +58,6 @@ inline void vframeStreamCommon::next() {
       }
     }
 
-    _prev_frame = _frame;
     _frame = _frame.sender(&_reg_map);
     
     if (cont_entry) {
@@ -71,7 +70,7 @@ inline void vframeStreamCommon::next() {
 }
 
 inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stub)
-  : vframeStreamCommon(RegisterMap(thread, false, true)) {
+  : vframeStreamCommon(RegisterMap(thread, true, true)) {
   _stop_at_java_call_stub = stop_at_java_call_stub;
 
   if (!thread->has_last_Java_frame()) {
@@ -85,7 +84,6 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
     if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
       cont = java_lang_Continuation::parent(cont);
     }
-    _prev_frame = _frame;
     _frame = _frame.sender(&_reg_map);
   }
   _cont = cont != (oop)NULL ? Handle(Thread::current(), cont) : Handle();

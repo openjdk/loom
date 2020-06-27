@@ -279,7 +279,6 @@ class MonitorInfo : public ResourceObj {
 class vframeStreamCommon : StackObj {
  protected:
   // common
-  frame        _prev_frame;
   frame        _frame;
   JavaThread*  _thread;
   RegisterMap  _reg_map;
