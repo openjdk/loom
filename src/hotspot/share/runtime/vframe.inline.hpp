@@ -29,12 +29,7 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/thread.inline.hpp"
-#include "runtime/handles.inline.hpp"
 #include "runtime/vframe.hpp"
-
-inline vframeStreamCommon::vframeStreamCommon(JavaThread* thread) : _reg_map(thread, false) {
-  _thread = thread;
-}
 
 inline vframeStreamCommon::vframeStreamCommon(RegisterMap reg_map) : _reg_map(reg_map) {
   _thread = _reg_map.thread();

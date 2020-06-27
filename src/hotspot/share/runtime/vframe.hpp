@@ -50,8 +50,6 @@
 
 // - BasicLock
 
-class javaVFrame;
-
 class vframe: public ResourceObj {
  protected:
   frame        _fr;      // Raw frame behind the virtual frame.
@@ -104,7 +102,6 @@ class vframe: public ResourceObj {
 #endif
 };
 
-class MonitorInfo;
 
 class javaVFrame: public vframe {
  public:
@@ -316,7 +313,6 @@ class vframeStreamCommon : StackObj {
 
  public:
   // Constructor
-  inline vframeStreamCommon(JavaThread* thread);
   inline vframeStreamCommon(RegisterMap reg_map);
 
   // Accessors
