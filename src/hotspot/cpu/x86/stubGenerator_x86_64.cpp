@@ -6753,8 +6753,6 @@ RuntimeStub* generate_cont_doYield() {
 
     // TODO: Handle Valhalla return types. May require generating different return barriers.
 
-    Register fi = r11;
-
     if (!return_barrier) {
       __ pop(c_rarg3); // pop return address. if we don't do this, we get a drift, where the bottom-most frozen frame continuously grows
       // __ lea(rsp, Address(rsp, wordSize)); // pop return address. if we don't do this, we get a drift, where the bottom-most frozen frame continuously grows
@@ -6764,7 +6762,7 @@ RuntimeStub* generate_cont_doYield() {
     assert_asm(_masm, cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
 
     Label thaw_success;
-    __ movptr(fi, rsp);
+
     if (return_barrier) {
       __ push(rax); __ push_d(xmm0); // preserve possible return value from a method returning to the return barrier
     }
@@ -6772,7 +6770,7 @@ RuntimeStub* generate_cont_doYield() {
     __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
     if (ContPerfTest > 105) {
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, c_rarg1);
-      __ movptr(rbx, rax);
+      __ movptr(rbx, rax); // rax contains the size of the frames to thaw, 0 if overflow or no more frames
     } else {
       __ xorq(rbx, rbx);
     }
@@ -6781,7 +6779,7 @@ RuntimeStub* generate_cont_doYield() {
     }
     assert_asm(_masm, cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
 
-    __ testq(rbx, rbx);           // rax contains the size of the frames to thaw, 0 if overflow or no more frames
+    __ testq(rbx, rbx);           // rbx contains the size of the frames to thaw, 0 if overflow or no more frames
     __ jcc(Assembler::notZero, thaw_success);
 
     __ jump(ExternalAddress(StubRoutines::throw_StackOverflowError_entry()));
@@ -6789,7 +6787,7 @@ RuntimeStub* generate_cont_doYield() {
     __ bind(thaw_success);
 
     __ subq(rsp, rbx);             // make room for the thawed frames
-    __ andptr(rsp, -16); // align
+    __ andptr(rsp, -16);           // align
     
     if (return_barrier) {
       __ push(rax); __ push_d(xmm0); // save original return value -- again
