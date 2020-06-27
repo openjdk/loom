@@ -1166,7 +1166,7 @@ bool nmethod::is_not_on_continuation_stack() {
   // As for old vthread stacks, they are kept alive by a WeakHandle.
   bool not_on_old_vthread_stack = false;
   if (_keepalive != NULL) {
-    WeakHandle<vm_nmethod_keepalive_data> wh = WeakHandle<vm_nmethod_keepalive_data>::from_raw(_keepalive);
+    WeakHandle wh = WeakHandle::from_raw(_keepalive);
     not_on_old_vthread_stack = wh.resolve() == NULL;
   }
   return not_on_new_vthread_stack && not_on_old_vthread_stack;
@@ -1879,7 +1879,7 @@ void nmethod::oops_do(OopClosure* f, bool allow_dead, bool allow_null, bool keep
 
   if (keepalive_is_strong) {
     if (_keepalive != NULL) {
-      WeakHandle<vm_nmethod_keepalive_data> wh = WeakHandle<vm_nmethod_keepalive_data>::from_raw(_keepalive);
+      WeakHandle wh = WeakHandle::from_raw(_keepalive);
       if (wh.resolve() != NULL) {
         f->do_oop(_keepalive);
       }

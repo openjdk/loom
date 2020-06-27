@@ -567,6 +567,8 @@ java/lang/StringCoding/CheckEncodings.sh                        7008363 generic-
 java/lang/ProcessHandle/InfoTest.java                           8211847 aix-ppc64
 java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-all
 
+java/lang/StackWalker/LocalsAndOperands.java                    8248432 linux-all
+
 ############################################################################
 
 # jdk_instrument
@@ -699,6 +701,10 @@ javax/security/auth/kerberos/KerberosTixDateTest.java           8039280 generic-
 sun/security/provider/PolicyFile/GrantAllPermToExtWhenNoPolicy.java 8039280 generic-all
 sun/security/provider/PolicyParser/ExtDirsChange.java           8039280 generic-all
 sun/security/provider/PolicyParser/PrincipalExpansionError.java 8039280 generic-all
+sun/security/provider/SecureRandom/AbstractDrbg/SpecTest.java   8247359 linux-aarch64
+sun/security/provider/SecureRandom/SHA1PRNGReseed.java          8247359 linux-aarch64
+sun/security/provider/SecureRandom/StrongSecureRandom.java      8247359 linux-aarch64
+sun/security/provider/SeedGenerator/SeedGeneratorChoice.java    8247359 linux-aarch64
 
 ############################################################################
 
@@ -859,6 +865,7 @@ sanity/client/SwingSet/src/ScrollPaneDemoTest.java 8225013 linux-all
 # core_tools
 
 tools/jlink/JLinkReproducibleTest.java                          8217166 windows-all
+tools/jlink/plugins/CompressorPluginTest.java                   8247407 generic-all
 
 ############################################################################
 

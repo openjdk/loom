@@ -50,7 +50,8 @@
 #include "gc/shared/gcTraceTime.inline.hpp"
 #include "gc/shared/isGCActiveMark.hpp"
 #include "gc/shared/oopStorage.inline.hpp"
-#include "gc/shared/oopStorageSet.hpp"
+#include "gc/shared/oopStorageSet.inline.hpp"
+#include "gc/shared/oopStorageSetParState.inline.hpp"
 #include "gc/shared/referencePolicy.hpp"
 #include "gc/shared/referenceProcessor.hpp"
 #include "gc/shared/referenceProcessorPhaseTimes.hpp"
@@ -2019,10 +2020,6 @@ static void mark_from_roots_work(ParallelRootType::Value root_type, uint worker_
       Universe::oops_do(&mark_and_push_closure);
       break;
 
-    case ParallelRootType::jni_handles:
-      JNIHandles::oops_do(&mark_and_push_closure);
-      break;
-
     case ParallelRootType::object_synchronizer:
       ObjectSynchronizer::oops_do(&mark_and_push_closure);
       break;
@@ -2033,10 +2030,6 @@ static void mark_from_roots_work(ParallelRootType::Value root_type, uint worker_
 
     case ParallelRootType::jvmti:
       JvmtiExport::oops_do(&mark_and_push_closure);
-      break;
-
-    case ParallelRootType::vm_global:
-      OopStorageSet::vm_global()->oops_do(&mark_and_push_closure);
       break;
 
     case ParallelRootType::class_loader_data:
@@ -2085,6 +2078,7 @@ static void steal_marking_work(TaskTerminator& terminator, uint worker_id) {
 class MarkFromRootsTask : public AbstractGangTask {
   typedef AbstractRefProcTaskExecutor::ProcessTask ProcessTask;
   StrongRootsScope _strong_roots_scope; // needed for Threads::possibly_parallel_threads_do
+  OopStorageSetStrongParState<false /* concurrent */, false /* is_const */> _oop_storage_set_par_state;
   SequentialSubTasksDone _subtasks;
   TaskTerminator _terminator;
   uint _active_workers;
@@ -2108,6 +2102,15 @@ public:
 
     PCAddThreadRootsMarkingTaskClosure closure(worker_id);
     Threads::possibly_parallel_threads_do(true /*parallel */, &closure);
+
+    // Mark from OopStorages
+    {
+      ParCompactionManager* cm = ParCompactionManager::gc_thread_compaction_manager(worker_id);
+      PCMarkAndPushClosure closure(cm);
+      _oop_storage_set_par_state.oops_do(&closure);
+      // Do the real work
+      cm->follow_marking_stacks();
+    }
 
     if (_active_workers > 1) {
       steal_marking_work(_terminator, worker_id);
@@ -2239,12 +2242,11 @@ void PSParallelCompact::adjust_roots(ParCompactionManager* cm) {
 
   // General strong roots.
   Universe::oops_do(&oop_closure);
-  JNIHandles::oops_do(&oop_closure);   // Global (strong) JNI handles
   Threads::oops_do(&oop_closure, NULL);
   ObjectSynchronizer::oops_do(&oop_closure);
   Management::oops_do(&oop_closure);
   JvmtiExport::oops_do(&oop_closure);
-  OopStorageSet::vm_global()->oops_do(&oop_closure);
+  OopStorageSet::strong_oops_do(&oop_closure);
   CLDToOopClosure cld_closure(&oop_closure, ClassLoaderData::_claim_strong);
   ClassLoaderDataGraph::cld_do(&cld_closure);
 

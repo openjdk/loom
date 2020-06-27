@@ -233,7 +233,7 @@ Thread::Thread() {
   set_resource_area(new (mtThread)ResourceArea());
   DEBUG_ONLY(_current_resource_mark = NULL;)
   set_handle_area(new (mtThread) HandleArea(NULL));
-  set_metadata_handles(new (ResourceObj::C_HEAP, mtClass) GrowableArray<Metadata*>(30, true));
+  set_metadata_handles(new (ResourceObj::C_HEAP, mtClass) GrowableArray<Metadata*>(30, mtClass));
   set_active_handles(NULL);
   set_free_handle_block(NULL);
   set_last_handle_mark(NULL);
@@ -1643,7 +1643,7 @@ void JavaThread::initialize() {
   set_vframe_array_head(NULL);
   set_vframe_array_last(NULL);
   set_deferred_locals(NULL);
-  set_keepalive_cleanup(new (ResourceObj::C_HEAP, mtInternal) GrowableArray<WeakHandle<vm_nmethod_keepalive_data> >(16, true));
+  set_keepalive_cleanup(new (ResourceObj::C_HEAP, mtInternal) GrowableArray<WeakHandle>(16, mtInternal));
   set_deopt_mark(NULL);
   set_deopt_compiled_method(NULL);
   set_monitor_chunks(NULL);

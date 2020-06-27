@@ -51,9 +51,6 @@
 #include "utilities/exceptions.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
-#ifdef ZERO
-# include "stack_zero.hpp"
-#endif
 #if INCLUDE_JFR
 #include "jfr/support/jfrThreadExtension.hpp"
 #endif
@@ -1079,7 +1076,7 @@ class JavaThread: public Thread {
   // This holds the pointer to array (yeah like there might be more than one) of
   // description of compiled vframes that have locals that need to be updated.
   GrowableArray<jvmtiDeferredLocalVariableSet*>* _deferred_locals_updates;
-  GrowableArray<WeakHandle<vm_nmethod_keepalive_data> >* _keepalive_cleanup;
+  GrowableArray<WeakHandle>* _keepalive_cleanup;
 
   // Handshake value for fixing 6243940. We need a place for the i2c
   // adapter to store the callee Method*. This value is NEVER live
@@ -1585,8 +1582,8 @@ public:
   GrowableArray<jvmtiDeferredLocalVariableSet*>* deferred_locals() const { return _deferred_locals_updates; }
   void set_deferred_locals(GrowableArray<jvmtiDeferredLocalVariableSet *>* vf) { _deferred_locals_updates = vf; }
 
-  void set_keepalive_cleanup(GrowableArray<WeakHandle<vm_nmethod_keepalive_data> >* lst) { _keepalive_cleanup = lst; }
-  GrowableArray<WeakHandle<vm_nmethod_keepalive_data> >* keepalive_cleanup() const { return _keepalive_cleanup; }
+  void set_keepalive_cleanup(GrowableArray<WeakHandle>* lst) { _keepalive_cleanup = lst; }
+  GrowableArray<WeakHandle>* keepalive_cleanup() const { return _keepalive_cleanup; }
 
   // These only really exist to make debugging deopt problems simpler
 
@@ -2065,13 +2062,10 @@ static ByteSize scopedCache_offset()             { return byte_offset_of(JavaThr
   bool has_pending_popframe()                         { return (popframe_condition() & popframe_pending_bit) != 0; }
   bool popframe_forcing_deopt_reexecution()           { return (popframe_condition() & popframe_force_deopt_reexecution_bit) != 0; }
   void clear_popframe_forcing_deopt_reexecution()     { _popframe_condition &= ~popframe_force_deopt_reexecution_bit; }
-#ifdef CC_INTERP
-  bool pop_frame_pending(void)                        { return ((_popframe_condition & popframe_pending_bit) != 0); }
-  void clr_pop_frame_pending(void)                    { _popframe_condition = popframe_inactive; }
+
   bool pop_frame_in_process(void)                     { return ((_popframe_condition & popframe_processing_bit) != 0); }
   void set_pop_frame_in_process(void)                 { _popframe_condition |= popframe_processing_bit; }
   void clr_pop_frame_in_process(void)                 { _popframe_condition &= ~popframe_processing_bit; }
-#endif
 
   int frames_to_pop_failed_realloc() const            { return _frames_to_pop_failed_realloc; }
   void set_frames_to_pop_failed_realloc(int nb)       { _frames_to_pop_failed_realloc = nb; }

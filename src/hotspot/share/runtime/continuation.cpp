@@ -1985,7 +1985,7 @@ public:
     oop* keepalive = cm->get_keepalive();
     if (keepalive != NULL) {
    //   log_info(jvmcont)("keepalive is %p (%p) for nm %p", keepalive, (void *) *keepalive, cm);
-      WeakHandle<vm_nmethod_keepalive_data> wh = WeakHandle<vm_nmethod_keepalive_data>::from_raw(keepalive);
+      WeakHandle wh = WeakHandle::from_raw(keepalive);
       oop resolved = wh.resolve();
       if (resolved != NULL) {
         //log_info(jvmcont)("found keepalive %p (%p)", keepalive, (void *) resolved);
@@ -2034,14 +2034,14 @@ public:
   }
 
   void set_handle(Handle keepalive) {
-    WeakHandle<vm_nmethod_keepalive_data> wh = WeakHandle<vm_nmethod_keepalive_data>::create(keepalive);
+    WeakHandle wh = WeakHandle(OopStorageSet::vm_weak(), keepalive);
     oop* result = _method->set_keepalive(wh.raw());
 
     if (result != NULL) {
       store_keepalive(_thread, result);
       // someone else managed to do it before us, destroy the weak
       _required = false;
-      wh.release();
+      wh.release(OopStorageSet::vm_weak());
     } else {
       store_keepalive(_thread, wh.raw());
       //log_info(jvmcont)("Winning cas for %p (%p -> %p (%p))", _method, result, wh.raw(), (void *) wh.resolve());
@@ -5756,7 +5756,7 @@ public:
   typedef Handle TypeT;
 
   static Handle make_keepalive(Thread* thread, oop* keepalive) {
-    return Handle(thread, WeakHandle<vm_nmethod_keepalive_data>::from_raw(keepalive).resolve());
+    return Handle(thread, WeakHandle::from_raw(keepalive).resolve());
   }
 
   static oop read_keepalive(Handle obj) {
@@ -5773,7 +5773,7 @@ public:
   }
 
   static oop read_keepalive(oop* keepalive) {
-    return WeakHandle<vm_nmethod_keepalive_data>::from_raw(keepalive).resolve();
+    return WeakHandle::from_raw(keepalive).resolve();
   }
 };
 
@@ -5919,12 +5919,12 @@ public:
 
   virtual void do_thread(Thread* thread) {
     JavaThread* jthread = (JavaThread*) thread;
-    GrowableArray<WeakHandle<vm_nmethod_keepalive_data> >* cleanup_list = jthread->keepalive_cleanup();
+    GrowableArray<WeakHandle>* cleanup_list = jthread->keepalive_cleanup();
     int len = cleanup_list->length();
     _count += len;
     for (int i = 0; i < len; ++i) {
-      WeakHandle<vm_nmethod_keepalive_data> ref = cleanup_list->at(i);
-      ref.release();
+      WeakHandle ref = cleanup_list->at(i);
+      ref.release(OopStorageSet::vm_weak());
     }
 
     cleanup_list->clear();
@@ -5985,7 +5985,7 @@ void Continuation::nmethod_patched(nmethod* nm) {
   if (keepalive == NULL) {
     return;
   }
-  WeakHandle<vm_nmethod_keepalive_data> wh = WeakHandle<vm_nmethod_keepalive_data>::from_raw(keepalive);
+  WeakHandle wh = WeakHandle::from_raw(keepalive);
   oop resolved = wh.resolve();
 #ifdef DEBUG
   Universe::heap()->is_in_or_null(resolved);
