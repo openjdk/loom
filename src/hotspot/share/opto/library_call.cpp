@@ -758,7 +758,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_onSpinWait:               return inline_onspinwait();
 
   case vmIntrinsics::_currentThread0:           return inline_native_currentThread0();
-  case vmIntrinsics::_currentThread:            return inline_currentThread();
+  //case vmIntrinsics::_currentThread:            return inline_currentThread();         // disabled temporarily
 
   case vmIntrinsics::_scopedCache:              return inline_native_scopedCache();
   case vmIntrinsics::_setScopedCache:           return inline_native_setScopedCache();
