@@ -6815,7 +6815,7 @@ RuntimeStub* generate_cont_doYield() {
     if (exception) {
       __ movptr(c_rarg1, Address(rsp, wordSize)); // return address
       __ push(rax); // save return value contaning the exception oop
-      __ call_VM(noreg, rbx, CAST_FROM_FN_PTR(address, Continuation::raw_exception_handler_for_return_address), c_rarg1, false);
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), r15_thread, c_rarg1);
       __ movptr(rbx, rax); // the exception handler
       __ pop(rax); // restore return value contaning the exception oop
       __ pop(rbp);

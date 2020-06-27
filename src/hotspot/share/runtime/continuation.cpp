@@ -4688,10 +4688,6 @@ bool Continuation::is_continuation_enterSpecial(const frame& f, const RegisterMa
   return false;
 }
 
-JRT_ENTRY(address, Continuation::raw_exception_handler_for_return_address(JavaThread* thread, address pc))
-  return SharedRuntime::raw_exception_handler_for_return_address(thread, pc);
-JRT_END
-
 bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap* map) {
   Method* m = (map->in_cont() && f.is_interpreted_frame()) ? Continuation::interpreter_frame_method(f, map)
                                                            : Frame::frame_method(f);

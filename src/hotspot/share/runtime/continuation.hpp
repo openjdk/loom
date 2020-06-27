@@ -85,7 +85,6 @@ public:
   static intptr_t* thaw_leaf(JavaThread* thread, int kind);
   static intptr_t* thaw(JavaThread* thread, int kind);
   static int try_force_yield(JavaThread* thread, oop cont);
-  static address raw_exception_handler_for_return_address(JavaThread* thread, address pc);
 
   static oop  get_continutation_for_frame(JavaThread* thread, const frame& f);
   static bool is_continuation_enterSpecial(const frame& f, const RegisterMap* map);
