@@ -145,7 +145,6 @@ public class TestHttpServer {
         throws IOException {
         schan = ServerSocketChannel.open ();
         InetSocketAddress addr = new InetSocketAddress (address, port);
-        schan.socket().setReuseAddress(true);
         schan.socket().bind (addr);
         this.threads = threads;
         this.cb = cb;
