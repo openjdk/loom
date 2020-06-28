@@ -50,9 +50,9 @@ import static org.testng.Assert.*;
 public class ThreadExecutorTest {
 
     /**
-     * Test that a new thread is created for each task.
+     * Test that a thread is created for each task.
      */
-    public void testNewThreadPerTask() throws Exception {
+    public void testThreadPerTask() throws Exception {
         final int NUM_TASKS = 1000;
         AtomicInteger threadCount = new AtomicInteger();
 
@@ -84,7 +84,7 @@ public class ThreadExecutorTest {
     /**
      * Tests that newVirtualThreadExecutor creates virtual threads
      */
-    public void testNewUnboundedVirtualThreadExecutor() {
+    public void testNewVirtualThreadExecutor() {
         final int NUM_TASKS = 10;
         AtomicInteger virtualThreadCount = new AtomicInteger();
         try (var executor = Executors.newVirtualThreadExecutor()) {
@@ -178,7 +178,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test invokeAll where all tasks complete with exception.
+     * Test invokeAny where all tasks complete with exception.
      */
     public void testInvokeAnyCompleteExceptionally1() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
@@ -197,7 +197,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test invokeAll where all tasks complete with exception.
+     * Test invokeAny where all tasks complete with exception.
      */
     public void testInvokeAnyCompleteExceptionally2() throws Exception {
         ThreadFactory factory = Thread.builder().virtual().factory();
