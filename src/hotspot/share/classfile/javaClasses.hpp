@@ -580,6 +580,7 @@ class java_lang_VirtualThread : AllStatic {
     PARKING      = 4,
     PARKED       = 5,
     PINNED       = 6,
+    YIELDING     = 7,
     TERMINATED   = 99,
 
     // can be suspended from scheduling when parked
@@ -599,7 +600,7 @@ class java_lang_VirtualThread : AllStatic {
   static oop carrier_thread(oop vthread);
   static oop continuation(oop vthread);
   static jshort state(oop vthread);
-  static java_lang_Thread::ThreadStatus map_state_to_thread_status(jshort state);
+  static java_lang_Thread::ThreadStatus map_state_to_thread_status(jint state);
   static void set_notify_jvmti_events(jboolean enable);
   static void init_static_notify_jvmti_events();
   static jlong set_jfrTraceId(oop vthread, jlong id);

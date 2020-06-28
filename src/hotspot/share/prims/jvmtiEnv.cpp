@@ -939,7 +939,7 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
     jshort vthread_state = java_lang_VirtualThread::state(thread_oop);
 
     if (vthread_state != java_lang_VirtualThread::RUNNING) {
-      jint state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
+      jint state = java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
       if (java_lang_Thread::interrupted(thread_oop)) {
         state |= JVMTI_THREAD_STATE_INTERRUPTED;
       }
@@ -954,7 +954,7 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
   }
 
   // get most state bits
-  jint state = (jint)java_lang_Thread::get_thread_status(thread_oop);
+  jint state = java_lang_Thread::get_thread_status(thread_oop);
 
   if (java_thread != NULL) {
     // We have a JavaThread* so add more state bits.

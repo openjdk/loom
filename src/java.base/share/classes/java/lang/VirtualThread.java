@@ -76,7 +76,7 @@ class VirtualThread extends Thread {
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
-            STATE = l.findVarHandle(VirtualThread.class, "state", short.class);
+            STATE = l.findVarHandle(VirtualThread.class, "state", int.class);
             PARK_PERMIT = l.findVarHandle(VirtualThread.class, "parkPermit", boolean.class);
             CARRIER_THREAD = l.findVarHandle(VirtualThread.class, "carrierThread", Thread.class);
             LOCK = l.findVarHandle(VirtualThread.class, "lock", ReentrantLock.class);
@@ -90,23 +90,24 @@ class VirtualThread extends Thread {
     private final Continuation cont;
     private final Runnable runContinuation;
 
-    // virtual thread state
-    private static final short NEW      = 0;
-    private static final short STARTED  = 1;
-    private static final short RUNNABLE = 2;     // runnable-unmounted
-    private static final short RUNNING  = 3;     // runnable-mounted
-    private static final short PARKING  = 4;
-    private static final short PARKED   = 5;     // unmounted
-    private static final short PINNED   = 6;     // mounted
-    private static final short TERMINATED = 99;  // final state
+    // virtual thread state, accessed by VM so need to coordinate changes
+    private volatile int state;
+
+    private static final int NEW      = 0;
+    private static final int STARTED  = 1;
+    private static final int RUNNABLE = 2;     // runnable-unmounted
+    private static final int RUNNING  = 3;     // runnable-mounted
+    private static final int PARKING  = 4;
+    private static final int PARKED   = 5;     // unmounted
+    private static final int PINNED   = 6;     // mounted
+    private static final int YIELDING = 7;     // Thread.yield
+    private static final int TERMINATED = 99;  // final state
 
     // can be suspended from scheduling when parked
-    private static final short SUSPENDED = 1 << 8;
-    private static final short PARKED_SUSPENDED = (PARKED | SUSPENDED);
+    private static final int SUSPENDED = 1 << 8;
+    private static final int PARKED_SUSPENDED = (PARKED | SUSPENDED);
 
-    private volatile short state;
-
-    // parking permit
+    // parking permit, may eventually be merged into state
     private volatile boolean parkPermit;
 
     // carrier thread when mounted
@@ -156,7 +157,6 @@ class VirtualThread extends Thread {
                 if (state() == PARKING) {
                     parkCarrierThread();
                 }
-                assert state() == RUNNING;
             }
         };
 
@@ -195,7 +195,7 @@ class VirtualThread extends Thread {
         }
 
         // set state to RUNNING
-        short initialState = state();
+        int initialState = state();
         if (initialState == STARTED && compareAndSetState(STARTED, RUNNING)) {
             // first run
         } else if (initialState == RUNNABLE && compareAndSetState(RUNNABLE, RUNNING)) {
@@ -309,24 +309,23 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Invoked after yielding. If parking it sets the state to PARKED. If
-     * unparked while parking then will attempt to submit the task to continue.
-     * If yield (Thread.yield) then submits the task to continue.
+     * Invoked after the continuation yields. If parking then it sets the state
+     * and also re-submits the task to continue if unparked while parking.
+     * If yielding due to Thread.yield then it just submits the task to continue.
      */
     private void afterYield() {
         int s = state();
+        assert s == PARKING || s == YIELDING;
+
         if (s == PARKING) {
             setState(PARKED);
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
                 scheduler.execute(runContinuation);  // may throw REE
             }
-        } else if (s == RUNNING) {
-            // Thread.yield, submit task to continue
+        } else if (s == YIELDING) {   // Thread.yield
             setState(RUNNABLE);
             scheduler.execute(runContinuation);  // may throw REE
-        } else {
-            throw new InternalError();
         }
     }
 
@@ -337,7 +336,7 @@ class VirtualThread extends Thread {
      * @param notifyAgents true to notify JVMTI agents
      */
     private void afterTerminate(boolean notifyAgents) {
-        assert state == STARTED || state == RUNNING;
+        assert state() == STARTED || state() == RUNNING;
         setState(TERMINATED);   // final state
 
         // notify JVMTI agents
@@ -372,7 +371,7 @@ class VirtualThread extends Thread {
         final ReentrantLock lock = getLock();
         lock.lock();
         try {
-            assert state == PARKING;
+            assert state() == PARKING;
             setState(PINNED);
 
             if (!parkPermit) {
@@ -385,7 +384,7 @@ class VirtualThread extends Thread {
             lock.unlock();
 
             // continue running on the carrier thread
-            assert state == PINNED;
+            assert state() == PINNED;
             setState(RUNNING);
 
             // consume parking permit
@@ -458,7 +457,7 @@ class VirtualThread extends Thread {
      * yielding.
      */
     private void tryPark() {
-        assert Thread.currentThread() == this && state == RUNNING;
+        assert Thread.currentThread() == this && state() == RUNNING;
 
         // continue if parking permit available or interrupted
         if (getAndSetParkPermit(false) || interrupted) {
@@ -470,7 +469,7 @@ class VirtualThread extends Thread {
         boolean yielded = Continuation.yield(VTHREAD_SCOPE);
 
         // continued
-        assert Thread.currentThread() == this && state == RUNNING;
+        assert Thread.currentThread() == this && state() == RUNNING;
 
         // notify JVMTI mount event here so that stack is available to agents
         if (yielded && notifyJvmtiEvents) {
@@ -511,19 +510,26 @@ class VirtualThread extends Thread {
      */
     boolean isParking() {
         assert Thread.currentThread() == this;
-        return state == PARKING;
+        return state() == PARKING;
     }
 
     /**
      * Attempts to yield. A no-op if the continuation is pinned.
      */
     void tryYield() {
-        assert Thread.currentThread() == this && state == RUNNING;
+        assert Thread.currentThread() == this && state() == RUNNING;
+        setState(YIELDING);
         boolean yielded = Continuation.yield(VTHREAD_SCOPE);
-        if (yielded && notifyJvmtiEvents) {
-            notifyMount(Thread.currentCarrierThread(), this);
+        if (yielded) {
+            assert Thread.currentThread() == this && state() == RUNNING;
+            // notify JVMTI mount event here so that stack is available to agents
+            if (notifyJvmtiEvents) {
+                notifyMount(Thread.currentCarrierThread(), this);
+            }
+        } else {
+            // pinned so can't yield
+            setState(RUNNING);
         }
-        assert Thread.currentThread() == this && state == RUNNING;
     }
 
     /**
@@ -538,7 +544,7 @@ class VirtualThread extends Thread {
     boolean joinNanos(long nanos) throws InterruptedException {
         if (nanos < 0)
             throw new IllegalArgumentException();
-        short s = state();
+        int s = state();
         if (s == NEW)
             throw new IllegalStateException("Not started");
         if (s == TERMINATED)
@@ -666,6 +672,7 @@ class VirtualThread extends Thread {
                 // runnable, mounted
                 return Thread.State.RUNNABLE;
             case PARKING:
+            case YIELDING:
                 // runnable, mounted, not yet waiting
                 return Thread.State.RUNNABLE;
             case PARKED:
@@ -782,12 +789,15 @@ class VirtualThread extends Thread {
         StackTraceElement[] stackTrace = null;
         carrier.suspendThread();
         try {
-            // get stack trace if virtual thread is still mounted on the suspended
-            // carrier thread. Skip if the virtual thread is parking as the
-            // continuation frames may or may not be on the thread stack.
-            // FIXME: Thread.yield may also need special handling.
-            if (carrierThread == carrier && state() != PARKING) {
-                stackTrace = carrier.getFullStackTrace();
+            // get stack trace if virtual thread is still mounted on the
+            // suspended carrier thread. Skip if the virtual thread is parking
+            // or yielding as the continuation frames may or may not be on the
+            // thread stack.
+            if (carrierThread == carrier) {
+                int s = state();
+                if (s != PARKING && s != YIELDING) {
+                    stackTrace = carrier.getFullStackTrace();
+                }
             }
         } finally {
             carrier.resumeThread();
@@ -811,7 +821,7 @@ class VirtualThread extends Thread {
                         .walk(s -> s.map(StackFrame::toStackTraceElement)
                                     .toArray(StackTraceElement[]::new));
             } finally {
-                assert state == PARKED_SUSPENDED;
+                assert state() == PARKED_SUSPENDED;
                 setState(PARKED);
 
                 // may have been unparked while suspended
@@ -822,8 +832,8 @@ class VirtualThread extends Thread {
                 }
             }
         } else {
-            short state = state();
-            if (state == NEW || state == TERMINATED) {
+            int s = state();
+            if (s == NEW || s == TERMINATED) {
                 return EMPTY_STACK;
             } else {
                 return null;
@@ -877,19 +887,19 @@ class VirtualThread extends Thread {
 
     // -- wrappers for VarHandle methods --
 
-    private short state() {
+    private int state() {
         return state;  // volatile read
     }
 
-    private void setState(short newValue) {
+    private void setState(int newValue) {
         state = newValue;  // volatile write
     }
 
-    private void setReleaseState(short newValue) {
+    private void setReleaseState(int newValue) {
         STATE.setRelease(this, newValue);
     }
 
-    private boolean compareAndSetState(short expectedValue, short newValue) {
+    private boolean compareAndSetState(int expectedValue, int newValue) {
         return STATE.compareAndSet(this, expectedValue, newValue);
     }
 

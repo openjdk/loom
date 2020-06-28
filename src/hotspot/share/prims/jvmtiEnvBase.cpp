@@ -1789,7 +1789,7 @@ VThreadGetThreadStateClosure::do_thread(Thread *target) {
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
   } else {
-    state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
+    state = java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
   }
   if (java_lang_Thread::interrupted(_vthread_h())) {
     state |= JVMTI_THREAD_STATE_INTERRUPTED;

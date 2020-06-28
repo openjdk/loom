@@ -2084,7 +2084,7 @@ int java_lang_VirtualThread::_state_offset;
   macro(static_notify_jvmti_events_offset,  k, "notifyJvmtiEvents",  bool_signature, true); \
   macro(_carrierThread_offset,  k, "carrierThread",  thread_signature, false); \
   macro(_continuation_offset,  k, "cont",  continuation_signature, false); \
-  macro(_state_offset,  k, "state",  short_signature, false)
+  macro(_state_offset,  k, "state",  int_signature, false)
 
 static jboolean vthread_notify_jvmti_events = JNI_FALSE;
 
@@ -2119,7 +2119,7 @@ jshort java_lang_VirtualThread::state(oop vthread) {
   return vthread->short_field_acquire(_state_offset);
 }
 
-java_lang_Thread::ThreadStatus java_lang_VirtualThread::map_state_to_thread_status(jshort state) {
+java_lang_Thread::ThreadStatus java_lang_VirtualThread::map_state_to_thread_status(jint state) {
   java_lang_Thread::ThreadStatus status = java_lang_Thread::NEW;
   switch (state) {
     case NEW :
@@ -2129,6 +2129,7 @@ java_lang_Thread::ThreadStatus java_lang_VirtualThread::map_state_to_thread_stat
     case RUNNABLE :
     case RUNNING :
     case PARKING :
+    case YIELDING :
       status = java_lang_Thread::RUNNABLE;
       break;
     case PARKED :
