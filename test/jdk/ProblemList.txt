@@ -567,7 +567,8 @@ java/lang/StringCoding/CheckEncodings.sh                        7008363 generic-
 java/lang/ProcessHandle/InfoTest.java                           8211847 aix-ppc64
 java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-all
 
-java/lang/StackWalker/LocalsAndOperands.java                    8248432 generic-all
+java/lang/StackWalker/LocalsAndOperands.java#id0                8248432 generic-all
+java/lang/StackWalker/LocalsAndOperands.java#id1                8248432 generic-all
 
 java/lang/Thread/virtual/PinALot.java                           0000000 generic-all
 
