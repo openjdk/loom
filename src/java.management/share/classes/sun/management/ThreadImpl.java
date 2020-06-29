@@ -236,6 +236,9 @@ public class ThreadImpl implements ThreadMXBean {
     @Override
     public long getCurrentThreadCpuTime() {
         if (verifyCurrentThreadCpuTime()) {
+            if (Thread.currentThread().isVirtual()) {
+                throw new UnsupportedOperationException("Not supported by virtual threads");
+            }
             return getThreadTotalCpuTime0(0);
         }
         return -1;
@@ -297,6 +300,9 @@ public class ThreadImpl implements ThreadMXBean {
     @Override
     public long getCurrentThreadUserTime() {
         if (verifyCurrentThreadCpuTime()) {
+            if (Thread.currentThread().isVirtual()) {
+                throw new UnsupportedOperationException("Not supported by virtual threads");
+            }
             return getThreadUserCpuTime0(0);
         }
         return -1;
@@ -351,6 +357,9 @@ public class ThreadImpl implements ThreadMXBean {
 
     protected long getCurrentThreadAllocatedBytes() {
         if (isThreadAllocatedMemoryEnabled()) {
+            if (Thread.currentThread().isVirtual()) {
+                throw new UnsupportedOperationException("Not supported by virtual threads");
+            }
             return getThreadAllocatedMemory0(0);
         }
         return -1;
