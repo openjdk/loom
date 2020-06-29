@@ -342,10 +342,12 @@ public interface ExecutorService extends Executor, AutoCloseable {
                         .findAny();
             } else {
                 // wait until all tasks complete
-                long ignore = CompletableFuture.completed(futures).count();
+                CompletableFuture.completed(futures)
+                        .mapToLong(e -> 1L)
+                        .sum();
             }
         } catch (CancellationException e) {
-            if (Thread.currentThread().isInterrupted()) {
+            if (Thread.interrupted()) {
                 throw new InterruptedException();
             } else {
                 throw e;
