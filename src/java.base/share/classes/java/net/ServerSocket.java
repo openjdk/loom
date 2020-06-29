@@ -500,7 +500,8 @@ public class ServerSocket implements java.io.Closeable {
      * Listens for a connection to be made to this socket and accepts
      * it. The method blocks until a connection is made.
      *
-     * <p> If a {@linkplain Thread#isVirtual() virtual thread} blocked in this
+     * <p> For the system-default socket implementation at least, if a
+     * {@linkplain Thread#isVirtual() virtual thread} blocked in this
      * method is {@linkplain Thread#interrupt() interrupted} then {@link
      * SocketException} is thrown with the interrupt status set.
      *

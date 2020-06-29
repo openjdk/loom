@@ -925,9 +925,10 @@ public class Socket implements java.io.Closeable {
      *
      * </ul>
      *
-     * <p> If a {@linkplain Thread#isVirtual() virtual thread} blocked in a
+     * <p> For the system-default socket implementation at least, if a
+     * {@linkplain Thread#isVirtual() virtual thread} blocked in a
      * {@code read} method is {@linkplain Thread#interrupt() interrupted} then
-     * {@link SocketException} is thrown with the interrupt status set.
+     * {@link SocketException} is thrown with the interrupt status set
      *
      * <p> Closing the returned {@link java.io.InputStream InputStream}
      * will close the associated socket.
@@ -1002,7 +1003,8 @@ public class Socket implements java.io.Closeable {
      * operations will throw an {@link
      * java.nio.channels.IllegalBlockingModeException}.
      *
-     * <p> If a {@linkplain Thread#isVirtual() virtual thread} blocked in a
+     * <p> For the system-default socket implementation at least, if a
+     * {@linkplain Thread#isVirtual() virtual thread} blocked in a
      * {@code write} method is {@linkplain Thread#interrupt() interrupted}
      * then {@link SocketException} is thrown with the interrupt status set.
      *

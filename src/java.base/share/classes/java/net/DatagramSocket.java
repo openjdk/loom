@@ -542,8 +542,9 @@ public class DatagramSocket implements java.io.Closeable {
      * {@code length} field of the datagram packet object contains
      * the length of the received message. If the message is longer than
      * the packet's length, the message is truncated.
-     * <p>
-     * If a {@linkplain Thread#isVirtual() virtual thread} blocked in this
+     *
+     * <p> For the system-default socket implementation at least, if a
+     * {@linkplain Thread#isVirtual() virtual thread} blocked in this
      * method is {@linkplain Thread#interrupt() interrupted} then {@link
      * SocketException} is thrown with the interrupt status set.
      * <p>
