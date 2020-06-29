@@ -149,10 +149,10 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
      * delay between the time an object is allocated and the time its size is
      * recorded.
      * <p>
-     * If the thread with the specified ID is not alive or does not exist,
-     * this method returns {@code -1}. If thread memory allocation measurement
-     * is disabled, this method returns {@code -1}.
-     * A thread is alive if it has been started and has not yet died.
+     * If the thread with the specified ID is a virtual thread, is not alive,
+     * or does not exist, this method returns {@code -1}. If thread memory
+     * allocation measurement is disabled, this method returns {@code -1}.
+     * A thread is alive if it has been started and has not yet terminated.
      * <p>
      * If thread memory allocation measurement is enabled after the thread has
      * started, the Java virtual machine implementation may choose any time up
