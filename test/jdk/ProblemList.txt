@@ -569,6 +569,8 @@ java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-
 
 java/lang/StackWalker/LocalsAndOperands.java                    8248432 generic-all
 
+java/lang/Thread/virtual/PinALot.java                           0000000 generic-all
+
 ############################################################################
 
 # jdk_instrument
