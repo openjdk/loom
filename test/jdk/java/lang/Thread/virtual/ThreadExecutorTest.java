@@ -340,7 +340,7 @@ public class ThreadExecutorTest {
                 Thread.sleep(Duration.ofMinutes(2));
                 return "bar";
             };
-            ScheduledInterrupter.schedule(Thread.currentThread(), 1000);
+            ScheduledInterrupter.schedule(Thread.currentThread(), 2000);
             try {
                 executor.invokeAny(Set.of(task1, task2));
                 assertTrue(false);
@@ -421,7 +421,7 @@ public class ThreadExecutorTest {
 
             List<Future<String>> list = executor.invokeAll(List.of(task1, task2), false);
 
-            // list should have two futures, both should be done
+            // list should have two elements, both should be done
             assertTrue(list.size() == 2);
             boolean notDone = list.stream().anyMatch(r -> !r.isDone());
             assertFalse(notDone);
@@ -440,11 +440,14 @@ public class ThreadExecutorTest {
             class FooException extends Exception { }
             class BarException extends Exception { }
             Callable<String> task1 = () -> { throw new FooException(); };
-            Callable<String> task2 = () -> { throw new BarException(); };
+            Callable<String> task2 = () -> {
+                Thread.sleep(Duration.ofSeconds(1));
+                throw new BarException();
+            };
 
             List<Future<String>> list = executor.invokeAll(List.of(task1, task2), false);
 
-            // list should have two futures, both should be done
+            // list should have two elements, both should be done
             assertTrue(list.size() == 2);
             boolean notDone = list.stream().anyMatch(r -> !r.isDone());
             assertFalse(notDone);
@@ -462,26 +465,34 @@ public class ThreadExecutorTest {
      */
     public void testInvokeAll3() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
-            class FooException extends Exception { }
-            Callable<String> task1 = () -> { throw new FooException(); };
+            class BarException extends Exception { }
+            Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
+                Thread.sleep(Duration.ofSeconds(3));
+                throw new BarException();
+            };
+            Callable<String> task3 = () -> {
                 Thread.sleep(Duration.ofDays(1));
-                return "bar";
+                return "baz";
             };
 
-            List<Future<String>> list = executor.invokeAll(List.of(task1, task2), true);
+            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), true);
 
-            // list should have two futures, both should be done
-            assertTrue(list.size() == 2);
+            // list should have three elements, all should be done
+            assertTrue(list.size() == 3);
             boolean notDone = list.stream().anyMatch(r -> !r.isDone());
             assertFalse(notDone);
 
-            // check results
-            Throwable e1 = expectThrows(ExecutionException.class, () -> list.get(0).get());
-            assertTrue(e1.getCause() instanceof FooException);
+            // task1 should have a result
+            String s = list.get(0).get();
+            assertTrue("foo".equals(s));
+
+            // tasl2 should have failed with an exception
+            Throwable e2 = expectThrows(ExecutionException.class, () -> list.get(1).get());
+            assertTrue(e2.getCause() instanceof BarException);
 
             // task2 should be cancelled
-            expectThrows(CancellationException.class, () -> list.get(1).get());
+            expectThrows(CancellationException.class, () -> list.get(2).get());
         }
     }
 
@@ -522,7 +533,7 @@ public class ThreadExecutorTest {
             // cancelOnException = true
             Thread.currentThread().interrupt();
             try {
-                executor.invokeAll(List.of(task1, task2), false);
+                executor.invokeAll(List.of(task1, task2), true);
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.currentThread().isInterrupted());
@@ -539,7 +550,7 @@ public class ThreadExecutorTest {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Callable<String> task1 = () -> "foo";
             DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofSeconds(60));
-            ScheduledInterrupter.schedule(Thread.currentThread(), 1000);
+            ScheduledInterrupter.schedule(Thread.currentThread(), 2000);
             try {
                 executor.invokeAll(Set.of(task1, task2), false);
                 assertTrue(false);
@@ -564,7 +575,7 @@ public class ThreadExecutorTest {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Callable<String> task1 = () -> "foo";
             DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofSeconds(60));
-            ScheduledInterrupter.schedule(Thread.currentThread(), 1000);
+            ScheduledInterrupter.schedule(Thread.currentThread(), 2000);
             try {
                 executor.invokeAll(Set.of(task1, task2), true);
                 assertTrue(false);
@@ -592,7 +603,7 @@ public class ThreadExecutorTest {
 
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> "bar";
-        executor.invokeAll(Set.of(task1, task2));
+        executor.invokeAll(Set.of(task1, task2), false);
     }
 
     /**
@@ -600,7 +611,7 @@ public class ThreadExecutorTest {
      */
     public void testInvokeAllEmpty1() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
-            List<Future<Object>> list = executor.invokeAll(Set.of());
+            List<Future<Object>> list = executor.invokeAll(Set.of(), false);
             assertTrue(list.size() == 0);
         }
     }
