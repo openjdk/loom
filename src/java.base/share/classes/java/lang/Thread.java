@@ -239,34 +239,31 @@ public class Thread implements Runnable {
     private VirtualThread vthread;
 
     /**
-     * Sets the virtual thread that is currently mounted on this thread.
+     * Sets the Thread object for the current thread.
      */
-    void setVirtualThread(VirtualThread vthread) {
-        // assert this == currentThread0();
-        this.vthread = vthread;
-    }
-
-    /**
-     * Returns the virtual thread that is currently mounted on this thread.
-     */
-    VirtualThread getVirtualThread() {
-        // assert this == currentThread0();
-        return vthread;
+    void setCurrentThread(Thread thread) {
+        // assert Thread.currentCarrierThread() == this;
+        // assert (vthread == null && thread instanceof VirtualThread)
+        //         ^ (vthread != null && thread == this);
+        if (thread.isVirtual()) {
+            vthread = (VirtualThread) thread;
+        } else {
+            vthread = null;
+        }
     }
 
     /**
      * Returns the Thread object for the current thread.
-     *
      * @return  the current thread
      */
     @HotSpotIntrinsicCandidate
     public static Thread currentThread() {
-        Thread t = currentThread0();
-        VirtualThread vthread = t.vthread;
+        Thread thread = currentThread0();
+        VirtualThread vthread = thread.vthread;
         if (vthread != null) {
             return vthread;
         } else {
-            return t;
+            return thread;
         }
     }
 
@@ -334,8 +331,9 @@ public class Thread implements Runnable {
      * {@link java.util.concurrent.locks} package.
      */
     public static void yield() {
-        VirtualThread vthread = currentCarrierThread().getVirtualThread();
-        if (vthread != null) {
+        Thread thread = currentThread();
+        if (thread.isVirtual()) {
+            VirtualThread vthread = (VirtualThread) thread;
             vthread.tryYield();
         } else {
             yield0();
@@ -379,8 +377,9 @@ public class Thread implements Runnable {
     }
 
     private static void sleepMillis(long millis) throws InterruptedException {
-        VirtualThread vthread = currentCarrierThread().getVirtualThread();
-        if (vthread != null) {
+        Thread thread = currentThread();
+        if (thread.isVirtual()) {
+            VirtualThread vthread = (VirtualThread) thread;
             vthread.sleepNanos(NANOSECONDS.convert(millis, MILLISECONDS));
         } else {
             sleep0(millis);
@@ -449,8 +448,9 @@ public class Thread implements Runnable {
     public static void sleep(Duration duration) throws InterruptedException {
         long nanos = duration.toNanos();
         if (nanos >= 0) {
-            VirtualThread vthread = currentCarrierThread().getVirtualThread();
-            if (vthread != null) {
+            Thread thread = currentThread();
+            if (thread.isVirtual()) {
+                VirtualThread vthread = (VirtualThread) thread;
                 if (ThreadSleepEvent.isTurnedOn()) {
                     ThreadSleepEvent event = new ThreadSleepEvent();
                     try {

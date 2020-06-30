@@ -142,16 +142,8 @@ class VirtualThread extends Thread {
             @Override
             protected void onPinned(Continuation.Pinned reason) {
                 if (TRACE_PINNING_MODE > 0) {
-                    // switch to carrier thread as the printing may park
-                    Thread carrier = Thread.currentCarrierThread();
-                    VirtualThread vthread = carrier.getVirtualThread();
-                    carrier.setVirtualThread(null);
-                    try {
-                        boolean printAll = (TRACE_PINNING_MODE == 1);
-                        PinnedThreadPrinter.printStackTrace(printAll);
-                    } finally {
-                        carrier.setVirtualThread(vthread);
-                    }
+                    boolean printAll = (TRACE_PINNING_MODE == 1);
+                    PinnedThreadPrinter.printStackTrace(printAll);
                 }
 
                 if (state() == PARKING) {
@@ -261,13 +253,12 @@ class VirtualThread extends Thread {
      */
     private void mount(boolean firstRun) {
         Thread carrier = Thread.currentCarrierThread();
-        //assert carrierThread == null && thread.getVirtualThread() == null;
 
         // sets the carrier thread
         CARRIER_THREAD.setRelease(this, carrier);
 
-        // set thread field so Thread.currentThread() returns the VirtualThread object
-        carrier.setVirtualThread(this);
+        // set Thread.currentThread() to return this virtual thread
+        carrier.setCurrentThread(this);
 
         // sync up carrier thread interrupt status if needed
         if (interrupted) {
@@ -292,14 +283,13 @@ class VirtualThread extends Thread {
      */
     private void unmount() {
         Thread carrier = Thread.currentCarrierThread();
-        //assert carrierThread == thread & thread.getVirtualThread() == this;
 
         if (notifyJvmtiEvents) {
             notifyUnmount(carrier, this);
         }
 
-        // drop connection between this virtual thread and the carrier thread
-        carrier.setVirtualThread(null);
+        // set Thread.currentThread() to return the carrier thread
+        carrier.setCurrentThread(carrier);
         synchronized (interruptLock) {   // synchronize with interrupt
             CARRIER_THREAD.setRelease(this, null);
         }
@@ -367,7 +357,7 @@ class VirtualThread extends Thread {
 
         // switch to carrier thread
         Thread carrier = Thread.currentCarrierThread();
-        carrier.setVirtualThread(null);
+        carrier.setCurrentThread(carrier);
         final ReentrantLock lock = getLock();
         lock.lock();
         try {
@@ -391,7 +381,7 @@ class VirtualThread extends Thread {
             setParkPermit(false);
 
             // switch back to virtual thread
-            carrier.setVirtualThread(this);
+            carrier.setCurrentThread(this);
         }
 
         // restore interrupt status
@@ -411,9 +401,11 @@ class VirtualThread extends Thread {
      * @throws IllegalCallerException if not called from a virtual thread
      */
     static void park() {
-        VirtualThread vthread = Thread.currentCarrierThread().getVirtualThread();
-        if (vthread == null)
-            throw new IllegalCallerException("not a virtual thread");
+        Thread thread = Thread.currentThread();
+        if (!thread.isVirtual()) {
+            throw new IllegalCallerException("Not a virtual thread");
+        }
+        VirtualThread vthread = (VirtualThread) thread;
         vthread.tryPark();
     }
 
@@ -433,10 +425,11 @@ class VirtualThread extends Thread {
      * @throws IllegalCallerException if not called from a virtual thread
      */
     static void parkNanos(long nanos) {
-        Thread carrier = Thread.currentCarrierThread();
-        VirtualThread vthread = carrier.getVirtualThread();
-        if (vthread == null)
-            throw new IllegalCallerException("not a virtual thread");
+        Thread thread = Thread.currentThread();
+        if (!thread.isVirtual()) {
+            throw new IllegalCallerException("Not a virtual thread");
+        }
+        VirtualThread vthread = (VirtualThread) thread;
         if (nanos > 0) {
             Future<?> unparker = UNPARKER.schedule(vthread::unpark, nanos, NANOSECONDS);
             try {
@@ -1048,18 +1041,26 @@ class VirtualThread extends Thread {
          *        frames that are native or holding a monitor
          */
         static synchronized void printStackTrace(boolean printAll) {
-            System.out.println(Thread.currentThread());
-            INSTANCE.forEach(f -> {
-                if (f.getDeclaringClass() != PinnedThreadPrinter.class) {
-                    var ste = f.toStackTraceElement();
-                    int monitorCount = ((LiveStackFrame) f).getMonitors().length;
-                    if (monitorCount > 0 || f.isNativeMethod()) {
-                        System.out.format("    %s <== monitors:%d%n", ste, monitorCount);
-                    } else if (printAll) {
-                        System.out.format("    %s%n", ste);
+            // switch to carrier thread as the printing may park
+            Thread vthread = Thread.currentThread();
+            Thread carrier = Thread.currentCarrierThread();
+            carrier.setCurrentThread(carrier);
+            try {
+                System.out.println(Thread.currentThread());
+                INSTANCE.forEach(f -> {
+                    if (f.getDeclaringClass() != PinnedThreadPrinter.class) {
+                        var ste = f.toStackTraceElement();
+                        int monitorCount = ((LiveStackFrame) f).getMonitors().length;
+                        if (monitorCount > 0 || f.isNativeMethod()) {
+                            System.out.format("    %s <== monitors:%d%n", ste, monitorCount);
+                        } else if (printAll) {
+                            System.out.format("    %s%n", ste);
+                        }
                     }
-                }
-            });
+                });
+            } finally {
+                carrier.setCurrentThread(vthread);
+            }
         }
     }
 

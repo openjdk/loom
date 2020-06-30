@@ -2300,13 +2300,13 @@ public final class System {
             }
 
             public <V> V executeOnCarrierThread(Callable<V> task) throws Exception {
+                Thread vthread = Thread.currentThread();
                 Thread carrier = Thread.currentCarrierThread();
-                VirtualThread vthread = carrier.getVirtualThread();
-                if (vthread != null) carrier.setVirtualThread(null);
+                carrier.setCurrentThread(carrier);
                 try {
                     return task.call();
                 } finally {
-                    if (vthread != null) carrier.setVirtualThread(vthread);
+                    carrier.setCurrentThread(vthread);
                 }
             }
 
