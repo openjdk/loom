@@ -3269,7 +3269,8 @@ void JavaThread::print_stack_on(outputStream* st) {
   ResourceMark rm;
   HandleMark   hm;
 
-  RegisterMap reg_map(this);
+  bool update_map = JavaMonitorsInStackTrace;
+  RegisterMap reg_map(this, update_map);
   vframe* start_vf = last_java_vframe(&reg_map);
   int count = 0;
   for (vframe* f = start_vf; f != NULL; f = f->sender()) {
