@@ -42,7 +42,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * An {@link Executor} that provides methods to manage termination and
@@ -310,10 +309,10 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * completes with an exception.
      *
      * @implSpec
-     * The default implementation invokes {@code submitTasks()} to submit all
-     * tasks and then waits until all tasks have completed, or in the case
-     * that {@code cancelOnException} is true, that a task completes with an
-     * exception.
+     * The default implementation uses the {@link #submit(Callable)} to submit
+     * each task for execution. It then waits until all tasks have completed,
+     * or in the case that {@code cancelOnException} is true, that a task
+     * completes with an exception.
      *
      * @param tasks the collection of tasks
      * @param cancelOnException true to cancel unfinished tasks when
@@ -333,31 +332,29 @@ public interface ExecutorService extends Executor, AutoCloseable {
                                           boolean cancelOnException)
             throws InterruptedException {
 
-        List<CompletableFuture<T>> futures = submitTasks(tasks);
+        List<Future<T>> futures = new ArrayList<>(tasks.size());
         try {
-            if (cancelOnException) {
-                // wait until a task fails or all tasks complete
-                CompletableFuture.completed(futures)
-                        .filter(CompletableFuture::isCompletedExceptionally)
-                        .findAny();
-            } else {
-                // wait until all tasks complete
-                CompletableFuture.completed(futures)
-                        .mapToLong(e -> 1L)
-                        .sum();
+            for (Callable<T> t : tasks) {
+                futures.add(submit(t));
             }
-        } catch (CancellationException e) {
-            if (Thread.interrupted()) {
-                throw new InterruptedException();
-            } else {
-                throw e;
+            boolean abort = false;
+            for (int i = 0, size = futures.size(); (i < size && !abort); i++) {
+                Future<T> f = futures.get(i);
+                try {
+                    f.get();
+                } catch (ExecutionException e) {
+                    if (cancelOnException) abort = true;
+                } catch (CancellationException ignore) { }
             }
+            return futures;
         } finally {
-            futures.forEach(f -> f.cancel(true));
+            // cancel remaining
+            for (Future<T> f : futures) {
+                if (!f.isDone()) {
+                    f.cancel(true);
+                }
+            }
         }
-        @SuppressWarnings("unchecked")
-        List<Future<T>> result = (List) futures;
-        return result;
     }
 
     /**
@@ -599,7 +596,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
             return tasks.stream()
                     .map(this::submitTask)
                     .collect(Collectors.toCollection(() -> list));
-        } catch (Exception e) {
+        } catch (Throwable e) {
             list.forEach(future -> future.cancel(true));
             throw e;
         }
