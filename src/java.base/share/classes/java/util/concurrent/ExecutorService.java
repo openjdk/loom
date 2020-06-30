@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * An {@link Executor} that provides methods to manage termination and
@@ -591,13 +590,18 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * @see CompletableFuture#completed(CompletableFuture[])
      */
     default <T> List<CompletableFuture<T>> submitTasks(Collection<? extends Callable<T>> tasks) {
-        List<CompletableFuture<T>> list = new ArrayList<>();
+        List<CompletableFuture<T>> futures = new ArrayList<>();
         try {
-            return tasks.stream()
-                    .map(this::submitTask)
-                    .collect(Collectors.toCollection(() -> list));
+            for (Callable<T> t : tasks) {
+                futures.add(submitTask(t));
+            }
+            return futures;
         } catch (Throwable e) {
-            list.forEach(future -> future.cancel(true));
+            for (Future<T> f : futures) {
+                if (!f.isDone()) {
+                    f.cancel(true);
+                }
+            }
             throw e;
         }
     }
