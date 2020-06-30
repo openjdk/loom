@@ -38,7 +38,7 @@ public class Collectable {
 
     // ensure that an unstarted virtual thread can be GC"ed
     public void testGC1() {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
+        var thread = Thread.builder().virtual().task(() -> { }).build();
         var ref = new WeakReference<>(thread);
         thread = null;
         waitUntilCleared(ref);
@@ -46,8 +46,7 @@ public class Collectable {
 
     // ensure that a parked virtual thread can be GC'ed
     public void testGC2() {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
-        thread.start();
+        var thread = Thread.startVirtualThread(LockSupport::park);
         var ref = new WeakReference<>(thread);
         thread = null;
         waitUntilCleared(ref);
@@ -55,8 +54,7 @@ public class Collectable {
 
     // ensure that a terminated virtual thread can be GC'ed
     public void testGC3() throws Exception {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> { });
-        thread.start();
+        var thread = Thread.startVirtualThread(() -> { });
         thread.join();
         var ref = new WeakReference<>(thread);
         thread = null;

@@ -39,8 +39,7 @@ public class Parking {
 
     // virtual thread parks, unparked by dinosaur thread
     public void testPark1() throws Exception {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
-        thread.start();
+        var thread = Thread.startVirtualThread(LockSupport::park);
         Thread.sleep(1000); // give time for virtual thread to park
         LockSupport.unpark(thread);
         thread.join();
@@ -48,24 +47,21 @@ public class Parking {
 
     // virtual thread parks, unparked by another virtual thread
     public void testPark2() throws Exception {
-        var thread1 = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.park());
-        thread1.start();
+        var thread1 = Thread.startVirtualThread(LockSupport::park);
         Thread.sleep(1000); // give time for virtual thread to park
-        var thread2 = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.unpark(thread1));
-        thread2.start();
+        var thread2 = Thread.startVirtualThread(() -> LockSupport.unpark(thread1));
         thread1.join();
         thread2.join();
     }
 
     // park while holding monitor
     public void testPark3() throws Exception {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread = Thread.startVirtualThread(() -> {
             var lock = new Object();
             synchronized (lock) {
                 LockSupport.park();
             }
         });
-        thread.start();
         Thread.sleep(1000); // give time for virtual thread to park
         LockSupport.unpark(thread);
         thread.join();
@@ -95,24 +91,22 @@ public class Parking {
 
     // unpark before park
     public void testPark5() throws Exception {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread = Thread.startVirtualThread(() -> {
             LockSupport.unpark(Thread.currentThread());
             LockSupport.park();
         });
-        thread.start();
         thread.join();
     }
 
     // 2 x unpark before park
     public void testPark6() throws Exception {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread = Thread.startVirtualThread(() -> {
             Thread me = Thread.currentThread();
             LockSupport.unpark(me);
             LockSupport.unpark(me);
             LockSupport.park();
             LockSupport.park();  // should park
         });
-        thread.start();
         Thread.sleep(1000); // give time for virtual thread to park
         LockSupport.unpark(thread);
         thread.join();
@@ -120,11 +114,10 @@ public class Parking {
 
     // 2 x park
     public void testPark7() throws Exception {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread = Thread.startVirtualThread(() -> {
             LockSupport.park();
             LockSupport.park();
         });
-        thread.start();
 
         Thread.sleep(1000); // give time for virtual thread to park
 
@@ -211,11 +204,10 @@ public class Parking {
 
     // virtual thread parks, unparked by dinosaur thread
     public void testParkNanos4() throws Exception {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread = Thread.startVirtualThread(() -> {
             long nanos = TimeUnit.NANOSECONDS.convert(30, TimeUnit.SECONDS);
             LockSupport.parkNanos(nanos);
         });
-        thread.start();
         Thread.sleep(1000); // give time for virtual thread to park
         LockSupport.unpark(thread);
         thread.join();
@@ -223,14 +215,12 @@ public class Parking {
 
     // virtual thread parks, unparked by another virtual thread
     public void testParkNanos5() throws Exception {
-        var thread1 = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread1 = Thread.startVirtualThread(() -> {
             long nanos = TimeUnit.NANOSECONDS.convert(30, TimeUnit.SECONDS);
             LockSupport.parkNanos(nanos);
         });
-        thread1.start();
         Thread.sleep(1000);  // give time for virtual thread to park
-        var thread2 = Thread.newThread(Thread.VIRTUAL, () -> LockSupport.unpark(thread1));
-        thread2.start();
+        var thread2 = Thread.startVirtualThread(() -> LockSupport.unpark(thread1));
         thread1.join();
         thread2.join();
     }
@@ -246,12 +236,11 @@ public class Parking {
 
     // unpark before parkNanos(0), should consume permit
     public void testParkNanos7() throws Exception {
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread = Thread.startVirtualThread(() -> {
             LockSupport.unpark(Thread.currentThread());
             LockSupport.parkNanos(0);
             LockSupport.park(); // should block
         });
-        thread.start();
         boolean isAlive = thread.join(Duration.ofSeconds(2));
         assertTrue(isAlive);
         LockSupport.unpark(thread);

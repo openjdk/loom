@@ -35,11 +35,11 @@ import static org.testng.Assert.*;
 @Test
 public class WaitNotify {
 
-    // virtual thread waits, notified by dinosaur thread
+    // virtual thread waits, notified by kernel thread
     public void testWaitNotify1() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread = Thread.startVirtualThread(() -> {
             synchronized (lock) {
                 ready.release();
                 try {
@@ -47,7 +47,6 @@ public class WaitNotify {
                 } catch (InterruptedException e) { }
             }
         });
-        thread.start();
         // thread invokes notify
         ready.acquire();
         synchronized (lock) {
@@ -56,17 +55,16 @@ public class WaitNotify {
         thread.join();
     }
 
-    // dinosaur thread waits, notified by virtual thread
+    // kernel thread waits, notified by virtual thread
     public void testWaitNotify2() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread = Thread.startVirtualThread(() -> {
             ready.acquireUninterruptibly();
             synchronized (lock) {
                 lock.notifyAll();
             }
         });
-        thread.start();
         synchronized (lock) {
             ready.release();
             lock.wait();
@@ -78,7 +76,7 @@ public class WaitNotify {
     public void testWaitNotify3() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread1 = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread1 = Thread.startVirtualThread(() -> {
             synchronized (lock) {
                 ready.release();
                 try {
@@ -86,7 +84,7 @@ public class WaitNotify {
                 } catch (InterruptedException e) { }
             }
         });
-        var thread2 = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread2 = Thread.startVirtualThread(() -> {
             ready.acquireUninterruptibly();
             synchronized (lock) {
                 lock.notifyAll();

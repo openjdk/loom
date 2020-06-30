@@ -93,14 +93,13 @@ public class Locking {
         // thread acquires lock
         lock.lock();
         try {
-            thread = Thread.newThread(Thread.VIRTUAL, () -> {
+            thread = Thread.startVirtualThread(() -> {
                 lock.lock();  // should block
                 holdsLock.set(true);
                 LockSupport.park();
                 lock.unlock();
                 holdsLock.set(false);
             });
-            thread.start();
             // give time for virtual thread to block
             Thread.sleep(500);
             assertFalse(holdsLock.get());
@@ -122,7 +121,7 @@ public class Locking {
     // locked by virtual thread, dinoasur thread tries to lock
     public void testReentrantLock5() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread = Thread.startVirtualThread(() -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -130,7 +129,6 @@ public class Locking {
                 lock.unlock();
             }
         });
-        thread.start();
 
         // wat for virtual thread to acquire lock
         while (!lock.isLocked()) {
@@ -154,7 +152,7 @@ public class Locking {
     // lock by virtual thread, another virtual thread tries to lock
     public void testReentrantLock6() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread1 = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread1 = Thread.startVirtualThread(() -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -162,7 +160,6 @@ public class Locking {
                 lock.unlock();
             }
         });
-        thread1.start();
 
         // wat for virtual thread to acquire lock
         while (!lock.isLocked()) {
@@ -170,14 +167,13 @@ public class Locking {
         }
 
         var holdsLock  = new AtomicBoolean();
-        var thread2 = Thread.newThread(Thread.VIRTUAL, () -> {
+        var thread2 = Thread.startVirtualThread(() -> {
             lock.lock();
             holdsLock.set(true);
             LockSupport.park();
             lock.unlock();
             holdsLock.set(false);
         });
-        thread2.start();
 
         // virtual thread2 should block
         Thread.sleep(1000);
