@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class SleepALot {
 
-    static final int ITERATIONS = 10_000_000;
+    static final int ITERATIONS = 1_000_000;
 
     public static void main(String[] args) throws Exception {
         AtomicInteger count = new AtomicInteger();
