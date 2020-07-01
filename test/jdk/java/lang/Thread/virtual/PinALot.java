@@ -36,11 +36,12 @@ public class PinALot {
 
     static final int ITERATIONS = 1_000_000;
 
+    static final Object lock = new Object();
+
     public static void main(String[] args) throws Exception {
         AtomicInteger count = new AtomicInteger();
 
         Thread thread = Thread.startVirtualThread(() -> {
-            Object lock = new Object();
             synchronized (lock) {
                 while (count.incrementAndGet() < ITERATIONS) {
                     LockSupport.parkNanos(1);
