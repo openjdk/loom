@@ -3391,8 +3391,9 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
     if (UNLIKELY(res == freeze_retry_slow)) {
       log_develop_trace(jvmcont)("-- RETRYING SLOW --");
       res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(sp, false);
+    } else if (LIKELY(res == freeze_ok)) {
+      set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
     }
-    set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
     return freeze_epilog(thread, cont, res);
   }
 }
