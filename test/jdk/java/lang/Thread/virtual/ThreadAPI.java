@@ -566,7 +566,12 @@ public class ThreadAPI {
     // interrupt virtual thread when in join of dinosaur thread
     public void testJoin30() throws Exception {
         TestHelper.runInVirtualThread(() -> {
-            var thread = new Thread(() -> LockSupport.park());
+            AtomicBoolean done = new AtomicBoolean();
+            var thread = new Thread(() -> {
+                while (!done.get()) {
+                    LockSupport.park();
+                }
+            });
             thread.start();
             TestHelper.scheduleInterrupt(Thread.currentThread(), 100);
             try {
@@ -575,6 +580,7 @@ public class ThreadAPI {
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());
             } finally {
+                done.set(true);
                 LockSupport.unpark(thread);
                 thread.join();
             }
