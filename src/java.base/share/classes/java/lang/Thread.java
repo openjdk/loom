@@ -236,19 +236,19 @@ public class Thread implements Runnable {
     private Continuation cont;
 
     // the virtual thread mounted on this thread
-    private VirtualThread vthread;
+    private Thread vthread;
 
     /**
-     * Sets the Thread object for the current thread.
+     * Sets the Thread object to be returned by Thread.currentThread().
      */
     void setCurrentThread(Thread thread) {
-        // assert Thread.currentCarrierThread() == this;
-        // assert (vthread == null && thread instanceof VirtualThread)
-        //         ^ (vthread != null && thread == this);
-        if (thread.isVirtual()) {
-            vthread = (VirtualThread) thread;
-        } else {
+        //assert Thread.currentCarrierThread() == this;
+        if (thread == this) {
+            //assert vthread != null;
             vthread = null;
+        } else {
+            //assert vthread == null && thread.isVirtual();
+            vthread = thread;
         }
     }
 
@@ -259,7 +259,7 @@ public class Thread implements Runnable {
     @HotSpotIntrinsicCandidate
     public static Thread currentThread() {
         Thread thread = currentThread0();
-        VirtualThread vthread = thread.vthread;
+        Thread vthread = thread.vthread;
         if (vthread != null) {
             return vthread;
         } else {
@@ -333,8 +333,7 @@ public class Thread implements Runnable {
     public static void yield() {
         Thread thread = currentThread();
         if (thread.isVirtual()) {
-            VirtualThread vthread = (VirtualThread) thread;
-            vthread.tryYield();
+            ((VirtualThread) thread).tryYield();
         } else {
             yield0();
         }
@@ -379,8 +378,8 @@ public class Thread implements Runnable {
     private static void sleepMillis(long millis) throws InterruptedException {
         Thread thread = currentThread();
         if (thread.isVirtual()) {
-            VirtualThread vthread = (VirtualThread) thread;
-            vthread.sleepNanos(NANOSECONDS.convert(millis, MILLISECONDS));
+            long nanos = NANOSECONDS.convert(millis, MILLISECONDS);
+            ((VirtualThread) thread).sleepNanos(nanos);
         } else {
             sleep0(millis);
         }
@@ -450,18 +449,17 @@ public class Thread implements Runnable {
         if (nanos >= 0) {
             Thread thread = currentThread();
             if (thread.isVirtual()) {
-                VirtualThread vthread = (VirtualThread) thread;
                 if (ThreadSleepEvent.isTurnedOn()) {
                     ThreadSleepEvent event = new ThreadSleepEvent();
                     try {
                         event.time = nanos;
                         event.begin();
-                        vthread.sleepNanos(nanos);
+                        ((VirtualThread) thread).sleepNanos(nanos);
                     } finally {
                         event.commit();
                     }
                 } else {
-                    vthread.sleepNanos(nanos);
+                    ((VirtualThread) thread).sleepNanos(nanos);
                 }
             } else {
                 // convert to milliseconds, ceiling rounding mode

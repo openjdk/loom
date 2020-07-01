@@ -356,7 +356,7 @@ class VirtualThread extends Thread {
         boolean awaitInterrupted = false;
 
         // switch to carrier thread
-        Thread carrier = Thread.currentCarrierThread();
+        Thread carrier = this.carrierThread;
         carrier.setCurrentThread(carrier);
         final ReentrantLock lock = getLock();
         lock.lock();
@@ -405,8 +405,7 @@ class VirtualThread extends Thread {
         if (!thread.isVirtual()) {
             throw new IllegalCallerException("Not a virtual thread");
         }
-        VirtualThread vthread = (VirtualThread) thread;
-        vthread.tryPark();
+        ((VirtualThread) thread).tryPark();
     }
 
     /**
@@ -429,19 +428,7 @@ class VirtualThread extends Thread {
         if (!thread.isVirtual()) {
             throw new IllegalCallerException("Not a virtual thread");
         }
-        VirtualThread vthread = (VirtualThread) thread;
-        if (nanos > 0) {
-            Future<?> unparker = UNPARKER.schedule(vthread::unpark, nanos, NANOSECONDS);
-            try {
-                vthread.tryPark();
-            } finally {
-                unparker.cancel(false);
-            }
-        } else {
-            // consume permit when not parking
-            vthread.tryYield();
-            vthread.setParkPermit(false);
-        }
+        ((VirtualThread) thread).tryPark(nanos);
     }
 
     /**
@@ -450,23 +437,51 @@ class VirtualThread extends Thread {
      * yielding.
      */
     private void tryPark() {
-        assert Thread.currentThread() == this && state() == RUNNING;
-
-        // continue if parking permit available or interrupted
-        if (getAndSetParkPermit(false) || interrupted) {
+        // complete immediately if parking permit available or interrupted
+        if (getAndSetParkPermit(false) || interrupted)
             return;
+
+        // park the thread
+        parkThread();
+    }
+
+    /**
+     * Try to park for up to the given waiting time. If already been unparked
+     * (parking permit available) or the interrupt status is set then this method
+     * completes immediately without yielding.
+     */
+    private void tryPark(long nanos) {
+        // complete immediately if parking permit available or interrupted
+        if (getAndSetParkPermit(false) || interrupted)
+            return;
+
+        // park the thread for the waiting time
+        if (nanos > 0) {
+            Future<?> unparker = UNPARKER.schedule(this::unpark, nanos, NANOSECONDS);
+            try {
+                parkThread();
+            } finally {
+                if (!unparker.isDone()) unparker.cancel(false);
+            }
+        } else {
+            // consume permit when not parking
+            tryYield();
+            setParkPermit(false);
         }
+    }
+
+    /**
+     * Park this virtual thread. If pinned, the carrier thread will be parked.
+     */
+    private void parkThread() {
+        //assert Thread.currentThread() == this && state() == RUNNING
 
         setState(PARKING);
-
         boolean yielded = Continuation.yield(VTHREAD_SCOPE);
-
-        // continued
-        assert Thread.currentThread() == this && state() == RUNNING;
 
         // notify JVMTI mount event here so that stack is available to agents
         if (yielded && notifyJvmtiEvents) {
-            notifyMount(Thread.currentCarrierThread(), this);
+            notifyMount(carrierThread, this);
         }
     }
 
@@ -517,7 +532,7 @@ class VirtualThread extends Thread {
             assert Thread.currentThread() == this && state() == RUNNING;
             // notify JVMTI mount event here so that stack is available to agents
             if (notifyJvmtiEvents) {
-                notifyMount(Thread.currentCarrierThread(), this);
+                notifyMount(carrierThread, this);
             }
         } else {
             // pinned so can't yield
