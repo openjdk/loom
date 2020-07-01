@@ -23,28 +23,24 @@
 
 /**
  * @test
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks PinALot
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks PinALot
- * @summary Stress test timed park when pinned
+ * @run main/othervm/timeout=300 -XX:-UseContinuationChunks YieldALot
+ * @run main/othervm/timeout=300 -XX:+UseContinuationChunks YieldALot
+ * @summary Stress test Thread.yield
  */
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.LockSupport;
 
-public class PinALot {
+public class YieldALot {
 
-    static final int ITERATIONS = 1_000_000;
+    static final int ITERATIONS = 10_000_000;
 
     public static void main(String[] args) throws Exception {
         AtomicInteger count = new AtomicInteger();
 
         Thread thread = Thread.startVirtualThread(() -> {
-            Object lock = new Object();
-            synchronized (lock) {
-                while (count.incrementAndGet() < ITERATIONS) {
-                    LockSupport.parkNanos(1);
-                }
+            while (count.incrementAndGet() < ITERATIONS) {
+                Thread.yield();
             }
         });
 
