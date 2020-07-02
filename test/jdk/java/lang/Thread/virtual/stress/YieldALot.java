@@ -23,9 +23,17 @@
 
 /**
  * @test
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks YieldALot
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks YieldALot
+ * @requires vm.debug != true
+ * @run main/othervm -XX:-UseContinuationChunks YieldALot
+ * @run main/othervm -XX:+UseContinuationChunks YieldALot
  * @summary Stress test Thread.yield
+ */
+
+/**
+ * @test
+ * @requires vm.debug == true
+ * @run main/othervm/timeout=300 -XX:-UseContinuationChunks YieldALot 200000
+ * @run main/othervm/timeout=300 -XX:+UseContinuationChunks YieldALot 200000
  */
 
 import java.time.Duration;
@@ -33,9 +41,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class YieldALot {
 
-    static final int ITERATIONS = 1_000_000;
-
     public static void main(String[] args) throws Exception {
+        int iterations = 1_000_000;
+        if (args.length > 0) {
+            iterations = Integer.parseInt(args[0]);
+        }
+        final int ITERATIONS = iterations;
+
         AtomicInteger count = new AtomicInteger();
 
         Thread thread = Thread.startVirtualThread(() -> {

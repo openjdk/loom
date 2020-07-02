@@ -23,26 +23,41 @@
 
 /**
  * @test
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks SleepALot
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks SleepALot
- * @summary Stress test Thread.sleep
+ * @requires vm.debug != true
+ * @run main/othervm -XX:-UseContinuationChunks PinALot
+ * @run main/othervm -XX:+UseContinuationChunks PinALot
+ * @summary Stress test timed park when pinned
+ */
+
+/**
+ * @test
+ * @requires vm.debug == true
+ * @run main/othervm/timeout=300 -XX:-UseContinuationChunks PinALot 200000
+ * @run main/othervm/timeout=300 -XX:+UseContinuationChunks PinALot 200000
  */
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
-public class SleepALot {
+public class PinALot {
 
-    static final int ITERATIONS = 1_000_000;
+    static final Object lock = new Object();
 
     public static void main(String[] args) throws Exception {
+        int iterations = 1_000_000;
+        if (args.length > 0) {
+            iterations = Integer.parseInt(args[0]);
+        }
+        final int ITERATIONS = iterations;
+
         AtomicInteger count = new AtomicInteger();
 
         Thread thread = Thread.startVirtualThread(() -> {
-            while (count.incrementAndGet() < ITERATIONS) {
-                try {
-                    Thread.sleep(Duration.ofNanos(100));
-                } catch (InterruptedException ignore) { }
+            synchronized (lock) {
+                while (count.incrementAndGet() < ITERATIONS) {
+                    LockSupport.parkNanos(1);
+                }
             }
         });
 
