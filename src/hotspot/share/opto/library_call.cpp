@@ -1114,7 +1114,7 @@ Node* LibraryCallKit::generate_current_thread(Node* &tls_output) {
 
 //--------------------------generate_virtual_thread--------------------
 Node* LibraryCallKit::generate_virtual_thread(Node* threadObj) {
-  return load_field_from_object(threadObj, "vthread", "Ljava/lang/VirtualThread;", false);
+  return load_field_from_object(threadObj, "vthread", "Ljava/lang/Thread;", false);
 }
 
 //------------------------------make_string_method_node------------------------
