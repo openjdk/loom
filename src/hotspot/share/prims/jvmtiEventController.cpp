@@ -214,6 +214,8 @@ public:
 
     state->enter_interp_only_mode();
 
+    Continuation::set_cont_fastpath_thread_state(state->get_thread()); // TODO LOOM: find out why the other place where this is called is insufficient 
+
     if (jt->has_last_Java_frame()) {
       // If running in fullspeed mode, single stepping is implemented
       // as follows: first, the interpreter does not dispatch to
