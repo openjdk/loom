@@ -1267,14 +1267,21 @@ NOINLINE static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end) 
     int slot;
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
     assert (cb != NULL, "");
+    if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
+    assert (cb->is_nmethod(), "");
+    assert (cb->frame_size() > 0, "");
+
+    if (UNLIKELY(slot <= 0)) { // we could have marked frames for deoptimization in thaw_chunk
+      CompiledMethod* cm = cb->as_compiled_method();
+      assert (cm->is_deopt_pc(pc), "");
+      pc = *(address*)((address)sp + cm->orig_pc_offset());
+      assert (cb == ContinuationCodeBlobLookup::find_blob(pc), "");
+      ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+    }
     assert (slot >= 0, "");
     const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
     assert (oopmap != NULL, "");
     log_develop_trace(jvmcont)("fix_stack_chunk slot: %d codeblob:", slot);
-
-    if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
-    assert (cb->is_nmethod(), "");
-    assert (cb->frame_size() > 0, "");
 
     num_frames++;
     num_oops += oopmap->num_oops();
