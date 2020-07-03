@@ -1271,7 +1271,7 @@ NOINLINE static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end) 
     assert (cb->is_nmethod(), "");
     assert (cb->frame_size() > 0, "");
 
-    if (UNLIKELY(slot <= 0)) { // we could have marked frames for deoptimization in thaw_chunk
+    if (UNLIKELY(slot < 0)) { // we could have marked frames for deoptimization in thaw_chunk
       CompiledMethod* cm = cb->as_compiled_method();
       assert (cm->is_deopt_pc(pc), "");
       pc = *(address*)((address)sp + cm->orig_pc_offset());
