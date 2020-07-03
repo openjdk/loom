@@ -28,6 +28,7 @@
 #include "jfr/recorder/checkpoint/types/jfrType.hpp"
 #include "jfr/recorder/checkpoint/types/jfrTypeManager.hpp"
 #include "jfr/recorder/jfrRecorder.hpp"
+#include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrIterator.hpp"
 #include "jfr/utilities/jfrLinkedList.inline.hpp"
 #include "memory/resourceArea.hpp"
@@ -101,7 +102,7 @@ void JfrTypeManager::write_threads(JfrCheckpointWriter& writer) {
 JfrBlobHandle JfrTypeManager::create_thread_blob(Thread* t, traceid tid, oop vthread) {
   assert(t != NULL, "invariant");
   ResourceMark rm;
-  JfrCheckpointWriter writer(Thread::current(), true, THREADS);
+  JfrCheckpointWriter writer(Thread::current(), true, THREADS, false);
   writer.write_type(TYPE_THREAD);
   JfrThreadConstant type_thread(t, tid, vthread);
   type_thread.serialize(writer);
@@ -111,7 +112,7 @@ JfrBlobHandle JfrTypeManager::create_thread_blob(Thread* t, traceid tid, oop vth
 void JfrTypeManager::write_checkpoint(Thread* t, traceid tid, oop vthread) {
   assert(t != NULL, "invariant");
   ResourceMark rm;
-  JfrCheckpointWriter writer(Thread::current(), true, THREADS);
+  JfrCheckpointWriter writer(Thread::current(), true, THREADS, false);
   writer.write_type(TYPE_THREAD);
   JfrThreadConstant type_thread(t, tid, vthread);
   type_thread.serialize(writer);

@@ -26,6 +26,7 @@
 #define SHARE_JFR_RECORDER_CHECKPOINT_JFRCHECKPOINTMANAGER_HPP
 
 #include "jfr/recorder/storage/jfrBuffer.hpp"
+#include "jfr/recorder/storage/jfrEpochStorage.hpp"
 #include "jfr/recorder/storage/jfrMemorySpace.hpp"
 #include "jfr/recorder/storage/jfrMemorySpaceRetrieval.hpp"
 #include "jfr/utilities/jfrBlob.hpp"
@@ -34,8 +35,6 @@
 
 class JfrCheckpointManager;
 class JfrChunkWriter;
-class JfrSerializer;
-class JfrTypeManager;
 class Thread;
 
 struct JfrCheckpointEntry {
@@ -47,6 +46,7 @@ struct JfrCheckpointEntry {
 };
 
 typedef JfrMemorySpace<JfrCheckpointManager, JfrMspaceRetrieval, JfrLinkedList<JfrBuffer>, JfrLinkedList<JfrBuffer>, true > JfrCheckpointMspace;
+typedef JfrEpochStorageHost<JfrBuffer, JfrMspaceRemoveRetrieval, true /* reclaim buffers eagerly*/ > JfrThreadLocalCheckpointMspace;
 
 //
 // Responsible for maintaining checkpoints and by implication types.
@@ -58,7 +58,8 @@ class JfrCheckpointManager : public JfrCHeapObj {
   typedef JfrCheckpointMspace::Node Buffer;
   typedef JfrCheckpointMspace::NodePtr BufferPtr;
  private:
-  JfrCheckpointMspace* _mspace;
+  JfrCheckpointMspace* _global_mspace;
+  JfrThreadLocalCheckpointMspace* _thread_local_mspace;
   JfrChunkWriter& _chunkwriter;
 
   JfrCheckpointManager(JfrChunkWriter& cw);
@@ -68,14 +69,16 @@ class JfrCheckpointManager : public JfrCHeapObj {
   bool initialize();
   static void destroy();
 
-  bool lookup(Buffer* old) const;
   static BufferPtr lease(Thread* thread, bool previous_epoch = false, size_t size = 0);
-  static BufferPtr lease(BufferPtr old, Thread* thread, size_t size = 0);
+  static BufferPtr lease(BufferPtr old, Thread* thread, size_t size);
+
+  static BufferPtr acquire_thread_local(size_t size, Thread* thread);
+  static BufferPtr lease_thread_local(Thread* thread, size_t size = 0);
+
   static BufferPtr flush(BufferPtr old, size_t used, size_t requested, Thread* thread);
 
   size_t clear();
   size_t write();
-  size_t flush();
   void notify_threads();
 
   size_t write_static_type_set(Thread* thread);
@@ -109,7 +112,6 @@ class JfrCheckpointManager : public JfrCHeapObj {
   friend class JfrCheckpointFlush;
   friend class JfrCheckpointWriter;
   friend class JfrSerializer;
-  friend class JfrStackTraceRepository;
   template <typename, template <typename> class, typename, typename, bool>
   friend class JfrMemorySpace;
 };
