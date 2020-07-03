@@ -348,9 +348,9 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Invoked by onPinned when an attempt to park fails because of a synchronized
-     * or native frame on the continuation stack. The state is changed to PINNED
-     * and the carrier thread parks until the virtual thread is unparked.
+     * Park the carrier thread until it is signalled or interrupted. This method
+     * is invoked by onPinned when an attempt to park fails because of a synchronized
+     * or native frame on the continuation stack.
      */
     private void parkCarrierThread() {
         boolean awaitInterrupted = false;
@@ -365,7 +365,7 @@ class VirtualThread extends Thread {
             setState(PINNED);
 
             if (!parkPermit) {
-                // wait to be unparked or interrupted
+                // wait to be signalled or interrupted
                 getCondition().await();
             }
         } catch (InterruptedException e) {
@@ -442,7 +442,7 @@ class VirtualThread extends Thread {
             return;
 
         // park the thread
-        parkThread();
+        doPark();
     }
 
     /**
@@ -459,7 +459,7 @@ class VirtualThread extends Thread {
         if (nanos > 0) {
             Future<?> unparker = UNPARKER.schedule(this::unpark, nanos, NANOSECONDS);
             try {
-                parkThread();
+                doPark();
             } finally {
                 if (!unparker.isDone()) unparker.cancel(false);
             }
@@ -473,7 +473,7 @@ class VirtualThread extends Thread {
     /**
      * Park this virtual thread. If pinned, the carrier thread will be parked.
      */
-    private void parkThread() {
+    private void doPark() {
         //assert Thread.currentThread() == this && state() == RUNNING
 
         setState(PARKING);
