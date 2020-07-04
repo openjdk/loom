@@ -65,6 +65,7 @@ public class TestManyVirtualThreads {
             Asserts.assertEquals(events.size(), VIRTUAL_THREAD_COUNT, "Expected " + VIRTUAL_THREAD_COUNT + " events");
             for (RecordedEvent e : events) {
                 RecordedThread t = e.getThread();
+                Asserts.assertNotNull(t);
                 Asserts.assertTrue(t.isVirtual());
                 Asserts.assertEquals(t.getJavaName(), "<unnamed>");
                 Asserts.assertEquals(t.getOSName(), "<unnamed>");

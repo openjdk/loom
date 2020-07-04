@@ -832,7 +832,6 @@ bool JfrJavaSupport::set_handler(jobject clazz, jobject handler, TRAPS) {
   return false;
 }
 
-
 bool JfrJavaSupport::on_thread_start(JavaThread* jt, jobject vthread) {
   assert(jt != NULL, "invariant");
   assert(Thread::current() == jt, "invariant");
@@ -841,7 +840,11 @@ bool JfrJavaSupport::on_thread_start(JavaThread* jt, jobject vthread) {
   const oop threadObj = vthread != NULL ? resolve_non_null(vthread) : jt->threadObj();
   Handle h_obj(jt, threadObj);
   if (check_exclusion_state_on_thread_start(h_obj)) {
-    vthread != NULL ? exclude(vthread) : JfrThreadLocal::exclude(jt);
+    if (vthread != NULL) {
+      exclude(vthread);
+    } else {
+      JfrThreadLocal::exclude(jt);
+    }
     return false;
   }
   return true;

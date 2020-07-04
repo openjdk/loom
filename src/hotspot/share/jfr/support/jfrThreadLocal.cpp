@@ -47,6 +47,8 @@ JfrThreadLocal::JfrThreadLocal() :
   _shelved_buffer(NULL),
   _load_barrier_buffer_epoch_0(NULL),
   _load_barrier_buffer_epoch_1(NULL),
+  _checkpoint_buffer_epoch_0(NULL),
+  _checkpoint_buffer_epoch_1(NULL),
   _stackframes(NULL),
   _thread(),
   _thread_id(0),
@@ -92,10 +94,6 @@ static void send_java_thread_start_event(JavaThread* jt, jobject vthread) {
     return;
   }
   if (JfrRecorder::is_recording()) {
-    if (vthread == NULL) {
-      // eager checkpoint, virtual threads write checkpoints lazily
-      JfrCheckpointManager::write_checkpoint(jt);
-    }
     EventThreadStart event;
     event.set_thread(vthread != NULL ? JfrThreadLocal::virtual_thread_id(jt, JfrJavaSupport::resolve_non_null(vthread)) : JfrThreadLocal::vm_thread_id(jt));
     event.set_parentThread(jt->jfr_thread_local()->parent_thread_id());
@@ -104,6 +102,9 @@ static void send_java_thread_start_event(JavaThread* jt, jobject vthread) {
 }
 
 void JfrThreadLocal::on_start(Thread* t) {
+  if (JfrRecorder::is_recording()) {
+    JfrCheckpointManager::write_checkpoint(t);
+  }
   if (t->is_Java_thread()) {
     send_java_thread_start_event((JavaThread*)t, NULL);
   }
@@ -141,6 +142,14 @@ void JfrThreadLocal::release(Thread* t) {
   if (_load_barrier_buffer_epoch_1 != NULL) {
     _load_barrier_buffer_epoch_1->set_retired();
     _load_barrier_buffer_epoch_1 = NULL;
+  }
+  if (_checkpoint_buffer_epoch_0 != NULL) {
+    _checkpoint_buffer_epoch_0->set_retired();
+    _checkpoint_buffer_epoch_0 = NULL;
+  }
+  if (_checkpoint_buffer_epoch_1 != NULL) {
+    _checkpoint_buffer_epoch_1->set_retired();
+    _checkpoint_buffer_epoch_1 = NULL;
   }
 }
 

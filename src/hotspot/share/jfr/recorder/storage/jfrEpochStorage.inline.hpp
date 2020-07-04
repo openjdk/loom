@@ -74,8 +74,7 @@ template <typename Functor>
 void JfrEpochStorageHost<NodeType, RetrievalPolicy, EagerReclaim>::iterate(Functor& functor, bool previous_epoch) {
   typedef ReinitializeAllReleaseRetiredOp<EpochMspace, typename EpochMspace::LiveList> PreviousEpochReleaseOperation;
   typedef CompositeOperation<Functor, PreviousEpochReleaseOperation> PreviousEpochOperation;
-  typedef ReleaseRetiredOp<EpochMspace, typename EpochMspace::LiveList> CurrentEpochReleaseOperation;
-  typedef CompositeOperation<Functor, CurrentEpochReleaseOperation> CurrentEpochOperation;
+  typedef ReleaseRetiredOp<Functor, EpochMspace, typename EpochMspace::LiveList> CurrentEpochOperation;
   if (previous_epoch) {
     PreviousEpochReleaseOperation pero(_mspace, _mspace->live_list(true));
     PreviousEpochOperation peo(&functor, &pero);
@@ -83,8 +82,7 @@ void JfrEpochStorageHost<NodeType, RetrievalPolicy, EagerReclaim>::iterate(Funct
     return;
   }
   if (EagerReclaim) {
-    CurrentEpochReleaseOperation cero(_mspace, _mspace->live_list());
-    CurrentEpochOperation ceo(&functor, &cero);
+    CurrentEpochOperation ceo(functor, _mspace, _mspace->live_list());
     process_live_list(ceo, _mspace, false); // current epoch list
     return;
   }

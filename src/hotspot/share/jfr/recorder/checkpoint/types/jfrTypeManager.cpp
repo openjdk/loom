@@ -99,20 +99,22 @@ void JfrTypeManager::write_threads(JfrCheckpointWriter& writer) {
   serialize_thread_groups(writer);
 }
 
-JfrBlobHandle JfrTypeManager::create_thread_blob(Thread* t, traceid tid, oop vthread) {
-  assert(t != NULL, "invariant");
-  ResourceMark rm;
-  JfrCheckpointWriter writer(Thread::current(), true, THREADS, false);
+JfrBlobHandle JfrTypeManager::create_thread_blob(JavaThread* jt, traceid tid, oop vthread) {
+  assert(jt != NULL, "invariant");
+  ResourceMark rm(jt);
+  JfrCheckpointWriter writer(jt, true, THREADS, false); // thread local lease
   writer.write_type(TYPE_THREAD);
-  JfrThreadConstant type_thread(t, tid, vthread);
+  JfrThreadConstant type_thread(jt, tid, vthread);
   type_thread.serialize(writer);
   return writer.move();
 }
 
 void JfrTypeManager::write_checkpoint(Thread* t, traceid tid, oop vthread) {
   assert(t != NULL, "invariant");
-  ResourceMark rm;
-  JfrCheckpointWriter writer(Thread::current(), true, THREADS, false);
+  Thread* const current = Thread::current(); // not necessarily the same as t
+  assert(current != NULL, "invariant");
+  ResourceMark rm(current);
+  JfrCheckpointWriter writer(current, true, THREADS, !current->is_Java_thread());
   writer.write_type(TYPE_THREAD);
   JfrThreadConstant type_thread(t, tid, vthread);
   type_thread.serialize(writer);
