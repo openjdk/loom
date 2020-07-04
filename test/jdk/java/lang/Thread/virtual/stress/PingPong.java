@@ -30,15 +30,6 @@
  * @run main/othervm -XX:+UseContinuationChunks PingPong LTQ 1000000
  */
 
-/**
- * @test
- * @requires vm.debug == true
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks PingPong SQ 200000
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks PingPong SQ 200000
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks PingPong LTQ 200000
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks PingPong LTQ 200000
- */
-
 import java.time.Duration;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.LinkedTransferQueue;
