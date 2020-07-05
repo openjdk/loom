@@ -1715,6 +1715,7 @@ VM_GetFrameLocation::doit() {
 
 void
 VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
+  assert(target->is_Java_thread(), "just checking");
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
@@ -1731,7 +1732,6 @@ VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
   JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
 
-  _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
   ThreadsListHandle tlh;
   if (java_thread != NULL && tlh.includes(java_thread)
       && !java_thread->is_exiting() && java_thread->threadObj() != NULL) {
@@ -1744,6 +1744,7 @@ VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
 
 void
 VThreadGetCurrentContendedMonitorClosure::do_thread(Thread *target) {
+  assert(target->is_Java_thread(), "just checking");
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
   if (carrier_thread == NULL) {
     // virtual thread is unmounted, so it can not be contended on a monitor
@@ -1768,6 +1769,7 @@ VThreadGetThreadClosure::do_thread(Thread *target) {
 
 void
 VThreadGetStackTraceClosure::do_thread(Thread *target) {
+  assert(target->is_Java_thread(), "just checking");
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
@@ -1779,17 +1781,20 @@ VThreadGetStackTraceClosure::do_thread(Thread *target) {
 
 void
 VThreadGetFrameCountClosure::do_thread(Thread *target) {
+  assert(target->is_Java_thread(), "just checking");
   _result = ((JvmtiEnvBase*)_env)->get_frame_count(_vthread_h(), _count_ptr);
 }
 
 void
 VThreadGetFrameLocationClosure::do_thread(Thread *target) {
+  assert(target->is_Java_thread(), "just checking");
   _result = ((JvmtiEnvBase*)_env)->get_frame_location(_vthread_h(), _depth,
                                                       _method_ptr, _location_ptr);
 }
 
 void
 VThreadGetThreadStateClosure::do_thread(Thread *target) {
+  assert(target->is_Java_thread(), "just checking");
   jshort vthread_state = java_lang_VirtualThread::state(_vthread_h());
   oop carrier_thread_oop = java_lang_VirtualThread::carrier_thread(_vthread_h());
   jint state;

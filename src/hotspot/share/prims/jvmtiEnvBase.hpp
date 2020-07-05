@@ -612,7 +612,7 @@ public:
       _env(env),
       _vthread_h(vthread_h),
       _owned_monitors_list(owned_monitors_list),
-      _result(JVMTI_ERROR_NONE) {}
+      _result(JVMTI_ERROR_THREAD_NOT_ALIVE) {}
 
   void do_thread(Thread *target);
   jvmtiError result() { return _result; }

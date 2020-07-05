@@ -1313,8 +1313,8 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
     VThreadGetOwnedMonitorInfoClosure op(this,
                                          Handle(calling_thread, thread_obj),
                                          owned_monitors_list);
-    Handshake::execute_direct(&op, calling_thread);
-    err = op.result();
+    bool executed = Handshake::execute_direct(&op, calling_thread);
+    err = executed ? op.result() : JVMTI_ERROR_THREAD_NOT_ALIVE;
   } else {
     // Support for ordinary threads
     JavaThread* java_thread = NULL;
@@ -1383,8 +1383,8 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
     VThreadGetOwnedMonitorInfoClosure op(this,
                                          Handle(calling_thread, thread_obj),
                                          owned_monitors_list);
-    Handshake::execute_direct(&op, calling_thread);
-    err = op.result();
+    bool executed = Handshake::execute_direct(&op, calling_thread);
+    err = executed ? op.result() : JVMTI_ERROR_THREAD_NOT_ALIVE;
   } else {
     // Support for ordinary threads
     JavaThread* java_thread = NULL;
@@ -1450,8 +1450,8 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
     VThreadGetCurrentContendedMonitorClosure op(this,
                                                 Handle(calling_thread, thread_obj),
                                                 monitor_ptr);
-    Handshake::execute_direct(&op, calling_thread);
-    err = op.result();
+    bool executed = Handshake::execute_direct(&op, calling_thread);
+    err = executed ? op.result() : JVMTI_ERROR_THREAD_NOT_ALIVE;
     return err;
   }
   // Support for ordinary threads
