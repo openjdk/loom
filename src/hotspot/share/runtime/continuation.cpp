@@ -1453,7 +1453,6 @@ void Continuation::set_cont_fastpath_thread_state(JavaThread* thread) {
   thread->set_cont_fastpath_thread_state(fast);
 }
 
-// works only in thaw
 static inline bool is_entry_frame(const ContMirror& cont, const frame& f) {
   return f.sp() == cont.entrySP();
 }
@@ -1498,23 +1497,6 @@ static int num_java_frames(ContMirror& cont) {
   return count;
 }
 
-// static int num_java_frames(const frame& f) {
-//   if (f.is_interpreted_frame())
-//     return 1;
-//   else if (f.is_compiled_frame())
-//     return num_java_frames(f.cb()->as_compiled_method(), f.pc());
-//   else
-//     return 0;
-// }
-
-// static int num_java_frames(ContMirror& cont, frame f) {
-//   int count = 0;
-//   RegisterMap map(cont.thread(), false, false, false); // should first argument be true?
-//   for (; f.real_fp() > cont.entrySP(); f = f.frame_sender<ContinuationCodeBlobLookup>(&map))
-//     count += num_java_frames(f);
-//   return count;
-// }
-
 static inline void clear_anchor(JavaThread* thread) {
   thread->frame_anchor()->clear();
 }
@@ -1524,10 +1506,6 @@ static oop get_continuation(JavaThread* thread) {
   assert (thread->threadObj() != NULL, "");
   return java_lang_Thread::continuation(thread->threadObj());
 }
-
-// static void set_continuation(JavaThread* thread, oop cont) {
-//   java_lang_Thread::set_continuation(thread->threadObj(), cont);
-// }
 
 template<typename RegisterMapT>
 class ContOopBase : public OopClosure, public DerivedOopClosure {
@@ -4790,26 +4768,6 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
   return false;
 }
 
-// frame Continuation::fix_continuation_bottom_sender(const frame& callee, RegisterMap* map, frame f) {
-//   if (!is_return_barrier_entry(f.pc())) {
-//     return f;
-//   }
-
-//   if (map->walk_cont()) {
-//     return top_frame(callee, map);
-//   }
-
-//   if (map->thread() != NULL) {
-//     address   sender_pc = f.pc();
-//     intptr_t* sender_sp = f.sp();
-//     intptr_t* sender_fp = f.fp();
-//     fix_continuation_bottom_sender(map, callee, &sender_pc, &sender_sp);
-//     return ContinuationHelper::frame_with(f, sender_sp, sender_pc, sender_fp);
-//   }
-
-//   return f;
-// }
-
 address Continuation::get_top_return_pc_post_barrier(JavaThread* thread, address pc) {
   ContinuationEntry* cont;
   if (thread != NULL && is_return_barrier_entry(pc) && (cont = thread->cont_entry()) != NULL) {
@@ -4833,24 +4791,6 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
   assert(sc != NULL, "");
   return sc == cont_scope;
 }
-
-// TODO: delete? consider other is_scope_bottom or something
-// bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const RegisterMap* map) {
-//   if (cont_scope == NULL || !map->in_cont())
-//     return false;
-
-//   oop sc = continuation_scope(map->cont());
-//   assert(sc != NULL, "");
-//   if (!oopDesc::equals(sc, cont_scope))
-//     return false;
-
-//   ContMirror cont(map);
-
-//   hframe hf = cont.from_frame(f);
-//   hframe sender = hf.sender(cont);
-
-//   return sender.is_empty();
-// }
 
 static frame chunk_top_frame_pd(oop chunk, intptr_t* sp);
 
