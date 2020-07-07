@@ -3293,9 +3293,12 @@ static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont) {
   if (JvmtiExport::should_post_continuation_yield() || JvmtiExport::can_post_frame_pop()) {
     set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible
 
+    cont.read_rest();
+    int num_frames = num_java_frames(cont);
+
     // The call to JVMTI can safepoint, so we need to restore oops.
     Handle conth(Thread::current(), cont.mirror());
-    JvmtiExport::post_continuation_yield(JavaThread::current(), num_java_frames(cont));
+    JvmtiExport::post_continuation_yield(JavaThread::current(), num_frames);
     cont.post_safepoint(conth);
   }
 
