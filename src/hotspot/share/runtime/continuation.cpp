@@ -1472,7 +1472,7 @@ static int num_java_frames(oop chunk) {
   int count = 0;
   CodeBlob* cb = NULL;
   intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
   for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
     cb = ContinuationCodeBlobLookup::find_blob(pc);
@@ -1490,7 +1490,11 @@ static int num_java_frames(ContMirror& cont) {
     count += num_java_frames(chunk);
   }
 
-  for (hframe hf = cont.last_frame<mode_slow>(); !hf.is_empty(); hf = hf.sender<mode_slow>(cont)) {
+  hframe hf = cont.last_frame<mode_slow>();
+  if (cont.is_flag(FLAG_SAFEPOINT_YIELD) && is_stub(hf.cb())) {
+    hf = hf.sender<mode_slow>(cont);
+  }
+  for (; !hf.is_empty(); hf = hf.sender<mode_slow>(cont)) {
     count += num_java_frames(hf);
   }
 
