@@ -331,29 +331,37 @@ public interface ExecutorService extends Executor, AutoCloseable {
                                           boolean cancelOnException)
             throws InterruptedException {
 
-        List<Future<T>> futures = new ArrayList<>(tasks.size());
+        List<CompletableFuture<T>> cfs = submitTasks(tasks);
         try {
-            for (Callable<T> t : tasks) {
-                futures.add(submit(t));
+            if (cancelOnException) {
+                // wait until a task fails or all tasks complete
+                CompletableFuture.completed(cfs)
+                        .filter(CompletableFuture::isCompletedExceptionally)
+                        .findAny();
+            } else {
+                // wait until all tasks complete
+                CompletableFuture.completed(cfs)
+                        .mapToLong(e -> 1L)
+                        .sum();
             }
-            boolean abort = false;
-            for (int i = 0, size = futures.size(); (i < size && !abort); i++) {
-                Future<T> f = futures.get(i);
-                try {
-                    f.get();
-                } catch (ExecutionException e) {
-                    if (cancelOnException) abort = true;
-                } catch (CancellationException ignore) { }
+        } catch (CancellationException e) {
+            if (Thread.interrupted()) {
+                throw new InterruptedException();
+            } else {
+                throw e;
             }
-            return futures;
         } finally {
             // cancel remaining
-            for (Future<T> f : futures) {
+            for (Future<T> f : cfs) {
                 if (!f.isDone()) {
                     f.cancel(true);
                 }
             }
         }
+
+        @SuppressWarnings("unchecked")
+        List<Future<T>> futures = (List) cfs;
+        return futures;
     }
 
     /**

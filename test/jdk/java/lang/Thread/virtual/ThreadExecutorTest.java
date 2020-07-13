@@ -461,7 +461,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test invokeAll with cancelOnException=true.
+     * Test invokeAll with cancelOnException=true, last task should be cancelled
      */
     public void testInvokeAll3() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
@@ -491,8 +491,44 @@ public class ThreadExecutorTest {
             Throwable e2 = expectThrows(ExecutionException.class, () -> list.get(1).get());
             assertTrue(e2.getCause() instanceof BarException);
 
-            // task2 should be cancelled
+            // task3 should be cancelled
             expectThrows(CancellationException.class, () -> list.get(2).get());
+        }
+    }
+
+    /**
+     * Test invokeAll with cancelOnException=true, first task should be cancelled
+     */
+    public void testInvokeAll4() throws Exception {
+        try (var executor = Executors.newVirtualThreadExecutor()) {
+            class BarException extends Exception { }
+            Callable<String> task1 = () -> {
+                Thread.sleep(Duration.ofDays(1));
+                return "foo";
+            };
+            Callable<String> task2 = () -> {
+                Thread.sleep(Duration.ofSeconds(3));
+                throw new BarException();
+            };
+            Callable<String> task3 = () -> "baz";
+
+            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), true);
+
+            // list should have three elements, all should be done
+            assertTrue(list.size() == 3);
+            boolean notDone = list.stream().anyMatch(r -> !r.isDone());
+            assertFalse(notDone);
+
+            // task1 should be cancelled
+            expectThrows(CancellationException.class, () -> list.get(0).get());
+
+            // tasl2 should have failed with an exception
+            Throwable e2 = expectThrows(ExecutionException.class, () -> list.get(1).get());
+            assertTrue(e2.getCause() instanceof BarException);
+
+            // task3 should have a result
+            String s = list.get(2).get();
+            assertTrue("baz".equals(s));
         }
     }
 
