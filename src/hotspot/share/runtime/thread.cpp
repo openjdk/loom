@@ -2059,7 +2059,6 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
         CLEAR_PENDING_EXCEPTION;
       }
     }
-    JFR_ONLY(Jfr::on_java_thread_dismantle(this);)
 
     // Call Thread.exit()
     if (!is_Compiler_thread()) {

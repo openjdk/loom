@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "classfile/javaClasses.hpp"
 #include "jfr/dcmd/jfrDcmds.hpp"
 #include "jfr/instrumentation/jfrJvmtiAgent.hpp"
 #include "jfr/jni/jfrJavaSupport.hpp"

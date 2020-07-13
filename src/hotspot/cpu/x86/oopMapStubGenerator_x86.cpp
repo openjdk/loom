@@ -24,6 +24,7 @@
 
 #include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
+#include "code/codeCache.hpp"
 #include "code/vmreg.inline.hpp"
 #include "compiler/oopMap.hpp"
 #include "compiler/oopMap.inline.hpp"

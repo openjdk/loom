@@ -104,9 +104,9 @@ static void send_java_thread_start_event(JavaThread* jt, jobject vthread) {
 void JfrThreadLocal::on_start(Thread* t) {
   if (JfrRecorder::is_recording()) {
     JfrCheckpointManager::write_checkpoint(t);
-  }
-  if (t->is_Java_thread()) {
-    send_java_thread_start_event((JavaThread*)t, NULL);
+    if (t->is_Java_thread()) {
+      send_java_thread_start_event((JavaThread*)t, NULL);
+    }
   }
   if (t->jfr_thread_local()->has_cached_stack_trace()) {
     t->jfr_thread_local()->clear_cached_stack_trace();
