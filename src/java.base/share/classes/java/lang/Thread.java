@@ -2719,6 +2719,8 @@ public class Thread implements Runnable {
         for (int i = 0; i < threads.length; i++) {
             StackTraceElement[] stackTrace = traces[i];
             if (stackTrace != null) {
+                // the thread may be a carrier thread
+                stackTrace = VirtualThread.carrierThreadStackTrace(stackTrace);
                 m.put(threads[i], stackTrace);
             }
             // else terminated so we don't put it in the map
