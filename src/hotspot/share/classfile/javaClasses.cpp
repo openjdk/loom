@@ -2448,7 +2448,9 @@ struct BacktraceElement : public StackObj {
 };
 
 class BacktraceIterator : public StackObj {
+  Thread* const _thread;
   int _index;
+  // bool _post_prefix; // The elements might have a prefix of nulls
   objArrayHandle  _result;
   objArrayHandle  _mirrors;
   typeArrayHandle _methods;
@@ -2456,44 +2458,74 @@ class BacktraceIterator : public StackObj {
   typeArrayHandle _names;
   objArrayHandle  _conts;
 
-  void init(objArrayHandle result, Thread* thread) {
+  void init(objArrayHandle result) {
     // Get method id, bci, version and mirror from chunk
     _result = result;
     if (_result.not_null()) {
-      _methods = typeArrayHandle(thread, BacktraceBuilder::get_methods(_result));
-      _bcis = typeArrayHandle(thread, BacktraceBuilder::get_bcis(_result));
-      _mirrors = objArrayHandle(thread, BacktraceBuilder::get_mirrors(_result));
-      _names = typeArrayHandle(thread, BacktraceBuilder::get_names(_result));
-      _conts = objArrayHandle(thread, BacktraceBuilder::get_conts(_result));
-      _index = 0;
+      _methods = typeArrayHandle(_thread, BacktraceBuilder::get_methods(_result));
+      _bcis = typeArrayHandle(_thread, BacktraceBuilder::get_bcis(_result));
+      _mirrors = objArrayHandle(_thread, BacktraceBuilder::get_mirrors(_result));
+      _names = typeArrayHandle(_thread, BacktraceBuilder::get_names(_result));
+      _conts = objArrayHandle(_thread, BacktraceBuilder::get_conts(_result));
+      _index = -1;
     }
   }
  public:
-  BacktraceIterator(objArrayHandle result, Thread* thread) {
-    init(result, thread);
+  BacktraceIterator(objArrayHandle result, Thread* thread) : _thread(thread) {
+    // _post_prefix = false;
+    init(result);
     assert(_methods.is_null() || _methods->length() == java_lang_Throwable::trace_chunk_size, "lengths don't match");
   }
 
-  BacktraceElement next(Thread* thread) {
-    BacktraceElement e (Handle(thread, _mirrors->obj_at(_index)),
-                        _methods->ushort_at(_index),
-                        Backtrace::version_at(_bcis->int_at(_index)),
-                        Backtrace::bci_at(_bcis->int_at(_index)),
-                        _names->symbol_at(_index),
-                        Handle(thread, _conts->obj_at(_index)));
-    _index++;
-
-    if (_index >= java_lang_Throwable::trace_chunk_size) {
-      int next_offset = java_lang_Throwable::trace_next_offset;
-      // Get next chunk
-      objArrayHandle result (thread, objArrayOop(_result->obj_at(next_offset)));
-      init(result, thread);
-    }
-    return e;
+  BacktraceIterator(oop result, Thread* thread) : _thread(thread) {
+    // _post_prefix = false;
+    init(objArrayHandle(thread, objArrayOop(result)));
+    assert(_methods.is_null() || _methods->length() == java_lang_Throwable::trace_chunk_size, "lengths don't match");
   }
 
-  bool repeat() {
+  bool valid() {
     return _result.not_null() && _mirrors->obj_at(_index) != NULL;
+  }
+
+  BacktraceElement current() {
+    assert (valid(), "");
+    return BacktraceElement(Handle(_thread, _mirrors->obj_at(_index)),
+                            _methods->ushort_at(_index),
+                            Backtrace::version_at(_bcis->int_at(_index)),
+                            Backtrace::bci_at(_bcis->int_at(_index)),
+                            _names->symbol_at(_index),
+                            Handle(_thread, _conts->obj_at(_index)));
+  }
+
+  Method* current_method() {
+    assert (valid(), "");
+    InstanceKlass* holder = InstanceKlass::cast(java_lang_Class::as_Klass(_mirrors->obj_at(_index)));
+    int method_id = _methods->ushort_at(_index);
+    int version = Backtrace::version_at(_bcis->int_at(_index));
+    return holder->method_with_orig_idnum(method_id, version);
+  }
+
+  void remove() {
+    assert (valid(), "");
+    _mirrors->obj_at_put(_index, NULL);
+    assert (!valid(), "");
+  }
+
+  bool next() {
+    if (_result.is_null()) return false;
+
+    do {
+      _index++;
+      if (_index >= java_lang_Throwable::trace_chunk_size) { // Get next chunk
+        int next_offset = java_lang_Throwable::trace_next_offset;
+        objArrayHandle result (_thread, objArrayOop(_result->obj_at(next_offset)));
+        init(result);
+        _index++;
+      }
+    } while(/*!_post_prefix &&*/ _result.not_null() && _mirrors->obj_at(_index) == NULL);
+    // _post_prefix = true;
+
+    return valid();
   }
 };
 
@@ -2599,8 +2631,8 @@ void java_lang_Throwable::print_stack_trace(Handle throwable, outputStream* st) 
     }
     BacktraceIterator iter(result, THREAD);
 
-    while (iter.repeat()) {
-      BacktraceElement bte = iter.next(THREAD);
+    while (iter.next()) {
+      BacktraceElement bte = iter.current();
       print_stack_element_to_stream(st, bte._mirror, bte._method_id, bte._version, bte._bci, bte._name);
     }
     {
@@ -2643,34 +2675,9 @@ void java_lang_Throwable::java_printStackTrace(Handle throwable, TRAPS) {
                           THREAD);
 }
 
-void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope, const methodHandle& method, TRAPS) {
-  if (!StackTraceInThrowable) return;
-  ResourceMark rm(THREAD);
-  HandleMark hm(THREAD);
-
-  // Start out by clearing the backtrace for this object, in case the VM
-  // runs out of memory while allocating the stack trace
-  set_backtrace(throwable(), NULL);
-  // Clear lazily constructed Java level stacktrace if refilling occurs
-  // This is unnecessary in 1.7+ but harmless
-  clear_stacktrace(throwable());
-
-  int max_depth = MaxJavaStackTraceDepth;
-  JavaThread* thread = (JavaThread*)THREAD;
-
-  BacktraceBuilder bt(CHECK);
-
-  // If there is no Java frame just return the method that was being called
-  // with bci 0
-  if (!thread->has_last_Java_frame()) {
-    if (max_depth >= 1 && method() != NULL) {
-      bt.push(method(), 0, NULL, CHECK);
-      log_info(stacktrace)("%s, %d", throwable->klass()->external_name(), 1);
-      set_depth(throwable(), 1);
-      set_backtrace(throwable(), bt.backtrace());
-    }
-    return;
-  }
+static int fill_in_stack_trace0(BacktraceBuilder &bt, JavaThread* thread, Handle contScope, int max_depth, TRAPS) {
+  int total_count = 0;
+  const bool skip_hidden = !ShowHiddenFrames;
 
   // Instead of using vframe directly, this version of fill_in_stack_trace
   // basically handles everything by hand. This significantly improved the
@@ -2681,13 +2688,9 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
 #ifdef ASSERT
   vframeStream st(thread, contScope);
 #endif
-  int total_count = 0;
   RegisterMap map(thread, false, true);
   int decode_offset = 0;
   CompiledMethod* nm = NULL;
-  bool skip_fillInStackTrace_check = false;
-  bool skip_throwableInit_check = false;
-  bool skip_hidden = !ShowHiddenFrames;
   Handle cont_h(THREAD, thread->last_continuation());
   for (frame fr = thread->last_frame(); max_depth == 0 || max_depth != total_count;) {
     Method* method = NULL;
@@ -2751,47 +2754,78 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
     st.next();
 #endif
 
-    // the format of the stacktrace will be:
-    // - 1 or more fillInStackTrace frames for the exception class (skipped)
-    // - 0 or more <init> methods for the exception class (skipped)
-    // - rest of the stack
-
-    if (!skip_fillInStackTrace_check) {
-      if (method->name() == vmSymbols::fillInStackTrace_name() &&
-          throwable->is_a(method->method_holder())) {
-        continue;
-      }
-      else {
-        skip_fillInStackTrace_check = true; // gone past them all
-      }
-    }
-    if (!skip_throwableInit_check) {
-      assert(skip_fillInStackTrace_check, "logic error in backtrace filtering");
-
-      // skip <init> methods of the exception class and superclasses
-      // This is simlar to classic VM.
-      if (method->name() == vmSymbols::object_initializer_name() &&
-          throwable->is_a(method->method_holder())) {
-        continue;
-      } else {
-        // there are none or we've seen them all - either way stop checking
-        skip_throwableInit_check = true;
-      }
-    }
     if (method->is_hidden()) {
       if (skip_hidden) {
         if (total_count == 0) {
           // The top frame will be hidden from the stack trace.
-          bt.set_has_hidden_top_frame(CHECK);
+          bt.set_has_hidden_top_frame(CHECK_0);
         }
         continue;
       }
     }
 
-    bt.push(method, bci, contScopeName, CHECK);
+    bt.push(method, bci, contScopeName, CHECK_0);
     total_count++;
   }
+  return total_count;
+}
 
+void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope, const methodHandle& method, TRAPS) {
+  if (!StackTraceInThrowable) return;
+  ResourceMark rm(THREAD);
+  HandleMark hm(THREAD);
+
+  // Start out by clearing the backtrace for this object, in case the VM
+  // runs out of memory while allocating the stack trace
+  set_backtrace(throwable(), NULL);
+  // Clear lazily constructed Java level stacktrace if refilling occurs
+  // This is unnecessary in 1.7+ but harmless
+  clear_stacktrace(throwable());
+
+  const int max_depth = MaxJavaStackTraceDepth;
+  JavaThread* thread = (JavaThread*)THREAD;
+
+  BacktraceBuilder bt(CHECK);
+
+  // If there is no Java frame just return the method that was being called
+  // with bci 0
+  if (!thread->has_last_Java_frame()) {
+    if (max_depth >= 1 && method() != NULL) {
+      bt.push(method(), 0, NULL, CHECK);
+      log_info(stacktrace)("%s, %d", throwable->klass()->external_name(), 1);
+      set_depth(throwable(), 1);
+      set_backtrace(throwable(), bt.backtrace());
+    }
+    return;
+  }
+
+  // leave room for frames we'll remove below
+  int total_count = fill_in_stack_trace0(bt, thread, contScope, (max_depth == 0 ? max_depth : max_depth + 10), CHECK);
+
+  // the format of the stacktrace will be:
+  // - 1 or more fillInStackTrace frames for the exception class (skipped)
+  // - 0 or more <init> methods for the exception class (skipped)
+  // - rest of the stack
+  BacktraceIterator iter(bt.backtrace(), THREAD);
+  iter.next();
+  while (iter.valid()) { // skip fillInStackTrace
+    Method* method = iter.current_method();
+    if (method->name() == vmSymbols::fillInStackTrace_name() && throwable->is_a(method->method_holder())) {
+      iter.remove();
+      iter.next();
+      total_count--;
+    } else break;
+  }
+  while (iter.valid()) { // skip <init> methods of the exception class and superclasses
+    Method* method = iter.current_method();
+    if (method->name() == vmSymbols::object_initializer_name() && throwable->is_a(method->method_holder())) {
+      iter.remove();
+      iter.next();
+      total_count--;
+    } else break;
+  }
+
+  if (max_depth != 0 && total_count > max_depth) total_count = max_depth;
   log_info(stacktrace)("%s, %d", throwable->klass()->external_name(), total_count);
 
   // Put completed stack trace into throwable object
@@ -2875,18 +2909,18 @@ void java_lang_Throwable::get_stack_trace_elements(Handle throwable,
 
   assert(stack_trace_array_h->is_objArray(), "Stack trace array should be an array of StackTraceElenent");
 
-  if (stack_trace_array_h->length() != depth(throwable())) {
+  const int n = stack_trace_array_h->length();
+  if (n != depth(throwable())) {
     THROW(vmSymbols::java_lang_IndexOutOfBoundsException());
   }
 
   objArrayHandle result(THREAD, objArrayOop(backtrace(throwable())));
   BacktraceIterator iter(result, THREAD);
 
-  int index = 0;
-  while (iter.repeat()) {
-    BacktraceElement bte = iter.next(THREAD);
+  for (int index = 0; iter.next() && index < n; index++) {
+    BacktraceElement bte = iter.current();
 
-    Handle stack_trace_element(THREAD, stack_trace_array_h->obj_at(index++));
+    Handle stack_trace_element(THREAD, stack_trace_array_h->obj_at(index));
 
     if (stack_trace_element.is_null()) {
       THROW(vmSymbols::java_lang_NullPointerException());
@@ -2910,7 +2944,7 @@ bool java_lang_Throwable::get_top_method_and_bci(oop throwable, Method** method,
   objArrayHandle result(THREAD, objArrayOop(backtrace(throwable)));
   BacktraceIterator iter(result, THREAD);
   // No backtrace available.
-  if (!iter.repeat()) return false;
+  if (!iter.next()) return false;
 
   // If the exception happened in a frame that has been hidden, i.e.,
   // omitted from the back trace, we can not compute the message.
@@ -2920,7 +2954,7 @@ bool java_lang_Throwable::get_top_method_and_bci(oop throwable, Method** method,
   }
 
   // Get first backtrace element.
-  BacktraceElement bte = iter.next(THREAD);
+  BacktraceElement bte = iter.current();
 
   InstanceKlass* holder = InstanceKlass::cast(java_lang_Class::as_Klass(bte._mirror()));
   assert(holder != NULL, "first element should be non-null");

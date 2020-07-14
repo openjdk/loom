@@ -61,9 +61,11 @@ public class ThrowableIntrospectionSegfault {
         }
 
         try {
-
-            // Retrieve the class of throwable.backtrace[0][0].
-            Class class2 = ((Object[]) ((Object[]) backtrace)[2])[0].getClass();
+            Object obj2 = null;
+            for (int i=0; obj2 == null && i<32; i++) {
+                obj2 = ((Object[]) ((Object[]) backtrace)[2])[i];
+            }
+            Class class2 = obj2.getClass();
 
             // Segfault occurs while executing this line, to retrieve the name of
             // this class.
