@@ -308,10 +308,10 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * completes with an exception.
      *
      * @implSpec
-     * The default implementation uses the {@link #submit(Callable)} to submit
-     * each task for execution. It then waits until all tasks have completed,
-     * or in the case that {@code cancelOnException} is true, that a task
-     * completes with an exception.
+     * The default implementation invokes {@link #submitTasks(Collection)} to
+     * submit the tasks for execution. It then waits until all tasks have
+     * completed, or in the case that {@code cancelOnException} is true, that
+     * a task completes with an exception.
      *
      * @param tasks the collection of tasks
      * @param cancelOnException true to cancel unfinished tasks when
@@ -514,18 +514,6 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * The default implementation schedules a task to run when the deadline
      * expires. The task invokes the {@code shutdownNow()} method to stop all
      * executing tasks and interrupts the owner thread.
-     *
-     * @apiNote This is a prototype API. It is intended to be used with the
-     * try-with-resources construct to set a deadline for tasks submitted to
-     * execute in the try-with-resources block.
-     * <pre> {@code
-     *     Instant deadline = Instant.now().plusSeconds(10);
-     *     try (ExecutorService executor = Executors.newVirtualThreadExecutor().withDeadline(deadline)) {
-     *         executor.submit(task1);
-     *         executor.submit(task2);
-     *         doSomethingThatMightBlock();
-     *     }
-     * }</pre>
      *
      * @param deadline the deadline
      * @return a new Executor that delegates operations to this Executor
