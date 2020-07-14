@@ -26,11 +26,12 @@ package java.util.concurrent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Set;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
@@ -39,9 +40,7 @@ import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
- * ExecutorService that executes each task in its own thread.
- *
- * This is a inefficient/simple implementation for now, it will likely be replaced.
+ * An ExecutorService that executes each task in its own thread.
  */
 class ThreadExecutor extends AbstractExecutorService {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -77,12 +76,13 @@ class ThreadExecutor extends AbstractExecutorService {
         };
     }
 
-    @Override
-    public void close() {
-        try {
-            super.close(); // waits for all threads to terminate
-        } finally {
-            lifetime.close();
+    /**
+     * Throws RejectedExecutionException if the executor has been shutdown.
+     */
+    private void ensureNotShutdown() {
+        if (state >= SHUTDOWN) {
+            // shutdown or terminated
+            throw new RejectedExecutionException();
         }
     }
 
@@ -117,21 +117,6 @@ class ThreadExecutor extends AbstractExecutorService {
         if (STATE.compareAndSet(this, RUNNING, SHUTDOWN)) {
             tryTerminate();
         }
-    }
-
-    /**
-     * Removes the thread from the set of threads and attempts to terminate
-     * the executor if shutdown but not terminated.
-     */
-    private void onTerminate(Thread thread) {
-        threads.remove(thread);
-        if (state == SHUTDOWN) {
-            tryTerminate();
-        }
-    }
-
-    private void onTerminate() {
-        onTerminate(Thread.currentThread());
     }
 
     @Override
@@ -174,15 +159,43 @@ class ThreadExecutor extends AbstractExecutorService {
         }
     }
 
-    private void ensureNotShutdown() {
-        if (state >= SHUTDOWN) {
-            // shutdown or terminated
-            throwRejectedExecutionException();
+    @Override
+    public void close() {
+        try {
+            super.close(); // waits for executor to terminate
+        } finally {
+            lifetime.close();
         }
     }
 
+    /**
+     * Creates a thread to run the given task.
+     */
+    private Thread newThread(Runnable task) {
+        return factory.newThread(task);
+    }
+
+    /**
+     * Notify the executor that the task executed by the given thread is complete.
+     * If the executor has been shutdown then this method will attempt to terminate
+     * the executor.
+     */
+    private void taskComplete(Thread thread) {
+        boolean removed = threads.remove(thread);
+        assert removed;
+        if (state == SHUTDOWN) {
+            tryTerminate();
+        }
+    }
+
+    /**
+     * Adds a thread to the set of threads and starts it.
+     * @throws RejectedExecutionException
+     */
     private void start(Thread thread) {
+        assert thread.getState() == Thread.State.NEW;
         threads.add(thread);
+
         boolean started = false;
         try {
             if (state == RUNNING) {
@@ -191,29 +204,128 @@ class ThreadExecutor extends AbstractExecutorService {
             }
         } finally {
             if (!started) {
-                onTerminate(thread);
-                throwRejectedExecutionException();
+                taskComplete(thread);
             }
+        }
+
+        // throw REE if thread not started and no exception thrown
+        if (!started) {
+            throw new RejectedExecutionException();
         }
     }
 
-    private Thread fork(Runnable task) {
+    /**
+     * Starts a thread to execute the given task.
+     * @throws RejectedExecutionException
+     */
+    private Thread start(Runnable task) {
         Objects.requireNonNull(task);
         ensureNotShutdown();
-        Thread thread = factory.newThread(() -> {
-            try {
-                task.run();
-            } finally {
-                onTerminate();
-            }
-        });
+        Thread thread = newThread(new TaskRunner(this, task));
+        if (thread == null)
+            throw new RejectedExecutionException();
         start(thread);
         return thread;
     }
 
     @Override
     public void execute(Runnable task) {
-        fork(task);
+        start(task);
+    }
+
+    @Override
+    public <T> CompletableFuture<T> submitTask(Callable<T> task) {
+        Objects.requireNonNull(task);
+        ensureNotShutdown();
+        var future = new ThreadBoundCompletableFuture<>(this, task);
+        Thread thread = future.thread();
+        if (thread == null)
+            throw new RejectedExecutionException();
+        start(thread);
+        return future;
+    }
+
+    @Override
+    public <T> Future<T> submit(Callable<T> task) {
+        return submitTask(task);
+    }
+
+    @Override
+    public Future<?> submit(Runnable task) {
+        return submitTask(Executors.callable(task));
+    }
+
+    @Override
+    public <T> Future<T> submit(Runnable task, T result) {
+        return submitTask(Executors.callable(task, result));
+    }
+
+    /**
+     * Runs a task and notifies a ThreadExecutor when it completes.
+     */
+    private static class TaskRunner implements Runnable {
+        final ThreadExecutor executor;
+        final Runnable task;
+        TaskRunner(ThreadExecutor executor, Runnable task) {
+            this.executor = executor;
+            this.task = task;
+        }
+        @Override
+        public void run() {
+            try {
+                task.run();
+            } finally {
+                executor.taskComplete(Thread.currentThread());
+            }
+        }
+    }
+
+    /**
+     * A CompletableFuture for a task that runs in its own thread. The thread
+     * is created (but not started) when the CompletableFuture is created. The
+     * thread is interrupted when the future is cancelled. Its ThreadExecutor
+     * is notified when the task completes.
+     */
+    private static class ThreadBoundCompletableFuture<T>
+            extends CompletableFuture<T> implements Runnable {
+
+        final ThreadExecutor executor;
+        final Callable<T> task;
+        final Thread thread;
+
+        ThreadBoundCompletableFuture(ThreadExecutor executor, Callable<T> task) {
+            this.executor = executor;
+            this.task = task;
+            this.thread = executor.newThread(this);
+        }
+
+        Thread thread() {
+            return thread;
+        }
+
+        @Override
+        public void run() {
+            if (Thread.currentThread() != thread) {
+                // should not happen except where something casts this object
+                // to a Runnable and invokes the run method.
+                throw new IllegalCallerException();
+            }
+            try {
+                T result = task.call();
+                complete(result);
+            } catch (Throwable e) {
+                completeExceptionally(e);
+            } finally {
+                executor.taskComplete(thread);
+            }
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            if (mayInterruptIfRunning)
+                thread.interrupt();
+            return super.cancel(mayInterruptIfRunning);
+        }
     }
 
     @Override
@@ -246,7 +358,7 @@ class ThreadExecutor extends AbstractExecutorService {
         }
 
         var holder = new AnyResultHolder<T>(Thread.currentThread());
-        var threads = ConcurrentHashMap.<Thread>newKeySet();
+        var threadList = new ArrayList<Thread>(size);
         long nanos = (timed) ? TimeUnit.NANOSECONDS.convert(timeout, unit) : 0;
         long startNanos = (timed) ? System.nanoTime() : 0;
 
@@ -256,7 +368,7 @@ class ThreadExecutor extends AbstractExecutorService {
             while (count < size && iterator.hasNext()) {
                 Callable<T> task = iterator.next();
                 Objects.requireNonNull(task);
-                Thread thread = fork(() -> {
+                Thread thread = start(() -> {
                     try {
                         T r = task.call();
                         holder.complete(r);
@@ -264,7 +376,7 @@ class ThreadExecutor extends AbstractExecutorService {
                         holder.completeExceptionally(e);
                     }
                 });
-                threads.add(thread);
+                threadList.add(thread);
                 count++;
             }
             if (count == 0) {
@@ -295,7 +407,12 @@ class ThreadExecutor extends AbstractExecutorService {
             }
 
         } finally {
-            threads.forEach(Thread::interrupt);
+            // interrupt any threads that are still running
+            for (Thread t : threadList) {
+                if (t.isAlive()) {
+                    t.interrupt();
+                }
+            }
         }
     }
 
@@ -356,8 +473,8 @@ class ThreadExecutor extends AbstractExecutorService {
         }
 
         /**
-         * Returns non-null if a task completed successfully. The result is NULL_RESULT
-         * if completed with null.
+         * Returns non-null if a task completed successfully. The result is
+         * NULL if completed with null.
          */
         T result() {
             return result;
@@ -380,54 +497,5 @@ class ThreadExecutor extends AbstractExecutorService {
         int exceptionCount() {
             return exceptionCount;
         }
-    }
-
-    @Override
-    public <T> CompletableFuture<T> submitTask(Callable<T> task) {
-        Objects.requireNonNull(task);
-        ensureNotShutdown();
-
-        class Runner extends CompletableFuture<T> implements Runnable {
-            final Thread thread;
-
-            Runner() {
-                thread = factory.newThread(this);
-            }
-
-            Thread thread() {
-                return thread;
-            }
-
-            @Override
-            public void run() {
-                if (Thread.currentThread() != thread) {
-                    // should not happen
-                    throw new IllegalCallerException();
-                }
-                try {
-                    T result = task.call();
-                    complete(result);
-                } catch (Throwable e) {
-                    completeExceptionally(e);
-                } finally {
-                    onTerminate();
-                }
-            }
-
-            @Override
-            public boolean cancel(boolean mayInterruptIfRunning) {
-                if (mayInterruptIfRunning)
-                    thread.interrupt();
-                return super.cancel(mayInterruptIfRunning);
-            }
-        }
-
-        var runner = new Runner();
-        start(runner.thread());
-        return runner;
-    }
-
-    private static void throwRejectedExecutionException() {
-        throw new RejectedExecutionException();
     }
 }
