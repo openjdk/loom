@@ -323,9 +323,10 @@ class ThreadExecutor implements ExecutorService {
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
+            boolean cancelled = super.cancel(mayInterruptIfRunning);
             if (mayInterruptIfRunning)
                 thread.interrupt();
-            return super.cancel(mayInterruptIfRunning);
+            return cancelled;
         }
     }
 
