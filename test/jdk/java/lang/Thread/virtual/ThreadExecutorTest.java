@@ -170,7 +170,7 @@ public class ThreadExecutorTest {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofSeconds(60));
+                Thread.sleep(Duration.ofMinutes(1));
                 return "bar";
             };
             String result = executor.invokeAny(Set.of(task1, task2));
@@ -299,7 +299,7 @@ public class ThreadExecutorTest {
     public void testInvokeAnyCancelRemaining() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             DelayedResult<String> task1 = new DelayedResult("foo", Duration.ofMillis(50));
-            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofSeconds(60));
+            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
             String result = executor.invokeAny(Set.of(task1, task2));
             assertTrue("foo".equals(result) && task1.isDone());
             while (!task2.isDone()) {
@@ -601,7 +601,7 @@ public class ThreadExecutorTest {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofSeconds(1));
+                Thread.sleep(Duration.ofMinutes(1));
                 return "bar";
             };
 
@@ -621,7 +621,7 @@ public class ThreadExecutorTest {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofSeconds(1));
+                Thread.sleep(Duration.ofMinutes(1));
                 return "bar";
             };
 
@@ -641,7 +641,7 @@ public class ThreadExecutorTest {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofSeconds(1));
+                Thread.sleep(Duration.ofMinutes(1));
                 return "bar";
             };
 
@@ -663,7 +663,7 @@ public class ThreadExecutorTest {
     public void testInvokeAllInterrupt4() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Callable<String> task1 = () -> "foo";
-            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofSeconds(60));
+            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
             ScheduledInterrupter.schedule(Thread.currentThread(), 2000);
             try {
                 executor.invokeAll(Set.of(task1, task2));
@@ -688,7 +688,7 @@ public class ThreadExecutorTest {
     public void testInvokeAllInterrupt5() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Callable<String> task1 = () -> "foo";
-            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofSeconds(60));
+            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
             ScheduledInterrupter.schedule(Thread.currentThread(), 2000);
             try {
                 executor.invokeAll(Set.of(task1, task2), 1, TimeUnit.DAYS);
@@ -713,7 +713,7 @@ public class ThreadExecutorTest {
     public void testInvokeAllInterrupt6() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Callable<String> task1 = () -> "foo";
-            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofSeconds(60));
+            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
             ScheduledInterrupter.schedule(Thread.currentThread(), 2000);
             try {
                 executor.invokeAll(Set.of(task1, task2), true);
