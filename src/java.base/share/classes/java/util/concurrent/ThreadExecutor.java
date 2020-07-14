@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
@@ -42,7 +43,7 @@ import jdk.internal.access.SharedSecrets;
 /**
  * An ExecutorService that executes each task in its own thread.
  */
-class ThreadExecutor extends AbstractExecutorService {
+class ThreadExecutor implements ExecutorService {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final VarHandle STATE;
     static {
@@ -162,7 +163,7 @@ class ThreadExecutor extends AbstractExecutorService {
     @Override
     public void close() {
         try {
-            super.close(); // waits for executor to terminate
+            ExecutorService.super.close(); // waits for executor to terminate
         } finally {
             lifetime.close();
         }
@@ -329,6 +330,67 @@ class ThreadExecutor extends AbstractExecutorService {
     }
 
     @Override
+    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
+            throws InterruptedException {
+
+        Objects.requireNonNull(tasks);
+        List<Future<T>> futures = new ArrayList<>();
+        int j = 0;
+        try {
+            for (Callable<T> t : tasks) {
+                Future<T> f = submit(t);
+                futures.add(f);
+            }
+            for (int size = futures.size(); j < size; j++) {
+                Future<T> f = futures.get(j);
+                if (!f.isDone()) {
+                    try {
+                        f.get();
+                    } catch (ExecutionException | CancellationException ignore) { }
+                }
+            }
+            return futures;
+        } finally {
+            cancelAll(futures, j);
+        }
+    }
+
+    @Override
+    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
+                                         long timeout, TimeUnit unit)
+            throws InterruptedException {
+
+        Objects.requireNonNull(tasks);
+        long deadline = System.nanoTime() + unit.toNanos(timeout);
+        List<Future<T>> futures = new ArrayList<>();
+        int j = 0;
+        try {
+            for (Callable<T> t : tasks) {
+                Future<T> f = submit(t);
+                futures.add(f);
+            }
+            for (int size = futures.size(); j < size; j++) {
+                Future<T> f = futures.get(j);
+                if (!f.isDone()) {
+                    try {
+                        f.get(deadline - System.nanoTime(), NANOSECONDS);
+                    } catch (TimeoutException e) {
+                        break;
+                    } catch (ExecutionException | CancellationException ignore) { }
+                }
+            }
+            return futures;
+        } finally {
+            cancelAll(futures, j);
+        }
+    }
+
+    private <T> void cancelAll(List<Future<T>> futures, int j) {
+        for (int size = futures.size(); j < size; j++)
+            futures.get(j).cancel(true);
+    }
+
+    @Override
     public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
             throws InterruptedException, ExecutionException {
         try {
@@ -359,7 +421,7 @@ class ThreadExecutor extends AbstractExecutorService {
 
         var holder = new AnyResultHolder<T>(Thread.currentThread());
         var threadList = new ArrayList<Thread>(size);
-        long nanos = (timed) ? TimeUnit.NANOSECONDS.convert(timeout, unit) : 0;
+        long nanos = (timed) ? unit.toNanos(timeout) : 0;
         long startNanos = (timed) ? System.nanoTime() : 0;
 
         try {
