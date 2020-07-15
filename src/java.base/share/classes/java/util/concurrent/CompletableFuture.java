@@ -1877,6 +1877,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * interrupted.
      */
     private Object waitingGet(boolean interruptible) {
+        if (interruptible && Thread.interrupted())
+            return null;
         Signaller q = null;
         boolean queued = false;
         Object r;
