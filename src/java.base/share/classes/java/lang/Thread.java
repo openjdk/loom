@@ -560,7 +560,8 @@ public class Thread implements Runnable {
             /* If the security manager doesn't have a strong opinion
                on the matter, use the parent thread group. */
             if (g == null) {
-                g = parent.getThreadGroup();
+                // avoid parent.getThreadGroup() during early startup
+                g = getCurrentThreadGroup();
             }
         }
 
@@ -2170,6 +2171,18 @@ public class Thread implements Runnable {
             return null;
         } else {
             return isVirtual() ? VirtualThreads.THREAD_GROUP : holder.group;
+        }
+    }
+
+    /**
+     * Returns the thread group for the current thread.
+     */
+    static ThreadGroup getCurrentThreadGroup() {
+        Thread thread = Thread.currentThread();
+        if (thread.isVirtual()) {
+            return VirtualThreads.THREAD_GROUP;
+        } else {
+            return thread.holder.group;
         }
     }
 
