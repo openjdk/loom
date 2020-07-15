@@ -5638,15 +5638,12 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
   // thread->print();
   // tty->print_cr("");
 
-  if (true) {
-    oop thread_oop = JNIHandles::resolve(jthread);
-    if (thread_oop != NULL) {
-      JavaThread* target = java_lang_Thread::thread(thread_oop);
-      Handshake::execute(&fyc, target);
-    }
-  } else {
-    Handshake::execute(&fyc);
+  oop thread_oop = JNIHandles::resolve(jthread);
+  if (thread_oop != NULL) {
+    JavaThread* target = java_lang_Thread::thread(thread_oop);
+    Handshake::execute_direct(&fyc, target);
   }
+
   return fyc.result();
 }
 JVM_END
