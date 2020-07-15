@@ -46,7 +46,7 @@ class JfrThreadLocal {
   mutable JfrStackFrame* _stackframes;
   JfrBlobHandle _thread;
   mutable traceid _thread_id;
-  mutable traceid _shelved_thread_id;
+  mutable traceid _thread_id_alias;
   u8 _data_lost;
   traceid _stack_trace_id;
   jlong _user_time;
@@ -66,7 +66,6 @@ class JfrThreadLocal {
   void release(Thread* t);
   static void release(JfrThreadLocal* tl, Thread* t);
   static traceid assign_thread_id(const Thread* t);
-  traceid cached_thread_id(const Thread* t) const;
 
  public:
   JfrThreadLocal();
@@ -131,7 +130,6 @@ class JfrThreadLocal {
 
   // jfr contextual thread id
   static traceid thread_id(const Thread* t, bool* is_virtual = NULL);
-
   static traceid virtual_thread_id(const Thread* t, oop vthread);
   // jfr hardware thread id
   static traceid vm_thread_id(const Thread* t);
