@@ -201,6 +201,10 @@ void Parse::do_monitor_enter() {
 void Parse::do_monitor_exit() {
   kill_dead_locals();
 
+  // need to set it for monitor exit as well.
+  // OSR compiled methods can start with lock taken
+  C->set_has_monitors(true);
+
   pop();                        // Pop oop to unlock
   // Because monitors are guaranteed paired (else we bail out), we know
   // the matching Lock for this Unlock.  Hence we know there is no need

@@ -1418,7 +1418,7 @@ bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, RegisterMapT* map
   CompiledMethod* cm = f.cb()->as_compiled_method();
   assert (!cm->is_compiled() || !cm->as_compiled_method()->is_native_method(), ""); // See compiledVFrame::compiledVFrame(...) in vframe_hp.cpp
 
-  // if (!cm->has_monitors()) return false;
+  if (!cm->has_monitors()) return false;
 
   ContinuationHelper::update_register_map_with_callee(map, f); // the monitor object could be stored in the link register
   ResourceMark rm;
@@ -1435,7 +1435,7 @@ bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, RegisterMapT* map
       StackValue* owner_sv = StackValue::create_stack_value(&f, map, ov); // it is an oop
       oop owner = owner_sv->get_obj()();
       if (owner != NULL) {
-        // assert(cm->has_monitors(), "");
+        //assert(cm->has_monitors(), "");
         return true;
       }
     }
