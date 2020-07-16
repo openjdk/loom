@@ -446,31 +446,6 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Try to park for up to the given waiting time. If already been unparked
-     * (parking permit available) or the interrupt status is set then this method
-     * completes immediately without yielding.
-     */
-    private void tryPark(long nanos) {
-        // complete immediately if parking permit available or interrupted
-        if (getAndSetParkPermit(false) || interrupted)
-            return;
-
-        // park the thread for the waiting time
-        if (nanos > 0) {
-            Future<?> unparker = UNPARKER.schedule(this::unpark, nanos, NANOSECONDS);
-            try {
-                doPark();
-            } finally {
-                if (!unparker.isDone()) unparker.cancel(false);
-            }
-        } else {
-            // consume permit when not parking
-            tryYield();
-            setParkPermit(false);
-        }
-    }
-
-    /**
      * Park this virtual thread. If pinned, the carrier thread will be parked.
      */
     private void doPark() {
@@ -482,6 +457,63 @@ class VirtualThread extends Thread {
         // notify JVMTI mount event here so that stack is available to agents
         if (yielded && notifyJvmtiEvents) {
             notifyMount(carrierThread, this);
+        }
+    }
+
+    /**
+     * Try to park for up to the given waiting time. If already been unparked
+     * (parking permit available) or the interrupt status is set then this method
+     * completes immediately without yielding.
+     */
+    private void tryPark(long nanos) {
+        // complete immediately if parking permit available or interrupted
+        if (getAndSetParkPermit(false) || interrupted)
+            return;
+
+        // park the thread for the waiting time
+        if (nanos > 0) {
+            Future<?> unparker = scheduleUnpark(nanos);
+            try {
+                doPark();
+            } finally {
+                cancel(unparker);
+            }
+        } else {
+            // consume permit when not parking
+            tryYield();
+            setParkPermit(false);
+        }
+    }
+
+    /**
+     * Schedules this thread to be unparked after the given delay.
+     */
+    private Future<?> scheduleUnpark(long nanos) {
+        //assert Thread.currentThread() == this;
+        Thread carrier = this.carrierThread;
+        // need to switch to carrier thread to avoid nested parking
+        carrier.setCurrentThread(carrier);
+        try {
+            return UNPARKER.schedule(this::unpark, nanos, NANOSECONDS);
+        } finally {
+            carrier.setCurrentThread(this);
+        }
+    }
+
+    /**
+     * Cancels a task if it has not completed.
+     */
+    private void cancel(Future<?> future) {
+        //assert Thread.currentThread() == this;
+        if (!future.isDone()) {
+            Thread carrier = this.carrierThread;
+            // need to switch to carrier thread to avoid nested parking
+            carrier.setCurrentThread(carrier);
+            try {
+                future.cancel(false);
+            } finally {
+                carrier.setCurrentThread(this);
+            }
         }
     }
 
@@ -1027,8 +1059,9 @@ class VirtualThread extends Thread {
      * Creates the ScheduledThreadPoolExecutor used to schedule unparking.
      */
     private static ScheduledExecutorService delayedTaskScheduler() {
+        int poolSize = Math.max(Runtime.getRuntime().availableProcessors()/4, 1);
         ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
-            Executors.newScheduledThreadPool(1, task -> {
+            Executors.newScheduledThreadPool(poolSize, task -> {
                 var thread = InnocuousThread.newThread("VirtualThread-unparker", task);
                 thread.setDaemon(true);
                 return thread;
