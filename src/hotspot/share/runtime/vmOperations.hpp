@@ -80,8 +80,6 @@
   template(UpdateForPopTopFrame)                  \
   template(SetFramePop)                           \
   template(GetObjectMonitorUsage)                 \
-  template(GetStackTrace)                         \
-  template(GetMultipleStackTraces)                \
   template(GetAllStackTraces)                     \
   template(GetThreadListStackTraces)              \
   template(GetFrameCount)                         \
