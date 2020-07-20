@@ -567,6 +567,7 @@ class java_lang_ThreadGroup : AllStatic {
 class java_lang_VirtualThread : AllStatic {
  private:
   static int static_notify_jvmti_events_offset;
+  static int static_vthread_scope_offset;
   static int _carrierThread_offset;
   static int _continuation_offset;
   static int _state_offset;
@@ -597,6 +598,7 @@ class java_lang_VirtualThread : AllStatic {
   }
   static bool is_instance(oop obj);
 
+  static oop vthread_scope();
   static oop carrier_thread(oop vthread);
   static oop continuation(oop vthread);
   static jshort state(oop vthread);

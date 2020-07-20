@@ -2076,12 +2076,14 @@ void java_lang_ThreadGroup::serialize_offsets(SerializeClosure* f) {
 // java_lang_VirtualThread
 
 int java_lang_VirtualThread::static_notify_jvmti_events_offset;
+int java_lang_VirtualThread::static_vthread_scope_offset;
 int java_lang_VirtualThread::_carrierThread_offset;
 int java_lang_VirtualThread::_continuation_offset;
 int java_lang_VirtualThread::_state_offset;
 
 #define VTHREAD_FIELDS_DO(macro) \
   macro(static_notify_jvmti_events_offset,  k, "notifyJvmtiEvents",  bool_signature, true); \
+  macro(static_vthread_scope_offset,  k, "VTHREAD_SCOPE",  continuationscope_signature, true); \
   macro(_carrierThread_offset,  k, "carrierThread",  thread_signature, false); \
   macro(_continuation_offset,  k, "cont",  continuation_signature, false); \
   macro(_state_offset,  k, "state",  int_signature, false)

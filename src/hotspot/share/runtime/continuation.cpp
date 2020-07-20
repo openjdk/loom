@@ -4750,6 +4750,15 @@ bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) 
   return get_continuation_entry_for_frame(thread, f.unextended_sp()) != NULL;
 }
 
+bool Continuation::is_mounted(JavaThread* thread, oop cont_scope) {
+  guarantee (thread->has_last_Java_frame(), "");
+  for (ContinuationEntry* entry = thread->cont_entry(); entry != NULL; entry = entry->parent()) {
+    if (cont_scope == java_lang_Continuation::scope(entry->continuation()))
+      return true;
+  }
+  return false;
+}
+
 bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
   if (thread != NULL && is_return_barrier_entry(*sender_pc)) {
     ContinuationEntry* cont = get_continuation_entry_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());

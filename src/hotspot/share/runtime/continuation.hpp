@@ -87,6 +87,7 @@ public:
   static int try_force_yield(JavaThread* thread, oop cont);
 
   static oop  get_continutation_for_frame(JavaThread* thread, const frame& f);
+  static bool is_mounted(JavaThread* thread, oop cont_scope);
   static bool is_continuation_enterSpecial(const frame& f, const RegisterMap* map);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap* map);
   static bool is_cont_barrier_frame(const frame& f);

@@ -268,6 +268,11 @@ inline bool java_lang_Continuation::done(oop ref) {
   return ref->bool_field(_done_offset);
 }
 
+inline oop java_lang_VirtualThread::vthread_scope() {
+  oop base = SystemDictionary::VirtualThread_klass()->static_field_base_raw();
+  return base->obj_field(static_vthread_scope_offset);
+}
+
 inline jlong java_lang_VirtualThread::set_jfrTraceId(oop ref, jlong id) {
   ref->long_field_put(java_lang_Thread::_tid_offset, id);
   return id;
