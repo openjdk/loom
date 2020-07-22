@@ -158,6 +158,42 @@ class VirtualThread extends Thread {
     }
 
     /**
+     * The task to execute when using a custom scheduler.
+     */
+    private static class Runner implements VirtualThreadTask {
+        private final VirtualThread vthread;
+        private static final VarHandle ATTACHMENT;
+        static {
+            try {
+                MethodHandles.Lookup l = MethodHandles.lookup();
+                ATTACHMENT = l.findVarHandle(Runner.class, "attachment", Object.class);
+            } catch (Exception e) {
+                throw new InternalError(e);
+            }
+        }
+        private volatile Object attachment;
+        Runner(VirtualThread vthread) {
+            this.vthread = vthread;
+        }
+        @Override
+        public void run() {
+            vthread.runContinuation();
+        }
+        @Override
+        public Thread thread() {
+            return vthread;
+        }
+        @Override
+        public Object attach(Object ob) {
+            return ATTACHMENT.getAndSet(this, ob);
+        }
+        @Override
+        public Object attachment() {
+            return attachment;
+        }
+    }
+
+    /**
      * Schedules this {@code VirtualThread} to execute.
      *
      * @throws IllegalThreadStateException if the thread has already been started
@@ -208,42 +244,6 @@ class VirtualThread extends Thread {
             } else {
                 afterYield();
             }
-        }
-    }
-
-    /**
-     * The task to execute when using a custom scheduler.
-     */
-    private static class Runner implements VirtualThreadTask {
-        private final VirtualThread vthread;
-        private static final VarHandle ATTACHMENT;
-        static {
-            try {
-                MethodHandles.Lookup l = MethodHandles.lookup();
-                ATTACHMENT = l.findVarHandle(Runner.class, "attachment", Object.class);
-            } catch (Exception e) {
-                throw new InternalError(e);
-            }
-        }
-        private volatile Object attachment;
-        Runner(VirtualThread vthread) {
-            this.vthread = vthread;
-        }
-        @Override
-        public void run() {
-            vthread.runContinuation();
-        }
-        @Override
-        public Thread thread() {
-            return vthread;
-        }
-        @Override
-        public Object attach(Object ob) {
-            return ATTACHMENT.getAndSet(this, ob);
-        }
-        @Override
-        public Object attachment() {
-            return attachment;
         }
     }
 
