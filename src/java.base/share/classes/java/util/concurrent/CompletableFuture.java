@@ -3012,14 +3012,11 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * @since 99
      */
     public static <T> Stream<CompletableFuture<T>> completed(Collection<? extends CompletableFuture<T>> cfs) {
-        int size = cfs.size();
-        if (size == 0)
+        if (cfs.size() == 0)
             return Stream.empty();
-        var queue = new ArrayBlockingQueue<CompletableFuture<T>>(size);
+        var queue = new LinkedTransferQueue<CompletableFuture<T>>();
         int count = 0;
-        Iterator<? extends CompletableFuture<T>> iterator = cfs.iterator();
-        while (count < size && iterator.hasNext()) {
-            CompletableFuture<T> cf = iterator.next();
+        for (CompletableFuture<T> cf : cfs) {
             cf.handle((result, exc) -> {
                 queue.add(cf);
                 return null;
@@ -3050,7 +3047,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         int size = cfs.length;
         if (size == 0)
             return Stream.empty();
-        var queue = new ArrayBlockingQueue<CompletableFuture<T>>(size);
+        var queue = new LinkedTransferQueue<CompletableFuture<T>>();
         for (CompletableFuture<T> cf : cfs) {
             cf.handle((result, exc) -> {
                 queue.add(cf);
