@@ -62,6 +62,28 @@ public class Monitoring {
     }
 
     /**
+     * Test that getThreadCpuTime returns -1.
+     */
+    public void testGetThreadCpuTime() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            long tid = Thread.currentThread().getId();
+            long cpuTime = ManagementFactory.getThreadMXBean().getThreadCpuTime(tid);
+            assertTrue(cpuTime == -1L);
+        });
+    }
+
+    /**
+     * Test that getThreadUserTime returns -1.
+     */
+    public void testGetThreadUserTime() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            long tid = Thread.currentThread().getId();
+            long cpuTime = ManagementFactory.getThreadMXBean().getThreadUserTime(tid);
+            assertTrue(cpuTime == -1L);
+        });
+    }
+
+    /**
      * Test that ThreadMXBean::getCurrentThreadCpuTime throws UOE.
      */
     @Test(expectedExceptions = { UnsupportedOperationException.class })
@@ -82,13 +104,13 @@ public class Monitoring {
     }
 
     /**
-     * Test that ThreadMXBean::getCurrentThreadAllocatedBytes throws UOE.
+     * Test that ThreadMXBean::getCurrentThreadAllocatedBytes returns -1.
      */
-    @Test(expectedExceptions = { UnsupportedOperationException.class })
     public void testGetCurrentThreadAllocatedBytes() throws Exception {
         TestHelper.runInVirtualThread(() -> {
-            ManagementFactory.getPlatformMXBean(com.sun.management.ThreadMXBean.class)
+            long allocated = ManagementFactory.getPlatformMXBean(com.sun.management.ThreadMXBean.class)
                     .getCurrentThreadAllocatedBytes();
+            assertTrue(allocated == -1L);
         });
     }
 

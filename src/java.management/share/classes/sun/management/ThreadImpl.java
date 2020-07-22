@@ -286,10 +286,16 @@ public class ThreadImpl implements ThreadMXBean {
         if (verified) {
             if (length == 1) {
                 long id = ids[0];
-                if (id == Thread.currentThread().getId()) {
-                    id = 0;
+                Thread thread = Thread.currentThread();
+                if (id == thread.getId()) {
+                    if (thread.isVirtual()) {
+                        times[0] = -1;
+                    } else {
+                        times[0] = getThreadTotalCpuTime0(0);
+                    }
+                } else {
+                    times[0] = getThreadTotalCpuTime0(id);
                 }
-                times[0] = getThreadTotalCpuTime0(id);
             } else {
                 getThreadTotalCpuTime1(ids, times);
             }
@@ -326,10 +332,16 @@ public class ThreadImpl implements ThreadMXBean {
         if (verified) {
             if (length == 1) {
                 long id = ids[0];
-                if (id == Thread.currentThread().getId()) {
-                    id = 0;
+                Thread thread = Thread.currentThread();
+                if (id == thread.getId()) {
+                    if (thread.isVirtual()) {
+                        times[0] = -1;
+                    } else {
+                        times[0] = getThreadUserCpuTime0(0);
+                    }
+                } else {
+                    times[0] = getThreadUserCpuTime0(id);
                 }
-                times[0] = getThreadUserCpuTime0(id);
             } else {
                 getThreadUserCpuTime1(ids, times);
             }
@@ -358,7 +370,7 @@ public class ThreadImpl implements ThreadMXBean {
     protected long getCurrentThreadAllocatedBytes() {
         if (isThreadAllocatedMemoryEnabled()) {
             if (Thread.currentThread().isVirtual()) {
-                throw new UnsupportedOperationException("Not supported by virtual threads");
+                return -1;
             }
             return getThreadAllocatedMemory0(0);
         }
@@ -374,8 +386,16 @@ public class ThreadImpl implements ThreadMXBean {
         boolean verified = verifyThreadAllocatedMemory(id);
 
         if (verified) {
-            return getThreadAllocatedMemory0(
-                Thread.currentThread().getId() == id ? 0 : id);
+            Thread thread = Thread.currentThread();
+            if (id == thread.getId()) {
+                if (thread.isVirtual()) {
+                    return -1L;
+                } else {
+                    return getThreadAllocatedMemory0(0);
+                }
+            } else {
+                return getThreadAllocatedMemory0(id);
+            }
         }
         return -1;
     }
