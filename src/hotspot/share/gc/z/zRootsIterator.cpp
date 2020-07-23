@@ -146,7 +146,8 @@ public:
   virtual void do_code_blob(CodeBlob* cb) {
     nmethod* const nm = cb->as_nmethod_or_null();
     if (nm != NULL && nm->oops_do_try_claim()) {
-      ZNMethod::nmethod_oops_do(nm, _cl);
+      ZNMethod::nmethod_oops_do(nm, _cl, _should_disarm_nmethods);
+      nm->mark_as_maybe_on_continuation();
       assert(!ZNMethod::supports_entry_barrier(nm) ||
              ZNMethod::is_armed(nm) == _should_disarm_nmethods, "Invalid state");
       if (_should_disarm_nmethods) {
@@ -247,7 +248,7 @@ void ZRootsIterator::do_java_threads(ZRootsIteratorClosure* cl) {
 
 void ZRootsIterator::do_code_cache(ZRootsIteratorClosure* cl) {
   ZStatTimer timer(ZSubPhasePauseRootsCodeCache);
-  ZNMethod::oops_do(cl);
+  ZNMethod::oops_do(cl, true /* keepalive_is_strong */);
 }
 
 void ZRootsIterator::oops_do(ZRootsIteratorClosure* cl) {

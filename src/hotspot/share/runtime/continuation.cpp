@@ -5944,7 +5944,7 @@ void Continuation::nmethod_patched(nmethod* nm) {
 
 #ifndef PRODUCT
   CountOops count;
-  nm->oops_do(&count, false, true);
+  nm->oops_do(&count, false);
   assert(nm->nr_oops() >= count.nr_oops(), "should be");
 #endif
 

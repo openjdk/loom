@@ -61,6 +61,7 @@ bool BarrierSetNMethod::supports_entry_barrier(nmethod* nm) {
 }
 
 bool BarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
+  nm->mark_as_maybe_on_continuation();
   LoadPhantomOopClosure cl;
   nm->oops_do(&cl);
   disarm(nm);

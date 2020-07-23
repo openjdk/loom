@@ -191,6 +191,11 @@ void ZCollectedHeap::collect(GCCause::Cause cause) {
   _driver->collect(cause);
 }
 
+void ZCollectedHeap::collect_for_codecache() {
+  // Start synchronous GC
+  collect(GCCause::_codecache_GC_threshold);
+}
+
 void ZCollectedHeap::collect_as_vm_thread(GCCause::Cause cause) {
   // These collection requests are ignored since ZGC can't run a synchronous
   // GC cycle from within the VM thread. This is considered benign, since the

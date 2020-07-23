@@ -235,6 +235,7 @@ void CollectedHeap::collect_as_vm_thread(GCCause::Cause cause) {
   switch (cause) {
     case GCCause::_heap_inspection:
     case GCCause::_heap_dump:
+    case GCCause::_codecache_GC_threshold:
     case GCCause::_metadata_GC_threshold : {
       HandleMark hm;
       do_full_collection(false);        // don't clear all soft refs
@@ -364,7 +365,7 @@ void CollectedHeap::collect_for_codecache() {
     // Generate a VM operation
     VM_CollectForCodeCacheAllocation op(gc_count,
                                         full_gc_count,
-                                        GCCause::_metadata_GC_threshold);
+                                        GCCause::_codecache_GC_threshold);
     VMThread::execute(&op);
 
     // If GC was locked out, try again. Check before checking success because the

@@ -98,11 +98,8 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
       // Decode narrowoop
       oop val = CompressedOops::decode(value.noop);
       // Deoptimization must make sure all oops have passed load barriers
-#if INCLUDE_SHENANDOAHGC
-      if (UseShenandoahGC) {
-        val = ShenandoahBarrierSet::barrier_set()->load_reference_barrier(val);
-      }
-#endif
+      // TODO: Erik: remove after integration with concurrent stack scanning
+      val = NativeAccess<>::oop_load(&val);
       Handle h(Thread::current(), val); // Wrap a handle around the oop
       return new StackValue(h);
     }
@@ -111,15 +108,12 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
       if (in_cont && UseCompressedOops) {
         narrowOop noop = *(narrowOop*) value_addr;
         oop val = CompressedOops::decode(noop);
-#if INCLUDE_SHENANDOAHGC
-        if (UseShenandoahGC) {
-          val = ShenandoahBarrierSet::barrier_set()->load_reference_barrier(val);
-        }
-#endif
+        // TODO: Erik: remove after integration with concurrent stack scanning
+        val = NativeAccess<>::oop_load(&val);
         Handle h(Thread::current(), val);
         return new StackValue(h);
-      } 
-      
+      }
+
       oop val = *(oop *)value_addr;
 #ifdef _LP64
       if (CompressedOops::is_base(val)) {
@@ -131,11 +125,8 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
       }
 #endif
       // Deoptimization must make sure all oops have passed load barriers
-#if INCLUDE_SHENANDOAHGC
-      if (UseShenandoahGC) {
-        val = ShenandoahBarrierSet::barrier_set()->load_reference_barrier(val);
-      }
-#endif
+      // TODO: Erik: remove after integration with concurrent stack scanning
+      val = NativeAccess<>::oop_load(&val);
       assert(oopDesc::is_oop_or_null(val, false), "bad oop found");
       Handle h(Thread::current(), val); // Wrap a handle around the oop
       return new StackValue(h);

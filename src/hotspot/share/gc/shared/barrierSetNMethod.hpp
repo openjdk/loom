@@ -50,6 +50,7 @@ public:
   bool nmethod_osr_entry_barrier(nmethod* nm);
   bool is_armed(nmethod* nm);
   void disarm(nmethod* nm);
+  void arm(nmethod* nm, int arm_value);
 
   void arm_all_nmethods();
 };

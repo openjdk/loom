@@ -47,12 +47,13 @@ public:
 
   static bool is_armed(nmethod* nm);
   static void disarm(nmethod* nm);
+  static void arm(nmethod* nm, int arm_value);
 
-  static void nmethod_oops_do(nmethod* nm, OopClosure* cl);
+  static void nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_strong);
 
   static void oops_do_begin();
   static void oops_do_end();
-  static void oops_do(OopClosure* cl);
+  static void oops_do(OopClosure* cl, bool keepalive_is_strong);
 
   static ZReentrantLock* lock_for_nmethod(nmethod* nm);
 

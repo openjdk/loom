@@ -22,6 +22,7 @@
  */
 
 #include "precompiled.hpp"
+#include "code/compiledMethod.inline.hpp"
 #include "code/relocInfo.hpp"
 #include "code/nmethod.hpp"
 #include "code/icBuffer.hpp"
@@ -212,7 +213,14 @@ void ZNMethod::disarm(nmethod* nm) {
   }
 }
 
-void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl) {
+void ZNMethod::arm(nmethod* nm, int arm_value) {
+  BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
+  if (bs != NULL) {
+    bs->arm(nm, arm_value);
+  }
+}
+
+void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_strong) {
   // Process oops table
   {
     oop* const begin = nm->oops_begin();
@@ -241,18 +249,27 @@ void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl) {
   if (oops->has_non_immediates()) {
     nm->fix_oop_relocations();
   }
+
+  if (keepalive_is_strong) {
+    oop* obj_ptr = nm->get_keepalive();
+    if (obj_ptr != NULL) {
+      cl->do_oop(obj_ptr);
+    }
+  }
 }
 
 class ZNMethodToOopsDoClosure : public NMethodClosure {
 private:
   OopClosure* _cl;
+  bool        _keepalive_is_strong;
 
 public:
-  ZNMethodToOopsDoClosure(OopClosure* cl) :
-      _cl(cl) {}
+  ZNMethodToOopsDoClosure(OopClosure* cl, bool keepalive_is_strong) :
+      _cl(cl),
+      _keepalive_is_strong(keepalive_is_strong) {}
 
   virtual void do_nmethod(nmethod* nm) {
-    ZNMethod::nmethod_oops_do(nm, _cl);
+    ZNMethod::nmethod_oops_do(nm, _cl, _keepalive_is_strong);
   }
 };
 
@@ -264,8 +281,8 @@ void ZNMethod::oops_do_end() {
   ZNMethodTable::nmethods_do_end();
 }
 
-void ZNMethod::oops_do(OopClosure* cl) {
-  ZNMethodToOopsDoClosure nmethod_cl(cl);
+void ZNMethod::oops_do(OopClosure* cl, bool keepalive_is_strong) {
+  ZNMethodToOopsDoClosure nmethod_cl(cl, keepalive_is_strong);
   ZNMethodTable::nmethods_do(&nmethod_cl);
 }
 
@@ -322,8 +339,8 @@ public:
     if (ZNMethod::is_armed(nm)) {
       // Heal oops and disarm
       ZNMethodOopClosure cl;
-      ZNMethod::nmethod_oops_do(nm, &cl);
-      ZNMethod::disarm(nm);
+      ZNMethod::nmethod_oops_do(nm, &cl, false /* keepalive_is_strong */);
+      ZNMethod::arm(nm, 0);
     }
 
     // Clear compiled ICs and exception caches

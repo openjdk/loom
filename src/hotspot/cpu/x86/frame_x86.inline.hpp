@@ -353,8 +353,12 @@ inline JavaCallWrapper** frame::entry_frame_call_wrapper_addr() const {
 inline oop frame::saved_oop_result(RegisterMap* map) const {
   oop* result_adr = (oop *)map->location(rax->as_VMReg());
   guarantee(result_adr != NULL, "bad register save location");
+  oop result = *result_adr;
 
-  return (*result_adr);
+  // TODO: Erik: remove after integration with concurrent stack scanning
+  result = NativeAccess<>::oop_load(&result);
+
+  return result;
 }
 
 inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {

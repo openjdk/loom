@@ -242,9 +242,9 @@ class CodeBlobClosure : public Closure {
 // Applies an oop closure to all ref fields in code blobs
 // iterated over in an object iteration.
 class CodeBlobToOopClosure : public CodeBlobClosure {
+ protected:
   OopClosure* _cl;
   bool _fix_relocations;
- protected:
   void do_nmethod(nmethod* nm);
  public:
   // If fix_relocations(), then cl must copy objects to their new location immediately to avoid

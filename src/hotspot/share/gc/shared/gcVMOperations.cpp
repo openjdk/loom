@@ -285,7 +285,7 @@ void VM_CollectForCodeCacheAllocation::doit() {
   log_debug(gc)("Full GC for CodeCache");
 
   // Don't clear the soft refs yet.
-  heap->collect_as_vm_thread(GCCause::_metadata_GC_threshold);
+  heap->collect_as_vm_thread(GCCause::_codecache_GC_threshold);
 
   log_debug(gc)("After GC for CodeCache");
 

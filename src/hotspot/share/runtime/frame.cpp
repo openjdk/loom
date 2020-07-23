@@ -889,6 +889,13 @@ oop* frame::interpreter_callee_receiver_addr(Symbol* signature) {
   return (oop *)interpreter_frame_tos_at(size);
 }
 
+oop frame::interpreter_callee_receiver(Symbol* signature) {
+  // TODO: Erik: remove after integration with concurrent stack scanning
+  oop r = *interpreter_callee_receiver_addr(signature);
+  r = NativeAccess<>::oop_load(&r);
+  return r;
+}
+
 void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) {
   Thread *thread = Thread::current();
   methodHandle m (thread, interpreter_frame_method());
@@ -1099,6 +1106,8 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
     return NULL;
   }
   oop r = *oop_adr;
+  // TODO: Erik: remove after integration with concurrent stack scanning
+  r = NativeAccess<>::oop_load(&r);
   assert(Universe::heap()->is_in_or_null(r), "bad receiver: " INTPTR_FORMAT " (" INTX_FORMAT ")", p2i(r), p2i(r));
   return r;
 }
@@ -1120,6 +1129,8 @@ oop frame::get_native_receiver() {
   int byte_offset = in_bytes(nm->native_receiver_sp_offset());
   assert(byte_offset >= 0, "should not see invalid offset");
   oop owner = ((oop*) sp())[byte_offset / wordSize];
+  // TODO: Erik: remove after integration with concurrent stack scanning
+  owner = NativeAccess<>::oop_load(&owner);
   assert( Universe::heap()->is_in(owner), "bad receiver" );
   return owner;
 }

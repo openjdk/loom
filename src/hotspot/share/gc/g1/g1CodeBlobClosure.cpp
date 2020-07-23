@@ -29,6 +29,7 @@
 #include "gc/g1/g1ConcurrentMark.inline.hpp"
 #include "gc/g1/heapRegion.hpp"
 #include "gc/g1/heapRegionRemSet.hpp"
+#include "gc/shared/barrierSetNMethod.hpp"
 #include "oops/access.inline.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/oop.inline.hpp"
@@ -75,9 +76,15 @@ void G1CodeBlobClosure::MarkingOopClosure::do_oop(narrowOop* o) {
 
 void G1CodeBlobClosure::do_evacuation_and_fixup(nmethod* nm) {
   _oc.set_nm(nm);
-  nm->mark_as_maybe_on_continuation();
+  if (_keepalive_is_strong) {
+    nm->mark_as_maybe_on_continuation();
+  }
   nm->oops_do_keepalive(&_oc, _keepalive_is_strong);
   nm->fix_oop_relocations();
+  BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+  if (bs_nm != NULL) {
+    bs_nm->disarm(nm);
+  }
 }
 
 void G1CodeBlobClosure::do_marking(nmethod* nm) {

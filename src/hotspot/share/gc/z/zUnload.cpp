@@ -72,7 +72,7 @@ public:
     ZReentrantLock* const lock = ZNMethod::lock_for_nmethod(nm);
     ZLocker<ZReentrantLock> locker(lock);
     ZIsUnloadingOopClosure cl;
-    ZNMethod::nmethod_oops_do(nm, &cl);
+    ZNMethod::nmethod_oops_do(nm, &cl, false /* keepalive_is_strong */);
     return cl.is_unloading();
   }
 };
