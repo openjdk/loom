@@ -58,6 +58,7 @@ public class LocalExecutionControl extends DirectExecutionControl {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     protected String invoke(Method doitMethod) throws Exception {
         execThreadGroup = new ThreadGroup("JShell process local execution");
 
@@ -124,7 +125,7 @@ public class LocalExecutionControl extends DirectExecutionControl {
     }
 
     @Override
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings({"deprecation", "removal"})
     public void stop() throws EngineTerminationException, InternalException {
         synchronized (STOP_LOCK) {
             if (!userCodeRunning) {

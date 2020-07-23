@@ -50,15 +50,6 @@ void NotificationThread::initialize() {
                           string,
                           CHECK);
 
-  Klass* group = SystemDictionary::ThreadGroup_klass();
-  JavaValue result(T_VOID);
-  JavaCalls::call_special(&result,
-                          thread_group,
-                          group,
-                          vmSymbols::add_method_name(),
-                          vmSymbols::thread_void_signature(),
-                          thread_oop,
-                          THREAD);
   {
     MutexLocker mu(THREAD, Threads_lock);
     NotificationThread* thread =  new NotificationThread(&notification_thread_entry);

@@ -2386,7 +2386,7 @@ jvmtiEnv *jvmti;
         <field id="is_daemon">
           <jboolean/>
           <description>
-            Is this a daemon thread group?
+              <code>JNI_FALSE</code>. The concept of daemon thread group no longer exists.
           </description>
         </field>
       </typedef>
@@ -2420,7 +2420,9 @@ jvmtiEnv *jvmti;
     <function id="GetThreadGroupChildren" num="15">
       <synopsis>Get Thread Group Children</synopsis>
       <description>
-        Get the live threads and active subgroups in this thread group.
+        Get the live threads and active subgroups in this thread group. A subgroup
+        is considered active if it contains any threads that are alive or any of its
+        subgroups (or descendants) contains a thread that is alive.
       </description>
       <origin>jvmdi</origin>
       <capabilities>

@@ -1235,21 +1235,6 @@ void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name
   if (daemon) {
     java_lang_Thread::set_daemon(thread_oop());
   }
-
-  if (HAS_PENDING_EXCEPTION) {
-    return;
-  }
-
-  Klass* group = SystemDictionary::ThreadGroup_klass();
-  Handle threadObj(THREAD, this->threadObj());
-
-  JavaCalls::call_special(&result,
-                          thread_group,
-                          group,
-                          vmSymbols::add_method_name(),
-                          vmSymbols::thread_void_signature(),
-                          threadObj,          // Arg 1
-                          THREAD);
 }
 
 // List of all NonJavaThreads and safe iteration over that list.

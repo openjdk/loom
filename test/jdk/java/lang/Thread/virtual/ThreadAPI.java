@@ -1498,11 +1498,9 @@ public class ThreadAPI {
 
     // -- ThreadGroup --
 
-    @SuppressWarnings({"deprecation", "removal"})
     public void testThreadGroup1() throws Exception {
         var thread = Thread.builder().virtual().task(LockSupport::park).build();
         var vgroup = thread.getThreadGroup();
-        assertTrue(vgroup.allowThreadSuspension(true) == false);
         thread.start();
         try {
             assertTrue(thread.getThreadGroup() == vgroup);

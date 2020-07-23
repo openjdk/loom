@@ -362,15 +362,10 @@
   template(daemon_name,                               "daemon")                                   \
   template(run_method_name,                           "run")                                      \
   template(exit_method_name,                          "exit")                                     \
-  template(add_method_name,                           "add")                                      \
   template(remove_method_name,                        "remove")                                   \
   template(parent_name,                               "parent")                                   \
-  template(threads_name,                              "threads")                                  \
   template(groups_name,                               "groups")                                   \
   template(maxPriority_name,                          "maxPriority")                              \
-  template(destroyed_name,                            "destroyed")                                \
-  template(nthreads_name,                             "nthreads")                                 \
-  template(ngroups_name,                              "ngroups")                                  \
   template(shutdown_name,                             "shutdown")                                 \
   template(finalize_method_name,                      "finalize")                                 \
   template(reference_lock_name,                       "lock")                                     \

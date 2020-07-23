@@ -67,10 +67,6 @@ public class NullThreadName
             if (count++ > 60)
                 throw new AssertionError("GoodThread is still alive!");
         }
-
-        if (!tg.isDestroyed()) {
-            throw new AssertionError("Failed: Thread group is not destroyed.");
-        }
     }
 
     static class GoodThread implements Runnable

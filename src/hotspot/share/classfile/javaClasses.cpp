@@ -1986,13 +1986,7 @@ const char* java_lang_Thread::thread_status_name(oop java_thread) {
 }
 int java_lang_ThreadGroup::_parent_offset;
 int java_lang_ThreadGroup::_name_offset;
-int java_lang_ThreadGroup::_threads_offset;
-int java_lang_ThreadGroup::_groups_offset;
 int java_lang_ThreadGroup::_maxPriority_offset;
-int java_lang_ThreadGroup::_destroyed_offset;
-int java_lang_ThreadGroup::_daemon_offset;
-int java_lang_ThreadGroup::_nthreads_offset;
-int java_lang_ThreadGroup::_ngroups_offset;
 
 oop  java_lang_ThreadGroup::parent(oop java_thread_group) {
   assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
@@ -2010,54 +2004,15 @@ const char* java_lang_ThreadGroup::name(oop java_thread_group) {
   return NULL;
 }
 
-int java_lang_ThreadGroup::nthreads(oop java_thread_group) {
-  assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
-  return java_thread_group->int_field(_nthreads_offset);
-}
-
-objArrayOop java_lang_ThreadGroup::threads(oop java_thread_group) {
-  oop threads = java_thread_group->obj_field(_threads_offset);
-  assert(threads != NULL, "threadgroups should have threads");
-  assert(threads->is_objArray(), "just checking"); // Todo: Add better type checking code
-  return objArrayOop(threads);
-}
-
-int java_lang_ThreadGroup::ngroups(oop java_thread_group) {
-  assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
-  return java_thread_group->int_field(_ngroups_offset);
-}
-
-objArrayOop java_lang_ThreadGroup::groups(oop java_thread_group) {
-  oop groups = java_thread_group->obj_field(_groups_offset);
-  assert(groups == NULL || groups->is_objArray(), "just checking"); // Todo: Add better type checking code
-  return objArrayOop(groups);
-}
-
 ThreadPriority java_lang_ThreadGroup::maxPriority(oop java_thread_group) {
   assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
   return (ThreadPriority) java_thread_group->int_field(_maxPriority_offset);
 }
 
-bool java_lang_ThreadGroup::is_destroyed(oop java_thread_group) {
-  assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
-  return java_thread_group->bool_field(_destroyed_offset) != 0;
-}
-
-bool java_lang_ThreadGroup::is_daemon(oop java_thread_group) {
-  assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
-  return java_thread_group->bool_field(_daemon_offset) != 0;
-}
-
 #define THREADGROUP_FIELDS_DO(macro) \
   macro(_parent_offset,      k, vmSymbols::parent_name(),      threadgroup_signature,       false); \
   macro(_name_offset,        k, vmSymbols::name_name(),        string_signature,            false); \
-  macro(_threads_offset,     k, vmSymbols::threads_name(),     thread_array_signature,      false); \
-  macro(_groups_offset,      k, vmSymbols::groups_name(),      threadgroup_array_signature, false); \
-  macro(_maxPriority_offset, k, vmSymbols::maxPriority_name(), int_signature,               false); \
-  macro(_destroyed_offset,   k, vmSymbols::destroyed_name(),   bool_signature,              false); \
-  macro(_daemon_offset,      k, vmSymbols::daemon_name(),      bool_signature,              false); \
-  macro(_nthreads_offset,    k, vmSymbols::nthreads_name(),    int_signature,               false); \
-  macro(_ngroups_offset,     k, vmSymbols::ngroups_name(),     int_signature,               false)
+  macro(_maxPriority_offset, k, vmSymbols::maxPriority_name(), int_signature,               false)
 
 void java_lang_ThreadGroup::compute_offsets() {
   assert(_parent_offset == 0, "offsets should be initialized only once");

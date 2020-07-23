@@ -584,8 +584,6 @@ public class Thread implements Runnable {
             }
         }
 
-        g.addUnstarted();
-
         this.name = name;
         this.tid = primordial ? 1 : ThreadIdentifiers.next();
         this.contextClassLoader = contextClassLoader(parent);
@@ -1691,26 +1689,7 @@ public class Thread implements Runnable {
         if (holder.threadStatus != 0)
             throw new IllegalThreadStateException();
 
-        /* Notify the group that this thread is about to be started
-         * so that it can be added to the group's list of threads
-         * and the group's unstarted count can be decremented. */
-        ThreadGroup group = holder.group;
-        group.add(this);
-
-        boolean started = false;
-        try {
-            start0();
-            started = true;
-        } finally {
-            try {
-                if (!started) {
-                    group.threadStartFailed(this);
-                }
-            } catch (Throwable ignore) {
-                /* do nothing. If start0 threw a Throwable then
-                  it will be passed up the call stack */
-            }
-        }
+        start0();
     }
 
     private native void start0();
@@ -1749,19 +1728,13 @@ public class Thread implements Runnable {
                 TerminatingThreadLocal.threadTerminated();
             }
         } finally {
-            try {
-                ThreadGroup group = holder.group;
-                // assert group != null
-                group.threadTerminated(this);
-            } finally {
-                /* Aggressively null out all reference fields: see bug 4006245 */
-                /* Speed the release of some of these resources */
-                threadLocals = null;
-                inheritableThreadLocals = null;
-                inheritedAccessControlContext = null;
-                nioBlocker = null;
-                uncaughtExceptionHandler = null;
-            }
+            /* Aggressively null out all reference fields: see bug 4006245 */
+            /* Speed the release of some of these resources */
+            threadLocals = null;
+            inheritableThreadLocals = null;
+            inheritedAccessControlContext = null;
+            nioBlocker = null;
+            uncaughtExceptionHandler = null;
         }
     }
 
@@ -2201,7 +2174,13 @@ public class Thread implements Runnable {
      * @return  an estimate of the number of active threads in the current
      *          thread's thread group and in any other thread group that
      *          has the current thread's thread group as an ancestor
+     *
+     * @deprecated {@linkplain java.lang.management.ThreadMXBean} provides a
+     *             more suitable interface for monitoring threads.
+     *
+     * @since 1.0
      */
+    @Deprecated(since="99")
     public static int activeCount() {
         return currentThread().getThreadGroup().activeCount();
     }
@@ -2231,7 +2210,15 @@ public class Thread implements Runnable {
      * @throws  SecurityException
      *          if {@link java.lang.ThreadGroup#checkAccess} determines that
      *          the current thread cannot access its thread group
+     *
+     * @deprecated This method is inherently racy.
+     *             {@linkplain java.lang.management.ThreadMXBean} provides a
+     *             more suitable interface for monitoring threads.
+     *
+     * @since 1.0
      */
+    @Deprecated(since="99")
+    @SuppressWarnings("deprecation")
     public static int enumerate(Thread tarray[]) {
         return currentThread().getThreadGroup().enumerate(tarray);
     }
@@ -2807,6 +2794,13 @@ public class Thread implements Runnable {
         return result.booleanValue();
     }
 
+    /**
+     * Return an array of all live threads.
+     */
+    static Thread[] getAllThreads() {
+        return getThreads();
+    }
+
     private static native StackTraceElement[][] dumpThreads(Thread[] threads);
     private static native Thread[] getThreads();
 
@@ -3295,23 +3289,14 @@ public class Thread implements Runnable {
             };
             ThreadGroup root = AccessController.doPrivileged(pa);
 
-            var vgroup = new ThreadGroup(root, "VirtualThreads", false) {
-                @Override
-                @SuppressWarnings({"deprecation", "removal"})
-                public boolean allowThreadSuspension(boolean b) {
-                    return false;
-                }
-            };
-            vgroup.setDaemon(true);
-            vgroup.setMaxPriority(NORM_PRIORITY);
+            var vgroup = new ThreadGroup(root, "VirtualThreads").maxPriority(NORM_PRIORITY);
             THREAD_GROUP = vgroup;
 
-            var subgroup = new ThreadGroup(vgroup, "other", false);
-            subgroup.setDaemon(true);
+            var subgroup = new ThreadGroup(vgroup, "other");
             if (System.getSecurityManager() == null) {
-                subgroup.setMaxPriority(NORM_PRIORITY);
+                subgroup.maxPriority(NORM_PRIORITY);
             } else {
-                subgroup.setMaxPriority(MIN_PRIORITY);
+                subgroup.maxPriority(MIN_PRIORITY);
             }
             THREAD_SUBGROUP = subgroup;
 
@@ -3324,8 +3309,7 @@ public class Thread implements Runnable {
     // The following three initially uninitialized fields are exclusively
     // managed by class java.util.concurrent.ThreadLocalRandom. These
     // fields are used to build the high-performance PRNGs in the
-    // concurrent code. Upcoming changes in the concurrent code avoid
-    // needing to use @Contented here.
+    // concurrent code.
 
     /** The current seed for a ThreadLocalRandom */
     long threadLocalRandomSeed;

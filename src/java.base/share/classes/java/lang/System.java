@@ -2021,11 +2021,6 @@ public final class System {
         // classes are used.
         VM.initializeOSEnvironment();
 
-        // The main thread is not added to its thread group in the same
-        // way as other threads; we must do it ourselves here.
-        Thread current = Thread.currentThread();
-        current.getThreadGroup().add(current);
-
         // register shared secrets
         setJavaLangAccess();
 

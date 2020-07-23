@@ -1578,15 +1578,13 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
 
   const char* name;
   Handle parent_group;
-  bool is_daemon;
   ThreadPriority max_priority;
 
   name         = java_lang_ThreadGroup::name(group_obj());
   parent_group = Handle(current_thread, java_lang_ThreadGroup::parent(group_obj()));
-  is_daemon    = java_lang_ThreadGroup::is_daemon(group_obj());
   max_priority = java_lang_ThreadGroup::maxPriority(group_obj());
 
-  info_ptr->is_daemon    = is_daemon;
+  info_ptr->is_daemon    = JNI_FALSE;
   info_ptr->max_priority = max_priority;
   info_ptr->parent       = jni_reference(parent_group);
 
@@ -1601,6 +1599,66 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
   return JVMTI_ERROR_NONE;
 } /* end GetThreadGroupInfo */
 
+static int get_live_threads(JavaThread* current_thread, Handle group_hdl, Handle **thread_objs_p) {
+  int count = 0;
+  Handle *thread_objs = NULL;
+  ThreadsListEnumerator tle(current_thread, true);
+  int nthreads = tle.num_threads();
+  if (nthreads > 0) {
+    thread_objs = NEW_RESOURCE_ARRAY(Handle, nthreads);
+    NULL_CHECK(thread_objs, JVMTI_ERROR_OUT_OF_MEMORY);
+    for (int i = 0; i < nthreads; i++) {
+      Handle thread = tle.get_threadObj(i);
+      if (thread()->is_a(SystemDictionary::Thread_klass()) && java_lang_Thread::threadGroup(thread()) == group_hdl()) {
+        thread_objs[count++] = thread;
+      }
+    }
+  }
+  *thread_objs_p = thread_objs;
+  return count;
+}
+
+static int get_active_subgroups(JavaThread* current_thread, Handle group_hdl, Handle **group_objs_p) {
+  int count = 0;
+  Handle *group_objs = NULL;
+  ThreadsListEnumerator tle(current_thread, true);
+  int nthreads = tle.num_threads();
+  if (nthreads > 0) {
+    group_objs = NEW_RESOURCE_ARRAY(Handle, nthreads); // FIXME, should use GrowableArray
+    NULL_CHECK(group_objs, JVMTI_ERROR_OUT_OF_MEMORY);
+    for (int i = 0; i < nthreads; i++) {
+      Handle thread = tle.get_threadObj(i);
+      if (thread()->is_a(SystemDictionary::Thread_klass())) {
+        oop group_obj = java_lang_Thread::threadGroup(thread());
+        if (group_obj != NULL && group_obj != group_hdl()) {
+          // check if group_obj is a subgroup of group_hdl()
+          oop g = group_obj;
+          oop parent;
+          while ((parent = java_lang_ThreadGroup::parent(g)) != NULL) {
+            if (parent == group_hdl()) {
+               // check if group is already added
+               bool found = false;
+               for (int j = 0; j < count; j++) {
+                 if (group_objs[j]() == g) {
+                   found = true;
+                   break;
+                 }
+               }
+               if (!found) {
+                 group_objs[count++] = Handle(current_thread, g);
+               }
+               break;
+            } else {
+              g = parent;
+            }
+          }
+        }
+      }
+    }
+  }
+  *group_objs_p = group_objs;
+  return count;
+}
 
 // thread_count_ptr - pre-checked for NULL
 // threads_ptr - pre-checked for NULL
@@ -1623,56 +1681,8 @@ JvmtiEnv::GetThreadGroupChildren(jthreadGroup group, jint* thread_count_ptr, jth
 
   Handle group_hdl(current_thread, group_obj);
 
-  { // Cannot allow thread or group counts to change.
-    ObjectLocker ol(group_hdl, current_thread);
-
-    nthreads = java_lang_ThreadGroup::nthreads(group_hdl());
-    ngroups  = java_lang_ThreadGroup::ngroups(group_hdl());
-
-    if (nthreads > 0) {
-      ThreadsListHandle tlh(current_thread);
-      objArrayOop threads = java_lang_ThreadGroup::threads(group_hdl());
-      assert(nthreads <= threads->length(), "too many threads");
-      thread_objs = NEW_RESOURCE_ARRAY(Handle,nthreads);
-      for (int i = 0, j = 0; i < nthreads; i++) {
-        oop thread_obj = threads->obj_at(i);
-        assert(thread_obj != NULL, "thread_obj is NULL");
-        JavaThread *java_thread = NULL;
-        jvmtiError err = JvmtiExport::cv_oop_to_JavaThread(tlh.list(), thread_obj, &java_thread);
-        if (err == JVMTI_ERROR_NONE) {
-          // Have a valid JavaThread*.
-          if (java_thread->is_hidden_from_external_view()) {
-            // Filter out hidden java threads.
-            hidden_threads++;
-            continue;
-          }
-        } else {
-          // We couldn't convert thread_obj into a JavaThread*.
-          if (err == JVMTI_ERROR_INVALID_THREAD) {
-            // The thread_obj does not refer to a java.lang.Thread object
-            // so skip it.
-            hidden_threads++;
-            continue;
-          }
-          // We have a valid thread_obj, but no JavaThread*; the caller
-          // can still have limited use for the thread_obj.
-        }
-        thread_objs[j++] = Handle(current_thread, thread_obj);
-      }
-      nthreads -= hidden_threads;
-    } // ThreadsListHandle is destroyed here.
-
-    if (ngroups > 0) {
-      objArrayOop groups = java_lang_ThreadGroup::groups(group_hdl());
-      assert(ngroups <= groups->length(), "too many groups");
-      group_objs = NEW_RESOURCE_ARRAY(Handle,ngroups);
-      for (int i = 0; i < ngroups; i++) {
-        oop group_obj = groups->obj_at(i);
-        assert(group_obj != NULL, "group_obj != NULL");
-        group_objs[i] = Handle(current_thread, group_obj);
-      }
-    }
-  } // ThreadGroup unlocked here
+  nthreads = get_live_threads(current_thread, group_hdl, &thread_objs);
+  ngroups = get_active_subgroups(current_thread, group_hdl, &group_objs);
 
   *group_count_ptr  = ngroups;
   *thread_count_ptr = nthreads;

@@ -525,13 +525,7 @@ class java_lang_ThreadGroup : AllStatic {
  private:
   static int _parent_offset;
   static int _name_offset;
-  static int _threads_offset;
-  static int _groups_offset;
   static int _maxPriority_offset;
-  static int _destroyed_offset;
-  static int _daemon_offset;
-  static int _nthreads_offset;
-  static int _ngroups_offset;
 
   static void compute_offsets();
 
@@ -539,24 +533,11 @@ class java_lang_ThreadGroup : AllStatic {
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
   // parent ThreadGroup
-  static oop  parent(oop java_thread_group);
+  static oop parent(oop java_thread_group);
   // name
   static const char* name(oop java_thread_group);
-  // ("name as oop" accessor is not necessary)
-  // Number of threads in group
-  static int nthreads(oop java_thread_group);
-  // threads
-  static objArrayOop threads(oop java_thread_group);
-  // Number of threads in group
-  static int ngroups(oop java_thread_group);
-  // groups
-  static objArrayOop groups(oop java_thread_group);
   // maxPriority in group
   static ThreadPriority maxPriority(oop java_thread_group);
-  // Destroyed
-  static bool is_destroyed(oop java_thread_group);
-  // Daemon
-  static bool is_daemon(oop java_thread_group);
   // Debugging
   friend class JavaClasses;
 };
