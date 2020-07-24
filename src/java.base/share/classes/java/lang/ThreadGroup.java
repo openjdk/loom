@@ -96,6 +96,15 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
         this(checkParentAccess(parent), parent, name);
     }
 
+    /**
+     * Creates a new thread group without a permission check.
+     */
+    ThreadGroup(ThreadGroup parent, String name, int maxPriority) {
+        this.parent = parent;
+        this.name = name;
+        this.maxPriority = maxPriority;
+    }
+
     private ThreadGroup(Void unused, ThreadGroup parent, String name) {
         this.parent = parent;
         this.name = name;
@@ -238,14 +247,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     public final void setMaxPriority(int pri) {
         checkAccess();
-        maxPriority(pri);
-    }
-
-    ThreadGroup maxPriority(int pri) {
         if (pri >= Thread.MIN_PRIORITY && pri <= Thread.MAX_PRIORITY) {
             this.maxPriority = pri;
         }
-        return this;
     }
 
     /**
