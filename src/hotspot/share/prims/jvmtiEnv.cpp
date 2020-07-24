@@ -1582,7 +1582,16 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
 
   name         = java_lang_ThreadGroup::name(group_obj());
   parent_group = Handle(current_thread, java_lang_ThreadGroup::parent(group_obj()));
+
   max_priority = java_lang_ThreadGroup::maxPriority(group_obj());
+  oop g = parent_group();
+  while (g != NULL) {
+    ThreadPriority pri = java_lang_ThreadGroup::maxPriority(g);
+    if (pri < max_priority) {
+      max_priority = pri;
+    }
+    g = java_lang_ThreadGroup::parent(g);
+  }
 
   info_ptr->is_daemon    = JNI_FALSE;
   info_ptr->max_priority = max_priority;

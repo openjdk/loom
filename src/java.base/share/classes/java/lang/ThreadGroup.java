@@ -46,13 +46,13 @@ import java.util.Set;
 public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private final ThreadGroup parent;
     private final String name;
-    private int maxPriority;
+    private volatile int maxPriority;
 
     /**
      * Creates an empty Thread group that is not in any Thread group.
      * This method is used to create the system Thread group.
      */
-    private ThreadGroup() {     // called from C code
+    private ThreadGroup() {     // called during VM initialization
         this.parent = null;
         this.name = "system";
         this.maxPriority = Thread.MAX_PRIORITY;
@@ -155,9 +155,13 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     public final int getMaxPriority() {
-        synchronized (this) {
-            return maxPriority;
+        int priority = this.maxPriority;
+        ThreadGroup g = parent;
+        while (g != null) {
+            priority = Math.min(priority, g.maxPriority);
+            g = g.parent;
         }
+        return priority;
     }
 
     /**
@@ -218,13 +222,11 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * {@link Thread#MAX_PRIORITY}, the maximum priority of the group
      * remains unchanged.
      * <p>
-     * Otherwise, the priority of this ThreadGroup object is set to the
+     * Otherwise, the priority of this ThreadGroup object is the
      * smaller of the specified {@code pri} and the maximum permitted
      * priority of the parent of this thread group. (If this thread group
      * is the system thread group, which has no parent, then its maximum
-     * priority is simply set to {@code pri}.) Then this method is
-     * called recursively, with {@code pri} as its argument, for
-     * every thread group that belongs to this thread group.
+     * priority is will be {@code pri}.)
      *
      * @param      pri   the new priority of the thread group.
      * @throws     SecurityException  if the current thread cannot modify
@@ -236,19 +238,12 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     public final void setMaxPriority(int pri) {
         checkAccess();
-        if (pri >= Thread.MIN_PRIORITY && pri <= Thread.MAX_PRIORITY) {
-            synchronized (this) {
-                maxPriority = (parent != null) ? Math.min(pri, parent.maxPriority) : pri;
-                for (ThreadGroup group : subgroups(true)) {
-                    group.setMaxPriority(pri);
-                }
-            }
-        }
+        maxPriority(pri);
     }
 
-    ThreadGroup maxPriority(int priority) {
-        synchronized (this) {
-            maxPriority = priority;
+    ThreadGroup maxPriority(int pri) {
+        if (pri >= Thread.MIN_PRIORITY && pri <= Thread.MAX_PRIORITY) {
+            this.maxPriority = pri;
         }
         return this;
     }
@@ -519,7 +514,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Returns the set of subgroups.
+     * Returns the set of active subgroups.
      */
     private Set<ThreadGroup> subgroups(boolean recurse) {
         Set<ThreadGroup> groups = new HashSet<>();
@@ -593,7 +588,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     @Deprecated(since="1.2", forRemoval=true)
-    @SuppressWarnings("removal")
     public final void suspend() {
         throw new UnsupportedOperationException();
     }
@@ -608,7 +602,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     @Deprecated(since="1.2", forRemoval=true)
-    @SuppressWarnings("removal")
     public final void resume() {
         throw new UnsupportedOperationException();
     }
@@ -711,6 +704,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     public String toString() {
-        return getClass().getName() + "[name=" + getName() + ",maxpri=" + maxPriority + "]";
+        return getClass().getName() + "[name=" + getName() + ",maxpri=" + getMaxPriority() + "]";
     }
 }
