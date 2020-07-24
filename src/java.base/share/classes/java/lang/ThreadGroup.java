@@ -293,8 +293,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
 
     /**
      * Returns an estimate of the number of active threads in this thread
-     * group and its subgroups. Recursively iterates over all subgroups in
-     * this thread group.
+     * group and its subgroups.
      *
      * <p> The value returned is only an estimate because the number of
      * threads may change dynamically while this method traverses internal

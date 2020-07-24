@@ -2162,8 +2162,7 @@ public class Thread implements Runnable {
     /**
      * Returns an estimate of the number of active threads in the current
      * thread's {@linkplain java.lang.ThreadGroup thread group} and its
-     * subgroups. Recursively iterates over all subgroups in the current
-     * thread's thread group.
+     * subgroups.
      *
      * <p> The value returned is only an estimate because the number of
      * threads may change dynamically while this method traverses internal
