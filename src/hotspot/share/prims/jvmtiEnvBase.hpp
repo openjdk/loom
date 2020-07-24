@@ -302,6 +302,12 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   // get a field descriptor for the specified class and field
   static bool get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd);
 
+  // enumerates the live threads in the given thread group
+  static int get_live_threads(JavaThread* current_thread, Handle group_hdl, Handle **thread_objs_p);
+
+  // enumerates the active subgroups in the given thread group
+  static int get_active_subgroups(JavaThread* current_thread, Handle group_hdl, Handle **group_objs_p);
+
   // JVMTI API helper functions which are called when target thread is suspended
   // or at safepoint / thread local handshake.
   oop get_vthread_or_thread_oop(JavaThread* thread);

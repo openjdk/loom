@@ -1608,67 +1608,6 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
   return JVMTI_ERROR_NONE;
 } /* end GetThreadGroupInfo */
 
-static int get_live_threads(JavaThread* current_thread, Handle group_hdl, Handle **thread_objs_p) {
-  int count = 0;
-  Handle *thread_objs = NULL;
-  ThreadsListEnumerator tle(current_thread, true);
-  int nthreads = tle.num_threads();
-  if (nthreads > 0) {
-    thread_objs = NEW_RESOURCE_ARRAY(Handle, nthreads);
-    NULL_CHECK(thread_objs, JVMTI_ERROR_OUT_OF_MEMORY);
-    for (int i = 0; i < nthreads; i++) {
-      Handle thread = tle.get_threadObj(i);
-      if (thread()->is_a(SystemDictionary::Thread_klass()) && java_lang_Thread::threadGroup(thread()) == group_hdl()) {
-        thread_objs[count++] = thread;
-      }
-    }
-  }
-  *thread_objs_p = thread_objs;
-  return count;
-}
-
-static int get_active_subgroups(JavaThread* current_thread, Handle group_hdl, Handle **group_objs_p) {
-  int count = 0;
-  Handle *group_objs = NULL;
-  ThreadsListEnumerator tle(current_thread, true);
-  int nthreads = tle.num_threads();
-  if (nthreads > 0) {
-    group_objs = NEW_RESOURCE_ARRAY(Handle, nthreads); // FIXME, should use GrowableArray
-    NULL_CHECK(group_objs, JVMTI_ERROR_OUT_OF_MEMORY);
-    for (int i = 0; i < nthreads; i++) {
-      Handle thread = tle.get_threadObj(i);
-      if (thread()->is_a(SystemDictionary::Thread_klass())) {
-        oop group_obj = java_lang_Thread::threadGroup(thread());
-        if (group_obj != NULL && group_obj != group_hdl()) {
-          // check if group_obj is a subgroup of group_hdl()
-          oop g = group_obj;
-          oop parent;
-          while ((parent = java_lang_ThreadGroup::parent(g)) != NULL) {
-            if (parent == group_hdl()) {
-               // check if group is already added
-               bool found = false;
-               for (int j = 0; j < count; j++) {
-                 if (group_objs[j]() == g) {
-                   found = true;
-                   break;
-                 }
-               }
-               if (!found) {
-                 group_objs[count++] = Handle(current_thread, g);
-               }
-               break;
-            } else {
-              g = parent;
-            }
-          }
-        }
-      }
-    }
-  }
-  *group_objs_p = group_objs;
-  return count;
-}
-
 // thread_count_ptr - pre-checked for NULL
 // threads_ptr - pre-checked for NULL
 // group_count_ptr - pre-checked for NULL

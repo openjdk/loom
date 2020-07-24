@@ -56,6 +56,7 @@
 #include "runtime/vframe_hp.hpp"
 #include "runtime/vmThread.hpp"
 #include "runtime/vmOperations.hpp"
+#include "services/threadService.hpp"
 
 ///////////////////////////////////////////////////////////////
 //
@@ -628,6 +629,75 @@ javaVFrame* get_vthread_jvf(Thread* cur_thread, oop vthread) {
     }
   }
   return jvf;
+}
+
+int
+JvmtiEnvBase::get_live_threads(JavaThread* current_thread, Handle group_hdl, Handle **thread_objs_p) {
+  int count = 0;
+  Handle *thread_objs = NULL;
+  ThreadsListEnumerator tle(current_thread, true);
+  int nthreads = tle.num_threads();
+  if (nthreads > 0) {
+    thread_objs = NEW_RESOURCE_ARRAY(Handle, nthreads);
+    NULL_CHECK(thread_objs, JVMTI_ERROR_OUT_OF_MEMORY);
+    for (int i = 0; i < nthreads; i++) {
+      Handle thread = tle.get_threadObj(i);
+      if (thread()->is_a(SystemDictionary::Thread_klass()) && java_lang_Thread::threadGroup(thread()) == group_hdl()) {
+        thread_objs[count++] = thread;
+      }
+    }
+  }
+  *thread_objs_p = thread_objs;
+  return count;
+}
+
+int
+JvmtiEnvBase::get_active_subgroups(JavaThread* current_thread, Handle group_hdl, Handle **group_objs_p) {
+  GrowableArray<Handle>* subgroups = new GrowableArray<Handle>();
+
+  ThreadsListEnumerator tle(current_thread, true);
+  int nthreads = tle.num_threads();
+  for (int i = 0; i < nthreads; i++) {
+    Handle thread = tle.get_threadObj(i);
+    if (thread()->is_a(SystemDictionary::Thread_klass())) {
+      oop group_obj = java_lang_Thread::threadGroup(thread());
+      if (group_obj != NULL && group_obj != group_hdl()) {
+        // check if group_obj is a subgroup of group_hdl()
+        oop g = group_obj;
+        oop parent;
+        while ((parent = java_lang_ThreadGroup::parent(g)) != NULL) {
+          if (parent == group_hdl()) {
+            // check if group is already added
+            bool found = false;
+            for (int j = 0; j < subgroups->length(); j++) {
+              if (subgroups->at(j)() == g) {
+                found = true;
+                break;
+               }
+             }
+             if (!found) {
+               subgroups->append(Handle(current_thread, g));
+             }
+             break;
+          } else {
+            g = parent;
+          }
+        }
+      }
+    } // is_a
+  } // for
+
+  int count = subgroups->length();
+  Handle *group_objs = NULL;
+  if (count > 0) {
+    group_objs = NEW_RESOURCE_ARRAY(Handle, count);
+    NULL_CHECK(group_objs, JVMTI_ERROR_OUT_OF_MEMORY);
+    for (int j = 0; j < subgroups->length(); j++) {
+      group_objs[j] = subgroups->at(j);
+    }
+  }
+  *group_objs_p = group_objs;
+  return count;
 }
 
 //
