@@ -108,7 +108,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private ThreadGroup(Void unused, ThreadGroup parent, String name) {
         this.parent = parent;
         this.name = name;
-        this.maxPriority = parent.maxPriority;
+        this.maxPriority = parent.getMaxPriority();
     }
 
     /*
