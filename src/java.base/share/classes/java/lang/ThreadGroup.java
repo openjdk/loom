@@ -32,9 +32,9 @@ import java.util.Set;
  * A thread group represents a set of threads. In addition, a thread
  * group can also include other thread groups. The thread groups form
  * a tree in which every thread group except the initial thread group
- * has a parent. A thread group is considered <i>active</i> if it
- * contains any threads that are {@link Thread#isAlive() alive} or
- * any of its subgroups (or descendants) contains a thread that is alive.
+ * has a parent. A thread group is considered <i>active</i> if there
+ * are any {@linkplain Thread#isAlive() alive} threads in the group or
+ * any of its subgroups.
  * <p>
  * A thread is allowed to access information about its own thread
  * group, but not to access information about its thread group's
@@ -444,9 +444,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     /**
      * Copies into the specified array references to every active
      * subgroup in this thread group and its subgroups.
-     * A thread group is considered active if it contains any threads
-     * that are {@link Thread#isAlive() alive} or any of its subgroups
-     * (or descendants) contains a thread that is alive.
+     * A thread group is considered <i>active</i> if there are any {@linkplain
+     * Thread#isAlive() alive} threads in the group or any of its subgroups.
      *
      * <p> An invocation of this method behaves in exactly the same
      * way as the invocation
@@ -478,9 +477,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     /**
      * Copies into the specified array references to every active
      * subgroup in this thread group.
-     * A thread group is considered active if it contains any threads
-     * that are {@link Thread#isAlive() alive} or any of its subgroups
-     * (or descendants) contains a thread that is alive.
+     * A thread group is considered <i>active</i> if there are any {@linkplain
+     * Thread#isAlive() alive} threads in the group or any of its subgroups.
      * If {@code recurse} is {@code true}, this method recursively enumerates
      * all subgroups of this thread group and references to every active
      * thread group in these subgroups are also included.
