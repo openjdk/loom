@@ -575,10 +575,6 @@ java/lang/invoke/LFCaching/LFGarbageCollectedTest.java          8078602 generic-
 java/lang/StackWalker/LocalsAndOperands.java#id0                8248432 generic-all
 java/lang/StackWalker/LocalsAndOperands.java#id1                8248432 generic-all
 
-java/lang/ThreadGroup/Daemon.java                               0000000 generic-all
-java/lang/ThreadGroup/Stop.java                                 0000000 generic-all
-java/lang/ThreadGroup/Suspend.java                              0000000 generic-all
-
 ############################################################################
 
 # jdk_instrument

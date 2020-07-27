@@ -2380,7 +2380,7 @@ jvmtiEnv *jvmti;
         <field id="max_priority">
           <jint/>
           <description>
-            The maximum priority for this thread group.
+            The effective maximum priority for this thread group.
           </description>
         </field>
         <field id="is_daemon">

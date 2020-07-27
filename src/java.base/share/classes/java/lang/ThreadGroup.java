@@ -32,9 +32,9 @@ import java.util.Set;
  * A thread group represents a set of threads. In addition, a thread
  * group can also include other thread groups. The thread groups form
  * a tree in which every thread group except the initial thread group
- * has a parent. A thread group is considered <i>active</i> if it
- * contains any threads that are {@link Thread#isAlive() alive} or
- * any of its subgroups (or descendants) contains a thread that is alive.
+ * has a parent. A thread group is considered <i>active</i> if there
+ * are any {@linkplain Thread#isAlive() alive} threads in the group or
+ * any of its subgroups.
  * <p>
  * A thread is allowed to access information about its own thread
  * group, but not to access information about its thread group's
@@ -74,7 +74,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * The {@code checkAccess} method of the parent thread group is
      * called with no arguments; this may result in a security exception.
      *
-     * @param   name   the name of the new thread group.
+     * @param   name   the name of the new thread group, can be {@code null}
      * @throws  SecurityException  if the current thread cannot create a
      *               thread in the specified thread group.
      * @see     java.lang.ThreadGroup#checkAccess()
@@ -92,7 +92,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * called with no arguments; this may result in a security exception.
      *
      * @param     parent   the parent thread group.
-     * @param     name     the name of the new thread group.
+     * @param     name     the name of the new thread group, can be {@code null}
      * @throws    NullPointerException  if the thread group argument is
      *               {@code null}.
      * @throws    SecurityException  if the current thread cannot create a
@@ -108,7 +108,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private ThreadGroup(Void unused, ThreadGroup parent, String name) {
         this.parent = parent;
         this.name = name;
-        this.maxPriority = parent.maxPriority;
+        this.maxPriority = parent.getMaxPriority();
     }
 
     /*
@@ -154,12 +154,17 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Returns the maximum priority of this thread group. Threads that are
-     * part of this group cannot have a higher priority than the maximum
-     * priority.
+     * Returns the <i>effective</i> maximum priority of this thread group.
+     * This is the maximum priority for new threads created in the group.
      *
-     * @return  the maximum priority that a thread in this thread group
-     *          can have.
+     * <p> The <i>effective</i> maximum priority of the group is the smaller of
+     * this group's maximum priority and the <i>effective</i> maximum priority
+     * of the parent of this thread group. If this thread group is the system
+     * thread group, which has no parent, then the effective maximum priority
+     * is the group's maximum priority.
+     *
+     * @return  the effective maximum priority of this thread group, the
+     *          maximum priority for new threads created in the group
      * @see     #setMaxPriority
      * @since   1.0
      */
@@ -181,7 +186,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @deprecated This method originally indicated if the thread group
      *             was automatically destroyed when the last thread in
      *             the group terminated or its last thread group was
-     *             destroyed.
+     *             destroyed. The concept of daemon thread group no
+     *             longer exists.
      *
      * @since   1.0
      */
@@ -196,7 +202,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @return false
      *
      * @deprecated This method originally indicated if the thread group
-     *             was destroyed.
+     *             was destroyed. The ability to destroy a thread group
+     *             no longer exists.
      *
      * @since   1.1
      */
@@ -211,7 +218,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @param daemon ignored
      *
      * @deprecated This method originally changed the daemon status of the
-     *             thread group.
+     *             thread group. The concept of daemon thread group no
+     *             longer exists.
      *
      * @since   1.0
      */
@@ -231,13 +239,14 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * {@link Thread#MAX_PRIORITY}, the maximum priority of the group
      * remains unchanged.
      * <p>
-     * Otherwise, the priority of this ThreadGroup object is the
-     * smaller of the specified {@code pri} and the maximum permitted
-     * priority of the parent of this thread group. (If this thread group
-     * is the system thread group, which has no parent, then its maximum
-     * priority is will be {@code pri}.)
+     * Otherwise, the maximum priority of the group is set to {@code pri}.
+     * The <i>effective</i> maximum priority of the group will be the smaller
+     * of {@code pri} and the <i>effective</i> maximum priority of the parent
+     * of this thread group. If this thread group is the system thread group,
+     * which has no parent, then the effective maximum priority will be
+     * {@code pri}.
      *
-     * @param      pri   the new priority of the thread group.
+     * @param      pri   the new maximum priority of the thread group.
      * @throws     SecurityException  if the current thread cannot modify
      *               this thread group.
      * @see        #getMaxPriority
@@ -435,6 +444,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     /**
      * Copies into the specified array references to every active
      * subgroup in this thread group and its subgroups.
+     * A thread group is considered <i>active</i> if there are any {@linkplain
+     * Thread#isAlive() alive} threads in the group or any of its subgroups.
      *
      * <p> An invocation of this method behaves in exactly the same
      * way as the invocation
@@ -465,10 +476,12 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
 
     /**
      * Copies into the specified array references to every active
-     * subgroup in this thread group. If {@code recurse} is
-     * {@code true}, this method recursively enumerates all subgroups of this
-     * thread group and references to every active thread group in these
-     * subgroups are also included.
+     * subgroup in this thread group.
+     * A thread group is considered <i>active</i> if there are any {@linkplain
+     * Thread#isAlive() alive} threads in the group or any of its subgroups.
+     * If {@code recurse} is {@code true}, this method recursively enumerates
+     * all subgroups of this thread group and references to every active
+     * thread group in these subgroups are also included.
      *
      * <p> An application might use the
      * {@linkplain #activeGroupCount activeGroupCount} method to
@@ -613,7 +626,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * Does nothing.
      *
      * @deprecated This method was originally specified to destroy an empty
-     *             thread group.
+     *             thread group. The ability to destroy a thread group no
+     *             longer exists.
      *
      * @since   1.0
      */

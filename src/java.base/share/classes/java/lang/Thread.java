@@ -607,7 +607,7 @@ public class Thread implements Runnable {
             priority = NORM_PRIORITY;
             daemon = false;
         } else {
-            priority = parent.getPriority();
+            priority = Math.min(parent.getPriority(), g.getMaxPriority());
             daemon = parent.isDaemon();
         }
         this.holder = new FieldHolder(g, task, stackSize, priority, daemon);
@@ -2061,18 +2061,19 @@ public class Thread implements Runnable {
      * @see        ThreadGroup#getMaxPriority()
      */
     public final void setPriority(int newPriority) {
+        checkAccess();
         if (newPriority > MAX_PRIORITY || newPriority < MIN_PRIORITY) {
             throw new IllegalArgumentException();
         }
-        checkAccess();
         priority(newPriority);
     }
 
     void priority(int newPriority) {
         ThreadGroup g;
         if (!isVirtual() && (g = getThreadGroup()) != null) {
-            if (newPriority > g.getMaxPriority()) {
-                newPriority = g.getMaxPriority();
+            int maxPriority = g.getMaxPriority();
+            if (newPriority > maxPriority) {
+                newPriority = maxPriority;
             }
             setPriority0(holder.priority = newPriority);
         }

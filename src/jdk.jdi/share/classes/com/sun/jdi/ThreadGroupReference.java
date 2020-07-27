@@ -89,11 +89,15 @@ public interface ThreadGroupReference extends ObjectReference {
     List<ThreadReference> threads();
 
     /**
-     * Returns a List containing each active {@link ThreadGroupReference} in this
-     * thread group. Only the active thread groups in this immediate thread group
-     * (and not its subgroups) are returned.
-     * See {@link java.lang.ThreadGroup}
-     * for information about 'active' ThreadGroups.
+     * Returns a List containing a {@link ThreadGroupReference} for each
+     * <i>active</i> subgroup. Only the active thread groups in this immediate
+     * thread group (and not its subgroups) are returned.
+     *
+     * @apiNote Since Java 99, a {@link ThreadGroup} is considered <i>active</i>
+     * if there are any {@linkplain Thread#isAlive() alive} threads in the group
+     * or any of its subgroups. Prior to Java 99, a thread group was considered
+     * <i>active</i> when not {@linkplain ThreadGroup#isDestroyed() destroyed}.
+     *
      * @return a List of {@link ThreadGroupReference} objects mirroring the
      * active thread groups from this thread group in the target VM.
      */
