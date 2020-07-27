@@ -2020,14 +2020,14 @@ public:
   }
 
   void set_handle(Handle keepalive) {
-    WeakHandle wh = WeakHandle(OopStorageSet::vm_weak(), keepalive);
+    WeakHandle wh = WeakHandle(Universe::vm_weak(), keepalive);
     oop* result = _method->set_keepalive(wh.raw());
 
     if (result != NULL) {
       store_keepalive(_thread, result);
       // someone else managed to do it before us, destroy the weak
       _required = false;
-      wh.release(OopStorageSet::vm_weak());
+      wh.release(Universe::vm_weak());
     } else {
       store_keepalive(_thread, wh.raw());
       //log_info(jvmcont)("Winning cas for %p (%p -> %p (%p))", _method, result, wh.raw(), (void *) wh.resolve());
@@ -5878,7 +5878,7 @@ public:
     _count += len;
     for (int i = 0; i < len; ++i) {
       WeakHandle ref = cleanup_list->at(i);
-      ref.release(OopStorageSet::vm_weak());
+      ref.release(Universe::vm_weak());
     }
 
     cleanup_list->clear();

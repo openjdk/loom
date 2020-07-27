@@ -37,12 +37,12 @@
 #include "utilities/align.hpp"
 #include "utilities/debug.hpp"
 
-static OopStorage* global_handles() {
-  return OopStorageSet::jni_global();
+OopStorage* JNIHandles::global_handles() {
+  return _global_handles;
 }
 
-static OopStorage* weak_global_handles() {
-  return OopStorageSet::jni_weak();
+OopStorage* JNIHandles::weak_global_handles() {
+  return _weak_global_handles;
 }
 
 // Serviceability agent support.
@@ -50,24 +50,14 @@ OopStorage* JNIHandles::_global_handles = NULL;
 OopStorage* JNIHandles::_weak_global_handles = NULL;
 
 void jni_handles_init() {
-  JNIHandles::_global_handles = global_handles();
-  JNIHandles::_weak_global_handles = weak_global_handles();
+  JNIHandles::_global_handles = OopStorageSet::create_strong("JNI Global");
+  JNIHandles::_weak_global_handles = OopStorageSet::create_weak("JNI Weak");
 }
-
 
 jobject JNIHandles::make_local(oop obj) {
-  if (obj == NULL) {
-    return NULL;                // ignore null handles
-  } else {
-    Thread* thread = Thread::current();
-    assert(oopDesc::is_oop(obj), "not an oop");
-    assert(!current_thread_in_native(), "must not be in native");
-    return thread->active_handles()->allocate_handle(obj);
-  }
+  return make_local(Thread::current(), obj);
 }
 
-
-// optimized versions
 
 jobject JNIHandles::make_local(Thread* thread, oop obj) {
   if (obj == NULL) {
@@ -79,19 +69,6 @@ jobject JNIHandles::make_local(Thread* thread, oop obj) {
     return thread->active_handles()->allocate_handle(obj);
   }
 }
-
-
-jobject JNIHandles::make_local(JNIEnv* env, oop obj) {
-  if (obj == NULL) {
-    return NULL;                // ignore null handles
-  } else {
-    JavaThread* thread = JavaThread::thread_from_jni_environment(env);
-    assert(oopDesc::is_oop(obj), "not an oop");
-    assert(!current_thread_in_native(), "must not be in native");
-    return thread->active_handles()->allocate_handle(obj);
-  }
-}
-
 
 static void report_handle_allocation_failure(AllocFailType alloc_failmode,
                                              const char* handle_kind) {
@@ -201,6 +178,9 @@ void JNIHandles::weak_oops_do(OopClosure* f) {
   weak_global_handles()->weak_oops_do(f);
 }
 
+bool JNIHandles::is_global_storage(const OopStorage* storage) {
+  return _global_handles == storage;
+}
 
 inline bool is_storage_handle(const OopStorage* storage, const oop* ptr) {
   return storage->allocation_status(ptr) == OopStorage::ALLOCATED_ENTRY;

@@ -42,6 +42,9 @@ class JNIHandles : AllStatic {
   static OopStorage* _weak_global_handles;
   friend void jni_handles_init();
 
+  static OopStorage* global_handles();
+  static OopStorage* weak_global_handles();
+
   inline static bool is_jweak(jobject handle);
   inline static oop* jobject_ptr(jobject handle); // NOT jweak!
   inline static oop* jweak_ptr(jobject handle);
@@ -81,8 +84,7 @@ class JNIHandles : AllStatic {
 
   // Local handles
   static jobject make_local(oop obj);
-  static jobject make_local(JNIEnv* env, oop obj);    // Fast version when env is known
-  static jobject make_local(Thread* thread, oop obj); // Even faster version when current thread is known
+  static jobject make_local(Thread* thread, oop obj); // Faster version when current thread is known
   inline static void destroy_local(jobject handle);
 
   // Global handles
@@ -124,6 +126,8 @@ class JNIHandles : AllStatic {
   static void weak_oops_do(BoolObjectClosure* is_alive, OopClosure* f);
   // Traversal of weak global handles.
   static void weak_oops_do(OopClosure* f);
+
+  static bool is_global_storage(const OopStorage* storage);
 };
 
 
