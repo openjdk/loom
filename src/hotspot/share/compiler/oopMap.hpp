@@ -83,12 +83,6 @@ public:
     set_content_reg(reg2);
   }
 
-  OopMapValue (const OopMapValue& o) : _value(o._value), _content_reg(o._content_reg) {}
-
-  bool equals(const OopMapValue& o) {
-    return _value == o._value && _content_reg == o._content_reg;
-  }
-
  private:
     void set_reg_type(VMReg p, oop_types t) {
     set_value((p->value() << register_shift) | t);
