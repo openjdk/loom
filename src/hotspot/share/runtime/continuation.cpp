@@ -420,9 +420,6 @@ protected:
 
   HFrameBase() : _sp(-1), _ref_sp(-1), _pc(NULL), _is_interpreted(true), _cb_imd(NULL), _oop_map(NULL) {}
 
-  HFrameBase(const HFrameBase& hf) : _sp(hf._sp),_ref_sp(hf._ref_sp), _pc(hf._pc),
-                                     _is_interpreted(hf._is_interpreted), _cb_imd(hf._cb_imd), _oop_map(hf._oop_map) {}
-
   HFrameBase(int sp, int ref_sp, address pc, void* cb_md, bool is_interpreted)
     : _sp(sp), _ref_sp(ref_sp), _pc(pc),
       _is_interpreted(is_interpreted), _cb_imd((intptr_t*)cb_md), _oop_map(NULL) {}
