@@ -113,16 +113,16 @@ public class Fuzz {
         REF_I_INT, REF_C_INT, REF_I_MANY, REF_C_MANY,
         LOOP, YIELD, THROW, DONE;
 
-    static final EnumSet<Op> BASIC       = EnumSet.of(LOOP, YIELD);
-    static final EnumSet<Op> PIN         = EnumSet.of(CALL_I_PIN, CALL_C_PIN);
-    static final EnumSet<Op> MH          = EnumSet.of(MH_I_INT, MH_C_INT, MH_I_MANY, MH_C_MANY);
-    static final EnumSet<Op> REFLECTED   = EnumSet.of(REF_I_INT, REF_C_INT, REF_I_MANY, REF_C_MANY);
-    static final EnumSet<Op> STANDARD    = EnumSet.of(CALL_C_INT, CALL_I_INT, CALL_C_DOUBLE, CALL_I_DOUBLE, CALL_C_MANY, CALL_I_MANY, CALL_C_CATCH, CALL_I_CATCH);
-    static final EnumSet<Op> COMPILED    = EnumSet.of(CALL_C_INT, CALL_C_DOUBLE, CALL_C_MANY, CALL_C_PIN, CALL_C_CATCH, MH_C_INT, MH_C_MANY, REF_C_INT, REF_C_MANY);
-    static final EnumSet<Op> INTERPRETED = EnumSet.of(CALL_I_INT, CALL_I_DOUBLE, CALL_I_MANY, CALL_I_PIN, CALL_I_CATCH, MH_I_INT, MH_I_MANY, REF_I_INT, REF_I_MANY);
-    static final EnumSet<Op> NON_CALLS   = EnumSet.of(LOOP, YIELD, THROW, DONE);
+        static final EnumSet<Op> BASIC       = EnumSet.of(LOOP, YIELD);
+        static final EnumSet<Op> PIN         = EnumSet.of(CALL_I_PIN, CALL_C_PIN);
+        static final EnumSet<Op> MH          = EnumSet.of(MH_I_INT, MH_C_INT, MH_I_MANY, MH_C_MANY);
+        static final EnumSet<Op> REFLECTED   = EnumSet.of(REF_I_INT, REF_C_INT, REF_I_MANY, REF_C_MANY);
+        static final EnumSet<Op> STANDARD    = EnumSet.of(CALL_C_INT, CALL_I_INT, CALL_C_DOUBLE, CALL_I_DOUBLE, CALL_C_MANY, CALL_I_MANY, CALL_C_CATCH, CALL_I_CATCH);
+        static final EnumSet<Op> COMPILED    = EnumSet.of(CALL_C_INT, CALL_C_DOUBLE, CALL_C_MANY, CALL_C_PIN, CALL_C_CATCH, MH_C_INT, MH_C_MANY, REF_C_INT, REF_C_MANY);
+        static final EnumSet<Op> INTERPRETED = EnumSet.of(CALL_I_INT, CALL_I_DOUBLE, CALL_I_MANY, CALL_I_PIN, CALL_I_CATCH, MH_I_INT, MH_I_MANY, REF_I_INT, REF_I_MANY);
+        static final EnumSet<Op> NON_CALLS   = EnumSet.of(LOOP, YIELD, THROW, DONE);
 
-    static final Op[] ARRAY = new Op[0];
+        static final Op[] ARRAY = new Op[0];
     }
 
     ///// Trace Gnereation
