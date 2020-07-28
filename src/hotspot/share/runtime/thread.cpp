@@ -3004,6 +3004,7 @@ void JavaThread::oops_do(OopClosure* f, CodeBlobClosure* cf) {
     jvmti_thread_state()->oops_do(f, cf);
   }
 
+  f->do_oop(&_vthread);
   f->do_oop(&_scopedCache);
 }
 

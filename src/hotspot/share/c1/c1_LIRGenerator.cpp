@@ -1327,6 +1327,13 @@ void LIRGenerator::do_scopedCache(Intrinsic* x) {
 }
 
 
+void LIRGenerator::do_vthread(Intrinsic* x) {
+  assert(x->number_of_arguments() == 0, "wrong type");
+  LIR_Opr reg = rlock_result(x);
+  __ move_wide(new LIR_Address(getThreadPointer(), in_bytes(JavaThread::vthread_offset()), T_OBJECT), reg);
+}
+
+
 void LIRGenerator::do_RegisterFinalizer(Intrinsic* x) {
   assert(x->number_of_arguments() == 1, "wrong type");
   LIRItem receiver(x->argument_at(0), this);
@@ -3039,8 +3046,9 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
   case vmIntrinsics::_isInstance:     do_isInstance(x);    break;
   case vmIntrinsics::_isPrimitive:    do_isPrimitive(x);   break;
   case vmIntrinsics::_getClass:       do_getClass(x);      break;
-  case vmIntrinsics::_currentThread0:  do_currentThread0(x); break;
-  case vmIntrinsics::_scopedCache:     do_scopedCache(x);    break;
+  case vmIntrinsics::_currentThread0: do_currentThread0(x); break;
+  case vmIntrinsics::_currentThread:  do_vthread(x);       break;
+  case vmIntrinsics::_scopedCache:    do_scopedCache(x);   break;
 
   case vmIntrinsics::_dlog:           // fall through
   case vmIntrinsics::_dlog10:         // fall through

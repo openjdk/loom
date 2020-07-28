@@ -124,7 +124,7 @@ static JfrBlobHandle get_thread_blob(JavaThread* thread, traceid tid, bool virtu
   assert(!tl->is_excluded(), "invariant");
   if (virtual_thread) {
     // TODO: blob cache for virtual threads
-    return JfrCheckpointManager::create_thread_blob(thread, tid, java_lang_Thread::vthread(thread->threadObj()));
+    return JfrCheckpointManager::create_thread_blob(thread, tid, thread->vthread());
   }
   if (!tl->has_thread_blob()) {
     // for regular threads, the blob is cached in the thread local data structure

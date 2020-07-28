@@ -1259,6 +1259,7 @@ private:
 public:
 
   oop _scopedCache;
+  oop _vthread;
   jlong _scoped_hash_table_shift;
 
   void allocate_scoped_hash_table(int count);
@@ -1311,7 +1312,8 @@ public:
   // Thread oop. threadObj() can be NULL for initial JavaThread
   // (or for threads attached via JNI)
   oop threadObj() const                          { return _threadObj; }
-  void set_threadObj(oop p)                      { _threadObj = p; }
+  oop vthread() const                            { return _vthread; }
+  void set_threadObj(oop p)                      { _vthread = _threadObj = p; }
 
   // Prepare thread and add to priority queue.  If a priority is
   // not specified, use the priority of the thread object. Threads_lock
@@ -1829,10 +1831,11 @@ public:
   void clr_do_not_unlock(void)                   { _do_not_unlock_if_synchronized = false; }
   bool do_not_unlock(void)                       { return _do_not_unlock_if_synchronized; }
 
-static ByteSize scopedCache_offset()             { return byte_offset_of(JavaThread, _scopedCache); }
+  static ByteSize scopedCache_offset()           { return byte_offset_of(JavaThread, _scopedCache); }
 
   // For assembly stub generation
   static ByteSize threadObj_offset()             { return byte_offset_of(JavaThread, _threadObj); }
+  static ByteSize vthread_offset()               { return byte_offset_of(JavaThread, _vthread); }
   static ByteSize jni_environment_offset()       { return byte_offset_of(JavaThread, _jni_environment); }
   static ByteSize pending_jni_exception_check_fn_offset() {
     return byte_offset_of(JavaThread, _pending_jni_exception_check_fn);

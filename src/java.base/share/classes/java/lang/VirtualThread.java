@@ -48,6 +48,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.vm.annotation.ChangesCurrentThread;
+import jdk.internal.vm.annotation.ForceInline;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
 import sun.security.util.SecurityConstants;
@@ -216,6 +218,7 @@ class VirtualThread extends Thread {
     /**
      * Runs or continues execution of the continuation on the current thread.
      */
+    @ChangesCurrentThread
     private void runContinuation() {
         // the carrier thread should be a kernel thread
         if (Thread.currentThread().isVirtual()) {
@@ -251,6 +254,7 @@ class VirtualThread extends Thread {
      * Mounts this virtual thread. This method must be invoked before the continuation
      * is run or continued. It binds the virtual thread to the current carrier thread.
      */
+    @ChangesCurrentThread
     private void mount(boolean firstRun) {
         Thread carrier = Thread.currentCarrierThread();
 
@@ -281,6 +285,7 @@ class VirtualThread extends Thread {
      * Unmounts this virtual thread. This method must be invoked after the continuation
      * yields or terminates. It unbinds this virtual thread from the carrier thread.
      */
+    @ChangesCurrentThread
     private void unmount() {
         Thread carrier = Thread.currentCarrierThread();
 
@@ -352,6 +357,7 @@ class VirtualThread extends Thread {
      * is invoked by onPinned when an attempt to park fails because of a synchronized
      * or native frame on the continuation stack.
      */
+    @ChangesCurrentThread
     private void parkCarrierThread() {
         boolean awaitInterrupted = false;
 
@@ -1088,6 +1094,7 @@ class VirtualThread extends Thread {
          * @param printAll true to print all stack frames, false to only print the
          *        frames that are native or holding a monitor
          */
+        @ChangesCurrentThread
         static synchronized void printStackTrace(boolean printAll) {
             // switch to carrier thread as the printing may park
             Thread vthread = Thread.currentThread();

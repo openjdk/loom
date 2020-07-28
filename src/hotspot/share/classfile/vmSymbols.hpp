@@ -295,6 +295,8 @@
   template(jdk_internal_vm_annotation_Hidden_signature,      "Ljdk/internal/vm/annotation/Hidden;") \
   template(jdk_internal_vm_annotation_Stable_signature,      "Ljdk/internal/vm/annotation/Stable;") \
                                                                                                   \
+  template(jdk_internal_vm_annotation_ChangesCurrentThread_signature,  "Ljdk/internal/vm/annotation/ChangesCurrentThread;")  \
+                                                                                                  \
   /* Support for JSR 292 & invokedynamic (JDK 1.7 and above) */                                   \
   template(java_lang_invoke_CallSite,                 "java/lang/invoke/CallSite")                \
   template(java_lang_invoke_ConstantCallSite,         "java/lang/invoke/ConstantCallSite")        \
@@ -902,10 +904,12 @@
   do_intrinsic(_currentThread,            java_lang_Thread,       currentThread_name, currentThread_signature,   F_S)   \
   do_intrinsic(_scopedCache,              java_lang_Thread,       scopedCache_name, scopedCache_signature,   F_S)       \
   do_intrinsic(_setScopedCache,           java_lang_Thread,       setScopedCache_name, setScopedCache_signature,   F_S) \
+  do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
    do_name(     currentThread0_name,                             "currentThread0")                                      \
    do_name(     currentThread_name,                              "currentThread")                                       \
    do_name(     scopedCache_name,                                "scopedCache")                                         \
    do_name(     setScopedCache_name,                             "setScopedCache")                                      \
+   do_name(     setCurrentThread_name,                           "setCurrentThread")                                    \
    do_signature(currentThread_signature,                         "()Ljava/lang/Thread;")                                \
    do_signature(scopedCache_signature,                           "()[Ljava/lang/Object;")                               \
    do_signature(setScopedCache_signature,                        "([Ljava/lang/Object;)V")                              \

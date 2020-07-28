@@ -99,6 +99,7 @@ Method::Method(ConstMethod* xconst, AccessFlags access_flags) {
   set_force_inline(false);
   set_hidden(false);
   set_dont_inline(false);
+  set_changes_current_thread(false);
   set_has_injected_profile(false);
   set_method_data(NULL);
   clear_method_counters();

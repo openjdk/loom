@@ -2171,6 +2171,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_constant(Method::_force_inline)                                 \
   declare_constant(Method::_dont_inline)                                  \
   declare_constant(Method::_hidden)                                       \
+  declare_constant(Method::_changes_current_thread)                       \
                                                                           \
   declare_constant(Method::nonvirtual_vtable_index)                       \
                                                                           \

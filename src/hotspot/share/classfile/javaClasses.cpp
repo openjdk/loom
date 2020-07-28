@@ -1800,7 +1800,6 @@ int java_lang_Thread::_eetop_offset;
 int java_lang_Thread::_interrupted_offset;
 int java_lang_Thread::_tid_offset;
 int java_lang_Thread::_continuation_offset;
-int java_lang_Thread::_vthread_offset;
 int java_lang_Thread::_park_blocker_offset;
 
 #define THREAD_FIELDS_DO(macro) \
@@ -1813,7 +1812,6 @@ int java_lang_Thread::_park_blocker_offset;
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
-  macro(_vthread_offset,       k, "vthread", thread_signature, false)
 
 void java_lang_Thread::compute_offsets() {
   assert(_holder_offset == 0, "offsets should be initialized only once");
@@ -1958,10 +1956,6 @@ jlong java_lang_Thread::thread_id(oop java_thread) {
 
 ByteSize java_lang_Thread::thread_id_offset() {
   return in_ByteSize(_tid_offset);
-}
-
-oop java_lang_Thread::vthread(oop java_thread) {
-  return java_thread->obj_field(_vthread_offset);
 }
 
 oop java_lang_Thread::park_blocker(oop java_thread) {

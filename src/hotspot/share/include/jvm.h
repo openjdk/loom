@@ -246,6 +246,12 @@ JVM_ScopedCache(JNIEnv *env, jclass threadClass);
 JNIEXPORT void JNICALL
 JVM_SetScopedCache(JNIEnv *env, jclass threadClass, jobject theCache);
 
+JNIEXPORT jobject JNICALL
+JVM_Vthread(JNIEnv *env, jclass threadClass);
+
+JNIEXPORT void JNICALL
+JVM_SetCurrentThread(JNIEnv *env, jclass threadClass, jobject theThread);
+
 JNIEXPORT jint JNICALL
 JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, jlong anchor, 
                   jint frame_count, jint start_index, 
@@ -280,6 +286,9 @@ JVM_Yield(JNIEnv *env, jclass threadClass);
 
 JNIEXPORT void JNICALL
 JVM_Sleep(JNIEnv *env, jclass threadClass, jlong millis);
+
+JNIEXPORT jobject JNICALL
+JVM_CurrentThread0(JNIEnv *env, jclass threadClass);
 
 JNIEXPORT jobject JNICALL
 JVM_CurrentThread(JNIEnv *env, jclass threadClass);

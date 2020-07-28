@@ -875,7 +875,11 @@ JvmtiEnv::GetVirtualThread(JavaThread* java_thread, jthread* vthread_ptr) {
   if (!java_thread->is_thread_fully_suspended(true, &debug_bits)) {
     return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
   }
-  vthread_oop = java_lang_Thread::vthread(java_thread->threadObj());
+  vthread_oop = java_thread->vthread();
+  if (vthread_oop == java_thread->threadObj()) { // not virtual
+    vthread_oop = NULL;
+  }
+
   *vthread_ptr = (jthread)JNIHandles::make_local(current_thread, vthread_oop);
   return JVMTI_ERROR_NONE;
 } /* end GetVirtualThread */

@@ -258,7 +258,7 @@ inline bool JfrVframeStream::continuation_scope_end_condition() const {
 inline bool is_virtual(JavaThread* jt) {
   assert(jt != NULL, "invariant");
   assert(jt->threadObj() != (oop)NULL, "invariant");
-  return java_lang_Thread::vthread(jt->threadObj()) != NULL;
+  return jt->vthread() != jt->threadObj();
 }
 
 bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool async_mode, bool* virtual_thread) {

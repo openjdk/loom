@@ -372,7 +372,6 @@ class java_lang_Thread : AllStatic {
   static int _interrupted_offset;
   static int _tid_offset;
   static int _continuation_offset;
-  static int _vthread_offset;
   static int _park_blocker_offset;
 
   static void compute_offsets();
@@ -419,11 +418,6 @@ class java_lang_Thread : AllStatic {
   static ByteSize thread_id_offset();
   // Continuation
   static inline oop continuation(oop java_thread);
-  // VirtualThread
-  static oop  vthread(oop java_thread);
-  static ByteSize vthread_offset() {
-    return in_ByteSize(_vthread_offset);
-  }
 
   // Blocker object responsible for thread parking
   static oop park_blocker(oop java_thread);

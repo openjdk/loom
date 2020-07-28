@@ -3286,8 +3286,8 @@ JVM_ENTRY(void, JVM_Sleep(JNIEnv* env, jclass threadClass, jlong millis))
   HOTSPOT_THREAD_SLEEP_END(0);
 JVM_END
 
-JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
-  JVMWrapper("JVM_CurrentThread");
+JVM_ENTRY(jobject, JVM_CurrentThread0(JNIEnv* env, jclass threadClass))
+  JVMWrapper("JVM_CurrentThread0");
   oop jthread = thread->threadObj();
   assert(jthread != NULL, "no current thread!");
   return JNIHandles::make_local(THREAD, jthread);
@@ -3323,6 +3323,18 @@ JVM_ENTRY(void, JVM_SetScopedCache(JNIEnv* env, jclass threadClass,
     assert(objs->length() == ScopedCacheSize * 2 + 2, "wrong length");
   }
   thread->_scopedCache = objs;
+JVM_END
+
+JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
+  JVMWrapper("JVM_CurrentThread");
+  oop theThread = thread->_vthread;
+  return JNIHandles::make_local(THREAD, theThread);
+JVM_END
+
+JVM_ENTRY(void, JVM_SetCurrentThread(JNIEnv* env, jclass threadClass,
+                                     jobject theThread))
+  JVMWrapper("JVM_SetCurrentThread0");
+  thread->_vthread = JNIHandles::resolve(theThread);
 JVM_END
 
 // Return true iff the current thread has locked the object passed in

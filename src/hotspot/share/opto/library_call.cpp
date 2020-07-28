@@ -260,9 +260,10 @@ class LibraryCallKit : public GraphKit {
   bool inline_unsafe_writebackSync0(bool is_pre);
   bool inline_unsafe_copyMemory();
   bool inline_native_currentThread0();
-  bool inline_currentThread();
   bool inline_native_scopedCache();
   bool inline_native_setScopedCache();
+  bool inline_native_currentThread();
+  bool inline_native_setCurrentThread();
 
   bool inline_native_time_funcs(address method, const char* funcName);
 #ifdef JFR_HAVE_INTRINSICS
@@ -758,10 +759,12 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_onSpinWait:               return inline_onspinwait();
 
   case vmIntrinsics::_currentThread0:           return inline_native_currentThread0();
-  //case vmIntrinsics::_currentThread:            return inline_currentThread();         // disabled temporarily
+  case vmIntrinsics::_currentThread:            return inline_native_currentThread();
 
   case vmIntrinsics::_scopedCache:              return inline_native_scopedCache();
   case vmIntrinsics::_setScopedCache:           return inline_native_setScopedCache();
+
+  case vmIntrinsics::_setCurrentThread:         return inline_native_setCurrentThread();
 
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), "counterTime");
@@ -1113,8 +1116,19 @@ Node* LibraryCallKit::generate_current_thread(Node* &tls_output) {
 }
 
 //--------------------------generate_virtual_thread--------------------
-Node* LibraryCallKit::generate_virtual_thread(Node* threadObj) {
-  return load_field_from_object(threadObj, "vthread", "Ljava/lang/Thread;", false);
+Node* LibraryCallKit::generate_virtual_thread(Node* tls_output) {
+  ciKlass*    thread_klass = env()->Thread_klass();
+  const Type* thread_type  = TypeOopPtr::make_from_klass(thread_klass)->cast_to_ptr_type(TypePtr::NotNull);
+  Node* p = basic_plus_adr(top()/*!oop*/, tls_output, in_bytes(JavaThread::vthread_offset()));
+  Node* threadObj;
+  if (C->method()->changes_current_thread()) {
+    threadObj = make_load(NULL, p, thread_type, T_OBJECT, MemNode::unordered);
+  } else {
+    threadObj = _gvn.transform
+      (LoadNode::make(_gvn, NULL, immutable_memory(), p,
+                      p->bottom_type()->is_ptr(), thread_type, T_OBJECT, MemNode::unordered));
+  }
+  return threadObj;
 }
 
 //------------------------------make_string_method_node------------------------
@@ -2977,7 +2991,7 @@ bool LibraryCallKit::inline_native_time_funcs(address funcAddr, const char* func
     oop threadObj = Thread::threadObj();
     oop vthread = java_lang_Thread::vthread(threadObj);
     traceid tid;
-    if (vthread != NULL) {
+    if (vthread != threadObj) {  // i.e. current thread is virtual
       traceid value = java_lang_VirtualThread::tid(vthread);
       tid = value & tid_mask;
       traceid epoch = value >> epoch_shift;
@@ -3033,10 +3047,10 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   Node* const p = basic_plus_adr(top()/*!oop*/, tls_ptr, in_bytes(JavaThread::threadObj_offset()));
   Node* const threadObj = make_load(jobj_is_not_null, p, thread_type, T_OBJECT, MemNode::unordered);
 
-  // load the vthread field from the threadObj
-  Node* vthreadObj = generate_virtual_thread(threadObj);
+  // load the vthread field
+  Node* vthreadObj = generate_virtual_thread(tls_ptr);
 
-  // vthread != NULL
+  // vthread != threadObj
   RegionNode* threadObj_result_rgn = new RegionNode(PATH_LIMIT);
   record_for_igvn(threadObj_result_rgn);
   PhiNode*    thread_id_mem = new PhiNode(threadObj_result_rgn, Type::MEMORY, TypePtr::BOTTOM);
@@ -3045,18 +3059,18 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   PhiNode*    thread_id_val = new PhiNode(threadObj_result_rgn, TypeLong::LONG);
   record_for_igvn(thread_id_val);
 
-  // Null check vthread
-  Node* vthreadObj_cmp_null = _gvn.transform(new CmpPNode(vthreadObj, null()));
-  Node* test_vthreadObj_ne_null = _gvn.transform(new BoolNode(vthreadObj_cmp_null, BoolTest::ne));
-  IfNode* iff_vthreadObj_ne_null =
-    create_and_map_if(jobj_is_not_null, test_vthreadObj_ne_null, PROB_FAIR, COUNT_UNKNOWN);
+  // If vthread != thread, this is a virtual thread
+  Node* vthreadObj_cmp_threadObj = _gvn.transform(new CmpPNode(vthreadObj, threadObj));
+  Node* test_vthreadObj_ne_threadObj = _gvn.transform(new BoolNode(vthreadObj_cmp_threadObj, BoolTest::ne));
+  IfNode* iff_vthreadObj_ne_threadObj =
+    create_and_map_if(jobj_is_not_null, test_vthreadObj_ne_threadObj, PROB_FAIR, COUNT_UNKNOWN);
 
   // false branch, fallback to threadObj
-  Node* virtual_thread_is_null = _gvn.transform(new IfFalseNode(iff_vthreadObj_ne_null));
+  Node* virtual_thread_is_threadObj = _gvn.transform(new IfFalseNode(iff_vthreadObj_ne_threadObj));
   Node* thread_obj_tid = load_field_from_object(threadObj, "tid", "J", false);
 
-  // true branch, there is a vthread object
-  Node* virtual_thread_is_not_null = _gvn.transform(new IfTrueNode(iff_vthreadObj_ne_null));
+  // true branch, this is a virtual thread
+  Node* virtual_thread_is_not_threadObj = _gvn.transform(new IfTrueNode(iff_vthreadObj_ne_threadObj));
   // read the thread id from the vthread
   Node* vthread_obj_tid_value = load_field_from_object(vthreadObj, "tid", "J", false);
 
@@ -3078,7 +3092,7 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   record_for_igvn(epoch_compare_io);
 
   Node* saved_ctl = control();
-  set_control(virtual_thread_is_not_null);
+  set_control(virtual_thread_is_not_threadObj);
   TypePtr* const no_memory_effects = NULL;
   // make a runtime call to get the current epoch
   Node* call_epoch_generation = make_runtime_call(RC_LEAF | RC_NO_FP,
@@ -3139,7 +3153,7 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 
   // merge the threadObj branch
   threadObj_result_rgn->init_req(_true_path, _gvn.transform(epoch_compare_rgn));
-  threadObj_result_rgn->init_req(_false_path, virtual_thread_is_null);
+  threadObj_result_rgn->init_req(_false_path, virtual_thread_is_threadObj);
   thread_id_mem->init_req(_true_path, _gvn.transform(epoch_compare_mem));
   thread_id_mem->init_req(_false_path, input_memory_state);
   thread_id_io->init_req(_true_path, _gvn.transform(epoch_compare_io));
@@ -3246,51 +3260,6 @@ bool LibraryCallKit::inline_native_currentThread0() {
   return true;
 }
 
-//------------------------inline_currentThread------------------
-bool LibraryCallKit::inline_currentThread() {
-  ciKlass* thread_klass = env()->Thread_klass();
-  const Type* thread0_type = TypeOopPtr::make_from_klass(thread_klass)->cast_to_ptr_type(TypePtr::NotNull);
-  const Type* thread_type = TypeOopPtr::make_from_klass(thread_klass);
-
-  Node* base_thread = _gvn.transform(new ThreadLocalNode());
-  Node* p0 = basic_plus_adr(top()/*!oop*/, base_thread, in_bytes(JavaThread::threadObj_offset()));
-  Node* thread0 = _gvn.transform
-    (LoadNode::make(_gvn, NULL, immutable_memory(), p0, p0->bottom_type()->is_ptr(),
-                    thread0_type, T_OBJECT, MemNode::unordered));
-
-  Node* p = basic_plus_adr(thread0, in_bytes(java_lang_Thread::vthread_offset()));
-  Node* vthread = _gvn.transform
-    (LoadNode::make(_gvn, NULL, immutable_memory(), p, p->bottom_type()->is_ptr(),
-                    thread_type, T_OBJECT, MemNode::unordered));
-
-  Node* cmp = _gvn.transform(new CmpPNode(vthread, null()));
-  Node* bol = _gvn.transform(new BoolNode(cmp, BoolTest::ne));
-
-  IfNode *if_ne_null = create_and_map_if(control(), bol, PROB_FAIR, COUNT_UNKNOWN);
-  Node* vthread_is_not_null = _gvn.transform(new IfTrueNode(if_ne_null));
-  Node* vthread_is_null = _gvn.transform(new IfFalseNode(if_ne_null));
-
-  RegionNode *r = new RegionNode(3);
-  PhiNode *phi = new PhiNode(r, thread0_type);
-  _gvn.set_type(phi, thread0_type);
-
-  set_control(vthread_is_null);
-
-  phi->init_req(1, thread0);
-  r->init_req(1, vthread_is_null);
-
-  set_control(vthread_is_not_null);
-
-  Node* vthread_cast = new CastPPNode(vthread, thread0_type);
-  _gvn.set_type(vthread_cast, thread0_type);
-
-  phi->init_req(2, vthread_cast);
-  r->init_req(2, vthread_is_not_null);
-
-  set_result(r, phi);
-  return true;
-}
-
 //------------------------inline_native_scopedCache------------------
 bool LibraryCallKit::inline_native_scopedCache() {
   ciKlass *objects_klass = ciObjArrayKlass::make(env()->Object_klass());
@@ -3319,6 +3288,26 @@ bool LibraryCallKit::inline_native_setScopedCache() {
   Node* arr = argument(0);
   Node* thread = _gvn.transform(new ThreadLocalNode());
   Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::scopedCache_offset()));
+  const TypePtr *adr_type = _gvn.type(p)->isa_ptr();
+  store_to_memory(control(), p, arr, T_OBJECT, adr_type, MemNode::unordered);
+
+  return true;
+}
+
+//------------------------inline_native_currentThread------------------
+bool LibraryCallKit::inline_native_currentThread() {
+  Node* thread = _gvn.transform(new ThreadLocalNode());
+  set_result(generate_virtual_thread(thread));
+  return true;
+}
+
+//------------------------inline_native_setVthread------------------
+bool LibraryCallKit::inline_native_setCurrentThread() {
+  assert(C->method()->changes_current_thread(),
+         "method changes current Thread but is not annotated ChangesCurrentThread");
+  Node* arr = argument(1);
+  Node* thread = _gvn.transform(new ThreadLocalNode());
+  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::vthread_offset()));
   const TypePtr *adr_type = _gvn.type(p)->isa_ptr();
   store_to_memory(control(), p, arr, T_OBJECT, adr_type, MemNode::unordered);
 

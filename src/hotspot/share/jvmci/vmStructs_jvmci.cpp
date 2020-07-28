@@ -599,6 +599,7 @@
   declare_constant(Method::_hidden)                                       \
   declare_constant(Method::_intrinsic_candidate)                          \
   declare_constant(Method::_reserved_stack_access)                        \
+  declare_constant(Method::_changes_current_thread)                       \
                                                                           \
   declare_constant(Method::nonvirtual_vtable_index)                       \
   declare_constant(Method::invalid_vtable_index)                          \

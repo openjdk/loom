@@ -78,6 +78,7 @@ import jdk.internal.logger.LazyLoggers;
 import jdk.internal.logger.LocalizedLoggerWrapper;
 import jdk.internal.util.SystemProps;
 import jdk.internal.vm.annotation.Stable;
+import jdk.internal.vm.annotation.ChangesCurrentThread;
 import sun.nio.fs.DefaultFileSystemProvider;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
@@ -2294,6 +2295,7 @@ public final class System {
                 return Thread.currentCarrierThread();
             }
 
+            @ChangesCurrentThread
             public <V> V executeOnCarrierThread(Callable<V> task) throws Exception {
                 Thread thread = Thread.currentThread();
                 if (thread.isVirtual()) {

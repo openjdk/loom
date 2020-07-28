@@ -1127,14 +1127,7 @@ JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
 // to the JavaThread* then return virtual thread oop. Otherwise, return thread oop.
 oop
 JvmtiEnvBase::get_vthread_or_thread_oop(JavaThread* thread) {
-  oop thread_oop = thread->threadObj();
-  if (get_capabilities()->can_support_virtual_threads) {
-    oop vthread_oop = java_lang_Thread::vthread(thread_oop);
-    if (vthread_oop != NULL) {
-      thread_oop = vthread_oop;
-    }
-  }
-  return thread_oop;
+  return thread->vthread();
 }
 
 jvmtiError

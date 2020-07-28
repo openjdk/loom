@@ -54,6 +54,7 @@ import jdk.internal.reflect.Reflection;
 import sun.security.util.SecurityConstants;
 import jdk.internal.HotSpotIntrinsicCandidate;
 import jdk.internal.event.ThreadSleepEvent;
+import jdk.internal.vm.annotation.ChangesCurrentThread;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -235,37 +236,18 @@ public class Thread implements Runnable {
     // current inner-most continuation
     private Continuation cont;
 
-    // the virtual thread mounted on this thread
-    private Thread vthread;
-
     /**
      * Sets the Thread object to be returned by Thread.currentThread().
      */
-    void setCurrentThread(Thread thread) {
-        //assert Thread.currentCarrierThread() == this;
-        if (thread == this) {
-            //assert vthread != null;
-            vthread = null;
-        } else {
-            //assert vthread == null && thread.isVirtual();
-            vthread = thread;
-        }
-    }
+    @HotSpotIntrinsicCandidate
+    native void setCurrentThread(Thread thread);
 
     /**
      * Returns the Thread object for the current thread.
      * @return  the current thread
      */
     @HotSpotIntrinsicCandidate
-    public static Thread currentThread() {
-        Thread thread = currentThread0();
-        Thread vthread = thread.vthread;
-        if (vthread != null) {
-            return vthread;
-        } else {
-            return thread;
-        }
-    }
+    public static native Thread currentThread();
 
     /**
      * Returns the current carrier thread.

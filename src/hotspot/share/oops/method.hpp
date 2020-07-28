@@ -83,14 +83,15 @@ class Method : public Metadata {
 
   // Flags
   enum Flags {
-    _caller_sensitive      = 1 << 0,
-    _force_inline          = 1 << 1,
-    _dont_inline           = 1 << 2,
-    _hidden                = 1 << 3,
-    _has_injected_profile  = 1 << 4,
-    _running_emcp          = 1 << 5,
-    _intrinsic_candidate   = 1 << 6,
-    _reserved_stack_access = 1 << 7
+    _caller_sensitive       = 1 << 0,
+    _force_inline           = 1 << 1,
+    _dont_inline            = 1 << 2,
+    _hidden                 = 1 << 3,
+    _has_injected_profile   = 1 << 4,
+    _running_emcp           = 1 << 5,
+    _intrinsic_candidate    = 1 << 6,
+    _reserved_stack_access  = 1 << 7,
+    _changes_current_thread = 1 << 8,
   };
   mutable u2 _flags;
 
@@ -902,6 +903,13 @@ public:
   }
   void set_dont_inline(bool x) {
     _flags = x ? (_flags | _dont_inline) : (_flags & ~_dont_inline);
+  }
+
+  bool changes_current_thread() {
+    return (_flags & _changes_current_thread) != 0;
+  }
+  void set_changes_current_thread(bool x) {
+    _flags = x ? (_flags | _changes_current_thread) : (_flags & ~_changes_current_thread);
   }
 
   bool is_hidden() const {

@@ -82,9 +82,9 @@ inline traceid load_java_thread_id(oop threadObj, const JavaThread* jt) {
   return java_lang_Thread::thread_id(threadObj);
 }
 
-inline oop get_vthread(oop threadObj) {
-  assert(threadObj != NULL, "invariant");
-  return java_lang_Thread::vthread(threadObj);
+inline oop get_vthread(const JavaThread* jt) {
+  assert(jt != NULL, "invariant");
+  return jt->vthread();
 }
 
 inline oop get_threadObj(const JavaThread* jt) {
@@ -100,8 +100,8 @@ traceid JfrJavaThread::contextual_thread_id(const JavaThread* jt, bool* is_virtu
     // to early
     return 0;
   }
-  const oop vthread = get_vthread(threadObj);
-  if (vthread == NULL) {
+  const oop vthread = get_vthread(jt);
+  if (vthread == threadObj) {
     return load_java_thread_id(threadObj, jt);
   }
   if (is_virtual != NULL) {
@@ -125,11 +125,11 @@ traceid JfrJavaThread::virtual_thread_id(const oop vthread, const JavaThread* jt
 bool JfrJavaThread::is_virtual(const JavaThread* jt) {
   assert(jt != NULL, "invariant");
   const oop threadObj = get_threadObj(jt);
-  return threadObj != NULL && get_vthread(threadObj) != NULL;
+  return threadObj != get_vthread(jt);
 }
 
 oop JfrJavaThread::virtual_thread(const JavaThread* jt) {
   assert(is_virtual(jt), "invariant");
-  return get_vthread(get_threadObj(jt));
+  return get_vthread(jt);
 }
 

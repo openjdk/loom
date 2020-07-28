@@ -49,7 +49,7 @@ static JNINativeMethod methods[] = {
     {"setPriority0",     "(I)V",       (void *)&JVM_SetThreadPriority},
     {"yield0",           "()V",        (void *)&JVM_Yield},
     {"sleep0",           "(J)V",       (void *)&JVM_Sleep},
-    {"currentThread0",   "()" THD,     (void *)&JVM_CurrentThread},
+    {"currentThread0",   "()" THD,     (void *)&JVM_CurrentThread0},
     {"interrupt0",       "()V",        (void *)&JVM_Interrupt},
     {"holdsLock",        "(" OBJ ")Z", (void *)&JVM_HoldsLock},
     {"getThreads",        "()[" THD,   (void *)&JVM_GetAllThreads},
@@ -57,6 +57,8 @@ static JNINativeMethod methods[] = {
     {"setNativeName",    "(" STR ")V", (void *)&JVM_SetNativeThreadName},
     {"scopedCache",      "()[" OBJ,    (void *)&JVM_ScopedCache},
     {"setScopedCache",   "([" OBJ ")V", (void *)&JVM_SetScopedCache},
+    {"currentThread",   "()" THD,      (void *)&JVM_CurrentThread},
+    {"setCurrentThread", "(" THD ")V", (void *)&JVM_SetCurrentThread},
 };
 
 #undef THD

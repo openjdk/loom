@@ -47,6 +47,8 @@ JVM_ConstantPoolGetStringAt
 JVM_ConstantPoolGetTagAt
 JVM_ConstantPoolGetUTF8At
 JVM_CurrentThread
+JVM_CurrentThread0
+JVM_SetCurrentThread
 JVM_CurrentTimeMillis
 JVM_DefineClass
 JVM_DefineClassWithSource
