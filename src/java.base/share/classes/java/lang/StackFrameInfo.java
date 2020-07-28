@@ -134,7 +134,7 @@ class StackFrameInfo implements StackFrame {
 
     @Override
     public java.lang.String getContinuationScopeName() {
-        return contScope.getName();
+        return contScope != null ? contScope.getName() : null;
     }
 
     @Override
