@@ -234,9 +234,9 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
     if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
 
     if (Devirtualizer::do_metadata(closure) && cb->is_nmethod()) {
-      nmethod* nm = cb->as_nmethod();
-      nm->mark_as_maybe_on_continuation();
-      nm->oops_do(closure);
+      // The nmethod entry barrier takes care of having the right synchronization
+      // when keeping the nmethod alive during concurrent execution.
+      cb->as_nmethod_or_null()->run_nmethod_entry_barrier();
     }
 
     num_frames++;

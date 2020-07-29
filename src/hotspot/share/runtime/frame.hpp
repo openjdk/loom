@@ -286,7 +286,7 @@ class frame {
 
   // Find receiver for an invoke when arguments are just pushed on stack (i.e., callee stack-frame is
   // not setup)
-  oop interpreter_callee_receiver(Symbol* signature)     { return *interpreter_callee_receiver_addr(signature); }
+  oop interpreter_callee_receiver(Symbol* signature);
 
 
   oop* interpreter_callee_receiver_addr(Symbol* signature);

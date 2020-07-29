@@ -74,7 +74,7 @@ public:
   virtual bool requires_barriers(oop obj) const;
 
   // Continuation support
-  virtual void collect_for_codecache() {}
+  virtual void collect_for_codecache();
 
   virtual uint32_t hash_oop(oop obj) const;
 

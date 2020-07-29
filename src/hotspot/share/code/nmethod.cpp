@@ -1147,10 +1147,6 @@ void nmethod::mark_as_seen_on_stack() {
 void nmethod::mark_as_maybe_on_continuation() {
   assert(is_alive(), "Must be an alive method");
   _marking_cycle = CodeCache::marking_cycle();
-  BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
-  if (bs_nm != NULL) {
-    bs_nm->disarm(this);
-  }
 }
 
 bool nmethod::is_not_on_continuation_stack() {
