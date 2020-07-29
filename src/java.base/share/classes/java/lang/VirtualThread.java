@@ -494,6 +494,7 @@ class VirtualThread extends Thread {
     /**
      * Schedules this thread to be unparked after the given delay.
      */
+    @ChangesCurrentThread
     private Future<?> scheduleUnpark(long nanos) {
         //assert Thread.currentThread() == this;
         Thread carrier = this.carrierThread;
@@ -509,6 +510,7 @@ class VirtualThread extends Thread {
     /**
      * Cancels a task if it has not completed.
      */
+    @ChangesCurrentThread
     private void cancel(Future<?> future) {
         //assert Thread.currentThread() == this;
         if (!future.isDone()) {
