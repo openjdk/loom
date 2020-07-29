@@ -115,12 +115,12 @@ public class Fuzz {
 
         static final EnumSet<Op> BASIC       = EnumSet.of(LOOP, YIELD);
         static final EnumSet<Op> PIN         = EnumSet.of(CALL_I_PIN, CALL_C_PIN);
-        static final EnumSet<Op> MH          = EnumSet.of(MH_I_INT, MH_C_INT, MH_I_MANY, MH_C_MANY);
-        static final EnumSet<Op> REFLECTED   = EnumSet.of(REF_I_INT, REF_C_INT, REF_I_MANY, REF_C_MANY);
-        static final EnumSet<Op> STANDARD    = EnumSet.of(CALL_C_INT, CALL_I_INT, CALL_C_DOUBLE, CALL_I_DOUBLE, CALL_C_MANY, CALL_I_MANY, CALL_C_CATCH, CALL_I_CATCH);
-        static final EnumSet<Op> COMPILED    = EnumSet.of(CALL_C_INT, CALL_C_DOUBLE, CALL_C_MANY, CALL_C_PIN, CALL_C_CATCH, MH_C_INT, MH_C_MANY, REF_C_INT, REF_C_MANY);
-        static final EnumSet<Op> INTERPRETED = EnumSet.of(CALL_I_INT, CALL_I_DOUBLE, CALL_I_MANY, CALL_I_PIN, CALL_I_CATCH, MH_I_INT, MH_I_MANY, REF_I_INT, REF_I_MANY);
-        static final EnumSet<Op> NON_CALLS   = EnumSet.of(LOOP, YIELD, THROW, DONE);
+        static final EnumSet<Op> MH          = EnumSet.range(MH_I_INT, MH_C_MANY);
+        static final EnumSet<Op> REFLECTED   = EnumSet.range(REF_I_INT, REF_C_MANY);
+        static final EnumSet<Op> STANDARD    = EnumSet.range(CALL_I_INT, CALL_C_CATCH);
+        static final EnumSet<Op> COMPILED    = EnumSet.copyOf(Arrays.stream(Op.values()).filter(x -> x.toString().contains("_C_")).collect(Collectors.toList()));
+        static final EnumSet<Op> INTERPRETED = EnumSet.copyOf(Arrays.stream(Op.values()).filter(x -> x.toString().contains("_I_")).collect(Collectors.toList()));
+        static final EnumSet<Op> NON_CALLS   = EnumSet.range(LOOP, DONE);
 
         static final Op[] ARRAY = new Op[0];
     }
@@ -137,7 +137,7 @@ public class Fuzz {
         }
 
         public Op[] generate() {
-            final int length = max(1, pick(new Integer[]{5, 10, 50/*, 200*/}) + plusOrMinus(5));
+            final int length = max(1, pick(5, 10, 50/*, 200*/) + plusOrMinus(5));
 
             Set<Op> highProb = new HashSet<Op>();
             Set<Op> lowProb  = new HashSet<Op>();
@@ -162,9 +162,10 @@ public class Fuzz {
             return trace;
         }
 
+        @SafeVarargs
+        private <T> T pick(T... values) { return values[rnd.nextInt(values.length)]; }
         private boolean percent(int percent) { return rnd.nextInt(100) < percent; }
         private int plusOrMinus(int n) { return rnd.nextInt(2*n + 1) - n; }
-        private <T> T pick(T[] array) { return array[rnd.nextInt(array.length)]; }
     }
 
 
