@@ -1323,10 +1323,10 @@ public class Thread implements Runnable {
      * of a subclass which overrides the {@code getContextClassLoader}
      * or {@code setContextClassLoader} methods.
      *
-     * <p>The priority of the newly created thread is set equal to the
-     * priority of the thread creating it, that is, the currently running
-     * thread. The method {@linkplain #setPriority setPriority} may be
-     * used to change the priority to a new value.
+     * <p>The priority of the newly created thread is the smaller of
+     * priority of the thread creating it and the maximum permitted
+     * priority of the thread group. The method {@linkplain #setPriority
+     * setPriority} may be used to change the priority to a new value.
      *
      * <p>The newly created thread is initially marked as being a daemon
      * thread if and only if the thread creating it is currently marked
