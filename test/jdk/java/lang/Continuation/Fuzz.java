@@ -29,14 +29,14 @@
 *
 * @build java.base/java.lang.StackWalkerHelper
 *
-* @run main/othervm -Xcomp -XX:-TieredCompilation -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks                                       -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -Xcomp -XX:-TieredCompilation -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks                                       -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -Xcomp -XX:-TieredCompilation -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks                                       -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -Xcomp -XX:-TieredCompilation -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks                                       -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -Xcomp -XX:-TieredCompilation -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -Xcomp -XX:-TieredCompilation -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -Xcomp -XX:-TieredCompilation -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -Xcomp -XX:-TieredCompilation -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
+* @run main/othervm -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks                                       -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
+* @run main/othervm -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks                                       -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
+* @run main/othervm -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks                                       -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
+* @run main/othervm -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks                                       -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
+* @run main/othervm -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
+* @run main/othervm -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
+* @run main/othervm -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
+* @run main/othervm -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
 *
 **/
 
@@ -129,12 +129,9 @@ public class Fuzz {
 
     static class Generator {
         private final Random rnd;
-
         public Generator(Random rnd) { this.rnd = rnd; }
 
-        public Stream<Op[]> stream() { 
-            return Stream.iterate(0, x->x+1).map(__ -> generate()); 
-        }
+        public Stream<Op[]> stream() { return Stream.iterate(0, x->x+1).map(__ -> generate()); }
 
         public Op[] generate() {
             final int length = max(1, pick(5, 10, 50/*, 200*/) + plusOrMinus(5));
@@ -177,14 +174,11 @@ public class Fuzz {
         public FuzzException(String msg) { super(msg); }
     }
 
+    boolean verbose = false;
+
     private final Op[] trace;
     private int index;
     private int result = -1;
-    boolean verbose = false;
-
-    StackTraceElement[] backtrace;
-    StackFrame[] fbacktrace;
-    StackFrame[] lfbacktrace;
 
     private Fuzz(Op[] trace) {
         this.trace = trace;
@@ -219,6 +213,10 @@ public class Fuzz {
 
     /////////// Instance Helpers
 
+    private StackTraceElement[] backtrace;
+    private StackFrame[] fbacktrace;
+    private StackFrame[] lfbacktrace;
+    
     void indent(int depth) {
         // depth = index;
         for (int i=0; i<depth; i++) System.out.print("  ");
@@ -308,34 +306,34 @@ public class Fuzz {
         // verifyStack(lfbacktrace, StackWalkerHelper.getLiveStackFrames(cont));
     }
 
-    static boolean isStackCaptureMechanism(StackTraceElement ste) {
-        return Fuzz.class.getName().equals(ste.getClassName()) 
-            && ("captureStack".equals(ste.getMethodName()) || "verifyStack".equals(ste.getMethodName()));
+    static boolean isStackCaptureMechanism(Object sf) {
+        return Fuzz.class.getName().equals(sfClassName(sf)) 
+            && ("captureStack".equals(sfMethodName(sf)) || "verifyStack".equals(sfMethodName(sf)));
     }
 
-    static boolean isPrePostYield(StackTraceElement ste) {
-        return Fuzz.class.getName().equals(ste.getClassName())
-            && ("preYield".equals(ste.getMethodName()) || "postYield".equals(ste.getMethodName()));
+    static boolean isPrePostYield(Object sf) {
+        return Fuzz.class.getName().equals(sfClassName(sf))
+            && ("preYield".equals(sfMethodName(sf)) || "postYield".equals(sfMethodName(sf)));
     }
 
-    static StackTraceElement[] cutStack(StackTraceElement[] stack) {
-        var list = new ArrayList<StackTraceElement>();
+    static <T> T[] cutStack(T[] stack) {
+        var list = new ArrayList<T>();
         int i = 0;
-        while (i < stack.length && (!Fuzz.class.getName().equals(stack[i].getClassName()) || isPrePostYield(stack[i]) || isStackCaptureMechanism(stack[i]))) i++;
-        while (i < stack.length && !Continuation.class.getName().equals(stack[i].getClassName())) { list.add(stack[i]); i++; }
-        while (i < stack.length && Continuation.class.getName().equals(stack[i].getClassName()) && !"enterSpecial".equals(stack[i].getMethodName())) { list.add(stack[i]); i++; }
-        return list.toArray(new StackTraceElement[0]);
+        while (i < stack.length && (!Fuzz.class.getName().equals(sfClassName(stack[i])) || isPrePostYield(stack[i]) || isStackCaptureMechanism(stack[i]))) i++;
+        while (i < stack.length && !Continuation.class.getName().equals(sfClassName(stack[i]))) { list.add(stack[i]); i++; }
+        while (i < stack.length && Continuation.class.getName().equals(sfClassName(stack[i])) && !"enterSpecial".equals(sfMethodName(stack[i]))) { list.add(stack[i]); i++; }
+        return list.toArray(arrayType(stack));
     }
 
-    static void verifyStack(StackTraceElement[] expected, StackTraceElement[] observed) {
+    static <T> void verifyStack(T[] expected, T[] observed) {
         expected = cutStack(expected);
         observed = cutStack(observed);
         boolean equal = true;
         if (expected.length == observed.length) {
             for (int i=0; i < expected.length; i++) {
-                if (!Objects.equals(expected[i], observed[i])) {
+                if (!sfEquals(expected[i], observed[i])) {
                     // we allow a different line number for the first element
-                    if (i > 0 || !Objects.equals(expected[i].getClassName(), observed[i].getClassName()) || !Objects.equals(expected[i].getMethodName(), observed[i].getMethodName())) {
+                    if (i > 0 || !Objects.equals(sfClassName(expected[i]), sfClassName(observed[i])) || !Objects.equals(sfMethodName(expected[i]), sfMethodName(observed[i]))) {
                         System.out.println("At index " + i);
                         equal = false;
                         break;
@@ -353,39 +351,12 @@ public class Fuzz {
         assert equal;
     }
 
-    static StackFrame[] cutStack(StackFrame[] stack) {
-        var list = new ArrayList<StackFrame>();
-        int i = 0;
-        while (i < stack.length && (!Fuzz.class.getName().equals(stack[i].getClassName()) || isPrePostYield(stack[i].toStackTraceElement()) || isStackCaptureMechanism(stack[i].toStackTraceElement()))) i++;
-        while (i < stack.length && !Continuation.class.getName().equals(stack[i].getClassName())) { list.add(stack[i]); i++; }
-        while (i < stack.length && Continuation.class.getName().equals(stack[i].getClassName()) && !"enterSpecial".equals(stack[i].getMethodName())) { list.add(stack[i]); i++; }
-        return list.toArray(new StackFrame[0]);
-    }
+    static String sfClassName(Object f)  { return f instanceof StackTraceElement ? ((StackTraceElement)f).getClassName()  : ((StackFrame)f).getClassName(); }
+    static String sfMethodName(Object f) { return f instanceof StackTraceElement ? ((StackTraceElement)f).getMethodName() : ((StackFrame)f).getMethodName(); }
 
-    static void verifyStack(StackFrame[] expected, StackFrame[] observed) {
-        expected = cutStack(expected);
-        observed = cutStack(observed);
-        boolean equal = true;
-        if (expected.length == observed.length) {
-            for (int i=0; i < expected.length; i++) {
-                if (!StackWalkerHelper.equals(expected[i], observed[i])) {
-                    // we allow a different line number for the first element
-                    if (i > 0 || !Objects.equals(expected[i].getClassName(), observed[i].getClassName()) || !Objects.equals(expected[i].getMethodName(), observed[i].getMethodName())) {
-                        System.out.println("At index " + i);
-                        equal = false;
-                        break;
-                    }
-                }
-            }
-        } else {
-            equal = false;
-            System.out.println("Expected length: " + expected.length + " Observed length: " + observed.length);
-        }
-        if (!equal) {
-            System.out.println("Expected: "); for (var sf : expected) System.out.println("\t" + sf);
-            System.out.println("Observed: "); for (var sf : observed) System.out.println("\t" + sf);
-        }
-        assert equal;
+    static <T> boolean sfEquals(T a, T b) {
+         return a instanceof StackTraceElement ? Objects.equals(a, b)
+                                               : StackWalkerHelper.equals((StackFrame)a, (StackFrame)b);
     }
 
     ////// Static Helpers
@@ -396,23 +367,20 @@ public class Fuzz {
         throw new AssertionError(t);
     }
 
-    static void printTrace(Op[] trace) {
-        System.out.println(write(trace));
+    static <T> T[] arrayType(T[] array) {
+        return (T[])java.lang.reflect.Array.newInstance(array.getClass().componentType(), 0);
     }
 
-    static String write(Op[] trace) {
-        return Arrays.stream(trace)
-            .map(Object::toString)
-            .collect(Collectors.joining(", "));
+    static void printTrace(Op[] trace) { System.out.println(write(trace)); }
+
+    static String write(Op[] trace) { 
+        return Arrays.stream(trace).map(Object::toString).collect(Collectors.joining(", ")); 
     }
 
     static Op[] parse(String line) {
-        return Arrays.stream(line.split(", "))
-            .map(s -> Enum.valueOf(Op.class, s))
-            .collect(Collectors.toList())
-            .toArray(Op.ARRAY);
-    }
-
+        return Arrays.stream(line.split(", ")).map(s -> Enum.valueOf(Op.class, s))
+            .collect(Collectors.toList()).toArray(Op.ARRAY);
+    }    
     //////
 
     static final Class<?>[] int_sig = new Class<?>[]{int.class, int.class};
