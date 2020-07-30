@@ -49,7 +49,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
-import jdk.internal.vm.annotation.ForceInline;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
 import sun.security.util.SecurityConstants;

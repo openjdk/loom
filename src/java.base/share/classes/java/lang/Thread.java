@@ -54,7 +54,6 @@ import jdk.internal.reflect.Reflection;
 import sun.security.util.SecurityConstants;
 import jdk.internal.HotSpotIntrinsicCandidate;
 import jdk.internal.event.ThreadSleepEvent;
-import jdk.internal.vm.annotation.ChangesCurrentThread;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
