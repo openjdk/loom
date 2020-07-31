@@ -569,6 +569,7 @@ StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
   _cont_scope_name = OopHandle(Universe::vm_global(), (jvf->continuation() != NULL) ? java_lang_ContinuationScope::name(java_lang_Continuation::scope(jvf->continuation())) : (oop)NULL);
   if (with_lock_info) {
     ResourceMark rm;
+    HandleMark hm;
     GrowableArray<MonitorInfo*>* list = jvf->locked_monitors();
     int length = list->length();
     if (length > 0) {

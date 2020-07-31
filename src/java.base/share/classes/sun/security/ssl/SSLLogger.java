@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,6 +42,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
+
 import sun.security.action.GetPropertyAction;
 import sun.security.util.HexDumpEncoder;
 import sun.security.x509.*;
@@ -255,9 +256,9 @@ public final class SSLLogger {
     }
 
     private static class SSLSimpleFormatter {
-        private static final DateTimeFormatter dateFormatter =
-                DateTimeFormatter.ofPattern("yyyy-MM-dd kk:mm:ss.SSS z", Locale.ENGLISH)
-                                 .withZone(ZoneId.systemDefault());
+        private static final String PATTERN = "yyyy-MM-dd kk:mm:ss.SSS z";
+        private static final DateTimeFormatter dateTimeFormat = DateTimeFormatter.ofPattern(PATTERN, Locale.ENGLISH)
+                                                                                 .withZone(ZoneId.systemDefault());
 
         private static final MessageFormat basicCertFormat = new MessageFormat(
                 "\"version\"            : \"v{0}\",\n" +
@@ -354,7 +355,7 @@ public final class SSLLogger {
                     level.getName(),
                     Utilities.toHexString(Thread.currentThread().getId()),
                     Thread.currentThread().getName(),
-                    dateFormatter.format(Instant.now()),
+                    dateTimeFormat.format(Instant.now()),
                     formatCaller(),
                     message
                 };
@@ -371,7 +372,7 @@ public final class SSLLogger {
                     level.getName(),
                     Utilities.toHexString(Thread.currentThread().getId()),
                     Thread.currentThread().getName(),
-                    dateFormatter.format(Instant.now()),
+                    dateTimeFormat.format(Instant.now()),
                     formatCaller(),
                     message,
                     (logger.useCompactFormat ?
@@ -473,8 +474,8 @@ public final class SSLLogger {
                                 x509.getSerialNumber().toByteArray()),
                         x509.getSigAlgName(),
                         x509.getIssuerX500Principal().toString(),
-                        dateFormatter.format(x509.getNotBefore().toInstant()),
-                        dateFormatter.format(x509.getNotAfter().toInstant()),
+                        dateTimeFormat.format(x509.getNotBefore().toInstant()),
+                        dateTimeFormat.format(x509.getNotAfter().toInstant()),
                         x509.getSubjectX500Principal().toString(),
                         x509.getPublicKey().getAlgorithm()
                         };
@@ -498,8 +499,8 @@ public final class SSLLogger {
                                 x509.getSerialNumber().toByteArray()),
                         x509.getSigAlgName(),
                         x509.getIssuerX500Principal().toString(),
-                        dateFormatter.format(x509.getNotBefore().toInstant()),
-                        dateFormatter.format(x509.getNotAfter().toInstant()),
+                        dateTimeFormat.format(x509.getNotBefore().toInstant()),
+                        dateTimeFormat.format(x509.getNotAfter().toInstant()),
                         x509.getSubjectX500Principal().toString(),
                         x509.getPublicKey().getAlgorithm(),
                         Utilities.indent(extBuilder.toString())

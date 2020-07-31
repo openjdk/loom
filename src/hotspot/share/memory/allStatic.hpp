@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,19 +22,16 @@
  *
  */
 
-#ifndef SHARE_METAPROGRAMMING_ISREGISTEREDENUM_HPP
-#define SHARE_METAPROGRAMMING_ISREGISTEREDENUM_HPP
+#ifndef SHARE_MEMORY_ALLSTATIC_HPP
+#define SHARE_MEMORY_ALLSTATIC_HPP
 
-#include "metaprogramming/integralConstant.hpp"
+// Base class for classes used as namespaces.  HotSpot style prefers
+// using classes for grouping.  Deriving from this class indicates the
+// derived class is intended to be a namespace, with no instances ever
+// created.
+struct AllStatic {
+  AllStatic() = delete;
+  ~AllStatic() = delete;
+};
 
-// Recognize registered enum types.
-// Registration is by specializing this trait.
-//
-// This is a manual stand-in for the C++11 std::is_enum<T> type trait.
-// It's a lot of work to implement is_enum portably in C++98, so this
-// manual approach is being taken for those enum types we need to
-// distinguish.
-template<typename T>
-struct IsRegisteredEnum : public FalseType {};
-
-#endif // SHARE_METAPROGRAMMING_ISREGISTEREDENUM_HPP
+#endif // SHARE_MEMORY_ALLSTATIC_HPP

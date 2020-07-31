@@ -54,4 +54,14 @@ inline void OopHandle::release(OopStorage* storage) {
   }
 }
 
+inline void OopHandle::replace(oop obj) {
+  oop* ptr = ptr_raw();
+  assert(ptr != NULL, "should not use replace");
+  NativeAccess<>::oop_store(ptr, obj);
+}
+
+inline oop OopHandle::xchg(oop new_value) {
+  return NativeAccess<MO_SEQ_CST>::oop_atomic_xchg(_obj, new_value);
+}
+
 #endif // SHARE_OOPS_OOPHANDLE_INLINE_HPP

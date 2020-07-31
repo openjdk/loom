@@ -571,6 +571,7 @@ java/lang/StringCoding/CheckEncodings.sh                        7008363 generic-
 java/lang/ProcessHandle/InfoTest.java                           8211847 aix-ppc64
 java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-all
 java/lang/invoke/LFCaching/LFGarbageCollectedTest.java          8078602 generic-all
+java/lang/invoke/lambda/LambdaFileEncodingSerialization.java    8249079 linux-x64
 
 java/lang/StackWalker/LocalsAndOperands.java#id0                8248432 generic-all
 java/lang/StackWalker/LocalsAndOperands.java#id1                8248432 generic-all
@@ -828,7 +829,6 @@ javax/swing/UIDefaults/8149879/InternalResourceBundle.java 8199054 windows-all
 javax/swing/text/html/parser/Parser/8078268/bug8078268.java 8199092 generic-all
 javax/swing/PopupFactory/8048506/bug8048506.java 8202660 windows-all
 javax/swing/JTextArea/TextViewOOM/TextViewOOM.java 8167355 generic-all
-javax/swing/text/Utilities/8142966/SwingFontMetricsTest.java 8199529 windows-all
 javax/swing/JPopupMenu/8075063/ContextMenuScrollTest.java 202880 linux-all
 javax/swing/dnd/8139050/NativeErrorsInTableDnD.java 8202765  macosx-all,linux-all
 javax/swing/Popup/TaskbarPositionTest.java 8065097 macosx-all,linux-all
@@ -935,6 +935,5 @@ jdk/jfr/event/os/TestThreadContextSwitches.java                 8247776 windows-
 # jdk_jpackage
 
 tools/jpackage/share/jdk/jpackage/tests/ModulePathTest3.java#id0    8248418 generic-all
-tools/jpackage/share/EmptyFolderPackageTest.java                    8249201 macosx-all
 
 ############################################################################

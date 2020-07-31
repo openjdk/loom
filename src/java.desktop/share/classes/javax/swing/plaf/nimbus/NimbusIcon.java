@@ -24,14 +24,20 @@
  */
 package javax.swing.plaf.nimbus;
 
+import javax.swing.JComponent;
+import javax.swing.JMenu;
+import javax.swing.JToolBar;
 import javax.swing.Painter;
+import javax.swing.UIManager;
+import javax.swing.plaf.UIResource;
+import javax.swing.plaf.synth.SynthContext;
 import javax.swing.plaf.synth.SynthIcon;
 
-import javax.swing.plaf.synth.SynthContext;
-import javax.swing.*;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Graphics2D;
+import java.awt.Graphics;
 import java.awt.image.BufferedImage;
-import javax.swing.plaf.UIResource;
 
 /**
  * An icon that delegates to a painter.

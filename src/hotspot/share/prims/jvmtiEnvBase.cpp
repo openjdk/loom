@@ -850,13 +850,13 @@ JvmtiEnvBase::get_locked_objects_in_frame(JavaThread* calling_thread, JavaThread
                                  javaVFrame *jvf, GrowableArray<jvmtiMonitorStackDepthInfo*>* owned_monitors_list, jint stack_depth) {
   jvmtiError err = JVMTI_ERROR_NONE;
   ResourceMark rm;
+  HandleMark hm;
 
   GrowableArray<MonitorInfo*>* mons = jvf->monitors();
   if (mons->is_empty()) {
     return err;  // this javaVFrame holds no monitors
   }
 
-  HandleMark hm;
   oop wait_obj = NULL;
   {
     // The ObjectMonitor* can't be async deflated since we are either
@@ -1058,10 +1058,10 @@ JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
 #ifdef ASSERT
   uint32_t debug_bits = 0;
 #endif
-  assert((SafepointSynchronize::is_at_safepoint() ||
-          java_thread->is_thread_fully_suspended(false, &debug_bits)),
-         "at safepoint or target thread is suspended");
   Thread* current_thread = Thread::current();
+  assert(current_thread == java_thread ||
+         current_thread == java_thread->active_handshaker(),
+         "call by myself or at direct handshake");
   ResourceMark rm(current_thread);
 
   vframe *vf = vframeFor(java_thread, depth);
@@ -1199,7 +1199,6 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
       // as lightweight locks before inflating the monitor are not included.
       // We have to count the number of recursive monitor entries the hard way.
       // We pass a handle to survive any GCs along the way.
-      ResourceMark rm(current_thread);
       ret.entry_count = count_locked_objects(owning_thread, hobj);
     }
     // implied else: entry_count == 0
@@ -1775,22 +1774,20 @@ GetStackTraceClosure::do_thread(Thread *target) {
 }
 
 void
-VM_GetFrameCount::doit() {
-  _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
+GetFrameCountClosure::do_thread(Thread *target) {
   JavaThread* jt = _state->get_thread();
-  ThreadsListHandle tlh;
-  if (jt != NULL && tlh.includes(jt) && !jt->is_exiting() && jt->threadObj() != NULL) {
+  assert(target == jt, "just checking");
+  if (!jt->is_exiting() && jt->threadObj() != NULL) {
     _result = ((JvmtiEnvBase*)_env)->get_frame_count(_state, _count_ptr);
   }
 }
 
 void
-VM_GetFrameLocation::doit() {
-  _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
-  ThreadsListHandle tlh;
-  if (_java_thread != NULL && tlh.includes(_java_thread)
-      && !_java_thread->is_exiting() && _java_thread->threadObj() != NULL) {
-    _result = ((JvmtiEnvBase*)_env)->get_frame_location(_java_thread, _depth,
+GetFrameLocationClosure::do_thread(Thread *target) {
+  assert(target->is_Java_thread(), "just checking");
+  JavaThread *jt = (JavaThread *)target;
+  if (!jt->is_exiting() && jt->threadObj() != NULL) {
+    _result = ((JvmtiEnvBase*)_env)->get_frame_location(jt, _depth,
                                                         _method_ptr, _location_ptr);
   }
 }

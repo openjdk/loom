@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,26 +19,31 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#include "precompiled.hpp"
-#include "memory/allocation.hpp"
-#include "metaprogramming/integralConstant.hpp"
-#include "metaprogramming/isRegisteredEnum.hpp"
+/*
+ * @test
+ * @bug 8245159 8239725
+ * @summary Ensure no exception getting bounds of an empty string when the font has
+ * layout attributes.
+ * @run main/othervm ZeroWidthStringBoundsTest
+ */
 
-#include "unittest.hpp"
+import java.awt.Font;
+import java.awt.font.FontRenderContext;
+import java.awt.font.TextAttribute;
+import java.text.AttributedCharacterIterator;
+import java.util.HashMap;
 
-struct IsRegisteredEnumTest : AllStatic {
-  enum A { A_x, A_y, A_z };
-  enum B { B_x, B_y, B_z };
-};
+public class ZeroWidthStringBoundsTest {
 
-typedef IsRegisteredEnumTest::A A;
-typedef IsRegisteredEnumTest::B B;
-
-template<> struct IsRegisteredEnum<A> : public TrueType {};
-
-STATIC_ASSERT(!IsRegisteredEnum<int>::value);
-STATIC_ASSERT(IsRegisteredEnum<A>::value);
-STATIC_ASSERT(!IsRegisteredEnum<B>::value);
+   public static void main(String[] args) {
+       FontRenderContext frc = new FontRenderContext(null, false, false);
+       Font f1 = new Font(Font.MONOSPACED, Font.PLAIN, 12);
+       f1.getStringBounds("", frc);
+       HashMap<AttributedCharacterIterator.Attribute, Object> attrs = new HashMap<>();
+       attrs.put(TextAttribute.KERNING, TextAttribute.KERNING_ON);
+       Font f2 = f1.deriveFont(attrs);
+       f2.getStringBounds("", frc);
+   }
+}

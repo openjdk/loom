@@ -479,25 +479,25 @@ bool VM_BaseGetOrSetLocal::is_assignable(const char* ty_sign, Klass* klass, Thre
 // Returns: 'true' - everything is Ok, 'false' - error code
 
 bool VM_BaseGetOrSetLocal::check_slot_type_lvt(javaVFrame* jvf) {
-  Method* method_oop = jvf->method();
-  if (!method_oop->has_localvariable_table()) {
+  Method* method = jvf->method();
+  if (!method->has_localvariable_table()) {
     // Just to check index boundaries
     jint extra_slot = (_type == T_LONG || _type == T_DOUBLE) ? 1 : 0;
-    if (_index < 0 || _index + extra_slot >= method_oop->max_locals()) {
+    if (_index < 0 || _index + extra_slot >= method->max_locals()) {
       _result = JVMTI_ERROR_INVALID_SLOT;
       return false;
     }
     return true;
   }
 
-  jint num_entries = method_oop->localvariable_table_length();
+  jint num_entries = method->localvariable_table_length();
   if (num_entries == 0) {
     _result = JVMTI_ERROR_INVALID_SLOT;
     return false;       // There are no slots
   }
   int signature_idx = -1;
   int vf_bci = jvf->bci();
-  LocalVariableTableElement* table = method_oop->localvariable_table_start();
+  LocalVariableTableElement* table = method->localvariable_table_start();
   for (int i = 0; i < num_entries; i++) {
     int start_bci = table[i].start_bci;
     int end_bci = start_bci + table[i].length;
@@ -513,7 +513,7 @@ bool VM_BaseGetOrSetLocal::check_slot_type_lvt(javaVFrame* jvf) {
     _result = JVMTI_ERROR_INVALID_SLOT;
     return false;       // Incorrect slot index
   }
-  Symbol*   sign_sym  = method_oop->constants()->symbol_at(signature_idx);
+  Symbol*   sign_sym  = method->constants()->symbol_at(signature_idx);
   BasicType slot_type = Signature::basic_type(sign_sym);
 
   switch (slot_type) {
@@ -555,10 +555,10 @@ bool VM_BaseGetOrSetLocal::check_slot_type_lvt(javaVFrame* jvf) {
 }
 
 bool VM_BaseGetOrSetLocal::check_slot_type_no_lvt(javaVFrame* jvf) {
-  Method* method_oop = jvf->method();
+  Method* method = jvf->method();
   jint extra_slot = (_type == T_LONG || _type == T_DOUBLE) ? 1 : 0;
 
-  if (_index < 0 || _index + extra_slot >= method_oop->max_locals()) {
+  if (_index < 0 || _index + extra_slot >= method->max_locals()) {
     _result = JVMTI_ERROR_INVALID_SLOT;
     return false;
   }
@@ -596,16 +596,16 @@ bool VM_BaseGetOrSetLocal::doit_prologue() {
     return false;
   }
 
-  Method* method_oop = _jvf->method();
+  Method* method = _jvf->method();
   if (getting_receiver()) {
-    if (method_oop->is_static()) {
+    if (method->is_static()) {
       _result = JVMTI_ERROR_INVALID_SLOT;
       return false;
     }
     return true;
   }
 
-  if (method_oop->is_native()) {
+  if (method->is_native()) {
     _result = JVMTI_ERROR_OPAQUE_FRAME;
     return false;
   }
@@ -613,7 +613,7 @@ bool VM_BaseGetOrSetLocal::doit_prologue() {
   if (!check_slot_type_no_lvt(_jvf)) {
     return false;
   }
-  if (method_oop->has_localvariable_table()) {
+  if (method->has_localvariable_table()) {
     return check_slot_type_lvt(_jvf);
   }
   return true;
