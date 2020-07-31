@@ -39,6 +39,8 @@ import java.util.Comparator;
 class ImageBufferCache {
     private static final int MAX_CACHED_BUFFERS = 3;
     private static final int LARGE_BUFFER = 0x10000;
+
+    // only used when on 32-bit of mmap of jimage file has been disabled
     private static final ThreadLocal<BufferReference[]> CACHE =
         new ThreadLocal<BufferReference[]>() {
             @Override
