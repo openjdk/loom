@@ -37,13 +37,10 @@ import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
- * Simple/non-scalable implementation of Poller based on WSAPoll. This
- * implementation will be replaced with a more scalable implementation in the
- * future.
+ * Implementation of Poller based on WSAPoll.
  *
- * Due to a bug in WSAPoll, this implementation does not support polling for a
- * connection to complete. If a socket is registered to poll for a connect to
- * complete then it never will be polled when the connection cannot be
+ * KB4550945 needs to be installed, otherwise a socket registered to poll for
+ * a connect to complete will not be polled when the connection cannot be
  * established.
  */
 
