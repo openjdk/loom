@@ -974,20 +974,8 @@ public class FloatingDecimal{
 
     }
 
-    private static final ThreadLocal<BinaryToASCIIBuffer> threadLocalBinaryToASCIIBuffer =
-            new ThreadLocal<BinaryToASCIIBuffer>() {
-                @Override
-                protected BinaryToASCIIBuffer initialValue() {
-                    return new BinaryToASCIIBuffer();
-                }
-            };
-
     private static BinaryToASCIIBuffer getBinaryToASCIIBuffer() {
-        if (Thread.currentThread().isVirtual()) {
-            return new BinaryToASCIIBuffer();
-        } else {
-            return threadLocalBinaryToASCIIBuffer.get();
-        }
+        return new BinaryToASCIIBuffer();
     }
 
     /**
