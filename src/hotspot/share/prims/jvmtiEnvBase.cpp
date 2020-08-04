@@ -24,6 +24,7 @@
 
 #include "precompiled.hpp"
 #include "classfile/classLoaderDataGraph.hpp"
+#include "classfile/javaClasses.inline.hpp"
 #include "classfile/moduleEntry.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "jvmtifiles/jvmtiEnv.hpp"
@@ -653,42 +654,38 @@ JvmtiEnvBase::get_live_threads(JavaThread* current_thread, Handle group_hdl, Han
 
 int
 JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle **group_objs_p) {
-  GrowableArray<Handle>* subgroups = new GrowableArray<Handle>();
+  ObjectLocker ol(group_hdl, current_thread);
 
-  {
-    ObjectLocker ol(group_hdl, current_thread);
+  int ngroups  = java_lang_ThreadGroup::ngroups(group_hdl());
+  int nweaks  = java_lang_ThreadGroup::nweaks(group_hdl());
 
-    // non-daemon groups
-    int ngroups  = java_lang_ThreadGroup::ngroups(group_hdl());
-    objArrayOop groups = java_lang_ThreadGroup::groups(group_hdl());
-    assert(ngroups <= groups->length(), "too many groups");
-    for (int i = 0; i < ngroups; i++) {
-      oop group_obj = groups->obj_at(i);
-      assert(group_obj != NULL, "group_obj != NULL");
-      subgroups->append(Handle(current_thread, group_obj));
-    }
+  int count = 0;
+  Handle *group_objs = NULL;
+  if (ngroups > 0 || nweaks > 0) {
+    group_objs = NEW_RESOURCE_ARRAY(Handle, ngroups + nweaks);
+    NULL_CHECK(group_objs, JVMTI_ERROR_OUT_OF_MEMORY);
 
-    // daemon groups
-    int nweaks  = java_lang_ThreadGroup::nweaks(group_hdl());
-    objArrayOop weaks = java_lang_ThreadGroup::weaks(group_hdl());
-    assert(nweaks <= weaks->length(), "too many groups");
-    for (int i = 0; i < nweaks; i++) {
-      oop weak_obj = weaks->obj_at(i);
-      assert(weak_obj != NULL, "weak_obj != NULL");
-      oop group_obj = java_lang_ref_Reference::referent(weak_obj);
-      if (group_obj != NULL) {
-        subgroups->append(Handle(current_thread, group_obj));
+    // non-daemon subgroups
+    if (ngroups > 0) {
+      objArrayOop groups = java_lang_ThreadGroup::groups(group_hdl());
+      for (int j = 0; j < ngroups; j++) {
+        oop group_obj = groups->obj_at(j);
+        assert(group_obj != NULL, "group_obj != NULL");
+        group_objs[count++] = Handle(current_thread, group_obj);
       }
     }
-  }
 
-  int count = subgroups->length();
-  Handle *group_objs = NULL;
-  if (count > 0) {
-    group_objs = NEW_RESOURCE_ARRAY(Handle, count);
-    NULL_CHECK(group_objs, JVMTI_ERROR_OUT_OF_MEMORY);
-    for (int j = 0; j < subgroups->length(); j++) {
-      group_objs[j] = subgroups->at(j);
+    // daemon subgroups
+    if (nweaks > 0) {
+      objArrayOop weaks = java_lang_ThreadGroup::weaks(group_hdl());
+      for (int j = 0; j < nweaks; j++) {
+        oop weak_obj = weaks->obj_at(j);
+        assert(weak_obj != NULL, "weak_obj != NULL");
+        oop group_obj = java_lang_ref_Reference::referent(weak_obj);
+        if (group_obj != NULL) {
+          group_objs[count++] = Handle(current_thread, group_obj);
+        }
+      }
     }
   }
   *group_objs_p = group_objs;
