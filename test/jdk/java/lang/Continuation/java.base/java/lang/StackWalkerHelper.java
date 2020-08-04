@@ -67,13 +67,15 @@ public final class StackWalkerHelper {
             // && Objects.equals(a.getByteCodeIndex(), b.getByteCodeIndex()) // TODO !!!!
             && Objects.equals(a.getContinuationScopeName(), b.getContinuationScopeName())
             )) {
-            // System.out.println("XXXX\ta: " + a + " a.scope: " + a.getContinuationScopeName() + " a.bci: " + a.getByteCodeIndex() + " a.toSTE: " + a.toStackTraceElement()
-            //                    + "\n\tb: " + b + " b.scope: " + b.getContinuationScopeName() + " b.bci: " + b.getByteCodeIndex() + " b.toSTE: " + b.toStackTraceElement());
+            System.out.println("XXXX\ta: " + a + " a.scope: " + a.getContinuationScopeName() + " a.bci: " + a.getByteCodeIndex() + " a.toSTE: " + a.toStackTraceElement()
+                               + "\n\tb: " + b + " b.scope: " + b.getContinuationScopeName() + " b.bci: " + b.getByteCodeIndex() + " b.toSTE: " + b.toStackTraceElement());
             return false;
         }
         try {
             if ( !(Objects.equals(a.getDeclaringClass(), b.getDeclaringClass())
                 && Objects.equals(a.getMethodType(),     b.getMethodType()))) {
+            System.out.println("YYYY\ta: " + a + " a.declaringClass: " + a.getDeclaringClass() + " a.methodType: " + a.getMethodType()
+                               + "\n\tb: " + b + " b.declaringClass: " + b.getDeclaringClass() + " b.methodType: " + b.getMethodType());
             return false;
         }
         } catch(UnsupportedOperationException e) {}
@@ -87,9 +89,29 @@ public final class StackWalkerHelper {
         LiveStackFrame la = (LiveStackFrame)a;
         LiveStackFrame lb = (LiveStackFrame)b;
 
-        if (!Objects.equals(la.getMonitors(), lb.getMonitors())) return false;
-        if (!slotEquals(la.getLocals(), lb.getLocals())) return false;
-        if (!slotEquals(la.getStack(),  lb.getStack()))  return false;
+        if (!Arrays.equals(la.getMonitors(), lb.getMonitors())) return false;
+        if (!slotsEqual(la.getLocals(), lb.getLocals())) return false;
+        if (!slotsEqual(la.getStack(),  lb.getStack()))  return false;
+        return true;
+    }
+
+    public static String frameToString(StackFrame sf) {
+        if (!(sf instanceof LiveStackFrame))
+            return sf.toString();
+        
+        LiveStackFrame lsf = (LiveStackFrame) sf;
+        var sb = new StringBuilder();
+        sb.append(sf.toString()).append("\n");
+        if (lsf.getMonitors() != null) sb.append("Monitors: ").append(Arrays.toString(lsf.getMonitors())).append("\n");
+        if (lsf.getLocals() != null)   sb.append("Locals: ").append(slotsToString(lsf.getLocals())).append("\n");
+        if (lsf.getStack() != null)    sb.append("Stack:  ").append(slotsToString(lsf.getStack())).append("\n");
+        return sb.toString();
+    }
+
+    private static boolean slotsEqual(Object[] a, Object[] b) {
+        if (a == b) return true;
+        if (a.length != b.length) return false;
+        for (int i=0; i<a.length; i++) if (!slotEquals(a[i], b[i])) return false;
         return true;
     }
 
@@ -106,6 +128,21 @@ public final class StackWalkerHelper {
             case 4 -> pa.intValue()  == pb.intValue();
             case 8 -> pa.longValue() == pb.longValue();
             default -> throw new AssertionError("Slot size is " + pa.size());
+        };
+    }
+
+    private static String slotsToString(Object[] x) {
+        return "[" + Arrays.stream(x).map(StackWalkerHelper::slotToString).collect(Collectors.joining(", ")) + "]";
+    }
+
+    private static String slotToString(Object x) {
+        if (!(x instanceof PrimitiveSlot))
+            return x.toString();
+        PrimitiveSlot p = (PrimitiveSlot)x;
+        return switch(p.size()) {
+            case 4 -> Integer.toString(p.intValue());
+            case 8 -> Long.toString(p.longValue());
+            default -> throw new AssertionError("Slot size is " + p.size());
         };
     }
 }

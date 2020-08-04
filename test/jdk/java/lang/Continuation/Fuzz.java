@@ -23,29 +23,27 @@
 
 
 
-/**
-* @test
-* @summary Fuzz tests for java.lang.Continuation
-*
-* @build java.base/java.lang.StackWalkerHelper
-*
-* @run main/othervm -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks                                       -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks                                       -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks                                       -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks                                       -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-* @run main/othervm -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:CompileCommand=exclude,Fuzz.enter -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Fuzz -XX:CompileCommand=exclude,Fuzz.int_int -XX:CompileCommand=exclude,Fuzz.int_double -XX:CompileCommand=exclude,Fuzz.int_many -XX:CompileCommand=exclude,Fuzz.int_pin Fuzz
-*
-**/
+/*
+ * @test
+ * @summary Fuzz tests for java.lang.Continuation
+ *
+ * @modules java.base
+ * @library /test/lib
+ * @build java.base/java.lang.StackWalkerHelper
+ * @build sun.hotspot.WhiteBox
+ * @run driver ClassFileInstaller sun.hotspot.WhiteBox
+ *
+ * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks Fuzz
+ * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks Fuzz
+ * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks Fuzz
+ * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks Fuzz
+ *
+ */
 
 // Anything excluded or not compileonly is not compiled; see CompilerOracle::should_exclude
 
 // @run driver jdk.test.lib.FileInstaller compilerDirectives.json compilerDirectives.json
 // -XX:CompilerDirectivesFile=compilerDirectives.json
-
-// import sun.hotspot.WhiteBox;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -58,8 +56,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
@@ -69,46 +69,73 @@ import java.util.stream.Stream;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
+import jdk.test.lib.Utils;
+import sun.hotspot.WhiteBox;
+
 public class Fuzz {
     static final boolean VERBOSE = false;
+    private static final WhiteBox WB = WhiteBox.getWhiteBox();
 
-    public static void main(String[] args) throws Exception {
+    private static boolean COMPILE_ENTER;
+    private static int COMPILE_LEVEL;
+
+    public static void main(String[] args) {
+        for (int compileLevel : new int[]{4})
+            for (boolean compileEnter : new boolean[]{true, false})
+                test(compileLevel, compileEnter);
+    }
+
+    static void test(int compileLevel, boolean compileEnter) {
+        resetCompilation();
+        COMPILE_LEVEL = compileLevel;
+        COMPILE_ENTER = compileEnter;
+
+        testFile();
+        testRandom();
+    }
+
+    static void testFile() {
         System.out.println("-- FILE --");
-        testStream(file(Path.of(System.getProperty("test.src", ".")).resolve("fuzz.dat")));
+        try {
+            testStream(file(Path.of(System.getProperty("test.src", ".")).resolve("fuzz.dat")));
+        } catch (IOException e) { throw new RuntimeException(e); }
+    }
 
+    static void testRandom() {
         System.out.println("-- RANDOM --");
         testStream(random(new Random(1)).limit(50));
-    }
-    
-    static void testStream(Stream<Op[]> traces) {
-        traces.forEach(Fuzz::testTrace);
-    }
-
-    static void testTrace(Op[] trace) {
-        var fuzz = new Fuzz(trace);
-
-        System.out.println();
-        fuzz.print();
-
-        fuzz.verbose = VERBOSE;
-        fuzz.run();
-    }
-
-    static Stream<Op[]> random(Random rnd) {
-        return new Generator(rnd).stream();
     }
 
     static Stream<Op[]> file(Path file) throws IOException {
         return Files.lines(file).map(String::trim).filter(s -> !s.isBlank() && !s.startsWith("#")).map(Fuzz::parse);
     }
 
+    static Stream<Op[]> random(Random rnd) {
+        var g = new Generator(rnd);
+        return Stream.iterate(0, x->x+1).map(__ -> g.generate());
+    }
+
+    static void testStream(Stream<Op[]> traces) {
+        traces.forEach(Fuzz::testTrace);
+    }
+
+    static void testTrace(Op[] trace) {
+        System.out.println();
+        System.out.println("COMPILE_LEVEL: " + COMPILE_LEVEL + " COMPILE_ENTER: " + COMPILE_ENTER);
+
+        var fuzz = new Fuzz(trace);
+        fuzz.verbose = VERBOSE;
+        fuzz.print();
+        fuzz.run();
+    }
+
     ////////////////
 
     enum Op {
-        CALL_I_INT, CALL_I_DOUBLE, CALL_I_MANY, 
-        CALL_C_INT, CALL_C_DOUBLE, CALL_C_MANY, 
+        CALL_I_INT, CALL_I_DBL, CALL_I_MANY, 
+        CALL_C_INT, CALL_C_DBL, CALL_C_MANY, 
         CALL_I_PIN, CALL_C_PIN,
-        CALL_I_CATCH, CALL_C_CATCH,
+        CALL_I_CTCH, CALL_C_CTCH,
         MH_I_INT, MH_C_INT, MH_I_MANY, MH_C_MANY,
         REF_I_INT, REF_C_INT, REF_I_MANY, REF_C_MANY,
         LOOP, YIELD, THROW, DONE;
@@ -117,10 +144,13 @@ public class Fuzz {
         static final EnumSet<Op> PIN         = EnumSet.of(CALL_I_PIN, CALL_C_PIN);
         static final EnumSet<Op> MH          = EnumSet.range(MH_I_INT, MH_C_MANY);
         static final EnumSet<Op> REFLECTED   = EnumSet.range(REF_I_INT, REF_C_MANY);
-        static final EnumSet<Op> STANDARD    = EnumSet.range(CALL_I_INT, CALL_C_CATCH);
+        static final EnumSet<Op> STANDARD    = EnumSet.range(CALL_I_INT, CALL_C_CTCH);
         static final EnumSet<Op> COMPILED    = EnumSet.copyOf(Arrays.stream(Op.values()).filter(x -> x.toString().contains("_C_")).collect(Collectors.toList()));
         static final EnumSet<Op> INTERPRETED = EnumSet.copyOf(Arrays.stream(Op.values()).filter(x -> x.toString().contains("_I_")).collect(Collectors.toList()));
         static final EnumSet<Op> NON_CALLS   = EnumSet.range(LOOP, DONE);
+
+        static Op toInterpreted(Op op) { return INTERPRETED.contains(op) ? op : Enum.valueOf(Op.class, op.toString().replace("_C_", "_I_")); }
+        static Op toCompiled(Op op)    { return COMPILED.contains(op)    ? op : Enum.valueOf(Op.class, op.toString().replace("_I_", "_C_")); }
 
         static final Op[] ARRAY = new Op[0];
     }
@@ -128,11 +158,6 @@ public class Fuzz {
     ///// Trace Gnereation
 
     static class Generator {
-        private final Random rnd;
-        public Generator(Random rnd) { this.rnd = rnd; }
-
-        public Stream<Op[]> stream() { return Stream.iterate(0, x->x+1).map(__ -> generate()); }
-
         public Op[] generate() {
             final int length = max(1, pick(5, 10, 50/*, 200*/) + plusOrMinus(5));
 
@@ -159,6 +184,8 @@ public class Fuzz {
             return trace;
         }
 
+        private final Random rnd;
+        public Generator(Random rnd) { this.rnd = rnd; }
         @SafeVarargs
         private <T> T pick(T... values) { return values[rnd.nextInt(values.length)]; }
         private boolean percent(int percent) { return rnd.nextInt(100) < percent; }
@@ -192,6 +219,8 @@ public class Fuzz {
     private Op next(int c)  { logOp(c); index++; return current(); }
 
     void run() {
+        compile();
+
         Continuation cont = new Continuation(SCOPE, this::enter) {
             @Override protected void onPinned(Pinned reason) { if (verbose) System.out.println("PINNED " + reason); }
         };
@@ -201,6 +230,7 @@ public class Fuzz {
                 cont.run();
                 if (cont.isDone()) break;
 
+                assert !shouldThrow();
                 verifyStack(cont);
             }
             verifyResult(result);
@@ -208,7 +238,13 @@ public class Fuzz {
             assert shouldThrow();
             assert e.getMessage().equals("EX");
             assert cont.isDone();
-         }
+
+        } finally {
+            if (!checkCompilation()) {
+                System.out.println("CHANGED COMPILATION AFTER");
+                printTrace(trace);
+            }
+        }
     }
 
     /////////// Instance Helpers
@@ -216,16 +252,10 @@ public class Fuzz {
     private StackTraceElement[] backtrace;
     private StackFrame[] fbacktrace;
     private StackFrame[] lfbacktrace;
-    
+
     void indent(int depth) {
         // depth = index;
         for (int i=0; i<depth; i++) System.out.print("  ");
-    }
-
-    int depth() {
-        int d = 0;
-        for (int i=0; i<=index && i < trace.length; i++) if (!Op.NON_CALLS.contains(trace[i])) d++;
-        return d;
     }
 
     void logOp(int iter) {
@@ -245,6 +275,54 @@ public class Fuzz {
         indent(depth);
         System.out.println("result " + result);
         return result;
+    }
+
+    int depth() {
+        int d = 0;
+        for (int i=0; i<=index && i < trace.length; i++) if (!Op.NON_CALLS.contains(trace[i])) d++;
+        return d;
+    }
+
+    static void resetCompilation() {
+        Set<Method> compile = Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
+        compile.add(enter);
+
+        for (Method m : compile) {
+            WB.deoptimizeMethod(m);
+            WB.clearMethodState(m);
+        }
+    }
+
+    static void compile() {
+        Set<Method> compile   =    Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
+        Set<Method> interpret = Op.INTERPRETED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
+        (COMPILE_ENTER ? compile : interpret).add(enter);
+
+        for (Method m : interpret) WB.makeMethodNotCompilable(m);
+
+        for (Method m : compile) if (!WB.isMethodCompiled(m)) WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
+        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
+
+        for (Method m : compile)   assert  WB.isMethodCompiled(m) : "method: " + m;
+        for (Method m : interpret) assert !WB.isMethodCompiled(m) : "method: " + m;
+    }
+
+    boolean checkCompilation() {
+        boolean ok = true;
+        for (int i = 0; i < trace.length; i++) {
+            Op op = trace[i];
+            if (Op.COMPILED.contains(op)    && !WB.isMethodCompiled(method(op))) trace[i] = Op.toInterpreted(op);
+            if (Op.INTERPRETED.contains(op) &&  WB.isMethodCompiled(method(op))) trace[i] = Op.toCompiled(op);
+            if (op != trace[i]) ok = false;
+        }
+        return ok;
+    }
+
+    String[] expectedStackTrace() {
+        var ms = new ArrayList<String>();
+        for (int i = index; i >= 0; i--) if (!Op.NON_CALLS.contains(trace[i])) ms.add(method(trace[i]).getName());
+        ms.add("enter");
+        return ms.toArray(new String[0]);
     }
 
     int computeResult() {
@@ -273,9 +351,9 @@ public class Fuzz {
     }
 
     boolean shouldThrow() {
-        for (int i = 0; i < trace.length; i++) {
+        for (int i = 0; i <= index && i < trace.length; i++) {
             switch (trace[i]) {
-                case CALL_I_CATCH, CALL_C_CATCH -> { return false; }
+                case CALL_I_CTCH, CALL_C_CTCH -> { return false; }
                 case THROW -> { return true; }
             }
         }
@@ -289,21 +367,23 @@ public class Fuzz {
     }
 
     void verifyStack() {
+        verifyStack(backtrace);
         verifyStack(backtrace, StackWalkerHelper.toStackTraceElement(fbacktrace));
-        // verifyStack(fbacktrace, lfbacktrace);
+        verifyStack(fbacktrace, lfbacktrace);
 
         verifyStack(backtrace, Thread.currentThread().getStackTrace());
         verifyStack(fbacktrace, StackWalkerHelper.getStackFrames(SCOPE));
-        // verifyStack(lfbacktrace, StackWalkerHelper.getLiveStackFrames(SCOPE));
+        verifyStack(lfbacktrace, StackWalkerHelper.getLiveStackFrames(SCOPE));
     }
 
     void verifyStack(Continuation cont) {
+        verifyStack(backtrace);
         verifyStack(backtrace, StackWalkerHelper.toStackTraceElement(fbacktrace));
-        // verifyStack(fbacktrace, lfbacktrace);
+        verifyStack(fbacktrace, lfbacktrace);
         
         verifyStack(backtrace, cont.getStackTrace());
         verifyStack(fbacktrace, StackWalkerHelper.getStackFrames(cont));
-        // verifyStack(lfbacktrace, StackWalkerHelper.getLiveStackFrames(cont));
+        verifyStack(lfbacktrace, StackWalkerHelper.getLiveStackFrames(cont));
     }
 
     static boolean isStackCaptureMechanism(Object sf) {
@@ -325,7 +405,14 @@ public class Fuzz {
         return list.toArray(arrayType(stack));
     }
 
-    static <T> void verifyStack(T[] expected, T[] observed) {
+    void verifyStack(Object[] observed) {
+        verifyStack(
+            expectedStackTrace(),
+            Arrays.stream(cutStack(observed)).filter(sf -> Fuzz.class.getName().equals(sfClassName(sf)))
+                            .collect(Collectors.toList()).toArray(new Object[0]));
+    }
+
+    static void verifyStack(Object[] expected, Object[] observed) {
         expected = cutStack(expected);
         observed = cutStack(observed);
         boolean equal = true;
@@ -334,7 +421,8 @@ public class Fuzz {
                 if (!sfEquals(expected[i], observed[i])) {
                     // we allow a different line number for the first element
                     if (i > 0 || !Objects.equals(sfClassName(expected[i]), sfClassName(observed[i])) || !Objects.equals(sfMethodName(expected[i]), sfMethodName(observed[i]))) {
-                        System.out.println("At index " + i);
+                        System.out.println("At index " + i + " expected: " + sfToString(expected[i]) + " observed: " + sfToString(observed[i]));
+
                         equal = false;
                         break;
                     }
@@ -345,18 +433,29 @@ public class Fuzz {
             System.out.println("Expected length: " + expected.length + " Observed length: " + observed.length);
         }
         if (!equal) {
-            System.out.println("Expected: "); for (var ste : expected) System.out.println("\t" + ste);
-            System.out.println("Observed: "); for (var ste : observed) System.out.println("\t" + ste);
+            System.out.println("Expected: "); for (var sf : expected) System.out.println("\t" + sf);
+            System.out.println("Observed: "); for (var sf : observed) System.out.println("\t" + sf);
         }
         assert equal;
     }
 
-    static String sfClassName(Object f)  { return f instanceof StackTraceElement ? ((StackTraceElement)f).getClassName()  : ((StackFrame)f).getClassName(); }
-    static String sfMethodName(Object f) { return f instanceof StackTraceElement ? ((StackTraceElement)f).getMethodName() : ((StackFrame)f).getMethodName(); }
+    static String sfClassName(Object f)  {
+        return f instanceof String ? Fuzz.class.getName() :
+            (f instanceof StackTraceElement ? ((StackTraceElement)f).getClassName()  : ((StackFrame)f).getClassName()); }
+    static String sfMethodName(Object f) { 
+        return f instanceof String ? (String)f :
+            (f instanceof StackTraceElement ? ((StackTraceElement)f).getMethodName() : ((StackFrame)f).getMethodName()); }
 
-    static <T> boolean sfEquals(T a, T b) {
-         return a instanceof StackTraceElement ? Objects.equals(a, b)
-                                               : StackWalkerHelper.equals((StackFrame)a, (StackFrame)b);
+    static boolean sfEquals(Object a, Object b) {
+        if (a instanceof String)
+            return sfClassName(a).equals(sfClassName(b)) && sfMethodName(a).equals(sfMethodName(b));
+        
+        return a instanceof StackTraceElement ? Objects.equals(a, b)
+                                              : StackWalkerHelper.equals((StackFrame)a, (StackFrame)b);
+    }
+
+    static String sfToString(Object f) { 
+        return f instanceof StackFrame ? StackWalkerHelper.frameToString((StackFrame)f) : Objects.toString(f);
     }
 
     ////// Static Helpers
@@ -370,7 +469,7 @@ public class Fuzz {
     static <T> T[] arrayType(T[] array) {
         return (T[])java.lang.reflect.Array.newInstance(array.getClass().componentType(), 0);
     }
-
+   
     static void printTrace(Op[] trace) { System.out.println(write(trace)); }
 
     static String write(Op[] trace) { 
@@ -381,32 +480,61 @@ public class Fuzz {
         return Arrays.stream(line.split(", ")).map(s -> Enum.valueOf(Op.class, s))
             .collect(Collectors.toList()).toArray(Op.ARRAY);
     }    
+
+    static Method method(Op op)       { return method.get(op); }
+    static MethodHandle handle(Op op) { return handle.get(op); }
+ 
     //////
 
+    static final Class<?>[] enter_sig = new Class<?>[]{};
     static final Class<?>[] int_sig = new Class<?>[]{int.class, int.class};
-    static final Class<?>[] many_sig = new Class<?>[]{int.class, 
+    static final Class<?>[] dbl_sig = new Class<?>[]{int.class, double.class};
+    static final Class<?>[] mny_sig = new Class<?>[]{int.class,
         int.class, double.class, long.class, float.class, Object.class,
         int.class, double.class, long.class, float.class, Object.class,
         int.class, double.class, long.class, float.class, Object.class,
         int.class, double.class, long.class, float.class, Object.class};
+    static final MethodType enter_type = MethodType.methodType(void.class, enter_sig);
     static final MethodType int_type = MethodType.methodType(int.class, int_sig);
-    static final MethodType many_type = MethodType.methodType(int.class, many_sig);
+    static final MethodType dbl_type = MethodType.methodType(double.class, dbl_sig);
+    static final MethodType mny_type = MethodType.methodType(int.class, mny_sig);
 
-    static final MethodHandle int_int_mh, com_int_mh, int_many_mh, com_many_mh;
-    static final Method int_int_ref, com_int_ref, int_many_ref, com_many_ref;
+    static final Method enter;
+    static final Map<Op, Method>       method = new EnumMap<>(Op.class);
+    static final Map<Op, MethodHandle> handle = new EnumMap<>(Op.class);
 
     static {
-        MethodHandles.Lookup lookup = MethodHandles.lookup();
         try {
-            int_int_mh  = lookup.findVirtual(Fuzz.class, "int_int", int_type);
-            com_int_mh  = lookup.findVirtual(Fuzz.class, "com_int", int_type);
-            int_many_mh = lookup.findVirtual(Fuzz.class, "int_many", many_type);
-            com_many_mh = lookup.findVirtual(Fuzz.class, "com_many", many_type);
-            
-            int_int_ref  = Fuzz.class.getDeclaredMethod("int_int", int_sig);
-            com_int_ref  = Fuzz.class.getDeclaredMethod("com_int", int_sig);
-            int_many_ref = Fuzz.class.getDeclaredMethod("int_many", many_sig);
-            com_many_ref = Fuzz.class.getDeclaredMethod("com_many", many_sig);
+            enter = Fuzz.class.getDeclaredMethod("enter", enter_sig);
+
+            method.put(Op.CALL_I_INT,  Fuzz.class.getDeclaredMethod("int_int", int_sig));
+            method.put(Op.CALL_C_INT,  Fuzz.class.getDeclaredMethod("com_int", int_sig));
+            method.put(Op.CALL_I_DBL,  Fuzz.class.getDeclaredMethod("int_dbl", dbl_sig));
+            method.put(Op.CALL_C_DBL,  Fuzz.class.getDeclaredMethod("com_dbl", dbl_sig));
+            method.put(Op.CALL_I_MANY, Fuzz.class.getDeclaredMethod("int_mny", mny_sig));
+            method.put(Op.CALL_C_MANY, Fuzz.class.getDeclaredMethod("com_mny", mny_sig));
+            method.put(Op.CALL_I_PIN,  Fuzz.class.getDeclaredMethod("int_pin", int_sig));
+            method.put(Op.CALL_C_PIN,  Fuzz.class.getDeclaredMethod("com_pin", int_sig));
+
+            method.put(Op.CALL_I_CTCH, method(Op.CALL_I_INT));
+            method.put(Op.CALL_C_CTCH, method(Op.CALL_C_INT));
+
+            method.put(Op.MH_I_INT,  method(Op.CALL_I_INT));
+            method.put(Op.MH_C_INT,  method(Op.CALL_C_INT));
+            method.put(Op.MH_I_MANY, method(Op.CALL_I_MANY));
+            method.put(Op.MH_C_MANY, method(Op.CALL_C_MANY));
+
+            method.put(Op.REF_I_INT,  method(Op.CALL_I_INT));
+            method.put(Op.REF_C_INT,  method(Op.CALL_C_INT));
+            method.put(Op.REF_I_MANY, method(Op.CALL_I_MANY));
+            method.put(Op.REF_C_MANY, method(Op.CALL_C_MANY)); 
+
+            MethodHandles.Lookup lookup = MethodHandles.lookup();
+
+            handle.put(Op.MH_I_INT,  lookup.unreflect(method(Op.CALL_I_INT)));
+            handle.put(Op.MH_C_INT,  lookup.unreflect(method(Op.CALL_C_INT)));
+            handle.put(Op.MH_I_MANY, lookup.unreflect(method(Op.CALL_I_MANY)));
+            handle.put(Op.MH_C_MANY, lookup.unreflect(method(Op.CALL_C_MANY)));
         } catch (ReflectiveOperationException e) {
             throw new AssertionError(e);
         }
@@ -434,24 +562,20 @@ public class Fuzz {
             case LOOP  -> { c += 2; index0 = index; }
             case YIELD -> { preYield(); boolean y = Continuation.yield(SCOPE); postYield(y); c++; }
             case DONE  -> { break; }
-            case CALL_I_INT    -> res += int_int(depth+1, (int)res);
-            case CALL_C_INT    -> res += com_int(depth+1, (int)res);
-            case CALL_I_DOUBLE -> res += (int)int_double(depth+1, res);
-            case CALL_C_DOUBLE -> res += (int)com_double(depth+1, res);
-            case CALL_I_PIN    -> res += int_pin(depth+1, (int)res);
-            case CALL_C_PIN    -> res += com_pin(depth+1, (int)res);
-            case CALL_I_MANY   -> res += int_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_C_MANY   -> res += com_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_I_CATCH  -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case CALL_C_CATCH  -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case MH_I_INT      -> {try { res += (int)int_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_C_INT      -> {try { res += (int)com_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_I_MANY     -> {try { res += (int)int_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case MH_C_MANY     -> {try { res += (int)com_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case REF_I_INT     -> {try { res += (int)int_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_INT     -> {try { res += (int)com_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_I_MANY    -> {try { res += (int)int_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_MANY    -> {try { res += (int)com_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case CALL_I_INT  -> res += int_int(depth+1, (int)res);
+            case CALL_C_INT  -> res += com_int(depth+1, (int)res);
+            case CALL_I_DBL  -> res += (int)int_dbl(depth+1, res);
+            case CALL_C_DBL  -> res += (int)com_dbl(depth+1, res);
+            case CALL_I_PIN  -> res += int_pin(depth+1, (int)res);
+            case CALL_C_PIN  -> res += com_pin(depth+1, (int)res);
+            case CALL_I_MANY -> res += int_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_C_MANY -> res += com_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_I_CTCH -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case CALL_C_CTCH -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case MH_I_INT, MH_C_INT     -> {try { res += (int)handle(current()).invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
+            case MH_I_MANY, MH_C_MANY   -> {try { res += (int)handle(current()).invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
+            case REF_I_INT,  REF_C_INT  -> {try { res += (int)method(current()).invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case REF_I_MANY, REF_C_MANY -> {try { res += (int)method(current()).invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
@@ -474,24 +598,20 @@ public class Fuzz {
             case LOOP  -> { c += 2; index0 = index; }
             case YIELD -> { preYield(); boolean y = Continuation.yield(SCOPE); postYield(y); c++; }
             case DONE  -> { break; }
-            case CALL_I_INT    -> res += int_int(depth+1, (int)res);
-            case CALL_C_INT    -> res += com_int(depth+1, (int)res);
-            case CALL_I_DOUBLE -> res += (int)int_double(depth+1, res);
-            case CALL_C_DOUBLE -> res += (int)com_double(depth+1, res);
-            case CALL_I_PIN    -> res += int_pin(depth+1, (int)res);
-            case CALL_C_PIN    -> res += com_pin(depth+1, (int)res);
-            case CALL_I_MANY   -> res += int_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_C_MANY   -> res += com_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_I_CATCH  -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case CALL_C_CATCH  -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case MH_I_INT      -> {try { res += (int)int_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_C_INT      -> {try { res += (int)com_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_I_MANY     -> {try { res += (int)int_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case MH_C_MANY     -> {try { res += (int)com_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case REF_I_INT     -> {try { res += (int)int_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_INT     -> {try { res += (int)com_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_I_MANY    -> {try { res += (int)int_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_MANY    -> {try { res += (int)com_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case CALL_I_INT  -> res += int_int(depth+1, (int)res);
+            case CALL_C_INT  -> res += com_int(depth+1, (int)res);
+            case CALL_I_DBL  -> res += (int)int_dbl(depth+1, res);
+            case CALL_C_DBL  -> res += (int)com_dbl(depth+1, res);
+            case CALL_I_PIN  -> res += int_pin(depth+1, (int)res);
+            case CALL_C_PIN  -> res += com_pin(depth+1, (int)res);
+            case CALL_I_MANY -> res += int_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_C_MANY -> res += com_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_I_CTCH -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case CALL_C_CTCH -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case MH_I_INT, MH_C_INT     -> {try { res += (int)handle(current()).invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
+            case MH_I_MANY, MH_C_MANY   -> {try { res += (int)handle(current()).invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
+            case REF_I_INT,  REF_C_INT  -> {try { res += (int)method(current()).invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case REF_I_MANY, REF_C_MANY -> {try { res += (int)method(current()).invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
@@ -514,24 +634,20 @@ public class Fuzz {
             case LOOP  -> { c += 2; index0 = index; }
             case YIELD -> { preYield(); boolean y = Continuation.yield(SCOPE); postYield(y); c++; }
             case DONE  -> { break; }
-            case CALL_I_INT    -> res += int_int(depth+1, (int)res);
-            case CALL_C_INT    -> res += com_int(depth+1, (int)res);
-            case CALL_I_DOUBLE -> res += (int)int_double(depth+1, res);
-            case CALL_C_DOUBLE -> res += (int)com_double(depth+1, res);
-            case CALL_I_PIN    -> res += int_pin(depth+1, (int)res);
-            case CALL_C_PIN    -> res += com_pin(depth+1, (int)res);
-            case CALL_I_MANY   -> res += int_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_C_MANY   -> res += com_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_I_CATCH  -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case CALL_C_CATCH  -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case MH_I_INT      -> {try { res += (int)int_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_C_INT      -> {try { res += (int)com_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_I_MANY     -> {try { res += (int)int_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case MH_C_MANY     -> {try { res += (int)com_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case REF_I_INT     -> {try { res += (int)int_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_INT     -> {try { res += (int)com_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_I_MANY    -> {try { res += (int)int_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_MANY    -> {try { res += (int)com_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case CALL_I_INT  -> res += int_int(depth+1, (int)res);
+            case CALL_C_INT  -> res += com_int(depth+1, (int)res);
+            case CALL_I_DBL  -> res += (int)int_dbl(depth+1, res);
+            case CALL_C_DBL  -> res += (int)com_dbl(depth+1, res);
+            case CALL_I_PIN  -> res += int_pin(depth+1, (int)res);
+            case CALL_C_PIN  -> res += com_pin(depth+1, (int)res);
+            case CALL_I_MANY -> res += int_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_C_MANY -> res += com_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_I_CTCH -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case CALL_C_CTCH -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case MH_I_INT, MH_C_INT     -> {try { res += (int)handle(current()).invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
+            case MH_I_MANY, MH_C_MANY   -> {try { res += (int)handle(current()).invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
+            case REF_I_INT,  REF_C_INT  -> {try { res += (int)method(current()).invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case REF_I_MANY, REF_C_MANY -> {try { res += (int)method(current()).invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
@@ -539,7 +655,7 @@ public class Fuzz {
         return log(res);
     }
 
-    double int_double(final int depth, double x) {
+    double int_dbl(final int depth, double x) {
         double res = 3.0;
 
         int x1 = (int)res, x2 = (int)res, x3 = (int)res, x4 = (int)res;
@@ -554,24 +670,20 @@ public class Fuzz {
             case LOOP  -> { c += 2; index0 = index; }
             case YIELD -> { preYield(); boolean y = Continuation.yield(SCOPE); postYield(y); c++; }
             case DONE  -> { break; }
-            case CALL_I_INT    -> res += int_int(depth+1, (int)res);
-            case CALL_C_INT    -> res += com_int(depth+1, (int)res);
-            case CALL_I_DOUBLE -> res += (int)int_double(depth+1, res);
-            case CALL_C_DOUBLE -> res += (int)com_double(depth+1, res);
-            case CALL_I_PIN    -> res += int_pin(depth+1, (int)res);
-            case CALL_C_PIN    -> res += com_pin(depth+1, (int)res);
-            case CALL_I_MANY   -> res += int_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_C_MANY   -> res += com_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_I_CATCH  -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case CALL_C_CATCH  -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case MH_I_INT      -> {try { res += (int)int_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_C_INT      -> {try { res += (int)com_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_I_MANY     -> {try { res += (int)int_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case MH_C_MANY     -> {try { res += (int)com_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case REF_I_INT     -> {try { res += (int)int_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_INT     -> {try { res += (int)com_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_I_MANY    -> {try { res += (int)int_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_MANY    -> {try { res += (int)com_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case CALL_I_INT  -> res += int_int(depth+1, (int)res);
+            case CALL_C_INT  -> res += com_int(depth+1, (int)res);
+            case CALL_I_DBL  -> res += (int)int_dbl(depth+1, res);
+            case CALL_C_DBL  -> res += (int)com_dbl(depth+1, res);
+            case CALL_I_PIN  -> res += int_pin(depth+1, (int)res);
+            case CALL_C_PIN  -> res += com_pin(depth+1, (int)res);
+            case CALL_I_MANY -> res += int_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_C_MANY -> res += com_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_I_CTCH -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case CALL_C_CTCH -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case MH_I_INT, MH_C_INT     -> {try { res += (int)handle(current()).invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
+            case MH_I_MANY, MH_C_MANY   -> {try { res += (int)handle(current()).invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
+            case REF_I_INT,  REF_C_INT  -> {try { res += (int)method(current()).invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case REF_I_MANY, REF_C_MANY -> {try { res += (int)method(current()).invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
@@ -579,7 +691,7 @@ public class Fuzz {
         return log(res);
     }
 
-    double com_double(final int depth, double x) {
+    double com_dbl(final int depth, double x) {
         double res = 3.0;
 
         int x1 = (int)res, x2 = (int)res, x3 = (int)res, x4 = (int)res;
@@ -594,24 +706,20 @@ public class Fuzz {
             case LOOP  -> { c += 2; index0 = index; }
             case YIELD -> { preYield(); boolean y = Continuation.yield(SCOPE); postYield(y); c++; }
             case DONE  -> { break; }
-            case CALL_I_INT    -> res += int_int(depth+1, (int)res);
-            case CALL_C_INT    -> res += com_int(depth+1, (int)res);
-            case CALL_I_DOUBLE -> res += (int)int_double(depth+1, res);
-            case CALL_C_DOUBLE -> res += (int)com_double(depth+1, res);
-            case CALL_I_PIN    -> res += int_pin(depth+1, (int)res);
-            case CALL_C_PIN    -> res += com_pin(depth+1, (int)res);
-            case CALL_I_MANY   -> res += int_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_C_MANY   -> res += com_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_I_CATCH  -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case CALL_C_CATCH  -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case MH_I_INT      -> {try { res += (int)int_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_C_INT      -> {try { res += (int)com_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_I_MANY     -> {try { res += (int)int_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case MH_C_MANY     -> {try { res += (int)com_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case REF_I_INT     -> {try { res += (int)int_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_INT     -> {try { res += (int)com_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_I_MANY    -> {try { res += (int)int_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_MANY    -> {try { res += (int)com_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case CALL_I_INT  -> res += int_int(depth+1, (int)res);
+            case CALL_C_INT  -> res += com_int(depth+1, (int)res);
+            case CALL_I_DBL  -> res += (int)int_dbl(depth+1, res);
+            case CALL_C_DBL  -> res += (int)com_dbl(depth+1, res);
+            case CALL_I_PIN  -> res += int_pin(depth+1, (int)res);
+            case CALL_C_PIN  -> res += com_pin(depth+1, (int)res);
+            case CALL_I_MANY -> res += int_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_C_MANY -> res += com_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_I_CTCH -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case CALL_C_CTCH -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case MH_I_INT, MH_C_INT     -> {try { res += (int)handle(current()).invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
+            case MH_I_MANY, MH_C_MANY   -> {try { res += (int)handle(current()).invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
+            case REF_I_INT,  REF_C_INT  -> {try { res += (int)method(current()).invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case REF_I_MANY, REF_C_MANY -> {try { res += (int)method(current()).invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
@@ -636,24 +744,20 @@ public class Fuzz {
             case LOOP  -> { c += 2; index0 = index; }
             case YIELD -> { preYield(); boolean y = Continuation.yield(SCOPE); postYield(y); c++; }
             case DONE  -> { break; }
-            case CALL_I_INT    -> res += int_int(depth+1, (int)res);
-            case CALL_C_INT    -> res += com_int(depth+1, (int)res);
-            case CALL_I_DOUBLE -> res += (int)int_double(depth+1, res);
-            case CALL_C_DOUBLE -> res += (int)com_double(depth+1, res);
-            case CALL_I_PIN    -> res += int_pin(depth+1, (int)res);
-            case CALL_C_PIN    -> res += com_pin(depth+1, (int)res);
-            case CALL_I_MANY   -> res += int_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_C_MANY   -> res += com_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_I_CATCH  -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case CALL_C_CATCH  -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case MH_I_INT      -> {try { res += (int)int_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_C_INT      -> {try { res += (int)com_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_I_MANY     -> {try { res += (int)int_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case MH_C_MANY     -> {try { res += (int)com_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case REF_I_INT     -> {try { res += (int)int_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_INT     -> {try { res += (int)com_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_I_MANY    -> {try { res += (int)int_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_MANY    -> {try { res += (int)com_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case CALL_I_INT  -> res += int_int(depth+1, (int)res);
+            case CALL_C_INT  -> res += com_int(depth+1, (int)res);
+            case CALL_I_DBL  -> res += (int)int_dbl(depth+1, res);
+            case CALL_C_DBL  -> res += (int)com_dbl(depth+1, res);
+            case CALL_I_PIN  -> res += int_pin(depth+1, (int)res);
+            case CALL_C_PIN  -> res += com_pin(depth+1, (int)res);
+            case CALL_I_MANY -> res += int_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_C_MANY -> res += com_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_I_CTCH -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case CALL_C_CTCH -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case MH_I_INT, MH_C_INT     -> {try { res += (int)handle(current()).invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
+            case MH_I_MANY, MH_C_MANY   -> {try { res += (int)handle(current()).invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
+            case REF_I_INT,  REF_C_INT  -> {try { res += (int)method(current()).invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case REF_I_MANY, REF_C_MANY -> {try { res += (int)method(current()).invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
@@ -680,24 +784,20 @@ public class Fuzz {
             case LOOP  -> { c += 2; index0 = index; }
             case YIELD -> { preYield(); boolean y = Continuation.yield(SCOPE); postYield(y); c++; }
             case DONE  -> { break; }
-            case CALL_I_INT    -> res += int_int(depth+1, (int)res);
-            case CALL_C_INT    -> res += com_int(depth+1, (int)res);
-            case CALL_I_DOUBLE -> res += (int)int_double(depth+1, res);
-            case CALL_C_DOUBLE -> res += (int)com_double(depth+1, res);
-            case CALL_I_PIN    -> res += int_pin(depth+1, (int)res);
-            case CALL_C_PIN    -> res += com_pin(depth+1, (int)res);
-            case CALL_I_MANY   -> res += int_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_C_MANY   -> res += com_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_I_CATCH  -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case CALL_C_CATCH  -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case MH_I_INT      -> {try { res += (int)int_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_C_INT      -> {try { res += (int)com_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_I_MANY     -> {try { res += (int)int_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case MH_C_MANY     -> {try { res += (int)com_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case REF_I_INT     -> {try { res += (int)int_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_INT     -> {try { res += (int)com_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_I_MANY    -> {try { res += (int)int_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_MANY    -> {try { res += (int)com_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case CALL_I_INT  -> res += int_int(depth+1, (int)res);
+            case CALL_C_INT  -> res += com_int(depth+1, (int)res);
+            case CALL_I_DBL  -> res += (int)int_dbl(depth+1, res);
+            case CALL_C_DBL  -> res += (int)com_dbl(depth+1, res);
+            case CALL_I_PIN  -> res += int_pin(depth+1, (int)res);
+            case CALL_C_PIN  -> res += com_pin(depth+1, (int)res);
+            case CALL_I_MANY -> res += int_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_C_MANY -> res += com_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_I_CTCH -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case CALL_C_CTCH -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case MH_I_INT, MH_C_INT     -> {try { res += (int)handle(current()).invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
+            case MH_I_MANY, MH_C_MANY   -> {try { res += (int)handle(current()).invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
+            case REF_I_INT,  REF_C_INT  -> {try { res += (int)method(current()).invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case REF_I_MANY, REF_C_MANY -> {try { res += (int)method(current()).invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
@@ -707,7 +807,7 @@ public class Fuzz {
         return log(res);
     }
 
-    int int_many(int depth,
+    int int_mny(int depth,
         int x1, double d1, long l1, float f1, Object o1,
         int x2, double d2, long l2, float f2, Object o2,
         int x3, double d3, long l3, float f3, Object o3,
@@ -721,24 +821,20 @@ public class Fuzz {
             case LOOP  -> { c += 2; index0 = index; }
             case YIELD -> { preYield(); boolean y = Continuation.yield(SCOPE); postYield(y); c++; }
             case DONE  -> { break; }
-            case CALL_I_INT    -> res += int_int(depth+1, (int)res);
-            case CALL_C_INT    -> res += com_int(depth+1, (int)res);
-            case CALL_I_DOUBLE -> res += (int)int_double(depth+1, res);
-            case CALL_C_DOUBLE -> res += (int)com_double(depth+1, res);
-            case CALL_I_PIN    -> res += int_pin(depth+1, (int)res);
-            case CALL_C_PIN    -> res += com_pin(depth+1, (int)res);
-            case CALL_I_MANY   -> res += int_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_C_MANY   -> res += com_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_I_CATCH  -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case CALL_C_CATCH  -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case MH_I_INT      -> {try { res += (int)int_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_C_INT      -> {try { res += (int)com_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_I_MANY     -> {try { res += (int)int_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case MH_C_MANY     -> {try { res += (int)com_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case REF_I_INT     -> {try { res += (int)int_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_INT     -> {try { res += (int)com_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_I_MANY    -> {try { res += (int)int_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_MANY    -> {try { res += (int)com_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case CALL_I_INT  -> res += int_int(depth+1, (int)res);
+            case CALL_C_INT  -> res += com_int(depth+1, (int)res);
+            case CALL_I_DBL  -> res += (int)int_dbl(depth+1, res);
+            case CALL_C_DBL  -> res += (int)com_dbl(depth+1, res);
+            case CALL_I_PIN  -> res += int_pin(depth+1, (int)res);
+            case CALL_C_PIN  -> res += com_pin(depth+1, (int)res);
+            case CALL_I_MANY -> res += int_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_C_MANY -> res += com_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_I_CTCH -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case CALL_C_CTCH -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case MH_I_INT, MH_C_INT     -> {try { res += (int)handle(current()).invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
+            case MH_I_MANY, MH_C_MANY   -> {try { res += (int)handle(current()).invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
+            case REF_I_INT,  REF_C_INT  -> {try { res += (int)method(current()).invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case REF_I_MANY, REF_C_MANY -> {try { res += (int)method(current()).invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
@@ -746,7 +842,7 @@ public class Fuzz {
         return log((int)res);
     }
 
-    int com_many(int depth,
+    int com_mny(int depth,
         int x1, double d1, long l1, float f1, Object o1,
         int x2, double d2, long l2, float f2, Object o2,
         int x3, double d3, long l3, float f3, Object o3,
@@ -760,24 +856,20 @@ public class Fuzz {
             case LOOP  -> { c += 2; index0 = index; }
             case YIELD -> { preYield(); boolean y = Continuation.yield(SCOPE); postYield(y); c++; }
             case DONE  -> { break; }
-            case CALL_I_INT    -> res += int_int(depth+1, (int)res);
-            case CALL_C_INT    -> res += com_int(depth+1, (int)res);
-            case CALL_I_DOUBLE -> res += (int)int_double(depth+1, res);
-            case CALL_C_DOUBLE -> res += (int)com_double(depth+1, res);
-            case CALL_I_PIN    -> res += int_pin(depth+1, (int)res);
-            case CALL_C_PIN    -> res += com_pin(depth+1, (int)res);
-            case CALL_I_MANY   -> res += int_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_C_MANY   -> res += com_many(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
-            case CALL_I_CATCH  -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case CALL_C_CATCH  -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
-            case MH_I_INT      -> {try { res += (int)int_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_C_INT      -> {try { res += (int)com_int_mh.invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
-            case MH_I_MANY     -> {try { res += (int)int_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case MH_C_MANY     -> {try { res += (int)com_many_mh.invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
-            case REF_I_INT     -> {try { res += (int)int_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_INT     -> {try { res += (int)com_int_ref.invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_I_MANY    -> {try { res += (int)int_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
-            case REF_C_MANY    -> {try { res += (int)com_many_ref.invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case CALL_I_INT  -> res += int_int(depth+1, (int)res);
+            case CALL_C_INT  -> res += com_int(depth+1, (int)res);
+            case CALL_I_DBL  -> res += (int)int_dbl(depth+1, res);
+            case CALL_C_DBL  -> res += (int)com_dbl(depth+1, res);
+            case CALL_I_PIN  -> res += int_pin(depth+1, (int)res);
+            case CALL_C_PIN  -> res += com_pin(depth+1, (int)res);
+            case CALL_I_MANY -> res += int_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_C_MANY -> res += com_mny(depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4);
+            case CALL_I_CTCH -> {try { res += int_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case CALL_C_CTCH -> {try { res += com_int(depth+1, (int)res); } catch (FuzzException e) {}}
+            case MH_I_INT, MH_C_INT     -> {try { res += (int)handle(current()).invokeExact(this, depth+1, (int)res);  } catch (Throwable e) { rethrow(e); }}
+            case MH_I_MANY, MH_C_MANY   -> {try { res += (int)handle(current()).invokeExact(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (Throwable e) { rethrow(e); }}
+            case REF_I_INT,  REF_C_INT  -> {try { res += (int)method(current()).invoke(this, depth+1, (int)res); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
+            case REF_I_MANY, REF_C_MANY -> {try { res += (int)method(current()).invoke(this, depth+1, x1, d1, l1, f1, o1, x2, d2, l2, f2, o2, x3, d3, l3, f3, o3, x4, d4, l4, f4, o4); } catch (InvocationTargetException e) { rethrow(e.getCause()); } catch (IllegalAccessException e) { assert false; }}
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
