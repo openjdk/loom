@@ -747,7 +747,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Throws {@code UnsupportedOperationException}.
+     * Does nothing.
      *
      * @return nothing
      *
@@ -760,7 +760,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     @Deprecated(since="1.2", forRemoval=true)
     public boolean allowThreadSuspension(boolean b) {
-        throw new UnsupportedOperationException();
     }
 
     /**
