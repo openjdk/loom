@@ -695,6 +695,7 @@ public:
   template<op_mode mode> void set_last_frame(const hframe& f);
   inline void set_last_frame_pd(const hframe& f);
   inline void set_empty();
+  bool is_last_frame(const hframe& hf) const { return hf.sp() == _sp; }
 
   hframe from_frame(const frame& f);
 
@@ -4817,10 +4818,6 @@ static frame continuation_body_top_frame(ContMirror& cont, RegisterMap* map) {
   // tty->print_cr(">>>> continuation_top_frame");
   // hf.print_on(cont, tty);
 
-  if (map->update_map() && !hf.is_interpreted_frame()) { // TODO : what about forced preemption? see `if (callee_safepoint_stub != NULL)` in thaw_java_frame
-    frame::update_map_with_saved_link(map, reinterpret_cast<intptr_t**>(-1));
-  }
-
   return hf.to_frame(cont);
 }
 
@@ -5154,10 +5151,13 @@ address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, V
 
   address res = NULL;
   if (oop_index >= 0) {
-    res = oop_address(cont.refStack(), cont.refSP(), hf.ref_sp() + find_oop_in_compiled_frame(fr, map, reg));
+    res = oop_address(cont.refStack(), cont.refSP(), hf.ref_sp() + oop_index);
   } else {
+    if (cont.is_last_frame(hf)) {
+      return map->location(reg);
+    }
   // assert ((void*)Frame::map_link_address(map) == (void*)map->location(reg), "must be the link register (rbp): %s", reg->name());
-    int index = (int)reinterpret_cast<uintptr_t>(map->location(reg)); // the RegisterMap should contain the link index. See sender_for_frame
+    int index = (int)reinterpret_cast<uintptr_t>(map->location(reg)); // the RegisterMap should contain the link index. See ContinuationHelper::update_register_map called by sender_for_frame
     assert (index >= 0, "non-oop in fp of the topmost frame is not supported");
     if (index >= 0) { // see frame::update_map_with_saved_link in continuation_top_frame
       address loc = (address)cont.stack_address(index);
