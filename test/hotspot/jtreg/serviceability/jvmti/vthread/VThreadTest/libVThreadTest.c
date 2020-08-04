@@ -483,7 +483,7 @@ test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
   // #1: Test JVMTI GetStackTrace function with bad start_depth
   err = (*jvmti)->GetStackTrace(jvmti, vthread, -(frame_count + 1), MAX_FRAME_COUNT, frames, &count);
   if (err != JVMTI_ERROR_ILLEGAL_ARGUMENT) {
-    printf("JVMTI GetStackTrace with very negative start_depth returned error: %d\n", err);
+    printf("JVMTI GetStackTrace with negative start_depth returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetStackTrace with verynegative start_depth failed to return JVMTI_ERROR_ILLEGAL_ARGUMENT");
   }
   err = (*jvmti)->GetStackTrace(jvmti, vthread, (frame_count + 1), MAX_FRAME_COUNT, frames, &count);

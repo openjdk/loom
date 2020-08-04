@@ -52,6 +52,7 @@ Mutex*   JmethodIdCreation_lock       = NULL;
 Mutex*   JfieldIdCreation_lock        = NULL;
 Monitor* JNICritical_lock             = NULL;
 Mutex*   JvmtiThreadState_lock        = NULL;
+Monitor* JvmtiVTMT_lock               = NULL;
 Monitor* Heap_lock                    = NULL;
 Mutex*   ExpandHeap_lock              = NULL;
 Mutex*   AdapterHandlerLibrary_lock   = NULL;
@@ -300,6 +301,7 @@ void mutex_init() {
   def(MultiArray_lock              , PaddedMutex  , nonleaf+2,   false, _safepoint_check_always);
 
   def(JvmtiThreadState_lock        , PaddedMutex  , nonleaf+2,   false, _safepoint_check_always); // Used by JvmtiThreadState/JvmtiEventController
+  def(JvmtiVTMT_lock               , PaddedMonitor, leaf,        true,  _safepoint_check_never);  // used for Virtual Thread Mount Transition management
   def(Management_lock              , PaddedMutex  , nonleaf+2,   false, _safepoint_check_always); // used for JVM management
 
   def(ConcurrentGCBreakpoints_lock , PaddedMonitor, nonleaf,     true,  _safepoint_check_always);

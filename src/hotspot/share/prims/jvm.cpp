@@ -4087,6 +4087,7 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMount(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadMount");
+  JvmtiThreadState::check_and_self_suspend_vthread(vthread, true);
   if (JvmtiExport::should_post_vthread_mounted()) {
     JvmtiExport::post_vthread_mounted(event_thread, vthread);
   }
@@ -4094,6 +4095,7 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmount(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadUnmount");
+  JvmtiThreadState::check_and_self_suspend_vthread(vthread, false);
   if (JvmtiExport::should_post_vthread_unmounted()) {
     JvmtiExport::post_vthread_unmounted(event_thread, vthread);
   }

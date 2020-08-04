@@ -1296,6 +1296,114 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
   return JVMTI_ERROR_NONE;
 }
 
+jvmtiError
+JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool ind_vt_mode,
+                             int* need_safepoint_p) {
+  if (java_lang_VirtualThread::is_instance(thread_oop)) {
+    if (!JvmtiExport::can_support_virtual_threads()) {
+      return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    }
+    if (ind_vt_mode) {
+      assert(java_thread == NULL, "suspend_thread: java_thread must be NULL");
+      bool vthread_ext_suspended = JvmtiThreadState::vthread_is_ext_suspended(thread_oop);
+      if (vthread_ext_suspended) {
+        return JVMTI_ERROR_THREAD_SUSPENDED;
+      }
+      JvmtiThreadState::register_vthread_suspend(thread_oop);
+      // Check if virtual thread is mounted and there is a java_thread.
+      // A non-NULL java_thread is always passed in the !ind_vt_mode case.
+      oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
+      java_thread = carrier_thread == NULL ? NULL : java_lang_Thread::thread(carrier_thread);
+    }
+    // The java_thread can be still blocked in VTMT transition after a previous JVMTI resume call.
+    // There is no need to suspend the java_thread in this case. After vthread unblocking,
+    // it will check for ext_suspend request and suspend itself if necessary.
+    if (java_thread == NULL || java_thread->is_being_ext_suspended()) {
+      // We are done if the virtual thread is unmounted or
+      // the java_thread is externally suspended.
+      return JVMTI_ERROR_NONE;
+    }
+    // The virtual thread is mounted: suspend the java_thread.
+  }
+  // Don't allow hidden thread suspend request.
+  if (java_thread->is_hidden_from_external_view()) {
+    return JVMTI_ERROR_NONE;
+  }
+  {
+    MutexLocker ml(java_thread->SR_lock(), Mutex::_no_safepoint_check_flag);
+    if (java_thread->is_external_suspend()) {
+      // Don't allow nested external suspend requests.
+      return JVMTI_ERROR_THREAD_SUSPENDED;
+    }
+    if (java_thread->is_exiting()) { // thread is in the process of exiting
+      return JVMTI_ERROR_THREAD_NOT_ALIVE;
+    }
+    java_thread->set_external_suspend();
+  }
+  if (need_safepoint_p == NULL) { // single thread suspend
+    if (!JvmtiSuspendControl::suspend(java_thread)) {
+      // The thread was in the process of exiting.
+      return JVMTI_ERROR_THREAD_NOT_ALIVE;
+    }
+  } else { // thread list suspend
+    if (java_thread->thread_state() == _thread_in_native) {
+      // We need to try and suspend native threads here. Threads in
+      // other states will self-suspend on their next transition.
+      if (!JvmtiSuspendControl::suspend(java_thread)) {
+        // The thread was in the process of exiting. Force another
+        // safepoint to make sure that this thread transitions.
+        (*need_safepoint_p)++;
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
+      }
+    } else {
+      (*need_safepoint_p)++;
+    }
+  }
+  return JVMTI_ERROR_NONE;
+}
+
+jvmtiError
+JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool ind_vt_mode) {
+  if (java_lang_VirtualThread::is_instance(thread_oop)) {
+    if (!JvmtiExport::can_support_virtual_threads()) {
+      return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    }
+    if (ind_vt_mode) {
+      assert(java_thread == NULL, "resume_thread: java_thread must be NULL");
+      bool vthread_ext_suspended = JvmtiThreadState::vthread_is_ext_suspended(thread_oop);
+      if (!vthread_ext_suspended) {
+        return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
+      }
+      JvmtiThreadState::register_vthread_resume(thread_oop);
+      // Check if virtual thread is mounted and there is a java_thread.
+      // A non-NULL java_thread is always passed in the !ind_vt_mode case.
+      oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
+      java_thread = carrier_thread == NULL ? NULL : java_lang_Thread::thread(carrier_thread);
+    }
+    // The java_thread can be still blocked in VTMT transition after a previous JVMTI suspend call.
+    // There is no need to resume the java_thread in this case. After vthread unblocking,
+    // it will check for ext_suspend request and remain resumed if necessary.
+    if (java_thread == NULL || !java_thread->is_being_ext_suspended()) {
+      // We are done if the virtual thread is unmounted or
+      // the java_thread is not externally suspended.
+      return JVMTI_ERROR_NONE;
+    }
+    // The virtual thread is mounted and java_thread is supended: resume the java_thread.
+  }
+  // Don't allow hidden thread resume request.
+  if (java_thread->is_hidden_from_external_view()) {
+    return JVMTI_ERROR_NONE;
+  }
+  if (!java_thread->is_being_ext_suspended()) {
+    return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
+  }
+
+  if (!JvmtiSuspendControl::resume(java_thread)) {
+    return JVMTI_ERROR_INTERNAL;
+  }
+  return JVMTI_ERROR_NONE;
+}
+
 ResourceTracker::ResourceTracker(JvmtiEnv* env) {
   _env = env;
   _allocations = new (ResourceObj::C_HEAP, mtServiceability) GrowableArray<unsigned char*>(20, mtServiceability);
@@ -1470,7 +1578,7 @@ VM_GetThreadListStackTraces::doit() {
       // We have a valid thread_oop.
     }
     if (java_lang_VirtualThread::is_instance(thread_oop)) {
-      if (!env()->get_capabilities()->can_support_virtual_threads) {
+      if (!JvmtiExport::can_support_virtual_threads()) {
         _collector.set_result(JVMTI_ERROR_MUST_POSSESS_CAPABILITY);
         return;
       }

@@ -1671,7 +1671,7 @@ void JvmtiExport::post_continuation_yield(JavaThread* thread, jint continuation_
         if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
           continue;
         }
-        EVT_TRACE(JVMTI_EVENT_CONTINUATION_RUN, ("Evt Continuation Run event sent"));
+        EVT_TRACE(JVMTI_EVENT_CONTINUATION_YIELD, ("Evt Continuation Yield event sent"));
 
         JvmtiThreadEventMark jem(thread);
         JvmtiJavaThreadEventTransition jet(thread);

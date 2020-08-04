@@ -25,9 +25,12 @@
 #include "precompiled.hpp"
 #include "jvmtifiles/jvmtiEnv.hpp"
 #include "memory/resourceArea.hpp"
+#include "oops/oopHandle.inline.hpp"
 #include "prims/jvmtiEventController.inline.hpp"
 #include "prims/jvmtiImpl.hpp"
 #include "prims/jvmtiThreadState.inline.hpp"
+#include "runtime/handles.inline.hpp"
+#include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/vframe.hpp"
 
@@ -177,6 +180,178 @@ JvmtiThreadState::periodic_clean_up() {
   }
 }
 
+/* Virtual Threads Mount Transition (VTMT) */
+
+// VTMT is disabled while this counter is positive
+unsigned short JvmtiThreadState::_VTMT_disable_count = 0;
+
+bool
+JvmtiThreadState::is_VTMT_disabled() {
+  return (_VTMT_disable_count > 0);
+}
+
+void
+JvmtiThreadState::disable_VTMT() {
+  if (!JvmtiExport::can_support_virtual_threads()) {
+    return;
+  }
+
+  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  assert(_VTMT_disable_count >= 0, "VTMT sanity check");
+  _VTMT_disable_count++;
+}
+
+void
+JvmtiThreadState::enable_VTMT() {
+  if (!JvmtiExport::can_support_virtual_threads()) {
+    return;
+  }
+
+  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  assert(_VTMT_disable_count > 0, "VTMT sanity check");
+
+  if (--_VTMT_disable_count == 0) {
+    ml.notify_all();
+  }
+}
+
+/* VThreadList implementation */
+
+int
+VThreadList::find(oop vt) const {
+  for (int idx = 0; idx < length(); idx++) {
+    if (vt == at(idx).resolve()) return idx;
+  }
+  return -1;
+}
+
+bool
+VThreadList::contains(oop vt) const {
+  int idx = find(vt);
+  return idx != -1;
+}
+
+void
+VThreadList::append(oop vt) {
+  assert(!contains(vt), "VThreadList::append sanity check");
+  GrowableArrayCHeap<OopHandle, mtServiceability>::append(OopHandle(Universe::vm_global(), vt));
+}
+
+void
+VThreadList::remove(oop vt) {
+  int idx = find(vt);
+  assert(idx != -1, "VThreadList::remove sanity check");
+  at(idx).release(Universe::vm_global());
+  remove_at(idx);
+}
+
+void
+VThreadList::invalidate() {
+  for (int idx = length() - 1; idx >= 0; idx--) {
+    at(idx).release(Universe::vm_global());
+    remove_at(idx);
+  }
+}
+
+/* Virtual Threads Suspend/Resume management */
+
+JvmtiThreadState::VThreadSuspendMode
+JvmtiThreadState::_vthread_suspend_mode = vthread_suspend_none;
+
+VThreadList*
+JvmtiThreadState::_vthread_suspend_list = new VThreadList();
+
+VThreadList*
+JvmtiThreadState::_vthread_resume_list = new VThreadList();
+
+void
+JvmtiThreadState::register_all_vthreads_suspend() {
+  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+
+  _vthread_suspend_mode = vthread_suspend_all;
+  _vthread_suspend_list->invalidate();
+}
+
+void
+JvmtiThreadState::register_all_vthreads_resume() {
+  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+
+  _vthread_suspend_mode = vthread_suspend_none;
+  _vthread_resume_list->invalidate();
+}
+
+bool
+JvmtiThreadState::register_vthread_suspend(oop vt) {
+  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+
+  if (_vthread_suspend_mode == vthread_suspend_all) {
+    assert(_vthread_resume_list->contains(vt),
+           "register_vthread_suspend sanity check");
+    _vthread_resume_list->remove(vt);
+  } else {
+    assert(!_vthread_suspend_list->contains(vt),
+           "register_vthread_suspend sanity check");
+    _vthread_suspend_mode = vthread_suspend_ind;
+    _vthread_suspend_list->append(vt);
+  }
+  return true;
+}
+
+bool
+JvmtiThreadState::register_vthread_resume(oop vt) {
+  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+
+  if (_vthread_suspend_mode == vthread_suspend_all) {
+    assert(!_vthread_resume_list->contains(vt),
+           "register_vthread_resume sanity check");
+    _vthread_resume_list->append(vt);
+  } else if (_vthread_suspend_mode == vthread_suspend_ind) {
+    assert(_vthread_suspend_list->contains(vt),
+           "register_vthread_resume check");
+    _vthread_suspend_list->remove(vt);
+    if (_vthread_suspend_list->length() == 0) {
+      _vthread_suspend_mode = vthread_suspend_none;
+    }
+  } else {
+    assert(false, "register_vthread_resume: no suspend mode enabled");
+  }
+  return true;
+}
+
+bool
+JvmtiThreadState::vthread_is_ext_suspended(oop vt) {
+  bool suspend_is_needed =
+   (_vthread_suspend_mode == vthread_suspend_all && !_vthread_resume_list->contains(vt)) ||
+   (_vthread_suspend_mode == vthread_suspend_ind && _vthread_suspend_list->contains(vt));
+
+  return suspend_is_needed;
+}
+
+void
+JvmtiThreadState::check_and_self_suspend_vthread(jthread vthread, bool at_mount) {
+  assert(JvmtiExport::can_support_virtual_threads(),
+         "check_and_self_suspend_vthread sanity check");
+
+  JavaThread* cur_thread = JavaThread::current();
+  HandleMark hm(cur_thread);
+  Handle vth = Handle(cur_thread, JNIHandles::resolve_external_guard(vthread));
+  ThreadBlockInVM tbivm(cur_thread);
+
+  // TBD: This is racy: VTMT can be disabled after this point.
+  //      Probably, disabling VTMT should wait until this transition is completed.
+  {
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+
+    while (is_VTMT_disabled()) {
+      ml.wait();
+    }
+    if (!vthread_is_ext_suspended(vth())) {
+      return;
+    }
+  }
+  cur_thread->java_suspend_self();
+}
+
 void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
 
@@ -198,9 +373,6 @@ void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
     }
   }
 }
-
-
-
 
 void JvmtiThreadState::enter_interp_only_mode() {
   assert(_thread->get_interp_only_mode() == 0, "entering interp only when mode not zero");

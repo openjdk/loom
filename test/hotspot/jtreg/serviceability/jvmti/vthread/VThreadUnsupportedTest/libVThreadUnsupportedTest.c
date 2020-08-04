@@ -86,32 +86,26 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
 
   printf("Testing JMTI functions which should not accept a virtual thread argument\n");
 
-  err = (*jvmti)->SuspendThread(jvmti, vthread);
-  check_jvmti_error_invalid_thread(jni,"SuspendThread", err);
-  
-  err = (*jvmti)->ResumeThread(jvmti, vthread);
-  check_jvmti_error_invalid_thread(jni,"ResumeThread", err);
-  
   err = (*jvmti)->StopThread(jvmti, vthread, vthread);
-  check_jvmti_error_invalid_thread(jni,"StopThread", err);
+  check_jvmti_error_invalid_thread(jni, "StopThread", err);
   
   err = (*jvmti)->InterruptThread(jvmti, vthread);
-  check_jvmti_error_invalid_thread(jni,"InterruptThread", err);
+  check_jvmti_error_invalid_thread(jni, "InterruptThread", err);
  
   err = (*jvmti)->PopFrame(jvmti, vthread);
-  check_jvmti_error_invalid_thread(jni,"PopFrame", err);
+  check_jvmti_error_invalid_thread(jni, "PopFrame", err);
   
   err = (*jvmti)->ForceEarlyReturnVoid(jvmti, vthread);
-  check_jvmti_error_invalid_thread(jni,"ForceEarlyReturnVoid", err);
+  check_jvmti_error_invalid_thread(jni, "ForceEarlyReturnVoid", err);
 
   err = (*jvmti)->GetThreadLocalStorage(jvmti, vthread, &local_storage_data);
-  check_jvmti_error_invalid_thread(jni,"GetThreadLocalStorage", err);
+  check_jvmti_error_invalid_thread(jni, "GetThreadLocalStorage", err);
   
   err = (*jvmti)->SetThreadLocalStorage(jvmti, vthread, &local_storage_data);
-  check_jvmti_error_invalid_thread(jni,"SetThreadLocalStorage", err);
+  check_jvmti_error_invalid_thread(jni, "SetThreadLocalStorage", err);
   
   err = (*jvmti)->GetThreadCpuTime(jvmti, vthread, &nanos);
-  check_jvmti_error_invalid_thread(jni,"GetThreadCpuTime", err);
+  check_jvmti_error_invalid_thread(jni, "GetThreadCpuTime", err);
 }
 
 JNIEXPORT jboolean JNICALL
