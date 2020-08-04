@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,34 +25,52 @@
 
 package java.lang;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.lang.ref.WeakReference;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * A thread group represents a set of threads. In addition, a thread
  * group can also include other thread groups. The thread groups form
  * a tree in which every thread group except the initial thread group
- * has a parent. A thread group is considered <i>active</i> if there
- * are any {@linkplain Thread#isAlive() alive} threads in the group or
- * any of its subgroups.
- * <p>
- * A thread is allowed to access information about its own thread
- * group, but not to access information about its thread group's
- * parent thread group or any other thread groups.
+ * has a parent.
+ *
+ * <p> Thread groups have a {@linkplain #isDaemon() daemon status}. A newly
+ * created thread group is a <i>non-daemon</i> thread group and is strongly
+ * reachable from its parent. The {@link #setDaemon(boolean)} method can be
+ * used to change the a group to be a <i>daemon</i> thread group. A daemon
+ * thread group is not strongly reachable from its parent so it can be garbage
+ * collected when there are no {@linkplain Thread#isAlive() alive} threads
+ * in the group and it is otherwise eligible for garbage collection.
  *
  * @since   1.0
  */
-
 public class ThreadGroup implements Thread.UncaughtExceptionHandler {
+    /**
+     * All fields are accessed directly by the VM and from JVMTI functions.
+     * Recursive operations that require synchronization should synchronize
+     * top-down, meaning parent first.
+     */
     private final ThreadGroup parent;
     private final String name;
     private volatile int maxPriority;
+    private volatile boolean daemon;
+
+    // non-daemon subgroups (strongly reachable from this group)
+    private int ngroups;
+    private ThreadGroup[] groups;
+
+    // daemon subgroups (weakly reachable from this group)
+    private int nweaks;
+    private WeakReference<ThreadGroup>[] weaks;
 
     /**
      * Creates an empty Thread group that is not in any Thread group.
-     * This method is used to create the system Thread group.
+     * This method is used early in the VM startup to create the system
+     * thread group.
      */
-    private ThreadGroup() {     // called during VM initialization
+    private ThreadGroup() {
         this.parent = null;
         this.name = "system";
         this.maxPriority = Thread.MAX_PRIORITY;
@@ -65,6 +83,19 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
         this.parent = parent;
         this.name = name;
         this.maxPriority = maxPriority;
+        parent.synchronizedAdd(this);
+    }
+
+    private ThreadGroup(Void unused, ThreadGroup parent, String name) {
+        this.parent = parent;
+        this.name = name;
+        this.maxPriority = parent.getMaxPriority();
+        parent.synchronizedAdd(this);
+    }
+
+    private static Void checkAccess(ThreadGroup parent) {
+        parent.checkAccess();
+        return null;
     }
 
     /**
@@ -102,29 +133,13 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     public ThreadGroup(ThreadGroup parent, String name) {
-        this(checkParentAccess(parent), parent, name);
-    }
-
-    private ThreadGroup(Void unused, ThreadGroup parent, String name) {
-        this.parent = parent;
-        this.name = name;
-        this.maxPriority = parent.getMaxPriority();
-    }
-
-    /*
-     * @throws  NullPointerException  if the parent argument is {@code null}
-     * @throws  SecurityException     if the current thread cannot create a
-     *                                thread in the specified thread group.
-     */
-    private static Void checkParentAccess(ThreadGroup parent) {
-        parent.checkAccess();
-        return null;
+        this(checkAccess(parent), parent, name);
     }
 
     /**
      * Returns the name of this thread group.
      *
-     * @return  the name of this thread group.
+     * @return  the name of this thread group, may be {@code null}
      * @since   1.0
      */
     public final String getName() {
@@ -154,46 +169,30 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Returns the <i>effective</i> maximum priority of this thread group.
-     * This is the maximum priority for new threads created in the group.
+     * Returns the maximum priority of this thread group. This is the maximum
+     * priority for new threads created in the thread group.
      *
-     * <p> The <i>effective</i> maximum priority of the group is the smaller of
-     * this group's maximum priority and the <i>effective</i> maximum priority
-     * of the parent of this thread group. If this thread group is the system
-     * thread group, which has no parent, then the effective maximum priority
-     * is the group's maximum priority.
-     *
-     * @return  the effective maximum priority of this thread group, the
-     *          maximum priority for new threads created in the group
+     * @return  the maximum priority for new threads created in the thread group
      * @see     #setMaxPriority
      * @since   1.0
      */
     public final int getMaxPriority() {
-        int priority = this.maxPriority;
-        ThreadGroup g = parent;
-        while (g != null) {
-            priority = Math.min(priority, g.maxPriority);
-            g = g.parent;
-        }
-        return priority;
+        return maxPriority;
     }
 
     /**
-     * Returns false.
+     * Tests if this thread group is a daemon thread group. A daemon thread
+     * group is not strongly reachable from its parent so it can be garbage
+     * collected when there are no {@linkplain Thread#isAlive() alive} threads
+     * in the group (and it is otherwise eligible for garbage collection).
      *
-     * @return false
-     *
-     * @deprecated This method originally indicated if the thread group
-     *             was automatically destroyed when the last thread in
-     *             the group terminated or its last thread group was
-     *             destroyed. The concept of daemon thread group no
-     *             longer exists.
+     * @return  {@code true} if this thread group is a daemon thread group;
+     *          {@code false} otherwise.
      *
      * @since   1.0
      */
-    @Deprecated(since="99", forRemoval=true)
     public final boolean isDaemon() {
-        return false;
+        return daemon;
     }
 
     /**
@@ -213,18 +212,47 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Does nothing.
+     * Changes the daemon status of this thread group. A daemon thread
+     * group is not strongly reachable from its parent so it can be garbage
+     * collected when there are no {@linkplain Thread#isAlive() alive} threads
+     * in the group (and it is otherwise eligible for garbage collection).
+     * <p>
+     * First, the {@code checkAccess} method of this thread group is
+     * called with no arguments; this may result in a security exception.
      *
-     * @param daemon ignored
-     *
-     * @deprecated This method originally changed the daemon status of the
-     *             thread group. The concept of daemon thread group no
-     *             longer exists.
-     *
-     * @since   1.0
+     * @param      daemon   if {@code true}, marks this thread group as
+     *                      a daemon thread group; otherwise, marks this
+     *                      thread group as normal.
+     * @throws     SecurityException  if the current thread cannot modify
+     *               this thread group.
+     * @see        java.lang.SecurityException
+     * @see        java.lang.ThreadGroup#checkAccess()
+     * @since      1.0
      */
-    @Deprecated(since="99", forRemoval=true)
     public final void setDaemon(boolean daemon) {
+        checkAccess();
+        if (parent == null) {
+            this.daemon = daemon;
+        } else {
+            // update the parent so that it has a weak or strong
+            // reference to this group
+            synchronized (parent) {
+                synchronized (this) {
+                    if (daemon != this.daemon) {
+                        if (daemon) {
+                            // add a weak reference to this group
+                            parent.addWeak(this);
+                            parent.remove(this);
+                        } else {
+                            // add a strong reference to this group
+                            parent.add(this);
+                            parent.removeWeak(this);
+                        }
+                        this.daemon = daemon;
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -239,14 +267,15 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * {@link Thread#MAX_PRIORITY}, the maximum priority of the group
      * remains unchanged.
      * <p>
-     * Otherwise, the maximum priority of the group is set to {@code pri}.
-     * The <i>effective</i> maximum priority of the group will be the smaller
-     * of {@code pri} and the <i>effective</i> maximum priority of the parent
-     * of this thread group. If this thread group is the system thread group,
-     * which has no parent, then the effective maximum priority will be
-     * {@code pri}.
+     * Otherwise, the priority of this ThreadGroup object is set to the
+     * smaller of the specified {@code pri} and the maximum permitted
+     * priority of the parent of this thread group. (If this thread group
+     * is the system thread group, which has no parent, then its maximum
+     * priority is simply set to {@code pri}.) Then this method is
+     * called recursively, with {@code pri} as its argument, for
+     * every thread group that belongs to this thread group.
      *
-     * @param      pri   the new maximum priority of the thread group.
+     * @param      pri   the new priority of the thread group.
      * @throws     SecurityException  if the current thread cannot modify
      *               this thread group.
      * @see        #getMaxPriority
@@ -257,7 +286,18 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     public final void setMaxPriority(int pri) {
         checkAccess();
         if (pri >= Thread.MIN_PRIORITY && pri <= Thread.MAX_PRIORITY) {
-            this.maxPriority = pri;
+            if (parent == null) {
+                maxPriority = pri;
+            } else {
+                maxPriority(pri);
+            }
+        }
+    }
+
+    private void maxPriority(int pri) {
+        synchronized (this) {
+            maxPriority = Math.min(pri, parent.maxPriority);
+            forEachSubgroup(g -> g.maxPriority(pri));
         }
     }
 
@@ -301,8 +341,10 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Returns an estimate of the number of active threads in this thread
-     * group and its subgroups.
+     * Returns an estimate of the number of active (meaning
+     * {@linkplain Thread#isAlive() alive}) threads in this thread group
+     * and its subgroups. Recursively iterates over all subgroups in this
+     * thread group.
      *
      * <p> The value returned is only an estimate because the number of
      * threads may change dynamically while this method traverses internal
@@ -314,12 +356,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          group and in any other thread group that has this thread
      *          group as an ancestor
      *
-     * @deprecated {@linkplain java.lang.management.ThreadMXBean} provides a
-     *             more suitable interface for monitoring threads.
-     *
      * @since   1.0
      */
-    @Deprecated(since="99")
     public int activeCount() {
         int n = 0;
         for (Thread thread : Thread.getAllThreads()) {
@@ -332,8 +370,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Copies into the specified array every active thread in this
-     * thread group and its subgroups.
+     * Copies into the specified array every active (meaning {@linkplain
+     * Thread#isAlive() alive}) thread in this thread group and its subgroups.
      *
      * <p> An invocation of this method behaves in exactly the same
      * way as the invocation
@@ -346,6 +384,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *         an array into which to put the list of threads
      *
      * @return  the number of threads put into the array
+     *
+     * @throws  NullPointerException
+     *          if {@code list} is null
      *
      * @throws  SecurityException
      *          if {@linkplain #checkAccess checkAccess} determines that
@@ -363,11 +404,11 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Copies into the specified array every active thread in this
-     * thread group. If {@code recurse} is {@code true},
-     * this method recursively enumerates all subgroups of this
-     * thread group and references to every active thread in these
-     * subgroups are also included. If the array is too short to
+     * Copies into the specified array every active (meaning {@linkplain
+     * Thread#isAlive() alive}) thread in this thread group. If {@code
+     * recurse} is {@code true}, this method recursively enumerates all
+     * subgroups of this thread group and references to every active thread
+     * in these subgroups are also included. If the array is too short to
      * hold all the threads, the extra threads are silently ignored.
      *
      * <p> An application might use the {@linkplain #activeCount activeCount}
@@ -389,6 +430,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * @return  the number of threads put into the array
      *
+     * @throws  NullPointerException
+     *          if {@code list} is null
+     *
      * @throws  SecurityException
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
@@ -401,6 +445,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     @Deprecated(since="99")
     public int enumerate(Thread list[], boolean recurse) {
+        Objects.requireNonNull(list);
         checkAccess();
         int n = 0;
         if (list.length > 0) {
@@ -419,33 +464,42 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Returns an estimate of the number of active groups in this
-     * thread group and its subgroups. Recursively iterates over
-     * all subgroups in this thread group.
+     * Returns an estimate of the number of groups in this thread group and its
+     * subgroups. Recursively iterates over all subgroups in this thread group.
      *
      * <p> The value returned is only an estimate because the number of
      * thread groups may change dynamically while this method traverses
      * internal data structures. This method is intended primarily for
      * debugging and monitoring purposes.
      *
-     * @return  the number of active thread groups with this thread group as
+     * @return  the number of thread groups with this thread group as
      *          an ancestor
-     *
-     * @deprecated {@linkplain java.lang.management.ThreadMXBean} provides a
-     *             more suitable interface for monitoring threads.
      *
      * @since   1.0
      */
-    @Deprecated(since="99")
     public int activeGroupCount() {
-        return subgroups(true).size();
+        int n;
+        synchronized (this) {
+            n = ngroups;
+            for (int i = 0; i < ngroups; i++) {
+                n+= groups[i].activeGroupCount();
+            }
+            for (int i = 0; i < nweaks; ) {
+                ThreadGroup g = weaks[i].get();
+                if (g == null) {
+                    removeWeak(i);
+                } else {
+                    n = n + 1 + g.activeGroupCount();
+                    i++;
+                }
+            }
+        }
+        return n;
     }
 
     /**
-     * Copies into the specified array references to every active
-     * subgroup in this thread group and its subgroups.
-     * A thread group is considered <i>active</i> if there are any {@linkplain
-     * Thread#isAlive() alive} threads in the group or any of its subgroups.
+     * Copies into the specified array references to every subgroup in this
+     * thread group and its subgroups.
      *
      * <p> An invocation of this method behaves in exactly the same
      * way as the invocation
@@ -458,6 +512,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *         an array into which to put the list of thread groups
      *
      * @return  the number of thread groups put into the array
+     *
+     * @throws  NullPointerException
+     *          if {@code list} is null
      *
      * @throws  SecurityException
      *          if {@linkplain #checkAccess checkAccess} determines that
@@ -475,12 +532,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Copies into the specified array references to every active
-     * subgroup in this thread group.
-     * A thread group is considered <i>active</i> if there are any {@linkplain
-     * Thread#isAlive() alive} threads in the group or any of its subgroups.
-     * If {@code recurse} is {@code true}, this method recursively enumerates
-     * all subgroups of this thread group and references to every active
+     * Copies into the specified array references to every subgroup in this
+     * thread group. If {@code recurse} is {@code true}, this method recursively
+     * enumerates all subgroups of this thread group and references to every
      * thread group in these subgroups are also included.
      *
      * <p> An application might use the
@@ -488,7 +542,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * get an estimate of how big the array should be, however <i>if the
      * array is too short to hold all the thread groups, the extra thread
      * groups are silently ignored.</i>  If it is critical to obtain every
-     * active subgroup in this thread group, the caller should verify that
+     * subgroup in this thread group, the caller should verify that
      * the returned int value is strictly less than the length of
      * {@code list}.
      *
@@ -503,6 +557,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * @return  the number of thread groups put into the array
      *
+     * @throws  NullPointerException
+     *          if {@code list} is null
+     *
      * @throws  SecurityException
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
@@ -515,44 +572,42 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     @Deprecated(since="99")
     public int enumerate(ThreadGroup list[], boolean recurse) {
+        Objects.requireNonNull(list);
         checkAccess();
-        int n = 0;
-        if (list.length > 0) {
-            for (ThreadGroup g : subgroups(recurse)) {
-                list[n++] = g;
-                if (n == list.length) {
-                    // list full
-                    break;
-                }
-            }
-        }
-        return n;
+        return enumerate(list, 0, recurse);
     }
 
     /**
-     * Returns the set of active subgroups.
+     * Add a reference to each subgroup to the given array, starting at
+     * the given index. Returns the new index.
      */
-    private Set<ThreadGroup> subgroups(boolean recurse) {
-        Set<ThreadGroup> groups = new HashSet<>();
-        for (Thread thread : Thread.getAllThreads()) {
-            ThreadGroup g = thread.getThreadGroup();
-            if (g != this && parentOf(g)) {
+    private int enumerate(ThreadGroup list[], int i, boolean recurse) {
+        synchronized (this) {
+            // non-daemon thread groups
+            for (int j = 0; j < ngroups && i < list.length; ) {
+                ThreadGroup group = groups[j];
+                list[i++] = group;
                 if (recurse) {
-                    // include intermediate subgroups
-                    while (g != this) {
-                        groups.add(g);
-                        g = g.parent;
-                    }
+                    i = group.enumerate(list, i, true);
+                }
+                j++;
+            }
+
+            // daemon thread groups
+            for (int j = 0; j < nweaks && i < list.length; ) {
+                ThreadGroup group = weaks[j].get();
+                if (group == null) {
+                    removeWeak(j);
                 } else {
-                    // include direct subgroup
-                    while (g.parent != this) {
-                        g = g.parent;
+                    list[i++] = group;
+                    if (recurse) {
+                        i = group.enumerate(list, i, true);
                     }
-                    groups.add(g);
+                    j++;
                 }
             }
         }
-        return groups;
+        return i;
     }
 
     /**
@@ -569,13 +624,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Interrupts all threads in this thread group.
-     * <p>
-     * First, the {@code checkAccess} method of this thread group is
-     * called with no arguments; this may result in a security exception.
-     * <p>
-     * This method then calls the {@code interrupt} method on all the
-     * threads in this thread group and in all of its subgroups.
+     * Interrupts all active (meaning {@linkplain Thread#isAlive() alive}) in
+     * this thread group and its subgroups.
      *
      * @throws     SecurityException  if the current thread is not allowed
      *               to access this thread group or any of the threads in
@@ -607,7 +657,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     public final void suspend() {
         throw new UnsupportedOperationException();
     }
-
 
     /**
      * Throws {@code UnsupportedOperationException}.
@@ -722,5 +771,114 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     public String toString() {
         return getClass().getName() + "[name=" + getName() + ",maxpri=" + getMaxPriority() + "]";
+    }
+
+    /**
+     * Add a non-daemon subgroup.
+     */
+    private void synchronizedAdd(ThreadGroup group) {
+        synchronized (this) {
+            add(group);
+        }
+    }
+
+    /**
+     * Add a non-daemon subgroup.
+     */
+    private void add(ThreadGroup group) {
+        assert Thread.holdsLock(this);
+        if (ngroups == 0) {
+            groups = new ThreadGroup[4];
+        } else if (groups.length == ngroups) {
+            groups = Arrays.copyOf(groups, ngroups + 4);
+        }
+        groups[ngroups++] = group;
+    }
+
+    /**
+     * Remove a non-daemon subgroup.
+     */
+    private boolean remove(ThreadGroup group) {
+        assert Thread.holdsLock(this);
+        for (int i = 0; i < ngroups; ) {
+            if (groups[i] == group) {
+                int last = ngroups - 1;
+                if (i < last)
+                    groups[i] = groups[last];
+                groups[last] = null;
+                ngroups--;
+                return true;
+            } else {
+                i++;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Add a daemon subgroup.
+     */
+    private void addWeak(ThreadGroup group) {
+        assert Thread.holdsLock(this);
+        if (nweaks == 0) {
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            WeakReference<ThreadGroup>[] array = new WeakReference[4];
+            weaks = array;
+        } else {
+            removeWeak(null);
+            if (weaks.length == nweaks) {
+                weaks = Arrays.copyOf(weaks, nweaks + 4);
+            }
+        }
+        weaks[nweaks++] = new WeakReference<>(group);
+    }
+
+    /**
+     * Remove a daemon subgroup, expunging stale elements as a side effect.
+     *
+     * @param group the non-daemon subgroup to remove, can be null to just
+     *              expunge stale elements
+     */
+    private void removeWeak(ThreadGroup group) {
+        assert Thread.holdsLock(this);
+        for (int i = 0; i < nweaks; ) {
+            ThreadGroup g = weaks[i].get();
+            if (g == null || g == group) {
+                removeWeak(i);
+            } else {
+                i++;
+            }
+        }
+    }
+
+    /**
+     * Remove the daemon thread at the given index of the weaks array.
+     */
+    private void removeWeak(int index) {
+        assert Thread.holdsLock(this) && index < nweaks;
+        int last = nweaks - 1;
+        if (index < nweaks)
+            weaks[index] = weaks[last];
+        weaks[last] = null;
+        nweaks--;
+    }
+
+    /**
+     * Performs an action for each (direct) subgroup.
+     */
+    private void forEachSubgroup(Consumer<ThreadGroup> action) {
+        assert Thread.holdsLock(this);
+        for (int i = 0; i < ngroups; i++) {
+            action.accept(groups[i]);
+        }
+        for (int i = 0; i < nweaks; ) {
+            ThreadGroup g = weaks[i].get();
+            if (g == null) {
+                removeWeak(i);
+            } else {
+                action.accept(g);
+                i++;
+            }
+        }
     }
 }

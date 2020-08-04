@@ -27,6 +27,7 @@
  * @summary Unit tests for java.lang.ThreadGroup
  */
 
+import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
@@ -121,16 +122,27 @@ public class BasicTests {
         ThreadGroup group = new ThreadGroup("group");
         Thread[] threads = new Thread[100];
         assertTrue(group.enumerate(threads) == 0);
+        assertTrue(threads[0] == null);
         assertTrue(group.enumerate(threads, true) == 0);
+        assertTrue(threads[0] == null);
         assertTrue(group.enumerate(threads, false) == 0);
+        assertTrue(threads[0] == null);
         TestThread thread = TestThread.start(group, "foo");
         try {
+            Arrays.setAll(threads, i -> null);
             assertTrue(group.enumerate(threads) == 1);
             assertTrue(threads[0] == thread);
+            assertTrue(threads[1] == null);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group.enumerate(threads, true) == 1);
             assertTrue(threads[0] == thread);
+            assertTrue(threads[1] == null);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group.enumerate(threads, false) == 1);
             assertTrue(threads[0] == thread);
+            assertTrue(threads[1] == null);
         } finally {
             thread.terminate();
         }
@@ -143,50 +155,97 @@ public class BasicTests {
 
         Thread[] threads = new Thread[100];
         assertTrue(group1.enumerate(threads) == 0);
+        assertTrue(threads[0] == null);
         assertTrue(group1.enumerate(threads, true) == 0);
+        assertTrue(threads[0] == null);
         assertTrue(group1.enumerate(threads, false) == 0);
+        assertTrue(threads[0] == null);
         assertTrue(group2.enumerate(threads) == 0);
+        assertTrue(threads[0] == null);
         assertTrue(group2.enumerate(threads, true) == 0);
+        assertTrue(threads[0] == null);
         assertTrue(group2.enumerate(threads, false) == 0);
+        assertTrue(threads[0] == null);
 
         TestThread thread1 = TestThread.start(group1, "foo");
         try {
+            Arrays.setAll(threads, i -> null);
             assertTrue(group1.enumerate(threads) == 1);
             assertTrue(threads[0] == thread1);
+            assertTrue(threads[1] == null);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group1.enumerate(threads, true) == 1);
             assertTrue(threads[0] == thread1);
+            assertTrue(threads[1] == null);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group1.enumerate(threads, false) == 1);
             assertTrue(threads[0] == thread1);
+            assertTrue(threads[1] == null);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group2.enumerate(threads) == 0);
+            assertTrue(threads[0] == null);
             assertTrue(group2.enumerate(threads, true) == 0);
+            assertTrue(threads[0] == null);
             assertTrue(group2.enumerate(threads, false) == 0);
+            assertTrue(threads[0] == null);
 
             TestThread thread2 = TestThread.start(group2, "bar");
             try {
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group1.enumerate(threads) == 2);
                 assertEquals(toSet(threads, 2), Set.of(thread1, thread2));
+                assertTrue(threads[2] == null);
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group1.enumerate(threads, true) == 2);
                 assertEquals(toSet(threads, 2), Set.of(thread1, thread2));
+                assertTrue(threads[2] == null);
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group1.enumerate(threads, false) == 1);
                 assertTrue(threads[0] == thread1);
+                assertTrue(threads[1] == null);
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group2.enumerate(threads) == 1);
+                assertTrue(threads[0] == thread2);
+                assertTrue(threads[1] == null);
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group2.enumerate(threads, true) == 1);
                 assertTrue(threads[0] == thread2);
+                assertTrue(threads[1] == null);
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group2.enumerate(threads, false) == 1);
                 assertTrue(threads[0] == thread2);
+                assertTrue(threads[1] == null);
             } finally {
                 thread2.terminate();
             }
 
+            Arrays.setAll(threads, i -> null);
             assertTrue(group1.enumerate(threads) == 1);
             assertTrue(threads[0] == thread1);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group1.enumerate(threads, true) == 1);
             assertTrue(threads[0] == thread1);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group1.enumerate(threads, false) == 1);
             assertTrue(threads[0] == thread1);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group2.enumerate(threads) == 0);
+            assertTrue(threads[0] == null);
             assertTrue(group2.enumerate(threads, true) == 0);
+            assertTrue(threads[0] == null);
             assertTrue(group2.enumerate(threads, false) == 0);
+            assertTrue(threads[0] == null);
         } finally {
             thread1.terminate();
         }
@@ -212,13 +271,20 @@ public class BasicTests {
 
         TestThread thread2 = TestThread.start(group2, "foo");
         try {
+            Arrays.setAll(threads, i -> null);
             assertTrue(group1.enumerate(threads) == 1);
             assertTrue(group1.enumerate(threads, true) == 1);
             assertTrue(group1.enumerate(threads, false) == 0);
 
+            Arrays.setAll(threads, i -> null);
             assertTrue(group2.enumerate(threads) == 1);
+            assertTrue(threads[0] == thread2);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group2.enumerate(threads, true) == 1);
             assertTrue(threads[0] == thread2);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group2.enumerate(threads, false) == 1);
             assertTrue(threads[0] == thread2);
 
@@ -228,41 +294,75 @@ public class BasicTests {
 
             TestThread thread3 = TestThread.start(group3, "bar");
             try {
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group1.enumerate(threads) == 2);
+                assertEquals(toSet(threads, 2), Set.of(thread2, thread3));
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group1.enumerate(threads, true) == 2);
                 assertEquals(toSet(threads, 2), Set.of(thread2, thread3));
                 assertTrue(group1.enumerate(threads, false) == 0);
 
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group2.enumerate(threads) == 2);
                 assertEquals(toSet(threads, 2), Set.of(thread2, thread3));
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group2.enumerate(threads, true) == 2);
                 assertEquals(toSet(threads, 2), Set.of(thread2, thread3));
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group2.enumerate(threads, false) == 1);
                 assertTrue(threads[0] == thread2);
 
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group3.enumerate(threads) == 1);
                 assertTrue(threads[0] == thread3);
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group3.enumerate(threads, true) == 1);
                 assertTrue(threads[0] == thread3);
+
+                Arrays.setAll(threads, i -> null);
                 assertTrue(group3.enumerate(threads, false) == 1);
                 assertTrue(threads[0] == thread3);
             } finally {
                 thread3.terminate();
             }
 
+            Arrays.setAll(threads, i -> null);
             assertTrue(group1.enumerate(threads) == 1);
-            assertTrue(group1.enumerate(threads, true) == 1);
-            assertTrue(group1.enumerate(threads, false) == 0);
+            assertTrue(threads[1] == null);
 
+            Arrays.setAll(threads, i -> null);
+            assertTrue(group1.enumerate(threads, true) == 1);
+            assertTrue(threads[1] == null);
+
+            Arrays.setAll(threads, i -> null);
+            assertTrue(group1.enumerate(threads, false) == 0);
+            assertTrue(threads[0] == null);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group2.enumerate(threads) == 1);
+            assertTrue(threads[1] == null);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group2.enumerate(threads, true) == 1);
             assertTrue(threads[0] == thread2);
+            assertTrue(threads[1] == null);
+
+            Arrays.setAll(threads, i -> null);
             assertTrue(group2.enumerate(threads, false) == 1);
             assertTrue(threads[0] == thread2);
+            assertTrue(threads[1] == null);
 
+            Arrays.setAll(threads, i -> null);
             assertTrue(group3.enumerate(threads) == 0);
+            assertTrue(threads[0] == null);
             assertTrue(group3.enumerate(threads, true) == 0);
+            assertTrue(threads[0] == null);
             assertTrue(group3.enumerate(threads, false) == 0);
+            assertTrue(threads[0] == null);
 
         } finally {
             thread2.terminate();
@@ -279,46 +379,186 @@ public class BasicTests {
         assertTrue(group3.enumerate(threads, false) == 0);
     }
 
-    public void enumerateGroups1() {
-        ThreadGroup group1 = new ThreadGroup("group1");
-        ThreadGroup group2 = new ThreadGroup(group1, "group2");
-        assertTrue(group1.activeGroupCount() == 0);
-        assertTrue(group2.activeGroupCount() == 0);
-        TestThread thread = TestThread.start(group2, "foo");
+    // test enumerate(Thread[]) with an array of insufficient size
+    public void enumerateThreads4() {
+        ThreadGroup group = new ThreadGroup("group");
+
+        // array too small
+        Thread[] threads = new Thread[1];
+
+        TestThread thread1 = TestThread.start(group, "thread1");
+        TestThread thread2 = TestThread.start(group, "thread2");
         try {
-            assertTrue(group1.activeGroupCount() == 1);
-            assertTrue(group2.activeGroupCount() == 0);
+            Arrays.setAll(threads, i -> null);
+            assertTrue(group.enumerate(threads) == 1);
+            assertTrue(threads[0] == thread1 || threads[1] == thread2);
+
+            Arrays.setAll(threads, i -> null);
+            assertTrue(group.enumerate(threads, true) == 1);
+            assertTrue(threads[0] == thread1 || threads[1] == thread2);
+
+            Arrays.setAll(threads, i -> null);
+            assertTrue(group.enumerate(threads, false) == 1);
+            assertTrue(threads[0] == thread1 || threads[1] == thread2);
         } finally {
-            thread.terminate();
+            thread1.terminate();
+            thread2.terminate();
         }
+    }
+
+    public void testActiveGroupCount() throws Exception {
+        ThreadGroup group1 = new ThreadGroup("group1");
         assertTrue(group1.activeGroupCount() == 0);
+
+        ThreadGroup group2 = new ThreadGroup(group1, "group2");
+        assertTrue(group1.activeGroupCount() == 1);
+        assertTrue(group2.activeGroupCount() == 0);
+
+        ThreadGroup group3 = new ThreadGroup(group2, "group3");
+        assertTrue(group1.activeGroupCount() == 2);
+        assertTrue(group2.activeGroupCount() == 1);
+        assertTrue(group3.activeGroupCount() == 0);
+
+        // change group3 to a daemon group and wait for it to be GC'ed
+        var ref = new WeakReference<>(group3);
+        group3.setDaemon(true);
+        group3 = null;
+        System.gc();
+        while (ref.get() != null) {
+            Thread.sleep(50);
+        }
+
+        assertTrue(group1.activeGroupCount() == 1);
         assertTrue(group2.activeGroupCount() == 0);
     }
 
-    public void enumerateGroups2() {
+    public void testEnumerateGroups1() throws Exception {
+        ThreadGroup[] groups = new ThreadGroup[100];
+
         ThreadGroup group1 = new ThreadGroup("group1");
+
+        assertTrue(group1.enumerate(groups) == 0);
+        assertTrue(groups[0] == null);
+        assertTrue(group1.enumerate(groups, true) == 0);
+        assertTrue(groups[0] == null);
+        assertTrue(group1.enumerate(groups, false) == 0);
+        assertTrue(groups[0] == null);
+
         ThreadGroup group2 = new ThreadGroup(group1, "group2");
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group1.enumerate(groups) == 1);
+        assertTrue(groups[0] == group2);
+        assertTrue(groups[1] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group1.enumerate(groups, true) == 1);
+        assertTrue(groups[0] == group2);
+        assertTrue(groups[1] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group1.enumerate(groups, false) == 1);
+        assertTrue(groups[0] == group2);
+        assertTrue(groups[1] == null);
+
         ThreadGroup group3 = new ThreadGroup(group2, "group3");
-        assertTrue(group1.activeGroupCount() == 0);
-        assertTrue(group2.activeGroupCount() == 0);
-        assertTrue(group3.activeGroupCount() == 0);
-        TestThread thread = TestThread.start(group3, "foo");
-        try {
-            assertTrue(group1.activeGroupCount() == 2);
-            assertTrue(group2.activeGroupCount() == 1);
-            assertTrue(group3.activeGroupCount() == 0);
-        } finally {
-            thread.terminate();
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group1.enumerate(groups) == 2);
+        assertEquals(toSet(groups, 2), Set.of(group2, group3));
+        assertTrue(groups[2] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group1.enumerate(groups, true) == 2);
+        assertEquals(toSet(groups, 2), Set.of(group2, group3));
+        assertTrue(groups[2] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group1.enumerate(groups, false) == 1);
+        assertTrue(groups[0] == group2);
+        assertTrue(groups[1] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group2.enumerate(groups) == 1);
+        assertTrue(groups[0] == group3);
+        assertTrue(groups[1] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group2.enumerate(groups, true) == 1);
+        assertTrue(groups[0] == group3);
+        assertTrue(groups[1] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group2.enumerate(groups, false) == 1);
+        assertTrue(groups[0] == group3);
+        assertTrue(groups[1] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group3.enumerate(groups) == 0);
+        assertTrue(groups[0] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group3.enumerate(groups, true) == 0);
+        assertTrue(groups[0] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group3.enumerate(groups, false) == 0);
+        assertTrue(groups[0] == null);
+
+        // change group3 to a daemon group
+        var ref = new WeakReference<>(group3);
+        group3.setDaemon(true);
+
+        // clear refs to group3 and wait for it to be GC'ed
+        Arrays.setAll(groups, i -> null);
+        group3 = null;
+        System.gc();
+        while (ref.get() != null) {
+            Thread.sleep(50);
         }
-        assertTrue(group1.activeGroupCount() == 0);
-        assertTrue(group2.activeGroupCount() == 0);
-        assertTrue(group3.activeGroupCount() == 0);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group1.enumerate(groups) == 1);
+        assertTrue(groups[0] == group2);
+        assertTrue(groups[1] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group1.enumerate(groups, true) == 1);
+        assertTrue(groups[0] == group2);
+        assertTrue(groups[1] == null);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group1.enumerate(groups, false) == 1);
+        assertTrue(groups[0] == group2);
+        assertTrue(groups[1] == null);
+    }
+
+    // test enumerate(ThreadGroup[]) with an array of insufficient size
+    public void testEnumerateGroups2() throws Exception {
+        ThreadGroup group = new ThreadGroup("group");
+        ThreadGroup child1 = new ThreadGroup(group, "child1");
+        ThreadGroup child2 = new ThreadGroup(group,"child2");
+
+        // array too small
+        ThreadGroup[] groups = new ThreadGroup[1];
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group.enumerate(groups) == 1);
+        assertTrue(groups[0] == child1 || groups[1] == child2);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group.enumerate(groups, true) == 1);
+        assertTrue(groups[0] == child1 || groups[1] == child2);
+
+        Arrays.setAll(groups, i -> null);
+        assertTrue(group.enumerate(groups, false) == 1);
+        assertTrue(groups[0] == child1 || groups[1] == child2);
     }
 
     public void testMaxPriority1() {
         ThreadGroup group = new ThreadGroup("group");
-        int maxPriority = group.getMaxPriority();
-        assertTrue(maxPriority <= Thread.currentThread().getThreadGroup().getMaxPriority());
+        final int maxPriority = group.getMaxPriority();
+        assertTrue(maxPriority == Thread.currentThread().getThreadGroup().getMaxPriority());
 
         group.setMaxPriority(Thread.MIN_PRIORITY-1);
         assertTrue(group.getMaxPriority() == maxPriority);
@@ -333,6 +573,9 @@ public class BasicTests {
             group.setMaxPriority(maxPriority-1);
             assertTrue(group.getMaxPriority() == (maxPriority-1));
         }
+
+        group.setMaxPriority(maxPriority);
+        assertTrue(group.getMaxPriority() == maxPriority);
     }
 
     public void testMaxPriority2() {
@@ -448,9 +691,9 @@ public class BasicTests {
     public void testDaemon() {
         ThreadGroup group = new ThreadGroup("group");
         assertFalse(group.isDaemon());
-        group.setDaemon(false);
-        assertFalse(group.isDaemon());
         group.setDaemon(true);
+        assertTrue(group.isDaemon());
+        group.setDaemon(false);
         assertFalse(group.isDaemon());
     }
 

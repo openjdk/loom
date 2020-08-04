@@ -366,7 +366,10 @@
   template(exit_method_name,                          "exit")                                     \
   template(remove_method_name,                        "remove")                                   \
   template(parent_name,                               "parent")                                   \
+  template(ngroups_name,                              "ngroups")                                  \
   template(groups_name,                               "groups")                                   \
+  template(nweaks_name,                               "nweaks")                                   \
+  template(weaks_name,                                "weaks")                                    \
   template(maxPriority_name,                          "maxPriority")                              \
   template(shutdown_name,                             "shutdown")                                 \
   template(finalize_method_name,                      "finalize")                                 \
@@ -593,6 +596,7 @@
   template(string_array_signature,                    "[Ljava/lang/String;")                                      \
   template(reference_signature,                       "Ljava/lang/ref/Reference;")                                \
   template(referencequeue_signature,                  "Ljava/lang/ref/ReferenceQueue;")                           \
+  template(weakreference_array_signature,             "[Ljava/lang/ref/WeakReference;")                           \
   template(executable_signature,                      "Ljava/lang/reflect/Executable;")                           \
   template(module_signature,                          "Ljava/lang/Module;")                                       \
   template(concurrenthashmap_signature,               "Ljava/util/concurrent/ConcurrentHashMap;")                 \

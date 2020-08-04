@@ -520,6 +520,12 @@ class java_lang_ThreadGroup : AllStatic {
   static int _parent_offset;
   static int _name_offset;
   static int _maxPriority_offset;
+  static int _daemon_offset;
+
+  static int _ngroups_offset;
+  static int _groups_offset;
+  static int _nweaks_offset;
+  static int _weaks_offset;
 
   static void compute_offsets();
 
@@ -532,6 +538,18 @@ class java_lang_ThreadGroup : AllStatic {
   static const char* name(oop java_thread_group);
   // maxPriority in group
   static ThreadPriority maxPriority(oop java_thread_group);
+  // Daemon
+  static bool is_daemon(oop java_thread_group);
+
+  // Number of non-daemon thread groups
+  static int ngroups(oop java_thread_group);
+  // Non-daemon thread groups
+  static objArrayOop groups(oop java_thread_group);
+  // Number of daemon thread groups
+  static int nweaks(oop java_thread_group);
+  // Daemon thread groups
+  static objArrayOop weaks(oop java_thread_group);
+
   // Debugging
   friend class JavaClasses;
 };

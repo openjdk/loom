@@ -2422,13 +2422,13 @@ jvmtiEnv *jvmti;
         <field id="max_priority">
           <jint/>
           <description>
-            The effective maximum priority for this thread group.
+            The maximum priority for this thread group.
           </description>
         </field>
         <field id="is_daemon">
           <jboolean/>
           <description>
-              <code>JNI_FALSE</code>. The concept of daemon thread group no longer exists.
+            Is this a daemon thread group?
           </description>
         </field>
       </typedef>
@@ -2462,9 +2462,7 @@ jvmtiEnv *jvmti;
     <function id="GetThreadGroupChildren" num="15">
       <synopsis>Get Thread Group Children</synopsis>
       <description>
-        Get the live threads and active subgroups in this thread group. A subgroup
-        is considered active if it contains any threads that are alive or any of its
-        subgroups (or descendants) contains a thread that is alive.
+        Get the live threads and the child thread groups in this thread group.
       </description>
       <origin>jvmdi</origin>
       <capabilities>
@@ -2491,13 +2489,13 @@ jvmtiEnv *jvmti;
         <param id="group_count_ptr">
           <outptr><jint/></outptr>
           <description>
-            On return, points to the number of active child thread groups
+            On return, points to the number of child thread groups
           </description>
         </param>
         <param id="groups_ptr">
           <allocbuf outcount="group_count_ptr"><jthreadGroup/></allocbuf>
             <description>
-              On return, points to an array of the active child thread groups.
+              On return, points to an array of the child thread groups.
             </description>
         </param>
       </parameters>

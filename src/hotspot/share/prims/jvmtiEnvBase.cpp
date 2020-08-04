@@ -652,40 +652,35 @@ JvmtiEnvBase::get_live_threads(JavaThread* current_thread, Handle group_hdl, Han
 }
 
 int
-JvmtiEnvBase::get_active_subgroups(JavaThread* current_thread, Handle group_hdl, Handle **group_objs_p) {
+JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle **group_objs_p) {
   GrowableArray<Handle>* subgroups = new GrowableArray<Handle>();
 
-  ThreadsListEnumerator tle(current_thread, true);
-  int nthreads = tle.num_threads();
-  for (int i = 0; i < nthreads; i++) {
-    Handle thread = tle.get_threadObj(i);
-    if (thread()->is_a(SystemDictionary::Thread_klass())) {
-      oop group_obj = java_lang_Thread::threadGroup(thread());
-      if (group_obj != NULL && group_obj != group_hdl()) {
-        // check if group_obj is a subgroup of group_hdl()
-        oop g = group_obj;
-        oop parent;
-        while ((parent = java_lang_ThreadGroup::parent(g)) != NULL) {
-          if (parent == group_hdl()) {
-            // check if group is already added
-            bool found = false;
-            for (int j = 0; j < subgroups->length(); j++) {
-              if (subgroups->at(j)() == g) {
-                found = true;
-                break;
-               }
-             }
-             if (!found) {
-               subgroups->append(Handle(current_thread, g));
-             }
-             break;
-          } else {
-            g = parent;
-          }
-        }
+  {
+    ObjectLocker ol(group_hdl, current_thread);
+
+    // non-daemon groups
+    int ngroups  = java_lang_ThreadGroup::ngroups(group_hdl());
+    objArrayOop groups = java_lang_ThreadGroup::groups(group_hdl());
+    assert(ngroups <= groups->length(), "too many groups");
+    for (int i = 0; i < ngroups; i++) {
+      oop group_obj = groups->obj_at(i);
+      assert(group_obj != NULL, "group_obj != NULL");
+      subgroups->append(Handle(current_thread, group_obj));
+    }
+
+    // daemon groups
+    int nweaks  = java_lang_ThreadGroup::nweaks(group_hdl());
+    objArrayOop weaks = java_lang_ThreadGroup::weaks(group_hdl());
+    assert(nweaks <= weaks->length(), "too many groups");
+    for (int i = 0; i < nweaks; i++) {
+      oop weak_obj = weaks->obj_at(i);
+      assert(weak_obj != NULL, "weak_obj != NULL");
+      oop group_obj = java_lang_ref_Reference::referent(weak_obj);
+      if (group_obj != NULL) {
+        subgroups->append(Handle(current_thread, group_obj));
       }
-    } // is_a
-  } // for
+    }
+  }
 
   int count = subgroups->length();
   Handle *group_objs = NULL;
