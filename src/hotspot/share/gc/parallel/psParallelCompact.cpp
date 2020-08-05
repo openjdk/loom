@@ -1998,7 +1998,7 @@ public:
     ParCompactionManager* cm = ParCompactionManager::gc_thread_compaction_manager(_worker_id);
 
     PCMarkAndPushClosure mark_and_push_closure(cm);
-    MarkingCodeBlobClosure mark_and_push_in_blobs(&mark_and_push_closure, !CodeBlobToOopClosure::FixRelocations);
+    MarkingCodeBlobClosure mark_and_push_in_blobs(&mark_and_push_closure, !CodeBlobToOopClosure::FixRelocations, true /* keepalive nmethods */);
 
     thread->oops_do(&mark_and_push_closure, &mark_and_push_in_blobs);
 
