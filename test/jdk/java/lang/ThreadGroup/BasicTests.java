@@ -719,11 +719,11 @@ public class BasicTests {
         ThreadGroup group = new ThreadGroup("foo");
         group.stop();
     }
-    
-    @Test(expectedExceptions = { UnsupportedOperationException.class })
+
     public void testAllowThreadSuspension() {
         ThreadGroup group = new ThreadGroup("foo");
-        group.allowThreadSuspension(true);
+        assertFalse(group.allowThreadSuspension(false));
+        assertFalse(group.allowThreadSuspension(true));
     }
 
     @Test(expectedExceptions = { NullPointerException.class })

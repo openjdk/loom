@@ -36,13 +36,20 @@ import java.util.function.Consumer;
  * a tree in which every thread group except the initial thread group
  * has a parent.
  *
- * <p> Thread groups have a {@linkplain #isDaemon() daemon status}. A newly
- * created thread group is a <i>non-daemon</i> thread group and is strongly
- * reachable from its parent. The {@link #setDaemon(boolean)} method can be
- * used to change the a group to be a <i>daemon</i> thread group. A daemon
- * thread group is not strongly reachable from its parent so it can be garbage
- * collected when there are no {@linkplain Thread#isAlive() alive} threads
- * in the group and it is otherwise eligible for garbage collection.
+ * <p> Thread groups have a {@linkplain #isDaemon() daemon status}. A daemon
+ * thread group is <i>weakly reachable</i> from its parent so it can be garbage
+ * collected when there are no {@linkplain Thread#isAlive() alive} threads in
+ * the group (and it is otherwise eligible for garbage collection). Daemon
+ * thread groups may be suitable for background threads where the thread group
+ * is not needed after all threads in the group terminate. A newly created
+ * thread group is a not a daemon thread group. It is <i>strongly reachable</i>
+ * from its parent.
+ *
+ * @apiNote
+ * The concept of <i>daemon thread group</i> is not related to the concept
+ * of {@linkplain Thread#isDaemon() daemon thread}. There may be both
+ * daemon and non-daemon threads in a thread group, independent of whether
+ * the group is a daemon or non-daemon thread group.
  *
  * @since   1.0
  */
@@ -182,7 +189,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
 
     /**
      * Tests if this thread group is a daemon thread group. A daemon thread
-     * group is not strongly reachable from its parent so it can be garbage
+     * group is <i>weakly reachable</i>  from its parent so it can be garbage
      * collected when there are no {@linkplain Thread#isAlive() alive} threads
      * in the group (and it is otherwise eligible for garbage collection).
      *
@@ -212,10 +219,12 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Changes the daemon status of this thread group. A daemon thread
-     * group is not strongly reachable from its parent so it can be garbage
-     * collected when there are no {@linkplain Thread#isAlive() alive} threads
-     * in the group (and it is otherwise eligible for garbage collection).
+     * Changes the daemon status of this thread group. A daemon thread group is
+     * <i>weakly reachable</i> from its parent so it can be garbage collected
+     * when there are no {@linkplain Thread#isAlive() alive} threads in the
+     * group (and it is otherwise eligible for garbage collection). A non-daemon
+     * thread is <i>strongly reachable</i> from its parent. This method does not
+     * change the daemon status of subgroups.
      * <p>
      * First, the {@code checkAccess} method of this thread group is
      * called with no arguments; this may result in a security exception.
@@ -392,13 +401,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
      *
-     * @deprecated This method is inherently racy.
-     *             {@linkplain java.lang.management.ThreadMXBean} provides a
-     *             more suitable interface for monitoring threads.
-     *
      * @since   1.0
      */
-    @Deprecated(since="99")
     public int enumerate(Thread list[]) {
         return enumerate(list, true);
     }
@@ -421,6 +425,11 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * <p> Due to the inherent race condition in this method, it is recommended
      * that the method only be used for debugging and monitoring purposes.
      *
+     * @apiNote {@linkplain java.lang.management.ThreadMXBean} supports
+     * monitoring and management of active threads in the Java virtual
+     * machine and may be a more suitable API some many debugging and
+     * monitoring purposes.
+     *
      * @param  list
      *         an array into which to put the list of threads
      *
@@ -437,13 +446,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
      *
-     * @deprecated This method is inherently racy.
-     *             {@linkplain java.lang.management.ThreadMXBean} provides a
-     *             more suitable interface for monitoring threads.
-     *
      * @since   1.0
      */
-    @Deprecated(since="99")
     public int enumerate(Thread list[], boolean recurse) {
         Objects.requireNonNull(list);
         checkAccess();
@@ -520,13 +524,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
      *
-     * @deprecated This method is inherently racy.
-     *             {@linkplain java.lang.management.ThreadMXBean} provides a
-     *             more suitable interface for monitoring threads.
-     *
      * @since   1.0
      */
-    @Deprecated(since="99")
     public int enumerate(ThreadGroup list[]) {
         return enumerate(list, true);
     }
@@ -564,13 +563,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
      *
-     * @deprecated This method is inherently racy.
-     *             {@linkplain java.lang.management.ThreadMXBean} provides a
-     *             more suitable interface for monitoring threads.
-     *
      * @since   1.0
      */
-    @Deprecated(since="99")
     public int enumerate(ThreadGroup list[], boolean recurse) {
         Objects.requireNonNull(list);
         checkAccess();
@@ -749,9 +743,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     /**
      * Does nothing.
      *
-     * @return nothing
+     * @return false
      *
-     * @param b ignore
+     * @param b ignored
      *
      * @deprecated This method was originally intended for controlling suspension
      *             in low memory conditions. It was never specified.
@@ -760,6 +754,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     @Deprecated(since="1.2", forRemoval=true)
     public boolean allowThreadSuspension(boolean b) {
+        return false;
     }
 
     /**
