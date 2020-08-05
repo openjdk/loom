@@ -94,6 +94,7 @@ class RegisterMap : public StackObj {
  public:
   DEBUG_ONLY(intptr_t* _update_for_id;) // Assert that RegisterMap is not updated twice for same frame
   RegisterMap(JavaThread *thread, bool update_map = true, bool walk_cont = false, bool validate_oops = true);
+  RegisterMap(Handle cont, bool update_map = true, bool validate_oops = true);
   RegisterMap(const RegisterMap* map);
 
   address location(VMReg reg) const {
@@ -142,7 +143,6 @@ class RegisterMap : public StackObj {
   bool in_chunk()      const { return (bool)_in_chunk; }
   oop  cont()          const { return _cont(); }
   void set_cont(oop cont);
-  void set_cont(Handle cont);
   void set_in_cont(bool on_hstack, bool in_chunk);
 
   const RegisterMap* as_RegisterMap() const { return this; }

@@ -69,15 +69,27 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool walk_cont, bo
 
   _on_hstack = false;
   _in_chunk = false;
-  if (walk_cont) {
-    // we allocate the handle now (rather than in set_cont) because sometimes (StackWalker) the handle must live across HandleMarks
-    if (thread != NULL && thread->cont_entry() != NULL) {
+  if (walk_cont && thread != NULL && thread->cont_entry() != NULL) {
       _cont = Handle(Thread::current(), thread->last_continuation());
-      *(_cont.raw_value()) = NULL; // TODO UGLY : we just need to allocate a NULL handle
-    } else {
-      _cont = Handle();
-    }
   }
+
+#ifndef PRODUCT
+  for (int i = 0; i < reg_count ; i++ ) _location[i] = NULL;
+#endif /* PRODUCT */
+}
+
+RegisterMap::RegisterMap(Handle cont, bool update_map, bool validate_oops) 
+  : _cont(cont) {
+  _thread         = NULL;
+  _update_map     = update_map;
+  _validate_oops  = validate_oops;
+  _walk_cont      = true;
+  DEBUG_ONLY(_skip_missing = false;)
+  clear();
+  debug_only(_update_for_id = NULL;)
+
+  _on_hstack = false;
+  _in_chunk = false;
 
 #ifndef PRODUCT
   for (int i = 0; i < reg_count ; i++ ) _location[i] = NULL;
@@ -95,7 +107,8 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
   _walk_cont     = map->_walk_cont;
   DEBUG_ONLY(_skip_missing = map->_skip_missing;)
 
-  _cont = map->_cont;
+  // only the original RegisterMap's handle lives long enough for StackWalker; this is bound to cause trouble with nested continuations.
+  _cont = map->_cont; // !map->_cont.is_null() && map->_cont() != NULL ? Handle(Thread::current(), map->_cont()) : Handle();
   _on_hstack = map->_on_hstack;
   _in_chunk = map->_in_chunk;
 
@@ -125,19 +138,11 @@ void RegisterMap::set_in_cont(bool on_hstack, bool in_chunk) {
    _in_chunk = (int)in_chunk;
 }
 
-void RegisterMap::set_cont(Handle cont) {
-  assert (_walk_cont, "");
-  _cont = cont;
-}
-
 void RegisterMap::set_cont(oop cont) {
   assert (_walk_cont, "");
-  if (cont != NULL) {
-    assert (_cont.not_null(), "");
-    *(_cont.raw_value()) = cont; // reuse handle. see comment above in the constructor
-  } else {
-    _cont = Handle();
-  }
+  assert (oopDesc::is_oop_or_null(cont), "");
+  assert (_cont.not_null(), "");
+  *(_cont.raw_value()) = cont; // reuse handle. see comment above in the constructor
 }
 
 void RegisterMap::clear() {

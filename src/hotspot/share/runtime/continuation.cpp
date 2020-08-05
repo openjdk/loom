@@ -4867,7 +4867,7 @@ static frame continuation_parent_frame(ContMirror& cont, RegisterMap* map) {
 
 frame Continuation::last_frame(Handle continuation, RegisterMap *map) {
   assert(map != NULL, "a map must be given");
-  map->set_cont(continuation); // set handle
+  assert (map->cont() == continuation(), "");
   return continuation_top_frame(continuation(), map);
 }
 
@@ -5212,6 +5212,10 @@ address Continuation::interpreter_frame_bcp(const frame& fr, const RegisterMap* 
   assert (fr.is_interpreted_frame(), "");
   hframe hf = ContMirror(map).from_frame(fr);
   return hf.interpreter_frame_bcp();
+}
+
+oop Continuation::continuation_parent(oop cont) {
+  return java_lang_Continuation::parent(cont);
 }
 
 oop Continuation::continuation_scope(oop cont) {

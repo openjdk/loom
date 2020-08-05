@@ -539,7 +539,7 @@ vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool s
 }
 
 vframeStream::vframeStream(Handle continuation) 
- : vframeStreamCommon(RegisterMap(NULL, true, true)) {
+ : vframeStreamCommon(RegisterMap(continuation, true)) {
 
   _stop_at_java_call_stub = false;
   _continuation_scope = Handle();

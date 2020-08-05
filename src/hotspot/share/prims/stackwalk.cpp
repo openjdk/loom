@@ -448,7 +448,8 @@ oop StackWalk::walk(Handle stackStream, jlong mode, int skip_frames, Handle cont
   // Setup traversal onto my stack.
   if (live_frame_info(mode)) {
     assert (use_frames_array(mode), "Bad mode for get live frame");
-    RegisterMap regMap(jt, true, true);
+    RegisterMap regMap = cont.is_null() ? RegisterMap(jt, true, true)
+                                        : RegisterMap(cont, true);
     LiveFrameStream stream(jt, &regMap, cont_scope, cont);
     return fetchFirstBatch(stream, stackStream, mode, skip_frames, frame_count,
                            start_index, frames_array, THREAD);

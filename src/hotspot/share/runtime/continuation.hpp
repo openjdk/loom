@@ -117,6 +117,7 @@ public:
   static Method* interpreter_frame_method(const frame& fr, const RegisterMap* map);
   static address interpreter_frame_bcp(const frame& fr, const RegisterMap* map);
 
+  static oop continuation_parent(oop cont);
   static oop continuation_scope(oop cont);
   static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
 
