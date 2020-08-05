@@ -862,7 +862,7 @@ void GenCollectedHeap::young_process_roots(StrongRootsScope* scope,
                                            OopsInGenClosure* root_closure,
                                            OopsInGenClosure* old_gen_closure,
                                            CLDClosure* cld_closure) {
-  MarkingCodeBlobClosure mark_code_closure(root_closure, CodeBlobToOopClosure::FixRelocations);
+  MarkingCodeBlobClosure mark_code_closure(root_closure, CodeBlobToOopClosure::FixRelocations, false /* keepalive nmethods */);
 
   process_roots(scope, SO_ScavengeCodeCache, root_closure,
                 cld_closure, cld_closure, &mark_code_closure);
@@ -886,7 +886,7 @@ void GenCollectedHeap::full_process_roots(StrongRootsScope* scope,
                                           bool only_strong_roots,
                                           OopsInGenClosure* root_closure,
                                           CLDClosure* cld_closure) {
-  MarkingCodeBlobClosure mark_code_closure(root_closure, is_adjust_phase);
+  MarkingCodeBlobClosure mark_code_closure(root_closure, CodeBlobToOopClosure::FixRelocations, !is_adjust_phase);
   CLDClosure* weak_cld_closure = only_strong_roots ? NULL : cld_closure;
 
   process_roots(scope, so, root_closure, cld_closure, weak_cld_closure, &mark_code_closure);
