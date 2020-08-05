@@ -26,6 +26,8 @@
  * @requires vm.debug != true
  * @run main/othervm -XX:-UseContinuationChunks SleepALot
  * @run main/othervm -XX:+UseContinuationChunks SleepALot
+ * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler SleepALot
+ * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler SleepALot
  * @summary Stress test Thread.sleep
  */
 
@@ -34,6 +36,8 @@
  * @requires vm.debug == true
  * @run main/othervm/timeout=300 -XX:-UseContinuationChunks SleepALot 200000
  * @run main/othervm/timeout=300 -XX:+UseContinuationChunks SleepALot 200000
+ * @run main/othervm/timeout=300 -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler SleepALot 200000
+ * @run main/othervm/timeout=300 -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler SleepALot 200000
  */
 
 import java.time.Duration;

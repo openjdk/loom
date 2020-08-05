@@ -26,6 +26,8 @@
  * @requires vm.debug != true
  * @run main/othervm -XX:-UseContinuationChunks -Xmx1g TimedGet
  * @run main/othervm -XX:+UseContinuationChunks -Xmx1g TimedGet
+ * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Xmx4g TimedGet
+ * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Xmx4g TimedGet
  * @summary Stress parking with CompletableFuture timed get
  */
 import java.time.Duration;
