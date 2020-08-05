@@ -32,6 +32,7 @@ import static org.graalvm.compiler.hotspot.HotSpotBackend.GHASH_PROCESS_BLOCKS;
 import static org.graalvm.compiler.hotspot.meta.HotSpotAOTProfilingPlugin.Options.TieredAOT;
 import static org.graalvm.compiler.hotspot.replacements.HotSpotReplacementsUtil.JAVA_THREAD_THREAD_OBJECT_HANDLE_LOCATION;
 import static org.graalvm.compiler.hotspot.replacements.HotSpotReplacementsUtil.JAVA_THREAD_THREAD_OBJECT_LOCATION;
+import static org.graalvm.compiler.hotspot.replacements.HotSpotReplacementsUtil.JAVA_THREAD_VTHREAD_LOCATION;
 import static org.graalvm.compiler.java.BytecodeParserOptions.InlineDuringParsing;
 
 import java.lang.invoke.ConstantCallSite;
@@ -437,6 +438,25 @@ public class HotSpotGraphBuilderPlugins {
                     value = b.add(new ReadNode(handleAddress, JAVA_THREAD_THREAD_OBJECT_HANDLE_LOCATION, stamp, BarrierType.NONE));
                 }
                 b.push(JavaKind.Object, value);
+                return true;
+            }
+        });
+
+        r.register0("currentThread", new InvocationPlugin() {
+            @Override
+            public boolean apply(GraphBuilderContext b, ResolvedJavaMethod targetMethod, Receiver receiver) {
+                CurrentJavaThreadNode thread = b.add(new CurrentJavaThreadNode(wordTypes.getWordKind()));
+                ValueNode offset = b.add(ConstantNode.forLong(config.vthreadOffset));
+                AddressNode address = b.add(new OffsetAddressNode(thread, offset));
+                // JavaThread::_threadObj is never compressed
+                ObjectStamp stamp = StampFactory.objectNonNull(TypeReference.create(b.getAssumptions(), metaAccess.lookupJavaType(Thread.class)));
+                ReadNode value = new ReadNode(address, JAVA_THREAD_VTHREAD_LOCATION, stamp, BarrierType.NONE);
+                if (config.threadObjectFieldIsHandle) {
+                    ValueNode handleOffset = ConstantNode.forIntegerKind(wordTypes.getWordKind(), 0, b.getGraph());
+                    AddressNode handleAddress = b.add(new OffsetAddressNode(value, handleOffset));
+                    value = b.add(new ReadNode(handleAddress, JAVA_THREAD_THREAD_OBJECT_HANDLE_LOCATION, stamp, BarrierType.NONE));
+                }
+                b.addPush(JavaKind.Object, value);
                 return true;
             }
         });

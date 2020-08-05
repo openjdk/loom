@@ -384,13 +384,16 @@ public class GraalHotSpotVMConfig extends GraalHotSpotVMConfigAccess {
 
     public final boolean threadObjectFieldIsHandle;
     public final int threadObjectOffset;
+    public final int vthreadOffset;
     {
         if (JDK <= 15) {
             threadObjectFieldIsHandle = false;
             threadObjectOffset = getFieldOffset("JavaThread::_threadObj", Integer.class, "oop");
+            vthreadOffset = 0;
         } else {
             threadObjectFieldIsHandle = true;
             threadObjectOffset = getFieldOffset("JavaThread::_threadObj", Integer.class, "OopHandle");
+            vthreadOffset = getFieldOffset("JavaThread::_vthread", Integer.class, "OopHandle");
         }
     }
 

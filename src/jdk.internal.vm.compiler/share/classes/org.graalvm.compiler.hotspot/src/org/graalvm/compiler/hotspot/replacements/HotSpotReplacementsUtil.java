@@ -305,6 +305,13 @@ public class HotSpotReplacementsUtil {
     public static final LocationIdentity JAVA_THREAD_THREAD_OBJECT_LOCATION = NamedLocationIdentity.immutable("JavaThread::_threadObj");
 
     public static final LocationIdentity JAVA_THREAD_THREAD_OBJECT_HANDLE_LOCATION = NamedLocationIdentity.immutable("JavaThread::_threadObj handle");
+    /*
+     * As far as Java code is concerned this can be considered
+     * immutable: it is set as the thread is mounted/unmounted but
+     * will be constant across all methods that may be inlined
+     * together.
+     */
+    public static final LocationIdentity JAVA_THREAD_VTHREAD_LOCATION = NamedLocationIdentity.immutable("JavaThread::_vthread");
 
     @Fold
     public static int threadObjectOffset(@InjectedParameter GraalHotSpotVMConfig config) {
