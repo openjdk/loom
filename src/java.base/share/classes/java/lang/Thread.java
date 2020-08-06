@@ -2156,12 +2156,8 @@ public class Thread implements Runnable {
      *          thread's thread group and in any other thread group that
      *          has the current thread's thread group as an ancestor
      *
-     * @deprecated {@linkplain java.lang.management.ThreadMXBean} provides a
-     *             more suitable interface for monitoring threads.
-     *
      * @since 1.0
      */
-    @Deprecated(since="99")
     public static int activeCount() {
         return currentThread().getThreadGroup().activeCount();
     }
@@ -2192,14 +2188,8 @@ public class Thread implements Runnable {
      *          if {@link java.lang.ThreadGroup#checkAccess} determines that
      *          the current thread cannot access its thread group
      *
-     * @deprecated This method is inherently racy.
-     *             {@linkplain java.lang.management.ThreadMXBean} provides a
-     *             more suitable interface for monitoring threads.
-     *
      * @since 1.0
      */
-    @Deprecated(since="99")
-    @SuppressWarnings("deprecation")
     public static int enumerate(Thread tarray[]) {
         return currentThread().getThreadGroup().enumerate(tarray);
     }
