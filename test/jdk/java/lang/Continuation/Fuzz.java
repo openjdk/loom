@@ -27,16 +27,16 @@
  * @test
  * @summary Fuzz tests for java.lang.Continuation
  *
- * @modules java.base
+ * @modules java.base java.base/jdk.internal.vm.annotation
  * @library /test/lib
  * @build java.base/java.lang.StackWalkerHelper
  * @build sun.hotspot.WhiteBox
  * @run driver ClassFileInstaller sun.hotspot.WhiteBox
  *
- * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks Fuzz
- * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks Fuzz
- * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks Fuzz
- * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks Fuzz
+ * @run main/othervm/timeout=300 -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+ * @run main/othervm/timeout=300 -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+ * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+ * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
  *
  */
 
@@ -50,6 +50,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.StackWalker.StackFrame;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -69,26 +70,27 @@ import java.util.stream.Stream;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
+import jdk.internal.vm.annotation.DontInline;
 import jdk.test.lib.Utils;
 import sun.hotspot.WhiteBox;
 
-public class Fuzz {
+public class Fuzz implements Runnable {
     static final boolean VERBOSE = false;
     private static final WhiteBox WB = WhiteBox.getWhiteBox();
 
-    private static boolean COMPILE_ENTER;
+    private static boolean COMPILE_RUN;
     private static int COMPILE_LEVEL;
 
     public static void main(String[] args) {
         for (int compileLevel : new int[]{4})
-            for (boolean compileEnter : new boolean[]{true, false})
-                test(compileLevel, compileEnter);
+            for (boolean compileRun : new boolean[]{true})
+                test(compileLevel, compileRun);
     }
 
-    static void test(int compileLevel, boolean compileEnter) {
+    static void test(int compileLevel, boolean compileRun) {
         resetCompilation();
         COMPILE_LEVEL = compileLevel;
-        COMPILE_ENTER = compileEnter;
+        COMPILE_RUN = compileRun;
 
         testFile();
         testRandom();
@@ -121,12 +123,29 @@ public class Fuzz {
 
     static void testTrace(Op[] trace) {
         System.out.println();
-        System.out.println("COMPILE_LEVEL: " + COMPILE_LEVEL + " COMPILE_ENTER: " + COMPILE_ENTER);
 
-        var fuzz = new Fuzz(trace);
-        fuzz.verbose = VERBOSE;
-        fuzz.print();
-        fuzz.run();
+        int retry = 0;
+        for (;;) {
+            System.out.println("COMPILE_LEVEL: " + COMPILE_LEVEL + " COMPILE_RUN: " + COMPILE_RUN);
+            compile();
+
+            var fuzz = new Fuzz(trace);
+            fuzz.verbose = VERBOSE && retry == 0;
+            fuzz.print();
+
+            fuzz.test();
+
+            Op[] newTrace = Arrays.copyOf(trace, trace.length);
+            if (!checkCompilation(newTrace)) {
+                System.out.println("CHANGED COMPILATION AFTER");
+                printTrace(newTrace);
+                if (retry++ < 2) {
+                    System.out.println("RETRYING");
+                    continue;
+                }
+            }
+            break;
+        }
     }
 
     ////////////////
@@ -134,20 +153,20 @@ public class Fuzz {
     enum Op {
         CALL_I_INT, CALL_I_DBL, CALL_I_MANY, 
         CALL_C_INT, CALL_C_DBL, CALL_C_MANY, 
-        CALL_I_PIN, CALL_C_PIN,
         CALL_I_CTCH, CALL_C_CTCH,
+        CALL_I_PIN, CALL_C_PIN,
         MH_I_INT, MH_C_INT, MH_I_MANY, MH_C_MANY,
         REF_I_INT, REF_C_INT, REF_I_MANY, REF_C_MANY,
         LOOP, YIELD, THROW, DONE;
 
         static final EnumSet<Op> BASIC       = EnumSet.of(LOOP, YIELD);
-        static final EnumSet<Op> PIN         = EnumSet.of(CALL_I_PIN, CALL_C_PIN);
+        static final EnumSet<Op> STANDARD    = EnumSet.range(CALL_I_INT, CALL_C_CTCH);
+        static final EnumSet<Op> PIN         = EnumSet.range(CALL_I_PIN, CALL_C_PIN);
         static final EnumSet<Op> MH          = EnumSet.range(MH_I_INT, MH_C_MANY);
         static final EnumSet<Op> REFLECTED   = EnumSet.range(REF_I_INT, REF_C_MANY);
-        static final EnumSet<Op> STANDARD    = EnumSet.range(CALL_I_INT, CALL_C_CTCH);
+        static final EnumSet<Op> NON_CALLS   = EnumSet.range(LOOP, DONE);
         static final EnumSet<Op> COMPILED    = EnumSet.copyOf(Arrays.stream(Op.values()).filter(x -> x.toString().contains("_C_")).collect(Collectors.toList()));
         static final EnumSet<Op> INTERPRETED = EnumSet.copyOf(Arrays.stream(Op.values()).filter(x -> x.toString().contains("_I_")).collect(Collectors.toList()));
-        static final EnumSet<Op> NON_CALLS   = EnumSet.range(LOOP, DONE);
 
         static Op toInterpreted(Op op) { return INTERPRETED.contains(op) ? op : Enum.valueOf(Op.class, op.toString().replace("_C_", "_I_")); }
         static Op toCompiled(Op op)    { return COMPILED.contains(op)    ? op : Enum.valueOf(Op.class, op.toString().replace("_I_", "_C_")); }
@@ -218,10 +237,8 @@ public class Fuzz {
     private Op current()    { return trace(index); }
     private Op next(int c)  { logOp(c); index++; return current(); }
 
-    void run() {
-        compile();
-
-        Continuation cont = new Continuation(SCOPE, this::enter) {
+    void test() {
+        Continuation cont = new Continuation(SCOPE, this) {
             @Override protected void onPinned(Pinned reason) { if (verbose) System.out.println("PINNED " + reason); }
         };
 
@@ -238,12 +255,6 @@ public class Fuzz {
             assert shouldThrow();
             assert e.getMessage().equals("EX");
             assert cont.isDone();
-
-        } finally {
-            if (!checkCompilation()) {
-                System.out.println("CHANGED COMPILATION AFTER");
-                printTrace(trace);
-            }
         }
     }
 
@@ -283,45 +294,10 @@ public class Fuzz {
         return d;
     }
 
-    static void resetCompilation() {
-        Set<Method> compile = Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
-        compile.add(enter);
-
-        for (Method m : compile) {
-            WB.deoptimizeMethod(m);
-            WB.clearMethodState(m);
-        }
-    }
-
-    static void compile() {
-        Set<Method> compile   =    Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
-        Set<Method> interpret = Op.INTERPRETED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
-        (COMPILE_ENTER ? compile : interpret).add(enter);
-
-        for (Method m : interpret) WB.makeMethodNotCompilable(m);
-
-        for (Method m : compile) if (!WB.isMethodCompiled(m)) WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
-        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
-
-        for (Method m : compile)   assert  WB.isMethodCompiled(m) : "method: " + m;
-        for (Method m : interpret) assert !WB.isMethodCompiled(m) : "method: " + m;
-    }
-
-    boolean checkCompilation() {
-        boolean ok = true;
-        for (int i = 0; i < trace.length; i++) {
-            Op op = trace[i];
-            if (Op.COMPILED.contains(op)    && !WB.isMethodCompiled(method(op))) trace[i] = Op.toInterpreted(op);
-            if (Op.INTERPRETED.contains(op) &&  WB.isMethodCompiled(method(op))) trace[i] = Op.toCompiled(op);
-            if (op != trace[i]) ok = false;
-        }
-        return ok;
-    }
-
     String[] expectedStackTrace() {
         var ms = new ArrayList<String>();
         for (int i = index; i >= 0; i--) if (!Op.NON_CALLS.contains(trace[i])) ms.add(method(trace[i]).getName());
-        ms.add("enter");
+        ms.add("run");
         return ms.toArray(new String[0]);
     }
 
@@ -331,7 +307,7 @@ public class Fuzz {
             .collect(Collectors.toList()).toArray(Op.ARRAY);
         
         Fuzz f0 = new Fuzz(trace0);
-        f0.enter();
+        f0.run();
         return f0.result;
     }
 
@@ -401,7 +377,7 @@ public class Fuzz {
         int i = 0;
         while (i < stack.length && (!Fuzz.class.getName().equals(sfClassName(stack[i])) || isPrePostYield(stack[i]) || isStackCaptureMechanism(stack[i]))) i++;
         while (i < stack.length && !Continuation.class.getName().equals(sfClassName(stack[i]))) { list.add(stack[i]); i++; }
-        while (i < stack.length && Continuation.class.getName().equals(sfClassName(stack[i])) && !"enterSpecial".equals(sfMethodName(stack[i]))) { list.add(stack[i]); i++; }
+        // while (i < stack.length && Continuation.class.getName().equals(sfClassName(stack[i])) && !"enterSpecial".equals(sfMethodName(stack[i]))) { list.add(stack[i]); i++; }
         return list.toArray(arrayType(stack));
     }
 
@@ -460,6 +436,67 @@ public class Fuzz {
 
     ////// Static Helpers
 
+    static void resetCompilation() {
+        Set<Method> compile = Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
+        compile.add(run);
+
+        for (Method m : compile) {
+            WB.deoptimizeMethod(m);
+            WB.clearMethodState(m);
+        }
+    }
+
+    static void compileContinuation() {
+        var compile = new HashSet<Method>();
+        for (Method m : Continuation.class.getDeclaredMethods()) {
+            if (!WB.isMethodCompiled(m)) {
+                if (!Modifier.isNative(m.getModifiers()) 
+                    && (m.getName().startsWith("enter")
+                     || m.getName().startsWith("yield"))) {
+                    WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
+                    compile.add(m);
+                }
+            }
+        }
+
+        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
+    }
+
+    static void compile() {
+        final long start = System.nanoTime();
+
+        compileContinuation();
+
+        Set<Method> compile   =    Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
+        Set<Method> interpret = Op.INTERPRETED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
+        (COMPILE_RUN ? compile : interpret).add(run);
+
+        compile.addAll(precompile);
+
+        for (Method m : interpret) WB.makeMethodNotCompilable(m);
+
+        for (Method m : compile) if (!WB.isMethodCompiled(m)) WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
+        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
+
+        for (Method m : compile)   assert  WB.isMethodCompiled(m) : "method: " + m;
+        for (Method m : interpret) assert !WB.isMethodCompiled(m) : "method: " + m;
+
+        final long duration = (System.nanoTime() - start)/1_000_000;
+        if (duration > 500)
+            System.out.println("Compile in " + duration + " ms");
+    }
+
+    static boolean checkCompilation(Op[] trace) {
+        boolean ok = true;
+        for (int i = 0; i < trace.length; i++) {
+            Op op = trace[i];
+            if (Op.COMPILED.contains(op)    && !WB.isMethodCompiled(method(op))) trace[i] = Op.toInterpreted(op);
+            if (Op.INTERPRETED.contains(op) &&  WB.isMethodCompiled(method(op))) trace[i] = Op.toCompiled(op);
+            if (op != trace[i]) ok = false;
+        }
+        return ok;
+    }
+
     static void rethrow(Throwable t) {
         if (t instanceof Error) throw (Error)t;
         if (t instanceof RuntimeException) throw (RuntimeException)t;
@@ -486,7 +523,7 @@ public class Fuzz {
  
     //////
 
-    static final Class<?>[] enter_sig = new Class<?>[]{};
+    static final Class<?>[] run_sig = new Class<?>[]{};
     static final Class<?>[] int_sig = new Class<?>[]{int.class, int.class};
     static final Class<?>[] dbl_sig = new Class<?>[]{int.class, double.class};
     static final Class<?>[] mny_sig = new Class<?>[]{int.class,
@@ -494,18 +531,21 @@ public class Fuzz {
         int.class, double.class, long.class, float.class, Object.class,
         int.class, double.class, long.class, float.class, Object.class,
         int.class, double.class, long.class, float.class, Object.class};
-    static final MethodType enter_type = MethodType.methodType(void.class, enter_sig);
+    static final MethodType run_type = MethodType.methodType(void.class, run_sig);
     static final MethodType int_type = MethodType.methodType(int.class, int_sig);
     static final MethodType dbl_type = MethodType.methodType(double.class, dbl_sig);
     static final MethodType mny_type = MethodType.methodType(int.class, mny_sig);
 
-    static final Method enter;
+    static final List<Method> precompile = new ArrayList<>();
+
+    static final Method run;
     static final Map<Op, Method>       method = new EnumMap<>(Op.class);
     static final Map<Op, MethodHandle> handle = new EnumMap<>(Op.class);
 
     static {
         try {
-            enter = Fuzz.class.getDeclaredMethod("enter", enter_sig);
+            run = Fuzz.class.getDeclaredMethod("run", run_sig);
+            // precompile.add(Fuzz.class.getDeclaredMethod("maybeResetIndex", new Class<?>[]{int.class}));
 
             method.put(Op.CALL_I_INT,  Fuzz.class.getDeclaredMethod("int_int", int_sig));
             method.put(Op.CALL_C_INT,  Fuzz.class.getDeclaredMethod("com_int", int_sig));
@@ -540,13 +580,13 @@ public class Fuzz {
         }
     }
 
-    void preYield() { captureStack(); }
-    void postYield(boolean yieldResult) { verifyPin(yieldResult); verifyStack(); }
-    void maybeResetIndex(int index0) { this.index = current() != Op.YIELD ? index0 : index; }
+    @DontInline void preYield() { captureStack(); }
+    @DontInline void postYield(boolean yieldResult) { verifyPin(yieldResult); verifyStack(); }
+    @DontInline void maybeResetIndex(int index0) { this.index = current() != Op.YIELD ? index0 : index; }
+    @DontInline static void throwException() { throw new FuzzException("EX"); }
 
-    void throwException() { throw new FuzzException("EX"); }
-
-    void enter() {
+    @Override
+    public void run() {
         final int depth = 0;
         int res = 3;
 
@@ -583,6 +623,7 @@ public class Fuzz {
         this.result = log(res);
     }
 
+    @DontInline
     int int_int(final int depth, int x) {
         int res = x;
 
@@ -619,6 +660,7 @@ public class Fuzz {
         return log(res);
     }
 
+    @DontInline
     int com_int(final int depth, int x) {
         int res = x;
 
@@ -655,6 +697,7 @@ public class Fuzz {
         return log(res);
     }
 
+    @DontInline
     double int_dbl(final int depth, double x) {
         double res = 3.0;
 
@@ -691,6 +734,7 @@ public class Fuzz {
         return log(res);
     }
 
+    @DontInline
     double com_dbl(final int depth, double x) {
         double res = 3.0;
 
@@ -727,6 +771,7 @@ public class Fuzz {
         return log(res);
     }
 
+    @DontInline
     int int_pin(final int depth, int x) {
         int res = x;
 
@@ -767,6 +812,7 @@ public class Fuzz {
         return log(res);
     }
 
+    @DontInline
     int com_pin(final int depth, int x) {
         int res = x;
 
@@ -807,6 +853,7 @@ public class Fuzz {
         return log(res);
     }
 
+    @DontInline
     int int_mny(int depth,
         int x1, double d1, long l1, float f1, Object o1,
         int x2, double d2, long l2, float f2, Object o2,
@@ -842,6 +889,7 @@ public class Fuzz {
         return log((int)res);
     }
 
+    @DontInline
     int com_mny(int depth,
         int x1, double d1, long l1, float f1, Object o1,
         int x2, double d2, long l2, float f2, Object o2,
