@@ -123,10 +123,10 @@ public class Fuzz implements Runnable {
 
     static void testTrace(Op[] trace) {
         System.out.println();
-
+        System.out.println("COMPILE_LEVEL: " + COMPILE_LEVEL + " COMPILE_RUN: " + COMPILE_RUN);
+ 
         int retry = 0;
         for (;;) {
-            System.out.println("COMPILE_LEVEL: " + COMPILE_LEVEL + " COMPILE_RUN: " + COMPILE_RUN);
             compile();
 
             var fuzz = new Fuzz(trace);

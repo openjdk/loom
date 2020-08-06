@@ -896,6 +896,9 @@ Method* HFrameBase<SelfPD>::method() const {
 
 template<typename SelfPD>
 inline frame HFrameBase<SelfPD>::to_frame(ContMirror& cont) const {
+  if (is_empty())
+    return frame();
+  
   bool deopt = false;
   address pc = _pc;
   if (!is_interpreted_frame()) {
@@ -4866,7 +4869,6 @@ static frame chunk_top_frame(oop chunk) {
 
 static frame continuation_body_top_frame(ContMirror& cont, RegisterMap* map) {
   hframe hf = cont.last_frame<mode_slow>(); // here mode_slow merely makes the fewest assumptions
-  assert (!hf.is_empty(), "");
 
   // tty->print_cr(">>>> continuation_top_frame");
   // hf.print_on(cont, tty);
@@ -4925,7 +4927,12 @@ frame Continuation::last_frame(Handle continuation, RegisterMap *map) {
 }
 
 bool Continuation::has_last_Java_frame(Handle continuation) {
-  return java_lang_Continuation::pc(continuation()) != NULL;
+  ContMirror cont(continuation());
+  for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
+    if (!ContMirror::is_empty_chunk(chunk))
+      return true;
+  }
+  return cont.pc() != NULL;
 }
 
 javaVFrame* Continuation::last_java_vframe(Handle continuation, RegisterMap *map) {
