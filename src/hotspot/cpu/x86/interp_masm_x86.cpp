@@ -1208,6 +1208,7 @@ void InterpreterMacroAssembler::remove_activation(
   leave();                           // remove frame anchor
   pop(ret_addr);                     // get return address
   mov(rsp, rbx);                     // set sp to sender sp
+  pop_cont_fastpath(rthread);
 }
 
 void InterpreterMacroAssembler::get_method_counters(Register method,

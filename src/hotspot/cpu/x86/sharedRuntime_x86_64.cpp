@@ -827,7 +827,7 @@ void SharedRuntime::gen_i2c_adapter(MacroAssembler *masm,
   }
 #endif // INCLUDE_JVMCI
 
-  __ set_cont_fastpath(r15_thread, 0);
+  __ push_cont_fastpath(r15_thread); // Set JavaThread::_cont_fastpath to the sp of the oldest interpreted frame we know about
 
   // Now generate the shuffle code.  Pick up all register args and move the
   // rest through the floating point stack top.

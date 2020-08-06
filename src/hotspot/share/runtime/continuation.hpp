@@ -86,6 +86,8 @@ public:
   static intptr_t* thaw(JavaThread* thread, int kind);
   static int try_force_yield(JavaThread* thread, oop cont);
 
+  static void notify_deopt(JavaThread* thread, intptr_t* sp);
+
   static oop  get_continutation_for_frame(JavaThread* thread, const frame& f);
   static bool is_mounted(JavaThread* thread, oop cont_scope);
   static bool is_continuation_enterSpecial(const frame& f, const RegisterMap* map);
@@ -185,7 +187,7 @@ private:
   oopDesc* _cont;
   oopDesc* _chunk;
   int _argsize;
-  int _parent_cont_fastpath;
+  intptr_t* _parent_cont_fastpath;
   int _parent_held_monitor_count;
 
 public:
@@ -199,6 +201,9 @@ public:
 
   int argsize() { return _argsize; }
   void set_argsize(int value) { _argsize = value; }
+
+  intptr_t* parent_cont_fastpath() { return _parent_cont_fastpath; }
+  void set_parent_cont_fastpath(intptr_t* x) { _parent_cont_fastpath = x; }
 
   frame to_frame();
 

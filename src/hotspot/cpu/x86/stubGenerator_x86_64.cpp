@@ -414,6 +414,8 @@ class StubGenerator: public StubCodeGenerator {
     // restore rsp
     __ addptr(rsp, -rsp_after_call_off * wordSize);
 
+    __ pop_cont_fastpath(r15_thread);
+
     // return
     __ vzeroupper();
     __ pop(rbp);
@@ -7401,7 +7403,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
   __ movptr(rax, Address(r15_thread, JavaThread::held_monitor_count_offset()));
   __ movptr(Address(rsp, ContinuationEntry::parent_held_monitor_count_offset()), rax);
   
-  __ set_cont_fastpath(r15_thread, 1);
+  __ movptr(Address(r15_thread, JavaThread::cont_fastpath_offset()), 0);
   __ reset_held_monitor_count(r15_thread);
 }
 

@@ -723,7 +723,7 @@ address TemplateInterpreterGenerator::generate_Continuation_doYield_entry(void) 
   // __ movl(c_rarg1, Address(rsp, wordSize)); // scopes
   const Register thread1 = NOT_LP64(rdi) LP64_ONLY(r15_thread);
   NOT_LP64(__ get_thread(thread1));
-  __ set_cont_fastpath(thread1, 0);
+  __ push_cont_fastpath(thread1);
   
   __ jump(RuntimeAddress(CAST_FROM_FN_PTR(address, StubRoutines::cont_doYield())));
   // return value is in rax

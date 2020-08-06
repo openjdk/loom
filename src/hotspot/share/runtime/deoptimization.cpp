@@ -651,8 +651,9 @@ JRT_LEAF(BasicType, Deoptimization::unpack_frames(JavaThread* thread, int exec_m
   ResetNoHandleMark rnhm; // No-op in release/product versions
   HandleMark hm;
 
-  thread->set_cont_fastpath(false);
   frame stub_frame = thread->last_frame();
+  
+  Continuation::notify_deopt(thread, stub_frame.sp());
 
   // Since the frame to unpack is the top frame of this thread, the vframe_array_head
   // must point to the vframeArray for the unpack frame.
@@ -1586,8 +1587,7 @@ void Deoptimization::deoptimize_single_frame(JavaThread* thread, frame fr, Deopt
     xtty->tail("deoptimized");
   }
 
-  // For simplicity, we currently clear the fast path if the frame is on _any_ continuation
-  if (Continuation::is_frame_in_continuation(thread, fr)) thread->set_cont_fastpath(false);
+  Continuation::notify_deopt(thread, fr.sp());
 
   // Patch the compiled method so that when execution returns to it we will
   // deopt the execution state and return to the interpreter.

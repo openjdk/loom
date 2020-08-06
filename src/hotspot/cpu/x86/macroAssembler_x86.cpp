@@ -2764,12 +2764,20 @@ void MacroAssembler::pop_FPU_state() {
   addptr(rsp, FPUStateSizeInWords * wordSize);
 }
 
-void MacroAssembler::get_cont_fastpath(Register java_thread, Register dst) {
-  movl(dst, Address(java_thread, JavaThread::cont_fastpath_offset()));
+void MacroAssembler::push_cont_fastpath(Register java_thread) {
+  Label done;
+  cmpptr(rsp, Address(java_thread, JavaThread::cont_fastpath_offset()));
+  jccb(Assembler::belowEqual, done);
+  movptr(Address(java_thread, JavaThread::cont_fastpath_offset()), rsp);
+  bind(done);
 }
 
-void MacroAssembler::set_cont_fastpath(Register java_thread, int32_t imm) {
-  movl(Address(java_thread, JavaThread::cont_fastpath_offset()), imm);
+void MacroAssembler::pop_cont_fastpath(Register java_thread) {
+  Label done;
+  cmpptr(rsp, Address(java_thread, JavaThread::cont_fastpath_offset()));
+  jccb(Assembler::below, done);
+  movptr(Address(java_thread, JavaThread::cont_fastpath_offset()), 0);
+  bind(done);
 }
 
 void MacroAssembler::inc_held_monitor_count(Register java_thread) {

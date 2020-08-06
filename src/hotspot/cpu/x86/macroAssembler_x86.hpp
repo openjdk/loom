@@ -506,8 +506,8 @@ class MacroAssembler: public Assembler {
   void push_CPU_state();
   void pop_CPU_state();
 
-  void get_cont_fastpath(Register java_thread, Register dst);
-  void set_cont_fastpath(Register java_thread, int32_t imm);
+  void push_cont_fastpath(Register java_thread);
+  void pop_cont_fastpath(Register java_thread);
   void inc_held_monitor_count(Register java_thread);
   void dec_held_monitor_count(Register java_thread);
   void reset_held_monitor_count(Register java_thread);

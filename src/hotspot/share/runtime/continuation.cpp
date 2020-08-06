@@ -3403,11 +3403,20 @@ static bool monitors_on_stack(JavaThread* thread) {
   ContinuationEntry* cont = thread->cont_entry();
   RegisterMap map(thread, false, false, false); // should first argument be true?
   map.set_include_argument_oops(false);
-  frame f = thread->last_frame();
-  while (true) {
-    if (!Continuation::is_frame_in_continuation(cont, f)) break;
+  for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(cont, f); f = f.sender(&map)) {
     if (is_pinned(f, &map) == freeze_pinned_monitor) return true;
-    f = f.sender(&map);
+  }
+  return false;
+}
+
+static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
+  ContinuationEntry* cont = thread->cont_entry();
+  RegisterMap map(thread, false, false, false); // should first argument be true?
+  map.set_include_argument_oops(false);
+  for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(cont, f); f = f.sender(&map)) {
+    if (f.is_interpreted_frame()) return true;
+    if (f.is_native_frame()) return true;
+    if (f.is_deoptimized_frame()) return true;
   }
   return false;
 }
@@ -3425,6 +3434,12 @@ int Continuation::freeze(JavaThread* thread, intptr_t* sp) {
 
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
   // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
+
+  #ifdef ASSERT
+    if (!(thread->cont_fastpath() == (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)))) { pns2(); pfl(); }
+  #endif
+  assert (thread->cont_fastpath() == (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)), "thread->raw_cont_fastpath(): " INTPTR_FORMAT " thread->cont_fastpath_thread_state(): %d", p2i(thread->raw_cont_fastpath()), thread->cont_fastpath_thread_state());
+
   // We also clear thread->cont_fastpath in Deoptimize::deoptimize_single_frame and when we thaw interpreted frames
   bool fast = UseContinuationFastPath && thread->cont_fastpath();
   assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
@@ -3661,7 +3676,9 @@ private:
   JavaThread* _thread;
   ContMirror& _cont;
 
-  bool _fastpath; // if true, a subsequent freeze can be in mode_fast
+  intptr_t* _fastpath;
+  
+  void maybe_set_fastpath(intptr_t* sp) { if (sp > _fastpath) _fastpath = sp; }
 
   RegisterMapT _map; // map is only passed to thaw_compiled_frame for use in deoptimize, which uses it only for biased locks; we may not need deoptimize there at all -- investigate
 
@@ -3696,7 +3713,7 @@ public:
 
   Thaw(JavaThread* thread, ContMirror& mirror) :
     _thread(thread), _cont(mirror),
-    _fastpath(true),
+    _fastpath(NULL),
     _map(thread, false, false, false),
     _preempt(false),
     _safepoint_stub_f(false) { // don't intitialize
@@ -4249,7 +4266,8 @@ public:
     _cont.dec_num_frames();
     _cont.dec_num_interpreted_frames();
 
-    _fastpath = false;
+    
+    maybe_set_fastpath(f.sp());
 
     return f;
   }
@@ -4344,7 +4362,7 @@ public:
       hf.cb()->as_compiled_method()->run_nmethod_entry_barrier();
 
       if (f.is_deoptimized_frame()) { // TODO PERF
-        _fastpath = false;
+        maybe_set_fastpath(f.sp());
       } else if (should_deoptimize()
           && (hf.cb()->as_compiled_method()->is_marked_for_deoptimization() || (mode != mode_fast && _thread->is_interp_only_mode()))) {
         log_develop_trace(jvmcont)("Deoptimizing thawed frame");
@@ -4358,7 +4376,7 @@ public:
         assert (f.is_deoptimized_frame() && is_deopt_return(f.raw_pc(), f),
           "f.is_deoptimized_frame(): %d is_deopt_return(f.raw_pc()): %d is_deopt_return(f.pc()): %d",
           f.is_deoptimized_frame(), is_deopt_return(f.raw_pc(), f), is_deopt_return(f.pc(), f));
-        _fastpath = false;
+        maybe_set_fastpath(f.sp());
       }
     }
 
@@ -4759,6 +4777,29 @@ bool Continuation::is_mounted(JavaThread* thread, oop cont_scope) {
       return true;
   }
   return false;
+}
+
+void Continuation::notify_deopt(JavaThread* thread, intptr_t* sp) {
+  ContinuationEntry* cont = thread->cont_entry();
+  
+  if (cont == NULL) return;
+  
+  if (is_sp_in_continuation(cont, sp)) {
+    if (sp > thread->raw_cont_fastpath())
+      thread->set_cont_fastpath(sp);
+    return;
+  }
+
+  ContinuationEntry* prev;
+  do {
+    prev = cont;
+    cont = cont->parent();
+  } while (cont != NULL && !is_sp_in_continuation(cont, sp));
+
+  if (cont == NULL) return;
+  assert (is_sp_in_continuation(cont, sp), "");
+  if (sp > prev->parent_cont_fastpath())
+      prev->set_parent_cont_fastpath(sp);
 }
 
 bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
