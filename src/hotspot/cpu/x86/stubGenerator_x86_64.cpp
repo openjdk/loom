@@ -385,6 +385,8 @@ class StubGenerator: public StubCodeGenerator {
     }
 #endif
 
+    __ pop_cont_fastpath(r15_thread);
+
     // restore regs belonging to calling function
 #ifdef _WIN64
     // emit the restores for xmm regs
@@ -413,8 +415,6 @@ class StubGenerator: public StubCodeGenerator {
 
     // restore rsp
     __ addptr(rsp, -rsp_after_call_off * wordSize);
-
-    __ pop_cont_fastpath(r15_thread);
 
     // return
     __ vzeroupper();

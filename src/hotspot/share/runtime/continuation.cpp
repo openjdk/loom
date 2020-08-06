@@ -3423,6 +3423,22 @@ static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
 #endif
 
 // Entry point to freeze. Transitions are handled manually
+static inline bool can_freeze_fast(JavaThread* thread) {
+  // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
+  // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
+  
+  #ifdef ASSERT
+    if (!(!thread->cont_fastpath() || (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)))) { pns2(); pfl(); }
+  #endif
+  assert (!thread->cont_fastpath() || (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)), "thread->raw_cont_fastpath(): " INTPTR_FORMAT " thread->cont_fastpath_thread_state(): %d", p2i(thread->raw_cont_fastpath()), thread->cont_fastpath_thread_state());
+
+  // We also clear thread->cont_fastpath in Deoptimize::deoptimize_single_frame and when we thaw interpreted frames
+  bool fast = UseContinuationFastPath && thread->cont_fastpath();
+  assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
+  fast = fast && thread->held_monitor_count() == 0;
+  // if (!fast) tty->print_cr(">>> freeze fast: %d thread.cont_fastpath: %d held_monitor_count: %d", fast, thread->cont_fastpath(), thread->held_monitor_count());
+  return fast;
+}
 int Continuation::freeze(JavaThread* thread, intptr_t* sp) {
   TRACE_CALL(int, Continuation::freeze(JavaThread* thread, intptr_t* sp))
   os::verify_stack_alignment();
@@ -3432,19 +3448,11 @@ int Continuation::freeze(JavaThread* thread, intptr_t* sp) {
 
   assert (sp == thread->frame_anchor()->last_Java_sp(), "");
 
-  // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
-  // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
+  if (thread->raw_cont_fastpath() > thread->cont_entry()->entry_sp() || thread->raw_cont_fastpath() < sp) {
+    thread->set_cont_fastpath(NULL);
+  }
 
-  #ifdef ASSERT
-    if (!(thread->cont_fastpath() == (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)))) { pns2(); pfl(); }
-  #endif
-  assert (thread->cont_fastpath() == (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)), "thread->raw_cont_fastpath(): " INTPTR_FORMAT " thread->cont_fastpath_thread_state(): %d", p2i(thread->raw_cont_fastpath()), thread->cont_fastpath_thread_state());
-
-  // We also clear thread->cont_fastpath in Deoptimize::deoptimize_single_frame and when we thaw interpreted frames
-  bool fast = UseContinuationFastPath && thread->cont_fastpath();
-  assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
-  fast = fast && thread->held_monitor_count() == 0;
-  // if (!fast) tty->print_cr(">>> freeze fast: %d thread.cont_fastpath: %d held_monitor_count: %d", fast, thread->cont_fastpath(), thread->held_monitor_count());
+  bool fast = can_freeze_fast(thread);
 
   return fast ? cont_freeze<mode_fast>(thread, sp, false)
               : cont_freeze<mode_slow>(thread, sp, false);
