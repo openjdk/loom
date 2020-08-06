@@ -3417,6 +3417,10 @@ static bool monitors_on_stack(JavaThread* thread) {
 int Continuation::freeze(JavaThread* thread, intptr_t* sp) {
   TRACE_CALL(int, Continuation::freeze(JavaThread* thread, intptr_t* sp))
   os::verify_stack_alignment();
+
+  // thread->frame_anchor()->set_last_Java_sp(sp);
+  // thread->frame_anchor()->make_walkable(thread);
+
   assert (sp == thread->frame_anchor()->last_Java_sp(), "");
 
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames

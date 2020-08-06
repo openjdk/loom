@@ -6639,18 +6639,6 @@ static Register get_thread() {
 #endif // LP64
 }
 
-static void setup_freeze_invocation(MacroAssembler* _masm, address pc) {
-  Register thread = get_thread();
-  NOT_LP64(__ push(thread));
-  LP64_ONLY(__ movptr(c_rarg0, thread));
-  __ set_last_Java_frame(rsp, rbp, pc);
-}
-
-static void teardown_freeze_invocation(MacroAssembler* _masm) {
-  __ reset_last_Java_frame(true);
-  NOT_LP64(__ pop(rdi));
-}
-
 RuntimeStub* generate_cont_doYield() {
     const char *name = "cont_doYield";
 
@@ -6686,9 +6674,15 @@ RuntimeStub* generate_cont_doYield() {
     __ post_call_nop(); // this must be exactly after the pc value that is pushed into the frame info, we use this nop for fast CodeBlob lookup
 
     if (ContPerfTest > 5) {
-      setup_freeze_invocation(_masm, the_pc);
+      Register thread = get_thread();
+      NOT_LP64(__ push(thread));
+      LP64_ONLY(__ movptr(c_rarg0, thread));
+      __ set_last_Java_frame(rsp, rbp, the_pc);
+
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
-      teardown_freeze_invocation(_masm);
+      
+      __ reset_last_Java_frame(true);
+      NOT_LP64(__ pop(rdi));
 
       // if (from_java) {
       //__ set_last_Java_frame(rsp, rbp, the_pc); // may be unnecessary. also, consider MacroAssembler::call_VM_leaf_base
