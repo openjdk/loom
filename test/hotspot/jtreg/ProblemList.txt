@@ -45,7 +45,6 @@ compiler/runtime/StackOverflowBug.java                           8242064 generic
 compiler/startup/SmallCodeCacheStartup.java                      8242064 generic-all
 compiler/exceptions/TestRecursiveReplacedException.java	         8242065 generic-all
 vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java 8242890 generic-all
-vmTestbase/nsk/jvmti/GetThreadGroupChildren/getthrdgrpchld001/TestDescription.java 8250261 generic-all
 
 # :hotspot_compiler
 

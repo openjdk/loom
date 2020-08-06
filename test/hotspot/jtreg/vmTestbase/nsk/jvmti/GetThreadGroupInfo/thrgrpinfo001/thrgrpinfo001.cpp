@@ -114,8 +114,10 @@ Java_nsk_jvmti_GetThreadGroupInfo_thrgrpinfo001_check(JNIEnv *env, jclass cls, j
         result = STATUS_FAILED;
     }
 
-    if (inf.is_daemon) {
-        printf("(%d) unexpected is_daemon: true\n", stage);
+    if (daemon != inf.is_daemon) {
+        printf("(%d) unexpected is_daemon: %s,", stage,
+            (inf.is_daemon == JNI_TRUE) ? "true" : "false");
+        printf(" expected: %s\n", (daemon == JNI_TRUE) ? "true" : "false");
         result = STATUS_FAILED;
     }
 
