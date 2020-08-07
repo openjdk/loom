@@ -894,9 +894,15 @@ frame Freeze<ConfigT, mode>::chunk_start_frame_pd(oop chunk, intptr_t* sp) {
   return frame(sp, sp, fp, pc, NULL, NULL, true);
 }
 
-static frame chunk_top_frame_pd(oop chunk, intptr_t* sp) {
+static frame chunk_top_frame_pd(oop chunk, intptr_t* sp, RegisterMap* map) {
   address pc = *(address*)(sp - 1);
-  intptr_t* fp = *(intptr_t**)(sp - 2);
+
+  intptr_t** fp_address = (intptr_t**)(sp - 2);
+  intptr_t* fp = *fp_address;
+  if (map->update_map()) {
+    frame::update_map_with_saved_link(map, fp_address);
+  }
+
   return frame(sp, sp, fp, pc, ContinuationCodeBlobLookup::find_blob(pc), NULL, true);
 }
 

@@ -104,8 +104,9 @@ public class Fuzz implements Runnable {
     }
 
     static void testRandom() {
-        System.out.println("-- RANDOM --");
-        testStream(random(new Random(1)).limit(50));
+        long seed = 1L; // System.currentTimeMillis();
+        System.out.println("-- RANDOM (seed: " + seed + ") --");
+        testStream(random(new Random(seed)).limit(50));
     }
 
     static Stream<Op[]> file(Path file) throws IOException {
