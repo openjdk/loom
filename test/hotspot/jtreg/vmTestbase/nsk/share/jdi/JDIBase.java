@@ -164,7 +164,7 @@ public class JDIBase {
             return;
         }
 
-        throw new JDITestRuntimeException("** event IS NOT a breakpoint ** Event: " + bpEvent.toString() + " <<<<<" + event.getClass().getName());
+        throw new JDITestRuntimeException("** event '" + event + "' IS NOT a breakpoint **");
     }
 
 }

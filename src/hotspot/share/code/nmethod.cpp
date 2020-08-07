@@ -909,7 +909,6 @@ void nmethod::log_identity(xmlStream* log) const {
 void nmethod::log_new_nmethod() const {
   if (LogCompilation && xtty != NULL) {
     ttyLocker ttyl;
-    HandleMark hm;
     xtty->begin_elem("nmethod");
     log_identity(xtty);
     xtty->print(" entry='" INTPTR_FORMAT "' size='%d'", p2i(code_begin()), size());
@@ -967,7 +966,6 @@ void nmethod::print_nmethod(bool printmethod) {
   // Print the header part, then print the requested information.
   // This is both handled in decode2().
   if (printmethod) {
-    HandleMark hm;
     ResourceMark m;
     if (is_compiled_by_c1()) {
       tty->cr();
@@ -2478,6 +2476,7 @@ void nmethod::verify() {
 
 
 void nmethod::verify_interrupt_point(address call_site) {
+
   // Verify IC only when nmethod installation is finished.
   if (!is_not_installed()) {
     if (CompiledICLocker::is_safe(this)) {
@@ -2487,6 +2486,8 @@ void nmethod::verify_interrupt_point(address call_site) {
       CompiledIC_at(this, call_site);
     }
   }
+
+  HandleMark hm(Thread::current());
 
   PcDesc* pd = pc_desc_at(nativeCall_at(call_site)->return_address());
   assert(pd != NULL, "PcDesc must exist");
@@ -2627,7 +2628,6 @@ void nmethod::print(outputStream* st) const {
 }
 
 void nmethod::print_code() {
-  HandleMark hm;
   ResourceMark m;
   ttyLocker ttyl;
   // Call the specialized decode method of this class.
@@ -2657,7 +2657,6 @@ void nmethod::print_dependencies() {
 
 // Print the oops from the underlying CodeBlob.
 void nmethod::print_oops(outputStream* st) {
-  HandleMark hm;
   ResourceMark m;
   st->print("Oops:");
   if (oops_begin() < oops_end()) {
@@ -2683,7 +2682,6 @@ void nmethod::print_oops(outputStream* st) {
 
 // Print metadata pool.
 void nmethod::print_metadata(outputStream* st) {
-  HandleMark hm;
   ResourceMark m;
   st->print("Metadata:");
   if (metadata_begin() < metadata_end()) {

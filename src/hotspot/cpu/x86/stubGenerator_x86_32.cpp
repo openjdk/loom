@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -425,38 +425,6 @@ class StubGenerator: public StubCodeGenerator {
     // rbx: exception handler
     // rdx: throwing pc
     __ jmp(handler_addr);
-
-    return start;
-  }
-
-
-  //----------------------------------------------------------------------------------------------------
-  // Implementation of int32_t atomic_xchg(int32_t exchange_value, volatile int32_t* dest)
-  // used by Atomic::xchg(volatile int32_t* dest, int32_t exchange_value)
-  //
-  // xchg exists as far back as 8086, lock needed for MP only
-  // Stack layout immediately after call:
-  //
-  // 0 [ret addr ] <--- rsp
-  // 1 [  ex     ]
-  // 2 [  dest   ]
-  //
-  // Result:   *dest <- ex, return (old *dest)
-  //
-  // Note: win32 does not currently use this code
-
-  address generate_atomic_xchg() {
-    StubCodeMark mark(this, "StubRoutines", "atomic_xchg");
-    address start = __ pc();
-
-    __ push(rdx);
-    Address exchange(rsp, 2 * wordSize);
-    Address dest_addr(rsp, 3 * wordSize);
-    __ movl(rax, exchange);
-    __ movptr(rdx, dest_addr);
-    __ xchgl(rax, Address(rdx, 0));
-    __ pop(rdx);
-    __ ret(0);
 
     return start;
   }
@@ -2916,6 +2884,46 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
+  // ofs and limit are use for multi-block byte array.
+  // int com.sun.security.provider.MD5.implCompress(byte[] b, int ofs)
+  address generate_md5_implCompress(bool multi_block, const char *name) {
+    __ align(CodeEntryAlignment);
+    StubCodeMark mark(this, "StubRoutines", name);
+    address start = __ pc();
+
+    const Register buf_param = rbp;
+    const Address state_param(rsp, 0 * wordSize);
+    const Address ofs_param  (rsp, 1 * wordSize);
+    const Address limit_param(rsp, 2 * wordSize);
+
+    __ enter();
+    __ push(rbx);
+    __ push(rdi);
+    __ push(rsi);
+    __ push(rbp);
+    __ subptr(rsp, 3 * wordSize);
+
+    __ movptr(rsi, Address(rbp, 8 + 4));
+    __ movptr(state_param, rsi);
+    if (multi_block) {
+      __ movptr(rsi, Address(rbp, 8 + 8));
+      __ movptr(ofs_param, rsi);
+      __ movptr(rsi, Address(rbp, 8 + 12));
+      __ movptr(limit_param, rsi);
+    }
+    __ movptr(buf_param, Address(rbp, 8 + 0)); // do it last because it override rbp
+    __ fast_md5(buf_param, state_param, ofs_param, limit_param, multi_block);
+
+    __ addptr(rsp, 3 * wordSize);
+    __ pop(rbp);
+    __ pop(rsi);
+    __ pop(rdi);
+    __ pop(rbx);
+    __ leave();
+    __ ret(0);
+    return start;
+  }
+
   address generate_upper_word_mask() {
     __ align(64);
     StubCodeMark mark(this, "StubRoutines", "upper_word_mask");
@@ -3797,9 +3805,6 @@ class StubGenerator: public StubCodeGenerator {
     // is referenced by megamorphic call
     StubRoutines::_catch_exception_entry        = generate_catch_exception();
 
-    // These are currently used by Solaris/Intel
-    StubRoutines::_atomic_xchg_entry            = generate_atomic_xchg();
-
     // platform dependent
     create_control_words();
 
@@ -3921,6 +3926,10 @@ class StubGenerator: public StubCodeGenerator {
       StubRoutines::_counterMode_AESCrypt = generate_counterMode_AESCrypt_Parallel();
     }
 
+    if (UseMD5Intrinsics) {
+      StubRoutines::_md5_implCompress = generate_md5_implCompress(false, "md5_implCompress");
+      StubRoutines::_md5_implCompressMB = generate_md5_implCompress(true, "md5_implCompressMB");
+    }
     if (UseSHA1Intrinsics) {
       StubRoutines::x86::_upper_word_mask_addr = generate_upper_word_mask();
       StubRoutines::x86::_shuffle_byte_flip_mask_addr = generate_shuffle_byte_flip_mask();

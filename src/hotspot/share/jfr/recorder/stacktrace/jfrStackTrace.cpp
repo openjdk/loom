@@ -263,7 +263,8 @@ inline bool is_virtual(JavaThread* jt) {
 
 bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool async_mode, bool* virtual_thread) {
   assert(jt != NULL, "invariant");
-  HandleMark hm; // TODO: RegisterMap uses Handles for continuations. But some callers here have NoHandleMark set.
+  Thread* current_thread = Thread::current();
+  HandleMark hm(current_thread); // TODO: RegisterMap uses Handles for continuations. But some callers here have NoHandleMark set.
   JfrVframeStream vfs(jt, frame, async_mode);
   u4 count = 0;
   _reached_root = true;

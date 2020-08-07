@@ -226,6 +226,8 @@ class StubRoutines: AllStatic {
   static address _ghash_processBlocks;
   static address _base64_encodeBlock;
 
+  static address _md5_implCompress;
+  static address _md5_implCompressMB;
   static address _sha1_implCompress;
   static address _sha1_implCompressMB;
   static address _sha256_implCompress;
@@ -422,6 +424,8 @@ class StubRoutines: AllStatic {
   static address counterMode_AESCrypt()  { return _counterMode_AESCrypt; }
   static address ghash_processBlocks()   { return _ghash_processBlocks; }
   static address base64_encodeBlock()    { return _base64_encodeBlock; }
+  static address md5_implCompress()      { return _md5_implCompress; }
+  static address md5_implCompressMB()    { return _md5_implCompressMB; }
   static address sha1_implCompress()     { return _sha1_implCompress; }
   static address sha1_implCompressMB()   { return _sha1_implCompressMB; }
   static address sha256_implCompress()   { return _sha256_implCompress; }

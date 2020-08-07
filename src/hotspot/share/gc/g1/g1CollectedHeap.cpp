@@ -3421,7 +3421,6 @@ public:
   virtual void work(uint worker_id) {
     // The reference processing task executed by a single worker.
     ResourceMark rm;
-    HandleMark   hm;
 
     G1STWIsAliveClosure is_alive(_g1h);
 
@@ -3794,7 +3793,6 @@ public:
 
     {
       ResourceMark rm;
-      HandleMark   hm;
 
       G1ParScanThreadState* pss = _per_thread_states->state_for_worker(worker_id);
       pss->set_ref_discoverer(_g1h->ref_processor_stw());

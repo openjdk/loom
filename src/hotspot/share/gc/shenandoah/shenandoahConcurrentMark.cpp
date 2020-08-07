@@ -289,14 +289,14 @@ public:
       bool do_nmethods = heap->unload_classes() && !ShenandoahConcurrentRoots::can_do_concurrent_class_unloading();
       if (heap->has_forwarded_objects()) {
         ShenandoahMarkResolveRefsClosure resolve_mark_cl(q, rp);
-        MarkingCodeBlobClosure blobsCl(&resolve_mark_cl, !CodeBlobToOopClosure::FixRelocations);
+        MarkingCodeBlobClosure blobsCl(&resolve_mark_cl, !CodeBlobToOopClosure::FixRelocations, true /*FIXME*/);
         ShenandoahSATBAndRemarkCodeRootsThreadsClosure tc(&cl,
                                                           ShenandoahStoreValEnqueueBarrier ? &resolve_mark_cl : NULL,
                                                           do_nmethods ? &blobsCl : NULL);
         Threads::threads_do(&tc);
       } else {
         ShenandoahMarkRefsClosure mark_cl(q, rp);
-        MarkingCodeBlobClosure blobsCl(&mark_cl, !CodeBlobToOopClosure::FixRelocations);
+        MarkingCodeBlobClosure blobsCl(&mark_cl, !CodeBlobToOopClosure::FixRelocations, true /*FIXME*/);
         ShenandoahSATBAndRemarkCodeRootsThreadsClosure tc(&cl,
                                                           ShenandoahStoreValEnqueueBarrier ? &mark_cl : NULL,
                                                           do_nmethods ? &blobsCl : NULL);
@@ -654,8 +654,9 @@ public:
   }
 
   void work(uint worker_id) {
-    ResourceMark rm;
-    HandleMark hm;
+    Thread* current_thread = Thread::current();
+    ResourceMark rm(current_thread);
+    HandleMark hm(current_thread);
     assert(ShenandoahSafepoint::is_at_shenandoah_safepoint(), "Must be at a safepoint");
     ShenandoahHeap* heap = ShenandoahHeap::heap();
     ShenandoahParallelWorkerSession worker_session(worker_id);

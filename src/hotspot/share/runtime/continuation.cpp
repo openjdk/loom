@@ -6096,7 +6096,7 @@ bool Continuation::debug_is_continuation(oop obj) {
 bool Continuation::debug_is_continuation_run_frame(const frame& f) {
   bool is_continuation_run = false;
   if (f.is_compiled_frame()) {
-    HandleMark hm;
+    HandleMark hm(Thread::current());
     ResourceMark rm;
     Method* m = f.cb()->as_compiled_method()->scope_desc_at(f.pc())->method();
     if (m != NULL) {
@@ -6238,7 +6238,7 @@ static void print_frames(JavaThread* thread, outputStream* st) {
   map.set_skip_missing(true);
   ResetNoHandleMark rnhm;
   ResourceMark rm;
-  HandleMark hm;
+  HandleMark hm(Thread::current());
   FrameValues values;
 #endif
 

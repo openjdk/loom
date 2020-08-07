@@ -27,6 +27,7 @@
 #include "jfr/dcmd/jfrDcmds.hpp"
 #include "jfr/instrumentation/jfrJvmtiAgent.hpp"
 #include "jfr/jni/jfrJavaSupport.hpp"
+#include "jfr/leakprofiler/sampling/objectSampler.hpp"
 #include "jfr/periodic/jfrOSInterface.hpp"
 #include "jfr/periodic/sampling/jfrThreadSampler.hpp"
 #include "jfr/recorder/jfrRecorder.hpp"
@@ -75,11 +76,19 @@ bool JfrRecorder::is_enabled() {
   return _enabled;
 }
 
+bool JfrRecorder::create_oop_storages() {
+  // currently only a single weak oop storage for Leak Profiler
+  return ObjectSampler::create_oop_storage();
+}
+
 bool JfrRecorder::on_create_vm_1() {
   if (!is_disabled()) {
     if (FlightRecorder || StartFlightRecording != NULL) {
       enable();
     }
+  }
+  if (!create_oop_storages()) {
+    return false;
   }
   // fast time initialization
   return JfrTime::initialize();
@@ -251,8 +260,9 @@ bool JfrRecorder::is_created() {
 }
 
 bool JfrRecorder::create_components() {
-  ResourceMark rm;
-  HandleMark hm;
+  // Move these down into the functions that might create handles!
+  ResourceMark rm(Thread::current());
+  HandleMark hm(Thread::current());
 
   if (!create_java_event_writer()) {
     return false;

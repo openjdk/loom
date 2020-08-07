@@ -1009,7 +1009,6 @@ void PSParallelCompact::pre_compact()
   heap->ensure_parsability(true);  // retire TLABs
 
   if (VerifyBeforeGC && heap->total_collections() >= VerifyGCStartAt) {
-    HandleMark hm;  // Discard invalid handles created during verification
     Universe::verify("Before GC");
   }
 
@@ -1792,7 +1791,6 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 
   {
     ResourceMark rm;
-    HandleMark hm;
 
     const uint active_workers =
       WorkerPolicy::calc_active_workers(ParallelScavengeHeap::heap()->workers().total_workers(),
@@ -1949,7 +1947,6 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 #endif // ASSERT
 
   if (VerifyAfterGC && heap->total_collections() >= VerifyGCStartAt) {
-    HandleMark hm;  // Discard invalid handles created during verification
     Universe::verify("After GC");
   }
 

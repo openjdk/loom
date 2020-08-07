@@ -1127,7 +1127,7 @@ public:
     ShenandoahParallelWorkerSession worker_session(worker_id);
     ShenandoahEvacOOMScope oom_evac_scope;
     ShenandoahEvacuateUpdateRootsClosure<> cl;
-    MarkingCodeBlobClosure blobsCl(&cl, CodeBlobToOopClosure::FixRelocations);
+    MarkingCodeBlobClosure blobsCl(&cl, CodeBlobToOopClosure::FixRelocations, true /*FIXME*/);
     _rp->roots_do(worker_id, &cl);
   }
 };
