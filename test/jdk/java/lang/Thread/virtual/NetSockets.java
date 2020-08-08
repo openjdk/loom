@@ -111,7 +111,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in write.
      */
-    public void testSockeWrite1() throws Exception {
+    public void testSocketWrite1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
                 Socket s1 = connection.socket1();
