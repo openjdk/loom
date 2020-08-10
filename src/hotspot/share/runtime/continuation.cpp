@@ -2343,13 +2343,13 @@ public:
         sp += argsize;
         assert (sp <= jdk_internal_misc_StackChunk::size(chunk), "");
         
-        if (UNLIKELY(argsize != 0)) { // patch pc, because we'll be copying it with the args into the middle of a chunk
-          intptr_t* const bottom_sp = bottom - argsize;
-          assert (bottom_sp == _bottom_address, "");
-          // we're patching the thread stack, not the chunk, as it's hopefully still hot in the cache
-          log_develop_trace(jvmcont)("patching bottom sp: " INTPTR_FORMAT, p2i(bottom_sp));
-           *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = jdk_internal_misc_StackChunk::pc(chunk);
-        }
+        // if (UNLIKELY(argsize != 0)) { // patch pc, because we'll be copying it with the args into the middle of a chunk; no harm in always doing this
+        // we're patching the thread stack, not the chunk, as it's hopefully still hot in the cache
+        intptr_t* const bottom_sp = bottom - argsize;
+        assert (bottom_sp == _bottom_address, "");
+        log_develop_trace(jvmcont)("patching bottom sp: " INTPTR_FORMAT, p2i(bottom_sp));
+        *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = jdk_internal_misc_StackChunk::pc(chunk);
+        // }
       } else {
         jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
       }
