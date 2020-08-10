@@ -1380,17 +1380,25 @@ static bool assert_frame_laid_out(frame f) {
   return f.raw_pc() == pc && f.fp() == fp;
 }
 
-static bool assert_entry_frame_laid_out(ContinuationEntry* cont) {
-  intptr_t* sp = cont->entry_sp();
-  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
-  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
-  CodeBlob* cb = CodeCache::find_blob(pc);
+// static bool assert_entry_frame_laid_out(ContinuationEntry* cont) {
+//   intptr_t* sp = cont->entry_sp();
+//   address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+//   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
+//   CodeBlob* cb = CodeCache::find_blob(pc);
 
-  assert (cb->is_compiled(), "");
-  assert (cb->as_compiled_method()->method()->is_continuation_enter_intrinsic(), "");
-  assert (cont->entry_fp() == fp, "entry_fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(cont->entry_sp()), p2i(fp));
-  return cb->as_compiled_method()->method()->is_continuation_enter_intrinsic() && cont->entry_fp() == fp;
-}
+//   // if (!cb->is_compiled()) {
+//   //   tty->print_cr(">>>>>>><<<<<<<<<");
+//   //   tty->print_cr(">>>> entry sp: %p", sp);
+//   //   pfl();
+//   //   cb->print_on(tty);
+//   //   os::print_location(tty, (intptr_t)pc);
+//   // }
+  
+//   assert (cb->is_compiled(), "");
+//   assert (cb->as_compiled_method()->method()->is_continuation_enter_intrinsic(), "");
+//   assert (cont->entry_fp() == fp, "entry_fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(cont->entry_sp()), p2i(fp));
+//   return cb->as_compiled_method()->method()->is_continuation_enter_intrinsic() && cont->entry_fp() == fp;
+// }
 
 bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_size, int* out_frames, int* out_oops) {
   const int metadata = 2;
