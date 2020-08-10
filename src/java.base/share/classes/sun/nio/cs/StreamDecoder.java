@@ -42,12 +42,15 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.IllegalCharsetNameException;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class StreamDecoder extends Reader
 {
 
     private static final int MIN_BYTE_BUFFER_SIZE = 32;
     private static final int DEFAULT_BYTE_BUFFER_SIZE = 8192;
+
+    private final ReentrantLock decoderLock;
 
     private volatile boolean closed;
 
@@ -122,89 +125,141 @@ public class StreamDecoder extends Reader
         return read0();
     }
 
-    @SuppressWarnings("fallthrough")
     private int read0() throws IOException {
-        synchronized (lock) {
-
-            // Return the leftover char, if there is one
-            if (haveLeftoverChar) {
-                haveLeftoverChar = false;
-                return leftoverChar;
+        if (decoderLock != null) {
+            decoderLock.lock();
+            try {
+                return lockedRead0();
+            } finally {
+                decoderLock.unlock();
             }
-
-            // Convert more bytes
-            char cb[] = new char[2];
-            int n = read(cb, 0, 2);
-            switch (n) {
-            case -1:
-                return -1;
-            case 2:
-                leftoverChar = cb[1];
-                haveLeftoverChar = true;
-                // FALL THROUGH
-            case 1:
-                return cb[0];
-            default:
-                assert false : n;
-                return -1;
+        } else {
+            synchronized (lock) {
+                return lockedRead0();
             }
+        }
+    }
+
+    @SuppressWarnings("fallthrough")
+    private int lockedRead0() throws IOException {
+        // Return the leftover char, if there is one
+        if (haveLeftoverChar) {
+            haveLeftoverChar = false;
+            return leftoverChar;
+        }
+
+        // Convert more bytes
+        char cb[] = new char[2];
+        int n = read(cb, 0, 2);
+        switch (n) {
+        case -1:
+            return -1;
+        case 2:
+            leftoverChar = cb[1];
+            haveLeftoverChar = true;
+            // FALL THROUGH
+        case 1:
+            return cb[0];
+        default:
+            assert false : n;
+            return -1;
         }
     }
 
     public int read(char cbuf[], int offset, int length) throws IOException {
+        if (decoderLock != null) {
+            decoderLock.lock();
+            try {
+                return lockedRead(cbuf, offset, length);
+            } finally {
+                decoderLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                return lockedRead(cbuf, offset, length);
+            }
+        }
+    }
+
+    private int lockedRead(char cbuf[], int offset, int length) throws IOException {
         int off = offset;
         int len = length;
-        synchronized (lock) {
-            ensureOpen();
-            if ((off < 0) || (off > cbuf.length) || (len < 0) ||
-                ((off + len) > cbuf.length) || ((off + len) < 0)) {
-                throw new IndexOutOfBoundsException();
-            }
-            if (len == 0)
-                return 0;
 
-            int n = 0;
-
-            if (haveLeftoverChar) {
-                // Copy the leftover char into the buffer
-                cbuf[off] = leftoverChar;
-                off++; len--;
-                haveLeftoverChar = false;
-                n = 1;
-                if ((len == 0) || !implReady())
-                    // Return now if this is all we can produce w/o blocking
-                    return n;
-            }
-
-            if (len == 1) {
-                // Treat single-character array reads just like read()
-                int c = read0();
-                if (c == -1)
-                    return (n == 0) ? -1 : n;
-                cbuf[off] = (char)c;
-                return n + 1;
-            }
-
-            return n + implRead(cbuf, off, off + len);
+        ensureOpen();
+        if ((off < 0) || (off > cbuf.length) || (len < 0) ||
+            ((off + len) > cbuf.length) || ((off + len) < 0)) {
+            throw new IndexOutOfBoundsException();
         }
+        if (len == 0)
+            return 0;
+
+        int n = 0;
+
+        if (haveLeftoverChar) {
+            // Copy the leftover char into the buffer
+            cbuf[off] = leftoverChar;
+            off++; len--;
+            haveLeftoverChar = false;
+            n = 1;
+            if ((len == 0) || !implReady())
+                // Return now if this is all we can produce w/o blocking
+                return n;
+        }
+
+        if (len == 1) {
+            // Treat single-character array reads just like read()
+            int c = read0();
+            if (c == -1)
+                return (n == 0) ? -1 : n;
+            cbuf[off] = (char)c;
+            return n + 1;
+        }
+
+        return n + implRead(cbuf, off, off + len);
     }
 
     public boolean ready() throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            return haveLeftoverChar || implReady();
+        if (decoderLock != null) {
+            decoderLock.lock();
+            try {
+                return lockedReady();
+            } finally {
+                decoderLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                return lockedReady();
+            }
         }
     }
 
+    private boolean lockedReady() throws IOException {
+        ensureOpen();
+        return haveLeftoverChar || implReady();
+    }
+
     public void close() throws IOException {
-        synchronized (lock) {
-            if (closed)
-                return;
+        if (decoderLock != null) {
+            decoderLock.lock();
             try {
-                implClose();
+                lockedClose();
             } finally {
-                closed = true;
+                decoderLock.unlock();
             }
+        } else {
+            synchronized (lock) {
+                lockedClose();
+            }
+        }
+    }
+
+    private void lockedClose() throws IOException {
+        if (closed)
+            return;
+        try {
+            implClose();
+        } finally {
+            closed = true;
         }
     }
 
@@ -254,16 +309,22 @@ public class StreamDecoder extends Reader
 
         // This path disabled until direct buffers are faster
         if (false && in instanceof FileInputStream) {
-        ch = getChannel((FileInputStream)in);
-        if (ch != null)
-            bb = ByteBuffer.allocateDirect(DEFAULT_BYTE_BUFFER_SIZE);
+            ch = getChannel((FileInputStream)in);
+            if (ch != null)
+                bb = ByteBuffer.allocateDirect(DEFAULT_BYTE_BUFFER_SIZE);
         }
         if (ch == null) {
-        this.in = in;
-        this.ch = null;
-        bb = ByteBuffer.allocate(DEFAULT_BYTE_BUFFER_SIZE);
+            this.in = in;
+            this.ch = null;
+            bb = ByteBuffer.allocate(DEFAULT_BYTE_BUFFER_SIZE);
         }
         bb.flip();                      // So that bb is initially empty
+
+        if (lock instanceof ReentrantLock) {
+            decoderLock = (ReentrantLock) lock;
+        } else {
+            decoderLock = null;
+        }
     }
 
     StreamDecoder(ReadableByteChannel ch, CharsetDecoder dec, int mbc) {
@@ -277,6 +338,12 @@ public class StreamDecoder extends Reader
                                      ? MIN_BYTE_BUFFER_SIZE
                                      : mbc));
         bb.flip();
+
+        if (lock instanceof ReentrantLock) {
+            decoderLock = (ReentrantLock) lock;
+        } else {
+            decoderLock = null;
+        }
     }
 
     private int readBytes() throws IOException {

@@ -26,6 +26,8 @@
 package java.io;
 
 
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  * Writes text to a character-output stream, buffering characters so as to
  * provide for the efficient writing of single characters, arrays, and strings.
@@ -70,6 +72,9 @@ public class BufferedWriter extends Writer {
     private char cb[];
     private int nChars, nextChar;
 
+    // initialized to null when BufferedWriter is sub-classed
+    private final ReentrantLock altLock;
+
     private static int defaultCharBufferSize = 8192;
 
     /**
@@ -99,6 +104,13 @@ public class BufferedWriter extends Writer {
         cb = new char[sz];
         nChars = sz;
         nextChar = 0;
+
+        // use monitors when BufferedWriter is sub-classed
+        if (getClass() == BufferedWriter.class) {
+            altLock = new ReentrantLock();
+        } else {
+            altLock = null;
+        }
     }
 
     /** Checks to make sure that the stream has not been closed */
@@ -113,13 +125,26 @@ public class BufferedWriter extends Writer {
      * may be invoked by PrintStream.
      */
     void flushBuffer() throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            if (nextChar == 0)
-                return;
-            out.write(cb, 0, nextChar);
-            nextChar = 0;
+        if (altLock != null) {
+            altLock.lock();
+            try {
+                lockedFlushBuffer();
+            } finally {
+                altLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                lockedFlushBuffer();
+            }
         }
+    }
+
+    private void lockedFlushBuffer() throws IOException {
+        ensureOpen();
+        if (nextChar == 0)
+            return;
+        out.write(cb, 0, nextChar);
+        nextChar = 0;
     }
 
     /**
@@ -128,12 +153,25 @@ public class BufferedWriter extends Writer {
      * @throws     IOException  If an I/O error occurs
      */
     public void write(int c) throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            if (nextChar >= nChars)
-                flushBuffer();
-            cb[nextChar++] = (char) c;
+        if (altLock != null) {
+            altLock.lock();
+            try {
+                lockedWrite(c);
+            } finally {
+                altLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                lockedWrite(c);
+            }
         }
+    }
+
+    private void lockedWrite(int c) throws IOException {
+        ensureOpen();
+        if (nextChar >= nChars)
+            flushBuffer();
+        cb[nextChar++] = (char) c;
     }
 
     /**
@@ -167,33 +205,46 @@ public class BufferedWriter extends Writer {
      * @throws  IOException  If an I/O error occurs
      */
     public void write(char cbuf[], int off, int len) throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            if ((off < 0) || (off > cbuf.length) || (len < 0) ||
-                ((off + len) > cbuf.length) || ((off + len) < 0)) {
-                throw new IndexOutOfBoundsException();
-            } else if (len == 0) {
-                return;
+        if (altLock != null) {
+            altLock.lock();
+            try {
+                lockedWrite(cbuf, off, len);
+            } finally {
+                altLock.unlock();
             }
+        } else {
+            synchronized (lock) {
+                lockedWrite(cbuf, off, len);
+            }
+        }
+    }
 
-            if (len >= nChars) {
-                /* If the request length exceeds the size of the output buffer,
-                   flush the buffer and then write the data directly.  In this
-                   way buffered streams will cascade harmlessly. */
+    private void lockedWrite(char cbuf[], int off, int len) throws IOException {
+        ensureOpen();
+        if ((off < 0) || (off > cbuf.length) || (len < 0) ||
+            ((off + len) > cbuf.length) || ((off + len) < 0)) {
+            throw new IndexOutOfBoundsException();
+        } else if (len == 0) {
+            return;
+        }
+
+        if (len >= nChars) {
+            /* If the request length exceeds the size of the output buffer,
+               flush the buffer and then write the data directly.  In this
+               way buffered streams will cascade harmlessly. */
+            flushBuffer();
+            out.write(cbuf, off, len);
+            return;
+        }
+
+        int b = off, t = off + len;
+        while (b < t) {
+            int d = min(nChars - nextChar, t - b);
+            System.arraycopy(cbuf, b, cb, nextChar, d);
+            b += d;
+            nextChar += d;
+            if (nextChar >= nChars)
                 flushBuffer();
-                out.write(cbuf, off, len);
-                return;
-            }
-
-            int b = off, t = off + len;
-            while (b < t) {
-                int d = min(nChars - nextChar, t - b);
-                System.arraycopy(cbuf, b, cb, nextChar, d);
-                b += d;
-                nextChar += d;
-                if (nextChar >= nChars)
-                    flushBuffer();
-            }
         }
     }
 
@@ -220,18 +271,31 @@ public class BufferedWriter extends Writer {
      * @throws  IOException  If an I/O error occurs
      */
     public void write(String s, int off, int len) throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-
-            int b = off, t = off + len;
-            while (b < t) {
-                int d = min(nChars - nextChar, t - b);
-                s.getChars(b, b + d, cb, nextChar);
-                b += d;
-                nextChar += d;
-                if (nextChar >= nChars)
-                    flushBuffer();
+        if (altLock != null) {
+            altLock.lock();
+            try {
+                lockedWrite(s, off, len);
+            } finally {
+                altLock.unlock();
             }
+        } else {
+            synchronized (lock) {
+                lockedWrite(s, off, len);
+            }
+        }
+    }
+
+    private void lockedWrite(String s, int off, int len) throws IOException {
+        ensureOpen();
+
+        int b = off, t = off + len;
+        while (b < t) {
+            int d = min(nChars - nextChar, t - b);
+            s.getChars(b, b + d, cb, nextChar);
+            b += d;
+            nextChar += d;
+            if (nextChar >= nChars)
+                flushBuffer();
         }
     }
 
@@ -252,24 +316,50 @@ public class BufferedWriter extends Writer {
      * @throws     IOException  If an I/O error occurs
      */
     public void flush() throws IOException {
-        synchronized (lock) {
-            flushBuffer();
-            out.flush();
+        if (altLock != null) {
+            altLock.lock();
+            try {
+                lockedFlush();
+            } finally {
+                altLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                lockedFlush();
+            }
+        }
+    }
+
+    private void lockedFlush() throws IOException {
+        flushBuffer();
+        out.flush();
+    }
+
+    public void close() throws IOException {
+        if (altLock != null) {
+            altLock.lock();
+            try {
+                lockedClose();
+            } finally {
+                altLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                lockedClose();
+            }
         }
     }
 
     @SuppressWarnings("try")
-    public void close() throws IOException {
-        synchronized (lock) {
-            if (out == null) {
-                return;
-            }
-            try (Writer w = out) {
-                flushBuffer();
-            } finally {
-                out = null;
-                cb = null;
-            }
+    private void lockedClose() throws IOException {
+        if (out == null) {
+            return;
+        }
+        try (Writer w = out) {
+            flushBuffer();
+        } finally {
+            out = null;
+            cb = null;
         }
     }
 }

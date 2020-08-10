@@ -27,6 +27,8 @@ package java.io;
 
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
+import java.util.concurrent.locks.ReentrantLock;
+
 import sun.nio.cs.StreamDecoder;
 
 
@@ -63,6 +65,14 @@ public class InputStreamReader extends Reader {
 
     private final StreamDecoder sd;
 
+    private static Object lockFor(InputStreamReader reader) {
+        if (reader.getClass() == InputStreamReader.class) {
+            return new ReentrantLock();
+        } else {
+            return reader;
+        }
+    }
+
     /**
      * Creates an InputStreamReader that uses the default charset.
      *
@@ -70,7 +80,7 @@ public class InputStreamReader extends Reader {
      */
     public InputStreamReader(InputStream in) {
         super(in);
-        sd = StreamDecoder.forInputStreamReader(in, this,
+        sd = StreamDecoder.forInputStreamReader(in, lockFor(this),
                 Charset.defaultCharset()); // ## check lock object
     }
 
@@ -93,7 +103,7 @@ public class InputStreamReader extends Reader {
         super(in);
         if (charsetName == null)
             throw new NullPointerException("charsetName");
-        sd = StreamDecoder.forInputStreamReader(in, this, charsetName);
+        sd = StreamDecoder.forInputStreamReader(in, lockFor(this), charsetName);
     }
 
     /**
@@ -109,7 +119,7 @@ public class InputStreamReader extends Reader {
         super(in);
         if (cs == null)
             throw new NullPointerException("charset");
-        sd = StreamDecoder.forInputStreamReader(in, this, cs);
+        sd = StreamDecoder.forInputStreamReader(in, lockFor(this), cs);
     }
 
     /**
@@ -125,7 +135,7 @@ public class InputStreamReader extends Reader {
         super(in);
         if (dec == null)
             throw new NullPointerException("charset decoder");
-        sd = StreamDecoder.forInputStreamReader(in, this, dec);
+        sd = StreamDecoder.forInputStreamReader(in, lockFor(this), dec);
     }
 
     /**
