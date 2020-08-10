@@ -184,6 +184,7 @@ static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap,
 template <class OopClosureType, bool concurrent_gc>
 void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure) {
     // see sender_for_compiled_frame
+  const int metadata = 2;
 
   assert (Continuation::debug_is_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack requires_barriers: %d", !Universe::heap()->requires_barriers(chunk));
@@ -204,9 +205,11 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
     assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
   }
 
+  int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
+  if (argsize > 0) argsize += metadata;
+  intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
   CodeBlob* cb = NULL;
-  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
   for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - 1);
     log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
@@ -276,7 +279,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
 
 template <class OopClosureType>
 void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* closure, MemRegion mr) {
-  assert (false, ""); // TODO REMOVE
+  guarantee (false, ""); // TODO REMOVE
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded");
   intptr_t* const l = (intptr_t*)mr.start();
   intptr_t* const h = (intptr_t*)mr.end();

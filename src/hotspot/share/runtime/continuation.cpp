@@ -133,6 +133,7 @@ template<int x> NOINLINE static bool verify_stack_chunk(oop chunk) { return Cont
 #ifdef ASSERT
 extern "C" void pns2();
 extern "C" void pfl();
+extern "C" void find(intptr_t x);
 #endif
 
 int Continuations::_flags = 0;
@@ -2326,10 +2327,10 @@ public:
     assert (size > 0, "");
 
     int sp;
-    bool allocated;
+    DEBUG_ONLY(bool allocated;)
     if (LIKELY(chunk_available)) {
       assert (chunk == _cont.tail() && is_chunk_available(top_sp), "");
-      allocated = false;
+      DEBUG_ONLY(allocated = false;)
       sp = jdk_internal_misc_StackChunk::sp(chunk);
       // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
       // if (requires_barriers(chunk)) {
@@ -2341,6 +2342,16 @@ public:
       if (sp < jdk_internal_misc_StackChunk::size(chunk)) {
         sp += argsize;
         assert (sp <= jdk_internal_misc_StackChunk::size(chunk), "");
+        
+        if (UNLIKELY(argsize != 0)) { // patch pc, because we'll be copying it with the args into the middle of a chunk
+          intptr_t* const bottom_sp = bottom - argsize;
+          assert (bottom_sp == _bottom_address, "");
+          // we're patching the thread stack, not the chunk, as it's hopefully still hot in the cache
+          log_develop_trace(jvmcont)("patching bottom sp: " INTPTR_FORMAT, p2i(bottom_sp));
+           *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = jdk_internal_misc_StackChunk::pc(chunk);
+        }
+      } else {
+        jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
       }
       // ContMirror::reset_chunk_counters(chunk);
     } else {
@@ -2357,7 +2368,8 @@ public:
         return false;
       }
 
-      allocated = true;
+      DEBUG_ONLY(allocated = true;)
+      jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
       sp = jdk_internal_misc_StackChunk::sp(chunk);
 
       assert (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL || ContMirror::is_stack_chunk(jdk_internal_misc_StackChunk::parent(chunk)), "");
@@ -2395,14 +2407,7 @@ public:
     _cont.set_flag(FLAG_SAFEPOINT_YIELD, false);
     _cont.write_minimal();
 
-    intptr_t* const bottom_sp = bottom - argsize;
-    const address bottom_ret_pc = *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET); // save before patching
-
-    if (UNLIKELY(argsize != 0)) { // patch pc + fp
-      // we're patching the thread stack, not the chunk, as it's hopefully still hot in the cache
-      log_develop_trace(jvmcont)("patching bottom sp: " INTPTR_FORMAT, p2i(bottom_sp));
-      assert (bottom_sp == _bottom_address, "");
-
+    if (UNLIKELY(argsize != 0)) {
       size += frame::sender_sp_offset; // b/c when argsize > 0, we don't reach the caller's metadata
     }
 
@@ -2412,7 +2417,6 @@ public:
     sp -= size;
     assert (size == (jdk_internal_misc_StackChunk::sp(chunk) - sp), "size: %d used chunk size: %d", size, (jdk_internal_misc_StackChunk::sp(chunk) - sp));
     jdk_internal_misc_StackChunk::set_sp(chunk, sp);
-    jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
     jdk_internal_misc_StackChunk::set_pc(chunk, *(address*)(top - SENDER_SP_RET_ADDRESS_OFFSET));
 
     // we copy the top frame's return address and link, but not the bottom's
@@ -3811,7 +3815,7 @@ public:
 
         return sp;
       } else {
-        assert (assert_entry_frame_laid_out(_cont.entry()), "");
+        // assert (assert_entry_frame_laid_out(_cont.entry()), "");
         return _cont.entrySP();
       }
     } else {
@@ -6292,9 +6296,9 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
   assert(ContMirror::is_stack_chunk(chunk), "");
   HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
   tty->print_cr("CHUNK " INTPTR_FORMAT " - " INTPTR_FORMAT " :: %s 0x%lx", p2i((oopDesc*)chunk), p2i((HeapWord*)(chunk + chunk->size())), hr->get_type_str(), chunk->identity_hash());
-  tty->print("CHUNK " INTPTR_FORMAT " young: %d size: %d sp: %d num_frames: %d num_oops: %d parent: " INTPTR_FORMAT,
+  tty->print("CHUNK " INTPTR_FORMAT " young: %d size: %d argsize: %d sp: %d num_frames: %d num_oops: %d parent: " INTPTR_FORMAT,
     p2i((oopDesc*)chunk), !requires_barriers(chunk),
-    jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::sp(chunk),
+    jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::argsize(chunk), jdk_internal_misc_StackChunk::sp(chunk),
     jdk_internal_misc_StackChunk::numFrames(chunk), jdk_internal_misc_StackChunk::numOops(chunk),
     p2i((oopDesc*)jdk_internal_misc_StackChunk::parent(chunk)));
   if (cont != (oop)NULL) {

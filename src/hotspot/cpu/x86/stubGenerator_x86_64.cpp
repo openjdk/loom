@@ -6627,8 +6627,13 @@ RuntimeStub* generate_cont_doYield() {
       // __ lea(rsp, Address(rsp, wordSize)); // pop return address. if we don't do this, we get a drift, where the bottom-most frozen frame continuously grows
     } else {
       __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+      // __ subptr(rsp, wordSize); // return address
     }
     assert_asm(_masm, cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
+  // #ifdef ASSERT
+  //   __ lea(rcx, Address(rsp, wordSize));
+  //   assert_asm(_masm, cmpptr(rcx, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
+  // #endif
 
     Label thaw_success;
 
@@ -6647,6 +6652,10 @@ RuntimeStub* generate_cont_doYield() {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
     }
     assert_asm(_masm, cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
+  // #ifdef ASSERT
+  //   __ lea(rcx, Address(rsp, wordSize));
+  //   assert_asm(_masm, cmpptr(rcx, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
+  // #endif
 
     __ testq(rbx, rbx);           // rbx contains the size of the frames to thaw, 0 if overflow or no more frames
     __ jcc(Assembler::notZero, thaw_success);

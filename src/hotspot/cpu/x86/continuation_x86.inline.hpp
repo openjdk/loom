@@ -1393,6 +1393,8 @@ static bool assert_entry_frame_laid_out(ContinuationEntry* cont) {
 }
 
 bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_size, int* out_frames, int* out_oops) {
+  const int metadata = 2;
+  
   assert (oopDesc::is_oop(chunk), "");
   log_develop_trace(jvmcont)("debug_verify_stack_chunk young: %d", !requires_barriers(chunk));
   assert (ContMirror::is_stack_chunk(chunk), "");
@@ -1416,11 +1418,14 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
   int num_frames = 0;
   int num_oops = 0;
 
-  CodeBlob* cb = NULL;
+  int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
+  assert (argsize >= 0, "");
+  if (argsize > 0) argsize += metadata;
   intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
+  intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
   int size0 = 0;
   intptr_t* sp;
+  CodeBlob* cb = NULL;
   for (sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
     // assert (!requires_barriers(chunk) || num_frames <= jdk_internal_misc_StackChunk::numFrames(chunk), "");
     address pc = *(address*)(sp - 1);

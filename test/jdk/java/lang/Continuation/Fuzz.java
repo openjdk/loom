@@ -75,11 +75,9 @@ import jdk.test.lib.Utils;
 import sun.hotspot.WhiteBox;
 
 public class Fuzz implements Runnable {
+    static final boolean RANDOM  = true;
+    static final boolean VERIFY_STACK = false; // could add significant time
     static final boolean VERBOSE = false;
-    private static final WhiteBox WB = WhiteBox.getWhiteBox();
-
-    private static boolean COMPILE_RUN;
-    private static int COMPILE_LEVEL;
 
     public static void main(String[] args) {
         for (int compileLevel : new int[]{4})
@@ -87,13 +85,17 @@ public class Fuzz implements Runnable {
                 test(compileLevel, compileRun);
     }
 
+    private static boolean COMPILE_RUN;
+    private static int COMPILE_LEVEL;
+
     static void test(int compileLevel, boolean compileRun) {
         resetCompilation();
         COMPILE_LEVEL = compileLevel;
         COMPILE_RUN = compileRun;
 
         testFile();
-        testRandom();
+        if (RANDOM)
+            testRandom();
     }
 
     static void testFile() {
@@ -130,11 +132,12 @@ public class Fuzz implements Runnable {
         for (;;) {
             compile();
 
+            long start = time();
             var fuzz = new Fuzz(trace);
             fuzz.verbose = VERBOSE && retry == 0;
             fuzz.print();
-
-            fuzz.test();
+            int yields = fuzz.test();
+            time(start, "Test (" + yields + " yields)");
 
             Op[] newTrace = Arrays.copyOf(trace, trace.length);
             if (!checkCompilation(newTrace)) {
@@ -238,11 +241,13 @@ public class Fuzz implements Runnable {
     private Op current()    { return trace(index); }
     private Op next(int c)  { logOp(c); index++; return current(); }
 
-    void test() {
+    int test() {
         Continuation cont = new Continuation(SCOPE, this) {
             @Override protected void onPinned(Pinned reason) { if (verbose) System.out.println("PINNED " + reason); }
         };
 
+        this.yields = 0;
+        int count = 0;
         try {
             while (true) {
                 cont.run();
@@ -250,6 +255,7 @@ public class Fuzz implements Runnable {
 
                 assert !shouldThrow();
                 verifyStack(cont);
+                count++;
             }
             verifyResult(result);
         } catch (FuzzException e) {
@@ -257,6 +263,8 @@ public class Fuzz implements Runnable {
             assert e.getMessage().equals("EX");
             assert cont.isDone();
         }
+        assert count == yields : "count: " + count + " yields: " + yields;
+        return count;
     }
 
     /////////// Instance Helpers
@@ -264,6 +272,7 @@ public class Fuzz implements Runnable {
     private StackTraceElement[] backtrace;
     private StackFrame[] fbacktrace;
     private StackFrame[] lfbacktrace;
+    private int yields;
 
     void indent(int depth) {
         // depth = index;
@@ -324,6 +333,7 @@ public class Fuzz implements Runnable {
     }
 
     void verifyPin(boolean yieldResult) {
+        if (yieldResult) yields++;
         assert yieldResult != shouldPin() : "res: " + yieldResult + " shouldPin: " + shouldPin();
     }
 
@@ -338,12 +348,14 @@ public class Fuzz implements Runnable {
     }
 
     void captureStack() {
+        if (!VERIFY_STACK) return;
         backtrace = Thread.currentThread().getStackTrace();
         fbacktrace = StackWalkerHelper.getStackFrames(SCOPE);
         lfbacktrace = StackWalkerHelper.getLiveStackFrames(SCOPE);
     }
 
     void verifyStack() {
+        if (!VERIFY_STACK) return;
         verifyStack(backtrace);
         verifyStack(backtrace, StackWalkerHelper.toStackTraceElement(fbacktrace));
         verifyStack(fbacktrace, lfbacktrace);
@@ -354,6 +366,7 @@ public class Fuzz implements Runnable {
     }
 
     void verifyStack(Continuation cont) {
+        if (!VERIFY_STACK) return;
         verifyStack(backtrace);
         verifyStack(backtrace, StackWalkerHelper.toStackTraceElement(fbacktrace));
         verifyStack(fbacktrace, lfbacktrace);
@@ -464,7 +477,7 @@ public class Fuzz implements Runnable {
     }
 
     static void compile() {
-        final long start = System.nanoTime();
+        final long start = time();
 
         compileContinuation();
 
@@ -482,9 +495,7 @@ public class Fuzz implements Runnable {
         for (Method m : compile)   assert  WB.isMethodCompiled(m) : "method: " + m;
         for (Method m : interpret) assert !WB.isMethodCompiled(m) : "method: " + m;
 
-        final long duration = (System.nanoTime() - start)/1_000_000;
-        if (duration > 500)
-            System.out.println("Compile in " + duration + " ms");
+        time(start, "Compile");
     }
 
     static boolean checkCompilation(Op[] trace) {
@@ -521,8 +532,17 @@ public class Fuzz implements Runnable {
 
     static Method method(Op op)       { return method.get(op); }
     static MethodHandle handle(Op op) { return handle.get(op); }
+
+    static long time() { return System.nanoTime(); }
+    static void time(long startNanos, String message) {
+        final long duration = (System.nanoTime() - startNanos)/1_000_000;
+        if (duration > 500)
+            System.out.println(message + " in " + duration + " ms");
+    }
  
     //////
+
+    private static final WhiteBox WB = WhiteBox.getWhiteBox();
 
     static final Class<?>[] run_sig = new Class<?>[]{};
     static final Class<?>[] int_sig = new Class<?>[]{int.class, int.class};
