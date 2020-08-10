@@ -211,7 +211,7 @@ static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) P
   static void print_frames(JavaThread* thread, outputStream* st = tty);
   // template<int x> static void walk_frames(JavaThread* thread);
   static bool assert_frame_laid_out(frame f);
-  static bool assert_entry_frame_laid_out(ContinuationEntry* cont);
+  // static bool assert_entry_frame_laid_out(ContinuationEntry* cont);
   //static void print_blob(outputStream* st, address addr);
   static jlong java_tid(JavaThread* thread);
   // static bool is_deopt_pc(const frame& f, address pc);
