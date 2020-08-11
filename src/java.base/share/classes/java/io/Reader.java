@@ -28,6 +28,8 @@ package java.io;
 
 import java.nio.CharBuffer;
 import java.util.Objects;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Abstract class for reading character streams.  The only methods that a
@@ -268,19 +270,34 @@ public abstract class Reader implements Readable, Closeable {
     public long skip(long n) throws IOException {
         if (n < 0L)
             throw new IllegalArgumentException("skip value is negative");
-        int nn = (int) Math.min(n, maxSkipBufferSize);
-        synchronized (lock) {
-            if ((skipBuffer == null) || (skipBuffer.length < nn))
-                skipBuffer = new char[nn];
-            long r = n;
-            while (r > 0) {
-                int nc = read(skipBuffer, 0, (int)Math.min(r, nn));
-                if (nc == -1)
-                    break;
-                r -= nc;
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                return lockedSkip(n);
+            } finally {
+                theLock.unlock();
             }
-            return n - r;
+        } else {
+            synchronized (lock) {
+                return lockedSkip(n);
+            }
         }
+    }
+
+    private long lockedSkip(long n) throws IOException {
+        int nn = (int) Math.min(n, maxSkipBufferSize);
+        if ((skipBuffer == null) || (skipBuffer.length < nn))
+            skipBuffer = new char[nn];
+        long r = n;
+        while (r > 0) {
+            int nc = read(skipBuffer, 0, (int)Math.min(r, nn));
+            if (nc == -1)
+                break;
+            r -= nc;
+        }
+        return n - r;
     }
 
     /**

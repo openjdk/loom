@@ -25,7 +25,7 @@
 
 package java.io;
 
-
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -71,10 +71,7 @@ public class BufferedWriter extends Writer {
 
     private char cb[];
     private int nChars, nextChar;
-
-    // initialized to null when BufferedWriter is sub-classed
-    private final ReentrantLock altLock;
-
+    
     private static int defaultCharBufferSize = 8192;
 
     /**
@@ -105,11 +102,9 @@ public class BufferedWriter extends Writer {
         nChars = sz;
         nextChar = 0;
 
-        // use monitors when BufferedWriter is sub-classed
+        // use ReentrantLock when BufferedWriter is not sub-classed
         if (getClass() == BufferedWriter.class) {
-            altLock = new ReentrantLock();
-        } else {
-            altLock = null;
+            this.lock = new ReentrantLock();
         }
     }
 
@@ -125,12 +120,14 @@ public class BufferedWriter extends Writer {
      * may be invoked by PrintStream.
      */
     void flushBuffer() throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 lockedFlushBuffer();
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -153,12 +150,14 @@ public class BufferedWriter extends Writer {
      * @throws     IOException  If an I/O error occurs
      */
     public void write(int c) throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 lockedWrite(c);
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -205,12 +204,14 @@ public class BufferedWriter extends Writer {
      * @throws  IOException  If an I/O error occurs
      */
     public void write(char cbuf[], int off, int len) throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 lockedWrite(cbuf, off, len);
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -271,12 +272,14 @@ public class BufferedWriter extends Writer {
      * @throws  IOException  If an I/O error occurs
      */
     public void write(String s, int off, int len) throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 lockedWrite(s, off, len);
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -316,12 +319,14 @@ public class BufferedWriter extends Writer {
      * @throws     IOException  If an I/O error occurs
      */
     public void flush() throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 lockedFlush();
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -336,12 +341,14 @@ public class BufferedWriter extends Writer {
     }
 
     public void close() throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 lockedClose();
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {

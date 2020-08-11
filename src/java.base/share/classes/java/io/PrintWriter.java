@@ -31,6 +31,8 @@ import java.util.Locale;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Prints formatted representations of objects to a text-output stream.  This
@@ -112,6 +114,11 @@ public class PrintWriter extends Writer {
         super(out);
         this.out = out;
         this.autoFlush = autoFlush;
+
+        // use ReentrantLock when PrintWriter is not sub-classed
+        if (getClass() == PrintWriter.class) {
+            this.lock = new ReentrantLock();
+        }
     }
 
     /**
@@ -390,13 +397,27 @@ public class PrintWriter extends Writer {
      * @see #checkError()
      */
     public void flush() {
-        try {
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                lockedFlush();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
             synchronized (lock) {
-                ensureOpen();
-                out.flush();
+                lockedFlush();
             }
         }
-        catch (IOException x) {
+    }
+
+    private void lockedFlush() {
+        try {
+            ensureOpen();
+            out.flush();
+        } catch (IOException x) {
             trouble = true;
         }
     }
@@ -408,15 +429,29 @@ public class PrintWriter extends Writer {
      * @see #checkError()
      */
     public void close() {
-        try {
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                lockedClose();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
             synchronized (lock) {
-                if (out == null)
-                    return;
+                lockedClose();
+            }
+        }
+    }
+
+    private void lockedClose() {
+        try {
+            if (out != null) {
                 out.close();
                 out = null;
             }
-        }
-        catch (IOException x) {
+        } catch (IOException x) {
             trouble = true;
         }
     }
@@ -475,16 +510,29 @@ public class PrintWriter extends Writer {
      * @param c int specifying a character to be written.
      */
     public void write(int c) {
-        try {
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                lockedWrite(c);
+            } finally {
+                theLock.unlock();
+            }
+        } else {
             synchronized (lock) {
-                ensureOpen();
-                out.write(c);
+                lockedWrite(c);
             }
         }
-        catch (InterruptedIOException x) {
+    }
+
+    private void lockedWrite(int c) {
+        try {
+            ensureOpen();
+            out.write(c);
+        } catch (InterruptedIOException x) {
             Thread.currentThread().interrupt();
-        }
-        catch (IOException x) {
+        } catch (IOException x) {
             trouble = true;
         }
     }
@@ -501,16 +549,29 @@ public class PrintWriter extends Writer {
      *          to throw an {@code IndexOutOfBoundsException}
      */
     public void write(char buf[], int off, int len) {
-        try {
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                lockedWrite(buf, off, len);
+            } finally {
+                theLock.unlock();
+            }
+        } else {
             synchronized (lock) {
-                ensureOpen();
-                out.write(buf, off, len);
+                lockedWrite(buf, off, len);
             }
         }
-        catch (InterruptedIOException x) {
+    }
+
+    private void lockedWrite(char buf[], int off, int len) {
+        try {
+            ensureOpen();
+            out.write(buf, off, len);
+        } catch (InterruptedIOException x) {
             Thread.currentThread().interrupt();
-        }
-        catch (IOException x) {
+        } catch (IOException x) {
             trouble = true;
         }
     }
@@ -536,16 +597,29 @@ public class PrintWriter extends Writer {
      *          to throw an {@code IndexOutOfBoundsException}
      */
     public void write(String s, int off, int len) {
-        try {
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                lockedWrite(s, off, len);
+            } finally {
+                theLock.unlock();
+            }
+        } else {
             synchronized (lock) {
-                ensureOpen();
-                out.write(s, off, len);
+                lockedWrite(s, off, len);
             }
         }
-        catch (InterruptedIOException x) {
+    }
+
+    private void lockedWrite(String s, int off, int len) {
+        try {
+            ensureOpen();
+            out.write(s, off, len);
+        } catch (InterruptedIOException x) {
             Thread.currentThread().interrupt();
-        }
-        catch (IOException x) {
+        } catch (IOException x) {
             trouble = true;
         }
     }
@@ -560,18 +634,31 @@ public class PrintWriter extends Writer {
     }
 
     private void newLine() {
-        try {
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                lockedNewLine();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
             synchronized (lock) {
-                ensureOpen();
-                out.write(System.lineSeparator());
-                if (autoFlush)
-                    out.flush();
+                lockedNewLine();
             }
         }
-        catch (InterruptedIOException x) {
+    }
+
+    private void lockedNewLine() {
+        try {
+            ensureOpen();
+            out.write(System.lineSeparator());
+            if (autoFlush)
+                out.flush();
+        } catch (InterruptedIOException x) {
             Thread.currentThread().interrupt();
-        }
-        catch (IOException x) {
+        } catch (IOException x) {
             trouble = true;
         }
     }
@@ -719,9 +806,21 @@ public class PrintWriter extends Writer {
      * @param x the {@code boolean} value to be printed
      */
     public void println(boolean x) {
-        synchronized (lock) {
-            print(x);
-            println();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                print(x);
+                println();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                print(x);
+                println();
+            }
         }
     }
 
@@ -733,9 +832,21 @@ public class PrintWriter extends Writer {
      * @param x the {@code char} value to be printed
      */
     public void println(char x) {
-        synchronized (lock) {
-            print(x);
-            println();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                print(x);
+                println();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                print(x);
+                println();
+            }
         }
     }
 
@@ -747,9 +858,21 @@ public class PrintWriter extends Writer {
      * @param x the {@code int} value to be printed
      */
     public void println(int x) {
-        synchronized (lock) {
-            print(x);
-            println();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                print(x);
+                println();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                print(x);
+                println();
+            }
         }
     }
 
@@ -761,9 +884,21 @@ public class PrintWriter extends Writer {
      * @param x the {@code long} value to be printed
      */
     public void println(long x) {
-        synchronized (lock) {
-            print(x);
-            println();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                print(x);
+                println();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                print(x);
+                println();
+            }
         }
     }
 
@@ -775,9 +910,21 @@ public class PrintWriter extends Writer {
      * @param x the {@code float} value to be printed
      */
     public void println(float x) {
-        synchronized (lock) {
-            print(x);
-            println();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                print(x);
+                println();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                print(x);
+                println();
+            }
         }
     }
 
@@ -789,9 +936,21 @@ public class PrintWriter extends Writer {
      * @param x the {@code double} value to be printed
      */
     public void println(double x) {
-        synchronized (lock) {
-            print(x);
-            println();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                print(x);
+                println();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                print(x);
+                println();
+            }
         }
     }
 
@@ -803,9 +962,21 @@ public class PrintWriter extends Writer {
      * @param x the array of {@code char} values to be printed
      */
     public void println(char x[]) {
-        synchronized (lock) {
-            print(x);
-            println();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                print(x);
+                println();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                print(x);
+                println();
+            }
         }
     }
 
@@ -817,9 +988,21 @@ public class PrintWriter extends Writer {
      * @param x the {@code String} value to be printed
      */
     public void println(String x) {
-        synchronized (lock) {
-            print(x);
-            println();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                print(x);
+                println();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                print(x);
+                println();
+            }
         }
     }
 
@@ -834,9 +1017,21 @@ public class PrintWriter extends Writer {
      */
     public void println(Object x) {
         String s = String.valueOf(x);
-        synchronized (lock) {
-            print(s);
-            println();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                print(s);
+                println();
+            } finally {
+                theLock.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                print(s);
+                println();
+            }
         }
     }
 
@@ -982,22 +1177,37 @@ public class PrintWriter extends Writer {
      * @since  1.5
      */
     public PrintWriter format(String format, Object ... args) {
-        try {
-            synchronized (lock) {
-                ensureOpen();
-                if ((formatter == null)
-                    || (formatter.locale() != Locale.getDefault()))
-                    formatter = new Formatter(this);
-                formatter.format(Locale.getDefault(), format, args);
-                if (autoFlush)
-                    out.flush();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                lockedFormat(format, args);
+            } finally {
+                theLock.unlock();
             }
+        } else {
+            synchronized (lock) {
+                lockedFormat(format, args);
+            }
+        }
+        return this;
+    }
+
+    private void lockedFormat(String format, Object ... args) {
+        try {
+            ensureOpen();
+            if ((formatter == null)
+                || (formatter.locale() != Locale.getDefault()))
+                formatter = new Formatter(this);
+            formatter.format(Locale.getDefault(), format, args);
+            if (autoFlush)
+                out.flush();
         } catch (InterruptedIOException x) {
             Thread.currentThread().interrupt();
         } catch (IOException x) {
             trouble = true;
         }
-        return this;
     }
 
     /**
@@ -1042,21 +1252,36 @@ public class PrintWriter extends Writer {
      * @since  1.5
      */
     public PrintWriter format(Locale l, String format, Object ... args) {
-        try {
-            synchronized (lock) {
-                ensureOpen();
-                if ((formatter == null) || (formatter.locale() != l))
-                    formatter = new Formatter(this, l);
-                formatter.format(l, format, args);
-                if (autoFlush)
-                    out.flush();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
+            try {
+                lockedFormat(l, format, args);
+            } finally {
+                theLock.unlock();
             }
+        } else {
+            synchronized (lock) {
+                lockedFormat(l, format, args);
+            }
+        }
+        return this;
+    }
+
+    private void lockedFormat(Locale l, String format, Object ... args) {
+        try {
+            ensureOpen();
+            if ((formatter == null) || (formatter.locale() != l))
+                formatter = new Formatter(this, l);
+            formatter.format(l, format, args);
+            if (autoFlush)
+                out.flush();
         } catch (InterruptedIOException x) {
             Thread.currentThread().interrupt();
         } catch (IOException x) {
             trouble = true;
         }
-        return this;
     }
 
     /**

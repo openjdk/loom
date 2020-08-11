@@ -80,7 +80,8 @@ public class InputStreamReader extends Reader {
      */
     public InputStreamReader(InputStream in) {
         super(in);
-        sd = StreamDecoder.forInputStreamReader(in, lockFor(this),
+        lock = lockFor(this);
+        sd = StreamDecoder.forInputStreamReader(in, lock,
                 Charset.defaultCharset()); // ## check lock object
     }
 
@@ -103,7 +104,8 @@ public class InputStreamReader extends Reader {
         super(in);
         if (charsetName == null)
             throw new NullPointerException("charsetName");
-        sd = StreamDecoder.forInputStreamReader(in, lockFor(this), charsetName);
+        lock = lockFor(this);
+        sd = StreamDecoder.forInputStreamReader(in, lock, charsetName);
     }
 
     /**
@@ -119,7 +121,8 @@ public class InputStreamReader extends Reader {
         super(in);
         if (cs == null)
             throw new NullPointerException("charset");
-        sd = StreamDecoder.forInputStreamReader(in, lockFor(this), cs);
+        lock = lockFor(this);
+        sd = StreamDecoder.forInputStreamReader(in, lock, cs);
     }
 
     /**
@@ -135,7 +138,8 @@ public class InputStreamReader extends Reader {
         super(in);
         if (dec == null)
             throw new NullPointerException("charset decoder");
-        sd = StreamDecoder.forInputStreamReader(in, lockFor(this), dec);
+        lock = lockFor(this);
+        sd = StreamDecoder.forInputStreamReader(in, lock, dec);
     }
 
     /**

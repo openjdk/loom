@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -85,13 +86,10 @@ public class BufferedReader extends Reader {
 
     /** The skipLF flag when the mark was set */
     private boolean markedSkipLF = false;
-
-    // initialized to null when BufferedReader is sub-classed
-    private final ReentrantLock altLock;
-
+    
     private static int defaultCharBufferSize = 8192;
     private static int defaultExpectedLineLength = 80;
-
+    
     /**
      * Creates a buffering character-input stream that uses an input buffer of
      * the specified size.
@@ -109,11 +107,9 @@ public class BufferedReader extends Reader {
         cb = new char[sz];
         nextChar = nChars = 0;
 
-        // use monitors when BufferedReader is sub-classed
+        // use ReentrantLock when BufferedReader is not sub-classed
         if (getClass() == BufferedReader.class) {
-            altLock = new ReentrantLock();
-        } else {
-            altLock = null;
+            super.lock = new ReentrantLock();
         }
     }
 
@@ -186,12 +182,14 @@ public class BufferedReader extends Reader {
      * @throws     IOException  If an I/O error occurs
      */
     public int read() throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 return lockedRead();
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -299,12 +297,14 @@ public class BufferedReader extends Reader {
      * @throws     IndexOutOfBoundsException {@inheritDoc}
      */
     public int read(char cbuf[], int off, int len) throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 return lockedRead(cbuf, off, len);
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -351,12 +351,14 @@ public class BufferedReader extends Reader {
      * @throws     IOException  If an I/O error occurs
      */
     String readLine(boolean ignoreLF, boolean[] term) throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 return lockedReadLine(ignoreLF, term);
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -460,12 +462,14 @@ public class BufferedReader extends Reader {
         if (n < 0L) {
             throw new IllegalArgumentException("skip value is negative");
         }
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 return lockedSkip(n);
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -510,12 +514,14 @@ public class BufferedReader extends Reader {
      * @throws     IOException  If an I/O error occurs
      */
     public boolean ready() throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 return lockedReady();
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -574,12 +580,14 @@ public class BufferedReader extends Reader {
         if (readAheadLimit < 0) {
             throw new IllegalArgumentException("Read-ahead limit < 0");
         }
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 lockedMark(readAheadLimit);
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -602,12 +610,14 @@ public class BufferedReader extends Reader {
      *                          or if the mark has been invalidated
      */
     public void reset() throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 lockedReset();
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
@@ -627,12 +637,14 @@ public class BufferedReader extends Reader {
     }
 
     public void close() throws IOException {
-        if (altLock != null) {
-            altLock.lock();
+        Object lock = this.lock;
+        if (lock instanceof Lock) {
+            Lock theLock = (Lock) lock;
+            theLock.lock();
             try {
                 lockedClose();
             } finally {
-                altLock.unlock();
+                theLock.unlock();
             }
         } else {
             synchronized (lock) {
