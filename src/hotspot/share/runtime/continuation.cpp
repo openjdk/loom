@@ -4757,6 +4757,7 @@ bool Continuation::is_frame_in_continuation(ContinuationEntry* cont, const frame
 }
 
 static ContinuationEntry* get_continuation_entry_for_frame(JavaThread* thread, intptr_t* const sp) {
+  assert (thread != NULL, "");
   ContinuationEntry* cont = thread->cont_entry();
   while (cont != NULL && !is_sp_in_continuation(cont, sp)) {
     cont = cont->parent();
@@ -4952,16 +4953,20 @@ javaVFrame* Continuation::last_java_vframe(Handle continuation, RegisterMap *map
 }
 
 frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
+  assert (map != NULL, "");
+  assert (map->thread() != NULL, "");
   oop cont = get_continuation_for_frame(map->thread(), callee.sp());
   return continuation_top_frame(cont, map);
 }
 
 static frame sender_for_frame(const frame& f, RegisterMap* map) {
+  const int metadata = 2;
   ContMirror cont(map);
 
   oop chunk = cont.find_chunk(f.unextended_sp());
   if (chunk != (oop)NULL) {
-    if (ContMirror::is_in_chunk(chunk, f.unextended_sp() + f.cb()->frame_size())) {
+    // we add to the pointer instead of subtracting from the bounds
+    if (ContMirror::is_in_chunk(chunk, f.unextended_sp() + f.cb()->frame_size() + jdk_internal_misc_StackChunk::argsize(chunk) + metadata)) {
       map->set_in_cont(false, false); // to prevent infinite recursion
       frame sender = f.sender(map);
       map->set_in_cont(true, true);
