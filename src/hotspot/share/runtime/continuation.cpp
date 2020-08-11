@@ -2346,8 +2346,9 @@ public:
         // if (UNLIKELY(argsize != 0)) { // patch pc, because we'll be copying it with the args into the middle of a chunk; no harm in always doing this
         // we're patching the thread stack, not the chunk, as it's hopefully still hot in the cache
         intptr_t* const bottom_sp = bottom - argsize;
-        assert (bottom_sp == _bottom_address, "");
         log_develop_trace(jvmcont)("patching bottom sp: " INTPTR_FORMAT, p2i(bottom_sp));
+        assert (bottom_sp == _bottom_address, "");
+        assert (*(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) == StubRoutines::cont_returnBarrier(), "");
         *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = jdk_internal_misc_StackChunk::pc(chunk);
         // }
       } else {
@@ -3938,7 +3939,7 @@ public:
       _cont.set_argsize(argsize);
       patch_chunk(bottom_sp, is_last);
 
-      address pc = *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET);
+      DEBUG_ONLY(address pc = *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET);)
       assert (is_last ? CodeCache::find_blob(pc)->as_compiled_method()->method()->is_continuation_enter_intrinsic() : pc == StubRoutines::cont_returnBarrier(), "is_last: %d", is_last);
     }
 
