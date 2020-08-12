@@ -109,7 +109,7 @@ public class BufferedReader extends Reader {
 
         // use ReentrantLock when BufferedReader is not sub-classed
         if (getClass() == BufferedReader.class) {
-            super.lock = new ReentrantLock();
+            lock = new ReentrantLock();
         }
     }
 

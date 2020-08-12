@@ -37,7 +37,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * @since   1.0
  */
 public class BufferedOutputStream extends FilterOutputStream {
-    // initialized to null when BufferedInputStream is sub-classed
+    // initialized to null when BufferedOutputStream is sub-classed
     private final ReentrantLock lock;
 
     /**

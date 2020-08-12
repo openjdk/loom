@@ -104,7 +104,7 @@ public class BufferedWriter extends Writer {
 
         // use ReentrantLock when BufferedWriter is not sub-classed
         if (getClass() == BufferedWriter.class) {
-            this.lock = new ReentrantLock();
+            lock = new ReentrantLock();
         }
     }
 
