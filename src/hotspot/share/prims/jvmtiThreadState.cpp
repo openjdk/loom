@@ -234,6 +234,9 @@ VThreadList::contains(oop vt) const {
 void
 VThreadList::append(oop vt) {
   assert(!contains(vt), "VThreadList::append sanity check");
+  // TMP: to work around OopHandle copy constructor assert
+  static OopHandle NULLHandle = OopHandle(NULL);
+  GrowableArrayCHeap<OopHandle, mtServiceability>::append(NULLHandle);
   GrowableArrayCHeap<OopHandle, mtServiceability>::append(OopHandle(Universe::vm_global(), vt));
 }
 
