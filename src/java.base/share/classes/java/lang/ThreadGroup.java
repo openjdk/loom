@@ -29,6 +29,7 @@ import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.Consumer;
+import jdk.internal.misc.VM;
 
 /**
  * A thread group represents a set of threads. In addition, a thread
@@ -36,18 +37,17 @@ import java.util.function.Consumer;
  * a tree in which every thread group except the initial thread group
  * has a parent.
  *
- * <p> Thread groups have a {@linkplain #isDaemon() daemon status}. A daemon
- * thread group is <i>weakly reachable</i> from its parent so it can be garbage
- * collected when there are no {@linkplain Thread#isAlive() alive} threads in
- * the group (and it is otherwise eligible for garbage collection). Daemon
- * thread groups may be suitable for background threads where the thread group
- * is not needed after all threads in the group terminate. A newly created
- * thread group is a not a daemon thread group. It is <i>strongly reachable</i>
- * from its parent.
+ * <p> A newly created thread group is a <i>daemon thread group</i>. It is
+ * <i>weakly reachable</i> from its parent so that it is eligible for garbage
+ * collection when there are no {@linkplain Thread#isAlive() live} threads in
+ * the group and there are no other objects keeping it alive. The {@link
+ * #setDaemon(boolean)}) method can be used to change a thread group to be
+ * a <i>non-daemon thread group</i>. A non-daemon thread group is <i>strongly
+ * reachable</i> from its parent.
  *
  * @apiNote
  * The concept of <i>daemon thread group</i> is not related to the concept
- * of {@linkplain Thread#isDaemon() daemon thread}. There may be both
+ * of {@linkplain Thread#isDaemon() daemon threads}. There may be both
  * daemon and non-daemon threads in a thread group, independent of whether
  * the group is a daemon or non-daemon thread group.
  *
@@ -73,9 +73,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private WeakReference<ThreadGroup>[] weaks;
 
     /**
-     * Creates an empty Thread group that is not in any Thread group.
-     * This method is used early in the VM startup to create the system
-     * thread group.
+     * Creates the top-level "system" ThreadGroup. This method is invoked early
+     * in the VM startup.
      */
     private ThreadGroup() {
         this.parent = null;
@@ -84,23 +83,28 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Creates a new thread group without a permission check.
+     * Creates a ThreadGroup without any permission or other checks.
+     *
+     * The daemon status is ignored during VM startup. All ThreadGroups created
+     * during VM startup are non-daemon.
      */
-    ThreadGroup(ThreadGroup parent, String name, int maxPriority) {
+    ThreadGroup(ThreadGroup parent, String name, int maxPriority, boolean daemon) {
         this.parent = parent;
         this.name = name;
         this.maxPriority = maxPriority;
-        parent.synchronizedAdd(this);
+        if (daemon && VM.isBooted()) {
+            parent.synchronizedAddWeak(this);
+            this.daemon = true;
+        } else {
+            parent.synchronizedAdd(this);
+        }
     }
 
     private ThreadGroup(Void unused, ThreadGroup parent, String name) {
-        this.parent = parent;
-        this.name = name;
-        this.maxPriority = parent.getMaxPriority();
-        parent.synchronizedAdd(this);
+        this(parent, name, parent.getMaxPriority(), true);
     }
 
-    private static Void checkAccess(ThreadGroup parent) {
+    private static Void checkParentAccess(ThreadGroup parent) {
         parent.checkAccess();
         return null;
     }
@@ -140,7 +144,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     public ThreadGroup(ThreadGroup parent, String name) {
-        this(checkAccess(parent), parent, name);
+        this(checkParentAccess(parent), parent, name);
     }
 
     /**
@@ -764,7 +768,11 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     public String toString() {
-        return getClass().getName() + "[name=" + getName() + ",maxpri=" + getMaxPriority() + "]";
+        return getClass().getName()
+                + "[name=" + getName()
+                + ",maxpri=" + getMaxPriority()
+                + ",daemon=" + isDaemon()
+                + "]";
     }
 
     /**
@@ -807,6 +815,15 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
             }
         }
         return false;
+    }
+
+    /**
+     * Add a daemon subgroup
+     */
+    private void synchronizedAddWeak(ThreadGroup group) {
+        synchronized (this) {
+            addWeak(group);
+        }
     }
 
     /**

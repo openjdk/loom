@@ -3260,14 +3260,14 @@ public class Thread implements Runnable {
             };
             ThreadGroup root = AccessController.doPrivileged(pa);
 
-            var vgroup = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY);
+            var vgroup = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY, false);
             THREAD_GROUP = vgroup;
 
             int priority = NORM_PRIORITY;
             if (System.getSecurityManager() != null) {
                 priority = MIN_PRIORITY;
             }
-            THREAD_SUBGROUP = new ThreadGroup(vgroup, "other", priority);
+            THREAD_SUBGROUP = new ThreadGroup(vgroup, "other", priority, false);
 
             ACCESS_CONTROL_CONTEXT = new AccessControlContext(new ProtectionDomain[] {
                 new ProtectionDomain(null, null)

@@ -690,11 +690,15 @@ public class BasicTests {
 
     public void testDaemon() {
         ThreadGroup group = new ThreadGroup("group");
-        assertFalse(group.isDaemon());
-        group.setDaemon(true);
         assertTrue(group.isDaemon());
         group.setDaemon(false);
         assertFalse(group.isDaemon());
+        try {
+            group.setDaemon(true);
+            assertTrue(group.isDaemon());
+        } finally {
+            group.setDaemon(false); // allow group to be GC'ed
+        }
     }
 
     public void testList() {
