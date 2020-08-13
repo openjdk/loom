@@ -1296,8 +1296,8 @@ class SocketChannelImpl
             // loop until all bytes have been written
             int pos = off;
             int end = off + len;
-            beginWrite(true);
             try {
+                beginWrite(true);
                 configureNonBlockingIfNeeded();
                 while (pos < end && isOpen()) {
                     int size = end - pos;
