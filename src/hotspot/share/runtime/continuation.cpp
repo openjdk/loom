@@ -571,7 +571,6 @@ private:
   ElemType* stack() const { return _hstack; }
 
   template <typename ConfigT> bool allocate_stacks_in_native(int size, int oops, bool needs_stack, bool needs_refstack);
-  void allocate_stacks_in_java(int size, int oops, int frames);
   static int fix_decreasing_index(int index, int old_length, int new_length);
   inline void post_safepoint_minimal(Handle conth);
   int ensure_capacity(int old, int min);
@@ -660,7 +659,7 @@ public:
   template <typename ConfigT> inline bool allocate_stacks(int size, int oops, int frames);
 
   template <typename ConfigT>
-  void make_keepalive(Thread* thread, CompiledMethodKeepalive<ConfigT>* keepalive);
+  bool make_keepalive(Thread* thread, CompiledMethodKeepalive<ConfigT>* keepalive);
 
   inline bool in_hstack(void *p) { return (_hstack != NULL && p >= _hstack && p < (_hstack + _stack_length)); }
 
@@ -2215,6 +2214,9 @@ public:
       if (freeze_chunk(sp, chunk_available)) {
         return freeze_ok;
       }
+      if (_thread != NULL && _thread->has_pending_exception()) {
+        return freeze_exception;
+      }
       if (!_thread->cont_fastpath()) {
         return freeze_retry_slow;  // things have deoptimized
       }
@@ -2365,7 +2367,7 @@ public:
         size1 += frame::sender_sp_offset; // b/c when argsize > 0, we don't reach the caller's metadata
       }
       chunk = allocate_chunk(size1);
-      if (!_thread->cont_fastpath()) {
+      if (chunk == NULL || !_thread->cont_fastpath()) {
         return false;
       }
 
@@ -2454,7 +2456,7 @@ public:
     log_develop_trace(jvmcont)("allocate_chunk allocating new chunk");
     oop chunk = _cont.allocate_stack_chunk(size);
     if (chunk == NULL) { // OOM
-      guarantee(false, "Unhandled OOM");
+      return NULL;
     }
     assert (jdk_internal_misc_StackChunk::size(chunk) == size, "");
     assert (chunk->size() >= size, "chunk->size(): %d size: %d", chunk->size(), size);
@@ -2762,16 +2764,19 @@ public:
     return freeze_ok;
   }
 
-  void allocate_keepalive() {
+  bool allocate_keepalive() {
     if (_keepalive == NULL) {
-      return;
+      return true;
     }
 
     CompiledMethodKeepaliveT* current = _keepalive;
     while (current != NULL) {
-      _cont.make_keepalive<ConfigT>(cur_thread(), current);
+      if (!_cont.make_keepalive<ConfigT>(cur_thread(), current)) {
+        return false;
+      }
       current = current->parent();
     }
+    return true;
   }
 
   template<typename FKind> // the callee's type
@@ -2814,7 +2819,11 @@ public:
     }
 
 #ifndef NO_KEEPALIVE
-    allocate_keepalive();
+    if (!allocate_keepalive()) {
+      if (_thread != NULL && _thread->has_pending_exception()) {
+        return freeze_exception; // TODO: restore max size ???
+      }
+    }
 #endif
 
     if (mode == mode_fast && !_thread->cont_fastpath()) {
@@ -5302,7 +5311,7 @@ oop Continuation::continuation_scope(oop cont) {
 ///// Allocation
 
 template <typename ConfigT>
-void ContMirror::make_keepalive(Thread* thread, CompiledMethodKeepalive<ConfigT>* keepalive) {
+bool ContMirror::make_keepalive(Thread* thread, CompiledMethodKeepalive<ConfigT>* keepalive) {
   Handle conth(thread, _cont);
   int oops = keepalive->nr_oops();
   if (oops == 0) {
@@ -5318,6 +5327,7 @@ void ContMirror::make_keepalive(Thread* thread, CompiledMethodKeepalive<ConfigT>
   //if (!SafepointSynchronize::is_same_safepoint(counter)) {
     post_safepoint(conth);
   //}
+  return keepalive_obj != NULL;
 }
 
 template <typename ConfigT>
@@ -5342,9 +5352,8 @@ inline bool ContMirror::allocate_stacks(int size, int oops, int frames) {
 #endif
 
   if (!allocate_stacks_in_native<ConfigT>(size, oops, needs_stack_allocation, needs_refStack_allocation)) {
-    guarantee(false, "");
-    allocate_stacks_in_java(size, oops, frames);
-    if (!thread()->has_pending_exception()) return true;
+    assert(thread()->has_pending_exception(), "should only happen on oom");
+    return false;
   }
 
   // This first assertion isn't important, as we'll overwrite the Java-computed ones, but it's just to test that the Java computation is OK.
@@ -5651,28 +5660,6 @@ oop ContMirror::allocate_stack_chunk(int stack_size) {
     //}
     return result;
   }
-}
-
-NOINLINE void ContMirror::allocate_stacks_in_java(int size, int oops, int frames) {
-  guarantee (false, "unreachable");
-  int old_stack_length = _stack_length;
-
-  //HandleMark hm(_thread);
-  Handle conth(_thread, _cont);
-  JavaCallArguments args;
-  args.push_oop(conth);
-  args.push_int(size);
-  args.push_int(oops);
-  args.push_int(frames);
-  JavaValue result(T_VOID);
-  JavaCalls::call_virtual(&result, SystemDictionary::Continuation_klass(), vmSymbols::getStacks_name(), vmSymbols::continuationGetStacks_signature(), &args, _thread);
-  post_safepoint(conth); // reload oop after java call
-
-  _sp     = java_lang_Continuation::sp(_cont);
-  _fp     = java_lang_Continuation::fp(_cont);
-  _ref_sp = java_lang_Continuation::refSP(_cont);
-  _stack_length = _stack->length();
-  /* We probably should handle OOM? */
 }
 
 void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops) {
