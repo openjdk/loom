@@ -98,7 +98,7 @@ public class TimedGet {
             }
         }
 
-        // check that ll tasks should have completed successfully
+        // all tasks should have completed successfully
         int completedCount = completed.get();
         System.out.println(completedCount);
         if (completedCount != threadCount) {
