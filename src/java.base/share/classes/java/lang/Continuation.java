@@ -418,7 +418,6 @@ public class Continuation {
      * @return {@code true} for success; {@code false} for failure
      * @throws IllegalStateException if not currently in the given {@code scope},
      */
-    // @DontInline
     public static boolean yield(ContinuationScope scope) {
         Continuation cont = currentCarrierThread().getContinuation();
         Continuation c;

@@ -184,7 +184,7 @@ static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap,
 template <class OopClosureType, bool concurrent_gc>
 void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure) {
     // see sender_for_compiled_frame
-  const int metadata = 2;
+  const int frame_metadata = 2;
 
   assert (Continuation::debug_is_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack requires_barriers: %d", !Universe::heap()->requires_barriers(chunk));
@@ -206,7 +206,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
   }
 
   int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
-  if (argsize > 0) argsize += metadata;
+  if (argsize > 0) argsize += frame_metadata;
   intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
   intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
   CodeBlob* cb = NULL;

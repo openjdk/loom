@@ -1218,8 +1218,7 @@ bool ContMirror::is_in_chunk(oop chunk, void* p) {
 
 bool ContMirror::is_usable_in_chunk(oop chunk, void* p) {
   assert (is_stack_chunk(chunk), "");
-  static const int metadata = 2;
-  HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk) - metadata;
+  HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk) - frame_metadata;
   HeapWord* end = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
   return (HeapWord*)p >= start && (HeapWord*)p < end;
 }
@@ -2137,7 +2136,7 @@ public:
     // _cont.read_entry(); // even when retrying, because deopt can change entryPC; see Continuation::get_continuation_entry_pc_for_sender
     _cont.read_minimal();
 
-    assert (thread->cont_entry()->entry_sp() == _cont.entrySP(), "metadata sp: %p cont.entrySP(): %p &metadata: %p", thread->cont_entry()->entry_sp(), _cont.entrySP(), thread->cont_entry()); // 111111
+    assert (thread->cont_entry()->entry_sp() == _cont.entrySP(), "");
 
     int argsize = bottom_argsize();
     _bottom_address = _cont.entrySP() - argsize;
@@ -2169,10 +2168,12 @@ public:
 
     assert (mode == mode_fast, "");
 
+    init_rest();
+
     // this is only uaed to terminate the frame loop.
     _bottom_address = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
     int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
-    _bottom_address += LIKELY(argsize == 0) ? frame::sender_sp_offset // We add 2 because the chunk does not include the bottommost 2 words (return pc and link)
+    _bottom_address += LIKELY(argsize == 0) ? frame_metadata // We add 2 because the chunk does not include the bottommost 2 words (return pc and link)
                                             : -argsize;
 
     log_develop_trace(jvmcont)("freeze chunk bottom_address: " INTPTR_FORMAT " argsize: %d", p2i(_bottom_address), argsize);
@@ -2284,16 +2285,15 @@ public:
     const int argsize = bottom_argsize();
     intptr_t* const bottom = align_bottom(_cont.entrySP(), argsize);
     int size = bottom - top; // in words
-    if (UNLIKELY(argsize != 0)) {
-      size += frame::sender_sp_offset;
-    }
     int sp = jdk_internal_misc_StackChunk::sp(chunk);
     if (sp < jdk_internal_misc_StackChunk::size(chunk)) {
-      size -= argsize;
+      size -= argsize + frame_metadata;
+    } else if (UNLIKELY(argsize != 0)) {
+      size += frame_metadata;
     }
     assert (size > 0, "");
 
-    bool available = jdk_internal_misc_StackChunk::sp(chunk) - frame::sender_sp_offset >= size;
+    bool available = jdk_internal_misc_StackChunk::sp(chunk) - frame_metadata >= size;
     log_develop_trace(jvmcont)("is_chunk_available available: %d size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT, available, argsize, size, p2i(top), p2i(bottom));
     return available;
   }
@@ -2307,15 +2307,13 @@ public:
     }
   #endif
 
+    log_develop_trace(jvmcont)("freeze_chunk");
     assert (USE_CHUNKS, "");
     assert (_thread != NULL, "");
     assert(_cont.chunk_invariant(), "");
-
-    // assert(verify_continuation<111>(_cont.mirror()), "");
-
-    log_develop_trace(jvmcont)("freeze_chunk");
     assert (mode == mode_fast, "");
     assert (!Interpreter::contains(_cont.entryPC()), "");
+    assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
 
     oop chunk = _cont.tail();
 
@@ -2341,8 +2339,11 @@ public:
       //   return false;
       // }
 
-      if (sp < jdk_internal_misc_StackChunk::size(chunk)) {
+      if (sp < jdk_internal_misc_StackChunk::size(chunk)) { // we are copying into a non-empty chunk
         sp += argsize;
+        if (UNLIKELY(argsize != 0)) {
+          sp += frame_metadata;
+        }
         assert (sp <= jdk_internal_misc_StackChunk::size(chunk), "");
         
         // if (UNLIKELY(argsize != 0)) { // patch pc, because we'll be copying it with the args into the middle of a chunk; no harm in always doing this
@@ -2353,8 +2354,12 @@ public:
         assert (*(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) == StubRoutines::cont_returnBarrier(), "");
         *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = jdk_internal_misc_StackChunk::pc(chunk);
         // }
-      } else {
+      } else { // the chunk is empty
         jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
+
+        if (jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk) && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
+          _cont.add_size(SP_WIGGLE << LogBytesPerWord);
+        }
       }
       // ContMirror::reset_chunk_counters(chunk);
     } else {
@@ -2364,7 +2369,7 @@ public:
 
       int size1 = size;
       if (UNLIKELY(argsize != 0)) {
-        size1 += frame::sender_sp_offset; // b/c when argsize > 0, we don't reach the caller's metadata
+        size1 += frame_metadata; // b/c when argsize > 0, we don't reach the caller's metadata
       }
       chunk = allocate_chunk(size1);
       if (chunk == NULL || !_thread->cont_fastpath()) {
@@ -2388,6 +2393,10 @@ public:
       }
       _cont.set_tail(chunk);
       java_lang_Continuation::set_tail(_cont.mirror(), chunk);
+
+      if (jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk) && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
+        _cont.add_size(SP_WIGGLE << LogBytesPerWord);
+      }
     }
 
     assert (chunk != NULL, "");
@@ -2398,35 +2407,29 @@ public:
     assert (chunk == _cont.tail(), "");
     assert (chunk == java_lang_Continuation::tail(_cont.mirror()), "");
     assert (!jdk_internal_misc_StackChunk::gc_mode(chunk), "");
-    assert (sp <= jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset, "sp: %d chunk size: %d size: %d argsize: %d allocated: %d", sp, jdk_internal_misc_StackChunk::size(chunk), size, argsize, allocated);
+    assert (sp <= jdk_internal_misc_StackChunk::size(chunk) + frame_metadata, "sp: %d chunk size: %d size: %d argsize: %d allocated: %d", sp, jdk_internal_misc_StackChunk::size(chunk), size, argsize, allocated);
 
     _cont.add_size((size - argsize) << LogBytesPerWord);
-    assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
-
-    if (jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk) && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
-      _cont.add_size(SP_WIGGLE << LogBytesPerWord);
-    }
 
     _cont.set_flag(FLAG_SAFEPOINT_YIELD, false);
     _cont.write_minimal();
 
     if (UNLIKELY(argsize != 0)) {
-      size += frame::sender_sp_offset; // b/c when argsize > 0, we don't reach the caller's metadata
+      size += frame_metadata; // b/c when argsize > 0, we don't reach the caller's metadata
     }
 
     // copy; no need to patch because of how we handle return address and link
     log_develop_trace(jvmcont)("freeze_chunk start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d", p2i((oopDesc*)chunk), jdk_internal_misc_StackChunk::size(chunk), sp, argsize);
     assert (sp >= size, "");
     sp -= size;
-    assert (size == (jdk_internal_misc_StackChunk::sp(chunk) - sp), "size: %d used chunk size: %d", size, (jdk_internal_misc_StackChunk::sp(chunk) - sp));
     jdk_internal_misc_StackChunk::set_sp(chunk, sp);
     jdk_internal_misc_StackChunk::set_pc(chunk, *(address*)(top - SENDER_SP_RET_ADDRESS_OFFSET));
-
+    
     // we copy the top frame's return address and link, but not the bottom's
     intptr_t* chunk_top = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp;
     log_develop_trace(jvmcont)("freeze_chunk start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT, p2i(InstanceStackChunkKlass::start_of_stack(chunk)), sp, p2i(chunk_top));
-    intptr_t* from = top       - frame::sender_sp_offset;
-    intptr_t* to   = chunk_top - frame::sender_sp_offset;
+    intptr_t* from = top       - frame_metadata;
+    intptr_t* to   = chunk_top - frame_metadata;
     copy_to_chunk(from, to, size, chunk);
 
     log_develop_trace(jvmcont)("Young chunk success");
@@ -2469,7 +2472,7 @@ public:
       assert (chunk0 == (oop)NULL || !ContMirror::is_empty_chunk(chunk0), "");
     }
 
-    int sp = size + frame::sender_sp_offset;
+    int sp = size + frame_metadata;
     jdk_internal_misc_StackChunk::set_sp(chunk, sp);
     jdk_internal_misc_StackChunk::set_pc(chunk, NULL);
     jdk_internal_misc_StackChunk::set_argsize(chunk, 0); // TODO PERF unnecessary?
@@ -2518,6 +2521,9 @@ public:
 #endif
 
   void add_chunks_size() {
+    // We want to signal how much to allocate by setting _size, but we want to keep max_size the same.
+    // The addition to _size is reverted in squash_chunks.
+    // We subtract from max_size here, since we'll add it again in the squashing freeze.
     int num_chunks = 0;
     int orig_frames = _frames;
 
@@ -2528,8 +2534,7 @@ public:
         Continuation::stack_chunk_iterate_stack<BasicOopIterateClosure, false>(chunk, (BasicOopIterateClosure*)NULL); // , false /* do_metadata */); // &do_nothing_cl
       // }
 
-      static const int metadata = 2;
-      int size = (jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + metadata) << LogBytesPerWord;
+      int size = (jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk) + frame_metadata) << LogBytesPerWord;
       int frames = jdk_internal_misc_StackChunk::numFrames(chunk);
       int oops = jdk_internal_misc_StackChunk::numOops(chunk);
 
@@ -2546,6 +2551,11 @@ public:
       log_develop_trace(jvmcont)("add_chunks_size frames: %d size: %d oops: %d", frames, size, oops);
       if (log_develop_is_enabled(Trace, jvmcont)) print_chunk(chunk, _cont.mirror(), false);
     }
+
+    if (_frames > orig_frames && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
+      _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
+    }
+
     assert (USE_CHUNKS || num_chunks == 0, "");
     EventContinuationSquash e;
     if (e.should_commit() && USE_CHUNKS) {
@@ -2583,8 +2593,8 @@ public:
     frz.squash_chunk(chunk);
     assert (((orig_sp - _cont.sp()) << LogBytesPerElement) == frz.nr_bytes(), "sp diff size: %d frz.nr_bytes(): %d", ((orig_sp - _cont.sp()) << LogBytesPerElement), frz.nr_bytes());
     // undo add_chunks_size
-    // _frames -= frz.nr_frames();
     _size -= frz.nr_bytes();
+    // _frames -= frz.nr_frames();
     // _oops -= frz.nr_oops();
   }
 
@@ -2598,7 +2608,7 @@ public:
     freeze_result res = freeze<true>(f, caller, 0);
     assert (res == freeze_ok, "");
 
-    jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset);
+    jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame_metadata);
     ContMirror::reset_chunk_counters(chunk);
   }
 
@@ -2790,7 +2800,7 @@ public:
   #endif
 
     assert (mode != mode_fast || !callee.is_interpreted_frame(), "");
-    assert (mode != mode_fast || _thread->cont_fastpath(), "");
+    assert (mode != mode_fast || _thread == NULL || _thread->cont_fastpath(), "");
 
     log_develop_trace(jvmcont)("bottom: " INTPTR_FORMAT " count %d size: %d, num_oops: %d", p2i(_bottom_address), nr_frames(), nr_bytes(), nr_oops());
 
@@ -2826,7 +2836,7 @@ public:
     }
 #endif
 
-    if (mode == mode_fast && !_thread->cont_fastpath()) {
+    if (mode == mode_fast && _thread != NULL && !_thread->cont_fastpath()) {
       if (ConfigT::_post_barrier) {
         _cont.zero_ref_stack_prefix();
       }
@@ -3846,7 +3856,7 @@ public:
     if (log_develop_is_enabled(Debug, jvmcont)) print_chunk(chunk, _cont.mirror(), true);
 
     int sp = jdk_internal_misc_StackChunk::sp(chunk);
-    int size = jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset - sp;
+    int size = jdk_internal_misc_StackChunk::size(chunk) + frame_metadata - sp;
     int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
 
     // this initial size could be reduced if it's a partial thaw
@@ -3889,7 +3899,7 @@ public:
         deoptimize_frames_in_chunk(chunk);
       }
 
-      jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset);
+      jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame_metadata);
       jdk_internal_misc_StackChunk::set_argsize(chunk, 0);
       // jdk_internal_misc_StackChunk::set_pc(chunk, NULL);
       // if (barriers) {
@@ -3900,7 +3910,7 @@ public:
       partial = true;
       empty = thaw_one_frame_from_chunk(chunk, hsp, &size, &argsize);
       if (UNLIKELY(argsize != 0)) {
-        size += frame::sender_sp_offset;
+        size += frame_metadata;
       }
       // if (empty && barriers) { // this is done in allocate_chunk; no need to do it here
       //   _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
@@ -3911,7 +3921,7 @@ public:
     const bool is_last_in_chunks = empty && jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk);
     const bool is_last = is_last_in_chunks && _cont.is_empty0();
 
-    _cont.sub_size((size - (UNLIKELY(argsize != 0) ? frame::sender_sp_offset : 0)) << LogBytesPerWord);
+    _cont.sub_size((size - (UNLIKELY(argsize != 0) ? frame_metadata : 0)) << LogBytesPerWord);
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
     if (is_last_in_chunks && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
@@ -3930,13 +3940,13 @@ public:
 
     vsp -= size;
     if (UNLIKELY(argsize != 0)) {
-      vsp += frame::sender_sp_offset;
+      vsp += frame_metadata;
     }
     assert (vsp == align_chunk(vsp), "");
 
     size += argsize;
-    intptr_t* from = hsp - frame::sender_sp_offset;
-    intptr_t* to   = vsp - frame::sender_sp_offset;
+    intptr_t* from = hsp - frame_metadata;
+    intptr_t* to   = vsp - frame_metadata;
     copy_from_chunk(from, to, size); // TODO: maybe use a memcpy that cares about ordering because we're racing with the GC
 
     // if (barriers) {
@@ -4025,9 +4035,9 @@ public:
     assert (!empty || argsize == jdk_internal_misc_StackChunk::argsize(chunk), "");
 
     if (empty) {
-      assert (jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset == (argsize == 0 ? jdk_internal_misc_StackChunk::sp(chunk) + size
-                                                                                                   : jdk_internal_misc_StackChunk::sp(chunk) + size + argsize + frame::sender_sp_offset), "");
-      jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame::sender_sp_offset);
+      assert (jdk_internal_misc_StackChunk::size(chunk) + frame_metadata == (argsize == 0 ? jdk_internal_misc_StackChunk::sp(chunk) + size
+                                                                                          : jdk_internal_misc_StackChunk::sp(chunk) + size + argsize + frame_metadata), "");
+      jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame_metadata);
       jdk_internal_misc_StackChunk::set_argsize(chunk, 0);
       // jdk_internal_misc_StackChunk::set_pc(chunk, NULL);
       // if (barriers) {
@@ -4969,13 +4979,12 @@ frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
 }
 
 static frame sender_for_frame(const frame& f, RegisterMap* map) {
-  const int metadata = 2;
   ContMirror cont(map);
 
   oop chunk = cont.find_chunk(f.unextended_sp());
   if (chunk != (oop)NULL) {
     // we add to the pointer instead of subtracting from the bounds
-    if (ContMirror::is_in_chunk(chunk, f.unextended_sp() + f.cb()->frame_size() + jdk_internal_misc_StackChunk::argsize(chunk) + metadata)) {
+    if (ContMirror::is_in_chunk(chunk, f.unextended_sp() + f.cb()->frame_size() + jdk_internal_misc_StackChunk::argsize(chunk) + frame_metadata)) {
       map->set_in_cont(false, false); // to prevent infinite recursion
       frame sender = f.sender(map);
       map->set_in_cont(true, true);
@@ -6165,13 +6174,9 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
     }
     frames++;
   }
-  assert (frames == cont.num_frames(), "");
-  assert (interpreted_frames == cont.num_interpreted_frames(), "");
-  /*if (max_size != cont.max_size()) {
-    debug_print_continuation(cont.mirror());
-    tty->print_cr("isize: %d, csize: %d", i_size, c_size);
-  }*/
+  assert (frames == cont.num_frames(), "frames: %d cont.num_frames(): %d", frames, cont.num_frames());
   assert (max_size == cont.max_size(), "max_size: %lu cont.max_size(): %lu", max_size, cont.max_size());
+  assert (interpreted_frames == cont.num_interpreted_frames(), "");
   // assert (oops == cont.num_oops(), "");
   return true;
 }

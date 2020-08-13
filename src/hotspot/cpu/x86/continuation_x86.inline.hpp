@@ -1400,9 +1400,7 @@ static bool assert_frame_laid_out(frame f) {
 //   return cb->as_compiled_method()->method()->is_continuation_enter_intrinsic() && cont->entry_fp() == fp;
 // }
 
-bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_size, int* out_frames, int* out_oops) {
-  const int metadata = 2;
-  
+bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_size, int* out_frames, int* out_oops) {  
   assert (oopDesc::is_oop(chunk), "");
   log_develop_trace(jvmcont)("debug_verify_stack_chunk young: %d", !requires_barriers(chunk));
   assert (ContMirror::is_stack_chunk(chunk), "");
@@ -1428,7 +1426,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
 
   int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
   assert (argsize >= 0, "");
-  if (argsize > 0) argsize += metadata;
+  if (argsize > 0) argsize += frame_metadata;
   intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
   intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
   int size0 = 0;

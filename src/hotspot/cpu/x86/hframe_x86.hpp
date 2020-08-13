@@ -25,7 +25,7 @@
 #ifndef CPU_X86_HFRAME_X86_HPP
 #define CPU_X86_HFRAME_X86_HPP
 
-static const int frame_metadata = 2;
+static const int frame_metadata = frame::sender_sp_offset;
 
 class hframe : public HFrameBase<hframe> {
 private:
