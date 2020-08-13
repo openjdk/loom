@@ -166,6 +166,9 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
     return err;
   }
 
+  static jvmtiError get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
+                                                 JavaThread** jt_pp, oop* thread_oop_p);
+
   static JvmtiEnv* JvmtiEnv_from_jvmti_env(jvmtiEnv *env) {
     return (JvmtiEnv*)((intptr_t)env - in_bytes(jvmti_external_offset()));
   };

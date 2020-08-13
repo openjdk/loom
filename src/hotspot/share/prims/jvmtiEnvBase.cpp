@@ -1116,6 +1116,36 @@ JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
   return JVMTI_ERROR_NONE;
 }
 
+jvmtiError
+JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
+                                           JavaThread** jt_pp, oop* thread_oop_p) {
+  JavaThread* cur_thread = JavaThread::current();
+  JavaThread* java_thread = NULL;
+  oop thread_oop = NULL;
+  ThreadsListHandle tlh(cur_thread);
+
+  if (thread == NULL) {
+    java_thread = cur_thread;
+    thread_oop = JvmtiExport::can_support_virtual_threads() ? java_thread->vthread() : java_thread->threadObj();
+    if (thread_oop == NULL || !thread_oop->is_a(SystemDictionary::Thread_klass())) {
+      return JVMTI_ERROR_INVALID_THREAD;
+    }
+  } else {
+    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+    if (err != JVMTI_ERROR_NONE) {
+      // We got an error code so we don't have a JavaThread*, but only return
+      // an error from here if we didn't get a valid thread_oop. In a vthread case
+      // the cv_external_thread_to_JavaThread is expected to correctly set the
+      // thread_oop and return JVMTI_ERROR_INVALID_THREAD which we ignore here.
+      if (thread_oop == NULL || err != JVMTI_ERROR_INVALID_THREAD) {
+        return err;
+      }
+    }
+  }
+  *jt_pp = java_thread;
+  *thread_oop_p = thread_oop;
+  return JVMTI_ERROR_NONE;
+}
 
 // If can_support_virtual_threads capability is enabled and there is a virtual thread mounted
 // to the JavaThread* then return virtual thread oop. Otherwise, return thread oop.
