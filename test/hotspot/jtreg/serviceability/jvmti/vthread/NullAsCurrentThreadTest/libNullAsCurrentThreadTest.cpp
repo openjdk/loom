@@ -198,11 +198,11 @@ testGetFrameLocation(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
   }
   if (loc0 != loc1) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetFrameLocation: current thread frame #1 locations do not match: %d != %d\n",
-           loc0, loc1);
+    printf("Agent: GetFrameLocation: current thread frame #1 locations do not match: %lld != %lld\n",
+           (long long)loc0, (long long)loc1);
   }
   printf("Agent: GetFrameLocation: current thread frame: method: %s%s, loc: %lld\n",
-         name0, sign0, loc0);
+         name0, sign0, (long long)loc0);
 }
 
 static void
