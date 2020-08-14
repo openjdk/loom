@@ -41,7 +41,7 @@ import jdk.internal.misc.VM;
  * <i>weakly reachable</i> from its parent so that it is eligible for garbage
  * collection when there are no {@linkplain Thread#isAlive() live} threads in
  * the group and there are no other objects keeping it alive. The {@link
- * #setDaemon(boolean)}) method can be used to change a thread group to be
+ * #setDaemon(boolean)} method can be used to change a thread group to be
  * a <i>non-daemon thread group</i>. A non-daemon thread group is <i>strongly
  * reachable</i> from its parent.
  *
