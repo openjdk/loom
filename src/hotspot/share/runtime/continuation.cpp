@@ -2708,7 +2708,7 @@ public:
       assert (mode != mode_fast || !Compiled::is_owning_locks(_cont.thread(), &_map, f), "");
 
       // Keepalive info here...
-      CompiledMethodKeepaliveT kd(f.cb()->as_compiled_method(), _keepalive, _thread);
+      CompiledMethodKeepaliveT kd(f.cb()->as_compiled_method(), _keepalive, _cont.thread());
       if (kd.required()) {
         _keepalive = &kd;
         return recurse_freeze_compiled_frame<top, true>(f, caller, &kd);
