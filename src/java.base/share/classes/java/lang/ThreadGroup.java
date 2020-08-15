@@ -37,13 +37,23 @@ import jdk.internal.misc.VM;
  * a tree in which every thread group except the initial thread group
  * has a parent.
  *
- * <p> A newly created thread group is a <i>daemon thread group</i>. It is
- * <i>weakly reachable</i> from its parent so that it is eligible for garbage
+ * <p> A thread group has a name, maximum priority, and a <i>daemon status</i>.
+ * The name is specified when creating the group and cannot be changed.
+ * The group's maximum priority is the maximum priority for threads created
+ * in the group. It is initially inherited from the parent thread group but
+ * may be changed using the {@link #setMaxPriority(int)} method.
+ *
+ * <p> The <i>daemon status</i> determines if the group is weakly or strongly
+ * <a href="ref/package-summary.html#reachability"><em>reachable</em></a> from
+ * its parent group. A newly created thread group is a daemon thread group. It
+ * is weakly reachable from its parent group so that it is eligible for garbage
  * collection when there are no {@linkplain Thread#isAlive() live} threads in
- * the group and there are no other objects keeping it alive. The {@link
- * #setDaemon(boolean)} method can be used to change a thread group to be
- * a <i>non-daemon thread group</i>. A non-daemon thread group is <i>strongly
- * reachable</i> from its parent.
+ * the group and is otherwise <i>unreachable</i>. The {@link #setDaemon(boolean)}
+ * method can be used to change a group to be a non-daemon thread group. A
+ * non-daemon thread group is <i>strongly reachable</i> from its parent. The
+ * need to keep a group strongly reachable from its parent may be important
+ * for cases where a parent group is {@linkplain #enumerate(ThreadGroup[])
+ * enumerated} to find a subgroup by name.
  *
  * @apiNote
  * The concept of <i>daemon thread group</i> is not related to the concept
@@ -193,9 +203,11 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
 
     /**
      * Tests if this thread group is a daemon thread group. A daemon thread
-     * group is <i>weakly reachable</i>  from its parent so it can be garbage
-     * collected when there are no {@linkplain Thread#isAlive() alive} threads
-     * in the group (and it is otherwise eligible for garbage collection).
+     * group is <a href="ref/package-summary.html#reachability"><em>weakly
+     * reachable</em></a> from its parent so that it is eligible for garbage
+     * collection when there are no {@linkplain Thread#isAlive() live} threads
+     * in the group and is otherwise <i>unreachable</i>. A non-daemon thread
+     * is strongly reachable from its parent.
      *
      * @return  {@code true} if this thread group is a daemon thread group;
      *          {@code false} otherwise.
@@ -224,11 +236,12 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
 
     /**
      * Changes the daemon status of this thread group. A daemon thread group is
-     * <i>weakly reachable</i> from its parent so it can be garbage collected
-     * when there are no {@linkplain Thread#isAlive() alive} threads in the
-     * group (and it is otherwise eligible for garbage collection). A non-daemon
-     * thread is <i>strongly reachable</i> from its parent. This method does not
-     * change the daemon status of subgroups.
+     * <a href="ref/package-summary.html#reachability"><em>weakly reachable</em></a>
+     * from its parent so that it is eligible for garbage collection when there
+     * are no {@linkplain Thread#isAlive() live} threads in the group and is
+     * otherwise <i>unreachable</i>. A non-daemon thread is strongly reachable
+     * from its parent. This method does not change the daemon status of
+     * subgroups.
      * <p>
      * First, the {@code checkAccess} method of this thread group is
      * called with no arguments; this may result in a security exception.
