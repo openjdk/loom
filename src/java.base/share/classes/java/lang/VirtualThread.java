@@ -255,6 +255,7 @@ class VirtualThread extends Thread {
      */
     @ChangesCurrentThread
     private void mount(boolean firstRun) {
+        //assert this.carrierThread == null
         Thread carrier = Thread.currentCarrierThread();
 
         // sets the carrier thread
@@ -286,7 +287,8 @@ class VirtualThread extends Thread {
      */
     @ChangesCurrentThread
     private void unmount() {
-        Thread carrier = Thread.currentCarrierThread();
+        //assert this.carrierThread == Thread.currentCarrierThread();
+        Thread carrier = this.carrierThread;
 
         if (notifyJvmtiEvents) {
             notifyUnmount(carrier, this);
