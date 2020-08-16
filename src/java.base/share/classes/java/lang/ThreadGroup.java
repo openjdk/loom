@@ -880,31 +880,30 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     /**
      * Returns a snapshot of the subgroups.
      */
-    private List<ThreadGroup> subgroups() {
+    private List<ThreadGroup> synchronizedSubgroups() {
         synchronized (this) {
-            return synchronizedSubgroups();
+            return subgroups();
         }
     }
 
     /**
      * Returns a snapshot of the subgroups.
      */
-    private List<ThreadGroup> synchronizedSubgroups() {
-        synchronized (this) {
-            List<ThreadGroup> snapshot = new ArrayList<>();
-            for (int i = 0; i < ngroups; i++) {
-                snapshot.add(groups[i]);
-            }
-            for (int i = 0; i < nweaks; ) {
-                ThreadGroup g = weaks[i].get();
-                if (g == null) {
-                    removeWeak(i);
-                } else {
-                    snapshot.add(g);
-                    i++;
-                }
-            }
-            return snapshot;
+    private List<ThreadGroup> subgroups() {
+        assert Thread.holdsLock(this);
+        List<ThreadGroup> snapshot = new ArrayList<>();
+        for (int i = 0; i < ngroups; i++) {
+            snapshot.add(groups[i]);
         }
+        for (int i = 0; i < nweaks; ) {
+            ThreadGroup g = weaks[i].get();
+            if (g == null) {
+                removeWeak(i);
+            } else {
+                snapshot.add(g);
+                i++;
+            }
+        }
+        return snapshot;
     }
 }
