@@ -25,10 +25,16 @@
 
 package java.lang;
 
+import java.io.PrintStream;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import jdk.internal.misc.VM;
 
 /**
@@ -312,18 +318,14 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     public final void setMaxPriority(int pri) {
         checkAccess();
         if (pri >= Thread.MIN_PRIORITY && pri <= Thread.MAX_PRIORITY) {
-            if (parent == null) {
-                maxPriority = pri;
-            } else {
-                maxPriority(pri);
+            synchronized (this) {
+                if (parent == null) {
+                    maxPriority = pri;
+                } else {
+                    maxPriority = Math.min(pri, parent.maxPriority);
+                }
+                subgroups().forEach(g -> g.setMaxPriority(pri));
             }
-        }
-    }
-
-    private void maxPriority(int pri) {
-        synchronized (this) {
-            maxPriority = Math.min(pri, parent.maxPriority);
-            forEachSubgroup(g -> g.maxPriority(pri));
         }
     }
 
@@ -499,21 +501,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @since   1.0
      */
     public int activeGroupCount() {
-        int n;
-        synchronized (this) {
-            n = ngroups;
-            for (int i = 0; i < ngroups; i++) {
-                n+= groups[i].activeGroupCount();
-            }
-            for (int i = 0; i < nweaks; ) {
-                ThreadGroup g = weaks[i].get();
-                if (g == null) {
-                    removeWeak(i);
-                } else {
-                    n = n + 1 + g.activeGroupCount();
-                    i++;
-                }
-            }
+        int n = 0;
+        for (ThreadGroup group : synchronizedSubgroups()) {
+            n = n + group.activeGroupCount() + 1;
         }
         return n;
     }
@@ -593,29 +583,12 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * the given index. Returns the new index.
      */
     private int enumerate(ThreadGroup list[], int i, boolean recurse) {
-        synchronized (this) {
-            // non-daemon thread groups
-            for (int j = 0; j < ngroups && i < list.length; ) {
-                ThreadGroup group = groups[j];
-                list[i++] = group;
-                if (recurse) {
-                    i = group.enumerate(list, i, true);
-                }
-                j++;
-            }
-
-            // daemon thread groups
-            for (int j = 0; j < nweaks && i < list.length; ) {
-                ThreadGroup group = weaks[j].get();
-                if (group == null) {
-                    removeWeak(j);
-                } else {
-                    list[i++] = group;
-                    if (recurse) {
-                        i = group.enumerate(list, i, true);
-                    }
-                    j++;
-                }
+        List<ThreadGroup> subgroups = synchronizedSubgroups();
+        for (int j = 0; j < subgroups.size() && i < list.length; j++) {
+            ThreadGroup group = subgroups.get(j);
+            list[i++] = group;
+            if (recurse) {
+                i = group.enumerate(list, i, true);
             }
         }
         return i;
@@ -696,14 +669,31 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Does nothing.
-     *
-     * @deprecated This method was originally intended for debugging purposes.
+     * Prints information about this thread group to the standard
+     * output. This method is be useful only for debugging.
      *
      * @since   1.0
      */
-    @Deprecated(since="99", forRemoval=true)
     public void list() {
+        Map<ThreadGroup, List<Thread>> map = Stream.of(Thread.getAllThreads())
+                .collect(Collectors.groupingBy(Thread::getThreadGroup));
+        list(map, System.out, 0);
+    }
+
+    private void list(Map<ThreadGroup, List<Thread>> map, PrintStream out, int indent) {
+        out.print(" ".repeat(indent));
+        out.println(this);
+        indent += 4;
+        List<Thread> threads = map.get(this);
+        if (threads != null) {
+            for (Thread thread : threads) {
+                out.print(" ".repeat(indent));
+                out.println(thread);
+            }
+        }
+        for (ThreadGroup group : synchronizedSubgroups()) {
+            group.list(map, out, indent);
+        }
     }
 
     /**
@@ -888,21 +878,33 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Performs an action for each (direct) subgroup.
+     * Returns a snapshot of the subgroups.
      */
-    private void forEachSubgroup(Consumer<ThreadGroup> action) {
-        assert Thread.holdsLock(this);
-        for (int i = 0; i < ngroups; i++) {
-            action.accept(groups[i]);
+    private List<ThreadGroup> subgroups() {
+        synchronized (this) {
+            return synchronizedSubgroups();
         }
-        for (int i = 0; i < nweaks; ) {
-            ThreadGroup g = weaks[i].get();
-            if (g == null) {
-                removeWeak(i);
-            } else {
-                action.accept(g);
-                i++;
+    }
+
+    /**
+     * Returns a snapshot of the subgroups.
+     */
+    private List<ThreadGroup> synchronizedSubgroups() {
+        synchronized (this) {
+            List<ThreadGroup> snapshot = new ArrayList<>();
+            for (int i = 0; i < ngroups; i++) {
+                snapshot.add(groups[i]);
             }
+            for (int i = 0; i < nweaks; ) {
+                ThreadGroup g = weaks[i].get();
+                if (g == null) {
+                    removeWeak(i);
+                } else {
+                    snapshot.add(g);
+                    i++;
+                }
+            }
+            return snapshot;
         }
     }
 }

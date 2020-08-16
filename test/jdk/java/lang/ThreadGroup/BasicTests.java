@@ -703,7 +703,7 @@ public class BasicTests {
 
     public void testList() {
         ThreadGroup group = new ThreadGroup("foo");
-        group.list(); // does nothing
+        group.list();
     }
 
     @Test(expectedExceptions = { UnsupportedOperationException.class })
