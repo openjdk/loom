@@ -72,8 +72,9 @@ import jdk.internal.misc.VM;
 public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     /**
      * All fields are accessed directly by the VM and from JVMTI functions.
-     * Recursive operations that require synchronization should synchronize
-     * top-down, meaning parent first.
+     * Operations that require synchronization on more than one group in the
+     * tree should synchronize on the parent group before synchronizing on
+     * the child group.
      */
     private final ThreadGroup parent;
     private final String name;
@@ -670,7 +671,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
 
     /**
      * Prints information about this thread group to the standard
-     * output. This method is be useful only for debugging.
+     * output. This method is useful only for debugging.
      *
      * @since   1.0
      */
