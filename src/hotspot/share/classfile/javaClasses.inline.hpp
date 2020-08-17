@@ -206,6 +206,9 @@ inline jlong java_lang_Continuation::fp(oop ref) {
 inline void java_lang_Continuation::set_fp(oop ref, const jlong i) {
   ref->long_field_put(_fp_offset, i);
 }
+inline intptr_t** java_lang_Continuation::raw_fp_address(oop ref) {
+  return (intptr_t**)ref->field_addr_raw(_fp_offset);
+}
 inline jint java_lang_Continuation::sp(oop ref) {
   return ref->int_field(_sp_offset);
 }

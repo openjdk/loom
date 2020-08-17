@@ -40,6 +40,11 @@
  *
  */
 
+// * @run main/othervm/timeout=300 -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+// * @run main/othervm/timeout=300 -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+// * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+// * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+
 // Anything excluded or not compileonly is not compiled; see CompilerOracle::should_exclude
 
 // @run driver jdk.test.lib.FileInstaller compilerDirectives.json compilerDirectives.json
@@ -139,10 +144,7 @@ public class Fuzz implements Runnable {
             int yields = fuzz.test();
             time(start, "Test (" + yields + " yields)");
 
-            Op[] newTrace = Arrays.copyOf(trace, trace.length);
-            if (!checkCompilation(newTrace)) {
-                System.out.println("CHANGED COMPILATION AFTER");
-                printTrace(newTrace);
+            if (!fuzz.checkCompilation("AFTER")) {
                 if (retry++ < 2) {
                     System.out.println("RETRYING");
                     continue;
@@ -498,6 +500,16 @@ public class Fuzz implements Runnable {
         time(start, "Compile");
     }
 
+    boolean checkCompilation(String message) {
+        Op[] newTrace = Arrays.copyOf(trace, trace.length);
+        boolean res = checkCompilation(newTrace);
+        if (!res) {
+            System.out.println("CHANGED COMPILATION " + message);
+            printTrace(newTrace);
+        }
+        return res;
+    }
+
     static boolean checkCompilation(Op[] trace) {
         boolean ok = true;
         for (int i = 0; i < trace.length; i++) {
@@ -604,7 +616,7 @@ public class Fuzz implements Runnable {
     @DontInline void preYield() { captureStack(); }
     @DontInline void postYield(boolean yieldResult) { verifyPin(yieldResult); verifyStack(); }
     @DontInline void maybeResetIndex(int index0) { this.index = current() != Op.YIELD ? index0 : index; }
-    @DontInline static void throwException() { throw new FuzzException("EX"); }
+    @DontInline void throwException() { throw new FuzzException("EX"); }
 
     @Override
     public void run() {

@@ -137,7 +137,7 @@ class StackValue : public ResourceObj {
           ? Continuation::reg_to_location(*fr, reg_map->as_RegisterMap(), VMRegImpl::as_VMReg(loc.register_number()), loc.type() == Location::oop || loc.type() == Location::narrowoop)
           : Continuation::usp_offset_to_location(*fr, reg_map->as_RegisterMap(), loc.stack_offset(), loc.type() == Location::oop || loc.type() == Location::narrowoop);
         
-      assert(value_addr == NULL || Continuation::is_in_usable_stack(value_addr, reg_map->as_RegisterMap()) || reg_map->thread()->is_in_usable_stack(value_addr), INTPTR_FORMAT, p2i(value_addr));
+      assert(value_addr == NULL || Continuation::is_in_usable_stack(value_addr, reg_map->as_RegisterMap()) || (reg_map->thread() != NULL && reg_map->thread()->is_in_usable_stack(value_addr)), INTPTR_FORMAT, p2i(value_addr));
     }
     return value_addr;
   }

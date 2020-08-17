@@ -1100,6 +1100,7 @@ class java_lang_Continuation: AllStatic {
   static inline void set_tail(oop ref, oop value);
   static inline jlong fp(oop ref);
   static inline void set_fp(oop ref, const jlong i);
+  static inline intptr_t** raw_fp_address(oop ref);
   static inline jint sp(oop ref);
   static inline void set_sp(oop ref, const jint i);
   static inline address pc(oop ref);

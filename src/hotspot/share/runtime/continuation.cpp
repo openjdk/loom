@@ -683,6 +683,7 @@ public:
   bool is_in_ref_stack(void* p) const;
   bool is_empty0();
   bool is_empty();
+  inline bool has_nonempty_chunk() const;
 
   static inline bool is_stack_chunk(oop obj);
   static inline bool is_empty_chunk(oop chunk);
@@ -1076,6 +1077,14 @@ bool ContMirror::is_empty() {
     }
   }
   return is_empty0();
+}
+
+inline bool ContMirror::has_nonempty_chunk() const {
+  for (oop chunk = tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
+    if (!ContMirror::is_empty_chunk(chunk))
+      return true;
+  }
+  return false;
 }
 
 template<op_mode mode>
@@ -4987,10 +4996,13 @@ frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
 }
 
 static frame sender_for_frame(const frame& f, RegisterMap* map) {
+  assert (map->in_cont(), "");
   ContMirror cont(map);
 
   oop chunk = cont.find_chunk(f.unextended_sp());
+  bool from_chunk = false;
   if (chunk != (oop)NULL) {
+    from_chunk = true;
     // we add to the pointer instead of subtracting from the bounds
     if (ContMirror::is_in_chunk(chunk, f.unextended_sp() + f.cb()->frame_size() + jdk_internal_misc_StackChunk::argsize(chunk) + frame_metadata)) {
       map->set_in_cont(false, false); // to prevent infinite recursion
@@ -5008,11 +5020,10 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
     assert (map->in_cont(), "");
     if (map->in_chunk()) map->set_in_cont(true, false);
     assert (!map->in_chunk(), "");
-    return continuation_body_top_frame(cont, map);
   }
 
-  hframe hf = cont.from_frame(f);
-  hframe sender = hf.sender<mode_slow>(cont);
+  hframe sender = from_chunk ? cont.last_frame<mode_slow>()
+                             : cont.from_frame(f).sender<mode_slow>(cont);
 
   // tty->print_cr(">>>> sender_for_frame");
   // sender.print_on(cont, tty);
@@ -5149,7 +5160,8 @@ bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
   oop chunk = cont.find_chunk(addr);
   assert (((intptr_t**)addr == Frame::map_link_address(map)) || (map->in_chunk() == (chunk != (oop)NULL)), "map->in_chunk(): %d", map->in_chunk());
   return (chunk != (oop)NULL) ? ContMirror::is_usable_in_chunk(chunk, addr)
-                              : (cont.is_in_stack(addr) || cont.is_in_ref_stack(addr));
+                              : (cont.is_in_stack(addr) || cont.is_in_ref_stack(addr) 
+                                 || (intptr_t**)addr == java_lang_Continuation::raw_fp_address(cont.mirror())); // TODO PD
 }
 
 // address Continuation::usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes) {
@@ -5256,8 +5268,8 @@ address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, V
   if (oop_index >= 0) {
     res = oop_address(cont.refStack(), cont.refSP(), hf.ref_sp() + oop_index);
   } else {
-    if (cont.is_last_frame(hf)) {
-      return map->location(reg);
+    if (cont.is_last_frame(hf)) { // in this case the link address in the map has not been set
+      return (address)java_lang_Continuation::raw_fp_address(cont.mirror()); // map->location(reg); // TODO PD
     }
   // assert ((void*)Frame::map_link_address(map) == (void*)map->location(reg), "must be the link register (rbp): %s", reg->name());
     int index = (int)reinterpret_cast<uintptr_t>(map->location(reg)); // the RegisterMap should contain the link index. See ContinuationHelper::update_register_map called by sender_for_frame
