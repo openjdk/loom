@@ -5147,7 +5147,7 @@ bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
   ContMirror cont(map);
 
   oop chunk = cont.find_chunk(addr);
-  assert (map->in_chunk() == (chunk != (oop)NULL), "");
+  assert (((intptr_t**)addr == Frame::map_link_address(map)) || (map->in_chunk() == (chunk != (oop)NULL)), "map->in_chunk(): %d", map->in_chunk());
   return (chunk != (oop)NULL) ? ContMirror::is_usable_in_chunk(chunk, addr)
                               : (cont.is_in_stack(addr) || cont.is_in_ref_stack(addr));
 }

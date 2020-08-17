@@ -136,6 +136,7 @@ void RegisterMap::set_in_cont(bool on_hstack, bool in_chunk) {
    assert (!in_chunk || on_hstack, "");
    _on_hstack = (int)on_hstack;
    _in_chunk = (int)in_chunk;
+   log_trace(jvmcont)("set_in_cont on_hstack: %d in_chunk: %d", on_hstack, in_chunk);
 }
 
 void RegisterMap::set_cont(oop cont) {
