@@ -2520,7 +2520,7 @@ public:
   }
 #endif
 
-  void add_chunks_size() {
+  bool add_chunks_size() {
     // We want to signal how much to allocate by setting _size, but we want to keep max_size the same.
     // The addition to _size is reverted in squash_chunks.
     // We subtract from max_size here, since we'll add it again in the squashing freeze.
@@ -2551,8 +2551,9 @@ public:
       log_develop_trace(jvmcont)("add_chunks_size frames: %d size: %d oops: %d", frames, size, oops);
       if (log_develop_is_enabled(Trace, jvmcont)) print_chunk(chunk, _cont.mirror(), false);
     }
+    bool not_empty = _frames > orig_frames;
 
-    if (_frames > orig_frames && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
+    if (not_empty && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
       _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
     }
 
@@ -2564,6 +2565,8 @@ public:
       e.set_numFrames(_frames - orig_frames);
       e.commit();
     }
+
+    return not_empty;
   }
 
   void squash_chunks() {
@@ -2809,14 +2812,35 @@ public:
     // DEBUG_ONLY(size_t orig_max_size = _cont.max_size());
     assert ((_cont.max_size() == 0) == _cont.is_empty(), "");
 
+    int argsize = 0;
+    if (!_cont.is_empty0()) {
+      if (!FKind::interpreted) {
+    #ifdef CONT_DOUBLE_NOP
+        CachedCompiledMetadata md = ContinuationHelper::cached_metadata<mode>(callee);
+        if (LIKELY(!md.empty())) {
+          argsize = md.stack_argsize();
+          assert(argsize == slow_stack_argsize(callee), "argsize: %d slow_stack_argsize: %d", argsize, slow_stack_argsize(callee));
+        } else
+    #endif
+          argsize = Compiled::stack_argsize(callee);
+      }
+    }
+    *argsize_out = argsize;
+
     DEBUG_ONLY(int pre_chunk_size = _size; int pre_chunk_oops = _oops;)
 
+    bool has_nonempty_chunk = false;
     if (_thread != NULL) {
-      add_chunks_size();
+      has_nonempty_chunk = add_chunks_size();
     }
 
     DEBUG_ONLY(int post_chunk_size = _size; int post_chunk_oops = _oops;)
     assert (_thread != NULL || post_chunk_size == pre_chunk_size, "_post_chunk_size: %d _pre_chunk_size: %d", post_chunk_size, pre_chunk_size);
+
+    if (!has_nonempty_chunk && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
+        log_develop_trace(jvmcont)("finalize _size: %d add argsize: %d", _size, argsize);
+        _size += argsize;
+    }
 
     assert (!_cont.is_empty() || _cont.max_size() == 0, "_cont.max_size(): %lu _cont.is_empty(): %d", _cont.max_size(), _cont.is_empty());
 
@@ -2866,7 +2890,6 @@ public:
     assert (!empty || assert_bottom_java_frame_name(callee, ENTER_SIG), "");
   #endif
 
-    int argsize = 0;
     if (_cont.is_empty0()) {
       assert (_cont.is_empty(), "");
       caller = new_bottom_hframe<true>(_cont.sp(), _cont.refSP(), NULL, false);
@@ -2874,26 +2897,13 @@ public:
       assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
       int sp = _cont.sp();
 
-      if (!FKind::interpreted) {
-    #ifdef CONT_DOUBLE_NOP
-        CachedCompiledMetadata md = ContinuationHelper::cached_metadata<mode>(callee);
-        if (LIKELY(!md.empty())) {
-          argsize = md.stack_argsize();
-          assert(argsize == slow_stack_argsize(callee), "argsize: %d slow_stack_argsize: %d", argsize, slow_stack_argsize(callee));
-        } else
-    #endif
-          argsize = Compiled::stack_argsize(callee);
-
-        if (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
-          log_develop_trace(jvmcont)("finalize _size: %d add argsize: %d", _size, argsize);
-          _size += argsize;
-        } else {
-          // the arguments of the bottom-most frame are part of the topmost compiled frame on the hstack; we overwrite that part
-          // tty->print_cr(">>> BEFORE: sp: %d", sp);
-          // sp += argsize >> LogBytesPerElement;
-          // tty->print_cr(">>> AFTER: sp: %d", sp);
-        }
-      }
+      // This is now done in freeze_compiled_frame:
+      // if (!FKind::interpreted&& !_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
+      //     // the arguments of the bottom-most frame are part of the topmost compiled frame on the hstack; we overwrite that part
+      //     // tty->print_cr(">>> BEFORE: sp: %d", sp);
+      //     // sp += argsize >> LogBytesPerElement;
+      //     // tty->print_cr(">>> AFTER: sp: %d", sp);
+      // }
       caller = new_bottom_hframe<false>(sp, _cont.refSP(), _cont.pc(), _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED));
       // tty->print_cr(">>> new_bottom_hframe"); caller.print_on(tty);
     }
@@ -2903,8 +2913,6 @@ public:
     _cont.add_num_frames(_frames);
     _cont.add_size(_size);
     _cont.e_add_refs(_oops);
-
-    *argsize_out = argsize;
 
     if (_thread != NULL) {
       frame entry = sender<FKind>(callee); // f.sender_for_compiled_frame<ContinuationCodeBlobLookup>(&map);
