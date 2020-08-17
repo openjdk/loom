@@ -62,8 +62,6 @@ public interface Runnable {
      * <p>
      * The general contract of the method {@code run} is that it may
      * take any action whatsoever.
-     *
-     * @see     java.lang.Thread#run()
      */
     public abstract void run();
 }
