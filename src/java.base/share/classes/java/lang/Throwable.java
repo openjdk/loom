@@ -812,7 +812,7 @@ public class Throwable implements Serializable {
         if (VM.isBooted()
                 && Thread.currentThread().isVirtual()
                 && !Configuration.SHOW_FULL_STACK_TRACE) {
-            scope = VirtualThread.VTHREAD_SCOPE;
+            scope = VirtualThread.continuationScope();
         }
         return fillInStackTrace(scope);
     }

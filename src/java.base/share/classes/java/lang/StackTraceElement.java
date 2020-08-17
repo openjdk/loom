@@ -361,7 +361,7 @@ public final class StackTraceElement implements java.io.Serializable {
                 (fileName != null ?  ""+fileName+")" : "Unknown Source)")));
 
         if (contScopeName != null
-                && !contScopeName.equals(VirtualThread.VTHREAD_SCOPE.getName())
+                && !contScopeName.equals(VirtualThread.continuationScope().getName())
                 && isContinuationEntry()) {
             s = s + " " + contScopeName;
         }

@@ -63,12 +63,10 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  */
 
 class VirtualThread extends Thread {
-    private static final Executor DEFAULT_SCHEDULER = defaultScheduler();
-    private static final ScheduledExecutorService UNPARKER = delayedTaskScheduler();
+    private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
+    private static final Executor DEFAULT_SCHEDULER = createDefaultScheduler();
+    private static final ScheduledExecutorService UNPARKER = createDelayedTaskScheduler();
     private static final int TRACE_PINNING_MODE = tracePinningMode();
-
-    // scope used for the continuations
-    static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
 
     private static final VarHandle STATE;
     private static final VarHandle PARK_PERMIT;
@@ -119,9 +117,13 @@ class VirtualThread extends Thread {
     private Condition condition;           // created lazily while holding lock
 
     /**
-     * Creates a new {@code VirtualThread} to run the given task with the given scheduler.
+     * Creates a new {@code VirtualThread} to run the given task with the given
+     * scheduler. If the given scheduler is {@code null} and the current thread
+     * is a kernel thread then the newly created virtual thread will use the
+     * default scheduler. If given scheduler is {@code null} and the current
+     * thread is a virtual thread then the current thread's scheduler is used.
      *
-     * @param scheduler the scheduler
+     * @param scheduler the scheduler or null.
      * @param name thread name
      * @param characteristics characteristics
      * @param task the task to execute
@@ -138,7 +140,17 @@ class VirtualThread extends Thread {
             }
         };
 
-        this.scheduler = (scheduler != null) ? scheduler : DEFAULT_SCHEDULER;
+        // choose scheduler if not specified
+        if (scheduler == null) {
+            Thread parent = Thread.currentThread();
+            if (parent.isVirtual()) {
+                scheduler = ((VirtualThread) parent).scheduler;
+            } else {
+                scheduler = DEFAULT_SCHEDULER;
+            }
+        }
+
+        this.scheduler = scheduler;
         this.cont = new Continuation(VTHREAD_SCOPE, target) {
             @Override
             protected void onPinned(Continuation.Pinned reason) {
@@ -156,6 +168,20 @@ class VirtualThread extends Thread {
         this.runContinuation = (scheduler != null)
                 ? new Runner(this)
                 : this::runContinuation;
+    }
+
+    /**
+     * Returns the default scheduler.
+     */
+    static Executor defaultScheduler() {
+        return DEFAULT_SCHEDULER;
+    }
+
+    /**
+     * Returns the continuation scope used for virtual threads.
+     */
+    static ContinuationScope continuationScope() {
+        return VTHREAD_SCOPE;
     }
 
     /**
@@ -981,7 +1007,7 @@ class VirtualThread extends Thread {
     /**
      * Creates the default scheduler as ForkJoinPool.
      */
-    private static Executor defaultScheduler() {
+    private static Executor createDefaultScheduler() {
         ForkJoinWorkerThreadFactory factory = pool -> {
             PrivilegedAction<ForkJoinWorkerThread> pa = () -> new CarrierThread(pool);
             return AccessController.doPrivileged(pa);
@@ -1065,9 +1091,9 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Creates the ScheduledThreadPoolExecutor used to schedule unparking.
+     * Creates the ScheduledThreadPoolExecutor used for timed unpark.
      */
-    private static ScheduledExecutorService delayedTaskScheduler() {
+    private static ScheduledExecutorService createDelayedTaskScheduler() {
         int poolSize = Math.max(Runtime.getRuntime().availableProcessors()/4, 1);
         ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
             Executors.newScheduledThreadPool(poolSize, task -> {

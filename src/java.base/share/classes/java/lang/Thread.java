@@ -785,7 +785,8 @@ public class Thread implements Runnable {
 
         /**
          * The thread will be scheduled by the Java virtual machine rather than
-         * the operating system with the default scheduler.
+         * the operating system. The scheduler will be selected when the thread
+         * is {@linkplain #build() created} or {@linkplain #start() started}.
          * @return this builder
          * @throws IllegalStateException if a thread group has been set
          */
@@ -802,7 +803,7 @@ public class Thread implements Runnable {
          * The {@code execute} method may be invoked at sensitive times (e.g. when
          * unparking a thread) so care should be taken to not directly execute the
          * task on the <em>current thread</em>.
-         * @param scheduler the scheduler
+         * @param scheduler the scheduler or {@code null} for the default scheduler
          * @return this builder
          * @throws IllegalStateException if a thread group has been set
          */
@@ -867,10 +868,17 @@ public class Thread implements Runnable {
          * builder.
          *
          * <p> When this method creates a kernel thread then it will inherit the
-         * {@linkplain ThreadGroup}, {@link #getPriority() priority}, and {@link
-         * #isDaemon() daemon status} of the current thread when these
-         * characteristics have not been set. When this method creates a virtual
-         * thread then will have no {@link java.security.Permission permissions}.
+         * {@linkplain ThreadGroup thread-group}, {@linkplain #getPriority() priority},
+         * and {@linkplain #isDaemon() daemon status} of the current thread if these
+         * characteristics have not been set. The {@linkplain #getContextClassLoader()
+         * context-class-loader} is inherited from the current thread.
+         *
+         * <p> When this method creates a virtual thread and a scheduler has not
+         * been set then the thread will be scheduled using the default scheduler if
+         * the current thread is a kernel thread, or the scheduler for the current
+         * thread if it is a virtual thread. The {@link #getContextClassLoader()
+         * context-class-loader} is inherited from the current thread. The thread
+         * will have no {@link java.security.Permission permissions}.
          *
          * @return a new unstarted Thread
          * @throws IllegalStateException if the task object to run object has not been set
@@ -884,6 +892,22 @@ public class Thread implements Runnable {
          * state of the builder. The returned thread factory is safe for use by
          * multiple concurrent threads.
          *
+         * <p> A {@code ThreadFactory} that creates kernel threads will inherit the
+         * {@linkplain ThreadGroup thread-group}, {@linkplain #getPriority()
+         * priority}, and {@linkplain #isDaemon() daemon status} of the current
+         * thread when creating a {@code Thread} if these characteristics have not
+         * been set. The {@linkplain #getContextClassLoader() context-class-loader}
+         * is inherited from the current thread when creating a {@code Thread}.
+         *
+         * <p> A {@code ThreadFactory} that creates virtual threads will use the
+         * selected scheduler. If a scheduler has not been set then the {@code
+         * ThreadFactory} will select the scheduler when creating a {@code Thread}.
+         * The default scheduler will be selected if the current thread is a
+         * kernel thread. It will use the scheduler for the current thread if it
+         * is a virtual thread. The {@link #getContextClassLoader() context-class-loader}
+         * is inherited from the current thread. The thread will have no
+         * {@link java.security.Permission permissions}.
+         *
          * @return a thread factory to create threads
          */
         ThreadFactory factory();
@@ -893,11 +917,18 @@ public class Thread implements Runnable {
          * and starts it as if by invoking the {@linkplain Thread#start() start}
          * method.
          *
-         * <p> When this method creates a kernel thread then it will inherit the
-         * {@linkplain ThreadGroup}, {@link #getPriority() priority}, and {@link
-         * #isDaemon() daemon status} of the current thread when these
-         * characteristics have not been set. When this method creates a virtual
-         * thread then will have no {@link java.security.Permission permissions}.
+         * <p> When this method starts a kernel thread then it will inherit the
+         * {@linkplain ThreadGroup thread-group}, {@linkplain #getPriority() priority},
+         * and {@linkplain #isDaemon() daemon status} of the current thread if these
+         * characteristics have not been set. The {@linkplain #getContextClassLoader()
+         * context-class-loader} is inherited from the current thread.
+         *
+         * <p> When this method starts a virtual thread and a scheduler has not
+         * been set then the thread will be scheduled using the default scheduler if
+         * the current thread is a kernel thread, or the scheduler for the current
+         * thread if it is a virtual thread. The {@link #getContextClassLoader()
+         * context-class-loader} is inherited from the current thread. The thread
+         * will have no {@link java.security.Permission permissions}.
          *
          * @implSpec The default implementation invokes {@linkplain #build() build}
          * to create a {@code Thread} and then invokes its {@linkplain Thread#start()
@@ -979,9 +1010,10 @@ public class Thread implements Runnable {
 
         @Override
         public Builder virtual(Executor scheduler) {
-            Objects.requireNonNull(scheduler);
             if (group != null)
                 throw new IllegalStateException();
+            if (scheduler == null)
+                scheduler = VirtualThread.defaultScheduler();
             this.virtual = true;
             this.scheduler = scheduler;
             return this;
@@ -1538,17 +1570,19 @@ public class Thread implements Runnable {
      * Creates an unnamed thread.
      *
      * By default, the thread is scheduled by the operating system, supports
-     * {@link ThreadLocal thread-locals}, and does not inherit any initial values
-     * for {@link InheritableThreadLocal inheritable-thread-locals}.
-     * The {@link ThreadGroup ThreadGroup}, {@link #isDaemon() daemon status},
+     * {@linkplain ThreadLocal thread-locals}, and does not inherit any initial
+     * values for {@linkplain InheritableThreadLocal inheritable-thread-locals}.
+     * The {@linkplain ThreadGroup thread-group}, {@link #isDaemon() daemon status},
      * {@link #getPriority() priority}, and the {@link #getContextClassLoader()
      * context-class-loader} are inherited from the current thread.
      *
-     * <p> The characteristic {@linkplain Thread#VIRTUAL VIRTUAL} is
-     * used to create a thread that is scheduled by the Java virtual machine
-     * using the default scheduler. The default in this case is to only inherit
-     * the {@link #getContextClassLoader() context-class-loader} from the current
-     * thread.
+     * <p> The characteristic {@link Thread#VIRTUAL VIRTUAL} is used to create
+     * a thread that is scheduled by the Java virtual machine. The thread will
+     * be scheduled using the default scheduler if the current thread is a kernel
+     * thread, or the scheduler for the current thread if it is a virtual thread.
+     * The {@linkplain #getContextClassLoader() context-class-loader} is inherited
+     * from the current thread. The thread will will have no {@link
+     * java.security.Permission permissions}.
      *
      * @apiNote The characteristics will probably be replaced by an enum
      *
@@ -1573,17 +1607,19 @@ public class Thread implements Runnable {
      * Creates a named thread.
      *
      * By default, the thread is scheduled by the operating system, supports
-     * {@link ThreadLocal thread-locals}, and does not inherit any initial values
-     * for {@link InheritableThreadLocal inheritable-thread-locals}.
-     * The {@link ThreadGroup ThreadGroup}, {@link #isDaemon() daemon status},
+     * {@linkplain ThreadLocal thread-locals}, and does not inherit any initial
+     * values for {@linkplain InheritableThreadLocal inheritable-thread-locals}.
+     * The {@linkplain ThreadGroup thread-group}, {@link #isDaemon() daemon status},
      * {@link #getPriority() priority}, and the {@link #getContextClassLoader()
      * context-class-loader} are inherited from the current thread.
      *
-     * <p> The characteristic {@linkplain Thread#VIRTUAL VIRTUAL} is
-     * used to create a thread that is scheduled by the Java virtual machine
-     * using the default scheduler. The default in this case is to only inherit
-     * the {@link #getContextClassLoader() context-class-loader} from the current
-     * thread.
+     * <p> The characteristic {@link Thread#VIRTUAL VIRTUAL} is used to create
+     * a thread that is scheduled by the Java virtual machine. The thread will
+     * be scheduled using the default scheduler if the current thread is a kernel
+     * thread, or the scheduler for the current thread if it is a virtual thread.
+     * The {@linkplain #getContextClassLoader() context-class-loader} is inherited
+     * from the current thread. The thread will will have no {@link
+     * java.security.Permission permissions}.
      *
      * @apiNote The characteristics will probably be replaced by an enum
      *
@@ -1609,11 +1645,13 @@ public class Thread implements Runnable {
 
     /**
      * Starts a new virtual thread to execute a task. The thread is scheduled
-     * by the Java virtual machine using the default scheduler. The resulting
-     * thread supports {@link ThreadLocal thread-locals} but does not inherit any
-     * initial values for {@link InheritableThreadLocal inheritable-thread-locals}.
-     * It inherits the {@link #getContextClassLoader() context-class-loader} from
-     * the current thread. It has no {@link java.security.Permission permissions}.
+     * by the Java virtual machine using the default scheduler if the current
+     * thread is a kernel thread, or the scheduler for the current thread if
+     * it is a virtual thread. The resulting thread supports {@linkplain
+     * ThreadLocal thread-locals} but does not inherit any initial values for
+     * {@linkplain InheritableThreadLocal inheritable-thread-locals}. It inherits
+     * the {@linkplain #getContextClassLoader() context-class-loader} from the
+     * current thread. It has no {@link java.security.Permission permissions}.
      * @param task the object to run when the thread executes
      * @throws NullPointerException if task is null
      * @return a new, and started, virtual thread
