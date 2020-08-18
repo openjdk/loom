@@ -80,8 +80,8 @@ import jdk.test.lib.Utils;
 import sun.hotspot.WhiteBox;
 
 public class Fuzz implements Runnable {
-    static final boolean RANDOM  = true;
-    static final boolean VERIFY_STACK = false; // could add significant time
+    static final boolean VERIFY_STACK = true; // could add significant time
+    static final boolean RANDOM  = false;
     static final boolean VERBOSE = false;
 
     public static void main(String[] args) {
@@ -195,16 +195,18 @@ public class Fuzz implements Runnable {
             if (percent(3)) lowProb.addAll(Op.PIN);
             if (percent(3)) lowProb.addAll(Op.MH);
             if (percent(0)) lowProb.addAll(Op.REFLECTED);
-            if (percent(90)) {
+            if (percent(50)) {
                 highProb.removeAll(Op.INTERPRETED);
                 lowProb.removeAll(Op.INTERPRETED);
             }
             Op[] highProb0 = highProb.toArray(Op.ARRAY);
             Op[] lowProb0  = lowProb.toArray(Op.ARRAY);
             
+            int loops = 7;
             Op[] trace = new Op[length];
             for (int i=0; i < trace.length; i++) {
                 trace[i] = pick((lowProb.isEmpty() || percent(90)) ? highProb0 : lowProb0);
+                if (trace[i] == Op.LOOP && (loops--) <= 0) i--;
             }
             return trace;
         }

@@ -573,8 +573,6 @@ java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-
 java/lang/invoke/LFCaching/LFGarbageCollectedTest.java          8078602 generic-all
 java/lang/invoke/lambda/LambdaFileEncodingSerialization.java    8249079 linux-x64
 
-java/lang/Continuation/Fuzz.java                                0000000 generic-all
-
 ############################################################################
 
 # jdk_instrument
