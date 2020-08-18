@@ -503,7 +503,7 @@ JVM_END
 
 JVM_LEAF(jlong, JVM_MaxObjectInspectionAge(void))
   JVMWrapper("JVM_MaxObjectInspectionAge");
-  return Universe::heap()->millis_since_last_gc();
+  return Universe::heap()->millis_since_last_whole_heap_examined();
 JVM_END
 
 
@@ -3350,14 +3350,15 @@ JVM_END
 
 JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
   JVMWrapper("JVM_CurrentThread");
-  oop theThread = thread->_vthread;
+  oop theThread = thread->vthread();
+  assert (theThread != (oop)NULL, "no current thread!");
   return JNIHandles::make_local(THREAD, theThread);
 JVM_END
 
 JVM_ENTRY(void, JVM_SetCurrentThread(JNIEnv* env, jclass threadClass,
                                      jobject theThread))
   JVMWrapper("JVM_SetCurrentThread0");
-  thread->_vthread = JNIHandles::resolve(theThread);
+  thread->set_vthread(JNIHandles::resolve(theThread));
 JVM_END
 
 // Return true iff the current thread has locked the object passed in

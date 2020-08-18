@@ -25,6 +25,7 @@
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/systemDictionary.hpp"
+#include "gc/shared/oopStorageSet.hpp"
 #include "memory/allocation.hpp"
 #include "memory/heapInspection.hpp"
 #include "memory/oopFactory.hpp"
@@ -68,6 +69,9 @@ ThreadDumpResult* ThreadService::_threaddump_list = NULL;
 
 static const int INITIAL_ARRAY_SIZE = 10;
 
+// OopStorage for thread stack sampling
+static OopStorage* _thread_service_storage = NULL;
+
 void ThreadService::init() {
   EXCEPTION_MARK;
 
@@ -96,6 +100,9 @@ void ThreadService::init() {
   }
 
   _thread_allocated_memory_enabled = true; // Always on, so enable it
+
+  // Initialize OopStorage for thread stack sampling walking
+  _thread_service_storage = OopStorageSet::create_strong("ThreadService OopStorage");
 }
 
 void ThreadService::reset_peak_thread_count() {
@@ -564,7 +571,7 @@ ThreadsList* ThreadDumpResult::t_list() {
 StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
   _method = jvf->method();
   _bci = jvf->bci();
-  _class_holder = OopHandle(Universe::vm_global(), _method->method_holder()->klass_holder());
+  _class_holder = OopHandle(_thread_service_storage, _method->method_holder()->klass_holder());
   _locked_monitors = NULL;
   _cont_scope_name = OopHandle(Universe::vm_global(), (jvf->continuation() != NULL) ? java_lang_ContinuationScope::name(java_lang_Continuation::scope(jvf->continuation())) : (oop)NULL);
   if (with_lock_info) {
@@ -578,7 +585,7 @@ StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
       for (int i = 0; i < length; i++) {
         MonitorInfo* monitor = list->at(i);
         assert(monitor->owner() != NULL, "This monitor must have an owning object");
-        _locked_monitors->append(OopHandle(Universe::vm_global(), monitor->owner()));
+        _locked_monitors->append(OopHandle(_thread_service_storage, monitor->owner()));
       }
     }
   }
@@ -587,12 +594,12 @@ StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
 StackFrameInfo::~StackFrameInfo() {
   if (_locked_monitors != NULL) {
     for (int i = 0; i < _locked_monitors->length(); i++) {
-      _locked_monitors->at(i).release(Universe::vm_global());
+      _locked_monitors->at(i).release(_thread_service_storage);
     }
     delete _locked_monitors;
   }
-  _class_holder.release(Universe::vm_global());
-  _cont_scope_name.release(Universe::vm_global());
+  _class_holder.release(_thread_service_storage);
+  _cont_scope_name.release(_thread_service_storage);
 }
 
 void StackFrameInfo::metadata_do(void f(Metadata*)) {
@@ -643,7 +650,7 @@ ThreadStackTrace::ThreadStackTrace(JavaThread* t, bool with_locked_monitors) {
 }
 
 void ThreadStackTrace::add_jni_locked_monitor(oop object) {
-  _jni_locked_monitors->append(OopHandle(Universe::vm_global(), object));
+  _jni_locked_monitors->append(OopHandle(_thread_service_storage, object));
 }
 
 ThreadStackTrace::~ThreadStackTrace() {
@@ -653,7 +660,7 @@ ThreadStackTrace::~ThreadStackTrace() {
   delete _frames;
   if (_jni_locked_monitors != NULL) {
     for (int i = 0; i < _jni_locked_monitors->length(); i++) {
-      _jni_locked_monitors->at(i).release(Universe::vm_global());
+      _jni_locked_monitors->at(i).release(_thread_service_storage);
     }
     delete _jni_locked_monitors;
   }
@@ -838,13 +845,13 @@ ThreadConcurrentLocks::ThreadConcurrentLocks(JavaThread* thread) {
 
 ThreadConcurrentLocks::~ThreadConcurrentLocks() {
   for (int i = 0; i < _owned_locks->length(); i++) {
-    _owned_locks->at(i).release(Universe::vm_global());
+    _owned_locks->at(i).release(_thread_service_storage);
   }
   delete _owned_locks;
 }
 
 void ThreadConcurrentLocks::add_lock(instanceOop o) {
-  _owned_locks->append(OopHandle(Universe::vm_global(), o));
+  _owned_locks->append(OopHandle(_thread_service_storage, o));
 }
 
 ThreadStatistics::ThreadStatistics() {
@@ -861,7 +868,7 @@ oop ThreadSnapshot::threadObj() const { return _threadObj.resolve(); }
 void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   _thread = thread;
   oop threadObj = thread->threadObj();
-  _threadObj = OopHandle(Universe::vm_global(), threadObj);
+  _threadObj = OopHandle(_thread_service_storage, threadObj);
 
   ThreadStatistics* stat = thread->get_thread_stat();
   _contended_enter_ticks = stat->contended_enter_ticks();
@@ -914,10 +921,10 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   }
 
   if (blocker_object != NULL) {
-    _blocker_object = OopHandle(Universe::vm_global(), blocker_object);
+    _blocker_object = OopHandle(_thread_service_storage, blocker_object);
   }
   if (blocker_object_owner != NULL) {
-    _blocker_object_owner = OopHandle(Universe::vm_global(), blocker_object_owner);
+    _blocker_object_owner = OopHandle(_thread_service_storage, blocker_object_owner);
   }
 }
 
@@ -925,9 +932,9 @@ oop ThreadSnapshot::blocker_object() const           { return _blocker_object.re
 oop ThreadSnapshot::blocker_object_owner() const     { return _blocker_object_owner.resolve(); }
 
 ThreadSnapshot::~ThreadSnapshot() {
-  _blocker_object.release(Universe::vm_global());
-  _blocker_object_owner.release(Universe::vm_global());
-  _threadObj.release(Universe::vm_global());
+  _blocker_object.release(_thread_service_storage);
+  _blocker_object_owner.release(_thread_service_storage);
+  _threadObj.release(_thread_service_storage);
 
   delete _stack_trace;
   delete _concurrent_locks;

@@ -274,6 +274,8 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool as
     }
     vfs.next_vframe();
   }
+
+  _hash = 1;
   while (!vfs.at_end()) {
     if (count >= _max_frames) {
       _reached_root = false;
@@ -295,12 +297,14 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool as
     } else {
       bci = vfs.bci();
     }
-    // Can we determine if it's inlined?
-    _hash = (_hash << 2) + (unsigned int)(((size_t)mid >> 2) + (bci << 4) + type);
+    _hash = (_hash * 31) + mid;
+    _hash = (_hash * 31) + bci;
+    _hash = (_hash * 31) + type;
     _frames[count] = JfrStackFrame(mid, bci, type, async_mode ? method->line_number_from_bci(bci) : 0, method->method_holder());
     vfs.next_vframe();
     count++;
   }
+
   if (async_mode) {
     assert(virtual_thread != NULL, "invariant");
     assert(_lineno, "invarinat");
