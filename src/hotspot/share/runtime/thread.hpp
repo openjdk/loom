@@ -1389,6 +1389,7 @@ public:
   bool cont_yield() { return _cont_yield; }
   void set_cont_yield(bool x) { _cont_yield = x; }
   void set_cont_fastpath(intptr_t* x) { _cont_fastpath = x; }
+  void push_cont_fastpath(intptr_t* sp) { if (sp > _cont_fastpath) _cont_fastpath = sp; }
   void set_cont_fastpath_thread_state(bool x) { _cont_fastpath_thread_state = (int)x; }
   intptr_t* raw_cont_fastpath() { return _cont_fastpath; }
   bool cont_fastpath() { return ((_cont_fastpath == NULL) & _cont_fastpath_thread_state) != 0; }

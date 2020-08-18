@@ -4839,8 +4839,7 @@ void Continuation::notify_deopt(JavaThread* thread, intptr_t* sp) {
   if (cont == NULL) return;
   
   if (is_sp_in_continuation(cont, sp)) {
-    if (sp > thread->raw_cont_fastpath())
-      thread->set_cont_fastpath(sp);
+    thread->push_cont_fastpath(sp);
     return;
   }
 

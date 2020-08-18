@@ -2365,14 +2365,6 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
       // push the return address
       __ push(retaddr);
 
-#ifdef _LP64
-      __ push_cont_fastpath(r15_thread);
-#else
-      const Register thread = rax;
-      __ get_thread(thread);
-      __ push_cont_fastpath(thread);
-#endif
-
       // and begin the OSR nmethod
       __ jmp(Address(rbx, nmethod::osr_entry_point_offset()));
     }

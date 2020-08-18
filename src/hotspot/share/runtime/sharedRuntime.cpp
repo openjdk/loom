@@ -3102,6 +3102,12 @@ JRT_LEAF(intptr_t*, SharedRuntime::OSR_migration_begin( JavaThread *thread) )
   }
   assert(i - max_locals == active_monitor_count*2, "found the expected number of monitors");
 
+  RegisterMap map(thread, false);
+  frame sender = fr.sender(&map);
+  if (sender.is_interpreted_frame()) {
+    thread->push_cont_fastpath(sender.sp());
+  }
+
   return buf;
 JRT_END
 
