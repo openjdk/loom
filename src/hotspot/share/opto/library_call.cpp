@@ -758,13 +758,13 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 
   case vmIntrinsics::_onSpinWait:               return inline_onspinwait();
 
-  case vmIntrinsics::_currentThread0:           return inline_native_currentThread0();
-  case vmIntrinsics::_currentThread:            return inline_native_currentThread();
+  // case vmIntrinsics::_currentThread0:           return inline_native_currentThread0();
+  // case vmIntrinsics::_currentThread:            return inline_native_currentThread();
 
   case vmIntrinsics::_scopedCache:              return inline_native_scopedCache();
   case vmIntrinsics::_setScopedCache:           return inline_native_setScopedCache();
 
-  case vmIntrinsics::_setCurrentThread:         return inline_native_setCurrentThread();
+  // case vmIntrinsics::_setCurrentThread:         return inline_native_setCurrentThread();
 
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), "counterTime");
