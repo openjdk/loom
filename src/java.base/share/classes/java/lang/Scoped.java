@@ -62,6 +62,11 @@ public abstract class Scoped<T> {
 
     private static int nextKey = 0xf0f0_f0f0;
 
+    /**
+     * TBD
+     */
+    protected Scoped() {}
+    
     @ForceInline
     @SuppressWarnings("unchecked")  // one map has entries for all types <T>
     static final Object getObject(int hash, Scoped<?> key) {

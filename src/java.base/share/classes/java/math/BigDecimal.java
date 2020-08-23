@@ -3790,12 +3790,11 @@ public class BigDecimal extends Number implements Comparable<BigDecimal> {
         return BigDecimal.valueOf(1, this.scale(), 1);
     }
 
-    // Private class to build a string representation for BigDecimal object.
-    // The StringBuilder field acts as a buffer to hold the temporary
-    // representation of BigDecimal. The cmpCharArray holds all the characters for
-    // the compact representation of BigDecimal (except for '-' sign' if it is
-    // negative) if its intCompact field is not INFLATED. It is shared by all
-    // calls to toString() and its variants in that particular thread.
+    // Private class to build a string representation for BigDecimal object. The
+    // StringBuilder field acts as a buffer to hold the temporary representation
+    // of BigDecimal. The cmpCharArray holds all the characters for the compact
+    // representation of BigDecimal (except for '-' sign' if it is negative) if
+    // its intCompact field is not INFLATED.
     static class StringBuilderHelper {
         final StringBuilder sb;    // Placeholder for BigDecimal string
         final char[] cmpCharArray; // character array to place the intCompact
