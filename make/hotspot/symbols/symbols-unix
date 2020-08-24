@@ -208,6 +208,8 @@ JVM_DefineModule
 JVM_SetBootLoaderUnnamedModule
 
 # Virtual thread support
+JVM_VTMTStart
+JVM_VTMTFinish
 JVM_VirtualThreadStarted
 JVM_VirtualThreadTerminated
 JVM_VirtualThreadMount

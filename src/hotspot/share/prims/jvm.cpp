@@ -4078,8 +4078,19 @@ JVM_ENTRY_NO_ENV(jint, JVM_FindSignal(const char *name))
   return os::get_signal_number(name);
 JVM_END
 
+JVM_ENTRY(void, JVM_VTMTStart(JNIEnv* env, jclass vthread_class, jobject vthread, int callsite_tag))
+  JVMWrapper("JVM_VTMTStart");
+  JvmtiThreadState::start_VTMT(vthread, callsite_tag);
+JVM_END
+
+JVM_ENTRY(void, JVM_VTMTFinish(JNIEnv* env, jclass vthread_class, jobject vthread, int callsite_tag))
+  JVMWrapper("JVM_VTMTFinish");
+  JvmtiThreadState::finish_VTMT(vthread, callsite_tag);
+JVM_END
+
 JVM_ENTRY(void, JVM_VirtualThreadStarted(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadStarted");
+  thread->set_mounted_vthread(JNIHandles::resolve(vthread));
   if (JvmtiExport::should_post_vthread_scheduled()) {
     JvmtiExport::post_vthread_scheduled(event_thread, vthread);
   }
@@ -4092,11 +4103,12 @@ JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, j
     JvmtiExport::post_vthread_terminated(event_thread, vthread);
   }
   JFR_ONLY(Jfr::on_thread_exit(event_thread, vthread));
+  thread->set_mounted_vthread(NULL);
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMount(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadMount");
-  JvmtiThreadState::check_and_self_suspend_vthread(vthread, true);
+  thread->set_mounted_vthread(JNIHandles::resolve(vthread));
   if (JvmtiExport::should_post_vthread_mounted()) {
     JvmtiExport::post_vthread_mounted(event_thread, vthread);
   }
@@ -4104,8 +4116,8 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmount(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadUnmount");
-  JvmtiThreadState::check_and_self_suspend_vthread(vthread, false);
   if (JvmtiExport::should_post_vthread_unmounted()) {
     JvmtiExport::post_vthread_unmounted(event_thread, vthread);
   }
+  thread->set_mounted_vthread(java_lang_VirtualThread::carrier_thread(thread->mounted_vthread()));
 JVM_END

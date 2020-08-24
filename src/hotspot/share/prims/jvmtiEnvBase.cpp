@@ -1126,7 +1126,7 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
 
   if (thread == NULL) {
     java_thread = cur_thread;
-    thread_oop = JvmtiExport::can_support_virtual_threads() ? java_thread->vthread() : java_thread->threadObj();
+    thread_oop = get_vthread_or_thread_oop(java_thread);
     if (thread_oop == NULL || !thread_oop->is_a(SystemDictionary::Thread_klass())) {
       return JVMTI_ERROR_INVALID_THREAD;
     }
@@ -1145,13 +1145,6 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
   *jt_pp = java_thread;
   *thread_oop_p = thread_oop;
   return JVMTI_ERROR_NONE;
-}
-
-// If can_support_virtual_threads capability is enabled and there is a virtual thread mounted
-// to the JavaThread* then return virtual thread oop. Otherwise, return thread oop.
-oop
-JvmtiEnvBase::get_vthread_or_thread_oop(JavaThread* thread) {
-  return thread->vthread();
 }
 
 jvmtiError

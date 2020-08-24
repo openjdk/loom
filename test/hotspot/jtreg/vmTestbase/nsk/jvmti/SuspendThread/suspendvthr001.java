@@ -91,17 +91,13 @@ public class suspendvthr001 extends DebugeeClass {
         if (status != Consts.TEST_PASSED) {
             return status;
         }
+        sleep(10); // let tested vthreads work while they are tested in native agent
 
-        sleep(10); // let tested vthreads work a little bit
         System.out.println("\n## Java: runIt: Finishing vthreads");
         try {
             for (int i = 0; i < VTHREADS_CNT; i++) {
                 // let thread to finish
                 suspendvthr001Thread thread = threads[i];
-                status = checkStatus(status);
-                if (status != Consts.TEST_PASSED) {
-                    return status;
-                }
                 thread.letFinish();
                 vts[i].join();
             }
@@ -109,7 +105,6 @@ public class suspendvthr001 extends DebugeeClass {
             throw new Failure(e);
         }
         System.out.println("\n## Java: runIt: Checking status");
-        status = checkStatus(status);
         return status;
     }
 

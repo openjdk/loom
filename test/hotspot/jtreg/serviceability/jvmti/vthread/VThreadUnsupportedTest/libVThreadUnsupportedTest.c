@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 static jvmtiEnv *jvmti = NULL;
-static jboolean is_completed_test_in_event = JNI_FALSE;
+static volatile jboolean is_completed_test_in_event = JNI_FALSE;
 
 static void
 fatal(JNIEnv* jni, char* msg) {
@@ -113,6 +113,11 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject thi
   jvmtiError err = JVMTI_ERROR_NONE;
   jint threads_count = 0;
   jthread *threads = NULL;
+  jthread cthread = NULL;
+
+  err = (*jvmti)->GetCurrentThread(jvmti, &cthread);
+  check(jni, "GetCurrentThread", err);
+  printf("\n#### GetCurrentThread returned thread: %p\n", (void*)cthread);
 
   err = (*jvmti)->GetAllThreads(jvmti, &threads_count, &threads);
   check(jni, "GetAllThreads", err);
@@ -120,21 +125,15 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject thi
   for (int thread_idx = 0; thread_idx < (int) threads_count; thread_idx++) {
     jthread thread = threads[thread_idx];
     jthread vthread;
-    jthread cthread;
 
     jvmtiThreadInfo thr_info;
     jvmtiError err = (*jvmti)->GetThreadInfo(jvmti, thread, &thr_info);
     check(jni, "GetThreadInfo", err);
 
     char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
-
-    err = (*jvmti)->GetCurrentThread(jvmti, &cthread);
-    check(jni, "GetCurrentThread", err);
-
     if ((*jni)->IsSameObject(jni, cthread, thread) == JNI_TRUE) {
       continue;
     }
-
     err = (*jvmti)->SuspendThread(jvmti, thread);
     if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
       continue;

@@ -32,6 +32,8 @@
 #define VIRTUAL_THREAD  "Ljava/lang/VirtualThread;"
 
 static JNINativeMethod methods[] = {
+    { "notifyVTMTStart",  "(" VIRTUAL_THREAD "I)V", (void *)&JVM_VTMTStart },
+    { "notifyVTMTFinish", "(" VIRTUAL_THREAD "I)V", (void *)&JVM_VTMTFinish },
     { "notifyStarted",    "(" THREAD VIRTUAL_THREAD ")V", (void *)&JVM_VirtualThreadStarted },
     { "notifyTerminated", "(" THREAD VIRTUAL_THREAD ")V", (void *)&JVM_VirtualThreadTerminated },
     { "notifyMount",      "(" THREAD VIRTUAL_THREAD ")V", (void *)&JVM_VirtualThreadMount },

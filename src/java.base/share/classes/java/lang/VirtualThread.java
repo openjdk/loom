@@ -284,6 +284,9 @@ class VirtualThread extends Thread {
         //assert this.carrierThread == null
         Thread carrier = Thread.currentCarrierThread();
 
+        if (notifyJvmtiEvents) {
+            notifyVTMTStart(this, 0);
+        }
         // sets the carrier thread
         CARRIER_THREAD.setRelease(this, carrier);
 
@@ -300,10 +303,13 @@ class VirtualThread extends Thread {
                 }
             }
         }
-
-        if (firstRun && notifyJvmtiEvents) {
-            notifyStarted(carrier, this);
+  
+        if (notifyJvmtiEvents) {
+            if (firstRun) {
+                notifyStarted(carrier, this);
+            }
             notifyMount(carrier, this);
+            notifyVTMTFinish(this, 0);
         }
     }
 
@@ -317,6 +323,7 @@ class VirtualThread extends Thread {
         Thread carrier = this.carrierThread;
 
         if (notifyJvmtiEvents) {
+            notifyVTMTStart(this, 1);
             notifyUnmount(carrier, this);
         }
 
@@ -325,9 +332,11 @@ class VirtualThread extends Thread {
         synchronized (interruptLock) {   // synchronize with interrupt
             CARRIER_THREAD.setRelease(this, null);
         }
-
         // clear carrier thread interrupt status before exit
         carrier.clearInterrupt();
+        if (notifyJvmtiEvents) {
+            notifyVTMTFinish(this, 1);
+        }
     }
 
     /**
@@ -363,8 +372,10 @@ class VirtualThread extends Thread {
 
         // notify JVMTI agents
         if (notifyAgents && notifyJvmtiEvents) {
+            notifyVTMTStart(this, 0);
             Thread thread = Thread.currentCarrierThread();
             notifyTerminated(thread, this);
+            notifyVTMTFinish(this, 0);
         }
 
         // notify anyone waiting for this virtual thread to terminate
@@ -391,6 +402,7 @@ class VirtualThread extends Thread {
         // switch to carrier thread
         Thread carrier = this.carrierThread;
         carrier.setCurrentThread(carrier);
+
         final ReentrantLock lock = getLock();
         lock.lock();
         try {
@@ -486,11 +498,6 @@ class VirtualThread extends Thread {
 
         setState(PARKING);
         boolean yielded = Continuation.yield(VTHREAD_SCOPE);
-
-        // notify JVMTI mount event here so that stack is available to agents
-        if (yielded && notifyJvmtiEvents) {
-            notifyMount(carrierThread, this);
-        }
     }
 
     /**
@@ -597,10 +604,6 @@ class VirtualThread extends Thread {
         boolean yielded = Continuation.yield(VTHREAD_SCOPE);
         if (yielded) {
             assert Thread.currentThread() == this && state() == RUNNING;
-            // notify JVMTI mount event here so that stack is available to agents
-            if (notifyJvmtiEvents) {
-                notifyMount(carrierThread, this);
-            }
         } else {
             // pinned so can't yield
             setState(RUNNING);
@@ -995,6 +998,8 @@ class VirtualThread extends Thread {
     // -- JVM TI support --
 
     private static volatile boolean notifyJvmtiEvents;  // set by VM
+    private static native void notifyVTMTStart(VirtualThread vthread, int callsiteTag);
+    private static native void notifyVTMTFinish(VirtualThread vthread, int callsiteTag);
     private static native void notifyStarted(Thread carrierThread, VirtualThread vthread);
     private static native void notifyTerminated(Thread carrierThread, VirtualThread vthread);
     private static native void notifyMount(Thread carrierThread, VirtualThread vthread);

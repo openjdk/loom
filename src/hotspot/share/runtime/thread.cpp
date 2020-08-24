@@ -1747,6 +1747,7 @@ void JavaThread::initialize() {
 
   _class_to_be_initialized = NULL;
 
+  _mounted_vthread = NULL;
   _scopedCache = NULL;
 
   pd_initialize();
@@ -3059,6 +3060,7 @@ void JavaThread::oops_do(OopClosure* f, CodeBlobClosure* cf) {
     jvmti_thread_state()->oops_do(f, cf);
   }
 
+  f->do_oop(&_mounted_vthread);
   f->do_oop(&_scopedCache);
 }
 

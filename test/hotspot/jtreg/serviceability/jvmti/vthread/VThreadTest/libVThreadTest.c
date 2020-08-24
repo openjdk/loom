@@ -179,8 +179,8 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
         if (inf->was_yield) {
           fatal(jni, "VirtualThreadMounted: event with ContinuationYield before!");
         }
-        if (continuation_events_enabled && !inf->was_run) {
-          fatal(jni, "VirtualThreadMounted: event without ContinuationRun before!");
+        if (continuation_events_enabled && inf->was_run) {
+          fatal(jni, "VirtualThreadMounted: event with ContinuationRun before!");
         }
       }
     }

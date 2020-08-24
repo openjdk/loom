@@ -166,6 +166,16 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
     return err;
   }
 
+  // If can_support_virtual_threads capability is enabled and there is a virtual thread mounted
+  // to the JavaThread* then return virtual thread oop. Otherwise, return thread oop.
+  static oop get_vthread_or_thread_oop(JavaThread* jt) {
+    oop result = jt->threadObj();
+    if (JvmtiExport::can_support_virtual_threads() && jt->mounted_vthread() != NULL) {
+      result = jt->mounted_vthread();
+    }
+    return result;
+  }
+
   static jvmtiError get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
                                                  JavaThread** jt_pp, oop* thread_oop_p);
 
@@ -315,7 +325,6 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
 
   // JVMTI API helper functions which are called when target thread is suspended
   // or at safepoint / thread local handshake.
-  oop get_vthread_or_thread_oop(JavaThread* thread);
   jvmtiError get_frame_count(JvmtiThreadState *state, jint *count_ptr);
   jvmtiError get_frame_count(oop frame_oop, jint *count_ptr);
   jvmtiError get_frame_location(JavaThread* java_thread, jint depth,

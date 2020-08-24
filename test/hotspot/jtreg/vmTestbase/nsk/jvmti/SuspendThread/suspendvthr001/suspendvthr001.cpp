@@ -189,9 +189,6 @@ test_vthread_resume_half(const jthread* vt_list) {
             nsk_jvmti_setFailStatus();
         }
         check_resumed_state(vt, i, "ResumeThread");
-        if (!NSK_JVMTI_VERIFY(jvmti->GetThreadState(vt, &state))) {
-            nsk_jvmti_setFailStatus();
-        }
     }
     printf("\n## Agent: test_vthread_resume_half: finished\n"); fflush(0);
 }
@@ -230,11 +227,8 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
     printf("\n## Agent: Wait for vthreads to finish\n"); fflush(0);
     for (int i = 0; i < VTHREADS_CNT; i++) {
         jni->DeleteGlobalRef(tested_vthreads[i]);
-        nsk_jvmti_waitForSync(timeout);
     }
     printf("\n## Agent: Let debugee to finish\n"); fflush(0);
-    nsk_jvmti_waitForSync(timeout);
-    nsk_jvmti_resumeSync();
 }
 
 static void JNICALL
@@ -243,9 +237,8 @@ VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vth
 
   lock_events();
 
-  jvmtiError err = jvmti->GetThreadInfo(vthread, &thr_info);
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "Agent: event handler failed during JVMTI GetThreadInfo call");
+  if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(vthread, &thr_info))) {
+      fatal(jni, "Agent: event handler failed during JVMTI GetThreadInfo call");
   }
   tested_vthreads[vthread_no++] = jni->NewGlobalRef(vthread);
   unlock_events();
@@ -257,9 +250,8 @@ VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vt
 
   lock_events();
 
-  jvmtiError err = jvmti->GetThreadInfo(vthread, &thr_info);
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "Agent: event handler failed during JVMTI GetThreadInfo call");
+  if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(vthread, &thr_info))) {
+      fatal(jni, "Agent: event handler failed during JVMTI GetThreadInfo call");
   }
   unlock_events();
 }
@@ -284,8 +276,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     timeout = nsk_jvmti_getWaitTime() * 60 * 1000;
 
     /* create JVMTI environment */
-    if (!NSK_VERIFY((jvmti =
-            nsk_jvmti_createJVMTIEnv(jvm, reserved)) != NULL))
+    if (!NSK_VERIFY((jvmti = nsk_jvmti_createJVMTIEnv(jvm, reserved)) != NULL))
         return JNI_ERR;
 
     /* add specific capabilities for suspending thread */
@@ -303,19 +294,17 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
         callbacks.VirtualThreadScheduled  = &VirtualThreadScheduled;
         callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
 
-        jvmtiError err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Agent: error in JVMTI SetEventCallbacks: %d\n", err);
+        if (!NSK_JVMTI_VERIFY(jvmti->SetEventCallbacks(&callbacks,
+                                         sizeof(jvmtiEventCallbacks)))) {
+            return JNI_ERR;
         }
-        err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                              JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Agent: error in JVMTI SetEventNotificationMode: %d\n", err);
+        if (!NSK_JVMTI_VERIFY(jvmti->SetEventNotificationMode(JVMTI_ENABLE,
+                                         JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL))) {
+            return JNI_ERR;
         }
-        err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                              JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Agent: error in JVMTI SetEventNotificationMode: %d\n", err);
+        if (!NSK_JVMTI_VERIFY(jvmti->SetEventNotificationMode(JVMTI_ENABLE,
+                                         JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL))) {
+            return JNI_ERR;
         }
         jvmti->CreateRawMonitor("Events Monitor", &events_monitor);
     }

@@ -1263,6 +1263,7 @@ private:
 
 public:
 
+  oop _mounted_vthread;
   oop _scopedCache;
   jlong _scoped_hash_table_shift;
 
@@ -1319,6 +1320,8 @@ public:
   void set_threadObj(oop p);
   oop vthread() const;
   void set_vthread(oop p);
+  oop mounted_vthread() const                    { return _mounted_vthread; }
+  void set_mounted_vthread(oop p)                { _mounted_vthread = p; }
 
   // Prepare thread and add to priority queue.  If a priority is
   // not specified, use the priority of the thread object. Threads_lock
