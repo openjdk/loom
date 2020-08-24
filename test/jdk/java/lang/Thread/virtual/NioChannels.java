@@ -50,7 +50,7 @@ import static org.testng.Assert.*;
 @Test
 public class NioChannels {
 
-    private static final long DELAY = 2000;
+    private static final long DELAY = 4000;
 
     /**
      * SocketChannel read/write, no blocking.
