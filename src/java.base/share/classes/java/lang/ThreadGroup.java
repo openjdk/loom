@@ -270,19 +270,17 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
             // update the parent so that it has a weak or strong
             // reference to this group
             synchronized (parent) {
-                synchronized (this) {
-                    if (daemon != this.daemon) {
-                        if (daemon) {
-                            // add a weak reference to this group
-                            parent.addWeak(this);
-                            parent.remove(this);
-                        } else {
-                            // add a strong reference to this group
-                            parent.add(this);
-                            parent.removeWeak(this);
-                        }
-                        this.daemon = daemon;
+                if (daemon != this.daemon) {
+                    if (daemon) {
+                        // add a weak reference to this group
+                        parent.addWeak(this);
+                        parent.remove(this);
+                    } else {
+                        // add a strong reference to this group
+                        parent.add(this);
+                        parent.removeWeak(this);
                     }
+                    this.daemon = daemon;
                 }
             }
         }
@@ -793,7 +791,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     private void add(ThreadGroup group) {
         assert Thread.holdsLock(this);
-        if (ngroups == 0) {
+        if (groups == null) {
             groups = new ThreadGroup[4];
         } else if (groups.length == ngroups) {
             groups = Arrays.copyOf(groups, ngroups + 4);
@@ -835,7 +833,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     private void addWeak(ThreadGroup group) {
         assert Thread.holdsLock(this);
-        if (nweaks == 0) {
+        if (weaks == null) {
             @SuppressWarnings({"unchecked", "rawtypes"})
             WeakReference<ThreadGroup>[] array = new WeakReference[4];
             weaks = array;
