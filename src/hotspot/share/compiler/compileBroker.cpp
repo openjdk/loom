@@ -858,7 +858,7 @@ JavaThread* CompileBroker::make_thread(jobject thread_handle, CompileQueue* queu
 
       java_lang_Thread::set_daemon(JNIHandles::resolve_non_null(thread_handle));
 
-      new_thread->set_threadObj(JNIHandles::resolve_non_null(thread_handle));
+      new_thread->set_threadOopHandles(JNIHandles::resolve_non_null(thread_handle));
       if (comp != NULL) {
         new_thread->as_CompilerThread()->set_compiler(comp);
       }

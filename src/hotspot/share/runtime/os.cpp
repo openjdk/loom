@@ -497,7 +497,7 @@ void os::initialize_jdk_signal_support(TRAPS) {
       java_lang_Thread::set_priority(thread_oop(), NearMaxPriority);
       java_lang_Thread::set_daemon(thread_oop());
 
-      signal_thread->set_threadObj(thread_oop());
+      signal_thread->set_threadOopHandles(thread_oop());
       Threads::add(signal_thread);
       Thread::start(signal_thread);
     }

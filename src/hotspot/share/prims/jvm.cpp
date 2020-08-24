@@ -3330,7 +3330,7 @@ JVM_END
 
 JVM_ENTRY(jobject, JVM_ScopedCache(JNIEnv* env, jclass threadClass))
   JVMWrapper("JVM_ScopedCache");
-  oop theCache = thread->_scopedCache;
+  oop theCache = thread->scopedCache();
   if (theCache) {
     arrayOop objs = arrayOop(theCache);
     assert(objs->length() == ScopedCacheSize * 2 + 2, "wrong length");
@@ -3345,7 +3345,7 @@ JVM_ENTRY(void, JVM_SetScopedCache(JNIEnv* env, jclass threadClass,
   if (objs != NULL) {
     assert(objs->length() == ScopedCacheSize * 2 + 2, "wrong length");
   }
-  thread->_scopedCache = objs;
+  thread->set_scopedCache(objs);
 JVM_END
 
 JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))

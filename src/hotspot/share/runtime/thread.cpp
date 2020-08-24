@@ -1071,7 +1071,7 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
   // constructor calls Thread.current(), which must be set here for the
   // initial thread.
   java_lang_Thread::set_thread(thread_oop(), thread);
-  thread->set_threadObj(thread_oop());
+  thread->set_threadOopHandles(thread_oop());
 
   Handle string = java_lang_String::create_from_str("main", CHECK);
 
@@ -1198,14 +1198,19 @@ static void call_postVMInitHook(TRAPS) {
 // Initialized by VMThread at vm_global_init
 static OopStorage* _thread_oop_storage = NULL;
 
-oop  JavaThread::threadObj() const    {
+oop JavaThread::threadObj() const    {
   return _threadObj.resolve();
 }
 
-void JavaThread::set_threadObj(oop p) {
+void JavaThread::set_threadOopHandles(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
-  _threadObj = OopHandle(_thread_oop_storage, p);
-  _vthread   = OopHandle(_thread_oop_storage, p);
+  _threadObj   = OopHandle(_thread_oop_storage, p);
+  _vthread     = OopHandle(_thread_oop_storage, p);
+  _scopedCache = OopHandle(_thread_oop_storage, NULL);
+}
+
+oop JavaThread::scopedCache() const {
+  return _scopedCache.resolve();
 }
 
 oop JavaThread::vthread() const {
@@ -1213,7 +1218,13 @@ oop JavaThread::vthread() const {
 }
 
 void JavaThread::set_vthread(oop p) {
+  assert(_thread_oop_storage != NULL, "not yet initialized");
   _vthread.replace(p);
+}
+
+void JavaThread::set_scopedCache(oop p) {
+  assert(_thread_oop_storage != NULL, "not yet initialized");
+  _scopedCache.replace(p);
 }
 
 OopStorage* JavaThread::thread_oop_storage() {
@@ -1234,7 +1245,7 @@ void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name
   // We cannot use JavaCalls::construct_new_instance because the java.lang.Thread
   // constructor calls Thread.current(), which must be set here.
   java_lang_Thread::set_thread(thread_oop(), this);
-  set_threadObj(thread_oop());
+  set_threadOopHandles(thread_oop());
 
   JavaValue result(T_VOID);
   if (thread_name != NULL) {
@@ -1748,7 +1759,6 @@ void JavaThread::initialize() {
   _class_to_be_initialized = NULL;
 
   _mounted_vthread = NULL;
-  _scopedCache = NULL;
 
   pd_initialize();
 }
@@ -3061,7 +3071,6 @@ void JavaThread::oops_do(OopClosure* f, CodeBlobClosure* cf) {
   }
 
   f->do_oop(&_mounted_vthread);
-  f->do_oop(&_scopedCache);
 }
 
 #ifdef ASSERT
@@ -3277,7 +3286,7 @@ void JavaThread::prepare(jobject jni_thread, ThreadPriority prio) {
                     JNIHandles::resolve_non_null(jni_thread));
   assert(InstanceKlass::cast(thread_oop->klass())->is_linked(),
          "must be initialized");
-  set_threadObj(thread_oop());
+  set_threadOopHandles(thread_oop());
   java_lang_Thread::set_thread(thread_oop(), this);
 
   if (prio == NoPriority) {
@@ -5172,10 +5181,4 @@ void Threads::verify() {
   }
   VMThread* thread = VMThread::vm_thread();
   if (thread != NULL) thread->verify();
-}
-
-void JavaThread::allocate_scoped_hash_table(int count) {
-  if (count > 0) {
-    _scopedCache = oopFactory::new_objectArray(count, this);
-  }
 }

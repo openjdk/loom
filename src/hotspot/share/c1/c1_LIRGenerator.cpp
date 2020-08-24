@@ -1326,8 +1326,12 @@ void LIRGenerator::do_currentThread0(Intrinsic* x) {
 
 void LIRGenerator::do_scopedCache(Intrinsic* x) {
   assert(x->number_of_arguments() == 0, "wrong type");
+  LIR_Opr temp = new_register(T_ADDRESS);
   LIR_Opr reg = rlock_result(x);
-  __ move_wide(new LIR_Address(getThreadPointer(), in_bytes(JavaThread::scopedCache_offset()), T_OBJECT), reg);
+  __ move(new LIR_Address(getThreadPointer(), in_bytes(JavaThread::scopedCache_offset()), T_ADDRESS), temp);
+  // threadObj = ((OopHandle)_vthread)->resolve();
+  access_load(IN_NATIVE, T_OBJECT,
+              LIR_OprFact::address(new LIR_Address(temp, T_OBJECT)), reg);
 }
 
 

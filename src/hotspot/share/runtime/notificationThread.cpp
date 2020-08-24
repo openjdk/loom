@@ -66,7 +66,7 @@ void NotificationThread::initialize() {
     java_lang_Thread::set_thread(thread_oop(), thread);
     java_lang_Thread::set_priority(thread_oop(), NearMaxPriority);
     java_lang_Thread::set_daemon(thread_oop());
-    thread->set_threadObj(thread_oop());
+    thread->set_threadOopHandles(thread_oop());
     _instance = thread;
 
     Threads::add(thread);

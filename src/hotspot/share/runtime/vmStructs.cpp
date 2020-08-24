@@ -744,6 +744,8 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   nonstatic_field(NamedThread,                 _name,                                         char*)                                 \
   nonstatic_field(NamedThread,                 _processed_thread,                             JavaThread*)                           \
   nonstatic_field(JavaThread,                  _threadObj,                                    OopHandle)                             \
+  nonstatic_field(JavaThread,                  _vthread,                                      OopHandle)                             \
+  nonstatic_field(JavaThread,                  _scopedCache,                                  OopHandle)                             \
   nonstatic_field(JavaThread,                  _anchor,                                       JavaFrameAnchor)                       \
   nonstatic_field(JavaThread,                  _vm_result,                                    oop)                                   \
   nonstatic_field(JavaThread,                  _vm_result_2,                                  Metadata*)                             \

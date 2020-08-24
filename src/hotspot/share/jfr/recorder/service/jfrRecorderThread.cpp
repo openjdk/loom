@@ -58,7 +58,7 @@ static Thread* start_thread(instanceHandle thread_oop, ThreadFunction proc, TRAP
       java_lang_Thread::set_thread(thread_oop(), new_thread);
       java_lang_Thread::set_priority(thread_oop(), NormPriority);
       java_lang_Thread::set_daemon(thread_oop());
-      new_thread->set_threadObj(thread_oop());
+      new_thread->set_threadOopHandles(thread_oop());
       Threads::add(new_thread);
     }
   }

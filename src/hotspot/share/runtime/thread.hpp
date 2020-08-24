@@ -1039,6 +1039,7 @@ class JavaThread: public Thread {
   bool           _on_thread_list;                // Is set when this JavaThread is added to the Threads list
   OopHandle      _threadObj;                     // The Java level thread object
   OopHandle      _vthread;
+  OopHandle      _scopedCache;
 
 #ifdef ASSERT
  private:
@@ -1264,7 +1265,6 @@ private:
 public:
 
   oop _mounted_vthread;
-  oop _scopedCache;
   jlong _scoped_hash_table_shift;
 
   void allocate_scoped_hash_table(int count);
@@ -1317,9 +1317,11 @@ public:
   // Thread oop. threadObj() can be NULL for initial JavaThread
   // (or for threads attached via JNI)
   oop threadObj() const;
-  void set_threadObj(oop p);
+  void set_threadOopHandles(oop p);
   oop vthread() const;
   void set_vthread(oop p);
+  oop scopedCache() const;
+  void set_scopedCache(oop p);
   oop mounted_vthread() const                    { return _mounted_vthread; }
   void set_mounted_vthread(oop p)                { _mounted_vthread = p; }
 

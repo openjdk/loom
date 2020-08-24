@@ -163,8 +163,12 @@ class LibraryCallKit : public GraphKit {
                              RegionNode* region);
   void  generate_string_range_check(Node* array, Node* offset,
                                     Node* length, bool char_count);
+
+  Node* current_thread_helper(Node* &tls_output, ByteSize handle_offset,
+                              bool is_immutable);
   Node* generate_current_thread(Node* &tls_output);
   Node* generate_virtual_thread(Node* threadObj);
+
   Node* load_mirror_from_klass(Node* klass);
   Node* load_klass_from_mirror_common(Node* mirror, bool never_see_null,
                                       RegionNode* region, int null_path,
@@ -261,6 +265,8 @@ class LibraryCallKit : public GraphKit {
   bool inline_unsafe_copyMemory();
   bool inline_native_currentThread0();
   bool inline_native_scopedCache();
+
+  Node* scopedCache_helper();
   bool inline_native_setScopedCache();
   bool inline_native_currentThread();
   bool inline_native_setCurrentThread();
@@ -758,13 +764,12 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 
   case vmIntrinsics::_onSpinWait:               return inline_onspinwait();
 
-  // case vmIntrinsics::_currentThread0:           return inline_native_currentThread0();
-  // case vmIntrinsics::_currentThread:            return inline_native_currentThread();
+  case vmIntrinsics::_currentThread0:           return inline_native_currentThread0();
+  case vmIntrinsics::_currentThread:            return inline_native_currentThread();
+  case vmIntrinsics::_setCurrentThread:         return inline_native_setCurrentThread();
 
   case vmIntrinsics::_scopedCache:              return inline_native_scopedCache();
   case vmIntrinsics::_setScopedCache:           return inline_native_setScopedCache();
-
-  // case vmIntrinsics::_setCurrentThread:         return inline_native_setCurrentThread();
 
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), "counterTime");
@@ -1104,32 +1109,40 @@ void LibraryCallKit::generate_string_range_check(Node* array, Node* offset, Node
   }
 }
 
+Node* LibraryCallKit::current_thread_helper(Node* &tls_output, ByteSize handle_offset,
+                                            bool is_immutable) {
+  ciKlass* thread_klass = env()->Thread_klass();
+  const Type* thread_type
+    = TypeOopPtr::make_from_klass(thread_klass)->cast_to_ptr_type(TypePtr::NotNull);
+
+  Node* thread = _gvn.transform(new ThreadLocalNode());
+  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(handle_offset));
+  tls_output = thread;
+
+  Node* thread_obj_handle
+    = (is_immutable
+       ? LoadNode::make(_gvn, NULL, immutable_memory(), p, p->bottom_type()->is_ptr(),
+                        TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered)
+       : make_load(NULL, p, p->bottom_type()->is_ptr(), T_ADDRESS, MemNode::unordered));
+  thread_obj_handle = _gvn.transform(thread_obj_handle);
+
+  DecoratorSet decorators = IN_NATIVE;
+  if (is_immutable) {
+    decorators |= C2_IMMUTABLE_MEMORY;
+  }
+  return access_load(thread_obj_handle, thread_type, T_OBJECT, decorators);
+}
+
 //--------------------------generate_current_thread--------------------
 Node* LibraryCallKit::generate_current_thread(Node* &tls_output) {
-  ciKlass*    thread_klass = env()->Thread_klass();
-  const Type* thread_type  = TypeOopPtr::make_from_klass(thread_klass)->cast_to_ptr_type(TypePtr::NotNull);
-  Node* thread = _gvn.transform(new ThreadLocalNode());
-  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::threadObj_offset()));
-  tls_output = thread;
-  Node* thread_obj_handle = LoadNode::make(_gvn, NULL, immutable_memory(), p, p->bottom_type()->is_ptr(), TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered);
-  thread_obj_handle = _gvn.transform(thread_obj_handle);
-  return access_load(thread_obj_handle, thread_type, T_OBJECT, IN_NATIVE | C2_IMMUTABLE_MEMORY);
+  return current_thread_helper(tls_output, JavaThread::threadObj_offset(),
+                               /*is_immutable*/false);
 }
 
 //--------------------------generate_virtual_thread--------------------
 Node* LibraryCallKit::generate_virtual_thread(Node* tls_output) {
-  ciKlass*    thread_klass = env()->Thread_klass();
-  const Type* thread_type  = TypeOopPtr::make_from_klass(thread_klass)->cast_to_ptr_type(TypePtr::NotNull);
-  Node* p = basic_plus_adr(top()/*!oop*/, tls_output, in_bytes(JavaThread::vthread_offset()));
-  Node* thread_obj_handle;
-  if (C->method()->changes_current_thread()) {
-    thread_obj_handle = make_load(NULL, p, TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered);
-  } else {
-    thread_obj_handle = _gvn.transform
-      (LoadNode::make(_gvn, NULL, immutable_memory(), p,
-                      p->bottom_type()->is_ptr(), TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered));
-  }
-  return access_load(thread_obj_handle, thread_type, T_OBJECT, IN_NATIVE | C2_IMMUTABLE_MEMORY);
+  return current_thread_helper(tls_output, JavaThread::vthread_offset(),
+                               ! C->method()->changes_current_thread());
 }
 
 //------------------------------make_string_method_node------------------------
@@ -3261,25 +3274,30 @@ bool LibraryCallKit::inline_native_currentThread0() {
   return true;
 }
 
+Node* LibraryCallKit::scopedCache_helper() {
+  ciKlass *objects_klass = ciObjArrayKlass::make(env()->Object_klass());
+  const TypeOopPtr *etype = TypeOopPtr::make_from_klass(env()->Object_klass());
+
+  bool xk = etype->klass_is_exact();
+
+  Node* thread = _gvn.transform(new ThreadLocalNode());
+  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::scopedCache_offset()));
+  return _gvn.transform(make_load(NULL, p, p->bottom_type()->is_ptr(),
+                                  T_ADDRESS, MemNode::unordered));
+}
+
 //------------------------inline_native_scopedCache------------------
 bool LibraryCallKit::inline_native_scopedCache() {
   ciKlass *objects_klass = ciObjArrayKlass::make(env()->Object_klass());
   const TypeOopPtr *etype = TypeOopPtr::make_from_klass(env()->Object_klass());
-
-  // It might be nice to eliminate the bounds check on the cache array
-  // by replacing TypeInt::POS here with
-  // TypeInt::make(ScopedCacheSize*2), but this causes a performance
-  // regression in some test cases.
   const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
-  bool xk = etype->klass_is_exact();
 
   // Because we create the scoped cache lazily we have to make the
   // type of the result BotPTR.
+  bool xk = etype->klass_is_exact();
   const Type* objects_type = TypeAryPtr::make(TypePtr::BotPTR, arr0, objects_klass, xk, 0);
-  Node* thread = _gvn.transform(new ThreadLocalNode());
-  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::scopedCache_offset()));
-  Node* threadObj = make_load(NULL, p, objects_type, T_OBJECT, MemNode::unordered);
-  set_result(threadObj);
+  Node* cache_obj_handle = scopedCache_helper();
+  set_result(access_load(cache_obj_handle, objects_type, T_OBJECT, IN_NATIVE));
 
   return true;
 }
@@ -3287,18 +3305,19 @@ bool LibraryCallKit::inline_native_scopedCache() {
 //------------------------inline_native_setScopedCache------------------
 bool LibraryCallKit::inline_native_setScopedCache() {
   Node* arr = argument(0);
-  Node* thread = _gvn.transform(new ThreadLocalNode());
-  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::scopedCache_offset()));
-  const TypePtr *adr_type = _gvn.type(p)->isa_ptr();
-  store_to_memory(control(), p, arr, T_OBJECT, adr_type, MemNode::unordered);
+  Node* cache_obj_handle = scopedCache_helper();
+
+  const TypePtr *adr_type = _gvn.type(cache_obj_handle)->isa_ptr();
+  store_to_memory(control(), cache_obj_handle, arr, T_OBJECT, adr_type,
+                  MemNode::unordered);
 
   return true;
 }
 
 //------------------------inline_native_currentThread------------------
 bool LibraryCallKit::inline_native_currentThread() {
-  Node* thread = _gvn.transform(new ThreadLocalNode());
-  set_result(generate_virtual_thread(thread));
+  Node* junk = NULL;
+  set_result(generate_virtual_thread(junk));
   return true;
 }
 
@@ -3309,8 +3328,13 @@ bool LibraryCallKit::inline_native_setCurrentThread() {
   Node* arr = argument(1);
   Node* thread = _gvn.transform(new ThreadLocalNode());
   Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::vthread_offset()));
-  const TypePtr *adr_type = _gvn.type(p)->isa_ptr();
-  store_to_memory(control(), p, arr, T_OBJECT, adr_type, MemNode::unordered);
+  Node* thread_obj_handle
+    = make_load(NULL, p, p->bottom_type()->is_ptr(), T_OBJECT, MemNode::unordered);
+  thread_obj_handle = _gvn.transform(thread_obj_handle);
+  const TypePtr *adr_type = _gvn.type(thread_obj_handle)->isa_ptr();
+  // Stores of oops to native memory not supported yet by BarrierSetC2::store_at_resolved
+  // access_store_at(NULL, thread_obj_handle, adr_type, arr, _gvn.type(arr), T_OBJECT, IN_NATIVE | MO_UNORDERED);
+  store_to_memory(control(), thread_obj_handle, arr, T_OBJECT, adr_type, MemNode::unordered);
 
   return true;
 }
