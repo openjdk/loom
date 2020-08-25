@@ -282,12 +282,15 @@ class VirtualThread extends Thread {
     @ChangesCurrentThread
     private void mount(boolean firstRun) {
         //assert this.carrierThread == null
-        Thread carrier = Thread.currentCarrierThread();
 
-        if (notifyJvmtiEvents) {
-            notifyVTMTStart(this, 0);
+        // notify JVMTI agents
+        boolean notifyJvmti = notifyJvmtiEvents;
+        if (notifyJvmti) {
+            notifyJvmtiMountBegin(firstRun);
         }
+
         // sets the carrier thread
+        Thread carrier = Thread.currentCarrierThread();
         CARRIER_THREAD.setRelease(this, carrier);
 
         // set Thread.currentThread() to return this virtual thread
@@ -304,12 +307,8 @@ class VirtualThread extends Thread {
             }
         }
   
-        if (notifyJvmtiEvents) {
-            if (firstRun) {
-                notifyStarted(carrier, this);
-            }
-            notifyMount(carrier, this);
-            notifyVTMTFinish(this, 0);
+        if (notifyJvmti) {
+            notifyJvmtiMountEnd(firstRun);
         }
     }
 
@@ -320,22 +319,25 @@ class VirtualThread extends Thread {
     @ChangesCurrentThread
     private void unmount() {
         //assert this.carrierThread == Thread.currentCarrierThread();
-        Thread carrier = this.carrierThread;
 
-        if (notifyJvmtiEvents) {
-            notifyVTMTStart(this, 1);
-            notifyUnmount(carrier, this);
+        // notify JVMTI agents
+        boolean notifyJvmti = notifyJvmtiEvents;
+        if (notifyJvmti) {
+            notifyJvmtiUnmountBegin();
         }
 
         // set Thread.currentThread() to return the carrier thread
+        Thread carrier = this.carrierThread;
         carrier.setCurrentThread(carrier);
+
+        // break connection to carrier thread
         synchronized (interruptLock) {   // synchronize with interrupt
             CARRIER_THREAD.setRelease(this, null);
         }
-        // clear carrier thread interrupt status before exit
         carrier.clearInterrupt();
-        if (notifyJvmtiEvents) {
-            notifyVTMTFinish(this, 1);
+
+        if (notifyJvmti) {
+            notifyJvmtiUnmountEnd();
         }
     }
 
@@ -370,14 +372,6 @@ class VirtualThread extends Thread {
         assert state() == STARTED || state() == RUNNING;
         setState(TERMINATED);   // final state
 
-        // notify JVMTI agents
-        if (notifyAgents && notifyJvmtiEvents) {
-            notifyVTMTStart(this, 0);
-            Thread thread = Thread.currentCarrierThread();
-            notifyTerminated(thread, this);
-            notifyVTMTFinish(this, 0);
-        }
-
         // notify anyone waiting for this virtual thread to terminate
         ReentrantLock lock = this.lock;
         if (lock != null) {
@@ -387,6 +381,11 @@ class VirtualThread extends Thread {
             } finally {
                 lock.unlock();
             }
+        }
+
+        // notify JVMTI agents
+        if (notifyAgents && notifyJvmtiEvents) {
+            notifyJvmtiTerminate();
         }
     }
 
@@ -487,17 +486,8 @@ class VirtualThread extends Thread {
             return;
 
         // park the thread
-        doPark();
-    }
-
-    /**
-     * Park this virtual thread. If pinned, the carrier thread will be parked.
-     */
-    private void doPark() {
-        //assert Thread.currentThread() == this && state() == RUNNING
-
         setState(PARKING);
-        boolean yielded = Continuation.yield(VTHREAD_SCOPE);
+        Continuation.yield(VTHREAD_SCOPE);
     }
 
     /**
@@ -514,7 +504,8 @@ class VirtualThread extends Thread {
         if (nanos > 0) {
             Future<?> unparker = scheduleUnpark(nanos);
             try {
-                doPark();
+                setState(PARKING);
+                Continuation.yield(VTHREAD_SCOPE);
             } finally {
                 cancel(unparker);
             }
@@ -1008,6 +999,35 @@ class VirtualThread extends Thread {
     static {
         registerNatives();
     }
+
+    private void notifyJvmtiMountBegin(boolean firstRun) {
+        notifyVTMTStart(this, 0);
+    }
+
+    private void notifyJvmtiMountEnd(boolean firstRun) {
+        Thread carrier = Thread.currentCarrierThread();
+        if (firstRun) {
+            notifyStarted(carrier, this);
+        }
+        notifyMount(carrier, this);
+        notifyVTMTFinish(this, 0);
+    }
+
+    private void notifyJvmtiUnmountBegin() {
+        notifyVTMTStart(this, 1);
+        notifyUnmount(Thread.currentCarrierThread(), this);
+    }
+
+    private void notifyJvmtiUnmountEnd() {
+        notifyVTMTFinish(this, 1);
+    }
+
+    private void notifyJvmtiTerminate() {
+        notifyVTMTStart(this, 0);
+        notifyTerminated(Thread.currentCarrierThread(), this);
+        notifyVTMTFinish(this, 0);
+    }
+    
 
     /**
      * Creates the default scheduler as ForkJoinPool.
