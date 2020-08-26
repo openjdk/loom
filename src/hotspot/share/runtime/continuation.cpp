@@ -2203,7 +2203,9 @@ public:
   int nr_frames() const { return _frames; }
 
   Thread* cur_thread() {
-    assert (_preempt || _thread == Thread::current(), ""); // could be VM thread in force preempt
+    assert (_preempt || _thread == Thread::current(), "Not in _preempt and _thread %s not equals Thread:current() %s \n",
+            _thread == NULL ? "NULL" : _thread->name(),
+            Thread::current() == NULL ? "NULL" :Thread::current()->name()); // could be VM thread in force preempt
     return mode == mode_fast ? _thread : Thread::current();
   }
 
