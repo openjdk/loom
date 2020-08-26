@@ -494,14 +494,14 @@ public interface ExecutorService extends Executor, AutoCloseable {
     }
 
     /**
-     * Returns an Executor that interrupts the current thread and stops all tasks
-     * executing if a deadline is reached before the Executor has terminated.
+     * Returns an Executor that stops all tasks executing, and interrupts the
+     * current thread, if a deadline is reached before the Executor has terminated.
      * The newly created Executor delegates all operations to this Executor.
      * The {@linkplain Thread#currentThread() current thread} is the <i>owner
      * thread</i>. If the deadline is reached before the Executor has terminated
-     * then the owner thread is {@linkplain Thread#interrupt() interrupted} and
-     * the Executor shutdown, as if by invoking {@link #shutdownNow()}.
-     * The {@code interrupt()} and {@code shutdownNow()} methods may be invoked
+     * then the Executor is shutdown, as if by invoking {@link #shutdownNow()},
+     * and the owner thread is {@linkplain Thread#interrupt() interrupted}.
+     * The {@code shutdownNow()} and {@code interrupt()} methods may be invoked
      * on a thread supporting the deadline mechanism.
      *
      * <p> If this method is invoked with a deadline that has already expired

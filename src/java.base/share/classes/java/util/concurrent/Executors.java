@@ -856,8 +856,8 @@ public class Executors {
 
         // deadline has already expired
         if (timeout.isZero() || timeout.isNegative()) {
-            Thread.currentThread().interrupt();
             delegate.shutdownNow();
+            Thread.currentThread().interrupt();
             return delegate;
         }
 
@@ -871,8 +871,8 @@ public class Executors {
         Callable<Void> timerExpired = () -> {
             PrivilegedAction<Void> pa = () -> {
                 if (!delegate.isTerminated()) {
-                    owner.interrupt();
                     delegate.shutdownNow();
+                    owner.interrupt();
                 }
                 return null;
             };
@@ -904,6 +904,17 @@ public class Executors {
                 boolean terminated = super.awaitTermination(timeout, unit);
                 if (terminated) cancelTimer();
                 return terminated;
+            }
+            @Override
+            public void close() {
+                if (!isTerminated()) {
+                    super.close();
+                    if (Thread.currentThread() == owner) {
+                        // wait for timer task to ensure that the owner is
+                        // interrupted when the timer expires
+                        try { timerTask.join(); } catch (Exception ignore) { }
+                    }
+                }
             }
         };
     }
