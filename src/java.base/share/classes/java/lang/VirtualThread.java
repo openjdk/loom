@@ -159,8 +159,11 @@ class VirtualThread extends Thread {
                     PinnedThreadPrinter.printStackTrace(printAll);
                 }
 
-                if (state() == PARKING) {
+                int s = state();
+                if (s == PARKING) {
                     parkCarrierThread();
+                } else if (s == YIELDING) {
+                    setState(RUNNING);
                 }
             }
         };
@@ -306,7 +309,8 @@ class VirtualThread extends Thread {
                 }
             }
         }
-  
+
+        // notify JVMTI agents
         if (notifyJvmti) {
             notifyJvmtiMountEnd(firstRun);
         }
@@ -336,6 +340,7 @@ class VirtualThread extends Thread {
         }
         carrier.clearInterrupt();
 
+        // notify JVMTI agents
         if (notifyJvmti) {
             notifyJvmtiUnmountEnd();
         }
@@ -592,13 +597,8 @@ class VirtualThread extends Thread {
     void tryYield() {
         assert Thread.currentThread() == this && state() == RUNNING;
         setState(YIELDING);
-        boolean yielded = Continuation.yield(VTHREAD_SCOPE);
-        if (yielded) {
-            assert Thread.currentThread() == this && state() == RUNNING;
-        } else {
-            // pinned so can't yield
-            setState(RUNNING);
-        }
+        Continuation.yield(VTHREAD_SCOPE);
+        assert Thread.currentThread() == this && state() == RUNNING;
     }
 
     /**
