@@ -36,20 +36,15 @@
 package java.util.concurrent;
 
 import static java.lang.ref.Reference.reachabilityFence;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
-
 import java.security.AccessControlContext;
 import java.security.AccessControlException;
 import java.security.AccessController;
-import java.security.Permission;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
-import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import jdk.internal.misc.InnocuousThread;
 import sun.security.util.SecurityConstants;
 
 /**
@@ -842,97 +837,4 @@ public class Executors {
 
     /** Cannot instantiate. */
     private Executors() {}
-
-    /**
-     * Returns an Executor that delegates and stops all executing tasks, by
-     * invoking its shutdownNow() method when a deadline is reached.
-     */
-    static ExecutorService timedExecutorService(ExecutorService delegate, Duration timeout) {
-        // need same permission as ExecutorService::shutdownNow
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(TimedExecutorServiceHelper.MODIFY_THREAD);
-        }
-
-        // deadline has already expired
-        if (timeout.isZero() || timeout.isNegative()) {
-            delegate.shutdownNow();
-            Thread.currentThread().interrupt();
-            return delegate;
-        }
-
-        // nothing to do
-        if (delegate.isTerminated()) {
-            return delegate;
-        }
-
-        // timer task needs permission to invoke shutdownNow
-        Thread owner = Thread.currentThread();
-        Callable<Void> timerExpired = () -> {
-            PrivilegedAction<Void> pa = () -> {
-                if (!delegate.isTerminated()) {
-                    delegate.shutdownNow();
-                    owner.interrupt();
-                }
-                return null;
-            };
-            return AccessController.doPrivileged(pa,
-                    null,
-                    TimedExecutorServiceHelper.MODIFY_THREAD);
-        };
-        long nanos = NANOSECONDS.convert(timeout);
-        Future<?> timerTask = TimedExecutorServiceHelper.STPE
-                .schedule(timerExpired, nanos, NANOSECONDS);
-        return new DelegatedExecutorService(delegate) {
-            private void cancelTimer() {
-                timerTask.cancel(false);
-            }
-            @Override
-            public void shutdown() {
-                super.shutdown();
-                if (isTerminated()) cancelTimer();
-            }
-            @Override
-            public List<Runnable> shutdownNow() {
-                List<Runnable> tasks = super.shutdownNow();
-                if (isTerminated()) cancelTimer();
-                return tasks;
-            }
-            @Override
-            public boolean awaitTermination(long timeout, TimeUnit unit)
-                    throws InterruptedException {
-                boolean terminated = super.awaitTermination(timeout, unit);
-                if (terminated) cancelTimer();
-                return terminated;
-            }
-            @Override
-            public void close() {
-                if (!isTerminated()) {
-                    super.close();
-                    if (Thread.currentThread() == owner) {
-                        // wait for timer task to ensure that the owner is
-                        // interrupted when the timer expires
-                        try { timerTask.join(); } catch (Exception ignore) { }
-                    }
-                }
-            }
-        };
-    }
-
-    /**
-     * Holder class for timedExecutorService
-     */
-    private static class TimedExecutorServiceHelper {
-        static final ScheduledThreadPoolExecutor STPE;
-        static {
-            STPE = new ScheduledThreadPoolExecutor(0, task -> {
-                Thread thread = InnocuousThread.newThread(task);
-                thread.setDaemon(true);
-                return thread;
-            });
-            STPE.setRemoveOnCancelPolicy(true);
-        }
-
-        static final Permission MODIFY_THREAD = new RuntimePermission("modifyThread");
-    }
 }

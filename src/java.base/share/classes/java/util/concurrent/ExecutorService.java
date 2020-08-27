@@ -35,7 +35,6 @@
 
 package java.util.concurrent;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -523,8 +522,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * @since 99
      */
     default ExecutorService withDeadline(Instant deadline) {
-        Duration timeout = Duration.between(Instant.now(), deadline);
-        return Executors.timedExecutorService(this, timeout);
+        return TimedExecutorService.create(this, deadline);
     }
 
     /**
