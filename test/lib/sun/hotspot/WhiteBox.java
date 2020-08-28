@@ -567,10 +567,6 @@ public class WhiteBox {
                               .orElse(null);
   }
 
-  // Safepoint Checking
-  public native void assertMatchingSafepointCalls(boolean mutexSafepointValue, boolean attemptedNoSafepointValue);
-  public native void assertSpecialLock(boolean allowVMBlock, boolean safepointCheck);
-
   // Sharing & archiving
   public native String  getDefaultArchivePath();
   public native boolean cdsMemoryMappingFailed();
@@ -618,4 +614,6 @@ public class WhiteBox {
 
   // ThreadSMR GC safety check for threadObj
   public native void checkThreadObjOfTerminatingThread(Thread target);
+
+  public native boolean isJVMTIIncluded();
 }

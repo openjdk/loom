@@ -89,7 +89,8 @@ class VM_Version : public Abstract_VM_Version {
                         : 1,
                osxsave  : 1,
                avx      : 1,
-                        : 3;
+                        : 2,
+               hv       : 1;
     } bits;
   };
 
@@ -356,10 +357,11 @@ protected:
 #define CPU_CLWB              ((uint64_t)UCONST64( 0x80000000000)) // clwb instruction
 #define CPU_AVX512_VBMI2      ((uint64_t)UCONST64(0x100000000000)) // VBMI2 shift left double instructions
 #define CPU_AVX512_VBMI       ((uint64_t)UCONST64(0x200000000000)) // Vector BMI instructions
+#define CPU_HV_PRESENT        ((uint64_t)UCONST64(0x400000000000)) // for hypervisor detection
     
 #define CPU_RDTSCP ((uint64_t)UCONST64(0x100000000000)) // RDTSCP instruction
 #define CPU_RDPID  ((uint64_t)UCONST64(0x200000000000)) // RDPID instruction
-#define CPU_FSRM ((uint64_t)UCONST64(0x400000000000))   // Fast Short REP MOV
+#define CPU_FSRM   ((uint64_t)UCONST64(0x400000000000)) // Fast Short REP MOV
 
 // NB! When adding new CPU feature detection consider updating vmStructs_x86.hpp, vmStructs_jvmci.hpp, and VM_Version::get_processor_features().
 
@@ -592,6 +594,8 @@ enum Extended_Family {
           result |= CPU_AVX512_VBMI2;
       }
     }
+    if (_cpuid_info.std_cpuid1_ecx.bits.hv != 0)
+      result |= CPU_HV_PRESENT;
     if (_cpuid_info.sef_cpuid7_ebx.bits.bmi1 != 0)
       result |= CPU_BMI1;
     if (_cpuid_info.std_cpuid1_edx.bits.tsc != 0)
@@ -892,6 +896,7 @@ public:
   static bool supports_avx512_vnni()       { return (_features & CPU_AVX512_VNNI) != 0; }
   static bool supports_avx512_vbmi()       { return (_features & CPU_AVX512_VBMI) != 0; }
   static bool supports_avx512_vbmi2()      { return (_features & CPU_AVX512_VBMI2) != 0; }
+  static bool supports_hv()                { return (_features & CPU_HV_PRESENT) != 0; }
 
   // Intel features
   static bool is_intel_family_core() { return is_intel() &&
@@ -1044,7 +1049,6 @@ public:
 
   // support functions for virtualization detection
  private:
-  static void check_virt_cpuid(uint32_t idx, uint32_t *regs);
   static void check_virtualizations();
 };
 

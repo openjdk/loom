@@ -339,7 +339,6 @@ public:
   jvalue value()         { return _value; }
   jvmtiError result()    { return _result; }
 
-  bool doit_prologue();
   void doit();
   bool allow_nested_vm_operations() const;
   virtual const char* name() const = 0;

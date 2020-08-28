@@ -1060,7 +1060,7 @@ void PSParallelCompact::post_compact()
   }
 
   // Delete metaspaces for unloaded class loaders and clean up loader_data graph
-  ClassLoaderDataGraph::purge();
+  ClassLoaderDataGraph::purge(/*at_safepoint*/true);
   MetaspaceUtils::verify_metrics();
 
   heap->prune_scavengable_nmethods();
@@ -1613,6 +1613,7 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
 {
   GCTraceTime(Info, gc, phases) tm("Summary Phase", &_gc_timer);
 
+#ifdef ASSERT
   log_develop_debug(gc, marking)(
       "add_obj_count=" SIZE_FORMAT " "
       "add_obj_bytes=" SIZE_FORMAT,
@@ -1623,6 +1624,7 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
       "mark_bitmap_bytes=" SIZE_FORMAT,
       mark_bitmap_count,
       mark_bitmap_size * HeapWordSize);
+#endif // ASSERT
 
   // Quick summarization of each space into itself, to see how much is live.
   summarize_spaces_quick();
