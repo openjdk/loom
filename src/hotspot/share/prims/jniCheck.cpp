@@ -2306,7 +2306,11 @@ struct JNINativeInterface_  checked_jni_NativeInterface = {
 
     // Module Features
 
-    checked_jni_GetModule
+    checked_jni_GetModule,
+
+    // Loom
+
+    checked_jni_IsVirtualThread
 };
 
 
