@@ -2140,7 +2140,22 @@ JDWP "Java(tm) Debug Wire Protocol"
             (Error VM_DEAD)
         )
     )
-
+    (Command IsVirtual=15
+        "Determine if a thread is scheduled by the Java virtual machine "
+        "rather than the operating system."
+        (Out
+            (threadObject thread "The thread object ID.")
+        )
+        (Reply
+            (boolean isVirtual "true if the thread is scheduled by the Java virtual "
+                               "machine rather than the operating system.")
+        )
+        (ErrorSet
+            (Error INVALID_THREAD)
+            (Error INVALID_OBJECT    "thread is not a known ID.")
+            (Error VM_DEAD)
+        )
+    )
 )
 (CommandSet ThreadGroupReference=12
     (Command Name=1

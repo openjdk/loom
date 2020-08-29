@@ -770,6 +770,11 @@ struct JNINativeInterface_ {
 
     jobject (JNICALL *GetModule)
        (JNIEnv* env, jclass clazz);
+
+    /* Loom */
+
+    jboolean (JNICALL *IsVirtualThread)
+       (JNIEnv* env, jobject obj);
 };
 
 /*
@@ -1866,6 +1871,12 @@ struct JNIEnv_ {
 
     jobject GetModule(jclass clazz) {
         return functions->GetModule(this, clazz);
+    }
+
+    /* Loom */
+
+    jboolean IsVirtualThread(jobject obj) {
+        return functions->IsVirtualThread(this, obj);
     }
 
 #endif /* __cplusplus */

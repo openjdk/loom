@@ -848,17 +848,6 @@ JvmtiEnv::GetJLocationFormat(jvmtiJlocationFormat* format_ptr) {
   // Functions supporting virtual threads
   //
 
-// object - pre-checked for NULL
-// is_vthread_ptr - pre-checked for NULL
-jvmtiError
-JvmtiEnv::IsVirtualThread(jthread thread, jboolean* is_vthread_ptr) {
-  oop thread_obj = JNIHandles::resolve_external_guard(thread);
-
-  *is_vthread_ptr = java_lang_VirtualThread::is_instance(thread_obj);
-  return JVMTI_ERROR_NONE;
-} /* end IsVirtualThread */
-
-
 // java_thread - pre-checked
 // vthread_ptr - pre-checked for NULL
 jvmtiError

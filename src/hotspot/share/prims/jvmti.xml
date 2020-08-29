@@ -2238,36 +2238,6 @@ jvmtiEnv *jvmti;
     <intro>
     </intro>
 
-    <function id="IsVirtualThread" num="105" since="16">
-      <synopsis>Is Virtual Thread</synopsis>
-      <description>
-        Determines whether a thread reference represents a virtual thread.
-        The <code>jboolean</code> result is
-        <code>JNI_TRUE</code> if the "thread" is actually a virtual thread,
-        <code>JNI_FALSE</code> otherwise.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_support_virtual_threads">Can support virtual threads</required>
-      </capabilities>
-      <parameters>
-        <param id="thread">
-	  <jthread impl="noconvert"/>
-            <description>
-              The thread reference.
-            </description>
-        </param>
-        <param id="is_virtual_thread_ptr">
-          <outptr><jboolean/></outptr>
-          <description>
-            On return, points to the boolean result of this function.
-          </description>
-        </param>
-      </parameters>
-      <errors>
-      </errors>
-    </function>
-
     <function id="GetVirtualThread" num="113" since="16">
       <synopsis>Get Virtual Thread</synopsis>
       <description>

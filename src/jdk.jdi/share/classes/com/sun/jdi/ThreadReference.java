@@ -473,4 +473,18 @@ public interface ThreadReference extends ObjectReference {
                                               ClassNotLoadedException,
                                               IncompatibleThreadStateException;
 
+    /**
+     * Returns {@code true} if the thread is scheduled by the Java virtual machine
+     * rather than the operating system.
+     *
+     * @return true if the thread is scheduled by the Java virtual machine rather
+     * than the operating system
+     *
+     * @implSpec The default implementation returns false.
+     *
+     * @since 99
+     */
+    default boolean isVirtual() {
+        return false;
+    }
 }

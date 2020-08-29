@@ -3284,6 +3284,12 @@ JNI_ENTRY(jobject, jni_GetModule(JNIEnv* env, jclass clazz))
   return Modules::get_module(clazz, THREAD);
 JNI_END
 
+JNI_ENTRY(jboolean, jni_IsVirtualThread(JNIEnv* env, jobject obj))
+  JNIWrapper("IsVirtualThread");
+  oop thread_obj = JNIHandles::resolve_external_guard(obj);
+  return java_lang_VirtualThread::is_instance(thread_obj) ? JNI_TRUE : JNI_FALSE;
+JNI_END
+
 
 // Structure containing all jni functions
 struct JNINativeInterface_ jni_NativeInterface = {
@@ -3568,7 +3574,11 @@ struct JNINativeInterface_ jni_NativeInterface = {
 
     // Module features
 
-    jni_GetModule
+    jni_GetModule,
+
+    // Loom
+
+    jni_IsVirtualThread
 };
 
 

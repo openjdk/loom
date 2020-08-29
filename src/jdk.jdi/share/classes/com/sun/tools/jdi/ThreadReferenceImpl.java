@@ -599,6 +599,15 @@ public class ThreadReferenceImpl extends ObjectReferenceImpl
         }
     }
 
+    @Override
+    public boolean isVirtual() {
+        try {
+            return JDWP.ThreadReference.IsVirtual.process(vm, this).isVirtual;
+        } catch (JDWPException exc) {
+            throw exc.toJDIException();
+        }
+    }
+
     public String toString() {
         return "instance of " + referenceType().name() +
                "(name='" + name() + "', " + "id=" + uniqueID() + ")";

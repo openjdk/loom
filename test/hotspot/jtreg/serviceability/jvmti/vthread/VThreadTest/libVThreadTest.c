@@ -232,44 +232,6 @@ print_cont_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jint frames_
 }
 
 static void
-test_IsVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, char* event_name) {
-  jboolean is_vthread = JNI_FALSE;
-  jvmtiError err;
-
-  printf("\n");
-
-  // #1: Test JVMTI IsVirtualThread function with NULL vthread
-  err = (*jvmti)->IsVirtualThread(jvmti, NULL, &is_vthread);
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler: failed during JVMTI IsVirtualThread call");
-  }
-  if (is_vthread != JNI_FALSE) {
-    fatal(jni, "event handler: JVMTI IsVirtualThread with NULL vthread failed to return JNI_FALSE");
-  }
-  printf("JVMTI IsVirtualThread with NULL vthread returned JNI_FALSE as expected\n");
-
-  // #2: Test JVMTI IsVirtualThread function with a bad vthread
-  err = (*jvmti)->IsVirtualThread(jvmti, thread, &is_vthread);
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler: failed during JVMTI IsVirtualThread call");
-  }
-  if (is_vthread != JNI_FALSE) {
-    fatal(jni, "event handler: JVMTI IsVirtualThread with bad vthread failed to return JNI_FALSE");
-  }
-  printf("JVMTI IsVirtualThread with bad vthread returned JNI_FALSE as expected\n");
-
-  // #3: Test JVMTI IsVirtualThread function with a good vthread
-  err = (*jvmti)->IsVirtualThread(jvmti, vthread, &is_vthread);
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler: failed during JVMTI IsVirtualThread call");
-  }
-  if (is_vthread != JNI_TRUE) {
-    fatal(jni, "event handler: JVMTI IsVirtualThread with good vthread failed to return JNI_TRUE");
-  }
-  printf("JVMTI IsVirtualThread with good vthread returned JNI_TRUE as expected\n");
-}
-
-static void
 test_GetVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, char* event_name) {
   jobject thread_vthread = NULL;
   jvmtiError err;
@@ -665,7 +627,6 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthrea
   }
 
   print_vthread_event_info(jvmti, jni, thread, vthread, event_name);
-  test_IsVirtualThread(jvmti, jni, thread, vthread, event_name);
 
   if (strcmp(event_name, "VirtualThreadTerminated") == 0) {
     return; // skip further testing as GetVirtualThread can return NULL

@@ -2007,7 +2007,16 @@ JNI_ENTRY_CHECKED(jobject,
   checked_jni_GetModule(JNIEnv *env,
                         jclass clazz))
     functionEnter(thr);
-    jobject result = UNCHECKED()->GetModule(env,clazz);
+    jobject result = UNCHECKED()->GetModule(env, clazz);
+    functionExit(thr);
+    return result;
+JNI_END
+
+JNI_ENTRY_CHECKED(jboolean,
+  checked_jni_IsVirtualThread(JNIEnv *env,
+                              jobject obj))
+    functionEnter(thr);
+    jboolean result = UNCHECKED()->IsVirtualThread(env, obj);
     functionExit(thr);
     return result;
 JNI_END

@@ -65,14 +65,12 @@ Java_VThreadUnsupportedTest_isCompletedTestInEvent(JNIEnv *env, jobject this) {
 static void
 test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   jvmtiError err;
-  jboolean is_vthread = JNI_FALSE;
+  jboolean is_vthread;
   jvmtiCapabilities caps;
   void* local_storage_data = NULL;
   jlong nanos;
 
-  err = (*jvmti)->IsVirtualThread(jvmti, vthread, &is_vthread);
-  check(jni, "IsVirtualThread", err);
-
+  is_vthread = (*jni)->IsVirtualThread(jni, vthread);
   if (is_vthread != JNI_TRUE) {
     fatal(jni, "IsVirtualThread failed to return JNI_TRUE");
   }
