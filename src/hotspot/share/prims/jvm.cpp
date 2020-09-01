@@ -4080,12 +4080,12 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VTMTStart(JNIEnv* env, jclass vthread_class, jobject vthread, int callsite_tag))
   JVMWrapper("JVM_VTMTStart");
-  JvmtiThreadState::start_VTMT(vthread, callsite_tag);
+  JvmtiVTMTDisabler::start_VTMT(vthread, callsite_tag);
 JVM_END
 
 JVM_ENTRY(void, JVM_VTMTFinish(JNIEnv* env, jclass vthread_class, jobject vthread, int callsite_tag))
   JVMWrapper("JVM_VTMTFinish");
-  JvmtiThreadState::finish_VTMT(vthread, callsite_tag);
+  JvmtiVTMTDisabler::finish_VTMT(vthread, callsite_tag);
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadStarted(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))

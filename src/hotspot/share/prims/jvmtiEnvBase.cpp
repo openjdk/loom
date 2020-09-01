@@ -1314,21 +1314,21 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
 }
 
 jvmtiError
-JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool ind_vt_mode,
+JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend,
                              int* need_safepoint_p) {
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    if (ind_vt_mode) {
+    if (single_suspend) {
       assert(java_thread == NULL, "suspend_thread: java_thread must be NULL");
-      bool vthread_ext_suspended = JvmtiThreadState::vthread_is_ext_suspended(thread_oop);
+      bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
       if (vthread_ext_suspended) {
         return JVMTI_ERROR_THREAD_SUSPENDED;
       }
-      JvmtiThreadState::register_vthread_suspend(thread_oop);
+      JvmtiVTSuspender::register_vthread_suspend(thread_oop);
       // Check if virtual thread is mounted and there is a java_thread.
-      // A non-NULL java_thread is always passed in the !ind_vt_mode case.
+      // A non-NULL java_thread is always passed in the !single_suspend case.
       oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
       java_thread = carrier_thread == NULL ? NULL : java_lang_Thread::thread(carrier_thread);
     }
@@ -1348,6 +1348,20 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool ind_v
   }
   {
     MutexLocker ml(java_thread->SR_lock(), Mutex::_no_safepoint_check_flag);
+    oop mounted_vt = java_thread->mounted_vthread();
+
+    if (single_suspend && JvmtiExport::can_support_virtual_threads() &&
+        mounted_vt != NULL && thread_oop != mounted_vt) {
+      // A case of a carrier thread executing a mounted virtual thread.
+      assert(!java_lang_VirtualThread::is_instance(thread_oop) &&
+             java_lang_VirtualThread::is_instance(mounted_vt),
+             "sanity check");
+      if (java_thread->is_cthread_pending_suspend()) {
+        return JVMTI_ERROR_THREAD_SUSPENDED;
+      }
+      java_thread->set_cthread_pending_suspend();
+      return JVMTI_ERROR_NONE;
+    }
     if (java_thread->is_external_suspend()) {
       // Don't allow nested external suspend requests.
       return JVMTI_ERROR_THREAD_SUSPENDED;
@@ -1380,20 +1394,20 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool ind_v
 }
 
 jvmtiError
-JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool ind_vt_mode) {
+JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend) {
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    if (ind_vt_mode) {
+    if (single_suspend) {
       assert(java_thread == NULL, "resume_thread: java_thread must be NULL");
-      bool vthread_ext_suspended = JvmtiThreadState::vthread_is_ext_suspended(thread_oop);
+      bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
       if (!vthread_ext_suspended) {
         return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
       }
-      JvmtiThreadState::register_vthread_resume(thread_oop);
+      JvmtiVTSuspender::register_vthread_resume(thread_oop);
       // Check if virtual thread is mounted and there is a java_thread.
-      // A non-NULL java_thread is always passed in the !ind_vt_mode case.
+      // A non-NULL java_thread is always passed in the !single_suspend case.
       oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
       java_thread = carrier_thread == NULL ? NULL : java_lang_Thread::thread(carrier_thread);
     }
@@ -1411,10 +1425,24 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool ind_vt
   if (java_thread->is_hidden_from_external_view()) {
     return JVMTI_ERROR_NONE;
   }
+
+  oop mounted_vt = java_thread->mounted_vthread();
+  if (single_suspend && JvmtiExport::can_support_virtual_threads() &&
+      mounted_vt != NULL && thread_oop != java_thread->mounted_vthread()) {
+    // A case of a carrier thread executing a mounted virtual thread.
+    assert(!java_lang_VirtualThread::is_instance(thread_oop) &&
+           java_lang_VirtualThread::is_instance(mounted_vt),
+           "sanity check");
+    if (java_thread->is_cthread_pending_suspend()) {
+      java_thread->clear_cthread_pending_suspend();
+      return JVMTI_ERROR_NONE;
+    } else {
+      return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
+    }
+  }
   if (!java_thread->is_being_ext_suspended()) {
     return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
   }
-
   if (!JvmtiSuspendControl::resume(java_thread)) {
     return JVMTI_ERROR_INTERNAL;
   }

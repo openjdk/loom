@@ -68,6 +68,34 @@ class JvmtiEnvThreadStateIterator : public StackObj {
   JvmtiEnvThreadState* next(JvmtiEnvThreadState* ets);
 };
 
+///////////////////////////////////////////////////////////////
+//
+// class JvmtiVTMTDisabler
+//
+// Virtual Threads Mount Transition (VTMT) mechanism
+//
+class JvmtiVTMTDisabler {
+ private:
+  // VTMT is disabled while this counter is non-zero
+  static unsigned short _VTMT_count;
+  static unsigned short _VTMT_disable_count;
+
+  static void disable_VTMT();
+  static void enable_VTMT();
+
+ public:
+  JvmtiVTMTDisabler() { disable_VTMT(); }
+  ~JvmtiVTMTDisabler() { enable_VTMT(); }
+  static void start_VTMT(jthread vthread, int callsite_tag);
+  static void finish_VTMT(jthread vthread, int callsite_tag);
+};
+
+///////////////////////////////////////////////////////////////
+//
+// class VThreadList
+//
+// Used for Virtual Threads Suspend/Resume management
+//
 class VThreadList : public GrowableArrayCHeap<OopHandle, mtServiceability> {
  public:
   VThreadList() : GrowableArrayCHeap<OopHandle, mtServiceability>(0) {}
@@ -76,6 +104,33 @@ class VThreadList : public GrowableArrayCHeap<OopHandle, mtServiceability> {
   int  find(oop vt) const;
   bool contains(oop vt) const;
   void invalidate();
+};
+
+///////////////////////////////////////////////////////////////
+//
+// class JvmtiVTSuspender
+//
+// Virtual Threads Suspend/Resume management
+//
+class JvmtiVTSuspender {
+ private:
+  // Suspend modes for virtual threads
+  typedef enum VThreadSuspendMode {
+    vthread_suspend_none = 0,
+    vthread_suspend_ind  = 1,
+    vthread_suspend_all  = 2
+  } VThreadSuspendMode;
+
+  static VThreadSuspendMode _vthread_suspend_mode;
+  static VThreadList* _vthread_suspend_list;
+  static VThreadList* _vthread_resume_list;
+
+ public:
+  static void register_all_vthreads_suspend();
+  static void register_all_vthreads_resume();
+  static bool register_vthread_suspend(oop vt);
+  static bool register_vthread_resume(oop vt);
+  static bool vthread_is_ext_suspended(oop vt);
 };
 
 ///////////////////////////////////////////////////////////////
@@ -156,39 +211,6 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   inline JvmtiEnvThreadState* env_thread_state(JvmtiEnvBase *env);
 
   static void periodic_clean_up();
-
- private:
-  // VTMT is disabled while this counter is non-zero
-  static unsigned short _VTMT_count;
-  static unsigned short _VTMT_disable_count;
-
-  // Suspend modes for virtual threads
-  typedef enum VThreadSuspendMode {
-    vthread_suspend_none = 0,
-    vthread_suspend_ind  = 1,
-    vthread_suspend_all  = 2
-  } VThreadSuspendMode;
-
-  static VThreadSuspendMode _vthread_suspend_mode;
-  static VThreadList* _vthread_suspend_list;
-  static VThreadList* _vthread_resume_list;
-
-  // Virtual Threads Mount Transition (VTMT) management
-  static void disable_VTMT();
-  static void enable_VTMT();
-
- public:
-  // Virtual Threads Mount Transition (VTMT) management
-  static void start_VTMT(jthread vthread, int callsite_tag);
-  static void finish_VTMT(jthread vthread, int callsite_tag);
-
- public:
-  // Virtual Threads Suspend/Resume management
-  static void register_all_vthreads_suspend();
-  static void register_all_vthreads_resume();
-  static bool register_vthread_suspend(oop vt);
-  static bool register_vthread_resume(oop vt);
-  static bool vthread_is_ext_suspended(oop vt);
 
   void add_env(JvmtiEnvBase *env);
 

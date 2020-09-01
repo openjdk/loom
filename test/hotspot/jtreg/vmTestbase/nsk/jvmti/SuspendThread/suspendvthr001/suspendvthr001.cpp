@@ -36,8 +36,11 @@ extern "C" {
 static jlong timeout = 0;
 static jvmtiEnv *jvmti = NULL;
 static jrawMonitorID events_monitor = NULL;
+static jthread agent_thread = NULL;
 static jthread tested_vthreads[VTHREADS_CNT];
 static int vthread_no = 0;
+static const char* CTHREAD_NAME_START = "ForkJoinPool";
+static const int CTHREAD_NAME_START_LEN = (int)strlen("ForkJoinPool");
 
 static void
 lock_events() {
@@ -56,146 +59,207 @@ fatal(JNIEnv* jni, const char* msg) {
 }
 
 static void
-check_suspended_state(jthread vt, int thr_idx, const char* fname) {
-    void *vtp = (void*) vt;
+check_suspended_state(jthread thread, int thr_idx, char* tname, const char* func_name) {
+    void *thread_p = (void*)thread;
     jint state = 0;
 
-    if (!NSK_JVMTI_VERIFY(jvmti->GetThreadState(vt, &state))) {
+    if (!NSK_JVMTI_VERIFY(jvmti->GetThreadState(thread, &state))) {
         nsk_jvmti_setFailStatus();
     }
-    printf("## Agent: vthread[%d] %p: state after suspend: %s (%d)\n",
-           thr_idx, vtp,  TranslateState(state), (int)state); fflush(0);
-    if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
-        printf("## Agent: %s did not turn on SUSPENDED flag:\n"
-               "#  state: %s (%d)\n", fname, TranslateState(state), (int)state);
+    printf("## Agent: thread[%d] %p %s: state after suspend: %s (%d)\n",
+           thr_idx, thread_p,  tname, TranslateState(state), (int)state); fflush(0);
+    if ((state & (JVMTI_THREAD_STATE_SUSPENDED | JVMTI_THREAD_STATE_TERMINATED)) == 0) {
+        printf("## Agent: FAILED: %s did not turn on SUSPENDED flag:\n"
+               "#  state: %s (%d)\n", func_name, TranslateState(state), (int)state);
         nsk_jvmti_setFailStatus();
     }
 }
 
 static void
-check_resumed_state(jthread vt, int thr_idx, const char* fname) {
-    void *vtp = (void*) vt;
+check_resumed_state(jthread thread, int thr_idx, char* tname, const char* func_name) {
+    void *thread_p = (void*)thread;
     jint state = 0;
 
-    if (!NSK_JVMTI_VERIFY(jvmti->GetThreadState(vt, &state))) {
+    if (!NSK_JVMTI_VERIFY(jvmti->GetThreadState(thread, &state))) {
         nsk_jvmti_setFailStatus();
     }
-    printf("## Agent: vthread[%d] %p: state after resume: %s (%d)\n",
-           thr_idx, vtp,  TranslateState(state), (int)state); fflush(0);
-    if (!((state & JVMTI_THREAD_STATE_SUSPENDED) == 0)) {
-        printf("## Agent: %s did not turn off SUSPENDED flag:\n"
-               "#   state: %s (%d)\n", fname, TranslateState(state), (int)state);
+    printf("## Agent: thread[%d] %p %s: state after resume: %s (%d)\n",
+           thr_idx, thread_p, tname, TranslateState(state), (int)state); fflush(0);
+    if (!((state & (JVMTI_THREAD_STATE_SUSPENDED | JVMTI_THREAD_STATE_TERMINATED)) == 0)) {
+        printf("## Agent: FAILED: %s did not turn off SUSPENDED flag:\n"
+               "#   state: %s (%d)\n", func_name, TranslateState(state), (int)state);
         nsk_jvmti_setFailStatus();
     }
 }
 
 static void
-test_vthread_suspend(jthread vt, int thr_idx) {
-    if (!NSK_JVMTI_VERIFY(jvmti->SuspendThread(vt))) {
+test_thread_suspend(jthread thread, int thr_idx, char* tname) {
+    if (!NSK_JVMTI_VERIFY(jvmti->SuspendThread(thread))) {
         nsk_jvmti_setFailStatus();
         return;
     }
-    check_suspended_state(vt, thr_idx, "SuspendThread");
+    check_suspended_state(thread, thr_idx, tname, "SuspendThread");
 }
 
 static void
-test_vthread_resume(jthread vt, int thr_idx) {
-    if (!NSK_JVMTI_VERIFY(jvmti->ResumeThread(vt))) {
+test_thread_resume(jthread thread, int thr_idx, char* tname) {
+    if (!NSK_JVMTI_VERIFY(jvmti->ResumeThread(thread))) {
         nsk_jvmti_setFailStatus();
     }
-    check_resumed_state(vt, thr_idx, "ResumeThread");
+    check_resumed_state(thread, thr_idx, tname, "ResumeThread");
 }
 
 static void
-test_vthread_suspend_list(const jthread* vt_list) {
+test_thread_suspend_list(const jthread* thread_list) {
     jvmtiError results[VTHREADS_CNT] = {JVMTI_ERROR_NONE};
+    jvmtiThreadInfo info;
 
-    printf("\n## Agent: test_vthread_suspend_list started\n"); fflush(0);
-    if (!NSK_JVMTI_VERIFY(jvmti->SuspendThreadList(VTHREADS_CNT, vt_list, results))) {
+    printf("\n## Agent: test_thread_suspend_list started\n"); fflush(0);
+    if (!NSK_JVMTI_VERIFY(jvmti->SuspendThreadList(VTHREADS_CNT, thread_list, results))) {
         nsk_jvmti_setFailStatus();
         return;
     }   
-    for (int i = 0; i < VTHREADS_CNT; i++) {
-        check_suspended_state(vt_list[i], i, "SuspendThreadList");
+    for (int idx = 0; idx < VTHREADS_CNT; idx++) {
+        jthread thread = thread_list[idx];
+        if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(thread, &info))) {
+            nsk_jvmti_setFailStatus();
+        }
+        char* tname = info.name;
+        check_suspended_state(thread, idx, tname,"SuspendThreadList");
     }
-    printf("\n## Agent: test_vthread_suspend_list finished\n"); fflush(0);
+    printf("\n## Agent: test_thread_suspend_list finished\n"); fflush(0);
 }
 
 static void
-test_vthread_resume_list(const jthread* vt_list) {
+test_thread_resume_list(const jthread* thread_list) {
     jvmtiError results[VTHREADS_CNT] = {JVMTI_ERROR_NONE};
+    jvmtiThreadInfo info;
 
-    printf("\n## Agent: test_vthread_resume_list: started\n"); fflush(0);
-    if (!NSK_JVMTI_VERIFY(jvmti->ResumeThreadList(VTHREADS_CNT, vt_list, results))) {
+    printf("\n## Agent: test_thread_resume_list: started\n"); fflush(0);
+    if (!NSK_JVMTI_VERIFY(jvmti->ResumeThreadList(VTHREADS_CNT, thread_list, results))) {
         nsk_jvmti_setFailStatus();
     }
-    for (int i = 0; i < VTHREADS_CNT; i++) {
-        check_resumed_state(vt_list[i], i, "ResumeThreadList");
+    for (int idx = 0; idx < VTHREADS_CNT; idx++) {
+        jthread thread = thread_list[idx];
+        if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(thread, &info))) {
+            nsk_jvmti_setFailStatus();
+        }
+        char* tname = info.name;
+        check_resumed_state(thread, idx, tname, "ResumeThreadList");
     }
-    printf("\n## Agent: test_vthread_resume_list: finished\n"); fflush(0);
+    printf("\n## Agent: test_thread_resume_list: finished\n"); fflush(0);
 }
 
 static void
-test_vthread_suspend_all(const jthread* vt_list) {
+test_vthread_suspend_all(const jthread* thread_list) {
+    jvmtiThreadInfo info;
+
     printf("\n## Agent: test_vthread_suspend_all started\n"); fflush(0);
     if (!NSK_JVMTI_VERIFY(jvmti->SuspendAllVirtualThreads())) {
         nsk_jvmti_setFailStatus();
         return;
     }
-    for (int i = 0; i < VTHREADS_CNT; i++) {
-        check_suspended_state(vt_list[i], i, "SuspendAllVirtualThreads");
+    for (int idx = 0; idx < VTHREADS_CNT; idx++) {
+        jthread thread = thread_list[idx];
+        if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(thread, &info))) {
+            nsk_jvmti_setFailStatus();
+        }
+        char* tname = info.name;
+        check_suspended_state(thread_list[idx], idx, tname, "SuspendAllVirtualThreads");
     }
     printf("\n## Agent: test_vthread_suspend_all finished\n"); fflush(0);
 }
 
 static void
-test_vthread_resume_all(const jthread* vt_list) {
+test_vthread_resume_all(const jthread* thread_list) {
+    jvmtiThreadInfo info;
+
     printf("\n## Agent: test_vthread_resume_all started\n"); fflush(0);
     if (!NSK_JVMTI_VERIFY(jvmti->ResumeAllVirtualThreads())) {
         nsk_jvmti_setFailStatus();
     }
-    for (int i = 0; i < VTHREADS_CNT; i++) {
-        check_resumed_state(vt_list[i], i, "ResumeAllVirtualThreads");
+    for (int idx = 0; idx < VTHREADS_CNT; idx++) {
+        jthread thread = thread_list[idx];
+        if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(thread, &info))) {
+            nsk_jvmti_setFailStatus();
+        }
+        char* tname = info.name;
+        check_resumed_state(thread_list[idx], idx, tname, "ResumeAllVirtualThreads");
     }
     printf("\n## Agent: test_vthread_resume_all: finished\n"); fflush(0);
 }
 
 static void
-test_vthread_suspend_half(const jthread* vt_list) {
+test_vthread_suspend_half(const jthread* thread_list) {
+    jvmtiThreadInfo info;
+
     printf("\n## Agent: test_vthread_suspend_half started\n"); fflush(0);
-    for (int i = 0; i < VTHREADS_CNT; i++) {
-        if (i % 2 == 1) {
+    for (int idx = 0; idx < VTHREADS_CNT; idx++) {
+        if (idx % 2 == 1) {
             continue; // skip odd indeces
         }
-        jthread vt = vt_list[i];
-        if (!NSK_JVMTI_VERIFY(jvmti->SuspendThread(vt))) {
+        jthread thread = thread_list[idx];
+        if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(thread, &info))) {
             nsk_jvmti_setFailStatus();
         }
-        check_suspended_state(vt, i, "SuspendThread");
+        char* tname = info.name;
+        if (!NSK_JVMTI_VERIFY(jvmti->SuspendThread(thread))) {
+            nsk_jvmti_setFailStatus();
+        }
+        check_suspended_state(thread, idx, tname, "SuspendThread");
     }
     printf("\n## Agent: test_vthread_suspend_half finished\n"); fflush(0);
 }
 
 static void
-test_vthread_resume_half(const jthread* vt_list) {
+test_vthread_resume_half(const jthread* thread_list) {
+    jvmtiThreadInfo info;
     jint state = 0;
+
     printf("\n## Agent: test_vthread_resume_half started\n"); fflush(0);
-    for (int i = 0; i < VTHREADS_CNT; i++) {
-        if (i % 2 == 1) {
+    for (int idx = 0; idx < VTHREADS_CNT; idx++) {
+        if (idx % 2 == 1) {
             continue; // skip odd indeces
         }
-        jthread vt = vt_list[i];
-        if (!NSK_JVMTI_VERIFY(jvmti->ResumeThread(vt))) {
+        jthread thread = thread_list[idx];
+        if (!NSK_JVMTI_VERIFY(jvmti->ResumeThread(thread))) {
             nsk_jvmti_setFailStatus();
         }
-        check_resumed_state(vt, i, "ResumeThread");
+        if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(thread, &info))) {
+            nsk_jvmti_setFailStatus();
+        }
+        char* tname = info.name;
+        check_resumed_state(thread, idx, tname, "ResumeThread");
     }
     printf("\n## Agent: test_vthread_resume_half: finished\n"); fflush(0);
 }
 
+static void test_threads_suspend_resume(JNIEnv* jni, jint threads_cnt, jthread* tested_vthreads) {
+    jvmtiThreadInfo info;
+
+    for (int idx = 0, ct_idx = 0; idx < threads_cnt; idx++) {
+        jthread thread = tested_vthreads[idx];
+        if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(thread, &info))) {
+            nsk_jvmti_setFailStatus();
+        }
+        char* tname = info.name;
+        if (strncmp(tname, CTHREAD_NAME_START, CTHREAD_NAME_START_LEN) != 0) {
+            continue;
+        }
+        printf("\n");
+        test_thread_suspend(thread, ct_idx, tname);
+        test_thread_resume(thread, ct_idx, tname);
+        ct_idx++;
+        if (!NSK_JVMTI_VERIFY(jvmti->Deallocate((unsigned char*)tname))) {
+            nsk_jvmti_setFailStatus();
+        }    
+    }
+}
 
 static void JNICALL
 agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
+   jthread* tested_threads = NULL;
+   jint threads_cnt = 0;
 
     printf("\n## Agent: Wait for vthreads to start\n"); fflush(0);
     if (!nsk_jvmti_waitForSync(timeout)) {
@@ -204,16 +268,21 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
     if (!nsk_jvmti_resumeSync()) {
         return;
     }
-    printf("\n## Agent: Test vthreads\n"); fflush(0);
-
-    for (int idx = 0; idx < VTHREADS_CNT; idx++) {
-        jthread vt = tested_vthreads[idx];
-        printf("\n");
-        test_vthread_suspend(vt, idx);
-        test_vthread_resume(vt, idx);
+    if (!NSK_JVMTI_VERIFY(jvmti->GetCurrentThread(&agent_thread))) {
+        nsk_jvmti_setFailStatus();
     }
-    test_vthread_suspend_list(tested_vthreads);
-    test_vthread_resume_list(tested_vthreads);
+    agent_thread = jni->NewGlobalRef(agent_thread);
+    if (!NSK_JVMTI_VERIFY(jvmti->GetAllThreads(&threads_cnt, &tested_threads))) {
+        nsk_jvmti_setFailStatus();
+    }
+    printf("\n## Agent: Test carrier threads\n"); fflush(0);
+    test_threads_suspend_resume(jni, threads_cnt, tested_threads);
+
+    printf("\n## Agent: Test virtual threads\n"); fflush(0);
+    test_threads_suspend_resume(jni, VTHREADS_CNT, tested_vthreads);
+
+    test_thread_suspend_list(tested_vthreads);
+    test_thread_resume_list(tested_vthreads);
 
     test_vthread_suspend_all(tested_vthreads);
     test_vthread_resume_all(tested_vthreads);
@@ -254,6 +323,11 @@ VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vt
       fatal(jni, "Agent: event handler failed during JVMTI GetThreadInfo call");
   }
   unlock_events();
+}
+
+JNIEXPORT jint JNICALL
+Java_nsk_jvmti_SuspendThread_suspendvthr001_GetStatus(JNIEnv* jni, jclass cls) {
+   return nsk_jvmti_getStatus();
 }
 
 /** Agent library initialization. */

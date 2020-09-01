@@ -899,6 +899,7 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
   JavaThread* current_thread = JavaThread::current();
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
+  JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh(current_thread);
 
   if (thread == NULL) {
@@ -928,11 +929,10 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    JvmtiThreadState::disable_VTMT();
 
     jshort vthread_state = java_lang_VirtualThread::state(thread_oop);
     jint state = java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
-    bool vthread_ext_suspended = JvmtiThreadState::vthread_is_ext_suspended(thread_oop);
+    bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
 
     if (vthread_ext_suspended && ((state & JVMTI_THREAD_STATE_ALIVE) != 0)) {
       state &= ~java_lang_VirtualThread::RUNNING;
@@ -941,7 +941,6 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
     if (java_lang_Thread::interrupted(thread_oop)) {
       state |= JVMTI_THREAD_STATE_INTERRUPTED;
     }
-    JvmtiThreadState::enable_VTMT();
     *thread_state_ptr = state;
     return JVMTI_ERROR_NONE;
   }
@@ -953,6 +952,12 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
     // We have a JavaThread* so add more state bits.
     JavaThreadState jts = java_thread->thread_state();
 
+    if (JvmtiExport::can_support_virtual_threads() &&
+        thread_oop != java_thread->mounted_vthread() &&
+        java_thread->is_cthread_pending_suspend()) {
+      // Suspended carrier thread with a mounted virtual thread.
+      state |= JVMTI_THREAD_STATE_SUSPENDED;
+    }
     if (java_thread->is_being_ext_suspended()) {
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
@@ -963,7 +968,6 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
       state |= JVMTI_THREAD_STATE_INTERRUPTED;
     }
   }
-
   *thread_state_ptr = state;
   return JVMTI_ERROR_NONE;
 } /* end GetThreadState */
@@ -1019,8 +1023,7 @@ jvmtiError
 JvmtiEnv::SuspendThread(jthread thread) {
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
-
-  JvmtiThreadState::disable_VTMT();
+  JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh;
 
   jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
@@ -1029,9 +1032,8 @@ JvmtiEnv::SuspendThread(jthread thread) {
   }
   err = suspend_thread(thread_oop,
                        java_thread,
-                       true,  // individual suspend
+                       true,  // single suspend
                        NULL); // no need for extra safepoint
-  JvmtiThreadState::enable_VTMT();
   return err;;
 } /* end SuspendThread */
 
@@ -1045,24 +1047,25 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
   oop thread_oop = NULL;
   JavaThread *java_thread = NULL;
 
-  JvmtiThreadState::disable_VTMT();
-  ThreadsListHandle tlh;
+  {
+    JvmtiVTMTDisabler vtmt_disabler;
+    ThreadsListHandle tlh;
 
-  for (int i = 0; i < request_count; i++) {
-    jthread thread = request_list[i];
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
-    if (err != JVMTI_ERROR_NONE) {
-      if (thread_oop == NULL || err != JVMTI_ERROR_INVALID_THREAD) {
-        results[i] = err;
-        continue;
+    for (int i = 0; i < request_count; i++) {
+      jthread thread = request_list[i];
+      jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+      if (err != JVMTI_ERROR_NONE) {
+        if (thread_oop == NULL || err != JVMTI_ERROR_INVALID_THREAD) {
+          results[i] = err;
+          continue;
+        }
       }
+      results[i] = suspend_thread(thread_oop,
+                                  java_thread,
+                                  true, // single suspend
+                                  &needSafepoint);
     }
-    results[i] = suspend_thread(thread_oop,
-                                java_thread,
-                                true, // individual suspend
-                                &needSafepoint);
   }
-  JvmtiThreadState::enable_VTMT();
   if (needSafepoint > 0) {
     VM_ThreadsSuspendJVMTI tsj;
     VMThread::execute(&tsj);
@@ -1078,30 +1081,30 @@ JvmtiEnv::SuspendAllVirtualThreads() {
   if (!JvmtiExport::can_support_virtual_threads()) {
     return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
   }
-  ResourceMark rm;
+  {
+    ResourceMark rm;
+    JvmtiVTMTDisabler vtmt_disabler;
 
-  JvmtiThreadState::disable_VTMT();
-
-  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
-    oop jt_oop = java_thread->threadObj();
-    if (jt_oop == NULL || java_thread->is_exiting() ||
-        !java_lang_Thread::is_alive(jt_oop) ||
-        java_thread->is_jvmti_agent_thread() ||
-        java_thread->is_hidden_from_external_view()) {
-      continue;
+    for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
+      oop jt_oop = java_thread->threadObj();
+      if (jt_oop == NULL || java_thread->is_exiting() ||
+          !java_lang_Thread::is_alive(jt_oop) ||
+          java_thread->is_jvmti_agent_thread() ||
+          java_thread->is_hidden_from_external_view()) {
+        continue;
+      }
+      oop thread_oop = java_thread->mounted_vthread();
+      // suspend non-suspended vthreads only
+      if (java_lang_VirtualThread::is_instance(thread_oop) &&
+          !JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop)) {
+        suspend_thread(thread_oop,
+                       java_thread,
+                       false, // suspend all
+                       &needSafepoint);
+      }
     }
-    oop thread_oop = java_thread->mounted_vthread();
-    // suspend non-suspended vthreads only
-    if (java_lang_VirtualThread::is_instance(thread_oop) &&
-        !JvmtiThreadState::vthread_is_ext_suspended(thread_oop)) {
-      suspend_thread(thread_oop,
-                     java_thread,
-                     false, // suspend all
-                     &needSafepoint);
-    }
+    JvmtiVTSuspender::register_all_vthreads_suspend();
   }
-  JvmtiThreadState::register_all_vthreads_suspend();
-  JvmtiThreadState::enable_VTMT();
   if (needSafepoint > 0) {
     VM_ThreadsSuspendJVMTI tsj;
     VMThread::execute(&tsj);
@@ -1114,16 +1117,14 @@ jvmtiError
 JvmtiEnv::ResumeThread(jthread thread) {
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
-
-  JvmtiThreadState::disable_VTMT();
+  JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh;  
 
   jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);  
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
-  err = resume_thread(thread_oop, java_thread, true); // individual suspend
-  JvmtiThreadState::enable_VTMT();
+  err = resume_thread(thread_oop, java_thread, true); // single suspend
   return err;
 } /* end ResumeThread */
 
@@ -1135,8 +1136,7 @@ jvmtiError
 JvmtiEnv::ResumeThreadList(jint request_count, const jthread* request_list, jvmtiError* results) {
   oop thread_oop = NULL;
   JavaThread* java_thread = NULL;
-
-  JvmtiThreadState::disable_VTMT();
+  JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh;
 
   for (int i = 0; i < request_count; i++) {
@@ -1148,9 +1148,8 @@ JvmtiEnv::ResumeThreadList(jint request_count, const jthread* request_list, jvmt
         continue;
       }
     }
-    results[i] = resume_thread(thread_oop, java_thread, true); // individual suspend
+    results[i] = resume_thread(thread_oop, java_thread, true); // single suspend
   }
-  JvmtiThreadState::enable_VTMT();
   // per-thread resume results returned via results parameter
   return JVMTI_ERROR_NONE;
 } /* end ResumeThreadList */
@@ -1161,9 +1160,8 @@ JvmtiEnv::ResumeAllVirtualThreads() {
   if (!JvmtiExport::can_support_virtual_threads()) {
     return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
   }
+  JvmtiVTMTDisabler vtmt_disabler;
   ResourceMark rm;
-
-  JvmtiThreadState::disable_VTMT();
 
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
     oop jt_oop = java_thread->threadObj();
@@ -1176,12 +1174,11 @@ JvmtiEnv::ResumeAllVirtualThreads() {
     oop thread_oop = java_thread->mounted_vthread();
     // resume suspended vthreads only
     if (java_lang_VirtualThread::is_instance(thread_oop) &&
-        JvmtiThreadState::vthread_is_ext_suspended(thread_oop)) {
+        JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop)) {
       resume_thread(thread_oop, java_thread, false); // suspend all
     }
   } 
-  JvmtiThreadState::register_all_vthreads_resume();
-  JvmtiThreadState::enable_VTMT();
+  JvmtiVTSuspender::register_all_vthreads_resume();
   return JVMTI_ERROR_NONE;
 }
 

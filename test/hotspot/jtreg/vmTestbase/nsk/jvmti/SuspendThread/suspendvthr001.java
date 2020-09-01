@@ -34,6 +34,8 @@ public class suspendvthr001 extends DebugeeClass {
         System.loadLibrary("suspendvthr001");
     }
 
+    native static int GetStatus();
+
     static public void sleep(long millis) {
         try {
             Thread.sleep(millis);
@@ -72,6 +74,7 @@ public class suspendvthr001 extends DebugeeClass {
         System.out.println("\n## Java: runIt: Starting threads");
         status = test_vthreads();
         if (status != Consts.TEST_PASSED) {
+            System.out.println("\n## Java: runIt FAILED: status from native Agent: " + status);
             return status;
         }
         return status;
@@ -91,7 +94,7 @@ public class suspendvthr001 extends DebugeeClass {
         if (status != Consts.TEST_PASSED) {
             return status;
         }
-        sleep(10); // let tested vthreads work while they are tested in native agent
+        sleep(100); // let tested vthreads work while they are tested in native agent
 
         System.out.println("\n## Java: runIt: Finishing vthreads");
         try {
@@ -104,8 +107,7 @@ public class suspendvthr001 extends DebugeeClass {
         } catch (InterruptedException e) {
             throw new Failure(e);
         }
-        System.out.println("\n## Java: runIt: Checking status");
-        return status;
+        return GetStatus();
     }
 
     Thread start_thread(String name, suspendvthr001Thread thread) {

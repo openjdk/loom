@@ -180,21 +180,21 @@ JvmtiThreadState::periodic_clean_up() {
   }
 }
 
-/* Virtual Threads Mount Transition (VTMT) */
+/* Virtual Threads Mount Transition (VTMT) mechanism */
 
 // VTMT can not be disabled while this counter is positive
-unsigned short JvmtiThreadState::_VTMT_count = 0;
+unsigned short JvmtiVTMTDisabler::_VTMT_count = 0;
 
 // VTMT is disabled while this counter is positive
-unsigned short JvmtiThreadState::_VTMT_disable_count = 0;
+unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
 
 void
-JvmtiThreadState::disable_VTMT() {
+JvmtiVTMTDisabler::disable_VTMT() {
   if (!JvmtiExport::can_support_virtual_threads()) {
     return;
   }
-  JavaThread* cur_thread = JavaThread::current();
-  ThreadBlockInVM tbivm(cur_thread);
+  JavaThread* thread = JavaThread::current();
+  ThreadBlockInVM tbivm(thread);
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   assert(_VTMT_disable_count >= 0, "VTMT sanity check");
@@ -207,7 +207,7 @@ JvmtiThreadState::disable_VTMT() {
 }
 
 void
-JvmtiThreadState::enable_VTMT() {
+JvmtiVTMTDisabler::enable_VTMT() {
   if (!JvmtiExport::can_support_virtual_threads()) {
     return;
   }
@@ -220,27 +220,28 @@ JvmtiThreadState::enable_VTMT() {
 }
 
 void
-JvmtiThreadState::start_VTMT(jthread vthread, int callsite_tag) {
+JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
+  JavaThread* thread = JavaThread::current();
   assert(JvmtiExport::can_support_virtual_threads(),
          "check_and_self_suspend_vthread sanity check");
 
-  JavaThread* cur_thread = JavaThread::current();
-  HandleMark hm(cur_thread);
-  Handle vth = Handle(cur_thread, JNIHandles::resolve_external_guard(vthread));
-  ThreadBlockInVM tbivm(cur_thread);
-  {
-    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  HandleMark hm(thread);
+  Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
+  ThreadBlockInVM tbivm(thread);
+  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-    // block while transitions are disabled
-    while (_VTMT_disable_count > 0 || vthread_is_ext_suspended(vth())) {
-      ml.wait();
-    }
-    _VTMT_count++;
+  // block while transitions are disabled
+  while (_VTMT_disable_count > 0 ||
+         thread->is_external_suspend() ||
+         JvmtiVTSuspender::vthread_is_ext_suspended(vth())) {
+    ml.wait();
   }
+  _VTMT_count++;
 }
 
 void
-JvmtiThreadState::finish_VTMT(jthread vthread, int callsite_tag) {
+JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
+  JavaThread* thread = JavaThread::current();
   assert(JvmtiExport::can_support_virtual_threads(),
          "check_and_self_suspend_vthread sanity check");
 
@@ -249,6 +250,15 @@ JvmtiThreadState::finish_VTMT(jthread vthread, int callsite_tag) {
   // unblock waiting VTMT disablers
   if (_VTMT_disable_count > 0) {
     ml.notify_all();
+  }
+  if (callsite_tag == 1) { // finish_VTMT for a vthread unmount
+    if (thread->is_cthread_pending_suspend()) {
+      thread->clear_cthread_pending_suspend();
+      // Safe to do without grabbing SR_lock as the thread is current.
+      // The JavaThread* will be suspended upon return to Java.
+      MonitorLocker ml(thread->SR_lock(), Mutex::_no_safepoint_check_flag);
+      thread->set_external_suspend();
+    }
   }
 }
 
@@ -295,17 +305,17 @@ VThreadList::invalidate() {
 
 /* Virtual Threads Suspend/Resume management */
 
-JvmtiThreadState::VThreadSuspendMode
-JvmtiThreadState::_vthread_suspend_mode = vthread_suspend_none;
+JvmtiVTSuspender::VThreadSuspendMode
+JvmtiVTSuspender::_vthread_suspend_mode = vthread_suspend_none;
 
 VThreadList*
-JvmtiThreadState::_vthread_suspend_list = new VThreadList();
+JvmtiVTSuspender::_vthread_suspend_list = new VThreadList();
 
 VThreadList*
-JvmtiThreadState::_vthread_resume_list = new VThreadList();
+JvmtiVTSuspender::_vthread_resume_list = new VThreadList();
 
 void
-JvmtiThreadState::register_all_vthreads_suspend() {
+JvmtiVTSuspender::register_all_vthreads_suspend() {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   _vthread_suspend_mode = vthread_suspend_all;
@@ -313,7 +323,7 @@ JvmtiThreadState::register_all_vthreads_suspend() {
 }
 
 void
-JvmtiThreadState::register_all_vthreads_resume() {
+JvmtiVTSuspender::register_all_vthreads_resume() {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   _vthread_suspend_mode = vthread_suspend_none;
@@ -321,7 +331,7 @@ JvmtiThreadState::register_all_vthreads_resume() {
 }
 
 bool
-JvmtiThreadState::register_vthread_suspend(oop vt) {
+JvmtiVTSuspender::register_vthread_suspend(oop vt) {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   if (_vthread_suspend_mode == vthread_suspend_all) {
@@ -338,7 +348,7 @@ JvmtiThreadState::register_vthread_suspend(oop vt) {
 }
 
 bool
-JvmtiThreadState::register_vthread_resume(oop vt) {
+JvmtiVTSuspender::register_vthread_resume(oop vt) {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   if (_vthread_suspend_mode == vthread_suspend_all) {
@@ -359,7 +369,7 @@ JvmtiThreadState::register_vthread_resume(oop vt) {
 }
 
 bool
-JvmtiThreadState::vthread_is_ext_suspended(oop vt) {
+JvmtiVTSuspender::vthread_is_ext_suspended(oop vt) {
   bool suspend_is_needed =
    (_vthread_suspend_mode == vthread_suspend_all && !_vthread_resume_list->contains(vt)) ||
    (_vthread_suspend_mode == vthread_suspend_ind && _vthread_suspend_list->contains(vt));

@@ -309,7 +309,8 @@ class Thread: public ThreadShadow {
     _has_async_exception    = 0x00000001U, // there is a pending async exception
     _critical_native_unlock = 0x00000002U, // Must call back to unlock JNI critical lock
 
-    _trace_flag             = 0x00000004U  // call tracing backend
+    _trace_flag             = 0x00000004U, // call tracing backend
+    _cthread_pending_suspend = 0x00000008U // carrier thread is suspended while vthread is mounted
   };
 
   // various suspension related flags - atomically updated
@@ -1545,6 +1546,13 @@ public:
 
   void set_suspend_equivalent()                  { _suspend_equivalent = true; }
   void clear_suspend_equivalent()                { _suspend_equivalent = false; }
+
+  inline void set_cthread_pending_suspend();
+  inline void clear_cthread_pending_suspend();
+
+  bool is_cthread_pending_suspend() const {
+    return (_suspend_flags & _cthread_pending_suspend) != 0;
+  }
 
   // Thread.stop support
   void send_thread_stop(oop throwable);

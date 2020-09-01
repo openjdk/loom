@@ -83,8 +83,9 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static void leaving_dying_thread_env_iteration()  { --_dying_thread_env_iteration_count; }
   static bool is_inside_dying_thread_env_iteration(){ return _dying_thread_env_iteration_count > 0; }
 
-  static jvmtiError suspend_thread(oop thread_oop, JavaThread* java_thread, bool ind_vt_mode, int* need_safepoint_p);
-  static jvmtiError resume_thread(oop thread_oop, JavaThread* java_thread, bool ind_vt_mode);
+  static jvmtiError suspend_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend,
+                                   int* need_safepoint_p);
+  static jvmtiError resume_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend);
  private:
 
   enum {
