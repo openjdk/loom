@@ -36,7 +36,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import jdk.internal.misc.Blocker;
 
 import static sun.nio.ch.KQueue.EVFILT_READ;
 import static sun.nio.ch.KQueue.EVFILT_WRITE;
@@ -102,10 +101,6 @@ class KQueueSelectorImpl extends SelectorImpl {
             throw new ClosedSelectorException();
     }
 
-    private int poll(long timeout) throws IOException {
-        return KQueue.poll(kqfd, pollArrayAddress, MAX_KEVENTS, timeout);
-    }
-
     @Override
     protected int doSelect(Consumer<SelectionKey> action, long timeout)
         throws IOException
@@ -125,10 +120,9 @@ class KQueueSelectorImpl extends SelectorImpl {
             do {
                 long startTime = timedPoll ? System.nanoTime() : 0;
                 if (blocking && Thread.currentThread().isVirtual()) {
-                    long millis = to;
-                    numEntries = Blocker.managedBlock(() -> poll(millis));
+                    numEntries = managedPoll(to);
                 } else {
-                    numEntries = poll(to);
+                    numEntries = implPoll(to);
                 }
                 if (numEntries == IOStatus.INTERRUPTED && timedPoll) {
                     // timed poll interrupted so need to adjust timeout
@@ -147,6 +141,11 @@ class KQueueSelectorImpl extends SelectorImpl {
         }
         processDeregisterQueue();
         return processEvents(numEntries, action);
+    }
+
+    @Override
+    protected int implPoll(long timeout) throws IOException {
+        return KQueue.poll(kqfd, pollArrayAddress, MAX_KEVENTS, timeout);
     }
 
     /**

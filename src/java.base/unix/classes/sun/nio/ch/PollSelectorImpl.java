@@ -111,7 +111,11 @@ class PollSelectorImpl extends SelectorImpl {
             int numPolled;
             do {
                 long startTime = timedPoll ? System.nanoTime() : 0;
-                numPolled = poll(pollArray.address(), pollArraySize, to);
+                if (blocking && Thread.currentThread().isVirtual()) {
+                    numPolled = managedPoll(to);
+                } else {
+                    numPolled = implPoll(to);
+                }
                 if (numPolled == IOStatus.INTERRUPTED && timedPoll) {
                     // timed poll interrupted so need to adjust timeout
                     long adjust = System.nanoTime() - startTime;
@@ -130,6 +134,11 @@ class PollSelectorImpl extends SelectorImpl {
 
         processDeregisterQueue();
         return processEvents(action);
+    }
+
+    @Override
+    protected int implPoll(long timeout) throws IOException {
+        return poll(pollArray.address(), pollArraySize, (int) timeout);
     }
 
     /**
