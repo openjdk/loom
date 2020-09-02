@@ -92,8 +92,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * <p> Kernel threads are designated <i>daemon</i> or <i>non-daemon</i> threads.
  * When the Java virtual machine starts up, there is usually one non-daemon
  * thread (the thread that typically calls the applications's {@code main} method).
- * The Java virtual machine terminates when all non-daemon threads have terminated.
- * The Java virtual machine can also be terminated by invoking the
+ * The Java virtual machine terminates when all started non-daemon threads have
+ * terminated. Unstarted daemon threads do not prevent the Java virtual machine from
+ * termination. The Java virtual machine can also be terminated by invoking the
  * {@linkplain Runtime#exit(int)} method, in which case it will terminate even
  * if there are non-daemon threads still running. The daemon status of virtual
  * threads is meaningless and have no influence on when the Java virtual
