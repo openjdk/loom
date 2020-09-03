@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Red Hat, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,19 +21,29 @@
  * questions.
  */
 
-
-/*
+/**
  * @test
+ * @bug 8252296
+ * @summary Shenandoah: crash in CallNode::extract_projections
+ * @requires vm.gc.Shenandoah
  *
- * @summary converted from VM Testbase jit/t/t113.
- * VM Testbase keywords: [jit, quick, vm6]
- * VM Testbase readme:
- * Clone of t097.  The pass file changed in JDK 1.2.
+ * @run main/othervm -XX:-BackgroundCompilation -XX:-TieredCompilation -XX:+UseShenandoahGC -XX:CompileOnly=TestBarrierExpandCallProjection::test TestBarrierExpandCallProjection
  *
- * @library /vmTestbase
- *          /test/lib
- * @run driver jdk.test.lib.FileInstaller . .
- * @build jit.t.t113.t113
- * @run driver ExecDriver --java jit.t.t113.t113
  */
 
+public class TestBarrierExpandCallProjection {
+    static TestBarrierExpandCallProjection test = new TestBarrierExpandCallProjection();
+    private int field;
+
+    public static void main(String[] args) {
+        test();
+    }
+
+    private static int test() {
+        int v = 0;
+        for (int i = 0; i < 100_000; i++) {
+            v += test.field;
+        }
+        return v;
+    }
+}
