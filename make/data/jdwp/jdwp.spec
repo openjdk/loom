@@ -2141,14 +2141,12 @@ JDWP "Java(tm) Debug Wire Protocol"
         )
     )
     (Command IsVirtual=15
-        "Determine if a thread is scheduled by the Java virtual machine "
-        "rather than the operating system."
+        "Determine if a thread is a virtual thread."
         (Out
             (threadObject thread "The thread object ID.")
         )
         (Reply
-            (boolean isVirtual "true if the thread is scheduled by the Java virtual "
-                               "machine rather than the operating system.")
+            (boolean isVirtual "true if the thread is a virtual thread.")
         )
         (ErrorSet
             (Error INVALID_THREAD)

@@ -474,17 +474,18 @@ public interface ThreadReference extends ObjectReference {
                                               IncompatibleThreadStateException;
 
     /**
-     * Returns {@code true} if the thread is scheduled by the Java virtual machine
-     * rather than the operating system.
+     * Returns {@code true} if the thread is a virtual thread. A virtual
+     * thread is scheduled by the Java virtual machine rather than the
+     * operating system.
      *
-     * @return true if the thread is scheduled by the Java virtual machine rather
-     * than the operating system
+     * @return true if the thread is a virtual thread
      *
-     * @implSpec The default implementation returns false.
+     * @implSpec
+     * The default implementation throws {@code UnsupportedOperationException}.
      *
      * @since 99
      */
     default boolean isVirtual() {
-        return false;
+        throw new UnsupportedOperationException("Method not implemented");
     }
 }

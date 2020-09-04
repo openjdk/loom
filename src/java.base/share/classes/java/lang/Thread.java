@@ -1666,17 +1666,10 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Returns {@code true} if this thread scheduled by the Java virtual machine
-     * rather than the operating system.
+     * Returns {@code true} if this thread is a virtual thread. A virtual thread
+     * is scheduled by the Java virtual machine rather than the operating system.
      *
-     * <p> Threads that are scheduled by the Java virtual machine do not support
-     * all features of Thread. In particular, the Thread is not an <i>active thread</i>
-     * in its thread group and so is not enumerated or acted on by thread group
-     * operations. In addition it does not support the stop, suspend or resume
-     * methods.
-     *
-     * @return {@code true} if this thread is scheduled by the Java virtual
-     *         machine rather than the operating system
+     * @return {@code true} if this thread is a virtual thread
      *
      * @since 99
      */
