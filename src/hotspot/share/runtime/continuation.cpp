@@ -3411,7 +3411,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   #endif
     return freeze_epilog(thread, cont);
   } else if (mode != mode_fast && UNLIKELY(preempt)) {
-    assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "");
+    assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "thread_state: %d %s", thread->thread_state(), thread->thread_state_name());
     freeze_result res = fr.freeze_preempt();
     return freeze_epilog(thread, cont, res);
   } else {
@@ -4112,7 +4112,7 @@ public:
 
     // Dynamically branch on frame type
     if (mode == mode_slow && _preempt && top && !hf.is_interpreted_frame()) {
-      assert (is_stub(hf.cb()), "");
+      assert (is_stub(hf.cb()), "cb: %s", hf.cb()->name());
       recurse_stub_frame(hf, caller, num_frames);
     } else if (mode == mode_fast || !hf.is_interpreted_frame()) {
       recurse_compiled_frame<top>(hf, caller, num_frames);
