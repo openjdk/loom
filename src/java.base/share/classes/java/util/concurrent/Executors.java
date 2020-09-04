@@ -248,7 +248,7 @@ public class Executors {
      *
      * @param threadFactory the factory to use when creating new threads
      * @return a newly created executor
-     * @throws NullPointerException if factory is null
+     * @throws NullPointerException if threadFactory is null
      * @since 99
      */
     public static ExecutorService newThreadExecutor(ThreadFactory threadFactory) {
