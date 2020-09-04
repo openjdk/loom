@@ -297,14 +297,7 @@ public final class StackWalker {
         /**
          * Obtain monitors, locals and operands.
          */
-        LOCALS_AND_OPERANDS,
-        /**
-         * Show carrier thread frames.
-         *
-         * <p>By default, carrier thread frames are hidden when walking the stack
-         * of a virtual thread.
-         */
-        SHOW_CARRIER_FRAMES
+        LOCALS_AND_OPERANDS
     };
 
     static final EnumSet<Option> DEFAULT_EMPTY_OPTION = EnumSet.noneOf(Option.class);
@@ -738,10 +731,6 @@ public final class StackWalker {
 
     boolean hasLocalsOperandsOption() {
         return extendedOption == ExtendedOption.LOCALS_AND_OPERANDS;
-    }
-
-    boolean hasShowCarrierFramesOption() {
-        return extendedOption == ExtendedOption.SHOW_CARRIER_FRAMES;
     }
 
     ContinuationScope getContScope() {

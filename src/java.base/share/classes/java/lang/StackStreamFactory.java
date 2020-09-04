@@ -142,9 +142,7 @@ final class StackStreamFactory {
             this.maxDepth = maxDepth;
             this.depth = 0;
             ContinuationScope scope = walker.getContScope();
-            if (scope == null
-                    && thread.isVirtual()
-                    && !walker.hasShowCarrierFramesOption()) {
+            if (scope == null && thread.isVirtual()) {
                 this.contScope = VirtualThread.continuationScope();
                 this.continuation = null;
             } else {
