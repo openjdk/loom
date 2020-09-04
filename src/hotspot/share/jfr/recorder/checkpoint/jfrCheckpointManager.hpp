@@ -32,6 +32,7 @@
 #include "jfr/utilities/jfrBlob.hpp"
 #include "jfr/utilities/jfrLinkedList.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
+#include "runtime/thread.hpp"
 
 class JfrCheckpointManager;
 class JfrChunkWriter;
