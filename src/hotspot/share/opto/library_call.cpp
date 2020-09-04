@@ -164,7 +164,8 @@ class LibraryCallKit : public GraphKit {
   void  generate_string_range_check(Node* array, Node* offset,
                                     Node* length, bool char_count);
 
-  Node* current_thread_helper(Node* &tls_output, ByteSize handle_offset);
+  Node* current_thread_helper(Node* &tls_output, ByteSize handle_offset,
+                              bool is_immutable);
   Node* generate_current_thread(Node* &tls_output);
   Node* generate_virtual_thread(Node* threadObj);
 
@@ -1108,26 +1109,40 @@ void LibraryCallKit::generate_string_range_check(Node* array, Node* offset, Node
   }
 }
 
-Node* LibraryCallKit::current_thread_helper(Node* &tls_output, ByteSize handle_offset) {
+Node* LibraryCallKit::current_thread_helper(Node*& tls_output, ByteSize handle_offset,
+                                            bool is_immutable) {
   ciKlass* thread_klass = env()->Thread_klass();
   const Type* thread_type
     = TypeOopPtr::make_from_klass(thread_klass)->cast_to_ptr_type(TypePtr::NotNull);
+
   Node* thread = _gvn.transform(new ThreadLocalNode());
   Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(handle_offset));
   tls_output = thread;
-  Node* thread_obj_handle = LoadNode::make(_gvn, NULL, immutable_memory(), p, p->bottom_type()->is_ptr(), TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered);
+
+  Node* thread_obj_handle
+    = (is_immutable
+      ? LoadNode::make(_gvn, NULL, immutable_memory(), p, p->bottom_type()->is_ptr(),
+        TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered)
+      : make_load(NULL, p, p->bottom_type()->is_ptr(), T_ADDRESS, MemNode::unordered));
   thread_obj_handle = _gvn.transform(thread_obj_handle);
-  return access_load(thread_obj_handle, thread_type, T_OBJECT, IN_NATIVE | C2_IMMUTABLE_MEMORY);
+
+  DecoratorSet decorators = IN_NATIVE;
+  if (is_immutable) {
+    decorators |= C2_IMMUTABLE_MEMORY;
+  }
+  return access_load(thread_obj_handle, thread_type, T_OBJECT, decorators);
 }
 
 //--------------------------generate_current_thread--------------------
 Node* LibraryCallKit::generate_current_thread(Node* &tls_output) {
-  return current_thread_helper(tls_output, JavaThread::threadObj_offset());
+  return current_thread_helper(tls_output, JavaThread::threadObj_offset(),
+                               /*is_immutable*/false);
 }
 
 //--------------------------generate_virtual_thread--------------------
 Node* LibraryCallKit::generate_virtual_thread(Node* tls_output) {
-  return current_thread_helper(tls_output, JavaThread::vthread_offset());
+  return current_thread_helper(tls_output, JavaThread::vthread_offset(),
+                               !C->method()->changes_current_thread());
 }
 
 //------------------------------make_string_method_node------------------------
