@@ -112,6 +112,7 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
   OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
 }
 
+#ifdef FIX_DERIVED_POINTERS
 static void fix_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
   for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
     OopMapValue omv = oms.current();
@@ -151,6 +152,7 @@ static void fix_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intpt
   OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
   jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
 }
+#endif
 
 template <class OopClosureType>
 static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
