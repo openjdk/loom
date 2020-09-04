@@ -754,16 +754,11 @@ public class Thread implements Runnable {
     public interface Builder {
 
         /**
-         * Sets the thread group.
-         *
-         * <p> The thread group for threads that are scheduled by the Java virtual
-         * machine threads does not support all features of regular thread groups.
-         * The thread group can only be set for threads that are scheduled by
-         * the operating system.
-         *
+         * Sets the thread group. The thread group of a virtual thread cannot
+         * be selected at build time. Setting the thread group of a virtual
+         * thread has no effect.
          * @param group the thread group
          * @return this builder
-         * @throws IllegalStateException if this is a builder for a virtual thread
          */
         Builder group(ThreadGroup group);
 
@@ -789,7 +784,6 @@ public class Thread implements Runnable {
          * the operating system. The scheduler will be selected when the thread
          * is {@linkplain #build() created} or {@linkplain #start() started}.
          * @return this builder
-         * @throws IllegalStateException if a thread group has been set
          */
         Builder virtual();
 
@@ -806,7 +800,6 @@ public class Thread implements Runnable {
          * task on the <em>current thread</em>.
          * @param scheduler the scheduler or {@code null} for the default scheduler
          * @return this builder
-         * @throws IllegalStateException if a thread group has been set
          */
         Builder virtual(Executor scheduler);
 
@@ -815,7 +808,6 @@ public class Thread implements Runnable {
          * a thread-local with the {@link ThreadLocal#set(Object)} method then
          * {@code UnsupportedOperationException} is thrown.
          * @return this builder
-         * @throws IllegalStateException if inheritThreadLocals has already been set
          * @see ThreadLocal#set(Object)
          */
         Builder disallowThreadLocals();
@@ -824,16 +816,16 @@ public class Thread implements Runnable {
          * Inherit threads-locals. Thread locals are inherited when the {@code Thread}
          * is created with the {@link #build() build} method or when the thread
          * factory {@link ThreadFactory#newThread(Runnable) newThread} method
-         * is invoked.
+         * is invoked. This method has no effect when thread locals are {@linkplain
+         * #disallowThreadLocals() disallowed}.
          * @return this builder
-         * @throws IllegalStateException if disallowThreadLocals has already been set
          */
         Builder inheritThreadLocals();
 
         /**
          * Sets the daemon status.
          * The {@link #isDaemon() daemon status} of virtual threads is always {@code true}.
-         * Setting the daemon status at build time has no effect.
+         * Setting the daemon status of a virtual thread has no effect.
          * @param on {@code true} to create daemon threads
          * @return this builder
          */
@@ -842,7 +834,7 @@ public class Thread implements Runnable {
         /**
          * Sets the thread priority.
          * The priority of virtual threads is always {@linkplain Thread#NORM_PRIORITY}.
-         * Setting the priority of a virtual thread at build time has no effect.
+         * Setting the priority of a virtual thread has no effect.
          * @param priority priority
          * @return this builder
          * @throws IllegalArgumentException if the priority is less than
@@ -977,9 +969,8 @@ public class Thread implements Runnable {
         @Override
         public Builder group(ThreadGroup group) {
             Objects.requireNonNull(group);
-            if (virtual)
-                throw new IllegalStateException();
-            this.group = group;
+            if (!virtual)
+                this.group = group;
             return this;
         }
 
@@ -1002,37 +993,33 @@ public class Thread implements Runnable {
 
         @Override
         public Builder virtual() {
-            if (group != null)
-                throw new IllegalStateException();
-            this.virtual = true;
+            this.group = null;
             this.scheduler = null;
+            this.virtual = true;
             return this;
         }
 
         @Override
         public Builder virtual(Executor scheduler) {
-            if (group != null)
-                throw new IllegalStateException();
             if (scheduler == null)
                 scheduler = VirtualThread.defaultScheduler();
-            this.virtual = true;
+            this.group = null;
             this.scheduler = scheduler;
+            this.virtual = true;
             return this;
         }
 
         @Override
         public Builder disallowThreadLocals() {
-            if (inheritThreadLocals)
-                throw new IllegalStateException();
             this.disallowThreadLocals = true;
+            this.inheritThreadLocals = false;
             return this;
         }
 
         @Override
         public Builder inheritThreadLocals() {
-            if (disallowThreadLocals)
-                throw new IllegalStateException();
-            this.inheritThreadLocals = true;
+            if (!disallowThreadLocals)
+                this.inheritThreadLocals = true;
             return this;
         }
 

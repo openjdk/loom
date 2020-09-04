@@ -222,15 +222,21 @@ public class BuilderTest {
             LockSupport.unpark(thread2);
         }
     }
+
     public void testThreadGroup2() {
-        ThreadGroup group = new ThreadGroup("groupies");
+        // thread group for virtual threads
+        ThreadGroup vgroup = Thread.builder()
+                .virtual()
+                .task(() -> { })
+                .build().getThreadGroup();
 
-        Thread.Builder builder1 = Thread.builder().virtual();
-        assertThrows(IllegalStateException.class, () -> builder1.group(group));
+        Thread thread = Thread.builder()
+                .virtual()
+                .group(new ThreadGroup("groupies"))
+                .task(() -> { })
+                .build();
 
-        Thread.Builder builder2 = Thread.builder().group(group);
-        assertThrows(IllegalStateException.class, () -> builder2.virtual());
-
+        assertTrue(thread.getThreadGroup() == vgroup);
     }
 
     // Executor
@@ -404,7 +410,6 @@ public class BuilderTest {
         assertTrue(exceptionRef.get() instanceof FooException);
     }
 
-
     static final ThreadLocal<Object> LOCAL = new ThreadLocal<>();
     static final ThreadLocal<Object> INHERITED_LOCAL = new InheritableThreadLocal<>();
 
@@ -430,7 +435,6 @@ public class BuilderTest {
         Thread thread2 = builder.task(task).start();
         thread2.join();
         assertTrue(done.get());
-
 
         done.set(false);
         Thread thread3 = builder.factory().newThread(task);
@@ -514,7 +518,6 @@ public class BuilderTest {
         thread2.join();
         assertTrue(done.get());
 
-
         done.set(false);
         Thread thread3 = builder.factory().newThread(task);
         thread3.start();
@@ -543,7 +546,6 @@ public class BuilderTest {
         thread2.join();
         assertTrue(done.get());
 
-
         done.set(false);
         Thread thread3 = builder.factory().newThread(task);
         thread3.start();
@@ -557,17 +559,37 @@ public class BuilderTest {
     }
 
     public void testInheritedThreadLocals2() throws Exception {
-        Thread.Builder builder = Thread.builder().virtual().inheritThreadLocals();
-        testInheritedThreadLocals(builder);
+        Thread.Builder builder = Thread.builder()
+                .inheritThreadLocals()
+                .disallowThreadLocals();
+        testNoInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals3() throws Exception {
-        Thread.Builder builder = Thread.builder();
+        Thread.Builder builder = Thread.builder()
+                .disallowThreadLocals()
+                .inheritThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals4() throws Exception {
-        Thread.Builder builder = Thread.builder().virtual();
+        Thread.Builder builder = Thread.builder().virtual().inheritThreadLocals();
+        testInheritedThreadLocals(builder);
+    }
+
+    public void testInheritedThreadLocals5() throws Exception {
+        Thread.Builder builder = Thread.builder()
+                .virtual()
+                .inheritThreadLocals()
+                .disallowThreadLocals();
+        testNoInheritedThreadLocals(builder);
+    }
+
+    public void testInheritedThreadLocals6() throws Exception {
+        Thread.Builder builder = Thread.builder()
+                .virtual()
+                .disallowThreadLocals()
+                .inheritThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
 
