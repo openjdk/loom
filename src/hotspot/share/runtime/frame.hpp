@@ -54,10 +54,11 @@ class frame {
   // Instance variables:
   union {
     intptr_t* _sp; // stack pointer (from Thread::last_Java_sp)
+    size_t _offset_sp; // used by frames in continuation chunks
     struct {
       int _sp;
       int _ref_sp;
-    } _cont_sp;
+    } _cont_sp; // used by frames in continuation arrays
   };
   address   _pc; // program counter (the next instruction after the call)
   mutable CodeBlob* _cb; // CodeBlob that "owns" pc
@@ -104,10 +105,11 @@ class frame {
 
   intptr_t* sp() const           { return _sp; }
   void set_sp( intptr_t* newsp ) { _sp = newsp; }
+  void set_offset_sp( size_t newsp ) { _offset_sp = newsp; }
 
-  int cont_sp()     const { return _cont_sp._sp; }
-  int cont_ref_sp() const { return _cont_sp._ref_sp; }
-  int cont_unextended_sp() const;
+  int cont_sp()      const { return _cont_sp._sp; }
+  int cont_ref_sp()  const { return _cont_sp._ref_sp; }
+  size_t offset_sp() const { return _offset_sp; }
 
   CodeBlob* cb() const           { return _cb; }
   inline CodeBlob* get_cb() const;
@@ -230,6 +232,9 @@ class frame {
   // The frame's original SP, before any extension by an interpreted callee;
   // used for packing debug info into vframeArray objects and vframeArray lookup.
   intptr_t* unextended_sp() const;
+  
+  size_t frame_index() const;
+  void set_frame_index(size_t index);
 
   // returns the stack pointer of the calling frame
   intptr_t* sender_sp() const;

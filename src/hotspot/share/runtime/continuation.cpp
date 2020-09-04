@@ -690,7 +690,8 @@ public:
   static bool is_in_chunk(oop chunk, void* p);
   static bool is_usable_in_chunk(oop chunk, void* p);
   static inline void reset_chunk_counters(oop chunk);
-  oop find_chunk(void* p) const;
+  oop find_chunk(size_t sp_offset, size_t* chunk_offset) const;
+  oop find_chunk_by_address(void* p) const;
 
   template<op_mode mode> const hframe last_frame();
   template<op_mode mode> void set_last_frame(const hframe& f);
@@ -1237,12 +1238,29 @@ inline void ContMirror::reset_chunk_counters(oop chunk) {
   jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
 }
 
-oop ContMirror::find_chunk(void* p) const {
+oop ContMirror::find_chunk_by_address(void* p) const {
   for (oop chunk = tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
     if (is_in_chunk(chunk, p)) {
       assert (is_usable_in_chunk(chunk, p), "");
       return chunk;
     }
+  }
+  return (oop)NULL;
+}
+
+oop ContMirror::find_chunk(size_t sp_offset, size_t* chunk_offset) const {
+  size_t offset = 0;
+  for (oop chunk = tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
+    if (is_empty_chunk(chunk)) continue;
+    const size_t end = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
+    const int chunk_sp = jdk_internal_misc_StackChunk::sp(chunk);
+    size_t offset_in_chunk = sp_offset - offset;
+    if (chunk_sp + offset_in_chunk < end) {
+      // tty->print_cr(">>> find_chunk chunk %p sp_offset: %ld offset: %ld, chunk_sp: %d offset_in_chunk: %ld end: %ld", (oopDesc*)chunk, sp_offset, offset, chunk_sp, offset_in_chunk, end);
+      if (chunk_offset != NULL) *chunk_offset = offset;
+      return chunk;
+    }
+    offset += end - chunk_sp;
   }
   return (oop)NULL;
 }
@@ -4905,10 +4923,12 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
 
 static frame chunk_top_frame_pd(oop chunk, intptr_t* sp, RegisterMap* map);
 
-static frame chunk_top_frame(oop chunk, RegisterMap* map) {
+static frame chunk_top_frame(oop chunk, RegisterMap* map, size_t offset, size_t index) {
   intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
-  // tty->print_cr(">>> chunk_top_frame usp: %p", sp);
-  return chunk_top_frame_pd(chunk, sp, map);
+  frame f = chunk_top_frame_pd(chunk, sp, map);
+  f.set_offset_sp(offset);
+  f.set_frame_index(index);
+  return f;
 }
 
 static frame continuation_body_top_frame(ContMirror& cont, RegisterMap* map) {
@@ -4929,7 +4949,7 @@ static frame continuation_top_frame(oop contOop, RegisterMap* map) {
   for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
     if (!ContMirror::is_empty_chunk(chunk)) {
       map->set_in_cont(true, true);
-      return chunk_top_frame(chunk, map);
+      return chunk_top_frame(chunk, map, 0, 0);
     }
   }
 
@@ -5000,28 +5020,44 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
   assert (map->in_cont(), "");
   ContMirror cont(map);
 
-  oop chunk = cont.find_chunk(f.unextended_sp());
+  assert (!f.is_empty(), "");
+
   bool from_chunk = false;
-  if (chunk != (oop)NULL) {
+  if (map->in_chunk()) {
     from_chunk = true;
-    // we add to the pointer instead of subtracting from the bounds
-    if (ContMirror::is_in_chunk(chunk, f.unextended_sp() + f.cb()->frame_size() + jdk_internal_misc_StackChunk::argsize(chunk) + frame_metadata)) {
-      map->set_in_cont(false, false); // to prevent infinite recursion
-      frame sender = f.sender(map);
-      map->set_in_cont(true, true);
-      // tty->print_cr(">>> sender_for_frame usp: %p", sender.unextended_sp());
+    
+    size_t frame_index = f.frame_index();
+    size_t chunk_offset;
+    oop chunk = cont.find_chunk(f.offset_sp(), &chunk_offset);
+    assert (!ContMirror::is_empty_chunk(chunk), "");
+    assert (chunk != (oop)NULL, "");
+    intptr_t* chunk_sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
+    intptr_t* sp = chunk_sp + (f.offset_sp() - chunk_offset);
+
+    frame f = sp_to_frame(sp);
+    if (ContMirror::is_in_chunk(chunk, sp + f.cb()->frame_size() + jdk_internal_misc_StackChunk::argsize(chunk) + frame_metadata)) {
+      frame sender = sp_to_frame(sp + f.cb()->frame_size());
+
       assert (ContMirror::is_usable_in_chunk(chunk, sender.unextended_sp()), "");
+      sender.set_offset_sp(chunk_offset + (sender.sp() - chunk_sp));
+      sender.set_frame_index(frame_index + 1);
+      if (map->update_map()) {
+        frame::update_map_with_saved_link(map, (intptr_t**)(intptr_t)(-2 * BytesPerWord)); // for chunk frames, we store offset TODO PD
+      }
       return sender;
     }
+    const size_t end = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
+    chunk_offset += end - jdk_internal_misc_StackChunk::sp(chunk);
     chunk = jdk_internal_misc_StackChunk::parent(chunk);
     if (chunk != (oop)NULL) {
       assert (!ContMirror::is_empty_chunk(chunk), "");
-      return chunk_top_frame(chunk, map);
+      return chunk_top_frame(chunk, map, chunk_offset, frame_index + 1);
     }
     assert (map->in_cont(), "");
     if (map->in_chunk()) map->set_in_cont(true, false);
-    assert (!map->in_chunk(), "");
   }
+
+  assert (!map->in_chunk(), "");
 
   hframe sender = from_chunk ? cont.last_frame<mode_slow>()
                              : cont.from_frame(f).sender<mode_slow>(cont);
@@ -5158,16 +5194,12 @@ address Continuation::oop_address(objArrayOop ref_stack, int ref_sp, int index) 
 bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
   ContMirror cont(map);
 
-  oop chunk = cont.find_chunk(addr);
+  oop chunk = cont.find_chunk_by_address(addr);
   assert (((intptr_t**)addr == Frame::map_link_address(map)) || (map->in_chunk() == (chunk != (oop)NULL)), "map->in_chunk(): %d", map->in_chunk());
   return (chunk != (oop)NULL) ? ContMirror::is_usable_in_chunk(chunk, addr)
                               : (cont.is_in_stack(addr) || cont.is_in_ref_stack(addr) 
                                  || (intptr_t**)addr == java_lang_Continuation::raw_fp_address(cont.mirror())); // TODO PD
 }
-
-// address Continuation::usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes) {
-//   return usp_offset_to_location(fr, map, usp_offset_in_bytes, find_oop_in_compiled_frame(fr, map, usp_offset_in_bytes) >= 0);
-// }
 
 // if oop, it is narrow iff UseCompressedOops
 address Continuation::usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes, bool is_oop) {
@@ -5176,9 +5208,13 @@ address Continuation::usp_offset_to_location(const frame& fr, const RegisterMap*
 
   assert(map->in_cont(), "");
 
-  assert (map->in_chunk() == (cont.find_chunk(fr.unextended_sp()) != (oop)NULL), "");
-  if (cont.find_chunk(fr.unextended_sp()) != (oop)NULL) {
-    return (address)fr.unextended_sp() + usp_offset_in_bytes;
+  if (map->in_chunk()) {
+    size_t chunk_offset;
+    oop chunk = cont.find_chunk(fr.offset_sp(), &chunk_offset);
+    assert (chunk != (oop)NULL, "");
+    size_t offset_in_chunk = jdk_internal_misc_StackChunk::sp(chunk) + (fr.offset_sp() - chunk_offset);
+    intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + offset_in_chunk;
+    return (address)sp + usp_offset_in_bytes;
   }
 
   assert(!map->in_chunk(), "fr.unextended_sp: " INTPTR_FORMAT, p2i(fr.unextended_sp()));
@@ -5200,8 +5236,8 @@ int Continuation::usp_offset_to_index(const frame& fr, const RegisterMap* map, c
   assert (fr.is_compiled_frame() || is_stub(fr.cb()), "");
   ContMirror cont(map);
 
-  assert (map->in_chunk() == (cont.find_chunk(fr.unextended_sp()) != (oop)NULL), "");
-  if (cont.find_chunk(fr.unextended_sp()) != (oop)NULL) {
+  if (map->in_chunk()) {
+    assert (cont.find_chunk(fr.offset_sp(), NULL) != (oop)NULL, "");
     return usp_offset_in_bytes;
   }
 
@@ -5226,22 +5262,6 @@ int Continuation::usp_offset_to_index(const frame& fr, const RegisterMap* map, c
   return index;
 }
 
-// address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg) {
-//   return reg_to_location(fr, map, reg, find_oop_in_compiled_frame(fr, map, reg) >= 0);
-// }
-
-// address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop) {
-//   assert (map != NULL, "");
-//   oop cont;
-//   assert (map->in_cont(), "");
-//   if (map->in_cont()) {
-//     cont = map->cont();
-//   } else {
-//     cont = get_continutation_for_frame(map->thread(), fr);
-//   }
-//   return reg_to_location(cont, fr, map, reg, is_oop);
-// }
-
 address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop) {
   assert (map != NULL, "");
   assert (fr.is_compiled_frame(), "");
@@ -5255,9 +5275,15 @@ address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, V
 
   ContMirror cont(map);
 
-  assert (map->in_chunk() == (cont.find_chunk(fr.unextended_sp()) != (oop)NULL), "");
-  if (cont.find_chunk(fr.unextended_sp()) != (oop)NULL) {
-    return map->location(reg);
+  if (map->in_chunk()) {
+    intptr_t usp_offset_in_bytes = (intptr_t)map->location(reg); // see usp_offset_to_index for the chunk case
+    
+    size_t chunk_offset;
+    oop chunk = cont.find_chunk(fr.offset_sp(), &chunk_offset);
+    assert (chunk != (oop)NULL, "");
+    size_t offset_in_chunk = jdk_internal_misc_StackChunk::sp(chunk) + (fr.offset_sp() - chunk_offset);
+    intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + offset_in_chunk;
+    return (address)sp + usp_offset_in_bytes;
   }
 
   hframe hf = cont.from_frame(fr);

@@ -900,9 +900,8 @@ static frame chunk_top_frame_pd(oop chunk, intptr_t* sp, RegisterMap* map) {
   intptr_t** fp_address = (intptr_t**)(sp - 2);
   intptr_t* fp = *fp_address;
   if (map->update_map()) {
-    frame::update_map_with_saved_link(map, fp_address);
+    frame::update_map_with_saved_link(map, (intptr_t**)(intptr_t)(-2 * BytesPerWord)); // for chunk frames, we store offset
   }
-
   return frame(sp, sp, fp, pc, ContinuationCodeBlobLookup::find_blob(pc), NULL, true);
 }
 

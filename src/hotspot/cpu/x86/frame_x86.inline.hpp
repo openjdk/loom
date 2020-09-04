@@ -225,6 +225,10 @@ inline intptr_t* frame::link() const              { return (intptr_t*) *(intptr_
 
 inline intptr_t* frame::unextended_sp() const     { return _unextended_sp; }
 
+inline size_t frame::frame_index() const          { return _frame_index; }
+
+inline void frame::set_frame_index(size_t index)  { _frame_index = index; }
+
 inline intptr_t* frame::real_fp() const {
   if (_cb != NULL) {
     // use the frame size if valid
