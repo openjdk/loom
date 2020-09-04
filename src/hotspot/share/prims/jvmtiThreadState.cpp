@@ -197,7 +197,6 @@ JvmtiVTMTDisabler::disable_VTMT() {
   ThreadBlockInVM tbivm(thread);
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  assert(_VTMT_disable_count >= 0, "VTMT sanity check");
   _VTMT_disable_count++;
 
   // block while some transitions are in progress
