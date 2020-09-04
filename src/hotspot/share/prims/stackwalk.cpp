@@ -98,12 +98,12 @@ JavaFrameStream::JavaFrameStream(JavaThread* thread, int mode, Handle cont_scope
 
 LiveFrameStream::LiveFrameStream(JavaThread* thread, RegisterMap* rm, Handle cont_scope, Handle cont)
    : BaseFrameStream(thread, cont), _cont_scope(cont_scope),
-    _cont(cont.not_null() ? cont : Handle(thread, thread->last_continuation())) {
+    _cont(cont.not_null() ? cont : Handle(thread, thread->last_continuation()->cont_oop())) {
      
     _map = rm;
     if (cont.is_null()) {
       _jvf  = thread->last_java_vframe(rm);
-      // _cont = Handle(thread, thread->last_continuation());
+      // _cont = Handle(thread, thread->last_continuation()->cont_oop());
     } else {
       _jvf  = Continuation::has_last_Java_frame(cont) ? Continuation::last_java_vframe(cont, rm) : NULL;
       // _cont = cont;

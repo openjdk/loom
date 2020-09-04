@@ -66,6 +66,7 @@ public class StackTraces {
         });
     }
 
+    @Test(enabled = false)
     public void testStackWalker2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             var options = Set.of(RETAIN_CLASS_REFERENCE);

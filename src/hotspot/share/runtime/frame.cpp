@@ -69,8 +69,8 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool walk_cont, bo
 
   _on_hstack = false;
   _in_chunk = false;
-  if (walk_cont && thread != NULL && thread->cont_entry() != NULL) {
-      _cont = Handle(Thread::current(), thread->last_continuation());
+  if (walk_cont && thread != NULL && thread->last_continuation() != NULL) {
+      _cont = Handle(Thread::current(), thread->last_continuation()->cont_oop());
   }
 
 #ifndef PRODUCT
@@ -143,6 +143,7 @@ void RegisterMap::set_cont(oop cont) {
   assert (_walk_cont, "");
   assert (oopDesc::is_oop_or_null(cont), "");
   assert (_cont.not_null(), "");
+  log_trace(jvmcont)("set_cont " INTPTR_FORMAT, p2i((oopDesc*)cont));
   *(_cont.raw_value()) = cont; // reuse handle. see comment above in the constructor
 }
 
@@ -199,9 +200,6 @@ void RegisterMap::print() const {
 // is deoptimization. It likely no one else should ever use it.
 
 address frame::raw_pc() const {
-  // if (Continuation::is_continuation_entry_frame(*this)) {
-  //   return StubRoutines::cont_returnBarrier();
-  // }
   if (is_deoptimized_frame()) {
     CompiledMethod* cm = cb()->as_compiled_method_or_null();
     if (cm->is_method_handle_return(pc()))

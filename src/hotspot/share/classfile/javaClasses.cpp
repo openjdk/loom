@@ -2657,7 +2657,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
   bool skip_fillInStackTrace_check = false;
   bool skip_throwableInit_check = false;
   bool skip_hidden = !ShowHiddenFrames;
-  Handle cont_h(THREAD, thread->last_continuation());
+  Handle cont_h(THREAD, thread->last_continuation()->cont_oop());
   for (frame fr = thread->last_frame(); max_depth == 0 || max_depth != total_count;) {
     Method* method = NULL;
     int bci = 0;
@@ -2716,8 +2716,10 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, Handle contScope
       }
     }
 #ifdef ASSERT
-    assert(st.method() == method && st.bci() == bci, "Wrong stack trace");
-    st.next();
+    if (!st.at_end()) { // TODO LOOM remove once we show only vthread trace
+      assert(st.method() == method && st.bci() == bci, "Wrong stack trace");
+      st.next();
+    }
 #endif
 
     // the format of the stacktrace will be:

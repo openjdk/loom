@@ -89,6 +89,7 @@ public:
   static void notify_deopt(JavaThread* thread, intptr_t* sp);
 
   static oop  get_continutation_for_frame(JavaThread* thread, const frame& f);
+  static ContinuationEntry* last_continuation(JavaThread* thread, oop cont_scope);
   static bool is_mounted(JavaThread* thread, oop cont_scope);
   static bool is_continuation_enterSpecial(const frame& f, const RegisterMap* map);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap* map);
@@ -166,8 +167,6 @@ public:
 #endif
 };
 
-void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls);
-
 // Metadata stored in the continuation entry frame
 class ContinuationEntry {
 public:
@@ -206,6 +205,7 @@ public:
   void set_parent_cont_fastpath(intptr_t* x) { _parent_cont_fastpath = x; }
 
   frame to_frame();
+  void update_register_map(RegisterMap* map);
 
   intptr_t* bottom_sender_sp() {
     intptr_t* sp = entry_sp() - argsize();
@@ -219,6 +219,8 @@ public:
     oop snapshot = _cont;
     return NativeAccess<>::oop_load(&snapshot);
   }
+
+  oop cont_oop() { return this != NULL ? continuation() : (oop)NULL; }
   oop cont_raw() { return _cont; }
   oop chunk()        { return _chunk; }
   void set_continuation(oop c) { _cont = c;  }
@@ -233,4 +235,7 @@ public:
   static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
   static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
 };
+
+void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls);
+
 #endif // SHARE_VM_RUNTIME_CONTINUATION_HPP

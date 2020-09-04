@@ -49,10 +49,10 @@ inline void vframeStreamCommon::next() {
   do {
     bool cont_entry = false;
     oop cont = _cont();
-    if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
+    if (cont != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame, &_reg_map)) {
       cont_entry = true;
       oop scope = java_lang_Continuation::scope(cont);
-      if (_continuation_scope.not_null() && (scope == _continuation_scope())) {
+      if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
         _mode = at_end_mode;
         break;
       }
@@ -69,7 +69,7 @@ inline void vframeStreamCommon::next() {
   } while (!fill_from_frame());
 }
 
-inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stub)
+inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stub, bool vthread_carrier)
   : vframeStreamCommon(RegisterMap(thread, true, true)) {
   _stop_at_java_call_stub = stop_at_java_call_stub;
 
@@ -78,10 +78,10 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
     return;
   }
 
-  _frame = _thread->last_frame();
-  oop cont = _thread->last_continuation();
+  _frame = vthread_carrier ? _thread->vthread_carrier_last_frame(&_reg_map) : _thread->last_frame();
+  oop cont = _thread->last_continuation()->cont_oop();
   while (!fill_from_frame()) {
-    if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
+    if (cont != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame, &_reg_map)) {
       cont = java_lang_Continuation::parent(cont);
     }
     _frame = _frame.sender(&_reg_map);

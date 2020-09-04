@@ -1390,8 +1390,8 @@ public:
   inline volatile void* get_polling_page();
 
   // Continuation support
-  oop last_continuation() { return _cont_entry != NULL ? _cont_entry->continuation() : (oop)NULL; }
-  ContinuationEntry* cont_entry() { return _cont_entry; }
+  ContinuationEntry* last_continuation() { return _cont_entry; }
+  ContinuationEntry* last_continuation(oop cont_scope) { return Continuation::last_continuation(this, cont_scope); }
   bool cont_yield() { return _cont_yield; }
   void set_cont_yield(bool x) { _cont_yield = x; }
   void set_cont_fastpath(intptr_t* x) { _cont_fastpath = x; }
@@ -1998,7 +1998,12 @@ public:
     _anchor.make_walkable(this);
     return pd_last_frame();
   }
-  javaVFrame* last_java_vframe(RegisterMap* reg_map);
+  javaVFrame* last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(last_frame(), reg_map); }
+
+  frame vthread_carrier_last_frame(RegisterMap* reg_map);
+  frame vthread_carrier_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(vthread_carrier_last_frame(reg_map), reg_map); }
+
+  javaVFrame* last_java_vframe(const frame f, RegisterMap* reg_map);
   
   // Returns method at 'depth' java or native frames down the stack
   // Used for security checks

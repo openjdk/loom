@@ -164,7 +164,7 @@ inline void JfrVframeStream::seek_stable_frame() {
 }
 
 JfrVframeStream::JfrVframeStream(JavaThread* jt, const frame& fr, bool async_mode) : vframeStreamCommon(RegisterMap(jt, false, true)),
-_continuation(jt->last_continuation()), _continuation_scope(NULL), _continuation_scope_end_condition(false), _async_mode(async_mode) {
+_continuation(jt->last_continuation()->cont_oop()), _continuation_scope(NULL), _continuation_scope_end_condition(false), _async_mode(async_mode) {
   _stop_at_java_call_stub = false;
   _frame = fr;
   seek_stable_frame();
@@ -179,7 +179,7 @@ _continuation(jt->last_continuation()), _continuation_scope(NULL), _continuation
 }
 
 inline bool JfrVframeStream::at_continuation_entry_frame() const {
-  return _continuation != (oop)NULL && Continuation::is_continuation_entry_frame(_frame, &_reg_map);
+  return _continuation != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame, &_reg_map);
 }
 
 inline void JfrVframeStream::set_parent_continuation() {

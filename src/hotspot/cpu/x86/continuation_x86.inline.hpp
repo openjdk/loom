@@ -70,6 +70,11 @@ frame ContinuationEntry::to_frame() {
   return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);
 }
 
+void ContinuationEntry::update_register_map(RegisterMap* map) {
+  intptr_t** fp = (intptr_t**)(bottom_sender_sp() - frame::sender_sp_offset);
+  frame::update_map_with_saved_link(map, fp);
+}
+
 static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
   JavaFrameAnchor* anchor = thread->frame_anchor();
   anchor->set_last_Java_sp(cont->entry_sp());
@@ -681,12 +686,11 @@ void ContinuationHelper::update_register_map(RegisterMap* map, const hframe& cal
   frame::update_map_with_saved_link(map, reinterpret_cast<intptr_t**>(link_index0));
 }
 
-void ContinuationHelper::update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map) {
+void ContinuationHelper::update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map) { // TODO NOT PD
   // we need to register the link address for the entry frame
   if (cont.entry() != NULL) {
-    intptr_t** fp = (intptr_t**)(cont.entry()->bottom_sender_sp() - frame::sender_sp_offset);
-    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: frame::update_map_with_saved_link: " INTPTR_FORMAT, p2i(fp));
-    frame::update_map_with_saved_link(map, fp);
+    cont.entry()->update_register_map(map);
+    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame");
   } else {
     log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: clearing register map.");
     map->clear();

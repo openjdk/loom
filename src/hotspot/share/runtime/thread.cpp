@@ -3461,9 +3461,16 @@ void JavaThread::trace_stack() {
 #endif // PRODUCT
 
 
-javaVFrame* JavaThread::last_java_vframe(RegisterMap *reg_map) {
+frame JavaThread::vthread_carrier_last_frame(RegisterMap* reg_map) {
+  ContinuationEntry* cont = last_continuation(java_lang_VirtualThread::vthread_scope());
+  guarantee (cont != NULL, "Not a carrier thread");
+  frame f = cont->to_frame();
+  cont->update_register_map(reg_map);
+  return f.sender(reg_map);
+}
+
+javaVFrame* JavaThread::last_java_vframe(const frame f, RegisterMap *reg_map) {
   assert(reg_map != NULL, "a map must be given");
-  frame f = last_frame();
   for (vframe* vf = vframe::new_vframe(&f, reg_map, this); vf; vf = vf->sender()) {
     if (vf->is_java_frame()) return javaVFrame::cast(vf);
   }
