@@ -138,7 +138,7 @@ void LiveFrameStream::next() {
     oop scope = java_lang_Continuation::scope(cont);
     *(_cont.raw_value()) = java_lang_Continuation::parent(cont);
     
-    if (_cont_scope.not_null() && (scope == _cont_scope())) {
+    if ((_cont_scope.not_null() && scope == _cont_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
       _jvf = NULL;
       return;
     }
