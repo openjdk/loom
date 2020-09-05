@@ -692,6 +692,7 @@ public:
   static inline void reset_chunk_counters(oop chunk);
   oop find_chunk(size_t sp_offset, size_t* chunk_offset) const;
   oop find_chunk_by_address(void* p) const;
+  address chunk_offset_to_location(const frame& fr, const int usp_offset_in_bytes) const;
 
   template<op_mode mode> const hframe last_frame();
   template<op_mode mode> void set_last_frame(const hframe& f);
@@ -1263,6 +1264,15 @@ oop ContMirror::find_chunk(size_t sp_offset, size_t* chunk_offset) const {
     offset += end - chunk_sp;
   }
   return (oop)NULL;
+}
+
+address ContMirror::chunk_offset_to_location(const frame& fr, const int usp_offset_in_bytes) const {
+    size_t chunk_offset;
+    oop chunk = find_chunk(fr.offset_sp(), &chunk_offset);
+    assert (chunk != (oop)NULL, "");
+    size_t offset_in_chunk = jdk_internal_misc_StackChunk::sp(chunk) + (fr.offset_sp() - chunk_offset);
+    intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + offset_in_chunk;
+    return (address)sp + usp_offset_in_bytes;
 }
 
 template<typename Event> void ContMirror::post_jfr_event(Event* e, JavaThread* jt) {
@@ -5203,37 +5213,6 @@ bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
                                  || (intptr_t**)addr == java_lang_Continuation::raw_fp_address(cont.mirror())); // TODO PD
 }
 
-// if oop, it is narrow iff UseCompressedOops
-address Continuation::usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes, bool is_oop) {
-  assert (fr.is_compiled_frame(), "");
-  ContMirror cont(map);
-
-  assert(map->in_cont(), "");
-
-  if (map->in_chunk()) {
-    size_t chunk_offset;
-    oop chunk = cont.find_chunk(fr.offset_sp(), &chunk_offset);
-    assert (chunk != (oop)NULL, "");
-    size_t offset_in_chunk = jdk_internal_misc_StackChunk::sp(chunk) + (fr.offset_sp() - chunk_offset);
-    intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + offset_in_chunk;
-    return (address)sp + usp_offset_in_bytes;
-  }
-
-  assert(!map->in_chunk(), "fr.unextended_sp: " INTPTR_FORMAT, p2i(fr.unextended_sp()));
-
-  hframe hf = cont.from_frame(fr);
-
-  intptr_t* hsp = cont.stack_address(hf.sp());
-  address loc = (address)hsp + usp_offset_in_bytes;
-
-  log_develop_trace(jvmcont)("usp_offset_to_location oop_address: stack index: %d length: %d", cont.stack_index(loc), cont.stack_length());
-
-  int oop_offset = find_oop_in_compiled_frame(fr, map, usp_offset_in_bytes);
-  assert (is_oop == (oop_offset >= 0), "must be");
-  address res = is_oop ? oop_address(cont.refStack(), cont.refSP(), hf.ref_sp() + oop_offset) : loc;
-  return res;
-}
-
 int Continuation::usp_offset_to_index(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes) {
   assert (fr.is_compiled_frame() || is_stub(fr.cb()), "");
   ContMirror cont(map);
@@ -5279,13 +5258,7 @@ address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, V
 
   if (map->in_chunk()) {
     intptr_t usp_offset_in_bytes = (intptr_t)map->location(reg); // see usp_offset_to_index for the chunk case
-    
-    size_t chunk_offset;
-    oop chunk = cont.find_chunk(fr.offset_sp(), &chunk_offset);
-    assert (chunk != (oop)NULL, "");
-    size_t offset_in_chunk = jdk_internal_misc_StackChunk::sp(chunk) + (fr.offset_sp() - chunk_offset);
-    intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + offset_in_chunk;
-    return (address)sp + usp_offset_in_bytes;
+    return cont.chunk_offset_to_location(fr, (int)usp_offset_in_bytes);
   }
 
   hframe hf = cont.from_frame(fr);
@@ -5310,6 +5283,31 @@ address Continuation::reg_to_location(const frame& fr, const RegisterMap* map, V
         res = loc;
     }
   }
+  return res;
+}
+
+address Continuation::usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes, bool is_oop) {
+  assert (fr.is_compiled_frame(), "");
+  ContMirror cont(map);
+
+  assert(map->in_cont(), "");
+
+  if (map->in_chunk()) {
+    return cont.chunk_offset_to_location(fr, usp_offset_in_bytes);
+  }
+
+  assert(!map->in_chunk(), "fr.unextended_sp: " INTPTR_FORMAT, p2i(fr.unextended_sp()));
+
+  hframe hf = cont.from_frame(fr);
+
+  intptr_t* hsp = cont.stack_address(hf.sp());
+  address loc = (address)hsp + usp_offset_in_bytes;
+
+  log_develop_trace(jvmcont)("usp_offset_to_location oop_address: stack index: %d length: %d", cont.stack_index(loc), cont.stack_length());
+
+  int oop_offset = find_oop_in_compiled_frame(fr, map, usp_offset_in_bytes);
+  assert (is_oop == (oop_offset >= 0), "must be");
+  address res = is_oop ? oop_address(cont.refStack(), cont.refSP(), hf.ref_sp() + oop_offset) : loc;
   return res;
 }
 
