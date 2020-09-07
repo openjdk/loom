@@ -28,6 +28,7 @@ package java.net;
 import sun.security.util.SecurityConstants;
 
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -583,6 +584,11 @@ public class Socket implements java.io.Closeable {
     /**
      * Connects this socket to the server.
      *
+     * <p> For the system-default socket implementation at least, if a
+     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code connect}
+     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
+     * and {@link SocketException} is thrown with the interrupt status set.
+     *
      * @param   endpoint the {@code SocketAddress}
      * @throws  IOException if an error occurs during the connection
      * @throws  java.nio.channels.IllegalBlockingModeException
@@ -601,6 +607,11 @@ public class Socket implements java.io.Closeable {
      * Connects this socket to the server with a specified timeout value.
      * A timeout of zero is interpreted as an infinite timeout. The connection
      * will then block until established or an error occurs.
+     *
+     * <p> For the system-default socket implementation at least, if a
+     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code connect}
+     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
+     * and {@link SocketException} is thrown with the interrupt status set.
      *
      * @param   endpoint the {@code SocketAddress}
      * @param   timeout  the timeout value to be used in milliseconds.
@@ -645,7 +656,18 @@ public class Socket implements java.io.Closeable {
         }
         if (!created)
             createImpl(true);
-        impl.connect(epoint, timeout);
+        try {
+            impl.connect(epoint, timeout);
+        } catch (SocketTimeoutException e) {
+            throw e;
+        } catch (InterruptedIOException e) {
+            Thread thread = Thread.currentThread();
+            if (thread.isVirtual() && thread.isInterrupted()) {
+                close();
+                throw new SocketException("Closed by interrupt");
+            }
+            throw e;
+        }
         connected = true;
         /*
          * If the socket was not bound before the connect, it is now because
@@ -926,9 +948,9 @@ public class Socket implements java.io.Closeable {
      * </ul>
      *
      * <p> For the system-default socket implementation at least, if a
-     * {@linkplain Thread#isVirtual() virtual thread} blocked in a
-     * {@code read} method is {@linkplain Thread#interrupt() interrupted} then
-     * {@link SocketException} is thrown with the interrupt status set
+     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code read}
+     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
+     * and {@link SocketException} is thrown with the interrupt status set.
      *
      * <p> Closing the returned {@link java.io.InputStream InputStream}
      * will close the associated socket.
@@ -982,7 +1004,18 @@ public class Socket implements java.io.Closeable {
         }
         @Override
         public int read(byte b[], int off, int len) throws IOException {
-            return in.read(b, off, len);
+            try {
+                return in.read(b, off, len);
+            } catch (SocketTimeoutException e) {
+                throw e;
+            } catch (InterruptedIOException e) {
+                Thread thread = Thread.currentThread();
+                if (thread.isVirtual() && thread.isInterrupted()) {
+                    close();
+                    throw new SocketException("Closed by interrupt");
+                }
+                throw e;
+            }
         }
         @Override
         public int available() throws IOException {
@@ -1004,9 +1037,9 @@ public class Socket implements java.io.Closeable {
      * java.nio.channels.IllegalBlockingModeException}.
      *
      * <p> For the system-default socket implementation at least, if a
-     * {@linkplain Thread#isVirtual() virtual thread} blocked in a
-     * {@code write} method is {@linkplain Thread#interrupt() interrupted}
-     * then {@link SocketException} is thrown with the interrupt status set.
+     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code write}
+     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
+     * and {@link SocketException} is thrown with the interrupt status set.
      *
      * <p> Closing the returned {@link java.io.OutputStream OutputStream}
      * will close the associated socket.
@@ -1056,7 +1089,16 @@ public class Socket implements java.io.Closeable {
         }
         @Override
         public void write(byte b[], int off, int len) throws IOException {
-            out.write(b, off, len);
+            try {
+                out.write(b, off, len);
+            } catch (InterruptedIOException iioe) {
+                Thread thread = Thread.currentThread();
+                if (thread.isVirtual() && thread.isInterrupted()) {
+                    close();
+                    throw new SocketException("Closed by interrupt");
+                }
+                throw iioe;
+            }
         }
         @Override
         public void close() throws IOException {

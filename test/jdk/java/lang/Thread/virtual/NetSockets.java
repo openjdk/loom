@@ -228,6 +228,7 @@ public class NetSockets {
                     throw new RuntimeException("read returned " + n);
                 } catch (SocketException expected) {
                     assertTrue(Thread.interrupted());
+                    assertTrue(s.isClosed());
                 }
             }
         });
@@ -268,6 +269,7 @@ public class NetSockets {
                     }
                 } catch (SocketException expected) {
                     assertTrue(Thread.interrupted());
+                    assertTrue(s.isClosed());
                 }
             }
         });
@@ -376,6 +378,7 @@ public class NetSockets {
                     throw new RuntimeException("connection accepted???");
                 } catch (SocketException expected) {
                     assertTrue(Thread.interrupted());
+                    assertTrue(listener.isClosed());
                 }
             }
         });
@@ -544,6 +547,7 @@ public class NetSockets {
                     assertTrue(false);
                 } catch (SocketException expected) {
                     assertTrue(Thread.interrupted());
+                    assertTrue(s.isClosed());
                 }
             }
         });

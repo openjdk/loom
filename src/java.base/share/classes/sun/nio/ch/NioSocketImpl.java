@@ -28,6 +28,7 @@ package sun.nio.ch;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.lang.ref.Cleaner.Cleanable;
@@ -183,9 +184,8 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                     } else {
                         VirtualThreads.park(nanos);
                     }
-                    // throw SocketException with interrupt status set for now
                     if (t.isInterrupted()) {
-                        throw new SocketException("I/O operation interrupted");
+                        throw new InterruptedIOException();
                     }
                 } finally {
                     Poller.deregister(fdVal, event);
@@ -321,7 +321,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                 }
             }
             return n;
-        } catch (SocketTimeoutException e) {
+        } catch (InterruptedIOException e) {
             throw e;
         } catch (ConnectionResetException e) {
             connectionReset = true;
@@ -422,6 +422,8 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                 n = tryWrite(fd, b, off, len);
             }
             return n;
+        } catch (InterruptedIOException e) {
+            throw e;
         } catch (IOException ioe) {
             throw new SocketException(ioe.getMessage());
         } finally {
@@ -614,7 +616,11 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             }
         } catch (IOException ioe) {
             close();
-            throw SocketExceptions.of(ioe, isa);
+            if (ioe instanceof InterruptedIOException) {
+                throw ioe;
+            } else {
+                throw SocketExceptions.of(ioe, isa);
+            }
         }
     }
 

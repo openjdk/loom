@@ -27,6 +27,7 @@ package java.net;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.channels.ServerSocketChannel;
 import java.util.Objects;
 import java.util.Set;
@@ -501,9 +502,9 @@ public class ServerSocket implements java.io.Closeable {
      * it. The method blocks until a connection is made.
      *
      * <p> For the system-default socket implementation at least, if a
-     * {@linkplain Thread#isVirtual() virtual thread} blocked in this
-     * method is {@linkplain Thread#interrupt() interrupted} then {@link
-     * SocketException} is thrown with the interrupt status set.
+     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code accept}
+     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
+     * and {@link SocketException} is thrown with the interrupt status set.
      *
      * <p> A new Socket {@code s} is created and, if there
      * is a security manager,
@@ -685,7 +686,18 @@ public class ServerSocket implements java.io.Closeable {
         assert !(si instanceof DelegatingSocketImpl);
 
         // accept a connection
-        impl.accept(si);
+        try {
+            impl.accept(si);
+        } catch (SocketTimeoutException e) {
+            throw e;
+        } catch (InterruptedIOException e) {
+            Thread thread = Thread.currentThread();
+            if (thread.isVirtual() && thread.isInterrupted()) {
+                close();
+                throw new SocketException("Closed by interrupt");
+            }
+            throw e;
+        }
 
         // check permission, close SocketImpl/connection if denied
         SecurityManager sm = System.getSecurityManager();

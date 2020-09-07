@@ -27,6 +27,7 @@ package sun.nio.ch;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.UncheckedIOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -487,9 +488,8 @@ class DatagramChannelImpl
                     } else {
                         VirtualThreads.park(nanos);
                     }
-                    // throw SocketException with interrupt status set for now
                     if (!interruptible && thread.isInterrupted()) {
-                        throw new SocketException("I/O operation interrupted");
+                        throw new InterruptedIOException();
                     }
                 } finally {
                     Poller.deregister(getFDVal(), event);
