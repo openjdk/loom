@@ -669,7 +669,7 @@ public final class ChunkedInputStream extends InputStream implements Hurryable {
             }
             return chunkData[chunkPos++] & 0xff;
         } finally {
-            lock.unlock();
+            unlock();
         }
     }
 
