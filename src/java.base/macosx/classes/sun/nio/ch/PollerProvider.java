@@ -30,10 +30,10 @@ class PollerProvider {
     private PollerProvider() { }
 
     static Poller readPoller() throws IOException {
-        return new KQueuePoller(KQueue.EVFILT_READ);
+        return new KQueuePoller(true);
     }
 
     static Poller writePoller() throws IOException {
-        return new KQueuePoller(KQueue.EVFILT_WRITE);
+        return new KQueuePoller(false);
     }
 }

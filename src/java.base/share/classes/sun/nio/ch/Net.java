@@ -670,6 +670,11 @@ public class Net {
      */
     static native int sendOOB(FileDescriptor fd, byte data) throws IOException;
 
+    /**
+     * Read and discard urgent data (MSG_OOB) on the socket.
+     */
+    static native boolean discardUrgentData(FileDescriptor fd);
+
 
     // -- Multicast support --
 
@@ -778,6 +783,7 @@ public class Net {
     public static final short POLLHUP;
     public static final short POLLNVAL;
     public static final short POLLCONN;
+    public static final short POLLRDBAND;
 
     static native short pollinValue();
     static native short polloutValue();
@@ -785,6 +791,7 @@ public class Net {
     static native short pollhupValue();
     static native short pollnvalValue();
     static native short pollconnValue();
+    static native short pollrdbandValue();
 
     static {
         IOUtil.load();
@@ -796,6 +803,7 @@ public class Net {
         POLLHUP    = pollhupValue();
         POLLNVAL   = pollnvalValue();
         POLLCONN   = pollconnValue();
+        POLLRDBAND = pollrdbandValue();
     }
 
     static {

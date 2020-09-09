@@ -25,16 +25,11 @@
 package sun.nio.ch;
 
 import java.io.IOException;
-
-import static sun.nio.ch.KQueue.EV_ADD;
-import static sun.nio.ch.KQueue.EV_DELETE;
-import static sun.nio.ch.KQueue.EV_ONESHOT;
-
+import static sun.nio.ch.KQueue.*;
 
 /**
  * Poller implementation based on the kqueue facility.
  */
-
 class KQueuePoller extends Poller {
     private static final int MAX_EVENTS_TO_POLL = 512;
 
@@ -42,23 +37,22 @@ class KQueuePoller extends Poller {
     private final int filter;
     private final long address;
 
-    KQueuePoller(int filter) throws IOException {
+    KQueuePoller(boolean read) throws IOException {
         this.kqfd = KQueue.create();
-        this.filter = filter;
+        this.filter = (read) ? EVFILT_READ : EVFILT_WRITE;
         this.address = KQueue.allocatePollArray(MAX_EVENTS_TO_POLL);
     }
 
     @Override
-    protected void implRegister(int fdVal) {
+    protected void implRegister(int fdVal) throws IOException {
         int err = KQueue.register(kqfd, fdVal, filter, (EV_ADD|EV_ONESHOT));
         if (err != 0)
-            throw new InternalError("kevent failed: " + err);
+            throw new IOException("kevent failed: " + err);
     }
 
     @Override
-    protected boolean implDeregister(int fdVal) {
-        int err = KQueue.register(kqfd, fdVal, filter, EV_DELETE);
-        return (err == 0);
+    protected void implDeregister(int fdVal) {
+        KQueue.register(kqfd, fdVal, filter, EV_DELETE);
     }
 
     @Override

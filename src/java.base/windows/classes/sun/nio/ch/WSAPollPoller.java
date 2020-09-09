@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,7 +31,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
-
 import jdk.internal.misc.Unsafe;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
@@ -44,22 +43,22 @@ import jdk.internal.access.SharedSecrets;
  * established.
  */
 
-class PollPoller extends Poller {
-    private static JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+class WSAPollPoller extends Poller {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final Unsafe UNSAFE = Unsafe.getUnsafe();
-    private static final NativeDispatcher ND = new SocketDispatcher();
     private static final long TEMP_BUF = UNSAFE.allocateMemory(1);
+    private static final NativeDispatcher ND = new SocketDispatcher();
 
     // initial capacity of poll array
     private static final int INITIAL_CAPACITY = 16;
 
     // true if this is a poller for reading (POLLIN), false for writing (POLLOUT)
-    private final boolean reader;
+    private final boolean read;
 
     // poll array, grows as needed
-    private int pollArrayCapacity = INITIAL_CAPACITY;
-    private int pollArraySize;
-    private AllocatedNativeObject pollArray;
+    private long pollArrayAddress;
+    private int pollArrayCapacity;  // allocated
+    private int pollArraySize;      // in use
 
     // maps file descriptor to index in poll array
     private final Map<Integer, Integer> fdToIndex = new HashMap<>();
@@ -87,14 +86,14 @@ class PollPoller extends Poller {
     private final Deque<DeregisterRequest> deregisterQueue = new ArrayDeque<>();
 
     /**
-     * Creates a PollPoller to support reading (POLLIN) or writing (POLLOUT)
+     * Creates a poller to support reading (POLLIN) or writing (POLLOUT)
      * operations.
      */
-    PollPoller(boolean reader) throws IOException {
-        this.reader = reader;
+    WSAPollPoller(boolean read) throws IOException {
+        this.read = read;
 
-        int size = pollArrayCapacity * SIZE_POLLFD;
-        this.pollArray = new AllocatedNativeObject(size, false);
+        this.pollArrayAddress = WSAPoll.allocatePollArray(INITIAL_CAPACITY);
+        this.pollArrayCapacity = INITIAL_CAPACITY;
 
         // wakeup support
         this.pipe = makePipe();
@@ -128,7 +127,7 @@ class PollPoller extends Poller {
      * has removed the file descriptor from the poll array.
      */
     @Override
-    protected boolean implDeregister(int fdVal) {
+    protected void implDeregister(int fdVal) {
         boolean interrupted = false;
         var request = new DeregisterRequest(fdVal);
         synchronized (request) {
@@ -145,7 +144,6 @@ class PollPoller extends Poller {
         if (interrupted) {
             Thread.currentThread().interrupt();
         }
-        return true;
     }
 
     /**
@@ -162,7 +160,7 @@ class PollPoller extends Poller {
                 }
 
                 // poll for wakeup and/or events
-                int numPolled = poll(pollArray.address(), pollArraySize, -1);
+                int numPolled = WSAPoll.poll(pollArrayAddress, pollArraySize, -1);
                 boolean polledWakeup = (getRevents(0) != 0);
                 if (polledWakeup) {
                     numPolled--;
@@ -186,7 +184,7 @@ class PollPoller extends Poller {
         assert Thread.holdsLock(updateLock);
         Integer fd;
         while ((fd = registerQueue.pollFirst()) != null) {
-            short events = (reader) ? Net.POLLIN : Net.POLLOUT;
+            short events = (read) ? Net.POLLIN : Net.POLLOUT;
             int index = add(fd, events);
             fdToIndex.put(fd, index);
         }
@@ -258,7 +256,6 @@ class PollPoller extends Poller {
             putRevents(0, (short) 0);
             wakeupTriggered = false;
         }
-
     }
 
     /**
@@ -304,13 +301,8 @@ class PollPoller extends Poller {
      */
     private void expandIfNeeded() {
         if (pollArraySize == pollArrayCapacity) {
-            int oldSize = pollArrayCapacity * SIZE_POLLFD;
             int newCapacity = pollArrayCapacity + INITIAL_CAPACITY;
-            int newSize = newCapacity * SIZE_POLLFD;
-            AllocatedNativeObject newPollArray = new AllocatedNativeObject(newSize, false);
-            UNSAFE.copyMemory(pollArray.address(), newPollArray.address(), oldSize);
-            pollArray.free();
-            pollArray = newPollArray;
+            pollArrayAddress = WSAPoll.reallocatePollArray(pollArrayAddress, pollArrayCapacity, newCapacity);
             pollArrayCapacity = newCapacity;
         }
     }
@@ -329,52 +321,27 @@ class PollPoller extends Poller {
         }
     }
 
-    /**
-     * typedef struct pollfd {
-     *   SOCKET fd;
-     *   SHORT events;
-     *   SHORT revents;
-     * } WSAPOLLFD;
-     */
-    private static final short SIZE_POLLFD    = 16;
-    private static final short FD_OFFSET      = 0;
-    private static final short EVENTS_OFFSET  = 8;
-    private static final short REVENTS_OFFSET = 10;
-
     private void putDescriptor(int i, int fd) {
-        int offset = SIZE_POLLFD * i + FD_OFFSET;
-        pollArray.putLong(offset, fd);
+        WSAPoll.putDescriptor(pollArrayAddress, i, fd);
     }
 
     private int getDescriptor(int i) {
-        int offset = SIZE_POLLFD * i + FD_OFFSET;
-        return (int) pollArray.getLong(offset);
+        return WSAPoll.getDescriptor(pollArrayAddress, i);
     }
 
     private void putEvents(int i, short events) {
-        int offset = SIZE_POLLFD * i + EVENTS_OFFSET;
-        pollArray.putShort(offset, events);
+        WSAPoll.putEvents(pollArrayAddress, i, events);
     }
 
     private short getEvents(int i) {
-        int offset = SIZE_POLLFD * i + EVENTS_OFFSET;
-        return pollArray.getShort(offset);
+        return WSAPoll.getEvents(pollArrayAddress, i);
     }
 
     private void putRevents(int i, short revents) {
-        int offset = SIZE_POLLFD * i + REVENTS_OFFSET;
-        pollArray.putShort(offset, revents);
+        WSAPoll.putRevents(pollArrayAddress, i, revents);
     }
 
     private short getRevents(int i) {
-        int offset = SIZE_POLLFD * i + REVENTS_OFFSET;
-        return pollArray.getShort(offset);
-    }
-
-    private static native int poll(long pollAddress, int numfds, int timeout)
-        throws IOException;
-
-    static {
-        IOUtil.load();
+        return WSAPoll.getRevents(pollArrayAddress, i);
     }
 }

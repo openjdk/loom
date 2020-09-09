@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,11 +28,11 @@
 #include "jni_util.h"
 #include "jlong.h"
 #include "nio.h"
-#include "sun_nio_ch_PollPoller.h"
+#include "sun_nio_ch_WSAPoll.h"
 
 JNIEXPORT jint JNICALL
-Java_sun_nio_ch_PollPoller_poll(JNIEnv *env, jclass clazz,
-                                jlong address, jint numfds, jint timeout)
+Java_sun_nio_ch_WSAPoll_poll(JNIEnv *env, jclass clazz,
+                             jlong address, jint numfds, jint timeout)
 {
     LPWSAPOLLFD a = (LPWSAPOLLFD) jlong_to_ptr(address);
     int res = WSAPoll(a, numfds, timeout);

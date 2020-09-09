@@ -25,6 +25,7 @@
 
 package sun.nio.ch;
 
+import java.io.FileDescriptor;
 import java.lang.invoke.ConstantBootstraps;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -72,6 +73,10 @@ public final class SelectionKeyImpl
     private void ensureValid() {
         if (!isValid())
             throw new CancelledKeyException();
+    }
+
+    FileDescriptor getFD() {
+        return channel.getFD();
     }
 
     int getFDVal() {

@@ -35,7 +35,7 @@ import java.security.PrivilegedAction;
 public class DefaultSelectorProvider {
     private static final SelectorProviderImpl INSTANCE;
     static {
-        PrivilegedAction<SelectorProviderImpl> pa = WindowsSelectorProvider::new;
+        PrivilegedAction<SelectorProviderImpl> pa = WEPollSelectorProvider::new;
         INSTANCE = AccessController.doPrivileged(pa);
     }
 

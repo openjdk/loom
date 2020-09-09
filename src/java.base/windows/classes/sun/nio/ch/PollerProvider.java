@@ -30,10 +30,10 @@ class PollerProvider {
     private PollerProvider() { }
 
     static Poller readPoller() throws IOException {
-        return new PollPoller(true);
+        return new WEPollPoller(true);
     }
 
     static Poller writePoller() throws IOException {
-        return new PollPoller(false);
+        return new WEPollPoller(false);
     }
 }

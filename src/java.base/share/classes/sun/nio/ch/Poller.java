@@ -61,13 +61,15 @@ abstract class Poller implements Runnable {
     }
 
     /**
-     * Registers a strand to be unparked when a file descriptor is ready for I/O.
+     * Registers the current thread to be unparked when a file descriptor is
+     * ready for I/O.
      *
+     * @throws IOException if the register fails
      * @throws IllegalArgumentException if the event is not POLLIN or POLLOUT
-     * @throws IllegalStateException if another strand is already registered
+     * @throws IllegalStateException if another thread is already registered
      *         to be unparked when the file descriptor is ready for this event
      */
-    static void register(int fdVal, int event) {
+    static void register(int fdVal, int event) throws IOException {
         if (event == Net.POLLIN) {
             READ_POLLER.register(fdVal);
         } else if (event == Net.POLLOUT) {
@@ -78,8 +80,8 @@ abstract class Poller implements Runnable {
     }
 
     /**
-     * Deregister a strand so that it will not be unparked when a file descriptor
-     * is ready for I/O. This method is a no-op if the strand is not registered.
+     * Deregister the current thread so it will not be unparked when a file descriptor
+     * is ready for I/O.
      *
      * @throws IllegalArgumentException if the event is not POLLIN or POLLOUT
      */
@@ -120,7 +122,7 @@ abstract class Poller implements Runnable {
 
     protected Poller() { }
 
-    private void register(int fdVal) {
+    private void register(int fdVal) throws IOException {
         Thread t = Thread.currentThread();
         Thread previous = map.putIfAbsent(fdVal, t);
         if (previous != null) {
@@ -128,6 +130,7 @@ abstract class Poller implements Runnable {
         }
         implRegister(fdVal);
     }
+
     private void deregister(int fdVal) {
         Thread t = Thread.currentThread();
         if (map.remove(fdVal, t)) {
@@ -156,10 +159,10 @@ abstract class Poller implements Runnable {
     /**
      * Register the file descriptor
      */
-    abstract protected void implRegister(int fdVal);
+    abstract protected void implRegister(int fdVal) throws IOException;
 
     /**
      * Deregister (or disarm) the file descriptor
      */
-    abstract protected boolean implDeregister(int fdVal);
+    abstract protected void implDeregister(int fdVal);
 }

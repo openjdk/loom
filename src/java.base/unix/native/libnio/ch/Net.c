@@ -906,6 +906,12 @@ Java_sun_nio_ch_Net_pollconnValue(JNIEnv *env, jclass this)
     return (jshort)POLLOUT;
 }
 
+JNIEXPORT jshort JNICALL
+Java_sun_nio_ch_Net_pollrdbandValue(JNIEnv *env, jclass this)
+{
+    return (jshort)POLLRDBAND;
+}
+
 JNIEXPORT jint JNICALL
 Java_sun_nio_ch_Net_sendOOB(JNIEnv* env, jclass this, jobject fdo, jbyte b)
 {
