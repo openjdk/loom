@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,50 +25,49 @@
 package sun.nio.ch;
 
 import java.io.IOException;
-import static sun.nio.ch.EPoll.*;
+import static sun.nio.ch.WEPoll.*;
 
 /**
- * Poller implementation based on the epoll facility.
+ * Poller implementation based on wepoll.
  */
-
-class EPollPoller extends Poller {
+class WEPollPoller extends Poller {
     private static final int MAX_EVENTS_TO_POLL = 512;
     private static final int ENOENT = 2;
 
-    private final int epfd;
+    private final long handle;
     private final int event;
     private final long address;
 
-    EPollPoller(boolean read) throws IOException {
-        this.epfd = EPoll.create();
+    WEPollPoller(boolean read) throws IOException {
+        this.handle = WEPoll.create();
         this.event = (read) ? EPOLLIN : EPOLLOUT;
-        this.address = EPoll.allocatePollArray(MAX_EVENTS_TO_POLL);
+        this.address = WEPoll.allocatePollArray(MAX_EVENTS_TO_POLL);
     }
 
     @Override
     protected void implRegister(int fdVal) throws IOException {
         // re-arm
-        int err = EPoll.ctl(epfd, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
+        int err = WEPoll.ctl(handle, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
         if (err == ENOENT)
-            err = EPoll.ctl(epfd, EPOLL_CTL_ADD, fdVal, (event | EPOLLONESHOT));
+            err = WEPoll.ctl(handle, EPOLL_CTL_ADD, fdVal, (event | EPOLLONESHOT));
         if (err != 0)
             throw new IOException("epoll_ctl failed: " + err);
     }
 
     @Override
     protected void implDeregister(int fdVal) {
-        EPoll.ctl(epfd, EPOLL_CTL_DEL, fdVal, 0);
+        WEPoll.ctl(handle, EPOLL_CTL_DEL, fdVal, 0);
     }
 
     @Override
     public void run() {
         try {
             for (;;) {
-                int n = EPoll.wait(epfd, address, MAX_EVENTS_TO_POLL, -1);
+                int n = WEPoll.wait(handle, address, MAX_EVENTS_TO_POLL, -1);
                 while (n-- > 0) {
-                    long eventAddress = EPoll.getEvent(address, n);
-                    int fdVal = EPoll.getDescriptor(eventAddress);
-                    polled(fdVal);
+                    long event = WEPoll.getEvent(address, n);
+                    long s = (int) WEPoll.getSocket(event);
+                    polled((int) s);
                 }
             }
         } catch (Throwable t) {

@@ -413,19 +413,19 @@ class WindowsSelectorImpl extends SelectorImpl {
                 // processDeregisterQueue.
                 if (me == null)
                     continue;
-                SelectionKeyImpl sk = me.ski;
+                SelectionKeyImpl ski = me.ski;
 
                 // The descriptor may be in the exceptfds set because there is
                 // OOB data queued to the socket. If there is OOB data then it
                 // is discarded and the key is not added to the selected set.
                 if (isExceptFds &&
-                    (sk.channel() instanceof SocketChannelImpl) &&
-                    discardUrgentData(desc))
+                    (ski.channel() instanceof SocketChannelImpl) &&
+                    Net.discardUrgentData(ski.getFD()))
                 {
                     continue;
                 }
 
-                int updated = processReadyEvents(rOps, sk, action);
+                int updated = processReadyEvents(rOps, ski, action);
                 if (updated > 0 && me.updateCount != updateCount) {
                     me.updateCount = updateCount;
                     numKeysUpdated++;
@@ -516,8 +516,6 @@ class WindowsSelectorImpl extends SelectorImpl {
     }
 
     private native void resetWakeupSocket0(int wakeupSourceFd);
-
-    private native boolean discardUrgentData(int fd);
 
     // We increment this counter on each call to updateSelectedKeys()
     // each entry in  SubSelector.fdsMap has a memorized value of
