@@ -41,7 +41,7 @@ import java.util.function.Predicate;
 
 
 /**
- * @notest THIS IS NOT A TEST.
+ * @test THIS IS NOT A TEST.
  * This is a test generator, should be run only when jcstress is changed
  *
  * @library /test/lib /
@@ -98,8 +98,8 @@ public class TestGenerator {
             + " * @test %1$s\n"
             + " * @library /test/lib /\n"
             + " * @run driver/timeout=21600 " + JcstressRunner.class.getName()
-                    // verbose output
-                    + " -v"
+                    // verbose output, testing in virtual threads
+                    + " -v -vt -spinStyle LOCKSUPPORT_PARK_NANOS -f 0"
                     // test name
                     + " -t org.openjdk.jcstress.tests.%1$s\\.\n"
             + " */\n";
@@ -122,7 +122,7 @@ public class TestGenerator {
         BufferedReader reader = Files.newBufferedReader(output);
 
         reader.lines()
-                .skip(4) // skip first 4 lines: name, -{80}, revision and empty line
+                .skip(6) // skip first 6 lines: name, -{80}, revision CPU info and empty line
                 .map(s -> s.split("\\.")[4]) // group by the package name following "org.openjdk.jcstress.tests."
                 .distinct()
                 .filter(s -> !s.startsWith("sample")) // skip sample test

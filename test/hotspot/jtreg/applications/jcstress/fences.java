@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,6 +26,6 @@
 /**
  * @test fences
  * @library /test/lib /
- * @run driver/timeout=21600 applications.jcstress.JcstressRunner -v -t org.openjdk.jcstress.tests.fences\.
+ * @run driver/timeout=21600 applications.jcstress.JcstressRunner -v -vt -spinStyle LOCKSUPPORT_PARK_NANOS -f 0 -t org.openjdk.jcstress.tests.fences\.
  */
 
