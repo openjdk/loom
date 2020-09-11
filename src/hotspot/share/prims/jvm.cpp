@@ -552,12 +552,10 @@ JVM_END
 
 // java.lang.Throwable //////////////////////////////////////////////////////
 
-JVM_ENTRY(void, JVM_FillInStackTrace(JNIEnv *env, jobject receiver, jobject contScope))
+JVM_ENTRY(void, JVM_FillInStackTrace(JNIEnv *env, jobject receiver))
   JVMWrapper("JVM_FillInStackTrace");
   Handle exception(thread, JNIHandles::resolve_non_null(receiver));
-  Handle scope(thread, JNIHandles::resolve(contScope));
-
-  java_lang_Throwable::fill_in_stack_trace(exception, scope);
+  java_lang_Throwable::fill_in_stack_trace(exception);
 JVM_END
 
 // java.lang.NullPointerException ///////////////////////////////////////////
@@ -589,13 +587,13 @@ JVM_END
 // java.lang.StackTraceElement //////////////////////////////////////////////
 
 
-JVM_ENTRY(void, JVM_InitStackTraceElementArray(JNIEnv *env, jobjectArray elements, jobject throwable))
+JVM_ENTRY(void, JVM_InitStackTraceElementArray(JNIEnv *env, jobjectArray elements, jobject backtrace, jint depth))
   JVMWrapper("JVM_InitStackTraceElementArray");
-  Handle exception(THREAD, JNIHandles::resolve(throwable));
+  Handle backtraceh(THREAD, JNIHandles::resolve(backtrace));
   objArrayOop st = objArrayOop(JNIHandles::resolve(elements));
   objArrayHandle stack_trace(THREAD, st);
   // Fill in the allocated stack trace
-  java_lang_Throwable::get_stack_trace_elements(exception, stack_trace, CHECK);
+  java_lang_Throwable::get_stack_trace_elements(depth, backtraceh, stack_trace, CHECK);
 JVM_END
 
 
@@ -3374,6 +3372,11 @@ JVM_ENTRY(jboolean, JVM_HoldsLock(JNIEnv* env, jclass threadClass, jobject obj))
   return ObjectSynchronizer::current_thread_holds_lock((JavaThread*)THREAD, h_obj);
 JVM_END
 
+JVM_ENTRY(jobject, JVM_GetStackTrace(JNIEnv *env, jobject jthread))
+  JVMWrapper("JVM_GetStackTrace");
+  oop trace = java_lang_Thread::async_get_stack_trace(JNIHandles::resolve(jthread), THREAD);
+  return JNIHandles::make_local(THREAD, trace);
+JVM_END
 
 JVM_ENTRY(void, JVM_DumpAllStacks(JNIEnv* env, jclass))
   JVMWrapper("JVM_DumpAllStacks");

@@ -5745,6 +5745,7 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
     void do_thread(Thread* th) {
       // assert (th == Thread::current(), ""); -- the handshake can be carried out by a VM thread (see HandshakeState::process_by_vmthread)
       assert (th->is_Java_thread(), "");
+      guarantee (Thread::current()->is_Java_thread(), "Thread: %s", Thread::current()->name());
       JavaThread* thread = (JavaThread*)th;
 
       // tty->print_cr(">>> ForceYieldClosure thread");

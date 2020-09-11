@@ -2001,7 +2001,7 @@ public:
   javaVFrame* last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(last_frame(), reg_map); }
 
   frame vthread_carrier_last_frame(RegisterMap* reg_map);
-  frame vthread_carrier_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(vthread_carrier_last_frame(reg_map), reg_map); }
+  javaVFrame* vthread_carrier_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(vthread_carrier_last_frame(reg_map), reg_map); }
 
   javaVFrame* last_java_vframe(const frame f, RegisterMap* reg_map);
   

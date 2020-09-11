@@ -44,8 +44,8 @@
  * `this' so you can write 'throw e.fillInStackTrace();'
  */
 JNIEXPORT jobject JNICALL
-Java_java_lang_Throwable_fillInStackTrace(JNIEnv *env, jobject throwable, jobject contScope, jint dummy)
+Java_java_lang_Throwable_fillInStackTrace(JNIEnv *env, jobject throwable, jint dummy)
 {
-    JVM_FillInStackTrace(env, throwable, contScope);
+    JVM_FillInStackTrace(env, throwable);
     return throwable;
 }

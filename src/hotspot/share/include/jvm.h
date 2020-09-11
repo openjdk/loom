@@ -210,13 +210,13 @@ JVM_GetRandomSeedForCDSDump();
  * java.lang.Throwable
  */
 JNIEXPORT void JNICALL
-JVM_FillInStackTrace(JNIEnv *env, jobject throwable, jobject contScope);
+JVM_FillInStackTrace(JNIEnv *env, jobject throwable);
 
 /*
  * java.lang.StackTraceElement
  */
 JNIEXPORT void JNICALL
-JVM_InitStackTraceElementArray(JNIEnv *env, jobjectArray elements, jobject throwable);
+JVM_InitStackTraceElementArray(JNIEnv *env, jobjectArray elements, jobject backtrace, jint depth);
 
 JNIEXPORT void JNICALL
 JVM_InitStackTraceElement(JNIEnv* env, jobject element, jobject stackFrameInfo);
@@ -301,6 +301,9 @@ JVM_Interrupt(JNIEnv *env, jobject thread);
 
 JNIEXPORT jboolean JNICALL
 JVM_HoldsLock(JNIEnv *env, jclass threadClass, jobject obj);
+
+JNIEXPORT jobject JNICALL
+JVM_GetStackTrace(JNIEnv *env, jobject thread);
 
 JNIEXPORT void JNICALL
 JVM_DumpAllStacks(JNIEnv *env, jclass unused);

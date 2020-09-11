@@ -813,71 +813,20 @@ class VirtualThread extends Thread {
 
     // -- stack trace support --
 
-    private static final StackWalker STACK_WALKER = StackWalker.getInstance(VTHREAD_SCOPE);
-    private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
-
     @Override
-    public StackTraceElement[] getStackTrace() {
-        if (Thread.currentThread() == this) {
-            return STACK_WALKER
-                    .walk(s -> s.map(StackFrame::toStackTraceElement)
-                    .toArray(StackTraceElement[]::new));
-        } else {
-            SecurityManager security = System.getSecurityManager();
-            if (security != null) {
-                security.checkPermission(SecurityConstants.GET_STACK_TRACE_PERMISSION);
+    StackTraceElement[] asyncGetStackTrace() {
+        StackTraceElement[] stackTrace;
+        do {
+            stackTrace = carrierThread != null ? super.asyncGetStackTrace() // mounted
+                                               : tryGetStackTrace();        // unmounted
+            if (stackTrace == null) {
+                Thread.yield();
             }
-
-            // target virtual thread may be mounted or unmounted
-            StackTraceElement[] stackTrace;
-            do {
-                Thread carrier = carrierThread;
-                if (carrier != null) {
-                    // mounted
-                    stackTrace = tryGetStackTrace(carrier);
-                } else {
-                    // not mounted
-                    stackTrace = tryGetStackTrace();
-                }
-                if (stackTrace == null) {
-                    Thread.yield();
-                }
-            } while (stackTrace == null);
-            return stackTrace;
-        }
+        } while (stackTrace == null);
+        return stackTrace;
     }
 
-    /**
-     * Returns the stack trace for this virtual thread if it mounted on the given carrier
-     * thread. If the virtual thread parks or is re-scheduled to another thread then
-     * null is returned.
-     */
-    private StackTraceElement[] tryGetStackTrace(Thread carrier) {
-        assert carrier != Thread.currentCarrierThread();
-
-        StackTraceElement[] stackTrace = null;
-        carrier.suspendThread();
-        try {
-            // get stack trace if virtual thread is still mounted on the
-            // suspended carrier thread. Skip if the virtual thread is parking
-            // or yielding as the continuation frames may or may not be on the
-            // thread stack.
-            if (carrierThread == carrier) {
-                int s = state();
-                if (s != PARKING && s != YIELDING) {
-                    stackTrace = carrier.getFullStackTrace();
-                }
-            }
-        } finally {
-            carrier.resumeThread();
-        }
-
-        if (stackTrace != null) {
-            return virtualThreadStackTrace(stackTrace);
-        } else {
-            return null;
-        }
-    }
+    private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
 
     /**
      * Returns the stack trace for this virtual thread if it newly created,
@@ -908,50 +857,6 @@ class VirtualThread extends Thread {
                 return null;
             }
         }
-    }
-
-    /**
-     * Returns the stack trace for the virtual thread. Returns the empty stack trace
-     * if the runContinuation frame is not found.
-     */
-    static StackTraceElement[] virtualThreadStackTrace(StackTraceElement[] stackTrace) {
-        int runMethod = findRunContinuation(stackTrace);
-        if (runMethod >= 2) {
-            // skip Continuation.run and Continuation.enterSpecial frames
-            return Arrays.copyOf(stackTrace, runMethod - 2);
-        } else {
-            return EMPTY_STACK;
-        }
-    }
-
-    /**
-     * Returns the stack trace for the carrier thread.
-     */
-    static StackTraceElement[] carrierThreadStackTrace(StackTraceElement[] stackTrace) {
-        int runMethod = findRunContinuation(stackTrace);
-        if (runMethod >= 0) {
-            return Arrays.copyOfRange(stackTrace, runMethod, stackTrace.length);
-        } else {
-            return stackTrace;
-        }
-    }
-
-    /**
-     * Returns index of the VirtualThread.runContinuation frame or -1 if not found.
-     */
-    private static int findRunContinuation(StackTraceElement[] stackTrace) {
-        int index = 0;
-        while (index < stackTrace.length) {
-            StackTraceElement e = stackTrace[index];
-            if ("java.base".equals(e.getModuleName())
-                    && "java.lang.VirtualThread".equals(e.getClassName())
-                    && "runContinuation".equals(e.getMethodName())) {
-                return index;
-            } else {
-                index++;
-            }
-        }
-        return -1;
     }
 
     // -- wrappers for VarHandle methods --

@@ -556,22 +556,17 @@ public final class StackTraceElement implements java.io.Serializable {
 
     /*
      * Returns an array of StackTraceElements of the given depth
-     * filled from the backtrace of a given Throwable.
+     * filled from the given backtrace.
      */
-    static StackTraceElement[] of(Throwable x, int depth) {
+    static StackTraceElement[] of(Object x, int depth) {
         StackTraceElement[] stackTrace = new StackTraceElement[depth];
         for (int i = 0; i < depth; i++) {
             stackTrace[i] = new StackTraceElement();
         }
 
         // VM to fill in StackTraceElement
-        initStackTraceElements(stackTrace, x);
-
-        // ensure the proper StackTraceElement initialization
-        for (StackTraceElement ste : stackTrace) {
-            ste.computeFormat();
-        }
-        return stackTrace;
+        initStackTraceElements(stackTrace, x, depth);
+        return of(stackTrace);
     }
 
     /*
@@ -585,12 +580,25 @@ public final class StackTraceElement implements java.io.Serializable {
         return ste;
     }
 
+    private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
+
+    static StackTraceElement[] of(StackTraceElement[] stackTrace) {
+        if (stackTrace == null)
+            return EMPTY_STACK;
+        
+        // ensure the proper StackTraceElement initialization
+        for (StackTraceElement ste : stackTrace) {
+            ste.computeFormat();
+        }
+        return stackTrace;
+    }
+
     /*
      * Sets the given stack trace elements with the backtrace
      * of the given Throwable.
      */
     private static native void initStackTraceElements(StackTraceElement[] elements,
-                                                      Throwable x);
+                                                      Object x, int depth);
     /*
      * Sets the given stack trace element with the given StackFrameInfo
      */

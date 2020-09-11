@@ -159,17 +159,6 @@ public class Throwable implements Serializable {
     }
 
     /**
-     * Holder class to defer initializing configuration.
-     */
-    private static class Configuration {
-        static final boolean SHOW_FULL_STACK_TRACE;
-        static {
-            String s = GetPropertyAction.privilegedGetProperty("jdk.showFullStackTrace");
-            SHOW_FULL_STACK_TRACE = (s != null && !s.equalsIgnoreCase("false"));
-        }
-    }
-
-    /**
      * A shared value for an empty stack.
      */
     private static final StackTraceElement[] UNASSIGNED_STACK = new StackTraceElement[0];
@@ -798,28 +787,6 @@ public class Throwable implements Serializable {
     /**
      * Fills in the execution stack trace. This method records within this
      * {@code Throwable} object information about the current state of
-     * the stack frames for the current thread.
-     *
-     * <p>If the stack trace of this {@code Throwable} {@linkplain
-     * Throwable#Throwable(String, Throwable, boolean, boolean) is not
-     * writable}, calling this method has no effect.
-     *
-     * @return  a reference to this {@code Throwable} instance.
-     * @see     java.lang.Throwable#printStackTrace()
-     */
-    public synchronized Throwable fillInStackTrace() {
-        ContinuationScope scope = null;
-        if (VM.isBooted()
-                && Thread.currentThread().isVirtual()
-                && !Configuration.SHOW_FULL_STACK_TRACE) {
-            scope = VirtualThread.continuationScope();
-        }
-        return fillInStackTrace(scope);
-    }
-
-    /**
-     * Fills in the execution stack trace. This method records within this
-     * {@code Throwable} object information about the current state of
      * the stack frames for the current thread in the given {@link ContinuationScope}.
      * 
      * <p>If this method is called not inside a continuation with the given scope,
@@ -829,21 +796,19 @@ public class Throwable implements Serializable {
      * Throwable#Throwable(String, Throwable, boolean, boolean) is not
      * writable}, calling this method has no effect.
      *
-     * @param  scope The scope of the continuation whose stack we want to capture; 
-     *               {@code null} for the entire thread stack.
      * @return  a reference to this {@code Throwable} instance.
      * @see     java.lang.Throwable#printStackTrace()
      */
-    public synchronized Throwable fillInStackTrace(ContinuationScope scope) {
+    public synchronized Throwable fillInStackTrace() {
         if (stackTrace != null ||
             backtrace != null /* Out of protocol state */ ) {
-            fillInStackTrace(scope, 0);
+            fillInStackTrace(0);
             stackTrace = UNASSIGNED_STACK;
         }
         return this;
     }
 
-    private native Throwable fillInStackTrace(ContinuationScope scope, int dummy);
+    private native Throwable fillInStackTrace(int dummy);
 
     /**
      * Provides programmatic access to the stack trace information printed by
@@ -878,7 +843,7 @@ public class Throwable implements Serializable {
         // backtrace if this is the first call to this method
         if (stackTrace == UNASSIGNED_STACK ||
             (stackTrace == null && backtrace != null) /* Out of protocol state */) {
-            stackTrace = StackTraceElement.of(this, depth);
+            stackTrace = StackTraceElement.of(backtrace, depth);
         } else if (stackTrace == null) {
             return UNASSIGNED_STACK;
         }

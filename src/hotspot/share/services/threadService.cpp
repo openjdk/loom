@@ -671,7 +671,10 @@ void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth) {
 
   if (_thread->has_last_Java_frame()) {
     RegisterMap reg_map(_thread, true, false);
-    vframe* start_vf = _thread->last_java_vframe(&reg_map);
+
+    vframe* start_vf = _thread->last_continuation(java_lang_VirtualThread::vthread_scope()) != NULL
+      ? _thread->vthread_carrier_last_java_vframe(&reg_map)
+      : _thread->last_java_vframe(&reg_map);
     int count = 0;
     for (vframe* f = start_vf; f; f = f->sender() ) {
       if (maxDepth >= 0 && count == maxDepth) {

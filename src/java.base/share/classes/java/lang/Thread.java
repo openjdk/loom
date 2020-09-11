@@ -2626,35 +2626,28 @@ public class Thread implements Runnable {
             // check for getStackTrace permission
             SecurityManager security = System.getSecurityManager();
             if (security != null) {
-                security.checkPermission(
-                    SecurityConstants.GET_STACK_TRACE_PERMISSION);
+                security.checkPermission(SecurityConstants.GET_STACK_TRACE_PERMISSION);
             }
             // optimization so we do not call into the vm for threads that
             // have not yet started or have terminated
             if (!isAlive()) {
                 return EMPTY_STACK_TRACE;
             }
-
-            StackTraceElement[] stackTrace = getFullStackTrace();
-
-            // the thread may be a carrier thread
-            return VirtualThread.carrierThreadStackTrace(stackTrace);
+            return asyncGetStackTrace();
         } else {
             return (new Exception()).getStackTrace();
         }
     }
 
+    StackTraceElement[] asyncGetStackTrace() {
+        return StackTraceElement.of((StackTraceElement[])getStackTrace0());
+    }
+
     /**
      * Returns an array of stack trace elements representing the stack dump
-     * of this thread. If the Thread is a carrier thread with a virtual thread
-     * mounted the the stack trace includes the frames for both. Returns the
-     * empty stack trace if the thread is not alive.
+     * of this thread. Returns null if the thread is not alive.
      */
-    StackTraceElement[] getFullStackTrace() {
-        StackTraceElement[][] stackTraceArray = dumpThreads(new Thread[] { this });
-        StackTraceElement[] stackTrace = stackTraceArray[0];
-        return (stackTrace != null) ? stackTrace : EMPTY_STACK_TRACE;
-    }
+    private native Object getStackTrace0();
 
     /**
      * Returns a map of stack traces for all live threads. The map does not
@@ -2696,10 +2689,8 @@ public class Thread implements Runnable {
         // check for getStackTrace permission
         SecurityManager security = System.getSecurityManager();
         if (security != null) {
-            security.checkPermission(
-                SecurityConstants.GET_STACK_TRACE_PERMISSION);
-            security.checkPermission(
-                SecurityConstants.MODIFY_THREADGROUP_PERMISSION);
+            security.checkPermission(SecurityConstants.GET_STACK_TRACE_PERMISSION);
+            security.checkPermission(SecurityConstants.MODIFY_THREADGROUP_PERMISSION);
         }
 
         // Get a snapshot of the list of all threads
@@ -2709,8 +2700,6 @@ public class Thread implements Runnable {
         for (int i = 0; i < threads.length; i++) {
             StackTraceElement[] stackTrace = traces[i];
             if (stackTrace != null) {
-                // the thread may be a carrier thread
-                stackTrace = VirtualThread.carrierThreadStackTrace(stackTrace);
                 m.put(threads[i], stackTrace);
             }
             // else terminated so we don't put it in the map

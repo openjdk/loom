@@ -209,11 +209,6 @@ public class Basic {
         public LoomException(String message) {
             super(message);
         }
-
-        @Override
-        public Throwable fillInStackTrace() {
-            return fillInStackTrace(FOO);
-        }
     }
 
     static double fooThrow(int a) {
@@ -252,13 +247,18 @@ public class Basic {
             fail("Exception not thrown.");
         } catch (LoomException e) {
             assertEquals(e.getMessage(), "Loom exception!");
-
+            // e.printStackTrace();
             StackTraceElement[] stes = e.getStackTrace();
-            // System.out.println(Arrays.toString(stes));
             assertEquals(stes[0].getMethodName(), "barThrow");
-            StackTraceElement last = stes[stes.length-1];
-            assertEquals(last.getClassName(), "java.lang.Continuation");
-            assertEquals(last.getMethodName(), "enter");
+            int index = -1;
+            for (int i=0; i<stes.length; i++) {
+                if (stes[i].getClassName().equals(Continuation.class.getName()) && stes[i].getMethodName().equals("enter")) {
+                    index = i;
+                    break;
+                }
+            }
+            assertTrue(index >= 0);
+            StackTraceElement last = stes[index];
             assertTrue(last.toString().endsWith(" " + FOO.toString()), last.toString());
         }
     }

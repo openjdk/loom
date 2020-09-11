@@ -25,7 +25,7 @@
  * @test
  * @modules java.base/java.lang:+open
  * @run testng StackTraces
- * @run testng/othervm -Djdk.showFullStackTrace=true StackTraces
+ * @run testng/othervm -XX:+UnlockDiagnosticVMOptions -XX:+ShowCarrierFrames StackTraces
  * @summary Test that the stack traces for carrier threads are hidden by
  *     exceptions and the StackWalker API
  */
@@ -48,8 +48,7 @@ public class StackTraces {
             boolean found = Arrays.stream(e.getStackTrace())
                     .map(StackTraceElement::getClassName)
                     .anyMatch("java.util.concurrent.ForkJoinPool"::equals);
-            boolean expected = Boolean.getBoolean("jdk.showFullStackTrace");
-            assertTrue(found == expected);
+            assertTrue(found == hasJvmArgument("-XX:+ShowCarrierFrames"));
         });
     }
 
@@ -64,4 +63,10 @@ public class StackTraces {
         });
     }
 
+    private static boolean hasJvmArgument(String arg) {
+        for (String argument : java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments()) {
+            if (argument.equals(arg)) return true;
+        }
+        return false;
+    }
 }

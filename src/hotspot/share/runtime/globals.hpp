@@ -2296,6 +2296,9 @@ const size_t minimumSymbolTableSize = 1024;
   diagnostic(bool, ShowHiddenFrames, false,                                 \
           "show method handle implementation frames (usually hidden)")      \
                                                                             \
+  diagnostic(bool, ShowCarrierFrames, false,                                \
+          "show virtual threads' carrier frames in exceptions")             \
+                                                                            \
   experimental(bool, TrustFinalNonStaticFields, false,                      \
           "trust final non-static declarations for constant folding")       \
                                                                             \

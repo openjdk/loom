@@ -461,6 +461,9 @@ class java_lang_Thread : AllStatic {
 
   static const char*  thread_status_name(oop java_thread_oop);
 
+  // Fill in current stack trace, can cause GC
+  static oop async_get_stack_trace(oop java_thread, TRAPS);
+
   // Debugging
   friend class JavaClasses;
 };
@@ -657,11 +660,11 @@ class java_lang_Throwable: AllStatic {
   // Fill in current stack trace for throwable with preallocated backtrace (no GC)
   static void fill_in_stack_trace_of_preallocated_backtrace(Handle throwable);
   // Fill in current stack trace, can cause GC
-  static void fill_in_stack_trace(Handle throwable, Handle contScope, const methodHandle& method, TRAPS);
-  static void fill_in_stack_trace(Handle throwable, Handle contScope, const methodHandle& method = methodHandle());
-  static void fill_in_stack_trace(Handle throwable, const methodHandle& method = methodHandle()) { fill_in_stack_trace(throwable, Handle(), method); }
+  static void fill_in_stack_trace(Handle throwable, const methodHandle& method, TRAPS);
+  static void fill_in_stack_trace(Handle throwable, const methodHandle& method = methodHandle());
+
   // Programmatic access to stack trace
-  static void get_stack_trace_elements(Handle throwable, objArrayHandle stack_trace, TRAPS);
+  static void get_stack_trace_elements(int depth, Handle backtrace, objArrayHandle stack_trace, TRAPS);
   // Printing
   static void print(oop throwable, outputStream* st);
   static void print_stack_trace(Handle throwable, outputStream* st);

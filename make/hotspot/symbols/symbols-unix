@@ -136,6 +136,7 @@ JVM_GetVmArguments
 JVM_Halt
 JVM_HasReferencePendingList
 JVM_HoldsLock
+JVM_GetStackTrace
 JVM_IHashCode
 JVM_InitClassName
 JVM_InitStackTraceElement
