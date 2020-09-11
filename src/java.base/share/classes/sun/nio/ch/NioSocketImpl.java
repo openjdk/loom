@@ -891,15 +891,18 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                 this.state = ST_CLOSED;
                 return;
             }
+            boolean connected = (state == ST_CONNECTED);
             this.state = ST_CLOSING;
 
             // shutdown output when linger interval not set to 0
-            try {
-                var SO_LINGER = StandardSocketOptions.SO_LINGER;
-                if ((int) Net.getSocketOption(fd, SO_LINGER) != 0) {
-                    Net.shutdown(fd, Net.SHUT_WR);
-                }
-            } catch (IOException ignore) { }
+            if (connected) {
+                try {
+                    var SO_LINGER = StandardSocketOptions.SO_LINGER;
+                    if ((int) Net.getSocketOption(fd, SO_LINGER) != 0) {
+                        Net.shutdown(fd, Net.SHUT_WR);
+                    }
+                } catch (IOException ignore) { }
+            }
 
             // attempt to close the socket. If there are I/O operations in progress
             // then the socket is pre-closed and the thread(s) signalled. The
@@ -908,13 +911,17 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                 long reader = readerThread;
                 long writer = writerThread;
                 if (NativeThread.isVirtualThread(reader)
-                        || NativeThread.isVirtualThread(writer))
+                        || NativeThread.isVirtualThread(writer)) {
                     Poller.stopPoll(fdVal(fd));
-                nd.preClose(fd);
-                if (NativeThread.isKernelThread(reader))
-                    NativeThread.signal(reader);
-                if (NativeThread.isKernelThread(writer))
-                    NativeThread.signal(writer);
+                }
+                if (NativeThread.isKernelThread(reader)
+                        || NativeThread.isKernelThread(writer)) {
+                    nd.preClose(fd);
+                    if (NativeThread.isKernelThread(reader))
+                        NativeThread.signal(reader);
+                    if (NativeThread.isKernelThread(writer))
+                        NativeThread.signal(writer);
+                }
             }
         }
     }

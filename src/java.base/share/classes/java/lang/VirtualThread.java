@@ -31,7 +31,6 @@ import java.security.AccessControlContext;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -51,7 +50,6 @@ import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
-import sun.security.util.SecurityConstants;
 
 import static java.lang.StackWalker.Option.RETAIN_CLASS_REFERENCE;
 import static java.lang.StackWalker.Option.SHOW_REFLECT_FRAMES;
@@ -817,8 +815,9 @@ class VirtualThread extends Thread {
     StackTraceElement[] asyncGetStackTrace() {
         StackTraceElement[] stackTrace;
         do {
-            stackTrace = carrierThread != null ? super.asyncGetStackTrace() // mounted
-                                               : tryGetStackTrace();        // unmounted
+            stackTrace = (carrierThread != null)
+                    ? super.asyncGetStackTrace()  // mounted
+                    : tryGetStackTrace();         // unmounted
             if (stackTrace == null) {
                 Thread.yield();
             }
@@ -826,11 +825,9 @@ class VirtualThread extends Thread {
         return stackTrace;
     }
 
-    private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
-
     /**
      * Returns the stack trace for this virtual thread if it newly created,
-     * parked, or terminated. Returns null if the thread is in other states.
+     * parked, or terminated. Returns null if the thread is in another state.
      */
     private StackTraceElement[] tryGetStackTrace() {
         if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
@@ -852,7 +849,7 @@ class VirtualThread extends Thread {
         } else {
             int s = state();
             if (s == NEW || s == TERMINATED) {
-                return EMPTY_STACK;
+                return new StackTraceElement[0];   // empty stack
             } else {
                 return null;
             }

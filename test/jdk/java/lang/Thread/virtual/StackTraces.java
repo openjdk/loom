@@ -23,13 +23,14 @@
 
 /**
  * @test
- * @modules java.base/java.lang:+open
+ * @modules java.management
  * @run testng StackTraces
  * @run testng/othervm -XX:+UnlockDiagnosticVMOptions -XX:+ShowCarrierFrames StackTraces
  * @summary Test that the stack traces for carrier threads are hidden by
  *     exceptions and the StackWalker API
  */
 
+import java.lang.management.ManagementFactory;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
@@ -64,7 +65,7 @@ public class StackTraces {
     }
 
     private static boolean hasJvmArgument(String arg) {
-        for (String argument : java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments()) {
+        for (String argument : ManagementFactory.getRuntimeMXBean().getInputArguments()) {
             if (argument.equals(arg)) return true;
         }
         return false;

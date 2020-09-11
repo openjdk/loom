@@ -1998,10 +1998,6 @@ public class Thread implements Runnable {
         suspend0();
     }
 
-    void suspendThread() {
-        suspend0();
-    }
-
     /**
      * Resumes a suspended thread.
      * <p>
@@ -2028,10 +2024,6 @@ public class Thread implements Runnable {
         checkAccess();
         if (isVirtual())
             throw new UnsupportedOperationException();
-        resume0();
-    }
-
-    void resumeThread() {
         resume0();
     }
 
@@ -2639,14 +2631,14 @@ public class Thread implements Runnable {
         }
     }
 
-    StackTraceElement[] asyncGetStackTrace() {
-        return StackTraceElement.of((StackTraceElement[])getStackTrace0());
-    }
-
     /**
      * Returns an array of stack trace elements representing the stack dump
      * of this thread. Returns null if the thread is not alive.
      */
+    StackTraceElement[] asyncGetStackTrace() {
+        return StackTraceElement.of((StackTraceElement[]) getStackTrace0());
+    }
+
     private native Object getStackTrace0();
 
     /**
