@@ -1333,7 +1333,6 @@ public class ThreadAPI {
 
     // runnable (mounted)
     public void testGetStackTrace1() throws Exception {
-        System.out.println("testGetStackTrace1");
         var sel = Selector.open();
         var thread = Thread.startVirtualThread(() -> {
             try { sel.select(); } catch (Exception e) { }
@@ -1351,7 +1350,6 @@ public class ThreadAPI {
 
     // waiting (mounted)
     public void testGetStackTrace2() throws Exception {
-        System.out.println("testGetStackTrace2");
         try (ForkJoinPool pool = new ForkJoinPool(1)) {
             AtomicReference<Thread> ref = new AtomicReference<>();
             Executor scheduler = task -> {
@@ -1402,7 +1400,6 @@ public class ThreadAPI {
 
     // parked (unmounted)
     public void testGetStackTrace3() throws Exception {
-        System.out.println("testGetStackTrace3");
         var thread = Thread.startVirtualThread(LockSupport::park);
 
         // wait for thread to park
@@ -1421,7 +1418,6 @@ public class ThreadAPI {
 
     // not started
     public void testGetStackTrace4() {
-        System.out.println("testGetStackTrace4");
         var thread = Thread.builder().virtual().task(() -> { }).build();
         StackTraceElement[] stack = thread.getStackTrace();
         assertTrue(stack.length == 0);
@@ -1429,7 +1425,6 @@ public class ThreadAPI {
 
     // terminated
     public void testGetStackTrace5() throws Exception {
-        System.out.println("testGetStackTrace5");
         var thread = Thread.startVirtualThread(() -> { });
         thread.join();
         StackTraceElement[] stack = thread.getStackTrace();

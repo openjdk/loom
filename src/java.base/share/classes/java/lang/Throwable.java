@@ -28,9 +28,6 @@ package java.lang;
 import java.io.*;
 import java.util.*;
 
-import jdk.internal.misc.VM;
-import sun.security.action.GetPropertyAction;
-
 /**
  * The {@code Throwable} class is the superclass of all errors and
  * exceptions in the Java language. Only objects that are instances of this
