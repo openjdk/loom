@@ -2202,19 +2202,29 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   public:
     const Handle _java_thread;
     Handle _result;
+    Handle _exception;
     int _depth;
 
-    GetStackTraceClosure(Handle java_thread, Handle result) : 
+    GetStackTraceClosure(Handle java_thread, Handle result, Handle exception) : 
       HandshakeClosure("GetStackTraceClosure"), 
-      _java_thread(java_thread), _result(result), _depth(0) {}
+      _java_thread(java_thread), _result(result), _exception(exception), _depth(0) {}
 
-    oop contScopeName(oop cont) {
-      return cont != (oop)NULL ? java_lang_ContinuationScope::name(Continuation::continuation_scope(cont)) : (oop)NULL;
+    void do_thread(Thread* thread) {
+      guarantee (!Thread::current()->is_VM_thread(), "Thread: %s", Thread::current()->name()); // TODO LOOM
+      Thread* THREAD = Thread::current();
+
+      do_thread0(thread);
+
+      if (THREAD == thread) { // we're running in the target thread
+        if (THREAD->has_pending_exception()) {
+          *_exception.raw_value() = THREAD->pending_exception();
+          THREAD->clear_pending_exception();
+        }
+      }
     }
 
-    void do_thread(Thread* th) {
+    void do_thread0(Thread* th) {
       assert (th->is_Java_thread(), "");
-      guarantee (!Thread::current()->is_VM_thread(), "Thread: %s", Thread::current()->name()); // TODO LOOM
       JavaThread* thread = (JavaThread*)th;
       JavaThread* THREAD = (JavaThread*)Thread::current();
 
@@ -2234,11 +2244,11 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
           carrier = true;
       }
       
-      HandleMark hm(THREAD);
-      BacktraceBuilder bt(CHECK);
-
       const int max_depth = MaxJavaStackTraceDepth;
       const bool skip_hidden = !ShowHiddenFrames;
+
+      HandleMark hm(THREAD);
+      BacktraceBuilder bt(CHECK);
 
       int total_count = 0;
       for (vframeStream vfst(thread, false, carrier); !vfst.at_end() && (max_depth == 0 || max_depth != total_count); vfst.next()) {
@@ -2246,16 +2256,27 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
         bt.push(vfst.method(), vfst.bci(), contScopeName(vfst.continuation()), CHECK);
         total_count++;
       }
+
       _depth = total_count;
       *_result.raw_value() = bt.backtrace();
     }
+
+    oop contScopeName(oop cont) {
+      return cont != (oop)NULL ? java_lang_ContinuationScope::name(Continuation::continuation_scope(cont)) : (oop)NULL;
+    }
   };
 
+  // handhsake with target
   Handle backtrace(THREAD, java_thread); // we need to allocate a handle with an arbitrary non-null oop
   *backtrace.raw_value() = (oop)NULL;
-  GetStackTraceClosure gstc(Handle(THREAD, java_thread), backtrace);
+  Handle exception(THREAD, java_thread); // we need to allocate a handle with an arbitrary non-null oop
+  *exception.raw_value() = (oop)NULL;
+  GetStackTraceClosure gstc(Handle(THREAD, java_thread), backtrace, exception);
   Handshake::execute_direct(&gstc, thread);
 
+  if (exception() != (oop)NULL) {
+    THROW_OOP_(exception(), (oop)NULL);
+  }
   if (backtrace() == (oop)NULL) {
     return (oop)NULL;
   }
