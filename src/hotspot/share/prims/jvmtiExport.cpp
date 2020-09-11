@@ -1710,6 +1710,7 @@ void JvmtiExport::post_continuation_yield(JavaThread* thread, jint continuation_
 
         if (ets->is_frame_pop(frame_num)) {
           // remove the frame's entry
+          MutexLocker mu(JvmtiThreadState_lock);
           ets->clear_frame_pop(frame_num);
         }
       } 
