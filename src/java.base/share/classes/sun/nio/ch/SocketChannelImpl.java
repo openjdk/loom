@@ -960,15 +960,28 @@ class SocketChannelImpl
     private void implCloseBlockingMode() throws IOException {
         synchronized (stateLock) {
             assert state < ST_CLOSING;
+            boolean connected = (state == ST_CONNECTED);
             state = ST_CLOSING;
+
             if (!tryClose()) {
+                // shutdown output when linger interval not set to 0
+                if (connected) {
+                    try {
+                        var SO_LINGER = StandardSocketOptions.SO_LINGER;
+                        if ((int) Net.getSocketOption(fd, SO_LINGER) != 0) {
+                            Net.shutdown(fd, Net.SHUT_WR);
+                        }
+                    } catch (IOException ignore) { }
+                }
+
                 long reader = readerThread;
                 long writer = writerThread;
-                if (reader != 0 || writer != 0) {
-                    if (NativeThread.isVirtualThread(reader)
-                            || NativeThread.isVirtualThread(writer)) {
-                        Poller.stopPoll(fdVal);
-                    }
+                if (NativeThread.isVirtualThread(reader)
+                        || NativeThread.isVirtualThread(writer)) {
+                    Poller.stopPoll(fdVal);
+                }
+                if (NativeThread.isKernelThread(reader)
+                        || NativeThread.isKernelThread(writer)) {
                     nd.preClose(fd);
                     if (NativeThread.isKernelThread(reader))
                         NativeThread.signal(reader);

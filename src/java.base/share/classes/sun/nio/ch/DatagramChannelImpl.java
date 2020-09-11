@@ -1787,11 +1787,14 @@ class DatagramChannelImpl
                             || NativeThread.isVirtualThread(writer)) {
                         Poller.stopPoll(fdVal);
                     }
-                    nd.preClose(fd);
-                    if (NativeThread.isKernelThread(reader))
-                        NativeThread.signal(reader);
-                    if (NativeThread.isKernelThread(writer))
-                        NativeThread.signal(writer);
+                    if (NativeThread.isKernelThread(reader)
+                            || NativeThread.isKernelThread(writer)) {
+                        nd.preClose(fd);
+                        if (NativeThread.isKernelThread(reader))
+                            NativeThread.signal(reader);
+                        if (NativeThread.isKernelThread(writer))
+                            NativeThread.signal(writer);
+                    }
                 }
             }
         }

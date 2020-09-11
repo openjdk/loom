@@ -124,11 +124,12 @@ class SourceChannelImpl
             if (!tryClose()) {
                 long th = thread;
                 if (th != 0) {
-                    if (NativeThread.isVirtualThread(th))
+                    if (NativeThread.isVirtualThread(th)) {
                         Poller.stopPoll(fdVal);
-                    nd.preClose(fd);
-                    if (NativeThread.isKernelThread(th))
+                    } else {
+                        nd.preClose(fd);
                         NativeThread.signal(th);
+                    }
                 }
             }
         }
