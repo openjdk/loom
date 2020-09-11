@@ -119,6 +119,7 @@ class OSThreadSampler : public os::SuspendedThreadTask {
                   JfrStackFrame *frames,
                   u4 max_frames) : os::SuspendedThreadTask((Thread*)thread),
     _success(false),
+    _thread_oop(thread->threadObj()),
     _stacktrace(frames, max_frames),
     _closure(closure),
     _suspend_time() {}
@@ -131,6 +132,7 @@ class OSThreadSampler : public os::SuspendedThreadTask {
 
  private:
   bool _success;
+  oop _thread_oop;
   JfrStackTrace _stacktrace;
   JfrThreadSampleClosure& _closure;
   JfrTicks _suspend_time;
@@ -191,7 +193,7 @@ void OSThreadSampler::protected_task(const os::SuspendedThreadTaskContext& conte
       ev->set_starttime(_suspend_time);
       ev->set_endtime(_suspend_time); // fake to not take an end time
       ev->set_sampledThread(virtual_thread ? JFR_THREAD_ID(jt) : JFR_VM_THREAD_ID(jt));
-      ev->set_state(java_lang_Thread::get_thread_status(jt->threadObj()));
+      ev->set_state(java_lang_Thread::get_thread_status(_thread_oop));
     }
   }
 }
@@ -203,7 +205,7 @@ void OSThreadSampler::take_sample() {
 class JfrNativeSamplerCallback : public os::CrashProtectionCallback {
  public:
   JfrNativeSamplerCallback(JfrThreadSampleClosure& closure, JavaThread* jt, JfrStackFrame* frames, u4 max_frames) :
-    _closure(closure), _jt(jt), _stacktrace(frames, max_frames), _success(false) {
+    _closure(closure), _jt(jt), _thread_oop(jt->threadObj()), _stacktrace(frames, max_frames), _success(false) {
   }
   virtual void call();
   bool success() { return _success; }
@@ -212,15 +214,16 @@ class JfrNativeSamplerCallback : public os::CrashProtectionCallback {
  private:
   JfrThreadSampleClosure& _closure;
   JavaThread* _jt;
+  oop _thread_oop;
   JfrStackTrace _stacktrace;
   bool _success;
 };
 
-static void write_native_event(JfrThreadSampleClosure& closure, bool virtual_thread, JavaThread* jt) {
+static void write_native_event(JfrThreadSampleClosure& closure, bool virtual_thread, JavaThread* jt, oop thread_oop) {
   EventNativeMethodSample *ev = closure.next_event_native();
   ev->set_starttime(JfrTicks::now());
   ev->set_sampledThread(virtual_thread ? JFR_THREAD_ID(jt) : JFR_VM_THREAD_ID(jt));
-  ev->set_state(java_lang_Thread::get_thread_status(jt->threadObj()));
+  ev->set_state(java_lang_Thread::get_thread_status(thread_oop));
 }
 
 void JfrNativeSamplerCallback::call() {
@@ -243,7 +246,7 @@ void JfrNativeSamplerCallback::call() {
   bool virtual_thread;
   _success = _stacktrace.record_async(_jt, topframe, &virtual_thread);
   if (_success) {
-    write_native_event(_closure, virtual_thread, _jt);
+    write_native_event(_closure, virtual_thread, _jt, _thread_oop);
   }
 }
 
