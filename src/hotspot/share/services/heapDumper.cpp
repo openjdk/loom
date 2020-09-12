@@ -1891,7 +1891,7 @@ void VM_HeapDumper::dump_stack_traces() {
       // dump thread stack trace
       ResourceMark rm;
       ThreadStackTrace* stack_trace = new ThreadStackTrace(thread, false);
-      stack_trace->dump_stack_at_safepoint(-1);
+      stack_trace->dump_stack_at_safepoint(-1, true);
       _stack_traces[_num_threads++] = stack_trace;
 
       // write HPROF_FRAME records for this thread's stack trace

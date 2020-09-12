@@ -340,7 +340,7 @@ void VM_ThreadDump::doit() {
 
 void VM_ThreadDump::snapshot_thread(JavaThread* java_thread, ThreadConcurrentLocks* tcl) {
   ThreadSnapshot* snapshot = _result->add_thread_snapshot(java_thread);
-  snapshot->dump_stack_at_safepoint(_max_depth, _with_locked_monitors);
+  snapshot->dump_stack_at_safepoint(_max_depth, _with_locked_monitors, false);
   snapshot->set_concurrent_locks(tcl);
 }
 
