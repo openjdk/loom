@@ -79,10 +79,9 @@ class WEPollSelectorImpl extends SelectorImpl {
         this.pollArrayAddress = WEPoll.allocatePollArray(NUM_EPOLLEVENTS);
 
         // wakeup support
-        this.pipe = new PipeImpl(null);
+        this.pipe = new PipeImpl(null, /*no delay*/ false);
         SourceChannelImpl source = (SourceChannelImpl) pipe.source();
         SinkChannelImpl sink = (SinkChannelImpl) pipe.sink();
-        (sink.sc).socket().setTcpNoDelay(true);
         this.fd0 = source.getFD();
         this.fd0Val = source.getFDVal();
         this.fd1 = sink.getFD();

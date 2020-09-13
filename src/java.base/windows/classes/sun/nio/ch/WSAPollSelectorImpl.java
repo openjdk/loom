@@ -80,10 +80,9 @@ class WSAPollSelectorImpl extends SelectorImpl {
         this.pollArrayCapacity = INITIAL_CAPACITY;
 
         // wakeup support
-        this.pipe = new PipeImpl(null);
+        this.pipe = new PipeImpl(null, /*no delay*/ false);
         SourceChannelImpl source = (SourceChannelImpl) pipe.source();
         SinkChannelImpl sink = (SinkChannelImpl) pipe.sink();
-        (sink.sc).socket().setTcpNoDelay(true);
         this.fd0 = source.getFD();
         this.fd1 = sink.getFD();
 

@@ -31,6 +31,7 @@ package sun.nio.ch;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
 import java.nio.*;
 import java.nio.channels.*;
 import java.nio.channels.spi.*;
@@ -55,16 +56,19 @@ class PipeImpl
     private static final Random RANDOM_NUMBER_GENERATOR = new SecureRandom();
 
     // Source and sink channels
-    private SourceChannel source;
-    private SinkChannel sink;
+    private final SourceChannel source;
+    private final SinkChannel sink;
 
-    private class Initializer
+    private static class Initializer
         implements PrivilegedExceptionAction<Void>
     {
 
         private final SelectorProvider sp;
 
-        private IOException ioe = null;
+        private IOException ioe;
+
+        SourceChannelImpl source;
+        SinkChannelImpl sink;
 
         private Initializer(SelectorProvider sp) {
             this.sp = sp;
@@ -166,12 +170,25 @@ class PipeImpl
         }
     }
 
-    PipeImpl(final SelectorProvider sp) throws IOException {
+    PipeImpl(SelectorProvider sp, boolean delay) throws IOException {
+        Initializer initializer = new Initializer(sp);
         try {
-            AccessController.doPrivileged(new Initializer(sp));
+            AccessController.doPrivileged(initializer);
         } catch (PrivilegedActionException x) {
             throw (IOException)x.getCause();
         }
+
+        if (!delay) {
+            SocketChannel sc = initializer.sink.sc;
+            sc.setOption(StandardSocketOptions.TCP_NODELAY, true);
+        }
+
+        this.source = initializer.source;
+        this.sink = initializer.sink;
+    }
+
+    PipeImpl(SelectorProvider sp) throws IOException {
+        this(sp, true);
     }
 
     public SourceChannel source() {
