@@ -784,10 +784,7 @@ public class Throwable implements Serializable {
     /**
      * Fills in the execution stack trace. This method records within this
      * {@code Throwable} object information about the current state of
-     * the stack frames for the current thread in the given {@link ContinuationScope}.
-     * 
-     * <p>If this method is called not inside a continuation with the given scope,
-     * the entire thread stack is returned.
+     * the stack frames for the current thread.
      *
      * <p>If the stack trace of this {@code Throwable} {@linkplain
      * Throwable#Throwable(String, Throwable, boolean, boolean) is not
@@ -838,11 +835,13 @@ public class Throwable implements Serializable {
     private synchronized StackTraceElement[] getOurStackTrace() {
         // Initialize stack trace field with information from
         // backtrace if this is the first call to this method
-        if (stackTrace == UNASSIGNED_STACK ||
-            (stackTrace == null && backtrace != null) /* Out of protocol state */) {
-            stackTrace = StackTraceElement.of(backtrace, depth);
-        } else if (stackTrace == null) {
-            return UNASSIGNED_STACK;
+        if (stackTrace == UNASSIGNED_STACK || stackTrace == null) {
+            if (backtrace != null) { /* Out of protocol state */
+                stackTrace = StackTraceElement.of(backtrace, depth);
+            } else {
+                // no backtrace, fillInStackTrace overridden or not called
+                return UNASSIGNED_STACK;
+            }
         }
         return stackTrace;
     }

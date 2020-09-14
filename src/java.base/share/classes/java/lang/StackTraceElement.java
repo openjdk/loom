@@ -580,12 +580,7 @@ public final class StackTraceElement implements java.io.Serializable {
         return ste;
     }
 
-    private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
-
     static StackTraceElement[] of(StackTraceElement[] stackTrace) {
-        if (stackTrace == null)
-            return EMPTY_STACK;
-        
         // ensure the proper StackTraceElement initialization
         for (StackTraceElement ste : stackTrace) {
             ste.computeFormat();

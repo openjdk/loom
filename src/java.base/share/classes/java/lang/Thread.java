@@ -2632,13 +2632,22 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Returns an array of stack trace elements representing the stack dump
-     * of this thread. Returns null if the thread is not alive.
+     * Returns an array of stack trace elements representing the stack dump of
+     * this thread. Returns an empty stack trace if the thread has terminated.
      */
     StackTraceElement[] asyncGetStackTrace() {
-        return StackTraceElement.of((StackTraceElement[]) getStackTrace0());
+        Object stackTrace = getStackTrace0();
+        if (stackTrace == null) {
+            return EMPTY_STACK_TRACE;
+        } else {
+            return StackTraceElement.of((StackTraceElement[]) stackTrace);
+        }
     }
 
+    /**
+     * Returns an array of stack trace elements representing the stack dump of
+     * this thread. Returns null if the thread has terminated.
+     */
     private native Object getStackTrace0();
 
     /**
