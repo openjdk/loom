@@ -2227,7 +2227,7 @@ public class Thread implements Runnable {
      * This method returns immediately, without waiting, if the thread has not
      * been {@link #start() started}.
      *
-     * <p> For non-{@linkplain #isVirtual() virtual}, this
+     * <p> For non-{@linkplain #isVirtual() virtual threads}, this
      * implementation uses a loop of {@code this.wait} calls
      * conditioned on {@code this.isAlive}. As a thread terminates the
      * {@code this.notifyAll} method is invoked. It is recommended that
@@ -2282,7 +2282,7 @@ public class Thread implements Runnable {
      * This method returns immediately, without waiting, if the thread has not
      * been {@link #start() started}.
      *
-     * <p> For non-{@link #isVirtual() virtual}, this
+     * <p> For non-{@link #isVirtual() virtual threads}, this
      * implementation uses a loop of {@code this.wait} calls
      * <p> This implementation uses a loop of {@code this.wait} calls
      * conditioned on {@code this.isAlive}. As a thread terminates the
