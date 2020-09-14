@@ -23,7 +23,7 @@
 
 /**
  * @test
- * @run testng NioChannels
+ * @run testng/othervm/timeout=300 NioChannels
  * @summary Basic tests for virtual threads doing blocking I/O with NIO channels
  */
 

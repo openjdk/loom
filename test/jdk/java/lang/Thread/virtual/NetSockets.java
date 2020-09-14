@@ -23,7 +23,7 @@
 
 /**
  * @test
- * @run testng NetSockets
+ * @run testng/othervm/timeout=300 NetSockets
  * @summary Basic tests for virtual threads using java.net sockets.
  */
 
@@ -271,6 +271,35 @@ public class NetSockets {
                     assertTrue(Thread.interrupted());
                     assertTrue(s.isClosed());
                 }
+            }
+        });
+    }
+
+    /**
+     * Virtual thread reading urgent data when SO_OOBINLINE is enabled.
+     */
+    public void testSocketReadUrgentData() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            try (var connection = new Connection()) {
+                Socket s1 = connection.socket1();
+                Socket s2 = connection.socket2();
+
+                // urgent data should be received
+                ScheduledUrgentData.scheduleUrgentData(s2, 'X', DELAY);
+                s1.setOOBInline(true);
+                byte[] ba = new byte[10];
+                int n = s1.getInputStream().read(ba);
+                assertTrue(n == 1);
+                assertTrue(ba[0] == 'X');
+
+                // urgent data should not be received
+                s1.setOOBInline(false);
+                s1.setSoTimeout(500);
+                s2.sendUrgentData('X');
+                try {
+                    s1.getInputStream().read(ba);
+                    assertTrue(false);
+                } catch (SocketTimeoutException expected) { }
             }
         });
     }
@@ -745,6 +774,33 @@ public class NetSockets {
 
         static void schedule(DatagramSocket socket, DatagramPacket packet, long delay) {
             new Thread(new ScheduledSender(socket, packet, delay)).start();
+        }
+    }
+
+    /**
+     * Sends urgent data after a delay
+     */
+    static class ScheduledUrgentData implements Runnable {
+        private final Socket s;
+        private final int data;
+        private final long delay;
+
+        ScheduledUrgentData(Socket s, int data, long delay) {
+            this.s = s;
+            this.data = data;
+            this.delay = delay;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Thread.sleep(delay);
+                s.sendUrgentData(data);
+            } catch (Exception e) { }
+        }
+
+        static void scheduleUrgentData(Socket s, int data, long delay) {
+            new Thread(new ScheduledUrgentData(s, data, delay)).start();
         }
     }
 }
