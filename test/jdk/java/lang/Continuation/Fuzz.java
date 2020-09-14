@@ -66,34 +66,38 @@ import jdk.test.lib.Utils;
 import sun.hotspot.WhiteBox;
 
 public class Fuzz implements Runnable {
-    static final boolean VERIFY_STACK = true; // could add significant time
+    static final boolean VERIFY_STACK = false; // could add significant time
     static final boolean FILE    = true;
     static final boolean RANDOM  = false;
     static final boolean VERBOSE = false;
 
+    static final String FILENAME = "fuzz.dat";
     static final Path TEST_DIR = Path.of(System.getProperty("test.src", "."));
 
     public static void main(String[] args) {
         warmup();
-        for (int compileLevel : new int[]{4})
-            for (boolean compileRun : new boolean[]{true})
-                test(compileLevel, compileRun);
+        for (int compileLevel : new int[]{4}) {
+            for (boolean compileRun : new boolean[]{true}) {
+                COMPILE_LEVEL = compileLevel;
+                COMPILE_RUN = compileRun;
+
+                runTests();
+            }
+        }
     }
 
-    static void test(int compileLevel, boolean compileRun) {
+    static void runTests() {
         resetCompilation();
-        COMPILE_LEVEL = compileLevel;
-        COMPILE_RUN = compileRun;
 
         if (FILE) {
-            System.out.println("-- FILE --");
-            testFile("fuzz.dat");
+            System.out.println("-- FILE (" + FILENAME + ") --");
+            testFile(FILENAME);
         }
 
         if (RANDOM) {
             long seed = System.currentTimeMillis();
             System.out.println("-- RANDOM (seed: " + seed + ") --");
-            testRandom(seed);
+            testRandom(seed, 50);
         }
     }
 
@@ -116,9 +120,9 @@ public class Fuzz implements Runnable {
             int yields = fuzz.test();
             time(start, "Test (" + yields + " yields)");
 
-            if (!fuzz.checkCompilation("AFTER")) {
+            if (!fuzz.checkCompilation()) {
                 if (retry++ < RETRIES) {
-                    System.out.println("RETRYING");
+                    System.out.println("RETRYING "+ retry);
                     continue;
                 }
             }
@@ -196,8 +200,8 @@ public class Fuzz implements Runnable {
         return Stream.iterate(0, x->x+1).map(__ -> g.generate()); 
     }
 
-    static void testRandom(long seed) { 
-        testStream(random(new Random(seed)).limit(50)); 
+    static void testRandom(long seed, int number) { 
+        testStream(random(new Random(seed)).limit(number)); 
     }
 
     //// File
@@ -462,10 +466,12 @@ public class Fuzz implements Runnable {
     private static int COMPILE_LEVEL;
 
     static final int  WARMUP_ITERS = 15_000;
-    static final Op[] WARMUP_TRACE = {Op.MH_C_INT, Op.MH_C_MANY, Op.CALL_C_INT};
+    static final Op[] WARMUP_TRACE = {Op.MH_C_INT, Op.MH_C_MANY, Op.REF_C_INT, Op.REF_C_MANY, Op.CALL_C_INT};
 
     static void warmup() {
-        warmup(WARMUP_TRACE, WARMUP_ITERS);
+        final long start = time();
+        warmup(WARMUP_TRACE, WARMUP_ITERS); // generate (for reflection) and compile method handles
+        time(start, "Warmup");
     }
 
     static void warmup(Op[] trace, int times) {
@@ -535,19 +541,21 @@ public class Fuzz implements Runnable {
         return true;
     }
 
-    boolean checkCompilation(String message) {
+    boolean checkCompilation() {
         boolean res = true;
+
         if (!checkContinuationCompilation()) {
             res = false;
-            System.out.println("CHANGED CONTINUATION COMPILATION " + message);
+            System.out.println("CHANGED CONTINUATION COMPILATION");
         }
 
         Op[] newTrace = Arrays.copyOf(trace, trace.length);
         if (!checkCompilation(newTrace)) {
             res = false;
-            System.out.println("CHANGED COMPILATION " + message);
+            System.out.println("CHANGED COMPILATION");
             printTrace(newTrace);
         }
+
         return res;
     }
 
