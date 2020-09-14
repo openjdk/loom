@@ -21,8 +21,6 @@
 * questions.
 */
 
-
-
 /*
  * @test
  * @summary Fuzz tests for java.lang.Continuation
@@ -45,31 +43,19 @@
 // * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
 // * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
 
+// * @run main/othervm/timeout=3000 -XX:StartFlightRecording=filename=test.jfr,settings=profile -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+
 // Anything excluded or not compileonly is not compiled; see CompilerOracle::should_exclude
 
 // @run driver jdk.test.lib.FileInstaller compilerDirectives.json compilerDirectives.json
 // -XX:CompilerDirectivesFile=compilerDirectives.json
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.invoke.*;
+import java.lang.reflect.*;
 import java.lang.StackWalker.StackFrame;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Random;
-import java.util.Set;
-import java.util.HashSet;
+import java.nio.file.*;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import static java.lang.Math.max;
@@ -81,53 +67,39 @@ import sun.hotspot.WhiteBox;
 
 public class Fuzz implements Runnable {
     static final boolean VERIFY_STACK = true; // could add significant time
+    static final boolean FILE    = true;
     static final boolean RANDOM  = false;
     static final boolean VERBOSE = false;
 
+    static final Path TEST_DIR = Path.of(System.getProperty("test.src", "."));
+
     public static void main(String[] args) {
+        warmup();
         for (int compileLevel : new int[]{4})
             for (boolean compileRun : new boolean[]{true})
                 test(compileLevel, compileRun);
     }
-
-    private static boolean COMPILE_RUN;
-    private static int COMPILE_LEVEL;
 
     static void test(int compileLevel, boolean compileRun) {
         resetCompilation();
         COMPILE_LEVEL = compileLevel;
         COMPILE_RUN = compileRun;
 
-        testFile();
-        if (RANDOM)
-            testRandom();
+        if (FILE) {
+            System.out.println("-- FILE --");
+            testFile("fuzz.dat");
+        }
+
+        if (RANDOM) {
+            long seed = System.currentTimeMillis();
+            System.out.println("-- RANDOM (seed: " + seed + ") --");
+            testRandom(seed);
+        }
     }
 
-    static void testFile() {
-        System.out.println("-- FILE --");
-        try {
-            testStream(file(Path.of(System.getProperty("test.src", ".")).resolve("fuzz.dat")));
-        } catch (IOException e) { throw new RuntimeException(e); }
-    }
+    static void testStream(Stream<Op[]> traces) { traces.forEach(Fuzz::testTrace); }
 
-    static void testRandom() {
-        long seed = 1L; // System.currentTimeMillis();
-        System.out.println("-- RANDOM (seed: " + seed + ") --");
-        testStream(random(new Random(seed)).limit(50));
-    }
-
-    static Stream<Op[]> file(Path file) throws IOException {
-        return Files.lines(file).map(String::trim).filter(s -> !s.isBlank() && !s.startsWith("#")).map(Fuzz::parse);
-    }
-
-    static Stream<Op[]> random(Random rnd) {
-        var g = new Generator(rnd);
-        return Stream.iterate(0, x->x+1).map(__ -> g.generate());
-    }
-
-    static void testStream(Stream<Op[]> traces) {
-        traces.forEach(Fuzz::testTrace);
-    }
+    static final int RETRIES = 4;
 
     static void testTrace(Op[] trace) {
         System.out.println();
@@ -145,7 +117,7 @@ public class Fuzz implements Runnable {
             time(start, "Test (" + yields + " yields)");
 
             if (!fuzz.checkCompilation("AFTER")) {
-                if (retry++ < 2) {
+                if (retry++ < RETRIES) {
                     System.out.println("RETRYING");
                     continue;
                 }
@@ -180,7 +152,7 @@ public class Fuzz implements Runnable {
         static final Op[] ARRAY = new Op[0];
     }
 
-    ///// Trace Gnereation
+    ///// Trace Generation
 
     static class Generator {
         public Op[] generate() {
@@ -219,6 +191,31 @@ public class Fuzz implements Runnable {
         private int plusOrMinus(int n) { return rnd.nextInt(2*n + 1) - n; }
     }
 
+    static Stream<Op[]> random(Random rnd) { 
+        var g = new Generator(rnd); 
+        return Stream.iterate(0, x->x+1).map(__ -> g.generate()); 
+    }
+
+    static void testRandom(long seed) { 
+        testStream(random(new Random(seed)).limit(50)); 
+    }
+
+    //// File
+
+    static void testFile(String fileName) { 
+        try { 
+            testStream(file(TEST_DIR.resolve(fileName))); 
+        } catch (IOException e) { throw new RuntimeException(e); } 
+    }
+    
+    static Stream<Op[]> file(Path file) throws IOException {
+        return Files.lines(file).map(String::trim).filter(s -> !s.isBlank() && !s.startsWith("#")).map(Fuzz::parse);
+    }
+
+    static Op[] parse(String line) {
+        return Arrays.stream(line.split(", ")).map(s -> Enum.valueOf(Op.class, s))
+            .collect(Collectors.toList()).toArray(Op.ARRAY);
+    }  
 
     ////////////////////////////////////////
 
@@ -254,12 +251,14 @@ public class Fuzz implements Runnable {
         int count = 0;
         try {
             while (true) {
+                var start = time();
                 cont.run();
                 if (cont.isDone()) break;
 
                 assert !shouldThrow();
                 verifyStack(cont);
                 count++;
+                time(start, "Iteration");
             }
             verifyResult(result);
         } catch (FuzzException e) {
@@ -346,6 +345,7 @@ public class Fuzz implements Runnable {
             switch (trace[i]) {
                 case CALL_I_CTCH, CALL_C_CTCH -> { return false; }
                 case THROW -> { return true; }
+                default -> {}
             }
         }
         return false;
@@ -360,6 +360,7 @@ public class Fuzz implements Runnable {
 
     void verifyStack() {
         if (!VERIFY_STACK) return;
+        var start = time();
         verifyStack(backtrace);
         verifyStack(backtrace, StackWalkerHelper.toStackTraceElement(fbacktrace));
         verifyStack(fbacktrace, lfbacktrace);
@@ -367,10 +368,12 @@ public class Fuzz implements Runnable {
         verifyStack(backtrace, Thread.currentThread().getStackTrace());
         verifyStack(fbacktrace, StackWalkerHelper.getStackFrames(SCOPE));
         verifyStack(lfbacktrace, StackWalkerHelper.getLiveStackFrames(SCOPE));
+        time(start, "Verify stack");
     }
 
     void verifyStack(Continuation cont) {
         if (!VERIFY_STACK) return;
+        var start = time();
         verifyStack(backtrace);
         verifyStack(backtrace, StackWalkerHelper.toStackTraceElement(fbacktrace));
         verifyStack(fbacktrace, lfbacktrace);
@@ -378,6 +381,7 @@ public class Fuzz implements Runnable {
         verifyStack(backtrace, cont.getStackTrace());
         verifyStack(fbacktrace, StackWalkerHelper.getStackFrames(cont));
         verifyStack(lfbacktrace, StackWalkerHelper.getLiveStackFrames(cont));
+        time(start, "Verify continuation stack");
     }
 
     static boolean isStackCaptureMechanism(Object sf) {
@@ -452,7 +456,23 @@ public class Fuzz implements Runnable {
         return f instanceof StackFrame ? StackWalkerHelper.frameToString((StackFrame)f) : Objects.toString(f);
     }
 
-    ////// Static Helpers
+    ////// Compilation
+
+    private static boolean COMPILE_RUN;
+    private static int COMPILE_LEVEL;
+
+    static final int  WARMUP_ITERS = 15_000;
+    static final Op[] WARMUP_TRACE = {Op.MH_C_INT, Op.MH_C_MANY, Op.CALL_C_INT};
+
+    static void warmup() {
+        warmup(WARMUP_TRACE, WARMUP_ITERS);
+    }
+
+    static void warmup(Op[] trace, int times) {
+        for (int i=0; i<times; i++) {
+            new Fuzz(trace).run();
+        }
+    }
 
     static void resetCompilation() {
         Set<Method> compile = Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
@@ -502,10 +522,29 @@ public class Fuzz implements Runnable {
         time(start, "Compile");
     }
 
+    boolean checkContinuationCompilation() {
+        for (Method m : Continuation.class.getDeclaredMethods()) {
+            if (!WB.isMethodCompiled(m)) {
+                if (!Modifier.isNative(m.getModifiers()) 
+                    && (m.getName().startsWith("enter")
+                     || m.getName().startsWith("yield"))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     boolean checkCompilation(String message) {
+        boolean res = true;
+        if (!checkContinuationCompilation()) {
+            res = false;
+            System.out.println("CHANGED CONTINUATION COMPILATION " + message);
+        }
+
         Op[] newTrace = Arrays.copyOf(trace, trace.length);
-        boolean res = checkCompilation(newTrace);
-        if (!res) {
+        if (!checkCompilation(newTrace)) {
+            res = false;
             System.out.println("CHANGED COMPILATION " + message);
             printTrace(newTrace);
         }
@@ -523,6 +562,8 @@ public class Fuzz implements Runnable {
         return ok;
     }
 
+    //// Static Helpers
+    
     static void rethrow(Throwable t) {
         if (t instanceof Error) throw (Error)t;
         if (t instanceof RuntimeException) throw (RuntimeException)t;
@@ -537,12 +578,7 @@ public class Fuzz implements Runnable {
 
     static String write(Op[] trace) { 
         return Arrays.stream(trace).map(Object::toString).collect(Collectors.joining(", ")); 
-    }
-
-    static Op[] parse(String line) {
-        return Arrays.stream(line.split(", ")).map(s -> Enum.valueOf(Op.class, s))
-            .collect(Collectors.toList()).toArray(Op.ARRAY);
-    }    
+    }  
 
     static Method method(Op op)       { return method.get(op); }
     static MethodHandle handle(Op op) { return handle.get(op); }
