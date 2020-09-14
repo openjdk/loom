@@ -80,25 +80,15 @@ public class Fuzz implements Runnable {
             for (boolean compileRun : new boolean[]{true}) {
                 COMPILE_LEVEL = compileLevel;
                 COMPILE_RUN = compileRun;
-
+                resetCompilation();
                 runTests();
             }
         }
     }
 
     static void runTests() {
-        resetCompilation();
-
-        if (FILE) {
-            System.out.println("-- FILE (" + FILENAME + ") --");
-            testFile(FILENAME);
-        }
-
-        if (RANDOM) {
-            long seed = System.currentTimeMillis();
-            System.out.println("-- RANDOM (seed: " + seed + ") --");
-            testRandom(seed, 50);
-        }
+        if (FILE)   testFile(FILENAME);
+        if (RANDOM) testRandom(System.currentTimeMillis(), 50);
     }
 
     static void testStream(Stream<Op[]> traces) { traces.forEach(Fuzz::testTrace); }
@@ -201,12 +191,14 @@ public class Fuzz implements Runnable {
     }
 
     static void testRandom(long seed, int number) { 
+        System.out.println("-- RANDOM (seed: " + seed + ") --");
         testStream(random(new Random(seed)).limit(number)); 
     }
 
     //// File
 
     static void testFile(String fileName) { 
+        System.out.println("-- FILE (" + FILENAME + ") --");
         try { 
             testStream(file(TEST_DIR.resolve(fileName))); 
         } catch (IOException e) { throw new RuntimeException(e); } 
