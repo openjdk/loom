@@ -31,6 +31,7 @@ runtime/ErrorHandling/TestCrashOnOutOfMemoryError.java
 runtime/ErrorHandling/TestExitOnOutOfMemoryError.java
 runtime/ErrorHandling/TestHeapDumpPath.java
 runtime/ErrorHandling/TestOnOutOfMemoryError.java
+runtime/Thread/ThreadPriorities.java
 runtime/Throwable/StackTraceLogging.java
 runtime/Throwable/TestMaxJavaStackTraceDepth.java
 runtime/Throwable/TestThrowable.java
@@ -129,13 +130,29 @@ gc/arguments/TestParallelHeapSizeFlags.java
 gc/arguments/TestMinInitialErgonomics.java
 gc/arguments/TestMaxRAMFlags.java
 gc/arguments/TestG1HeapSizeFlags.java
+gc/arguments/TestNewSizeThreadIncrease.java
 gc/TestAgeOutput.java#id1
 gc/TestAgeOutput.java#id0
 
 ####
-# Expected exception is ignored
+## Expected exception is ignored
 
 runtime/condy/BadBSMUseTest.java
+
+
+####
+## Classes not unloaded as expected (TODO, need to check if FJ keep link)
+
+gc/g1/humongousObjects/TestHumongousClassLoader.java
+runtime/ClassUnload/UnloadInterfaceTest.java
+runtime/ClassUnload/UnloadTest.java
+runtime/ClassUnload/SuperDependsTest.java
+runtime/ClassUnload/KeepAliveSoftReference.java
+runtime/ClassUnload/KeepAliveObject.java
+runtime/ClassUnload/KeepAliveClassLoader.java
+runtime/ClassUnload/DictionaryDependsTest.java
+runtime/ClassUnload/KeepAliveClass.java
+runtime/ClassUnload/ConstantPoolDependsTest.java
 
 
 ##########

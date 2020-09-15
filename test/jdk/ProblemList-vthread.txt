@@ -18,7 +18,9 @@ java/lang/StackWalker/GetCallerClassTest.java
 java/lang/StackWalker/DumpStackTest.java
 java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
-
+java/lang/Continuation/Scoped.java
+java/lang/Continuation/PreemptLiveFramesDriver.java
+java/lang/Continuation/Preempt.java
 
 ####
 # Thread-sensitive threads
@@ -88,6 +90,7 @@ java/lang/module/ModuleFinderWithSecurityManager.java
 java/lang/invoke/MethodTypeSecurityManager.java
 java/lang/invoke/MethodHandleConstants.java
 java/lang/invoke/InvokeDynamicPrintArgs.java
+java/lang/reflect/callerCache/ReflectionCallerCacheTest.java
 java/util/ServiceLoader/security/SecurityTest.java
 java/util/PluggableLocale/PermissionTest.java
 java/util/logging/TestLoggerBundleSync.java
@@ -154,3 +157,9 @@ java/lang/ClassLoader/getResource/automaticmodules/Driver.java
 java/lang/Class/getResource/ResourcesTest.java
 java/lang/Class/forName/modules/TestDriver.java
 java/lang/ClassLoader/getResource/modules/ResourcesTest.java
+
+
+####
+# No expected StackOverflow
+
+java/lang/invoke/condy/CondyNestedResolutionTest.java
