@@ -2625,7 +2625,8 @@ public class Thread implements Runnable {
             if (!isAlive()) {
                 return EMPTY_STACK_TRACE;
             }
-            return asyncGetStackTrace();
+            StackTraceElement[] stackTrace = asyncGetStackTrace();
+            return (stackTrace != null) ? stackTrace : EMPTY_STACK_TRACE;
         } else {
             return (new Exception()).getStackTrace();
         }
@@ -2633,21 +2634,20 @@ public class Thread implements Runnable {
 
     /**
      * Returns an array of stack trace elements representing the stack dump of
-     * this thread. Returns an empty stack trace if the thread has terminated.
+     * this thread. Returns null if the stack trace cannot be obtained. In
+     * the default implementation, null is returned if the thread is a virtual
+     * thread that is not mounted or the thread is a kernel thread that has
+     * terminated.
      */
     StackTraceElement[] asyncGetStackTrace() {
         Object stackTrace = getStackTrace0();
         if (stackTrace == null) {
-            return EMPTY_STACK_TRACE;
+            return null;
         } else {
             return StackTraceElement.of((StackTraceElement[]) stackTrace);
         }
     }
 
-    /**
-     * Returns an array of stack trace elements representing the stack dump of
-     * this thread. Returns null if the thread has terminated.
-     */
     private native Object getStackTrace0();
 
     /**
