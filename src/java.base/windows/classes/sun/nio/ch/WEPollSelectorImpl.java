@@ -38,17 +38,12 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
-import jdk.internal.misc.Unsafe;
 import static sun.nio.ch.WEPoll.*;
 
 /**
  * Windows wepoll based Selector implementation
  */
 class WEPollSelectorImpl extends SelectorImpl {
-    private static final Unsafe UNSAFE = Unsafe.getUnsafe();
-    private static final long TEMP_BUF = UNSAFE.allocateMemory(1);
-    private static final NativeDispatcher ND = new SocketDispatcher();
-
     // maximum number of events to poll in one call to epoll_wait
     private static final int NUM_EPOLLEVENTS = 256;
 
@@ -70,7 +65,7 @@ class WEPollSelectorImpl extends SelectorImpl {
     private boolean interruptTriggered;
     private final Pipe pipe;
     private final FileDescriptor fd0, fd1;
-    private final int fd0Val;
+    private final int fd0Val, fd1Val;
 
     WEPollSelectorImpl(SelectorProvider sp) throws IOException {
         super(sp);
@@ -79,13 +74,13 @@ class WEPollSelectorImpl extends SelectorImpl {
         this.pollArrayAddress = WEPoll.allocatePollArray(NUM_EPOLLEVENTS);
 
         // wakeup support
-        this.pipe = new PipeImpl(null);
+        this.pipe = new PipeImpl(null, /*no delay*/ false);
         SourceChannelImpl source = (SourceChannelImpl) pipe.source();
         SinkChannelImpl sink = (SinkChannelImpl) pipe.sink();
-        (sink.sc).socket().setTcpNoDelay(true);
         this.fd0 = source.getFD();
-        this.fd0Val = source.getFDVal();
         this.fd1 = sink.getFD();
+        this.fd0Val = source.getFDVal();
+        this.fd1Val = sink.getFDVal();
 
         // register one end of the pipe for wakeups
         WEPoll.ctl(eph, EPOLL_CTL_ADD, fd0Val, WEPoll.EPOLLIN);
@@ -247,7 +242,7 @@ class WEPollSelectorImpl extends SelectorImpl {
         synchronized (interruptLock) {
             if (!interruptTriggered) {
                 try {
-                    ND.write(fd1, TEMP_BUF, 1);
+                    IOUtil.write1(fd1Val, (byte) 0);
                 } catch (IOException ioe) {
                     throw new InternalError(ioe);
                 }
@@ -259,7 +254,7 @@ class WEPollSelectorImpl extends SelectorImpl {
 
     private void clearInterrupt() throws IOException {
         synchronized (interruptLock) {
-            ND.read(fd0, TEMP_BUF, 1);
+            IOUtil.drain(fd0Val);
             interruptTriggered = false;
         }
     }

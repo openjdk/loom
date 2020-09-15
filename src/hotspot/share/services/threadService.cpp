@@ -666,13 +666,13 @@ ThreadStackTrace::~ThreadStackTrace() {
   }
 }
 
-void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth) {
+void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, bool full) {
   assert(SafepointSynchronize::is_at_safepoint(), "all threads are stopped");
 
   if (_thread->has_last_Java_frame()) {
     RegisterMap reg_map(_thread, true, false);
 
-    vframe* start_vf = _thread->last_continuation(java_lang_VirtualThread::vthread_scope()) != NULL
+    vframe* start_vf = !full && _thread->last_continuation(java_lang_VirtualThread::vthread_scope()) != NULL
       ? _thread->vthread_carrier_last_java_vframe(&reg_map)
       : _thread->last_java_vframe(&reg_map);
     int count = 0;
@@ -943,9 +943,9 @@ ThreadSnapshot::~ThreadSnapshot() {
   delete _concurrent_locks;
 }
 
-void ThreadSnapshot::dump_stack_at_safepoint(int max_depth, bool with_locked_monitors) {
+void ThreadSnapshot::dump_stack_at_safepoint(int max_depth, bool with_locked_monitors, bool full) {
   _stack_trace = new ThreadStackTrace(_thread, with_locked_monitors);
-  _stack_trace->dump_stack_at_safepoint(max_depth);
+  _stack_trace->dump_stack_at_safepoint(max_depth, full);
 }
 
 

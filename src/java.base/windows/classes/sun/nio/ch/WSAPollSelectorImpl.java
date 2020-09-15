@@ -37,7 +37,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.function.Consumer;
-import jdk.internal.misc.Unsafe;
 
 /**
  * Selector implementation based on WASPoll.
@@ -48,10 +47,6 @@ import jdk.internal.misc.Unsafe;
  */
 
 class WSAPollSelectorImpl extends SelectorImpl {
-    private static final Unsafe UNSAFE = Unsafe.getUnsafe();
-    private static final long TEMP_BUF = UNSAFE.allocateMemory(1);
-    private static final NativeDispatcher ND = new SocketDispatcher();
-
     // initial capacity of poll array
     private static final int INITIAL_CAPACITY = 16;
 
@@ -72,6 +67,7 @@ class WSAPollSelectorImpl extends SelectorImpl {
     private boolean interruptTriggered;
     private final Pipe pipe;
     private final FileDescriptor fd0, fd1;
+    private final int fd0Val, fd1Val;
 
     WSAPollSelectorImpl(SelectorProvider sp) throws IOException {
         super(sp);
@@ -80,16 +76,17 @@ class WSAPollSelectorImpl extends SelectorImpl {
         this.pollArrayCapacity = INITIAL_CAPACITY;
 
         // wakeup support
-        this.pipe = new PipeImpl(null);
+        this.pipe = new PipeImpl(null, /*no delay*/ false);
         SourceChannelImpl source = (SourceChannelImpl) pipe.source();
         SinkChannelImpl sink = (SinkChannelImpl) pipe.sink();
-        (sink.sc).socket().setTcpNoDelay(true);
         this.fd0 = source.getFD();
         this.fd1 = sink.getFD();
+        this.fd0Val = source.getFDVal();
+        this.fd1Val = sink.getFDVal();
 
         // element 0 in poll array is for wakeup.
         synchronized (this) {
-            putDescriptor(0, source.getFDVal());
+            putDescriptor(0, fd0Val);
             putEvents(0, Net.POLLIN);
             putRevents(0, (short) 0);
             pollArraySize = 1;
@@ -240,7 +237,7 @@ class WSAPollSelectorImpl extends SelectorImpl {
         synchronized (interruptLock) {
             if (!interruptTriggered) {
                 try {
-                    ND.write(fd1, TEMP_BUF, 1);
+                    IOUtil.write1(fd1Val, (byte) 0);
                 } catch (IOException ioe) {
                     throw new InternalError(ioe);
                 }
@@ -252,7 +249,7 @@ class WSAPollSelectorImpl extends SelectorImpl {
 
     private void clearInterrupt() throws IOException {
         synchronized (interruptLock) {
-            ND.read(fd0, TEMP_BUF, 1);
+            IOUtil.drain(fd0Val);
             interruptTriggered = false;
         }
     }
