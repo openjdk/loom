@@ -22,6 +22,7 @@
  */
 package nsk.share.runner;
 
+import java.util.concurrent.locks.LockSupport;
 import nsk.share.gc.OOMStress;
 import nsk.share.log.*;
 import nsk.share.test.Stresser;
@@ -102,13 +103,13 @@ public class ThreadsRunner implements MultiRunner, LogAware, RunParamsAware {
         public void run() {
             notStarted.decrementAndGet();
             while (notStarted.get() != 0) {
-                Thread.onSpinWait();
+                LockSupport.parkNanos(1);
             }
             try {
                 stresser.start(runParams.getIterations());
                 while (!this.thread.isInterrupted() && stresser.iteration()) {
                     test.run();
-                    Thread.yield();
+                    LockSupport.parkNanos(1);
                 }
             } catch (OutOfMemoryError oom) {
                 if (test instanceof OOMStress) {
