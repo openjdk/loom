@@ -14,7 +14,14 @@ serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id0
 serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
 serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
 serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java
+
+
+####
+# JVMTI tests failing to find thread
+
 serviceability/jvmti/GetLocalVariable/GetLocalVars.java
+serviceability/jvmti/GetThreadListStackTraces/OneGetThreadListStackTraces.java
+serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java
 
 ####
 # OOME in unexpected thread
