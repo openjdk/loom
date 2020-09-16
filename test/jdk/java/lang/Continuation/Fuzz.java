@@ -66,12 +66,11 @@ import jdk.test.lib.Utils;
 import sun.hotspot.WhiteBox;
 
 public class Fuzz implements Runnable {
-    static final boolean VERIFY_STACK = false; // could add significant time
+    static final boolean VERIFY_STACK = true; // could add significant time
     static final boolean FILE    = true;
     static final boolean RANDOM  = false;
     static final boolean VERBOSE = false;
 
-    static final String FILENAME = "fuzz.dat";
     static final Path TEST_DIR = Path.of(System.getProperty("test.src", "."));
 
     public static void main(String[] args) {
@@ -87,7 +86,7 @@ public class Fuzz implements Runnable {
     }
 
     static void runTests() {
-        if (FILE)   testFile(FILENAME);
+        if (FILE)   testFile("fuzz.dat");
         if (RANDOM) testRandom(System.currentTimeMillis(), 50);
     }
 
@@ -198,7 +197,7 @@ public class Fuzz implements Runnable {
     //// File
 
     static void testFile(String fileName) { 
-        System.out.println("-- FILE (" + FILENAME + ") --");
+        System.out.println("-- FILE (" + fileName + ") --");
         try { 
             testStream(file(TEST_DIR.resolve(fileName))); 
         } catch (IOException e) { throw new RuntimeException(e); } 
