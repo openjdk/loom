@@ -449,3 +449,27 @@ vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes004/TestDescription.java
 vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes005/TestDescription.java
 vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes006/TestDescription.java
 vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes007/TestDescription.java
+
+
+####
+## NSK JMX Tests
+
+
+####
+## Unsupported functionality
+
+vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_server_default/TestDescription.java
+vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_server_custom/TestDescription.java
+vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_directly/TestDescription.java
+vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_proxy_custom/TestDescription.java
+vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_proxy_default/TestDescription.java
+
+
+####
+## No ThreadInfo for vthreads
+
+vmTestbase/nsk/monitoring/ThreadInfo/isInNative/isinnative001/TestDescription.java
+vmTestbase/nsk/monitoring/ThreadInfo/getLockOwnerName/getlockownername001/TestDescription.java
+vmTestbase/nsk/monitoring/ThreadInfo/getLockName/getlockname001/TestDescription.java
+vmTestbase/nsk/monitoring/ThreadInfo/from_c/from_c001/TestDescription.java
+vmTestbase/nsk/monitoring/MemoryUsage/from/from001/TestDescription.java
