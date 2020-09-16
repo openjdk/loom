@@ -259,7 +259,9 @@ public class Continuation {
      * @throws IllegalStateException if the continuation is mounted
      */
     public StackTraceElement[] getStackTrace() {
-        return stackWalker().walk(s -> s.map(StackWalker.StackFrame::toStackTraceElement).toArray(StackTraceElement[]::new));
+        return stackWalker(StackWalker.Option.SHOW_REFLECT_FRAMES)
+            .walk(s -> s.map(StackWalker.StackFrame::toStackTraceElement)
+            .toArray(StackTraceElement[]::new));
     }
 
     /// Support for StackWalker

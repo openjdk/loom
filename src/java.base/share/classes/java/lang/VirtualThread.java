@@ -832,9 +832,7 @@ class VirtualThread extends Thread {
     private StackTraceElement[] tryGetStackTrace() {
         if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
             try {
-                return cont.stackWalker()
-                        .walk(s -> s.map(StackFrame::toStackTraceElement)
-                                    .toArray(StackTraceElement[]::new));
+                return cont.getStackTrace();
             } finally {
                 assert state() == PARKED_SUSPENDED;
                 setState(PARKED);
