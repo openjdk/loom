@@ -26,7 +26,8 @@ serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java
 ####
 # OOME in unexpected thread
 gc/g1/ihop/TestIHOPStatic.java
-
+vmTestbase/gc/gctests/MemoryEater/TestDescription.java
+vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java
 
 ####
 # Test failing because of incorrect stacktrace or thread properties for main thread
