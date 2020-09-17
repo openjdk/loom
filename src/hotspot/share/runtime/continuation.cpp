@@ -716,6 +716,8 @@ public:
   inline void sub_size(size_t s) { log_develop_trace(jvmcont)("sub max_size: " SIZE_FORMAT " s: " SIZE_FORMAT, _max_size - s, s);
                                    assert(s <= _max_size, "s: " SIZE_FORMAT " max_size: " SIZE_FORMAT, s, _max_size);
                                    _max_size -= s; }
+  inline void set_max_size(size_t s) { log_develop_trace(jvmcont)("set max_size: " SIZE_FORMAT " s: " SIZE_FORMAT, _max_size, s);
+                                       _max_size = s; }
   inline short num_interpreted_frames() { return _num_interpreted_frames; }
   inline void inc_num_interpreted_frames() { _num_interpreted_frames++; _e_num_interpreted_frames++; }
   inline void dec_num_interpreted_frames() { _num_interpreted_frames--; _e_num_interpreted_frames++; }
@@ -2126,6 +2128,8 @@ static void verify_cookie(intptr_t *addr) {
 
 template <typename ConfigT, op_mode mode>
 class Freeze {
+  template<typename ConfigT_1, op_mode mode_1> friend class Freeze;
+
   typedef typename Conditional<mode == mode_slow, RegisterMap, SmallRegisterMap>::type RegisterMapT; // we need a full map to store the register dump for a safepoint stub during preemtion
   typedef Freeze<ConfigT, mode> SelfT;
   typedef CompiledMethodKeepalive<ConfigT> CompiledMethodKeepaliveT;
@@ -2200,7 +2204,8 @@ public:
     _map.set_include_argument_oops(false);
   }
 
-  Freeze(oop chunk, Freeze<ConfigT, mode>* other) :
+  template <op_mode other_mode>
+  Freeze(oop chunk, Freeze<ConfigT, other_mode>* other) :
     _thread(other->_thread), _cont(other->_cont),
     _map(NULL, false, false, false), _fp_oop_info(),
     _preempt(false),
@@ -2222,7 +2227,8 @@ public:
     _bottom_address += LIKELY(argsize == 0) ? frame_metadata // We add 2 because the chunk does not include the bottommost 2 words (return pc and link)
                                             : -argsize;
 
-    log_develop_trace(jvmcont)("freeze chunk bottom_address: " INTPTR_FORMAT " argsize: %d", p2i(_bottom_address), argsize);
+
+    log_develop_trace(jvmcont)("squash chunk bottom_address: " INTPTR_FORMAT " argsize: %d size: %d oops: %d frames: %d", p2i(_bottom_address), argsize, _size, _oops, _frames);
     if (log_develop_is_enabled(Trace, jvmcont)) print_chunk(chunk, _cont.mirror(), true);
   }
 
@@ -2567,21 +2573,41 @@ public:
   }
 #endif
 
+  freeze_result squash_chunks() {
+    if (_chunk != (oop)NULL) {
+      return squash_chunks(jdk_internal_misc_StackChunk::parent(_chunk));
+    }
+
+    log_develop_trace(jvmcont)("squash_chunks begin");
+    size_t orig_max_size = _cont.max_size();
+    freeze_result res = squash_chunks(_cont.tail());
+    if (res == freeze_ok) {
+      // cleanup chunks
+      assert (_cont.tail() != (oop)NULL, "");
+      for (oop chunk = _cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
+        jdk_internal_misc_StackChunk::set_parent(chunk, (oop)NULL);
+        jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame_metadata);
+        ContMirror::reset_chunk_counters(chunk);
+      }
+    }
+    _cont.set_tail(NULL); // won't be committed to object on failure
+    _cont.set_max_size(orig_max_size); // squashing chunks maintains max_size
+    log_develop_trace(jvmcont)("squash_chunks end");
+
+    return res;
+  }
+
   freeze_result squash_chunks(oop chunk) {
     if (chunk == (oop)NULL) 
       return freeze_result::freeze_no_chunk;
 
     freeze_result res;
     if (ContMirror::is_empty_chunk(chunk)) {
-      res = squash_chunks(jdk_internal_misc_StackChunk::parent(chunk));
-    } else {
-      DEBUG_ONLY(int orig_sp = _cont.sp();)
-      Freeze<ConfigT, mode_fast> frz(chunk, (Freeze<ConfigT, mode_fast>*)this);
-      res = frz.squash_chunk();
-      assert (res != freeze_ok || ((orig_sp - _cont.sp()) << LogBytesPerElement) == frz.nr_bytes(), "sp diff size: %d frz.nr_bytes(): %d", ((orig_sp - _cont.sp()) << LogBytesPerElement), frz.nr_bytes());
+      return squash_chunks(jdk_internal_misc_StackChunk::parent(chunk));
     }
-    _cont.set_tail(NULL); // won't be committed to object on failure
-    return res;
+    
+    Freeze<ConfigT, mode_fast> frz(chunk, this);
+    return frz.squash_chunk();
   }
 
   freeze_result squash_chunk() {
@@ -2595,11 +2621,7 @@ public:
     hframe caller;
     freeze_result res = freeze<true>(f, caller, 0);
 
-    if (res != freeze_exception) {
-      jdk_internal_misc_StackChunk::set_parent(_chunk, (oop)NULL);
-      jdk_internal_misc_StackChunk::set_sp(_chunk, jdk_internal_misc_StackChunk::size(_chunk) + frame_metadata);
-      ContMirror::reset_chunk_counters(_chunk);
-
+    if (res == freeze_ok) {
       EventContinuationSquash e;
       if (e.should_commit() && USE_CHUNKS) {
         e.set_id(cast_from_oop<u8>(_cont.mirror()));
@@ -2807,7 +2829,7 @@ public:
     PERFTEST_ONLY(if (PERFTEST_LEVEL <= 15) return freeze_ok;)
 
     // DEBUG_ONLY(size_t orig_max_size = _cont.max_size());
-    assert ((_cont.max_size() == 0) == _cont.is_empty(), "");
+    assert ((_cont.max_size() == 0) == _cont.is_empty(), "_cont.max_size(): %lu _cont.is_empty(): %d", _cont.max_size(), _cont.is_empty());
 
     int argsize = 0;
     if (!_cont.is_empty0()) {
@@ -2824,9 +2846,16 @@ public:
     }
     *argsize_out = argsize;
 
-    freeze_result res = squash_chunks(_chunk != (oop)NULL ? jdk_internal_misc_StackChunk::parent(_chunk) : _cont.tail());
+    DEBUG_ONLY(bool of_chunk = (_chunk != (oop)NULL);)
+
+    freeze_result res = squash_chunks();
     if (res == freeze_exception)
       return res;
+    
+    _chunk = (oop)NULL;
+    assert (of_chunk == (_cont.tail() != (oop)NULL), "of_chunk: %d", of_chunk);
+
+    assert (res != freeze_retry_slow, "");
 
     if (res == freeze_result::freeze_no_chunk) {
       if (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
@@ -2835,7 +2864,6 @@ public:
       }
 
       // ALLOCATION
-      _chunk = (oop)NULL;
 
       bool allocated = _cont.allocate_stacks<ConfigT>(_size, _oops, _frames);
       if (_thread->has_pending_exception()) {
@@ -2849,17 +2877,20 @@ public:
         }
       }
   #endif
+
+      _cont.add_num_frames(_frames);
+      _cont.e_add_refs(_oops);
     }
 
-    if (mode == mode_fast && !_thread->cont_fastpath()) {
+    _cont.add_size(_size);
+
+    if (mode == mode_fast && _cont.tail() == (oop)NULL && !_thread->cont_fastpath()) {
       if (ConfigT::_post_barrier) {
         _cont.zero_ref_stack_prefix();
       }
       log_develop_trace(jvmcont)("RETRY SLOW");
       return freeze_retry_slow; // things have deoptimized
     }
-
-    assert (!_cont.is_empty() || _cont.max_size() == 0, "_cont.max_size(): %lu _cont.is_empty(): %d", _cont.max_size(), _cont.is_empty());
 
     // java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail()); -- doesn't seem to help
 
@@ -2872,12 +2903,12 @@ public:
     log_develop_trace(jvmcont)("empty: %d", empty);
     assert (!FULL_STACK || empty, "");
     assert (!empty || _cont.sp() >= _cont.stack_length() || _cont.sp() < 0, "sp: %d stack_length: %d", _cont.sp(), _cont.stack_length());
-    assert (orig_top_frame.is_empty() == empty, "empty: %d f.sp: %d tail: %d", empty, orig_top_frame.sp(), (_cont.tail() != (oop)NULL));
+    assert (_cont.tail() != (oop)NULL || orig_top_frame.is_empty() == empty, "empty: %d f.sp: %d tail: %d", empty, orig_top_frame.sp(), (_cont.tail() != (oop)NULL));
     assert (!empty || assert_bottom_java_frame_name(callee, ENTER_SIG), "");
   #endif
 
     if (_cont.is_empty0()) {
-      assert (_cont.is_empty(), "");
+      assert (_cont.tail() != (oop)NULL || _cont.is_empty(), "");
       caller = new_bottom_hframe<true>(_cont.sp(), _cont.refSP(), NULL, false);
     } else {
       assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
@@ -2896,11 +2927,8 @@ public:
 
     DEBUG_ONLY(log_develop_trace(jvmcont)("finalize bottom frame:"); if (log_develop_is_enabled(Trace, jvmcont)) caller.print_on(_cont, tty);)
 
-    _cont.add_num_frames(_frames);
-    _cont.add_size(_size);
-    _cont.e_add_refs(_oops);
-
-    if (_thread != NULL && _chunk == (oop)NULL) {
+#ifdef ASSERT
+    if (_thread != NULL && !of_chunk) {
       frame entry = sender<FKind>(callee); // f.sender_for_compiled_frame<ContinuationCodeBlobLookup>(&map);
 
       log_develop_trace(jvmcont)("Found entry:");
@@ -2911,6 +2939,7 @@ public:
       assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()), ""); // we do not allow entry to be interpreted in fast mode
       assert (mode != mode_fast || Interpreter::contains(_cont.entryPC()) || entry.sp() == _bottom_address, "f.sp: " INTPTR_FORMAT " _bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT, p2i(entry.sp()), p2i(_bottom_address), p2i(_cont.entrySP()));
     }
+#endif
 
     return freeze_ok;
   }
@@ -2962,8 +2991,9 @@ public:
     assert (bottom || mode == mode_fast || Interpreter::contains(FKind::interpreted ? hf.return_pc<FKind>() : caller.real_pc(_cont)) == caller.is_interpreted_frame(),
       "FKind: %s contains: %d is_interpreted: %d", FKind::name, Interpreter::contains(FKind::interpreted ? hf.return_pc<FKind>() : caller.real_pc(_cont)), caller.is_interpreted_frame()); // fails for perftest < 25, but that's ok
     assert (!bottom || !_cont.is_empty() || (_cont.fp() == 0 && _cont.pc() == NULL), "");
-    assert (!bottom || _cont.is_empty() || (!FKind::interpreted && caller.is_interpreted_frame() && hf.compiled_frame_stack_argsize() > 0) || caller == _cont.last_frame<mode_slow>(), "");
-    assert (!bottom || _cont.is_empty() || _chunk != (oop)NULL || Continuation::is_cont_barrier_frame(f), "");
+    // _cont.tail() != (oop)NULL below is just used to detect if we're squashing a chunk
+    assert (!bottom || _cont.tail() != (oop)NULL || _cont.is_empty() || (!FKind::interpreted && caller.is_interpreted_frame() && hf.compiled_frame_stack_argsize() > 0) || caller == _cont.last_frame<mode_slow>(), "");
+    assert (!bottom || _cont.tail() != (oop)NULL || _cont.is_empty() || Continuation::is_cont_barrier_frame(f), "");
     assert (!bottom || _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
     assert (!FKind::interpreted || hf.interpreted_link_address() == _cont.stack_address(hf.fp()), "");
 
@@ -3383,6 +3413,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   } else if (mode != mode_fast && UNLIKELY(preempt)) {
     assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "thread_state: %d %s", thread->thread_state(), thread->thread_state_name());
     freeze_result res = fr.freeze_preempt();
+    assert (res != freeze_retry_slow, "");
     return freeze_epilog(thread, cont, res);
   } else {
     // manual transtion. see JRT_ENTRY in interfaceSupport.inline.hpp
@@ -3399,6 +3430,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
     } else if (LIKELY(res == freeze_ok)) {
       set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
     }
+    assert (res != freeze_retry_slow, "");
     return freeze_epilog(thread, cont, res);
   }
 }
@@ -6116,7 +6148,9 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   bool nonempty_chunk = false;
   assert (oopDesc::is_oop_or_null(cont.tail()), "");
   assert (cont.chunk_invariant(), "");
+  int num_chunks = 0;
   for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
+    num_chunks++;
     debug_verify_stack_chunk(chunk, contOop, &max_size);
     if (!ContMirror::is_empty_chunk(chunk))
       nonempty_chunk = true;
