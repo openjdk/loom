@@ -2601,7 +2601,6 @@ public:
     if (chunk == (oop)NULL) 
       return freeze_result::freeze_no_chunk;
 
-    freeze_result res;
     if (ContMirror::is_empty_chunk(chunk)) {
       return squash_chunks(jdk_internal_misc_StackChunk::parent(chunk));
     }
