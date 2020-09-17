@@ -53,14 +53,11 @@
 import java.lang.invoke.*;
 import java.lang.reflect.*;
 import java.lang.StackWalker.StackFrame;
-import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.stream.*;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
-
 import jdk.internal.vm.annotation.DontInline;
 import jdk.test.lib.Utils;
 import sun.hotspot.WhiteBox;
@@ -78,7 +75,7 @@ public class Fuzz implements Runnable {
         for (int compileLevel : new int[]{4}) {
             for (boolean compileRun : new boolean[]{true}) {
                 COMPILE_LEVEL = compileLevel;
-                COMPILE_RUN = compileRun;
+                COMPILE_RUN   = compileRun;
                 resetCompilation();
                 runTests();
             }
@@ -88,35 +85,6 @@ public class Fuzz implements Runnable {
     static void runTests() {
         if (FILE)   testFile("fuzz.dat");
         if (RANDOM) testRandom(System.currentTimeMillis(), 50);
-    }
-
-    static void testStream(Stream<Op[]> traces) { traces.forEach(Fuzz::testTrace); }
-
-    static final int RETRIES = 4;
-
-    static void testTrace(Op[] trace) {
-        System.out.println();
-        System.out.println("COMPILE_LEVEL: " + COMPILE_LEVEL + " COMPILE_RUN: " + COMPILE_RUN);
- 
-        int retry = 0;
-        for (;;) {
-            compile();
-
-            long start = time();
-            var fuzz = new Fuzz(trace);
-            fuzz.verbose = VERBOSE && retry == 0;
-            fuzz.print();
-            int yields = fuzz.test();
-            time(start, "Test (" + yields + " yields)");
-
-            if (!fuzz.checkCompilation()) {
-                if (retry++ < RETRIES) {
-                    System.out.println("RETRYING "+ retry);
-                    continue;
-                }
-            }
-            break;
-        }
     }
 
     ////////////////
@@ -144,8 +112,6 @@ public class Fuzz implements Runnable {
 
         static final Op[] ARRAY = new Op[0];
     }
-
-    ///// Trace Generation
 
     static class Generator {
         public Op[] generate() {
@@ -194,25 +160,44 @@ public class Fuzz implements Runnable {
         testStream(random(new Random(seed)).limit(number)); 
     }
 
-    //// File
-
     static void testFile(String fileName) { 
         System.out.println("-- FILE (" + fileName + ") --");
         try { 
             testStream(file(TEST_DIR.resolve(fileName))); 
-        } catch (IOException e) { throw new RuntimeException(e); } 
+        } catch (java.io.IOException e) { throw new RuntimeException(e); } 
     }
     
-    static Stream<Op[]> file(Path file) throws IOException {
+    static Stream<Op[]> file(Path file) throws java.io.IOException {
         return Files.lines(file).map(String::trim).filter(s -> !s.isBlank() && !s.startsWith("#")).map(Fuzz::parse);
     }
 
     static Op[] parse(String line) {
         return Arrays.stream(line.split(", ")).map(s -> Enum.valueOf(Op.class, s))
             .collect(Collectors.toList()).toArray(Op.ARRAY);
-    }  
+    }
+
+    static void testStream(Stream<Op[]> traces) { traces.forEach(Fuzz::testTrace); }
 
     ////////////////////////////////////////
+
+    static void testTrace(Op[] trace) {
+        System.out.println("\nCOMPILE_LEVEL: " + COMPILE_LEVEL + " COMPILE_RUN: " + COMPILE_RUN);
+        for (int attempt = 0; attempt < 3; attempt++) {
+            if (attempt > 0) System.out.println("RETRYING " + attempt);
+
+            compile();
+
+            long start = time();
+            var fuzz = new Fuzz(trace);
+            fuzz.verbose = VERBOSE && attempt == 0;
+            fuzz.print();
+            int yields = fuzz.test();
+            time(start, "Test (" + yields + " yields)");
+
+            if (fuzz.checkCompilation()) 
+                break;
+        }
+    }
 
     static final ContinuationScope SCOPE = new ContinuationScope() {};
 
@@ -223,19 +208,10 @@ public class Fuzz implements Runnable {
     boolean verbose = false;
 
     private final Op[] trace;
-    private int index;
+    private int index  = -1;
     private int result = -1;
 
-    private Fuzz(Op[] trace) {
-        this.trace = trace;
-        this.index = -1;
-    }
-
-    void print() { printTrace(trace); }
-
-    private Op trace(int i) { return i < trace.length ? trace[i] : Op.DONE; }
-    private Op current()    { return trace(index); }
-    private Op next(int c)  { logOp(c); index++; return current(); }
+    private Fuzz(Op[] trace) { this.trace = trace; }
 
     int test() {
         Continuation cont = new Continuation(SCOPE, this) {
@@ -263,6 +239,122 @@ public class Fuzz implements Runnable {
         }
         assert count == yields : "count: " + count + " yields: " + yields;
         return count;
+    }
+
+    void print() { printTrace(trace); }
+
+    private Op trace(int i) { return i < trace.length ? trace[i] : Op.DONE; }
+    private Op current()    { return trace(index); }
+    private Op next(int c)  { logOp(c); index++; return current(); }
+
+    ////// Compilation
+
+    private static boolean COMPILE_RUN;
+    private static int COMPILE_LEVEL;
+
+    static final int  WARMUP_ITERS = 15_000;
+    static final Op[] WARMUP_TRACE = {Op.MH_C_INT, Op.MH_C_MANY, Op.REF_C_INT, Op.REF_C_MANY, Op.CALL_C_INT};
+
+    static void warmup() {
+        final long start = time();
+        warmup(WARMUP_TRACE, WARMUP_ITERS); // generate (for reflection) and compile method handles
+        time(start, "Warmup");
+    }
+
+    static void warmup(Op[] trace, int times) {
+        for (int i=0; i<times; i++) {
+            new Fuzz(trace).run();
+        }
+    }
+
+    static void resetCompilation() {
+        Set<Method> compile = Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
+        compile.add(run);
+
+        for (Method m : compile) {
+            WB.deoptimizeMethod(m);
+            WB.clearMethodState(m);
+        }
+    }
+
+    static void compileContinuation() {
+        var compile = new HashSet<Method>();
+        for (Method m : Continuation.class.getDeclaredMethods()) {
+            if (!WB.isMethodCompiled(m)) {
+                if (!Modifier.isNative(m.getModifiers()) 
+                    && (m.getName().startsWith("enter")
+                     || m.getName().startsWith("yield"))) {
+                    WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
+                    compile.add(m);
+                }
+            }
+        }
+
+        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
+    }
+
+    static void compile() {
+        final long start = time();
+
+        compileContinuation();
+
+        Set<Method> compile   =    Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
+        Set<Method> interpret = Op.INTERPRETED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
+        (COMPILE_RUN ? compile : interpret).add(run);
+
+        compile.addAll(precompile);
+
+        for (Method m : interpret) WB.makeMethodNotCompilable(m);
+
+        for (Method m : compile) if (!WB.isMethodCompiled(m)) WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
+        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
+
+        for (Method m : compile)   assert  WB.isMethodCompiled(m) : "method: " + m;
+        for (Method m : interpret) assert !WB.isMethodCompiled(m) : "method: " + m;
+
+        time(start, "Compile");
+    }
+
+    boolean checkContinuationCompilation() {
+        for (Method m : Continuation.class.getDeclaredMethods()) {
+            if (!WB.isMethodCompiled(m)) {
+                if (!Modifier.isNative(m.getModifiers()) 
+                    && (m.getName().startsWith("enter")
+                     || m.getName().startsWith("yield"))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    boolean checkCompilation() {
+        boolean res = true;
+
+        if (!checkContinuationCompilation()) {
+            res = false;
+            System.out.println("CHANGED CONTINUATION COMPILATION");
+        }
+
+        Op[] newTrace = Arrays.copyOf(trace, trace.length);
+        if (!checkCompilation(newTrace)) {
+            res = false;
+            System.out.println("CHANGED COMPILATION");
+            printTrace(newTrace);
+        }
+
+        return res;
+    }
+
+    static boolean checkCompilation(Op[] trace) {
+        boolean ok = true;
+        for (int i = 0; i < trace.length; i++) {
+            Op op = trace[i];
+            if (Op.COMPILED.contains(op)    && !WB.isMethodCompiled(method(op))) trace[i] = Op.toInterpreted(op);
+            if (Op.INTERPRETED.contains(op) &&  WB.isMethodCompiled(method(op))) trace[i] = Op.toCompiled(op);
+            if (op != trace[i]) ok = false;
+        }
+        return ok;
     }
 
     /////////// Instance Helpers
@@ -449,116 +541,6 @@ public class Fuzz implements Runnable {
 
     static String sfToString(Object f) { 
         return f instanceof StackFrame ? StackWalkerHelper.frameToString((StackFrame)f) : Objects.toString(f);
-    }
-
-    ////// Compilation
-
-    private static boolean COMPILE_RUN;
-    private static int COMPILE_LEVEL;
-
-    static final int  WARMUP_ITERS = 15_000;
-    static final Op[] WARMUP_TRACE = {Op.MH_C_INT, Op.MH_C_MANY, Op.REF_C_INT, Op.REF_C_MANY, Op.CALL_C_INT};
-
-    static void warmup() {
-        final long start = time();
-        warmup(WARMUP_TRACE, WARMUP_ITERS); // generate (for reflection) and compile method handles
-        time(start, "Warmup");
-    }
-
-    static void warmup(Op[] trace, int times) {
-        for (int i=0; i<times; i++) {
-            new Fuzz(trace).run();
-        }
-    }
-
-    static void resetCompilation() {
-        Set<Method> compile = Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
-        compile.add(run);
-
-        for (Method m : compile) {
-            WB.deoptimizeMethod(m);
-            WB.clearMethodState(m);
-        }
-    }
-
-    static void compileContinuation() {
-        var compile = new HashSet<Method>();
-        for (Method m : Continuation.class.getDeclaredMethods()) {
-            if (!WB.isMethodCompiled(m)) {
-                if (!Modifier.isNative(m.getModifiers()) 
-                    && (m.getName().startsWith("enter")
-                     || m.getName().startsWith("yield"))) {
-                    WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
-                    compile.add(m);
-                }
-            }
-        }
-
-        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
-    }
-
-    static void compile() {
-        final long start = time();
-
-        compileContinuation();
-
-        Set<Method> compile   =    Op.COMPILED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
-        Set<Method> interpret = Op.INTERPRETED.stream().map(Fuzz::method).collect(Collectors.toCollection(HashSet::new));
-        (COMPILE_RUN ? compile : interpret).add(run);
-
-        compile.addAll(precompile);
-
-        for (Method m : interpret) WB.makeMethodNotCompilable(m);
-
-        for (Method m : compile) if (!WB.isMethodCompiled(m)) WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
-        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
-
-        for (Method m : compile)   assert  WB.isMethodCompiled(m) : "method: " + m;
-        for (Method m : interpret) assert !WB.isMethodCompiled(m) : "method: " + m;
-
-        time(start, "Compile");
-    }
-
-    boolean checkContinuationCompilation() {
-        for (Method m : Continuation.class.getDeclaredMethods()) {
-            if (!WB.isMethodCompiled(m)) {
-                if (!Modifier.isNative(m.getModifiers()) 
-                    && (m.getName().startsWith("enter")
-                     || m.getName().startsWith("yield"))) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    boolean checkCompilation() {
-        boolean res = true;
-
-        if (!checkContinuationCompilation()) {
-            res = false;
-            System.out.println("CHANGED CONTINUATION COMPILATION");
-        }
-
-        Op[] newTrace = Arrays.copyOf(trace, trace.length);
-        if (!checkCompilation(newTrace)) {
-            res = false;
-            System.out.println("CHANGED COMPILATION");
-            printTrace(newTrace);
-        }
-
-        return res;
-    }
-
-    static boolean checkCompilation(Op[] trace) {
-        boolean ok = true;
-        for (int i = 0; i < trace.length; i++) {
-            Op op = trace[i];
-            if (Op.COMPILED.contains(op)    && !WB.isMethodCompiled(method(op))) trace[i] = Op.toInterpreted(op);
-            if (Op.INTERPRETED.contains(op) &&  WB.isMethodCompiled(method(op))) trace[i] = Op.toCompiled(op);
-            if (op != trace[i]) ok = false;
-        }
-        return ok;
     }
 
     //// Static Helpers
