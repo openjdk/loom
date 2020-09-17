@@ -24,7 +24,6 @@
  */
 package java.lang;
 
-import java.lang.StackWalker.StackFrame;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.security.AccessControlContext;
@@ -490,7 +489,14 @@ class VirtualThread extends Thread {
 
         // park the thread
         setState(PARKING);
-        Continuation.yield(VTHREAD_SCOPE);
+        try {
+            Continuation.yield(VTHREAD_SCOPE);
+        } finally {
+            // restore state in case of OutOfMemoryError/other errors
+            if (state() != RUNNING) {
+                setState(RUNNING);
+            }
+        }
     }
 
     /**
@@ -510,6 +516,10 @@ class VirtualThread extends Thread {
                 setState(PARKING);
                 Continuation.yield(VTHREAD_SCOPE);
             } finally {
+                // restore state in case of OutOfMemoryError/other errors
+                if (state() != RUNNING) {
+                    setState(RUNNING);
+                }
                 cancel(unparker);
             }
         } else {
@@ -595,8 +605,15 @@ class VirtualThread extends Thread {
     void tryYield() {
         assert Thread.currentThread() == this && state() == RUNNING;
         setState(YIELDING);
-        Continuation.yield(VTHREAD_SCOPE);
-        assert Thread.currentThread() == this && state() == RUNNING;
+        try {
+            Continuation.yield(VTHREAD_SCOPE);
+        } finally {
+            // restore state in case of OutOfMemoryError/other errors
+            if (state() != RUNNING) {
+                setState(RUNNING);
+            }
+            assert Thread.currentThread() == this;
+        }
     }
 
     /**
