@@ -42,7 +42,7 @@ class ScopedMap {
         return (i + 2 < len ? i + 2 : 0);
     }
 
-    private static int hash(Scoped<?> key, int len) {
+    private static int hash(Object key, int len) {
         return hash(key.hashCode(), len);
     }
 
@@ -52,7 +52,7 @@ class ScopedMap {
     }
 
     @SuppressWarnings("unchecked")
-    public Object get(long k, Scoped<?> key) {
+    public Object get(long k, Object key) {
         int len = tab.length;
         int i = hash(k, len);
         while (true) {
@@ -66,7 +66,8 @@ class ScopedMap {
     }
 
     @SuppressWarnings(value = {"unchecked", "rawtypes"})  // one map has entries for all types <T>
-    public Object put(long k, Scoped<?> key, Object value) {
+    public Object put(long k, Object key, Object value) {
+        checkInUse();
 
         retryAfterResize: for (;;) {
             final int len = tab.length;
@@ -95,7 +96,14 @@ class ScopedMap {
         }
     }
 
+    private void checkInUse() {
+        if (Thread.currentThread().observers() != 0) {
+            throw new LifetimeError();
+        }
+    }
+
     Object remove(long k, Object key) {
+        checkInUse();
         int len = tab.length;
         int i = hash(k, len);
 
@@ -132,7 +140,7 @@ class ScopedMap {
             // newly vacated i.  This process will terminate when we hit
             // the null slot at the end of this run.
             // The test is messy because we are using a circular table.
-            int r = hash((Scoped<?>)tab[i], len);
+            int r = hash(tab[i], len);
             if ((i < r && (r <= d || d <= i)) || (r <= d && d <= i)) {
                 tab[d] = item;
                 tab[d + 1] = tab[i + 1];
@@ -166,7 +174,7 @@ class ScopedMap {
                 Object value = oldTable[j+1];
                 oldTable[j] = null;
                 oldTable[j + 1] = null;
-                int i = hash((Scoped<?>)key, newLength);
+                int i = hash(key, newLength);
                 while (newTable[i] != null)
                     i = nextKeyIndex(i, newLength);
                 newTable[i] = key;

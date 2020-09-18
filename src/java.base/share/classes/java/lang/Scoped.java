@@ -52,7 +52,7 @@ public abstract class Scoped<T> {
 
     private static final Unsafe UNSAFE = Unsafe.getUnsafe();
 
-    private static final boolean USE_CACHE = Cache.INDEX_BITS > 0;
+    static final boolean USE_CACHE = Cache.INDEX_BITS > 0;
 
     private static final boolean DEBUG;
     static {
@@ -66,7 +66,7 @@ public abstract class Scoped<T> {
      * TBD
      */
     protected Scoped() {}
-    
+
     @ForceInline
     @SuppressWarnings("unchecked")  // one map has entries for all types <T>
     static final Object getObject(int hash, Scoped<?> key) {
@@ -157,6 +157,16 @@ public abstract class Scoped<T> {
         Cache.remove(this);
     }
 
+    static final void release(Object key, Object prev) {
+        var map = Thread.currentThread().scopedMap();
+        if (prev != NULL_PLACEHOLDER) {
+            map.put(key.hashCode(), key, prev);
+        } else {
+            map.remove(key.hashCode(), key);
+        }
+        Cache.remove(key);
+    }
+
     /**
      * TBD
      *
@@ -218,16 +228,17 @@ public abstract class Scoped<T> {
         return (T) value;
     }
 
-    // A Marsaglia xor-shift generator used to generate hashes.
-    private static synchronized int generateKey() {
-        int x = nextKey;
-        do {
-            x ^= x >>> 12;
-            x ^= x << 9;
-            x ^= x >>> 23;
-        } while (USE_CACHE && ((x & Cache.TABLE_MASK) == ((x >>> Cache.INDEX_BITS)
-                & Cache.TABLE_MASK)));
-        return (nextKey = x);
+    static int generateKey() {
+        for (;;) {
+            int x = ThreadLocal.nextHashCode();
+            // Make sure the primary and secondary hash indexes used
+            // by ScopedCache are different.
+            if (USE_CACHE &&
+                 ((x & Cache.TABLE_MASK)
+                  == ((x >>> Cache.INDEX_BITS) & Cache.TABLE_MASK)))
+                continue;
+            return x;
+        }
     }
 
     private static long sequenceNumber = 0;
@@ -402,14 +413,14 @@ public abstract class Scoped<T> {
             return objects;
         }
 
-        static void put(Thread t, Scoped<?> key, Object value) {
+        static void put(Thread t, Object key, Object value) {
             if (Thread.scopedCache() == null) {
                 createCache();
             }
             setKeyAndObjectAt(chooseVictim(t, key.hashCode()), key, value);
         }
 
-        private static final void update(Object key, Object value) {
+        static final void update(Object key, Object value) {
             Object[] objects;
             if (USE_CACHE && (objects = Thread.scopedCache()) != null) {
 
@@ -424,7 +435,7 @@ public abstract class Scoped<T> {
             }
         }
 
-        private static final void remove(Object key) {
+        static final void remove(Object key) {
             Object[] objects;
             if (USE_CACHE && (objects = Thread.scopedCache()) != null) {
 

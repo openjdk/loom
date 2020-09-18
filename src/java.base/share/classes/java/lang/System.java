@@ -2341,6 +2341,14 @@ public final class System {
             public void unsafeSetLifetime(Thread thread, Lifetime lt) {
                 thread.unsafeSetLifetime(lt);
             }
+
+            public void addObserver(Thread thread) {
+                    thread.parentThread.addObserver();
+            }
+
+            public void removeObserver(Thread thread) {
+                thread.parentThread.removeObserver();
+            }
         });
     }
 }

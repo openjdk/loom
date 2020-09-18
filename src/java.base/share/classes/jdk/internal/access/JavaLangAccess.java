@@ -404,4 +404,16 @@ public interface JavaLangAccess {
      * @param lt
      */
     void unsafeSetLifetime(Thread thread, Lifetime lt);
+
+    /**
+     * Add an observer to the parent thread.
+     * @param thread
+     */
+    void addObserver(Thread thread);
+
+    /**
+     * Remove an observer from the parent thread.
+     * @param thread
+     */
+    void removeObserver(Thread thread);
 }

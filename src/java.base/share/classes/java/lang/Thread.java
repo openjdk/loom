@@ -43,6 +43,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.misc.TerminatingThreadLocal;
@@ -278,6 +279,7 @@ public class Thread implements Runnable {
 
     // V2:
     private ScopedMap scopedMap;
+    private int observers = 0;
 
     final ScopedMap scopedMap() {
         if (Lifetime.version == Lifetime.Version.V1) {
@@ -3148,6 +3150,7 @@ public class Thread implements Runnable {
             assert depth == parentDepth;
 
             var old = new Lifetime(parentThread, parentDepth);
+            lt.thread.addObserver();
             this.parentThread = lt.thread;
             this.parentDepth = lt.depth();
             this.depth = parentDepth;
@@ -3197,6 +3200,20 @@ public class Thread implements Runnable {
             }
             return false;
         }
+    }
+
+    synchronized void addObserver() {
+        observers++;
+        assert(observers > 0);
+    }
+
+    synchronized void removeObserver() {
+        assert(observers > 0);
+        observers--;
+    }
+
+    synchronized int observers() {
+        return observers;
     }
 
     /**

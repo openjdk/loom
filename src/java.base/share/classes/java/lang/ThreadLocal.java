@@ -104,7 +104,7 @@ public class ThreadLocal<T> {
     /**
      * Returns the next hash code.
      */
-    private static int nextHashCode() {
+    static int nextHashCode() {
         return nextHashCode.getAndAdd(HASH_INCREMENT);
     }
 
@@ -341,6 +341,18 @@ public class ThreadLocal<T> {
         protected T initialValue() {
             return supplier.get();
         }
+    }
+
+
+    /**
+     * TBD
+     *
+     * @param <T>   TBD
+     * @param klass TBD
+     * @return TBD
+     */
+    public static <T> LightweightThreadLocal<T> forType(Class<T> klass) {
+        return new LightweightThreadLocal<T>(klass);
     }
 
     /**

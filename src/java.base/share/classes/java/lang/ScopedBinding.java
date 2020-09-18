@@ -34,7 +34,7 @@ import jdk.internal.misc.UnsafeConstants;
 public final class ScopedBinding
     implements AutoCloseable {
 
-    final Scoped<?> referent;
+    final Object referent;
     final Lifetime lifetime;
 
     final Object prev;
@@ -59,9 +59,23 @@ public final class ScopedBinding
 
     /**
      * TBD
+     * @param v TBD
+     * @param t TBD
+     * @param prev TBD
+     */
+    ScopedBinding(LightweightThreadLocal<?> v, Object t, Object prev, Lifetime lifetime) {
+        if (t != null && !v.getType().isInstance(t))
+            throw new ClassCastException(cannotBindMsg(t, v.getType()));
+        this.lifetime = lifetime;
+        this.prev = prev;
+        this.referent = v;
+    }
+
+    /**
+     * TBD
      */
     public final void close() {
-        referent.release(prev);
+        Scoped.release(this.referent, prev);
         lifetime.close();
     }
 }

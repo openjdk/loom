@@ -180,6 +180,7 @@ class ThreadExecutor implements ExecutorService {
      */
     private void taskComplete(Thread thread) {
         boolean removed = threads.remove(thread);
+        JLA.removeObserver(thread);
         assert removed;
         if (state == SHUTDOWN) {
             tryTerminate();
