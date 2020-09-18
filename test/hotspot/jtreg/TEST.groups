@@ -76,10 +76,14 @@ hotspot_containers = \
   containers
 
 tier1_loom = \
+  :tier1_loom_runtime \
   :tier1_loom_serviceability
 
+tier1_loom_runtime = \
+  runtime/vthread
+
 tier1_loom_serviceability = \
-  serviceability/jvmti/vthread \
+  serviceability/jvmti/vthread
 
 tier1_common = \
   sanity/BasicVMTest.java \
