@@ -2579,7 +2579,6 @@ public:
     }
 
     log_develop_trace(jvmcont)("squash_chunks begin");
-    size_t orig_max_size = _cont.max_size();
     freeze_result res = squash_chunks(_cont.tail());
     if (res == freeze_ok) {
       // cleanup chunks
@@ -2591,7 +2590,6 @@ public:
       }
     }
     _cont.set_tail(NULL); // won't be committed to object on failure
-    _cont.set_max_size(orig_max_size); // squashing chunks maintains max_size
     log_develop_trace(jvmcont)("squash_chunks end");
 
     return res;
@@ -2845,14 +2843,15 @@ public:
     }
     *argsize_out = argsize;
 
-    DEBUG_ONLY(bool of_chunk = (_chunk != (oop)NULL);)
+    DEBUG_ONLY(bool is_chunk0 = (_chunk != (oop)NULL);)
 
     freeze_result res = squash_chunks();
     if (res == freeze_exception)
       return res;
     
     _chunk = (oop)NULL;
-    assert (of_chunk == (_cont.tail() != (oop)NULL), "of_chunk: %d", of_chunk);
+    bool is_chunk = (_cont.tail() != (oop)NULL);
+    assert (is_chunk0 == is_chunk, "is_chunk0: %d", is_chunk0);
 
     assert (res != freeze_retry_slow, "");
 
@@ -2881,9 +2880,11 @@ public:
       _cont.e_add_refs(_oops);
     }
 
-    _cont.add_size(_size);
+    if (!is_chunk) {
+      _cont.add_size(_size); // chunk's size has already been added when originally freezing it
+    }
 
-    if (mode == mode_fast && _cont.tail() == (oop)NULL && !_thread->cont_fastpath()) {
+    if (mode == mode_fast && !is_chunk && !_thread->cont_fastpath()) {
       if (ConfigT::_post_barrier) {
         _cont.zero_ref_stack_prefix();
       }
@@ -2902,12 +2903,12 @@ public:
     log_develop_trace(jvmcont)("empty: %d", empty);
     assert (!FULL_STACK || empty, "");
     assert (!empty || _cont.sp() >= _cont.stack_length() || _cont.sp() < 0, "sp: %d stack_length: %d", _cont.sp(), _cont.stack_length());
-    assert (_cont.tail() != (oop)NULL || orig_top_frame.is_empty() == empty, "empty: %d f.sp: %d tail: %d", empty, orig_top_frame.sp(), (_cont.tail() != (oop)NULL));
+    assert (is_chunk || orig_top_frame.is_empty() == empty, "empty: %d f.sp: %d tail: %d", empty, orig_top_frame.sp(), is_chunk);
     assert (!empty || assert_bottom_java_frame_name(callee, ENTER_SIG), "");
   #endif
 
     if (_cont.is_empty0()) {
-      assert (_cont.tail() != (oop)NULL || _cont.is_empty(), "");
+      assert (is_chunk || _cont.is_empty(), "");
       caller = new_bottom_hframe<true>(_cont.sp(), _cont.refSP(), NULL, false);
     } else {
       assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
@@ -2927,7 +2928,7 @@ public:
     DEBUG_ONLY(log_develop_trace(jvmcont)("finalize bottom frame:"); if (log_develop_is_enabled(Trace, jvmcont)) caller.print_on(_cont, tty);)
 
 #ifdef ASSERT
-    if (_thread != NULL && !of_chunk) {
+    if (_thread != NULL && !is_chunk) {
       frame entry = sender<FKind>(callee); // f.sender_for_compiled_frame<ContinuationCodeBlobLookup>(&map);
 
       log_develop_trace(jvmcont)("Found entry:");
@@ -2990,9 +2991,9 @@ public:
     assert (bottom || mode == mode_fast || Interpreter::contains(FKind::interpreted ? hf.return_pc<FKind>() : caller.real_pc(_cont)) == caller.is_interpreted_frame(),
       "FKind: %s contains: %d is_interpreted: %d", FKind::name, Interpreter::contains(FKind::interpreted ? hf.return_pc<FKind>() : caller.real_pc(_cont)), caller.is_interpreted_frame()); // fails for perftest < 25, but that's ok
     assert (!bottom || !_cont.is_empty() || (_cont.fp() == 0 && _cont.pc() == NULL), "");
-    // _cont.tail() != (oop)NULL below is just used to detect if we're squashing a chunk
-    assert (!bottom || _cont.tail() != (oop)NULL || _cont.is_empty() || (!FKind::interpreted && caller.is_interpreted_frame() && hf.compiled_frame_stack_argsize() > 0) || caller == _cont.last_frame<mode_slow>(), "");
-    assert (!bottom || _cont.tail() != (oop)NULL || _cont.is_empty() || Continuation::is_cont_barrier_frame(f), "");
+    DEBUG_ONLY(bool is_chunk = (_cont.tail() != (oop)NULL);)
+    assert (!bottom || is_chunk || _cont.is_empty() || (!FKind::interpreted && caller.is_interpreted_frame() && hf.compiled_frame_stack_argsize() > 0) || caller == _cont.last_frame<mode_slow>(), "");
+    assert (!bottom || is_chunk || _cont.is_empty() || Continuation::is_cont_barrier_frame(f), "");
     assert (!bottom || _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
     assert (!FKind::interpreted || hf.interpreted_link_address() == _cont.stack_address(hf.fp()), "");
 
