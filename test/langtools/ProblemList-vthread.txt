@@ -24,3 +24,8 @@ tools/javac/launcher/SourceLauncherTest.java
 tools/javac/lambda/T8031967.java
 tools/javac/lambda/LambdaParserTest.java
 jdk/javadoc/doclet/testLinkOption/TestRedirectLinks.java
+
+
+####
+# Uninvestigated timeouts
+jdk/jshell/ToolSimpleTest.java
