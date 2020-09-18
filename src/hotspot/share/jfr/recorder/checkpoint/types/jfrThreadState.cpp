@@ -92,12 +92,8 @@ traceid JfrThreadId::id(const Thread* t, oop vthread) {
   if (vthread != NULL) {
     return java_lang_Thread::thread_id(vthread);
   }
-  const JavaThread* const jt = (JavaThread*)t;
-  oop thread_obj = jt->threadObj();
-  if (thread_obj == NULL) {
-    return 0;
-  }
-  return java_lang_Thread::thread_id(thread_obj);
+  const oop thread_obj = t->as_Java_thread()->threadObj();
+  return thread_obj != NULL ? java_lang_Thread::thread_id(thread_obj) : 0;
 }
 
 traceid JfrThreadId::os_id(const Thread* t) {
@@ -114,8 +110,7 @@ traceid JfrThreadId::jfr_id(const Thread* t, traceid tid) {
 // caller needs ResourceMark
 const char* get_java_thread_name(const Thread* t, oop vthread) {
   assert(t != NULL, "invariant");
-  assert(t->is_Java_thread(), "invariant");
-  const JavaThread* const jt = ((JavaThread*)t);
+  const JavaThread* const jt = t->as_Java_thread();
   const char* name_str = "<no-name - thread name unresolved>";
   oop thread_obj = vthread != NULL ? vthread : jt->threadObj();
   if (thread_obj == NULL) {

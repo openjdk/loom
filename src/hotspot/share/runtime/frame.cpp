@@ -755,13 +755,13 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
 */
 class InterpreterFrameClosure : public OffsetClosure {
  private:
-  frame* _fr;
-  OopClosure* _f;
-  int    _max_locals;
-  int    _max_stack;
+  const frame* _fr;
+  OopClosure*  _f;
+  int          _max_locals;
+  int          _max_stack;
 
  public:
-  InterpreterFrameClosure(frame* fr, int max_locals, int max_stack,
+  InterpreterFrameClosure(const frame* fr, int max_locals, int max_stack,
                           OopClosure* f) {
     _fr         = fr;
     _max_locals = max_locals;
@@ -792,16 +792,15 @@ class InterpreterFrameClosure : public OffsetClosure {
   }
 
   int max_locals()  { return _max_locals; }
-  frame* fr()       { return _fr; }
 };
 
 
 class InterpretedArgumentOopFinder: public SignatureIterator {
  private:
-  OopClosure* _f;        // Closure to invoke
-  int    _offset;        // TOS-relative offset, decremented with each argument
-  bool   _has_receiver;  // true if the callee has a receiver
-  frame* _fr;
+  OopClosure*  _f;             // Closure to invoke
+  int          _offset;        // TOS-relative offset, decremented with each argument
+  bool         _has_receiver;  // true if the callee has a receiver
+  const frame* _fr;
 
   friend class SignatureIterator;  // so do_parameters_on can call do_type
   void do_type(BasicType type) {
@@ -816,7 +815,7 @@ class InterpretedArgumentOopFinder: public SignatureIterator {
   }
 
  public:
-  InterpretedArgumentOopFinder(Symbol* signature, bool has_receiver, frame* fr, OopClosure* f) : SignatureIterator(signature), _has_receiver(has_receiver) {
+  InterpretedArgumentOopFinder(Symbol* signature, bool has_receiver, const frame* fr, OopClosure* f) : SignatureIterator(signature), _has_receiver(has_receiver) {
     // compute size of arguments
     int args_size = ArgumentSizeComputer(signature).size() + (has_receiver ? 1 : 0);
     assert(!fr->is_interpreted_frame() ||
@@ -852,10 +851,10 @@ class InterpretedArgumentOopFinder: public SignatureIterator {
 // visits and GC's all the arguments in entry frame
 class EntryFrameOopFinder: public SignatureIterator {
  private:
-  bool   _is_static;
-  int    _offset;
-  frame* _fr;
-  OopClosure* _f;
+  bool         _is_static;
+  int          _offset;
+  const frame* _fr;
+  OopClosure*  _f;
 
   friend class SignatureIterator;  // so do_parameters_on can call do_type
   void do_type(BasicType type) {
@@ -872,7 +871,7 @@ class EntryFrameOopFinder: public SignatureIterator {
   }
 
  public:
-  EntryFrameOopFinder(frame* frame, Symbol* signature, bool is_static) : SignatureIterator(signature) {
+  EntryFrameOopFinder(const frame* frame, Symbol* signature, bool is_static) : SignatureIterator(signature) {
     _f = NULL; // will be set later
     _fr = frame;
     _is_static = is_static;
@@ -900,7 +899,7 @@ oop frame::interpreter_callee_receiver(Symbol* signature) {
   return r;
 }
 
-void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) {
+void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const {
   Thread *thread = Thread::current();
   methodHandle m (thread, interpreter_frame_method());
   jint bci = interpreter_frame_bci();
@@ -915,14 +914,14 @@ void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool quer
   oops_interpreted_do0(f, map, m, bci, mask);
 }
 
-void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, const InterpreterOopMap& mask) {
+void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, const InterpreterOopMap& mask) const {
   Thread *thread = Thread::current();
   methodHandle m (thread, interpreter_frame_method());
   jint bci = interpreter_frame_bci();
   oops_interpreted_do0(f, map, m, bci, mask);
 }
 
-void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHandle m, jint bci, const InterpreterOopMap& mask) {
+void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHandle m, jint bci, const InterpreterOopMap& mask) const {
   assert(is_interpreted_frame(), "Not an interpreted frame");
   // assert(map != NULL, "map must be set");
 
@@ -995,12 +994,12 @@ void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHa
 }
 
 
-void frame::oops_interpreted_arguments_do(Symbol* signature, bool has_receiver, OopClosure* f) {
+void frame::oops_interpreted_arguments_do(Symbol* signature, bool has_receiver, OopClosure* f) const {
   InterpretedArgumentOopFinder finder(signature, has_receiver, this, f);
   finder.oops_do();
 }
 
-void frame::oops_code_blob_do(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, const RegisterMap* reg_map) {
+void frame::oops_code_blob_do(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, const RegisterMap* reg_map) const {
   assert(_cb != NULL, "sanity check");
   assert((oop_map() == NULL) == (_cb->oop_maps() == NULL), "frame and _cb must agree that oopmap is set or not");
   if (oop_map() != NULL) {
@@ -1087,7 +1086,7 @@ class CompiledArgumentOopFinder: public SignatureIterator {
 };
 
 void frame::oops_compiled_arguments_do(Symbol* signature, bool has_receiver, bool has_appendix,
-                                       const RegisterMap* reg_map, OopClosure* f) {
+                                       const RegisterMap* reg_map, OopClosure* f) const {
   // ResourceMark rm;
   CompiledArgumentOopFinder finder(signature, has_receiver, has_appendix, f, *this, reg_map);
   finder.oops_do();
@@ -1139,7 +1138,7 @@ oop frame::get_native_receiver() {
   return owner;
 }
 
-void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) {
+void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) const {
   assert(map != NULL, "map must be set");
   if (map->include_argument_oops()) {
     // must collect argument oops, as nobody else is doing it
@@ -1153,7 +1152,7 @@ void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) {
 }
 
 
-void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, const RegisterMap* map, bool use_interpreter_oop_map_cache) {
+void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, const RegisterMap* map, bool use_interpreter_oop_map_cache) const {
 #ifndef PRODUCT
   // simulate GC crash here to dump java thread in error report
   if (CrashGCForDumpingJavaThread) {
@@ -1172,7 +1171,7 @@ void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosu
   }
 }
 
-void frame::nmethods_do(CodeBlobClosure* cf) {
+void frame::nmethods_do(CodeBlobClosure* cf) const {
   if (_cb != NULL && _cb->is_nmethod()) {
     cf->do_code_blob(_cb);
   }
@@ -1180,7 +1179,7 @@ void frame::nmethods_do(CodeBlobClosure* cf) {
 
 
 // Call f closure on the interpreted Method*s in the stack.
-void frame::metadata_do(MetadataClosure* f) {
+void frame::metadata_do(MetadataClosure* f) const {
   ResourceMark rm;
   if (is_interpreted_frame()) {
     Method* m = this->interpreter_frame_method();
@@ -1189,7 +1188,7 @@ void frame::metadata_do(MetadataClosure* f) {
   }
 }
 
-void frame::verify(const RegisterMap* map) {
+void frame::verify(const RegisterMap* map) const {
 #ifndef PRODUCT
   if (TraceCodeBlobStacks) {
     tty->print_cr("*** verify");

@@ -105,7 +105,7 @@ void JfrCheckpointThreadClosure::do_thread(Thread* t) {
   } else {
     _writer.write(name);
     _writer.write(tid);
-    _writer.write(JfrThreadGroup::thread_group_id((JavaThread*)t, _curthread));
+    _writer.write(JfrThreadGroup::thread_group_id(t->as_Java_thread(), _curthread));
   }
   _writer.write<bool>(false); // isVirtual
 }
@@ -285,7 +285,7 @@ void JfrThreadConstant::serialize(JfrCheckpointWriter& writer) {
     const bool vthread = _vthread != NULL;
     // VirtualThread threadgroup reserved id 1
     const traceid thread_group_id = vthread ? 1 :
-      JfrThreadGroup::thread_group_id((JavaThread*)_thread, Thread::current());
+      JfrThreadGroup::thread_group_id(_thread->as_Java_thread(), Thread::current());
     writer.write(thread_group_id);
     writer.write<bool>(vthread);    // isVirtual
     // VirtualThread threadgroup already serialized invariant

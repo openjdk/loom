@@ -159,7 +159,6 @@ void LiveFrameStream::next() {
 BaseFrameStream* BaseFrameStream::from_current(JavaThread* thread, jlong magic,
                                                objArrayHandle frames_array)
 {
-  assert(thread != NULL && thread->is_Java_thread(), "");
   oop m1 = frames_array->obj_at(magic_pos);
   if (m1 != thread->threadObj()) return NULL;
   if (magic == 0L)                    return NULL;
@@ -430,7 +429,7 @@ oop StackWalk::walk(Handle stackStream, jlong mode, int skip_frames, Handle cont
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD); // needed to store a continuation in the RegisterMap
 
-  JavaThread* jt = (JavaThread*)THREAD;
+  JavaThread* jt = THREAD->as_Java_thread();
   log_debug(stackwalk)("Start walking: mode " JLONG_FORMAT " skip %d frames batch size %d", mode, skip_frames, frame_count);
   LogTarget(Debug, stackwalk) lt;
   if (lt.is_enabled()) {
@@ -558,7 +557,7 @@ jint StackWalk::fetchNextBatch(Handle stackStream, jlong mode, jlong magic,
                                objArrayHandle frames_array,
                                TRAPS)
 {
-  JavaThread* jt = (JavaThread*)THREAD;
+  JavaThread* jt = THREAD->as_Java_thread();
   BaseFrameStream* existing_stream = BaseFrameStream::from_current(jt, magic, frames_array);
   if (existing_stream == NULL) {
     THROW_MSG_(vmSymbols::java_lang_InternalError(), "doStackWalk: corrupted buffers", 0L);
@@ -595,7 +594,7 @@ jint StackWalk::fetchNextBatch(Handle stackStream, jlong mode, jlong magic,
 }
 
 void StackWalk::setContinuation(Handle stackStream, jlong magic, objArrayHandle frames_array, Handle cont, TRAPS) {
-  JavaThread* jt = (JavaThread*)THREAD;
+  JavaThread* jt = THREAD->as_Java_thread();
 
   if (frames_array.is_null()) {
     THROW_MSG(vmSymbols::java_lang_NullPointerException(), "frames_array is NULL");
