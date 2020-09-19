@@ -167,3 +167,25 @@ java/lang/ClassLoader/getResource/modules/ResourcesTest.java
 # No expected StackOverflow
 
 java/lang/invoke/condy/CondyNestedResolutionTest.java
+
+
+####
+# JDI tests, should be re-reviewed when JVMTI is synced with JDI
+
+com/sun/jdi/EarlyReturnNegativeTest.java
+com/sun/jdi/EarlyReturnTest.java
+com/sun/jdi/FieldWatchpoints.java
+com/sun/jdi/FramesTest.java
+com/sun/jdi/InstanceFilter.java
+com/sun/jdi/InterfaceMethodsTest.java
+com/sun/jdi/InvokeTest.java
+com/sun/jdi/ModificationWatchpoints.java
+com/sun/jdi/MonitorFrameInfo.java
+com/sun/jdi/PopAndStepTest.java
+com/sun/jdi/PopAsynchronousTest.java
+com/sun/jdi/RequestReflectionTest.java
+com/sun/jdi/SourceNameFilterTest.java
+com/sun/jdi/VarargsTest.java
+com/sun/jdi/redefineMethod/RedefineTest.java
+com/sun/jdi/sde/MangleTest.java
+com/sun/jdi/sde/TemperatureTableTest.java
