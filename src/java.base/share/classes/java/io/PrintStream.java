@@ -31,6 +31,8 @@ import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.access.JavaIOPrintStreamAccess;
+import jdk.internal.access.SharedSecrets;
 
 /**
  * A {@code PrintStream} adds functionality to another output stream,
@@ -1523,4 +1525,11 @@ public class PrintStream extends FilterOutputStream
         return this;
     }
 
+    static {
+        SharedSecrets.setJavaIOCPrintStreamAccess(new JavaIOPrintStreamAccess() {
+            public Object lock(PrintStream ps) {
+                return ps.lock;
+            }
+        });
+    }
 }

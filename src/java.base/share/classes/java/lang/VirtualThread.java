@@ -24,6 +24,7 @@
  */
 package java.lang;
 
+import java.io.PrintStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.security.AccessControlContext;
@@ -47,6 +48,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
+import sun.nio.ch.ConsoleStreams;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
 
@@ -151,9 +153,10 @@ class VirtualThread extends Thread {
         this.cont = new Continuation(VTHREAD_SCOPE, target) {
             @Override
             protected void onPinned(Continuation.Pinned reason) {
-                if (TRACE_PINNING_MODE > 0) {
+                if (TRACE_PINNING_MODE > 0
+                        && !ConsoleStreams.isOutOrErrLocked(Thread.currentThread())) {
                     boolean printAll = (TRACE_PINNING_MODE == 1);
-                    PinnedThreadPrinter.printStackTrace(printAll);
+                    PinnedThreadPrinter.printStackTrace(System.out, printAll);
                 }
 
                 int s = state();
@@ -589,14 +592,6 @@ class VirtualThread extends Thread {
                 }
             }
         }
-    }
-
-    /**
-     * Returns true if parking.
-     */
-    boolean isParking() {
-        assert Thread.currentThread() == this;
-        return state() == PARKING;
     }
 
     /**
@@ -1060,27 +1055,27 @@ class VirtualThread extends Thread {
         }
 
         /**
-         * Prints a stack trace of the current virtual thread to the standard output stream.
-         * This method is synchronized to reduce interference in the output.
+         * Prints a stack trace of the current virtual thread to the given print
+         * stream. This method is synchronized to reduce interference in the output.
          * @param printAll true to print all stack frames, false to only print the
          *        frames that are native or holding a monitor
          */
         @ChangesCurrentThread
-        static synchronized void printStackTrace(boolean printAll) {
+        static synchronized void printStackTrace(PrintStream out, boolean printAll) {
             // switch to carrier thread as the printing may park
             Thread vthread = Thread.currentThread();
             Thread carrier = Thread.currentCarrierThread();
             carrier.setCurrentThread(carrier);
             try {
-                System.out.println(Thread.currentThread());
+                out.println(Thread.currentThread());
                 INSTANCE.forEach(f -> {
                     if (f.getDeclaringClass() != PinnedThreadPrinter.class) {
                         var ste = f.toStackTraceElement();
                         int monitorCount = ((LiveStackFrame) f).getMonitors().length;
                         if (monitorCount > 0 || f.isNativeMethod()) {
-                            System.out.format("    %s <== monitors:%d%n", ste, monitorCount);
+                            out.format("    %s <== monitors:%d%n", ste, monitorCount);
                         } else if (printAll) {
-                            System.out.format("    %s%n", ste);
+                            out.format("    %s%n", ste);
                         }
                     }
                 });

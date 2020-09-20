@@ -27,6 +27,8 @@ package java.lang;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.access.SharedSecrets;
 
 /**
  * The {@code Throwable} class is the superclass of all errors and
@@ -661,27 +663,40 @@ public class Throwable implements Serializable {
     }
 
     private void printStackTrace(PrintStreamOrWriter s) {
+        Object lock = s.lock();
+        if (lock instanceof ReentrantLock) {
+            ReentrantLock l = (ReentrantLock) lock;
+            l.lock();
+            try {
+                lockedPrintStackTrace(s);
+            } finally {
+                l.unlock();
+            }
+        } else synchronized (lock) {
+            lockedPrintStackTrace(s);
+        }
+    }
+
+    private void lockedPrintStackTrace(PrintStreamOrWriter s) {
         // Guard against malicious overrides of Throwable.equals by
         // using a Set with identity equality semantics.
         Set<Throwable> dejaVu = Collections.newSetFromMap(new IdentityHashMap<>());
         dejaVu.add(this);
 
-        synchronized (s.lock()) {
-            // Print our stack trace
-            s.println(this);
-            StackTraceElement[] trace = getOurStackTrace();
-            for (StackTraceElement traceElement : trace)
-                s.println("\tat " + traceElement);
+        // Print our stack trace
+        s.println(this);
+        StackTraceElement[] trace = getOurStackTrace();
+        for (StackTraceElement traceElement : trace)
+            s.println("\tat " + traceElement);
 
-            // Print suppressed exceptions, if any
-            for (Throwable se : getSuppressed())
-                se.printEnclosedStackTrace(s, trace, SUPPRESSED_CAPTION, "\t", dejaVu);
+        // Print suppressed exceptions, if any
+        for (Throwable se : getSuppressed())
+            se.printEnclosedStackTrace(s, trace, SUPPRESSED_CAPTION, "\t", dejaVu);
 
-            // Print cause, if any
-            Throwable ourCause = getCause();
-            if (ourCause != null)
-                ourCause.printEnclosedStackTrace(s, trace, CAUSE_CAPTION, "", dejaVu);
-        }
+        // Print cause, if any
+        Throwable ourCause = getCause();
+        if (ourCause != null)
+            ourCause.printEnclosedStackTrace(s, trace, CAUSE_CAPTION, "", dejaVu);
     }
 
     /**
@@ -693,7 +708,7 @@ public class Throwable implements Serializable {
                                          String caption,
                                          String prefix,
                                          Set<Throwable> dejaVu) {
-        assert Thread.holdsLock(s.lock());
+        assert s.isLockedByCurrentThread();
         if (dejaVu.contains(this)) {
             s.println(prefix + caption + "[CIRCULAR REFERENCE: " + this + "]");
         } else {
@@ -745,6 +760,15 @@ public class Throwable implements Serializable {
         /** Returns the object to be locked when using this StreamOrWriter */
         abstract Object lock();
 
+        boolean isLockedByCurrentThread() {
+            Object lock = lock();
+            if (lock instanceof ReentrantLock) {
+                return ((ReentrantLock) lock).isHeldByCurrentThread();
+            } else {
+                return Thread.holdsLock(lock);
+            }
+        }
+
         /** Prints the specified string as a line on this StreamOrWriter */
         abstract void println(Object o);
     }
@@ -757,7 +781,7 @@ public class Throwable implements Serializable {
         }
 
         Object lock() {
-            return printStream;
+            return SharedSecrets.getJavaIOPrintStreamAccess().lock(printStream);
         }
 
         void println(Object o) {
@@ -773,7 +797,7 @@ public class Throwable implements Serializable {
         }
 
         Object lock() {
-            return printWriter;
+            return SharedSecrets.getJavaIOPrintWriterAccess().lock(printWriter);
         }
 
         void println(Object o) {

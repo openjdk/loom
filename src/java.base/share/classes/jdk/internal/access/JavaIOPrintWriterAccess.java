@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,13 +22,10 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package sun.nio.ch;
+package jdk.internal.access;
 
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
+import java.io.PrintWriter;
 
-public class ConsoleInputStream extends FileInputStream {
-    public ConsoleInputStream(FileDescriptor fd) {
-        super (fd);
-    }
+public interface JavaIOPrintWriterAccess {
+    Object lock(PrintWriter pw);
 }

@@ -33,6 +33,8 @@ import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.access.JavaIOPrintWriterAccess;
+import jdk.internal.access.SharedSecrets;
 
 /**
  * Prints formatted representations of objects to a text-output stream.  This
@@ -1373,5 +1375,13 @@ public class PrintWriter extends Writer {
     public PrintWriter append(char c) {
         write(c);
         return this;
+    }
+
+    static {
+        SharedSecrets.setJavaIOCPrintWriterAccess(new JavaIOPrintWriterAccess() {
+            public Object lock(PrintWriter pw) {
+                return pw.lock;
+            }
+        });
     }
 }

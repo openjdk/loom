@@ -79,6 +79,7 @@ import jdk.internal.logger.LocalizedLoggerWrapper;
 import jdk.internal.util.SystemProps;
 import jdk.internal.vm.annotation.Stable;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
+import sun.nio.ch.ConsoleStreams;
 import sun.nio.fs.DefaultFileSystemProvider;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
@@ -2006,12 +2007,9 @@ public final class System {
 
         lineSeparator = props.getProperty("line.separator");
 
-        InputStream in = new sun.nio.ch.ConsoleInputStream(FileDescriptor.in);
-        OutputStream out = new sun.nio.ch.ConsoleOutputStream(FileDescriptor.out);
-        OutputStream err = new sun.nio.ch.ConsoleOutputStream(FileDescriptor.err);
-        setIn0(new BufferedInputStream(in));
-        setOut0(newPrintStream(out, props.getProperty("sun.stdout.encoding")));
-        setErr0(newPrintStream(err, props.getProperty("sun.stderr.encoding")));
+        setIn0(new BufferedInputStream(ConsoleStreams.in));
+        setOut0(newPrintStream(ConsoleStreams.out, props.getProperty("sun.stdout.encoding")));
+        setErr0(newPrintStream(ConsoleStreams.err, props.getProperty("sun.stderr.encoding")));
 
         // Setup Java signal handlers for HUP, TERM, and INT (where available).
         Terminator.setup();
@@ -2332,10 +2330,6 @@ public final class System {
 
             public void unparkVirtualThread(Thread thread) {
                 ((VirtualThread) thread).unpark();
-            }
-
-            public boolean isVirtualThreadParking(Thread thread) {
-                return ((VirtualThread) thread).isParking();
             }
 
             public void unsafeSetLifetime(Thread thread, Lifetime lt) {

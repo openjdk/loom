@@ -35,6 +35,8 @@ import java.io.Console;
 import java.io.FileDescriptor;
 import java.io.FilePermission;
 import java.io.ObjectInputStream;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.security.ProtectionDomain;
 import java.security.Signature;
@@ -59,6 +61,8 @@ public class SharedSecrets {
     private static JavaLangRefAccess javaLangRefAccess;
     private static JavaLangReflectAccess javaLangReflectAccess;
     private static JavaIOAccess javaIOAccess;
+    private static JavaIOPrintStreamAccess javaIOPrintStreamAccess;
+    private static JavaIOPrintWriterAccess javaIOPrintWriterAccess;
     private static JavaIOFileDescriptorAccess javaIOFileDescriptorAccess;
     private static JavaIOFilePermissionAccess javaIOFilePermissionAccess;
     private static JavaIORandomAccessFileAccess javaIORandomAccessFileAccess;
@@ -200,6 +204,28 @@ public class SharedSecrets {
             ensureClassInitialized(Console.class);
         }
         return javaIOAccess;
+    }
+
+    public static void setJavaIOCPrintWriterAccess(JavaIOPrintWriterAccess a) {
+        javaIOPrintWriterAccess = a;
+    }
+
+    public static JavaIOPrintWriterAccess getJavaIOPrintWriterAccess() {
+        if (javaIOPrintStreamAccess == null) {
+            ensureClassInitialized(PrintWriter.class);
+        }
+        return javaIOPrintWriterAccess;
+    }
+
+    public static void setJavaIOCPrintStreamAccess(JavaIOPrintStreamAccess a) {
+        javaIOPrintStreamAccess = a;
+    }
+
+    public static JavaIOPrintStreamAccess getJavaIOPrintStreamAccess() {
+        if (javaIOPrintStreamAccess == null) {
+            ensureClassInitialized(PrintStream.class);
+        }
+        return javaIOPrintStreamAccess;
     }
 
     public static void setJavaIOFileDescriptorAccess(JavaIOFileDescriptorAccess jiofda) {
