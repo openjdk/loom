@@ -1528,7 +1528,8 @@ public class PrintStream extends FilterOutputStream
     static {
         SharedSecrets.setJavaIOCPrintStreamAccess(new JavaIOPrintStreamAccess() {
             public Object lock(PrintStream ps) {
-                return ps.lock;
+                Object lock = ps.lock;
+                return (lock != null) ? lock : ps;
             }
         });
     }

@@ -1380,7 +1380,8 @@ public class PrintWriter extends Writer {
     static {
         SharedSecrets.setJavaIOCPrintWriterAccess(new JavaIOPrintWriterAccess() {
             public Object lock(PrintWriter pw) {
-                return pw.lock;
+                Object lock = pw.lock;
+                return (lock != null) ? lock : pw;
             }
         });
     }
