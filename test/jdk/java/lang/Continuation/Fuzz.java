@@ -55,6 +55,7 @@ import java.lang.reflect.*;
 import java.lang.StackWalker.StackFrame;
 import java.nio.file.*;
 import java.util.*;
+import java.util.function.*;
 import java.util.stream.*;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
@@ -394,6 +395,11 @@ public class Fuzz implements Runnable {
         return d;
     }
 
+    boolean traceHas(Predicate<Op> pred) {
+        for (int i = 0; i < index; i++) if (pred.test(trace[i])) return true;
+        return false;
+    }
+
     String[] expectedStackTrace() {
         var ms = new ArrayList<String>();
         for (int i = index; i >= 0; i--) if (!Op.NON_CALLS.contains(trace[i])) ms.add(method(trace[i]).getName());
@@ -417,13 +423,12 @@ public class Fuzz implements Runnable {
     }
 
     boolean shouldPin() {
-        for (int i = 0; i < index; i++)
-            if (trace[i] == Op.CALL_I_PIN || trace[i] == Op.CALL_C_PIN) return true;
-        return false;
+        return traceHas(Op.PIN::contains);
     }
 
     void verifyPin(boolean yieldResult) {
         if (yieldResult) yields++;
+        if (!yieldResult && traceHas(op -> Op.INTERPRETED.contains(op) && Op.REFLECTED.contains(op))) return;
         assert yieldResult != shouldPin() : "res: " + yieldResult + " shouldPin: " + shouldPin();
     }
 
@@ -439,6 +444,7 @@ public class Fuzz implements Runnable {
     }
 
     void captureStack() {
+        // Thread.dumpStack();
         if (!VERIFY_STACK) return;
         backtrace = Thread.currentThread().getStackTrace();
         fbacktrace = StackWalkerHelper.getStackFrames(SCOPE);
@@ -494,7 +500,7 @@ public class Fuzz implements Runnable {
         verifyStack(
             expectedStackTrace(),
             Arrays.stream(cutStack(observed)).filter(sf -> Fuzz.class.getName().equals(sfClassName(sf)))
-                            .collect(Collectors.toList()).toArray(new Object[0]));
+                            .collect(Collectors.toList()).toArray(Object[]::new));
     }
 
     static void verifyStack(Object[] expected, Object[] observed) {
