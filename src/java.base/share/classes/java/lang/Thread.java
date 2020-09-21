@@ -2645,9 +2645,13 @@ public class Thread implements Runnable {
         Object stackTrace = getStackTrace0();
         if (stackTrace == null) {
             return null;
-        } else {
-            return StackTraceElement.of((StackTraceElement[]) stackTrace);
-        }
+        } 
+        
+        StackTraceElement[] stes = (StackTraceElement[])stackTrace;
+        if (stes.length == 0)
+            return null;
+        
+        return StackTraceElement.of((StackTraceElement[]) stackTrace);
     }
 
     private native Object getStackTrace0();
