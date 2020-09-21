@@ -1383,25 +1383,46 @@ static bool assert_frame_laid_out(frame f) {
   return f.raw_pc() == pc && f.fp() == fp;
 }
 
-// static bool assert_entry_frame_laid_out(ContinuationEntry* cont) {
-//   intptr_t* sp = cont->entry_sp();
-//   address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
-//   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
-//   CodeBlob* cb = CodeCache::find_blob(pc);
+static bool assert_entry_frame_laid_out(JavaThread* thread) {
+  assert (thread->has_last_Java_frame(), "Wrong place to use this assertion");
 
-//   // if (!cb->is_compiled()) {
-//   //   tty->print_cr(">>>>>>><<<<<<<<<");
-//   //   tty->print_cr(">>>> entry sp: %p", sp);
-//   //   pfl();
-//   //   cb->print_on(tty);
-//   //   os::print_location(tty, (intptr_t)pc);
-//   // }
+  ContinuationEntry* cont = Continuation::get_continuation_entry_for_continuation(thread, get_continuation(thread));
+  assert (cont != NULL, "");
+
+  intptr_t* unextended_sp = cont->entry_sp();
+  intptr_t* sp;
+  if (cont->argsize() > 0) {
+    sp = cont->bottom_sender_sp();
+  } else {
+    sp = NULL;
+    RegisterMap map(thread, false, false, false);
+    for (frame f = thread->last_frame(); !f.is_first_frame() && f.sp() <= unextended_sp; f = f.sender(&map)) sp = f.sp();
+  }
+  assert (sp != NULL && sp <= cont->bottom_sender_sp(), "sp: %p bottom_sender_sp: %p", sp, cont->bottom_sender_sp());
+  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+
+  if (pc != StubRoutines::cont_returnBarrier()) {
+    CodeBlob* cb = pc != NULL ? CodeCache::find_blob(pc) : NULL;
+
+    if (cb == NULL || !cb->is_compiled() || !cb->as_compiled_method()->method()->is_continuation_enter_intrinsic()) {
+      pfl();
+
+      tty->print_cr(">>>>>>><<<<<<<<<");
+      tty->print_cr(">>>> entry unextended_sp: %p sp: %p", unextended_sp, sp);
+      if (cb == NULL) tty->print_cr("NULL"); else cb->print_on(tty);
+      os::print_location(tty, (intptr_t)pc);
+     }
   
-//   assert (cb->is_compiled(), "");
-//   assert (cb->as_compiled_method()->method()->is_continuation_enter_intrinsic(), "");
-//   assert (cont->entry_fp() == fp, "entry_fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(cont->entry_sp()), p2i(fp));
-//   return cb->as_compiled_method()->method()->is_continuation_enter_intrinsic() && cont->entry_fp() == fp;
-// }
+    assert (cb != NULL, "");
+    assert (cb->is_compiled(), "");
+    assert (cb->as_compiled_method()->method()->is_continuation_enter_intrinsic(), "");
+  }
+
+  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);  
+  // assert (cont->entry_fp() == fp, "entry_fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(cont->entry_sp()), p2i(fp));
+  
+  return true;
+}
 
 bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_size, int* out_frames, int* out_oops) {  
   assert (oopDesc::is_oop(chunk), "");

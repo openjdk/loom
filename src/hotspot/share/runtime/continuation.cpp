@@ -211,7 +211,7 @@ static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) P
   static void print_frames(JavaThread* thread, outputStream* st = tty);
   // template<int x> static void walk_frames(JavaThread* thread);
   static bool assert_frame_laid_out(frame f);
-  // static bool assert_entry_frame_laid_out(ContinuationEntry* cont);
+  static bool assert_entry_frame_laid_out(JavaThread* thread);
   //static void print_blob(outputStream* st, address addr);
   static jlong java_tid(JavaThread* thread);
   // static bool is_deopt_pc(const frame& f, address pc);
@@ -3389,6 +3389,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
 
   oop oopCont = get_continuation(thread);
   assert (oopCont == thread->last_continuation()->cont_oop(), "");
+  assert (assert_entry_frame_laid_out(thread), "");
 
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
@@ -3856,7 +3857,6 @@ public:
 
         return sp;
       } else {
-        // assert (assert_entry_frame_laid_out(_cont.entry()), "");
         return _cont.entrySP();
       }
     } else {
@@ -4618,6 +4618,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
 #ifdef ASSERT
   set_anchor_to_entry(thread, cont.entry());
+  // assert (assert_entry_frame_laid_out(thread), "");
   print_frames(thread);
 #endif
 
@@ -4650,6 +4651,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
     intptr_t *v = 0;
     do_verify_after_thaw(thread, sp0, &v);
   }
+  assert (assert_entry_frame_laid_out(thread), "");
   clear_anchor(thread);
 #endif
 
