@@ -179,7 +179,7 @@ _continuation(jt->last_continuation()->cont_oop()), _continuation_scope(NULL), _
 }
 
 inline bool JfrVframeStream::at_continuation_entry_frame() const {
-  return _continuation != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame, &_reg_map);
+  return _continuation != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame);
 }
 
 inline void JfrVframeStream::set_parent_continuation() {

@@ -49,7 +49,7 @@ inline void vframeStreamCommon::next() {
   do {
     bool cont_entry = false;
     oop cont = _cont();
-    if (cont != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame, &_reg_map)) {
+    if (cont != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame)) {
       cont_entry = true;
       oop scope = java_lang_Continuation::scope(cont);
       if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
@@ -81,7 +81,7 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
   _frame = vthread_carrier ? _thread->vthread_carrier_last_frame(&_reg_map) : _thread->last_frame();
   oop cont = _thread->last_continuation()->cont_oop();
   while (!fill_from_frame()) {
-    if (cont != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame, &_reg_map)) {
+    if (cont != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame)) {
       cont = java_lang_Continuation::parent(cont);
     }
     _frame = _frame.sender(&_reg_map);

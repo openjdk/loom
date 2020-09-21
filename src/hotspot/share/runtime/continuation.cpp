@@ -4747,7 +4747,7 @@ JRT_ENTRY(intptr_t*, Continuation::thaw(JavaThread* thread, int kind))
   return sp;
 JRT_END
 
-bool Continuation::is_continuation_enterSpecial(const frame& f, const RegisterMap* map) {
+bool Continuation::is_continuation_enterSpecial(const frame& f) {
   if (f.cb() == NULL || !f.cb()->is_compiled()) return false;
   Method* m = f.cb()->as_compiled_method()->method();
   return (m != NULL && m->is_continuation_enter_intrinsic());

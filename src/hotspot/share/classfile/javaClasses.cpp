@@ -2779,7 +2779,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
     } else {
       if (fr.is_first_frame()) break;
 
-      if (cont_h() != NULL && Continuation::is_continuation_enterSpecial(fr, &map)) {
+      if (cont_h() != NULL && Continuation::is_continuation_enterSpecial(fr)) {
         oop scope = java_lang_Continuation::scope(cont_h());
         if (!show_carrier && scope == java_lang_VirtualThread::vthread_scope()) break;
 

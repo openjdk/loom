@@ -65,6 +65,11 @@ static inline void copy_to_stack(void* from, void* to, size_t size) {
   cont_thaw_chunk_memcpy(from, to, size);
 }
 
+ContinuationEntry* ContinuationEntry::from_frame(const frame& f) {
+  assert (Continuation::is_continuation_enterSpecial(f), "");
+  return (ContinuationEntry*)f.unextended_sp();
+}
+
 frame ContinuationEntry::to_frame() {
   static CodeBlob* cb = CodeCache::find_blob(entry_pc());
   return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);

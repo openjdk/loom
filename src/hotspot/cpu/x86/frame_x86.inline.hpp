@@ -448,7 +448,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     } else {
       Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &sender_sp);	
     }
-  } else if (map->walk_cont() && Continuation::is_continuation_enterSpecial(*this, map)) {
+  } else if (map->walk_cont() && Continuation::is_continuation_enterSpecial(*this)) {
     assert (map->cont() != (oop)NULL, "");
     map->set_cont(Continuation::continuation_parent(map->cont()));
   }

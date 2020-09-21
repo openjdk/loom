@@ -91,7 +91,7 @@ public:
   static oop  get_continutation_for_frame(JavaThread* thread, const frame& f);
   static ContinuationEntry* last_continuation(JavaThread* thread, oop cont_scope);
   static bool is_mounted(JavaThread* thread, oop cont_scope);
-  static bool is_continuation_enterSpecial(const frame& f, const RegisterMap* map);
+  static bool is_continuation_enterSpecial(const frame& f);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap* map);
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);
@@ -204,6 +204,7 @@ public:
   intptr_t* parent_cont_fastpath() { return _parent_cont_fastpath; }
   void set_parent_cont_fastpath(intptr_t* x) { _parent_cont_fastpath = x; }
 
+  static ContinuationEntry* from_frame(const frame& f);
   frame to_frame();
   void update_register_map(RegisterMap* map);
 
