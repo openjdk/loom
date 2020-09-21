@@ -667,7 +667,7 @@ public class LinkedTransferQueue<E> extends AbstractQueue<E>
                 LockSupport.setCurrentBlocker(this);
                 try {
                     ForkJoinPool.managedBlock(s);
-                } catch (InterruptedException cannotHappen) {  }
+                } catch (InterruptedException cannotHappen) { }
                 LockSupport.setCurrentBlocker(null);
             }
             else {

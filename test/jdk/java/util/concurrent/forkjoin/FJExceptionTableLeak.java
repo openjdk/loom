@@ -62,11 +62,15 @@ import java.util.function.BooleanSupplier;
 @Test
 public class FJExceptionTableLeak {
     final ThreadLocalRandom rnd = ThreadLocalRandom.current();
-    final VarHandle NEXT, EX;
-    final Object[] exceptionTable;
-    final ReentrantLock exceptionTableLock;
+    VarHandle NEXT, EX;
+    Object[] exceptionTable;
+    ReentrantLock exceptionTableLock;
 
-    FJExceptionTableLeak() throws ReflectiveOperationException {
+    FJExceptionTableLeak() {
+        // initialize separately to allow to pass with FJ versions without table
+    }
+
+    void init() throws ReflectiveOperationException {
         MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(
             ForkJoinTask.class, MethodHandles.lookup());
         Class<?> nodeClass = Class.forName(
@@ -115,6 +119,11 @@ public class FJExceptionTableLeak {
 
     @Test
     public void exceptionTableCleanup() throws Exception {
+        try {
+            init();
+        } catch (ReflectiveOperationException ex) {
+            return; // using FJ Version without Exception table
+        }
         ArrayList<FailingTask> failedTasks = failedTasks();
 
         // Retain a strong ref to one last failing task

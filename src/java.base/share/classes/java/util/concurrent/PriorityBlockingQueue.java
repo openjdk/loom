@@ -290,7 +290,9 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E>
         if (allocationSpinLock == 0 &&
             ALLOCATIONSPINLOCK.compareAndSet(this, 0, 1)) {
             try {
-                int growth = oldCap < 64 ? oldCap + 2 : oldCap >> 1;
+                int growth = (oldCap < 64)
+                    ? (oldCap + 2) // grow faster if small
+                    : (oldCap >> 1);
                 int newCap = ArraysSupport.newLength(oldCap, 1, growth);
                 if (queue == array)
                     newArray = new Object[newCap];
