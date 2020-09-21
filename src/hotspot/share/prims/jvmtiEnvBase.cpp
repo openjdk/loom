@@ -616,6 +616,14 @@ javaVFrame* get_vthread_jvf(Thread* cur_thread, oop vthread) {
   if (java_lang_Continuation::is_mounted(cont)) {
     oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
+
+    if (!java_thread->has_last_Java_frame()) {
+      // TBD: This is a temporary work around to avoid asserts because of
+      // the native enterSpecial frame on the top. No frames will be found
+      // by the JVMTI functions such as GetStackTrace.
+      return NULL;
+    }
+
     vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
 
     if (!vfs.at_end()) {

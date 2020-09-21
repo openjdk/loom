@@ -637,7 +637,7 @@ void vframeStreamCommon::skip_reflection_related_frames() {
 
 javaVFrame* vframeStreamCommon::asJavaVFrame() {
   javaVFrame* result = NULL;
-  if (_mode == compiled_mode) {
+  if (_mode == compiled_mode && _frame.is_compiled_frame()) {
     guarantee(_frame.is_compiled_frame(), "expected compiled Java frame");
     guarantee(_reg_map.update_map(), "");
 
@@ -653,6 +653,14 @@ javaVFrame* vframeStreamCommon::asJavaVFrame() {
 
     result = cvf;
   } else {
+    if (_mode == compiled_mode && _frame.is_native_frame()) {
+      // TBD: This is a temporary work around to avoid asserts because of
+      // the native enterSpecial frame on the top. No frames will be found
+      // by the JVMTI functions such as GetStackTrace. Without this return
+      // a carrier thread stack trace with the enterSpecial frame on the top
+      // will be returned by the JVMTI GetStackTrace.
+      return NULL;
+    }
     result = javaVFrame::cast(vframe::new_vframe(&_frame, &_reg_map, _thread));
   }
   guarantee(result->method() == method(), "wrong method");
