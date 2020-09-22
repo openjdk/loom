@@ -3319,7 +3319,7 @@ void JavaThread::print_stack_on(outputStream* st) {
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
 
-  RegisterMap reg_map(this);
+  RegisterMap reg_map(this, true, true);
   vframe* start_vf = last_java_vframe(&reg_map);
   int count = 0;
   for (vframe* f = start_vf; f != NULL; f = f->sender()) {
