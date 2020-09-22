@@ -3412,7 +3412,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   #endif
     return freeze_epilog(thread, cont);
   } else if (mode != mode_fast && UNLIKELY(preempt)) {
-    assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked, "thread_state: %d %s", thread->thread_state(), thread->thread_state_name());
+    assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked /*|| thread->thread_state() == _thread_in_native*/, "thread_state: %d %s", thread->thread_state(), thread->thread_state_name());
     freeze_result res = fr.freeze_preempt();
     assert (res != freeze_retry_slow, "");
     return freeze_epilog(thread, cont, res);
