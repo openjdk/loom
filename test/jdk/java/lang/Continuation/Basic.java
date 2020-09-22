@@ -70,6 +70,13 @@
 * @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
 */
 
+/**
+ * @test
+ * @summary Test which verifies that continuation repspects Xint mode
+ *
+ * @run testng/othervm -Xint -XX:+SegmentedCodeCache Basic
+ */
+
 // Anything excluded or not compileonly is not compiled; see CompilerOracle::should_exclude
 
 // * @library /test/lib /
@@ -102,7 +109,7 @@ public class Basic {
     // private static final WhiteBox WB = WhiteBox.getWhiteBox();
 
     static final ContinuationScope FOO = new ContinuationScope() {};
-    
+
     // @Test
     // public void test0() {
     //     fooooooo();
@@ -124,7 +131,7 @@ public class Basic {
             }
             res.set((int)r);
         });
-        
+
         int i = 0;
         while (!cont.isDone()) {
             cont.run();
@@ -138,14 +145,14 @@ public class Basic {
         assertEquals(res.get(), 247);
         assertEquals(cont.isPreempted(), false);
     }
-    
+
     static double foo(int a) {
         long x = 8;
         String s = "yyy";
         String r = bar(a + 1);
         return Integer.parseInt(r)+1;
     }
-    
+
     static final int DEPTH = 40;
     static String bar(long b) {
         double x = 9.99;
@@ -229,7 +236,7 @@ public class Basic {
             throw new LoomException("Loom exception!");
         return "" + r;
     }
-    
+
     public void testException1() {
         System.out.println("testException1");
         Continuation cont = new Continuation(FOO, ()-> {
@@ -240,7 +247,7 @@ public class Basic {
                 r += fooThrow(k);
             }
         });
-        
+
         cont.run();
         try {
             cont.run();
@@ -269,7 +276,7 @@ public class Basic {
         Continuation cont = new Continuation(FOO, ()-> {
             res.set((int)manyArgsDriver());
         });
-        
+
         int i = 0;
         while (!cont.isDone()) {
             cont.run();
@@ -277,12 +284,12 @@ public class Basic {
         }
         assertEquals(res.get(), 247);
     }
-    
+
     static double manyArgsDriver() {
         double r = 0;
         for (int k = 1; k < 20; k++) {
             int x = 3;
-            String s = "abc"; 
+            String s = "abc";
 
             r += fooMany(k,
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
@@ -307,7 +314,7 @@ public class Basic {
         o1, o2, o3, o4, o5, o6, o7, o8, o9, o10, o11, o12, o13, o14, o15, o16, o17, o18, o19, o20);
         return Integer.parseInt(r)+1;
     }
-    
+
     static String barMany(long b,
     int x1, int x2, int x3, int x4, int x5, int x6, int x7, int x8, int x9, int x10, int x11, int x12,
     int x13, int x14, int x15, int x16, int x17, int x18, int x19, int x20,
@@ -323,11 +330,11 @@ public class Basic {
         long r = b+1;
         return "" + r;
     }
-    
+
     public void testPinnedMonitor() {
         System.out.println("testPinnedMonitor");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
-        
+
         Continuation cont = new Continuation(FOO, ()-> {
             syncFoo(1);
         }) {
@@ -337,13 +344,13 @@ public class Basic {
                 res.set(reason);
             }
         };
-        
+
         cont.run();
         assertEquals(res.get(), Continuation.Pinned.MONITOR);
         boolean isDone = cont.isDone();
         assertEquals(isDone, true);
     }
-    
+
     static double syncFoo(int a) {
         long x = 8;
         String s = "yyy";
@@ -353,11 +360,11 @@ public class Basic {
         }
         return Integer.parseInt(r)+1;
     }
-    
+
     private void testNotPinnedMonitor() {
         System.out.println("testNotPinnedMonitor");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
-        
+
         Continuation cont = new Continuation(FOO, ()-> {
             noSyncFoo(1);
         }) {
@@ -367,7 +374,7 @@ public class Basic {
                 res.set(reason);
             }
         };
-        
+
         cont.run();
         boolean isDone = cont.isDone();
         assertEquals(res.get(), null);
@@ -387,7 +394,7 @@ public class Basic {
     private void testPinnedNative() {
         System.out.println("testPinnedNative");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
-        
+
         Continuation cont = new Continuation(FOO, ()-> {
             nativeFoo(1);
         }) {
@@ -396,11 +403,11 @@ public class Basic {
                 res.set(reason);
             }
         };
-        
+
         cont.run();
         assertEquals(res.get(), Continuation.Pinned.NATIVE);
     }
-    
+
     static double nativeFoo(int a) {
         try {
             long x = 8;
@@ -426,7 +433,7 @@ public class Basic {
     private void testPinnedCriticalSection() {
         System.out.println("testPinnedCriticalSection");
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();
-        
+
         Continuation cont = new Continuation(FOO, ()-> {
             csFoo(1);
         }) {
@@ -435,7 +442,7 @@ public class Basic {
                 res.set(reason);
             }
         };
-        
+
         cont.run();
         assertEquals(res.get(), Continuation.Pinned.CRITICAL_SECTION);
     }
