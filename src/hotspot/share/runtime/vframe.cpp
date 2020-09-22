@@ -93,6 +93,10 @@ vframe* vframe::sender() const {
   if (_fr.is_entry_frame() && _fr.is_first_frame()) return NULL;
   frame s = _fr.real_sender(&temp_map);
   if (s.is_first_frame()) return NULL;
+  if (Continuation::is_continuation_enterSpecial(s)) {
+    if (Continuation::continuation_scope(Continuation::get_continutation_for_frame(temp_map.thread(), _fr)) == java_lang_VirtualThread::vthread_scope())
+      return NULL;
+  }
   return vframe::new_vframe(&s, &temp_map, thread());
 }
 
