@@ -475,6 +475,13 @@ public class ThreadLocal<T> {
         }
 
         /**
+         * Returns the number of elements in the map.
+         */
+        int size() {
+            return size;
+        }
+
+        /**
          * Get the entry associated with key.  This method
          * itself handles only the fast path: a direct hit of existing
          * key. It otherwise relays to getEntryAfterMiss.  This is

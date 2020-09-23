@@ -579,7 +579,9 @@ public class Thread implements Runnable {
             this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
         } else if ((characteristics & INHERIT_THREAD_LOCALS) != 0) {
             ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
-            if (parentMap != null && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED) {
+            if (parentMap != null
+                    && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED
+                    && parentMap.size() > 0) {
                 this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
             }
         }
@@ -620,7 +622,9 @@ public class Thread implements Runnable {
             this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
         } else if ((characteristics & INHERIT_THREAD_LOCALS) != 0) {
             ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
-            if (parentMap != null && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED) {
+            if (parentMap != null
+                    && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED
+                    && parentMap.size() > 0) {
                 this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
             }
         }
