@@ -2,10 +2,15 @@
 java/lang/Continuation/Basic.java                                   8241633 generic-all
 java/lang/Continuation/LiveFramesDriver.java                        8241633 generic-all
 
-jdk/jfr/jcmd/TestJcmdStartStopDefault.java                          8253378 generic-all
-jdk/jfr/event/runtime/TestJavaBlockedEvent.java                     8253378 generic-all
-jdk/jfr/event/os/TestCPULoad.java                                   8253378 generic-all
 jdk/jfr/api/consumer/recordingstream/TestBasics.java                8253378 generic-all
+jdk/jfr/api/recording/event/TestLoadEventAfterStart.java            8253378 generic-all
+jdk/jfr/event/compiler/TestCompilerCompile.java                     8253378 generic-all
+jdk/jfr/event/gc/collection/TestGCGarbageCollectionEvent.java       8253378 generic-all
+jdk/jfr/event/os/TestCPULoad.java                                   8253378 generic-all
+jdk/jfr/event/runtime/TestClassLoadEvent.java                       8253378 generic-all
+jdk/jfr/event/runtime/TestJavaBlockedEvent.java                     8253378 generic-all
+jdk/jfr/jcmd/TestJcmdStartStopDefault.java                          8253378 generic-all
+
 
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
