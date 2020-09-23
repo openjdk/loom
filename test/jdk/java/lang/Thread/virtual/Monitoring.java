@@ -29,7 +29,12 @@
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
+import java.nio.channels.Selector;
 import java.util.Arrays;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
@@ -38,8 +43,8 @@ import static org.testng.Assert.*;
 public class Monitoring {
 
     /**
-     * Test that ThreadMXBean::getAllThreadsIds does not include thread ids for virtual
-     * threads.
+     * Test that ThreadMXBean::getAllThreadsIds does not include thread ids for
+     * virtual threads.
      */
     public void testGetAllThreadIds() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -51,9 +56,9 @@ public class Monitoring {
     }
 
     /**
-     * Test that ThreadMXBean::getThreadInfo returns null.
+     * Test that ThreadMXBean::getThreadInfo returns null for a virual thread.
      */
-    public void testGetThreadInfo() throws Exception {
+    public void testGetThreadInfo1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             long tid = Thread.currentThread().getId();
             ThreadInfo info = ManagementFactory.getThreadMXBean().getThreadInfo(tid);
@@ -62,7 +67,46 @@ public class Monitoring {
     }
 
     /**
-     * Test that getThreadCpuTime returns -1.
+     * Test that ThreadMXBean::getThreadInfo on a carrier thread. The stack
+     * frames of the virtual thread should not be returned.
+     */
+    public void testGetThreadInfo2() throws Exception {
+        try (ExecutorService pool = Executors.newFixedThreadPool(1)) {
+            var carrierRef = new AtomicReference<Thread>();
+            Executor scheduler = (task) -> {
+                pool.execute(() -> {
+                    carrierRef.set(Thread.currentThread());
+                    task.run();
+                });
+            };
+
+            // start virtual thread so carrier Thread can be captured
+            Thread.builder().virtual(scheduler).task(() -> { }).start().join();
+            Thread carrier = carrierRef.get();
+            assertTrue(carrier != null && !carrier.isVirtual());
+
+            try (Selector sel = Selector.open()) {
+                // start virtual reads that blocks in a native method
+                Thread.builder().virtual(scheduler).task(() -> {
+                    try {
+                        sel.select();
+                    } catch (Exception e) { }
+                }).start();
+
+                // invoke getThreadInfo get and check the stack trace
+                long tid = carrier.getId();
+                ThreadInfo info = ManagementFactory.getThreadMXBean().getThreadInfo(tid, 100);
+                StackTraceElement[] stack = info.getStackTrace();
+
+                // should only see carrier frames
+                assertTrue(contains(stack, "java.util.concurrent.ThreadPoolExecutor"));
+                assertFalse(contains(stack, "java.nio.channels.Selector"));
+            }
+        }
+    }
+
+    /**
+     * Test that getThreadCpuTime returns -1 for a virual thread..
      */
     public void testGetThreadCpuTime() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -73,7 +117,7 @@ public class Monitoring {
     }
 
     /**
-     * Test that getThreadUserTime returns -1.
+     * Test that getThreadUserTime returns -1 for a virual thread.
      */
     public void testGetThreadUserTime() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -84,7 +128,8 @@ public class Monitoring {
     }
 
     /**
-     * Test that ThreadMXBean::getCurrentThreadCpuTime throws UOE.
+     * Test that ThreadMXBean::getCurrentThreadCpuTime throws UOE when invoked
+     * on a virtual thread.
      */
     @Test(expectedExceptions = { UnsupportedOperationException.class })
     public void testGetCurrentThreadCpuTime() throws Exception {
@@ -94,7 +139,8 @@ public class Monitoring {
     }
 
     /**
-     * Test that ThreadMXBean::getCurrentThreadUserTime throws UOE.
+     * Test that ThreadMXBean::getCurrentThreadUserTime throws UOE when
+     * invoked on a virtual thread.
      */
     @Test(expectedExceptions = { UnsupportedOperationException.class })
     public void testGetCurrentThreadUserTime() throws Exception {
@@ -104,7 +150,8 @@ public class Monitoring {
     }
 
     /**
-     * Test that ThreadMXBean::getCurrentThreadAllocatedBytes returns -1.
+     * Test that ThreadMXBean::getCurrentThreadAllocatedBytes returns -1 when
+     * invoked on a virtual thread.
      */
     public void testGetCurrentThreadAllocatedBytes() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -114,4 +161,9 @@ public class Monitoring {
         });
     }
 
+    private static boolean contains(StackTraceElement[] stack, String className) {
+        return Arrays.stream(stack)
+                .map(StackTraceElement::getClassName)
+                .anyMatch(className::equals);
+    }
 }
