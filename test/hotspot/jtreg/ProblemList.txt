@@ -46,7 +46,7 @@ compiler/startup/SmallCodeCacheStartup.java                                   82
 compiler/exceptions/TestRecursiveReplacedException.java	                      8242065 generic-all
 vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java   8242890 generic-all
 runtime/vthread/RedefineClass.java                                            8253378 generic-all
-ava/lang/Continuation/Basic.java#id1                                          8253570 generic-all
+
 
 # :hotspot_compiler
 

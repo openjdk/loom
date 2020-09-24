@@ -111,6 +111,10 @@
 
 ############################################################################
 
+# Loom-specific failures
+java/lang/Continuation/Basic.java#id1                                          8253570 generic-all
+
+
 # jdk_awt
 
 java/awt/event/MouseEvent/MouseClickTest/MouseClickTest.java 8168389 windows-all,macosx-all
