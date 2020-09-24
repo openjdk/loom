@@ -40,13 +40,13 @@
 
 # loom specific failing tests
 
-compiler/graalunit/HotspotTest.java                              8242063 generic-all
-compiler/runtime/StackOverflowBug.java                           8242064 generic-all
-compiler/startup/SmallCodeCacheStartup.java                      8242064 generic-all
-compiler/exceptions/TestRecursiveReplacedException.java	         8242065 generic-all
-vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java 8242890 generic-all
-runtime/vthread/RedefineClass.java                                  8253378 generic-all
-
+compiler/graalunit/HotspotTest.java                                           8242063 generic-all
+compiler/runtime/StackOverflowBug.java                                        8242064 generic-all
+compiler/startup/SmallCodeCacheStartup.java                                   8242064 generic-all
+compiler/exceptions/TestRecursiveReplacedException.java	                      8242065 generic-all
+vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java   8242890 generic-all
+runtime/vthread/RedefineClass.java                                            8253378 generic-all
+ava/lang/Continuation/Basic.java#id1                                          8253570 generic-all
 
 # :hotspot_compiler
 
