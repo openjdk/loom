@@ -158,6 +158,7 @@ jdk/internal/misc/VM/RuntimeArguments.java
 java/lang/StackWalker/CallerFromMain.java
 java/lang/Package/PackageFromManifest.java
 java/lang/Package/IsCompatibleWithDriver.java
+java/lang/ClassLoader/EndorsedDirs.java
 java/lang/ClassLoader/ExtDirs.java
 java/lang/ClassLoader/GetSystemPackage.java
 java/lang/ClassLoader/securityManager/ClassLoaderTest.java
