@@ -86,7 +86,7 @@ public class Monitoring {
             assertTrue(carrier != null && !carrier.isVirtual());
 
             try (Selector sel = Selector.open()) {
-                // start virtual reads that blocks in a native method
+                // start virtual thread that blocks in a native method
                 Thread.builder().virtual(scheduler).task(() -> {
                     try {
                         sel.select();
@@ -96,11 +96,14 @@ public class Monitoring {
                 // invoke getThreadInfo get and check the stack trace
                 long tid = carrier.getId();
                 ThreadInfo info = ManagementFactory.getThreadMXBean().getThreadInfo(tid, 100);
-                StackTraceElement[] stack = info.getStackTrace();
 
                 // should only see carrier frames
+                StackTraceElement[] stack = info.getStackTrace();
                 assertTrue(contains(stack, "java.util.concurrent.ThreadPoolExecutor"));
                 assertFalse(contains(stack, "java.nio.channels.Selector"));
+
+                // carrier should not be holding any monitors
+                assertTrue(info.getLockedMonitors().length == 0);
             }
         }
     }
