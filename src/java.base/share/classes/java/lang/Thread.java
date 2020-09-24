@@ -43,7 +43,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.misc.TerminatingThreadLocal;
@@ -102,11 +101,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * machine terminates.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
- * or method in this class will cause a {@link NullPointerException} to be
- * thrown.
+ * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
- * @author  unascribed
- * @see     Runtime#exit(int)
  * @since   1.0
  */
 public class Thread implements Runnable {
@@ -399,8 +395,7 @@ public class Thread implements Runnable {
         }
 
         if (nanos < 0 || nanos > 999999) {
-            throw new IllegalArgumentException(
-                    "nanosecond timeout value out of range");
+            throw new IllegalArgumentException("nanosecond timeout value out of range");
         }
 
         if (nanos > 0 && millis < Long.MAX_VALUE) {
@@ -430,29 +425,30 @@ public class Thread implements Runnable {
      */
     public static void sleep(Duration duration) throws InterruptedException {
         long nanos = duration.toNanos();
-        if (nanos >= 0) {
-            Thread thread = currentThread();
-            if (thread.isVirtual()) {
-                if (ThreadSleepEvent.isTurnedOn()) {
-                    ThreadSleepEvent event = new ThreadSleepEvent();
-                    try {
-                        event.time = nanos;
-                        event.begin();
-                        ((VirtualThread) thread).sleepNanos(nanos);
-                    } finally {
-                        event.commit();
-                    }
-                } else {
+        if (nanos < 0)
+            return;
+
+        Thread thread = currentThread();
+        if (thread.isVirtual()) {
+            if (ThreadSleepEvent.isTurnedOn()) {
+                ThreadSleepEvent event = new ThreadSleepEvent();
+                try {
+                    event.time = nanos;
+                    event.begin();
                     ((VirtualThread) thread).sleepNanos(nanos);
+                } finally {
+                    event.commit();
                 }
             } else {
-                // convert to milliseconds, ceiling rounding mode
-                long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
-                if (nanos > NANOSECONDS.convert(millis, MILLISECONDS)) {
-                    millis += 1L;
-                }
-                sleep(millis);
+                ((VirtualThread) thread).sleepNanos(nanos);
             }
+        } else {
+            // convert to milliseconds, ceiling rounding mode
+            long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
+            if (nanos > NANOSECONDS.convert(millis, MILLISECONDS)) {
+                millis += 1L;
+            }
+            sleep(millis);
         }
     }
 
@@ -551,7 +547,7 @@ public class Thread implements Runnable {
 
         /* can't create a kernel thread in the virtual thread group */
         if ((VM.initLevel() >= 1) && g == VirtualThreads.THREAD_GROUP) {
-            g = VirtualThreads.THREAD_SUBGROUP;
+            g = VirtualThreads.OFFSPRING_THREAD_GROUP;
         }
 
         /* checkAccess regardless of whether or not threadgroup is
@@ -1811,7 +1807,7 @@ public class Thread implements Runnable {
      *       <a href="{@docRoot}/java.base/java/lang/doc-files/threadPrimitiveDeprecation.html">Why
      *       are Thread.stop, Thread.suspend and Thread.resume Deprecated?</a>.
      */
-    @Deprecated(since="1.2")
+    @Deprecated(since="1.2", forRemoval=true)
     public final void stop() {
         SecurityManager security = System.getSecurityManager();
         if (security != null) {
@@ -2131,11 +2127,6 @@ public class Thread implements Runnable {
      * Returns the thread group to which this thread belongs.
      * This method returns null if the thread has terminated.
      *
-     * <p> The thread group for virtual threads does not support all features
-     * of regular thread groups. Virtual threads are not considered <i>active
-     * threads</i> in the thread group and so are not enumerated or acted on by
-     * thread group operations.
-     *
      * @return  this thread's thread group.
      */
     public final ThreadGroup getThreadGroup() {
@@ -2161,7 +2152,9 @@ public class Thread implements Runnable {
     /**
      * Returns an estimate of the number of active threads in the current
      * thread's {@linkplain java.lang.ThreadGroup thread group} and its
-     * subgroups.
+     * subgroups. Virtual threads are not considered active threads in a
+     * thread group so this method returns {@code 0} when invoked from
+     * a virtual thread.
      *
      * <p> The value returned is only an estimate because the number of
      * threads may change dynamically while this method traverses internal
@@ -2172,8 +2165,6 @@ public class Thread implements Runnable {
      * @return  an estimate of the number of active threads in the current
      *          thread's thread group and in any other thread group that
      *          has the current thread's thread group as an ancestor
-     *
-     * @since 1.0
      */
     public static int activeCount() {
         return currentThread().getThreadGroup().activeCount();
@@ -2183,7 +2174,9 @@ public class Thread implements Runnable {
      * Copies into the specified array every active thread in the current
      * thread's thread group and its subgroups. This method simply
      * invokes the {@link java.lang.ThreadGroup#enumerate(Thread[])}
-     * method of the current thread's thread group.
+     * method of the current thread's thread group. Virtual threads are
+     * not considered active threads in a thread group so this method
+     * returns {@code 0} when invoked from a virtual thread.
      *
      * <p> An application might use the {@linkplain #activeCount activeCount}
      * method to get an estimate of how big the array should be, however
@@ -2204,8 +2197,6 @@ public class Thread implements Runnable {
      * @throws  SecurityException
      *          if {@link java.lang.ThreadGroup#checkAccess} determines that
      *          the current thread cannot access its thread group
-     *
-     * @since 1.0
      */
     public static int enumerate(Thread tarray[]) {
         return currentThread().getThreadGroup().enumerate(tarray);
@@ -2257,7 +2248,7 @@ public class Thread implements Runnable {
 
         if (isVirtual()) {
             if (isAlive()) {
-                long nanos = TimeUnit.MILLISECONDS.toNanos(millis);
+                long nanos = MILLISECONDS.toNanos(millis);
                 ((VirtualThread) this).joinNanos(nanos);
             }
             return;
@@ -2377,12 +2368,15 @@ public class Thread implements Runnable {
         if (duration.isZero() || duration.isNegative())
             return false;
 
+        long nanos = NANOSECONDS.convert(duration);
         if (isVirtual()) {
-            long nanos = TimeUnit.NANOSECONDS.convert(duration);
             return ((VirtualThread) this).joinNanos(nanos);
         } else {
-            // ignore nano precision for now
-            long millis = Long.max(TimeUnit.MILLISECONDS.convert(duration), 1);
+            // convert to milliseconds, ceiling rounding mode
+            long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
+            if (nanos > NANOSECONDS.convert(millis, MILLISECONDS)) {
+                millis += 1L;
+            }
             join(millis);
             return getState() == State.TERMINATED;
         }
@@ -2649,13 +2643,13 @@ public class Thread implements Runnable {
         Object stackTrace = getStackTrace0();
         if (stackTrace == null) {
             return null;
-        } 
-        
-        StackTraceElement[] stes = (StackTraceElement[])stackTrace;
-        if (stes.length == 0)
+        }
+        StackTraceElement[] stes = (StackTraceElement[]) stackTrace;
+        if (stes.length == 0) {
             return null;
-        
-        return StackTraceElement.of((StackTraceElement[]) stackTrace);
+        } else {
+            return StackTraceElement.of(stes);
+        }
     }
 
     private native Object getStackTrace0();
@@ -3277,7 +3271,7 @@ public class Thread implements Runnable {
         static final ThreadGroup THREAD_GROUP;
 
         // Thread group for kernel threads created by virtual threads
-        static final ThreadGroup THREAD_SUBGROUP;
+        static final ThreadGroup OFFSPRING_THREAD_GROUP;
 
         // AccessControlContext that doesn't support any permissions.
         static final AccessControlContext ACCESS_CONTROL_CONTEXT;
@@ -3301,7 +3295,7 @@ public class Thread implements Runnable {
             if (System.getSecurityManager() != null) {
                 priority = MIN_PRIORITY;
             }
-            THREAD_SUBGROUP = new ThreadGroup(vgroup, "other", priority, false);
+            OFFSPRING_THREAD_GROUP = new ThreadGroup(vgroup, "offspring", priority, false);
 
             ACCESS_CONTROL_CONTEXT = new AccessControlContext(new ProtectionDomain[] {
                 new ProtectionDomain(null, null)

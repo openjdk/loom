@@ -61,6 +61,9 @@ import jdk.internal.misc.VM;
  * for cases where a parent group is {@linkplain #enumerate(ThreadGroup[])
  * enumerated} to find a subgroup by name.
  *
+ * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
+ * or method in this class will cause a {@link NullPointerException} to be thrown.
+ *
  * @apiNote
  * The concept of <i>daemon thread group</i> is not related to the concept
  * of {@linkplain Thread#isDaemon() daemon threads}. There may be both
@@ -152,13 +155,10 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * @param     parent   the parent thread group.
      * @param     name     the name of the new thread group, can be {@code null}
-     * @throws    NullPointerException  if the thread group argument is
-     *               {@code null}.
      * @throws    SecurityException  if the current thread cannot create a
      *               thread in the specified thread group.
      * @see     java.lang.SecurityException
      * @see     java.lang.ThreadGroup#checkAccess()
-     * @since   1.0
      */
     public ThreadGroup(ThreadGroup parent, String name) {
         this(checkParentAccess(parent), parent, name);
@@ -412,9 +412,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * @return  the number of threads put into the array
      *
-     * @throws  NullPointerException
-     *          if {@code list} is null
-     *
      * @throws  SecurityException
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
@@ -456,9 +453,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *         thread group
      *
      * @return  the number of threads put into the array
-     *
-     * @throws  NullPointerException
-     *          if {@code list} is null
      *
      * @throws  SecurityException
      *          if {@linkplain #checkAccess checkAccess} determines that
@@ -523,9 +517,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * @return  the number of thread groups put into the array
      *
-     * @throws  NullPointerException
-     *          if {@code list} is null
-     *
      * @throws  SecurityException
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
@@ -561,9 +552,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *         if {@code true}, recursively enumerate all subgroups
      *
      * @return  the number of thread groups put into the array
-     *
-     * @throws  NullPointerException
-     *          if {@code list} is null
      *
      * @throws  SecurityException
      *          if {@linkplain #checkAccess checkAccess} determines that
