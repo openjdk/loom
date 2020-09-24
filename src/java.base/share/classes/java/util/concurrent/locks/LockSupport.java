@@ -454,7 +454,8 @@ public class LockSupport {
      * preserve unique mappings.
      */
     static final long getThreadId(Thread thread) {
-        return U.getLong(thread, TID);
+        // need to keep in sync with Thread::getId
+        return U.getLong(thread, TID) & TID_MASK;
     }
 
     // Hotspot implementation via intrinsics API
@@ -463,5 +464,6 @@ public class LockSupport {
         = U.objectFieldOffset(Thread.class, "parkBlocker");
     private static final long TID
         = U.objectFieldOffset(Thread.class, "tid");
+    private static final long TID_MASK = (1L << 48) - 1;
 
 }
