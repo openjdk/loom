@@ -111,9 +111,6 @@
 
 ############################################################################
 
-# Loom-specific failures
-java/lang/Continuation/Basic.java#id1                                          8253570 generic-all
-
 
 # jdk_awt
 
@@ -574,6 +571,10 @@ java/lang/ProcessHandle/InfoTest.java                           8211847 aix-ppc6
 java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-all
 java/lang/invoke/LFCaching/LFGarbageCollectedTest.java          8078602 generic-all
 java/lang/invoke/lambda/LambdaFileEncodingSerialization.java    8249079 linux-x64
+
+# Loom-specific failures
+java/lang/Continuation/Basic.java#id1                           8253570 generic-all
+java/lang/Thread/virtual/stress/PinALot.java#id1                8253523 generic-all
 
 ############################################################################
 

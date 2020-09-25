@@ -66,6 +66,7 @@
 #include "runtime/arguments.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/continuation.hpp"
+#include "runtime/globals_extension.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/init.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
