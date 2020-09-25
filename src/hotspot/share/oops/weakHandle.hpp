@@ -48,6 +48,7 @@ class WeakHandle {
  public:
   WeakHandle() : _obj(NULL) {} // needed for init
   WeakHandle(OopStorage* storage, Handle obj);
+  WeakHandle(OopStorage* storage, oop obj);
 
   static WeakHandle from_raw(oop* raw);
   inline oop resolve() const;
