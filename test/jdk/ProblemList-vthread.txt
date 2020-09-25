@@ -11,6 +11,8 @@ jdk/jfr/event/runtime/TestClassLoadEvent.java                       8253378 gene
 jdk/jfr/event/runtime/TestJavaBlockedEvent.java                     8253378 generic-all
 jdk/jfr/jcmd/TestJcmdStartStopDefault.java                          8253378 generic-all
 
+java/lang/invoke/condy/CondyNestedTest.java                         8253670 generic-all
+
 
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
