@@ -1,8 +1,9 @@
 ### Filed bugs
 
-gc/g1/humongousObjects/TestNoAllocationsInHRegions.java             8241630 generic-all
-runtime/Metaspace/DefineClass.java                                  8253378 generic-all
-serviceability/dcmd/compiler/CodeCacheTest.java                     8253570 generic-all
+gc/g1/humongousObjects/TestNoAllocationsInHRegions.java                         8241630 generic-all
+runtime/Metaspace/DefineClass.java                                              8253378 generic-all
+serviceability/dcmd/compiler/CodeCacheTest.java                                 8253570 generic-all
+serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.jaa	8253617 generic-all
 
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
