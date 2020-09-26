@@ -6,6 +6,13 @@ runtime/Metaspace/DefineClass.java                                              
 runtime/whitebox/WBStackSize.java                                                               8253670 generic-all
 serviceability/dcmd/compiler/CodeCacheTest.java                                                 8253570 generic-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.java                  8253617 generic-all
+vmTestbase/nsk/stress/stack/stack019.java                                                       8253670 generic-all
+vmTestbase/nsk/stress/stack/stack009.java                                                       8253670 generic-all
+vmTestbase/nsk/stress/stack/stack007.java                                                       8253670 generic-all
+vmTestbase/nsk/stress/stack/stack006.java                                                       8253670 generic-all
+vmTestbase/nsk/stress/stack/stack004.java                                                       8253670 generic-all
+vmTestbase/nsk/stress/stack/stack003.java                                                       8253670 generic-all
+vmTestbase/nsk/stress/except/except010.java                                                     8253670 generic-all
 
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
