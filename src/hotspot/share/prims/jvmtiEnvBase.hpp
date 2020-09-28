@@ -180,6 +180,10 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static jvmtiError get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
                                                  JavaThread** jt_pp, oop* thread_oop_p);
 
+  // Return true if java thread is a carrier thread with a mounted virtual thread.
+  static bool cthread_with_mounted_vthread(JavaThread* jt);
+  static bool cthread_with_continuation(JavaThread* jt);
+
   static JvmtiEnv* JvmtiEnv_from_jvmti_env(jvmtiEnv *env) {
     return (JvmtiEnv*)((intptr_t)env - in_bytes(jvmti_external_offset()));
   };
@@ -317,6 +321,18 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
  public:
   // get a field descriptor for the specified class and field
   static bool get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd);
+
+  // get virtual thread last java vframe
+  static javaVFrame* get_vthread_jvf(oop vthread);
+
+  // get carrier thread last java vframe depending on can_support_virtual_threads capability
+  static javaVFrame* get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map);
+
+  // get ordinary thread thread state
+  static jint get_thread_state(oop thread_oop, JavaThread* jt);
+
+  // get virtual thread thread state
+  static jint get_vthread_state(oop thread_oop);
 
   // enumerates the live threads in the given thread group
   static int get_live_threads(JavaThread* current_thread, Handle group_hdl, Handle **thread_objs_p);

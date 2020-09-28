@@ -56,7 +56,7 @@ public class VThreadMonitorTest {
 
     static void m0() {
         synchronized (lock0) {
-            log("Thread entered sync section with lock0: " + thrName());
+            log("Thread entered sync section with lock0: " + thrName() + "\n");
         }
     }
     static void m1() {

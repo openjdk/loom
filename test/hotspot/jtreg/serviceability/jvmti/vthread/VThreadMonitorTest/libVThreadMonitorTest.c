@@ -78,7 +78,7 @@ static jboolean CheckLockObject(JNIEnv *env, jobject monitor) {
 
 static void
 check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
-                        jthread thread, jobject monitor) {
+                        jthread thread, char* tname, jboolean is_vt, jobject monitor) {
   jvmtiError err;
   jint state = 0;
   jobject contended_monitor = NULL;
@@ -90,19 +90,15 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
     status = FAILED;
     return;
   }
+  printf("%s: %s: monitor: %p, contended monitor: %p\n", func, tname, monitor, contended_monitor);
 
   // Check if it is expected monitor.
-  if (!(*env)->IsSameObject(env, monitor, contended_monitor)) {
-    if (err != JVMTI_ERROR_NONE) {
-      printf("%s: monitor: %p, contended monitor: %p\n",
-             func, monitor, contended_monitor);
-      ShowErrorMessage(jvmti, err, func,
-                       "FAIL: unexpected monitor from GetCurrentContendedMonitor");
-      status = FAILED;
-      return;
-    }
+  if ((*env)->IsSameObject(env, monitor, contended_monitor) == JNI_FALSE) {
+    printf("FAIL: is_vt: %d: unexpected monitor from GetCurrentContendedMonitor\n", is_vt);
+    status = FAILED;
+    return;
   }
-  printf("%s: GetCurrentContendedMonitor returned expected monitor\n", func);
+  printf("%s: GetCurrentContendedMonitor returned expected monitor for %s\n", func, tname);
 
   // Check GetThreadState for a vthread.
   err = (*jvmti)->GetThreadState(jvmti, thread, &state);
@@ -111,12 +107,12 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
     status = FAILED;
     return;
   }
-  printf("%s: GetThreadState returned vthread thread state: %0x\n", func, state);
+  printf("%s: GetThreadState returned state for %s: %0x\n\n", func, tname, state);
 }
 
 static void
 check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
-                    jthread thread, char* tname, jobject monitor) {
+                    jthread thread, char* tname, jboolean is_vt, jobject monitor) {
   jvmtiError err;
   jint state = 0;
   jint mcount = -1;
@@ -132,12 +128,18 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
   printf("%s: GetOwnedMonitorInfo: %s owns %d monitor(s)\n", func, tname, mcount);
   (*jvmti)->Deallocate(jvmti, (unsigned char *)owned_monitors);
 
-  if (mcount < 2) {
-    fprintf(stderr, "%s: FAIL: monitorCount expected to be >= 2\n", func);
+  if (is_vt == JNI_TRUE && mcount < 2) {
+    fprintf(stderr, "%s: FAIL: monitorCount for %s expected to be >= 2\n", func, tname);
     status = FAILED;
     return;
   }
-  printf("%s: GetOwnedMonitorInfo: returned expected number of monitors\n", func);
+  if (is_vt == JNI_FALSE && mcount != 0) {
+    fprintf(stderr, "%s: FAIL: monitorCount for %s expected to be 0\n", func, tname);
+    status = FAILED;
+    return;
+  }
+
+  printf("%s: GetOwnedMonitorInfo: returned expected number of monitors for %s\n", func, tname);
 
   // Check GetThreadState for a vthread.
   err = (*jvmti)->GetThreadState(jvmti, thread, &state);
@@ -146,11 +148,11 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
     status = FAILED;
     return;
   }
-  printf("%s: GetThreadState returned vthread thread state: %0x\n", func, state);
+  printf("%s: GetThreadState returned state for %s: %0x\n\n", func, tname, state);
 }
 
 JNIEXPORT void JNICALL
-MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject monitor) {
+MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread cthread, jobject monitor) {
   jvmtiError err;
   jvmtiThreadInfo tinfo;
   jthread vthread = NULL;
@@ -160,7 +162,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject moni
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetVirtualThread(jvmti, thread, &vthread);
+  err = (*jvmti)->GetVirtualThread(jvmti, cthread, &vthread);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
                      "error in JVMTI GetVirtualThread");
@@ -176,26 +178,26 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject moni
     event_has_posted = JNI_TRUE;
     return;
   }
-  check_contended_monitor(jvmti, env, "MonitorContendedEnter", vthread, monitor);
-  check_owned_monitor(jvmti, env, "MonitorContendedEnter", vthread, tinfo.name,  monitor);
+  check_contended_monitor(jvmti, env, "MonitorContendedEnter", vthread, tinfo.name, JNI_TRUE, monitor);
+  check_contended_monitor(jvmti, env, "MonitorContendedEnter", cthread, "cthread", JNI_FALSE, NULL);
+  check_owned_monitor(jvmti, env, "MonitorContendedEnter", vthread, tinfo.name, JNI_TRUE, monitor);
+  check_owned_monitor(jvmti, env, "MonitorContendedEnter", cthread, "cthread", JNI_FALSE, monitor);
   event_has_posted = JNI_TRUE;
   (*jvmti)->Deallocate(jvmti, (unsigned char *)tinfo.name);
 }
 
 JNIEXPORT void JNICALL
-MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject monitor) {
+MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread cthread, jobject monitor) {
   jvmtiError err;
   jvmtiThreadInfo tinfo;
-  jint mcount = 0;
-  jobject *owned_monitors = NULL;
   jthread vthread = NULL;
-  jobject contended_monitor = (jobject)thread; // init with a wrong monitor
+  jobject contended_monitor = (jobject)cthread; // init with a wrong monitor
 
   if (CheckLockObject(env, monitor) == JNI_FALSE) {
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetVirtualThread(jvmti, thread, &vthread);
+  err = (*jvmti)->GetVirtualThread(jvmti, cthread, &vthread);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetVirtualThread");
@@ -210,7 +212,8 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jobject mo
     status = FAILED;
     return;
   }
-  check_contended_monitor(jvmti, env, "MonitorContendedEntered", vthread, NULL);
+  check_contended_monitor(jvmti, env, "MonitorContendedEntered", vthread, "vthread", JNI_TRUE, NULL);
+  check_contended_monitor(jvmti, env, "MonitorContendedEntered", cthread, "cthread", JNI_FALSE, NULL);
   (*jvmti)->Deallocate(jvmti, (unsigned char *)tinfo.name);
 }
 
@@ -334,7 +337,7 @@ Java_VThreadMonitorTest_hasEventPosted(JNIEnv *env, jclass cls) {
 JNIEXPORT void JNICALL
 Java_VThreadMonitorTest_checkContendedMonitor(JNIEnv *env, jclass cls,
                                             jthread vthread, jobject monitor) {
-  check_contended_monitor(jvmti, env, "checkContendedMonitor", vthread, monitor);
+  check_contended_monitor(jvmti, env, "checkContendedMonitor", vthread, "vthread", JNI_TRUE, monitor);
 }
 
 JNIEXPORT jint JNICALL

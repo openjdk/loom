@@ -929,46 +929,10 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-
-    jshort vthread_state = java_lang_VirtualThread::state(thread_oop);
-    jint state = java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
-    bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
-
-    if (vthread_ext_suspended && ((state & JVMTI_THREAD_STATE_ALIVE) != 0)) {
-      state &= ~java_lang_VirtualThread::RUNNING;
-      state |= JVMTI_THREAD_STATE_ALIVE | JVMTI_THREAD_STATE_RUNNABLE | JVMTI_THREAD_STATE_SUSPENDED;
-    }
-    if (java_lang_Thread::interrupted(thread_oop)) {
-      state |= JVMTI_THREAD_STATE_INTERRUPTED;
-    }
-    *thread_state_ptr = state;
-    return JVMTI_ERROR_NONE;
+    *thread_state_ptr = JvmtiEnvBase::get_vthread_state(thread_oop);
+  } else {
+    *thread_state_ptr = JvmtiEnvBase::get_thread_state(thread_oop, java_thread);
   }
-
-  // get most state bits
-  jint state = java_lang_Thread::get_thread_status(thread_oop);
-
-  if (java_thread != NULL) {
-    // We have a JavaThread* so add more state bits.
-    JavaThreadState jts = java_thread->thread_state();
-
-    if (JvmtiExport::can_support_virtual_threads() &&
-        thread_oop != java_thread->mounted_vthread() &&
-        java_thread->is_cthread_pending_suspend()) {
-      // Suspended carrier thread with a mounted virtual thread.
-      state |= JVMTI_THREAD_STATE_SUSPENDED;
-    }
-    if (java_thread->is_being_ext_suspended()) {
-      state |= JVMTI_THREAD_STATE_SUSPENDED;
-    }
-    if (jts == _thread_in_native) {
-      state |= JVMTI_THREAD_STATE_IN_NATIVE;
-    }
-    if (java_thread->is_interrupted(false)) {
-      state |= JVMTI_THREAD_STATE_INTERRUPTED;
-    }
-  }
-  *thread_state_ptr = state;
   return JVMTI_ERROR_NONE;
 } /* end GetThreadState */
 
@@ -1514,7 +1478,13 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
   // It is only safe to perform the direct operation on the current
   // thread. All other usage needs to use a direct handshake for safety.
   if (java_thread == calling_thread) {
-    err = get_current_contended_monitor(calling_thread, java_thread, monitor_ptr);
+    if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
+      // Carrier thread with a mounted continuation case.
+      // No contended monitor can be owned by carrier thread in this case.
+      monitor_ptr = NULL;
+    } else {
+      err = get_current_contended_monitor(calling_thread, java_thread, monitor_ptr);
+    }
   } else {
     // get contended monitor information with handshake
     GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr);

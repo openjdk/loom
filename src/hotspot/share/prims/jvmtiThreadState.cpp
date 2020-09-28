@@ -430,7 +430,7 @@ int JvmtiThreadState::count_frames() {
 
   ResourceMark rm;
   RegisterMap reg_map(get_thread(), true, true);
-  javaVFrame *jvf = get_thread()->last_java_vframe(&reg_map);
+  javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(get_thread(), &reg_map);
   int n = 0;
   while (jvf != NULL) {
     Method* method = jvf->method();

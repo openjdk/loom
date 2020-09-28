@@ -498,7 +498,7 @@ test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
 enum Slots { SlotInvalid0 = -1, SlotObj = 0, SlotInt = 1, SlotLong = 2, SlotUnaligned = 3, SlotFloat = 4, SlotDouble = 5 };
 
 static void
-test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_name, int frame_count) {
+test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, char* event_name, int frame_count) {
   jmethodID method = NULL;
   jobject obj = NULL;
   jint ii = 0;
@@ -512,11 +512,18 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_name, i
     return; // Check GetLocal at VirtualThreadMounted/VirtualThreadUnmounted events only
   }
 
+  // #0: Test JVMTI GetLocalInstance function for carrier thread
+  err = (*jvmti)->GetLocalInstance(jvmti, cthread, 3, &obj);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("JVMTI GetLocalInstance for carrier thread top frame Continuation.run() returned error: %d\n", err);
+    fatal(jni, "JVMTI GetLocalInstance failed for carrier thread top frame Continuation.run()");
+  }
+  printf("JVMTI GetLocalInstance succeed for carrier thread top frame Continuation.run()\n");
+
   depth = find_method_depth(jvmti, jni, vthread, "producer");
   if (depth == -1) {
     return; // skip testing CONSUMER vthreads wich have no producer(String msg) method
   }
-
   printf("Testing GetLocal<Type> for method: producer(Ljava/Lang/String;)V at depth: %d\n", depth);
 
   // #1: Test JVMTI GetLocalObject function with negative frame depth
@@ -642,7 +649,7 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthrea
   int frame_count = test_GetFrameCount(jvmti, jni, vthread, event_name);
   test_GetFrameLocation(jvmti, jni, vthread, event_name, frame_count);
   test_GetStackTrace(jvmti, jni, vthread, event_name, frame_count);
-  test_GetLocal(jvmti, jni, vthread, event_name, frame_count);
+  test_GetLocal(jvmti, jni, thread, vthread, event_name, frame_count);
 }
 
 static void JNICALL

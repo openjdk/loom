@@ -732,7 +732,7 @@ vframe *VM_GetOrSetLocal::get_vframe() {
     return NULL;
   }
   RegisterMap reg_map(_thread, true, true);
-  vframe *vf = _thread->last_java_vframe(&reg_map);
+  vframe *vf = JvmtiEnvBase::get_last_java_vframe(_thread, &reg_map);
   int d = 0;
   while ((vf != NULL) && (d < _depth)) {
     vf = vf->java_sender();
