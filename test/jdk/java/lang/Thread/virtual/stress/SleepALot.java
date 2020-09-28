@@ -26,8 +26,14 @@
  * @requires vm.debug != true
  * @run main/othervm -XX:-UseContinuationChunks SleepALot
  * @run main/othervm -XX:+UseContinuationChunks SleepALot
- * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler SleepALot
- * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler SleepALot
+ * @summary Stress test Thread.sleep
+ */
+
+/**
+ * @test
+ * @requires vm.debug != true & vm.graal.enabled
+ * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal SleepALot
+ * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal SleepALot
  * @summary Stress test Thread.sleep
  */
 
@@ -36,8 +42,13 @@
  * @requires vm.debug == true
  * @run main/othervm/timeout=300 -XX:-UseContinuationChunks SleepALot 200000
  * @run main/othervm/timeout=300 -XX:+UseContinuationChunks SleepALot 200000
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler SleepALot 200000
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler SleepALot 200000
+ */
+
+/**
+ * @test
+ * @requires vm.debug == true & vm.graal.enabled
+ * @run main/othervm/timeout=300 -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal SleepALot 200000
+ * @run main/othervm/timeout=300 -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal SleepALot 200000
  */
 
 import java.time.Duration;

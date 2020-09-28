@@ -26,10 +26,18 @@
  * @requires vm.debug != true
  * @run main/othervm -XX:-UseContinuationChunks -Xmx1g TimedGet
  * @run main/othervm -XX:+UseContinuationChunks -Xmx1g TimedGet
- * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Xmx4g TimedGet
- * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Xmx4g TimedGet
  * @summary Stress parking with CompletableFuture timed get
  */
+
+/**
+ * @test
+ * @requires vm.debug != true & vm.graal.enabled
+ * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -Xmx4g TimedGet
+ * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -Xmx4g TimedGet
+ * @summary Stress parking with CompletableFuture timed get
+ */
+
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
