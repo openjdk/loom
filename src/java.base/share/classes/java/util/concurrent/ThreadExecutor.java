@@ -56,7 +56,7 @@ class ThreadExecutor implements ExecutorService {
     }
 
     private final ThreadFactory factory;
-    private final Lifetime lifetime = Lifetime.start();   // experimental
+    //private final Lifetime lifetime = Lifetime.start();   // experimental
     private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
     private final ReentrantLock terminationLock = new ReentrantLock();
     private final Condition terminationCondition = terminationLock.newCondition();
@@ -83,7 +83,8 @@ class ThreadExecutor implements ExecutorService {
     }
 
     /**
-     * Sets the state to TERMINATED if there are no remaining threads.
+     * Sets the state to TERMINATED if there are no remaining threads
+     * and signals any threads waiting for termination.
      */
     private boolean tryTerminate() {
         assert state >= SHUTDOWN;
@@ -160,7 +161,7 @@ class ThreadExecutor implements ExecutorService {
         try {
             ExecutorService.super.close(); // waits for executor to terminate
         } finally {
-            lifetime.close();
+            //lifetime.close();
         }
     }
 
@@ -169,7 +170,7 @@ class ThreadExecutor implements ExecutorService {
      */
     private Thread newThread(Runnable task) {
         Thread thread = factory.newThread(task);
-        JLA.unsafeSetLifetime(thread, lifetime);  // experimental
+        //JLA.unsafeSetLifetime(thread, lifetime);  // experimental
         return thread;
     }
 
@@ -180,7 +181,7 @@ class ThreadExecutor implements ExecutorService {
      */
     private void taskComplete(Thread thread) {
         boolean removed = threads.remove(thread);
-        JLA.removeObserver(thread);
+        //JLA.removeObserver(thread);
         assert removed;
         if (state == SHUTDOWN) {
             tryTerminate();
