@@ -31,48 +31,38 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import jdk.internal.misc.InnocuousThread;
 
 /**
- * A delegating ExecutorService that stops all tasks executing and interrupts
- * the "owner" if a deadline is reached before the Executor has terminated.
+ * A delegating ExecutorService that stops all tasks executing if a deadline
+ * is reached before the Executor has terminated.
  */
 class TimedExecutorService implements ExecutorService {
     private final ExecutorService delegate;
-    private final Instant deadline;
-    private final Thread owner;
     private final Future<?> timerTask;
 
-    // used to coordinate timer cancellation with close/awaitTermination
-    private final Object lock = new Object();
-    private volatile boolean cancelled;
-
-    private TimedExecutorService(ExecutorService delegate,
-                                 Instant deadline,
-                                 Duration timeout) {
+    private TimedExecutorService(ExecutorService delegate, Duration timeout) {
         this.delegate = delegate;
-        this.deadline = deadline;
-        this.owner = Thread.currentThread();
-
-        long nanos = NANOSECONDS.convert(timeout);
-        this.timerTask = STPE.schedule(this::shutdownAndInterrupt, nanos, NANOSECONDS);
+        long nanos = TimeUnit.NANOSECONDS.convert(timeout);
+        this.timerTask = STPE.schedule(this::timeout, nanos, TimeUnit.NANOSECONDS);
     }
 
     /**
-     * Returns an Executor that stops all tasks executing, and interrupts the
-     * current thread, if a deadline is reached before the Executor has terminated.
-     * The newly created Executor delegates all operations to the given Executor.
+     * Returns an Executor that stops all tasks executing if a deadline is
+     * reached before the Executor has terminated.
      *
      * <p> If this method is invoked with a deadline that has already expired
-     * then the {@code shutdownNow()} method is invoked immediately and the owner
-     * is interrupted. If the deadline has already expired or the executor has
-     * already terminated then the given Executor is returned (a new Executor is
-     * not created).
+     * then its {@code shutdownNow()} method is invoked and returned (a new
+     * executor is not created).
      */
     static ExecutorService create(ExecutorService delegate, Instant deadline) {
         Duration timeout = Duration.between(Instant.now(), deadline);
+
+        // deadline has already expired
+        if (timeout.isZero() || timeout.isNegative()) {
+            delegate.shutdownNow();  // may throw security exception
+            return delegate;
+        }
 
         // need same permission as shutdownNow
         SecurityManager sm = System.getSecurityManager();
@@ -80,121 +70,54 @@ class TimedExecutorService implements ExecutorService {
             sm.checkPermission(MODIFY_THREAD);
         }
 
-        // deadline has already expired
-        if (timeout.isZero() || timeout.isNegative()) {
-            delegate.shutdownNow();
-            Thread.currentThread().interrupt();
-            return delegate;
-        }
-
-        // nothing to do
         if (delegate.isTerminated()) {
             return delegate;
+        } else {
+            return new TimedExecutorService(delegate, timeout);
         }
-
-        return new TimedExecutorService(delegate, deadline, timeout);
     }
 
     /**
-     * Invoked when the deadline is reached.
+     * Invoked when the timeout is reached.
      */
-    private Void shutdownAndInterrupt() {
+    private void timeout() {
         if (!delegate.isTerminated()) {
             // timer task needs permission to invoke shutdownNow
-            PrivilegedAction<?> pa = delegate::shutdownNow;
-            AccessController.doPrivileged(pa, null, MODIFY_THREAD);
+            PrivilegedAction<List<Runnable>> pa = delegate::shutdownNow;
+            List<Runnable> tasks = AccessController.doPrivileged(pa, null, MODIFY_THREAD);
 
-            // do not interrupt if owner thread has cancelled timer
-            synchronized (lock) {
-                if (!cancelled) {
-                    owner.interrupt();
+            // cancel any of the Future tasks that didn't execute
+            for (Runnable task : tasks) {
+                if (task instanceof Future) {
+                    ((Future<?>) task).cancel(false);
                 }
             }
         }
-        return null;
     }
 
     /**
-     * Invoked by the owner thread to cancel the timer task.
+     * Cancels the timer if not already cancelled.
      */
     private void cancelTimer() {
-        assert isTerminated() && Thread.currentThread() == owner;
-        synchronized (lock) {
-            cancelled = true;
-        }
         if (!timerTask.isDone()) {
             timerTask.cancel(false);
         }
     }
 
-    /**
-     * Returns true if the deadline has been reached.
-     */
-    private boolean isDeadlineReached() {
-        Duration remaining = Duration.between(Instant.now(), deadline);
-        return remaining.isZero() || remaining.isNegative();
-    }
-
     @Override
     public boolean awaitTermination(long timeout, TimeUnit unit)
             throws InterruptedException {
-
-        Objects.requireNonNull(unit);
-        boolean terminated = isTerminated();
+        boolean terminated = delegate.awaitTermination(timeout, unit);
         if (terminated) {
-            return true;
-        } else if (Thread.currentThread() != owner) {
-            return delegate.awaitTermination(timeout, unit);
-        }
-
-        // Owner waits for termination. If the deadline is reached while
-        // waiting then it needs to coordinate with the timer task to ensure
-        // this method throws InterruptedException.
-        terminated = delegate.awaitTermination(timeout, unit);
-        if (terminated && isDeadlineReached()) {
             cancelTimer();
-            Thread.interrupted(); // clear interrupt status
-            throw new InterruptedException();
         }
         return terminated;
     }
 
     @Override
-    public void close() {
-        boolean terminated = isTerminated();
-        if (terminated) {
-            return;
-        } else if (Thread.currentThread() != owner) {
-            delegate.close();
-            return;
-        }
-
-        // Owner waits for termination. If the deadline is reached while
-        // waiting then it needs to coordinate with the timer task to ensure
-        // that this method completes with the interrupt status set.
-        shutdown();
-        boolean interrupted = false;
-        while (!terminated) {
-            try {
-                terminated = delegate.awaitTermination(1L, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                if (!interrupted) {
-                    delegate.shutdownNow();  // interrupt running tasks
-                    interrupted = true;
-                }
-            }
-        }
-        cancelTimer();
-        if (interrupted || isDeadlineReached()) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    @Override
     public void shutdown() {
         delegate.shutdown();
-        if (isTerminated() && Thread.currentThread() == owner) {
-            // timer no longer needed
+        if (isTerminated()) {
             cancelTimer();
         }
     }
@@ -202,8 +125,7 @@ class TimedExecutorService implements ExecutorService {
     @Override
     public List<Runnable> shutdownNow() {
         List<Runnable> tasks = delegate.shutdownNow();
-        if (isTerminated() && Thread.currentThread() == owner) {
-            // timer no longer needed
+        if (isTerminated()) {
             cancelTimer();
         }
         return tasks;

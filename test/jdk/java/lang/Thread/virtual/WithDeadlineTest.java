@@ -23,150 +23,204 @@
 
 /**
  * @test
- * @run testng WithDeadlineTest
+ * @run testng/othervm/timeout=300 WithDeadlineTest
  * @summary Basic tests for ExecutorExecutor.withDeadline
  */
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
 public class WithDeadlineTest {
 
-    private static final Duration ONE_DAY = Duration.ofDays(1);
+    // long running interruptible task
+    private static final Callable<Void> SLEEP_FOR_A_DAY = () -> {
+        Thread.sleep(Duration.ofDays(1));
+        return null;
+    };
 
     /**
-     * Deadline expires with running tasks before the executor is shutdown.
+     * The executors to test.
      */
-    public void testDeadlineBeforeShutdown() throws Exception {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
-        var deadline = Instant.now().plusSeconds(5);
-        try (var executor = Executors.newThreadExecutor(factory).withDeadline(deadline)) {
-            // assume this is submitted before the deadline expires
-            Future<?> result = executor.submit(() -> {
-                Thread.sleep(ONE_DAY);
-                return null;
-            });
-
-            // current thread should be interrupted
-            expectThrows(InterruptedException.class, () -> Thread.sleep(ONE_DAY));
-
-            // task should be interrupted
-            Throwable e = expectThrows(ExecutionException.class, result::get);
-            assertTrue(e.getCause() instanceof InterruptedException);
-
-            // executor should be shutdown and should almost immediately
-            assertTrue(executor.isShutdown());
-            assertTrue(executor.awaitTermination(1, TimeUnit.SECONDS));
-        } finally {
-            Thread.interrupted();  // ensure interrupt status is cleared
-        }
+    @DataProvider(name = "executors")
+    public Object[][] executors() {
+        return new Object[][] {
+            { Executors.newVirtualThreadExecutor() },
+            { Executors.newCachedThreadPool() },
+            { new ForkJoinPool() },
+        };
     }
 
     /**
-     * Deadline expires with running tasks after the executor is shutdown.
+     * Deadline expires with running tasks, thread blocked in Future::get.
      */
-    public void testDeadlineAfterShutdown() throws Exception {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
+    @Test(dataProvider = "executors")
+    public void testDeadlineFutureGet(ExecutorService delegate) throws Exception {
         var deadline = Instant.now().plusSeconds(5);
-        try (var executor = Executors.newThreadExecutor(factory).withDeadline(deadline)) {
-            // assume this is submitted before the deadline expires
-            Future<?> result = executor.submit(() -> {
-                Thread.sleep(ONE_DAY);
-                return null;
-            });
-            executor.shutdown();
-
-            // current thread should be interrupted
-            expectThrows(InterruptedException.class, () -> Thread.sleep(ONE_DAY));
+        try (ExecutorService executor = delegate.withDeadline(deadline)) {
+            // submit long running task
+            Future<?> future = executor.submit(SLEEP_FOR_A_DAY);
 
             // task should be interrupted
-            Throwable e = expectThrows(ExecutionException.class, result::get);
-            assertTrue(e.getCause() instanceof InterruptedException);
-
-            // executor should almost terminate immediately
-            assertTrue(executor.awaitTermination(1, TimeUnit.SECONDS));
-        } finally {
-            Thread.interrupted();  // ensure interrupt status is cleared
-        }
-    }
-
-    /**
-     * Deadline expires while the owner is waiting in close.
-     */
-    public void testDeadlineDuringClose() {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
-        var deadline = Instant.now().plusSeconds(5);
-        Future<?> result;
-        try {
-            try (var executor = Executors.newThreadExecutor(factory).withDeadline(deadline)) {
-                // assume this is submitted before the deadline expires
-                result = executor.submit(() -> {
-                    Thread.sleep(ONE_DAY);
-                    return null;
-                });
+            Throwable e = expectThrows(ExecutionException.class, future::get);
+            if (!(delegate instanceof ForkJoinPool)) {
+                assertTrue(e.getCause() instanceof InterruptedException);
             }
 
-            // interrupt status should be set
-            assertTrue(Thread.interrupted());
+            // executor should be shutdown and should terminate
+            assertTrue(executor.isShutdown());
+            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
+        }
+    }
+
+    /**
+     * Deadline expires with running tasks, thread blocked in CompletableFuture::get.
+     */
+    @Test(dataProvider = "executors")
+    public void testDeadlineCompletableFutureGet(ExecutorService delegate) throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        try (ExecutorService executor = delegate.withDeadline(deadline)) {
+            // submit long running task
+            CompletableFuture<?> future = executor.submitTask(SLEEP_FOR_A_DAY);
 
             // task should be interrupted
-            Throwable e = expectThrows(ExecutionException.class, result::get);
-            assertTrue(e.getCause() instanceof InterruptedException);
+            Throwable e = expectThrows(ExecutionException.class, future::get);
+            if (!(delegate instanceof ForkJoinPool)) {
+                assertTrue(e.getCause() instanceof InterruptedException);
+            }
 
-        } finally {
-            Thread.interrupted();  // ensure interrupt status is cleared
+            // executor should be shutdown and should terminate
+            assertTrue(executor.isShutdown());
+            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
+        }
+    }
+
+    /**
+     * Deadline expires with running tasks, thread blocked in invokeAll.
+     */
+    @Test(dataProvider = "executors")
+    public void testDeadlineInvokeAll(ExecutorService delegate) throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        try (var executor = delegate.withDeadline(deadline)) {
+            // execute long running tasks
+            List<Future<Void>> futures = executor.invokeAll(List.of(SLEEP_FOR_A_DAY, SLEEP_FOR_A_DAY));
+            for (Future<Void> f : futures) {
+                assertTrue(f.isDone());
+                try {
+                    Object result = f.get();
+                    assertTrue(false);
+                } catch (ExecutionException | CancellationException e) {
+                    // expected
+                }
+            }
+        }
+    }
+
+    /**
+     * Deadline expires with running tasks, thread blocked in invokeAny.
+     */
+    @Test(dataProvider = "executors")
+    public void testDeadlineInvokeAny(ExecutorService delegate) throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        try (var executor = delegate.withDeadline(deadline)) {
+            try {
+                // execute long running tasks
+                executor.invokeAny(List.of(SLEEP_FOR_A_DAY, SLEEP_FOR_A_DAY));
+                assertTrue(false);
+            } catch (ExecutionException e) {
+                // expected
+            }
+        }
+    }
+
+    /**
+     * Deadline expires with running tasks, thread blocked in close.
+     */
+    @Test(dataProvider = "executors")
+    public void testDeadlineClose(ExecutorService delegate) throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        Future<?> future;
+        try (var executor = delegate.withDeadline(deadline)) {
+            // submit long running task
+            future = executor.submit(SLEEP_FOR_A_DAY);
+        }
+
+        // task should be interrupted
+        assertTrue(future.isDone());
+        Throwable e = expectThrows(ExecutionException.class, future::get);
+        if (!(delegate instanceof ForkJoinPool)) {
+            assertTrue(e.getCause() instanceof InterruptedException);
+        }
+    }
+
+    /**
+     * Deadline expires after the executor is shutdown.
+     */
+    @Test(dataProvider = "executors")
+    public void testDeadlineAfterShutdown(ExecutorService delegate) throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        try (ExecutorService executor = delegate.withDeadline(deadline)) {
+            // submit long running task
+            Future<?> future = executor.submit(SLEEP_FOR_A_DAY);
+
+            // shutdown with running task
+            executor.shutdown();
+
+            // task should be interrupted
+            Throwable e = expectThrows(ExecutionException.class, future::get);
+            if (!(delegate instanceof ForkJoinPool)) {
+                assertTrue(e.getCause() instanceof InterruptedException);
+            }
+
+            // executor should terminate
+            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
         }
     }
 
     /**
      * Deadline expires after executor has terminated.
      */
-    public void testDeadlineAfterTerminate() throws Exception {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
-        var deadline = Instant.now().plusSeconds(60);
-        Future<?> result;
-        try (var executor = Executors.newThreadExecutor(factory).withDeadline(deadline)) {
-            result = executor.submit(() -> {
-                Thread.sleep(Duration.ofMillis(500));
-                return null;
-            });
+    @Test(dataProvider = "executors")
+    public void testDeadlineAfterTerminate(ExecutorService delegate) throws Exception {
+        var deadline = Instant.now().plusSeconds(10);
+        Future<?> future;
+        try (var executor = delegate.withDeadline(deadline)) {
+            future = executor.submit(() -> { });
         }
-        assertFalse(Thread.interrupted());
-        assertTrue(result.get() == null);
+        assertTrue(future.get() == null);
     }
 
     /**
      * Deadline has already expired
      */
-    public void testDeadlineAlreadyExpired() {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
-
+    @Test(dataProvider = "executors")
+    public void testDeadlineAlreadyExpired1(ExecutorService delegate) throws Exception {
         // now
         Instant now = Instant.now();
-        try (var executor = Executors.newThreadExecutor(factory).withDeadline(now)) {
+        try (var executor = delegate.withDeadline(now)) {
             assertTrue(executor.isTerminated());
         }
-        try (var executor = Executors.newThreadExecutor(factory).withDeadline(now)) {
-            assertTrue(Thread.interrupted());
-            assertTrue(executor.isTerminated());
-        }
+    }
 
+    @Test(dataProvider = "executors")
+    public void testDeadlineAlreadyExpired2(ExecutorService delegate) throws Exception {
         // in the past
-        var yesterday = Instant.now().minus(ONE_DAY);
-        try (var executor = Executors.newThreadExecutor(factory).withDeadline(yesterday)) {
-            assertTrue(executor.isTerminated());
-        }
-        try (var executor = Executors.newThreadExecutor(factory).withDeadline(yesterday)) {
-            assertTrue(Thread.interrupted());
+        var yesterday = Instant.now().minus(Duration.ofDays(1));
+        try (var executor = delegate.withDeadline(yesterday)) {
             assertTrue(executor.isTerminated());
         }
     }

@@ -481,7 +481,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
                     terminated = awaitTermination(1L, TimeUnit.DAYS);
                 } catch (InterruptedException e) {
                     if (!interrupted) {
-                        shutdownNow();  // interrupt running tasks
+                        shutdownNow();
                         interrupted = true;
                     }
                 }
@@ -493,26 +493,22 @@ public interface ExecutorService extends Executor, AutoCloseable {
     }
 
     /**
-     * Returns an Executor that stops all tasks executing, and interrupts the
-     * current thread, if a deadline is reached before the Executor has terminated.
-     * The newly created Executor delegates all operations to this Executor.
-     * The {@linkplain Thread#currentThread() current thread} is the <i>owner
-     * thread</i>. If the deadline is reached before the Executor has terminated
-     * then the Executor is shutdown, as if by invoking {@link #shutdownNow()},
-     * and the owner thread is {@linkplain Thread#interrupt() interrupted}.
-     * The {@code shutdownNow()} and {@code interrupt()} methods may be invoked
-     * on a thread supporting the deadline mechanism.
+     * Returns an Executor that stops all tasks executing if a deadline is
+     * reached before it has terminated. The newly created Executor delegates
+     * all operations to this Executor. If the deadline is reached before the
+     * Executor has terminated then it is shutdown, as if by invoking {@link
+     * #shutdownNow()}. The {@code shutdownNow()} method may be invoked on a
+     * thread supporting the deadline mechanism.
      *
      * <p> If this method is invoked with a deadline that has already expired
-     * then the {@code shutdownNow()} method is invoked immediately and the owner
-     * is interrupted. If the deadline has already expired or the executor has
-     * already terminated then this Executor is returned (a new Executor is not
-     * created).
+     * then its {@code shutdownNow()} method is invoked immediately. If the
+     * deadline has already expired or the executor has already terminated
+     * then this Executor is returned (a new Executor is not created).
      *
      * @implSpec
      * The default implementation schedules a task to run when the deadline
      * expires. The task invokes the {@code shutdownNow()} method to stop all
-     * executing tasks and interrupts the owner thread.
+     * executing tasks.
      *
      * @param deadline the deadline
      * @return a new Executor that delegates operations to this Executor
@@ -543,16 +539,23 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * @since 99
      */
     default <T> CompletableFuture<T> submitTask(Callable<T> task) {
-        Objects.requireNonNull(task);
-        var future = new CompletableFuture<T>();
-        execute(() -> {
-            try {
-                T result = task.call();
-                future.complete(result);
-            } catch (Throwable e) {
-                future.completeExceptionally(e);
+        class RunnableCompletableFuture<T>
+                extends CompletableFuture<T> implements RunnableFuture<T> {
+            private final Callable<T> task;
+            RunnableCompletableFuture(Callable<T> task) {
+                this.task = Objects.requireNonNull(task);
             }
-        });
+            public void run() {
+                try {
+                    T result = task.call();
+                    complete(result);
+                } catch (Throwable e) {
+                    completeExceptionally(e);
+                }
+            }
+        }
+        var future = new RunnableCompletableFuture<>(task);
+        execute(future);
         return future;
     }
 
