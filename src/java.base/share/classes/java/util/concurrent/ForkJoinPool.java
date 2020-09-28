@@ -797,7 +797,7 @@ public class ForkJoinPool extends AbstractExecutorService {
             return AccessController.doPrivileged(
                 new PrivilegedAction<>() {
                     public ForkJoinWorkerThread run() {
-                        return new ForkJoinWorkerThread(null, pool, true, false);
+                        return new ForkJoinWorkerThread(null, pool, true, true);
                     }},
                 ACC);
         }
