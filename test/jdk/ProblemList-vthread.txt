@@ -180,6 +180,7 @@ java/lang/invoke/condy/CondyNestedResolutionTest.java
 ####
 # JDI tests, should be re-reviewed when JVMTI is synced with JDI
 
+com/sun/jdi/AfterThreadDeathTest.java
 com/sun/jdi/EarlyReturnNegativeTest.java
 com/sun/jdi/EarlyReturnTest.java
 com/sun/jdi/FieldWatchpoints.java
