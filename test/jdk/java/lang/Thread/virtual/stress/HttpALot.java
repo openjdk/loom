@@ -35,11 +35,17 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.URL;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import com.sun.net.httpserver.HttpServer;
 
 public class HttpALot {
+
+    static AtomicInteger requestsSent = new AtomicInteger();
+    static AtomicInteger requestErrors = new AtomicInteger();
+    static AtomicInteger requestsHandled = new AtomicInteger();
 
     /**
      * Usage: {@code java HttpALot <iterations> <parallelism> <url-count>}
@@ -47,7 +53,7 @@ public class HttpALot {
     public static void main(String[] args) throws Exception {
         int iterations = 50;
         int parallelism = 10;
-        int urlCount = 10_000;
+        int urlCount = 1000;
 
         if (args.length > 0) {
             iterations = Integer.parseInt(args[0]);
@@ -58,16 +64,13 @@ public class HttpALot {
         System.out.format("%d iterations, %d HTTP requests/iteration%n",
                 iterations, (parallelism * urlCount));
 
-        // number of HTTP requests received
-        AtomicInteger requests = new AtomicInteger();
-
         // Create HTTP on the loopback address. The server will reply to
         // the requests to GET /hello. It uses virtual threads.
         InetAddress lb = InetAddress.getLoopbackAddress();
         HttpServer server = HttpServer.create(new InetSocketAddress(lb, 0), 0);
         server.setExecutor(Executors.newVirtualThreadExecutor());
         server.createContext("/hello", e -> {
-            requests.incrementAndGet();
+            requestsHandled.incrementAndGet();
             byte[] response = "Hello".getBytes("UTF-8");
             e.sendResponseHeaders(200, response.length);
             try (OutputStream out = e.getResponseBody()) {
@@ -79,10 +82,21 @@ public class HttpALot {
         var address = server.getAddress();
         URL url = new URL("http://" + address.getHostName() + ":" + address.getPort() + "/hello");
 
+        // monitoring thread
+        Thread.builder().daemon(true).task(() -> {
+            for (;;) {
+                try {
+                    Thread.sleep(Duration.ofSeconds(5));
+                } catch (InterruptedException e) { }
+                System.out.format("%s: %d requests, %d errors, %d handled%n", Instant.now(),
+                        requestsSent.get(), requestErrors.get(), requestsHandled.get());
+            }
+        }).start();
+
+        // go
         server.start();
         try {
             for (int i = 1; i <= iterations; i++) {
-                System.out.format("Iteration %d%n", i);
                 try (var executor = Executors.newVirtualThreadExecutor()) {
                     for (int k = 0; k < parallelism; k++) {
                         int count = urlCount;
@@ -94,20 +108,23 @@ public class HttpALot {
             server.stop(1);
         }
 
-        System.out.println(requests.get() + " HTTP requests");
+        System.out.format("FINISHED: %d requests, %d errors, %d handled%n",
+                requestsSent.get(), requestErrors.get(), requestsHandled.get());
         int expected = iterations * parallelism * urlCount;
-        if (requests.get() < expected) {
-            throw new RuntimeException("Expected " + expected + " HTTP requests");
+        if (requestsHandled.get() < expected) {
+            throw new RuntimeException("Expected " + expected + " HTTP requests to be handled");
         }
     }
 
-    private static Void fetch(URL url, int count) throws IOException {
+    private static void fetch(URL url, int count) {
         for (int k = 0; k < count; k++) {
             try (InputStream in = url.openConnection(Proxy.NO_PROXY).getInputStream()) {
                 byte[] bytes = in.readAllBytes();
                 String s = new String(bytes, "UTF-8");
+                requestsSent.incrementAndGet();
+            } catch (IOException ioe) {
+                requestErrors.incrementAndGet();
             }
         }
-        return null;
     }
 }
