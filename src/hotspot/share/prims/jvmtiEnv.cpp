@@ -2028,7 +2028,7 @@ JvmtiEnv::NotifyFramePop(JavaThread* java_thread, jint depth) {
   // thread. All other usage needs to use a vm-safepoint-op for safety.
   MutexLocker mu(JvmtiThreadState_lock);
   if (java_thread == JavaThread::current()) {
-    int frame_number = state->count_frames() - depth;
+    int frame_number = state->count_frames(false) - depth;
     state->env_thread_state(this)->set_frame_pop(frame_number);
   } else {
     SetFramePopClosure op(this, state, depth);
