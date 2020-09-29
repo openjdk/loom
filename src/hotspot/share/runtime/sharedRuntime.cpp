@@ -3188,7 +3188,7 @@ frame SharedRuntime::look_for_reserved_stack_annotated_method(JavaThread* thread
 
   assert(fr.is_java_frame(), "Must start on Java frame");
 
-  RegisterMap map(JavaThread::current(), false, true); // don't update; walk continuations
+  RegisterMap map(JavaThread::current(), false, false); // don't walk continuations
   for (; !fr.is_first_frame(); fr = fr.sender(&map)) {
     if (!fr.is_java_frame())
       continue;
