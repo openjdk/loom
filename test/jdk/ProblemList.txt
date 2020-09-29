@@ -575,6 +575,8 @@ java/lang/invoke/lambda/LambdaFileEncodingSerialization.java    8249079 linux-x6
 # Loom-specific failures
 java/lang/Continuation/Basic.java#id1                           8253570 generic-all
 java/lang/Thread/virtual/stress/PinALot.java#id1                8253523 generic-all
+java/lang/ProcessBuilder/Basic.java#id0                         8253825 windows-all
+
 
 ############################################################################
 
