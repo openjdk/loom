@@ -238,6 +238,10 @@ public class VMProps implements Callable<Map<String, String>> {
             return "false";
         }
 
+        if (vmCompMode().equals("Xint")) {
+            return "false";
+        }
+
         switch (GC.selected()) {
             case Serial:
             case Parallel:
@@ -374,6 +378,9 @@ public class VMProps implements Callable<Map<String, String>> {
      * @return true if VM supports AOT and false otherwise
      */
     protected String vmAOT() {
+        if (vmCompMode().equals("Xint")) {
+            return "false";
+        }
         // builds with aot have jaotc in <JDK>/bin
         Path bin = Paths.get(System.getProperty("java.home"))
                         .resolve("bin");
