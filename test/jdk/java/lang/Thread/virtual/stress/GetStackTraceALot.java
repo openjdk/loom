@@ -26,7 +26,7 @@
  * @requires vm.debug != true
  * @run main/othervm -XX:-UseContinuationChunks GetStackTraceALot
  * @run main/othervm -XX:+UseContinuationChunks GetStackTraceALot
- * @summary Stress test asynchronous Thread.getStackTrace()
+ * @summary Stress test asynchronous Thread.getStackTrace
  */
 
 /**
@@ -34,7 +34,6 @@
  * @requires vm.debug != true & vm.graal.enabled
  * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot
  * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot
- * @summary Stress test asynchronous Thread.getStackTrace()
  */
 
 /**
@@ -42,7 +41,6 @@
  * @requires vm.debug == true
  * @run main/othervm/timeout=300 -XX:-UseContinuationChunks GetStackTraceALot 1000
  * @run main/othervm/timeout=300 -XX:+UseContinuationChunks GetStackTraceALot 1000
- * @summary Stress test asynchronous Thread.getStackTrace()
  */
 
 /**
@@ -50,32 +48,41 @@
  * @requires vm.debug == true & vm.graal.enabled
  * @run main/othervm/timeout=300 -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot 1000
  * @run main/othervm/timeout=300 -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internalGetStackTraceALot 1000
- * @summary Stress test asynchronous Thread.getStackTrace()
  */
 
 import java.time.Duration;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
 public class GetStackTraceALot {
-    static class RoundRobinExecutor implements Executor {
-        private final Executor[] es;
-        private int e = 0;
+    static class RoundRobinExecutor implements Executor, AutoCloseable {
+        private final ExecutorService[] executors;
+        private int next;
 
         RoundRobinExecutor() {
-            var tf = Thread.builder().name("worker-", 1).daemon(true).factory();
-            this.es = new Executor[2];
-            for (int i=0; i<es.length; i++)
-                es[i] = Executors.newSingleThreadExecutor(tf);
+            var factory = Thread.builder().name("worker-", 1).daemon(true).factory();
+            var executors = new ExecutorService[2];
+            for (int i = 0; i < executors.length; i++) {
+                executors[i] = Executors.newSingleThreadExecutor(factory);
+            }
+            this.executors = executors;
         }
 
         @Override
         public void execute(Runnable task) {
-            es[e].execute(task);
-            e = (e + 1) % es.length;
+            executors[next].execute(task);
+            next = (next + 1) % executors.length;
+        }
+
+        @Override
+        public void close() {
+            for (int i = 0; i < executors.length; i++) {
+                executors[i].shutdown();
+            }
         }
     }
 
@@ -86,41 +93,43 @@ public class GetStackTraceALot {
         final int ITERATIONS = iterations;
         final int SPIN_NANOS = 5000;
 
-        Executor exec = new RoundRobinExecutor();
         AtomicInteger count = new AtomicInteger();
 
-        Thread thread = Thread.builder().virtual(exec).task(() -> {
+        try (RoundRobinExecutor executor = new RoundRobinExecutor()) {
+            Thread thread = Thread.builder().virtual(executor).task(() -> {
                 while (count.incrementAndGet() < ITERATIONS) {
                     long start = System.nanoTime();
-                    while (System.nanoTime() - start < SPIN_NANOS) Thread.onSpinWait();
-
+                    while ((System.nanoTime() - start) < SPIN_NANOS) {
+                        Thread.onSpinWait();
+                    }
                     LockSupport.parkNanos(500_000);
                 }
             }).start();
 
-        long start = System.nanoTime();
-        while (thread.isAlive()) {
-            StackTraceElement[] trace = thread.getStackTrace();
-            // printStackTrace(trace);
-            Thread.sleep(5);
-            if (System.nanoTime() - start > 500_000_000) {
-                System.out.println(count.get());
-                start = System.nanoTime();
+            long start = System.nanoTime();
+            while (thread.isAlive()) {
+                StackTraceElement[] stackTrace = thread.getStackTrace();
+                // printStackTrace(stackTrace);
+                Thread.sleep(5);
+                if ((System.nanoTime() - start) > 500_000_000) {
+                    System.out.println(count.get());
+                    start = System.nanoTime();
+                }
             }
-        }
 
-        int countValue = count.get();
-        if (countValue != ITERATIONS) {
-            throw new RuntimeException("count = " + countValue);
+            int countValue = count.get();
+            if (countValue != ITERATIONS) {
+                throw new RuntimeException("count = " + countValue);
+            }
         }
     }
 
-    static void printStackTrace(StackTraceElement[] stes) {
-        if (stes == null) {
+    static void printStackTrace(StackTraceElement[] stackTrace) {
+        if (stackTrace == null) {
             System.out.println("NULL");
         } else {
-            for (var ste : stes) {
-                System.out.println("\t" + ste);
+            for (var e : stackTrace) {
+                System.out.println("\t" + e);
             }
         }
     }

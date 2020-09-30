@@ -28,6 +28,7 @@
  * @run main/othervm -XX:+UseContinuationChunks PingPong SQ 1000000
  * @run main/othervm -XX:-UseContinuationChunks PingPong LTQ 1000000
  * @run main/othervm -XX:+UseContinuationChunks PingPong LTQ 1000000
+ * @summary Stress test virtual threads with SynchronousQueue and LinkedTransferQueue
  */
 
 /**

@@ -572,11 +572,13 @@ java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-
 java/lang/invoke/LFCaching/LFGarbageCollectedTest.java          8078602 generic-all
 java/lang/invoke/lambda/LambdaFileEncodingSerialization.java    8249079 linux-x64
 
+# Maybe Loom or may be intermittent issue
+java/lang/ProcessBuilder/Basic.java#id0                         8253825 windows-all
+
 # Loom-specific failures
 java/lang/Continuation/Basic.java#id1                           8253570 generic-all
 java/lang/Thread/virtual/stress/PinALot.java#id1                8253523 generic-all
-java/lang/ProcessBuilder/Basic.java#id0                         8253825 windows-all
-
+java/lang/Thread/virtual/stress/PinALot.java#id3                8253523 generic-all
 
 ############################################################################
 

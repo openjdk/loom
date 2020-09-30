@@ -43,6 +43,7 @@
  * @requires vm.debug == true
  * @run main/othervm/timeout=360 -XX:-UseContinuationChunks YieldALot 200000
  * @run main/othervm/timeout=360 -XX:+UseContinuationChunks YieldALot 200000
+ * @symmary Stress test Thread.yield
  */
 
 /**

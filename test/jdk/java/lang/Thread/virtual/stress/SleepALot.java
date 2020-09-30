@@ -34,7 +34,6 @@
  * @requires vm.debug != true & vm.graal.enabled
  * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal SleepALot
  * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal SleepALot
- * @summary Stress test Thread.sleep
  */
 
 /**
