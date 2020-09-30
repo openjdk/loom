@@ -493,12 +493,12 @@ public interface ExecutorService extends Executor, AutoCloseable {
     }
 
     /**
-     * Returns an Executor that stops all tasks executing if a deadline is
-     * reached before it has terminated. The newly created Executor delegates
-     * all operations to this Executor. If the deadline is reached before the
-     * Executor has terminated then it is shutdown, as if by invoking {@link
-     * #shutdownNow()}. The {@code shutdownNow()} method may be invoked on a
-     * thread supporting the deadline mechanism.
+     * Returns an Executor that attempts to stop all tasks executing if a
+     * deadline is reached before it has terminated. The newly created Executor
+     * delegates all operations to this Executor. If the deadline is reached
+     * before the Executor has terminated then it is shutdown, as if by
+     * invoking {@link #shutdownNow()}. The {@code shutdownNow()} method
+     * may be invoked on a thread supporting the deadline mechanism.
      *
      * <p> If this method is invoked with a deadline that has already expired
      * then its {@code shutdownNow()} method is invoked immediately. If the
@@ -507,8 +507,8 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *
      * @implSpec
      * The default implementation schedules a task to run when the deadline
-     * expires. The task invokes the {@code shutdownNow()} method to stop all
-     * executing tasks.
+     * expires. The task invokes the {@code shutdownNow()} method to attempt
+     * to stop all executing tasks.
      *
      * @param deadline the deadline
      * @return a new Executor that delegates operations to this Executor
