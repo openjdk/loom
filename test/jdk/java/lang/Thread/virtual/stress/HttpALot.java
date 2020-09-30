@@ -111,8 +111,8 @@ public class HttpALot {
         System.out.format("FINISHED: %d requests, %d errors, %d handled%n",
                 requestsSent.get(), requestErrors.get(), requestsHandled.get());
         int expected = iterations * parallelism * urlCount;
-        if (requestsHandled.get() < expected) {
-            throw new RuntimeException("Expected " + expected + " HTTP requests to be handled");
+        if ((expected - requestErrors.get()) > requestsSent.get()) {
+            throw new RuntimeException();
         }
     }
 
