@@ -34,7 +34,6 @@
  * @requires vm.debug != true & vm.graal.enabled
  * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal YieldALot
  * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal YieldALot
- * @summary Stress test Thread.yield
  */
 
 
@@ -43,7 +42,6 @@
  * @requires vm.debug == true
  * @run main/othervm/timeout=360 -XX:-UseContinuationChunks YieldALot 200000
  * @run main/othervm/timeout=360 -XX:+UseContinuationChunks YieldALot 200000
- * @symmary Stress test Thread.yield
  */
 
 /**
