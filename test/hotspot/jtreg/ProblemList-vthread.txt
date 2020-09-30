@@ -100,6 +100,7 @@ runtime/StackTrace/LargeClassTest.java
 runtime/LocalVariableTable/TestLVT.java
 runtime/duplAttributes/DuplAttributesTest.java
 runtime/EnclosingMethodAttr/EnclMethodAttr.java
+runtime/classFileParserBug/TestBadPackageWithInterface.java
 runtime/classFileParserBug/TestEmptyBootstrapMethodsAttr.java
 runtime/classFileParserBug/ClassFileParserBug.java
 runtime/ClassFile/UnsupportedClassFileVersion.java
