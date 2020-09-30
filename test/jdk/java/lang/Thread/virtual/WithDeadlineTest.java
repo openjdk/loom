@@ -61,6 +61,7 @@ public class WithDeadlineTest {
         return new Object[][] {
             { Executors.newVirtualThreadExecutor() },
             { Executors.newCachedThreadPool() },
+            { Executors.newFixedThreadPool(1) },
             { new ForkJoinPool() },
         };
     }
