@@ -342,7 +342,8 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
 
   // JVMTI API helper functions which are called when target thread is suspended
   // or at safepoint / thread local handshake.
-  jvmtiError get_frame_count(JvmtiThreadState *state, jint *count_ptr);
+  static jint get_frame_count(javaVFrame* jvf);
+  jvmtiError get_frame_count(JavaThread* java_thread, jint *count_ptr);
   jvmtiError get_frame_count(oop frame_oop, jint *count_ptr);
   jvmtiError get_frame_location(JavaThread* java_thread, jint depth,
                                 jmethodID* method_ptr, jlocation* location_ptr);
@@ -617,15 +618,13 @@ public:
 class GetFrameCountClosure : public HandshakeClosure {
 private:
   JvmtiEnv *_env;
-  JvmtiThreadState *_state;
   jint *_count_ptr;
   jvmtiError _result;
 
 public:
-  GetFrameCountClosure(JvmtiEnv *env, JvmtiThreadState *state, jint *count_ptr)
+  GetFrameCountClosure(JvmtiEnv *env, jint *count_ptr)
     : HandshakeClosure("GetFrameCount"),
       _env(env),
-      _state(state),
       _count_ptr(count_ptr),
       _result(JVMTI_ERROR_THREAD_NOT_ALIVE) {
   }

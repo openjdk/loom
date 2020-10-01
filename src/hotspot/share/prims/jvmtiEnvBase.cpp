@@ -1080,20 +1080,8 @@ JvmtiEnvBase::get_stack_trace(JavaThread *java_thread,
   return err;
 }
 
-jvmtiError
-JvmtiEnvBase::get_frame_count(JvmtiThreadState *state, jint *count_ptr) {
-  assert((state != NULL),
-         "JavaThread should create JvmtiThreadState before calling this method");
-  *count_ptr = state->count_frames();
-  return JVMTI_ERROR_NONE;
-}
-
-jvmtiError
-JvmtiEnvBase::get_frame_count(oop vthread_oop, jint *count_ptr) {
-  Thread* cur_thread = Thread::current();
-  ResourceMark rm(cur_thread);
-  HandleMark hm(cur_thread);
-  javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(vthread_oop);
+jint
+JvmtiEnvBase::get_frame_count(javaVFrame *jvf) {
   int count = 0;
 
   while (jvf != NULL) {
@@ -1101,7 +1089,36 @@ JvmtiEnvBase::get_frame_count(oop vthread_oop, jint *count_ptr) {
     jvf = jvf->java_sender();
     count++;
   }
-  *count_ptr = count;
+  return count;
+}
+
+jvmtiError
+JvmtiEnvBase::get_frame_count(JavaThread* jt, jint *count_ptr) {
+  Thread *current_thread = Thread::current();
+  assert(current_thread == jt ||
+         SafepointSynchronize::is_at_safepoint() ||
+         current_thread == jt->active_handshaker(),
+         "call by myself / at safepoint / at handshake");
+
+  if (!jt->has_last_Java_frame()) { // no Java frames
+    *count_ptr = 0;
+  } else {
+    ResourceMark rm(current_thread);
+    RegisterMap reg_map(jt, true, true);
+    javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(jt, &reg_map);
+
+    *count_ptr = get_frame_count(jvf);
+  }
+  return JVMTI_ERROR_NONE;
+}
+
+jvmtiError
+JvmtiEnvBase::get_frame_count(oop vthread_oop, jint *count_ptr) {
+  Thread *current_thread = Thread::current();
+  ResourceMark rm(current_thread);
+  javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(vthread_oop);
+
+  *count_ptr = get_frame_count(jvf);
   return JVMTI_ERROR_NONE;
 }
 
@@ -1616,7 +1633,7 @@ MultipleStackTracesCollector::fill_frames(jthread jt, JavaThread *thr, oop threa
     }
   } else {
     state = JvmtiEnvBase::get_thread_state(thread_oop, thr);
-    if (thr != NULL && (infop->state & JVMTI_THREAD_STATE_ALIVE) != 0) {
+    if (thr != NULL && (state & JVMTI_THREAD_STATE_ALIVE) != 0) {
       infop->frame_buffer = NEW_RESOURCE_ARRAY(jvmtiFrameInfo, max_frame_count());
       _result = env()->get_stack_trace(thr, 0, max_frame_count(),
                                        infop->frame_buffer, &(infop->frame_count));
@@ -1992,10 +2009,10 @@ GetStackTraceClosure::do_thread(Thread *target) {
 
 void
 GetFrameCountClosure::do_thread(Thread *target) {
-  JavaThread* jt = _state->get_thread();
+  JavaThread* jt = target->as_Java_thread();
   assert(target == jt, "just checking");
   if (!jt->is_exiting() && jt->threadObj() != NULL) {
-    _result = ((JvmtiEnvBase*)_env)->get_frame_count(_state, _count_ptr);
+    _result = ((JvmtiEnvBase*)_env)->get_frame_count(jt, _count_ptr);
   }
 }
 

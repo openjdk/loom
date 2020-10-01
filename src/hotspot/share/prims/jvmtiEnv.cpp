@@ -1807,19 +1807,13 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
     return err;
   }
 
-  // retrieve or create JvmtiThreadState.
-  JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread);
-  if (state == NULL) {
-    return JVMTI_ERROR_THREAD_NOT_ALIVE;
-  }
-
   // It is only safe to perform the direct operation on the current
   // thread. All other usage needs to use a direct handshake for safety.
   if (java_thread == JavaThread::current()) {
-    err = get_frame_count(state, count_ptr);
+    err = get_frame_count(java_thread, count_ptr);
   } else {
     // get java stack frame count with handshake.
-    GetFrameCountClosure op(this, state, count_ptr);
+    GetFrameCountClosure op(this, count_ptr);
     bool executed = Handshake::execute_direct(&op, java_thread);
     err = executed ? op.result() : JVMTI_ERROR_THREAD_NOT_ALIVE;
   }
@@ -2028,7 +2022,7 @@ JvmtiEnv::NotifyFramePop(JavaThread* java_thread, jint depth) {
   // thread. All other usage needs to use a vm-safepoint-op for safety.
   MutexLocker mu(JvmtiThreadState_lock);
   if (java_thread == JavaThread::current()) {
-    int frame_number = state->count_frames(false) - depth;
+    int frame_number = state->count_frames() - depth;
     state->env_thread_state(this)->set_frame_pop(frame_number);
   } else {
     SetFramePopClosure op(this, state, depth);

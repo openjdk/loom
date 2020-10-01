@@ -238,7 +238,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   void incr_cur_stack_depth();
   void decr_cur_stack_depth();
 
-  int count_frames(bool split_carrier_virtual_frames = true);
+  int count_frames();
 
   inline JavaThread *get_thread()      { return _thread;              }
 

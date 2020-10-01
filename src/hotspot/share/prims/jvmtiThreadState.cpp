@@ -417,7 +417,7 @@ void JvmtiThreadState::leave_interp_only_mode() {
 
 
 // Helper routine used in several places
-int JvmtiThreadState::count_frames(bool split_carrier_virtual_frames) {
+int JvmtiThreadState::count_frames() {
 #ifdef ASSERT
   Thread *current_thread = Thread::current();
 #endif
@@ -430,15 +430,9 @@ int JvmtiThreadState::count_frames(bool split_carrier_virtual_frames) {
 
   ResourceMark rm;
   RegisterMap reg_map(get_thread(), true, true);
-  javaVFrame *jvf = split_carrier_virtual_frames == true
-          ? JvmtiEnvBase::get_last_java_vframe(get_thread(), &reg_map)
-          : get_thread()->last_java_vframe(&reg_map);
-  int n = 0;
-  while (jvf != NULL) {
-    jvf = jvf->java_sender();
-    n++;
-  }
-  return n;
+  javaVFrame *jvf = get_thread()->last_java_vframe(&reg_map);
+
+  return (int)JvmtiEnvBase::get_frame_count(jvf);
 }
 
 
@@ -462,7 +456,7 @@ void JvmtiThreadState::incr_cur_stack_depth() {
 #ifdef ASSERT
     // heavy weight assert
     // fixme: remove this before merging loom with main jdk repo
-    jint num_frames = count_frames(false);
+    jint num_frames = count_frames();
     assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync _cur_stack_depth: %d num_frames: %d", _cur_stack_depth, num_frames);
 #endif
   }
@@ -478,7 +472,7 @@ void JvmtiThreadState::decr_cur_stack_depth() {
 #ifdef ASSERT
     // heavy weight assert
     // fixme: remove this before merging loom with main jdk repo
-    jint num_frames = count_frames(false);
+    jint num_frames = count_frames();
     assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync _cur_stack_depth: %d num_frames: %d", _cur_stack_depth, num_frames);
 #endif
     --_cur_stack_depth;
@@ -492,11 +486,11 @@ int JvmtiThreadState::cur_stack_depth() {
             "must be current thread or direct handshake");
 
   if (!is_interp_only_mode() || _cur_stack_depth == UNKNOWN_STACK_DEPTH) {
-    _cur_stack_depth = count_frames(false);
+    _cur_stack_depth = count_frames();
   } else {
 #ifdef ASSERT
     // heavy weight assert
-    jint num_frames = count_frames(false);
+    jint num_frames = count_frames();
     assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync _cur_stack_depth: %d num_frames: %d", _cur_stack_depth, num_frames);
 #endif
   }
