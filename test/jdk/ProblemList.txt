@@ -573,7 +573,7 @@ java/lang/invoke/LFCaching/LFGarbageCollectedTest.java          8078602 generic-
 java/lang/invoke/lambda/LambdaFileEncodingSerialization.java    8249079 linux-x64
 
 # Loom-specific failures
-java/lang/Continuation/Basic.java#id1                           8253570 generic-all
+java/lang/Continuation/Basic.java#id2                           8253570 generic-all
 java/lang/Thread/virtual/stress/PinALot.java#id1                8253523 generic-all
 java/lang/Thread/virtual/stress/PinALot.java#id3                8253523 generic-all
 
