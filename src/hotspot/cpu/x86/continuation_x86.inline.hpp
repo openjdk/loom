@@ -1430,6 +1430,7 @@ static bool assert_entry_frame_laid_out(JavaThread* thread) {
 }
 
 bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_size, int* out_frames, int* out_oops) {  
+  DEBUG_ONLY(if (!VerifyContinuations) return true;)
   assert (oopDesc::is_oop(chunk), "");
   log_develop_trace(jvmcont)("debug_verify_stack_chunk young: %d", !requires_barriers(chunk));
   assert (ContMirror::is_stack_chunk(chunk), "");

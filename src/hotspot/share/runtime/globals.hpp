@@ -2480,6 +2480,9 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, UseContinuationStreamingCopy, false,                        \
           "Use streaming memory when copying continuation stack chunks")    \
                                                                             \
+  develop(bool, VerifyContinuations, true,                                  \
+          "Verify continuation consistency")                                \
+                                                                            \
   product(intx, ScopedCacheSize, 16,                                        \
           "Size of the cache for scoped values")                            \
            range(0, max_intx)                                               \

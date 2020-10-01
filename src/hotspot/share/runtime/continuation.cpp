@@ -6141,6 +6141,7 @@ bool Continuation::debug_is_continuation_run_frame(const frame& f) {
 
 
 NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
+  DEBUG_ONLY(if (!VerifyContinuations) return true;)
   assert (contOop != (oop)NULL, "");
   assert (oopDesc::is_oop(contOop), "");
   ContMirror cont(contOop);
