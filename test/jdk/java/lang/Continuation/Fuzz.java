@@ -25,6 +25,8 @@
  * @test
  * @summary Fuzz tests for java.lang.Continuation
  *
+ * @requires vm.flavor == "server" & (vm.opt.TieredStopAtLevel == null | vm.opt.TieredStopAtLevel == 4)
+ * @requires vm.opt.TieredCompilation == null | vm.opt.TieredCompilation == true
  * @modules java.base java.base/jdk.internal.vm.annotation
  * @library /test/lib
  * @build java.base/java.lang.StackWalkerHelper
