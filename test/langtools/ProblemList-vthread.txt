@@ -1,3 +1,9 @@
+#####
+## Filed bugs
+
+tools/javac/diags/RunExamples.java                                                              8253918 generic-all
+tools/javac/records/mandated_members/CheckRecordMembers.java                                    8253918 generic-all
+
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
 

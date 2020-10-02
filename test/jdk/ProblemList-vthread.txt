@@ -13,6 +13,39 @@ jdk/jfr/jcmd/TestJcmdStartStopDefault.java                          8253378 gene
 
 java/lang/invoke/condy/CondyNestedTest.java                         8253670 generic-all
 
+java/foreign/TestMismatch.java                                                                  8253918 generic-all
+java/lang/Continuation/Basic.java#id0                                                           8253918 generic-all
+java/lang/Continuation/Fuzz.java                                                                8253918 generic-all
+java/lang/StackWalker/LocalsAndOperands.java#id0                                                8253918 generic-all
+java/lang/invoke/LFCaching/LFSingleThreadCachingTest.java                                       8253918 generic-all
+java/util/Arrays/Sorting.java                                                                   8253918 generic-all
+java/util/Calendar/CalendarTestScripts/JapaneseTests.java                                       8253918 generic-all
+java/util/PluggableLocale/TimeZoneNameProviderTest.java                                         8253918 generic-all
+java/util/concurrent/ScheduledThreadPoolExecutor/BasicCancelTest.java                           8253918 generic-all
+java/util/stream/boottest/java.base/java/util/stream/NodeTest.java                              8253918 generic-all
+java/util/stream/boottest/java.base/java/util/stream/StreamReuseTest.java                       8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/CollectorsTest.java                    8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/ConcatOpTest.java                      8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/DistinctOpTest.java                    8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/FilterOpTest.java                      8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/FindFirstOpTest.java                   8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/FlatMapOpTest.java                     8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/GroupByOpTest.java                     8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/IntSliceOpTest.java                    8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/IntUniqOpTest.java                     8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/MapOpTest.java                         8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/MatchOpTest.java                       8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/ReduceTest.java                        8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/SequentialOpTest.java                  8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/SliceOpTest.java                       8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/SortedOpTest.java                      8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/StreamLinkTest.java                    8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/StreamSpliteratorTest.java             8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/ToArrayOpTest.java                     8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/WhileOpTest.java                       8253918 generic-all
+java/util/stream/test/org/openjdk/tests/java/util/stream/mapMultiOpTest.java                    8253918 generic-all
+jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
+sun/util/resources/cldr/TimeZoneNamesTest.java                                                  8253918 generic-all
 
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread

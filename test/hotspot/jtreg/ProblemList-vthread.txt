@@ -17,46 +17,10 @@ vmTestbase/nsk/stress/stack/stack004.java                                       
 vmTestbase/nsk/stress/stack/stack003.java                                                       8253670 generic-all
 vmTestbase/nsk/stress/except/except010.java                                                     8253670 generic-all
 
-
 compiler/codegen/Test6942326.java                                                               8253918 generic-all
 compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java                                       8253918 generic-all
 gc/TestJNIWeak/TestJNIWeak.java                                                                 8253918 generic-all
-java/foreign/TestMismatch.java                                                                  8253918 generic-all
-java/lang/Continuation/Basic.java#id0                                                           8253918 generic-all
-java/lang/Continuation/Fuzz.java                                                                8253918 generic-all
-java/lang/StackWalker/LocalsAndOperands.java#id0                                                8253918 generic-all
-java/lang/invoke/LFCaching/LFSingleThreadCachingTest.java                                       8253918 generic-all
-java/util/Arrays/Sorting.java                                                                   8253918 generic-all
-java/util/Calendar/CalendarTestScripts/JapaneseTests.java                                       8253918 generic-all
-java/util/PluggableLocale/TimeZoneNameProviderTest.java                                         8253918 generic-all
-java/util/concurrent/ScheduledThreadPoolExecutor/BasicCancelTest.java                           8253918 generic-all
-java/util/stream/boottest/java.base/java/util/stream/NodeTest.java                              8253918 generic-all
-java/util/stream/boottest/java.base/java/util/stream/StreamReuseTest.java                       8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/CollectorsTest.java                    8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/ConcatOpTest.java                      8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/DistinctOpTest.java                    8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/FilterOpTest.java                      8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/FindFirstOpTest.java                   8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/FlatMapOpTest.java                     8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/GroupByOpTest.java                     8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/IntSliceOpTest.java                    8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/IntUniqOpTest.java                     8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/MapOpTest.java                         8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/MatchOpTest.java                       8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/ReduceTest.java                        8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/SequentialOpTest.java                  8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/SliceOpTest.java                       8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/SortedOpTest.java                      8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/StreamLinkTest.java                    8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/StreamSpliteratorTest.java             8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/ToArrayOpTest.java                     8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/WhileOpTest.java                       8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/mapMultiOpTest.java                    8253918 generic-all
-jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
 runtime/Nestmates/membership/TestNestmateMembership.java                                        8253918 generic-all
-sun/util/resources/cldr/TimeZoneNamesTest.java                                                  8253918 generic-all
-tools/javac/diags/RunExamples.java                                                              8253918 generic-all
-tools/javac/records/mandated_members/CheckRecordMembers.java                                    8253918 generic-all
 
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
