@@ -1,5 +1,6 @@
 ### Filed bugs
 
+compiler/vectorization/TestMacroLogicVector.java                                                8253919 windows-all
 gc/g1/humongousObjects/TestNoAllocationsInHRegions.java                                         8241630 generic-all
 runtime/cds/serviceability/transformRelatedClasses/TransformInterfaceAndImplementor.java        8253693 generic-all
 runtime/Metaspace/DefineClass.java                                                              8253378 generic-all
