@@ -1125,9 +1125,6 @@ JvmtiEnvBase::get_frame_count(oop vthread_oop, jint *count_ptr) {
 jvmtiError
 JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
                                  jmethodID* method_ptr, jlocation* location_ptr) {
-#ifdef ASSERT
-  uint32_t debug_bits = 0;
-#endif
   Thread* current_thread = Thread::current();
   assert(current_thread == java_thread ||
          current_thread == java_thread->active_handshaker(),
@@ -1238,6 +1235,14 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
       // thread_oop and return JVMTI_ERROR_INVALID_THREAD which we ignore here.
       if (thread_oop == NULL || err != JVMTI_ERROR_INVALID_THREAD) {
         return err;
+      }
+    }
+    if (java_thread == NULL && JvmtiExport::can_support_virtual_threads() &&
+        java_lang_VirtualThread::is_instance(thread_oop)) {
+      oop cont = java_lang_VirtualThread::continuation(thread_oop);
+      if (java_lang_Continuation::is_mounted(cont)) {
+        oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
+        java_thread = java_lang_Thread::thread(carrier_thread);
       }
     }
   }
@@ -1420,7 +1425,6 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
     if (single_suspend) {
-      assert(java_thread == NULL, "suspend_thread: java_thread must be NULL");
       bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
       if (vthread_ext_suspended) {
         return JVMTI_ERROR_THREAD_SUSPENDED;
@@ -1499,7 +1503,6 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
     if (single_suspend) {
-      assert(java_thread == NULL, "resume_thread: java_thread must be NULL");
       bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
       if (!vthread_ext_suspended) {
         return JVMTI_ERROR_THREAD_NOT_SUSPENDED;

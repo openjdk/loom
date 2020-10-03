@@ -1672,32 +1672,31 @@ JvmtiEnv::GetStackTrace(jthread thread, jint start_depth, jint max_frame_count, 
   JavaThread* java_thread = NULL;
   JavaThread* current_thread = JavaThread::current();
   HandleMark hm(current_thread);
-  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+  oop thread_obj = NULL;
 
-  // TBD: Use current thread in vthread case as well.
-  if (thread == NULL) {
-    java_thread = current_thread;
-    thread_obj = get_vthread_or_thread_oop(java_thread);
-    if (thread_obj == NULL || !thread_obj->is_a(SystemDictionary::Thread_klass())) {
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
+  JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(current_thread);
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
   }
+
   // Support for virtual threads
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
+    if (java_thread == NULL) { // target virtual thread is unmounted
+      ResourceMark hm(current_thread);
+      javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(thread_obj);
+      err = get_stack_trace(jvf, start_depth, max_frame_count, frame_buffer, count_ptr);
+      return err;
+    }
     VThreadGetStackTraceClosure op(this, Handle(current_thread, thread_obj),
                                    start_depth, max_frame_count, frame_buffer, count_ptr);
-    Handshake::execute_direct(&op, current_thread);
+    Handshake::execute_direct(&op, java_thread);
     return op.result();
-  }
-
-  // Support for ordinary threads
-  ThreadsListHandle tlh(current_thread);
-  err = get_JavaThread(tlh.list(), thread, &java_thread);
-  if (err != JVMTI_ERROR_NONE) {
-    return err;
   }
 
   // It is only safe to perform the direct operation on the current
@@ -1779,15 +1778,14 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
   JavaThread* java_thread = NULL;
   JavaThread* current_thread = JavaThread::current();
   HandleMark hm(current_thread);
-  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+  oop thread_obj = NULL;
 
-  // TBD: Use current thread in vthread case as well.
-  if (thread == NULL) {
-    java_thread = current_thread;
-    thread_obj = get_vthread_or_thread_oop(java_thread);
-    if (thread_obj == NULL || !thread_obj->is_a(SystemDictionary::Thread_klass())) {
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
+  JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(current_thread);
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
   }
 
   // Support for virtual threads
@@ -1795,16 +1793,13 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
+    if (java_thread == NULL) { // target virtual thread is unmounted
+      err = get_frame_count(thread_obj, count_ptr);
+      return err;
+    }
     VThreadGetFrameCountClosure op(this, Handle(current_thread, thread_obj), count_ptr);
-    Handshake::execute_direct(&op, current_thread);
+    Handshake::execute_direct(&op, java_thread);
     return op.result();
-  }
-
-  // Support for ordinary threads
-  ThreadsListHandle tlh(current_thread);
-  err = get_JavaThread(tlh.list(), thread, &java_thread);
-  if (err != JVMTI_ERROR_NONE) {
-    return err;
   }
 
   // It is only safe to perform the direct operation on the current
@@ -1941,15 +1936,14 @@ JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jl
   JavaThread* java_thread = NULL;
   JavaThread* current_thread = JavaThread::current();
   HandleMark hm(current_thread);
-  oop thread_obj = JNIHandles::resolve_external_guard(thread);
+  oop thread_obj = NULL;
 
-  // TBD: Use current thread in vthread case as well.
-  if (thread == NULL) {
-    java_thread = current_thread;
-    thread_obj = get_vthread_or_thread_oop(java_thread);
-    if (thread_obj == NULL || !thread_obj->is_a(SystemDictionary::Thread_klass())) {
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
+  JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(current_thread);
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
   }
 
   // Support for virtual threads
@@ -1957,17 +1951,14 @@ JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jl
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
+    if (java_thread == NULL) { // target virtual thread is unmounted
+      err = get_frame_location(thread_obj, depth, method_ptr, location_ptr);
+      return err;
+    }
     VThreadGetFrameLocationClosure op(this, Handle(current_thread, thread_obj),
                                       depth, method_ptr, location_ptr);
-    Handshake::execute_direct(&op, current_thread);
+    Handshake::execute_direct(&op, java_thread);
     return op.result();
-  }
-
-  // Support for ordinary threads
-  ThreadsListHandle tlh(current_thread);
-  err = get_JavaThread(tlh.list(), thread, &java_thread);
-  if (err != JVMTI_ERROR_NONE) {
-    return err;
   }
 
   // It is only safe to perform the direct operation on the current
