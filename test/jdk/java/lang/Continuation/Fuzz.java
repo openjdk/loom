@@ -131,8 +131,8 @@ public class Fuzz implements Runnable {
                 highProb.removeAll(Op.INTERPRETED);
                 lowProb.removeAll(Op.INTERPRETED);
             }
-            Op[] highProb0 = highProb.toArray(Op.ARRAY);
-            Op[] lowProb0  = lowProb.toArray(Op.ARRAY);
+            Op[] highProb0 = highProb.toArray(Op[]::new);
+            Op[] lowProb0  = lowProb.toArray(Op[]::new);
             
             int loops = 7;
             Op[] trace = new Op[length];
