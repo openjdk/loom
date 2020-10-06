@@ -1,17 +1,19 @@
 # Filed bugs
-java/lang/Continuation/Basic.java                                   8241633 generic-all
-java/lang/Continuation/LiveFramesDriver.java                        8241633 generic-all
+java/lang/Continuation/Basic.java                                                               8241633 generic-all
+java/lang/Continuation/LiveFramesDriver.java                                                    8241633 generic-all
 
-jdk/jfr/api/consumer/recordingstream/TestBasics.java                8253378 generic-all
-jdk/jfr/api/recording/event/TestLoadEventAfterStart.java            8253378 generic-all
-jdk/jfr/event/compiler/TestCompilerCompile.java                     8253378 generic-all
-jdk/jfr/event/gc/collection/TestGCGarbageCollectionEvent.java       8253378 generic-all
-jdk/jfr/event/os/TestCPULoad.java                                   8253378 generic-all
-jdk/jfr/event/runtime/TestClassLoadEvent.java                       8253378 generic-all
-jdk/jfr/event/runtime/TestJavaBlockedEvent.java                     8253378 generic-all
-jdk/jfr/jcmd/TestJcmdStartStopDefault.java                          8253378 generic-all
+jdk/jfr/api/consumer/recordingstream/TestBasics.java                                            8253378 generic-all
+jdk/jfr/api/recording/event/TestLoadEventAfterStart.java                                        8253378 generic-all
+jdk/jfr/event/compiler/TestCompilerCompile.java                                                 8253378 generic-all
+jdk/jfr/event/gc/collection/TestGCGarbageCollectionEvent.java                                   8253378 generic-all
+jdk/jfr/event/os/TestCPULoad.java                                                               8253378 generic-all
+jdk/jfr/event/runtime/TestClassLoadEvent.java                                                   8253378 generic-all
+jdk/jfr/event/runtime/TestJavaBlockedEvent.java                                                 8253378 generic-all
+jdk/jfr/jcmd/TestJcmdStartStopDefault.java                                                      8253378 generic-all
 
-java/lang/invoke/condy/CondyNestedTest.java                         8253670 generic-all
+java/lang/invoke/condy/CondyNestedTest.java                                                     8253670 generic-all
+
+java/util/stream/boottest/java.base/java/util/stream/SpinedBufferTest.java                      8254093 generic-all
 
 java/foreign/TestMismatch.java                                                                  8253918 generic-all
 java/lang/Continuation/Basic.java#id0                                                           8253918 generic-all
