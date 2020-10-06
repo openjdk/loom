@@ -112,8 +112,6 @@ public class Fuzz implements Runnable {
 
         static Op toInterpreted(Op op) { return INTERPRETED.contains(op) ? op : Enum.valueOf(Op.class, op.toString().replace("_C_", "_I_")); }
         static Op toCompiled(Op op)    { return COMPILED.contains(op)    ? op : Enum.valueOf(Op.class, op.toString().replace("_I_", "_C_")); }
-
-        static final Op[] ARRAY = new Op[0];
     }
 
     static class Generator {
@@ -176,7 +174,7 @@ public class Fuzz implements Runnable {
 
     static Op[] parse(String line) {
         return Arrays.stream(line.split(", ")).map(s -> Enum.valueOf(Op.class, s))
-            .collect(Collectors.toList()).toArray(Op.ARRAY);
+            .collect(Collectors.toList()).toArray(Op[]::new);
     }
 
     static void testStream(Stream<Op[]> traces) { traces.forEach(Fuzz::testTrace); }
@@ -412,7 +410,7 @@ public class Fuzz implements Runnable {
     int computeResult() {
         // To compute the expected result, we remove all YIELDs from the trace and run it
         Op[] trace0 = Arrays.stream(trace).filter(op -> op != Op.YIELD)
-            .collect(Collectors.toList()).toArray(Op.ARRAY);
+            .collect(Collectors.toList()).toArray(Op[]::new);
         
         Fuzz f0 = new Fuzz(trace0);
         f0.run();
