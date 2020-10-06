@@ -24,8 +24,12 @@
 /**
  * @test
  * @requires vm.debug != true
- * @run main/othervm/timeout=600 HttpALot 50 10 1000
- * @summary Stress test the HTTP protocol handler
+ * @modules java.base/java.util.concurrent:open
+ * @run main/othervm/timeout=600
+ *     -Dsun.net.client.defaultConnectTimeout=5000
+ *     -Dsun.net.client.defaultReadTimeout=5000
+ *     HttpALot
+ * @summary Stress test the HTTP protocol handler and HTTP server
  */
 
 import java.io.IOException;
@@ -35,96 +39,60 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.URL;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import com.sun.net.httpserver.HttpServer;
 
 public class HttpALot {
 
-    static AtomicInteger requestsSent = new AtomicInteger();
-    static AtomicInteger requestErrors = new AtomicInteger();
-    static AtomicInteger requestsHandled = new AtomicInteger();
-
-    /**
-     * Usage: {@code java HttpALot <iterations> <parallelism> <url-count>}
-     */
     public static void main(String[] args) throws Exception {
-        int iterations = 50;
-        int parallelism = 10;
-        int urlCount = 1000;
-
+        int requests = 100_000;
         if (args.length > 0) {
-            iterations = Integer.parseInt(args[0]);
-            parallelism = Integer.parseInt(args[1]);
-            urlCount = Integer.parseInt(args[2]);
+            requests = Integer.parseInt(args[0]);
         }
 
-        System.out.format("%d iterations, %d HTTP requests/iteration%n",
-                iterations, (parallelism * urlCount));
+        AtomicInteger requestsHandled = new AtomicInteger();
 
         // Create HTTP on the loopback address. The server will reply to
         // the requests to GET /hello. It uses virtual threads.
         InetAddress lb = InetAddress.getLoopbackAddress();
-        HttpServer server = HttpServer.create(new InetSocketAddress(lb, 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(lb, 0), 1024);
         server.setExecutor(Executors.newVirtualThreadExecutor());
         server.createContext("/hello", e -> {
-            requestsHandled.incrementAndGet();
             byte[] response = "Hello".getBytes("UTF-8");
             e.sendResponseHeaders(200, response.length);
             try (OutputStream out = e.getResponseBody()) {
                 out.write(response);
             }
+            requestsHandled.incrementAndGet();
         });
 
         // URL for hello service
         var address = server.getAddress();
         URL url = new URL("http://" + address.getHostName() + ":" + address.getPort() + "/hello");
 
-        // monitoring thread
-        Thread.builder().daemon(true).task(() -> {
-            for (;;) {
-                try {
-                    Thread.sleep(Duration.ofSeconds(5));
-                } catch (InterruptedException e) { }
-                System.out.format("%s: %d requests, %d errors, %d handled%n", Instant.now(),
-                        requestsSent.get(), requestErrors.get(), requestsHandled.get());
-            }
-        }).start();
-
         // go
         server.start();
         try {
-            for (int i = 1; i <= iterations; i++) {
-                try (var executor = Executors.newVirtualThreadExecutor()) {
-                    for (int k = 0; k < parallelism; k++) {
-                        int count = urlCount;
-                        executor.submit(() -> fetch(url, count));
-                    }
+            try (var executor = Executors.newVirtualThreadExecutor()) {
+                ThreadDumper.monitor(executor);
+                for (int i = 1; i <= requests; i++) {
+                    executor.submit(() -> fetch(url)).get();
                 }
             }
         } finally {
             server.stop(1);
         }
 
-        System.out.format("FINISHED: %d requests, %d errors, %d handled%n",
-                requestsSent.get(), requestErrors.get(), requestsHandled.get());
-        int expected = iterations * parallelism * urlCount;
-        if ((expected - requestErrors.get()) > requestsSent.get()) {
-            throw new RuntimeException();
+        if (requestsHandled.get() < requests) {
+            throw new RuntimeException(requestsHandled.get() + " handled, expected " + requests);
         }
     }
 
-    private static void fetch(URL url, int count) {
-        for (int k = 0; k < count; k++) {
-            try (InputStream in = url.openConnection(Proxy.NO_PROXY).getInputStream()) {
-                byte[] bytes = in.readAllBytes();
-                String s = new String(bytes, "UTF-8");
-                requestsSent.incrementAndGet();
-            } catch (IOException ioe) {
-                requestErrors.incrementAndGet();
-            }
+    private static String fetch(URL url) throws IOException {
+        try (InputStream in = url.openConnection(Proxy.NO_PROXY).getInputStream()) {
+            byte[] bytes = in.readAllBytes();
+            return new String(bytes, "UTF-8");
         }
     }
 }
