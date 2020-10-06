@@ -89,9 +89,9 @@ void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* c
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_header(oop obj, OopClosureType* closure) {
   OrderAccess::storestore();
-  Devirtualizer::do_oop(closure, (T*)obj->obj_field_addr_raw<T>(jdk_internal_misc_StackChunk::parent_offset()));
+  Devirtualizer::do_oop(closure, (T*)obj->obj_field_addr<T>(jdk_internal_misc_StackChunk::parent_offset()));
   OrderAccess::storestore();
-  Devirtualizer::do_oop(closure, (T*)obj->obj_field_addr_raw<T>(jdk_internal_misc_StackChunk::cont_offset())); // must be last oop iterated
+  Devirtualizer::do_oop(closure, (T*)obj->obj_field_addr<T>(jdk_internal_misc_StackChunk::cont_offset())); // must be last oop iterated
 }
 
 template <typename T, class OopClosureType>

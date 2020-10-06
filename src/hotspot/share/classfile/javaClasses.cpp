@@ -1421,8 +1421,7 @@ oop java_lang_Class::archive_mirror(Klass* k, TRAPS) {
     if (!(ik->is_shared_boot_class() || ik->is_shared_platform_class() ||
           ik->is_shared_app_class())) {
       // Archiving mirror for classes from non-builtin loaders is not
-      // supported. Clear the _java_mirror within the archived class.
-      k->clear_java_mirror_handle();
+      // supported.
       return NULL;
     }
   }
@@ -2270,7 +2269,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   Handle exception(THREAD, java_thread); // we need to allocate a handle with an arbitrary non-null oop
   *exception.raw_value() = (oop)NULL;
   GetStackTraceClosure gstc(Handle(THREAD, java_thread), backtrace, exception);
-  Handshake::execute_direct(&gstc, thread);
+  Handshake::execute(&gstc, thread);
 
   if (exception() != (oop)NULL) {
     THROW_OOP_(exception(), (oop)NULL);

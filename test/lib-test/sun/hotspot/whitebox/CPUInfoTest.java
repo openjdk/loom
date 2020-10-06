@@ -52,7 +52,8 @@ public class CPUInfoTest {
                     "sha", "fma", "popcnt", "vzeroupper", "erms", "rtm", "mmxext", "3dnowpref", "lzcnt", "ht",
                     "tsc", "tscinvbit", "tscinv", "sse", "sse2", "sse3", "ssse3", "sse4.1", "sse4.2", "sse4a", "avx", "avx2",
                     "avx512f", "avx512dq", "avx512pf", "avx512er", "avx512cd", "avx512bw", "avx512vl",
-                    "avx512_vpopcntdq", "avx512_vpclmulqdq", "avx512_vbmi2", "avx512_vaes", "avx512_vnni");
+                    "avx512_vpopcntdq", "avx512_vpclmulqdq", "avx512_vbmi2", "avx512_vaes", "avx512_vnni", 
+                    "rdtscp", "rdpid", "fsrm", "hv");
         } else {
             wellKnownCPUFeatures = null;
         }

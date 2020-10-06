@@ -4029,7 +4029,7 @@ public:
 
   inline bool oop_fixed(oop obj, int offset) {
     typedef typename ConfigT::OopT OopT;
-    OopT* loc = obj->obj_field_addr_raw<OopT>(offset);
+    OopT* loc = obj->obj_field_addr<OopT>(offset);
     intptr_t before = *(intptr_t*)loc;
     intptr_t after = cast_from_oop<intptr_t>(HeapAccess<>::oop_load(loc));
     // tty->print_cr("!oop_fixed %d", before != after);
@@ -5748,7 +5748,7 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
   oop thread_oop = JNIHandles::resolve(jthread);
   if (thread_oop != NULL) {
     JavaThread* target = java_lang_Thread::thread(thread_oop);
-    Handshake::execute_direct(&fyc, target);
+    Handshake::execute(&fyc, target);
   }
 
   return fyc.result();

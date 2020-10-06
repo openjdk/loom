@@ -791,14 +791,13 @@ JvmtiEnvBase::count_locked_objects(JavaThread *java_thread, Handle hobj) {
 
 jvmtiError
 JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThread *java_thread, jobject *monitor_ptr) {
-  JavaThread *current_jt = JavaThread::current();
+  JavaThread *current_thread = JavaThread::current();
 /* The HandshakeState::process_self_inner() does not set the_active_handshaker
  * as needed, so the assert below is temporarily disabled.
  * Enable it after the issue in HandshakeState::process_self_inner() is fixed.
  */
-  // assert(current_jt == java_thread ||
-  //        current_jt == java_thread->active_handshaker(),
-  //        "call by myself or at direct handshake");
+  // assert(java_thread->is_handshake_safe_for(current_thread),
+  //         "call by myself or at handshake");
   oop obj = NULL;
   // The ObjectMonitor* can't be async deflated since we are either
   // at a safepoint or the calling thread is operating on itself so
@@ -822,8 +821,8 @@ JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThre
   if (obj == NULL) {
     *monitor_ptr = NULL;
   } else {
-    HandleMark hm(current_jt);
-    Handle     hobj(current_jt, obj);
+    HandleMark hm(current_thread);
+    Handle     hobj(current_thread, obj);
     *monitor_ptr = jni_reference(calling_thread, hobj);
   }
   return JVMTI_ERROR_NONE;
@@ -832,15 +831,19 @@ JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThre
 jvmtiError
 JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread,
                                  GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list) {
+  // Note:
+  // calling_thread is the thread that requested the list of monitors for java_thread.
+  // java_thread is the thread owning the monitors.
+  // current_thread is the thread executing this code, can be a non-JavaThread (e.g. VM Thread).
+  // And they all may be different threads.
   jvmtiError err = JVMTI_ERROR_NONE;
-  JavaThread *current_jt = JavaThread::current();
-  assert(current_jt == java_thread ||
-         current_jt == java_thread->active_handshaker(),
-         "call by myself or at direct handshake");
+  Thread *current_thread = Thread::current();
+  assert(java_thread->is_handshake_safe_for(current_thread),
+         "call by myself or at handshake");
 
   if (java_thread->has_last_Java_frame()) {
-    ResourceMark rm(current_jt);
-    HandleMark   hm(current_jt);
+    ResourceMark rm(current_thread);
+    HandleMark   hm(current_thread);
     RegisterMap  reg_map(java_thread);
 
     int depth = 0;
@@ -991,7 +994,7 @@ jvmtiError
 JvmtiEnvBase::get_stack_trace(javaVFrame *jvf,
                               jint start_depth, jint max_count,
                               jvmtiFrameInfo* frame_buffer, jint* count_ptr) {
-  Thread* current_thread = Thread::current();
+  Thread *current_thread = Thread::current();
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
   int count = 0;
@@ -1057,9 +1060,8 @@ JvmtiEnvBase::get_stack_trace(JavaThread *java_thread,
   uint32_t debug_bits = 0;
 #endif
   Thread *current_thread = Thread::current();
-  assert(current_thread == java_thread ||
-         SafepointSynchronize::is_at_safepoint() ||
-         current_thread == java_thread->active_handshaker(),
+  assert(SafepointSynchronize::is_at_safepoint() ||
+         java_thread->is_handshake_safe_for(current_thread),
          "call by myself / at safepoint / at handshake");
   int count = 0;
   jvmtiError err = JVMTI_ERROR_NONE;
@@ -1097,7 +1099,7 @@ JvmtiEnvBase::get_frame_count(JavaThread* jt, jint *count_ptr) {
   Thread *current_thread = Thread::current();
   assert(current_thread == jt ||
          SafepointSynchronize::is_at_safepoint() ||
-         current_thread == jt->active_handshaker(),
+         jt->is_handshake_safe_for(current_thread),
          "call by myself / at safepoint / at handshake");
 
   if (!jt->has_last_Java_frame()) { // no Java frames
@@ -1126,9 +1128,8 @@ jvmtiError
 JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
                                  jmethodID* method_ptr, jlocation* location_ptr) {
   Thread* current_thread = Thread::current();
-  assert(current_thread == java_thread ||
-         current_thread == java_thread->active_handshaker(),
-         "call by myself or at direct handshake");
+  assert(java_thread->is_handshake_safe_for(current_thread),
+         "call by myself or at handshake");
   ResourceMark rm(current_thread);
 
   vframe *vf = vframeFor(java_thread, depth);
@@ -1607,9 +1608,8 @@ void
 MultipleStackTracesCollector::fill_frames(jthread jt, JavaThread *thr, oop thread_oop) {
 #ifdef ASSERT
   Thread *current_thread = Thread::current();
-  assert(current_thread == thr ||
-         SafepointSynchronize::is_at_safepoint() ||
-         current_thread == thr->active_handshaker(),
+  assert(SafepointSynchronize::is_at_safepoint() ||
+         thr->is_handshake_safe_for(current_thread),
          "call by myself / at safepoint / at handshake");
 #endif
 
@@ -1755,7 +1755,7 @@ VM_GetAllStackTraces::doit() {
 // HandleMark must be defined in the caller only.
 // It is to keep a ret_ob_h handle alive after return to the caller.
 jvmtiError
-JvmtiEnvBase::check_top_frame(JavaThread* current_thread, JavaThread* java_thread,
+JvmtiEnvBase::check_top_frame(Thread* current_thread, JavaThread* java_thread,
                               jvalue value, TosState tos, Handle* ret_ob_h) {
   ResourceMark rm(current_thread);
 
@@ -1818,7 +1818,7 @@ JvmtiEnvBase::check_top_frame(JavaThread* current_thread, JavaThread* java_threa
 
 jvmtiError
 JvmtiEnvBase::force_early_return(JavaThread* java_thread, jvalue value, TosState tos) {
-  JavaThread* current_thread = JavaThread::current();
+  Thread* current_thread = Thread::current();
   HandleMark   hm(current_thread);
   uint32_t debug_bits = 0;
 
