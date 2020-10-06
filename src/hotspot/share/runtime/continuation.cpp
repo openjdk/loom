@@ -716,8 +716,7 @@ public:
   inline void sub_size(size_t s) { log_develop_trace(jvmcont)("sub max_size: " SIZE_FORMAT " s: " SIZE_FORMAT, _max_size - s, s);
                                    assert(s <= _max_size, "s: " SIZE_FORMAT " max_size: " SIZE_FORMAT, s, _max_size);
                                    _max_size -= s; }
-  inline void set_max_size(size_t s) { log_develop_trace(jvmcont)("set max_size: " SIZE_FORMAT " s: " SIZE_FORMAT, _max_size, s);
-                                       _max_size = s; }
+
   inline short num_interpreted_frames() { return _num_interpreted_frames; }
   inline void inc_num_interpreted_frames() { _num_interpreted_frames++; _e_num_interpreted_frames++; }
   inline void dec_num_interpreted_frames() { _num_interpreted_frames--; _e_num_interpreted_frames++; }
@@ -2579,6 +2578,7 @@ public:
     }
 
     log_develop_trace(jvmcont)("squash_chunks begin");
+    DEBUG_ONLY(size_t orig_max_size = _cont.max_size();)
     freeze_result res = squash_chunks(_cont.tail());
     if (res == freeze_ok) {
       // cleanup chunks
@@ -2588,7 +2588,9 @@ public:
         jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame_metadata);
         ContMirror::reset_chunk_counters(chunk);
       }
+      assert (!_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED), "");
     }
+    assert (_cont.max_size() == orig_max_size, "max_size: %lu orig: %lu", _cont.max_size(), orig_max_size);
     _cont.set_tail(NULL); // won't be committed to object on failure
     log_develop_trace(jvmcont)("squash_chunks end");
 
@@ -5555,7 +5557,9 @@ int ContMirror::fix_decreasing_index(int index, int old_length, int new_length) 
 
 inline void ContMirror::post_safepoint(Handle conth) {
   _cont = conth(); // reload oop
-  _tail = java_lang_Continuation::tail(_cont);
+  if (_tail != (oop)NULL) {
+    _tail = java_lang_Continuation::tail(_cont);
+  }
   _ref_stack = java_lang_Continuation::refStack(_cont);
   _stack = java_lang_Continuation::stack(_cont);
   _hstack = (ElemType*)_stack->base(basicElementType);
@@ -5563,7 +5567,9 @@ inline void ContMirror::post_safepoint(Handle conth) {
 
 inline void ContMirror::post_safepoint_minimal(Handle conth) {
   _cont = conth(); // reload oop
-  _tail = java_lang_Continuation::tail(_cont);
+  if (_tail != (oop)NULL) {
+    _tail = java_lang_Continuation::tail(_cont);
+  }
   assert(_ref_stack == (oop)NULL, "");
   assert(_stack == (oop)NULL, "");
   assert(_hstack == NULL, "");

@@ -875,7 +875,10 @@ inline void Freeze<ConfigT, mode>::align(const hframe& caller) {
   // TODO: See AbstractAssembler::generate_stack_overflow_check (assembler.cpp), Compile::bang_size_in_bytes() (compile.cpp), m->as_SafePoint()->jvms()->interpreter_frame_size()
   // when we stack-bang, we need to update a thread field with the lowest (farthest) bang point.
   if ((mode != mode_fast || bottom) && caller.is_interpreted_frame()) {
-    _cont.add_size(SP_WIGGLE << LogBytesPerWord); // See Thaw::align
+    bool is_chunk = (_cont.tail() != (oop)NULL);
+    if (!is_chunk) {
+      _cont.add_size(SP_WIGGLE << LogBytesPerWord); // See Thaw::align
+    }
   }
 }
 
