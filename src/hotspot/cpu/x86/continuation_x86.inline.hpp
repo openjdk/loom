@@ -1450,8 +1450,9 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
 
   // if argsize == 0, the chunk contains the metadata (pc, fp -- frame::sender_sp_offset) for the top frame (below sp), and *not* for the bottom frame
   int size = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::sp(chunk)
+              - jdk_internal_misc_StackChunk::argsize(chunk)
               + ((jdk_internal_misc_StackChunk::argsize(chunk) == 0) ? frame::sender_sp_offset : 0);
-  if (cont != (oop)NULL && !is_last) size -= jdk_internal_misc_StackChunk::argsize(chunk);
+  // if (cont != (oop)NULL && !is_last) size -= jdk_internal_misc_StackChunk::argsize(chunk);
   size <<= LogBytesPerWord;
 
   int num_frames = 0;
@@ -1573,7 +1574,7 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
     if (cont != (oop)NULL) {
       assert (jdk_internal_misc_StackChunk::argsize(chunk) == 0, "");
     } else {
-      size0 += jdk_internal_misc_StackChunk::argsize(chunk) << LogBytesPerWord;
+      // size0 += jdk_internal_misc_StackChunk::argsize(chunk) << LogBytesPerWord;
       sp    += cb != NULL ? ((cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord) : 0;
     }
   }

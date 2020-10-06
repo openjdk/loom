@@ -2410,7 +2410,8 @@ public:
         jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
 
         if (jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk) && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
-          _cont.add_size(SP_WIGGLE << LogBytesPerWord);
+          log_develop_trace(jvmcont)("add wiggle: %d argsize: %d", SP_WIGGLE << LogBytesPerWord, argsize << LogBytesPerWord);
+          _cont.add_size((SP_WIGGLE + argsize) << LogBytesPerWord);
         }
       }
       // ContMirror::reset_chunk_counters(chunk);
@@ -2447,7 +2448,8 @@ public:
       java_lang_Continuation::set_tail(_cont.mirror(), chunk);
 
       if (jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk) && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
-        _cont.add_size(SP_WIGGLE << LogBytesPerWord);
+        log_develop_trace(jvmcont)("add wiggle: %d argsize: %d", SP_WIGGLE << LogBytesPerWord, argsize << LogBytesPerWord);
+        _cont.add_size((SP_WIGGLE + argsize) << LogBytesPerWord);
       }
     }
 
@@ -3028,7 +3030,7 @@ public:
     int fsize = Interpreted::size(f, &mask);
     int oops  = Interpreted::num_oops(f, &mask);
 
-    log_develop_trace(jvmcont)("recurse_interpreted_frame _size: %d add fsize: %d callee_argsize: %d -- %d", _size, fsize, callee_argsize, fsize + callee_argsize);
+    log_develop_trace(jvmcont)("recurse_freeze_interpreted_frame %s _size: %d add fsize: %d callee_argsize: %d -- %d", Frame::frame_method(f)->name_and_sig_as_C_string(), _size, fsize, callee_argsize, fsize + callee_argsize);
     _size += fsize + callee_argsize;
     _oops += oops;
     _frames++;
@@ -3085,7 +3087,7 @@ public:
     }
     FreezeFnT freeze_stub = get_oopmap_stub(f); // try to do this early, so we wouldn't need to look at the oopMap again.
 
-    log_develop_trace(jvmcont)("recurse_freeze_compiled_frame _size: %d add fsize: %d", _size, fsize);
+    log_develop_trace(jvmcont)("recurse_freeze_compiled_frame %s _size: %d add fsize: %d", Frame::frame_method(f) != NULL ? Frame::frame_method(f)->name_and_sig_as_C_string() : "", _size, fsize);
     _size += fsize;
     _oops += oops;
     _frames++;
@@ -3947,7 +3949,8 @@ public:
     _cont.sub_size((size - (UNLIKELY(argsize != 0) ? frame_metadata : 0)) << LogBytesPerWord);
     assert (_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED) == Interpreter::contains(_cont.pc()), "");
     if (is_last_in_chunks && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
-      _cont.sub_size(SP_WIGGLE << LogBytesPerWord);
+      log_develop_trace(jvmcont)("sub wiggle: %d argsize: %d", SP_WIGGLE << LogBytesPerWord, argsize << LogBytesPerWord);
+      _cont.sub_size((SP_WIGGLE + argsize) << LogBytesPerWord);
     }
 
     log_develop_trace(jvmcont)("thaw_chunk partial: %d full: %d top: %d is_last: %d empty: %d size: %d argsize: %d", partial, FULL_STACK, top, is_last, empty, size, argsize);
@@ -6154,16 +6157,20 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   cont.read();
 
   size_t max_size = 0;
-  bool nonempty_chunk = false;
+  int callee_argsize = 0;
+  bool callee_compiled = false;
   assert (oopDesc::is_oop_or_null(cont.tail()), "");
   assert (cont.chunk_invariant(), "");
   int num_chunks = 0;
   for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
     num_chunks++;
     debug_verify_stack_chunk(chunk, contOop, &max_size);
-    if (!ContMirror::is_empty_chunk(chunk))
-      nonempty_chunk = true;
+    if (!ContMirror::is_empty_chunk(chunk)) {
+      callee_compiled = true;
+      callee_argsize = jdk_internal_misc_StackChunk::argsize(chunk) << LogBytesPerWord;
+    }
   }
+  bool nonempty_chunk = callee_compiled;
 
   // assert (cont.max_size() >= 0, ""); // size_t can't be negative...
   const bool is_empty = cont.is_empty();
@@ -6174,12 +6181,16 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   int frames = 0;
   int interpreted_frames = 0;
   int oops = 0;
-  int callee_argsize = 0;
-  bool callee_compiled = nonempty_chunk;
+
+  char buf[1000];
   for (hframe hf = cont.last_frame<mode_slow>(); !hf.is_empty(); hf = hf.sender<mode_slow>(cont)) {
     assert (frames > 0 || (hf.is_interpreted_frame() == cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)), "frames: %d interpreted: %d FLAG_LAST_FRAME_INTERPRETED: %d", frames, hf.is_interpreted_frame(), cont.is_flag(FLAG_LAST_FRAME_INTERPRETED));
     assert (frames > 0 || ((!hf.is_interpreted_frame() && is_stub(hf.cb())) <= cont.is_flag(FLAG_SAFEPOINT_YIELD)), "frames: %d interpreted: %d stub: %d FLAG_SAFEPOINT_YIELD: %d", frames, hf.is_interpreted_frame(), !hf.is_interpreted_frame() && is_stub(hf.cb()), cont.is_flag(FLAG_SAFEPOINT_YIELD));
     if (hf.is_interpreted_frame()) {
+      log_develop_trace(jvmcont)("debug_verify_continuation --- I frame %s -- max_size: %lu fsize: %d callee_argsize: %d wiggle: %d", 
+        hf.method<Interpreted>()->name_and_sig_as_C_string(buf, 1000), 
+        max_size, hf.interpreted_frame_size(), callee_argsize, callee_compiled ? SP_WIGGLE << LogBytesPerWord : 0);
+
       interpreted_frames++;
 
       if (callee_compiled) { max_size += SP_WIGGLE << LogBytesPerWord; } // TODO PD
@@ -6192,6 +6203,10 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
       // hf.interpreted_frame_oop_map(&mask);
       // oops += hf.interpreted_frame_num_oops(mask);
     } else {
+      log_develop_trace(jvmcont)("debug_verify_continuation --- C frame %s -- max_size: %lu fsize: %d", 
+        hf.cb()->is_compiled() ? hf.cb()->as_compiled_method()->method()->name_and_sig_as_C_string(buf, 1000) : hf.cb()->name(), 
+        max_size, hf.compiled_frame_size());
+
       max_size += hf.compiled_frame_size();
       callee_compiled = true;
       assert ((frames == 0 && cont.is_flag(FLAG_SAFEPOINT_YIELD)) || !is_stub(hf.cb()), "");
