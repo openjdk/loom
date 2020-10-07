@@ -40,13 +40,14 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.URL;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import com.sun.net.httpserver.HttpServer;
 
 public class HttpALot {
 
     public static void main(String[] args) throws Exception {
-        int requests = 100_000;
+        int requests = 25_000;
         if (args.length > 0) {
             requests = Integer.parseInt(args[0]);
         }
@@ -74,7 +75,8 @@ public class HttpALot {
         // go
         server.start();
         try {
-            try (var executor = Executors.newVirtualThreadExecutor()) {
+            ThreadFactory factory = Thread.builder().virtual().name("fetcher-", 0).factory();
+            try (var executor = Executors.newThreadExecutor(factory)) {
                 ThreadDumper.monitor(executor);
                 for (int i = 1; i <= requests; i++) {
                     executor.submit(() -> fetch(url)).get();
