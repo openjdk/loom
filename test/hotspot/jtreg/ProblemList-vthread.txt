@@ -1,6 +1,10 @@
 ### Filed bugs
 
+compiler/escapeAnalysis/TestArrayCopy.java                                                      8254093 generic-all
+compiler/memoryinitialization/ZeroTLABTest.java                                                 8254187 generic-all
+gc/epsilon/TestManyThreads.java                                                                 8254187 generic-all
 gc/g1/humongousObjects/TestNoAllocationsInHRegions.java                                         8241630 generic-all
+gc/survivorAlignment/TestAllocationInEden.java                                                  8254187 generic-all
 runtime/cds/serviceability/transformRelatedClasses/TransformInterfaceAndImplementor.java        8253693 generic-all
 runtime/Metaspace/DefineClass.java                                                              8253378 generic-all
 runtime/logging/TestMethodHandlesVerbose.java                                                   8253907 windows-all

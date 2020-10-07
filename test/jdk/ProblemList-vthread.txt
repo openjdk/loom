@@ -16,6 +16,7 @@ java/lang/invoke/condy/CondyNestedTest.java                                     
 java/util/stream/boottest/java.base/java/util/stream/SpinedBufferTest.java                      8254093 generic-all
 
 java/foreign/TestMismatch.java                                                                  8253918 generic-all
+jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
 java/lang/Continuation/Basic.java#id0                                                           8253918 generic-all
 java/lang/Continuation/Fuzz.java                                                                8253918 generic-all
 java/lang/StackWalker/LocalsAndOperands.java#id0                                                8253918 generic-all
@@ -24,6 +25,8 @@ java/util/Arrays/Sorting.java                                                   
 java/util/Calendar/CalendarTestScripts/JapaneseTests.java                                       8253918 generic-all
 java/util/PluggableLocale/TimeZoneNameProviderTest.java                                         8253918 generic-all
 java/util/concurrent/ScheduledThreadPoolExecutor/BasicCancelTest.java                           8253918 generic-all
+java/util/concurrent/tck/JSR166TestCase.java                                                    8253918 generic-all
+java/util/stream/boottest/java.base/java/util/stream/FlagOpTest.java                            8253918 generic-all
 java/util/stream/boottest/java.base/java/util/stream/NodeTest.java                              8253918 generic-all
 java/util/stream/boottest/java.base/java/util/stream/StreamReuseTest.java                       8253918 generic-all
 java/util/stream/test/org/openjdk/tests/java/util/stream/CollectorsTest.java                    8253918 generic-all
@@ -210,6 +213,13 @@ java/lang/ClassLoader/getResource/modules/ResourcesTest.java
 # No expected StackOverflow
 
 java/lang/invoke/condy/CondyNestedResolutionTest.java
+
+
+####
+# Other incorrect test expectations (test bugs)
+
+# Test memory consumption changed a little bit
+java/lang/RuntimeTests/exec/LotsOfOutput.java
 
 
 ####
