@@ -48,10 +48,7 @@ compiler/vectorization/TestMacroLogicVector.java                              82
 vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java   8242890 generic-all
 runtime/vthread/RedefineClass.java                                            8253378 generic-all
 
-serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id0                       0000000 generic-all
-serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id1                       0000000 generic-all
-serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java 0000000 generic-all
-
+#############################################################################
 
 # :hotspot_compiler
 
