@@ -220,7 +220,8 @@ JvmtiVTMTDisabler::enable_VTMT() {
     return;
   }
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
-  assert(_VTMT_count == 0 && _VTMT_disable_count > 0, "VTMT sanity check");
+  assert((JavaThread::current()->in_vtmt() || _VTMT_count == 0) && _VTMT_disable_count > 0,
+         "VTMT sanity check");
 
   if (--_VTMT_disable_count == 0) {
     ml.notify_all();
