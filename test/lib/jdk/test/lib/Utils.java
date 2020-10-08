@@ -534,6 +534,7 @@ public final class Utils {
      * The seed could be provided via system property {@link Utils#SEED_PROPERTY_NAME}
      * In case no seed is provided, the method uses a random number.
      * The used seed printed to stdout.
+     * The printing is moved out of synchronized block to prevent carrier threads starvation.
      * @return {@link java.util.Random} generator with particular seed.
      */
     public static Random getRandomInstance() {
@@ -541,10 +542,12 @@ public final class Utils {
             synchronized (Utils.class) {
                 if (RANDOM_GENERATOR == null) {
                     RANDOM_GENERATOR = new Random(SEED);
-                    System.out.printf("For random generator using seed: %d%n", SEED);
-                    System.out.printf("To re-run test with same seed value please add \"-D%s=%d\" to command line.%n", SEED_PROPERTY_NAME, SEED);
+                } else {
+                    return RANDOM_GENERATOR;
                 }
             }
+            System.out.printf("For random generator using seed: %d%n", SEED);
+            System.out.printf("To re-run test with same seed value please add \"-D%s=%d\" to command line.%n", SEED_PROPERTY_NAME, SEED);
         }
         return RANDOM_GENERATOR;
     }
