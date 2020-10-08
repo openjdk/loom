@@ -1,17 +1,16 @@
 ### Filed bugs
 
 compiler/escapeAnalysis/TestArrayCopy.java                                                      8254093 generic-all
-compiler/memoryinitialization/ZeroTLABTest.java                                                 8254187 generic-all
-gc/epsilon/TestManyThreads.java                                                                 8254187 generic-all
 gc/g1/humongousObjects/TestNoAllocationsInHRegions.java                                         8241630 generic-all
-gc/survivorAlignment/TestAllocationInEden.java                                                  8254187 generic-all
 runtime/cds/serviceability/transformRelatedClasses/TransformInterfaceAndImplementor.java        8253693 generic-all
 runtime/Metaspace/DefineClass.java                                                              8253378 generic-all
 runtime/logging/TestMethodHandlesVerbose.java                                                   8253907 windows-all
+serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.java                  8253617 generic-all
+
+# Issues caused a lot of test failures
 runtime/whitebox/WBStackSize.java                                                               8253670 generic-all
 runtime/execstack/Testexecstack.java                                                            8253670 generic-all
 serviceability/dcmd/compiler/CodeCacheTest.java                                                 8253570 generic-all
-serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.java                  8253617 generic-all
 vmTestbase/nsk/stress/stack/stack019.java                                                       8253670 generic-all
 vmTestbase/nsk/stress/stack/stack009.java                                                       8253670 generic-all
 vmTestbase/nsk/stress/stack/stack007.java                                                       8253670 generic-all
@@ -19,6 +18,19 @@ vmTestbase/nsk/stress/stack/stack006.java                                       
 vmTestbase/nsk/stress/stack/stack004.java                                                       8253670 generic-all
 vmTestbase/nsk/stress/stack/stack003.java                                                       8253670 generic-all
 vmTestbase/nsk/stress/except/except010.java                                                     8253670 generic-all
+
+vmTestbase/nsk/stress/strace/strace001.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace003.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace005.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace010.java                                                     8254188 generic-all
+
+compiler/codegen/TestOopCmp.java                                                                8254187 generic-all
+compiler/memoryinitialization/ZeroTLABTest.java                                                 8254187 generic-all
+gc/epsilon/TestByteArrays.java                                                                  8254187 generic-all
+gc/epsilon/TestManyThreads.java                                                                 8254187 generic-all
+gc/epsilon/TestObjects.java                                                                     8254187 generic-all
+gc/epsilon/TestRefArrays.java                                                                   8254187 generic-all
+gc/survivorAlignment/TestAllocationInEden.java                                                  8254187 generic-all
 
 compiler/codegen/Test6942326.java                                                               8253918 generic-all
 compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java                                       8253918 generic-all
@@ -184,6 +196,7 @@ runtime/ClassUnload/KeepAliveClassLoader.java
 runtime/ClassUnload/DictionaryDependsTest.java
 runtime/ClassUnload/KeepAliveClass.java
 runtime/ClassUnload/ConstantPoolDependsTest.java
+vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 
 
 ##########
