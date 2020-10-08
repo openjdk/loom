@@ -174,12 +174,12 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
     if (inf->thr_name == NULL && strcmp(event_name, "VirtualThreadTerminated") != 0) {
       fatal(jni, "VThread event: worker thread not found!");
     }
-    if (strcmp(event_name, "VirtualThreadMounted") == 0) {
+    if (continuation_events_enabled == JNI_TRUE && strcmp(event_name, "VirtualThreadMounted") == 0) {
       if (!inf->just_scheduled) { // There is no ContinuationRun for just scheduled vthreads
         if (inf->was_yield) {
           fatal(jni, "VirtualThreadMounted: event with ContinuationYield before!");
         }
-        if (continuation_events_enabled && inf->was_run) {
+        if (inf->was_run) {
           fatal(jni, "VirtualThreadMounted: event with ContinuationRun before!");
         }
       }
@@ -188,10 +188,10 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
       if (inf->just_scheduled) {
         fatal(jni, "VirtualThreadUnmounted: event without VirtualThreadMounted before!");
       }
-      if (inf->was_run) {
+      if (continuation_events_enabled == JNI_TRUE && inf->was_run) {
         fatal(jni, "VirtualThreadUnmounted: event with ContinuationRun before!");
       }
-      if (continuation_events_enabled && !inf->was_yield) {
+      if (continuation_events_enabled == JNI_TRUE && !inf->was_yield) {
         fatal(jni, "VirtualThreadUnmounted: event without ContinuationYield before!");
       }
     }
@@ -745,14 +745,14 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
   callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
   callbacks.VirtualThreadMounted   = &VirtualThreadMounted;
   callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
-  callbacks.ContinuationRun   = &ContinuationRun;
-  callbacks.ContinuationYield = &ContinuationYield;
 
   memset(&caps, 0, sizeof(caps));
   caps.can_support_virtual_threads = 1;
   caps.can_access_local_variables = 1;
-  if (continuation_events_enabled) {
+  if (continuation_events_enabled == JNI_TRUE) {
     caps.can_support_continuations = 1;
+    callbacks.ContinuationRun   = &ContinuationRun;
+    callbacks.ContinuationYield = &ContinuationYield;
   }
   err = (*jvmti)->AddCapabilities(jvmti, &caps);
   if (err != JVMTI_ERROR_NONE) {
@@ -784,7 +784,7 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  if (continuation_events_enabled) {
+  if (continuation_events_enabled == JNI_TRUE) {
     err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_RUN, NULL);
     if (err != JVMTI_ERROR_NONE) {
       printf("error in JVMTI SetEventNotificationMode: %d\n", err);

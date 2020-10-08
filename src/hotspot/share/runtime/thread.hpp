@@ -1035,6 +1035,7 @@ class JavaThread: public Thread {
   friend class Continuation;
  private:
   bool           _on_thread_list;                // Is set when this JavaThread is added to the Threads list
+  bool           _in_vtmt;
   OopHandle      _threadObj;                     // The Java level thread object
   OopHandle      _vthread;
   OopHandle      _scopedCache;
@@ -1361,6 +1362,8 @@ public:
   void smr_delete();
   bool on_thread_list() const { return _on_thread_list; }
   void set_on_thread_list() { _on_thread_list = true; }
+  bool in_vtmt() const { return _in_vtmt; }
+  void set_in_vtmt(bool val) { _in_vtmt = val; }
 
   // thread has called JavaThread::exit() or is terminated
   bool is_exiting() const;
