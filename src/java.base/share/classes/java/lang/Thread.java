@@ -45,15 +45,15 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
+import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
-import sun.nio.ch.Interruptible;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
+import jdk.internal.vm.annotation.IntrinsicCandidate;
+import sun.nio.ch.Interruptible;
 import sun.security.util.SecurityConstants;
-import jdk.internal.HotSpotIntrinsicCandidate;
-import jdk.internal.event.ThreadSleepEvent;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -236,14 +236,14 @@ public class Thread implements Runnable {
     /**
      * Sets the Thread object to be returned by Thread.currentThread().
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     native void setCurrentThread(Thread thread);
 
     /**
      * Returns the Thread object for the current thread.
      * @return  the current thread
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     public static native Thread currentThread();
 
     /**
@@ -253,7 +253,7 @@ public class Thread implements Runnable {
         return currentThread0();
     }
 
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     private static native Thread currentThread0();
 
     // Scoped support:
@@ -262,10 +262,10 @@ public class Thread implements Runnable {
      * TBD
      * @return TBD
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     static native Object[] scopedCache();
 
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     static native void setScopedCache(Object[] cache);
 
     // A simple (not very) random string of bits to use when evicting
@@ -488,7 +488,7 @@ public class Thread implements Runnable {
      *
      * @since 9
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     public static void onSpinWait() {}
 
     /**

@@ -27,7 +27,7 @@ package jdk.jfr.internal;
 
 import java.util.List;
 
-import jdk.internal.HotSpotIntrinsicCandidate;
+import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.jfr.Event;
 import jdk.jfr.internal.EventWriter;
 import jdk.jfr.internal.handlers.EventHandler;
@@ -103,7 +103,7 @@ public final class JVM {
      * @return the time, in ticks
      *
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     public static native long counterTime();
 
     /**
@@ -435,7 +435,7 @@ public final class JVM {
      *
      * @return thread local EventWriter
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     public static native EventWriter getEventWriter();
 
     /**

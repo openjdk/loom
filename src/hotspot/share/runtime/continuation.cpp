@@ -4710,7 +4710,7 @@ public:
     if (oopDesc::is_oop_or_null(obj)) return;
 
     tty->print_cr("*** (narrow) non-oop %x found at " PTR_FORMAT,
-                  *p, p2i(p));
+                  (int)(*p), p2i(p));
     if (_ok) {
       _ok = false;
     }

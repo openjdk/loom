@@ -938,13 +938,18 @@ void Thread::print_on_error(outputStream* st, char* buf, int buflen) const {
     st->print(" \"%s\"", name());
   }
 
-  st->print(" [stack: " PTR_FORMAT "," PTR_FORMAT "]",
-            p2i(stack_end()), p2i(stack_base()));
-
-  if (osthread()) {
-    st->print(" [id=%d]", osthread()->thread_id());
+  OSThread* os_thr = osthread();
+  if (os_thr != NULL) {
+    if (os_thr->get_state() != ZOMBIE) {
+      st->print(" [stack: " PTR_FORMAT "," PTR_FORMAT "]",
+                p2i(stack_end()), p2i(stack_base()));
+      st->print(" [id=%d]", osthread()->thread_id());
+    } else {
+      st->print(" terminated");
+    }
+  } else {
+    st->print(" unknown state (no osThread)");
   }
-
   ThreadsSMRSupport::print_info_on(this, st);
 }
 
@@ -975,7 +980,7 @@ void Thread::check_possible_safepoint() {
 
   if (_no_safepoint_count > 0) {
     print_owned_locks();
-    //assert(false, "Possible safepoint reached by thread that does not allow it");
+    //assert(false, "Possible safepoint reached by thread that does not allow it");    // FIXME
   }
 #ifdef CHECK_UNHANDLED_OOPS
   // Clear unhandled oops in JavaThreads so we get a crash right away.
@@ -1337,6 +1342,7 @@ void NonJavaThread::post_run() {
   unregister_thread_stack_with_NMT();
   // Ensure thread-local-storage is cleared before termination.
   Thread::clear_thread_current();
+  osthread()->set_state(ZOMBIE);
 }
 
 // NamedThread --  non-JavaThread subclasses with multiple

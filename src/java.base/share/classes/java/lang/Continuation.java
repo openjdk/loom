@@ -25,8 +25,8 @@
 
 package java.lang;
 
-import jdk.internal.HotSpotIntrinsicCandidate;
 import jdk.internal.vm.annotation.DontInline;
+import jdk.internal.vm.annotation.IntrinsicCandidate;
 import sun.security.action.GetPropertyAction;
 
 import java.lang.invoke.MethodHandles;
@@ -365,10 +365,10 @@ public class Continuation {
         }
     }
 
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     private static int doYield(int scopes) { throw new Error("Intrinsic not installed"); };
 
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     private native static void enterSpecial(Continuation c, boolean isContinue);
 
     private void finish() {
@@ -381,7 +381,7 @@ public class Continuation {
     }
 
     @DontInline
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     private static void enter(Continuation c, boolean isContinue) {
       // This method runs in the "entry frame".
       // A yield jumps to this method's caller as if returning from this method.
