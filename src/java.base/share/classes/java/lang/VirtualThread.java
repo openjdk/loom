@@ -24,7 +24,6 @@
  */
 package java.lang;
 
-import java.io.PrintStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.security.AccessControlContext;
@@ -32,7 +31,6 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -44,23 +42,17 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
-import sun.nio.ch.ConsoleStreams;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
-
-import static java.lang.StackWalker.Option.RETAIN_CLASS_REFERENCE;
-import static java.lang.StackWalker.Option.SHOW_REFLECT_FRAMES;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
  * A thread that is scheduled by the Java virtual machine rather than the operating
  * system.
  */
-
 class VirtualThread extends Thread {
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
     private static final Executor DEFAULT_SCHEDULER = createDefaultScheduler();
@@ -153,8 +145,7 @@ class VirtualThread extends Thread {
         this.cont = new Continuation(VTHREAD_SCOPE, target) {
             @Override
             protected void onPinned(Continuation.Pinned reason) {
-                if (TRACE_PINNING_MODE > 0
-                        && !ConsoleStreams.isOutOrErrLocked(Thread.currentThread())) {
+                if (TRACE_PINNING_MODE > 0) {
                     boolean printAll = (TRACE_PINNING_MODE == 1);
                     PinnedThreadPrinter.printStackTrace(System.out, printAll);
                 }
@@ -766,6 +757,49 @@ class VirtualThread extends Thread {
     }
 
     @Override
+    StackTraceElement[] asyncGetStackTrace() {
+        StackTraceElement[] stackTrace;
+        do {
+            stackTrace = (carrierThread != null)
+                    ? super.asyncGetStackTrace()  // mounted
+                    : tryGetStackTrace();         // unmounted
+            if (stackTrace == null) {
+                Thread.yield();
+            }
+        } while (stackTrace == null);
+        return stackTrace;
+    }
+
+    /**
+     * Returns the stack trace for this virtual thread if it newly created,
+     * parked, or terminated. Returns null if the thread is in another state.
+     */
+    private StackTraceElement[] tryGetStackTrace() {
+        if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
+            try {
+                return cont.getStackTrace();
+            } finally {
+                assert state() == PARKED_SUSPENDED;
+                setState(PARKED);
+
+                // may have been unparked while suspended
+                if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
+                    try {
+                        scheduler.execute(runContinuation);
+                    } catch (RejectedExecutionException ignore) { }
+                }
+            }
+        } else {
+            int s = state();
+            if (s == NEW || s == TERMINATED) {
+                return new StackTraceElement[0];   // empty stack
+            } else {
+                return null;
+            }
+        }
+    }
+
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("VirtualThread[");
         String name = getName();
@@ -819,51 +853,6 @@ class VirtualThread extends Thread {
             this.condition = condition = lock.newCondition();
         }
         return condition;
-    }
-
-    // -- stack trace support --
-
-    @Override
-    StackTraceElement[] asyncGetStackTrace() {
-        StackTraceElement[] stackTrace;
-        do {
-            stackTrace = (carrierThread != null)
-                    ? super.asyncGetStackTrace()  // mounted
-                    : tryGetStackTrace();         // unmounted
-            if (stackTrace == null) {
-                Thread.yield();
-            }
-        } while (stackTrace == null);
-        return stackTrace;
-    }
-
-    /**
-     * Returns the stack trace for this virtual thread if it newly created,
-     * parked, or terminated. Returns null if the thread is in another state.
-     */
-    private StackTraceElement[] tryGetStackTrace() {
-        if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
-            try {
-                return cont.getStackTrace();
-            } finally {
-                assert state() == PARKED_SUSPENDED;
-                setState(PARKED);
-
-                // may have been unparked while suspended
-                if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
-                    try {
-                        scheduler.execute(runContinuation);
-                    } catch (RejectedExecutionException ignore) { }
-                }
-            }
-        } else {
-            int s = state();
-            if (s == NEW || s == TERMINATED) {
-                return new StackTraceElement[0];   // empty stack
-            } else {
-                return null;
-            }
-        }
     }
 
     // -- wrappers for VarHandle methods --
@@ -939,7 +928,6 @@ class VirtualThread extends Thread {
         notifyTerminated(Thread.currentCarrierThread(), this);
         notifyVTMTFinish(this, 0);
     }
-    
 
     /**
      * Creates the default scheduler as ForkJoinPool.
@@ -1040,49 +1028,6 @@ class VirtualThread extends Thread {
             });
         stpe.setRemoveOnCancelPolicy(true);
         return stpe;
-    }
-
-    /**
-     * Helper class to print the virtual thread stack trace when a carrier thread is
-     * pinned.
-     */
-    private static class PinnedThreadPrinter {
-        static final StackWalker INSTANCE;
-        static {
-            var options = Set.of(SHOW_REFLECT_FRAMES, RETAIN_CLASS_REFERENCE);
-            PrivilegedAction<StackWalker> pa = () -> LiveStackFrame.getStackWalker(options, VTHREAD_SCOPE);
-            INSTANCE = AccessController.doPrivileged(pa);
-        }
-
-        /**
-         * Prints a stack trace of the current virtual thread to the given print
-         * stream. This method is synchronized to reduce interference in the output.
-         * @param printAll true to print all stack frames, false to only print the
-         *        frames that are native or holding a monitor
-         */
-        @ChangesCurrentThread
-        static synchronized void printStackTrace(PrintStream out, boolean printAll) {
-            // switch to carrier thread as the printing may park
-            Thread vthread = Thread.currentThread();
-            Thread carrier = Thread.currentCarrierThread();
-            carrier.setCurrentThread(carrier);
-            try {
-                out.println(Thread.currentThread());
-                INSTANCE.forEach(f -> {
-                    if (f.getDeclaringClass() != PinnedThreadPrinter.class) {
-                        var ste = f.toStackTraceElement();
-                        int monitorCount = ((LiveStackFrame) f).getMonitors().length;
-                        if (monitorCount > 0 || f.isNativeMethod()) {
-                            out.format("    %s <== monitors:%d%n", ste, monitorCount);
-                        } else if (printAll) {
-                            out.format("    %s%n", ste);
-                        }
-                    }
-                });
-            } finally {
-                carrier.setCurrentThread(vthread);
-            }
-        }
     }
 
     /**
