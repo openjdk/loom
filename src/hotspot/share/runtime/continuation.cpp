@@ -1761,7 +1761,7 @@ private:
 protected:
   template <class T> inline void do_oop_work(T* p) {
     this->process(p);
-    oop obj = (oop)NativeAccess<>::oop_load(p); // we might be reading off a chunk when squashing
+    oop obj = (oop)NativeAccess<>::oop_load(p); // we might be reading off a chunk when squashing so we might need a load barrier
     int index = add_oop(obj, _starting_index + this->_count - 1);
 
 #ifdef ASSERT
@@ -1777,7 +1777,7 @@ protected:
     } else {
       address hloc = (address)_hsp + offset; // address of oop in the (raw) h-stack
       assert (this->_cont->in_hstack(hloc), "");
-      assert (*(T*)hloc == *p, "*hloc: " INTPTR_FORMAT " *p: " INTPTR_FORMAT, *(intptr_t*)hloc, *(intptr_t*)p);
+      // assert (*(T*)hloc == *p, "*hloc: " INTPTR_FORMAT " *p: " INTPTR_FORMAT, *(intptr_t*)hloc, *(intptr_t*)p); -- not true if squashing and a load barrier happens above
 
       log_develop_trace(jvmcont)("Marking oop at " INTPTR_FORMAT " (offset: %d)", p2i(hloc), offset);
       memset(hloc, 0xba, sizeof(T)); // we must take care not to write a full word to a narrow oop
@@ -4722,10 +4722,7 @@ public:
     // Assertions therein might prevent call from returning.
     tty->print_cr("*** non-oop " PTR_FORMAT " found at " PTR_FORMAT,
                   p2i(*p), p2i(p));
-    if (_ok) {
-      _ok = false;
-    }
-    assert(false, "");
+    if (_ok) _ok = false;
   }
   virtual void do_oop(narrowOop* p) {
     if ((intptr_t*) p < _sp) {
@@ -4737,10 +4734,7 @@ public:
 
     tty->print_cr("*** (narrow) non-oop %x found at " PTR_FORMAT,
                   (int)(*p), p2i(p));
-    if (_ok) {
-      _ok = false;
-    }
-    assert(false, "");
+    if (_ok) _ok = false;
   }
 };
 
