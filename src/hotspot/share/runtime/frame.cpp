@@ -347,8 +347,9 @@ bool frame::can_be_deoptimized() const {
 void frame::deoptimize(JavaThread* thread) {
   // tty->print_cr(">>> frame::deoptimize");
   // print_on(tty);
-  assert(thread->frame_anchor()->has_last_Java_frame() &&
-         thread->frame_anchor()->walkable(), "must be");
+  assert(thread == NULL
+         || (thread->frame_anchor()->has_last_Java_frame() &&
+             thread->frame_anchor()->walkable()), "must be");
   // Schedule deoptimization of an nmethod activation with this frame.
   assert(_cb != NULL && _cb->is_compiled(), "must be");
 
@@ -368,7 +369,7 @@ void frame::deoptimize(JavaThread* thread) {
   assert(is_deoptimized_frame(), "must be");
 
 #ifdef ASSERT
-  {
+  if (thread != NULL) {
     frame check = thread->last_frame();
     if (is_older(check.id())) {
       RegisterMap map(thread, false);

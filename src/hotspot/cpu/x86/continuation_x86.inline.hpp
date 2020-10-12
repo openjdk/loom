@@ -1345,7 +1345,7 @@ void Thaw<ConfigT, mode>::deoptimize_frame_in_chunk(intptr_t* sp, address pc, Co
   intptr_t* fp = *(intptr_t**)(sp - 2);
   frame f(sp, sp, fp, pc, cb, NULL, true);
   DEBUG_ONLY(Frame::patch_pc(f, NULL));
-  f.deoptimize(_thread);
+  f.deoptimize(NULL);
 }
 
 template <typename ConfigT, op_mode mode>
