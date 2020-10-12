@@ -202,7 +202,7 @@ static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont);
 
 // debugging functions
 frame sp_to_frame(intptr_t* sp);
-void do_verify_after_thaw(JavaThread* thread, intptr_t* sp, intptr_t **rbp_pos);
+bool do_verify_after_thaw(JavaThread* thread, intptr_t* sp, intptr_t **rbp_pos);
 static void print_oop(void *p, oop obj, outputStream* st = tty);
 static void print_vframe(frame f, const RegisterMap* map = NULL, outputStream* st = tty);
 static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) PRODUCT_RETURN;
@@ -1761,7 +1761,7 @@ private:
 protected:
   template <class T> inline void do_oop_work(T* p) {
     this->process(p);
-    oop obj = RawAccess<>::oop_load(p); // we are reading off our own stack, Raw should be fine
+    oop obj = (oop)NativeAccess<>::oop_load(p); // we might be reading off a chunk when squashing
     int index = add_oop(obj, _starting_index + this->_count - 1);
 
 #ifdef ASSERT
@@ -1810,8 +1810,15 @@ public:
     DEBUG_ONLY(this->verify(base_loc);)
     DEBUG_ONLY(this->verify(derived_loc);)
 
-    intptr_t offset = cast_from_oop<intptr_t>(*derived_loc) - cast_from_oop<intptr_t>(*base_loc);
-
+    oop base = (oop)NativeAccess<>::oop_load(base_loc); // we could be squashing a chunk
+    assert (oopDesc::is_oop_or_null(base), "invalid oop");
+    intptr_t offset = *(intptr_t*)derived_loc;
+    if (offset < 0) { // see fix_derived_pointers -- we could be squashing a chunk
+      offset = -offset;
+    } else {
+      offset = cast_from_oop<intptr_t>(*derived_loc) - cast_from_oop<intptr_t>(base);
+    }
+    
     log_develop_trace(jvmcont)(
         "Continuation freeze derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
         p2i(derived_loc), p2i(*derived_loc), p2i(*base_loc), p2i(base_loc), offset);
@@ -2166,6 +2173,8 @@ private:
   template<typename FKind> hframe new_hframe(const frame& f, intptr_t* vsp, const hframe& caller, int fsize, int num_oops);
   static frame chunk_start_frame_pd(oop chunk, intptr_t* sp);
   inline intptr_t* align_bottom(intptr_t* vsp, int argsize);
+
+  inline bool is_chunk() { return _cont.tail() != (oop)NULL; }
 
 public:
 
@@ -3263,7 +3272,7 @@ public:
   }
 
   inline FreezeFnT get_oopmap_stub(const frame& f) {
-    if (!USE_STUBS) {
+    if (!USE_STUBS || _chunk != (oop)NULL) {
       return OopStubs::freeze_oops_slow();
     }
     return ContinuationHelper::freeze_stub<mode>(f);
@@ -4654,7 +4663,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   print_frames(thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
   if (LoomVerifyAfterThaw) {
     intptr_t *v = 0;
-    do_verify_after_thaw(thread, sp0, &v);
+    assert(do_verify_after_thaw(thread, sp0, &v), "");
   }
   assert (assert_entry_frame_laid_out(thread), "");
   clear_anchor(thread);
@@ -4718,7 +4727,7 @@ public:
   }
 };
 
-void do_verify_after_thaw(JavaThread* thread, intptr_t* sp, intptr_t **rbp_pos) {
+bool do_verify_after_thaw(JavaThread* thread, intptr_t* sp, intptr_t **rbp_pos) {
   ThawVerifyOopsClosure cl(sp);
   // Traverse the execution stack
   int i = 0;
@@ -4728,11 +4737,14 @@ void do_verify_after_thaw(JavaThread* thread, intptr_t* sp, intptr_t **rbp_pos) 
   for (; !fst.is_done(); fst.next()) {
     fst.current()->oops_do(&cl, NULL, fst.register_map());
     if (!cl.ok()) {
-      frame fr = fst.current();
+      frame fr = *fst.current();
       tty->print_cr("Failed for frame %d, pc: %p, sp: %p, fp: %p", i, fr.pc(), fr.unextended_sp(), fr.fp());
+      fr.print_on(tty);
       cl.reset();
+      return false;
     }
   }
+  return true;
 }
 
 JRT_LEAF(intptr_t*, Continuation::thaw_leaf(JavaThread* thread, int kind))
@@ -6340,8 +6352,8 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
   }
   // tty->print_cr("CHUNK " INTPTR_FORMAT " ::", p2i((oopDesc*)chunk));
   assert(ContMirror::is_stack_chunk(chunk), "");
-  HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
-  tty->print_cr("CHUNK " INTPTR_FORMAT " - " INTPTR_FORMAT " :: %s 0x%lx", p2i((oopDesc*)chunk), p2i((HeapWord*)(chunk + chunk->size())), hr->get_type_str(), chunk->identity_hash());
+  // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
+  tty->print_cr("CHUNK " INTPTR_FORMAT " - " INTPTR_FORMAT " :: 0x%lx", p2i((oopDesc*)chunk), p2i((HeapWord*)(chunk + chunk->size())), chunk->identity_hash());
   tty->print("CHUNK " INTPTR_FORMAT " young: %d size: %d argsize: %d sp: %d num_frames: %d num_oops: %d parent: " INTPTR_FORMAT,
     p2i((oopDesc*)chunk), !requires_barriers(chunk),
     jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::argsize(chunk), jdk_internal_misc_StackChunk::sp(chunk),
