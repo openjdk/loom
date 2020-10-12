@@ -113,8 +113,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
         this.name = name;
         this.maxPriority = maxPriority;
         if (daemon && VM.isBooted()) {
-            parent.synchronizedAddWeak(this);
             this.daemon = true;
+            parent.synchronizedAddWeak(this);
         } else {
             parent.synchronizedAdd(this);
         }
