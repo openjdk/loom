@@ -2553,6 +2553,10 @@ public:
     log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i(from + size), size << LogBytesPerWord);
     log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i(to + size), size << LogBytesPerWord);
 
+#ifdef ASSERT
+    if (!(to >= (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk))) { tty->print_cr("Entry argsize: %d sp: %p bottom sp: %p", _cont.argsize(), _cont.entrySP(), _cont.entry()->bottom_sender_sp()); pns2(); }
+#endif
+    
     copy_from_stack(from, to, size);
 
     assert (to >= (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(InstanceStackChunkKlass::start_of_stack(chunk)));
@@ -3134,7 +3138,7 @@ public:
     hframe hf = new_hframe<FKind>(f, vsp, caller, fsize, oops);
     intptr_t* hsp = _cont.stack_address(hf.sp());
 
-    fsize += argsize;
+    fsize += argsize; // we overwrite the caller with our stack-passed arguments
     freeze_raw_frame(vsp, hsp, fsize);
 
     if (!FKind::stub) {
@@ -4004,7 +4008,9 @@ public:
     }
 
     OrderAccess::loadload(); // we must test the gc mode *after* the copy
+    DEBUG_ONLY(bool fix = false;)
     if (UNLIKELY(should_fix(chunk))) {
+      DEBUG_ONLY(fix = true;)
       intptr_t* end = vsp + size - argsize;
       if (argsize > 0) {
         end -= frame_metadata;
@@ -4028,6 +4034,17 @@ public:
       e.commit();
     }
   #endif
+
+#ifdef ASSERT
+  intptr_t* sp0 = vsp;
+  set_anchor(_thread, sp0);
+  print_frames(_thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
+  if (LoomVerifyAfterThaw) {
+    intptr_t *v = 0;
+    assert(do_verify_after_thaw(_thread, sp0, &v), "partial: %d empty: %d is_last: %d fix: %d", partial, empty, is_last, fix);
+  }
+  clear_anchor(_thread);
+#endif
 
     // assert (verify_continuation<100>(_cont.mirror()), "");
     return vsp;
@@ -5023,6 +5040,7 @@ frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
 
 static frame sender_for_frame(const frame& f, RegisterMap* map) {
   assert (map->in_cont(), "");
+  assert (!map->include_argument_oops(), "");
   ContMirror cont(map);
 
   assert (!f.is_empty(), "");

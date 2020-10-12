@@ -54,6 +54,7 @@ static bool is_in_frame(CodeBlob* cb, intptr_t* sp, void* p0) {
   intptr_t* p = (intptr_t*)p0;
   int argsize = cb->is_compiled() ? (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord : 0;
   int frame_size = cb->frame_size() + argsize;
+  // tty->print_cr("offset: %ld fsize: %d, argsize: %d", p - sp, cb->frame_size(), argsize);
   return p == sp - frame::sender_sp_offset || ((p - sp) >= 0 && (p - sp) < frame_size);
 }
 #endif

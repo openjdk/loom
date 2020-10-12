@@ -1123,6 +1123,7 @@ Handle SharedRuntime::find_callee_info_helper(JavaThread* thread,
 
     // Retrieve from a compiled argument list
     receiver = Handle(THREAD, callerFrame.retrieve_receiver(&reg_map2));
+    assert (oopDesc::is_oop_or_null(receiver()), ""); // if (receiver() != NULL) oopDesc::verify(receiver()); // 
 
     if (receiver.is_null()) {
       THROW_(vmSymbols::java_lang_NullPointerException(), nullHandle);

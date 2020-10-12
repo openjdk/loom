@@ -1442,6 +1442,12 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
     assert (oopDesc::is_oop_or_null(jdk_internal_misc_StackChunk::parent(chunk)), "");
   }
 
+  bool check_deopt = false;
+  if (Thread::current()->is_Java_thread() && !SafepointSynchronize::is_at_safepoint()) {
+    if (Thread::current()->as_Java_thread()->cont_fastpath_thread_state())
+      check_deopt = true;
+  }
+
   const bool gc_mode = jdk_internal_misc_StackChunk::gc_mode(chunk);
   const bool concurrent = !SafepointSynchronize::is_at_safepoint() && !Thread::current()->is_Java_thread();
   const bool is_last = jdk_internal_misc_StackChunk::parent(chunk) == NULL && (cont == (oop)NULL || java_lang_Continuation::pc(cont) == NULL);
@@ -1484,6 +1490,15 @@ bool Continuation::debug_verify_stack_chunk(oop chunk, oop cont, size_t* out_siz
     assert (cb->is_compiled(), "");
     assert (cb->frame_size() > 0, "");
     assert (!cb->as_compiled_method()->is_deopt_pc(pc), "");
+
+    // if (cb->is_nmethod()) {
+    //   nmethod* nm = cb->as_nmethod();
+    //   if (check_deopt && nm->is_marked_for_deoptimization() && nm->is_not_entrant()) {
+    //     tty->print_cr("-- FOUND NON ENTRANT NMETHOD IN CHUNK: ");
+    //     if (nm->method() != NULL) nm->method()->print_on(tty);
+    //     nm->print_on(tty);
+    //   }
+    // }
 
     num_frames++;
     size0 += cb->frame_size() << LogBytesPerWord;
