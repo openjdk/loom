@@ -56,7 +56,6 @@ class ThreadExecutor implements ExecutorService {
     }
 
     private final ThreadFactory factory;
-    //private final Lifetime lifetime = Lifetime.start();   // experimental
     private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
     private final ReentrantLock terminationLock = new ReentrantLock();
     private final Condition terminationCondition = terminationLock.newCondition();
@@ -170,7 +169,6 @@ class ThreadExecutor implements ExecutorService {
      */
     private Thread newThread(Runnable task) {
         Thread thread = factory.newThread(task);
-        //JLA.unsafeSetLifetime(thread, lifetime);  // experimental
         return thread;
     }
 
