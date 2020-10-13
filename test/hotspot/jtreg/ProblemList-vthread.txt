@@ -6,6 +6,8 @@ runtime/cds/serviceability/transformRelatedClasses/TransformInterfaceAndImplemen
 runtime/Metaspace/DefineClass.java                                                              8253378 generic-all
 runtime/logging/TestMethodHandlesVerbose.java                                                   8253907 windows-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.java                  8253617 generic-all
+vmTestbase/gc/memory/UniThread/Linear1/Linear1.java	                                        8241630 generic-all
+vmTestbase/gc/gctests/RememberedSet/RememberedSet.java                                          8241630 generic-all
 
 # Issues caused a lot of test failures
 runtime/whitebox/WBStackSize.java                                                               8253670 generic-all
