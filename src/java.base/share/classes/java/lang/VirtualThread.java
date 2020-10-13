@@ -907,16 +907,16 @@ class VirtualThread extends Thread {
 
     private void notifyJvmtiMountEnd(boolean firstRun) {
         Thread carrier = Thread.currentCarrierThread();
+        notifyVTMTFinish(this, 0);
         if (firstRun) {
             notifyStarted(carrier, this);
         }
         notifyMount(carrier, this);
-        notifyVTMTFinish(this, 0);
     }
 
     private void notifyJvmtiUnmountBegin() {
-        notifyVTMTStart(this, 1);
         notifyUnmount(Thread.currentCarrierThread(), this);
+        notifyVTMTStart(this, 1);
     }
 
     private void notifyJvmtiUnmountEnd() {
@@ -924,8 +924,8 @@ class VirtualThread extends Thread {
     }
 
     private void notifyJvmtiTerminate() {
-        notifyVTMTStart(this, 0);
         notifyTerminated(Thread.currentCarrierThread(), this);
+        notifyVTMTStart(this, 0);
         notifyVTMTFinish(this, 0);
     }
 

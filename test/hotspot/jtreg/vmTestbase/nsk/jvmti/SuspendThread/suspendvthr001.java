@@ -94,7 +94,7 @@ public class suspendvthr001 extends DebugeeClass {
         if (status != Consts.TEST_PASSED) {
             return status;
         }
-        sleep(100); // let tested vthreads work while they are tested in native agent
+        sleep(3000); // let tested vthreads work while they are tested in native agent
 
         System.out.println("\n## Java: runIt: Finishing vthreads");
         try {

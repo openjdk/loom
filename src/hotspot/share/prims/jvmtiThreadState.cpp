@@ -205,11 +205,7 @@ JvmtiVTMTDisabler::disable_VTMT() {
   _VTMT_disable_count++;
 
   // Block while some mount/unmount transitions are in progress.
-  // Thread in VTMT can call JVMTI functions in mount/unmount event handlers.
-  // The JVMTI functions supporting virtual threads normally disable VTMT.
-  // To avoid deadlocks, such VTMT disablers are not blocked on wait below.
-  // Other VTMT disablers are waiting until all VTMT's go through.
-  while (_VTMT_count > 0 && !thread->in_vtmt()) {
+  while (_VTMT_count > 0) {
     ml.wait();
   }
 }
@@ -220,8 +216,7 @@ JvmtiVTMTDisabler::enable_VTMT() {
     return;
   }
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
-  assert((JavaThread::current()->in_vtmt() || _VTMT_count == 0) && _VTMT_disable_count > 0,
-         "VTMT sanity check");
+  assert(_VTMT_count == 0 && _VTMT_disable_count > 0, "VTMT sanity check");
 
   if (--_VTMT_disable_count == 0) {
     ml.notify_all();
@@ -247,7 +242,6 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     ml.wait();
   }
   _VTMT_count++;
-  thread->set_in_vtmt(true);
 }
 
 void
@@ -259,18 +253,16 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   _VTMT_count--;
-  thread->set_in_vtmt(false);
 
   // unblock waiting VTMT disablers
   if (_VTMT_disable_count > 0) {
     ml.notify_all();
   }
   if (callsite_tag == 1) { // finish_VTMT for a vthread unmount
+    MonitorLocker ml(thread->SR_lock(), Mutex::_no_safepoint_check_flag);
     if (thread->is_cthread_pending_suspend()) {
       thread->clear_cthread_pending_suspend();
-      // Safe to do without grabbing SR_lock as the thread is current.
       // The JavaThread* will be suspended upon return to Java.
-      MonitorLocker ml(thread->SR_lock(), Mutex::_no_safepoint_check_flag);
       thread->set_external_suspend();
     }
   }

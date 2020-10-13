@@ -655,7 +655,7 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
     // We have a JavaThread* so add more state bits.
     JavaThreadState jts = jt->thread_state();
 
-    if (cthread_with_mounted_vthread(jt) && jt->is_cthread_pending_suspend()) {
+    if (jt->is_cthread_pending_suspend()) {
       // Suspended carrier thread with a mounted virtual thread.
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
@@ -1455,11 +1455,10 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
     oop mounted_vt = java_thread->mounted_vthread();
 
     if (single_suspend && JvmtiExport::can_support_virtual_threads() &&
+        !java_lang_VirtualThread::is_instance(thread_oop) &&
         mounted_vt != NULL && thread_oop != mounted_vt) {
       // A case of a carrier thread executing a mounted virtual thread.
-      assert(!java_lang_VirtualThread::is_instance(thread_oop) &&
-             java_lang_VirtualThread::is_instance(mounted_vt),
-             "sanity check");
+      assert(java_lang_VirtualThread::is_instance(mounted_vt), "sanity check");
       if (java_thread->is_cthread_pending_suspend()) {
         return JVMTI_ERROR_THREAD_SUSPENDED;
       }
@@ -1528,20 +1527,10 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
   if (java_thread->is_hidden_from_external_view()) {
     return JVMTI_ERROR_NONE;
   }
-
-  oop mounted_vt = java_thread->mounted_vthread();
-  if (single_suspend && JvmtiExport::can_support_virtual_threads() &&
-      mounted_vt != NULL && thread_oop != java_thread->mounted_vthread()) {
-    // A case of a carrier thread executing a mounted virtual thread.
-    assert(!java_lang_VirtualThread::is_instance(thread_oop) &&
-           java_lang_VirtualThread::is_instance(mounted_vt),
-           "sanity check");
-    if (java_thread->is_cthread_pending_suspend()) {
-      java_thread->clear_cthread_pending_suspend();
-      return JVMTI_ERROR_NONE;
-    } else {
-      return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
-    }
+  // A case of a carrier thread executing a mounted virtual thread.
+  if (java_thread->is_cthread_pending_suspend()) {
+    java_thread->clear_cthread_pending_suspend();
+    return JVMTI_ERROR_NONE;
   }
   if (!java_thread->is_being_ext_suspended()) {
     return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
