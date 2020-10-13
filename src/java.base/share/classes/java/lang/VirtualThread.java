@@ -631,11 +631,9 @@ class VirtualThread extends Thread {
                 }
                 return true;
             } else {
-                long startNanos = System.nanoTime();
                 long remainingNanos = nanos;
                 while (remainingNanos > 0 && state() != TERMINATED) {
-                    condition.await(remainingNanos, NANOSECONDS);
-                    remainingNanos = nanos - (System.nanoTime() - startNanos);
+                    remainingNanos = condition.awaitNanos(remainingNanos);
                 }
                 return (state() == TERMINATED);
             }
