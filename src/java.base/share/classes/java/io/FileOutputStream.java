@@ -289,7 +289,7 @@ public class FileOutputStream extends OutputStream
      */
     private void open(String name, boolean append) throws FileNotFoundException {
         if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> open0(name, append));
+            Blocker.block(() -> open0(name, append));
         } else {
             open0(name, append);
         }
@@ -314,7 +314,7 @@ public class FileOutputStream extends OutputStream
     public void write(int b) throws IOException {
         boolean append = fdAccess.getAppend(fd);
         if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> write(b, append));
+            Blocker.block(() -> write(b, append));
         } else {
             write(b, append);
         }
@@ -342,7 +342,7 @@ public class FileOutputStream extends OutputStream
     public void write(byte b[]) throws IOException {
         boolean append = fdAccess.getAppend(fd);
         if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> writeBytes(b, 0, b.length, append));
+            Blocker.block(() -> writeBytes(b, 0, b.length, append));
         } else {
             writeBytes(b, 0, b.length, append);
         }
@@ -360,7 +360,7 @@ public class FileOutputStream extends OutputStream
     public void write(byte b[], int off, int len) throws IOException {
         boolean append = fdAccess.getAppend(fd);
         if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> writeBytes(b, off, len, append));
+            Blocker.block(() -> writeBytes(b, off, len, append));
         } else {
             writeBytes(b, off, len, append);
         }

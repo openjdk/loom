@@ -25,16 +25,34 @@
 
 package jdk.internal.misc;
 
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
- * Defines static methods to execute blocking tasks in a managed blocker. This
- * class is intended to be used by code executing in virtual thread that need
- * to support additional parallelism while pinning the carrier thread.
+ * Defines static methods to execute blocking tasks on virtual threads.
+ *
+ * The managedBlock methods are used to execute blocking tasks on the caller
+ * thread or its carrier thread. If the carrier thread is a ForkJoinWorkerThread
+ * then the task may be run in a ForkJoinPool.managedBlocker.
+ *
+ * The block methods are used to execute blocking tasks on the caller
+ * thread, its carrier thread, or on a thread in background thread pool. These
+ * methods not suitable for tasks that use carrier thread locals (such as
+ * thread local buffer caches) and they are not suitable when called when
+ * the thread is pinned.
+ *
+ * The managedBlock and block methods are not suitable for tasks that are
+ * interruptible or tasks that synchronize/locks in ways that is visible to
+ * user-code.
  */
-
 public class Blocker {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -44,77 +62,240 @@ public class Blocker {
     /**
      * A task that returns a result and may throw an exception.
      */
-    public interface BlockingCallable<V, X extends Throwable> {
-        V call() throws X;
+    @FunctionalInterface
+    public interface BlockingCallable<V, X extends Throwable> extends Callable<V> {
+        V execute() throws X;
+
+        // do not invoke directly
+        default V call() {
+            try {
+                return execute();
+            } catch (Throwable e) {
+                U.throwException(e);
+                return null;
+            }
+        }
     }
 
     /**
      * A task that may throw an exception.
      */
-    public interface BlockingRunnable<X extends Throwable> {
-        void run() throws X;
+    @FunctionalInterface
+    public interface BlockingRunnable<X extends Throwable> extends Runnable {
+        void execute() throws X;
+
+        // do not invoke directly
+        default void run() {
+            try {
+                execute();
+            } catch (Throwable e) {
+                U.throwException(e);
+            }
+        }
     }
 
-    private static <V, X extends Throwable> V call(BlockingCallable<V, X> task) throws Exception {
-        class Block<V, X extends Throwable> implements ForkJoinPool.ManagedBlocker {
-            private final BlockingCallable<V, X> task;
-            private boolean done;
-            private V result;
+    private static class CallableBlocker<V, X extends Throwable>
+            implements ForkJoinPool.ManagedBlocker {
 
-            Block(BlockingCallable<V, X> task) {
-                this.task = task;
+        private final BlockingCallable<V, X> task;
+        private boolean done;
+        private V result;
+
+        CallableBlocker(BlockingCallable<V, X> task) {
+            this.task = task;
+        }
+
+        V result() {
+            return result;
+        }
+
+        @Override
+        public boolean block() {
+            try {
+                result = task.call();
+            } catch (Throwable e) {
+                U.throwException(e);
+            } finally {
+                done = true;
             }
+            return true;
+        }
 
-            V result() {
-                return result;
+        @Override
+        public boolean isReleasable() {
+            return done;
+        }
+    }
+
+    private static class RunnableBlocker<X extends Throwable>
+            implements ForkJoinPool.ManagedBlocker {
+        private final BlockingRunnable<X> task;
+        private boolean done;
+
+        RunnableBlocker(BlockingRunnable<X> task) {
+            this.task = task;
+        }
+
+        @Override
+        public boolean block() {
+            try {
+                task.run();
+            } catch (Throwable e) {
+                U.throwException(e);
+            } finally {
+                done = true;
             }
+            return true;
+        }
 
-            @Override
-            public boolean block() {
+        @Override
+        public boolean isReleasable() {
+            return done;
+        }
+    }
+
+    private static boolean allowCompensate(ForkJoinPool pool) {
+        // don't allow the pool to expand too much
+        return pool.getPoolSize() < (pool.getParallelism() * 2);
+    }
+
+    /**
+     * Runs the given task in a background thread pool.
+     */
+    private static <V> V runInThreadPool(Callable<V> task) {
+        Future<V> future = THREAD_POOL.submit(task);
+        try {
+            return future.join();
+        } catch (CompletionException e) {
+            U.throwException(e.getCause());
+            return null;
+        }
+    }
+
+    /**
+     * Runs the given task in a background thread pool.
+     */
+    private static Void runInThreadPool(Runnable task) {
+        Future<?> future = THREAD_POOL.submit(task);
+        try {
+            future.join();
+        } catch (CompletionException e) {
+            U.throwException(e.getCause());
+        }
+        return null;
+    }
+
+    /**
+     * Returns true if ForkJoinPool.managedBlock can be used.
+     */
+    public static boolean canUseManagedBlocker() {
+        Thread thread = Thread.currentThread();
+        if (thread.isVirtual()) {
+            Thread carrier = JLA.currentCarrierThread();
+            if (carrier instanceof ForkJoinWorkerThread) {
+                ForkJoinPool pool = ((ForkJoinWorkerThread) carrier).getPool();
+                return allowCompensate(pool);
+            }
+        }
+        return false;
+    }
+
+    private static <V, X extends Throwable> V block(BlockingCallable<V, X> task,
+                                                    boolean asyncAllowed) {
+        Thread thread = Thread.currentThread();
+        if (thread.isVirtual()) {
+            Thread carrier = JLA.currentCarrierThread();
+            if (carrier instanceof ForkJoinWorkerThread
+                    && allowCompensate(((ForkJoinWorkerThread) carrier).getPool())) {
+                JLA.setCurrentThread(carrier);
                 try {
-                    result = task.call();
+                    var blocker = new CallableBlocker<>(task);
+                    ForkJoinPool.managedBlock(blocker);
+                    return blocker.result();
                 } catch (Throwable e) {
                     U.throwException(e);
                 } finally {
-                    done = true;
+                    JLA.setCurrentThread(thread);
                 }
-                return true;
-            }
-
-            @Override
-            public boolean isReleasable() {
-                return done;
+                assert false;  // should not get here
+            } else if (asyncAllowed) {
+                return runInThreadPool(task);
             }
         }
-        var block = new Block<V, X>(task);
-        ForkJoinPool.managedBlock(block);
-        return block.result();
+        return task.call();
+    }
+
+    private static <X extends Throwable> Void block(BlockingRunnable<X> task,
+                                                    boolean asyncAllowed) {
+        Thread thread = Thread.currentThread();
+        if (thread.isVirtual()) {
+            Thread carrier = JLA.currentCarrierThread();
+            if (carrier instanceof ForkJoinWorkerThread
+                    && allowCompensate(((ForkJoinWorkerThread) carrier).getPool())) {
+                JLA.setCurrentThread(carrier);
+                try {
+                    ForkJoinPool.managedBlock(new RunnableBlocker<>(task));
+                    return null;
+                } catch (Throwable e) {
+                    U.throwException(e);
+                } finally {
+                    JLA.setCurrentThread(thread);
+                }
+                assert false;  // should not get here
+            } else if (asyncAllowed) {
+                return runInThreadPool(task);
+            }
+        }
+
+        task.run();
+        return null;
+    }
+
+
+    /**
+     * Executes a task that may block and pin the current thread.
+     * If the current carrier thread is in a ForkJoinPool then the pool may be
+     * expanded to support additional parallelism during the call to this method.
+     */
+    public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task) {
+        return block(task, false);
     }
 
     /**
      * Executes a task that may block and pin the current thread.
-     *
-     * If the current carrier thread is in a ForkJoinPool then the pool may be expanded
-     * to support additional parallelism during the call to this method.
+     * If the current carrier thread is in a ForkJoinPool then the pool may be
+     * expanded to support additional parallelism during the call to this method.
      */
-    public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task)  throws X {
-        try {
-            return JLA.executeOnCarrierThread(() -> call(task));
-        }  catch (Throwable e) {
-            U.throwException(e);
-            return null;
-        }
+    public static <X extends Throwable> void managedBlock(BlockingRunnable<X> task) {
+        block(task, false);
     }
 
     /**
      * Executes a task that may block and pin the current thread.
+     * If the current carrier thread is in a ForkJoinWorkerThread then its pool
+     * may be expanded to support additional parallelism during the call to this
+     * method. If it cannot be expanded then the task is queued to execute in
+     * a thread pool.
      */
-    public static <X extends Throwable> void managedBlock(BlockingRunnable<X> task) throws X {
-        managedBlock(() -> {
-            task.run();
-            return null;
-        });
+    public static <V, X extends Throwable> V block(BlockingCallable<V, X> task) {
+        return block(task, true);
     }
 
+    /**
+     * Executes a task that may block and pin the current thread.
+     * If the current carrier thread is in a ForkJoinWorkerThread then its pool
+     * may be expanded to support additional parallelism during the call to this
+     * method. If it cannot be expanded then the task is queued to execute in
+     * a thread pool.
+     */
+    public static <X extends Throwable> void block(BlockingRunnable<X> task) {
+        block(task, true);
+    }
 
+    private static final ExecutorService THREAD_POOL;
+    static {
+        int parallelism = Runtime.getRuntime().availableProcessors() << 1;
+        ThreadFactory factory = task -> InnocuousThread.newThread(task);
+        THREAD_POOL = Executors.newFixedThreadPool(parallelism, factory);
+    }
 }

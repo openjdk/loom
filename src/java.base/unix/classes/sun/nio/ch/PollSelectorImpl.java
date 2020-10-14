@@ -35,7 +35,6 @@ import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-
 import jdk.internal.misc.Unsafe;
 
 /**
@@ -111,11 +110,7 @@ class PollSelectorImpl extends SelectorImpl {
             int numPolled;
             do {
                 long startTime = timedPoll ? System.nanoTime() : 0;
-                if (blocking && Thread.currentThread().isVirtual()) {
-                    numPolled = managedPoll(to);
-                } else {
-                    numPolled = implPoll(to);
-                }
+                numPolled = poll(to);
                 if (numPolled == IOStatus.INTERRUPTED && timedPoll) {
                     // timed poll interrupted so need to adjust timeout
                     long adjust = System.nanoTime() - startTime;

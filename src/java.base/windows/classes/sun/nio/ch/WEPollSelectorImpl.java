@@ -38,6 +38,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+
 import static sun.nio.ch.WEPoll.*;
 
 /**
@@ -106,13 +107,8 @@ class WEPollSelectorImpl extends SelectorImpl {
         processDeregisterQueue();
         try {
             begin(blocking);
-            if (blocking && Thread.currentThread().isVirtual()) {
-                numEntries = managedPoll(to);
-            } else {
-                numEntries = implPoll(to);
-            }
+            numEntries = poll(to);
             assert IOStatus.check(numEntries);
-
         } finally {
             end(blocking);
         }

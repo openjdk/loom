@@ -210,7 +210,7 @@ public class FileInputStream extends InputStream
      */
     private void open(String name) throws FileNotFoundException {
         if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> open0(name));
+            Blocker.block(() -> open0(name));
         } else {
             open0(name);
         }
@@ -226,7 +226,7 @@ public class FileInputStream extends InputStream
      */
     public int read() throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> read0());
+            return Blocker.block(() -> read0());
         } else {
             return read0();
         }
@@ -256,7 +256,7 @@ public class FileInputStream extends InputStream
      */
     public int read(byte b[]) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> readBytes(b, 0, b.length));
+            return Blocker.block(() -> readBytes(b, 0, b.length));
         } else {
             return readBytes(b, 0, b.length);
         }
@@ -282,7 +282,7 @@ public class FileInputStream extends InputStream
      */
     public int read(byte b[], int off, int len) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> readBytes(b, off, len));
+            return Blocker.block(() -> readBytes(b, off, len));
         } else {
             return readBytes(b, off, len);
         }

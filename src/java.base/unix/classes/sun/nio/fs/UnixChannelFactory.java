@@ -133,8 +133,7 @@ class UnixChannelFactory {
 
         FileDescriptor fdObj;
         if (Thread.currentThread().isVirtual()) {
-            fdObj = Blocker.managedBlock(() ->
-                    open(dfd, path, pathForPermissionCheck, flags, mode));
+            fdObj = Blocker.block(() -> open(dfd, path, pathForPermissionCheck, flags, mode));
         } else {
             fdObj = open(dfd, path, pathForPermissionCheck, flags, mode);
         }

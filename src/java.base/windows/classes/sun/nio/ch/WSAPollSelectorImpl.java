@@ -112,12 +112,7 @@ class WSAPollSelectorImpl extends SelectorImpl {
         processDeregisterQueue();
         try {
             begin(blocking);
-            int numPolled;
-            if (blocking && Thread.currentThread().isVirtual()) {
-                numPolled = managedPoll(to);
-            } else {
-                numPolled = implPoll(to);
-            }
+            int numPolled = poll(to);
             assert numPolled <= pollArraySize;
         } finally {
             end(blocking);
