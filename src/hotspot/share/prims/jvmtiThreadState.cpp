@@ -259,7 +259,6 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
     ml.notify_all();
   }
   if (callsite_tag == 1) { // finish_VTMT for a vthread unmount
-    MonitorLocker ml(thread->SR_lock(), Mutex::_no_safepoint_check_flag);
     if (thread->is_cthread_pending_suspend()) {
       thread->clear_cthread_pending_suspend();
       // The JavaThread* will be suspended upon return to Java.
