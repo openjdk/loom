@@ -23,12 +23,16 @@
 
 package jdk.test.failurehandler;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.file.Path;
 import java.util.Properties;
+
 
 public final class Utils {
     private static final int BUFFER_LENGTH = 1024;
@@ -66,6 +70,15 @@ public final class Utils {
         String resourceName = String.format(
                 "/%s.%s", name.toLowerCase(), "properties");
         InputStream stream = Utils.class.getResourceAsStream(resourceName);
+
+        if (System.getenv("CONF") != null) {
+            String confPath = System.getenv("CONF");
+            try {
+                stream = new FileInputStream(Path.of(confPath,resourceName).toFile());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         if (stream == null) {
             throw new IllegalStateException(String.format(
                     "resource '%s' doesn't exist%n", resourceName));

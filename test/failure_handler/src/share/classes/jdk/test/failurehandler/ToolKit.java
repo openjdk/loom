@@ -25,15 +25,20 @@ package jdk.test.failurehandler;
 
 import jdk.test.failurehandler.action.ActionSet;
 import jdk.test.failurehandler.action.ActionHelper;
+import jdk.test.failurehandler.action.PatternAction;
 
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Deque;
+import java.util.zip.GZIPInputStream;
 
-public class ToolKit implements EnvironmentInfoGatherer, ProcessInfoGatherer {
+public class ToolKit implements EnvironmentInfoGatherer, ProcessInfoGatherer, CoreInfoGatherer {
     private final List<ActionSet> actions = new ArrayList<>();
     private final ActionHelper helper;
 
@@ -48,6 +53,25 @@ public class ToolKit implements EnvironmentInfoGatherer, ProcessInfoGatherer {
     public void gatherEnvironmentInfo(HtmlSection section) {
         for (ActionSet set : actions) {
             set.gatherEnvironmentInfo(section);
+        }
+    }
+
+    @Override
+    public void gatherCoreInfo(HtmlSection section, Path core) {
+        if (core.getFileName().toString().endsWith(".gz")) {
+            Path unpackedCore = Path.of(core.toString().replace(".gz", ""));
+            try (GZIPInputStream gzis = new GZIPInputStream(Files.newInputStream(core))) {
+                Files.copy(gzis, unpackedCore);
+                for (ActionSet set : actions) {
+                    set.gatherCoreInfo(section, unpackedCore);
+                }
+            } catch (IOException ioe) {
+            }
+            unpackedCore.toFile().delete();
+        } else {
+            for (ActionSet set : actions) {
+                set.gatherCoreInfo(section, core);
+            }
         }
     }
 

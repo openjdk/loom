@@ -23,8 +23,6 @@
 
 package jdk.test.failurehandler.action;
 
-import com.sun.tools.attach.VirtualMachine;
-import com.sun.tools.attach.VirtualMachineDescriptor;
 import jdk.test.failurehandler.value.InvalidValueException;
 import jdk.test.failurehandler.value.Value;
 import jdk.test.failurehandler.value.ValueHandler;
@@ -134,7 +132,7 @@ public class ActionHelper {
                 .directory(workDir.toFile());
     }
 
-    private File findApp(String app) {
+    public File findApp(String app) {
         String name = app + executableSuffix;
         for (Path pathElem : paths) {
             File result = pathElem.resolve(name).toFile();
