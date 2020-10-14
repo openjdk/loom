@@ -2333,7 +2333,11 @@ public:
     return argsize;
   }
 
-  bool is_chunk_available(intptr_t* top_sp) {
+  bool is_chunk_available(intptr_t* top_sp 
+#ifdef ASSERT
+    , int* out_size = NULL
+#endif
+  ) {
     if (mode != mode_fast || !USE_CHUNKS) return false;
 
     oop chunk = _cont.tail();
@@ -2346,11 +2350,16 @@ public:
     const int argsize = bottom_argsize();
     intptr_t* const bottom = align_bottom(_cont.entrySP(), argsize);
     int size = bottom - top; // in words
+    DEBUG_ONLY(if (out_size != NULL) *out_size = size;)
+
     int sp = jdk_internal_misc_StackChunk::sp(chunk);
-    if (sp < jdk_internal_misc_StackChunk::size(chunk)) {
-      size -= argsize + frame_metadata;
-    } else if (UNLIKELY(argsize != 0)) {
-      size += frame_metadata;
+    if (UNLIKELY(argsize != 0)) {
+      DEBUG_ONLY(if (out_size != NULL) *out_size = size + frame_metadata;)
+      if (sp < jdk_internal_misc_StackChunk::size(chunk)) {
+        size -= argsize;
+      } else {
+        size += frame_metadata;
+      }
     }
     assert (size > 0, "");
 
@@ -2388,9 +2397,13 @@ public:
     assert (size > 0, "");
 
     int sp;
-    DEBUG_ONLY(bool allocated;)
+  #ifdef ASSERT
+    bool allocated, empty;
+    int is_chunk_available_size;
+    bool is_chunk_available0 = is_chunk_available(top_sp, &is_chunk_available_size);
+  #endif
     if (LIKELY(chunk_available)) {
-      assert (chunk == _cont.tail() && is_chunk_available(top_sp), "");
+      assert (chunk == _cont.tail() && is_chunk_available0, "");
       DEBUG_ONLY(allocated = false;)
       sp = jdk_internal_misc_StackChunk::sp(chunk);
       // TODO The the following is commented means we don't squash old chunks, but let them be (Rickard's idea)
@@ -2401,9 +2414,9 @@ public:
       // }
 
       if (sp < jdk_internal_misc_StackChunk::size(chunk)) { // we are copying into a non-empty chunk
-        sp += argsize;
+        DEBUG_ONLY(empty = false;)
         if (UNLIKELY(argsize != 0)) {
-          sp += frame_metadata;
+          sp += argsize + frame_metadata;
         }
         assert (sp <= jdk_internal_misc_StackChunk::size(chunk), "");
         
@@ -2414,8 +2427,10 @@ public:
         assert (bottom_sp == _bottom_address, "");
         assert (*(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) == StubRoutines::cont_returnBarrier(), "");
         *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = jdk_internal_misc_StackChunk::pc(chunk);
+        // the stack is not walkable beyond this point
         // }
       } else { // the chunk is empty
+        DEBUG_ONLY(empty = true;)
         jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
 
         if (jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk) && _cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)) {
@@ -2438,6 +2453,7 @@ public:
         return false;
       }
 
+      DEBUG_ONLY(empty = true;)
       DEBUG_ONLY(allocated = true;)
       jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
       sp = jdk_internal_misc_StackChunk::sp(chunk);
@@ -2483,7 +2499,9 @@ public:
 
     // copy; no need to patch because of how we handle return address and link
     log_develop_trace(jvmcont)("freeze_chunk start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d", p2i((oopDesc*)chunk), jdk_internal_misc_StackChunk::size(chunk), sp, argsize);
+    assert (!is_chunk_available0 || size == is_chunk_available_size, "mismatched size calculation: size: %d is_chunk_available_size: %d empty: %d allocated: %d argsize: %d", size, is_chunk_available_size, empty, allocated, argsize);
     assert (sp >= size, "");
+    
     sp -= size;
     jdk_internal_misc_StackChunk::set_sp(chunk, sp);
     jdk_internal_misc_StackChunk::set_pc(chunk, *(address*)(top - SENDER_SP_RET_ADDRESS_OFFSET));
@@ -2552,10 +2570,6 @@ public:
   void copy_to_chunk(intptr_t* from, intptr_t* to, int size, oop chunk) {
     log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i(from + size), size << LogBytesPerWord);
     log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i(to + size), size << LogBytesPerWord);
-
-#ifdef ASSERT
-    if (!(to >= (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk))) { tty->print_cr("Entry argsize: %d sp: %p bottom sp: %p", _cont.argsize(), _cont.entrySP(), _cont.entry()->bottom_sender_sp()); pns2(); }
-#endif
     
     copy_from_stack(from, to, size);
 
