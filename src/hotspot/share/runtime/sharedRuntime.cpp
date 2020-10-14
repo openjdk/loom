@@ -2885,7 +2885,7 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
       // accesses. For native_wrappers we need a constant.
       buffer.initialize_consts_size(8);
 #endif
-      buffer.stubs()->initialize_shared_locs((relocInfo*)stubs_locs_buf, sizeof(stubs_locs_buf) / sizeof(relocInfo));
+      buffer.stubs()->initialize_shared_locs((relocInfo*)stubs_locs_buf, sizeof(stubs_locs_buf) / (sizeof(relocInfo)));
       MacroAssembler _masm(&buffer);
 
       // Fill in the signature array, for the calling-convention call.
