@@ -284,12 +284,16 @@ VThreadList::contains(oop vt) const {
   return idx != -1;
 }
 
+static OopHandle NULLHandle = OopHandle(NULL);
+
 void
 VThreadList::append(oop vt) {
   assert(!contains(vt), "VThreadList::append sanity check");
-  // TMP: to work around OopHandle copy constructor assert
-  static OopHandle NULLHandle = OopHandle(NULL);
+
+  // This is to work around assert in OopHandle copy constructor.
   GrowableArrayCHeap<OopHandle, mtServiceability>::append(NULLHandle);
+  pop();
+
   GrowableArrayCHeap<OopHandle, mtServiceability>::append(OopHandle(Universe::vm_global(), vt));
 }
 
@@ -298,15 +302,21 @@ VThreadList::remove(oop vt) {
   int idx = find(vt);
   assert(idx != -1, "VThreadList::remove sanity check");
   at(idx).release(Universe::vm_global());
-  remove_at(idx);
+
+  // To work around assert in OopHandle copy constructor do not use remove_at().
+  for (int i = idx + 1; i < length(); i++) {
+    at_put(i - 1, NULLHandle); // work around assert in OopHandle copy constructor
+    at_put(i - 1, at(i));
+  }
+  pop();
 }
 
 void
 VThreadList::invalidate() {
   for (int idx = length() - 1; idx >= 0; idx--) {
     at(idx).release(Universe::vm_global());
-    remove_at(idx);
   }
+  clear();
 }
 
 /* Virtual Threads Suspend/Resume management */
