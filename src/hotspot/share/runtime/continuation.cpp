@@ -202,7 +202,7 @@ static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont);
 
 // debugging functions
 frame sp_to_frame(intptr_t* sp);
-bool do_verify_after_thaw(JavaThread* thread, intptr_t* sp, intptr_t **rbp_pos);
+bool do_verify_after_thaw(JavaThread* thread);
 static void print_oop(void *p, oop obj, outputStream* st = tty);
 static void print_vframe(frame f, const RegisterMap* map = NULL, outputStream* st = tty);
 static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) PRODUCT_RETURN;
@@ -3408,6 +3408,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   assert (oopCont == thread->last_continuation()->cont_oop(), "");
   assert (assert_entry_frame_laid_out(thread), "");
 
+  DEBUG_ONLY(if (LoomVerifyAfterThaw) assert(do_verify_after_thaw(thread), "");)
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
@@ -4040,8 +4041,7 @@ public:
   set_anchor(_thread, sp0);
   print_frames(_thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
   if (LoomVerifyAfterThaw) {
-    intptr_t *v = 0;
-    assert(do_verify_after_thaw(_thread, sp0, &v), "partial: %d empty: %d is_last: %d fix: %d", partial, empty, is_last, fix);
+    assert(do_verify_after_thaw(_thread), "partial: %d empty: %d is_last: %d fix: %d", partial, empty, is_last, fix);
   }
   clear_anchor(_thread);
 #endif
@@ -4679,8 +4679,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   set_anchor(thread, sp0);
   print_frames(thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
   if (LoomVerifyAfterThaw) {
-    intptr_t *v = 0;
-    assert(do_verify_after_thaw(thread, sp0, &v), "");
+    assert(do_verify_after_thaw(thread), "");
   }
   assert (assert_entry_frame_laid_out(thread), "");
   clear_anchor(thread);
@@ -4704,52 +4703,46 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 }
 
 class ThawVerifyOopsClosure: public OopClosure {
-  intptr_t* _sp;
-  bool     _ok;
+  intptr_t* _p;
 public:
-  ThawVerifyOopsClosure(intptr_t* sp) : _sp(sp), _ok(true) { }
-  bool ok() { return _ok; }
-
-  void reset() { _ok = true; }
+  ThawVerifyOopsClosure() : _p(NULL) {}
+  intptr_t* p() { return _p; }
+  void reset() { _p = NULL; }
 
   virtual void do_oop(oop* p) {
-    if ((intptr_t*) p < _sp) {
-      return;
-    }
-
     if (oopDesc::is_oop_or_null(*p)) return;
-    // Print diagnostic information before calling print_nmethod().
-    // Assertions therein might prevent call from returning.
-    tty->print_cr("*** non-oop " PTR_FORMAT " found at " PTR_FORMAT,
-                  p2i(*p), p2i(p));
-    if (_ok) _ok = false;
+    _p = (intptr_t*)p;
+    tty->print_cr("*** non-oop " PTR_FORMAT " found at " PTR_FORMAT, p2i(*p), p2i(p));
   }
   virtual void do_oop(narrowOop* p) {
-    if ((intptr_t*) p < _sp) {
-      return;
-    }
-
-    oop obj = NativeAccess<>::oop_load(p);
-    if (oopDesc::is_oop_or_null(obj)) return;
-
-    tty->print_cr("*** (narrow) non-oop %x found at " PTR_FORMAT,
-                  (int)(*p), p2i(p));
-    if (_ok) _ok = false;
+    if (oopDesc::is_oop_or_null(RawAccess<>::oop_load(p))) return;
+    _p = (intptr_t*)p;
+    tty->print_cr("*** (narrow) non-oop %x found at " PTR_FORMAT, (int)(*p), p2i(p));
   }
 };
 
-bool do_verify_after_thaw(JavaThread* thread, intptr_t* sp, intptr_t **rbp_pos) {
-  ThawVerifyOopsClosure cl(sp);
-  // Traverse the execution stack
+bool do_verify_after_thaw(JavaThread* thread) {
+  assert(thread->has_last_Java_frame(), "");
+
+  ResourceMark rm;
+  ThawVerifyOopsClosure cl;
+
   int i = 0;
   StackFrameStream fst(thread);
-  frame::update_map_with_saved_link(fst.register_map(), rbp_pos);
-
+  fst.register_map()->set_include_argument_oops(false);
+  ContinuationHelper::update_register_map_with_callee(fst.register_map(), *fst.current());
   for (; !fst.is_done(); fst.next()) {
     fst.current()->oops_do(&cl, NULL, fst.register_map());
-    if (!cl.ok()) {
+    if (cl.p() != NULL) {
       frame fr = *fst.current();
       tty->print_cr("Failed for frame %d, pc: %p, sp: %p, fp: %p", i, fr.pc(), fr.unextended_sp(), fr.fp());
+      if (!fr.is_interpreted_frame()) {
+        tty->print_cr("size: %d argsize: %d", NonInterpretedUnknown::size(fr), NonInterpretedUnknown::stack_argsize(fr));
+      }
+  #ifdef ASSERT
+      VMReg reg = fst.register_map()->find_register_spilled_here(cl.p());
+      if (reg != NULL) tty->print_cr("Reg %s %d", reg->name(), reg->is_stack() ? (int)reg->reg2stack() : -99);
+  #endif
       fr.print_on(tty);
       cl.reset();
       return false;
