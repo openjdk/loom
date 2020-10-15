@@ -313,7 +313,11 @@ public class FileInputStream extends InputStream
      *             support seek, or if an I/O error occurs.
      */
     public long skip(long n) throws IOException {
-        return skip0(n);
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.block(() -> skip0(n));
+        } else {
+            return skip0(n);
+        }
     }
 
     private native long skip0(long n) throws IOException;

@@ -605,6 +605,9 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
     public void seek(long pos) throws IOException {
         if (pos < 0) {
             throw new IOException("Negative seek offset");
+        }
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.block(() -> seek0(pos));
         } else {
             seek0(pos);
         }

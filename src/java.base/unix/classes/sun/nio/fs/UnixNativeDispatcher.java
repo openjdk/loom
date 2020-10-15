@@ -25,6 +25,8 @@
 
 package sun.nio.fs;
 
+import jdk.internal.misc.Blocker;
+
 /**
  * Unix system and library calls.
  */
@@ -65,7 +67,11 @@ class UnixNativeDispatcher {
     static int open(UnixPath path, int flags, int mode) throws UnixException {
         NativeBuffer buffer = copyToNativeBuffer(path);
         try {
-            return open0(buffer.address(), flags, mode);
+            if (Thread.currentThread().isVirtual()) {
+                return Blocker.block(() -> open0(buffer.address(), flags, mode));
+            } else {
+                return open0(buffer.address(), flags, mode);
+            }
         } finally {
             buffer.release();
         }
@@ -79,7 +85,11 @@ class UnixNativeDispatcher {
     static int openat(int dfd, byte[] path, int flags, int mode) throws UnixException {
         NativeBuffer buffer = NativeBuffers.asNativeBuffer(path);
         try {
-            return openat0(dfd, buffer.address(), flags, mode);
+            if (Thread.currentThread().isVirtual()) {
+                return Blocker.block(() -> openat0(dfd, buffer.address(), flags, mode));
+            } else {
+                return openat0(dfd, buffer.address(), flags, mode);
+            }
         } finally {
             buffer.release();
         }
@@ -274,7 +284,11 @@ class UnixNativeDispatcher {
     static void stat(UnixPath path, UnixFileAttributes attrs) throws UnixException {
         NativeBuffer buffer = copyToNativeBuffer(path);
         try {
-            stat0(buffer.address(), attrs);
+            if (Thread.currentThread().isVirtual()) {
+                Blocker.block(() -> stat0(buffer.address(), attrs));
+            } else {
+                stat0(buffer.address(), attrs);
+            }
         } finally {
             buffer.release();
         }
@@ -291,7 +305,11 @@ class UnixNativeDispatcher {
     static int stat(UnixPath path) {
         NativeBuffer buffer = copyToNativeBuffer(path);
         try {
-            return stat1(buffer.address());
+            if (Thread.currentThread().isVirtual()) {
+                return Blocker.block(() -> stat1(buffer.address()));
+            } else {
+                return stat1(buffer.address());
+            }
         } finally {
             buffer.release();
         }
@@ -316,7 +334,15 @@ class UnixNativeDispatcher {
     /**
      * fstat(int filedes, struct stat* buf)
      */
-    static native void fstat(int fd, UnixFileAttributes attrs) throws UnixException;
+    static void fstat(int fd, UnixFileAttributes attrs) throws UnixException {
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.block(() -> fstat0(fd, attrs));
+        } else {
+            fstat0(fd, attrs);
+        }
+    }
+    private static native void fstat0(int fd, UnixFileAttributes attrs)
+        throws UnixException;
 
     /**
      * fstatat(int filedes,const char* path,  struct stat* buf, int flag)
