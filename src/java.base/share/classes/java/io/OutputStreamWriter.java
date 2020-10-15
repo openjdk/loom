@@ -106,7 +106,6 @@ public class OutputStreamWriter extends Writer {
         super(out);
         if (charsetName == null)
             throw new NullPointerException("charsetName");
-
         lock = lockFor(this);
         se = StreamEncoder.forOutputStreamWriter(out, lock, charsetName);
     }

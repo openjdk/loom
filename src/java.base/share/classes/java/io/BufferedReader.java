@@ -86,7 +86,7 @@ public class BufferedReader extends Reader {
 
     /** The skipLF flag when the mark was set */
     private boolean markedSkipLF = false;
-    
+
     private static int defaultCharBufferSize = 8192;
     private static int defaultExpectedLineLength = 80;
     
