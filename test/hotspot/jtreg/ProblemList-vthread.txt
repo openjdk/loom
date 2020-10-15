@@ -264,6 +264,21 @@ vmTestbase/nsk/jvmti/SetLocalVariable/setlocal004/TestDescription.java
 vmTestbase/nsk/jvmti/StopThread/stopthrd006/TestDescription.java
 vmTestbase/nsk/jvmti/scenarios/events/EM02/em02t012/TestDescription.java
 
+# Events are not handled on vthreads while checking function (GetFrameLocation) does
+vmTestbase/nsk/jvmti/FramePop/framepop001/TestDescription.java
+vmTestbase/nsk/jvmti/GetFrameLocation/frameloc001/TestDescription.java
+vmTestbase/nsk/jvmti/GetLocalVariable/getlocal001/TestDescription.java
+vmTestbase/nsk/jvmti/MethodEntry/mentry001/TestDescription.java
+vmTestbase/nsk/jvmti/MethodExit/mexit001/TestDescription.java
+vmTestbase/nsk/jvmti/MethodExit/mexit002/TestDescription.java
+vmTestbase/nsk/jvmti/NotifyFramePop/nframepop001/TestDescription.java
+vmTestbase/nsk/jvmti/unit/GetLocalVariable/getlocal003/TestDescription.java
+
+
+# returned JVMTI_ERROR_INVALID_THREAD for non-implented
+vmTestbase/nsk/jvmti/Exception/exception001/TestDescription.java
+vmTestbase/nsk/jvmti/RedefineClasses/redefclass005/TestDescription.java
+
 
 ####
 ## Breakpoint expects name of virtual thread which is set by test.
