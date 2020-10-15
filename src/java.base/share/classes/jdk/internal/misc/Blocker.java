@@ -158,7 +158,7 @@ public class Blocker {
      * Runs the given task in a background thread pool.
      */
     private static <V> V runInThreadPool(Callable<V> task) {
-        Future<V> future = THREAD_POOL.submit(task);
+        Future<V> future = ThreadPool.THREAD_POOL.submit(task);
         try {
             return future.join();
         } catch (CompletionException e) {
@@ -171,7 +171,7 @@ public class Blocker {
      * Runs the given task in a background thread pool.
      */
     private static Void runInThreadPool(Runnable task) {
-        Future<?> future = THREAD_POOL.submit(task);
+        Future<?> future = ThreadPool.THREAD_POOL.submit(task);
         try {
             future.join();
         } catch (CompletionException e) {
@@ -270,10 +270,12 @@ public class Blocker {
         block(task, true);
     }
 
-    private static final ExecutorService THREAD_POOL;
-    static {
-        int parallelism = Runtime.getRuntime().availableProcessors() << 1;
-        ThreadFactory factory = task -> InnocuousThread.newThread(task);
-        THREAD_POOL = Executors.newFixedThreadPool(parallelism, factory);
+    private static class ThreadPool {
+        private static final ExecutorService THREAD_POOL;
+        static {
+            int parallelism = Runtime.getRuntime().availableProcessors() << 1;
+            ThreadFactory factory = task -> InnocuousThread.newThread(task);
+            THREAD_POOL = Executors.newFixedThreadPool(parallelism, factory);
+        }
     }
 }

@@ -234,6 +234,20 @@ public class Thread implements Runnable {
     private Continuation cont;
 
     /**
+     * TBD
+     */
+    Continuation getContinuation() {
+        return cont;
+    }
+
+    /**
+     * TBD
+     */
+    void setContinuation(Continuation cont) {
+        this.cont = cont;
+    }
+
+    /**
      * Sets the Thread object to be returned by Thread.currentThread().
      */
     @IntrinsicCandidate
@@ -2510,20 +2524,6 @@ public class Thread implements Runnable {
                                                    Reflection.getCallerClass());
         }
         return contextClassLoader;
-    }
-
-    /**
-     * TBD
-     */
-    Continuation getContinuation() {
-        return cont;
-    }
-
-    /**
-     * TBD
-     */
-    void setContinuation(Continuation cont) {
-        this.cont = cont;
     }
 
     /**
