@@ -47,7 +47,7 @@ import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.*;
 
 /**
  * A thread that is scheduled by the Java virtual machine rather than the operating
@@ -936,18 +936,25 @@ class VirtualThread extends Thread {
             return AccessController.doPrivileged(pa);
         };
         PrivilegedAction<Executor> pa = () -> {
-            int parallelism;
+            int parallelism, maxPoolSize;
             String propValue = System.getProperty("jdk.defaultScheduler.parallelism");
             if (propValue != null) {
                 parallelism = Integer.parseInt(propValue);
             } else {
                 parallelism = Runtime.getRuntime().availableProcessors();
             }
-            Thread.UncaughtExceptionHandler ueh = (t, e) -> { };
+            propValue = System.getProperty("jdk.defaultScheduler.maxPoolSize");
+            if (propValue != null) {
+                maxPoolSize = Integer.max(parallelism, Integer.parseInt(propValue));
+            } else {
+                maxPoolSize = parallelism << 1;
+            }
+            Thread.UncaughtExceptionHandler handler = (t, e) -> { };
             // use FIFO as default
             propValue = System.getProperty("jdk.defaultScheduler.lifo");
             boolean asyncMode = (propValue == null) || propValue.equalsIgnoreCase("false");
-            return new ForkJoinPool(parallelism, factory, ueh, asyncMode);
+            return new ForkJoinPool(parallelism, factory, handler, asyncMode,
+                         0, maxPoolSize, 1, pool -> true, 30, SECONDS);
         };
         return AccessController.doPrivileged(pa);
     }

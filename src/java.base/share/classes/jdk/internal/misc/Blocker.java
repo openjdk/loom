@@ -41,7 +41,7 @@ import jdk.internal.access.SharedSecrets;
  *
  * The managedBlock methods are used to execute blocking tasks on the caller
  * thread or its carrier thread. If the carrier thread is a ForkJoinWorkerThread
- * then the task may be run in a ForkJoinPool.managedBlocker.
+ * then the task runs in ForkJoinPool.ManagedBlocker.
  *
  * The block methods are used to execute blocking tasks on the caller
  * thread, its carrier thread, or on a thread in background thread pool. These
@@ -154,11 +154,6 @@ public class Blocker {
         }
     }
 
-    private static boolean allowCompensate(ForkJoinPool pool) {
-        // don't allow the pool to expand too much
-        return pool.getPoolSize() < (pool.getParallelism() * 2);
-    }
-
     /**
      * Runs the given task in a background thread pool.
      */
@@ -185,28 +180,12 @@ public class Blocker {
         return null;
     }
 
-    /**
-     * Returns true if ForkJoinPool.managedBlock can be used.
-     */
-    public static boolean canUseManagedBlocker() {
-        Thread thread = Thread.currentThread();
-        if (thread.isVirtual()) {
-            Thread carrier = JLA.currentCarrierThread();
-            if (carrier instanceof ForkJoinWorkerThread) {
-                ForkJoinPool pool = ((ForkJoinWorkerThread) carrier).getPool();
-                return allowCompensate(pool);
-            }
-        }
-        return false;
-    }
-
     private static <V, X extends Throwable> V block(BlockingCallable<V, X> task,
                                                     boolean asyncAllowed) {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
             Thread carrier = JLA.currentCarrierThread();
-            if (carrier instanceof ForkJoinWorkerThread
-                    && allowCompensate(((ForkJoinWorkerThread) carrier).getPool())) {
+            if (carrier instanceof ForkJoinWorkerThread) {
                 JLA.setCurrentThread(carrier);
                 try {
                     var blocker = new CallableBlocker<>(task);
@@ -230,8 +209,7 @@ public class Blocker {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
             Thread carrier = JLA.currentCarrierThread();
-            if (carrier instanceof ForkJoinWorkerThread
-                    && allowCompensate(((ForkJoinWorkerThread) carrier).getPool())) {
+            if (carrier instanceof ForkJoinWorkerThread) {
                 JLA.setCurrentThread(carrier);
                 try {
                     ForkJoinPool.managedBlock(new RunnableBlocker<>(task));

@@ -43,11 +43,11 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.function.Consumer;
 
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.Blocker;
 import jdk.internal.misc.Unsafe;
 
 /**
@@ -237,15 +237,29 @@ public abstract class SelectorImpl
     }
 
     /**
+     * Returns the ManagedSelect object for this Selector if running on a virtual
+     * thread and its carrier is a ForkJoinWorkerThread, otherwise returns null.
+     */
+    private ManagedSelect managedSelect() {
+        if (Thread.currentThread().isVirtual()
+                && JLA.currentCarrierThread() instanceof ForkJoinWorkerThread) {
+            if (managedSelect == null)
+                managedSelect = new ManagedSelect(this);
+            return managedSelect;
+        } else {
+            return null;
+        }
+    }
+
+    /**
      * Invoked by doSelect to poll for file descriptors that are ready for I/O
      * operations. If invoked on a virtual thread mounted on a ForkJoinWorkerThread
-     * then the poll may be done in a ForkJoinPool managedBlock.
+     * then blocking polls are done in ForkJoinPool.ManagedBlocker.
      */
     protected final int poll(long timeout) throws IOException {
         assert Thread.holdsLock(this);
-        if (timeout != 0 && Blocker.canUseManagedBlocker()) {
-            if (managedSelect == null)
-                managedSelect = new ManagedSelect(this);
+        ManagedSelect managedSelect;
+        if (timeout != 0 && (managedSelect = managedSelect()) != null) {
             managedSelect.prepare(timeout);
             try {
                 JLA.executeOnCarrierThread(managedSelect);
