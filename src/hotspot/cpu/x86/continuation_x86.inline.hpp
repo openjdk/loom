@@ -1226,42 +1226,7 @@ static void fix_oops(const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) 
   }
 }
 
-static void fix_derived_pointers(const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
-  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
-    OopMapValue omv = oms.current();
-    if (omv.type() != OopMapValue::derived_oop_value)
-      continue;
-    
-    oop* derived_loc = (oop*)reg_to_loc(omv.reg(), sp);
-    oop* base_loc    = (oop*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
-
-    assert (base_loc != NULL, "");
-    assert (is_in_frame(cb, sp, base_loc), "");
-    assert (is_in_frame(cb, sp, derived_loc), "");
-    oop base = (oop)NativeAccess<>::oop_load((oop*)base_loc); // *(oop*)base_loc;
-    if (base != (oop)NULL) {
-      assert (!CompressedOops::is_base(base), "");
-      assert (oopDesc::is_oop(base), "");
-      ZGC_ONLY(assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
-      intptr_t offset = *(intptr_t*)derived_loc;
-      if (offset < 0) {
-        offset = -offset;
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
-        *derived_loc = (oop)(cast_from_oop<address>(base) + offset);
-      }
-  #ifdef ASSERT 
-      else { // DEBUG ONLY
-        offset = offset - cast_from_oop<intptr_t>(base);
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
-      }
-  #endif
-    } else {
-      assert (*derived_loc == (oop)NULL, "");
-    }
-  }
-}
-
-NOINLINE static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end) {
+NOINLINE static void fix_stack_chunk(oop chunk) {
   assert (ContMirror::is_stack_chunk(chunk), "");
 
   log_develop_trace(jvmcont)("fix_stack_chunk young: %d", !requires_barriers(chunk));
@@ -1271,9 +1236,11 @@ NOINLINE static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end) 
   int num_oops = 0;
   CodeBlob* cb = NULL;
 
-  // intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  // intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
-  // start += jdk_internal_misc_StackChunk::sp(chunk);
+  int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
+  if (argsize > 0) argsize += frame_metadata;
+  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
+  start += jdk_internal_misc_StackChunk::sp(chunk);
 
   for (intptr_t* sp = start; sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - 1);
@@ -1304,10 +1271,15 @@ NOINLINE static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end) 
 
     cb->as_compiled_method()->run_nmethod_entry_barrier();
     if (UseZGC) {
+      iterate_derived_pointers<true>(chunk, oopmap, sp, cb);
       fix_oops(oopmap, sp, cb);
+      OrderAccess::loadload();
     }
     fix_derived_pointers(oopmap, sp, cb);
   }
+  OrderAccess::storestore();
+  jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
+
   assert (num_frames >= 0, "");
   assert (num_oops >= 0, "");
 

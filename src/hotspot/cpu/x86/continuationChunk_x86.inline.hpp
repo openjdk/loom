@@ -78,13 +78,12 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load((oop*)base_loc);
-    assert (oopDesc::is_oop_or_null(base), "not an oop");
     assert (Universe::heap()->is_in_or_null(base), "not an oop");
     if (base != (oop)NULL) {
       assert (!CompressedOops::is_base(base), "");
 
 #if INCLUDE_ZGC
-      if (concurrent_gc) { //  && UseZGC // TODO: this is a ZGC-specific optimization
+      if (concurrent_gc) { //  && UseZG
         if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) 
           continue;
       }
@@ -104,7 +103,7 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
       // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-      assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
+      // assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize)); -- base might be invalid at this point
       Atomic::store((intptr_t*)derived_loc, -offset); // there could be a benign race here; we write a negative offset to let the sign bit signify it's an offset rather than an address
     } else {
       assert (*derived_loc == 0, "");
@@ -113,8 +112,7 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
   OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
 }
 
-#ifdef FIX_DERIVED_POINTERS
-static void fix_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
+static void fix_derived_pointers(const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
   for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
     OopMapValue omv = oms.current();
     if (omv.type() != OopMapValue::derived_oop_value)
@@ -150,10 +148,7 @@ static void fix_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intpt
   #endif
     }
   }
-  OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
-  jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
 }
-#endif
 
 template <class OopClosureType>
 static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
@@ -257,11 +252,14 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
 
     bool mutated_oops = iterate_oops(closure, oopmap, sp, cb);
 
-  #ifdef FIX_DERIVED_POINTERS
-    if (concurrent_gc && mutated_oops && jdk_internal_misc_StackChunk::gc_mode(chunk)) { // TODO: this is a ZGC-specific optimization that depends on the one in iterate_derived_pointers
-      fix_derived_pointers(chunk, oopmap, sp, cb);
+    if (FIX_DERIVED_POINTERS && concurrent_gc && mutated_oops && jdk_internal_misc_StackChunk::gc_mode(chunk)) { // TODO: this is a ZGC-specific optimization that depends on the one in iterate_derived_pointers
+      fix_derived_pointers(oopmap, sp, cb);
     }
-  #endif
+  }
+
+  if (FIX_DERIVED_POINTERS && concurrent_gc) {
+    OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
+    jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
   }
 
   assert (num_frames >= 0, "");

@@ -69,7 +69,7 @@
 
 #define SENDER_SP_RET_ADDRESS_OFFSET (frame::sender_sp_offset - frame::return_addr_offset)
 
-static void fix_stack_chunk(oop chunk, intptr_t* start, intptr_t* end);
+static void fix_stack_chunk(oop chunk);
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time from chunks for testing purposes
 // #define PERFTEST 1
@@ -2501,8 +2501,9 @@ public:
     log_develop_trace(jvmcont)("freeze_chunk start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d", p2i((oopDesc*)chunk), jdk_internal_misc_StackChunk::size(chunk), sp, argsize);
     assert (!is_chunk_available0 || size == is_chunk_available_size, "mismatched size calculation: size: %d is_chunk_available_size: %d empty: %d allocated: %d argsize: %d", size, is_chunk_available_size, empty, allocated, argsize);
     assert (sp >= size, "");
-    
     sp -= size;
+
+    // We're always writing to a young chunk, so the GC can't see it until the next safepoint.
     jdk_internal_misc_StackChunk::set_sp(chunk, sp);
     jdk_internal_misc_StackChunk::set_pc(chunk, *(address*)(top - SENDER_SP_RET_ADDRESS_OFFSET));
     
@@ -3920,6 +3921,12 @@ public:
       return thaw<true>(true); // no harm if we're wrong about return_barrier
     }
 
+    DEBUG_ONLY(bool fix = false;)
+    if (UNLIKELY(should_fix(chunk))) {
+      DEBUG_ONLY(fix = true;)
+      fix_stack_chunk(chunk);
+    }
+
     assert (verify_stack_chunk<1>(chunk), "");
     // assert (verify_continuation<99>(_cont.mirror()), "");
 
@@ -3997,8 +4004,8 @@ public:
       vsp += frame_metadata;
     }
     assert (vsp == align_chunk(vsp), "");
-
     size += argsize;
+
     intptr_t* from = hsp - frame_metadata;
     intptr_t* to   = vsp - frame_metadata;
     copy_from_chunk(from, to, size); // TODO: maybe use a memcpy that cares about ordering because we're racing with the GC
@@ -4020,21 +4027,6 @@ public:
       // _cont.write_minimal(); // must be done after patch; really only need to write max_size
       java_lang_Continuation::set_maxSize(_cont.mirror(), (jint)_cont.max_size());
       assert (java_lang_Continuation::flags(_cont.mirror()) == _cont.flags(), "");
-    }
-
-    OrderAccess::loadload(); // we must test the gc mode *after* the copy
-    DEBUG_ONLY(bool fix = false;)
-    if (UNLIKELY(should_fix(chunk))) {
-      DEBUG_ONLY(fix = true;)
-      intptr_t* end = vsp + size - argsize;
-      if (argsize > 0) {
-        end -= frame_metadata;
-      }
-      fix_stack_chunk(chunk, vsp, end);
-      if (empty) {
-        // we've set 
-        jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
-      }
     }
     
     assert (is_last == _cont.is_empty(), "is_last: %d _cont.is_empty(): %d", is_last, _cont.is_empty());
@@ -6373,8 +6365,8 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
   assert(ContMirror::is_stack_chunk(chunk), "");
   // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
   tty->print_cr("CHUNK " INTPTR_FORMAT " - " INTPTR_FORMAT " :: 0x%lx", p2i((oopDesc*)chunk), p2i((HeapWord*)(chunk + chunk->size())), chunk->identity_hash());
-  tty->print("CHUNK " INTPTR_FORMAT " young: %d size: %d argsize: %d sp: %d num_frames: %d num_oops: %d parent: " INTPTR_FORMAT,
-    p2i((oopDesc*)chunk), !requires_barriers(chunk),
+  tty->print("CHUNK " INTPTR_FORMAT " young: %d gc_mode: %d, size: %d argsize: %d sp: %d num_frames: %d num_oops: %d parent: " INTPTR_FORMAT,
+    p2i((oopDesc*)chunk), !requires_barriers(chunk), jdk_internal_misc_StackChunk::gc_mode(chunk), 
     jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::argsize(chunk), jdk_internal_misc_StackChunk::sp(chunk),
     jdk_internal_misc_StackChunk::numFrames(chunk), jdk_internal_misc_StackChunk::numOops(chunk),
     p2i((oopDesc*)jdk_internal_misc_StackChunk::parent(chunk)));
