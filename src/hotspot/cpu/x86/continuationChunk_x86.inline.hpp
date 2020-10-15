@@ -78,7 +78,7 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load((oop*)base_loc);
-    assert (Universe::heap()->is_in_or_null(base), "not an oop");
+    // assert (Universe::heap()->is_in_or_null(base), "not an oop"); -- base might be invalid at this point
     if (base != (oop)NULL) {
       assert (!CompressedOops::is_base(base), "");
 

@@ -3423,7 +3423,6 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   assert (oopCont == thread->last_continuation()->cont_oop(), "");
   assert (assert_entry_frame_laid_out(thread), "");
 
-  DEBUG_ONLY(if (LoomVerifyAfterThaw) assert(do_verify_after_thaw(thread), "");)
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
@@ -4046,9 +4045,9 @@ public:
   intptr_t* sp0 = vsp;
   set_anchor(_thread, sp0);
   print_frames(_thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
-  if (LoomVerifyAfterThaw) {
-    assert(do_verify_after_thaw(_thread), "partial: %d empty: %d is_last: %d fix: %d", partial, empty, is_last, fix);
-  }
+  // if (LoomVerifyAfterThaw) {
+  //   assert(do_verify_after_thaw(_thread), "partial: %d empty: %d is_last: %d fix: %d", partial, empty, is_last, fix);
+  // }
   clear_anchor(_thread);
 #endif
 
