@@ -1598,8 +1598,9 @@ MultipleStackTracesCollector::fill_frames(jthread jt, JavaThread *thr, oop threa
 #ifdef ASSERT
   Thread *current_thread = Thread::current();
   assert(SafepointSynchronize::is_at_safepoint() ||
+         thr == NULL ||
          thr->is_handshake_safe_for(current_thread),
-         "call by myself / at safepoint / at handshake");
+         "unmounted virtual thread / call by myself / at safepoint / at handshake");
 #endif
 
   jint state = 0;

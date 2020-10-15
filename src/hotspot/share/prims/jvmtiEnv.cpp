@@ -1688,7 +1688,7 @@ JvmtiEnv::GetStackTrace(jthread thread, jint start_depth, jint max_frame_count, 
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
     if (java_thread == NULL) { // target virtual thread is unmounted
-      ResourceMark hm(current_thread);
+      ResourceMark rm(current_thread);
       javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(thread_obj);
       err = get_stack_trace(jvf, start_depth, max_frame_count, frame_buffer, count_ptr);
       return err;
@@ -1741,16 +1741,35 @@ JvmtiEnv::GetThreadListStackTraces(jint thread_count, const jthread* thread_list
   jvmtiError err = JVMTI_ERROR_NONE;
 
   if (thread_count == 1) {
+    JvmtiVTMTDisabler vtmt_disabler;
+
     // Use direct handshake if we need to get only one stack trace.
     JavaThread *current_thread = JavaThread::current();
     ThreadsListHandle tlh(current_thread);
+    jthread thread = thread_list[0];
     JavaThread *java_thread;
-    err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), *thread_list, &java_thread, NULL);
+    oop thread_obj = NULL;
+    err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
 
-    GetSingleStackTraceClosure op(this, current_thread, *thread_list, max_frame_count);
+    // Support for virtual threads
+    if (java_lang_VirtualThread::is_instance(thread_obj)) {
+      if (!JvmtiExport::can_support_virtual_threads()) {
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+      }
+      if (java_thread == NULL) { // target virtual thread is unmounted
+        ResourceMark rm(current_thread);
+        MultipleStackTracesCollector collector(this, max_frame_count);
+        collector.fill_frames(thread, java_thread, thread_obj);
+        collector.allocate_and_fill_stacks(1);
+        *stack_info_ptr = collector.stack_info();
+        return collector.result();
+      }
+    }
+
+    GetSingleStackTraceClosure op(this, current_thread, thread, max_frame_count);
     Handshake::execute(&op, java_thread);
     err = op.result();
     if (err == JVMTI_ERROR_NONE) {

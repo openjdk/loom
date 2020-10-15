@@ -113,11 +113,12 @@ test_get_stack_trace(JNIEnv *jni, jthread thread, char* tname) {
 }
 
 static void
-test_get_thread_list_stack_traces(JNIEnv *jni, jint thread_cnt, jthread* thread_list) {
+test_get_thread_list_stack_traces(JNIEnv *jni, bool is_virt, jint thread_cnt, jthread* thread_list) {
     jvmtiStackInfo* stack_info_arr = NULL;
     jvmtiThreadInfo info;
 
-    printf("## Agent: test_get_thread_list_stack_traces started: count: %d\n", thread_cnt);
+    printf("## Agent: test_get_thread_list_stack_traces started: is virtual: %d, count: %d\n\n",
+           is_virt, thread_cnt);
     if (!NSK_JVMTI_VERIFY(jvmti->GetThreadListStackTraces(thread_cnt, thread_list,
                                                           MAX_FRAME_CNT, &stack_info_arr))) {
         nsk_jvmti_setFailStatus();
@@ -131,10 +132,8 @@ test_get_thread_list_stack_traces(JNIEnv *jni, jint thread_cnt, jthread* thread_
         }
         print_stack_trace(jni, sinfo.frame_count, sinfo.frame_buffer, info.name);
     }
-    //if (!NSK_JVMTI_VERIFY(jvmti->Deallocate((unsigned char*)stack_info_arr))) { 
-    //    nsk_jvmti_setFailStatus();
-    //}
-    printf("## Agent: test_get_thread_list_stack_traces finished: count: %d\n", thread_cnt);
+    printf("## Agent: test_get_thread_list_stack_traces finished: virtual: %d, count: %d\n\n",
+          is_virt, thread_cnt);
 }
 
 static void
@@ -369,7 +368,7 @@ test_jvmti_functions_for_one_thread(JNIEnv* jni, jthread thread, char* tname) {
 }
 
 static void
-test_jvmti_functions_for_threads(JNIEnv* jni, jint thread_cnt, jthread* thread_list, bool is_virt) {
+test_jvmti_functions_for_threads(JNIEnv* jni, bool is_virt, jint thread_cnt, jthread* thread_list) {
     jvmtiError results[VTHREAD_CNT] = {JVMTI_ERROR_NONE}; // VTHREAD_CNT is max
     jvmtiThreadInfo info;
     jint frame_count = 0;
@@ -387,7 +386,8 @@ test_jvmti_functions_for_threads(JNIEnv* jni, jint thread_cnt, jthread* thread_l
     }
 
     // test JVMTI GetTheadListStackTraces
-    test_get_thread_list_stack_traces(jni, thread_cnt, thread_list);
+    test_get_thread_list_stack_traces(jni, is_virt, 1, thread_list);          // test with one thread
+    test_get_thread_list_stack_traces(jni, is_virt, thread_cnt, thread_list); // test with multiple threads
 
     printf("\n## Agent: test_jvmti_functions_for_threads finished: virtual: %d\n", is_virt);
     fflush(0);
@@ -437,11 +437,11 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
     printf("\n## Agent: Test carrier threads\n"); fflush(0);
     cthread_cnt = get_cthreads(&tested_cthreads);
     test_threads_suspend_resume(jni, cthread_cnt, tested_cthreads);
-    test_jvmti_functions_for_threads(jni, cthread_cnt, tested_cthreads, false);
+    test_jvmti_functions_for_threads(jni, false /*virtual */, cthread_cnt, tested_cthreads);
 
     printf("\n## Agent: Test virtual threads\n"); fflush(0);
     test_threads_suspend_resume(jni, VTHREAD_CNT, tested_vthreads);
-    test_jvmti_functions_for_threads(jni, VTHREAD_CNT, tested_vthreads, true);
+    test_jvmti_functions_for_threads(jni, true /* virtual */, VTHREAD_CNT, tested_vthreads);
 
     test_thread_suspend_list(tested_vthreads);
     test_thread_resume_list(tested_vthreads);
@@ -456,6 +456,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
     test_vthread_resume_all(tested_vthreads);
 
     printf("\n## Agent: Wait for vthreads to finish\n"); fflush(0);
+
     for (int i = 0; i < VTHREAD_CNT; i++) {
         jni->DeleteGlobalRef(tested_vthreads[i]);
     }
