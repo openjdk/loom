@@ -32,9 +32,11 @@ vmTestbase/nsk/stress/except/except010.java                                     
 vmTestbase/nsk/stress/strace/strace001.java                                                     8254188 generic-all
 vmTestbase/nsk/stress/strace/strace003.java                                                     8254188 generic-all
 vmTestbase/nsk/stress/strace/strace005.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace007.java                                                     8254188 generic-all
 vmTestbase/nsk/stress/strace/strace009.java                                                     8254188 generic-all
-vmTestbase/nsk/stress/strace/strace012.java                                                     8254188 generic-all
 vmTestbase/nsk/stress/strace/strace010.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace012.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace013.java                                                     8254188 generic-all
 vmTestbase/nsk/stress/strace/strace015.java                                                     8254188 generic-all
 
 compiler/codegen/TestOopCmp.java                                                                8254187 generic-all
