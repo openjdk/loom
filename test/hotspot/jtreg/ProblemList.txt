@@ -46,6 +46,7 @@ compiler/startup/SmallCodeCacheStartup.java                                   82
 compiler/exceptions/TestRecursiveReplacedException.java	                      8242065 generic-all
 compiler/vectorization/TestMacroLogicVector.java                              8253919 windows-all
 vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java   8242890 generic-all
+runtime/clinit/ClassInitBarrier.java                                          8254936 generic-all
 runtime/vthread/RedefineClass.java                                            8253378 generic-all
 
 #############################################################################
