@@ -1,6 +1,7 @@
 ### Filed bugs
 
 runtime/Metaspace/DefineClass.java                                                              8253378 generic-all
+runtime/clinit/ClassInitBarrier.java                                                            8254936 generic-all
 runtime/logging/TestMethodHandlesVerbose.java                                                   8253907 windows-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.java                  8253617 generic-all
 
