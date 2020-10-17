@@ -1288,43 +1288,40 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
   JavaThread* calling_thread = JavaThread::current();
   JavaThread* java_thread = NULL;
   HandleMark hm(calling_thread);
-  oop thread_oop = JNIHandles::resolve_external_guard(thread);
+  oop thread_oop = NULL;
 
   // growable array of jvmti monitors info on the C-heap
   GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list =
       new (ResourceObj::C_HEAP, mtServiceability) GrowableArray<jvmtiMonitorStackDepthInfo*>(1, mtServiceability);
 
-  // TBD: Use current thread in vthread case as well.
-  if (thread == NULL) {
-    java_thread = calling_thread;
-    thread_oop = get_vthread_or_thread_oop(java_thread);
-    if (thread_oop == NULL || !thread_oop->is_a(SystemDictionary::Thread_klass())) {
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
+  JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(calling_thread);
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
   }
+
   // Support for virtual threads
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VThreadGetOwnedMonitorInfoClosure op(this,
-                                         Handle(calling_thread, thread_oop),
-                                         owned_monitors_list);
-    Handshake::execute(&op, calling_thread);
-    err = op.result();
-  } else {
-    // Support for ordinary threads
-    ThreadsListHandle tlh(calling_thread);
-
-    err = get_JavaThread(tlh.list(), thread, &java_thread);
-    if (err != JVMTI_ERROR_NONE) {
-      delete owned_monitors_list;
-      return err;
+    // there is no monitor info to collect if target virtual thread is unmounted
+    if (java_thread != NULL) {
+      VThreadGetOwnedMonitorInfoClosure op(this,
+                                           Handle(calling_thread, thread_oop),
+                                           owned_monitors_list);
+      Handshake::execute(&op, java_thread);
+      err = op.result();
     }
-
-    // It is only safe to perform the direct operation on the current
-    // thread. All other usage needs to use a direct handshake for safety.
-    if (java_thread == calling_thread) {
+  } else {
+    if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
+      // Carrier thread with a mounted continuation case.
+      // No contended monitor can be owned by carrier thread in this case.
+    } else if (java_thread == calling_thread) {
+      // It is only safe to make a direct call on the current thread.
+      // All other usage needs to use a direct handshake for safety.
       err = get_owned_monitors(calling_thread, java_thread, owned_monitors_list);
     } else {
       // get owned monitors info with handshake
@@ -1366,43 +1363,40 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
   JavaThread* calling_thread = JavaThread::current();
   JavaThread* java_thread = NULL;
   HandleMark hm(calling_thread);
-  oop thread_oop = JNIHandles::resolve_external_guard(thread);
+  oop thread_oop = NULL;
 
   // growable array of jvmti monitors info on the C-heap
   GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list =
          new (ResourceObj::C_HEAP, mtServiceability) GrowableArray<jvmtiMonitorStackDepthInfo*>(1, mtServiceability);
 
-  // TBD: Use current thread in vthread case as well.
-  if (thread == NULL) {
-    java_thread = calling_thread;
-    thread_oop = get_vthread_or_thread_oop(java_thread);
-    if (thread_oop == NULL || !thread_oop->is_a(SystemDictionary::Thread_klass())) {
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
+  JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(calling_thread);
+ 
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
   }
+
   // Support for virtual threads
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VThreadGetOwnedMonitorInfoClosure op(this,
-                                         Handle(calling_thread, thread_oop),
-                                         owned_monitors_list);
-    Handshake::execute(&op, calling_thread);
-    err = op.result();
-  } else {
-    // Support for ordinary threads
-    ThreadsListHandle tlh(calling_thread);
-
-    err = get_JavaThread(tlh.list(), thread, &java_thread);
-    if (err != JVMTI_ERROR_NONE) {
-      delete owned_monitors_list;
-      return err;
+    // there is no monitor info to collect if target virtual thread is unmounted
+    if (java_thread != NULL) {
+      VThreadGetOwnedMonitorInfoClosure op(this,
+                                           Handle(calling_thread, thread_oop),
+                                           owned_monitors_list);
+      Handshake::execute(&op, java_thread);
+      err = op.result();
     }
-
-    // It is only safe to perform the direct operation on the current
-    // thread. All other usage needs to use a direct handshake for safety.
-    if (java_thread == calling_thread) {
+  } else {
+    if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
+      // Carrier thread with a mounted continuation case.
+      // No contended monitor can be owned by carrier thread in this case.
+    } else if (java_thread == calling_thread) {
+      // It is only safe to make a direct call on the current thread.
+      // All other usage needs to use a direct handshake for safety.
       err = get_owned_monitors(calling_thread, java_thread, owned_monitors_list); 
     } else {
       // get owned monitors info with handshake
@@ -1445,46 +1439,39 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
   JavaThread* calling_thread = JavaThread::current();
   JavaThread* java_thread = NULL;
   HandleMark hm(calling_thread);
-  oop thread_oop = JNIHandles::resolve_external_guard(thread);
+  oop thread_oop = NULL;
 
-  // TBD: Use current thread in vthread case as well.
-  if (thread == NULL) {
-    java_thread = calling_thread;
-    thread_oop = get_vthread_or_thread_oop(java_thread);
-    if (thread_oop == NULL || !thread_oop->is_a(SystemDictionary::Thread_klass())) {
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
+  JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(calling_thread);
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
   }
+
   // Support for virtual threads
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     if (!JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-    VThreadGetCurrentContendedMonitorClosure op(this,
-                                                Handle(calling_thread, thread_oop),
-                                                monitor_ptr);
-    Handshake::execute(&op, calling_thread);
-    err = op.result();
-    return err;
-  }
-  // Support for ordinary threads
-  ThreadsListHandle tlh(calling_thread);
-
-  err = get_JavaThread(tlh.list(), thread, &java_thread);
-  if (err != JVMTI_ERROR_NONE) {
-    return err;
-  }
-
-  // It is only safe to perform the direct operation on the current
-  // thread. All other usage needs to use a direct handshake for safety.
-  if (java_thread == calling_thread) {
-    if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
-      // Carrier thread with a mounted continuation case.
-      // No contended monitor can be owned by carrier thread in this case.
-      monitor_ptr = NULL;
-    } else {
-      err = get_current_contended_monitor(calling_thread, java_thread, monitor_ptr);
+    // there is no monitor info to collect if target virtual thread is unmounted
+    if (java_thread != NULL) {
+      VThreadGetCurrentContendedMonitorClosure op(this,
+                                                  Handle(calling_thread, thread_oop),
+                                                  monitor_ptr);
+      Handshake::execute(&op, java_thread);
+      err = op.result();
     }
+    return err;
+  }
+  if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
+    // Carrier thread with a mounted continuation case.
+    // No contended monitor can be owned by carrier thread in this case.
+    *monitor_ptr = NULL;
+  } else if (java_thread == calling_thread) {
+    // It is only safe to make a direct call on the current thread.
+    // All other usage needs to use a direct handshake for safety.
+    err = get_current_contended_monitor(calling_thread, java_thread, monitor_ptr);
   } else {
     // get contended monitor information with handshake
     GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr);

@@ -792,8 +792,8 @@ JvmtiEnvBase::count_locked_objects(JavaThread *java_thread, Handle hobj) {
 jvmtiError
 JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThread *java_thread, jobject *monitor_ptr) {
   Thread *current_thread = Thread::current();
-  // assert(java_thread->is_handshake_safe_for(current_thread),
-  //       "call by myself or at handshake");
+  assert(java_thread->is_handshake_safe_for(current_thread),
+         "call by myself or at handshake");
   oop obj = NULL;
   // The ObjectMonitor* can't be async deflated since we are either
   // at a safepoint or the calling thread is operating on itself so
@@ -1972,13 +1972,6 @@ GetOwnedMonitorInfoClosure::do_thread(Thread *target) {
 void
 GetCurrentContendedMonitorClosure::do_thread(Thread *target) {
   JavaThread *jt = target->as_Java_thread();
-  if (JvmtiEnvBase::cthread_with_continuation(jt)) {
-    // Carrier thread with a mounted continuation case.
-    // No contended monitor can be owned by carrier thread in this case.
-    _owned_monitor_ptr = NULL;
-    _result = JVMTI_ERROR_NONE;
-    return;
-  }
   if (!jt->is_exiting() && (jt->threadObj() != NULL)) {
     _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor(_calling_thread,
                                                                     jt,
@@ -2016,26 +2009,14 @@ GetFrameLocationClosure::do_thread(Thread *target) {
 
 void
 VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
-  assert(target->is_Java_thread(), "just checking");
+  JavaThread* java_thread = target->as_Java_thread();
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
 
-  oop cont = java_lang_VirtualThread::continuation(_vthread_h());
-  assert(cont != NULL, "virtual thread continuation must not be NULL");
-
-  if (!java_lang_Continuation::is_mounted(cont)) {
-    // No monitor info to collect if virtual thread is unmounted
-    _result = JVMTI_ERROR_NONE;
-    return;
-  }
   javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(_vthread_h());
-  oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-  JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
 
-  ThreadsListHandle tlh;
-  if (java_thread != NULL && tlh.includes(java_thread)
-      && !java_thread->is_exiting() && java_thread->threadObj() != NULL) {
+  if (!java_thread->is_exiting() && java_thread->threadObj() != NULL) {
     _result = ((JvmtiEnvBase *)_env)->get_owned_monitors((JavaThread*)target,
                                                          java_thread,
                                                          jvf,
@@ -2045,18 +2026,9 @@ VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
 
 void
 VThreadGetCurrentContendedMonitorClosure::do_thread(Thread *target) {
-  assert(target->is_Java_thread(), "just checking");
-  oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-  if (carrier_thread == NULL) {
-    // virtual thread is unmounted, so it can not be contended on a monitor
-    *_owned_monitor_ptr = NULL;
-    _result = JVMTI_ERROR_NONE;
-    return;
-  }
-  JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
-  ThreadsListHandle tlh;
-  if (java_thread != NULL && tlh.includes(java_thread)
-      && !java_thread->is_exiting() && java_thread->threadObj() != NULL) {
+  JavaThread* java_thread = target->as_Java_thread();
+
+  if (!java_thread->is_exiting() && java_thread->threadObj() != NULL) {
     _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor((JavaThread*)target,
                                                                     java_thread,
                                                                     _owned_monitor_ptr);
