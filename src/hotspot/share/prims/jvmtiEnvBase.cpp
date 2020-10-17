@@ -791,13 +791,9 @@ JvmtiEnvBase::count_locked_objects(JavaThread *java_thread, Handle hobj) {
 
 jvmtiError
 JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThread *java_thread, jobject *monitor_ptr) {
-  JavaThread *current_thread = JavaThread::current();
-/* The HandshakeState::process_self_inner() does not set the_active_handshaker
- * as needed, so the assert below is temporarily disabled.
- * Enable it after the issue in HandshakeState::process_self_inner() is fixed.
- */
+  Thread *current_thread = Thread::current();
   // assert(java_thread->is_handshake_safe_for(current_thread),
-  //         "call by myself or at handshake");
+  //       "call by myself or at handshake");
   oop obj = NULL;
   // The ObjectMonitor* can't be async deflated since we are either
   // at a safepoint or the calling thread is operating on itself so
