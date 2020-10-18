@@ -157,7 +157,7 @@ public class Blocker {
     /**
      * Runs the given task in a background thread pool.
      */
-    private static <V> V runInThreadPool(Callable<V> task) {
+    public static <V> V runInThreadPool(Callable<V> task) {
         Future<V> future = ThreadPool.THREAD_POOL.submit(task);
         try {
             return future.join();
@@ -170,7 +170,7 @@ public class Blocker {
     /**
      * Runs the given task in a background thread pool.
      */
-    private static Void runInThreadPool(Runnable task) {
+    public static Void runInThreadPool(Runnable task) {
         Future<?> future = ThreadPool.THREAD_POOL.submit(task);
         try {
             future.join();

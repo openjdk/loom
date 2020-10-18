@@ -49,10 +49,9 @@ class UnixDirectoryStream
     private final DirectoryStream.Filter<? super Path> filter;
 
     // used to coordinate closing of directory stream
-    private final ReentrantReadWriteLock streamLock =
-        new ReentrantReadWriteLock(true);
+    private final ReentrantReadWriteLock streamLock = new ReentrantReadWriteLock();
 
-    // indicates if directory stream is open (synchronize on closeLock)
+    // indicates if directory stream is open
     private volatile boolean isClosed;
 
     // directory iterator
@@ -130,6 +129,8 @@ class UnixDirectoryStream
      * Iterator implementation
      */
     private class UnixDirectoryIterator implements Iterator<Path> {
+        private final ReentrantLock iteratorLock = new ReentrantLock();
+
         // true when at EOF
         private boolean atEof;
 
@@ -153,7 +154,7 @@ class UnixDirectoryStream
 
         // Returns next entry (or null)
         private Path readNextEntry() {
-            assert Thread.holdsLock(this);
+            assert iteratorLock.isHeldByCurrentThread();
 
             for (;;) {
                 byte[] nameAsBytes = null;
@@ -193,24 +194,34 @@ class UnixDirectoryStream
         }
 
         @Override
-        public synchronized boolean hasNext() {
-            if (nextEntry == null && !atEof)
-                nextEntry = readNextEntry();
-            return nextEntry != null;
+        public boolean hasNext() {
+            iteratorLock.tryLock();
+            try {
+                if (nextEntry == null && !atEof)
+                    nextEntry = readNextEntry();
+                return nextEntry != null;
+            } finally {
+                iteratorLock.unlock();
+            }
         }
 
         @Override
-        public synchronized Path next() {
-            Path result;
-            if (nextEntry == null && !atEof) {
-                result = readNextEntry();
-            } else {
-                result = nextEntry;
-                nextEntry = null;
+        public Path next() {
+            iteratorLock.tryLock();
+            try {
+                Path result;
+                if (nextEntry == null && !atEof) {
+                    result = readNextEntry();
+                } else {
+                    result = nextEntry;
+                    nextEntry = null;
+                }
+                if (result == null)
+                    throw new NoSuchElementException();
+                return result;
+            } finally {
+                iteratorLock.unlock();
             }
-            if (result == null)
-                throw new NoSuchElementException();
-            return result;
         }
 
         @Override

@@ -35,10 +35,9 @@ import java.nio.file.LinkPermission;
 import java.nio.file.StandardCopyOption;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
+import jdk.internal.misc.Blocker;
 import static sun.nio.fs.UnixNativeDispatcher.*;
 import static sun.nio.fs.UnixConstants.*;
-
 
 /**
  * Unix implementation of Path#copyTo and Path#moveTo methods.
@@ -251,7 +250,13 @@ class UnixCopyFile {
             try {
                 // transfer bytes to target file
                 try {
-                    transfer(fo, fi, addressToPollForCancel);
+                    int dst = fo;
+                    int src = fi;
+                    if (Thread.currentThread().isVirtual()) {
+                        Blocker.block(() -> transfer(dst, src, addressToPollForCancel));
+                    } else {
+                        transfer(dst, src, addressToPollForCancel);
+                    }
                 } catch (UnixException x) {
                     x.rethrowAsIOException(source, target);
                 }
