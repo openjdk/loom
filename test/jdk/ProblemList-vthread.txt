@@ -23,6 +23,7 @@ java/foreign/TestMismatch.java                                                  
 jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
 java/lang/Continuation/Basic.java#id0                                                           8253918 generic-all
 java/lang/Continuation/Fuzz.java                                                                8253918 generic-all
+java/lang/Thread/virtual/stress/SleepALot.java#id2                                              8253918 generic-all
 java/lang/StackWalker/LocalsAndOperands.java#id0                                                8253918 generic-all
 java/lang/invoke/LFCaching/LFSingleThreadCachingTest.java                                       8253918 generic-all
 java/util/Arrays/Sorting.java                                                                   8253918 generic-all
