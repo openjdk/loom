@@ -521,7 +521,11 @@ public class FileChannelImpl
             if (!isOpen())
                 return -1;
             do {
-                n = transferTo0(fd, position, icount, targetFD);
+                if (Thread.currentThread().isVirtual()) {
+                    n = Blocker.managedBlock(() -> transferTo0(fd, position, icount, targetFD));
+                } else {
+                    n = transferTo0(fd, position, icount, targetFD);
+                }
             } while ((n == IOStatus.INTERRUPTED) && isOpen());
             if (n == IOStatus.UNSUPPORTED_CASE) {
                 if (target instanceof SinkChannelImpl)

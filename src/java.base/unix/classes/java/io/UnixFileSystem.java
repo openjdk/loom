@@ -445,7 +445,14 @@ class UnixFileSystem extends FileSystem {
     /* -- Disk usage -- */
 
     @Override
-    public native long getSpace(File f, int t);
+    public long getSpace(File f, int t) {
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.block(() -> getSpace0(f, t));
+        } else {
+            return getSpace0(f, t);
+        }
+    }
+    private native long getSpace0(File f, int t);
 
     /* -- Basic infrastructure -- */
 

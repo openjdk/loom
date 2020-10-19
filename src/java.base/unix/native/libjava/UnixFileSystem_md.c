@@ -458,8 +458,8 @@ Java_java_io_UnixFileSystem_setReadOnly0(JNIEnv *env, jobject this,
 }
 
 JNIEXPORT jlong JNICALL
-Java_java_io_UnixFileSystem_getSpace(JNIEnv *env, jobject this,
-                                     jobject file, jint t)
+Java_java_io_UnixFileSystem_getSpace0(JNIEnv *env, jobject this,
+                                      jobject file, jint t)
 {
     jlong rv = 0L;
 
