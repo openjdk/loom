@@ -229,7 +229,8 @@ public class FileChannelImpl
                 do {
                     if (Thread.currentThread().isVirtual()) {
                         n = Blocker.managedBlock(() ->
-                                IOUtil.read(fd, dst, -1, direct, alignment, nd));
+                                IOUtil.read(fd, dst, -1, direct, alignment, nd),
+                                false);
                     } else {
                         n = IOUtil.read(fd, dst, -1, direct, alignment, nd);
                     }
@@ -263,7 +264,8 @@ public class FileChannelImpl
                 do {
                     if (Thread.currentThread().isVirtual()) {
                         n = Blocker.managedBlock(() ->
-                                IOUtil.read(fd, dsts, offset, length, direct, alignment, nd));
+                                IOUtil.read(fd, dsts, offset, length, direct, alignment, nd),
+                                false);
                     } else {
                         n = IOUtil.read(fd, dsts, offset, length, direct, alignment, nd);
                     }
@@ -294,7 +296,8 @@ public class FileChannelImpl
                 do {
                     if (Thread.currentThread().isVirtual()) {
                         n = Blocker.managedBlock(() ->
-                                IOUtil.write(fd, src, -1, direct, alignment, nd));
+                                IOUtil.write(fd, src, -1, direct, alignment, nd),
+                                false);
                     } else {
                         n = IOUtil.write(fd, src, -1, direct, alignment, nd);
                     }
@@ -328,7 +331,8 @@ public class FileChannelImpl
                 do {
                     if (Thread.currentThread().isVirtual()) {
                         n = Blocker.managedBlock(() ->
-                                IOUtil.write(fd, srcs, offset, length, direct, alignment, nd));
+                                IOUtil.write(fd, srcs, offset, length, direct, alignment, nd),
+                                false);
                     } else {
                         n = IOUtil.write(fd, srcs, offset, length, direct, alignment, nd);
                     }
@@ -522,7 +526,9 @@ public class FileChannelImpl
                 return -1;
             do {
                 if (Thread.currentThread().isVirtual()) {
-                    n = Blocker.managedBlock(() -> transferTo0(fd, position, icount, targetFD));
+                    n = Blocker.managedBlock(() ->
+                            transferTo0(fd, position, icount, targetFD),
+                            false);
                 } else {
                     n = transferTo0(fd, position, icount, targetFD);
                 }
@@ -1284,7 +1290,8 @@ public class FileChannelImpl
             do {
                 if (Thread.currentThread().isVirtual()) {
                     n = Blocker.managedBlock(() ->
-                            nd.lock(fd, true, position, size, shared));
+                            nd.lock(fd, true, position, size, shared),
+                            false);
                 } else {
                     n = nd.lock(fd, true, position, size, shared);
                 }

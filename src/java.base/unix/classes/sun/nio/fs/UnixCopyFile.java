@@ -253,7 +253,7 @@ class UnixCopyFile {
                     int dst = fo;
                     int src = fi;
                     if (Thread.currentThread().isVirtual()) {
-                        Blocker.block(() -> transfer(dst, src, addressToPollForCancel));
+                        Blocker.managedBlock(() -> transfer(dst, src, addressToPollForCancel));
                     } else {
                         transfer(dst, src, addressToPollForCancel);
                     }

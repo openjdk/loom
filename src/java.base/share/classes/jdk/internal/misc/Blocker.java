@@ -41,17 +41,13 @@ import jdk.internal.access.SharedSecrets;
  *
  * The managedBlock methods are used to execute blocking tasks on the caller
  * thread or its carrier thread. If the carrier thread is a ForkJoinWorkerThread
- * then the task runs in ForkJoinPool.ManagedBlocker.
+ * then the task runs in ForkJoinPool.ManagedBlocker to that its pool may be
+ * expanded to support additional parallelism during the blocking operation.
  *
- * The block methods are used to execute blocking tasks on the caller
- * thread, its carrier thread, or on a thread in background thread pool. These
- * methods not suitable for tasks that use carrier thread locals (such as
- * thread local buffer caches) and they are not suitable when called when
- * the thread is pinned.
- *
- * The managedBlock and block methods are not suitable for tasks that are
- * interruptible or tasks that synchronize/locks in ways that is visible to
- * user-code.
+ * When running with a custom scheduler, blocking tasks can optionally be run
+ * in a secondary thread pool. This is only suitable for tasks that are not
+ * interruptible, tasks that don't synchronize/lock in ways that are visible to
+ * other code, or where the caller thread is not pinned.
  */
 public class Blocker {
     private static final Unsafe U = Unsafe.getUnsafe();
@@ -180,8 +176,17 @@ public class Blocker {
         return null;
     }
 
-    private static <V, X extends Throwable> V block(BlockingCallable<V, X> task,
-                                                    boolean asyncAllowed) {
+    /**
+     * Executes a task that may block and pin the current thread. If invoked on a
+     * virtual thread and the current carrier thread is in a ForkJoinPool then the
+     * pool may be expanded to support additional parallelism during the call to
+     * this method.
+     *
+     * @param task the task to run
+     * @param mayRunInThreadPool true if the task can run in thread pool
+     */
+    public static <V, X extends Throwable> V
+    managedBlock(BlockingCallable<V, X> task, boolean mayRunInThreadPool) {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
             Thread carrier = JLA.currentCarrierThread();
@@ -197,15 +202,28 @@ public class Blocker {
                     JLA.setCurrentThread(thread);
                 }
                 assert false;  // should not get here
-            } else if (asyncAllowed) {
+            } else if (mayRunInThreadPool) {
+                // custom scheduler, run in thread pool for now
                 return runInThreadPool(task);
             }
         }
+
+        // run directly
         return task.call();
     }
 
-    private static <X extends Throwable> Void block(BlockingRunnable<X> task,
-                                                    boolean asyncAllowed) {
+    /**
+     * Executes a task that may block and pin the current thread. If invoked on a
+     * virtual thread and the current carrier thread is in a ForkJoinPool then the
+     * pool may be expanded to support additional parallelism during the call to
+     * this method.
+     *
+     * @param task the task to run
+     * @param mayRunInThreadPool true if the task must run on the current thread
+     *                               or its carrier thread
+     */
+    public static <X extends Throwable> Void
+    managedBlock(BlockingRunnable<X> task, boolean mayRunInThreadPool) {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
             Thread carrier = JLA.currentCarrierThread();
@@ -220,54 +238,35 @@ public class Blocker {
                     JLA.setCurrentThread(thread);
                 }
                 assert false;  // should not get here
-            } else if (asyncAllowed) {
+            } else if (mayRunInThreadPool) {
+                // custom scheduler, run in thread pool for now
                 return runInThreadPool(task);
             }
         }
 
+        // run directly
         task.run();
         return null;
     }
 
-
     /**
-     * Executes a task that may block and pin the current thread.
-     * If the current carrier thread is in a ForkJoinPool then the pool may be
-     * expanded to support additional parallelism during the call to this method.
+     * Executes a task that may block and pin the current thread. If invoked on a
+     * virtual thread and the current carrier thread is in a ForkJoinPool then the
+     * pool may be expanded to support additional parallelism during the call to
+     * this method.
      */
     public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task) {
-        return block(task, false);
+        return managedBlock(task, true);
     }
 
     /**
-     * Executes a task that may block and pin the current thread.
-     * If the current carrier thread is in a ForkJoinPool then the pool may be
-     * expanded to support additional parallelism during the call to this method.
+     * Executes a task that may block and pin the current thread. If invoked on a
+     * virtual thread and the current carrier thread is in a ForkJoinPool then the
+     * pool may be expanded to support additional parallelism during the call to
+     * this method.
      */
     public static <X extends Throwable> void managedBlock(BlockingRunnable<X> task) {
-        block(task, false);
-    }
-
-    /**
-     * Executes a task that may block and pin the current thread.
-     * If the current carrier thread is in a ForkJoinWorkerThread then its pool
-     * may be expanded to support additional parallelism during the call to this
-     * method. If it cannot be expanded then the task is queued to execute in
-     * a thread pool.
-     */
-    public static <V, X extends Throwable> V block(BlockingCallable<V, X> task) {
-        return block(task, true);
-    }
-
-    /**
-     * Executes a task that may block and pin the current thread.
-     * If the current carrier thread is in a ForkJoinWorkerThread then its pool
-     * may be expanded to support additional parallelism during the call to this
-     * method. If it cannot be expanded then the task is queued to execute in
-     * a thread pool.
-     */
-    public static <X extends Throwable> void block(BlockingRunnable<X> task) {
-        block(task, true);
+        managedBlock(task, true);
     }
 
     private static class ThreadPool {

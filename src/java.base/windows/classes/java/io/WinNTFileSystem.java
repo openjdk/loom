@@ -414,7 +414,7 @@ class WinNTFileSystem extends FileSystem {
         }
         if (!useCanonCaches) {
             if (Thread.currentThread().isVirtual()) {
-                return Blocker.block(() -> canonicalize0(path));
+                return Blocker.managedBlock(() -> canonicalize0(path));
             } else {
                 return canonicalize0(path);
             }
@@ -536,7 +536,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public int getBooleanAttributes(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> getBooleanAttributes0(f));
+            return Blocker.managedBlock(() -> getBooleanAttributes0(f));
         } else {
             return getBooleanAttributes0(f);
         }
@@ -546,7 +546,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public boolean checkAccess(File f, int access) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> checkAccess0(f, access));
+            return Blocker.managedBlock(() -> checkAccess0(f, access));
         } else {
             return checkAccess0(f, access);
         }
@@ -556,7 +556,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public long getLastModifiedTime(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> getLastModifiedTime0(f));
+            return Blocker.managedBlock(() -> getLastModifiedTime0(f));
         } else {
             return getLastModifiedTime0(f);
         }
@@ -566,7 +566,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public long getLength(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> getLength0(f));
+            return Blocker.managedBlock(() -> getLength0(f));
         } else {
             return getLength0(f);
         }
@@ -576,7 +576,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public boolean setPermission(File f, int access, boolean enable, boolean owneronly) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> setPermission0(f, access, enable, owneronly));
+            return Blocker.managedBlock(() -> setPermission0(f, access, enable, owneronly));
         } else {
             return setPermission0(f, access, enable, owneronly);
         }
@@ -588,7 +588,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public boolean createFileExclusively(String path) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> createFileExclusively0(path));
+            return Blocker.managedBlock(() -> createFileExclusively0(path));
         } else {
             return createFileExclusively0(path);
         }
@@ -598,7 +598,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public String[] list(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> list0(f));
+            return Blocker.managedBlock(() -> list0(f));
         } else {
             return list0(f);
         }
@@ -608,7 +608,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public boolean createDirectory(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> createDirectory0(f));
+            return Blocker.managedBlock(() -> createDirectory0(f));
         } else {
             return createDirectory0(f);
         }
@@ -618,7 +618,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public boolean setLastModifiedTime(File f, long time) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> setLastModifiedTime0(f, time));
+            return Blocker.managedBlock(() -> setLastModifiedTime0(f, time));
         } else {
             return setLastModifiedTime0(f, time);
         }
@@ -628,7 +628,7 @@ class WinNTFileSystem extends FileSystem {
     @Override
     public boolean setReadOnly(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> setReadOnly0(f));
+            return Blocker.managedBlock(() -> setReadOnly0(f));
         } else {
             return setReadOnly0(f);
         }
@@ -649,7 +649,7 @@ class WinNTFileSystem extends FileSystem {
             prefixCache.clear();
         }
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> delete0(f));
+            return Blocker.managedBlock(() -> delete0(f));
         } else {
             return delete0(f);
         }
@@ -670,7 +670,7 @@ class WinNTFileSystem extends FileSystem {
             prefixCache.clear();
         }
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> rename0(f1, f2));
+            return Blocker.managedBlock(() -> rename0(f1, f2));
         } else {
             return rename0(f1, f2);
         }

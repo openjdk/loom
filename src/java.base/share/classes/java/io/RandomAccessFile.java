@@ -345,7 +345,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      */
     private void open(String name, int mode) throws FileNotFoundException {
         if (Thread.currentThread().isVirtual()) {
-            Blocker.block(() -> open0(name, mode));
+            Blocker.managedBlock(() -> open0(name, mode));
         } else {
             open0(name, mode);
         }
@@ -370,7 +370,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      */
     public int read() throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> read0());
+            return Blocker.managedBlock(() -> read0());
         } else {
             return read0();
         }
@@ -414,7 +414,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      */
     public int read(byte b[], int off, int len) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> readBytes(b, off, len));
+            return Blocker.managedBlock(() -> readBytes(b, off, len));
         } else {
             return readBytes(b, off, len);
         }
@@ -534,7 +534,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(int b) throws IOException {
-        Blocker.block(() -> write0(b));
+        Blocker.managedBlock(() -> write0(b));
     }
 
     private native void write0(int b) throws IOException;
@@ -571,7 +571,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      */
     public void write(byte b[], int off, int len) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            Blocker.block(() -> writeBytes(b, off, len));
+            Blocker.managedBlock(() -> writeBytes(b, off, len));
         } else {
             writeBytes(b, off, len);
         }
@@ -607,7 +607,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
             throw new IOException("Negative seek offset");
         }
         if (Thread.currentThread().isVirtual()) {
-            Blocker.block(() -> seek0(pos));
+            Blocker.managedBlock(() -> seek0(pos));
         } else {
             seek0(pos);
         }

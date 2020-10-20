@@ -166,7 +166,7 @@ class UnixFileSystem extends FileSystem {
     public String canonicalize(String path) throws IOException {
         if (!useCanonCaches) {
             if (Thread.currentThread().isVirtual()) {
-                return Blocker.block(() -> canonicalize0(path));
+                return Blocker.managedBlock(() -> canonicalize0(path));
             } else {
                 return canonicalize0(path);
             }
@@ -192,7 +192,7 @@ class UnixFileSystem extends FileSystem {
                 }
                 if (res == null) {
                     if (Thread.currentThread().isVirtual()) {
-                        res = Blocker.block(() -> canonicalize0(path));
+                        res = Blocker.managedBlock(() -> canonicalize0(path));
                     } else {
                         res = canonicalize0(path);
                     }
@@ -268,7 +268,7 @@ class UnixFileSystem extends FileSystem {
     public int getBooleanAttributes(File f) {
         int rv;
         if (Thread.currentThread().isVirtual()) {
-            rv = Blocker.block(() -> getBooleanAttributes0(f));
+            rv = Blocker.managedBlock(() -> getBooleanAttributes0(f));
         } else {
             rv = getBooleanAttributes0(f);
         }
@@ -279,7 +279,7 @@ class UnixFileSystem extends FileSystem {
     public boolean hasBooleanAttributes(File f, int attributes) {
         int rv;
         if (Thread.currentThread().isVirtual()) {
-            rv = Blocker.block(() -> getBooleanAttributes0(f));
+            rv = Blocker.managedBlock(() -> getBooleanAttributes0(f));
         } else {
             rv = getBooleanAttributes0(f);
         }
@@ -296,7 +296,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public boolean checkAccess(File f, int access) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> checkAccess0(f, access));
+            return Blocker.managedBlock(() -> checkAccess0(f, access));
         } else {
             return checkAccess0(f, access);
         }
@@ -306,7 +306,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public long getLastModifiedTime(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> getLastModifiedTime0(f));
+            return Blocker.managedBlock(() -> getLastModifiedTime0(f));
         } else {
             return getLastModifiedTime0(f);
         }
@@ -316,7 +316,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public long getLength(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> getLength0(f));
+            return Blocker.managedBlock(() -> getLength0(f));
         } else {
             return getLength0(f);
         }
@@ -326,7 +326,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public boolean setPermission(File f, int access, boolean enable, boolean owneronly) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> setPermission0(f, access, enable, owneronly));
+            return Blocker.managedBlock(() -> setPermission0(f, access, enable, owneronly));
         } else {
             return setPermission0(f, access, enable, owneronly);
         }
@@ -338,7 +338,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public boolean createFileExclusively(String path) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> createFileExclusively0(path));
+            return Blocker.managedBlock(() -> createFileExclusively0(path));
         } else {
             return createFileExclusively0(path);
         }
@@ -359,7 +359,7 @@ class UnixFileSystem extends FileSystem {
             javaHomePrefixCache.clear();
         }
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> delete0(f));
+            return Blocker.managedBlock(() -> delete0(f));
         } else {
             return delete0(f);
         }
@@ -369,7 +369,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public String[] list(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> list0(f));
+            return Blocker.managedBlock(() -> list0(f));
         } else {
             return list0(f);
         }
@@ -379,7 +379,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public boolean createDirectory(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> createDirectory0(f));
+            return Blocker.managedBlock(() -> createDirectory0(f));
         } else {
             return createDirectory0(f);
         }
@@ -400,7 +400,7 @@ class UnixFileSystem extends FileSystem {
             javaHomePrefixCache.clear();
         }
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> rename0(f1, f2));
+            return Blocker.managedBlock(() -> rename0(f1, f2));
         } else {
             return rename0(f1, f2);
         }
@@ -410,7 +410,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public boolean setLastModifiedTime(File f, long time) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> setLastModifiedTime0(f, time));
+            return Blocker.managedBlock(() -> setLastModifiedTime0(f, time));
         } else {
             return setLastModifiedTime0(f, time);
         }
@@ -420,7 +420,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public boolean setReadOnly(File f) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> setReadOnly0(f));
+            return Blocker.managedBlock(() -> setReadOnly0(f));
         } else {
             return setReadOnly0(f);
         }
@@ -447,7 +447,7 @@ class UnixFileSystem extends FileSystem {
     @Override
     public long getSpace(File f, int t) {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> getSpace0(f, t));
+            return Blocker.managedBlock(() -> getSpace0(f, t));
         } else {
             return getSpace0(f, t);
         }

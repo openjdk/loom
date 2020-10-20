@@ -936,7 +936,7 @@ public class InetAddress implements java.io.Serializable {
             throws UnknownHostException
         {
             if (Thread.currentThread().isVirtual()) {
-                return Blocker.block(() -> impl.lookupAllHostAddr(host));
+                return Blocker.managedBlock(() -> impl.lookupAllHostAddr(host));
             } else {
                 return impl.lookupAllHostAddr(host);
             }
@@ -946,7 +946,7 @@ public class InetAddress implements java.io.Serializable {
             throws UnknownHostException
         {
             if (Thread.currentThread().isVirtual()) {
-                return Blocker.block(() ->  impl.getHostByAddr(addr));
+                return Blocker.managedBlock(() ->  impl.getHostByAddr(addr));
             } else {
                 return impl.getHostByAddr(addr);
             }
