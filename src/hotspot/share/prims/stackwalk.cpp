@@ -36,6 +36,7 @@
 #include "runtime/globals.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/javaCalls.hpp"
+#include "runtime/stackWatermarkSet.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "utilities/globalDefinitions.hpp"
@@ -447,7 +448,7 @@ oop StackWalk::walk(Handle stackStream, jlong mode, int skip_frames, Handle cont
   // Setup traversal onto my stack.
   if (live_frame_info(mode)) {
     assert (use_frames_array(mode), "Bad mode for get live frame");
-    RegisterMap regMap = cont.is_null() ? RegisterMap(jt, true, true)
+    RegisterMap regMap = cont.is_null() ? RegisterMap(jt, true, true, true)
                                         : RegisterMap(cont, true);
     LiveFrameStream stream(jt, &regMap, cont_scope, cont);
     return fetchFirstBatch(stream, stackStream, mode, skip_frames, frame_count,
@@ -580,6 +581,11 @@ jint StackWalk::fetchNextBatch(Handle stackStream, jlong mode, jlong magic,
 
   BaseFrameStream& stream = (*existing_stream);
   if (!stream.at_end()) {
+    // If we have to get back here for even more frames, then 1) the user did not supply
+    // an accurate hint suggesting the depth of the stack walk, and 2) we are not just
+    // peeking  at a few frames. Take the cost of flushing out any pending deferred GC
+    // processing of the stack.
+    StackWatermarkSet::finish_processing(jt, NULL /* context */, StackWatermarkKind::gc);
     stream.next(); // advance past the last frame decoded in previous batch
     if (!stream.at_end()) {
       int n = fill_in_frames(mode, stream, frame_count, start_index,

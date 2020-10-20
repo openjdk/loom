@@ -711,7 +711,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * Reads a signed eight-bit value from this file. This method reads a
      * byte from the file, starting from the current file pointer.
      * If the byte read is {@code b}, where
-     * <code>0&nbsp;&lt;=&nbsp;b&nbsp;&lt;=&nbsp;255</code>,
+     * {@code 0 <= b <= 255},
      * then the result is:
      * <blockquote><pre>
      *     (byte)(b)
@@ -785,7 +785,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * two bytes from the file, starting at the current file pointer.
      * If the bytes read, in order, are
      * {@code b1} and {@code b2}, where
-     * <code>0&nbsp;&lt;=&nbsp;b1, b2&nbsp;&lt;=&nbsp;255</code>,
+     * {@code 0 <= b1, b2 <= 255},
      * then the result is equal to:
      * <blockquote><pre>
      *     (b1 &lt;&lt; 8) | b2
@@ -813,7 +813,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * bytes from the file, starting at the current file pointer.
      * If the bytes read, in order, are
      * {@code b1} and {@code b2}, where
-     * <code>0&nbsp;&lt;=&nbsp;b1,&nbsp;b2&nbsp;&lt;=&nbsp;255</code>,
+     * {@code 0 <= b1, b2 <= 255},
      * then the result is equal to:
      * <blockquote><pre>
      *     (char)((b1 &lt;&lt; 8) | b2)
@@ -841,7 +841,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * bytes from the file, starting at the current file pointer.
      * If the bytes read, in order, are {@code b1},
      * {@code b2}, {@code b3}, and {@code b4}, where
-     * <code>0&nbsp;&lt;=&nbsp;b1, b2, b3, b4&nbsp;&lt;=&nbsp;255</code>,
+     * {@code 0 <= b1, b2, b3, b4 <= 255},
      * then the result is equal to:
      * <blockquote><pre>
      *     (b1 &lt;&lt; 24) | (b2 &lt;&lt; 16) + (b3 &lt;&lt; 8) + b4

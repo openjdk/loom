@@ -57,13 +57,14 @@
 #include "utilities/decoder.hpp"
 #include "utilities/formatBuffer.hpp"
 
-RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool walk_cont, bool validate_oops) 
-  : _cont(Handle()) {
+RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool process_frames, bool walk_cont, bool validate_oops) :
+    _cont(Handle()) {
   _thread         = thread;
   _update_map     = update_map;
   _validate_oops  = validate_oops;
   _walk_cont      = walk_cont;
   DEBUG_ONLY(_skip_missing = false;)
+  _process_frames = process_frames;
   clear();
   debug_only(_update_for_id = NULL;)
 
@@ -78,13 +79,14 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool walk_cont, bo
 #endif /* PRODUCT */
 }
 
-RegisterMap::RegisterMap(Handle cont, bool update_map, bool validate_oops) 
+RegisterMap::RegisterMap(Handle cont, bool update_map, bool process_frames, bool validate_oops) 
   : _cont(cont) {
   _thread         = NULL;
   _update_map     = update_map;
   _validate_oops  = validate_oops;
   _walk_cont      = true;
   DEBUG_ONLY(_skip_missing = false;)
+    _process_frames = process_frames;
   clear();
   debug_only(_update_for_id = NULL;)
 
@@ -101,6 +103,7 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
   assert(map != NULL, "RegisterMap must be present");
   _thread                = map->thread();
   _update_map            = map->update_map();
+  _process_frames        = map->process_frames();
   _include_argument_oops = map->include_argument_oops();
   debug_only(_update_for_id = map->_update_for_id;)
   _validate_oops = map->_validate_oops;
@@ -1000,11 +1003,15 @@ void frame::oops_interpreted_arguments_do(Symbol* signature, bool has_receiver, 
   finder.oops_do();
 }
 
-void frame::oops_code_blob_do(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, const RegisterMap* reg_map) const {
+void frame::oops_code_blob_do(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, DerivedPointerIterationMode derived_mode, const RegisterMap* reg_map) const {
   assert(_cb != NULL, "sanity check");
   assert((oop_map() == NULL) == (_cb->oop_maps() == NULL), "frame and _cb must agree that oopmap is set or not");
   if (oop_map() != NULL) {
-    _oop_map->oops_do(this, reg_map, f, df);
+    if (df != NULL) {
+      _oop_map->oops_do(this, reg_map, f, df);
+    } else {
+      _oop_map->oops_do(this, reg_map, f, derived_mode);
+    }
 
     // Preserve potential arguments for a callee. We handle this by dispatching
     // on the codeblob. For c2i, we do
@@ -1152,8 +1159,7 @@ void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) const {
   entry_frame_call_wrapper()->oops_do(f);
 }
 
-
-void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, const RegisterMap* map, bool use_interpreter_oop_map_cache) const {
+void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, DerivedPointerIterationMode derived_mode, const RegisterMap* map, bool use_interpreter_oop_map_cache) const {
 #ifndef PRODUCT
   // simulate GC crash here to dump java thread in error report
   if (CrashGCForDumpingJavaThread) {
@@ -1166,7 +1172,7 @@ void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosu
   } else if (is_entry_frame()) {
     oops_entry_do(f, map);
   } else if (CodeCache::contains(pc())) {
-    oops_code_blob_do(f, cf, df, map);
+    oops_code_blob_do(f, cf, df, derived_mode, map);
   } else {
     ShouldNotReachHere();
   }
@@ -1210,7 +1216,8 @@ void frame::verify(const RegisterMap* map) const {
 #if COMPILER2_OR_JVMCI
   assert(DerivedPointerTable::is_empty(), "must be empty before verify");
 #endif
-  oops_do_internal(&VerifyOopClosure::verify_oop, NULL, NULL, (RegisterMap*)map, false);
+
+  oops_do_internal(&VerifyOopClosure::verify_oop, NULL, NULL, DerivedPointerIterationMode::_ignore, map, false);
 }
 
 
@@ -1490,7 +1497,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
 //-----------------------------------------------------------------------------------
 // StackFrameStream implementation
 
-StackFrameStream::StackFrameStream(JavaThread *thread, bool update, bool allow_missing_reg) : _reg_map(thread, update) {
+StackFrameStream::StackFrameStream(JavaThread *thread, bool update, bool process_frames, bool allow_missing_reg) : _reg_map(thread, update, process_frames) {
   assert(thread->has_last_Java_frame(), "sanity check");
   _fr = thread->last_frame();
   _is_done = false;

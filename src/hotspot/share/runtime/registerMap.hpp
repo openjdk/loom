@@ -80,10 +80,11 @@ class RegisterMap : public StackObj {
 
   bool        _update_map;              // Tells if the register map need to be
                                         // updated when traversing the stack
+  bool        _process_frames;          // Should frames be processed by stack watermark barriers?
   bool        _validate_oops;           // whether to perform valid oop checks in asserts -- used only in the map use for continuation freeze/thaw
   bool        _walk_cont;               // whether to walk frames on a continuation stack
 
-  DEBUG_ONLY(bool  _skip_missing;)     
+  DEBUG_ONLY(bool  _skip_missing;)
 
 #ifdef ASSERT
   void check_location_valid();
@@ -93,9 +94,11 @@ class RegisterMap : public StackObj {
 
  public:
   DEBUG_ONLY(intptr_t* _update_for_id;) // Assert that RegisterMap is not updated twice for same frame
-  RegisterMap(JavaThread *thread, bool update_map = true, bool walk_cont = false, bool validate_oops = true);
-  RegisterMap(Handle cont, bool update_map = true, bool validate_oops = true);
+  RegisterMap(JavaThread *thread, bool update_map = true, bool process_frames = true, bool walk_cont = false, bool validate_oops = true);
+  RegisterMap(Handle cont, bool update_map = true, bool process_frames = true, bool validate_oops = true);
   RegisterMap(const RegisterMap* map);
+
+  bool validate_oops() const { return _validate_oops; }
 
   address location(VMReg reg) const {
     int index = reg->value() / location_valid_type_size;
@@ -134,10 +137,10 @@ class RegisterMap : public StackObj {
   bool include_argument_oops() const      { return _include_argument_oops; }
   void set_include_argument_oops(bool f)  { _include_argument_oops = f; }
 
-  JavaThread *thread() const { return _thread; }
-  bool update_map()    const { return _update_map; }
-  bool validate_oops() const { return _validate_oops; }
-  bool walk_cont()     const { return _walk_cont; }
+  JavaThread *thread()  const { return _thread; }
+  bool update_map()     const { return _update_map; }
+  bool process_frames() const { return _process_frames; }
+  bool walk_cont()      const { return _walk_cont; }
 
   bool in_cont()       const { return (bool)_on_hstack; } // Whether we are currently on the hstack
   bool in_chunk()      const { return (bool)_in_chunk; }
