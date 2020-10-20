@@ -947,12 +947,10 @@ class VirtualThread extends Thread {
             if (propValue != null) {
                 maxPoolSize = Integer.max(parallelism, Integer.parseInt(propValue));
             } else {
-                maxPoolSize = parallelism << 1;
+                maxPoolSize = Integer.max(parallelism << 1, 128);
             }
             Thread.UncaughtExceptionHandler handler = (t, e) -> { };
-            // use FIFO as default
-            propValue = System.getProperty("jdk.defaultScheduler.lifo");
-            boolean asyncMode = (propValue == null) || propValue.equalsIgnoreCase("false");
+            boolean asyncMode = true; // FIFO
             return new ForkJoinPool(parallelism, factory, handler, asyncMode,
                          0, maxPoolSize, 1, pool -> true, 30, SECONDS);
         };
