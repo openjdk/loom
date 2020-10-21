@@ -2207,7 +2207,6 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       _java_thread(java_thread), _result(result), _exception(exception), _depth(0) {}
 
     void do_thread(Thread* thread) {
-      guarantee (!Thread::current()->is_VM_thread(), "Thread: %s", Thread::current()->name()); // TODO LOOM
       Thread* THREAD = Thread::current();
 
       do_thread0(thread);
