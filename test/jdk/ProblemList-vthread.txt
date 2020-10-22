@@ -18,6 +18,7 @@ java/util/stream/boottest/java.base/java/util/stream/SpinedBufferTest.java      
 java/lang/Thread/GenerifyStackTraces.java                                                       8253918 generic-all
 java/lang/Thread/NullStackTrace.java                                                            8253918 generic-all
 
+java/lang/Thread/virtual/stress/PinALot.java#id2                                                8255275 generic-all
 
 java/foreign/TestMismatch.java                                                                  8253918 generic-all
 jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
