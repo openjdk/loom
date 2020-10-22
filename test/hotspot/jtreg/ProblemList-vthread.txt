@@ -295,12 +295,13 @@ vmTestbase/nsk/jvmti/MethodExit/mexit001/TestDescription.java
 vmTestbase/nsk/jvmti/MethodExit/mexit002/TestDescription.java
 vmTestbase/nsk/jvmti/NotifyFramePop/nframepop001/TestDescription.java
 vmTestbase/nsk/jvmti/unit/GetLocalVariable/getlocal003/TestDescription.java
-
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS101/hs101t007/TestDescription.java
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS101/hs101t008/TestDescription.java
 
 # returned JVMTI_ERROR_INVALID_THREAD for non-implented
 vmTestbase/nsk/jvmti/Exception/exception001/TestDescription.java
 vmTestbase/nsk/jvmti/RedefineClasses/redefclass005/TestDescription.java
-
+vmTestbase/nsk/jvmti/RedefineClasses/redefclass018/TestDescription.java
 
 ####
 ## Breakpoint expects name of virtual thread which is set by test.
