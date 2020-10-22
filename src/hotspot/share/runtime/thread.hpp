@@ -1388,8 +1388,8 @@ public:
   inline volatile void* get_polling_page();
 
   // Continuation support
-  ContinuationEntry* last_continuation() { return _cont_entry; }
-  ContinuationEntry* last_continuation(oop cont_scope) { return Continuation::last_continuation(this, cont_scope); }
+  ContinuationEntry* last_continuation() const { return _cont_entry; }
+  ContinuationEntry* last_continuation(oop cont_scope) const { return Continuation::last_continuation(this, cont_scope); }
   bool cont_yield() { return _cont_yield; }
   void set_cont_yield(bool x) { _cont_yield = x; }
   void set_cont_fastpath(intptr_t* x) { _cont_fastpath = x; }
@@ -1403,7 +1403,7 @@ public:
   int held_monitor_count() { return _held_monitor_count; }
   void reset_held_monitor_count() { _held_monitor_count = 0; }
   void inc_held_monitor_count() { _held_monitor_count++; }
-  void dec_held_monitor_count() { /* assert (_held_monitor_count > 0, ""); -- TODO LOOM: currently this does not hold because we don't handle nesting well */ 
+  void dec_held_monitor_count() { /* assert (_held_monitor_count > 0, ""); -- TODO LOOM: currently this does not hold because we don't handle nesting well */
                                   _held_monitor_count--; }
 
  private:
@@ -1881,7 +1881,7 @@ public:
     return byte_offset_of(JavaThread, _should_post_on_exceptions_flag);
   }
   static ByteSize doing_unsafe_access_offset() { return byte_offset_of(JavaThread, _doing_unsafe_access); }
-  
+
   static ByteSize cont_entry_offset()         { return byte_offset_of(JavaThread, _cont_entry); }
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }
   static ByteSize cont_preempt_offset()       { return byte_offset_of(JavaThread, _cont_preempt); }
@@ -1988,7 +1988,7 @@ public:
   javaVFrame* vthread_carrier_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(vthread_carrier_last_frame(reg_map), reg_map); }
 
   javaVFrame* last_java_vframe(const frame f, RegisterMap* reg_map);
-  
+
   // Returns method at 'depth' java or native frames down the stack
   // Used for security checks
   Klass* security_get_caller_class(int depth);
