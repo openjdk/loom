@@ -30,8 +30,10 @@
 
 ####
 ## OOME in CodeCache for adapters
+java/foreign/TestAddressHandle.java
 java/foreign/TestAdaptVarHandles.java
 java/foreign/TestMemoryAccess.java
+java/lang/invoke/MethodHandlesInsertArgumentsTest.java
 java/lang/invoke/VarHandles/VarHandleTestMethodTypeBoolean.java
 java/lang/invoke/VarHandles/VarHandleTestMethodTypeByte.java
 java/lang/invoke/VarHandles/VarHandleTestMethodTypeChar.java
@@ -40,3 +42,4 @@ java/lang/invoke/VarHandles/VarHandleTestMethodTypeFloat.java
 java/lang/invoke/VarHandles/VarHandleTestMethodTypeInt.java
 java/lang/invoke/VarHandles/VarHandleTestMethodTypeLong.java
 java/lang/invoke/VarHandles/VarHandleTestMethodTypeShort.java
+java/lang/invoke/VarHandles/VarHandleTestMethodTypeString.java
