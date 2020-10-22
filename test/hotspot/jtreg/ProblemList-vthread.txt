@@ -3,6 +3,7 @@
 runtime/Metaspace/DefineClass.java                                                              8253378 generic-all
 runtime/logging/TestMethodHandlesVerbose.java                                                   8253907 windows-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.java                  8253617 generic-all
+compiler/jsr292/TestArrayReturnType.java                                                        8255197 generic-all
 
 # Issues caused a lot of test failures
 
@@ -11,6 +12,7 @@ runtime/cds/serviceability/transformRelatedClasses/TransformInterfaceAndImplemen
 
 gc/g1/TestPeriodicCollectionJNI.java                                                            8254852 generic-all
 vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8254852 generic-all
+gc/cslocker/TestCSLocker.java                                                                   8254852 generic-all
 
 gc/g1/humongousObjects/TestNoAllocationsInHRegions.java                                         8241630 generic-all
 vmTestbase/gc/memory/Churn/Churn4/Churn4.java                                                   8241630 generic-all
@@ -70,6 +72,7 @@ serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
 serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
 serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java
 serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java
+serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java
 
 ####
 # JVMTI tests failing to find thread
