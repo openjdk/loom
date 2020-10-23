@@ -287,9 +287,6 @@ class VirtualThread extends Thread {
         Thread carrier = Thread.currentCarrierThread();
         CARRIER_THREAD.setRelease(this, carrier);
 
-        // set Thread.currentThread() to return this virtual thread
-        carrier.setCurrentThread(this);
-
         // sync up carrier thread interrupt status if needed
         if (interrupted) {
             carrier.setInterrupt();
@@ -300,6 +297,9 @@ class VirtualThread extends Thread {
                 }
             }
         }
+
+        // set Thread.currentThread() to return this virtual thread
+        carrier.setCurrentThread(this);
 
         // notify JVMTI agents
         if (notifyJvmti) {
