@@ -43,11 +43,6 @@ import jdk.internal.access.SharedSecrets;
  * thread or its carrier thread. If the carrier thread is a ForkJoinWorkerThread
  * then the task runs in ForkJoinPool.ManagedBlocker to that its pool may be
  * expanded to support additional parallelism during the blocking operation.
- *
- * When running with a custom scheduler, blocking tasks can optionally be run
- * in a secondary thread pool. This is only suitable for tasks that are not
- * interruptible, tasks that don't synchronize/lock in ways that are visible to
- * other code, or where the caller thread is not pinned.
  */
 public class Blocker {
     private static final Unsafe U = Unsafe.getUnsafe();
@@ -59,35 +54,16 @@ public class Blocker {
      * A task that returns a result and may throw an exception.
      */
     @FunctionalInterface
-    public interface BlockingCallable<V, X extends Throwable> extends Callable<V> {
-        V execute() throws X;
-
-        // do not invoke directly
-        default V call() {
-            try {
-                return execute();
-            } catch (Throwable e) {
-                U.throwException(e);
-                return null;
-            }
-        }
+    public interface BlockingCallable<V, X extends Throwable> {
+        V call() throws X;
     }
 
     /**
      * A task that may throw an exception.
      */
     @FunctionalInterface
-    public interface BlockingRunnable<X extends Throwable> extends Runnable {
-        void execute() throws X;
-
-        // do not invoke directly
-        default void run() {
-            try {
-                execute();
-            } catch (Throwable e) {
-                U.throwException(e);
-            }
-        }
+    public interface BlockingRunnable<X extends Throwable> {
+        void run() throws X;
     }
 
     private static class CallableBlocker<V, X extends Throwable>
@@ -151,42 +127,12 @@ public class Blocker {
     }
 
     /**
-     * Runs the given task in a background thread pool.
-     */
-    public static <V> V runInThreadPool(Callable<V> task) {
-        Future<V> future = ThreadPool.THREAD_POOL.submit(task);
-        try {
-            return future.join();
-        } catch (CompletionException e) {
-            U.throwException(e.getCause());
-            return null;
-        }
-    }
-
-    /**
-     * Runs the given task in a background thread pool.
-     */
-    public static Void runInThreadPool(Runnable task) {
-        Future<?> future = ThreadPool.THREAD_POOL.submit(task);
-        try {
-            future.join();
-        } catch (CompletionException e) {
-            U.throwException(e.getCause());
-        }
-        return null;
-    }
-
-    /**
      * Executes a task that may block and pin the current thread. If invoked on a
      * virtual thread and the current carrier thread is in a ForkJoinPool then the
      * pool may be expanded to support additional parallelism during the call to
      * this method.
-     *
-     * @param task the task to run
-     * @param mayRunInThreadPool true if the task can run in thread pool
      */
-    public static <V, X extends Throwable> V
-    managedBlock(BlockingCallable<V, X> task, boolean mayRunInThreadPool) {
+    public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task) {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
             Thread carrier = JLA.currentCarrierThread();
@@ -202,61 +148,16 @@ public class Blocker {
                     JLA.setCurrentThread(thread);
                 }
                 assert false;  // should not get here
-            } else if (mayRunInThreadPool) {
-                // custom scheduler, run in thread pool for now
-                return runInThreadPool(task);
             }
         }
 
         // run directly
-        return task.call();
-    }
-
-    /**
-     * Executes a task that may block and pin the current thread. If invoked on a
-     * virtual thread and the current carrier thread is in a ForkJoinPool then the
-     * pool may be expanded to support additional parallelism during the call to
-     * this method.
-     *
-     * @param task the task to run
-     * @param mayRunInThreadPool true if the task must run on the current thread
-     *                               or its carrier thread
-     */
-    public static <X extends Throwable> Void
-    managedBlock(BlockingRunnable<X> task, boolean mayRunInThreadPool) {
-        Thread thread = Thread.currentThread();
-        if (thread.isVirtual()) {
-            Thread carrier = JLA.currentCarrierThread();
-            if (carrier instanceof ForkJoinWorkerThread) {
-                JLA.setCurrentThread(carrier);
-                try {
-                    ForkJoinPool.managedBlock(new RunnableBlocker<>(task));
-                    return null;
-                } catch (Throwable e) {
-                    U.throwException(e);
-                } finally {
-                    JLA.setCurrentThread(thread);
-                }
-                assert false;  // should not get here
-            } else if (mayRunInThreadPool) {
-                // custom scheduler, run in thread pool for now
-                return runInThreadPool(task);
-            }
+        try {
+            return task.call();
+        } catch (Throwable e) {
+            U.throwException(e);
+            return null;
         }
-
-        // run directly
-        task.run();
-        return null;
-    }
-
-    /**
-     * Executes a task that may block and pin the current thread. If invoked on a
-     * virtual thread and the current carrier thread is in a ForkJoinPool then the
-     * pool may be expanded to support additional parallelism during the call to
-     * this method.
-     */
-    public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task) {
-        return managedBlock(task, true);
     }
 
     /**
@@ -266,7 +167,54 @@ public class Blocker {
      * this method.
      */
     public static <X extends Throwable> void managedBlock(BlockingRunnable<X> task) {
-        managedBlock(task, true);
+        Thread thread = Thread.currentThread();
+        if (thread.isVirtual()) {
+            Thread carrier = JLA.currentCarrierThread();
+            if (carrier instanceof ForkJoinWorkerThread) {
+                JLA.setCurrentThread(carrier);
+                try {
+                    ForkJoinPool.managedBlock(new RunnableBlocker<>(task));
+                    return;
+                } catch (Throwable e) {
+                    U.throwException(e);
+                } finally {
+                    JLA.setCurrentThread(thread);
+                }
+                assert false;  // should not get here
+            }
+        }
+
+        // run directly
+        try {
+            task.run();
+        } catch (Throwable e) {
+            U.throwException(e);
+        }
+    }
+
+    /**
+     * Runs the given task in a background thread pool.
+     */
+    public static <V> V runInThreadPool(Callable<V> task) {
+        Future<V> future = ThreadPool.THREAD_POOL.submit(task);
+        try {
+            return future.join();
+        } catch (CompletionException e) {
+            U.throwException(e.getCause());
+            return null;
+        }
+    }
+
+    /**
+     * Runs the given task in a background thread pool.
+     */
+    public static void runInThreadPool(Runnable task) {
+        Future<?> future = ThreadPool.THREAD_POOL.submit(task);
+        try {
+            future.join();
+        } catch (CompletionException e) {
+            U.throwException(e.getCause());
+        }
     }
 
     private static class ThreadPool {

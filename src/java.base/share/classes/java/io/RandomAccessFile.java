@@ -621,7 +621,15 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @return     the length of this file, measured in bytes.
      * @throws     IOException  if an I/O error occurs.
      */
-    public native long length() throws IOException;
+    public long length() throws IOException {
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> length0());
+        } else {
+            return length0();
+        }
+    }
+
+    private native long length0() throws IOException;
 
     /**
      * Sets the length of this file.
@@ -642,7 +650,15 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  If an I/O error occurs
      * @since      1.2
      */
-    public native void setLength(long newLength) throws IOException;
+    public void setLength(long newLength) throws IOException {
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> setLength0(newLength));
+        } else {
+            setLength0(newLength);
+        }
+    }
+
+    private native void setLength0(long newLength) throws IOException;
 
     /**
      * Closes this random access file stream and releases any system

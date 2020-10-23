@@ -229,8 +229,7 @@ public class FileChannelImpl
                 do {
                     if (Thread.currentThread().isVirtual()) {
                         n = Blocker.managedBlock(() ->
-                                IOUtil.read(fd, dst, -1, direct, alignment, nd),
-                                false);
+                                IOUtil.read(fd, dst, -1, direct, alignment, nd));
                     } else {
                         n = IOUtil.read(fd, dst, -1, direct, alignment, nd);
                     }
@@ -264,8 +263,7 @@ public class FileChannelImpl
                 do {
                     if (Thread.currentThread().isVirtual()) {
                         n = Blocker.managedBlock(() ->
-                                IOUtil.read(fd, dsts, offset, length, direct, alignment, nd),
-                                false);
+                                IOUtil.read(fd, dsts, offset, length, direct, alignment, nd));
                     } else {
                         n = IOUtil.read(fd, dsts, offset, length, direct, alignment, nd);
                     }
@@ -296,8 +294,7 @@ public class FileChannelImpl
                 do {
                     if (Thread.currentThread().isVirtual()) {
                         n = Blocker.managedBlock(() ->
-                                IOUtil.write(fd, src, -1, direct, alignment, nd),
-                                false);
+                                IOUtil.write(fd, src, -1, direct, alignment, nd));
                     } else {
                         n = IOUtil.write(fd, src, -1, direct, alignment, nd);
                     }
@@ -331,8 +328,7 @@ public class FileChannelImpl
                 do {
                     if (Thread.currentThread().isVirtual()) {
                         n = Blocker.managedBlock(() ->
-                                IOUtil.write(fd, srcs, offset, length, direct, alignment, nd),
-                                false);
+                                IOUtil.write(fd, srcs, offset, length, direct, alignment, nd));
                     } else {
                         n = IOUtil.write(fd, srcs, offset, length, direct, alignment, nd);
                     }
@@ -454,7 +450,11 @@ public class FileChannelImpl
                 // truncate file if given size is less than the current size
                 if (newSize < size) {
                     do {
-                        rv = nd.truncate(fd, newSize);
+                        if (Thread.currentThread().isVirtual()) {
+                            rv = Blocker.managedBlock(() -> nd.truncate(fd, newSize));
+                        } else {
+                            rv = nd.truncate(fd, newSize);
+                        }
                     } while ((rv == IOStatus.INTERRUPTED) && isOpen());
                     if (!isOpen())
                         return null;
@@ -485,7 +485,11 @@ public class FileChannelImpl
             if (!isOpen())
                 return;
             do {
-                rv = nd.force(fd, metaData);
+                if (Thread.currentThread().isVirtual()) {
+                    rv = Blocker.managedBlock(() -> nd.force(fd, metaData));
+                } else {
+                    rv = nd.force(fd, metaData);
+                }
             } while ((rv == IOStatus.INTERRUPTED) && isOpen());
         } finally {
             threads.remove(ti);
@@ -526,9 +530,7 @@ public class FileChannelImpl
                 return -1;
             do {
                 if (Thread.currentThread().isVirtual()) {
-                    n = Blocker.managedBlock(() ->
-                            transferTo0(fd, position, icount, targetFD),
-                            false);
+                    n = Blocker.managedBlock(() -> transferTo0(fd, position, icount, targetFD));
                 } else {
                     n = transferTo0(fd, position, icount, targetFD);
                 }
@@ -1289,9 +1291,7 @@ public class FileChannelImpl
             int n;
             do {
                 if (Thread.currentThread().isVirtual()) {
-                    n = Blocker.managedBlock(() ->
-                            nd.lock(fd, true, position, size, shared),
-                            false);
+                    n = Blocker.managedBlock(() -> nd.lock(fd, true, position, size, shared));
                 } else {
                     n = nd.lock(fd, true, position, size, shared);
                 }

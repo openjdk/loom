@@ -340,7 +340,11 @@ public class FileInputStream extends InputStream
      *             {@code close} or an I/O error occurs.
      */
     public int available() throws IOException {
-        return available0();
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> available0());
+        } else {
+            return available0();
+        }
     }
 
     private native int available0() throws IOException;
