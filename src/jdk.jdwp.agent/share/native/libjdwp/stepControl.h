@@ -55,7 +55,7 @@ typedef struct {
 void stepControl_initialize(void);
 void stepControl_reset(void);
 
-jboolean stepControl_handleStep(JNIEnv *env, jthread thread, jthread vthread, jboolean matchesVThread,
+jboolean stepControl_handleStep(JNIEnv *env, jthread thread,
                                 jclass clazz, jmethodID method);
 
 jvmtiError stepControl_beginStep(JNIEnv *env, jthread thread,

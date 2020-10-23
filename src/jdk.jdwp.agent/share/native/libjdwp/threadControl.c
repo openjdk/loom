@@ -4,7 +4,7 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this`
+ * published by the Free Software Foundation.  Oracle designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
  *
@@ -94,10 +94,6 @@ typedef struct ThreadNode {
 } ThreadNode;
 
 static jint suspendAllCount;
-
-// minimumSuspendAllCount takes into account threads that have had a resume done
-// on them. It represents the minimum suspend count any thread might have.
-static jint minimumSuspendAllCount;
 
 typedef struct ThreadList {
     ThreadNode *first;
@@ -243,19 +239,21 @@ findThread(ThreadList *list, jthread thread)
 {
     ThreadNode *node;
     JNIEnv *env = getEnv();
+    jboolean is_vthread = isVThread(thread);
 
-    if (list == NULL || list == &runningVThreads) {
-        /*
-         * Search for a vthread.
-         * vthread fixme: this needs to be done a lot faster. Maybe some sort of TLS for vthreads is needed.
-         * Otherwise we'll need something like a hashlist front end to the runningVThreads list so
-         * we can do quick lookups.
-         */
-        ThreadNode *node = nonTlsSearch(env, &runningVThreads, thread);
-        if (node != NULL || list == &runningVThreads) {
-            return node;
+    if (is_vthread) {
+        if (list == NULL || list == &runningVThreads) {
+            /*
+             * Search for a vthread.
+             * vthread fixme: this needs to be done a lot faster. Maybe some sort of TLS for vthreads is needed.
+             * Otherwise we'll need something like a hashlist front end to the runningVThreads list so
+             * we can do quick lookups.
+             */
+            return nonTlsSearch(env, &runningVThreads, thread);
+        } else {
+            return NULL; // return NULL if we aren't looking for vthreads
         }
-    }    
+    }
 
     /* Get thread local storage for quick thread -> node access */
     node = getThreadLocalStorage(thread);
@@ -281,6 +279,19 @@ findThread(ThreadList *list, jthread thread)
     /* If a list is supplied, only return ones in this list */
     if ( node != NULL && list != NULL && node->list != list ) {
         return NULL;
+    }
+    return node;
+}
+
+/* Search for a running thread, including vthreads. */
+static ThreadNode *
+findRunningThread(jthread thread)
+{
+    ThreadNode *node;
+    if (isVThread(thread)) {
+        node = findThread(&runningVThreads, thread);
+    } else {
+        node = findThread(&runningThreads, thread);
     }
     return node;
 }
@@ -605,7 +616,6 @@ threadControl_initialize(void)
     jvmtiError error;
 
     suspendAllCount = 0;
-    minimumSuspendAllCount = 0;
     runningThreads.first = NULL;
     otherThreads.first = NULL;
     runningVThreads.first = NULL;
@@ -632,7 +642,6 @@ getResumee(jthread resumingThread)
     jobject object;
     FrameNumber fnum = 0;
 
-    JDI_ASSERT(!isVThread(resumingThread));
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetLocalObject)
                     (gdata->jvmti, resumingThread, fnum, 0, &object);
     if (error == JVMTI_ERROR_NONE) {
@@ -688,6 +697,10 @@ notifyAppResumeComplete(void)
     }
 }
 
+/*
+ * Event handler for FRAME_POP and EXCEPTION_CATCH when in Thread.resume()
+ * so we can detect its completion.
+ */
 static void
 handleAppResumeCompletion(JNIEnv *env, EventInfo *evinfo,
                           HandlerNode *handlerNode,
@@ -697,7 +710,7 @@ handleAppResumeCompletion(JNIEnv *env, EventInfo *evinfo,
     jthread     thread;
 
     /* vthread fixme: it's unclear how this is used and if anything special needs to be done for vthreads. */
-    JDI_ASSERT(!evinfo->matchesVThread);
+    JDI_ASSERT(!evinfo->is_vthread);
 
     thread = evinfo->thread;
 
@@ -742,7 +755,7 @@ trackAppResume(jthread thread)
     ThreadNode *node;
 
     fnum = 0;
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node != NULL) {
         JDI_ASSERT(node->resumeFrameDepth == 0);
         error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)
@@ -775,14 +788,12 @@ trackAppResume(jthread thread)
     }
 }
 
+/* Global breakpoint handler for Thread.resume() */
 static void
 handleAppResumeBreakpoint(JNIEnv *env, EventInfo *evinfo,
                           HandlerNode *handlerNode,
                           struct bag *eventBag)
 {
-    /* vthread fixme: it's unclear how this is used and if anything special needs to be done for vthreads. */
-    JDI_ASSERT(!evinfo->matchesVThread);
-
     jthread resumer = evinfo->thread;
     jthread resumee = getResumee(resumer);
 
@@ -917,25 +928,6 @@ commonSuspendByNode(ThreadNode *node)
 }
 
 /*
- * Track the guaranteed minimum suspend count each Thread has after one or more
- * suspendAll() have been done, followed by selectively resuming some threads.
- * The idea is to figure out if any carrier threads *might* be running. If
- * minimumSuspendAllCount > 0, we know we can treat all vthreads as being supended.
- *
- * vthread fixme: We don't take into account doing a suspend of a thread that we
- * previously had resumed, and that resulted in decrementing minimumSuspendAllCount.
- * If we tracked these threads, we could have a more accureate minimumSuspendAllCount,
- * one that can recover from a resume + suspend of an individual thread.
- */
-static void
-adjustMinimumSuspendAllCount(jint suspendCount) 
-{
-    if (minimumSuspendAllCount > suspendCount) {
-        minimumSuspendAllCount = suspendCount;
-    }
-}
-
-/*
  * Deferred suspends happen when the suspend is attempted on a thread
  * that is not started. Bookkeeping (suspendCount,etc.)
  * is handled by the original request, and once the thread actually
@@ -968,7 +960,6 @@ deferredSuspendThreadByNode(ThreadNode *node)
          */
         if (error != JVMTI_ERROR_NONE) {
             node->suspendCount--;
-            adjustMinimumSuspendAllCount(node->suspendCount);
         }
     }
 
@@ -987,8 +978,6 @@ suspendThreadByNode(ThreadNode *node)
         /* Ignore requests for suspending debugger threads */
         return JVMTI_ERROR_NONE;
     }
-
-    JDI_ASSERT(!node->is_vthread);
 
     /*
      * Just increment the suspend count if we are waiting
@@ -1033,37 +1022,15 @@ resumeThreadByNode(ThreadNode *node)
         /* never suspended by debugger => don't ever try to resume */
         return JVMTI_ERROR_NONE;
     }
-
-    //JDI_ASSERT(!node->is_vthread);
-
     if (node->suspendCount > 0) {
         node->suspendCount--;
-        /*
-         * Only adjust minimumSuspendAllCount if we are not suspending due an invoke request.
-         * The reason is because doing invokes under a SUSPEND_ALL is very common, and we don't
-         * want it to result in no longer considering all vthreads to be suspended. For the most
-         * part this is safe because under normal situations this thread could not be used
-         * to mount another vthread, although technically the code being invoked could do this.
-         * A safeguard is to catch this during the VIRTUAL_THREAD_MOUNTED event and no
-         * longer assume vthreads are suspended whenever one is received.
-         */
-        if (!node->currentInvoke.pending) {
-            adjustMinimumSuspendAllCount(node->suspendCount);
-        }
         debugMonitorNotifyAll(threadLock);
         if ((node->suspendCount == 0) && node->toBeResumed &&
             !node->suspendOnStart) {
             LOG_MISC(("thread=%p resumed", node->thread));
             error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeThread)
                         (gdata->jvmti, node->thread);
-            /* Don't invalidate frameIDs for thread handling an invoke.
-             * vthread fixme: This probably is not JDWP spec compliant since the InvokeMethod commands
-             * say that they resume the thread(s), and ThreadReference.frames() says that the
-             * frameIDs are only valid while the thread is suspended.
-             */
-            if (!node->currentInvoke.pending) {
-              node->frameGeneration++; /* Increment on each resume */
-            }
+            node->frameGeneration++; /* Increment on each resume */
             node->toBeResumed = JNI_FALSE;
             if (error == JVMTI_ERROR_THREAD_NOT_ALIVE && !node->isStarted) {
                 /*
@@ -1139,21 +1106,17 @@ commonSuspend(JNIEnv *env, jthread thread, jboolean deferred)
 {
     ThreadNode *node;
 
-    if (isVThread(thread)) {
-      printf("commonSuspend: cannot suspend vthread\n");
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
-
     /*
      * If the thread is not between its start and end events, we should
      * still suspend it. To keep track of things, add the thread
      * to a separate list of threads so that we'll resume it later.
      */
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
 #if 0
     tty_message("commonSuspend: node(%p) suspendCount(%d) %s", node, node->suspendCount, node->name);
 #endif
     if (node == NULL) {
+        JDI_ASSERT(!isVThread(thread));
         node = insertThread(env, &otherThreads, thread);
     }
 
@@ -1175,7 +1138,6 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
 
     if (node->suspendCount > 1) {
         node->suspendCount--;
-        adjustMinimumSuspendAllCount(node->suspendCount);
         /* nested suspend so just undo one level */
         return JVMTI_ERROR_NONE;
     }
@@ -1197,7 +1159,6 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
      */
     if (node->suspendCount == 1 && (!node->toBeResumed || node->suspendOnStart)) {
         node->suspendCount--;
-        adjustMinimumSuspendAllCount(node->suspendCount);
         return JVMTI_ERROR_NONE;
     }
 
@@ -1339,7 +1300,6 @@ commonResumeList(JNIEnv *env)
          * the same here. We also don't clear the error.
          */
         node->suspendCount--;
-        adjustMinimumSuspendAllCount(node->suspendCount);
         node->toBeResumed = JNI_FALSE;
         node->frameGeneration++; /* Increment on each resume */
     }
@@ -1469,17 +1429,6 @@ commonResume(jthread thread)
     jvmtiError  error;
     ThreadNode *node;
 
-    if (isVThread(thread)) {
-      /* Resume the carrier thread if mounted. Otherwise produce and error. */
-      jthread carrier_thread = getVThreadThread(thread);
-      if (carrier_thread == NULL) {
-        printf("commonResume: cannot resume unmounted vthread\n");
-        return JVMTI_ERROR_INVALID_THREAD;
-      } else {
-        thread = carrier_thread;
-      }
-    }
-
     /*
      * The thread is normally between its start and end events, but if
      * not, check the auxiliary list used by threadControl_suspendThread.
@@ -1497,7 +1446,6 @@ commonResume(jthread thread)
     if (node != NULL) {
         error = resumeThreadByNode(node);
     }
-
     return error;
 }
 
@@ -1564,20 +1512,7 @@ threadControl_suspendCount(jthread thread, jint *count)
 
     error = JVMTI_ERROR_NONE;
     if (node != NULL) {
-        if (!is_vthread) {
-            *count = node->suspendCount;
-        } else {
-            jthread carrier_thread = getVThreadThread(thread);
-            if (carrier_thread == NULL) {
-              /* Not mounted, so use minimumSuspendAllCount. */
-              *count = minimumSuspendAllCount;
-            } else {
-              /* It's a mounted vthread, so the carrier thread tracks the suspend count. */
-              node = findThread(&runningThreads, carrier_thread);
-              JDI_ASSERT(node != NULL);
-              *count = node->suspendCount;
-            }
-        }
+        *count = node->suspendCount;
     } else {
         /*
          * If the node is in neither list, the debugger never suspended
@@ -1604,6 +1539,13 @@ contains(JNIEnv *env, jthread *list, jint count, jthread item)
     return JNI_FALSE;
 }
 
+
+static jvmtiError
+incrementSupendCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
+{
+    node->suspendCount++;
+    return JVMTI_ERROR_NONE;
+}
 
 typedef struct {
     jthread *list;
@@ -1646,6 +1588,19 @@ threadControl_suspendAll(void)
         jthread *threads;
         jint count;
 
+        /* Tell JVMTI to suspend all virtual threads. */
+        if (suspendAllCount == 0) {
+            error = JVMTI_FUNC_PTR(gdata->jvmti, SuspendAllVirtualThreads)
+                    (gdata->jvmti);
+          if (error != JVMTI_ERROR_NONE) {
+              EXIT_ERROR(error, "cannot suspend all virtual threads");
+          }
+        }
+
+        /* Increment suspend count of each virtual thread that we are tracking. */
+        error = enumerateOverThreadList(env, &runningVThreads, incrementSupendCountHelper, NULL);
+        JDI_ASSERT(error == JVMTI_ERROR_NONE);
+
         threads = allThreads(&count);
         if (threads == NULL) {
             error = AGENT_ERROR_OUT_OF_MEMORY;
@@ -1681,7 +1636,6 @@ threadControl_suspendAll(void)
 
         if (error == JVMTI_ERROR_NONE) {
             suspendAllCount++;
-            minimumSuspendAllCount++;
         }
 
     err: ;
@@ -1691,6 +1645,15 @@ threadControl_suspendAll(void)
     postSuspend();
 
     return error;
+}
+
+static jvmtiError
+decrementSupendCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
+{
+    // vthread fixme: eventually need to support some vthreads already being resumed
+    JDI_ASSERT(node->suspendCount > 0);
+    node->suspendCount--;
+    return JVMTI_ERROR_NONE;
 }
 
 static jvmtiError
@@ -1719,6 +1682,19 @@ threadControl_resumeAll(void)
 
     eventHandler_lock(); /* for proper lock order */
     debugMonitorEnter(threadLock);
+
+    if (suspendAllCount == 1) {
+        /* Tell JVMTI to resume all virtual threads. */
+        error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeAllVirtualThreads)
+                (gdata->jvmti);
+        if (error != JVMTI_ERROR_NONE) {
+            EXIT_ERROR(error, "cannot resume all virtual threads");
+        }
+    }
+
+    /* Decrement suspend count of each virtual thread that we are tracking. */
+    error = enumerateOverThreadList(env, &runningVThreads, decrementSupendCountHelper, NULL);
+    JDI_ASSERT(error == JVMTI_ERROR_NONE);
 
     /*
      * Resume only those threads that the debugger has suspended. All
@@ -1761,7 +1737,7 @@ threadControl_getStepRequest(jthread thread)
 
     debugMonitorEnter(threadLock);
 
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node != NULL) {
         step = &node->currentStep;
     }
@@ -1781,7 +1757,7 @@ threadControl_getInvokeRequest(jthread thread)
 
     debugMonitorEnter(threadLock);
 
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node != NULL) {
          request = &node->currentInvoke;
     }
@@ -2168,15 +2144,6 @@ checkForPopFrameEvents(JNIEnv *env, EventIndex ei, jthread thread)
     return JNI_FALSE;
 }
 
-/*
- * vthread fixme: We need to consider the impact of events being delivered on
- * carrier threads, especially if it is handled on the vthread. It's unclear
- * if any of this "onEvent" code is doing the right thing in that case, since
- * it always deals with just the carrier thread. Things to look into are:
- *  - the setting of node->current_ei, which the HANDLING_EVENT macro looks at
- *  - the fact that we always return the eventBag for the thread, not the vthread
- *  - always calling checkForPopFrameEvents() for the thread and not the vthread
- */
 struct bag *
 threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject currentException)
 {
@@ -2216,6 +2183,7 @@ threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject cu
      */
     node = findThread(&otherThreads, thread);
     if (node != NULL) {
+        JDI_ASSERT(!evinfo->is_vthread);
         moveNode(&otherThreads, &runningThreads, node);
     } else {
         /*
@@ -2226,7 +2194,11 @@ threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject cu
          * It is possible for certain events (notably method entry/exit)
          * to precede thread start for some VM implementations.
          */
-        node = insertThread(env, &runningThreads, thread);
+        if (evinfo->is_vthread) {
+            node = insertThread(env, &runningVThreads, thread);
+        } else {
+            node = insertThread(env, &runningThreads, thread);
+        }
     }
 
     if (ei == EI_THREAD_START) {
@@ -2292,7 +2264,7 @@ threadControl_onEventHandlerExit(EventIndex ei, jthread thread,
     }
     debugMonitorEnter(threadLock);
 
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node == NULL) {
         EXIT_ERROR(AGENT_ERROR_NULL_POINTER,"thread list corrupted");
     } else {
@@ -2341,10 +2313,9 @@ jvmtiError
 threadControl_applicationThreadStatus(jthread thread,
                         jdwpThreadStatus *pstatus, jint *statusFlags)
 {
-    ThreadNode *node = NULL;
+    ThreadNode *node;
     jvmtiError  error;
     jint        state;
-    jboolean    is_vthread = isVThread(thread);
 
     log_debugee_location("threadControl_applicationThreadStatus()", thread, NULL, 0);
 
@@ -2355,28 +2326,22 @@ threadControl_applicationThreadStatus(jthread thread,
     *statusFlags = map2jdwpSuspendStatus(state);
 
     if (error == JVMTI_ERROR_NONE) {
-        if (is_vthread) {
-            if (minimumSuspendAllCount > 0) {
-                *statusFlags = JDWP_SUSPEND_STATUS(SUSPENDED);
-            }
-        } else {
-            node = findThread(&runningThreads, thread);
-            if ((node != NULL) && HANDLING_EVENT(node)) {
-                /*
-                 * While processing an event, an application thread is always
-                 * considered to be running even if its handler happens to be
-                 * cond waiting on an internal debugger monitor, etc.
-                 *
-                 * Leave suspend status untouched since it is not possible
-                 * to distinguish debugger suspends from app suspends.
-                 */
-                *pstatus = JDWP_THREAD_STATUS(RUNNING);
-            }
+        node = findRunningThread(thread);
+        if ((node != NULL) && HANDLING_EVENT(node)) {
+            /*
+             * While processing an event, an application thread is always
+             * considered to be running even if its handler happens to be
+             * cond waiting on an internal debugger monitor, etc.
+             *
+             * Leave suspend status untouched since it is not possible
+             * to distinguish debugger suspends from app suspends.
+             */
+            *pstatus = JDWP_THREAD_STATUS(RUNNING);
         }
     }
 #if 0
     tty_message("status %s: node(%p) suspendCount(%d) %d %d %s",
-                is_vthread ? "vthread" : "thread",
+                isVThread(thread) ? "vthread" : "thread",
                 node, node->suspendCount, *pstatus, *statusFlags, node->name);
 #endif
 
@@ -2390,6 +2355,9 @@ threadControl_interrupt(jthread thread)
 {
     ThreadNode *node;
     jvmtiError  error;
+
+    // vthread fixme: should this work for vthreads?
+    JDI_ASSERT(!isVThread(thread));
 
     error = JVMTI_ERROR_NONE;
 
@@ -2420,7 +2388,7 @@ threadControl_clearCLEInfo(JNIEnv *env, jthread thread)
 
     debugMonitorEnter(threadLock);
 
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node != NULL) {
         node->cleInfo.ei = 0;
         if (node->cleInfo.clazz != NULL) {
@@ -2442,7 +2410,7 @@ threadControl_cmpCLEInfo(JNIEnv *env, jthread thread, jclass clazz,
 
     debugMonitorEnter(threadLock);
 
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node != NULL && node->cleInfo.ei != 0 &&
         node->cleInfo.method == method &&
         node->cleInfo.location == location &&
@@ -2463,7 +2431,7 @@ threadControl_saveCLEInfo(JNIEnv *env, jthread thread, EventIndex ei,
 
     debugMonitorEnter(threadLock);
 
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node != NULL) {
         node->cleInfo.ei = ei;
         /* Create a class ref that will live beyond */
@@ -2482,6 +2450,9 @@ threadControl_setPendingInterrupt(jthread thread)
 {
     ThreadNode *node;
 
+    // vthread fixme: should this work for vthreads?
+    JDI_ASSERT(!isVThread(thread));
+
     debugMonitorEnter(threadLock);
 
     node = findThread(&runningThreads, thread);
@@ -2497,6 +2468,9 @@ threadControl_stop(jthread thread, jobject throwable)
 {
     ThreadNode *node;
     jvmtiError  error;
+
+    // vthread fixme: should this work for vthreads?
+    JDI_ASSERT(!isVThread(thread));
 
     error = JVMTI_ERROR_NONE;
 
@@ -2576,7 +2550,6 @@ threadControl_reset(void)
     freeDeferredEventModes(env);
 
     suspendAllCount = 0;
-    minimumSuspendAllCount = 0;
 
     /* Everything should have been resumed */
     JDI_ASSERT(otherThreads.first == NULL);
@@ -2594,7 +2567,7 @@ threadControl_getInstructionStepMode(jthread thread)
     mode = JVMTI_DISABLE;
 
     debugMonitorEnter(threadLock);
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node != NULL) {
         mode = node->instructionStepMode;
     }
@@ -2641,9 +2614,9 @@ threadControl_setEventMode(jvmtiEventMode mode, EventIndex ei, jthread thread)
                  * handling during mount/unmount.
                  *
                  * And it should also be noted here that if the carrier thread is null, the
-                 * findThread() call ends up returning the current thread, and then 
+                 * findThread() call ends up returning the current thread, and then
                  * threadSetEventNotificationMode() is called with a NULL thread, resulting
-                 * in the event being enabled on all threads. This bug actually has the 
+                 * in the event being enabled on all threads. This bug actually has the
                  * desireable affect of making breakpoints that are filtered on an unmounted
                  * vthread work as expected, because all the carrier threads get the breakpoint
                  * event enabled. However, for some odd reason it also works as expected if
@@ -2663,7 +2636,12 @@ threadControl_setEventMode(jvmtiEventMode mode, EventIndex ei, jthread thread)
                  *    enabling/disabling of the JVMTI single step event on the carrier thread.
                  * There is a potential issue with initiating a StepRequest on and unmounted
                  * vthread. See the fixme comment in stepControl_beginStep.
-                 */ 
+                 */
+              /* vthread fixme: If we save the event mode state with the vthread node, then we can
+                 clear that state when the vthread is umounted and restore it when mounted again.
+                 This is similar to what we already do for single stepping, but could be done
+                 in a generic fashion for all events.
+              */
                 thread = getVThreadThread(thread);
             }
             node = findThread(&runningThreads, thread);
@@ -2774,12 +2752,9 @@ threadControl_addVThread(jthread vthread)
 
 void
 threadControl_mountVThread(jthread vthread, jthread thread, jbyte sessionID) {
-  /* If we get a MOUNT event, there must be a carrier thread running. The only way this
-   * should happen when minimumSuspendAllCount is not already 0 is if the JDWP
-   * invoke support was used to invoke a method that triggered a vthread to be mounted,
-   * which should never happen unless someone writes a test to do this.
-   */
-  minimumSuspendAllCount = 0;
+    /* vthread fixme: this funciton no longer serves any purpose now that we rely on
+     * continuation events instead. remove.
+     */
 }
 
 
@@ -2843,6 +2818,11 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
         JDI_ASSERT(vthreadNode->isStarted);
         JDI_ASSERT(bagSize(vthreadNode->eventBag) == 0);
 
+        // vthread fixme: Can't think of why this should be needed. The agent doesn't
+        // consider yields to be like a suspend and runs to be like a resume. The agent
+        // considers the vthread to be running the whole time it was unmounted.
+        // frameGeneration would have been incremented the last time the vthread was
+        // resumed, and this should suffice.
         vthreadNode->frameGeneration++; /* Increment, since this is like a thread resume. */
 
         /* If we are not single stepping in this vthread then there is nothing more to do. */
@@ -2853,16 +2833,25 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
         JDI_ASSERT(vthreadNode->currentStep.is_vthread);
 
         /*
+         * We have to call stepControl_handleContinuationRun here just like we
+         * did above for the threadNode. Note we'll never end up doing this for both.
+         */
+        JDI_ASSERT(!threadNode->currentStep.pending);
+        stepControl_handleContinuationRun(env, vthread, &vthreadNode->currentStep);
+
+        /*
          * Move the single step state from the vthreadNode to threadNode, but only if we aren't
          * already single stepping on the carrier thread.
+         *
+         * vthread fixme: The notion of the carrier thread already single stepping should
+         * go away once we have vthread events.
          */
         if (!threadNode->currentStep.pending) {
-            /* Copy vthread currentStep struct to carrier thread. */
-            memcpy(&threadNode->currentStep, &vthreadNode->currentStep, sizeof(vthreadNode->currentStep));
-
             /* Enable JVMTI single step on the carrier thread if necessary. */
             if (vthreadNode->instructionStepMode == JVMTI_ENABLE) {
                 stepControl_enableStepping(thread);
+                // vthread fixme: This shouldn't be needed since it is already
+                // done by threadSetEventNotificationMode().
                 threadNode->instructionStepMode = JVMTI_ENABLE;
             }
 
@@ -2881,19 +2870,19 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
                  * represents the frame where the STEP_OVER was done, but since we want one
                  * frame below this point, we also subtract one.
                  */
-                depth = getThreadFrameCount(thread) - vthreadNode->currentStep.fromStackDepth;
+                depth = continuation_frame_count - vthreadNode->currentStep.fromStackDepth;
                 depth--; /* We actually want the frame one below the adjusted fromStackDepth. */
                 if (depth >= 0) {
                     error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)(gdata->jvmti, thread, depth);
                     if (error == JVMTI_ERROR_DUPLICATE) {
-                      error = JVMTI_ERROR_NONE;
-                      /* Already being notified, continue without error */
+                        error = JVMTI_ERROR_NONE;
+                        /* Already being notified, continue without error */
                     } else if (error != JVMTI_ERROR_NONE) {
-                      EXIT_ERROR(error, "NotifyFramePop failed during mountVThread");
+                        EXIT_ERROR(error, "NotifyFramePop failed during mountVThread");
                     }
                 } else {
                     /*
-                     * If the less than 0, then that means we were single stepping over
+                     * If the depth is less than 0, then that means we were single stepping over
                      * the Continuation.doYield() call. In this case NotifyFramePop is not going to work
                      * since there was never one setup (doYield() was never actually entered). So
                      * all that needs to be done is to restore single stepping, and we'll stop
@@ -2901,23 +2890,22 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
                      */
                     JDI_ASSERT(depth == -1);
                     if (vthreadNode->instructionStepMode == JVMTI_DISABLE) {
-                      stepControl_enableStepping(thread);
-                      threadNode->instructionStepMode = JVMTI_ENABLE;
+                        stepControl_enableStepping(thread);
+                        // vthread fixme: This shouldn't be needed since it is already
+                        // done by threadSetEventNotificationMode().
+                        threadNode->instructionStepMode = JVMTI_ENABLE;
+                        vthreadNode->instructionStepMode = JVMTI_ENABLE;
                     }
                 }
             }
-   
+
             /* Enable events */
             threadControl_setEventMode(JVMTI_ENABLE, EI_EXCEPTION_CATCH, thread);
             threadControl_setEventMode(JVMTI_ENABLE, EI_FRAME_POP, thread);
-            if (threadNode->currentStep.methodEnterHandlerNode != NULL) {
+            if (vthreadNode->currentStep.methodEnterHandlerNode != NULL) {
                 threadControl_setEventMode(JVMTI_ENABLE, EI_METHOD_ENTRY, thread);
             }
         }
-
-        /* Always clear the vthread single step state, regardless of what we've done above. */
-        vthreadNode->instructionStepMode = JVMTI_DISABLE;
-        memset(&vthreadNode->currentStep, 0, sizeof(vthreadNode->currentStep));
     }
     debugMonitorExit(threadLock);
 }
@@ -2934,9 +2922,13 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
     debugMonitorEnter(threadLock);
     {
         JNIEnv *env = getEnv();
+        jthread vthread;
         ThreadNode *threadNode;
+        ThreadNode *vthreadNode = NULL;
         jint total_frame_count;
         jint fromDepth;
+        jboolean pending;
+        jboolean is_vthread;
 
         threadNode = findThread(&runningThreads, thread);
 
@@ -2948,25 +2940,45 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
 
         JDI_ASSERT(threadNode->isStarted);
         JDI_ASSERT(bagSize(threadNode->eventBag) == 0);
+        pending = threadNode->currentStep.pending;
+
+        vthread = getThreadVThread(thread);
+        if (vthread != NULL) {
+            vthreadNode = findThread(&runningVThreads, vthread);
+            if (!gdata->notifyDebuggerOfAllVThreads && vthreadNode == NULL) {
+                /* This is not a vthread we are tracking. */
+                debugMonitorExit(threadLock);
+                return;
+            }
+            JDI_ASSERT(vthreadNode != NULL);
+            JDI_ASSERT(vthreadNode->isStarted);
+            JDI_ASSERT(bagSize(vthreadNode->eventBag) == 0);
+            pending = pending || vthreadNode->currentStep.pending;
+        }
+        is_vthread = vthreadNode != NULL;
 
         /*
          * If we are not single stepping in this thread, then there is nothing to do.
          */
-        if (!threadNode->currentStep.pending) {
+        if (!pending) {
             debugMonitorExit(threadLock);
             return; /* Nothing to do. */
         }
 
         /* At what depth were we single stepping. */
-        fromDepth = threadNode->currentStep.fromStackDepth;
-
+        if (is_vthread) {
+            fromDepth = vthreadNode->currentStep.fromStackDepth;
+        } else {
+            fromDepth = threadNode->currentStep.fromStackDepth;
+        }
         /*
          * Note the continuation has already been unmounted, so total_frame_count will not
-         * include the continuation frames.
+         * include the continuation frames. Note, even when dealing with a vthread here,
+         * we still awant to get the carrier thread's frame count.
          */
         total_frame_count = getThreadFrameCount(thread);
 
-        if (threadNode->currentStep.depth == JDWP_STEP_DEPTH(OVER) &&
+        if (!is_vthread && threadNode->currentStep.depth == JDWP_STEP_DEPTH(OVER) &&
             total_frame_count == fromDepth) {
             /*
              * We were stepping over Continuation.doContinue() in Continuation.run(). This
@@ -2988,7 +3000,7 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
                 stepControl_enableStepping(thread);
                 threadNode->instructionStepMode = JVMTI_ENABLE;
             }
-        } else if (!threadNode->currentStep.is_vthread) {
+        } else if (!is_vthread) {
             /* We were single stepping, but not in a vthread. */
             if (total_frame_count < fromDepth) { /* Check if fromDepth is in the continuation. */
                 /*
@@ -3013,65 +3025,50 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
             }
         } else {
             /*
-             * We are single stepping the vthread, not the carrier thread. Move the single step
-             * state to the vthreadNode.
+             * We are single stepping the vthread, not the carrier thread.
              */
-            jthread vthread = getThreadVThread(thread);
-            ThreadNode *vthreadNode;
-            JDI_ASSERT(vthread != NULL);
-
-            vthreadNode = findThread(&runningVThreads, vthread);
-            if (!gdata->notifyDebuggerOfAllVThreads && vthreadNode == NULL) {
-                /* This is not a vthread we are tracking. */
-                debugMonitorExit(threadLock);
-                return;
-            }
-
-            JDI_ASSERT(vthreadNode != NULL);
-            JDI_ASSERT(vthreadNode->isStarted);
-            JDI_ASSERT(bagSize(vthreadNode->eventBag) == 0);
-
-            if (threadNode->currentStep.depth == JDWP_STEP_DEPTH(INTO) &&
-                (total_frame_count + continuation_frame_count == fromDepth)) {
+            JDI_ASSERT(vthreadNode->currentStep.is_vthread);
+            if (vthreadNode->currentStep.depth == JDWP_STEP_DEPTH(INTO) &&
+                (continuation_frame_count == fromDepth)) {
                 /* We are stepping into Continuation.doYield(), so leave single stepping enabled.
                  * This will resume single stepping in Continuation.run() right after the
                  * Continuation.enter() call.
                  */
-            } else if (total_frame_count >= fromDepth) { /* Check if fromDepth is NOT in the continuation. */
+                // vthread fixme: I think when vthread events are supported, this becomes irrelevant,
+                // and instead single stepping will simply resume automatically when the vthread
+                // is mounted again.
+            } else if (JNI_FALSE /*total_frame_count >= fromDepth*/) { /* Check if fromDepth is NOT in the continuation. */
+                // vthread fixme: the above check doesn't work anymore because fromDepth no longer
+                // includes the non-continuation frames. However, this likely also will no longer
+                // matter once vthread events are supported.
                 /*
                  * This means the single stepping was initiated stepping in a vthread, but in that small
                  * window after Thread.setVirtualThread(this) has been called, and before the vthread's
                  * continuation was actually mounted. An example of this is stepping over the cont.run()
                  * call in VirtualThread.runContinuation(). In this case we just leave the carrier
-                 * thread's single step state in place. We should eventually get a FramePop event to 
+                 * thread's single step state in place. We should eventually get a FramePop event to
                  * enable single stepping again.
                  */
-                JDI_ASSERT(threadNode->currentStep.depth == JDWP_STEP_DEPTH(OVER));
+                JDI_ASSERT(vthreadNode->currentStep.depth == JDWP_STEP_DEPTH(OVER));
             } else {
                 /*
                  * We were single stepping in the vthread, and now we need to stop doing that since
-                 * we are leaving the vthread. We will copy our single step state from the carrier
-                 * thread to the vthread so we can later restore it when the vthread is mounted again
-                 * and we get a CONTINUATION_RUN event.
+                 * we are leaving the vthread.
                  */
 
                 /* Clean up JVMTI SINGLE_STEP state. */
-                if (threadNode->instructionStepMode == JVMTI_ENABLE) {
+                if (vthreadNode->instructionStepMode == JVMTI_ENABLE) {
                     stepControl_disableStepping(thread);
                     threadNode->instructionStepMode = JVMTI_DISABLE;
-                    vthreadNode->instructionStepMode = JVMTI_ENABLE;
+                    vthreadNode->instructionStepMode = JVMTI_ENABLE; // so we re-enable it during the Run event
                 }
-   
+
                 /* Disable events */
                 threadControl_setEventMode(JVMTI_DISABLE, EI_EXCEPTION_CATCH, thread);
                 threadControl_setEventMode(JVMTI_DISABLE, EI_FRAME_POP, thread);
-                if (threadNode->currentStep.methodEnterHandlerNode != NULL) {
+                if (vthreadNode->currentStep.methodEnterHandlerNode != NULL) {
                     threadControl_setEventMode(JVMTI_DISABLE, EI_METHOD_ENTRY, thread);
                 }
-
-                /* Copy currentStep struct from the threadNode to the vthreadNode and then zero out the threadNode. */
-                memcpy(&vthreadNode->currentStep, &threadNode->currentStep, sizeof(threadNode->currentStep));
-                memset(&threadNode->currentStep, 0, sizeof(threadNode->currentStep));
             }
         }
     }

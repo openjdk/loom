@@ -94,7 +94,6 @@ typedef struct {
     char * options;
 
     jclass              classClass;
-    jclass              virtualThreadClass;
     jclass              threadClass;
     jclass              threadGroupClass;
     jclass              classLoaderClass;
@@ -214,10 +213,7 @@ typedef struct {
 
     EventIndex  ei;
     jthread     thread;
-    jthread     vthread;      /* NULL if not running on a vthread. */
-    jboolean    matchesVThread; /* true if the matching HandlerNode specified a vthread that matched,
-                                   or the HandlerNode specified no thread and the event came in on a
-                                   carrier thread running a vthread. */
+    jboolean    is_vthread;
     jclass      clazz;
     jmethodID   method;
     jlocation   location;
@@ -380,6 +376,7 @@ jboolean isSameObject(JNIEnv *env, jobject o1, jobject o2);
 
 jthread  getThreadVThread(jthread thread);
 jthread  getVThreadThread(jthread vthread);
+jthread  getLiveThread(jthread thread);
 
 jint getThreadFrameCount(jthread thread);
 

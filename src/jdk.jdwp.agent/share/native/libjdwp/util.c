@@ -183,7 +183,6 @@ util_initialize(JNIEnv *env)
 
         jvmtiError error;
         jclass localClassClass;
-        jclass localVirtualThreadClass;
         jclass localThreadClass;
         jclass localThreadGroupClass;
         jclass localClassLoaderClass;
@@ -200,7 +199,6 @@ util_initialize(JNIEnv *env)
         /* Find some standard classes */
 
         localClassClass         = findClass(env,"java/lang/Class");
-        localVirtualThreadClass = findClass(env,"java/lang/VirtualThread");
         localThreadClass        = findClass(env,"java/lang/Thread");
         localThreadGroupClass   = findClass(env,"java/lang/ThreadGroup");
         localClassLoaderClass   = findClass(env,"java/lang/ClassLoader");
@@ -210,13 +208,12 @@ util_initialize(JNIEnv *env)
 
         /* Save references */
 
-        saveGlobalRef(env, localClassClass,         &(gdata->classClass));
-        saveGlobalRef(env, localVirtualThreadClass, &(gdata->virtualThreadClass));
-        saveGlobalRef(env, localThreadClass,        &(gdata->threadClass));
-        saveGlobalRef(env, localThreadGroupClass,   &(gdata->threadGroupClass));
-        saveGlobalRef(env, localClassLoaderClass,   &(gdata->classLoaderClass));
-        saveGlobalRef(env, localStringClass,        &(gdata->stringClass));
-        saveGlobalRef(env, localSystemClass,        &(gdata->systemClass));
+        saveGlobalRef(env, localClassClass,       &(gdata->classClass));
+        saveGlobalRef(env, localThreadClass,      &(gdata->threadClass));
+        saveGlobalRef(env, localThreadGroupClass, &(gdata->threadGroupClass));
+        saveGlobalRef(env, localClassLoaderClass, &(gdata->classLoaderClass));
+        saveGlobalRef(env, localStringClass,      &(gdata->stringClass));
+        saveGlobalRef(env, localSystemClass,      &(gdata->systemClass));
 
         /* Find some standard methods */
 
@@ -315,12 +312,6 @@ specificTypeKey(JNIEnv *env, jobject object)
         return JDWP_TAG(OBJECT);
     } else if (JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->stringClass)) {
         return JDWP_TAG(STRING);
-    } else if (JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->virtualThreadClass)) {
-        /* We don't really need to check if it's an instance of a VirtualThread class since
-         * that would get detected below, but this is a bit faster. At one point
-         * it was thought that we would need to return THREAD here instead of OBJECT,
-         * but that's not the case. */
-        return JDWP_TAG(OBJECT);
     } else if (JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->threadClass)) {
         return JDWP_TAG(THREAD);
     } else if (JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->threadGroupClass)) {
@@ -612,22 +603,14 @@ sharedInvoke(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* Don't try this with unmounted vthreads. */
-    if (isVThread(thread)) {
-        thread = getVThreadThread(thread);
-    }
-    if (thread == NULL) {
-        error = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
-    } else {
-        /*
-         * Request the invoke. If there are no errors in the request,
-         * the interrupting thread will actually do the invoke and a
-         * reply will be generated subsequently, so we don't reply here.
-         */
-        error = invoker_requestInvoke(invokeType, (jbyte)options, inStream_id(in),
-                                      thread, clazz, method,
-                                      instance, arguments, argumentCount);
-    }
+    /*
+     * Request the invoke. If there are no errors in the request,
+     * the interrupting thread will actually do the invoke and a
+     * reply will be generated subsequently, so we don't reply here.
+     */
+    error = invoker_requestInvoke(invokeType, (jbyte)options, inStream_id(in),
+                                  thread, clazz, method,
+                                  instance, arguments, argumentCount);
     if (error != JVMTI_ERROR_NONE) {
         outStream_setError(out, map2jdwpError(error));
         if ( arguments != NULL ) {
@@ -887,6 +870,26 @@ getVThreadThread(jthread vthread)
     return thread;
 }
 
+/*
+ * Return the "live" thread for the specified thread. In other words, returns the
+ * carrier thread if the thread is a vthread, otherwise returns the thread itself.
+ */
+jthread
+getLiveThread(jthread thread)
+{
+    if (!gdata->vthreadsSupported || !isVThread(thread)) {
+        return thread;
+    } else {
+        return getVThreadThread(thread);
+    }
+}
+
+
+/*
+ * vthread fixme: This was moved here from stepControl.c because it is now also called
+ * from threadControl.c. However, the need to call it from there may go away. If it does,
+ * move this code back to stepControl.c.
+ */
 jint
 getThreadFrameCount(jthread thread)
 {
@@ -1644,7 +1647,7 @@ jboolean
 isVThread(jobject object)
 {
     JNIEnv *env = getEnv();
-    return JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->virtualThreadClass);
+    return JNI_FUNC_PTR(env,IsVirtualThread)(env, object);
 }
 
 jboolean

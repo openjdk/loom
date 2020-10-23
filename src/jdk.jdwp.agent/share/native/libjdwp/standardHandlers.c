@@ -85,7 +85,7 @@ handleGarbageCollectionFinish(JNIEnv *env, EventInfo *evinfo,
     JDI_ASSERT_MSG(JNI_FALSE, "Should never call handleGarbageCollectionFinish");
 }
 
-/* HandlerFunction - Invoked from event_callback() */
+/* HandlerFunction - Invoked from event_callback() for METHOD_ENTRY and METHOD_EXIT. */
 static void
 handleFrameEvent(JNIEnv *env, EventInfo *evinfo,
                  HandlerNode *node,
@@ -106,6 +106,11 @@ handleFrameEvent(JNIEnv *env, EventInfo *evinfo,
     FrameNumber fnum = 0;
     jvalue returnValue;
 
+    // vthread fixme: this assert should probably be removed. I don't know how to trigger
+    // the ENTER/EXIT events from IDEA, but with jdb it can be done with the "trace"
+    // command. So simply trace a method that will be executed by a vthread, and that
+    // should trigger the assert. Then remove the assert and confirm that tracing
+    // works properly.
     JDI_ASSERT(!isVThread(evinfo->thread));
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
             (gdata->jvmti, evinfo->thread, fnum, &method, &location);
