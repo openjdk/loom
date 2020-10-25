@@ -138,7 +138,7 @@ public class Thread implements Runnable {
         }
     }
     private final FieldHolder holder;
-    
+
     // interrupt status (read/written by VM)
     volatile boolean interrupted;
 
@@ -179,7 +179,7 @@ public class Thread implements Runnable {
         private static final Unsafe U = Unsafe.getUnsafe();
         private static final long NEXT_TID_OFFSET =
             U.objectFieldOffset(ThreadIdentifiers.class, "nextTid");
-        private static final long TID_MASK = (1L << 48) - 1; 
+        private static final long TID_MASK = (1L << 48) - 1;
         private static volatile long nextTid = 2;
         private static long next() {
             return U.getAndAddLong(ThreadIdentifiers.class, NEXT_TID_OFFSET, 1);
@@ -659,7 +659,7 @@ public class Thread implements Runnable {
      *     };
      * }</pre>
      *
-     * @see Thread.Builder#virtual(Executor) 
+     * @see Thread.Builder#virtual(Executor)
      * @since 99
      */
     public interface VirtualThreadTask extends Runnable {
