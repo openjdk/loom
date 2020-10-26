@@ -88,6 +88,12 @@ jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
 
 
 ####
+# Other virtual threads tests, failing with wrapper
+
+java/lang/Thread/virtual/NioChannels.java
+
+
+####
 # ThreadGroup owner is not main
 
 java/lang/Thread/MainThreadTest.java
