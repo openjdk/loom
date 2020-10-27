@@ -344,6 +344,33 @@ public class FileChannelImpl
 
     // -- Other operations --
 
+    private long lockedSize() throws IOException {
+        assert Thread.holdsLock(positionLock);
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> nd.size(fd));
+        } else {
+            return nd.size(fd);
+        }
+    }
+
+    private long lockedSeek(long offset) throws IOException {
+        assert Thread.holdsLock(positionLock);
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> nd.seek(fd, offset));
+        } else {
+            return nd.seek(fd, offset);
+        }
+    }
+
+    private int lockedTruncate(long newSize) throws IOException {
+        assert Thread.holdsLock(positionLock);
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> nd.truncate(fd, newSize));
+        } else {
+            return nd.truncate(fd, newSize);
+        }
+    }
+
     public long position() throws IOException {
         ensureOpen();
         synchronized (positionLock) {
@@ -357,7 +384,7 @@ public class FileChannelImpl
                 boolean append = fdAccess.getAppend(fd);
                 do {
                     // in append-mode then position is advanced to end before writing
-                    p = (append) ? nd.size(fd) : nd.seek(fd, -1);
+                    p = (append) ? lockedSize() : lockedSeek(-1);
                 } while ((p == IOStatus.INTERRUPTED) && isOpen());
                 return IOStatus.normalize(p);
             } finally {
@@ -381,7 +408,7 @@ public class FileChannelImpl
                 if (!isOpen())
                     return null;
                 do {
-                    p = nd.seek(fd, newPosition);
+                    p = lockedSeek(newPosition);
                 } while ((p == IOStatus.INTERRUPTED) && isOpen());
                 return this;
             } finally {
@@ -403,7 +430,7 @@ public class FileChannelImpl
                 if (!isOpen())
                     return -1;
                 do {
-                    s = nd.size(fd);
+                    s = lockedSize();
                 } while ((s == IOStatus.INTERRUPTED) && isOpen());
                 return IOStatus.normalize(s);
             } finally {
@@ -434,14 +461,14 @@ public class FileChannelImpl
                 // get current size
                 long size;
                 do {
-                    size = nd.size(fd);
+                    size = lockedSize();
                 } while ((size == IOStatus.INTERRUPTED) && isOpen());
                 if (!isOpen())
                     return null;
 
                 // get current position
                 do {
-                    p = nd.seek(fd, -1);
+                    p = lockedSeek(-1);
                 } while ((p == IOStatus.INTERRUPTED) && isOpen());
                 if (!isOpen())
                     return null;
@@ -450,11 +477,7 @@ public class FileChannelImpl
                 // truncate file if given size is less than the current size
                 if (newSize < size) {
                     do {
-                        if (Thread.currentThread().isVirtual()) {
-                            rv = Blocker.managedBlock(() -> nd.truncate(fd, newSize));
-                        } else {
-                            rv = nd.truncate(fd, newSize);
-                        }
+                        rv = lockedTruncate(newSize);
                     } while ((rv == IOStatus.INTERRUPTED) && isOpen());
                     if (!isOpen())
                         return null;
@@ -464,7 +487,7 @@ public class FileChannelImpl
                 if (p > newSize)
                     p = newSize;
                 do {
-                    rp = nd.seek(fd, p);
+                    rp = lockedSeek(p);
                 } while ((rp == IOStatus.INTERRUPTED) && isOpen());
                 return this;
             } finally {
@@ -843,7 +866,12 @@ public class FileChannelImpl
             if (!isOpen())
                 return -1;
             do {
-                n = IOUtil.read(fd, dst, position, direct, alignment, nd);
+                if (Thread.currentThread().isVirtual()) {
+                    n = Blocker.managedBlock(() ->
+                            IOUtil.read(fd, dst, position, direct, alignment, nd));
+                } else {
+                    n = IOUtil.read(fd, dst, position, direct, alignment, nd);
+                }
             } while ((n == IOStatus.INTERRUPTED) && isOpen());
             return IOStatus.normalize(n);
         } finally {
@@ -882,7 +910,12 @@ public class FileChannelImpl
             if (!isOpen())
                 return -1;
             do {
-                n = IOUtil.write(fd, src, position, direct, alignment, nd);
+                if (Thread.currentThread().isVirtual()) {
+                    n = Blocker.managedBlock(() ->
+                            IOUtil.write(fd, src, position, direct, alignment, nd));
+                } else {
+                    n = IOUtil.write(fd, src, position, direct, alignment, nd);
+                }
             } while ((n == IOStatus.INTERRUPTED) && isOpen());
             return IOStatus.normalize(n);
         } finally {
@@ -1090,7 +1123,7 @@ public class FileChannelImpl
             synchronized (positionLock) {
                 long filesize;
                 do {
-                    filesize = nd.size(fd);
+                    filesize = lockedSize();
                 } while ((filesize == IOStatus.INTERRUPTED) && isOpen());
                 if (!isOpen())
                     return null;
@@ -1102,7 +1135,7 @@ public class FileChannelImpl
                     }
                     int rv;
                     do {
-                        rv = nd.truncate(fd, position + size);
+                        rv = lockedTruncate(position + size);
                     } while ((rv == IOStatus.INTERRUPTED) && isOpen());
                     if (!isOpen())
                         return null;
