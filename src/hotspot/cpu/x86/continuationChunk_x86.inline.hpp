@@ -187,6 +187,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
   assert (Continuation::debug_is_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack requires_barriers: %d", !Universe::heap()->requires_barriers(chunk));
 
+  // TODO: return if chunk is empty; add is_empty to jdk_internal_misc_StackChunk and remove ContMirror::is_chunk_empty
   int num_frames = 0;
   int num_oops = 0;
 
@@ -194,7 +195,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
   if (concurrent_gc) {
     do_destructive_processing = true;
   } else {
-    if (SafepointSynchronize::is_at_safepoint() && !jdk_internal_misc_StackChunk::gc_mode(chunk)) {
+    if (SafepointSynchronize::is_at_safepoint() /*&& !jdk_internal_misc_StackChunk::gc_mode(chunk)*/) {
       do_destructive_processing = true;
       jdk_internal_misc_StackChunk::set_gc_mode(chunk, true);
     } else {
@@ -265,8 +266,8 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
   assert (num_frames >= 0, "");
   assert (num_oops >= 0, "");
   if (do_destructive_processing || closure == NULL) {
-    jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
-    jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
+    // jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames); -- TODO: remove those fields
+    // jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
   }
 
   if (closure != NULL) {

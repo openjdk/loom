@@ -60,6 +60,10 @@ public:
   virtual int oop_size(oop obj) const;
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
+
+#ifndef PRODUCT
+  void oop_print_on(oop obj, outputStream* st);
+#endif
   
   // Stack offset is an offset into the Heap
   static HeapWord* start_of_stack(oop obj) {

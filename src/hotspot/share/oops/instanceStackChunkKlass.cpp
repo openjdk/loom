@@ -34,6 +34,7 @@
 #include "oops/instanceOop.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/symbol.hpp"
+#include "runtime/continuation.hpp"
 #include "utilities/macros.hpp"
 
 int InstanceStackChunkKlass::_offset_of_stack = 0;
@@ -59,5 +60,12 @@ int InstanceStackChunkKlass::oop_size(oop obj) const {
 #if INCLUDE_CDS
 void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
   f->do_u4((u4*)&_offset_of_stack);
+}
+#endif
+
+#ifndef PRODUCT
+void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
+  InstanceKlass::oop_print_on(obj, st);
+  Continuation::debug_print_stack_chunk(obj /*, st */); // TODO
 }
 #endif
