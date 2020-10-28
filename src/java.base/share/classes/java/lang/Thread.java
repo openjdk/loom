@@ -46,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.event.ThreadSleepEvent;
+import jdk.internal.misc.Blocker;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
@@ -2274,13 +2275,22 @@ public class Thread implements Runnable {
                     final long startTime = System.nanoTime();
                     long delay = millis;
                     do {
-                        wait(delay);
+                        if (Thread.currentThread().isVirtual()) {
+                            long d = delay;
+                            Blocker.managedBlock(() -> wait(d));
+                        } else {
+                            wait(delay);
+                        }
                     } while (isAlive() && (delay = millis -
                             TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)) > 0);
                 }
             } else if (millis == 0) {
                 while (isAlive()) {
-                    wait(0);
+                    if (Thread.currentThread().isVirtual()) {
+                        Blocker.managedBlock(() -> wait(0));
+                    } else {
+                        wait(0);
+                    }
                 }
             }
         }
@@ -2375,10 +2385,10 @@ public class Thread implements Runnable {
         Objects.requireNonNull(duration);
 
         Thread.State state = getState();
-        if (state == State.TERMINATED)
-            return true;
         if (state == State.NEW)
             throw new IllegalThreadStateException("Thread not started");
+        if (state == State.TERMINATED)
+            return true;
         if (duration.isZero() || duration.isNegative())
             return false;
 
