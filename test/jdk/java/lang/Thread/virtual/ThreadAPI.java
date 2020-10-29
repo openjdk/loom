@@ -1389,11 +1389,11 @@ public class ThreadAPI {
             }
 
             // check carrier thread's stack trace
-            assertTrue(contains(carrierStackTrace, "java.util.concurrent.ForkJoinPool"));
+            assertTrue(contains(carrierStackTrace, "java.util.concurrent.ForkJoinPool.runWorker"));
             assertFalse(contains(carrierStackTrace, "java.lang.Object.wait"));
 
             // check virtual thread's stack trace
-            assertFalse(contains(vthreadStackTrace, "java.util.concurrent.ForkJoinPool"));
+            assertFalse(contains(vthreadStackTrace, "java.util.concurrent.ForkJoinPool.runWorker"));
             assertTrue(contains(vthreadStackTrace, "java.lang.Object.wait"));
         }
     }

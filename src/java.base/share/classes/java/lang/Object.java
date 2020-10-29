@@ -25,6 +25,7 @@
 
 package java.lang;
 
+import jdk.internal.misc.Blocker;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 
 /**
@@ -343,14 +344,17 @@ public class Object {
      * @see    #wait(long, int)
      */
     public final void wait(long timeoutMillis) throws InterruptedException {
-        try {
-            wait0(timeoutMillis);
-        } catch (InterruptedException e) {
-            Thread thread = Thread.currentThread();
-            if (thread.isVirtual()) {
-                thread.clearInterrupt();
+        Thread thread = Thread.currentThread();
+        if (thread.isVirtual()) {
+            try {
+                Blocker.managedBlock(() -> wait(timeoutMillis));
+            } catch (Exception e) {
+                if (e instanceof InterruptedException)
+                    thread.getAndClearInterrupt();
+                throw e;
             }
-            throw e;
+        } else {
+            wait0(timeoutMillis);
         }
     }
 

@@ -676,8 +676,7 @@ class VirtualThread extends Thread {
             boolean oldValue = interrupted;
             if (oldValue)
                 interrupted = false;
-            Thread carrier = carrierThread;
-            if (carrier != null) carrier.clearInterrupt();
+            carrierThread.clearInterrupt();
             return oldValue;
         }
     }
