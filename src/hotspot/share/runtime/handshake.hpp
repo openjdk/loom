@@ -47,6 +47,7 @@ class HandshakeClosure : public ThreadClosure, public CHeapObj<mtThread> {
   const char* name() const    { return _name; }
   virtual bool is_async()     { return false; }
   virtual void do_thread(Thread* thread) = 0;
+  virtual bool can_be_processed_by(Thread* thread) { return true; }
 };
 
 class AsyncHandshakeClosure : public HandshakeClosure {
@@ -85,6 +86,7 @@ class HandshakeState {
   void process_self_inner();
 
   bool have_non_self_executable_operation();
+  static bool non_self_queue_filter(HandshakeOperation* op);
   HandshakeOperation* pop_for_self();
   HandshakeOperation* pop();
 

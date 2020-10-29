@@ -389,8 +389,11 @@ HandshakeOperation* HandshakeState::pop_for_self() {
   return _queue.pop();
 };
 
-static bool non_self_queue_filter(HandshakeOperation* op) {
-  return !op->is_async();
+bool HandshakeState::non_self_queue_filter(HandshakeOperation* op) {
+  if (op->_handshake_cl->can_be_processed_by(Thread::current())) {
+    return !op->is_async();
+  }
+  return false;
 }
 
 bool HandshakeState::have_non_self_executable_operation() {

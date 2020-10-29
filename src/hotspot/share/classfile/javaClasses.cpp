@@ -2209,6 +2209,10 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       HandshakeClosure("GetStackTraceClosure"), 
       _java_thread(java_thread), _result(result), _exception(exception), _depth(0) {}
 
+    bool can_be_processed_by(Thread* thread) {
+      return thread->is_Java_thread();
+    }
+
     void do_thread(Thread* thread) {
       Thread* THREAD = Thread::current();
 

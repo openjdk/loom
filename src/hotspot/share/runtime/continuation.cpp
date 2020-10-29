@@ -5778,6 +5778,10 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
     jobject _jcont;
     jint _result;
 
+    bool can_be_processed_by(Thread* thread) {
+      return thread->is_Java_thread();
+    }
+
     void do_thread(Thread* th) {
       // assert (th == Thread::current(), ""); -- the handshake can be carried out by a VM thread (see HandshakeState::process_by_vmthread)
       assert (th->is_Java_thread(), "");
