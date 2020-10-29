@@ -289,6 +289,10 @@
   template(base_name,                                 "base")                                     \
   /* Type Annotations (JDK 8 and above) */                                                        \
   template(type_annotations_name,                     "typeAnnotations")                          \
+  /* used by CDS */                                                                               \
+  template(jdk_internal_misc_CDS, "jdk/internal/misc/CDS")                                        \
+  template(generateLambdaFormHolderClasses, "generateLambdaFormHolderClasses")                    \
+  template(generateLambdaFormHolderClasses_signature, "([Ljava/lang/String;)[Ljava/lang/Object;") \
                                                                                                   \
   /* Intrinsic Annotation (JDK 9 and above) */                                                    \
   template(jdk_internal_vm_annotation_DontInline_signature,  "Ljdk/internal/vm/annotation/DontInline;")  \

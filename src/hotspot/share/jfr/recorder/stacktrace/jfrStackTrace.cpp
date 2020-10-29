@@ -163,7 +163,7 @@ inline void JfrVframeStream::seek_stable_frame() {
   }
 }
 
-JfrVframeStream::JfrVframeStream(JavaThread* jt, const frame& fr, bool async_mode) : vframeStreamCommon(RegisterMap(jt, false, true)),
+JfrVframeStream::JfrVframeStream(JavaThread* jt, const frame& fr, bool async_mode) : vframeStreamCommon(RegisterMap(jt, false, false, true)),
 _continuation(jt->last_continuation()->cont_oop()), _continuation_scope(NULL), _continuation_scope_end_condition(false), _async_mode(async_mode) {
   _stop_at_java_call_stub = false;
   _frame = fr;
@@ -348,4 +348,3 @@ void JfrStackTrace::resolve_linenos() const {
   }
   _lineno = true;
 }
-

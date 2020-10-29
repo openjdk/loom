@@ -1059,8 +1059,8 @@ private:
   // bool        _validate_oops;           // whether to perform valid oop checks in asserts -- used only in the map use for continuation freeze/thaw
   // bool        _walk_cont;               // whether to walk frames on a continuation stack
 public:
-  SmallRegisterMap(JavaThread *thread, bool update_map = true, bool walk_cont = false, bool validate_oops = true) 
-   DEBUG_ONLY(: _thread(thread)) /*, _update_map(update_map), _validate_oops(validate_oops) */ {
+  SmallRegisterMap(JavaThread *thread, bool update_map = true, bool process_frames = true, bool walk_cont = false, bool validate_oops = true) 
+   DEBUG_ONLY(: _thread(thread)) /*, _update_map(update_map), _process_frames(process_frames), _validate_oops(validate_oops) */ {
      _rbp = NULL;
   }
   SmallRegisterMap(const SmallRegisterMap* map) 

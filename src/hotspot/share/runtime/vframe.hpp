@@ -340,7 +340,7 @@ class vframeStreamCommon : StackObj {
 class vframeStream : public vframeStreamCommon {
  public:
   // Constructors
-  vframeStream(JavaThread* thread, bool stop_at_java_call_stub = false, bool vthread_carrier = false);
+  vframeStream(JavaThread* thread, bool stop_at_java_call_stub = false, bool process_frames = true, bool vthread_carrier = false);
 
   vframeStream(JavaThread* thread, Handle continuation_scope, bool stop_at_java_call_stub = false);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -190,27 +190,17 @@ void ZNMethod::flush_nmethod(nmethod* nm) {
 
 bool ZNMethod::supports_entry_barrier(nmethod* nm) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
-  if (bs != NULL) {
-    return bs->supports_entry_barrier(nm);
-  }
-
-  return false;
+  return bs->supports_entry_barrier(nm);
 }
 
 bool ZNMethod::is_armed(nmethod* nm) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
-  if (bs != NULL) {
-    return bs->is_armed(nm);
-  }
-
-  return false;
+  return bs->is_armed(nm);
 }
 
 void ZNMethod::disarm(nmethod* nm) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
-  if (bs != NULL) {
-    bs->disarm(nm);
-  }
+  bs->disarm(nm);
 }
 
 void ZNMethod::arm(nmethod* nm, int arm_value) {
@@ -260,16 +250,30 @@ void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_st
 
 class ZNMethodToOopsDoClosure : public NMethodClosure {
 private:
-  OopClosure* _cl;
-  bool        _keepalive_is_strong;
+  OopClosure* const _cl;
+  const bool        _should_disarm_nmethods;
+  bool              _keepalive_is_strong;
 
 public:
-  ZNMethodToOopsDoClosure(OopClosure* cl, bool keepalive_is_strong) :
+  ZNMethodToOopsDoClosure(OopClosure* cl, bool should_disarm_nmethods, bool keepalive_is_strong) :
       _cl(cl),
+      _should_disarm_nmethods(should_disarm_nmethods),
       _keepalive_is_strong(keepalive_is_strong) {}
 
   virtual void do_nmethod(nmethod* nm) {
-    ZNMethod::nmethod_oops_do(nm, _cl, _keepalive_is_strong);
+    ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
+    if (!nm->is_alive()) {
+      return;
+    }
+
+    if (_should_disarm_nmethods) {
+      if (ZNMethod::is_armed(nm)) {
+        ZNMethod::nmethod_oops_do(nm, _cl, _keepalive_is_strong);
+        ZNMethod::disarm(nm);
+      }
+    } else {
+      ZNMethod::nmethod_oops_do(nm, _cl, _keepalive_is_strong);
+    }
   }
 };
 
@@ -281,8 +285,8 @@ void ZNMethod::oops_do_end() {
   ZNMethodTable::nmethods_do_end();
 }
 
-void ZNMethod::oops_do(OopClosure* cl, bool keepalive_is_strong) {
-  ZNMethodToOopsDoClosure nmethod_cl(cl, keepalive_is_strong);
+void ZNMethod::oops_do(OopClosure* cl, bool should_disarm_nmethods, bool keepalive_is_strong) {
+  ZNMethodToOopsDoClosure nmethod_cl(cl, should_disarm_nmethods, keepalive_is_strong);
   ZNMethodTable::nmethods_do(&nmethod_cl);
 }
 

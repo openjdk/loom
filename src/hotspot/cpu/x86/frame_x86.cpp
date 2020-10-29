@@ -38,6 +38,7 @@
 #include "runtime/monitorChunk.hpp"
 #include "runtime/os.inline.hpp"
 #include "runtime/signature.hpp"
+#include "runtime/stackWatermarkSet.hpp"
 #include "runtime/stubCodeGenerator.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "vmreg_x86.inline.hpp"
@@ -443,9 +444,19 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
 
 
 //------------------------------------------------------------------------------
-// frame::sender
-frame frame::sender(RegisterMap* map) const {
+// frame::sender_raw
+frame frame::sender_raw(RegisterMap* map) const {
   return frame_sender<CodeCache>(map);
+}
+
+frame frame::sender(RegisterMap* map) const {
+  frame result = sender_raw(map);
+
+  if (map->process_frames() && !map->in_cont()) {
+    StackWatermarkSet::on_iteration(map->thread(), result);
+  }
+
+  return result;
 }
 
 bool frame::is_interpreted_frame_valid(JavaThread* thread) const {

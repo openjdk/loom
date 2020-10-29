@@ -56,6 +56,8 @@
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/prefetch.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "runtime/stackWatermarkSet.inline.hpp"
+#include "runtime/stackOverflow.hpp"
 #include "runtime/vframe_hp.hpp"
 #include "utilities/copy.hpp"
 #include "utilities/debug.hpp"
@@ -221,7 +223,7 @@ static void print_chunk(oop chunk, oop cont = (oop)NULL, bool verbose = false) P
   // static void print_JavaThread_offsets();
   // static void trace_codeblob_maps(const frame *fr, const RegisterMap *reg_map);
 
-  static RegisterMap dmap(NULL, false); // global dummy RegisterMap
+  static RegisterMap dmap(NULL, false, false, false, false); // global dummy RegisterMap
 #endif
 
 #define ELEMS_PER_WORD (wordSize/sizeof(jint))
@@ -2183,7 +2185,7 @@ public:
 
   Freeze(JavaThread* thread, ContMirror& mirror) :
     _thread(thread), _cont(mirror),
-    _map(thread, false, false, false), _fp_oop_info(),
+    _map(thread, false, false, false, false), _fp_oop_info(),
     _preempt(false),
     _chunk((oop)NULL),
     _safepoint_stub(false), _safepoint_stub_h(false) { // don't intitialize
@@ -2218,7 +2220,7 @@ public:
   template <op_mode other_mode>
   Freeze(oop chunk, Freeze<ConfigT, other_mode>* other) :
     _thread(other->_thread), _cont(other->_cont),
-    _map(NULL, false, false, false), _fp_oop_info(),
+    _map(NULL, false, false, false, false), _fp_oop_info(),
     _preempt(false),
     _chunk(chunk),
     _safepoint_stub(false), _safepoint_stub_h(false) { // don't intitialize
@@ -3439,6 +3441,8 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   EventContinuationFreeze event;
 #endif
 
+  StackWatermarkSet::finish_processing(thread, NULL /* context */, StackWatermarkKind::gc);
+
   thread->set_cont_yield(true);
 
   oop oopCont = get_continuation(thread);
@@ -3505,7 +3509,7 @@ static freeze_result is_pinned(const frame& f, RegisterMap* map) {
 #ifdef ASSERT
 static bool monitors_on_stack(JavaThread* thread) {
   ContinuationEntry* cont = thread->last_continuation();
-  RegisterMap map(thread, false, false, false); // should first argument be true?
+  RegisterMap map(thread, false, false, false, false); // should first argument be true?
   map.set_include_argument_oops(false);
   for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(cont, f); f = f.sender(&map)) {
     if (is_pinned(f, &map) == freeze_pinned_monitor) return true;
@@ -3515,7 +3519,7 @@ static bool monitors_on_stack(JavaThread* thread) {
 
 static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
   ContinuationEntry* cont = thread->last_continuation();
-  RegisterMap map(thread, false, false, false); // should first argument be true?
+  RegisterMap map(thread, false, false, false, false); // should first argument be true?
   map.set_include_argument_oops(false);
   for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(cont, f); f = f.sender(&map)) {
     if (f.is_interpreted_frame()) return true;
@@ -3570,7 +3574,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   if (java_lang_Continuation::critical_section(cont->continuation()) > 0)
     return freeze_pinned_cs;
 
-  RegisterMap map(thread, false, false, false); // should first argument be true?
+  RegisterMap map(thread, false, false, false, false); // should first argument be true?
   map.set_include_argument_oops(false);
   frame f = thread->last_frame();
 
@@ -3739,7 +3743,7 @@ static intptr_t* cont_thaw(JavaThread* thread, ContMirror& cont, thaw_kind kind)
 static bool stack_overflow_check(JavaThread* thread, int size, address sp) {
   const int page_size = os::vm_page_size();
   if (size > page_size) {
-    if (sp - size < thread->stack_overflow_limit()) {
+    if (sp - size < thread->stack_overflow_state()->stack_overflow_limit()) {
       return false;
     }
   }
@@ -3826,7 +3830,7 @@ public:
   Thaw(JavaThread* thread, ContMirror& mirror) :
     _thread(thread), _cont(mirror),
     _fastpath(NULL),
-    _map(thread, false, false, false),
+    _map(thread, false, false, false, false),
     _preempt(false),
     _safepoint_stub_f(false) { // don't intitialize
 
@@ -4758,7 +4762,7 @@ bool do_verify_after_thaw(JavaThread* thread) {
   CodeBlobToOopClosure cf(&cl, false);
 
   int i = 0;
-  StackFrameStream fst(thread);
+  StackFrameStream fst(thread, true, false);
   fst.register_map()->set_include_argument_oops(false);
   ContinuationHelper::update_register_map_with_callee(fst.register_map(), *fst.current());
   for (; !fst.is_done(); fst.next()) {
@@ -5004,9 +5008,7 @@ static frame continuation_parent_frame(ContMirror& cont, RegisterMap* map) {
   //     return continuation_top_frame(parentOop, map);
   //   }
   // }
-
-  map->set_in_cont(false, false); // TODO parent != (oop)NULL; consider getting rid of set_in_cont altogether
-
+  
   if (!cont.is_mounted()) { // When we're walking an unmounted continuation and reached the end
     oop parent = java_lang_Continuation::parent(cont.mirror());
     map->set_cont(parent);
@@ -5014,6 +5016,8 @@ static frame continuation_parent_frame(ContMirror& cont, RegisterMap* map) {
     // tty->print_cr("continuation_parent_frame: no more");
     return frame();
   }
+
+  map->set_in_cont(false, false); // TODO parent != (oop)NULL; consider getting rid of set_in_cont altogether
 
   // map->set_cont will be called in frame::sender_for_compiled_frame/sender_for_interpreted_frame
   frame sender(cont.entrySP(), cont.entryFP(), cont.entryPC());
@@ -6330,7 +6334,7 @@ static void print_frames(JavaThread* thread, outputStream* st) {
   if (!thread->has_last_Java_frame()) st->print_cr("NO ANCHOR!");
 
   st->print_cr("------- frames ---------");
-  RegisterMap map(thread, true, false);
+  RegisterMap map(thread, true, true, false, false);
   map.set_include_argument_oops(false);
 #ifndef PRODUCT
   map.set_skip_missing(true);
@@ -6413,7 +6417,7 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
     tty->cr();
     tty->print_cr("------ chunk frames end: " INTPTR_FORMAT, p2i(end));
     if (sp < end) {
-      RegisterMap map(NULL, false);
+      RegisterMap map(NULL, true, false, false);
       frame f = create_frame(sp);
       tty->print_cr("-- frame size: %d argsize: %d", Compiled::size(f), Compiled::stack_argsize(f));
       f.print_on(tty);

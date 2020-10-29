@@ -53,6 +53,7 @@
 #include "oops/recordComponent.hpp"
 #include "oops/typeArrayOop.inline.hpp"
 #include "prims/jvmtiExport.hpp"
+#include "prims/methodHandles.hpp"
 #include "prims/resolvedMethodTable.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/frame.inline.hpp"
@@ -1486,6 +1487,8 @@ oop java_lang_Class::process_archived_mirror(Klass* k, oop mirror,
     java_lang_Class:set_init_lock(archived_mirror, NULL);
 
     set_protection_domain(archived_mirror, NULL);
+    set_signers(archived_mirror, NULL);
+    set_source_file(archived_mirror, NULL);
   }
 
   // clear class loader and mirror_module_field
@@ -2247,7 +2250,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       BacktraceBuilder bt(CHECK);
 
       int total_count = 0;
-      for (vframeStream vfst(thread, false, carrier); !vfst.at_end() && (max_depth == 0 || max_depth != total_count); vfst.next()) {
+      for (vframeStream vfst(thread, false, false, carrier); !vfst.at_end() && (max_depth == 0 || max_depth != total_count); vfst.next()) {
         if (skip_hidden && (vfst.method()->is_hidden() || vfst.method()->is_continuation_enter_intrinsic())) continue;
         bt.push(vfst.method(), vfst.bci(), contScopeName(vfst.continuation()), CHECK);
         total_count++;
@@ -2752,10 +2755,10 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
   // The "ASSERT" here is to verify this method generates the exactly same stack
   // trace as utilizing vframe.
 #ifdef ASSERT
-  vframeStream st(thread);
+  vframeStream st(thread, false /* stop_at_java_call_stub */, false /* process_frames */);
 #endif
   int total_count = 0;
-  RegisterMap map(thread, false, true);
+  RegisterMap map(thread, false /* update */, false /* process_frames */, true /* walk_cont */);
   int decode_offset = 0;
   CompiledMethod* nm = NULL;
   bool skip_fillInStackTrace_check = false;
@@ -2917,7 +2920,7 @@ void java_lang_Throwable::fill_in_stack_trace_of_preallocated_backtrace(Handle t
   assert(backtrace.not_null(), "backtrace should have been preallocated");
 
   ResourceMark rm(THREAD);
-  vframeStream st(THREAD);
+  vframeStream st(THREAD, false /* stop_at_java_call_stub */, false /* process_frames */);
 
   BacktraceBuilder bt(THREAD, backtrace);
 

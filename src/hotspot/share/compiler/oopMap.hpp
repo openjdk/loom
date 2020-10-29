@@ -41,6 +41,7 @@
 //
 // OopMapValue describes a single OopMap entry
 
+enum class DerivedPointerIterationMode;
 class frame;
 class RegisterMap;
 class OopClosure;
@@ -239,8 +240,8 @@ class OopMapSet : public ResourceObj {
   // Iterates through frame for a compiled method
   static void oops_do            (const frame* fr, const RegisterMap* reg_map,
                                   OopClosure* f, DerivedOopClosure* df);
-  static void oops_do            (const frame* fr,
-                                  const RegisterMap* reg_map, OopClosure* f) { oops_do(fr, reg_map, f, NULL); }
+  static void oops_do            (const frame* fr, const RegisterMap* reg_map,
+                                  OopClosure* f, DerivedPointerIterationMode mode);
   static void update_register_map(const frame* fr, RegisterMap *reg_map);
 
 #ifndef PRODUCT
@@ -296,6 +297,7 @@ public:
 #endif
 
   void oops_do(const frame* fr, const RegisterMap* reg_map, OopClosure* f, DerivedOopClosure* df) const;
+  void oops_do(const frame* fr, const RegisterMap* reg_map, OopClosure* f, DerivedPointerIterationMode derived_mode) const;
   void all_type_do(const frame *fr, OopMapValue::oop_types type, OopMapClosure* fn) const;
   void all_type_do(const frame *fr, OopMapClosure* fn) const;
   void update_register_map(const frame* fr, RegisterMap *reg_map) const;

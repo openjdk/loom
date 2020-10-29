@@ -439,7 +439,7 @@ int JvmtiThreadState::count_frames() {
   if (!get_thread()->has_last_Java_frame()) return 0;  // no Java frames
 
   ResourceMark rm;
-  RegisterMap reg_map(get_thread(), true, true);
+  RegisterMap reg_map(get_thread(), false, false, true);
   javaVFrame *jvf = get_thread()->last_java_vframe(&reg_map);
 
   return (int)JvmtiEnvBase::get_frame_count(jvf);

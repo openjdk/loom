@@ -558,12 +558,13 @@ JvmtiEnvBase::new_jthreadGroupArray(int length, Handle *handles) {
 }
 
 // return the vframe on the specified thread and depth, NULL if no such frame
+// The thread and the oops in the returned vframe might not have been process.
 vframe*
-JvmtiEnvBase::vframeFor(JavaThread* java_thread, jint depth, bool for_cont) {
+JvmtiEnvBase::vframeForNoProcess(JavaThread* java_thread, jint depth, bool for_cont) {
   if (!java_thread->has_last_Java_frame()) {
     return NULL;
   }
-  RegisterMap reg_map(java_thread, true, true);
+  RegisterMap reg_map(java_thread, true /* update_map */, false /* process_frames */, true /* walk_cont */);
   vframe *vf = for_cont ? JvmtiEnvBase::get_last_java_vframe(java_thread, &reg_map)
                         : java_thread->last_java_vframe(&reg_map);
   int d = 0;
@@ -1129,7 +1130,7 @@ JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
          "call by myself or at handshake");
   ResourceMark rm(current_thread);
 
-  vframe *vf = vframeFor(java_thread, depth, true /* for cont */);
+  vframe *vf = vframeForNoProcess(java_thread, depth, true /* for cont */);
   if (vf == NULL) {
     return JVMTI_ERROR_NO_MORE_FRAMES;
   }
@@ -1746,7 +1747,7 @@ JvmtiEnvBase::check_top_frame(Thread* current_thread, JavaThread* java_thread,
                               jvalue value, TosState tos, Handle* ret_ob_h) {
   ResourceMark rm(current_thread);
 
-  vframe *vf = vframeFor(java_thread, 0);
+  vframe *vf = vframeForNoProcess(java_thread, 0);
   NULL_CHECK(vf, JVMTI_ERROR_NO_MORE_FRAMES);
 
   javaVFrame *jvf = (javaVFrame*) vf;
