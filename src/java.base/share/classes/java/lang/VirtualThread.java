@@ -606,21 +606,10 @@ class VirtualThread extends Thread {
      * Waits up to {@code nanos} nanoseconds for this virtual thread to terminate.
      * A timeout of {@code 0} means to wait forever.
      *
-     * @throws IllegalArgumentException if nanos is negative
-     * @throws IllegalStateException if not started
      * @throws InterruptedException if interrupted while waiting
      * @return true if the thread has terminated
      */
     boolean joinNanos(long nanos) throws InterruptedException {
-        if (nanos < 0)
-            throw new IllegalArgumentException();
-        int s = state();
-        if (s == NEW)
-            throw new IllegalStateException("Not started");
-        if (s == TERMINATED)
-            return true;
-
-        // timed or untimed wait for the thread to terminate
         final ReentrantLock lock = getLock();
         lock.lock();
         try {
