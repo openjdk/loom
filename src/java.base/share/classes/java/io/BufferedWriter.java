@@ -74,8 +74,12 @@ public class BufferedWriter extends Writer {
     private int nChars, nextChar;
     private final int maxChars;  // maximum number of buffers chars
 
+    /**
+     * Creates a buffered character-output stream.
+     */
     private BufferedWriter(Writer out, int initialSize, int maxSize) {
         super(out);
+
         if (initialSize <= 0) {
             throw new IllegalArgumentException("Buffer size <= 0");
         }
