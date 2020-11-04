@@ -63,7 +63,6 @@ public class WithDeadlineTest {
             { Executors.newCachedThreadPool() },
             { Executors.newFixedThreadPool(1) },
             { new ForkJoinPool() },
-            { new ForkJoinPool(1) },
         };
     }
 
