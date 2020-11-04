@@ -126,7 +126,8 @@ public class BufferedWriter extends Writer {
 
     /**
      * Grow char array to fit an additional len characters if needed.
-     * If possible, it grows by len+1 to reduce the need to flush.
+     * If possible, it grows by len+1 to avoid flushing when len chars
+     * are added.
      */
     private void growIfNeeded(int len) {
         int neededSize = nextChar + len + 1;

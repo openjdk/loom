@@ -115,7 +115,8 @@ public class BufferedOutputStream extends FilterOutputStream {
 
     /**
      * Grow buf to fit an additional len bytes if needed.
-     * A no-op if the buffer is not resizable.
+     * If possible, it grows by len+1 to avoid flushing when len bytes
+     * are added. A no-op if the buffer is not resizable.
      */
     private void growIfNeeded(int len) {
         if (maxBufSize > 0) {
