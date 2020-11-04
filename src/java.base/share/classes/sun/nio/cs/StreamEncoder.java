@@ -42,7 +42,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public final class StreamEncoder extends Writer {
 
-    private static final int DEFAULT_BYTE_BUFFER_SIZE = 8192;
+    private static final int INITIAL_BYTE_BUFFER_CAPACITY = 512;
+    private static final int MAX_BYTE_BUFFER_CAPACITY= 8192;
 
     private final ReentrantLock encoderLock;
 
@@ -246,13 +247,15 @@ public final class StreamEncoder extends Writer {
 
     // -- Charset-based stream encoder impl --
 
-    private Charset cs;
-    private CharsetEncoder encoder;
+    private final Charset cs;
+    private final CharsetEncoder encoder;
+
     private ByteBuffer bb;
+    private final int maxBufferCapacity;
 
     // Exactly one of these is non-null
     private final OutputStream out;
-    private WritableByteChannel ch;
+    private final WritableByteChannel ch;
 
     // Leftover first char in a surrogate pair
     private boolean haveLeftoverChar = false;
@@ -273,20 +276,13 @@ public final class StreamEncoder extends Writer {
         this.cs = enc.charset();
         this.encoder = enc;
 
-        // This path disabled until direct buffers are faster
-        if (false && out instanceof FileOutputStream) {
-            ch = ((FileOutputStream)out).getChannel();
-        if (ch != null)
-            bb = ByteBuffer.allocateDirect(DEFAULT_BYTE_BUFFER_SIZE);
-        }
-        if (ch == null) {
-            bb = ByteBuffer.allocate(DEFAULT_BYTE_BUFFER_SIZE);
-        }
+        this.bb = ByteBuffer.allocate(INITIAL_BYTE_BUFFER_CAPACITY);
+        this.maxBufferCapacity = MAX_BYTE_BUFFER_CAPACITY;
 
         if (lock instanceof ReentrantLock) {
-            encoderLock = (ReentrantLock) lock;
+            this.encoderLock = (ReentrantLock) lock;
         } else {
-            encoderLock = null;
+            this.encoderLock = null;
         }
     }
 
@@ -295,9 +291,15 @@ public final class StreamEncoder extends Writer {
         this.ch = ch;
         this.cs = enc.charset();
         this.encoder = enc;
-        this.bb = ByteBuffer.allocate(mbc < 0
-                                  ? DEFAULT_BYTE_BUFFER_SIZE
-                                  : mbc);
+
+        if (mbc > 0) {
+            this.bb = ByteBuffer.allocate(INITIAL_BYTE_BUFFER_CAPACITY);
+            this.maxBufferCapacity = MAX_BYTE_BUFFER_CAPACITY;
+        } else {
+            this.bb = ByteBuffer.allocate(mbc);
+            this.maxBufferCapacity = mbc;
+        }
+
         this.encoderLock = new ReentrantLock();
     }
 
@@ -371,6 +373,8 @@ public final class StreamEncoder extends Writer {
             flushLeftoverChar(cb, false);
         }
 
+        growByeBufferIfNeeded(cb.remaining());
+
         while (cb.hasRemaining()) {
             CoderResult cr = encoder.encode(cb, bb, false);
             if (cr.isUnderflow()) {
@@ -387,6 +391,20 @@ public final class StreamEncoder extends Writer {
                 continue;
             }
             cr.throwException();
+        }
+    }
+
+    /**
+     * Grows bb to a capacity to allow len characters be encoded.
+     */
+    void growByeBufferIfNeeded(int len) {
+        int cap = bb.capacity();
+        if (cap < maxBufferCapacity) {
+            int maxBytes = len * Math.round(encoder.maxBytesPerChar());
+            int newCap = Math.min(maxBytes, maxBufferCapacity);
+            if (newCap > cap) {
+                bb = ByteBuffer.allocate(newCap);
+            }
         }
     }
 
