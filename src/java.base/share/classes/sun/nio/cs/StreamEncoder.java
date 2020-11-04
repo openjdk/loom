@@ -293,11 +293,11 @@ public final class StreamEncoder extends Writer {
         this.encoder = enc;
 
         if (mbc > 0) {
-            this.bb = ByteBuffer.allocate(INITIAL_BYTE_BUFFER_CAPACITY);
-            this.maxBufferCapacity = MAX_BYTE_BUFFER_CAPACITY;
-        } else {
             this.bb = ByteBuffer.allocate(mbc);
             this.maxBufferCapacity = mbc;
+        } else {
+            this.bb = ByteBuffer.allocate(INITIAL_BYTE_BUFFER_CAPACITY);
+            this.maxBufferCapacity = MAX_BYTE_BUFFER_CAPACITY;
         }
 
         this.encoderLock = new ReentrantLock();
@@ -373,7 +373,7 @@ public final class StreamEncoder extends Writer {
             flushLeftoverChar(cb, false);
         }
 
-        growByeBufferIfNeeded(cb.remaining());
+        growByteBufferIfNeeded(cb.remaining());
 
         while (cb.hasRemaining()) {
             CoderResult cr = encoder.encode(cb, bb, false);
@@ -397,12 +397,13 @@ public final class StreamEncoder extends Writer {
     /**
      * Grows bb to a capacity to allow len characters be encoded.
      */
-    void growByeBufferIfNeeded(int len) {
+    void growByteBufferIfNeeded(int len) throws IOException {
         int cap = bb.capacity();
         if (cap < maxBufferCapacity) {
             int maxBytes = len * Math.round(encoder.maxBytesPerChar());
             int newCap = Math.min(maxBytes, maxBufferCapacity);
             if (newCap > cap) {
+                implFlushBuffer();
                 bb = ByteBuffer.allocate(newCap);
             }
         }
