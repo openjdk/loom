@@ -534,7 +534,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(int b) throws IOException {
-        Blocker.managedBlock(() -> write0(b));
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> write0(b));
+        } else {
+            write0(b);
+        }
     }
 
     private native void write0(int b) throws IOException;
