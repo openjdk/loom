@@ -67,6 +67,8 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 
 public class BufferedWriter extends Writer {
+    private static final int DEFAULT_INITIAL_BUFFER_SIZE = 512;
+    private static final int DEFAULT_MAX_BUFFER_SIZE = 8192;
 
     private Writer out;
 
@@ -102,7 +104,7 @@ public class BufferedWriter extends Writer {
      * @param  out  A Writer
      */
     public BufferedWriter(Writer out) {
-        this(out, /*initialSize*/ 512,  /* maxSize*/ 8192);
+        this(out, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE);
     }
 
     /**

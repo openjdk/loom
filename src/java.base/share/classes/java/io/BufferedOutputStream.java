@@ -38,6 +38,9 @@ import java.util.concurrent.locks.ReentrantLock;
  * @since   1.0
  */
 public class BufferedOutputStream extends FilterOutputStream {
+    private static final int DEFAULT_INITIAL_BUFFER_SIZE = 512;
+    private static final int DEFAULT_MAX_BUFFER_SIZE = 8192;
+
     // initialized to null when BufferedOutputStream is sub-classed
     private final ReentrantLock lock;
 
@@ -89,7 +92,7 @@ public class BufferedOutputStream extends FilterOutputStream {
      * @param   out   the underlying output stream.
      */
     public BufferedOutputStream(OutputStream out) {
-        this(out, /*initialSize*/ 512, /*maxSize*/ 8192);
+        this(out, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE);
     }
 
     /**
