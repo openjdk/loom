@@ -1296,6 +1296,8 @@ public:
   }
 };
 
+// callers need a ResourceMark because of name_and_sig_as_C_string() usage,
+// RA allocated string is returned to the caller
 void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_map) {
   // boundaries: sp and the 'real' frame pointer
   values.describe(-1, sp(), err_msg("sp for #%d", frame_no), 0);

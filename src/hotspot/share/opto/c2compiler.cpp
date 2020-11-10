@@ -93,8 +93,7 @@ void C2Compiler::compile_method(ciEnv* env, ciMethod* target, int entry_bci, boo
   assert(is_initialized(), "Compiler thread must be initialized");
 
   bool subsume_loads = SubsumeLoads;
-  bool do_escape_analysis = DoEscapeAnalysis && !env->should_retain_local_variables()
-                                             && !env->jvmti_can_get_owned_monitor_info();
+  bool do_escape_analysis = DoEscapeAnalysis;
   bool eliminate_boxing = EliminateAutoBox;
 
   while (!env->failing()) {
@@ -630,6 +629,7 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
   case vmIntrinsics::_sha_implCompress:
   case vmIntrinsics::_sha2_implCompress:
   case vmIntrinsics::_sha5_implCompress:
+  case vmIntrinsics::_sha3_implCompress:
   case vmIntrinsics::_digestBase_implCompressMB:
   case vmIntrinsics::_multiplyToLen:
   case vmIntrinsics::_squareToLen:
@@ -653,6 +653,28 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
   case vmIntrinsics::_Preconditions_checkIndex:
   case vmIntrinsics::_Continuation_doYield:
     break;
+
+  case vmIntrinsics::_VectorUnaryOp:
+  case vmIntrinsics::_VectorBinaryOp:
+  case vmIntrinsics::_VectorTernaryOp:
+  case vmIntrinsics::_VectorBroadcastCoerced:
+  case vmIntrinsics::_VectorShuffleIota:
+  case vmIntrinsics::_VectorShuffleToVector:
+  case vmIntrinsics::_VectorLoadOp:
+  case vmIntrinsics::_VectorStoreOp:
+  case vmIntrinsics::_VectorGatherOp:
+  case vmIntrinsics::_VectorScatterOp:
+  case vmIntrinsics::_VectorReductionCoerced:
+  case vmIntrinsics::_VectorTest:
+  case vmIntrinsics::_VectorBlend:
+  case vmIntrinsics::_VectorRearrange:
+  case vmIntrinsics::_VectorCompare:
+  case vmIntrinsics::_VectorBroadcastInt:
+  case vmIntrinsics::_VectorConvert:
+  case vmIntrinsics::_VectorInsert:
+  case vmIntrinsics::_VectorExtract:
+    return EnableVectorSupport;
+
   default:
     return false;
   }

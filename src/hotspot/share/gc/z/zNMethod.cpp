@@ -28,6 +28,7 @@
 #include "code/icBuffer.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
+#include "gc/shared/suspendibleThreadSet.hpp"
 #include "gc/z/zGlobals.hpp"
 #include "gc/z/zLock.inline.hpp"
 #include "gc/z/zNMethod.hpp"
@@ -56,7 +57,7 @@ void ZNMethod::attach_gc_data(nmethod* nm) {
   GrowableArray<oop*> immediate_oops;
   bool non_immediate_oops = false;
 
-  // Find all oops relocations
+  // Find all oop relocations
   RelocIterator iter(nm);
   while (iter.next()) {
     if (iter.type() != relocInfo::oop_type) {
@@ -211,6 +212,15 @@ void ZNMethod::arm(nmethod* nm, int arm_value) {
 }
 
 void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_strong) {
+  ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
+  if (!nm->is_alive()) {
+    return;
+  }
+
+  ZNMethod::nmethod_oops_do_inner(nm, cl, keepalive_is_strong);
+}
+
+void ZNMethod::nmethod_oops_do_inner(nmethod* nm, OopClosure* cl, bool keepalive_is_strong) {
   // Process oops table
   {
     oop* const begin = nm->oops_begin();
@@ -248,46 +258,16 @@ void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_st
   }
 }
 
-class ZNMethodToOopsDoClosure : public NMethodClosure {
-private:
-  OopClosure* const _cl;
-  const bool        _should_disarm_nmethods;
-  bool              _keepalive_is_strong;
-
-public:
-  ZNMethodToOopsDoClosure(OopClosure* cl, bool should_disarm_nmethods, bool keepalive_is_strong) :
-      _cl(cl),
-      _should_disarm_nmethods(should_disarm_nmethods),
-      _keepalive_is_strong(keepalive_is_strong) {}
-
-  virtual void do_nmethod(nmethod* nm) {
-    ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
-    if (!nm->is_alive()) {
-      return;
-    }
-
-    if (_should_disarm_nmethods) {
-      if (ZNMethod::is_armed(nm)) {
-        ZNMethod::nmethod_oops_do(nm, _cl, _keepalive_is_strong);
-        ZNMethod::disarm(nm);
-      }
-    } else {
-      ZNMethod::nmethod_oops_do(nm, _cl, _keepalive_is_strong);
-    }
-  }
-};
-
-void ZNMethod::oops_do_begin() {
+void ZNMethod::nmethods_do_begin() {
   ZNMethodTable::nmethods_do_begin();
 }
 
-void ZNMethod::oops_do_end() {
+void ZNMethod::nmethods_do_end() {
   ZNMethodTable::nmethods_do_end();
 }
 
-void ZNMethod::oops_do(OopClosure* cl, bool should_disarm_nmethods, bool keepalive_is_strong) {
-  ZNMethodToOopsDoClosure nmethod_cl(cl, should_disarm_nmethods, keepalive_is_strong);
-  ZNMethodTable::nmethods_do(&nmethod_cl);
+void ZNMethod::nmethods_do(NMethodClosure* cl) {
+  ZNMethodTable::nmethods_do(cl);
 }
 
 class ZNMethodUnlinkClosure : public NMethodClosure {

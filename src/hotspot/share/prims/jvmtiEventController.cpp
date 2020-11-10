@@ -234,7 +234,7 @@ class EnterInterpOnlyModeClosure : public HandshakeClosure {
     _completed = true;
   }
   bool completed() {
-    return _completed = true;
+    return _completed;
   }
 };
 

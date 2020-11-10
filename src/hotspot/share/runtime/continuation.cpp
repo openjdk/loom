@@ -46,6 +46,7 @@
 #include "oops/objArrayOop.inline.hpp"
 #include "oops/weakHandle.hpp"
 #include "oops/weakHandle.inline.hpp"
+#include "prims/jvmtiDeferredUpdates.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/continuation.inline.hpp"
 #include "runtime/deoptimization.hpp"
@@ -3436,6 +3437,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
 
   assert (!thread->cont_yield(), "");
   assert (!thread->has_pending_exception(), ""); // if (thread->has_pending_exception()) return early_return(freeze_exception, thread, fi);
+  assert (thread->deferred_updates() == NULL || thread->deferred_updates()->count() == 0, "");
 
 #if CONT_JFR
   EventContinuationFreeze event;

@@ -27,7 +27,7 @@
 #include "memory/allocation.hpp"
 
 class nmethod;
-class OopClosure;
+class NMethodClosure;
 class ZReentrantLock;
 class ZWorkers;
 
@@ -50,10 +50,11 @@ public:
   static void arm(nmethod* nm, int arm_value);
 
   static void nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_strong);
+  static void nmethod_oops_do_inner(nmethod* nm, OopClosure* cl, bool keepalive_is_strong);
 
-  static void oops_do_begin();
-  static void oops_do_end();
-  static void oops_do(OopClosure* cl, bool should_disarm_nmethods, bool keepalive_is_strong);
+  static void nmethods_do_begin();
+  static void nmethods_do_end();
+  static void nmethods_do(NMethodClosure* cl);
 
   static ZReentrantLock* lock_for_nmethod(nmethod* nm);
 

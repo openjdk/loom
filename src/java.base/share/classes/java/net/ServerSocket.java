@@ -534,7 +534,6 @@ public class ServerSocket implements java.io.Closeable {
      * @return the new Socket
      * @see SecurityManager#checkAccept
      * @revised 1.4
-     * @spec JSR-51
      */
     public Socket accept() throws IOException {
         if (isClosed())
@@ -578,7 +577,6 @@ public class ServerSocket implements java.io.Closeable {
      *
      * @since   1.1
      * @revised 1.4
-     * @spec JSR-51
      */
     protected final void implAccept(Socket s) throws IOException {
         SocketImpl si = s.impl;
@@ -733,7 +731,6 @@ public class ServerSocket implements java.io.Closeable {
      *
      * @throws     IOException  if an I/O error occurs when closing the socket.
      * @revised 1.4
-     * @spec JSR-51
      */
     public void close() throws IOException {
         synchronized(closeLock) {
@@ -759,7 +756,6 @@ public class ServerSocket implements java.io.Closeable {
      *          for a channel
      *
      * @since 1.4
-     * @spec JSR-51
      */
     public ServerSocketChannel getChannel() {
         return null;

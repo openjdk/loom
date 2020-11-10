@@ -32,6 +32,7 @@
 #include "prims/jvmtiEventController.hpp"
 #include "prims/jvmtiTrace.hpp"
 #include "prims/jvmtiUtil.hpp"
+#include "runtime/escapeBarrier.hpp"
 #include "runtime/stackValueCollection.hpp"
 #include "runtime/vmOperations.hpp"
 #include "utilities/ostream.hpp"
@@ -351,6 +352,7 @@ public:
 class VM_GetOrSetLocal : public VM_BaseGetOrSetLocal {
  protected:
   JavaThread* _thread;
+  EscapeBarrier _eb;
 
   vframe* get_vframe();
   javaVFrame* get_java_vframe();
@@ -367,6 +369,8 @@ public:
                    int index);
 
   VMOp_Type type() const { return VMOp_GetOrSetLocal; }
+
+  bool doit_prologue();
 
   const char* name() const                       { return "get/set locals"; }
 };
