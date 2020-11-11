@@ -2353,13 +2353,16 @@ public class Thread implements Runnable {
 
     /**
      * Waits for this thread to terminate for up to the given waiting duration.
-     * This method does not wait if the duration to wait is less than or equal
-     * to zero.
+     *
+     * <p> This method does not wait if the duration to wait is less than or
+     * equal to zero. In this case, the method just tests if the thread has
+     * terminated.
      *
      * @param   duration
      *          the maximum duration to wait
      *
-     * @return  {@code true} if the thread has terminated
+     * @return  {@code true} if the thread has terminated, {@code false} if the
+     *          thread has not terminated
      *
      * @throws  InterruptedException
      *          if the current thread is interrupted while waiting.
