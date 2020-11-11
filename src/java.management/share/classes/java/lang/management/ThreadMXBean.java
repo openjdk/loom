@@ -34,7 +34,7 @@ import java.util.Map;
  * <p> {@code ThreadMXBean} supports monitoring and management of <em>live
  * threads</em> in the Java virtual machine that are scheduled by the operating
  * system. {@code ThreadMXBean} does not support monitoring or management
- * of {@linkplain Thread#isVirtual() virtual threads} at this time.
+ * of {@linkplain Thread#isVirtual() virtual threads} in this release.
  *
  * <p> A Java virtual machine has a single instance of the implementation
  * class of this interface.  This instance implementing this interface is
@@ -604,14 +604,14 @@ public interface ThreadMXBean extends PlatformManagedObject {
      * <p>
      * This method is designed for troubleshooting use, but not for
      * synchronization control.  It might be an expensive operation.
+     * Its behavior with cycles involving virtual threads is not defined
+     * in this release.
      * <p>
      * This method finds deadlocks involving only object monitors.
      * To find deadlocks involving both object monitors and
      * <a href="LockInfo.html#OwnableSynchronizer">ownable synchronizers</a>,
      * the {@link #findDeadlockedThreads findDeadlockedThreads} method
      * should be used.
-     *
-     * @apiNote TBD, need to specify behavior for virtual threads.
      *
      * @return an array of IDs of the threads that are monitor
      * deadlocked, if any; {@code null} otherwise.
@@ -649,8 +649,8 @@ public interface ThreadMXBean extends PlatformManagedObject {
      * <p>
      * This method is designed for troubleshooting use, but not for
      * synchronization control.  It might be an expensive operation.
-     *
-     * @apiNote TBD, need to specify behavior for virtual threads.
+     * Its behavior with cycles involving virtual threads is not defined
+     * in this release.
      *
      * @return an array of IDs of the threads that are
      * deadlocked waiting for object monitors or ownable synchronizers, if any;
