@@ -255,8 +255,8 @@ class VirtualThread extends Thread {
             throw new IllegalStateException();
         }
 
-        boolean firstRun = (initialState == STARTED);
-        mount(firstRun);
+        boolean firstMount = (initialState == STARTED);
+        mount(firstMount);
         try {
             cont.run();
         } finally {
@@ -274,13 +274,13 @@ class VirtualThread extends Thread {
      * is run or continued. It binds the virtual thread to the current carrier thread.
      */
     @ChangesCurrentThread
-    private void mount(boolean firstRun) {
+    private void mount(boolean firstMount) {
         //assert this.carrierThread == null
 
         // notify JVMTI agents
         boolean notifyJvmti = notifyJvmtiEvents;
         if (notifyJvmti) {
-            notifyJvmtiMountBegin(firstRun);
+            notifyJvmtiMountBegin(firstMount);
         }
 
         // sets the carrier thread
@@ -303,7 +303,7 @@ class VirtualThread extends Thread {
 
         // notify JVMTI agents
         if (notifyJvmti) {
-            notifyJvmtiMountEnd(firstRun);
+            notifyJvmtiMountEnd(firstMount);
         }
     }
 
@@ -381,7 +381,7 @@ class VirtualThread extends Thread {
 
         // notify JVMTI agents
         if (notifyAgents && notifyJvmtiEvents) {
-            notifyJvmtiTerminate();
+            notifyJvmtiTerminated();
         }
     }
 
@@ -876,43 +876,34 @@ class VirtualThread extends Thread {
     // -- JVM TI support --
 
     private static volatile boolean notifyJvmtiEvents;  // set by VM
-    private static native void notifyVTMTStart(VirtualThread vthread, int callsiteTag);
-    private static native void notifyVTMTFinish(VirtualThread vthread, int callsiteTag);
-    private static native void notifyStarted(Thread carrierThread, VirtualThread vthread);
-    private static native void notifyTerminated(Thread carrierThread, VirtualThread vthread);
-    private static native void notifyMount(Thread carrierThread, VirtualThread vthread);
-    private static native void notifyUnmount(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyMountBegin0(Thread carrierThread, VirtualThread vthread, boolean firstMount);
+    private static native void notifyMountEnd0(Thread carrierThread, VirtualThread vthread, boolean firstMount);
+    private static native void notifyUnmountBegin0(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyUnmountEnd0(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyTerminated0(Thread carrierThread, VirtualThread vthread);
     private static native void registerNatives();
     static {
         registerNatives();
     }
 
-    private void notifyJvmtiMountBegin(boolean firstRun) {
-        notifyVTMTStart(this, 0);
+    private void notifyJvmtiMountBegin(boolean firstMount) {
+        notifyMountBegin0(Thread.currentCarrierThread(), this, firstMount);
     }
 
-    private void notifyJvmtiMountEnd(boolean firstRun) {
-        Thread carrier = Thread.currentCarrierThread();
-        notifyVTMTFinish(this, 0);
-        if (firstRun) {
-            notifyStarted(carrier, this);
-        }
-        notifyMount(carrier, this);
+    private void notifyJvmtiMountEnd(boolean firstMount) {
+        notifyMountEnd0(Thread.currentCarrierThread(), this, firstMount);
     }
 
     private void notifyJvmtiUnmountBegin() {
-        notifyUnmount(Thread.currentCarrierThread(), this);
-        notifyVTMTStart(this, 1);
+        notifyUnmountBegin0(Thread.currentCarrierThread(), this);
     }
 
     private void notifyJvmtiUnmountEnd() {
-        notifyVTMTFinish(this, 1);
+        notifyUnmountEnd0(Thread.currentCarrierThread(), this);
     }
 
-    private void notifyJvmtiTerminate() {
-        notifyTerminated(Thread.currentCarrierThread(), this);
-        notifyVTMTStart(this, 0);
-        notifyVTMTFinish(this, 0);
+    private void notifyJvmtiTerminated() {
+        notifyTerminated0(Thread.currentCarrierThread(), this);
     }
 
     /**
