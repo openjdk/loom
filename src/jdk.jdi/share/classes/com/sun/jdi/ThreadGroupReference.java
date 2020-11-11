@@ -79,9 +79,10 @@ public interface ThreadGroupReference extends ObjectReference {
 
     /**
      * Returns a List containing a {@link ThreadReference} for each live thread
-     * in this thread group. Only the live threads in this immediate thread group
-     * (and not its subgroups) are returned.  A thread is alive if it
-     * has been started and has not yet been stopped.
+     * in this thread group. Virtual threads are not considered live threads in
+     * a thread group and are not included. Only the live threads in this
+     * immediate thread group (and not its subgroups) are returned. A thread is
+     * alive if it has been started and has not yet been stopped.
      *
      * @return a List of {@link ThreadReference} objects mirroring the
      * live threads from this thread group in the target VM.

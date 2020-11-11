@@ -2658,8 +2658,8 @@ public class Thread implements Runnable {
     private native Object getStackTrace0();
 
     /**
-     * Returns a map of stack traces for all live threads. The map does not
-     * include virtual threads.
+     * Returns a map of stack traces for all live threads that are scheduled
+     * by the operating system. The map does not include virtual threads.
      * The map keys are threads and each map value is an array of
      * {@code StackTraceElement} that represents the stack dump
      * of the corresponding {@code Thread}.

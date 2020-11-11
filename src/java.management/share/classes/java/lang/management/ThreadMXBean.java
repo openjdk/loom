@@ -32,10 +32,9 @@ import java.util.Map;
  * the Java virtual machine.
  *
  * <p> {@code ThreadMXBean} supports monitoring and management of <em>live
- * threads</em> in the Java virtual machine. <em>Live threads</em> are threads
- * scheduled by the operating system that have been started but have not yet
- * terminated. {@code ThreadMXBean} does not support monitoring or management
- * of {@linkplain Thread#isVirtual() virtual threads}.
+ * threads</em> in the Java virtual machine that are scheduled by the operating
+ * system. {@code ThreadMXBean} does not support monitoring or management
+ * of {@linkplain Thread#isVirtual() virtual threads} at this time.
  *
  * <p> A Java virtual machine has a single instance of the implementation
  * class of this interface.  This instance implementing this interface is
@@ -131,6 +130,7 @@ public interface ThreadMXBean extends PlatformManagedObject {
     /**
      * Returns the current number of live threads including both
      * daemon and non-daemon threads.
+     * The count does not include virtual threads.
      *
      * @return the current number of live threads.
      */
@@ -139,6 +139,7 @@ public interface ThreadMXBean extends PlatformManagedObject {
     /**
      * Returns the peak live thread count since the Java virtual machine
      * started or peak was reset.
+     * The count does not include virtual threads.
      *
      * @return the peak live thread count.
      */
@@ -147,6 +148,7 @@ public interface ThreadMXBean extends PlatformManagedObject {
     /**
      * Returns the total number of threads created and also started
      * since the Java virtual machine started.
+     * The count does not include virtual threads.
      *
      * @return the total number of threads started.
      */
@@ -154,6 +156,7 @@ public interface ThreadMXBean extends PlatformManagedObject {
 
     /**
      * Returns the current number of live daemon threads.
+     * The count does not include virtual threads.
      *
      * @return the current number of live daemon threads.
      */
@@ -161,6 +164,7 @@ public interface ThreadMXBean extends PlatformManagedObject {
 
     /**
      * Returns all live thread IDs.
+     * The thread IDs of virtual threads are not included.
      * Some threads included in the returned array
      * may have been terminated when this method returns.
      *
@@ -607,6 +611,8 @@ public interface ThreadMXBean extends PlatformManagedObject {
      * the {@link #findDeadlockedThreads findDeadlockedThreads} method
      * should be used.
      *
+     * @apiNote TBD, need to specify behavior for virtual threads.
+     *
      * @return an array of IDs of the threads that are monitor
      * deadlocked, if any; {@code null} otherwise.
      *
@@ -643,6 +649,8 @@ public interface ThreadMXBean extends PlatformManagedObject {
      * <p>
      * This method is designed for troubleshooting use, but not for
      * synchronization control.  It might be an expensive operation.
+     *
+     * @apiNote TBD, need to specify behavior for virtual threads.
      *
      * @return an array of IDs of the threads that are
      * deadlocked waiting for object monitors or ownable synchronizers, if any;
@@ -829,7 +837,8 @@ public interface ThreadMXBean extends PlatformManagedObject {
     /**
      * Returns the thread info for all live threads with stack trace
      * and synchronization information.
-     * This is equivalent to calling:
+     * The thread IDs of virtual threads are not included.
+     * This method is equivalent to calling:
      * <blockquote>
      * {@link #dumpAllThreads(boolean, boolean, int)
      * dumpAllThreads(lockedMonitors, lockedSynchronizers, Integer.MAX_VALUE)}
@@ -870,6 +879,7 @@ public interface ThreadMXBean extends PlatformManagedObject {
      * and synchronization information.
      * if {@code maxDepth == 0}, no stack trace of the thread
      * will be dumped.
+     * The thread IDs of virtual threads are not included.
      * Some threads included in the returned array
      * may have been terminated when this method returns.
      *

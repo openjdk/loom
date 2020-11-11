@@ -250,9 +250,10 @@ public interface VirtualMachine extends Mirror {
     void redefineClasses(Map<? extends ReferenceType,byte[]> classToBytes);
 
     /**
-     * Returns a list of the currently running threads. For each
-     * running thread in the target VM, a {@link ThreadReference}
-     * that mirrors it is placed in the list.
+     * Returns a list of the live threads in the target VM. The returned list
+     * contains a {@link ThreadReference} mirror for each live thread that
+     * is attached to the VM. It does not contain elements for virtual threads.
+     * <p>
      * The returned list contains threads created through
      * java.lang.Thread, all native threads attached to
      * the target VM through JNI, and system threads created

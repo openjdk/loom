@@ -92,7 +92,9 @@ JDWP "Java(tm) Debug Wire Protocol"
         )
     )
     (Command AllThreads=4
-        "Returns all threads currently running in the target VM . "
+        "Returns the live threads in the target VM. "
+        "The returned list contains all live threads that are attached to the VM. "
+        "It does not contain virtual threads. "
         "The returned list contains threads created through "
         "java.lang.Thread, all native threads attached to "
         "the target VM through JNI, and system threads created "
@@ -2188,10 +2190,11 @@ JDWP "Java(tm) Debug Wire Protocol"
     )
     (Command Children=3
         "Returns the live threads and active thread groups directly contained "
-        "in this thread group. Threads and thread groups in child "
+        "in this thread group. Virtual threads are not considered live threads "
+        "in a thread group and are not included. Threads and thread groups in child "
         "thread groups are not included. "
         "A thread is alive if it has been started and has not yet been stopped. "
-        "See <a href=../../api/java.base/java/lang/ThreadGroup.html>java.lang.ThreadGroup </a>
+        "See <a href=../../api/java.base/java/lang/ThreadGroup.html>java.lang.ThreadGroup </a> "
         "for information about active ThreadGroups.
         (Out
             (threadGroupObject group "The thread group object ID. ")
