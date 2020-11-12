@@ -438,7 +438,7 @@ public class Thread implements Runnable {
      * @since 99
      */
     public static void sleep(Duration duration) throws InterruptedException {
-        long nanos = duration.toNanos();
+        long nanos = NANOSECONDS.convert(duration);  // MAX_VALUE if > 292 years
         if (nanos < 0)
             return;
 
@@ -2277,7 +2277,7 @@ public class Thread implements Runnable {
                     } while (isAlive() && (delay = millis -
                             TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)) > 0);
                 }
-            } else if (millis == 0) {
+            } else {
                 while (isAlive()) {
                     wait(0);
                 }
@@ -2374,17 +2374,16 @@ public class Thread implements Runnable {
      * @since 99
      */
     public final boolean join(Duration duration) throws InterruptedException {
-        Objects.requireNonNull(duration);
+        long nanos = NANOSECONDS.convert(duration); // MAX_VALUE if > 292 years
 
         Thread.State state = getState();
         if (state == State.NEW)
             throw new IllegalThreadStateException("Thread not started");
         if (state == State.TERMINATED)
             return true;
-        if (duration.isZero() || duration.isNegative())
+        if (nanos <= 0)
             return false;
 
-        long nanos = NANOSECONDS.convert(duration);
         if (isVirtual()) {
             return ((VirtualThread) this).joinNanos(nanos);
         } else {
