@@ -264,7 +264,7 @@ public interface VirtualMachine extends Mirror {
      * completed their execution are not included in the returned list.
      *
      * @return a list of {@link ThreadReference} objects, one for each
-     * running thread in the mirrored VM.
+     * live thread in the mirrored VM.
      */
     List<ThreadReference> allThreads();
 
