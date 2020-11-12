@@ -3475,6 +3475,9 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
     assert (thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked /*|| thread->thread_state() == _thread_in_native*/, "thread_state: %d %s", thread->thread_state(), thread->thread_state_name());
     freeze_result res = fr.freeze_preempt();
     assert (res != freeze_retry_slow, "");
+    // if (LIKELY(res == freeze_ok)) {
+    //   set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
+    // }
     return freeze_epilog(thread, cont, res);
   } else {
     // manual transtion. see JRT_ENTRY in interfaceSupport.inline.hpp
@@ -3710,9 +3713,9 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
   if (res == 0) { // success
     thread->set_cont_preempt(true);
 
-    frame last = thread->last_frame();
-    Frame::patch_pc(last, StubRoutines::cont_jump_from_sp()); // reinstates rbpc and rlocals for the sake of the interpreter
-    log_develop_trace(jvmcont)("try_force_yield installed cont_jump_from_sp stub on"); if (log_develop_is_enabled(Trace, jvmcont)) last.print_on(tty);
+    // frame last = thread->last_frame();
+    // Frame::patch_pc(last, StubRoutines::cont_jump_from_sp()); // reinstates rbpc and rlocals for the sake of the interpreter
+    // log_develop_trace(jvmcont)("try_force_yield installed cont_jump_from_sp stub on"); if (log_develop_is_enabled(Trace, jvmcont)) last.print_on(tty);
 
     // this return barrier is used for compiled frames; for interpreted frames we use the call to StubRoutines::cont_jump_from_sp_C in JavaThread::handle_special_runtime_exit_condition
   }
