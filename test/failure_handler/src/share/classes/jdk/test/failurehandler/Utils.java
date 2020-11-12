@@ -71,8 +71,9 @@ public final class Utils {
                 "/%s.%s", name.toLowerCase(), "properties");
         InputStream stream = Utils.class.getResourceAsStream(resourceName);
 
-        if (System.getenv("CONF") != null) {
-            String confPath = System.getenv("CONF");
+        // EFH_CONF_DIR might re-defined to load custom configs for development purposes
+        if (System.getenv("EFH_CONF_DIR") != null) {
+            String confPath = System.getenv("EFH_CONF_DIR");
             try {
                 stream = new FileInputStream(Path.of(confPath,resourceName).toFile());
             } catch (Exception e) {
