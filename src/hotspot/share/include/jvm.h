@@ -198,7 +198,7 @@ JVM_LookupLambdaProxyClassFromArchive(JNIEnv* env, jclass caller,
                                       jboolean initialize);
 
 JNIEXPORT jboolean JNICALL
-JVM_IsDynamicDumpingEnabled(JNIEnv* env);
+JVM_IsCDSDumpingEnabled(JNIEnv* env);
 
 JNIEXPORT jboolean JNICALL
 JVM_IsSharingEnabled(JNIEnv* env);
@@ -356,6 +356,15 @@ JVM_HasReferencePendingList(JNIEnv *env);
 
 JNIEXPORT void JNICALL
 JVM_WaitForReferencePendingList(JNIEnv *env);
+
+JNIEXPORT jboolean JNICALL
+JVM_ReferenceRefersTo(JNIEnv *env, jobject ref, jobject o);
+
+/*
+ * java.lang.ref.PhantomReference
+ */
+JNIEXPORT jboolean JNICALL
+JVM_PhantomReferenceRefersTo(JNIEnv *env, jobject ref, jobject o);
 
 /*
  * java.io.ObjectInputStream

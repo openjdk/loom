@@ -419,10 +419,10 @@ void  JvmtiCurrentBreakpoints::listener_fun(void *this_obj, address *cache) {
 //
 
 const jvalue VM_BaseGetOrSetLocal::_DEFAULT_VALUE = {0L};
+// Constructor for non-object getter
 
 VM_BaseGetOrSetLocal::VM_BaseGetOrSetLocal(JavaThread* calling_thread, jint depth,
-                                           jint index, BasicType type, jvalue value,
-                                           bool set)
+                                           jint index, BasicType type, jvalue value, bool set)
   : _calling_thread(calling_thread)
   , _depth(depth)
   , _index(index)
@@ -583,6 +583,16 @@ static bool can_be_deoptimized(vframe* vf) {
   return (vf->is_compiled_frame() && vf->fr().can_be_deoptimized());
 }
 
+bool VM_GetOrSetLocal::doit_prologue() {
+  if (!_eb.deoptimize_objects(_depth, _depth)) {
+    // The target frame is affected by a reallocation failure.
+    _result = JVMTI_ERROR_OUT_OF_MEMORY;
+    return false;
+  }
+
+  return true;
+}
+
 void VM_BaseGetOrSetLocal::doit() {
   _jvf = get_java_vframe();
   if (_jvf == NULL) {
@@ -707,31 +717,33 @@ bool VM_BaseGetOrSetLocal::allow_nested_vm_operations() const {
 
 // Constructor for non-object getter
 VM_GetOrSetLocal::VM_GetOrSetLocal(JavaThread* thread, jint depth, jint index, BasicType type)
-  : VM_BaseGetOrSetLocal((JavaThread*)NULL, depth, index, type, _DEFAULT_VALUE, false)
+  : VM_BaseGetOrSetLocal((JavaThread*)NULL, depth, index, type, _DEFAULT_VALUE, false),
+    _thread(thread),
+    _eb(false, NULL, NULL)
 {
-  _thread = thread;
 }
 
 // Constructor for object or non-object setter
 VM_GetOrSetLocal::VM_GetOrSetLocal(JavaThread* thread, jint depth, jint index, BasicType type, jvalue value)
-  : VM_BaseGetOrSetLocal((JavaThread*)NULL, depth, index, type, value, true)
+  : VM_BaseGetOrSetLocal((JavaThread*)NULL, depth, index, type, value, true),
+    _thread(thread),
+    _eb(type == T_OBJECT, JavaThread::current(), thread)
 {
-  _thread = thread;
 }
 
 // Constructor for object getter
 VM_GetOrSetLocal::VM_GetOrSetLocal(JavaThread* thread, JavaThread* calling_thread, jint depth, int index)
-  : VM_BaseGetOrSetLocal(calling_thread, depth, index, T_OBJECT, _DEFAULT_VALUE, false)
+  : VM_BaseGetOrSetLocal(calling_thread, depth, index, T_OBJECT, _DEFAULT_VALUE, false),
+    _thread(thread),
+    _eb(true, calling_thread, thread)
 {
-  _thread = thread;
 }
-
 
 vframe *VM_GetOrSetLocal::get_vframe() {
   if (!_thread->has_last_Java_frame()) {
     return NULL;
   }
-  RegisterMap reg_map(_thread, true, true);
+  RegisterMap reg_map(_thread, true, true, true);
   vframe *vf = JvmtiEnvBase::get_last_java_vframe(_thread, &reg_map);
   int d = 0;
   while ((vf != NULL) && (d < _depth)) {

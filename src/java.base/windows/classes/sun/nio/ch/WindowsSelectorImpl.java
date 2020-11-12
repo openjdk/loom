@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -30,6 +30,7 @@ import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.Pipe;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -139,11 +140,9 @@ class WindowsSelectorImpl extends SelectorImpl {
     WindowsSelectorImpl(SelectorProvider sp) throws IOException {
         super(sp);
         pollWrapper = new PollArrayWrapper(INIT_CAP);
-
-        wakeupPipe = new PipeImpl(null, /*no delay*/ false);
-        wakeupSourceFd = ((SelChImpl) wakeupPipe.source()).getFDVal();
-        wakeupSinkFd = ((SelChImpl) wakeupPipe.sink()).getFDVal();
-
+        wakeupPipe = new PipeImpl(sp, false);
+        wakeupSourceFd = ((SelChImpl)wakeupPipe.source()).getFDVal();
+        wakeupSinkFd = ((SelChImpl)wakeupPipe.sink()).getFDVal();
         pollWrapper.addWakeupSocket(wakeupSourceFd, 0);
     }
 
@@ -415,10 +414,10 @@ class WindowsSelectorImpl extends SelectorImpl {
                 // The descriptor may be in the exceptfds set because there is
                 // OOB data queued to the socket. If there is OOB data then it
                 // is discarded and the key is not added to the selected set.
-                if (isExceptFds &&
-                    (ski.channel() instanceof SocketChannelImpl) &&
-                    Net.discardUrgentData(ski.getFD()))
-                {
+                SelectableChannel sc = ski.channel();
+                if (isExceptFds && (sc instanceof SocketChannelImpl)
+                        && ((SocketChannelImpl) sc).isNetSocket()
+                        && Net.discardUrgentData(desc)) {
                     continue;
                 }
 

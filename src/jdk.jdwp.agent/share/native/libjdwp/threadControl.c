@@ -893,6 +893,7 @@ threadControl_onHook(void)
                  */
                 node->isStarted = JNI_TRUE;
             }
+            jvmtiDeallocate(threads);
         }
 
     } END_WITH_LOCAL_REFS(env)
@@ -1638,7 +1639,8 @@ threadControl_suspendAll(void)
             suspendAllCount++;
         }
 
-    err: ;
+    err:
+        jvmtiDeallocate(threads);
 
     } END_WITH_LOCAL_REFS(env)
 
@@ -1702,12 +1704,7 @@ threadControl_resumeAll(void)
      * no need to get the whole thread list from JVMTI (unlike
      * suspendAll).
      */
-    if (canSuspendResumeThreadLists()) {
-        error = commonResumeList(env);
-    } else {
-        error = enumerateOverThreadList(env, &runningThreads,
-                                        resumeHelper, NULL);
-    }
+    error = commonResumeList(env);
     if ((error == JVMTI_ERROR_NONE) && (otherThreads.first != NULL)) {
         error = enumerateOverThreadList(env, &otherThreads,
                                         resumeHelper, NULL);
