@@ -417,7 +417,7 @@ class WindowsSelectorImpl extends SelectorImpl {
                 SelectableChannel sc = ski.channel();
                 if (isExceptFds && (sc instanceof SocketChannelImpl)
                         && ((SocketChannelImpl) sc).isNetSocket()
-                        && Net.discardUrgentData(desc)) {
+                        && Net.discardUrgentData(ski.getFD())) {
                     continue;
                 }
 

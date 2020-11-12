@@ -1294,10 +1294,6 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
   GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list =
       new (ResourceObj::C_HEAP, mtServiceability) GrowableArray<jvmtiMonitorStackDepthInfo*>(1, mtServiceability);
 
-  EscapeBarrier eb(true, calling_thread, java_thread);
-  if (!eb.deoptimize_objects(MaxJavaStackTraceDepth)) {
-    return JVMTI_ERROR_OUT_OF_MEMORY;
-  }
 
   JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh(calling_thread);
@@ -1321,6 +1317,11 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
       err = op.result();
     }
   } else {
+    EscapeBarrier eb(true, calling_thread, java_thread);
+    if (!eb.deoptimize_objects(MaxJavaStackTraceDepth)) {
+      return JVMTI_ERROR_OUT_OF_MEMORY;
+    }
+
     if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
       // Carrier thread with a mounted continuation case.
       // No contended monitor can be owned by carrier thread in this case.
@@ -1374,11 +1375,6 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
   GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list =
          new (ResourceObj::C_HEAP, mtServiceability) GrowableArray<jvmtiMonitorStackDepthInfo*>(1, mtServiceability);
 
-  EscapeBarrier eb(true, calling_thread, java_thread);
-  if (!eb.deoptimize_objects(MaxJavaStackTraceDepth)) {
-    return JVMTI_ERROR_OUT_OF_MEMORY;
-  }
-
   JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh(calling_thread);
  
@@ -1401,6 +1397,11 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
       err = op.result();
     }
   } else {
+    EscapeBarrier eb(true, calling_thread, java_thread);
+    if (!eb.deoptimize_objects(MaxJavaStackTraceDepth)) {
+      return JVMTI_ERROR_OUT_OF_MEMORY;
+    }
+
     if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
       // Carrier thread with a mounted continuation case.
       // No contended monitor can be owned by carrier thread in this case.

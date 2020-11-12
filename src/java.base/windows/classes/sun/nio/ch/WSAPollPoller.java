@@ -99,7 +99,6 @@ class WSAPollPoller extends Poller {
         this.pipe = makePipe();
         SourceChannelImpl source = (SourceChannelImpl) pipe.source();
         SinkChannelImpl sink = (SinkChannelImpl) pipe.sink();
-        (sink.sc).socket().setTcpNoDelay(true);
         this.fd0 = source.getFD();
         this.fd1 = sink.getFD();
 
@@ -313,7 +312,7 @@ class WSAPollPoller extends Poller {
      */
     private static PipeImpl makePipe() throws IOException {
         try {
-            return JLA.executeOnCarrierThread(() -> new PipeImpl(null));
+            return JLA.executeOnCarrierThread(() -> new PipeImpl(null, false));
         } catch (IOException ioe) {
             throw ioe;
         } catch (Throwable e) {
