@@ -461,8 +461,6 @@ public class NioChannels {
         });
     }
 
-
-
     /**
      * Pipe read/write, no blocking.
      */

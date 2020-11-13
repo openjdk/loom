@@ -27,18 +27,18 @@ package sun.nio.ch;
 import java.io.IOException;
 
 /**
- * WSAPoll based PollerProvider
+ * Default PollerProvider for Windows based on wepoll.
  */
-class WSAPollPollerProvider extends PollerProvider {
-    WSAPollPollerProvider() { }
+class DefaultPollerProvider extends PollerProvider {
+    DefaultPollerProvider() { }
 
     @Override
     Poller readPoller() throws IOException {
-        return new WSAPollPolle(true);
+        return new WEPollPoller(true);
     }
 
     @Override
     Poller writePoller() throws IOException {
-        return new WSAPollPolle(false);
+        return new WEPollPoller(false);
     }
 }
