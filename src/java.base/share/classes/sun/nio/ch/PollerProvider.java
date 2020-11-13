@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,15 +25,36 @@
 package sun.nio.ch;
 
 import java.io.IOException;
+import java.util.ServiceConfigurationError;
+import sun.security.action.GetPropertyAction;
 
-class PollerProvider {
-    private PollerProvider() { }
+abstract class PollerProvider {
+    PollerProvider() { }
 
-    static Poller readPoller() throws IOException {
-        return new KQueuePoller(true);
-    }
+    /**
+     * Creates a Poller for read ops.
+     */
+    abstract Poller readPoller() throws IOException;
 
-    static Poller writePoller() throws IOException {
-        return new KQueuePoller(false);
+    /**
+     * Creates a Poller for write ops.
+     */
+    abstract Poller writePoller() throws IOException;
+
+    /**
+     * Creates the PollerProvider.
+     */
+    static PollerProvider provider() {
+        String cn = GetPropertyAction.privilegedGetProperty("jdk.PollerProvider");
+        if (cn != null) {
+            try {
+                Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
+                return (PollerProvider) clazz.getConstructor().newInstance();
+            } catch (Exception e) {
+                throw new ServiceConfigurationError(null, e);
+            }
+        } else {
+            return new DefaultPollerProvider();
+        }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,8 +41,9 @@ abstract class Poller implements Runnable {
 
     static {
         try {
-            READ_POLLER = startPollerThread("Read-Poller", PollerProvider.readPoller());
-            WRITE_POLLER = startPollerThread("Write-Poller", PollerProvider.writePoller());
+            PollerProvider provider = PollerProvider.provider();
+            READ_POLLER = startPollerThread("Read-Poller", provider.readPoller());
+            WRITE_POLLER = startPollerThread("Write-Poller", provider.writePoller());
         } catch (IOException ioe) {
             throw new IOError(ioe);
         }

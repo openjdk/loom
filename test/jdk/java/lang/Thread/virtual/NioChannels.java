@@ -27,6 +27,12 @@
  * @summary Basic tests for virtual threads doing blocking I/O with NIO channels
  */
 
+/**
+ * @test
+ * @requires (os.family == "windows")
+ * @run testng/othervm/timeout=300 -Djdk.pollProvider=sun.nio.ch.WSAPollPollerProvider NioChannels
+ */
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.DatagramPacket;

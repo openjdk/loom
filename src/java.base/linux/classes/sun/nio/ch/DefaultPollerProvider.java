@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,14 +26,19 @@ package sun.nio.ch;
 
 import java.io.IOException;
 
-class PollerProvider {
-    private PollerProvider() { }
+/**
+ * Default PollerProvider for Linux.
+ */
+class DefaultPollerProvider extends PollerProvider {
+    DefaultPollerProvider() { }
 
-    static Poller readPoller() throws IOException {
-        return new WEPollPoller(true);
+    @Override
+    Poller readPoller() throws IOException {
+        return new EPollPoller(true);
     }
 
-    static Poller writePoller() throws IOException {
-        return new WEPollPoller(false);
+    @Override
+    Poller writePoller() throws IOException {
+        return new EPollPoller(false);
     }
 }
