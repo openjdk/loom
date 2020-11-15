@@ -1484,14 +1484,9 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
         }
     }
 
-    /* Ignore VIRTUAL_THREAD_SCHEDULED events unless we are notifying the debugger of all vthreads. */
-    if (!gdata->notifyDebuggerOfAllVThreads) {
-        return;
-    }
-
     BEGIN_CALLBACK() {
         (void)memset(&info,0,sizeof(info));
-        info.ei         = EI_VIRTUAL_THREAD_SCHEDULED;
+        info.ei         = EI_THREAD_START;
         info.thread     = vthread;
         event_callback(env, &info);
     } END_CALLBACK();
@@ -1511,14 +1506,9 @@ cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
     /*tty_message("cbVThreadTerminated: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
-    if (!gdata->notifyDebuggerOfAllVThreads && !threadControl_isKnownVThread(vthread)) {
-        /* This is not a vthread we are tracking, so don't deliver a VIRTUAL_THREAD_TERMINATED event for it. */
-        return;
-    }
-
     BEGIN_CALLBACK() {
         (void)memset(&info,0,sizeof(info));
-        info.ei         = EI_VIRTUAL_THREAD_TERMINATED;
+        info.ei         = EI_THREAD_END;
         info.thread     = vthread;
         event_callback(env, &info);
     } END_CALLBACK();

@@ -92,6 +92,10 @@ typedef struct SourceNameFilter {
     char *sourceNamePattern;
 } SourceNameFilter;
 
+typedef struct VirtualThreadsExcludeFilter {
+    char unused;  // to avoid an empty struct
+} VirtualThreadsExcludeFilter;
+
 typedef struct Filter_ {
     jbyte modifier;
     union {
@@ -107,6 +111,7 @@ typedef struct Filter_ {
         struct MatchFilter ClassMatch;
         struct MatchFilter ClassExclude;
         struct SourceNameFilter SourceNameOnly;
+        struct VirtualThreadsExcludeFilter VirtualThreadsExclude;
     } u;
 } Filter;
 
@@ -562,6 +567,14 @@ eventFilterRestricted_passesFilter(JNIEnv *env,
               break;
           }
 
+        case JDWP_REQUEST_MODIFIER(VirtualThreadsExclude): {
+            jboolean isVirtual = JNI_FUNC_PTR(env, IsVirtualThread)(env, thread);
+            if (isVirtual) {
+                return JNI_FALSE;
+            }
+            break;
+        }
+
         default:
             EXIT_ERROR(AGENT_ERROR_ILLEGAL_ARGUMENT,"Invalid filter modifier");
             return JNI_FALSE;
@@ -1000,6 +1013,20 @@ eventFilter_setSourceNameMatchFilter(HandlerNode *node,
     FILTER(node, index).modifier =
                        JDWP_REQUEST_MODIFIER(SourceNameMatch);
     filter->sourceNamePattern = sourceNamePattern;
+    return JVMTI_ERROR_NONE;
+
+}
+
+jvmtiError eventFilter_setVirtualThreadsExcludeFilter(HandlerNode *node, jint index)
+{
+    VirtualThreadsExcludeFilter *filter = &FILTER(node, index).u.VirtualThreadsExclude;
+    if (index >= FILTER_COUNT(node)) {
+        return AGENT_ERROR_ILLEGAL_ARGUMENT;
+    }
+    if (NODE_EI(node) != EI_THREAD_START && NODE_EI(node) != EI_THREAD_END) {
+        return AGENT_ERROR_ILLEGAL_ARGUMENT;
+    }
+    FILTER(node, index).modifier = JDWP_REQUEST_MODIFIER(VirtualThreadsExclude);
     return JVMTI_ERROR_NONE;
 
 }

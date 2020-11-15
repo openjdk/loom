@@ -207,6 +207,10 @@ readAndSetFilters(JNIEnv *env, PacketInputStream *in, HandlerNode *node,
                 break;
             }
 
+            case JDWP_REQUEST_MODIFIER(VirtualThreadsExclude):
+                serror = map2jdwpError(eventFilter_setVirtualThreadsExcludeFilter(node, i));
+                break;
+
             default:
                 serror = JDWP_ERROR(ILLEGAL_ARGUMENT);
                 break;
