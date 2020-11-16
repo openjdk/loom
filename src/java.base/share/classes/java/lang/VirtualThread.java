@@ -1013,7 +1013,7 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Reads the value of the jdk.tracePinning property to determine if stack
+     * Reads the value of the jdk.tracePinnedThreads property to determine if stack
      * traces should be printed when a carrier thread is pinned when a virtual thread
      * attempts to park.
      */
