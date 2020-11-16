@@ -2928,7 +2928,11 @@ public:
       _cont.e_add_refs(_oops);
     }
 
-    if (!is_chunk()) {
+    _chunk = chunkh();
+
+    if (is_chunk()) {
+      _top_address = (intptr_t*)InstanceStackChunkKlass::start_of_stack(_chunk) + jdk_internal_misc_StackChunk::sp(_chunk); // TODO: add method to jdk_internal_misc_StackChunk
+    } else {
       _cont.add_size(_size); // chunk's size has already been added when originally freezing it
     }
 
@@ -2941,11 +2945,6 @@ public:
     }
 
     // java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail()); -- doesn't seem to help
-
-  if (is_chunk()) {
-    _chunk = chunkh();
-    _top_address = (intptr_t*)InstanceStackChunkKlass::start_of_stack(_chunk) + jdk_internal_misc_StackChunk::sp(_chunk); // TODO: add method to jdk_internal_misc_StackChunk
-  }
 
   #ifdef ASSERT
     hframe orig_top_frame = _cont.last_frame<mode_slow>();
