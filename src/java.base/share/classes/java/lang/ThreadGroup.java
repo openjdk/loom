@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import jdk.internal.misc.VM;
 
 /**
@@ -43,32 +42,20 @@ import jdk.internal.misc.VM;
  * a tree in which every thread group except the initial thread group
  * has a parent.
  *
- * <p> A thread group has a name, maximum priority, and a <i>daemon status</i>.
- * The name is specified when creating the group and cannot be changed.
- * The group's maximum priority is the maximum priority for threads created
- * in the group. It is initially inherited from the parent thread group but
- * may be changed using the {@link #setMaxPriority(int)} method.
+ * <p> A thread group has a name and maximum priority. The name is specified
+ * when creating the group and cannot be changed. The group's maximum priority
+ * is the maximum priority for threads created in the group. It is initially
+ * inherited from the parent thread group but may be changed using the {@link
+ * #setMaxPriority(int)} method.
  *
- * <p> The <i>daemon status</i> determines if the group is weakly or strongly
- * <a href="ref/package-summary.html#reachability"><em>reachable</em></a> from
- * its parent group. A newly created thread group is a daemon thread group. It
- * is weakly reachable from its parent group so that it is eligible for garbage
- * collection when there are no {@linkplain Thread#isAlive() live} threads in
- * the group and is otherwise <i>unreachable</i>. The {@link #setDaemon(boolean)}
- * method can be used to change a group to be a non-daemon thread group. A
- * non-daemon thread group is <i>strongly reachable</i> from its parent. The
- * need to keep a group strongly reachable from its parent may be important
- * for cases where a parent group is {@linkplain #enumerate(ThreadGroup[])
- * enumerated} to find a subgroup by name.
+ * <p> A thread group is weakly
+ * <a href="ref/package-summary.html#reachability"><em>reachable</em></a>
+ * from its parent group so that it is eligible for garbage collection when there
+ * are no {@linkplain Thread#isAlive() live} threads in the group and is otherwise
+ * <i>unreachable</i>.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
- *
- * @apiNote
- * The concept of <i>daemon thread group</i> is not related to the concept
- * of {@linkplain Thread#isDaemon() daemon threads}. There may be both
- * daemon and non-daemon threads in a thread group, independent of whether
- * the group is a daemon or non-daemon thread group.
  *
  * @since   1.0
  */
@@ -82,19 +69,19 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private final ThreadGroup parent;
     private final String name;
     private volatile int maxPriority;
-    private volatile boolean daemon;
 
-    // non-daemon subgroups (strongly reachable from this group)
+    // strongly reachable from this group
     private int ngroups;
     private ThreadGroup[] groups;
 
-    // daemon subgroups (weakly reachable from this group)
+    // weakly reachable from this group
     private int nweaks;
     private WeakReference<ThreadGroup>[] weaks;
 
     /**
-     * Creates the top-level "system" ThreadGroup. This method is invoked early
-     * in the VM startup.
+     * Creates the top-level "system" ThreadGroup.
+     *
+     * @apiNote This method is invoked by the VM early startup.
      */
     private ThreadGroup() {
         this.parent = null;
@@ -104,24 +91,23 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
 
     /**
      * Creates a ThreadGroup without any permission or other checks.
-     *
-     * The daemon status is ignored during VM startup. All ThreadGroups created
-     * during VM startup are non-daemon.
      */
-    ThreadGroup(ThreadGroup parent, String name, int maxPriority, boolean daemon) {
+    ThreadGroup(ThreadGroup parent, String name, int maxPriority) {
         this.parent = parent;
         this.name = name;
         this.maxPriority = maxPriority;
-        if (daemon && VM.isBooted()) {
-            this.daemon = true;
+        if (VM.isBooted()) {
             parent.synchronizedAddWeak(this);
         } else {
-            parent.synchronizedAdd(this);
+            // keep strong reference to the "main" and other groups created
+            // early in the VM startup to avoid use weak references during
+            // when starting the reference handlers.
+            parent.synchronizedAddStrong(this);
         }
     }
 
     private ThreadGroup(Void unused, ThreadGroup parent, String name) {
-        this(parent, name, parent.getMaxPriority(), true);
+        this(parent, name, parent.getMaxPriority());
     }
 
     private static Void checkParentAccess(ThreadGroup parent) {
@@ -205,18 +191,18 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Tests if this thread group is a daemon thread group. A daemon thread
-     * group is <a href="ref/package-summary.html#reachability"><em>weakly
-     * reachable</em></a> from its parent so that it is eligible for garbage
-     * collection when there are no {@linkplain Thread#isAlive() live} threads
-     * in the group and is otherwise <i>unreachable</i>. A non-daemon thread
-     * is strongly reachable from its parent.
+     * Returns false.
      *
-     * @return  {@code true} if this thread group is a daemon thread group;
-     *          {@code false} otherwise.
+     * @return false
+     *
+     * @deprecated This method originally indicated if the thread group is a
+     *             <i>daemon thread group</i> that is automatically destroyed
+     *             when its last thread terminates. The concept of daemon
+     *             thread group no longer exists.
      */
+    @Deprecated(since="99", forRemoval=true)
     public final boolean isDaemon() {
-        return daemon;
+        return false;
     }
 
     /**
@@ -224,9 +210,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * @return false
      *
-     * @deprecated This method originally indicated if the thread group
-     *             was destroyed. The ability to destroy a thread group
-     *             no longer exists.
+     * @deprecated This method originally indicated if the thread group is
+     *             destroyed. The ability to destroy a thread group and the
+     *             concept of a destroyed thread group no longer exists.
      *
      * @since   1.1
      */
@@ -236,47 +222,19 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Changes the daemon status of this thread group. A daemon thread group is
-     * <a href="ref/package-summary.html#reachability"><em>weakly reachable</em></a>
-     * from its parent so that it is eligible for garbage collection when there
-     * are no {@linkplain Thread#isAlive() live} threads in the group and is
-     * otherwise <i>unreachable</i>. A non-daemon thread is strongly reachable
-     * from its parent. This method does not change the daemon status of
-     * subgroups.
-     * <p>
-     * First, the {@code checkAccess} method of this thread group is
-     * called with no arguments; this may result in a security exception.
+     * Does nothing.
      *
-     * @param      daemon   if {@code true}, marks this thread group as
-     *                      a daemon thread group; otherwise, marks this
-     *                      thread group as normal.
-     * @throws     SecurityException  if the current thread cannot modify
-     *               this thread group.
-     * @see        java.lang.SecurityException
-     * @see        java.lang.ThreadGroup#checkAccess()
+     * @param daemon  ignored
+     *
+     * @deprecated This method originally changed the <i>daemon status</i> of
+     *             the thread group that determined if the thread group was
+     *             automatically destroyed when its last thread terminates.
+     *             The concept of daemon thread group and the concept of a
+     *             destroyed thread group no longer exists.
      */
+    @Deprecated(since="99", forRemoval=true)
     public final void setDaemon(boolean daemon) {
         checkAccess();
-        if (parent == null) {
-            this.daemon = daemon;
-        } else {
-            // update the parent so that it has a weak or strong
-            // reference to this group
-            synchronized (parent) {
-                if (daemon != this.daemon) {
-                    if (daemon) {
-                        // add a weak reference to this group
-                        parent.addWeak(this);
-                        parent.remove(this);
-                    } else {
-                        // add a strong reference to this group
-                        parent.add(this);
-                        parent.removeWeak(this);
-                    }
-                    this.daemon = daemon;
-                }
-            }
-        }
     }
 
     /**
@@ -727,99 +685,53 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
         return getClass().getName()
                 + "[name=" + getName()
                 + ",maxpri=" + getMaxPriority()
-                + ",daemon=" + isDaemon()
                 + "]";
     }
 
     /**
-     * Add a non-daemon subgroup.
+     * Add a strongly reachable subgroup.
      */
-    private void synchronizedAdd(ThreadGroup group) {
+    private void synchronizedAddStrong(ThreadGroup group) {
         synchronized (this) {
-            add(group);
-        }
-    }
-
-    /**
-     * Add a non-daemon subgroup.
-     */
-    private void add(ThreadGroup group) {
-        assert Thread.holdsLock(this);
-        if (groups == null) {
-            groups = new ThreadGroup[4];
-        } else if (groups.length == ngroups) {
-            groups = Arrays.copyOf(groups, ngroups + 4);
-        }
-        groups[ngroups++] = group;
-    }
-
-    /**
-     * Remove a non-daemon subgroup.
-     */
-    private boolean remove(ThreadGroup group) {
-        assert Thread.holdsLock(this);
-        for (int i = 0; i < ngroups; ) {
-            if (groups[i] == group) {
-                int last = ngroups - 1;
-                if (i < last)
-                    groups[i] = groups[last];
-                groups[last] = null;
-                ngroups--;
-                return true;
-            } else {
-                i++;
+            if (groups == null) {
+                groups = new ThreadGroup[4];
+            } else if (groups.length == ngroups) {
+                groups = Arrays.copyOf(groups, ngroups + 4);
             }
+            groups[ngroups++] = group;
         }
-        return false;
     }
 
     /**
-     * Add a daemon subgroup
+     * Add a weakly reachable subgroup.
      */
     private void synchronizedAddWeak(ThreadGroup group) {
         synchronized (this) {
-            addWeak(group);
-        }
-    }
-
-    /**
-     * Add a daemon subgroup.
-     */
-    private void addWeak(ThreadGroup group) {
-        assert Thread.holdsLock(this);
-        if (weaks == null) {
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            WeakReference<ThreadGroup>[] array = new WeakReference[4];
-            weaks = array;
-        } else {
-            removeWeak(null);
-            if (weaks.length == nweaks) {
-                weaks = Arrays.copyOf(weaks, nweaks + 4);
-            }
-        }
-        weaks[nweaks++] = new WeakReference<>(group);
-    }
-
-    /**
-     * Remove a daemon subgroup, expunging stale elements as a side effect.
-     *
-     * @param group the non-daemon subgroup to remove, can be null to just
-     *              expunge stale elements
-     */
-    private void removeWeak(ThreadGroup group) {
-        assert Thread.holdsLock(this);
-        for (int i = 0; i < nweaks; ) {
-            ThreadGroup g = weaks[i].get();
-            if (g == null || g == group) {
-                removeWeak(i);
+            if (weaks == null) {
+                @SuppressWarnings({"unchecked", "rawtypes"})
+                WeakReference<ThreadGroup>[] array = new WeakReference[4];
+                weaks = array;
             } else {
-                i++;
+                // expunge
+                for (int i = 0; i < nweaks; ) {
+                    ThreadGroup g = weaks[i].get();
+                    if (g == null) {
+                        removeWeak(i);
+                    } else {
+                        i++;
+                    }
+                }
+                // expand to make space if needed
+                if (weaks.length == nweaks) {
+                    weaks = Arrays.copyOf(weaks, nweaks + 4);
+                }
             }
+            weaks[nweaks++] = new WeakReference<>(group);
         }
     }
 
     /**
-     * Remove the daemon thread at the given index of the weaks array.
+     * Remove the weakly reachable group at the given index of the weaks array.
      */
     private void removeWeak(int index) {
         assert Thread.holdsLock(this) && index < nweaks;

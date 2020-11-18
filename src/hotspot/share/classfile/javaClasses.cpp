@@ -2317,7 +2317,6 @@ const char* java_lang_Thread::thread_status_name(oop java_thread) {
 int java_lang_ThreadGroup::_parent_offset;
 int java_lang_ThreadGroup::_name_offset;
 int java_lang_ThreadGroup::_maxPriority_offset;
-int java_lang_ThreadGroup::_daemon_offset;
 int java_lang_ThreadGroup::_ngroups_offset;
 int java_lang_ThreadGroup::_groups_offset;
 int java_lang_ThreadGroup::_nweaks_offset;
@@ -2342,11 +2341,6 @@ const char* java_lang_ThreadGroup::name(oop java_thread_group) {
 ThreadPriority java_lang_ThreadGroup::maxPriority(oop java_thread_group) {
   assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
   return (ThreadPriority) java_thread_group->int_field(_maxPriority_offset);
-}
-
-bool java_lang_ThreadGroup::is_daemon(oop java_thread_group) {
-  assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
-  return java_thread_group->bool_field(_daemon_offset) != 0;
 }
 
 int java_lang_ThreadGroup::ngroups(oop java_thread_group) {
@@ -2375,7 +2369,6 @@ objArrayOop java_lang_ThreadGroup::weaks(oop java_thread_group) {
   macro(_parent_offset,      k, vmSymbols::parent_name(),      threadgroup_signature,       false); \
   macro(_name_offset,        k, vmSymbols::name_name(),        string_signature,            false); \
   macro(_maxPriority_offset, k, vmSymbols::maxPriority_name(), int_signature,               false); \
-  macro(_daemon_offset,      k, vmSymbols::daemon_name(),      bool_signature,              false); \
   macro(_ngroups_offset,     k, vmSymbols::ngroups_name(),     int_signature,               false); \
   macro(_groups_offset,      k, vmSymbols::groups_name(),      threadgroup_array_signature, false); \
   macro(_nweaks_offset,      k, vmSymbols::nweaks_name(),      int_signature,               false); \

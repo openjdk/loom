@@ -723,7 +723,7 @@ JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle
     group_objs = NEW_RESOURCE_ARRAY(Handle, ngroups + nweaks);
     NULL_CHECK(group_objs, JVMTI_ERROR_OUT_OF_MEMORY);
 
-    // non-daemon subgroups
+    // strongly reachable subgroups
     if (ngroups > 0) {
       objArrayOop groups = java_lang_ThreadGroup::groups(group_hdl());
       for (int j = 0; j < ngroups; j++) {
@@ -733,7 +733,7 @@ JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle
       }
     }
 
-    // daemon subgroups
+    // weakly reachable subgroups
     if (nweaks > 0) {
       objArrayOop weaks = java_lang_ThreadGroup::weaks(group_hdl());
       for (int j = 0; j < nweaks; j++) {

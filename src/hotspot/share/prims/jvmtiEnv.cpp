@@ -1593,17 +1593,11 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
 
   const char* name;
   Handle parent_group;
-  bool is_daemon;
   ThreadPriority max_priority;
 
   name         = java_lang_ThreadGroup::name(group_obj());
   parent_group = Handle(current_thread, java_lang_ThreadGroup::parent(group_obj()));
-  is_daemon    = java_lang_ThreadGroup::is_daemon(group_obj());
   max_priority = java_lang_ThreadGroup::maxPriority(group_obj());
-
-  info_ptr->is_daemon    = is_daemon;
-  info_ptr->max_priority = max_priority;
-  info_ptr->parent       = jni_reference(parent_group);
 
   if (name != NULL) {
     info_ptr->name = (char*)jvmtiMalloc(strlen(name)+1);
@@ -1612,6 +1606,10 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
   } else {
     info_ptr->name = NULL;
   }
+
+  info_ptr->parent       = jni_reference(parent_group);
+  info_ptr->max_priority = max_priority;
+  info_ptr->is_daemon    = JNI_FALSE;
 
   return JVMTI_ERROR_NONE;
 } /* end GetThreadGroupInfo */

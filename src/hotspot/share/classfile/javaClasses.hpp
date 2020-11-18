@@ -530,7 +530,6 @@ class java_lang_ThreadGroup : AllStatic {
   static int _parent_offset;
   static int _name_offset;
   static int _maxPriority_offset;
-  static int _daemon_offset;
 
   static int _ngroups_offset;
   static int _groups_offset;
@@ -548,16 +547,14 @@ class java_lang_ThreadGroup : AllStatic {
   static const char* name(oop java_thread_group);
   // maxPriority in group
   static ThreadPriority maxPriority(oop java_thread_group);
-  // Daemon
-  static bool is_daemon(oop java_thread_group);
 
-  // Number of non-daemon thread groups
+  // Number of strongly reachable thread groups
   static int ngroups(oop java_thread_group);
-  // Non-daemon thread groups
+  // Strongly reachable thread groups
   static objArrayOop groups(oop java_thread_group);
-  // Number of daemon thread groups
+  // Number of weakly reachable thread groups
   static int nweaks(oop java_thread_group);
-  // Daemon thread groups
+  // Weakly reachable thread groups
   static objArrayOop weaks(oop java_thread_group);
 
   // Debugging
