@@ -116,15 +116,10 @@ public class NioChannels {
 
                 // write should block
                 ByteBuffer bb = ByteBuffer.allocate(100*1024);
-                long total = 0;
                 for (int i=0; i<1000; i++) {
                     int n = sc1.write(bb);
                     assertTrue(n > 0);
-                    total += n;
                     bb.clear();
-                    if ((i % 50) == 0) {
-                        System.out.println("wrote: " + total);
-                    }
                 }
             }
         });
@@ -133,7 +128,6 @@ public class NioChannels {
     /**
      * SocketChannel close while virtual thread blocked in read.
      */
-    @Test(enabled=false)
     public void testSocketChannelReadAsyncClose() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -150,7 +144,6 @@ public class NioChannels {
     /**
      * Virtual thread interrupted while blocked in SocketChannel read.
      */
-    @Test(enabled=false)
     public void testSocketChannelReadInterrupt() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -169,7 +162,6 @@ public class NioChannels {
     /**
      * SocketChannel close while virtual thread blocked in write.
      */
-    @Test(enabled=false)
     public void testSocketChannelWriteAsyncClose() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -190,7 +182,6 @@ public class NioChannels {
     /**
      * Virtual thread interrupted while blocked in SocketChannel write.
      */
-    @Test(enabled=false)
     public void testSocketChannelWriteInterrupt() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -282,7 +273,6 @@ public class NioChannels {
     /**
      * SeverSocketChannel close while virtual thread blocked in accept.
      */
-    @Test(enabled=false)
     public void testServerSocketChannelAcceptAsyncClose() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
@@ -301,7 +291,6 @@ public class NioChannels {
     /**
      * Virtual thread interrupted while blocked in ServerSocketChannel accept.
      */
-    @Test(enabled=false)
     public void testServerSocketChannelAcceptInterrupt() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var ssc = ServerSocketChannel.open()) {
