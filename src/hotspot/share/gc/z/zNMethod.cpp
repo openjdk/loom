@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,6 +28,7 @@
 #include "code/icBuffer.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
+#include "gc/shared/suspendibleThreadSet.hpp"
 #include "gc/z/zGlobals.hpp"
 #include "gc/z/zLock.inline.hpp"
 #include "gc/z/zNMethod.hpp"
@@ -56,7 +57,7 @@ void ZNMethod::attach_gc_data(nmethod* nm) {
   GrowableArray<oop*> immediate_oops;
   bool non_immediate_oops = false;
 
-  // Find all oops relocations
+  // Find all oop relocations
   RelocIterator iter(nm);
   while (iter.next()) {
     if (iter.type() != relocInfo::oop_type) {
@@ -190,27 +191,17 @@ void ZNMethod::flush_nmethod(nmethod* nm) {
 
 bool ZNMethod::supports_entry_barrier(nmethod* nm) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
-  if (bs != NULL) {
-    return bs->supports_entry_barrier(nm);
-  }
-
-  return false;
+  return bs->supports_entry_barrier(nm);
 }
 
 bool ZNMethod::is_armed(nmethod* nm) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
-  if (bs != NULL) {
-    return bs->is_armed(nm);
-  }
-
-  return false;
+  return bs->is_armed(nm);
 }
 
 void ZNMethod::disarm(nmethod* nm) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
-  if (bs != NULL) {
-    bs->disarm(nm);
-  }
+  bs->disarm(nm);
 }
 
 void ZNMethod::arm(nmethod* nm, int arm_value) {
@@ -221,6 +212,15 @@ void ZNMethod::arm(nmethod* nm, int arm_value) {
 }
 
 void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_strong) {
+  ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
+  if (!nm->is_alive()) {
+    return;
+  }
+
+  ZNMethod::nmethod_oops_do_inner(nm, cl, keepalive_is_strong);
+}
+
+void ZNMethod::nmethod_oops_do_inner(nmethod* nm, OopClosure* cl, bool keepalive_is_strong) {
   // Process oops table
   {
     oop* const begin = nm->oops_begin();
@@ -258,32 +258,16 @@ void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_st
   }
 }
 
-class ZNMethodToOopsDoClosure : public NMethodClosure {
-private:
-  OopClosure* _cl;
-  bool        _keepalive_is_strong;
-
-public:
-  ZNMethodToOopsDoClosure(OopClosure* cl, bool keepalive_is_strong) :
-      _cl(cl),
-      _keepalive_is_strong(keepalive_is_strong) {}
-
-  virtual void do_nmethod(nmethod* nm) {
-    ZNMethod::nmethod_oops_do(nm, _cl, _keepalive_is_strong);
-  }
-};
-
-void ZNMethod::oops_do_begin() {
+void ZNMethod::nmethods_do_begin() {
   ZNMethodTable::nmethods_do_begin();
 }
 
-void ZNMethod::oops_do_end() {
+void ZNMethod::nmethods_do_end() {
   ZNMethodTable::nmethods_do_end();
 }
 
-void ZNMethod::oops_do(OopClosure* cl, bool keepalive_is_strong) {
-  ZNMethodToOopsDoClosure nmethod_cl(cl, keepalive_is_strong);
-  ZNMethodTable::nmethods_do(&nmethod_cl);
+void ZNMethod::nmethods_do(NMethodClosure* cl) {
+  ZNMethodTable::nmethods_do(cl);
 }
 
 class ZNMethodUnlinkClosure : public NMethodClosure {

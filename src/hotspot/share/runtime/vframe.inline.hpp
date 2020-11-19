@@ -69,8 +69,8 @@ inline void vframeStreamCommon::next() {
   } while (!fill_from_frame());
 }
 
-inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stub, bool vthread_carrier)
-  : vframeStreamCommon(RegisterMap(thread, true, true)) {
+inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stub, bool process_frame, bool vthread_carrier)
+  : vframeStreamCommon(RegisterMap(thread, true, process_frame, true)) {
   _stop_at_java_call_stub = stop_at_java_call_stub;
 
   if (!thread->has_last_Java_frame()) {

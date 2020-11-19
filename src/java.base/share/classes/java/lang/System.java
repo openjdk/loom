@@ -28,6 +28,8 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.Console;
 import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -2007,9 +2009,16 @@ public final class System {
 
         lineSeparator = props.getProperty("line.separator");
 
-        setIn0(new BufferedInputStream(ConsoleStreams.in));
-        setOut0(newPrintStream(ConsoleStreams.out, props.getProperty("sun.stdout.encoding")));
-        setErr0(newPrintStream(ConsoleStreams.err, props.getProperty("sun.stderr.encoding")));
+        FileInputStream fdIn = new FileInputStream(FileDescriptor.in);
+        FileOutputStream fdOut = new FileOutputStream(FileDescriptor.out);
+        FileOutputStream fdErr = new FileOutputStream(FileDescriptor.err);
+        setIn0(new BufferedInputStream(fdIn));
+        setOut0(newPrintStream(fdOut, props.getProperty("sun.stdout.encoding")));
+        setErr0(newPrintStream(fdErr, props.getProperty("sun.stderr.encoding")));
+
+//        setIn0(new BufferedInputStream(ConsoleStreams.in));
+//        setOut0(newPrintStream(ConsoleStreams.out, props.getProperty("sun.stdout.encoding")));
+//        setErr0(newPrintStream(ConsoleStreams.err, props.getProperty("sun.stderr.encoding")));
 
         // Setup Java signal handlers for HUP, TERM, and INT (where available).
         Terminator.setup();

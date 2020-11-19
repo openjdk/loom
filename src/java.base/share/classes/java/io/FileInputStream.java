@@ -210,7 +210,7 @@ public class FileInputStream extends InputStream
      */
     private void open(String name) throws FileNotFoundException {
         if (Thread.currentThread().isVirtual()) {
-            Blocker.block(() -> open0(name));
+            Blocker.managedBlock(() -> open0(name));
         } else {
             open0(name);
         }
@@ -226,7 +226,7 @@ public class FileInputStream extends InputStream
      */
     public int read() throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> read0());
+            return Blocker.managedBlock(() -> read0());
         } else {
             return read0();
         }
@@ -256,7 +256,7 @@ public class FileInputStream extends InputStream
      */
     public int read(byte b[]) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> readBytes(b, 0, b.length));
+            return Blocker.managedBlock(() -> readBytes(b, 0, b.length));
         } else {
             return readBytes(b, 0, b.length);
         }
@@ -282,7 +282,7 @@ public class FileInputStream extends InputStream
      */
     public int read(byte b[], int off, int len) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> readBytes(b, off, len));
+            return Blocker.managedBlock(() -> readBytes(b, off, len));
         } else {
             return readBytes(b, off, len);
         }
@@ -314,7 +314,7 @@ public class FileInputStream extends InputStream
      */
     public long skip(long n) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            return Blocker.block(() -> skip0(n));
+            return Blocker.managedBlock(() -> skip0(n));
         } else {
             return skip0(n);
         }
@@ -340,7 +340,11 @@ public class FileInputStream extends InputStream
      *             {@code close} or an I/O error occurs.
      */
     public int available() throws IOException {
-        return available0();
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> available0());
+        } else {
+            return available0();
+        }
     }
 
     private native int available0() throws IOException;
@@ -363,7 +367,6 @@ public class FileInputStream extends InputStream
      * @throws     IOException  if an I/O error occurs.
      *
      * @revised 1.4
-     * @spec JSR-51
      */
     public void close() throws IOException {
         if (closed) {
@@ -421,7 +424,6 @@ public class FileInputStream extends InputStream
      * @return  the file channel associated with this file input stream
      *
      * @since 1.4
-     * @spec JSR-51
      */
     public FileChannel getChannel() {
         FileChannel fc = this.channel;

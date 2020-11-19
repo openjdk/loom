@@ -18,11 +18,13 @@ java/util/stream/boottest/java.base/java/util/stream/SpinedBufferTest.java      
 java/lang/Thread/GenerifyStackTraces.java                                                       8253918 generic-all
 java/lang/Thread/NullStackTrace.java                                                            8253918 generic-all
 
+java/lang/Thread/virtual/stress/PinALot.java#id2                                                8255275 generic-all
 
 java/foreign/TestMismatch.java                                                                  8253918 generic-all
 jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
 java/lang/Continuation/Basic.java#id0                                                           8253918 generic-all
 java/lang/Continuation/Fuzz.java                                                                8253918 generic-all
+java/lang/Thread/virtual/stress/SleepALot.java#id2                                              8253918 generic-all
 java/lang/StackWalker/LocalsAndOperands.java#id0                                                8253918 generic-all
 java/lang/invoke/LFCaching/LFSingleThreadCachingTest.java                                       8253918 generic-all
 java/util/Arrays/Sorting.java                                                                   8253918 generic-all
@@ -83,6 +85,12 @@ java/lang/ThreadGroup/SetMaxPriority.java
 java/lang/ThreadGroup/Suspend.java
 java/lang/Thread/virtual/CustomScheduler.java
 jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
+
+
+####
+# Other virtual threads tests, failing with wrapper
+
+java/lang/Thread/virtual/NioChannels.java
 
 
 ####

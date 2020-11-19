@@ -2,6 +2,7 @@
 /dist/
 /.idea/
 /.vscode/
+/nbproject/
 nbproject/private/
 make/nb_native/nbproject/private
 /webrev
@@ -15,6 +16,7 @@ test/nashorn/lib
 NashornProfile.txt
 **/JTreport/**
 **/JTwork/**
+/src/utils/LogCompilation/target/
 /src/utils/hsdis/build/
 /test/micro/.idea/
 /test/micro/bench.iml

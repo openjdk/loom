@@ -1513,16 +1513,15 @@ jvmtiEnv *jvmti;
     <function id="GetAllThreads" num="4">
       <synopsis>Get All Threads</synopsis>
       <description>
-        Get all live threads.
-        The threads are Java programming language threads;
-        that is, threads that are attached to the VM.
+        Get all live threads that are attached to the VM.
+        The list of threads includes
+        <internallink id="RunAgentThread">agent threads</internallink>.
+        It does not include virtual threads.
         A thread is live if <code>java.lang.Thread.isAlive()</code>
         would return <code>true</code>, that is, the thread has
         been started and has not yet died.
         The universe of threads is determined by the context of the <jvmti/>
         environment, which typically is all threads attached to the VM.
-        Note that this includes <jvmti/> agent threads
-        (see <functionlink id="RunAgentThread"/>).
       </description>
       <origin>jvmdi</origin>
       <capabilities>
@@ -1531,14 +1530,14 @@ jvmtiEnv *jvmti;
         <param id="threads_count_ptr">
           <outptr><jint/></outptr>
           <description>
-            On return, points to the number of running threads.
+            On return, points to the number of threads.
           </description>
         </param>
         <param id="threads_ptr">
           <allocbuf outcount="threads_count_ptr"><jthread/></allocbuf>
             <description>
               On return, points to an array of references, one
-              for each running thread.
+              for each thread.
             </description>
         </param>
       </parameters>
@@ -2433,6 +2432,8 @@ jvmtiEnv *jvmti;
       <synopsis>Get Thread Group Children</synopsis>
       <description>
         Get the live threads and the child thread groups in this thread group.
+        Virtual threads are not considered live threads in a thread group
+        and not returned by this function.
       </description>
       <origin>jvmdi</origin>
       <capabilities>
@@ -2652,8 +2653,11 @@ if (err == JVMTI_ERROR_NONE &amp;&amp; count &gt;= 1) {
     <function id="GetAllStackTraces" num="100">
       <synopsis>Get All Stack Traces</synopsis>
       <description>
-        Get information about the stacks of all live threads
-        (including <internallink id="RunAgentThread">agent threads</internallink>).
+        Get the stack traces of all live threads attached to the VM.
+        The list includes the stack traces of
+        <internallink id="RunAgentThread">agent threads</internallink>.
+        It does not include the stack traces of virtual threads.
+        <p/>
         If <paramlink id="max_frame_count"/> is less than the depth of a stack,
         the <paramlink id="max_frame_count"/> topmost frames are returned for that thread,
         otherwise the entire stack is returned.
@@ -10060,9 +10064,11 @@ myInit() {
           there is a <code>jint</code> parameter, the event handler should be
           declared:
 <example>
-    void JNICALL myHandler(jvmtiEnv* jvmti_env, jint myInt, ...)
+    void JNICALL myHandler(jvmtiEnv* jvmti_env, ...)
 </example>
           Note the terminal "<code>...</code>" which indicates varargs.
+          The <code>jint</code> argument inside <code>myHandler</code> needs to be extracted using
+          the <code>va_*</code> syntax of the C programming language.
         </description>
         <parameters>
           <param id="jvmti_env">

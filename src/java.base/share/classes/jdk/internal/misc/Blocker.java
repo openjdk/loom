@@ -41,17 +41,8 @@ import jdk.internal.access.SharedSecrets;
  *
  * The managedBlock methods are used to execute blocking tasks on the caller
  * thread or its carrier thread. If the carrier thread is a ForkJoinWorkerThread
- * then the task runs in ForkJoinPool.ManagedBlocker.
- *
- * The block methods are used to execute blocking tasks on the caller
- * thread, its carrier thread, or on a thread in background thread pool. These
- * methods not suitable for tasks that use carrier thread locals (such as
- * thread local buffer caches) and they are not suitable when called when
- * the thread is pinned.
- *
- * The managedBlock and block methods are not suitable for tasks that are
- * interruptible or tasks that synchronize/locks in ways that is visible to
- * user-code.
+ * then the task runs in ForkJoinPool.ManagedBlocker to that its pool may be
+ * expanded to support additional parallelism during the blocking operation.
  */
 public class Blocker {
     private static final Unsafe U = Unsafe.getUnsafe();
@@ -63,35 +54,16 @@ public class Blocker {
      * A task that returns a result and may throw an exception.
      */
     @FunctionalInterface
-    public interface BlockingCallable<V, X extends Throwable> extends Callable<V> {
-        V execute() throws X;
-
-        // do not invoke directly
-        default V call() {
-            try {
-                return execute();
-            } catch (Throwable e) {
-                U.throwException(e);
-                return null;
-            }
-        }
+    public interface BlockingCallable<V, X extends Throwable> {
+        V call() throws X;
     }
 
     /**
      * A task that may throw an exception.
      */
     @FunctionalInterface
-    public interface BlockingRunnable<X extends Throwable> extends Runnable {
-        void execute() throws X;
-
-        // do not invoke directly
-        default void run() {
-            try {
-                execute();
-            } catch (Throwable e) {
-                U.throwException(e);
-            }
-        }
+    public interface BlockingRunnable<X extends Throwable> {
+        void run() throws X;
     }
 
     private static class CallableBlocker<V, X extends Throwable>
@@ -155,33 +127,12 @@ public class Blocker {
     }
 
     /**
-     * Runs the given task in a background thread pool.
+     * Executes a task that may block and pin the current thread. If invoked on a
+     * virtual thread and the current carrier thread is in a ForkJoinPool then the
+     * pool may be expanded to support additional parallelism during the call to
+     * this method.
      */
-    private static <V> V runInThreadPool(Callable<V> task) {
-        Future<V> future = ThreadPool.THREAD_POOL.submit(task);
-        try {
-            return future.join();
-        } catch (CompletionException e) {
-            U.throwException(e.getCause());
-            return null;
-        }
-    }
-
-    /**
-     * Runs the given task in a background thread pool.
-     */
-    private static Void runInThreadPool(Runnable task) {
-        Future<?> future = ThreadPool.THREAD_POOL.submit(task);
-        try {
-            future.join();
-        } catch (CompletionException e) {
-            U.throwException(e.getCause());
-        }
-        return null;
-    }
-
-    private static <V, X extends Throwable> V block(BlockingCallable<V, X> task,
-                                                    boolean asyncAllowed) {
+    public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task) {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
             Thread carrier = JLA.currentCarrierThread();
@@ -197,15 +148,25 @@ public class Blocker {
                     JLA.setCurrentThread(thread);
                 }
                 assert false;  // should not get here
-            } else if (asyncAllowed) {
-                return runInThreadPool(task);
             }
         }
-        return task.call();
+
+        // run directly
+        try {
+            return task.call();
+        } catch (Throwable e) {
+            U.throwException(e);
+            return null;
+        }
     }
 
-    private static <X extends Throwable> Void block(BlockingRunnable<X> task,
-                                                    boolean asyncAllowed) {
+    /**
+     * Executes a task that may block and pin the current thread. If invoked on a
+     * virtual thread and the current carrier thread is in a ForkJoinPool then the
+     * pool may be expanded to support additional parallelism during the call to
+     * this method.
+     */
+    public static <X extends Throwable> void managedBlock(BlockingRunnable<X> task) {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
             Thread carrier = JLA.currentCarrierThread();
@@ -213,61 +174,47 @@ public class Blocker {
                 JLA.setCurrentThread(carrier);
                 try {
                     ForkJoinPool.managedBlock(new RunnableBlocker<>(task));
-                    return null;
+                    return;
                 } catch (Throwable e) {
                     U.throwException(e);
                 } finally {
                     JLA.setCurrentThread(thread);
                 }
                 assert false;  // should not get here
-            } else if (asyncAllowed) {
-                return runInThreadPool(task);
             }
         }
 
-        task.run();
-        return null;
-    }
-
-
-    /**
-     * Executes a task that may block and pin the current thread.
-     * If the current carrier thread is in a ForkJoinPool then the pool may be
-     * expanded to support additional parallelism during the call to this method.
-     */
-    public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task) {
-        return block(task, false);
+        // run directly
+        try {
+            task.run();
+        } catch (Throwable e) {
+            U.throwException(e);
+        }
     }
 
     /**
-     * Executes a task that may block and pin the current thread.
-     * If the current carrier thread is in a ForkJoinPool then the pool may be
-     * expanded to support additional parallelism during the call to this method.
+     * Runs the given task in a background thread pool.
      */
-    public static <X extends Throwable> void managedBlock(BlockingRunnable<X> task) {
-        block(task, false);
+    public static <V> V runInThreadPool(Callable<V> task) {
+        Future<V> future = ThreadPool.THREAD_POOL.submit(task);
+        try {
+            return future.join();
+        } catch (CompletionException e) {
+            U.throwException(e.getCause());
+            return null;
+        }
     }
 
     /**
-     * Executes a task that may block and pin the current thread.
-     * If the current carrier thread is in a ForkJoinWorkerThread then its pool
-     * may be expanded to support additional parallelism during the call to this
-     * method. If it cannot be expanded then the task is queued to execute in
-     * a thread pool.
+     * Runs the given task in a background thread pool.
      */
-    public static <V, X extends Throwable> V block(BlockingCallable<V, X> task) {
-        return block(task, true);
-    }
-
-    /**
-     * Executes a task that may block and pin the current thread.
-     * If the current carrier thread is in a ForkJoinWorkerThread then its pool
-     * may be expanded to support additional parallelism during the call to this
-     * method. If it cannot be expanded then the task is queued to execute in
-     * a thread pool.
-     */
-    public static <X extends Throwable> void block(BlockingRunnable<X> task) {
-        block(task, true);
+    public static void runInThreadPool(Runnable task) {
+        Future<?> future = ThreadPool.THREAD_POOL.submit(task);
+        try {
+            future.join();
+        } catch (CompletionException e) {
+            U.throwException(e.getCause());
+        }
     }
 
     private static class ThreadPool {

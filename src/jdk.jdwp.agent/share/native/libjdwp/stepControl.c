@@ -90,7 +90,6 @@ getFrameLocation(jthread thread,
     *pmethod = NULL;
     *plocation = -1;
 
-    JDI_ASSERT(!isVThread(thread));
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
             (gdata->jvmti, thread, 0, pmethod, plocation);
     if (error == JVMTI_ERROR_NONE && *pmethod!=NULL ) {
@@ -189,7 +188,7 @@ initState(JNIEnv *env, jthread thread, StepRequest *step)
      * TO DO: explain the need for this notification.
      */
     error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)
-                (gdata->jvmti, thread, 0);
+                (gdata->jvmti, getLiveThread(thread), 0);
     if (error == JVMTI_ERROR_OPAQUE_FRAME) {
         step->fromNative = JNI_TRUE;
         error = JVMTI_ERROR_NONE;
@@ -347,10 +346,11 @@ handleFramePopEvent(JNIEnv *env, EventInfo *evinfo,
                 LOG_STEP(("handleFramePopEvent: starting singlestep, have methodEnter handler && depth==INTO && fromDepth >= afterPopDepth (%d>=%d)", fromDepth, afterPopDepth));
             } else {
                 /*
-                 * The only way this should happen is if FramePop events were enabled to support a
-                 * CONTINUATION_RUN event while doing a STEP_INTO. See stepControl_handleContinuationRun().
-                 * Resume stepping in the current frame. If it is not the correct frame to resume stepping
-                 * in, then handleStep() will disable single stepping and setup another FramePop request.
+                 * The only way this should happen is if FramePop events were enabled to
+                 * support a CONTINUATION_RUN event while doing a STEP_INTO. See
+                 * stepControl_handleContinuationRun(). Resume stepping in the current frame.
+                 * If it is not the correct frame to resume stepping in, then handleStep()
+                 * will disable single stepping and setup another FramePop request.
                  */
                 LOG_STEP(("handleFramePopEvent: starting singlestep, have methodEnter handler && depth==INTO && fromDepth < afterPopDepth (%d<%d)", fromDepth, afterPopDepth));
             }
@@ -470,7 +470,9 @@ handleMethodEnterEvent(JNIEnv *env, EventInfo *evinfo,
                        struct bag *eventBag)
 {
     StepRequest *step;
-    jthread thread = evinfo->thread;
+    jthread thread;
+
+    thread = evinfo->thread;
 
     stepControl_lock();
     LOG_STEP(("handleMethodEnterEvent: thread=%p", thread));
@@ -487,7 +489,7 @@ stepControl_handleContinuationRun(JNIEnv *env, jthread thread, StepRequest *step
 {
     stepControl_lock();
     if (step->methodEnterHandlerNode != NULL) {
-        /* 
+        /*
          * Looks like we were doing a single step INTO with filtering enabled, so a MethodEntry
          * handler was installed to detect when we enter an unfiltered method. It's possible
          * that the continuation method we are resuming execution in is unfiltered, but there
@@ -499,12 +501,12 @@ stepControl_handleContinuationRun(JNIEnv *env, jthread thread, StepRequest *step
         jmethodID method;
         jlocation location;
         jvmtiError error;
-        
+
         JDI_ASSERT(step->depth == JDWP_STEP_DEPTH(INTO));
 
         /*
-         * We leverage the existing MethodEntry handler support for this, but it needs to know
-         * the location of the MethodEntry, so we get this from the current frame.
+         * We leverage the existing MethodEnter handler support for this, but it needs to know
+         * the location of the MethodEnter, so we get this from the current frame.
          */
         error = getFrameLocation(thread, &clazz, &method, &location);
         if (error != JVMTI_ERROR_NONE) {
@@ -515,11 +517,11 @@ stepControl_handleContinuationRun(JNIEnv *env, jthread thread, StepRequest *step
         if (!steppingEnabled) {
             /*
              * It looks like the continuation is resuming in a filtered method. We need to setup
-             * a FramePop request on the current frame, so when it exits we can check if the 
+             * a FramePop request on the current frame, so when it exits we can check if the
              * method we return to is filtered, and enable single stepping if not.
              */
             error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)
-                (gdata->jvmti, thread, 0);
+                (gdata->jvmti, getLiveThread(thread), 0);
             if (error == JVMTI_ERROR_DUPLICATE) {
                 error = JVMTI_ERROR_NONE;
             } else if (error != JVMTI_ERROR_NONE) {
@@ -557,7 +559,7 @@ completeStep(JNIEnv *env, jthread thread, StepRequest *step)
 }
 
 jboolean
-stepControl_handleStep(JNIEnv *env, jthread thread, jthread vthread, jboolean matchesVThread,
+stepControl_handleStep(JNIEnv *env, jthread thread,
                        jclass clazz, jmethodID method)
 {
     jboolean completed = JNI_FALSE;
@@ -583,9 +585,6 @@ stepControl_handleStep(JNIEnv *env, jthread thread, jthread vthread, jboolean ma
     }
 
     LOG_STEP(("stepControl_handleStep: thread=%p", thread));
-
-    /* Make sure the StepRequest is in agreement as to whether or not we are stepping in a vthread. */
-    JDI_ASSERT(step->is_vthread == matchesVThread);
 
     /*
      * We never filter step into instruction. It's always over on the
@@ -648,16 +647,17 @@ stepControl_handleStep(JNIEnv *env, jthread thread, jthread vthread, jboolean ma
                 step->methodEnterHandlerNode =
                     eventHandler_createInternalThreadOnly(
                                        EI_METHOD_ENTRY,
-                                       handleMethodEnterEvent, matchesVThread ? vthread : thread);
+                                       handleMethodEnterEvent, thread);
                 if (step->methodEnterHandlerNode == NULL) {
                     EXIT_ERROR(AGENT_ERROR_INVALID_EVENT_TYPE,
                                 "installing event method enter handler");
                 }
             }
-            LOG_STEP(("stepControl_handleStep: NotifyFramePop, (fromDepth currentDepth)(%d %d) ", fromDepth, currentDepth));
+            LOG_STEP(("stepControl_handleStep: NotifyFramePop, (fromDepth currentDepth)(%d %d) ",
+                      fromDepth, currentDepth));
 
             error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)
-                        (gdata->jvmti, thread, 0);
+                        (gdata->jvmti, getLiveThread(thread), 0);
             if (error == JVMTI_ERROR_DUPLICATE) {
                 error = JVMTI_ERROR_NONE;
             } else if (error != JVMTI_ERROR_NONE) {
@@ -776,7 +776,7 @@ stepControl_resetRequest(jthread thread)
 }
 
 static void
-initEvents(jthread thread, jthread filter_thread, StepRequest *step)
+initEvents(jthread thread, StepRequest *step)
 {
     /* Need to install frame pop handler and exception catch handler when
      * single-stepping is enabled (i.e. step-into or step-over/step-out
@@ -790,12 +790,12 @@ initEvents(jthread thread, jthread filter_thread, StepRequest *step)
         step->catchHandlerNode = eventHandler_createInternalThreadOnly(
                                      EI_EXCEPTION_CATCH,
                                      handleExceptionCatchEvent,
-                                     filter_thread);
+                                     thread);
         JDI_ASSERT(step->framePopHandlerNode == NULL);
         step->framePopHandlerNode = eventHandler_createInternalThreadOnly(
                                         EI_FRAME_POP,
                                         handleFramePopEvent,
-                                        filter_thread);
+                                        thread);
 
         if (step->catchHandlerNode == NULL ||
             step->framePopHandlerNode == NULL) {
@@ -838,52 +838,19 @@ initEvents(jthread thread, jthread filter_thread, StepRequest *step)
 }
 
 jvmtiError
-stepControl_beginStep(JNIEnv *env, jthread filter_thread,  jint size, jint depth,
+stepControl_beginStep(JNIEnv *env, jthread thread,  jint size, jint depth,
                       HandlerNode *node)
 {
     StepRequest *step;
     jvmtiError error;
     jvmtiError error2;
-    jthread thread;
-    jboolean is_vthread;
 
-    /* filter_thread could be a vthread. Get the carrier thread it is mounted on. */
-    is_vthread = isVThread(filter_thread);
-    if (is_vthread) {
-        thread = getVThreadThread(filter_thread);
-        if (thread == NULL) {
-            /* vthread fixme: It is possible for the StepRequest to have been made on an unmounted
-             * vthread, and currently we don't support this. 
-             */
-            LOG_STEP(("stepControl_beginStep: thread is an unmounted vthread(%p)", filter_thread));
-            return JVMTI_ERROR_INVALID_THREAD;
-        }
-    }  else {
-        thread = filter_thread;
-    }
-
-    LOG_STEP(("stepControl_beginStep: filter_thread=%p,thread=%p,size=%d,depth=%d",
-              filter_thread, thread, size, depth));
+    LOG_STEP(("stepControl_beginStep: thread=%p,size=%d,depth=%d",
+              thread, size, depth));
 
     eventHandler_lock(); /* for proper lock order */
     stepControl_lock();
 
-    /* vthread fixme: we should consider getting the StepRequest from the vthread instead of the thread.
-     * That way we don't need to copy back and forth in threadControl_continuationRun and
-     * threadControl_continuationYield. It would require some additional changes in the step event 
-     * support to always pass the vthread to threadControl_getStepRequest(). We also need to 
-     * deal with node->instructionStepMode, referenceing the vthread copy when appropriate. Note
-     * this will get tricky if you try to single step in both the vthread and thread. With the
-     * current impl, if you single step in the vthread first, hit a breakpoint while stepping over
-     * a method call, and then switch to the carrier thread and start to single step there,
-     * that will clear out the vthread single stepping. If we get the StepRequest
-     * from the vthread instead, it won't automatically clear out the vthread single stepping
-     * when you start single stepping in the carrier thread, but it won't work as expected either
-     * because JVMTI single stepping on the carrier thread will be disabled once the single
-     * step is complete. We'd need to detect that we were single stepping on the vthread and
-     * keep JVMTI single stepping enabled, or we need to clear the single stepping state of
-     * the vthread.
-     */
     step = threadControl_getStepRequest(thread);
     if (step == NULL) {
         error = AGENT_ERROR_INVALID_THREAD;
@@ -901,14 +868,14 @@ stepControl_beginStep(JNIEnv *env, jthread filter_thread,  jint size, jint depth
              */
             step->granularity = size;
             step->depth = depth;
-            step->is_vthread = is_vthread;
+            step->is_vthread = isVThread(thread);
             step->catchHandlerNode = NULL;
             step->framePopHandlerNode = NULL;
             step->methodEnterHandlerNode = NULL;
             step->stepHandlerNode = node;
             error = initState(env, thread, step);
             if (error == JVMTI_ERROR_NONE) {
-                initEvents(thread, filter_thread, step);
+                initEvents(thread, step);
             }
             /* false means it is not okay to unblock the commandLoop thread */
             error2 = threadControl_resumeThread(thread, JNI_FALSE);
@@ -974,13 +941,6 @@ stepControl_endStep(jthread thread)
     eventHandler_lock(); /* for proper lock order */
     stepControl_lock();
 
-    if (isVThread(thread)) {
-        jthread carrier_thread = getVThreadThread(thread);
-        /* During termination the vthread might not be mounted, so a NULL carrier thead is ok in that case. */
-        if (carrier_thread != NULL) {
-            thread = carrier_thread;
-        }
-    }
     step = threadControl_getStepRequest(thread);
     if (step != NULL) {
         clearStep(thread, step);

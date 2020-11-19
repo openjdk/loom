@@ -70,6 +70,8 @@ void eventFilter_setStepFilterThread(HandlerNode *node, jthread thread);
 jvmtiError eventFilter_setSourceNameMatchFilter(HandlerNode *node,
                                                 jint index,
                                                 char *sourceNamePattern);
+jvmtiError eventFilter_setVirtualThreadsExcludeFilter(HandlerNode *node,
+                                                      jint index);
 /***** debugging *****/
 
 void eventFilter_dumpHandlerFilters(HandlerNode *node);

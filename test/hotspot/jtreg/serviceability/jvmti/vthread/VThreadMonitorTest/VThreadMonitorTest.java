@@ -44,7 +44,7 @@ public class VThreadMonitorTest {
         }
     }
     private static native boolean hasEventPosted();
-    private static native void checkContendedMonitor(Thread thread, Object monitor);
+    private static native void checkContendedMonitor(Thread thread, Object mon1, Object mon2);
     private static native int check();
 
     private static void log(String str) { System.out.println(str); }
@@ -54,45 +54,87 @@ public class VThreadMonitorTest {
     private static final Object lock1 = new Object();
     private static final Object lock2 = new Object();
 
+    static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ie) {
+        }
+    }
+
     static void m0() {
         synchronized (lock0) {
-            log("Thread entered sync section with lock0: " + thrName() + "\n");
+            log(thrName() +" entered sync section with lock0\n");
         }
     }
     static void m1() {
         synchronized (lock1) {
-            log("Thread entered sync section with lock1: " + thrName());
+            log(thrName() +" entered sync section with lock1");
             m0();
         }
     }
     static void m2() {
         synchronized (lock2) {
-            log("Thread entered sync section with lock2: " + thrName());
+            log(thrName() +" entered sync section with lock2");
             m1();
         }
     }
 
-    static final Runnable VT1 = () -> {
+    static final Runnable VT = () -> {
         m2();
     };
 
-    public static void main(String[] args) throws Exception {
-        Thread vt1 = Thread.newThread("VirtualThread-1", Thread.VIRTUAL, VT1);
+    static private int counter = 0;
 
-        // Make sure VT1 is blocked on monitor lock0
-        synchronized (lock0) {
-            log("Main starting VT2 virtual thread.");
-            vt1.start();
-
-            // Wait for the MonitorContendedEnter event
-            while (!hasEventPosted()) {
-                log("Main thread is waiting for event.");
-                Thread.sleep(100);
+    static final Runnable SLEEPING_VT = () -> {
+        for (int i = 0; i < 40; i++) {
+            for (int j = 0; j < 1000; j++) {
+                counter += j;
+                counter %= 100;
             }
-            checkContendedMonitor(vt1, lock0);
+            sleep(1);
+        }
+    };
+
+    static final int VT_TOTAL = 10;
+    static final int VT_COUNT = 2;
+
+    public static void main(String[] args) throws Exception {
+        Thread[] vthreads = new Thread[VT_TOTAL];
+
+        // Create VT threads.
+        for (int i = 0; i < VT_COUNT; i++) {
+            vthreads[i] = Thread.newThread("VirtualThread-" + i, Thread.VIRTUAL, VT);
+        }
+        // Create SLEEPING_VT threads.
+        for (int i = VT_COUNT; i < VT_TOTAL; i++) {
+            vthreads[i] = Thread.newThread("VirtualThread-" + i, Thread.VIRTUAL, SLEEPING_VT);
         }
 
-        vt1.join();
+
+        // Make sure one of the VT threads is blocked on monitor lock0.
+        synchronized (lock0) {
+            log("Main starting VT virtual threads");
+            for (int i = 0; i < VT_TOTAL; i++) {
+                vthreads[i].start();
+            }
+            // Wait for the MonitorContendedEnter event.
+            while (!hasEventPosted()) {
+                log("Main thread is waiting for event\n");
+                sleep(100);
+            }
+            // One of the VT threads is blocked at lock0, another - at lock2.
+            for (int i = 0; i < VT_COUNT; i++) {
+                checkContendedMonitor(vthreads[i], lock0, lock2);
+            }
+            // SLEEPING_VT threads do not grab any monitors.
+            for (int i = VT_COUNT; i < VT_TOTAL; i++) {
+                checkContendedMonitor(vthreads[i], null, null);
+            }
+        }
+
+        for (int i = 0; i < VT_TOTAL; i++) {
+           vthreads[i].join();
+        }
 
         if (check() != 0) {
             throw new RuntimeException("FAILED status returned from the agent");

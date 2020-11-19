@@ -115,8 +115,10 @@ public class VMProps implements Callable<Map<String, String>> {
         map.put("vm.compiler1.enabled", this::isCompiler1Enabled);
         map.put("vm.compiler2.enabled", this::isCompiler2Enabled);
         map.put("docker.support", this::dockerSupport);
+        map.put("vm.musl", this::isMusl);
         map.put("release.implementor", this::implementor);
         map.put("test.vm.gc.nvdimm", this::isNvdimmTestEnabled);
+        map.put("jdk.containerized", this::jdkContainerized);
         vmGC(map); // vm.gc.X = true/false
         vmOptFinalFlags(map);
 
@@ -521,6 +523,15 @@ public class VMProps implements Callable<Map<String, String>> {
         return (p.exitValue() == 0);
     }
 
+    /**
+     * Checks musl libc.
+     *
+     * @return true if musl libc is used.
+     */
+    protected String isMusl() {
+        return Boolean.toString(WB.getLibcName().contains("musl"));
+    }
+
     private String implementor() {
         try (InputStream in = new BufferedInputStream(new FileInputStream(
                 System.getProperty("java.home") + "/release"))) {
@@ -539,6 +550,11 @@ public class VMProps implements Callable<Map<String, String>> {
 
     private String isNvdimmTestEnabled() {
         String isEnabled = System.getenv("TEST_VM_GC_NVDIMM");
+        return "" + "true".equalsIgnoreCase(isEnabled);
+    }
+
+    private String jdkContainerized() {
+        String isEnabled = System.getenv("TEST_JDK_CONTAINERIZED");
         return "" + "true".equalsIgnoreCase(isEnabled);
     }
 

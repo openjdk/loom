@@ -102,6 +102,9 @@ class WindowsSecurity {
         final boolean stopImpersontating = impersontating;
         final boolean needToRevert = elevated;
 
+        // prevent yielding with privileges
+        Continuation.pin();
+
         return () -> {
             try {
                 if (token != 0L) {
@@ -119,6 +122,7 @@ class WindowsSecurity {
                 }
             } finally {
                 LocalFree(pLuid);
+                Continuation.unpin();
             }
         };
     }

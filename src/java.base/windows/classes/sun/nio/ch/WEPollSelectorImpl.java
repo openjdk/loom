@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -75,7 +75,7 @@ class WEPollSelectorImpl extends SelectorImpl {
         this.pollArrayAddress = WEPoll.allocatePollArray(NUM_EPOLLEVENTS);
 
         // wakeup support
-        this.pipe = new PipeImpl(null, /*no delay*/ false);
+        this.pipe = new PipeImpl(sp, false);
         SourceChannelImpl source = (SourceChannelImpl) pipe.source();
         SinkChannelImpl sink = (SinkChannelImpl) pipe.sink();
         this.fd0 = source.getFD();

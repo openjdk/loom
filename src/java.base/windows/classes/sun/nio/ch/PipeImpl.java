@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,9 +31,14 @@ package sun.nio.ch;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.UnixDomainSocketAddress;
+import java.net.StandardProtocolFamily;
 import java.net.StandardSocketOptions;
 import java.nio.*;
 import java.nio.channels.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.channels.spi.*;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
@@ -64,9 +69,7 @@ class PipeImpl
     {
 
         private final SelectorProvider sp;
-
         private IOException ioe;
-
         SourceChannelImpl source;
         SinkChannelImpl sink;
 
@@ -107,23 +110,20 @@ class PipeImpl
                 ServerSocketChannel ssc = null;
                 SocketChannel sc1 = null;
                 SocketChannel sc2 = null;
+                // Loopback address
+                SocketAddress sa = null;
 
                 try {
                     // Create secret with a backing array.
                     ByteBuffer secret = ByteBuffer.allocate(NUM_SECRET_BYTES);
                     ByteBuffer bb = ByteBuffer.allocate(NUM_SECRET_BYTES);
 
-                    // Loopback address
-                    InetAddress lb = InetAddress.getLoopbackAddress();
-                    assert(lb.isLoopbackAddress());
-                    InetSocketAddress sa = null;
                     for(;;) {
                         // Bind ServerSocketChannel to a port on the loopback
                         // address
                         if (ssc == null || !ssc.isOpen()) {
-                            ssc = ServerSocketChannel.open();
-                            ssc.socket().bind(new InetSocketAddress(lb, 0));
-                            sa = new InetSocketAddress(lb, ssc.socket().getLocalPort());
+                            ssc = createListener();
+                            sa = ssc.getLocalAddress();
                         }
 
                         // Establish connection (assume connections are eagerly
@@ -164,31 +164,43 @@ class PipeImpl
                     try {
                         if (ssc != null)
                             ssc.close();
+                        if (sa instanceof UnixDomainSocketAddress) {
+                            Path path = ((UnixDomainSocketAddress) sa).getPath();
+                            Files.deleteIfExists(path);
+                        }
                     } catch (IOException e2) {}
                 }
             }
         }
     }
 
-    PipeImpl(SelectorProvider sp, boolean delay) throws IOException {
+    /**
+     * Creates a Pipe implementation that supports buffering.
+     */
+    PipeImpl(SelectorProvider sp) throws IOException {
+        this(sp, true);
+    }
+
+    /**
+     * Creates Pipe implementation that supports optionally buffering.
+     *
+     * @implNote The pipe uses Unix domain sockets where possible. It uses a
+     * loopback connection on older editions of Windows. When buffering is
+     * disabled then it sets TCP_NODELAY on the sink channel.
+     */
+    PipeImpl(SelectorProvider sp, boolean buffering) throws IOException {
         Initializer initializer = new Initializer(sp);
         try {
             AccessController.doPrivileged(initializer);
-        } catch (PrivilegedActionException x) {
-            throw (IOException)x.getCause();
+            SinkChannelImpl sink = initializer.sink;
+            if (sink.isNetSocket() && !buffering) {
+                sink.setOption(StandardSocketOptions.TCP_NODELAY, true);
+            }
+        } catch (PrivilegedActionException pae) {
+            throw (IOException) pae.getCause();
         }
-
-        if (!delay) {
-            SocketChannel sc = initializer.sink.sc;
-            sc.setOption(StandardSocketOptions.TCP_NODELAY, true);
-        }
-
         this.source = initializer.source;
         this.sink = initializer.sink;
-    }
-
-    PipeImpl(SelectorProvider sp) throws IOException {
-        this(sp, true);
     }
 
     public SourceChannel source() {
@@ -199,4 +211,25 @@ class PipeImpl
         return sink;
     }
 
+    private static volatile boolean noUnixDomainSockets;
+
+    private static ServerSocketChannel createListener() throws IOException {
+        ServerSocketChannel listener = null;
+        if (!noUnixDomainSockets) {
+            try {
+                listener = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
+                return listener.bind(null);
+            } catch (UnsupportedOperationException | IOException e) {
+                // IOException is most likely to be caused by the temporary directory
+                // name being too long. Possibly should log this.
+                noUnixDomainSockets = true;
+                if (listener != null)
+                    listener.close();
+            }
+        }
+        listener = ServerSocketChannel.open();
+        InetAddress lb = InetAddress.getLoopbackAddress();
+        listener.bind(new InetSocketAddress(lb, 0));
+        return listener;
+    }
 }

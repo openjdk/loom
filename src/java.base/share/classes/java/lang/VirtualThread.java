@@ -255,8 +255,8 @@ class VirtualThread extends Thread {
             throw new IllegalStateException();
         }
 
-        boolean firstRun = (initialState == STARTED);
-        mount(firstRun);
+        boolean firstMount = (initialState == STARTED);
+        mount(firstMount);
         try {
             cont.run();
         } finally {
@@ -274,21 +274,18 @@ class VirtualThread extends Thread {
      * is run or continued. It binds the virtual thread to the current carrier thread.
      */
     @ChangesCurrentThread
-    private void mount(boolean firstRun) {
+    private void mount(boolean firstMount) {
         //assert this.carrierThread == null
 
         // notify JVMTI agents
         boolean notifyJvmti = notifyJvmtiEvents;
         if (notifyJvmti) {
-            notifyJvmtiMountBegin(firstRun);
+            notifyJvmtiMountBegin(firstMount);
         }
 
         // sets the carrier thread
         Thread carrier = Thread.currentCarrierThread();
         CARRIER_THREAD.setRelease(this, carrier);
-
-        // set Thread.currentThread() to return this virtual thread
-        carrier.setCurrentThread(this);
 
         // sync up carrier thread interrupt status if needed
         if (interrupted) {
@@ -301,9 +298,12 @@ class VirtualThread extends Thread {
             }
         }
 
+        // set Thread.currentThread() to return this virtual thread
+        carrier.setCurrentThread(this);
+
         // notify JVMTI agents
         if (notifyJvmti) {
-            notifyJvmtiMountEnd(firstRun);
+            notifyJvmtiMountEnd(firstMount);
         }
     }
 
@@ -381,7 +381,7 @@ class VirtualThread extends Thread {
 
         // notify JVMTI agents
         if (notifyAgents && notifyJvmtiEvents) {
-            notifyJvmtiTerminate();
+            notifyJvmtiTerminated();
         }
     }
 
@@ -606,21 +606,10 @@ class VirtualThread extends Thread {
      * Waits up to {@code nanos} nanoseconds for this virtual thread to terminate.
      * A timeout of {@code 0} means to wait forever.
      *
-     * @throws IllegalArgumentException if nanos is negative
-     * @throws IllegalStateException if not started
      * @throws InterruptedException if interrupted while waiting
      * @return true if the thread has terminated
      */
     boolean joinNanos(long nanos) throws InterruptedException {
-        if (nanos < 0)
-            throw new IllegalArgumentException();
-        int s = state();
-        if (s == NEW)
-            throw new IllegalStateException("Not started");
-        if (s == TERMINATED)
-            return true;
-
-        // timed or untimed wait for the thread to terminate
         final ReentrantLock lock = getLock();
         lock.lock();
         try {
@@ -676,8 +665,7 @@ class VirtualThread extends Thread {
             boolean oldValue = interrupted;
             if (oldValue)
                 interrupted = false;
-            Thread carrier = carrierThread;
-            if (carrier != null) carrier.clearInterrupt();
+            carrierThread.clearInterrupt();
             return oldValue;
         }
     }
@@ -888,43 +876,34 @@ class VirtualThread extends Thread {
     // -- JVM TI support --
 
     private static volatile boolean notifyJvmtiEvents;  // set by VM
-    private static native void notifyVTMTStart(VirtualThread vthread, int callsiteTag);
-    private static native void notifyVTMTFinish(VirtualThread vthread, int callsiteTag);
-    private static native void notifyStarted(Thread carrierThread, VirtualThread vthread);
-    private static native void notifyTerminated(Thread carrierThread, VirtualThread vthread);
-    private static native void notifyMount(Thread carrierThread, VirtualThread vthread);
-    private static native void notifyUnmount(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyMountBegin0(Thread carrierThread, VirtualThread vthread, boolean firstMount);
+    private static native void notifyMountEnd0(Thread carrierThread, VirtualThread vthread, boolean firstMount);
+    private static native void notifyUnmountBegin0(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyUnmountEnd0(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyTerminated0(Thread carrierThread, VirtualThread vthread);
     private static native void registerNatives();
     static {
         registerNatives();
     }
 
-    private void notifyJvmtiMountBegin(boolean firstRun) {
-        notifyVTMTStart(this, 0);
+    private void notifyJvmtiMountBegin(boolean firstMount) {
+        notifyMountBegin0(Thread.currentCarrierThread(), this, firstMount);
     }
 
-    private void notifyJvmtiMountEnd(boolean firstRun) {
-        Thread carrier = Thread.currentCarrierThread();
-        notifyVTMTFinish(this, 0);
-        if (firstRun) {
-            notifyStarted(carrier, this);
-        }
-        notifyMount(carrier, this);
+    private void notifyJvmtiMountEnd(boolean firstMount) {
+        notifyMountEnd0(Thread.currentCarrierThread(), this, firstMount);
     }
 
     private void notifyJvmtiUnmountBegin() {
-        notifyUnmount(Thread.currentCarrierThread(), this);
-        notifyVTMTStart(this, 1);
+        notifyUnmountBegin0(Thread.currentCarrierThread(), this);
     }
 
     private void notifyJvmtiUnmountEnd() {
-        notifyVTMTFinish(this, 1);
+        notifyUnmountEnd0(Thread.currentCarrierThread(), this);
     }
 
-    private void notifyJvmtiTerminate() {
-        notifyTerminated(Thread.currentCarrierThread(), this);
-        notifyVTMTStart(this, 0);
-        notifyVTMTFinish(this, 0);
+    private void notifyJvmtiTerminated() {
+        notifyTerminated0(Thread.currentCarrierThread(), this);
     }
 
     /**
@@ -947,12 +926,10 @@ class VirtualThread extends Thread {
             if (propValue != null) {
                 maxPoolSize = Integer.max(parallelism, Integer.parseInt(propValue));
             } else {
-                maxPoolSize = parallelism << 1;
+                maxPoolSize = Integer.max(parallelism << 1, 128);
             }
             Thread.UncaughtExceptionHandler handler = (t, e) -> { };
-            // use FIFO as default
-            propValue = System.getProperty("jdk.defaultScheduler.lifo");
-            boolean asyncMode = (propValue == null) || propValue.equalsIgnoreCase("false");
+            boolean asyncMode = true; // FIFO
             return new ForkJoinPool(parallelism, factory, handler, asyncMode,
                          0, maxPoolSize, 1, pool -> true, 30, SECONDS);
         };
@@ -1036,7 +1013,7 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Reads the value of the jdk.tracePinning property to determine if stack
+     * Reads the value of the jdk.tracePinnedThreads property to determine if stack
      * traces should be printed when a carrier thread is pinned when a virtual thread
      * attempts to park.
      */

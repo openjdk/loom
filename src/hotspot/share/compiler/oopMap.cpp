@@ -41,6 +41,7 @@
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/signature.hpp"
+#include "runtime/stackWatermarkSet.inline.hpp"
 #include "utilities/align.hpp"
 #include "utilities/lockFreeStack.hpp"
 #ifdef COMPILER1
@@ -386,10 +387,43 @@ class AddDerivedOop : public DerivedOopClosure {
   }
 };
 
+class ProcessDerivedOop : public DerivedOopClosure {
+  OopClosure* _oop_cl;
+public:
+  ProcessDerivedOop(OopClosure* oop_cl) :
+      _oop_cl(oop_cl) {}
+
+  enum {
+    SkipNull = true, NeedsLock = true
+  };
+
+  virtual void do_derived_oop(oop *base, oop *derived) {
+    // All derived pointers must be processed before the base pointer of any derived pointer is processed.
+    // Otherwise, if two derived pointers use the same base, the second derived pointer will get an obscured
+    // offset, if the base pointer is processed in the first derived pointer.
+    uintptr_t offset = cast_from_oop<uintptr_t>(*derived) - cast_from_oop<uintptr_t>(*base);
+    *derived = *base;
+    _oop_cl->do_oop(derived);
+    *derived = cast_to_oop(cast_from_oop<uintptr_t>(*derived) + offset);
+  }
+};
+
+class IgnoreDerivedOop : public DerivedOopClosure {
+  OopClosure* _oop_cl;
+public:
+  enum {
+        SkipNull = true, NeedsLock = true
+  };
+
+  virtual void do_derived_oop(oop *base, oop *derived) {}
+};
+
+void OopMapSet::oops_do(const frame* fr, const RegisterMap* reg_map, OopClosure* f, DerivedPointerIterationMode mode) {
+  find_map(fr)->oops_do(fr, reg_map, f, mode);
+}
+
 void OopMapSet::oops_do(const frame *fr, const RegisterMap* reg_map, OopClosure* f, DerivedOopClosure* df) {
-  // add_derived_oop: add derived oops to a table
   find_map(fr)->oops_do(fr, reg_map, f, df);
-  // all_do(fr, reg_map, f, df != NULL ? df : &add_derived_oop, &do_nothing_cl);
 }
 
 // void OopMapSet::all_do(const frame *fr, const RegisterMap *reg_map,
@@ -425,11 +459,29 @@ void ImmutableOopMap::generate_stub(const CodeBlob* cb) const {
 
 void ImmutableOopMap::oops_do(const frame *fr, const RegisterMap *reg_map,
                               OopClosure* oop_fn, DerivedOopClosure* derived_oop_fn) const {
-  AddDerivedOop add_derived_oop;
-  if (derived_oop_fn == NULL) {
-    derived_oop_fn = &add_derived_oop;
-  }
+  assert(derived_oop_fn != NULL, "sanity");
   OopMapDo<OopClosure, DerivedOopClosure, SkipNullValue> visitor(oop_fn, derived_oop_fn);
+  visitor.oops_do(fr, reg_map, this);
+}
+
+void ImmutableOopMap::oops_do(const frame *fr, const RegisterMap *reg_map,
+                              OopClosure* oop_fn, DerivedPointerIterationMode derived_mode) const {
+  ProcessDerivedOop process_cl(oop_fn);
+  AddDerivedOop add_cl;
+  IgnoreDerivedOop ignore_cl;
+  DerivedOopClosure* derived_cl;
+  switch (derived_mode) {
+  case DerivedPointerIterationMode::_directly:
+    derived_cl = &process_cl;
+    break;
+  case DerivedPointerIterationMode::_with_table:
+    derived_cl = &add_cl;
+    break;
+  case DerivedPointerIterationMode::_ignore:
+    derived_cl = &ignore_cl;
+    break;
+  }
+  OopMapDo<OopClosure, DerivedOopClosure, SkipNullValue> visitor(oop_fn, derived_cl);
   visitor.oops_do(fr, reg_map, this);
 }
 
@@ -899,27 +951,26 @@ inline intptr_t value_of_loc(oop *pointer) {
 void DerivedPointerTable::add(oop *derived_loc, oop *base_loc) {
   assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop");
   assert(derived_loc != base_loc, "Base and derived in same location");
-  if (_active) {
-    assert(*derived_loc != (oop)base_loc, "location already added");
-    assert(Entry::_list != NULL, "list must exist");
-    intptr_t offset = value_of_loc(derived_loc) - value_of_loc(base_loc);
-    // This assert is invalid because derived pointers can be
-    // arbitrarily far away from their base.
-    // assert(offset >= -1000000, "wrong derived pointer info");
+  assert(*derived_loc != (void*)base_loc, "location already added");
+  assert(Entry::_list != NULL, "list must exist");
+  assert(is_active(), "table must be active here");
+  intptr_t offset = value_of_loc(derived_loc) - value_of_loc(base_loc);
+  // This assert is invalid because derived pointers can be
+  // arbitrarily far away from their base.
+  // assert(offset >= -1000000, "wrong derived pointer info");
 
-    if (TraceDerivedPointers) {
-      tty->print_cr(
-        "Add derived pointer@" INTPTR_FORMAT
-        " - Derived: " INTPTR_FORMAT
-        " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
-        p2i(derived_loc), p2i(*derived_loc), p2i(*base_loc), p2i(base_loc), offset
-      );
-    }
-    // Set derived oop location to point to base.
-    *derived_loc = (oop)base_loc;
-    Entry* entry = new Entry(derived_loc, offset);
-    Entry::_list->push(*entry);
+  if (TraceDerivedPointers) {
+    tty->print_cr(
+      "Add derived pointer@" INTPTR_FORMAT
+      " - Derived: " INTPTR_FORMAT
+      " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
+      p2i(derived_loc), p2i(*derived_loc), p2i(*base_loc), p2i(base_loc), offset
+    );
   }
+  // Set derived oop location to point to base.
+  *derived_loc = (oop)base_loc;
+  Entry* entry = new Entry(derived_loc, offset);
+  Entry::_list->push(*entry);
 }
 
 void DerivedPointerTable::update_pointers() {

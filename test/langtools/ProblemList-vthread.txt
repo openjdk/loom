@@ -33,6 +33,10 @@ tools/javac/lambda/T8031967.java
 tools/javac/lambda/LambdaParserTest.java
 jdk/javadoc/doclet/testLinkOption/TestRedirectLinks.java
 
+####
+# Exception: java.lang.ThreadDeath Error: Error while cleaning up threads after test
+
+jdk/jshell/ToolTabSnippetTest.java
 
 ####
 # Uninvestigated timeouts

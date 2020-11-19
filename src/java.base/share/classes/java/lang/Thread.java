@@ -138,7 +138,7 @@ public class Thread implements Runnable {
         }
     }
     private final FieldHolder holder;
-    
+
     // interrupt status (read/written by VM)
     volatile boolean interrupted;
 
@@ -179,7 +179,7 @@ public class Thread implements Runnable {
         private static final Unsafe U = Unsafe.getUnsafe();
         private static final long NEXT_TID_OFFSET =
             U.objectFieldOffset(ThreadIdentifiers.class, "nextTid");
-        private static final long TID_MASK = (1L << 48) - 1; 
+        private static final long TID_MASK = (1L << 48) - 1;
         private static volatile long nextTid = 2;
         private static long next() {
             return U.getAndAddLong(ThreadIdentifiers.class, NEXT_TID_OFFSET, 1);
@@ -438,7 +438,7 @@ public class Thread implements Runnable {
      * @since 99
      */
     public static void sleep(Duration duration) throws InterruptedException {
-        long nanos = duration.toNanos();
+        long nanos = NANOSECONDS.convert(duration);  // MAX_VALUE if > 292 years
         if (nanos < 0)
             return;
 
@@ -659,7 +659,7 @@ public class Thread implements Runnable {
      *     };
      * }</pre>
      *
-     * @see Thread.Builder#virtual(Executor) 
+     * @see Thread.Builder#virtual(Executor)
      * @since 99
      */
     public interface VirtualThreadTask extends Runnable {
@@ -1885,7 +1885,6 @@ public class Thread implements Runnable {
      *          if the current thread cannot modify this thread
      *
      * @revised 6.0, 14
-     * @spec JSR-51
      */
     public void interrupt() {
         if (this != Thread.currentThread()) {
@@ -2278,7 +2277,7 @@ public class Thread implements Runnable {
                     } while (isAlive() && (delay = millis -
                             TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)) > 0);
                 }
-            } else if (millis == 0) {
+            } else {
                 while (isAlive()) {
                     wait(0);
                 }
@@ -2353,13 +2352,16 @@ public class Thread implements Runnable {
 
     /**
      * Waits for this thread to terminate for up to the given waiting duration.
-     * This method does not wait if the duration to wait is less than or equal
-     * to zero.
+     *
+     * <p> This method does not wait if the duration to wait is less than or
+     * equal to zero. In this case, the method just tests if the thread has
+     * terminated.
      *
      * @param   duration
      *          the maximum duration to wait
      *
-     * @return  {@code true} if the thread has terminated
+     * @return  {@code true} if the thread has terminated, {@code false} if the
+     *          thread has not terminated
      *
      * @throws  InterruptedException
      *          if the current thread is interrupted while waiting.
@@ -2372,17 +2374,16 @@ public class Thread implements Runnable {
      * @since 99
      */
     public final boolean join(Duration duration) throws InterruptedException {
-        Objects.requireNonNull(duration);
+        long nanos = NANOSECONDS.convert(duration); // MAX_VALUE if > 292 years
 
         Thread.State state = getState();
-        if (state == State.TERMINATED)
-            return true;
         if (state == State.NEW)
             throw new IllegalThreadStateException("Thread not started");
-        if (duration.isZero() || duration.isNegative())
+        if (state == State.TERMINATED)
+            return true;
+        if (nanos <= 0)
             return false;
 
-        long nanos = NANOSECONDS.convert(duration);
         if (isVirtual()) {
             return ((VirtualThread) this).joinNanos(nanos);
         } else {
@@ -2655,8 +2656,8 @@ public class Thread implements Runnable {
     private native Object getStackTrace0();
 
     /**
-     * Returns a map of stack traces for all live threads. The map does not
-     * include virtual threads.
+     * Returns a map of stack traces for all live threads that are scheduled
+     * by the operating system. The map does not include virtual threads.
      * The map keys are threads and each map value is an array of
      * {@code StackTraceElement} that represents the stack dump
      * of the corresponding {@code Thread}.

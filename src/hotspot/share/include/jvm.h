@@ -198,13 +198,19 @@ JVM_LookupLambdaProxyClassFromArchive(JNIEnv* env, jclass caller,
                                       jboolean initialize);
 
 JNIEXPORT jboolean JNICALL
-JVM_IsDynamicDumpingEnabled(JNIEnv* env);
+JVM_IsCDSDumpingEnabled(JNIEnv* env);
 
 JNIEXPORT jboolean JNICALL
 JVM_IsSharingEnabled(JNIEnv* env);
 
+JNIEXPORT jboolean JNICALL
+JVM_IsDumpingClassList(JNIEnv* env);
+
 JNIEXPORT jlong JNICALL
 JVM_GetRandomSeedForDumping();
+
+JNIEXPORT void JNICALL
+JVM_LogLambdaFormInvoker(JNIEnv* env, jstring line);
 
 /*
  * java.lang.Throwable
@@ -350,6 +356,15 @@ JVM_HasReferencePendingList(JNIEnv *env);
 
 JNIEXPORT void JNICALL
 JVM_WaitForReferencePendingList(JNIEnv *env);
+
+JNIEXPORT jboolean JNICALL
+JVM_ReferenceRefersTo(JNIEnv *env, jobject ref, jobject o);
+
+/*
+ * java.lang.ref.PhantomReference
+ */
+JNIEXPORT jboolean JNICALL
+JVM_PhantomReferenceRefersTo(JNIEnv *env, jobject ref, jobject o);
 
 /*
  * java.io.ObjectInputStream
@@ -1276,22 +1291,19 @@ JVM_GetEnclosingMethodInfo(JNIEnv* env, jclass ofClass);
 /* Virtual thread support.
  */
 JNIEXPORT void JNICALL
-JVM_VTMTStart(JNIEnv* env, jclass vthread_class, jobject vthread, int callsite_tag);
+JVM_VirtualThreadMountBegin(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread, jboolean first_mount);
 
 JNIEXPORT void JNICALL
-JVM_VTMTFinish(JNIEnv* env, jclass vthread_class, jobject vthread, int callsite_tag);
+JVM_VirtualThreadMountEnd(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread, jboolean first_mount);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadStarted(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
+JVM_VirtualThreadUnmountBegin(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, jobject event_hread, jobject vthread);
+JVM_VirtualThreadUnmountEnd(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadMount(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
-
-JNIEXPORT void JNICALL
-JVM_VirtualThreadUnmount(JNIEnv* env, jclass vthread_class, jobject event_hread, jobject vthread);
+JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
 
 /*
  * This structure is used by the launcher to get the default thread

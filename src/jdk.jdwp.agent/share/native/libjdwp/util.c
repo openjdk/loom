@@ -183,7 +183,6 @@ util_initialize(JNIEnv *env)
 
         jvmtiError error;
         jclass localClassClass;
-        jclass localVirtualThreadClass;
         jclass localThreadClass;
         jclass localThreadGroupClass;
         jclass localClassLoaderClass;
@@ -200,7 +199,6 @@ util_initialize(JNIEnv *env)
         /* Find some standard classes */
 
         localClassClass         = findClass(env,"java/lang/Class");
-        localVirtualThreadClass = findClass(env,"java/lang/VirtualThread");
         localThreadClass        = findClass(env,"java/lang/Thread");
         localThreadGroupClass   = findClass(env,"java/lang/ThreadGroup");
         localClassLoaderClass   = findClass(env,"java/lang/ClassLoader");
@@ -210,13 +208,12 @@ util_initialize(JNIEnv *env)
 
         /* Save references */
 
-        saveGlobalRef(env, localClassClass,         &(gdata->classClass));
-        saveGlobalRef(env, localVirtualThreadClass, &(gdata->virtualThreadClass));
-        saveGlobalRef(env, localThreadClass,        &(gdata->threadClass));
-        saveGlobalRef(env, localThreadGroupClass,   &(gdata->threadGroupClass));
-        saveGlobalRef(env, localClassLoaderClass,   &(gdata->classLoaderClass));
-        saveGlobalRef(env, localStringClass,        &(gdata->stringClass));
-        saveGlobalRef(env, localSystemClass,        &(gdata->systemClass));
+        saveGlobalRef(env, localClassClass,       &(gdata->classClass));
+        saveGlobalRef(env, localThreadClass,      &(gdata->threadClass));
+        saveGlobalRef(env, localThreadGroupClass, &(gdata->threadGroupClass));
+        saveGlobalRef(env, localClassLoaderClass, &(gdata->classLoaderClass));
+        saveGlobalRef(env, localStringClass,      &(gdata->stringClass));
+        saveGlobalRef(env, localSystemClass,      &(gdata->systemClass));
 
         /* Find some standard methods */
 
@@ -315,12 +312,6 @@ specificTypeKey(JNIEnv *env, jobject object)
         return JDWP_TAG(OBJECT);
     } else if (JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->stringClass)) {
         return JDWP_TAG(STRING);
-    } else if (JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->virtualThreadClass)) {
-        /* We don't really need to check if it's an instance of a VirtualThread class since
-         * that would get detected below, but this is a bit faster. At one point
-         * it was thought that we would need to return THREAD here instead of OBJECT,
-         * but that's not the case. */
-        return JDWP_TAG(OBJECT);
     } else if (JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->threadClass)) {
         return JDWP_TAG(THREAD);
     } else if (JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->threadGroupClass)) {
@@ -612,22 +603,14 @@ sharedInvoke(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* Don't try this with unmounted vthreads. */
-    if (isVThread(thread)) {
-        thread = getVThreadThread(thread);
-    }
-    if (thread == NULL) {
-        error = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
-    } else {
-        /*
-         * Request the invoke. If there are no errors in the request,
-         * the interrupting thread will actually do the invoke and a
-         * reply will be generated subsequently, so we don't reply here.
-         */
-        error = invoker_requestInvoke(invokeType, (jbyte)options, inStream_id(in),
-                                      thread, clazz, method,
-                                      instance, arguments, argumentCount);
-    }
+    /*
+     * Request the invoke. If there are no errors in the request,
+     * the interrupting thread will actually do the invoke and a
+     * reply will be generated subsequently, so we don't reply here.
+     */
+    error = invoker_requestInvoke(invokeType, (jbyte)options, inStream_id(in),
+                                  thread, clazz, method,
+                                  instance, arguments, argumentCount);
     if (error != JVMTI_ERROR_NONE) {
         outStream_setError(out, map2jdwpError(error));
         if ( arguments != NULL ) {
@@ -716,12 +699,12 @@ methodClass(jmethodID method, jclass *pclazz)
     jvmtiError error;
 
     *pclazz = NULL;
-    error = FUNC_PTR(gdata->jvmti,GetMethodDeclaringClass)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetMethodDeclaringClass)
                                 (gdata->jvmti, method, pclazz);
     return error;
 }
 
-/* Returns a local ref to the declaring class for a method, or NULL. */
+/* Returns the start and end locations of the specified method. */
 jvmtiError
 methodLocation(jmethodID method, jlocation *ploc1, jlocation *ploc2)
 {
@@ -744,7 +727,7 @@ methodSignature(jmethodID method,
     char *signature = NULL;
     char *generic_signature = NULL;
 
-    error = FUNC_PTR(gdata->jvmti,GetMethodName)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetMethodName)
             (gdata->jvmti, method, &name, &signature, &generic_signature);
 
     if ( pname != NULL ) {
@@ -887,6 +870,26 @@ getVThreadThread(jthread vthread)
     return thread;
 }
 
+/*
+ * Return the "live" thread for the specified thread. In other words, returns the
+ * carrier thread if the thread is a vthread, otherwise returns the thread itself.
+ */
+jthread
+getLiveThread(jthread thread)
+{
+    if (!gdata->vthreadsSupported || !isVThread(thread)) {
+        return thread;
+    } else {
+        return getVThreadThread(thread);
+    }
+}
+
+
+/*
+ * vthread fixme: This was moved here from stepControl.c because it is now also called
+ * from threadControl.c. However, the need to call it from there may go away. If it does,
+ * move this code back to stepControl.c.
+ */
 jint
 getThreadFrameCount(jthread thread)
 {
@@ -1093,16 +1096,9 @@ void
 debugMonitorEnter(jrawMonitorID monitor)
 {
     jvmtiError error;
-    while (JNI_TRUE) {
-        error = FUNC_PTR(gdata->jvmti,RawMonitorEnter)
-                        (gdata->jvmti, monitor);
-        error = ignore_vm_death(error);
-        if (error == JVMTI_ERROR_INTERRUPT) {
-            handleInterrupt();
-        } else {
-            break;
-        }
-    }
+    error = JVMTI_FUNC_PTR(gdata->jvmti,RawMonitorEnter)
+            (gdata->jvmti, monitor);
+    error = ignore_vm_death(error);
     if (error != JVMTI_ERROR_NONE) {
         EXIT_ERROR(error, "on raw monitor enter");
     }
@@ -1113,7 +1109,7 @@ debugMonitorExit(jrawMonitorID monitor)
 {
     jvmtiError error;
 
-    error = FUNC_PTR(gdata->jvmti,RawMonitorExit)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,RawMonitorExit)
                 (gdata->jvmti, monitor);
     error = ignore_vm_death(error);
     if (error != JVMTI_ERROR_NONE) {
@@ -1125,7 +1121,7 @@ void
 debugMonitorWait(jrawMonitorID monitor)
 {
     jvmtiError error;
-    error = FUNC_PTR(gdata->jvmti,RawMonitorWait)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,RawMonitorWait)
         (gdata->jvmti, monitor, ((jlong)(-1)));
 
     /*
@@ -1170,7 +1166,7 @@ void
 debugMonitorTimedWait(jrawMonitorID monitor, jlong millis)
 {
     jvmtiError error;
-    error = FUNC_PTR(gdata->jvmti,RawMonitorWait)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,RawMonitorWait)
         (gdata->jvmti, monitor, millis);
     if (error == JVMTI_ERROR_INTERRUPT) {
         /* See comment above */
@@ -1188,7 +1184,7 @@ debugMonitorNotify(jrawMonitorID monitor)
 {
     jvmtiError error;
 
-    error = FUNC_PTR(gdata->jvmti,RawMonitorNotify)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,RawMonitorNotify)
                 (gdata->jvmti, monitor);
     error = ignore_vm_death(error);
     if (error != JVMTI_ERROR_NONE) {
@@ -1201,7 +1197,7 @@ debugMonitorNotifyAll(jrawMonitorID monitor)
 {
     jvmtiError error;
 
-    error = FUNC_PTR(gdata->jvmti,RawMonitorNotifyAll)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,RawMonitorNotifyAll)
                 (gdata->jvmti, monitor);
     error = ignore_vm_death(error);
     if (error != JVMTI_ERROR_NONE) {
@@ -1215,7 +1211,7 @@ debugMonitorCreate(char *name)
     jrawMonitorID monitor;
     jvmtiError error;
 
-    error = FUNC_PTR(gdata->jvmti,CreateRawMonitor)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,CreateRawMonitor)
                 (gdata->jvmti, name, &monitor);
     if (error != JVMTI_ERROR_NONE) {
         EXIT_ERROR(error, "on creation of a raw monitor");
@@ -1228,7 +1224,7 @@ debugMonitorDestroy(jrawMonitorID monitor)
 {
     jvmtiError error;
 
-    error = FUNC_PTR(gdata->jvmti,DestroyRawMonitor)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,DestroyRawMonitor)
                 (gdata->jvmti, monitor);
     error = ignore_vm_death(error);
     if (error != JVMTI_ERROR_NONE) {
@@ -1287,7 +1283,7 @@ classSignature(jclass clazz, char **psignature, char **pgeneric_signature)
      * pgeneric_signature can be NULL, and GetClassSignature
      * accepts NULL.
      */
-    error = FUNC_PTR(gdata->jvmti,GetClassSignature)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetClassSignature)
                 (gdata->jvmti, clazz, &signature, pgeneric_signature);
 
     if ( psignature != NULL ) {
@@ -1644,7 +1640,7 @@ jboolean
 isVThread(jobject object)
 {
     JNIEnv *env = getEnv();
-    return JNI_FUNC_PTR(env,IsInstanceOf)(env, object, gdata->virtualThreadClass);
+    return JNI_FUNC_PTR(env,IsVirtualThread)(env, object);
 }
 
 jboolean
@@ -1866,7 +1862,7 @@ jvmtiAllocate(jint numBytes)
     if ( numBytes == 0 ) {
         return NULL;
     }
-    error = FUNC_PTR(gdata->jvmti,Allocate)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,Allocate)
                 (gdata->jvmti, numBytes, (unsigned char**)&ptr);
     if (error != JVMTI_ERROR_NONE ) {
         EXIT_ERROR(error, "Can't allocate jvmti memory");
@@ -1881,7 +1877,7 @@ jvmtiDeallocate(void *ptr)
     if ( ptr == NULL ) {
         return;
     }
-    error = FUNC_PTR(gdata->jvmti,Deallocate)
+    error = JVMTI_FUNC_PTR(gdata->jvmti,Deallocate)
                 (gdata->jvmti, ptr);
     if (error != JVMTI_ERROR_NONE ) {
         EXIT_ERROR(error, "Can't deallocate jvmti memory");
