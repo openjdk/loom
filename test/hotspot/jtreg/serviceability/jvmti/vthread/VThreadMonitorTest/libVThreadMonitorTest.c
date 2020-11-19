@@ -82,7 +82,7 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
                         jobject monitor1, jobject monitor2) {
   jvmtiError err;
   jint state = 0;
-  jobject contended_monitor = NULL;
+  jobject contended_monitor = (jobject)5; // initialize to an invalid value
 
   // Test GetCurrentContendedMonitor for a vthread.
   err = (*jvmti)->GetCurrentContendedMonitor(jvmti, thread, &contended_monitor);
@@ -91,7 +91,7 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
     status = FAILED;
     return;
   }
- 
+
   printf("\n%s: %s: contended monitor: %p\n", func, tname, contended_monitor);
 
   // Check if it is expected monitor.
