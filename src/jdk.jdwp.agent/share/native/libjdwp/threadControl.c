@@ -2310,17 +2310,6 @@ threadControl_onEventHandlerExit(EventIndex ei, jthread thread,
     }
 }
 
-void
-threadControl_setName(jthread thread, const char *name)
-{
-#ifdef DEBUG_THREADNAME
-    ThreadNode *node = findThread(NULL, thread);
-    if (node != NULL) {
-        strncpy(node->name, name, sizeof(node->name) - 1);
-    }
-#endif
-}
-
 /* Returns JDWP flavored status and status flags. */
 jvmtiError
 threadControl_applicationThreadStatus(jthread thread,

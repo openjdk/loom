@@ -65,7 +65,6 @@ name(PacketInputStream *in, PacketOutputStream *out)
         }
 
         if ( info.name != NULL ) {
-            threadControl_setName(thread, info.name);
             jvmtiDeallocate(info.name);
         }
     } END_WITH_LOCAL_REFS(env);
