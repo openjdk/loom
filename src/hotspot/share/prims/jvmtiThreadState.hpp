@@ -143,8 +143,10 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
  private:
   friend class JvmtiEnv;
   JavaThread        *_thread;
+  OopHandle         _thread_oop_h;
   // Jvmti Events that cannot be posted in their current context.
   JvmtiDeferredEventQueue* _jvmti_event_queue;
+  bool              _is_virtual; // state belongs to a virtual thread
   bool              _hide_single_stepping;
   bool              _pending_step_for_popframe;
   bool              _pending_step_for_earlyret;
@@ -168,6 +170,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
 
   // This is only valid when is_interp_only_mode() returns true
   int               _cur_stack_depth;
+  int               _saved_interp_only_mode;
 
   JvmtiThreadEventEnable _thread_event_enable;
 
@@ -188,7 +191,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   JvmtiSampledObjectAllocEventCollector* _sampled_object_alloc_event_collector;
 
   // Should only be created by factory methods
-  JvmtiThreadState(JavaThread *thread);
+  JvmtiThreadState(JavaThread *thread, oop thread_oop);
 
   friend class JvmtiEnvThreadStateIterator;
   inline JvmtiEnvThreadState* head_env_thread_state();
@@ -214,6 +217,9 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   static void periodic_clean_up();
 
   void add_env(JvmtiEnvBase *env);
+
+  void unbind_from(JavaThread* thread);
+  void bind_to(JavaThread* thread);
 
   // Used by the interpreter for fullspeed debugging support
   bool is_interp_only_mode()                { return _thread->is_interp_only_mode(); }
@@ -241,6 +247,11 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   int count_frames();
 
   inline JavaThread *get_thread()      { return _thread;              }
+
+  // Needed for virtual threads only as they can migrate to different carrirer threads.
+  void set_thread(JavaThread* thread);
+  oop get_thread_oop(); 
+  inline bool is_virtual() { return _is_virtual; } // the _thread is virtual
 
   inline bool is_exception_detected()  { return _exception_state == ES_DETECTED;  }
   inline bool is_exception_caught()    { return _exception_state == ES_CAUGHT;  }
@@ -412,10 +423,10 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
 
   // already holding JvmtiThreadState_lock - retrieve or create JvmtiThreadState
   // Can return NULL if JavaThread is exiting.
-  static JvmtiThreadState *state_for_while_locked(JavaThread *thread);
+  static JvmtiThreadState *state_for_while_locked(JavaThread *thread, oop thread_oop = NULL);
   // retrieve or create JvmtiThreadState
   // Can return NULL if JavaThread is exiting.
-  static JvmtiThreadState *state_for(JavaThread *thread);
+  static JvmtiThreadState *state_for(JavaThread *thread, oop thread_oop = NULL);
 
   // JVMTI ForceEarlyReturn support
 

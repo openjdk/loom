@@ -360,7 +360,7 @@ Java_NullAsCurrentThreadTest_failedStatus(JNIEnv *env, jclass clas) {
 }
 
 static void JNICALL
-VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread) {
+VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   printf("Got VirtualThreadMounted event\n");
   fflush(stdout);
 }

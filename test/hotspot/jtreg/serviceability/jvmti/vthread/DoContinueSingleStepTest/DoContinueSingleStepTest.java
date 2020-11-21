@@ -65,9 +65,9 @@ public class DoContinueSingleStepTest {
     };
 
     public static void test1() throws Exception {
-        Thread p1 = Thread.newThread(Thread.VIRTUAL, PRODUCER);
-        Thread c1 = Thread.newThread(Thread.VIRTUAL, CONSUMER);
-        Thread c2 = Thread.newThread(Thread.VIRTUAL, CONSUMER);
+        Thread p1 = Thread.newThread("VT-PRODUCER#0", Thread.VIRTUAL, PRODUCER);
+        Thread c1 = Thread.newThread("VT-CONSUMER#1", Thread.VIRTUAL, CONSUMER);
+        Thread c2 = Thread.newThread("VT-CONSUMER#2", Thread.VIRTUAL, CONSUMER);
         p1.start();
         c1.start();
         c2.start();

@@ -114,6 +114,9 @@ public class Thread implements Runnable {
 
     /* Reserved for exclusive use by the JVM, TBD: move to FieldHolder */
     private long eetop;
+ 
+    // used by JVMTI to store JvmtiThreadState link
+    private volatile long jvmtiThreadState;
 
     // holds fields for kernel threads
     private static class FieldHolder {

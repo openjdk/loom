@@ -26,13 +26,13 @@
 #define SHARE_CLASSFILE_JAVACLASSES_HPP
 
 #include "classfile/systemDictionary.hpp"
-#include "jvmtifiles/jvmti.h"
 #include "oops/oop.hpp"
 #include "oops/instanceKlass.hpp"
 #include "oops/symbol.hpp"
 #include "runtime/os.hpp"
 #include "utilities/vmEnums.hpp"
 
+class JvmtiThreadState;
 class RecordComponent;
 
 // Interface for manipulating the basic Java classes.
@@ -376,6 +376,7 @@ class java_lang_Thread : AllStatic {
   static int _contextClassLoader_offset;
   static int _inheritedAccessControlContext_offset;
   static int _eetop_offset;
+  static int _jvmti_thread_state_offset;
   static int _interrupted_offset;
   static int _tid_offset;
   static int _continuation_offset;
@@ -425,6 +426,9 @@ class java_lang_Thread : AllStatic {
   static ByteSize thread_id_offset();
   // Continuation
   static inline oop continuation(oop java_thread);
+
+  static JvmtiThreadState* jvmti_thread_state(oop java_thread);
+  static void set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state);
 
   // Blocker object responsible for thread parking
   static oop park_blocker(oop java_thread);

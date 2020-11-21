@@ -536,41 +536,39 @@ JvmtiEnv::SetEventCallbacks(const jvmtiEventCallbacks* callbacks, jint size_of_c
 // event_thread - NULL is a valid value, must be checked
 jvmtiError
 JvmtiEnv::SetEventNotificationMode(jvmtiEventMode mode, jvmtiEvent event_type, jthread event_thread,   ...) {
+  bool enabled = (mode == JVMTI_ENABLE);
+
+  // event_type must be valid
+  if (!JvmtiEventController::is_valid_event_type(event_type)) {
+    return JVMTI_ERROR_INVALID_EVENT_TYPE;
+  }
+
+  // assure that needed capabilities are present
+  if (enabled && !JvmtiUtil::has_event_capability(event_type, get_capabilities())) {
+    return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+  }
+
+  if (event_type == JVMTI_EVENT_CLASS_FILE_LOAD_HOOK && enabled) {
+    record_class_file_load_hook_enabled();
+  }
+
   if (event_thread == NULL) {
     // Can be called at Agent_OnLoad() time with event_thread == NULL
     // when Thread::current() does not work yet so we cannot create a
     // ThreadsListHandle that is common to both thread-specific and
     // global code paths.
 
-    // event_type must be valid
-    if (!JvmtiEventController::is_valid_event_type(event_type)) {
-      return JVMTI_ERROR_INVALID_EVENT_TYPE;
-    }
-
-    bool enabled = (mode == JVMTI_ENABLE);
-
-    // assure that needed capabilities are present
-    if (enabled && !JvmtiUtil::has_event_capability(event_type, get_capabilities())) {
-      return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
-    }
-
-    if (event_type == JVMTI_EVENT_CLASS_FILE_LOAD_HOOK && enabled) {
-      record_class_file_load_hook_enabled();
-    }
-
     JvmtiEventController::set_user_enabled(this, (JavaThread*) NULL, event_type, enabled);
   } else {
     // We have a specified event_thread.
     JavaThread* java_thread = NULL;
     ThreadsListHandle tlh;
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), event_thread, &java_thread, NULL);
+    oop thread_obj = NULL;
+    JvmtiVTMTDisabler vtmt_disabler;
+
+    jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), event_thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
       return err;
-    }
-
-    // event_type must be valid
-    if (!JvmtiEventController::is_valid_event_type(event_type)) {
-      return JVMTI_ERROR_INVALID_EVENT_TYPE;
     }
 
     // global events cannot be controlled at thread level.
@@ -578,16 +576,11 @@ JvmtiEnv::SetEventNotificationMode(jvmtiEventMode mode, jvmtiEvent event_type, j
       return JVMTI_ERROR_ILLEGAL_ARGUMENT;
     }
 
-    bool enabled = (mode == JVMTI_ENABLE);
-
     // assure that needed capabilities are present
-    if (enabled && !JvmtiUtil::has_event_capability(event_type, get_capabilities())) {
+    if (java_lang_VirtualThread::is_instance(thread_obj) && !JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
 
-    if (event_type == JVMTI_EVENT_CLASS_FILE_LOAD_HOOK && enabled) {
-      record_class_file_load_hook_enabled();
-    }
     JvmtiEventController::set_user_enabled(this, java_thread, event_type, enabled);
   }
 
@@ -1913,11 +1906,39 @@ JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jl
 
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
-// java_thread - unchecked
+// thread - NOT pre-checked
 // depth - pre-checked as non-negative
 jvmtiError
-JvmtiEnv::NotifyFramePop(JavaThread* java_thread, jint depth) {
+JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  ResourceMark rm;
+  JavaThread* java_thread = NULL;
+  oop thread_obj = NULL;
+  ThreadsListHandle tlh;
+  JvmtiVTMTDisabler vtmt_disabler;
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
+
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    if (!JvmtiExport::can_support_virtual_threads()) {
+      return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    }
+    if (java_thread == NULL) {
+      // java_thread is NULL if virtual thread is unmounted
+      JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_obj);
+      if (state == NULL) {
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
+      }
+      int frame_number = state->count_frames() - depth;
+      state->env_thread_state(this)->set_frame_pop(frame_number);
+      return JVMTI_ERROR_NONE;
+    }
+  }
+
   JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
