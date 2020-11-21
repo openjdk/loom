@@ -635,7 +635,7 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_n
   }
   jvmtiError err = (*jvmti)->GetCarrierThread(jvmti, vthread, &cthread);
   if (err != JVMTI_ERROR_NONE) {
-    printf("processVThreadEvent: GetCarrierThread returned error code: %err\n");
+    printf("processVThreadEvent: GetCarrierThread returned error code: %d\n", err);
     fatal(jni, "event handler: JVMTI GetCarrierThread failed to return JVMTI_ERROR_NONE");
   }
 
@@ -661,7 +661,6 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_n
 static void JNICALL
 VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   jobject mounted_vthread = NULL;
-  jvmtiError err;
 
   lock_events();
 
@@ -673,7 +672,6 @@ VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
 static void JNICALL
 VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   jobject mounted_vthread = NULL;
-  jvmtiError err;
 
   lock_events();
 
