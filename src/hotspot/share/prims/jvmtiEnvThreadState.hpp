@@ -165,6 +165,7 @@ public:
     return _single_stepping_posted;
   }
 
+  inline void set_thread(JavaThread* thread) { _thread = thread; }
   inline JavaThread *get_thread() { return _thread; }
   inline JvmtiEnv *get_env() { return _env; }
 

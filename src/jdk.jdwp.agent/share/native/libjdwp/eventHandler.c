@@ -1451,7 +1451,7 @@ cbVMDeath(jvmtiEnv *jvmti_env, JNIEnv *env)
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED */
 static void JNICALL
 cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
-                   jthread thread, jthread vthread)
+                   jthread vthread)
 {
     EventInfo info;
 
@@ -1497,13 +1497,13 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED */
 static void JNICALL
 cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
-                    jthread thread, jthread vthread)
+                    jthread vthread)
 {
 
     EventInfo info;
 
     LOG_CB(("cbVThreadTerminated: vthread=%p", vthread));
-    /*tty_message("cbVThreadTerminated: vthread=%p", vthread);*/
+    /*ttyrmessage("cbVThreadTerminated: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
     BEGIN_CALLBACK() {
@@ -1519,8 +1519,11 @@ cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED */
 static void JNICALL
 cbVThreadMounted(jvmtiEnv *jvmti_env, JNIEnv *env,
-                 jthread thread, jthread vthread)
+                 jthread vthread)
 {
+    jvmtiError error;
+    jthread thread = NULL;
+
     LOG_CB(("cbVThreadMounted: vthread=%p", vthread));
     /*tty_message("cbVThreadMounted: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
@@ -1528,6 +1531,12 @@ cbVThreadMounted(jvmtiEnv *jvmti_env, JNIEnv *env,
     /* Ignore VIRTUAL_THREAD_MOUNTED events unless we are doing vthread debugging. */
     if (!gdata->vthreadsSupported) {
         return;
+    }
+
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
+            (gdata->jvmti, vthread, &thread);
+    if (error != JVMTI_ERROR_NONE) {
+        EXIT_ERROR(error, "could not get carrier thread for vthread");
     }
 
     threadControl_mountVThread(vthread, thread, currentSessionID);
@@ -1538,8 +1547,11 @@ cbVThreadMounted(jvmtiEnv *jvmti_env, JNIEnv *env,
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED */
 static void JNICALL
 cbVThreadUnmounted(jvmtiEnv *jvmti_env, JNIEnv *env,
-                   jthread thread, jthread vthread)
+                   jthread vthread)
 {
+    jvmtiError error;
+    jthread thread = NULL;
+
     LOG_CB(("cbVThreadUnmounted: vthread=%p", vthread));
     /*tty_message("cbVThreadUnmounted: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
@@ -1547,6 +1559,12 @@ cbVThreadUnmounted(jvmtiEnv *jvmti_env, JNIEnv *env,
     /* Ignore VIRTUAL_THREAD_UNMOUNTED events unless we are doing vthread debugging. */
     if (!gdata->vthreadsSupported) {
         return;
+    }
+
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
+            (gdata->jvmti, vthread, &thread);
+    if (error != JVMTI_ERROR_NONE) {
+        EXIT_ERROR(error, "could not get carrier thread for vthread");
     }
 
     threadControl_unmountVThread(vthread, thread);

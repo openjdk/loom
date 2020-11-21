@@ -1142,6 +1142,7 @@ class JavaThread: public Thread {
   volatile bool         _doing_unsafe_access;    // Thread may fault due to unsafe access
   bool                  _do_not_unlock_if_synchronized;  // Do not unlock the receiver of a synchronized method (since it was
                                                          // never locked) when throwing an exception. Used by interpreter only.
+  bool                  _is_in_VTMT;             // thread is in virtual thread mount transition
 
   // JNI attach states:
   enum JNIAttachStates {
@@ -1499,6 +1500,9 @@ public:
   bool is_cthread_pending_suspend() const {
     return (_suspend_flags & _cthread_pending_suspend) != 0;
   }
+
+  bool is_in_VTMT() const                        { return _is_in_VTMT; }
+  void set_is_in_VTMT(bool val)                  { _is_in_VTMT = val; }
 
   // Thread.stop support
   void send_thread_stop(oop throwable);
@@ -1904,6 +1908,7 @@ public:
   static ByteSize interp_only_mode_offset() { return byte_offset_of(JavaThread, _interp_only_mode); }
   bool is_interp_only_mode()                { return (_interp_only_mode != 0); }
   int get_interp_only_mode()                { return _interp_only_mode; }
+  int set_interp_only_mode(int val)         { return _interp_only_mode = val; }
   void increment_interp_only_mode()         { ++_interp_only_mode; }
   void decrement_interp_only_mode()         { --_interp_only_mode; }
 

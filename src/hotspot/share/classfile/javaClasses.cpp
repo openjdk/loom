@@ -2019,6 +2019,7 @@ int java_lang_Thread::_name_offset;
 int java_lang_Thread::_contextClassLoader_offset;
 int java_lang_Thread::_inheritedAccessControlContext_offset;
 int java_lang_Thread::_eetop_offset;
+int java_lang_Thread::_jvmti_thread_state_offset;
 int java_lang_Thread::_interrupted_offset;
 int java_lang_Thread::_tid_offset;
 int java_lang_Thread::_continuation_offset;
@@ -2030,6 +2031,7 @@ int java_lang_Thread::_park_blocker_offset;
   macro(_contextClassLoader_offset, k, vmSymbols::contextClassLoader_name(), classloader_signature, false); \
   macro(_inheritedAccessControlContext_offset, k, vmSymbols::inheritedAccessControlContext_name(), accesscontrolcontext_signature, false); \
   macro(_eetop_offset,         k, "eetop", long_signature, false); \
+  macro(_jvmti_thread_state_offset,  k, "jvmtiThreadState", long_signature, false); \
   macro(_interrupted_offset,   k, "interrupted", bool_signature, false); \
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
@@ -2052,9 +2054,16 @@ JavaThread* java_lang_Thread::thread(oop java_thread) {
   return (JavaThread*)java_thread->address_field(_eetop_offset);
 }
 
-
 void java_lang_Thread::set_thread(oop java_thread, JavaThread* thread) {
   java_thread->address_field_put(_eetop_offset, (address)thread);
+}
+
+JvmtiThreadState* java_lang_Thread::jvmti_thread_state(oop java_thread) {
+  return (JvmtiThreadState*)java_thread->address_field(_jvmti_thread_state_offset);
+}
+
+void java_lang_Thread::set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state) {
+  java_thread->address_field_put(_jvmti_thread_state_offset, (address)state);
 }
 
 oop java_lang_Thread::holder(oop java_thread) {

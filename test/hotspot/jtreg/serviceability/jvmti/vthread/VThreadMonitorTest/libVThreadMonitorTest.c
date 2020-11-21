@@ -157,25 +157,26 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
 }
 
 JNIEXPORT void JNICALL
-MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread cthread, jobject monitor) {
+MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject monitor) {
   jvmtiError err;
   jvmtiThreadInfo vt_info;
   jvmtiThreadInfo ct_info;
-  jthread vthread = NULL;
+  jthread cthread = NULL;
   jobject contended_monitor = NULL;
 
   if (CheckLockObject(env, monitor) == JNI_FALSE) {
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetVirtualThread(jvmti, cthread, &vthread);
+  err = (*jvmti)->GetCarrierThread(jvmti, vthread, &cthread);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
-                     "error in JVMTI GetVirtualThread");
+                     "error in JVMTI GetCarrierThread");
     event_has_posted = JNI_TRUE;
     status = FAILED;
     return;
   }
+
   err = (*jvmti)->GetThreadInfo(jvmti, vthread, &vt_info);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
@@ -208,21 +209,21 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread cthread, jobject mon
 }
 
 JNIEXPORT void JNICALL
-MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread cthread, jobject monitor) {
+MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject monitor) {
   jvmtiError err;
   jvmtiThreadInfo vt_info;
   jvmtiThreadInfo ct_info;
-  jthread vthread = NULL;
+  jthread cthread = NULL;
   jobject contended_monitor = (jobject)cthread; // init with a wrong monitor
 
   if (CheckLockObject(env, monitor) == JNI_FALSE) {
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetVirtualThread(jvmti, cthread, &vthread);
+  err = (*jvmti)->GetCarrierThread(jvmti, vthread, &cthread);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
-                     "error in JVMTI GetVirtualThread");
+                     "error in JVMTI GetCarrierThread");
     status = FAILED;
     return;
   }
@@ -230,7 +231,7 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread cthread, jobject m
   err = (*jvmti)->GetThreadInfo(jvmti, vthread, &vt_info);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
-                     "error in JVMTI GetThreadInfo");
+                     "error in JVMTI GetThreadInfo for virtual thread");
     status = FAILED;
     return;
   }
@@ -238,7 +239,7 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread cthread, jobject m
   err = (*jvmti)->GetThreadInfo(jvmti, cthread, &ct_info);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
-                     "error in JVMTI GetThreadInfo");
+                     "error in JVMTI GetThreadInfo for carrier thread");
     status = FAILED;
     return;
   }

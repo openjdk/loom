@@ -62,7 +62,7 @@
 #include "oops/oop.inline.hpp"
 #include "prims/jvm_misc.hpp"
 #include "prims/jvmtiExport.hpp"
-#include "prims/jvmtiThreadState.hpp"
+#include "prims/jvmtiThreadState.inline.hpp"
 #include "prims/nativeLookup.hpp"
 #include "prims/stackwalk.hpp"
 #include "runtime/arguments.hpp"
@@ -4115,25 +4115,41 @@ JVM_END
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread, jboolean first_mount))
   JVMWrapper("JVM_VirtualThreadMountEnd");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
-  thread->set_mounted_vthread(JNIHandles::resolve(vthread));
+  oop vt_oop = JNIHandles::resolve(vthread);
+  thread->set_mounted_vthread(vt_oop);
+
+  // unbind JvmtiThreadState of carrier thread from JavaThread
+  thread->jvmti_thread_state()->unbind_from(thread);
+
+  // bind JvmtiThreadState of virtual thread to JavaThread
+  java_lang_Thread::jvmti_thread_state(vt_oop)->bind_to(thread);
+
   if (first_mount) {
     // thread start
     if (JvmtiExport::should_post_vthread_scheduled()) {
-      JvmtiExport::post_vthread_scheduled(event_thread, vthread);
+      JvmtiExport::post_vthread_scheduled(vthread);
     }
     JFR_ONLY(Jfr::on_thread_start(event_thread, vthread));
   }
   if (JvmtiExport::should_post_vthread_mounted()) {
-    JvmtiExport::post_vthread_mounted(event_thread, vthread);
+    JvmtiExport::post_vthread_mounted(vthread);
   }
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadUnmountBegin");
   if (JvmtiExport::should_post_vthread_unmounted()) {
-    JvmtiExport::post_vthread_unmounted(event_thread, vthread);
+    JvmtiExport::post_vthread_unmounted(vthread);
   }
-  thread->set_mounted_vthread(java_lang_VirtualThread::carrier_thread(thread->mounted_vthread()));
+  oop ct_oop = JNIHandles::resolve(event_thread);
+
+  // unbind JvmtiThreadState of virtual thread from JavaThread
+  thread->jvmti_thread_state()->unbind_from(thread);
+
+  // bind JvmtiThreadState of carrier thread to JavaThread
+  java_lang_Thread::jvmti_thread_state(ct_oop)->bind_to(thread);
+
+  thread->set_mounted_vthread(ct_oop);
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
 JVM_END
 
@@ -4145,7 +4161,7 @@ JVM_END
 JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
   JVMWrapper("JVM_VirtualThreadTerminated");
   if (JvmtiExport::should_post_vthread_terminated()) {
-    JvmtiExport::post_vthread_terminated(event_thread, vthread);
+    JvmtiExport::post_vthread_terminated(vthread);
   }
   JFR_ONLY(Jfr::on_thread_exit(event_thread, vthread));
   thread->set_mounted_vthread(NULL);

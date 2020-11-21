@@ -158,7 +158,7 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject thi
 }
 
 static void JNICALL
-VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread) {
+VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   printf("Got VirtualThreadMounted event\n");
   fflush(stdout);
   test_unsupported_jvmti_functions(jvmti, jni, vthread);

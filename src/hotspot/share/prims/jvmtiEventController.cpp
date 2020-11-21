@@ -531,9 +531,15 @@ JvmtiEventControllerPrivate::recompute_thread_enabled(JvmtiThreadState *state) {
     // mark if event is truly enabled on this thread in any environment
     state->thread_event_enable()->_event_enabled.set_bits(any_env_enabled);
 
-    // update the JavaThread cached value for thread-specific should_post_on_exceptions value
-    bool should_post_on_exceptions = (any_env_enabled & SHOULD_POST_ON_EXCEPTIONS_BITS) != 0;
-    state->set_should_post_on_exceptions(should_post_on_exceptions);
+    // pointer to JavaThread can be NULL for unmouted virtual thread
+    if (state->get_thread() != NULL) {
+      // update the JavaThread cached value for thread-specific should_post_on_exceptions value
+      bool should_post_on_exceptions = (any_env_enabled & SHOULD_POST_ON_EXCEPTIONS_BITS) != 0;
+      state->set_should_post_on_exceptions(should_post_on_exceptions);
+    }
+  }
+  if (state->get_thread() == NULL) {
+    return any_env_enabled;
   }
 
   // compute interp_only mode
@@ -592,8 +598,18 @@ JvmtiEventControllerPrivate::recompute_enabled() {
   if (    (any_env_thread_enabled & THREAD_FILTERED_EVENT_BITS) != 0 &&
       (was_any_env_thread_enabled & THREAD_FILTERED_EVENT_BITS) == 0) {
     for (JavaThreadIteratorWithHandle jtiwh; JavaThread *tp = jtiwh.next(); ) {
-      // state_for_while_locked() makes tp->is_exiting() check
-      JvmtiThreadState::state_for_while_locked(tp);  // create the thread state if missing
+      oop jt_oop = tp->threadObj();
+
+      // create the thread state if missing, state_for_while_locked() makes tp->is_exiting() check
+      JvmtiThreadState* state = JvmtiThreadState::state_for_while_locked(tp, jt_oop);
+
+      // create the thread state for mounted virtual thread if missing
+      if (JvmtiExport::can_support_virtual_threads()) {
+        oop vt_oop = tp->mounted_vthread();
+        if (vt_oop != NULL && java_lang_VirtualThread::is_instance(vt_oop)) {
+          state = JvmtiThreadState::state_for_while_locked(tp, vt_oop);
+        }
+      } 
     }
   }
 

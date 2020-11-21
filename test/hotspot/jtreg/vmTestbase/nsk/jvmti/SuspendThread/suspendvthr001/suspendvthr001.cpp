@@ -464,7 +464,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
 }
 
 static void JNICALL
-VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread) {
+VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   lock();
   tested_vthreads[vthread_no++] = jni->NewGlobalRef(vthread);
   unlock();

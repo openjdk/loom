@@ -49,7 +49,7 @@ static const int UNKNOWN_STACK_DEPTH = -99;
 
 JvmtiThreadState *JvmtiThreadState::_head = NULL;
 
-JvmtiThreadState::JvmtiThreadState(JavaThread* thread)
+JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
   : _thread_event_enable() {
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
   _thread               = thread;
@@ -68,6 +68,7 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread)
   _the_class_for_redefinition_verification = NULL;
   _scratch_class_for_redefinition_verification = NULL;
   _cur_stack_depth = UNKNOWN_STACK_DEPTH;
+  _saved_interp_only_mode = 0;
 
   // JVMTI ForceEarlyReturn support
   _pending_step_for_earlyret = false;
@@ -102,8 +103,19 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread)
     _head = this;
   }
 
-  // set this as the state for the thread
-  thread->set_jvmti_thread_state(this);
+  _thread_oop_h = OopHandle(Universe::vm_global(), thread_oop);
+  _is_virtual = false;
+  if (thread_oop != NULL) {
+    java_lang_Thread::set_jvmti_thread_state(thread_oop, (JvmtiThreadState*)this);
+    _is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
+  }
+
+  // thread can be NULL if virtual thread is unmounted
+  if (thread != NULL) {
+    // set this as the state for the thread
+    thread->set_jvmti_thread_state(this);
+    thread->set_interp_only_mode(0); // TBD: is it correct?
+  }
 }
 
 
@@ -148,6 +160,10 @@ JvmtiThreadState::~JvmtiThreadState()   {
     _next = NULL;
     _prev = NULL;
   }
+  if (get_thread_oop() != NULL) {
+    java_lang_Thread::set_jvmti_thread_state(get_thread_oop(), NULL);
+  }
+  _thread_oop_h.release(Universe::vm_global());
 }
 
 
@@ -242,6 +258,7 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     ml.wait();
   }
   _VTMT_count++;
+  thread->set_is_in_VTMT(true);
 }
 
 void
@@ -265,6 +282,7 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
       thread->set_external_suspend();
     }
   }
+  thread->set_is_in_VTMT(false);
 }
 
 /* VThreadList implementation */
@@ -662,3 +680,18 @@ void JvmtiThreadState::run_nmethod_entry_barriers() {
     _jvmti_event_queue->run_nmethod_entry_barriers();
   }
 }
+
+oop JvmtiThreadState::get_thread_oop() {
+  return _thread_oop_h.resolve(); 
+}
+
+void JvmtiThreadState::set_thread(JavaThread* thread) {
+  _thread = thread;
+
+  JvmtiEnvThreadStateIterator it(this);
+  // update thread in all JvmtiEnvThreadState instances
+  for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = ets->next()) {
+    ets->set_thread(thread);
+  }
+}
+

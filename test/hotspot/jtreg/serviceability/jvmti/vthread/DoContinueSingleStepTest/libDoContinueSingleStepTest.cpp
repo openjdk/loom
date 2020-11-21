@@ -146,7 +146,7 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
   err = jvmti->GetMethodName(method, &mname, &msign, NULL);
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetMethodName call");
 
-  printf("%s event #%d: thread: %s, method: %s: %s%s\n",
+  printf("\n%s event #%d: thread: %s, method: %s: %s%s\n",
          event_name, event_count, thr_name, cname, mname, msign);
 
   if (strcmp(event_name, "SingleStep") != 0) {
@@ -156,12 +156,12 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
 }
 
 static void
-print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_cnt, const char* event_name) {
+print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames_cnt, const char* event_name) {
   jvmtiThreadInfo thr_info;
   jvmtiError err;
 
   memset(&thr_info, 0, sizeof(thr_info));
-  err = jvmti->GetThreadInfo(thread, &thr_info);
+  err = jvmti->GetThreadInfo(vthread, &thr_info);
   check_jvmti_status(jni, err, "event handler failed during JVMTI GetThreadInfo call");
 
   const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
@@ -329,44 +329,44 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
 }
 
 static void JNICALL
-VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
+VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   lock_events();
-  //processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadScheduled");
+  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadScheduled");
   unlock_events();
 }
 
 static void JNICALL
-VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
+VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   lock_events();
-  //processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadTerminated");
+  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadTerminated");
   unlock_events();
 }
 
 static void JNICALL
-VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
+VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   lock_events();
-  //processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadMounted");
+  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadMounted");
   unlock_events();
 }
 
 static void JNICALL
-VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject fiber) {
+VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   lock_events();
-  //processFiberEvent(jvmti, jni, thread, fiber, "VirtualThreadUnmounted");
+  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadUnmounted");
   unlock_events();
 }
 
 static void JNICALL
-ContinuationRun(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_count) {
+ContinuationRun(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames_count) {
   lock_events();
-  //print_cont_event_info(jvmti, jni, thread, frames_count, "ContinuationRun");
+  //print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationRun");
   unlock_events();
 }
 
 static void JNICALL
-ContinuationYield(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_count) {
+ContinuationYield(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames_count) {
   lock_events();
-  //print_cont_event_info(jvmti, jni, thread, frames_count, "ContinuationYield");
+  //print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationYield");
   unlock_events();
 }
 
