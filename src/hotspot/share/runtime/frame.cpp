@@ -1402,7 +1402,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
         }
         assert(sig_index == sizeargs, "");
       }
-      int out_preserve = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs, false);
+      int out_preserve = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
       assert (out_preserve ==  m->num_stack_arg_slots(), "");
       int sig_index = 0;
       int arg_index = (m->is_static() ? 0 : -1);

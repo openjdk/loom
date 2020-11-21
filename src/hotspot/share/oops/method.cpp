@@ -1809,7 +1809,7 @@ void Method::set_num_stack_arg_slots() {
   }
   assert(sig_index == sizeargs, "");
 
-  _num_stack_arg_slots = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs, false);
+  _num_stack_arg_slots = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
 }
 
 //-----------------------------------------------------------------------------------

@@ -677,7 +677,7 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
 jint
 JvmtiEnvBase::get_vthread_state(oop thread_oop) {
   jshort vt_state = java_lang_VirtualThread::state(thread_oop);
-  jint state = java_lang_VirtualThread::map_state_to_thread_status(vt_state);
+  jint state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vt_state);
   bool ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
 
   if (ext_suspended && ((state & JVMTI_THREAD_STATE_ALIVE) != 0)) {
@@ -2199,13 +2199,13 @@ VThreadGetThreadStateClosure::do_thread(Thread *target) {
   jint state;
 
   if (vthread_state == java_lang_VirtualThread::RUNNING && carrier_thread_oop != NULL) {
-    state = java_lang_Thread::get_thread_status(carrier_thread_oop);
+    state = (jint) java_lang_Thread::get_thread_status(carrier_thread_oop);
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread_oop);
     if (java_thread->is_being_ext_suspended()) {
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
   } else {
-    state = java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
+    state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
   }
   if (java_lang_Thread::interrupted(_vthread_h())) {
     state |= JVMTI_THREAD_STATE_INTERRUPTED;

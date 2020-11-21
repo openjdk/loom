@@ -197,10 +197,6 @@ const intx ObjectAlignmentInBytes = 8;
   develop(bool, LargePagesIndividualAllocationInjectError, false,           \
           "Fail large pages individual allocation")                         \
                                                                             \
-  product(bool, UseLargePagesInMetaspace, false,                            \
-          "(Deprecated) Use large page memory in metaspace. "               \
-          "Only used if UseLargePages is enabled.")                         \
-                                                                            \
   product(bool, UseNUMA, false,                                             \
           "Use NUMA if available")                                          \
                                                                             \
@@ -948,11 +944,6 @@ const intx ObjectAlignmentInBytes = 8;
                                                                             \
   product(bool, IgnoreEmptyClassPaths, false,                               \
           "Ignore empty path elements in -classpath")                       \
-                                                                            \
-  product(size_t, InitialBootClassLoaderMetaspaceSize,                      \
-          NOT_LP64(2200*K) LP64_ONLY(4*M),                                  \
-          "(Deprecated) Initial size of the boot class loader data metaspace") \
-          range(30*K, max_uintx/BytesPerWord)                               \
                                                                             \
   product(bool, PrintHeapAtSIGBREAK, true,                                  \
           "Print heap layout in response to SIGBREAK")                      \
@@ -2507,12 +2498,6 @@ const intx ObjectAlignmentInBytes = 8;
   product(intx, ScopedCacheSize, 16,                                        \
           "Size of the cache for scoped values")                            \
            range(0, max_intx)                                               \
-                                                                            \
-  product(ccstr, AllocateOldGenAt, NULL, EXPERIMENTAL,                      \
-          "Path to the directoy where a temporary file will be "            \
-          "created to use as the backing store for old generation."         \
-          "File of size Xmx is pre-allocated for performance reason, so"    \
-          "we need that much space available")                              \
                                                                             \
   develop(int, VerifyMetaspaceInterval, DEBUG_ONLY(500) NOT_DEBUG(0),       \
                "Run periodic metaspace verifications (0 - none, "           \

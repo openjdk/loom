@@ -1082,9 +1082,9 @@ JvmtiEnv::ResumeThread(jthread thread) {
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
   JvmtiVTMTDisabler vtmt_disabler;
-  ThreadsListHandle tlh;
+  ThreadsListHandle tlh;  
 
-  jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+  jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);  
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
@@ -1141,7 +1141,7 @@ JvmtiEnv::ResumeAllVirtualThreads() {
         JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop)) {
       resume_thread(thread_oop, java_thread, false); // suspend all
     }
-  }
+  } 
   JvmtiVTSuspender::register_all_vthreads_resume();
   return JVMTI_ERROR_NONE;
 }
@@ -1242,7 +1242,7 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
   } else {
     priority = java_lang_Thread::priority(thread_obj());
     is_daemon = java_lang_Thread::is_daemon(thread_obj());
-    if (java_lang_Thread::get_thread_status(thread_obj()) == java_lang_Thread::TERMINATED) {
+    if (java_lang_Thread::get_thread_status(thread_obj()) == JavaThreadStatus::TERMINATED) {
       thread_group = Handle(current_thread, NULL);
     } else {
       thread_group = Handle(current_thread, java_lang_Thread::threadGroup(thread_obj()));
@@ -1377,7 +1377,7 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
 
   JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh(calling_thread);
-
+ 
   err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
   if (err != JVMTI_ERROR_NONE) {
     return err;
@@ -1408,7 +1408,7 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
     } else if (java_thread == calling_thread) {
       // It is only safe to make a direct call on the current thread.
       // All other usage needs to use a direct handshake for safety.
-      err = get_owned_monitors(calling_thread, java_thread, owned_monitors_list);
+      err = get_owned_monitors(calling_thread, java_thread, owned_monitors_list); 
     } else {
       // get owned monitors info with handshake
       GetOwnedMonitorInfoClosure op(calling_thread, this, owned_monitors_list);
@@ -1466,9 +1466,7 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
     // there is no monitor info to collect if target virtual thread is unmounted
-    if (java_thread == NULL) {
-      *monitor_ptr = NULL;
-    } else {
+    if (java_thread != NULL) {
       VThreadGetCurrentContendedMonitorClosure op(this,
                                                   Handle(calling_thread, thread_oop),
                                                   monitor_ptr);

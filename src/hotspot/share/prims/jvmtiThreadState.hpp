@@ -29,6 +29,7 @@
 #include "memory/allocation.hpp"
 #include "oops/oopHandle.hpp"
 #include "prims/jvmtiEventController.hpp"
+#include "prims/jvmtiExport.hpp"
 #include "runtime/thread.hpp"
 #include "utilities/growableArray.hpp"
 
