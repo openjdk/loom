@@ -1465,6 +1465,8 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
                                                   monitor_ptr);
       Handshake::execute(&op, java_thread);
       err = op.result();
+    } else {
+      *monitor_ptr = NULL;
     }
     return err;
   }
