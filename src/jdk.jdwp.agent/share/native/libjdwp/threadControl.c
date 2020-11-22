@@ -1668,9 +1668,10 @@ threadControl_suspendAll(void)
 static jvmtiError
 decrementSupendCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
 {
-    // vthread fixme: eventually need to support some vthreads already being resumed
-    JDI_ASSERT(node->suspendCount > 0);
-    node->suspendCount--;
+    // Some vthreads might already have a suspendCount of 0. Just ignore them.
+    if (node->suspendCount > 0) {
+        node->suspendCount--;
+    }
     return JVMTI_ERROR_NONE;
 }
 
