@@ -124,19 +124,14 @@ abstract class Poller implements Runnable {
     protected Poller() { }
 
     private void register(int fdVal) throws IOException {
-        Thread t = Thread.currentThread();
-        Thread previous = map.putIfAbsent(fdVal, t);
-        if (previous != null) {
-            throw new IllegalStateException();
-        }
+        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
+        assert previous == null;
         implRegister(fdVal);
     }
 
     private void deregister(int fdVal) {
-        Thread t = Thread.currentThread();
-        if (map.remove(fdVal, t)) {
-            implDeregister(fdVal);
-        }
+        Thread previous = map.remove(fdVal);
+        assert previous == null || previous == Thread.currentThread();
     }
 
     private void wakeup(int fdVal) {

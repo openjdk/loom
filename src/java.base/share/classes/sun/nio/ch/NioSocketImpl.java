@@ -104,6 +104,9 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
     private static final int ST_CLOSED = 5;
     private volatile int state;  // need stateLock to change
 
+    // The file descriptor value
+    private int fdVal;
+
     // set by SocketImpl.create, protected by stateLock
     private boolean stream;
     private Cleanable cleaner;
@@ -175,10 +178,9 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
     private void park(FileDescriptor fd, int event, long nanos) throws IOException {
         Thread t = Thread.currentThread();
         if (t.isVirtual()) {
-            int fdVal = fdVal(fd);
             Poller.register(fdVal, event);
-            if (isOpen()) {
-                try {
+            try {
+                if (isOpen()) {
                     if (nanos == 0) {
                         VirtualThreads.park();
                     } else {
@@ -187,9 +189,9 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                     if (t.isInterrupted()) {
                         throw new InterruptedIOException();
                     }
-                } finally {
-                    Poller.deregister(fdVal, event);
                 }
+            } finally {
+                Poller.deregister(fdVal, event);
             }
         } else {
             long millis;
@@ -480,6 +482,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             }
             Runnable closer = closerFor(fd, stream);
             this.fd = fd;
+            this.fdVal = IOUtil.fdVal(fd);
             this.stream = stream;
             this.cleaner = CleanerFactory.cleaner().register(this, closer);
             this.state = ST_UNCONNECTED;
@@ -781,6 +784,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
         Runnable closer = closerFor(newfd, true);
         synchronized (nsi.stateLock) {
             nsi.fd = newfd;
+            nsi.fdVal = IOUtil.fdVal(newfd);
             nsi.stream = true;
             nsi.cleaner = CleanerFactory.cleaner().register(nsi, closer);
             nsi.localport = localAddress.getPort();
@@ -912,7 +916,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                 long writer = writerThread;
                 if (NativeThread.isVirtualThread(reader)
                         || NativeThread.isVirtualThread(writer)) {
-                    Poller.stopPoll(fdVal(fd));
+                    Poller.stopPoll(fdVal);
                 }
                 if (NativeThread.isKernelThread(reader)
                         || NativeThread.isKernelThread(writer)) {
@@ -1163,7 +1167,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             if (!isInputClosed) {
                 Net.shutdown(fd, Net.SHUT_RD);
                 if (NativeThread.isVirtualThread(readerThread)) {
-                    Poller.stopPoll(fdVal(fd), Net.POLLIN);
+                    Poller.stopPoll(fdVal, Net.POLLIN);
                 }
                 isInputClosed = true;
             }
@@ -1177,7 +1181,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             if (!isOutputClosed) {
                 Net.shutdown(fd, Net.SHUT_WR);
                 if (NativeThread.isVirtualThread(writerThread)) {
-                    Poller.stopPoll(fdVal(fd), Net.POLLOUT);
+                    Poller.stopPoll(fdVal, Net.POLLOUT);
                 }
                 isOutputClosed = true;
             }
@@ -1273,14 +1277,5 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
         } else {
             return StandardProtocolFamily.INET;
         }
-    }
-
-    /**
-     * Returns the native file descriptor
-     */
-    private static int fdVal(FileDescriptor fd) {
-        int fdVal = SharedSecrets.getJavaIOFileDescriptorAccess().get(fd);
-        assert fdVal == IOUtil.fdVal(fd);
-        return fdVal;
     }
 }
