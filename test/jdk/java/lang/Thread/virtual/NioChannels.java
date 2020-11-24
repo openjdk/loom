@@ -390,7 +390,6 @@ public class NioChannels {
     /**
      * DatagramChannel close while virtual thread blocked in receive.
      */
-    @Test(enabled=false)
     public void testDatagramChannelReceiveAsyncClose() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
@@ -408,7 +407,6 @@ public class NioChannels {
     /**
      * Virtual thread interrupted while blocked in DatagramChannel receive.
      */
-    @Test(enabled=false)
     public void testDatagramChannelReceiveInterrupt() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
@@ -533,7 +531,6 @@ public class NioChannels {
     /**
      * Pipe.SourceChannel close while virtual thread blocked in read.
      */
-    @Test(enabled=false)
     public void testPipeReadAsyncClose() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Pipe p = Pipe.open();
@@ -550,7 +547,6 @@ public class NioChannels {
     /**
      * Virtual thread interrupted while blocked in Pipe.SourceChannel read.
      */
-    @Test(enabled=false)
     public void testPipeReadInterrupt() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Pipe p = Pipe.open();
@@ -569,7 +565,6 @@ public class NioChannels {
     /**
      * Pipe.SinkChannel close while virtual thread blocked in write.
      */
-    @Test(enabled=false)
     public void testPipeWriteAsyncClose() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Pipe p = Pipe.open();
@@ -590,7 +585,6 @@ public class NioChannels {
     /**
      * Virtual thread interrupted while blocked in Pipe.SinkChannel write.
      */
-    @Test(enabled=false)
     public void testPipeWriteInterrupt() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Pipe p = Pipe.open();
