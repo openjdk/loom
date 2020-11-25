@@ -73,6 +73,7 @@
 #define SENDER_SP_RET_ADDRESS_OFFSET (frame::sender_sp_offset - frame::return_addr_offset)
 
 static void fix_stack_chunk(oop chunk);
+static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap);
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time from chunks for testing purposes
 // #define PERFTEST 1
@@ -3959,7 +3960,7 @@ public:
     assert (verify_stack_chunk<1>(chunk), "");
     // assert (verify_continuation<99>(_cont.mirror()), "");
 
-    // const bool barriers = requires_barriers(chunk); // TODO PERF
+    const bool barriers = requires_barriers(chunk); // TODO R PERF
 
     // if (!barriers) { // TODO ????
     //   ContMirror::reset_chunk_counters(chunk);
@@ -3976,7 +3977,7 @@ public:
     }
 
     bool partial, empty;
-    if (!TEST_THAW_ONE_CHUNK_FRAME && LIKELY(FULL_STACK || (size < threshold /*&& !barriers*/))) {
+    if (!TEST_THAW_ONE_CHUNK_FRAME && !barriers && LIKELY(FULL_STACK || (size < threshold))) {
       // prefetch with anticipation of memcpy starting at highest address
       prefetch_chunk_pd(InstanceStackChunkKlass::start_of_stack(chunk), size);
 
@@ -3997,7 +3998,7 @@ public:
       // }
     } else { // thaw a single frame
       partial = true;
-      empty = thaw_one_frame_from_chunk(chunk, hsp, &size, &argsize);
+      empty = thaw_one_frame_from_chunk(chunk, hsp, &size, &argsize, barriers);
       if (UNLIKELY(argsize != 0)) {
         size += frame_metadata;
       }
@@ -4102,7 +4103,7 @@ public:
     return before == after;
   }
 
-  NOINLINE bool thaw_one_frame_from_chunk(oop chunk, intptr_t* hsp, int* out_size, int* out_argsize) {
+  NOINLINE bool thaw_one_frame_from_chunk(oop chunk, intptr_t* hsp, int* out_size, int* out_argsize, bool barriers) {
     assert (hsp == (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk), "");
 
     address pc = *(address*)(hsp - SENDER_SP_RET_ADDRESS_OFFSET);
@@ -4116,6 +4117,13 @@ public:
     if (should_deoptimize()
         && (cb->as_compiled_method()->is_marked_for_deoptimization() || (mode != mode_fast && _thread->is_interp_only_mode()))) {
       deoptimize_frame_in_chunk(hsp, pc, cb);
+    }
+
+    if (barriers) {
+      assert (slot >= 0, "");
+      const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
+      assert (oopmap != NULL, "");
+      barriers_for_oops_in_frame(hsp, cb, oopmap);
     }
 
     int empty = jdk_internal_misc_StackChunk::sp(chunk) + size >= (jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk));

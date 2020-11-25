@@ -1295,6 +1295,30 @@ NOINLINE static void fix_stack_chunk(oop chunk) {
   // tty->print_cr("<<< fix_stack_chunk %p %p", (oopDesc*)chunk, Thread::current());
 }
 
+static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap) {
+  // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
+
+  if (cb->is_nmethod()) {
+    cb->as_nmethod_or_null()->run_nmethod_entry_barrier();
+  }
+
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    OopMapValue omv = oms.current();
+    if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+      continue;
+    assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+
+    void* p = reg_to_loc(omv.reg(), sp);
+    assert (p != NULL, "");
+    assert (is_in_frame(cb, sp, p), "");
+
+    const bool narrow = omv.type() == OopMapValue::narrowoop_value;
+    oop value = narrow ? (oop)HeapAccess<>::oop_load((narrowOop*)p) : HeapAccess<>::oop_load((oop*)p);
+    narrow ? HeapAccess<>::oop_store((narrowOop*)p, value) : HeapAccess<>::oop_store((oop*)p, value);
+    log_develop_trace(jvmcont)("barriers_for_oops_in_frame narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", narrow, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
+  }
+}
+
 template <typename ConfigT, op_mode mode>
 void Thaw<ConfigT, mode>::deoptimize_frames_in_chunk(oop chunk) {
   CodeBlob* cb = NULL;
