@@ -4504,6 +4504,12 @@ void Threads::print_on(outputStream* st, bool print_stacks,
     ResourceMark rm;
     p->print_on(st, print_extended_info);
     if (print_stacks) {
+      // if (p->has_last_Java_frame()) {
+      //   static char buf[O_BUFLEN];
+      //   frame fr = p->last_frame();
+      //   VMError::print_native_stack(tty, fr, p, buf, sizeof(buf));
+      // }
+
       if (internal_format) {
         p->trace_stack();
       } else {

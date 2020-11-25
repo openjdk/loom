@@ -3443,6 +3443,12 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   assert (!thread->has_pending_exception(), ""); // if (thread->has_pending_exception()) return early_return(freeze_exception, thread, fi);
   assert (thread->deferred_updates() == NULL || thread->deferred_updates()->count() == 0, "");
 
+  assert (mode != mode_fast || thread->held_monitor_count() == 0, "");
+  // if (mode != mode_fast &&thread->held_monitor_count() > 0) {
+  //    // tty->print_cr(">>> FAIL FAST");
+  //    return freeze_pinned_monitor;
+  // }
+
 #if CONT_JFR
   EventContinuationFreeze event;
 #endif
@@ -4046,10 +4052,6 @@ public:
     intptr_t* from = hsp - frame_metadata;
     intptr_t* to   = vsp - frame_metadata;
     copy_from_chunk(from, to, size); // TODO: maybe use a memcpy that cares about ordering because we're racing with the GC
-
-    // if (barriers) {
-    //   memset(from, 0, size << LogBytesPerWord);
-    // }
 
     if (!FULL_STACK || is_last) {
       assert (!is_last || argsize == 0, "");
@@ -4785,6 +4787,12 @@ bool do_verify_after_thaw(JavaThread* thread) {
   fst.register_map()->set_include_argument_oops(false);
   ContinuationHelper::update_register_map_with_callee(fst.register_map(), *fst.current());
   for (; !fst.is_done(); fst.next()) {
+    if (fst.current()->cb()->is_compiled() && fst.current()->cb()->as_compiled_method()->is_marked_for_deoptimization()) {
+      tty->print_cr(">>> do_verify_after_thaw deopt");
+      fst.current()->deoptimize(NULL);
+      fst.current()->print_on(tty);
+    }
+
     fst.current()->oops_do(&cl, &cf, fst.register_map());
     if (cl.p() != NULL) {
       frame fr = *fst.current();
@@ -4816,6 +4824,7 @@ JRT_LEAF(intptr_t*, Continuation::thaw_leaf(JavaThread* thread, int kind))
 JRT_END
 
 JRT_ENTRY(intptr_t*, Continuation::thaw(JavaThread* thread, int kind))
+  assert((thaw_kind)kind == thaw_top, "");
   intptr_t* sp = thaw0(thread, (thaw_kind)kind);
   set_anchor(thread, sp); // we're in a full transition that expects last_java_frame
   return sp;
@@ -6300,6 +6309,15 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   assert (max_size == cont.max_size(), "max_size: %lu cont.max_size(): %lu", max_size, cont.max_size());
   assert (interpreted_frames == cont.num_interpreted_frames(), "");
   // assert (oops == cont.num_oops(), "");
+
+  // if (cont.refStack() != (oop)NULL) {
+  //   log_develop_trace(jvmcont)("debug_verify_continuation ref stack length %d ref sp: %d", cont.refStack()->length(), cont.refSP());
+  //   for (int i=0; i < cont.refStack()->length(); i++) {
+  //     oop o = cont.refStack()->obj_at(i);
+  //     assert (o == (oop)NULL || (oopDesc::is_oop(o) && o->klass()->is_klass()), "i: %d refSP: %d", i, cont.refSP());
+  //   }
+  // }
+
   return true;
 }
 

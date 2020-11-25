@@ -364,8 +364,13 @@ void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *
   if (method() != NULL) {
     // handle the case of an anchor explicitly set in continuation code that doesn't have a callee
     JavaThread* thread = reg_map->thread();
-    if (thread->has_last_Java_frame() && fr.sp() == thread->last_Java_sp())
+    if (thread->has_last_Java_frame() && fr.sp() == thread->last_Java_sp()) {
+      // if (!method()->is_native()) {
+      //   fr.print_on(tty);
+      // }
+      assert (method()->is_native(), "");
       return;
+    }
     
     if (!method()->is_native()) {
       address pc = fr.pc();
