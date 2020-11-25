@@ -38,7 +38,7 @@ import jdk.internal.misc.VM;
 
 /**
  * A thread group represents a set of threads. In addition, a thread
- * group can also include other thread groups. The thread groups form
+ * group can also include other thread groups. The thread groups form@
  * a tree in which every thread group except the initial thread group
  * has a parent.
  *
@@ -200,7 +200,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *             when its last thread terminates. The concept of daemon
      *             thread group no longer exists.
      */
-    @Deprecated(since="99", forRemoval=true)
+    @Deprecated(since="16", forRemoval=true)
     public final boolean isDaemon() {
         return false;
     }
@@ -216,7 +216,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * @since   1.1
      */
-    @Deprecated(since="99", forRemoval=true)
+    @Deprecated(since="16", forRemoval=true)
     public boolean isDestroyed() {
         return false;
     }
@@ -232,7 +232,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *             The concept of daemon thread group and the concept of a
      *             destroyed thread group no longer exists.
      */
-    @Deprecated(since="99", forRemoval=true)
+    @Deprecated(since="16", forRemoval=true)
     public final void setDaemon(boolean daemon) {
         checkAccess();
     }
@@ -579,7 +579,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *             thread group. The ability to destroy a thread group no
      *             longer exists.
      */
-    @Deprecated(since="99", forRemoval=true)
+    @Deprecated(since="16", forRemoval=true)
     public final void destroy() {
     }
 
