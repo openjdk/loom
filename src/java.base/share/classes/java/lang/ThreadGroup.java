@@ -234,7 +234,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     @Deprecated(since="16", forRemoval=true)
     public final void setDaemon(boolean daemon) {
-        checkAccess();
     }
 
     /**
