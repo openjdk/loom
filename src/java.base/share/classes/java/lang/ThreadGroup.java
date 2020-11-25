@@ -38,7 +38,7 @@ import jdk.internal.misc.VM;
 
 /**
  * A thread group represents a set of threads. In addition, a thread
- * group can also include other thread groups. The thread groups form@
+ * group can also include other thread groups. The thread groups form
  * a tree in which every thread group except the initial thread group
  * has a parent.
  *
