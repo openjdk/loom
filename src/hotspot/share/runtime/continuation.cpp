@@ -2518,6 +2518,7 @@ public:
     // We're always writing to a young chunk, so the GC can't see it until the next safepoint.
     jdk_internal_misc_StackChunk::set_sp(chunk, sp);
     jdk_internal_misc_StackChunk::set_pc(chunk, *(address*)(top - SENDER_SP_RET_ADDRESS_OFFSET));
+    jdk_internal_misc_StackChunk::set_gc_sp(chunk, sp);
 
     // we copy the top frame's return address and link, but not the bottom's
     intptr_t* chunk_top = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp;
@@ -2570,6 +2571,8 @@ public:
     jdk_internal_misc_StackChunk::set_pc(chunk, NULL);
     jdk_internal_misc_StackChunk::set_argsize(chunk, 0); // TODO PERF unnecessary?
     jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
+    jdk_internal_misc_StackChunk::set_gc_sp(chunk, sp);
+    jdk_internal_misc_StackChunk::set_mark_cycle(chunk, 0);
     jdk_internal_misc_StackChunk::set_parent_raw<typename ConfigT::OopT>(chunk, chunk0); // field is uninitialized
     jdk_internal_misc_StackChunk::set_cont_raw<typename ConfigT::OopT>(chunk, _cont.mirror());
     ContMirror::reset_chunk_counters(chunk);
@@ -2627,6 +2630,7 @@ public:
       for (oop chunk = _cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
         // jdk_internal_misc_StackChunk::set_parent(chunk, (oop)NULL); // TODO: kills loop
         jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::size(chunk) + frame_metadata);
+        jdk_internal_misc_StackChunk::set_gc_sp(chunk, jdk_internal_misc_StackChunk::sp(chunk));
         ContMirror::reset_chunk_counters(chunk);
       }
       assert (!_cont.is_flag(FLAG_LAST_FRAME_INTERPRETED), "");
@@ -3960,7 +3964,7 @@ public:
     assert (verify_stack_chunk<1>(chunk), "");
     // assert (verify_continuation<99>(_cont.mirror()), "");
 
-    const bool barriers = requires_barriers(chunk); // TODO R PERF
+    const bool barriers = false; // requires_barriers(chunk); // TODO R PERF
 
     // if (!barriers) { // TODO ????
     //   ContMirror::reset_chunk_counters(chunk);
@@ -3976,8 +3980,11 @@ public:
       vsp = _cont.entrySP();
     }
 
+    // Instead of invoking barriers on oops in thawed frames, we use the gcSP field; see continuationChunk's get_chunk_sp
+    jdk_internal_misc_StackChunk::set_mark_cycle(chunk, CodeCache::marking_cycle());
+
     bool partial, empty;
-    if (!TEST_THAW_ONE_CHUNK_FRAME && !barriers && LIKELY(FULL_STACK || (size < threshold))) {
+    if (!TEST_THAW_ONE_CHUNK_FRAME && LIKELY((FULL_STACK || (size < threshold)) && !barriers)) {
       // prefetch with anticipation of memcpy starting at highest address
       prefetch_chunk_pd(InstanceStackChunkKlass::start_of_stack(chunk), size);
 

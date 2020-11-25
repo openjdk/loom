@@ -179,6 +179,23 @@ static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap,
   return mutated;
 }
 
+static int get_chunk_sp(oop chunk) {
+  // we don't invoke write barriers on oops in thawed frames, so we use the gcSP field to traverse thawed frames
+  int chunk_sp = jdk_internal_misc_StackChunk::sp(chunk);
+  if (chunk_sp != jdk_internal_misc_StackChunk::gc_sp(chunk) && Universe::heap()->requires_barriers(chunk)) {
+    uint64_t marking_cycle = CodeCache::marking_cycle() >> 1;
+    uint64_t chunk_marking_cycle = jdk_internal_misc_StackChunk::mark_cycle(chunk) >> 1;
+    if (marking_cycle == chunk_marking_cycle) {
+      // Marking isn't finished, so we need to traverse thawed frames
+      chunk_sp = jdk_internal_misc_StackChunk::gc_sp(chunk);
+      assert (chunk_sp >= 0 && chunk_sp <= jdk_internal_misc_StackChunk::sp(chunk), "");
+    } else {
+      jdk_internal_misc_StackChunk::set_gc_sp(chunk, chunk_sp); // atomic; benign race
+    }
+  }
+  return chunk_sp;
+}
+
 template <class OopClosureType, bool concurrent_gc>
 void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure) {
   // see sender_for_compiled_frame
@@ -209,7 +226,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
   intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
   intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
   CodeBlob* cb = NULL;
-  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+  for (intptr_t* sp = start + get_chunk_sp(chunk); sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - 1);
     log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
     assert (pc != NULL, "");
@@ -394,7 +411,7 @@ void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* 
   intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
   if (end > h) end = h;
   CodeBlob* cb = NULL;
-  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+  for (intptr_t* sp = start + get_chunk_sp(chunk); sp < end; sp += cb->frame_size()) {
     intptr_t* next_sp = sp + cb->frame_size();
     if (sp + cb->frame_size() >= l) {
       sp += cb->frame_size();

@@ -4941,6 +4941,8 @@ int jdk_internal_misc_StackChunk::_sp_offset;
 int jdk_internal_misc_StackChunk::_pc_offset;
 int jdk_internal_misc_StackChunk::_argsize_offset;
 int jdk_internal_misc_StackChunk::_mode_offset;
+int jdk_internal_misc_StackChunk::_gcSP_offset;
+int jdk_internal_misc_StackChunk::_markCycle_offset;
 int jdk_internal_misc_StackChunk::_numFrames_offset;
 int jdk_internal_misc_StackChunk::_numOops_offset;
 int jdk_internal_misc_StackChunk::_cont_offset;
@@ -4952,6 +4954,8 @@ int jdk_internal_misc_StackChunk::_cont_offset;
   macro(_pc_offset,        k, vmSymbols::pc_name(),        long_signature,       false); \
   macro(_argsize_offset,   k, vmSymbols::argsize_name(),   int_signature,        false); \
   macro(_mode_offset,      k, vmSymbols::mode_name(),      bool_signature,       false); \
+  macro(_gcSP_offset,      k, "gcSP",                      int_signature,        false); \
+  macro(_markCycle_offset, k, "markCycle",                 long_signature,       false); \
   macro(_numFrames_offset, k, vmSymbols::numFrames_name(), int_signature,        false); \
   macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false); \
   macro(_cont_offset,      k, "cont",                      continuation_signature, false);

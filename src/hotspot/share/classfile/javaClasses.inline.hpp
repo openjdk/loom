@@ -336,6 +336,18 @@ inline bool jdk_internal_misc_StackChunk::gc_mode(oop ref) {
 inline void jdk_internal_misc_StackChunk::set_gc_mode(oop ref, bool value) {
   ref->bool_field_put(_mode_offset, (jboolean)value);
 }
+inline int jdk_internal_misc_StackChunk::gc_sp(oop ref) {
+  return ref->int_field(_gcSP_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_gc_sp(oop ref, int value) {
+  ref->int_field_put(_gcSP_offset, value);
+}
+inline uint64_t jdk_internal_misc_StackChunk::mark_cycle(oop ref) {
+  return (uint64_t)ref->long_field(_markCycle_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_mark_cycle(oop ref, uint64_t value) {
+  ref->long_field_put(_markCycle_offset, (jlong)value);
+}
 inline int jdk_internal_misc_StackChunk::end(oop ref) {
   return size(ref) - argsize(ref);
 }
