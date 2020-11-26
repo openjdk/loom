@@ -230,25 +230,30 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
     address pc = *(address*)(sp - 1);
     log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
     assert (pc != NULL, "");
+    if (Continuation::is_return_barrier_entry(pc)) {
+      assert ((int)(sp - start) < jdk_internal_misc_StackChunk::sp(chunk), ""); // only happens when starting from gcSP
+      break;
+    }
 
     int slot;
     cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
     assert (cb != NULL, "");
     assert (cb->is_compiled(), "");
     assert (cb->frame_size() > 0, "");
-    assert (!cb->as_compiled_method()->is_deopt_pc(pc), "");
 
-    assert (slot >= 0, "");
+    // assert (!cb->as_compiled_method()->is_deopt_pc(pc), "");
+    // assert (slot >= 0, "");
     const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
-    // if (LIKELY(slot >= 0)) {
-    //   oopmap = cb->oop_map_for_slot(slot, pc);
-    // } else {
-    //   CompiledMethod* cm = cb->as_compiled_method();
-    //   assert (cm->is_deopt_pc(pc), "");
-    //   pc = *(address*)((address)sp + cm->orig_pc_offset());
-    //   oopmap = cb->oop_map_for_return_address(pc);
-    // }
+    if (LIKELY(slot >= 0)) {
+      oopmap = cb->oop_map_for_slot(slot, pc);
+    } else {
+      CompiledMethod* cm = cb->as_compiled_method();
+      assert (cm->is_deopt_pc(pc), "");
+      pc = *(address*)((address)sp + cm->orig_pc_offset());
+      oopmap = cb->oop_map_for_return_address(pc);
+    }
     assert (oopmap != NULL, "");
+
     log_develop_trace(jvmcont)("stack_chunk_iterate_stack slot: %d codeblob:", slot);
     if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
 
