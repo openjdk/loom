@@ -27,6 +27,7 @@
 
 #include "classfile/javaClasses.hpp"
 #include "oops/access.inline.hpp"
+#include "oops/instanceStackChunkKlass.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "oops/typeArrayOop.inline.hpp"
@@ -372,6 +373,22 @@ inline int jdk_internal_misc_StackChunk::numOops(oop ref) {
 }
 inline void jdk_internal_misc_StackChunk::set_numOops(oop ref, int value) {
   ref->int_field_put(_numOops_offset, value);
+}
+
+inline bool jdk_internal_misc_StackChunk::is_stack_chunk(oop ref) {
+  assert (ref != (oop)NULL && ref->klass() != NULL, "");
+  Klass* k = ref->klass();
+  return k->is_instance_klass() && InstanceKlass::cast(k)->is_stack_chunk_instance_klass();
+}
+
+inline bool jdk_internal_misc_StackChunk::is_empty(oop chunk) {
+  assert (is_stack_chunk(chunk), "");
+  assert ((jdk_internal_misc_StackChunk::sp(chunk) < jdk_internal_misc_StackChunk::end(chunk)) || (jdk_internal_misc_StackChunk::sp(chunk) >= jdk_internal_misc_StackChunk::size(chunk)), "");
+  return jdk_internal_misc_StackChunk::sp(chunk) >= jdk_internal_misc_StackChunk::size(chunk);
+}
+
+inline intptr_t* jdk_internal_misc_StackChunk::start_address(oop chunk) {
+  return (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
 }
 
 inline void java_lang_invoke_CallSite::set_target_volatile(oop site, oop target) {

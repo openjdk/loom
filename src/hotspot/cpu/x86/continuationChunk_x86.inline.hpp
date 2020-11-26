@@ -223,10 +223,8 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
     assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
   }
 
-  int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
-  if (argsize > 0) argsize += frame_metadata;
-  intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
+  intptr_t* const start = jdk_internal_misc_StackChunk::start_address(chunk);
+  intptr_t* const end   = jdk_internal_misc_StackChunk::end_address(chunk);
   CodeBlob* cb = NULL;
   for (intptr_t* sp = start + get_chunk_sp(chunk); sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - 1);
@@ -413,10 +411,8 @@ void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* 
   }
   assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
 
-  int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
-  if (argsize > 0) argsize += frame_metadata;
-  intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
+  intptr_t* const start = jdk_internal_misc_StackChunk::start_address(chunk);
+  intptr_t* end = jdk_internal_misc_StackChunk::end_address(chunk);
   if (end > h) end = h;
   CodeBlob* cb = NULL;
   for (intptr_t* sp = start + get_chunk_sp(chunk); sp < end; sp += cb->frame_size()) {

@@ -689,8 +689,6 @@ public:
   bool is_empty();
   inline bool has_nonempty_chunk() const;
 
-  static inline bool is_stack_chunk(oop obj);
-  static inline bool is_empty_chunk(oop chunk);
   static bool is_in_chunk(oop chunk, void* p);
   static bool is_usable_in_chunk(oop chunk, void* p);
   static inline void reset_chunk_counters(oop chunk);
@@ -741,10 +739,10 @@ public:
     // only the topmost chunk can be empty
     if (_tail == (oop)NULL)
       return true;
-    assert (is_stack_chunk(_tail), "");
+    assert (jdk_internal_misc_StackChunk::is_stack_chunk(_tail), "");
     int i = 1;
     for (oop chunk = jdk_internal_misc_StackChunk::parent(_tail); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-      if (is_empty_chunk(chunk)) {
+      if (jdk_internal_misc_StackChunk::is_empty(chunk)) {
         assert (chunk != _tail, "");
         tty->print_cr("i: %d", i);
         print_chunk(chunk, _cont, true);
@@ -1075,11 +1073,11 @@ bool ContMirror::is_empty0() {
 }
 bool ContMirror::is_empty() {
   if (_tail != (oop)NULL) {
-    if (!is_empty_chunk(_tail))
+    if (!jdk_internal_misc_StackChunk::is_empty(_tail))
       return false;
     // if (!jdk_internal_misc_StackChunk::is_parent_null<HeapWord>(_tail)) {
     if (jdk_internal_misc_StackChunk::parent(_tail) != (oop)NULL) {
-      assert (!is_empty_chunk(jdk_internal_misc_StackChunk::parent(_tail)), ""); // only topmost chunk can be empty
+      assert (!jdk_internal_misc_StackChunk::is_empty(jdk_internal_misc_StackChunk::parent(_tail)), ""); // only topmost chunk can be empty
       return false;
     }
   }
@@ -1088,7 +1086,7 @@ bool ContMirror::is_empty() {
 
 inline bool ContMirror::has_nonempty_chunk() const {
   for (oop chunk = tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-    if (!ContMirror::is_empty_chunk(chunk))
+    if (!jdk_internal_misc_StackChunk::is_empty(chunk))
       return true;
   }
   return false;
@@ -1212,28 +1210,15 @@ int ContMirror::num_oops() {
   return _ref_stack == NULL ? 0 : _ref_stack->length() - _ref_sp;
 }
 
-inline bool ContMirror::is_stack_chunk(oop obj) {
-  assert (obj != (oop)NULL, "");
-  Klass* k = obj->klass();
-  assert (k != NULL, "");
-  return k->is_instance_klass() && InstanceKlass::cast(k)->is_stack_chunk_instance_klass();
-}
-
-inline bool ContMirror::is_empty_chunk(oop chunk) {
-  assert (is_stack_chunk(chunk), "");
-  assert ((jdk_internal_misc_StackChunk::sp(chunk) < jdk_internal_misc_StackChunk::end(chunk)) || (jdk_internal_misc_StackChunk::sp(chunk) >= jdk_internal_misc_StackChunk::size(chunk)), "");
-  return jdk_internal_misc_StackChunk::sp(chunk) >= jdk_internal_misc_StackChunk::size(chunk);
-}
-
 bool ContMirror::is_in_chunk(oop chunk, void* p) {
-  assert (is_stack_chunk(chunk), "");
+  assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
   HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk);
   HeapWord* end = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
   return (HeapWord*)p >= start && (HeapWord*)p < end;
 }
 
 bool ContMirror::is_usable_in_chunk(oop chunk, void* p) {
-  assert (is_stack_chunk(chunk), "");
+  assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
   HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk) - frame_metadata;
   HeapWord* end = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
   return (HeapWord*)p >= start && (HeapWord*)p < end;
@@ -1257,7 +1242,7 @@ oop ContMirror::find_chunk_by_address(void* p) const {
 oop ContMirror::find_chunk(size_t sp_offset, size_t* chunk_offset) const {
   size_t offset = 0;
   for (oop chunk = tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-    if (is_empty_chunk(chunk)) continue;
+    if (jdk_internal_misc_StackChunk::is_empty(chunk)) continue;
     const size_t end = jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
     const int chunk_sp = jdk_internal_misc_StackChunk::sp(chunk);
     size_t offset_in_chunk = sp_offset - offset;
@@ -1276,7 +1261,7 @@ address ContMirror::chunk_offset_to_location(const frame& fr, const int usp_offs
     oop chunk = find_chunk(fr.offset_sp(), &chunk_offset);
     assert (chunk != (oop)NULL, "");
     size_t offset_in_chunk = jdk_internal_misc_StackChunk::sp(chunk) + (fr.offset_sp() - chunk_offset);
-    intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + offset_in_chunk;
+    intptr_t* sp = jdk_internal_misc_StackChunk::start_address(chunk) + offset_in_chunk;
     return (address)sp + usp_offset_in_bytes;
 }
 
@@ -1514,8 +1499,8 @@ static int num_java_frames(const hframe& f) {
 static int num_java_frames(oop chunk) {
   int count = 0;
   CodeBlob* cb = NULL;
-  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end = start + jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk);
+  intptr_t* start = jdk_internal_misc_StackChunk::start_address(chunk);
+  intptr_t* end = jdk_internal_misc_StackChunk::end_address(chunk);
   for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
     cb = ContinuationCodeBlobLookup::find_blob(pc);
@@ -2228,7 +2213,7 @@ public:
     _safepoint_stub(false), _safepoint_stub_h(false) { // don't intitialize
 
     assert (mode == mode_fast, "");
-    assert (is_chunk() && !ContMirror::is_empty_chunk(_chunk), "");
+    assert (is_chunk() && !jdk_internal_misc_StackChunk::is_empty(_chunk), "");
 
     _fp_oop_info.init();
     _keepalive = other->_keepalive;
@@ -2237,7 +2222,7 @@ public:
     _frames = other->_frames;
 
     // this is only uaed to terminate the frame loop.
-    _bottom_address = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
+    _bottom_address = jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::size(chunk);
     int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
     _bottom_address += LIKELY(argsize == 0) ? frame_metadata // We add 2 because the chunk does not include the bottommost 2 words (return pc and link)
                                             : -argsize;
@@ -2470,7 +2455,7 @@ public:
       jdk_internal_misc_StackChunk::set_argsize(chunk, argsize);
       sp = jdk_internal_misc_StackChunk::sp(chunk);
 
-      assert (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL || ContMirror::is_stack_chunk(jdk_internal_misc_StackChunk::parent(chunk)), "");
+      assert (jdk_internal_misc_StackChunk::parent(chunk) == (oop)NULL || jdk_internal_misc_StackChunk::is_stack_chunk(jdk_internal_misc_StackChunk::parent(chunk)), "");
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
       // They'll then be stored twice: in the chunk and in the parent
 
@@ -2493,7 +2478,7 @@ public:
     assert (chunk != NULL, "");
 
     NoSafepointVerifier nsv;
-    assert (ContMirror::is_stack_chunk(chunk), "");
+    assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
     assert (!requires_barriers(chunk), "");
     assert (chunk == _cont.tail(), "");
     assert (chunk == java_lang_Continuation::tail(_cont.mirror()), "");
@@ -2521,8 +2506,8 @@ public:
     jdk_internal_misc_StackChunk::set_gc_sp(chunk, sp);
 
     // we copy the top frame's return address and link, but not the bottom's
-    intptr_t* chunk_top = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp;
-    log_develop_trace(jvmcont)("freeze_chunk start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT, p2i(InstanceStackChunkKlass::start_of_stack(chunk)), sp, p2i(chunk_top));
+    intptr_t* chunk_top = jdk_internal_misc_StackChunk::start_address(chunk) + sp;
+    log_develop_trace(jvmcont)("freeze_chunk start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT, p2i(jdk_internal_misc_StackChunk::start_address(chunk)), sp, p2i(chunk_top));
     intptr_t* from = top       - frame_metadata;
     intptr_t* to   = chunk_top - frame_metadata;
     copy_to_chunk(from, to, size, chunk);
@@ -2557,13 +2542,13 @@ public:
     }
     assert (jdk_internal_misc_StackChunk::size(chunk) == size, "");
     assert (chunk->size() >= size, "chunk->size(): %d size: %d", chunk->size(), size);
-    assert ((intptr_t)InstanceStackChunkKlass::start_of_stack(chunk) % 8 == 0, "");
+    assert ((intptr_t)jdk_internal_misc_StackChunk::start_address(chunk) % 8 == 0, "");
 
     oop chunk0 = _cont.tail();
-    if (chunk0 != (oop)NULL && ContMirror::is_empty_chunk(chunk0)) {
+    if (chunk0 != (oop)NULL && jdk_internal_misc_StackChunk::is_empty(chunk0)) {
       // chunk0 = jdk_internal_misc_StackChunk::is_parent_null<typename ConfigT::OopT>(chunk0) ? (oop)NULL : jdk_internal_misc_StackChunk::parent(chunk0);
       chunk0 = jdk_internal_misc_StackChunk::parent(chunk0);
-      assert (chunk0 == (oop)NULL || !ContMirror::is_empty_chunk(chunk0), "");
+      assert (chunk0 == (oop)NULL || !jdk_internal_misc_StackChunk::is_empty(chunk0), "");
     }
 
     int sp = size + frame_metadata;
@@ -2588,9 +2573,9 @@ public:
 
     copy_from_stack(from, to, size);
 
-    assert (to >= (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(InstanceStackChunkKlass::start_of_stack(chunk)));
-    assert (to + size <= (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk),
-      "to + size: " INTPTR_FORMAT " end: " INTPTR_FORMAT, p2i(to + size), p2i((intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk)));
+    assert (to >= jdk_internal_misc_StackChunk::start_address(chunk), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(jdk_internal_misc_StackChunk::start_address(chunk)));
+    assert (to + size <= jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::size(chunk),
+      "to + size: " INTPTR_FORMAT " end: " INTPTR_FORMAT, p2i(to + size), p2i(jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::size(chunk)));
   }
 
 #ifdef ASSERT
@@ -2598,8 +2583,8 @@ public:
     assert(_cont.chunk_invariant(), "");
     address pc = NULL;
     for (oop chunk = _cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-      if (ContMirror::is_empty_chunk(chunk)) continue;
-      intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
+      if (jdk_internal_misc_StackChunk::is_empty(chunk)) continue;
+      intptr_t* sp =jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
       pc = *(address*)(sp - 1);
       break;
     }
@@ -2649,7 +2634,7 @@ public:
     if (chunk == (oop)NULL)
       return freeze_result::freeze_no_chunk;
 
-    if (ContMirror::is_empty_chunk(chunk)) {
+    if (jdk_internal_misc_StackChunk::is_empty(chunk)) {
       return squash_chunks(jdk_internal_misc_StackChunk::parent(chunk));
     }
 
@@ -2659,7 +2644,7 @@ public:
 
   freeze_result squash_chunk() {
     assert (USE_CHUNKS, "");
-    assert (!ContMirror::is_empty_chunk(_chunk), "");
+    assert (!jdk_internal_misc_StackChunk::is_empty(_chunk), "");
 
     int orig_frames = _frames;
 
@@ -2754,7 +2739,7 @@ public:
   }
 
   static frame chunk_start_frame(oop chunk) {
-    intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
+    intptr_t* sp = jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
     return chunk_start_frame_pd(chunk, sp);
   }
 
@@ -2936,7 +2921,7 @@ public:
     _chunk = chunkh();
 
     if (is_chunk()) {
-      _top_address = (intptr_t*)InstanceStackChunkKlass::start_of_stack(_chunk) + jdk_internal_misc_StackChunk::sp(_chunk); // TODO: add method to jdk_internal_misc_StackChunk
+      _top_address = jdk_internal_misc_StackChunk::start_address(_chunk) + jdk_internal_misc_StackChunk::sp(_chunk); // TODO: add method to jdk_internal_misc_StackChunk
     } else {
       _cont.add_size(_size); // chunk's size has already been added when originally freezing it
     }
@@ -3978,7 +3963,7 @@ public:
     //   ContMirror::reset_chunk_counters(chunk);
     // }
 
-    intptr_t* const hsp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + sp;
+    intptr_t* const hsp = jdk_internal_misc_StackChunk::start_address(chunk) + sp;
     intptr_t* vsp;
     if (FULL_STACK) {
       _cont.set_tail(jdk_internal_misc_StackChunk::parent(chunk));
@@ -3994,7 +3979,7 @@ public:
     bool partial, empty;
     if (LIKELY(!TEST_THAW_ONE_CHUNK_FRAME && (FULL_STACK || ((size < threshold)) && !barriers))) {
       // prefetch with anticipation of memcpy starting at highest address
-      prefetch_chunk_pd(InstanceStackChunkKlass::start_of_stack(chunk), size);
+      prefetch_chunk_pd(jdk_internal_misc_StackChunk::start_address(chunk), size);
 
       partial = false;
       empty = true;
@@ -4119,7 +4104,7 @@ public:
   }
 
   NOINLINE bool thaw_one_frame_from_chunk(oop chunk, intptr_t* hsp, int* out_size, int* out_argsize, bool barriers) {
-    assert (hsp == (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk), "");
+    assert (hsp == jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::sp(chunk), "");
 
     address pc = *(address*)(hsp - SENDER_SP_RET_ADDRESS_OFFSET);
     int slot;
@@ -4664,7 +4649,7 @@ static inline bool can_thaw_fast(ContMirror& cont) {
 
   if (LIKELY(!CONT_FULL_STACK)) {
     for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-      if (!ContMirror::is_empty_chunk(chunk))
+      if (!jdk_internal_misc_StackChunk::is_empty(chunk))
         return true;
     }
     // return !cont.is_flag(FLAG_LAST_FRAME_INTERPRETED);
@@ -4999,7 +4984,7 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
 static frame chunk_top_frame_pd(oop chunk, intptr_t* sp, RegisterMap* map);
 
 static frame chunk_top_frame(oop chunk, RegisterMap* map, size_t offset, size_t index) {
-  intptr_t* sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
+  intptr_t* sp = jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
   frame f = chunk_top_frame_pd(chunk, sp, map);
   f.set_offset_sp(offset);
   f.set_frame_index(index);
@@ -5022,7 +5007,7 @@ static frame continuation_top_frame(oop contOop, RegisterMap* map) {
   ContMirror cont(map); // cont(NULL, contOop);
 
   for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-    if (!ContMirror::is_empty_chunk(chunk)) {
+    if (!jdk_internal_misc_StackChunk::is_empty(chunk)) {
       map->set_in_cont(true, true);
       return chunk_top_frame(chunk, map, 0, 0);
     }
@@ -5071,7 +5056,7 @@ frame Continuation::last_frame(Handle continuation, RegisterMap *map) {
 bool Continuation::has_last_Java_frame(Handle continuation) {
   ContMirror cont(continuation());
   for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-    if (!ContMirror::is_empty_chunk(chunk))
+    if (!jdk_internal_misc_StackChunk::is_empty(chunk))
       return true;
   }
   return cont.pc() != NULL;
@@ -5107,9 +5092,9 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
     size_t frame_index = f.frame_index();
     size_t chunk_offset;
     oop chunk = cont.find_chunk(f.offset_sp(), &chunk_offset);
-    assert (!ContMirror::is_empty_chunk(chunk), "");
+    assert (!jdk_internal_misc_StackChunk::is_empty(chunk), "");
     assert (chunk != (oop)NULL, "");
-    intptr_t* chunk_sp = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
+    intptr_t* chunk_sp = jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
     intptr_t* sp = chunk_sp + (f.offset_sp() - chunk_offset);
 
     frame f = sp_to_frame(sp);
@@ -5128,7 +5113,7 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
     chunk_offset += end - jdk_internal_misc_StackChunk::sp(chunk);
     chunk = jdk_internal_misc_StackChunk::parent(chunk);
     if (chunk != (oop)NULL) {
-      assert (!ContMirror::is_empty_chunk(chunk), "");
+      assert (!jdk_internal_misc_StackChunk::is_empty(chunk), "");
       return chunk_top_frame(chunk, map, chunk_offset, frame_index + 1);
     }
     assert (map->in_cont(), "");
@@ -6254,7 +6239,7 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
     num_chunks++;
     debug_verify_stack_chunk(chunk, contOop, &max_size);
-    if (!ContMirror::is_empty_chunk(chunk)) {
+    if (!jdk_internal_misc_StackChunk::is_empty(chunk)) {
       callee_compiled = true;
       callee_argsize = jdk_internal_misc_StackChunk::argsize(chunk) << LogBytesPerWord;
     }
@@ -6438,7 +6423,7 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
     return;
   }
   // tty->print_cr("CHUNK " INTPTR_FORMAT " ::", p2i((oopDesc*)chunk));
-  assert(ContMirror::is_stack_chunk(chunk), "");
+  assert(jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
   // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
   tty->print_cr("CHUNK " INTPTR_FORMAT " - " INTPTR_FORMAT " :: 0x%lx", p2i((oopDesc*)chunk), p2i((HeapWord*)(chunk + chunk->size())), chunk->identity_hash());
   tty->print("CHUNK " INTPTR_FORMAT " young: %d gc_mode: %d, size: %d argsize: %d sp: %d num_frames: %d num_oops: %d parent: " INTPTR_FORMAT,
@@ -6456,8 +6441,8 @@ void print_chunk(oop chunk, oop cont, bool verbose) {
       tty->print("%d", i+1);
   }
 
-  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end   = start + jdk_internal_misc_StackChunk::size(chunk);
+  intptr_t* start = jdk_internal_misc_StackChunk::start_address(chunk);
+  intptr_t* end   = jdk_internal_misc_StackChunk::end_address(chunk);
 
   if (verbose) {
     intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk);

@@ -4971,6 +4971,12 @@ void jdk_internal_misc_StackChunk::serialize_offsets(SerializeClosure* f) {
 }
 #endif
 
+intptr_t* jdk_internal_misc_StackChunk::end_address(oop chunk) {
+  int argsz = argsize(chunk);
+  if (argsz > 0) argsz += frame::sender_sp_offset;
+  return start_address(chunk) + size(chunk) - argsz;
+}
+
 bool java_lang_Continuation::on_local_stack(oop ref, address adr) {
   arrayOop s = stack(ref);
   void* base = s->base(T_INT);

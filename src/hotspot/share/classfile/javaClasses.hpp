@@ -1161,6 +1161,11 @@ class jdk_internal_misc_StackChunk: AllStatic {
 
   static inline int parent_offset() { return _parent_offset; }
   static inline int cont_offset()   { return _cont_offset; }
+
+  static inline bool is_stack_chunk(oop ref);
+  static inline bool is_empty(oop ref);
+  static inline intptr_t* start_address(oop ref);
+  static intptr_t* end_address(oop ref);
 };
 
 // Interface to java.lang.invoke.MethodHandle objects
