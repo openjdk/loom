@@ -73,7 +73,6 @@
 #define SENDER_SP_RET_ADDRESS_OFFSET (frame::sender_sp_offset - frame::return_addr_offset)
 
 static void fix_stack_chunk(oop chunk);
-static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap);
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time from chunks for testing purposes
 // #define PERFTEST 1
@@ -3826,6 +3825,8 @@ private:
   void derelativize_interpreted_frame_metadata(const hframe& hf, const frame& f);
   inline hframe::callee_info frame_callee_info_address(frame& f);
   template<typename FKind, bool top, bool bottom> inline intptr_t* align(const hframe& hf, intptr_t* vsp, frame& caller);
+  void barriers_for_oops_in_chunk(oop chunk);
+  static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap);
   void deoptimize_frames_in_chunk(oop chunk);
   void deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb);
   void patch_chunk_pd(intptr_t* sp);
@@ -3970,7 +3971,7 @@ public:
     assert (verify_stack_chunk<1>(chunk), "");
     // assert (verify_continuation<99>(_cont.mirror()), "");
 
-    const bool barriers = false; // requires_barriers(chunk); // TODO R PERF
+    const bool barriers = requires_barriers(chunk); // TODO R PERF
 
     // if (!barriers) { // TODO ????
     //   ContMirror::reset_chunk_counters(chunk);
@@ -3990,7 +3991,7 @@ public:
     jdk_internal_misc_StackChunk::set_mark_cycle(chunk, CodeCache::marking_cycle());
 
     bool partial, empty;
-    if (!TEST_THAW_ONE_CHUNK_FRAME && LIKELY((FULL_STACK || (size < threshold)) && !barriers)) {
+    if (LIKELY(!TEST_THAW_ONE_CHUNK_FRAME && (FULL_STACK || ((size < threshold)) && !barriers))) {
       // prefetch with anticipation of memcpy starting at highest address
       prefetch_chunk_pd(InstanceStackChunkKlass::start_of_stack(chunk), size);
 
@@ -3998,6 +3999,10 @@ public:
       empty = true;
       size -= argsize;
 
+      if (barriers) {
+        barriers_for_oops_in_chunk(chunk);
+      }
+      
       if (mode != mode_fast && should_deoptimize()) {
         deoptimize_frames_in_chunk(chunk);
       }

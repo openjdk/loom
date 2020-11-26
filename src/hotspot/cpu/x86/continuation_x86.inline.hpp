@@ -1295,7 +1295,25 @@ NOINLINE static void fix_stack_chunk(oop chunk) {
   // tty->print_cr("<<< fix_stack_chunk %p %p", (oopDesc*)chunk, Thread::current());
 }
 
-static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap) {
+template <typename ConfigT, op_mode mode>
+void Thaw<ConfigT, mode>::barriers_for_oops_in_chunk(oop chunk) {
+  CodeBlob* cb = NULL;
+  int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
+  if (argsize > 0) argsize += frame_metadata;
+  intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
+  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+    address pc = *(address*)(sp - 1);
+    int slot;
+    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
+    assert (oopmap != NULL, "");
+    barriers_for_oops_in_frame(sp, cb, oopmap);
+  }
+}
+
+template <typename ConfigT, op_mode mode>
+void Thaw<ConfigT, mode>::barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap) {
   // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
 
   if (cb->is_nmethod()) {
@@ -1322,8 +1340,10 @@ static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const Immutab
 template <typename ConfigT, op_mode mode>
 void Thaw<ConfigT, mode>::deoptimize_frames_in_chunk(oop chunk) {
   CodeBlob* cb = NULL;
-  intptr_t* start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
-  intptr_t* end = start + jdk_internal_misc_StackChunk::end(chunk);
+  int argsize = jdk_internal_misc_StackChunk::argsize(chunk);
+  if (argsize > 0) argsize += frame_metadata;
+  intptr_t* const start = (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+  intptr_t* const end = start + jdk_internal_misc_StackChunk::size(chunk) - argsize;
   for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
     address pc = *(address*)(sp - 1);
     int slot;
