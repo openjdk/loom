@@ -50,11 +50,12 @@
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/continuation.inline.hpp"
 #include "runtime/deoptimization.hpp"
-#include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/javaCalls.hpp"
 #include "runtime/jniHandles.inline.hpp"
+#include "runtime/keepStackGCProcessed.hpp"
 #include "runtime/prefetch.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stackWatermarkSet.inline.hpp"
@@ -965,7 +966,7 @@ ContMirror::ContMirror(const RegisterMap* map)
   _e_size(0) {
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
 
-  assert (_entry == NULL || _cont == _entry->cont_raw(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_raw()), p2i(entrySP()));
+  assert (_entry == NULL || _cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
   read();
 }
 
@@ -3452,7 +3453,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   EventContinuationFreeze event;
 #endif
 
-  StackWatermarkSet::finish_processing(thread, NULL /* context */, StackWatermarkKind::gc);
+  KeepStackGCProcessedMark ksgcpm(JavaThread::current()); // StackWatermarkSet::finish_processing(thread, NULL /* context */, StackWatermarkKind::gc);
 
   thread->set_cont_yield(true);
 
@@ -3773,7 +3774,7 @@ JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier
   log_develop_trace(jvmcont)("prepare_thaw");
 
   assert (thread == JavaThread::current(), "");
-  oop cont = thread->last_continuation()->cont_raw(); // get_continuation(thread);
+  oop cont = thread->last_continuation()->cont_oop(); // get_continuation(thread);
   assert (cont == get_continuation(thread), "cont: %p entry cont: %p", (oopDesc*)cont, (oopDesc*)get_continuation(thread));
   assert (verify_continuation<1>(cont), "");
 
@@ -4692,7 +4693,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   assert (thread == JavaThread::current(), "");
 
-  oop oopCont = thread->last_continuation()->cont_raw();
+  oop oopCont = thread->last_continuation()->cont_oop();
 
   assert (!java_lang_Continuation::done(oopCont), "");
 
