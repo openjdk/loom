@@ -243,7 +243,7 @@ void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure)
 
     // assert (!cb->as_compiled_method()->is_deopt_pc(pc), "");
     // assert (slot >= 0, "");
-    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
+    const ImmutableOopMap* oopmap;
     if (LIKELY(slot >= 0)) {
       oopmap = cb->oop_map_for_slot(slot, pc);
     } else {
