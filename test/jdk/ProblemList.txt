@@ -108,13 +108,6 @@
 #   results, some of these samevm failures are not very predictable.
 #
 #############################################################################
-
-# loom specific
-
-java/lang/Thread/virtual/stress/GetStackTraceALot.java#id2                      8254188 generic-all
-
-
-
 ############################################################################
 
 
@@ -578,6 +571,7 @@ java/lang/invoke/lambda/LambdaFileEncodingSerialization.java    8249079 linux-x6
 java/lang/Continuation/Basic.java#id2                           8253570 generic-all
 java/lang/Thread/virtual/stress/PinALot.java#id1                8253523 generic-all
 java/lang/Thread/virtual/stress/PinALot.java#id3                8253523 generic-all
+java/lang/Thread/virtual/stress/GetStackTraceALot.java#id2      8254188 generic-all
 
 ############################################################################
 
