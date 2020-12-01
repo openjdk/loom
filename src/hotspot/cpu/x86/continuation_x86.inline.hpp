@@ -778,6 +778,47 @@ static inline frame sender_for_compiled_frame(const frame& f) {
 static inline frame sender_for_interpreted_frame(const frame& f) {
   return frame(f.sender_sp(), f.interpreter_frame_sender_sp(), f.link(), f.sender_pc());
 }
+template <bool store>
+void ContinuationHelper::barriers_for_oops_in_chunk(oop chunk) {
+  CodeBlob* cb = NULL;
+  intptr_t* const start = jdk_internal_misc_StackChunk::start_address(chunk);
+  intptr_t* const end   = jdk_internal_misc_StackChunk::end_address(chunk);
+  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
+    address pc = *(address*)(sp - 1);
+    int slot;
+    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
+    assert (oopmap != NULL, "");
+    barriers_for_oops_in_frame<store>(sp, cb, oopmap);
+  }
+}
+
+template <bool store>
+void ContinuationHelper::barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap) {
+  // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
+
+  if (cb->is_nmethod()) {
+    cb->as_nmethod_or_null()->run_nmethod_entry_barrier();
+  }
+
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    OopMapValue omv = oms.current();
+    if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+      continue;
+    assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+
+    void* p = reg_to_loc(omv.reg(), sp);
+    assert (p != NULL, "");
+    assert (is_in_frame(cb, sp, p), "");
+
+    const bool narrow = omv.type() == OopMapValue::narrowoop_value;
+    oop value = narrow ? (oop)HeapAccess<>::oop_load((narrowOop*)p) : HeapAccess<>::oop_load((oop*)p);
+    if (store) {
+      narrow ? HeapAccess<>::oop_store((narrowOop*)p, value) : HeapAccess<>::oop_store((oop*)p, value);
+    }
+    log_develop_trace(jvmcont)("barriers_for_oops_in_frame narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", narrow, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
+  }
+}
 
 // inline void Freeze<ConfigT, mode>::update_register_map_stub(RegisterMap* map, const frame& f) {
 //   update_register_map(map, link_address_stub(f));
@@ -1291,46 +1332,6 @@ NOINLINE static void fix_stack_chunk(oop chunk) {
 
   log_develop_trace(jvmcont)("fix_stack_chunk ------- end -------");
   // tty->print_cr("<<< fix_stack_chunk %p %p", (oopDesc*)chunk, Thread::current());
-}
-
-template <typename ConfigT, op_mode mode>
-void Thaw<ConfigT, mode>::barriers_for_oops_in_chunk(oop chunk) {
-  CodeBlob* cb = NULL;
-  intptr_t* const start = jdk_internal_misc_StackChunk::start_address(chunk);
-  intptr_t* const end   = jdk_internal_misc_StackChunk::end_address(chunk);
-  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
-    address pc = *(address*)(sp - 1);
-    int slot;
-    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
-    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
-    assert (oopmap != NULL, "");
-    barriers_for_oops_in_frame(sp, cb, oopmap);
-  }
-}
-
-template <typename ConfigT, op_mode mode>
-void Thaw<ConfigT, mode>::barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap) {
-  // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
-
-  if (cb->is_nmethod()) {
-    cb->as_nmethod_or_null()->run_nmethod_entry_barrier();
-  }
-
-  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
-    OopMapValue omv = oms.current();
-    if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
-      continue;
-    assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
-
-    void* p = reg_to_loc(omv.reg(), sp);
-    assert (p != NULL, "");
-    assert (is_in_frame(cb, sp, p), "");
-
-    const bool narrow = omv.type() == OopMapValue::narrowoop_value;
-    oop value = narrow ? (oop)HeapAccess<>::oop_load((narrowOop*)p) : HeapAccess<>::oop_load((oop*)p);
-    narrow ? HeapAccess<>::oop_store((narrowOop*)p, value) : HeapAccess<>::oop_store((oop*)p, value);
-    log_develop_trace(jvmcont)("barriers_for_oops_in_frame narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", narrow, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
-  }
 }
 
 template <typename ConfigT, op_mode mode>

@@ -151,6 +151,13 @@ void ContinuationEntry::set_enter_nmethod(nmethod* nm) {
   return_pc = nm->code_begin() + return_pc_offset;
 }
 
+template<class P>
+static inline oop safe_load(P *addr) {
+  oop obj = (oop)RawAccess<>::oop_load(addr);
+  obj = (oop)NativeAccess<>::oop_load(&obj);
+  return obj;
+}
+
 PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 // Freeze:
 // 5 - no call into C
@@ -1305,6 +1312,11 @@ public:
   static inline frame frame_with(frame& f, intptr_t* sp, address pc, intptr_t* fp);
   static inline frame last_frame(JavaThread* thread);
   static inline void push_pd(const frame& f);
+
+  template <bool store>
+  static void barriers_for_oops_in_chunk(oop chunk);
+  template <bool store>
+  static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap);
 };
 
 #ifdef ASSERT
@@ -1729,7 +1741,6 @@ public:
     assert(Universe::heap()->is_in_or_null(obj), "");
   }
 };
-
 template <typename RegisterMapT, typename OopWriterT>
 class FreezeOopFn : public ContOopBase<RegisterMapT> {
 private:
@@ -1750,7 +1761,7 @@ private:
 protected:
   template <class T> inline void do_oop_work(T* p) {
     this->process(p);
-    oop obj = (oop)NativeAccess<>::oop_load(p); // we might be reading off a chunk when squashing so we might need a load barrier
+    oop obj = safe_load(p); // we could be squashing a chunk and reading from the heap, or reading an unprocessed oop from the stack
     int index = add_oop(obj, _starting_index + this->_count - 1);
 
 #ifdef ASSERT
@@ -1799,7 +1810,7 @@ public:
     DEBUG_ONLY(this->verify(base_loc);)
     DEBUG_ONLY(this->verify(derived_loc);)
 
-    oop base = (oop)NativeAccess<>::oop_load(base_loc); // we could be squashing a chunk
+    oop base = safe_load(base_loc); // we could be squashing a chunk and reading from the heap, or reading an unprocessed oop from the stack
     assert (oopDesc::is_oop_or_null(base), "invalid oop");
     intptr_t offset = *(intptr_t*)derived_loc;
     if (offset < 0) { // see fix_derived_pointers -- we could be squashing a chunk
@@ -2528,6 +2539,19 @@ public:
     intptr_t* from = top       - frame_metadata;
     intptr_t* to   = chunk_top - frame_metadata;
     copy_to_chunk(from, to, size, chunk);
+
+    // if (UNLIKELY(argsize != 0)) {
+    //   // we're patching the chunk itself rather than the stack before the copy becuase of concurrent stack scanning
+    //   intptr_t* const chunk_bottom_sp = to + size - argsize;
+    //   log_develop_trace(jvmcont)("patching chunk's bottom sp: " INTPTR_FORMAT, p2i(chunk_bottom_sp));
+    //   assert (*(address*)(chunk_bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) == StubRoutines::cont_returnBarrier(), "");
+    //   *(address*)(chunk_bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = jdk_internal_misc_StackChunk::pc(chunk);
+    // }
+
+    // // We're always writing to a young chunk, so the GC can't see it until the next safepoint.
+    // jdk_internal_misc_StackChunk::set_sp(chunk, sp);
+    // jdk_internal_misc_StackChunk::set_pc(chunk, *(address*)(top - SENDER_SP_RET_ADDRESS_OFFSET));
+    // jdk_internal_misc_StackChunk::set_gc_sp(chunk, sp);
 
     log_develop_trace(jvmcont)("Young chunk success");
     if (log_develop_is_enabled(Debug, jvmcont)) print_chunk(chunk, _cont.mirror(), true);
@@ -3829,8 +3853,6 @@ private:
   void derelativize_interpreted_frame_metadata(const hframe& hf, const frame& f);
   inline hframe::callee_info frame_callee_info_address(frame& f);
   template<typename FKind, bool top, bool bottom> inline intptr_t* align(const hframe& hf, intptr_t* vsp, frame& caller);
-  void barriers_for_oops_in_chunk(oop chunk);
-  static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap);
   void deoptimize_frames_in_chunk(oop chunk);
   void deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb);
   void patch_chunk_pd(intptr_t* sp);
@@ -4003,8 +4025,8 @@ public:
       empty = true;
       size -= argsize;
 
-      if (barriers) {
-        barriers_for_oops_in_chunk(chunk);
+      if (UNLIKELY(barriers)) {
+        ContinuationHelper::barriers_for_oops_in_chunk<true>(chunk);
       }
       
       if (mode != mode_fast && should_deoptimize()) {
@@ -4137,11 +4159,11 @@ public:
       deoptimize_frame_in_chunk(hsp, pc, cb);
     }
 
-    if (barriers) {
+    if (UNLIKELY(barriers)) {
       assert (slot >= 0, "");
       const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
       assert (oopmap != NULL, "");
-      barriers_for_oops_in_frame(hsp, cb, oopmap);
+      ContinuationHelper::barriers_for_oops_in_frame<true>(hsp, cb, oopmap);
     }
 
     int empty = jdk_internal_misc_StackChunk::sp(chunk) + size >= (jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk));
