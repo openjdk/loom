@@ -2251,6 +2251,20 @@ public:
     return mode == mode_fast ? _thread : Thread::current();
   }
 
+  inline bool should_flush_stack_processing() {
+    StackWatermark* sw;
+    uintptr_t watermark;
+    return ((sw = StackWatermarkSet::get(_thread, StackWatermarkKind::gc)) != NULL 
+      && (watermark = sw->watermark()) != 0
+      && watermark <= ((uintptr_t)_cont.entrySP() + ContinuationEntry::size()));
+  }
+
+  NOINLINE void flush_stack_processing() {
+    log_develop_trace(jvmcont)("flush_stack_processing");
+    for (StackFrameStream fst(_thread, true, true); !Continuation::is_continuation_enterSpecial(*fst.current()); fst.next())
+      ;
+  }
+
   void verify() {
     if (_cont.refStack() == NULL) {
       return;
@@ -2477,6 +2491,9 @@ public:
 
     assert (chunk != NULL, "");
 
+    if (should_flush_stack_processing())
+      flush_stack_processing();
+      
     NoSafepointVerifier nsv;
     assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
     assert (!requires_barriers(chunk), "");
@@ -2917,6 +2934,9 @@ public:
       _cont.add_num_frames(_frames);
       _cont.e_add_refs(_oops);
     }
+
+    if (should_flush_stack_processing())
+      flush_stack_processing();
 
     _chunk = chunkh();
 
@@ -3385,6 +3405,9 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
 
   assert (!cont.is_empty(), "");
 
+  set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks
+  StackWatermarkSet::after_unwind(thread);
+
   thread->set_cont_yield(false);
 
   log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
@@ -3438,8 +3461,6 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   EventContinuationFreeze event;
 #endif
 
-  KeepStackGCProcessedMark ksgcpm(JavaThread::current()); // StackWatermarkSet::finish_processing(thread, NULL /* context */, StackWatermarkKind::gc);
-
   thread->set_cont_yield(true);
 
   oop oopCont = get_continuation(thread);
@@ -3483,9 +3504,10 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
       if (UNLIKELY(res == freeze_retry_slow)) {
         log_develop_trace(jvmcont)("-- RETRYING SLOW --");
         res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(sp, false);
-      } else if (LIKELY(res == freeze_ok)) {
-        set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
-      }
+      } 
+      // else if (LIKELY(res == freeze_ok)) {
+      //   set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
+      // }
       assert (res != freeze_retry_slow, "");
       return freeze_epilog(thread, cont, res);
     JRT_BLOCK_END
