@@ -2265,7 +2265,7 @@ public:
   inline bool should_flush_stack_processing() {
     StackWatermark* sw;
     uintptr_t watermark;
-    return ((sw = StackWatermarkSet::get(_thread, StackWatermarkKind::gc)) != NULL 
+    return ((sw = StackWatermarkSet::get(_thread, StackWatermarkKind::gc)) != NULL
       && (watermark = sw->watermark()) != 0
       && watermark <= ((uintptr_t)_cont.entrySP() + ContinuationEntry::size()));
   }
@@ -2504,7 +2504,7 @@ public:
 
     if (should_flush_stack_processing())
       flush_stack_processing();
-      
+
     NoSafepointVerifier nsv;
     assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
     assert (!requires_barriers(chunk), "");
@@ -3528,7 +3528,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
       if (UNLIKELY(res == freeze_retry_slow)) {
         log_develop_trace(jvmcont)("-- RETRYING SLOW --");
         res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(sp, false);
-      } 
+      }
       // else if (LIKELY(res == freeze_ok)) {
       //   set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
       // }
@@ -4028,7 +4028,7 @@ public:
       if (UNLIKELY(barriers)) {
         ContinuationHelper::barriers_for_oops_in_chunk<true>(chunk);
       }
-      
+
       if (mode != mode_fast && should_deoptimize()) {
         deoptimize_frames_in_chunk(chunk);
       }
@@ -4923,7 +4923,7 @@ static oop get_continuation_for_frame(JavaThread* thread, intptr_t* const sp) {
   return cont != NULL ? cont->continuation() : (oop)NULL;
 }
 
-oop Continuation::get_continutation_for_frame(JavaThread* thread, const frame& f) {
+oop Continuation::get_continuation_for_frame(JavaThread* thread, const frame& f) {
   return get_continuation_for_frame(thread, f.unextended_sp());
 }
 
@@ -5067,7 +5067,7 @@ static frame continuation_parent_frame(ContMirror& cont, RegisterMap* map) {
   //     return continuation_top_frame(parentOop, map);
   //   }
   // }
-  
+
   if (!cont.is_mounted()) { // When we're walking an unmounted continuation and reached the end
     oop parent = java_lang_Continuation::parent(cont.mirror());
     map->set_cont(parent);

@@ -101,7 +101,7 @@ vframe* vframe::sender() const {
   frame s = _fr.real_sender(&temp_map);
   if (s.is_first_frame()) return NULL;
   if (Continuation::is_continuation_enterSpecial(s)) {
-    if (Continuation::continuation_scope(Continuation::get_continutation_for_frame(temp_map.thread(), _fr)) == java_lang_VirtualThread::vthread_scope())
+    if (Continuation::continuation_scope(Continuation::get_continuation_for_frame(temp_map.thread(), _fr)) == java_lang_VirtualThread::vthread_scope())
       return NULL;
   }
   return vframe::new_vframe(&s, &temp_map, thread());
@@ -513,7 +513,7 @@ void vframeStreamCommon::found_bad_method_frame() const {
 
 // top-frame will be skipped
 vframeStream::vframeStream(JavaThread* thread, frame top_frame,
-                          bool stop_at_java_call_stub) : 
+                          bool stop_at_java_call_stub) :
     vframeStreamCommon(RegisterMap(thread, true, true, true)) {
   _stop_at_java_call_stub = stop_at_java_call_stub;
 
@@ -524,12 +524,12 @@ vframeStream::vframeStream(JavaThread* thread, frame top_frame,
   }
 }
 
-vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool stop_at_java_call_stub) 
+vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool stop_at_java_call_stub)
  : vframeStreamCommon(RegisterMap(thread, true, true, true)) {
 
   _stop_at_java_call_stub = stop_at_java_call_stub;
   _continuation_scope = continuation_scope;
-  
+
   if (!thread->has_last_Java_frame()) {
     _mode = at_end_mode;
     return;
@@ -545,17 +545,17 @@ vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool s
   }
   _cont = Handle(Thread::current(), cont);
 
-  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()), 
-    "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
+  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()),
+    "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT,
     p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
 }
 
-vframeStream::vframeStream(Handle continuation) 
+vframeStream::vframeStream(Handle continuation)
  : vframeStreamCommon(RegisterMap(continuation, true)) {
 
   _stop_at_java_call_stub = false;
   _continuation_scope = Handle();
-  
+
   if (!Continuation::has_last_Java_frame(continuation)) {
     _mode = at_end_mode;
     return;
@@ -567,8 +567,8 @@ vframeStream::vframeStream(Handle continuation)
     _frame = _frame.sender(&_reg_map);
   }
 
-  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()), 
-    "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
+  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()),
+    "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT,
     p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
 }
 
