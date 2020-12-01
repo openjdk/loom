@@ -40,19 +40,17 @@ import jdk.internal.misc.VM;
  * A thread group represents a set of threads. In addition, a thread
  * group can also include other thread groups. The thread groups form
  * a tree in which every thread group except the initial thread group
- * has a parent.
+ * has a parent. A thread group is weakly
+ * <a href="ref/package-summary.html#reachability"><em>reachable</em></a>
+ * from its parent group so that it is eligible for garbage collection when there
+ * are no {@linkplain Thread#isAlive() live} threads in the group and is otherwise
+ * <i>unreachable</i>.
  *
  * <p> A thread group has a name and maximum priority. The name is specified
  * when creating the group and cannot be changed. The group's maximum priority
  * is the maximum priority for threads created in the group. It is initially
  * inherited from the parent thread group but may be changed using the {@link
  * #setMaxPriority(int)} method.
- *
- * <p> A thread group is weakly
- * <a href="ref/package-summary.html#reachability"><em>reachable</em></a>
- * from its parent group so that it is eligible for garbage collection when there
- * are no {@linkplain Thread#isAlive() live} threads in the group and is otherwise
- * <i>unreachable</i>.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
