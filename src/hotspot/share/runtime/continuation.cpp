@@ -3475,22 +3475,20 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
     // }
     return freeze_epilog(thread, cont, res);
   } else {
-    // manual transtion. see JRT_ENTRY in interfaceSupport.inline.hpp
     log_develop_trace(jvmcont)("chunk unavailable; transitioning to VM");
-    ThreadInVMfromJava __tiv(thread);
-    HandleMarkCleaner __hm(thread);
-    debug_only(VMEntryWrapper __vew;)
-    assert (thread->thread_state() == _thread_in_vm, "");
+    JRT_BLOCK
+      assert (thread->thread_state() == _thread_in_vm, "");
 
-    freeze_result res = fr.freeze(sp, false);
-    if (UNLIKELY(res == freeze_retry_slow)) {
-      log_develop_trace(jvmcont)("-- RETRYING SLOW --");
-      res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(sp, false);
-    } else if (LIKELY(res == freeze_ok)) {
-      set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
-    }
-    assert (res != freeze_retry_slow, "");
-    return freeze_epilog(thread, cont, res);
+      freeze_result res = fr.freeze(sp, false);
+      if (UNLIKELY(res == freeze_retry_slow)) {
+        log_develop_trace(jvmcont)("-- RETRYING SLOW --");
+        res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(sp, false);
+      } else if (LIKELY(res == freeze_ok)) {
+        set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
+      }
+      assert (res != freeze_retry_slow, "");
+      return freeze_epilog(thread, cont, res);
+    JRT_BLOCK_END
   }
 }
 
@@ -3547,10 +3545,8 @@ static inline bool can_freeze_fast(JavaThread* thread) {
   // if (!fast) tty->print_cr(">>> freeze fast: %d thread.cont_fastpath: %d held_monitor_count: %d", fast, thread->cont_fastpath(), thread->held_monitor_count());
   return fast;
 }
-int Continuation::freeze(JavaThread* thread, intptr_t* sp) {
-  TRACE_CALL(int, Continuation::freeze(JavaThread* thread, intptr_t* sp))
-  os::verify_stack_alignment();
 
+JRT_BLOCK_ENTRY(int, Continuation::freeze(JavaThread* thread, intptr_t* sp))
   // thread->frame_anchor()->set_last_Java_sp(sp);
   // thread->frame_anchor()->make_walkable(thread);
 
@@ -3564,7 +3560,7 @@ int Continuation::freeze(JavaThread* thread, intptr_t* sp) {
 
   return fast ? cont_freeze<mode_fast>(thread, sp, false)
               : cont_freeze<mode_slow>(thread, sp, false);
-}
+JRT_END
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint) {
   ContinuationEntry* cont = thread->last_continuation();
