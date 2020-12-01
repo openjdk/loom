@@ -945,7 +945,7 @@ ContMirror::ContMirror(JavaThread* thread, oop cont)
 #endif
   _e_size(0) {
   assert(_cont != NULL && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
-  assert (_cont == _entry->cont_raw(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_raw()), p2i(entrySP()));
+  assert (_cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
 }
 
 ContMirror::ContMirror(oop cont)
