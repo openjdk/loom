@@ -831,6 +831,42 @@ public class ThreadExecutorTest {
         }
     }
 
+    @Test(expectedExceptions = { RejectedExecutionException.class })
+    public void testNoThreads1() throws Exception {
+        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        executor.execute(() -> { });
+    }
+
+    @Test(expectedExceptions = { RejectedExecutionException.class })
+    public void testNoThreads2() throws Exception {
+        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        executor.submit(() -> "foo");
+    }
+
+    @Test(expectedExceptions = { RejectedExecutionException.class })
+    public void testNoThreads3() throws Exception {
+        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        executor.submitTask(() -> "foo");
+    }
+
+    @Test(expectedExceptions = { RejectedExecutionException.class })
+    public void testNoThreads4() throws Exception {
+        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        executor.submitTasks(List.of(() -> "foo"));
+    }
+
+    @Test(expectedExceptions = { RejectedExecutionException.class })
+    public void testNoThreads5() throws Exception {
+        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        executor.invokeAll(List.of(() -> "foo"));
+    }
+
+    @Test(expectedExceptions = { RejectedExecutionException.class })
+    public void testNoThreads6() throws Exception {
+        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        executor.invokeAny(List.of(() -> "foo"));
+    }
+
     // -- supporting classes --
 
     static class DelayedResult<T> implements Callable<T> {
