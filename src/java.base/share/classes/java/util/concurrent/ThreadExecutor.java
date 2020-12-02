@@ -170,6 +170,8 @@ class ThreadExecutor implements ExecutorService {
      */
     private Thread newThread(Runnable task) {
         Thread thread = factory.newThread(task);
+        if (thread == null)
+            throw new RejectedExecutionException();
         //JLA.unsafeSetLifetime(thread, lifetime);  // experimental
         return thread;
     }
@@ -222,8 +224,6 @@ class ThreadExecutor implements ExecutorService {
         Objects.requireNonNull(task);
         ensureNotShutdown();
         Thread thread = newThread(new TaskRunner(this, task));
-        if (thread == null)
-            throw new RejectedExecutionException();
         start(thread);
         return thread;
     }
@@ -239,8 +239,6 @@ class ThreadExecutor implements ExecutorService {
         ensureNotShutdown();
         var future = new ThreadBoundCompletableFuture<>(this, task);
         Thread thread = future.thread();
-        if (thread == null)
-            throw new RejectedExecutionException();
         start(thread);
         return future;
     }
