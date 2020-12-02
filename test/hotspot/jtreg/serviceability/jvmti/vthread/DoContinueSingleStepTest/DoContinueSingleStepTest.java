@@ -36,21 +36,26 @@ import java.util.concurrent.*;
 public class DoContinueSingleStepTest {
     private static final String agentLib = "DoContinueSingleStepTest";
 
-    static native void enableEvents(Thread thread, Class contClass);
+    static native void enableEvents(Thread thread, Class contClass, Class testClass);
     static native boolean check();
 
     static int MSG_COUNT; // Passed as an argument
     static final SynchronousQueue<String> QUEUE = new SynchronousQueue<>();
 
+    static void qPut(String msg) throws InterruptedException {
+        QUEUE.put(msg);
+    }
+
     static final Runnable PRODUCER = () -> {
         try {
             for (int i = 0; i < MSG_COUNT; i++) {
-                QUEUE.put("msg"+i);
-                QUEUE.put("msg"+i);
+                qPut("msg"+i);
+                qPut("msg"+i);
                 if (i == MSG_COUNT - 10) {
                     // Once we have warmed up, enable the first breakpoint which eventually will
                     // lead to enabling single stepping.
-                    enableEvents(Thread.currentThread(), java.lang.Continuation.class);
+                    enableEvents(Thread.currentThread(), java.lang.Continuation.class,
+                                 DoContinueSingleStepTest.class);
                 }
             }
         } catch (InterruptedException e) { }
