@@ -28,6 +28,7 @@
 #include "classfile/javaClasses.hpp"
 #include "prims/jvmtiEnvThreadState.hpp"
 #include "prims/jvmtiThreadState.hpp"
+#include "runtime/handles.inline.hpp"
 #include "runtime/thread.inline.hpp"
 
 // JvmtiEnvThreadStateIterator implementation
@@ -96,9 +97,12 @@ inline JvmtiThreadState* JvmtiThreadState::state_for(JavaThread *thread, oop thr
   // in a case of unmounted virtual thread the thread can be NULL
   JvmtiThreadState *state = (thread == NULL) ? NULL : thread->jvmti_thread_state();
   if (state == NULL) {
+    Thread* current_thread = Thread::current();
+    HandleMark hm(current_thread);
+    Handle h_thread_oop = Handle(current_thread, thread_oop);
     MutexLocker mu(JvmtiThreadState_lock);
     // check again with the lock held
-    state = state_for_while_locked(thread, thread_oop);
+    state = state_for_while_locked(thread, h_thread_oop());
   } else {
     // Check possible safepoint even if state is non-null.
     // (Note: the thread argument isn't the current thread)
