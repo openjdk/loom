@@ -296,11 +296,6 @@ void frame::patch_pc(Thread* thread, address pc) {
 #endif
 }
 
-int frame::frame_size(RegisterMap* map) const {
-  frame sender = this->sender(map);
-  return sender.sp() - sp();
-}
-
 intptr_t* frame::entry_frame_argument_at(int offset) const {
   // convert offset to index to deal with tsi
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);

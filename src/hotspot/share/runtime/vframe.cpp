@@ -776,7 +776,7 @@ void javaVFrame::print_value() const {
     RegisterMap map = *register_map();
     uint size = (map.in_cont() || Continuation::is_cont_barrier_frame(fr()))
       ? Continuation::frame_size(fr(), &map)
-      : fr().frame_size(&map);
+      : fr().frame_size();
 #ifdef _LP64
     if (size > 8*K) warning("SUSPICIOUSLY LARGE FRAME (%d)", size);
 #else

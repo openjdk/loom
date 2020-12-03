@@ -61,8 +61,11 @@ public:
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
+  static void print_chunk(oop chunk, bool verbose, outputStream* st = tty);
+
 #ifndef PRODUCT
   void oop_print_on(oop obj, outputStream* st);
+  static bool verify(oop chunk, oop cont = (oop)NULL, size_t* out_size = NULL, int* out_frames = NULL, int* out_oops = NULL);
 #endif
   
   // Stack offset is an offset into the Heap
@@ -80,6 +83,8 @@ public:
     return _offset_of_stack;
   }
 
+  static int count_frames(oop obj);
+  
   // Oop fields (and metadata) iterators
   //
   // The InstanceClassLoaderKlass iterators also visit the CLD pointer (or mirror of anonymous klasses.)
@@ -99,15 +104,26 @@ public:
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
+public:
+  template <bool store>
+  static void barriers_for_oops_in_chunk(oop chunk);
+
+  template <bool store>
+  static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap);
+
+  static void fix_chunk(oop chunk);
+
 private:
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(oop obj, OopClosureType* closure);
 
-  template <typename T, class OopClosureType>
+  template <class OopClosureType, bool concurrent_gc>
   inline void oop_oop_iterate_stack(oop obj, OopClosureType* closure);
 
-  template <typename T, class OopClosureType>
+  template <class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
+
+  static void fix_derived_pointers(const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb);
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
