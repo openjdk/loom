@@ -28,6 +28,7 @@ package java.io;
 import java.util.Arrays;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.VM;
 
 /**
  * Writes text to a character-output stream, buffering characters so as to
@@ -77,6 +78,17 @@ public class BufferedWriter extends Writer {
     private final int maxChars;  // maximum number of buffers chars
 
     /**
+     * Returns the buffer size to use when no output buffer size specified
+     */
+    private static int initialBufferSize() {
+        if (VM.isBooted() && Thread.currentThread().isVirtual()) {
+            return DEFAULT_INITIAL_BUFFER_SIZE;
+        } else {
+            return DEFAULT_MAX_BUFFER_SIZE;
+        }
+    }
+
+    /**
      * Creates a buffered character-output stream.
      */
     private BufferedWriter(Writer out, int initialSize, int maxSize) {
@@ -104,7 +116,7 @@ public class BufferedWriter extends Writer {
      * @param  out  A Writer
      */
     public BufferedWriter(Writer out) {
-        this(out, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE);
+        this(out, initialBufferSize(), DEFAULT_MAX_BUFFER_SIZE);
     }
 
     /**
