@@ -63,9 +63,48 @@ void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
 }
 #endif
 
+void InstanceStackChunkKlass::print_chunk(oop chunk, bool verbose, outputStream* st) {
+  if (chunk == (oop)NULL) {
+    st->print_cr("CHUNK NULL");
+    return;
+  }
+  // tty->print_cr("CHUNK " INTPTR_FORMAT " ::", p2i((oopDesc*)chunk));
+  assert(jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
+  // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
+  st->print_cr("CHUNK " INTPTR_FORMAT " - " INTPTR_FORMAT " :: 0x%lx", p2i((oopDesc*)chunk), p2i((HeapWord*)(chunk + chunk->size())), chunk->identity_hash());
+  st->print("CHUNK " INTPTR_FORMAT " young: %d gc_mode: %d, size: %d argsize: %d sp: %d num_frames: %d num_oops: %d parent: " INTPTR_FORMAT,
+    p2i((oopDesc*)chunk), !Universe::heap()->requires_barriers(chunk), jdk_internal_misc_StackChunk::gc_mode(chunk),
+    jdk_internal_misc_StackChunk::size(chunk), jdk_internal_misc_StackChunk::argsize(chunk), jdk_internal_misc_StackChunk::sp(chunk),
+    jdk_internal_misc_StackChunk::numFrames(chunk), jdk_internal_misc_StackChunk::numOops(chunk),
+    p2i((oopDesc*)jdk_internal_misc_StackChunk::parent(chunk)));
+
+  intptr_t* start = jdk_internal_misc_StackChunk::start_address(chunk);
+  intptr_t* end   = jdk_internal_misc_StackChunk::end_address(chunk);
+
+  if (verbose) {
+    intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk);
+    st->cr();
+    st->print_cr("------ chunk frames end: " INTPTR_FORMAT, p2i(end));
+    if (sp < end) {
+      RegisterMap map(NULL, true, false, false);
+      frame f(sp);
+      st->print_cr("-- frame size: %d argsize: %d", f.frame_size(), f.compiled_frame_stack_argsize());
+      f.print_on(st);
+      while (f.sp() + ((f.frame_size() + f.compiled_frame_stack_argsize()) >> LogBytesPerWord) < end) {
+        f = f.sender(&map);
+        st->print_cr("-- frame size: %d argsize: %d", f.frame_size(), f.compiled_frame_stack_argsize());
+        f.print_on(st);
+      }
+    }
+    st->print_cr("------");
+  } else {
+    st->print_cr(" frames: %d", count_frames(chunk));
+  }
+}
+
 #ifndef PRODUCT
 void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
   InstanceKlass::oop_print_on(obj, st);
-  Continuation::debug_print_stack_chunk(obj /*, st */); // TODO
+  print_chunk(obj, false, st);
 }
 #endif

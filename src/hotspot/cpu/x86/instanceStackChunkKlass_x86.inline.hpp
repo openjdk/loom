@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef CPU_X86_CONTINUATION_CHUNK_X86_INLINE_HPP
-#define CPU_X86_CONTINUATION_CHUNK_X86_INLINE_HPP
+#ifndef CPU_X86_INSTANCESTACKCHUNKKLASS_X86_INLINE_HPP
+#define CPU_X86_INSTANCESTACKCHUNKKLASS_X86_INLINE_HPP
 
 #include "memory/iterator.inline.hpp"
 #include "runtime/frame.inline.hpp"
@@ -112,44 +112,6 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
   OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
 }
 
-static void fix_derived_pointers(const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
-  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
-    OopMapValue omv = oms.current();
-    if (omv.type() != OopMapValue::derived_oop_value)
-      continue;
-    
-    intptr_t* derived_loc = (intptr_t*)reg_to_loc(omv.reg(), sp);
-    intptr_t* base_loc    = (intptr_t*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
-    
-    // The ordering in the following is crucial
-    OrderAccess::loadload();
-    oop base = Atomic::load((oop*)base_loc);
-    if (base != (oop)NULL) {
-      assert (!CompressedOops::is_base(base), "");
-      ZGC_ONLY(assert (ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
-
-      OrderAccess::loadload();
-      intptr_t offset = Atomic::load(derived_loc); // *derived_loc;
-      if (offset >= 0)
-        continue;
-
-      // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
-      // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
-      if (offset < 0) {
-        offset = -offset;
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
-        Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
-      }
-  #ifdef ASSERT 
-      else { // DEBUG ONLY
-        offset = offset - cast_from_oop<intptr_t>(base);
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
-      }
-  #endif
-    }
-  }
-}
-
 template <class OopClosureType>
 static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
   DEBUG_ONLY(int oops = 0;)
@@ -199,7 +161,7 @@ inline static int get_chunk_sp(oop chunk) {
 }
 
 template <class OopClosureType, bool concurrent_gc>
-void Continuation::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure) {
+void InstanceStackChunkKlass::oop_oop_iterate_stack(oop chunk, OopClosureType* closure) {
   // see sender_for_compiled_frame
   const int frame_metadata = 2;
 
@@ -386,7 +348,7 @@ static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap,
 }
 
 template <class OopClosureType>
-void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* closure, MemRegion mr) {
+void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(oop chunk, OopClosureType* closure, MemRegion mr) {
   assert (!UseZGC, "");
   
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded");
@@ -482,4 +444,4 @@ void Continuation::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* 
   // tty->print_cr("<<< stack_chunk_iterate_stack %p %p", (oopDesc*)chunk, Thread::current());
 }
 
-#endif // CPU_X86_CONTINUATION_CHUNK_X86_INLINE_HPP
+#endif // CPU_X86_INSTANCESTACKCHUNKKLASS_X86_INLINE_HPP

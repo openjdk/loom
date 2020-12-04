@@ -29,10 +29,11 @@
 #include "oops/instanceStackChunkKlass.hpp"
 #include "oops/klass.hpp"
 #include "oops/oop.inline.hpp"
-#include "runtime/continuation.inline.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
+
+#include CPU_HEADER_INLINE(instanceStackChunkKlass)
 
 // class DecoratorOopClosure : public BasicOopIterateClosure {
 //   OopIterateClosure* _cl;
@@ -60,17 +61,19 @@ void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) 
   if (Devirtualizer::do_metadata(closure)) {
     Devirtualizer::do_klass(closure, this);
   }
-  // InstanceKlass::oop_oop_iterate<T>(obj, closure);
-  oop_oop_iterate_stack<T>(obj, closure);
+  UseZGC
+    ? oop_oop_iterate_stack<OopClosureType, true> (obj, closure)
+    : oop_oop_iterate_stack<OopClosureType, false>(obj, closure);
   oop_oop_iterate_header<T>(obj, closure);
 }
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_reverse(oop obj, OopClosureType* closure) {
-  assert(!Devirtualizer::do_metadata(closure),
-      "Code to handle metadata is not implemented");
-  // InstanceKlass::oop_oop_iterate_reverse<T>(obj, closure);
-  oop_oop_iterate_stack<T>(obj, closure);
+  assert(!Devirtualizer::do_metadata(closure), "Code to handle metadata is not implemented");
+
+  UseZGC
+    ? oop_oop_iterate_stack<OopClosureType, true> (obj, closure)
+    : oop_oop_iterate_stack<OopClosureType, false>(obj, closure);
   oop_oop_iterate_header<T>(obj, closure);
 }
 
@@ -82,7 +85,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* c
     }
   }
   // InstanceKlass::oop_oop_iterate_bounded<T>(obj, closure, mr);
-  oop_oop_iterate_stack_bounded<T>(obj, closure, mr);
+  oop_oop_iterate_stack_bounded(obj, closure, mr);
   oop_oop_iterate_header<T>(obj, closure);
 }
 
@@ -94,16 +97,16 @@ void InstanceStackChunkKlass::oop_oop_iterate_header(oop obj, OopClosureType* cl
   Devirtualizer::do_oop(closure, (T*)obj->obj_field_addr<T>(jdk_internal_misc_StackChunk::cont_offset())); // must be last oop iterated
 }
 
-template <typename T, class OopClosureType>
-void InstanceStackChunkKlass::oop_oop_iterate_stack(oop obj, OopClosureType* closure) {
-  UseZGC
-    ? Continuation::stack_chunk_iterate_stack<OopClosureType, true> (obj, closure)
-    : Continuation::stack_chunk_iterate_stack<OopClosureType, false>(obj, closure);
-}
+// template <class OopClosureType>
+// void InstanceStackChunkKlass::stack_chunk_iterate_stack(oop chunk, OopClosureType* closure) {
+//   // for now, we don't devirtualize for faster compilation
+//   Continuation::stack_chunk_iterate_stack(chunk, (OopClosure*)closure, closure->do_metadata());
+// }
 
-template <typename T, class OopClosureType>
-void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr) {
-  Continuation::stack_chunk_iterate_stack_bounded<OopClosureType>(obj, closure, mr);
-}
+// template <class OopClosureType>
+// void InstanceStackChunkKlass::stack_chunk_iterate_stack_bounded(oop chunk, OopClosureType* closure, MemRegion mr) {
+//   // for now, we don't devirtualize for faster compilation
+//   Continuation::stack_chunk_iterate_stack_bounded(chunk, (OopClosure*)closure, closure->do_metadata(), mr);
+// }
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_INLINE_HPP
