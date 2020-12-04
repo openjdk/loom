@@ -88,7 +88,7 @@ public:
 
   static void notify_deopt(JavaThread* thread, intptr_t* sp);
 
-  static oop  get_continutation_for_frame(JavaThread* thread, const frame& f);
+  static oop  get_continuation_for_frame(JavaThread* thread, const frame& f);
   static ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
   static bool is_mounted(JavaThread* thread, oop cont_scope);
   static bool is_continuation_enterSpecial(const frame& f);

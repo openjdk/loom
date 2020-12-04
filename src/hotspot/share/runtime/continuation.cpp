@@ -335,8 +335,8 @@ public:
   static inline intptr_t* frame_top(const frame& f);
   static inline intptr_t* frame_bottom(const frame& f);
 
-  template <typename FrameT> static inline int size(const FrameT& f);
-  template <typename FrameT> static inline int stack_argsize(const FrameT& f);
+  static inline int size(const frame& f);
+  static inline int stack_argsize(const frame& f);
   static inline int num_oops(const frame& f);
 
   template <typename RegisterMapT>
@@ -831,7 +831,8 @@ inline int HFrameBase<SelfPD>::compiled_frame_num_oops() const {
 
 template<typename SelfPD>
 int HFrameBase<SelfPD>::compiled_frame_size() const {
-  return NonInterpretedUnknown::size(*this);
+  assert (!is_interpreted_frame(), "");
+  return cb()->frame_size() * wordSize;
 }
 
 template<typename SelfPD>
@@ -1414,22 +1415,19 @@ inline intptr_t* NonInterpreted<Self>::frame_bottom(const frame& f) { // exclusi
 #endif
 
 template<typename Self>
-template<typename FrameT>
-inline int NonInterpreted<Self>::size(const FrameT& f) {
+inline int NonInterpreted<Self>::size(const frame& f) {
   assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
   return f.cb()->frame_size() * wordSize;
 }
 
 template<typename Self>
-template<typename FrameT>
-inline int NonInterpreted<Self>::stack_argsize(const FrameT& f) {
+inline int NonInterpreted<Self>::stack_argsize(const frame& f) {
   return f.compiled_frame_stack_argsize();
 }
 
 template<typename Self>
 inline int NonInterpreted<Self>::num_oops(const frame& f) {
   assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
-  assert (f.oop_map() != NULL, "");
   return f.num_oops() + Self::extra_oops;
 }
 
@@ -4907,8 +4905,8 @@ static oop get_continuation_for_frame(JavaThread* thread, intptr_t* const sp) {
   return cont != NULL ? cont->continuation() : (oop)NULL;
 }
 
-oop Continuation::get_continutation_for_frame(JavaThread* thread, const frame& f) {
-  return get_continuation_for_frame(thread, f.unextended_sp());
+oop Continuation::get_continuation_for_frame(JavaThread* thread, const frame& f) {
+  return ::get_continuation_for_frame(thread, f.unextended_sp());
 }
 
 ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThread* thread, oop cont) {
