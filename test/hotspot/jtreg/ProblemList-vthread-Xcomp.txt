@@ -34,6 +34,10 @@ compiler/profiling/spectrapredefineclass_classloaders/Launcher.java
 compiler/profiling/spectrapredefineclass/Launcher.java
 
 ####
+## OOME in CodeCache for method handle intrinsic
+java/foreign/TestByteBuffer.java	
+
+####
 ## Unexpected results
 compiler/uncommontrap/TestUnstableIfTrap.java
 gc/g1/plab/TestPLABPromotion.java
