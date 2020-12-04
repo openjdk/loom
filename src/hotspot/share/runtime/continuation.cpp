@@ -4900,13 +4900,13 @@ static ContinuationEntry* get_continuation_entry_for_frame(JavaThread* thread, i
   return cont;
 }
 
-static oop get_continuation_for_frame(JavaThread* thread, intptr_t* const sp) {
+static oop get_continuation_for_sp(JavaThread* thread, intptr_t* const sp) {
   ContinuationEntry* cont = get_continuation_entry_for_frame(thread, sp);
   return cont != NULL ? cont->continuation() : (oop)NULL;
 }
 
 oop Continuation::get_continuation_for_frame(JavaThread* thread, const frame& f) {
-  return ::get_continuation_for_frame(thread, f.unextended_sp());
+  return get_continuation_for_sp(thread, f.unextended_sp());
 }
 
 ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThread* thread, oop cont) {
@@ -4994,7 +4994,7 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
   assert (!map->in_cont(), "");
   // if (map->in_cont()) return false;
 
-  oop cont = get_continuation_for_frame(map->thread(), f.sp());
+  oop cont = get_continuation_for_sp(map->thread(), f.sp());
   if (cont == NULL)
     return false;
 
@@ -5096,7 +5096,7 @@ javaVFrame* Continuation::last_java_vframe(Handle continuation, RegisterMap *map
 frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
   assert (map != NULL, "");
   assert (map->thread() != NULL, "");
-  oop cont = get_continuation_for_frame(map->thread(), callee.sp());
+  oop cont = get_continuation_for_sp(map->thread(), callee.sp());
   return continuation_top_frame(cont, map);
 }
 
