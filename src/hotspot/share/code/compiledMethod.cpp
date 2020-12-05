@@ -386,6 +386,7 @@ void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *
         signature    = callee->signature();
       } else {
         SimpleScopeDesc ssd(this, pc);
+        if (ssd.is_optimized_linkToNative()) return; // call was replaced
         Bytecode_invoke call(methodHandle(Thread::current(), ssd.method()), ssd.bci());
         has_receiver = call.has_receiver();
         has_appendix = call.has_appendix();

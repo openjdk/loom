@@ -114,6 +114,7 @@ Mutex*   OopMapCacheAlloc_lock        = NULL;
 
 Mutex*   FreeList_lock                = NULL;
 Mutex*   OldSets_lock                 = NULL;
+Mutex*   Uncommit_lock                = NULL;
 Monitor* RootRegionScan_lock          = NULL;
 
 Mutex*   Management_lock              = NULL;
@@ -221,6 +222,7 @@ void mutex_init() {
 
     def(FreeList_lock              , PaddedMutex  , leaf     ,   true,  _safepoint_check_never);
     def(OldSets_lock               , PaddedMutex  , leaf     ,   true,  _safepoint_check_never);
+    def(Uncommit_lock              , PaddedMutex  , leaf + 1 ,   true,  _safepoint_check_never);
     def(RootRegionScan_lock        , PaddedMonitor, leaf     ,   true,  _safepoint_check_never);
 
     def(StringDedupQueue_lock      , PaddedMonitor, leaf,        true,  _safepoint_check_never);
