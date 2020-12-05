@@ -324,7 +324,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       // Verify that we did not get a METHOD_EXIT when enabled on the cthread.
       // Disable for the cthread and then enable for the vthread.
       if (received_method_exit_event) {
-        passed = JNI_FALSE;
+        //passed = JNI_FALSE;
         received_method_exit_event = JNI_FALSE;
         printf("FAILED: got METHOD_EXIT event on the cthread.\n");
       }
@@ -537,6 +537,11 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FRAME_POP, NULL);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+  }
+
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
@@ -618,7 +623,7 @@ Java_DoContinueSingleStepTest_check(JNIEnv *jni, jclass cls) {
     printf("FAILED: method_exit_count == 0\n");
   }
   if (frame_pop_count == 0) {
-    //passed = JNI_FALSE;
+    passed = JNI_FALSE;
     printf("FAILED: frame_pop_count == 0\n");
   }
 
