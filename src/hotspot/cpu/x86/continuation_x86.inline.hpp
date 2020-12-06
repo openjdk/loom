@@ -1189,31 +1189,6 @@ static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
 }
 
 template <typename ConfigT, op_mode mode>
-void Thaw<ConfigT, mode>::deoptimize_frames_in_chunk(oop chunk) {
-  CodeBlob* cb = NULL;
-  intptr_t* const start = jdk_internal_misc_StackChunk::start_address(chunk);
-  intptr_t* const end   = jdk_internal_misc_StackChunk::end_address(chunk);
-  for (intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk); sp < end; sp += cb->frame_size()) {
-    address pc = *(address*)(sp - 1);
-    int slot;
-    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
-
-    if (cb->as_compiled_method()->is_marked_for_deoptimization() || _thread->is_interp_only_mode()) {
-      deoptimize_frame_in_chunk(sp, pc, cb);
-    }
-  }
-}
-
-template <typename ConfigT, op_mode mode>
-void Thaw<ConfigT, mode>::deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb) {
-  log_develop_trace(jvmcont)("Deoptimizing frame");
-  intptr_t* fp = *(intptr_t**)(sp - 2);
-  frame f(sp, sp, fp, pc, cb, NULL, true);
-  DEBUG_ONLY(Frame::patch_pc(f, NULL));
-  f.deoptimize(NULL);
-}
-
-template <typename ConfigT, op_mode mode>
 void Thaw<ConfigT, mode>::patch_chunk_pd(intptr_t* sp) {
   intptr_t* fp = _cont.entryFP();
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;

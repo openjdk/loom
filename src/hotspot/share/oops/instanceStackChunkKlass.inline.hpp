@@ -24,14 +24,119 @@
 #ifndef SHARE_OOPS_INSTANCESTACKCHUNKKLASS_INLINE_HPP
 #define SHARE_OOPS_INSTANCESTACKCHUNKKLASS_INLINE_HPP
 
+#include "compiler/oopMap.hpp"
 #include "classfile/javaClasses.hpp"
 #include "oops/instanceKlass.inline.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
 #include "oops/klass.hpp"
 #include "oops/oop.inline.hpp"
+#include "runtime/frame.inline.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
+
+class StackChunkFrameStream : public StackObj {
+ private:
+  intptr_t* _end;
+  intptr_t* _sp;
+  CodeBlob* _cb;
+  mutable const ImmutableOopMap* _oopmap;
+  int _oopmap_slot;
+
+ public:
+  // Iteration
+  StackChunkFrameStream(oop chunk, int gc = false) {
+    assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
+    _end = jdk_internal_misc_StackChunk::end_address(chunk);
+    intptr_t* start = jdk_internal_misc_StackChunk::start_address(chunk);
+    _sp = start + get_initial_sp(chunk, gc);
+    get_cb();
+  }
+
+  bool is_done() const { return _sp >= _end; }
+
+  void next() { _sp += cb()->frame_size(); get_cb(); }
+
+  intptr_t* end() { return _end; }
+  void set_end(intptr_t* end) { _end = end; }
+
+  // Query
+  intptr_t*      sp() const { return _sp; }
+  inline address pc() const { return get_pc(); }
+
+  CodeBlob* cb() const { return _cb; }
+
+  const ImmutableOopMap* oopmap() const {
+    if (_oopmap == NULL) get_oopmap();
+    return _oopmap;
+  }
+
+  StackChunkFrameStream& handle_deopted() {
+    if (UNLIKELY(_oopmap_slot < 0)) { // we could have marked frames for deoptimization in thaw_chunk
+      CompiledMethod* cm = cb()->as_compiled_method();
+      assert (cm->is_deopt_pc(pc()), "");
+      address pc1 = *(address*)((address)_sp + cm->orig_pc_offset());
+      assert (!cm->is_deopt_pc(pc1), "");
+      assert (_cb == ContinuationCodeBlobLookup::find_blob(pc1), "");
+      ContinuationCodeBlobLookup::find_blob_and_oopmap(pc1, _oopmap_slot);
+      get_oopmap(pc1);
+    }
+    return *this;
+  }
+
+  inline int to_offset(oop chunk) const {
+    assert (!is_done(), "");
+    return _sp - jdk_internal_misc_StackChunk::start_address(chunk);
+  }
+
+  inline frame to_frame() const;
+
+  inline void* reg_to_loc(VMReg reg) const;
+
+#ifdef ASSERT
+  bool is_in_frame(void* p) const;
+  bool is_in_oops(void* p) const;
+#endif
+
+ private:
+  inline address get_pc() const;
+  inline void get_cb() {
+    _oopmap = NULL;
+    if (is_done()) {
+      _cb = NULL;
+      return;
+    }
+
+    assert (pc() != NULL, "");
+    _cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc(), _oopmap_slot);
+    assert (_cb != NULL && _cb->is_compiled() && _cb->frame_size() > 0, "");
+  }
+
+  inline void get_oopmap() const { get_oopmap(pc()); }
+  inline const void get_oopmap(address pc) const {
+    assert (cb() != NULL, "");
+    assert (_oopmap_slot >= 0, "");
+    _oopmap = cb()->oop_map_for_slot(_oopmap_slot, pc);
+    assert (_oopmap != NULL, "");
+  }
+
+  static inline int get_initial_sp(oop chunk, bool gc) {
+    int chunk_sp = jdk_internal_misc_StackChunk::sp(chunk);
+    // we don't invoke write barriers on oops in thawed frames, so we use the gcSP field to traverse thawed frames
+    // if (gc && chunk_sp != jdk_internal_misc_StackChunk::gc_sp(chunk) && Universe::heap()->requires_barriers(chunk)) {
+    //   uint64_t marking_cycle = CodeCache::marking_cycle() >> 1;
+    //   uint64_t chunk_marking_cycle = jdk_internal_misc_StackChunk::mark_cycle(chunk) >> 1;
+    //   if (marking_cycle == chunk_marking_cycle) {
+    //     // Marking isn't finished, so we need to traverse thawed frames
+    //     chunk_sp = jdk_internal_misc_StackChunk::gc_sp(chunk);
+    //     assert (chunk_sp >= 0 && chunk_sp <= jdk_internal_misc_StackChunk::sp(chunk), "");
+    //   } else {
+    //     jdk_internal_misc_StackChunk::set_gc_sp(chunk, chunk_sp); // atomic; benign race
+    //   }
+    // }
+    return chunk_sp;
+  }
+};
 
 #include CPU_HEADER_INLINE(instanceStackChunkKlass)
 

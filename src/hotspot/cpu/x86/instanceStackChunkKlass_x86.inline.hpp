@@ -33,47 +33,38 @@
 #define FIX_DERIVED_POINTERS true
 #endif
 
-static inline void* reg_to_loc(VMReg reg, intptr_t* sp) {
+inline address StackChunkFrameStream::get_pc() const {
+  assert (!is_done(), "");
+  return *(address*)(_sp - 1);
+}
+
+inline void* StackChunkFrameStream::reg_to_loc(VMReg reg) const {
+  assert (!is_done(), "");
   assert (!reg->is_reg() || reg == rbp->as_VMReg(), "");
-  return reg->is_reg() ? (void*)(sp - frame::sender_sp_offset) // see frame::update_map_with_saved_link(&map, link_addr);
-                       : (void*)((address)sp + (reg->reg2stack() * VMRegImpl::stack_slot_size));
+  return reg->is_reg() ? (void*)(_sp - frame::sender_sp_offset) // see frame::update_map_with_saved_link(&map, link_addr);
+                       : (void*)((address)_sp + (reg->reg2stack() * VMRegImpl::stack_slot_size));
 }
 
-#ifdef ASSERT
-static bool is_in_oops(const ImmutableOopMap* oopmap, intptr_t* sp, void* p) {
-  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
-    if (oms.current().type() != OopMapValue::oop_value)
-      continue;
-    if (reg_to_loc(oms.current().reg(), sp) == p)
-      return true;
-  }
-  return false;
+inline frame StackChunkFrameStream::to_frame() const {
+  intptr_t* fp = *(intptr_t**)(_sp - frame::sender_sp_offset);
+  return frame(_sp, _sp, fp, pc(), cb(), NULL, true);
 }
-
-static bool is_in_frame(CodeBlob* cb, intptr_t* sp, void* p0) {
-  intptr_t* p = (intptr_t*)p0;
-  int argsize = cb->is_compiled() ? (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord : 0;
-  int frame_size = cb->frame_size() + argsize;
-  // tty->print_cr("offset: %ld fsize: %d, argsize: %d", p - sp, cb->frame_size(), argsize);
-  return p == sp - frame::sender_sp_offset || ((p - sp) >= 0 && (p - sp) < frame_size);
-}
-#endif
 
 // We replace derived pointers with offsets; the converse is done in fix_stack_chunk
 template <bool concurrent_gc>
-static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
-  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
+static void iterate_derived_pointers(oop chunk, const StackChunkFrameStream& f) {
+  for (OopMapStream oms(f.oopmap()); !oms.is_done(); oms.next()) {
     OopMapValue omv = oms.current();
     if (omv.type() != OopMapValue::derived_oop_value)
       continue;
     
-    intptr_t* derived_loc = (intptr_t*)reg_to_loc(omv.reg(), sp);
-    intptr_t* base_loc    = (intptr_t*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
-    assert (is_in_frame(cb, sp, base_loc), "");
-    assert (is_in_frame(cb, sp, derived_loc), "");
+    intptr_t* derived_loc = (intptr_t*)f.reg_to_loc(omv.reg());
+    intptr_t* base_loc    = (intptr_t*)f.reg_to_loc(omv.content_reg()); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
+    assert (f.is_in_frame(base_loc), "");
+    assert (f.is_in_frame(derived_loc), "");
     assert (derived_loc != base_loc, "Base and derived in same location");
-    assert (is_in_oops(oopmap, sp, base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
-    assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
+    assert (f.is_in_oops(base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
+    assert (!f.is_in_oops(derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
     
     // The ordering in the following is crucial
     OrderAccess::loadload();
@@ -113,10 +104,10 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
 }
 
 template <class OopClosureType>
-static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb) {
+static bool iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f) {
   DEBUG_ONLY(int oops = 0;)
   bool mutated = false;
-  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+  for (OopMapStream oms(f.oopmap()); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
     OopMapValue omv = oms.current();
     if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
       continue;
@@ -124,40 +115,21 @@ static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap,
     assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
     DEBUG_ONLY(oops++;)
 
-    void* p = reg_to_loc(omv.reg(), sp);
+    void* p = f.reg_to_loc(omv.reg());
     assert (p != NULL, "");
-    assert (is_in_frame(cb, sp, p), "");
+    assert (f.is_in_frame(p), "");
 
     // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
 
     // if (!SkipNullValue::should_skip(*p))
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - f.sp());
     // DEBUG_ONLY(intptr_t old = *(intptr_t*)p;)
     intptr_t before = *(intptr_t*)p;
     omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
     mutated |= before != *(intptr_t*)p;
   }
-  assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
+  assert (oops == f.oopmap()->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, f.oopmap()->num_oops());
   return mutated;
-}
-
-inline static int get_chunk_sp(oop chunk) {
-  int chunk_sp = jdk_internal_misc_StackChunk::sp(chunk);
-
-  // we don't invoke write barriers on oops in thawed frames, so we use the gcSP field to traverse thawed frames
-  // if (chunk_sp != jdk_internal_misc_StackChunk::gc_sp(chunk) && Universe::heap()->requires_barriers(chunk)) {
-  //   uint64_t marking_cycle = CodeCache::marking_cycle() >> 1;
-  //   uint64_t chunk_marking_cycle = jdk_internal_misc_StackChunk::mark_cycle(chunk) >> 1;
-  //   if (marking_cycle == chunk_marking_cycle) {
-  //     // Marking isn't finished, so we need to traverse thawed frames
-  //     chunk_sp = jdk_internal_misc_StackChunk::gc_sp(chunk);
-  //     assert (chunk_sp >= 0 && chunk_sp <= jdk_internal_misc_StackChunk::sp(chunk), "");
-  //   } else {
-  //     jdk_internal_misc_StackChunk::set_gc_sp(chunk, chunk_sp); // atomic; benign race
-  //   }
-  // }
-
-  return chunk_sp;
 }
 
 template <class OopClosureType, bool concurrent_gc>
@@ -185,39 +157,16 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack(oop chunk, OopClosureType* c
     assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
   }
 
-  intptr_t* const start = jdk_internal_misc_StackChunk::start_address(chunk);
-  intptr_t* const end   = jdk_internal_misc_StackChunk::end_address(chunk);
-  CodeBlob* cb = NULL;
-  for (intptr_t* sp = start + get_chunk_sp(chunk); sp < end; sp += cb->frame_size()) {
-    address pc = *(address*)(sp - 1);
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
-    assert (pc != NULL, "");
-    // if (Continuation::is_return_barrier_entry(pc)) {
-    //   assert ((int)(sp - start) < jdk_internal_misc_StackChunk::sp(chunk), ""); // only happens when starting from gcSP
+  for (StackChunkFrameStream f(chunk, true); !f.is_done(); f.next()) {
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld pc: " INTPTR_FORMAT, f.sp() - jdk_internal_misc_StackChunk::start_address(chunk), p2i(f.pc()));
+    // if (Continuation::is_return_barrier_entry(f.pc())) {
+    //   assert ((int)(f.sp() - jdk_internal_misc_StackChunk::start_address(chunk)) < jdk_internal_misc_StackChunk::sp(chunk), ""); // only happens when starting from gcSP
     //   break;
     // }
 
-    int slot;
-    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
-    assert (cb != NULL, "");
-    assert (cb->is_compiled(), "");
-    assert (cb->frame_size() > 0, "");
+    CodeBlob* cb = f.cb();
+    const ImmutableOopMap* oopmap = f.oopmap();
 
-    assert (!cb->as_compiled_method()->is_deopt_pc(pc), "");
-    assert (slot >= 0, "");
-    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
-    // const ImmutableOopMap* oopmap;
-    // if (LIKELY(slot >= 0)) {
-    //   oopmap = cb->oop_map_for_slot(slot, pc);
-    // } else {
-    //   CompiledMethod* cm = cb->as_compiled_method();
-    //   assert (cm->is_deopt_pc(pc), "");
-    //   pc = *(address*)((address)sp + cm->orig_pc_offset());
-    //   oopmap = cb->oop_map_for_return_address(pc);
-    // }
-    assert (oopmap != NULL, "");
-
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack slot: %d codeblob:", slot);
     if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
 
     if (Devirtualizer::do_metadata(closure) && cb->is_nmethod()) {
@@ -233,13 +182,13 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack(oop chunk, OopClosureType* c
     }
     
     if (do_destructive_processing) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
-      iterate_derived_pointers<concurrent_gc>(chunk, oopmap, sp, cb);
+      iterate_derived_pointers<concurrent_gc>(chunk, f);
     }
 
-    bool mutated_oops = iterate_oops(closure, oopmap, sp, cb);
+    bool mutated_oops = iterate_oops(closure, f);
 
     if (FIX_DERIVED_POINTERS && concurrent_gc && mutated_oops && jdk_internal_misc_StackChunk::gc_mode(chunk)) { // TODO: this is a ZGC-specific optimization that depends on the one in iterate_derived_pointers
-      fix_derived_pointers(oopmap, sp, cb);
+      fix_derived_pointers(f);
     }
   }
 
@@ -266,27 +215,27 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack(oop chunk, OopClosureType* c
 
 
 // We replace derived pointers with offsets; the converse is done in fix_stack_chunk
-static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb, MemRegion mr) {
+static void iterate_derived_pointers(oop chunk, const StackChunkFrameStream& f, MemRegion mr) {
   intptr_t* const l = (intptr_t*)mr.start();
   intptr_t* const h = (intptr_t*)mr.end();
 
-  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
+  for (OopMapStream oms(f.oopmap()); !oms.is_done(); oms.next()) {
     OopMapValue omv = oms.current();
     if (omv.type() != OopMapValue::derived_oop_value)
       continue;
     
-    intptr_t* derived_loc = (intptr_t*)reg_to_loc(omv.reg(), sp);
-    intptr_t* base_loc    = (intptr_t*)reg_to_loc(omv.content_reg(), sp); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
+    intptr_t* derived_loc = (intptr_t*)f.reg_to_loc(omv.reg());
+    intptr_t* base_loc    = (intptr_t*)f.reg_to_loc(omv.content_reg()); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
     
     if (((intptr_t*)derived_loc < l || (intptr_t*)derived_loc >= h)
       && ((intptr_t*)base_loc < l || (intptr_t*)base_loc >= h))
       continue;
 
-    assert (is_in_frame(cb, sp, base_loc), "");
-    assert (is_in_frame(cb, sp, derived_loc), "");
+    assert (f.is_in_frame(base_loc), "");
+    assert (f.is_in_frame(derived_loc), "");
     assert (derived_loc != base_loc, "Base and derived in same location");
-    assert (is_in_oops(oopmap, sp, base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
-    assert (!is_in_oops(oopmap, sp, derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
+    assert (f.is_in_oops(base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
+    assert (!f.is_in_oops(derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
     
     // The ordering in the following is crucial
     OrderAccess::loadload();
@@ -315,13 +264,13 @@ static void iterate_derived_pointers(oop chunk, const ImmutableOopMap* oopmap, i
 }
 
 template <class OopClosureType>
-static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb, MemRegion mr) {
+static bool iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f, MemRegion mr) {
   intptr_t* const l = (intptr_t*)mr.start();
   intptr_t* const h = (intptr_t*)mr.end();
 
   DEBUG_ONLY(int oops = 0;)
   bool mutated = false;
-  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+  for (OopMapStream oms(f.oopmap()); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
     OopMapValue omv = oms.current();
     if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
       continue;
@@ -329,21 +278,21 @@ static bool iterate_oops(OopClosureType* closure, const ImmutableOopMap* oopmap,
     assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
     DEBUG_ONLY(oops++;)
 
-    void* p = reg_to_loc(omv.reg(), sp);
+    void* p = f.reg_to_loc(omv.reg());
     assert (p != NULL, "");
-    assert (is_in_frame(cb, sp, p), "");
+    assert (f.is_in_frame(p), "");
     if ((intptr_t*)p < l || (intptr_t*)p >= h) continue;
 
     // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
 
     // if (!SkipNullValue::should_skip(*p))
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp);
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - f.sp());
     // DEBUG_ONLY(intptr_t old = *(intptr_t*)p;)
     intptr_t before = *(intptr_t*)p;
     omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
     mutated |= before != *(intptr_t*)p;
   }
-  assert (oops == oopmap->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap->num_oops());
+  assert (oops == f.oopmap()->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, f.oopmap()->num_oops());
   return mutated;
 }
 
@@ -373,59 +322,34 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(oop chunk, OopClosur
   }
   assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
 
-  intptr_t* const start = jdk_internal_misc_StackChunk::start_address(chunk);
-  intptr_t* end = jdk_internal_misc_StackChunk::end_address(chunk);
-  if (end > h) end = h;
-  CodeBlob* cb = NULL;
-  for (intptr_t* sp = start + get_chunk_sp(chunk); sp < end; sp += cb->frame_size()) {
-    intptr_t* next_sp = sp + cb->frame_size();
-    if (sp + cb->frame_size() >= l) {
-      sp += cb->frame_size();
+  StackChunkFrameStream f(chunk, true);
+  if (f.end() > h) f.set_end(h);
+  for (; !f.is_done(); f.next()) {
+    if (f.sp() + f.cb()->frame_size() < l) {
       continue;
     }
 
-    address pc = *(address*)(sp - 1);
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded sp: %ld pc: " INTPTR_FORMAT, sp - start, p2i(pc));
-    assert (pc != NULL, "");
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded sp: %ld pc: " INTPTR_FORMAT, f.sp() - jdk_internal_misc_StackChunk::start_address(chunk), p2i(f.pc()));
 
-    int slot;
-    cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
-    assert (cb != NULL, "");
-    assert (cb->is_compiled(), "");
-    assert (cb->frame_size() > 0, "");
-    assert (!cb->as_compiled_method()->is_deopt_pc(pc), "");
+    if (log_develop_is_enabled(Trace, jvmcont)) f.cb()->print_value_on(tty);
 
-    assert (slot >= 0, "");
-    const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
-    // if (LIKELY(slot >= 0)) {
-    //   oopmap = cb->oop_map_for_slot(slot, pc);
-    // } else {
-    //   CompiledMethod* cm = cb->as_compiled_method();
-    //   assert (cm->is_deopt_pc(pc), "");
-    //   pc = *(address*)((address)sp + cm->orig_pc_offset());
-    //   oopmap = cb->oop_map_for_return_address(pc);
-    // }
-    assert (oopmap != NULL, "");
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded slot: %d codeblob:", slot);
-    if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
-
-    if (Devirtualizer::do_metadata(closure) && cb->is_nmethod()) {
+    if (Devirtualizer::do_metadata(closure) && f.cb()->is_nmethod()) {
       // The nmethod entry barrier takes care of having the right synchronization
       // when keeping the nmethod alive during concurrent execution.
-      cb->as_nmethod_or_null()->run_nmethod_entry_barrier();
+      f.cb()->as_nmethod_or_null()->run_nmethod_entry_barrier();
     }
 
     num_frames++;
-    num_oops += oopmap->num_oops();
+    num_oops += f.oopmap()->num_oops();
     if (closure == NULL) {
       continue;
     }
     
     if (do_destructive_processing) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
-      iterate_derived_pointers(chunk, oopmap, sp, cb, mr);
+      iterate_derived_pointers(chunk, f, mr);
     }
 
-    bool mutated_oops = iterate_oops(closure, oopmap, sp, cb, mr);
+    bool mutated_oops = iterate_oops(closure, f, mr);
   }
 
   assert (num_frames >= 0, "");

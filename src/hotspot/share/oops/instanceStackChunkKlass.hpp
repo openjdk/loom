@@ -29,6 +29,7 @@
 #include "utilities/macros.hpp"
 
 class ClassFileParser;
+class StackChunkFrameStream;
 
 // An InstanceStackChunkKlass is a specialization of the InstanceKlass. 
 // It has a header containing metadata, and a blob containing a stack segment
@@ -109,7 +110,7 @@ public:
   static void barriers_for_oops_in_chunk(oop chunk);
 
   template <bool store>
-  static void barriers_for_oops_in_frame(intptr_t* sp, CodeBlob* cb, const ImmutableOopMap* oopmap);
+  static void barriers_for_oops_in_frame(const StackChunkFrameStream& f);
 
   static void fix_chunk(oop chunk);
 
@@ -123,7 +124,7 @@ private:
   template <class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
-  static void fix_derived_pointers(const ImmutableOopMap* oopmap, intptr_t* sp, CodeBlob* cb);
+  static void fix_derived_pointers(const StackChunkFrameStream& f);
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP

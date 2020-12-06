@@ -63,6 +63,12 @@ void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
 }
 #endif
 
+int InstanceStackChunkKlass::count_frames(oop chunk) {
+  int frames = 0;
+  for (StackChunkFrameStream f(chunk); !f.is_done(); f.next()) frames++;
+  return frames;
+}
+
 void InstanceStackChunkKlass::print_chunk(oop chunk, bool verbose, outputStream* st) {
   if (chunk == (oop)NULL) {
     st->print_cr("CHUNK NULL");
@@ -82,19 +88,12 @@ void InstanceStackChunkKlass::print_chunk(oop chunk, bool verbose, outputStream*
   intptr_t* end   = jdk_internal_misc_StackChunk::end_address(chunk);
 
   if (verbose) {
-    intptr_t* sp = start + jdk_internal_misc_StackChunk::sp(chunk);
     st->cr();
     st->print_cr("------ chunk frames end: " INTPTR_FORMAT, p2i(end));
-    if (sp < end) {
-      RegisterMap map(NULL, true, false, false);
-      frame f(sp);
+    for (StackChunkFrameStream fs(chunk); !fs.is_done(); fs.next()) {
+      frame f = fs.to_frame();
       st->print_cr("-- frame size: %d argsize: %d", f.frame_size(), f.compiled_frame_stack_argsize());
       f.print_on(st);
-      while (f.sp() + ((f.frame_size() + f.compiled_frame_stack_argsize()) >> LogBytesPerWord) < end) {
-        f = f.sender(&map);
-        st->print_cr("-- frame size: %d argsize: %d", f.frame_size(), f.compiled_frame_stack_argsize());
-        f.print_on(st);
-      }
     }
     st->print_cr("------");
   } else {
@@ -106,5 +105,17 @@ void InstanceStackChunkKlass::print_chunk(oop chunk, bool verbose, outputStream*
 void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
   InstanceKlass::oop_print_on(obj, st);
   print_chunk(obj, false, st);
+}
+#endif
+
+#ifdef ASSERT
+bool StackChunkFrameStream::is_in_oops(void* p) const {
+  for (OopMapStream oms(oopmap()); !oms.is_done(); oms.next()) {
+    if (oms.current().type() != OopMapValue::oop_value)
+      continue;
+    if (reg_to_loc(oms.current().reg()) == p)
+      return true;
+  }
+  return false;
 }
 #endif

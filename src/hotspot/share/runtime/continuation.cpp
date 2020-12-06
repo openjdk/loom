@@ -3818,8 +3818,6 @@ private:
   void derelativize_interpreted_frame_metadata(const hframe& hf, const frame& f);
   inline hframe::callee_info frame_callee_info_address(frame& f);
   template<typename FKind, bool top, bool bottom> inline intptr_t* align(const hframe& hf, intptr_t* vsp, frame& caller);
-  void deoptimize_frames_in_chunk(oop chunk);
-  void deoptimize_frame_in_chunk(intptr_t* sp, address pc, CodeBlob* cb);
   void patch_chunk_pd(intptr_t* sp);
   inline intptr_t* align_chunk(intptr_t* vsp);
   inline void prefetch_chunk_pd(void* start, int size_words);
@@ -4099,6 +4097,19 @@ public:
     return false;
   }
 
+  void deoptimize_frames_in_chunk(oop chunk) {
+    for (StackChunkFrameStream f(chunk); !f.is_done(); f.next()) {
+      if (f.cb()->as_compiled_method()->is_marked_for_deoptimization() || _thread->is_interp_only_mode()) {
+        deoptimize_frame_in_chunk(f);
+      }
+    }
+  }
+
+  void deoptimize_frame_in_chunk(const StackChunkFrameStream& f) {
+    log_develop_trace(jvmcont)("Deoptimizing frame");
+    f.to_frame().deoptimize(NULL);
+  }
+
   inline bool oop_fixed(oop obj, int offset) {
     typedef typename ConfigT::OopT OopT;
     OopT* loc = obj->obj_field_addr<OopT>(offset);
@@ -4109,11 +4120,10 @@ public:
   }
 
   NOINLINE bool thaw_one_frame_from_chunk(oop chunk, intptr_t* hsp, int* out_size, int* out_argsize, bool barriers) {
-    assert (hsp == jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::sp(chunk), "");
+    StackChunkFrameStream f(chunk);
+    assert (hsp == f.sp(), "");
 
-    address pc = *(address*)(hsp - SENDER_SP_RET_ADDRESS_OFFSET);
-    int slot;
-    CodeBlob* cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc, slot);
+    CodeBlob* cb = f.cb();
     int size = cb->frame_size(); // in words
     int argsize = (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord; // in words
 
@@ -4121,17 +4131,14 @@ public:
 
     if (should_deoptimize()
         && (cb->as_compiled_method()->is_marked_for_deoptimization() || (mode != mode_fast && _thread->is_interp_only_mode()))) {
-      deoptimize_frame_in_chunk(hsp, pc, cb);
+      deoptimize_frame_in_chunk(f);
     }
 
     if (UNLIKELY(barriers)) {
-      assert (slot >= 0, "");
-      const ImmutableOopMap* oopmap = cb->oop_map_for_slot(slot, pc);
-      assert (oopmap != NULL, "");
-      InstanceStackChunkKlass::barriers_for_oops_in_frame<true>(hsp, cb, oopmap);
+      InstanceStackChunkKlass::barriers_for_oops_in_frame<true>(f);
     }
 
-    int empty = jdk_internal_misc_StackChunk::sp(chunk) + size >= (jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk));
+    bool empty = (jdk_internal_misc_StackChunk::sp(chunk) + size) >= (jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk));
     assert (!empty || argsize == jdk_internal_misc_StackChunk::argsize(chunk), "");
 
     if (empty) {
@@ -4147,6 +4154,7 @@ public:
         // assert (0 == jdk_internal_misc_StackChunk::numOops(chunk) - cb->oop_map_for_slot(slot, pc)->num_oops(), "");
         // jdk_internal_misc_StackChunk::set_numOops(chunk, 0);
       // }
+      assert((f.next(), f.is_done()), "");
     } else {
       jdk_internal_misc_StackChunk::set_sp(chunk, jdk_internal_misc_StackChunk::sp(chunk) + size);
       address top_pc = *(address*)(hsp + size - SENDER_SP_RET_ADDRESS_OFFSET);
@@ -4160,6 +4168,7 @@ public:
       //   assert (jdk_internal_misc_StackChunk::numOops(chunk) >= oopmap->num_oops(), "jdk_internal_misc_StackChunk::numOops(chunk): %d oopmap->num_oops() : %d", jdk_internal_misc_StackChunk::numOops(chunk), oopmap->num_oops());
       //   jdk_internal_misc_StackChunk::set_numOops(chunk, jdk_internal_misc_StackChunk::numOops(chunk) - oopmap->num_oops());
       // }
+      assert((f.next(), !f.is_done()), "");
     }
 
     *out_size = size;
