@@ -108,12 +108,6 @@ static void set_anchor(JavaThread* thread, intptr_t* sp) {
   assert(thread->last_frame().cb() != NULL, "");
 }
 
-frame sp_to_frame(intptr_t* sp) {
-  return frame(sp,
-               *(intptr_t**)(sp - frame::sender_sp_offset),
-               *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET));
-}
-
 // unused
 // static void set_anchor(JavaThread* thread, const frame& f) {
 //   JavaFrameAnchor* anchor = thread->frame_anchor();

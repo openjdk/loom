@@ -139,9 +139,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   setup(pc);
 }
 
-#ifndef PRODUCT
-  inline frame::frame(intptr_t* sp) : frame(sp, sp, *(intptr_t**)(sp - 2), *(address*)(sp - 1)) {}
-#endif
+inline frame::frame(intptr_t* sp) : frame(sp, sp, *(intptr_t**)(sp - frame::sender_sp_offset), *(address*)(sp - 1)) {}
 
 inline void frame::setup(address pc) {
   adjust_unextended_sp();

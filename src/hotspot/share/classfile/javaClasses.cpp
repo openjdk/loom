@@ -5036,6 +5036,13 @@ intptr_t* jdk_internal_misc_StackChunk::end_address(oop chunk) {
   return start_address(chunk) + size(chunk) - argsz;
 }
 
+bool jdk_internal_misc_StackChunk::is_usable_in_chunk(oop chunk, void* p) {
+  assert (is_stack_chunk(chunk), "");
+  HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk) - frame::sender_sp_offset;
+  HeapWord* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  return (HeapWord*)p >= start && (HeapWord*)p < end;
+}
+
 bool java_lang_Continuation::on_local_stack(oop ref, address adr) {
   arrayOop s = stack(ref);
   void* base = s->base(T_INT);

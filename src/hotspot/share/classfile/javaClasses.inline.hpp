@@ -391,6 +391,13 @@ inline intptr_t* jdk_internal_misc_StackChunk::start_address(oop chunk) {
   return (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
 }
 
+inline bool jdk_internal_misc_StackChunk::is_in_chunk(oop chunk, void* p) {
+  assert (is_stack_chunk(chunk), "");
+  HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk);
+  HeapWord* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  return (HeapWord*)p >= start && (HeapWord*)p < end;
+}
+
 inline void java_lang_invoke_CallSite::set_target_volatile(oop site, oop target) {
   site->obj_field_put_volatile(_target_offset, target);
 }

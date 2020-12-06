@@ -81,7 +81,9 @@ class frame {
   // Constructors
   frame();
 
-  frame(bool dummy) {} // no initialization
+  explicit frame(bool dummy) {} // no initialization
+
+  explicit frame(intptr_t* sp);
 
 #ifndef PRODUCT
   // This is a generic constructor which is only used by pns() in debug.cpp.
@@ -90,8 +92,6 @@ class frame {
   // dependent (i.e. SPARC doesn't need an 'fp' argument an will ignore it) but
   // we want to keep the signature generic because pns() is shared code.
   frame(void* sp, void* fp, void* pc);
-
-  frame(intptr_t* sp);
 #endif
 
   // Accessors

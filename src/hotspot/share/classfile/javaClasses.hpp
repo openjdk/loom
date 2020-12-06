@@ -1167,6 +1167,8 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline bool is_empty(oop ref);
   static inline intptr_t* start_address(oop ref);
   static intptr_t* end_address(oop ref);
+  static bool is_in_chunk(oop chunk, void* p);
+  static bool is_usable_in_chunk(oop ref, void* p);
 };
 
 // Interface to java.lang.invoke.MethodHandle objects

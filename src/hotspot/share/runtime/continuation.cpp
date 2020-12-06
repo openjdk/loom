@@ -210,7 +210,6 @@ static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont);
 // static void set_anchor(JavaThread* thread, const frame& f); -- unused
 
 // debugging functions
-frame sp_to_frame(intptr_t* sp);
 bool do_verify_after_thaw(JavaThread* thread);
 static void print_oop(void *p, oop obj, outputStream* st = tty);
 static void print_vframe(frame f, const RegisterMap* map = NULL, outputStream* st = tty);
@@ -692,8 +691,6 @@ public:
   bool is_empty();
   inline bool has_nonempty_chunk() const;
 
-  static bool is_in_chunk(oop chunk, void* p);
-  static bool is_usable_in_chunk(oop chunk, void* p);
   static inline void reset_chunk_counters(oop chunk);
   oop find_chunk(size_t sp_offset, size_t* chunk_offset) const;
   oop find_chunk_by_address(void* p) const;
@@ -1215,20 +1212,6 @@ int ContMirror::num_oops() {
   return _ref_stack == NULL ? 0 : _ref_stack->length() - _ref_sp;
 }
 
-bool ContMirror::is_in_chunk(oop chunk, void* p) {
-  assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
-  HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk);
-  HeapWord* end = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
-  return (HeapWord*)p >= start && (HeapWord*)p < end;
-}
-
-bool ContMirror::is_usable_in_chunk(oop chunk, void* p) {
-  assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
-  HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk) - frame_metadata;
-  HeapWord* end = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::size(chunk);
-  return (HeapWord*)p >= start && (HeapWord*)p < end;
-}
-
 inline void ContMirror::reset_chunk_counters(oop chunk) {
   jdk_internal_misc_StackChunk::set_numFrames(chunk, -1);
   jdk_internal_misc_StackChunk::set_numOops(chunk, -1);
@@ -1236,8 +1219,8 @@ inline void ContMirror::reset_chunk_counters(oop chunk) {
 
 oop ContMirror::find_chunk_by_address(void* p) const {
   for (oop chunk = tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-    if (is_in_chunk(chunk, p)) {
-      assert (is_usable_in_chunk(chunk, p), "");
+    if (jdk_internal_misc_StackChunk::is_in_chunk(chunk, p)) {
+      assert (jdk_internal_misc_StackChunk::is_usable_in_chunk(chunk, p), "");
       return chunk;
     }
   }
@@ -3893,7 +3876,7 @@ public:
 
   #ifdef ASSERT
     log_develop_debug(jvmcont)("Jumping to frame (thaw): [%ld]", java_tid(_thread));
-    frame f = sp_to_frame(sp);
+    frame f(sp);
     if (log_develop_is_enabled(Debug, jvmcont)) f.print_on(tty);
   #endif
 
@@ -4752,7 +4735,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   if (log_develop_is_enabled(Trace, jvmcont)) {
     log_develop_trace(jvmcont)("Jumping to frame (thaw):");
-    frame f = sp_to_frame(sp);
+    frame f(sp);
     print_vframe(f, NULL);
   }
 
@@ -5119,11 +5102,11 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
     intptr_t* chunk_sp = jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::sp(chunk);
     intptr_t* sp = chunk_sp + (f.offset_sp() - chunk_offset);
 
-    frame f = sp_to_frame(sp);
-    if (ContMirror::is_in_chunk(chunk, sp + f.cb()->frame_size() + jdk_internal_misc_StackChunk::argsize(chunk) + frame_metadata)) {
-      frame sender = sp_to_frame(sp + f.cb()->frame_size());
+    frame f(sp);
+    if (jdk_internal_misc_StackChunk::is_in_chunk(chunk, sp + f.cb()->frame_size() + jdk_internal_misc_StackChunk::argsize(chunk) + frame_metadata)) {
+      frame sender(sp + f.cb()->frame_size());
 
-      assert (ContMirror::is_usable_in_chunk(chunk, sender.unextended_sp()), "");
+      assert (jdk_internal_misc_StackChunk::is_usable_in_chunk(chunk, sender.unextended_sp()), "");
       sender.set_offset_sp(chunk_offset + (sender.sp() - chunk_sp));
       sender.set_frame_index(frame_index + 1);
       if (map->update_map()) {
@@ -5281,7 +5264,7 @@ bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
 
   oop chunk = cont.find_chunk_by_address(addr);
   assert (((intptr_t**)addr == Frame::map_link_address(map)) || (map->in_chunk() == (chunk != (oop)NULL)), "map->in_chunk(): %d", map->in_chunk());
-  return (chunk != (oop)NULL) ? ContMirror::is_usable_in_chunk(chunk, addr)
+  return (chunk != (oop)NULL) ? jdk_internal_misc_StackChunk::is_usable_in_chunk(chunk, addr)
                               : (cont.is_in_stack(addr) || cont.is_in_ref_stack(addr)
                                  || (intptr_t**)addr == java_lang_Continuation::raw_fp_address(cont.mirror())); // TODO PD
 }
