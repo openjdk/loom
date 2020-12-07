@@ -129,9 +129,6 @@ class ExecutorServiceHelper {
                 futures.add(future);
             }
         } catch (Throwable e) {
-
-            e.printStackTrace();
-
             cancelAll(futures);
             throw e;
         }
