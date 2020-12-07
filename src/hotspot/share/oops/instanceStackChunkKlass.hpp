@@ -120,9 +120,16 @@ private:
 
   template <class OopClosureType, bool concurrent_gc>
   inline void oop_oop_iterate_stack(oop obj, OopClosureType* closure);
+  template <class OopClosureType>
+  static bool iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f);
+  template <bool concurrent_gc>
+  static void iterate_derived_pointers(oop chunk, const StackChunkFrameStream& f);
 
   template <class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
+  template <class OopClosureType>
+  static bool iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f, MemRegion mr);
+  static void iterate_derived_pointers(oop chunk, const StackChunkFrameStream& f, MemRegion mr);
 
   static void fix_derived_pointers(const StackChunkFrameStream& f);
 };

@@ -26,6 +26,7 @@
 
 #include "compiler/oopMap.hpp"
 #include "classfile/javaClasses.hpp"
+#include "memory/iterator.inline.hpp"
 #include "oops/instanceKlass.inline.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
 #include "oops/klass.hpp"
@@ -34,6 +35,11 @@
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
+
+#if INCLUDE_ZGC
+#include "gc/z/zAddress.inline.hpp"
+#define FIX_DERIVED_POINTERS true
+#endif
 
 class StackChunkFrameStream : public StackObj {
  private:
@@ -213,5 +219,220 @@ void InstanceStackChunkKlass::oop_oop_iterate_header(oop obj, OopClosureType* cl
 //   // for now, we don't devirtualize for faster compilation
 //   Continuation::stack_chunk_iterate_stack_bounded(chunk, (OopClosure*)closure, closure->do_metadata(), mr);
 // }
+
+template <class OopClosureType>
+bool InstanceStackChunkKlass::iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f) {
+  DEBUG_ONLY(int oops = 0;)
+  bool mutated = false;
+  for (OopMapStream oms(f.oopmap()); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    OopMapValue omv = oms.current();
+    if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+      continue;
+
+    assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+    DEBUG_ONLY(oops++;)
+
+    void* p = f.reg_to_loc(omv.reg());
+    assert (p != NULL, "");
+    assert (f.is_in_frame(p), "");
+
+    // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
+
+    // if (!SkipNullValue::should_skip(*p))
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - f.sp());
+    // DEBUG_ONLY(intptr_t old = *(intptr_t*)p;)
+    intptr_t before = *(intptr_t*)p;
+    omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
+    mutated |= before != *(intptr_t*)p;
+  }
+  assert (oops == f.oopmap()->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, f.oopmap()->num_oops());
+  return mutated;
+}
+
+template <class OopClosureType, bool concurrent_gc>
+void InstanceStackChunkKlass::oop_oop_iterate_stack(oop chunk, OopClosureType* closure) {
+  // see sender_for_compiled_frame
+  const int frame_metadata = 2;
+
+  assert (Continuation::debug_is_stack_chunk(chunk), "");
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack requires_barriers: %d", !Universe::heap()->requires_barriers(chunk));
+
+  // TODO: return if chunk is empty; add is_empty to jdk_internal_misc_StackChunk and remove ContMirror::is_chunk_empty
+  int num_frames = 0;
+  int num_oops = 0;
+
+  bool do_destructive_processing; // should really be `= closure.is_destructive()`, if we had such a thing
+  if (concurrent_gc) {
+    do_destructive_processing = true;
+  } else {
+    if (SafepointSynchronize::is_at_safepoint() /*&& !jdk_internal_misc_StackChunk::gc_mode(chunk)*/) {
+      do_destructive_processing = true;
+      jdk_internal_misc_StackChunk::set_gc_mode(chunk, true);
+    } else {
+      do_destructive_processing = false;
+    }
+    assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
+  }
+
+  for (StackChunkFrameStream f(chunk, true); !f.is_done(); f.next()) {
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld pc: " INTPTR_FORMAT, f.sp() - jdk_internal_misc_StackChunk::start_address(chunk), p2i(f.pc()));
+    // if (Continuation::is_return_barrier_entry(f.pc())) {
+    //   assert ((int)(f.sp() - jdk_internal_misc_StackChunk::start_address(chunk)) < jdk_internal_misc_StackChunk::sp(chunk), ""); // only happens when starting from gcSP
+    //   break;
+    // }
+
+    CodeBlob* cb = f.cb();
+    const ImmutableOopMap* oopmap = f.oopmap();
+
+    if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
+
+    if (Devirtualizer::do_metadata(closure) && cb->is_nmethod()) {
+      // The nmethod entry barrier takes care of having the right synchronization
+      // when keeping the nmethod alive during concurrent execution.
+      cb->as_nmethod_or_null()->run_nmethod_entry_barrier();
+    }
+
+    num_frames++;
+    num_oops += oopmap->num_oops();
+    if (closure == NULL) {
+      continue;
+    }
+    
+    if (do_destructive_processing) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
+      iterate_derived_pointers<concurrent_gc>(chunk, f);
+    }
+
+    bool mutated_oops = iterate_oops(closure, f);
+
+    if (FIX_DERIVED_POINTERS && concurrent_gc && mutated_oops && jdk_internal_misc_StackChunk::gc_mode(chunk)) { // TODO: this is a ZGC-specific optimization that depends on the one in iterate_derived_pointers
+      fix_derived_pointers(f);
+    }
+  }
+
+  if (FIX_DERIVED_POINTERS && concurrent_gc) {
+    OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
+    jdk_internal_misc_StackChunk::set_gc_mode(chunk, false);
+  }
+
+  assert (num_frames >= 0, "");
+  assert (num_oops >= 0, "");
+  if (do_destructive_processing || closure == NULL) {
+    // jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames); -- TODO: remove those fields
+    // jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
+  }
+
+  if (closure != NULL) {
+    Continuation::emit_chunk_iterate_event(chunk, num_frames, num_oops);
+  }
+
+  // assert(Continuation::debug_verify_stack_chunk(chunk), "");
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack ------- end -------");
+  // tty->print_cr("<<< stack_chunk_iterate_stack %p %p", (oopDesc*)chunk, Thread::current());
+}
+
+template <class OopClosureType>
+bool InstanceStackChunkKlass::iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f, MemRegion mr) {
+  intptr_t* const l = (intptr_t*)mr.start();
+  intptr_t* const h = (intptr_t*)mr.end();
+
+  DEBUG_ONLY(int oops = 0;)
+  bool mutated = false;
+  for (OopMapStream oms(f.oopmap()); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    OopMapValue omv = oms.current();
+    if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
+      continue;
+
+    assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
+    DEBUG_ONLY(oops++;)
+
+    void* p = f.reg_to_loc(omv.reg());
+    assert (p != NULL, "");
+    assert (f.is_in_frame(p), "");
+    if ((intptr_t*)p < l || (intptr_t*)p >= h) continue;
+
+    // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
+
+    // if (!SkipNullValue::should_skip(*p))
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - f.sp());
+    // DEBUG_ONLY(intptr_t old = *(intptr_t*)p;)
+    intptr_t before = *(intptr_t*)p;
+    omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
+    mutated |= before != *(intptr_t*)p;
+  }
+  assert (oops == f.oopmap()->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, f.oopmap()->num_oops());
+  return mutated;
+}
+
+template <class OopClosureType>
+void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(oop chunk, OopClosureType* closure, MemRegion mr) {
+  assert (!UseZGC, "");
+  
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded");
+  intptr_t* const l = (intptr_t*)mr.start();
+  intptr_t* const h = (intptr_t*)mr.end();
+
+  // see sender_for_compiled_frame
+  const int frame_metadata = 2;
+
+  assert (Continuation::debug_is_stack_chunk(chunk), "");
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded requires_barriers: %d", !Universe::heap()->requires_barriers(chunk));
+
+  int num_frames = 0;
+  int num_oops = 0;
+
+  bool do_destructive_processing; // should really be `= closure.is_destructive()`, if we had such a thing
+  if (SafepointSynchronize::is_at_safepoint() && !jdk_internal_misc_StackChunk::gc_mode(chunk)) {
+    do_destructive_processing = true;
+    jdk_internal_misc_StackChunk::set_gc_mode(chunk, true);
+  } else {
+    do_destructive_processing = false;
+  }
+  assert (!SafepointSynchronize::is_at_safepoint() || jdk_internal_misc_StackChunk::gc_mode(chunk), "gc_mode: %d is_at_safepoint: %d", jdk_internal_misc_StackChunk::gc_mode(chunk), SafepointSynchronize::is_at_safepoint());
+
+  StackChunkFrameStream f(chunk, true);
+  if (f.end() > h) f.set_end(h);
+  for (; !f.is_done(); f.next()) {
+    if (f.sp() + f.cb()->frame_size() < l) {
+      continue;
+    }
+
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded sp: %ld pc: " INTPTR_FORMAT, f.sp() - jdk_internal_misc_StackChunk::start_address(chunk), p2i(f.pc()));
+
+    if (log_develop_is_enabled(Trace, jvmcont)) f.cb()->print_value_on(tty);
+
+    if (Devirtualizer::do_metadata(closure) && f.cb()->is_nmethod()) {
+      // The nmethod entry barrier takes care of having the right synchronization
+      // when keeping the nmethod alive during concurrent execution.
+      f.cb()->as_nmethod_or_null()->run_nmethod_entry_barrier();
+    }
+
+    num_frames++;
+    num_oops += f.oopmap()->num_oops();
+    if (closure == NULL) {
+      continue;
+    }
+    
+    if (do_destructive_processing) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
+      iterate_derived_pointers(chunk, f, mr);
+    }
+
+    bool mutated_oops = iterate_oops(closure, f, mr);
+  }
+
+  assert (num_frames >= 0, "");
+  assert (num_oops >= 0, "");
+  if (do_destructive_processing || closure == NULL) {
+    jdk_internal_misc_StackChunk::set_numFrames(chunk, num_frames);
+    jdk_internal_misc_StackChunk::set_numOops(chunk, num_oops);
+  }
+
+  if (closure != NULL) {
+    Continuation::emit_chunk_iterate_event(chunk, num_frames, num_oops);
+  }
+
+  // assert(Continuation::debug_verify_stack_chunk(chunk), "");
+  log_develop_trace(jvmcont)("stack_chunk_iterate_stack_bounded ------- end -------");
+  // tty->print_cr("<<< stack_chunk_iterate_stack %p %p", (oopDesc*)chunk, Thread::current());
+}
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_INLINE_HPP
