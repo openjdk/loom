@@ -3105,6 +3105,9 @@ javaVFrame* JavaThread::last_java_vframe(const frame f, RegisterMap *reg_map) {
 }
 
 Klass* JavaThread::security_get_caller_class(int depth) {
+  ResetNoHandleMark rnhm;
+  HandleMark hm(Thread::current());
+  
   vframeStream vfst(this);
   vfst.security_get_caller_frame(depth);
   if (!vfst.at_end()) {
