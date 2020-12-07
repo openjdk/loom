@@ -77,7 +77,11 @@ class StackChunkFrameStream : public StackObj {
     return _oopmap;
   }
 
-  StackChunkFrameStream& handle_deopted() {
+  void handle_deopted() {
+    if (_oopmap != NULL) return;
+
+    assert (!is_done(), "");
+    get_cb();
     if (UNLIKELY(_oopmap_slot < 0)) { // we could have marked frames for deoptimization in thaw_chunk
       CompiledMethod* cm = cb()->as_compiled_method();
       assert (cm->is_deopt_pc(pc()), "");
@@ -87,7 +91,6 @@ class StackChunkFrameStream : public StackObj {
       ContinuationCodeBlobLookup::find_blob_and_oopmap(pc1, _oopmap_slot);
       get_oopmap(pc1);
     }
-    return *this;
   }
 
   inline int to_offset(oop chunk) const {
@@ -121,6 +124,7 @@ class StackChunkFrameStream : public StackObj {
   inline void get_oopmap() const { get_oopmap(pc()); }
   inline const void get_oopmap(address pc) const {
     assert (cb() != NULL, "");
+    assert (!cb()->as_compiled_method()->is_deopt_pc(pc), "_oopmap_slot: %d", _oopmap_slot);
     assert (_oopmap_slot >= 0, "");
     _oopmap = cb()->oop_map_for_slot(_oopmap_slot, pc);
     assert (_oopmap != NULL, "");
@@ -281,6 +285,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack(oop chunk, OopClosureType* c
     //   break;
     // }
 
+    f.handle_deopted(); // because of deopt in thaw; TODO: remove when changing deoptimization
     CodeBlob* cb = f.cb();
     const ImmutableOopMap* oopmap = f.oopmap();
 

@@ -4097,46 +4097,25 @@ public:
     return false;
   }
 
-  void deoptimize_frames_in_chunk(oop chunk) {
-    for (StackChunkFrameStream f(chunk); !f.is_done(); f.next()) {
-      if (f.cb()->as_compiled_method()->is_marked_for_deoptimization() || _thread->is_interp_only_mode()) {
-        deoptimize_frame_in_chunk(f);
-      }
-    }
-  }
-
-  void deoptimize_frame_in_chunk(const StackChunkFrameStream& f) {
-    log_develop_trace(jvmcont)("Deoptimizing frame");
-    f.to_frame().deoptimize(NULL);
-  }
-
-  inline bool oop_fixed(oop obj, int offset) {
-    typedef typename ConfigT::OopT OopT;
-    OopT* loc = obj->obj_field_addr<OopT>(offset);
-    intptr_t before = *(intptr_t*)loc;
-    intptr_t after = cast_from_oop<intptr_t>(HeapAccess<>::oop_load(loc));
-    // tty->print_cr("!oop_fixed %d", before != after);
-    return before == after;
-  }
-
   NOINLINE bool thaw_one_frame_from_chunk(oop chunk, intptr_t* hsp, int* out_size, int* out_argsize, bool barriers) {
     StackChunkFrameStream f(chunk);
     assert (hsp == f.sp(), "");
 
-    CodeBlob* cb = f.cb();
-    int size = cb->frame_size(); // in words
-    int argsize = (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord; // in words
-
-    // tty->print_cr(">>>> thaw_one_frame_from_chunk thawing: "); cb->print_value_on(tty);
-
-    if (should_deoptimize()
-        && (cb->as_compiled_method()->is_marked_for_deoptimization() || (mode != mode_fast && _thread->is_interp_only_mode()))) {
-      deoptimize_frame_in_chunk(f);
-    }
+    // tty->print_cr(">>>> thaw_one_frame_from_chunk thawing: "); f.cb()->print_value_on(tty);
 
     if (UNLIKELY(barriers)) {
       InstanceStackChunkKlass::barriers_for_oops_in_frame<true>(f);
     }
+
+    if (should_deoptimize()
+        && (f.cb()->as_compiled_method()->is_marked_for_deoptimization() || (mode != mode_fast && _thread->is_interp_only_mode()))) {
+      deoptimize_frame_in_chunk(f);
+      f.handle_deopted();
+    }
+
+    CodeBlob* cb = f.cb();
+    int size = cb->frame_size(); // in words
+    int argsize = (cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord; // in words
 
     bool empty = (jdk_internal_misc_StackChunk::sp(chunk) + size) >= (jdk_internal_misc_StackChunk::size(chunk) - jdk_internal_misc_StackChunk::argsize(chunk));
     assert (!empty || argsize == jdk_internal_misc_StackChunk::argsize(chunk), "");
@@ -4191,6 +4170,28 @@ public:
     log_develop_trace(jvmcont)("thaw_chunk is_last: %d sp: " INTPTR_FORMAT " patching pc at " INTPTR_FORMAT " to " INTPTR_FORMAT, is_last, p2i(sp), p2i(sp - SENDER_SP_RET_ADDRESS_OFFSET), p2i(pc));
 
     // patch_chunk_pd(sp);
+  }
+
+  void deoptimize_frames_in_chunk(oop chunk) {
+    for (StackChunkFrameStream f(chunk); !f.is_done(); f.next()) {
+      if (f.cb()->as_compiled_method()->is_marked_for_deoptimization() || _thread->is_interp_only_mode()) {
+        deoptimize_frame_in_chunk(f);
+      }
+    }
+  }
+
+  void deoptimize_frame_in_chunk(const StackChunkFrameStream& f) {
+    log_develop_trace(jvmcont)("Deoptimizing frame");
+    f.to_frame().deoptimize(NULL);
+  }
+
+  inline bool oop_fixed(oop obj, int offset) {
+    typedef typename ConfigT::OopT OopT;
+    OopT* loc = obj->obj_field_addr<OopT>(offset);
+    intptr_t before = *(intptr_t*)loc;
+    intptr_t after = cast_from_oop<intptr_t>(HeapAccess<>::oop_load(loc));
+    // tty->print_cr("!oop_fixed %d", before != after);
+    return before == after;
   }
 
   template<bool top>
