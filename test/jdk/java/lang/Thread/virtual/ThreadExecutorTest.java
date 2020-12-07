@@ -846,23 +846,11 @@ public class ThreadExecutorTest {
     @Test(expectedExceptions = { RejectedExecutionException.class })
     public void testNoThreads3() throws Exception {
         ExecutorService executor = Executors.newThreadExecutor(task -> null);
-        executor.submitTask(() -> "foo");
-    }
-
-    @Test(expectedExceptions = { RejectedExecutionException.class })
-    public void testNoThreads4() throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(task -> null);
-        executor.submitTasks(List.of(() -> "foo"));
-    }
-
-    @Test(expectedExceptions = { RejectedExecutionException.class })
-    public void testNoThreads5() throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(task -> null);
         executor.invokeAll(List.of(() -> "foo"));
     }
 
     @Test(expectedExceptions = { RejectedExecutionException.class })
-    public void testNoThreads6() throws Exception {
+    public void testNoThreads4() throws Exception {
         ExecutorService executor = Executors.newThreadExecutor(task -> null);
         executor.invokeAny(List.of(() -> "foo"));
     }

@@ -240,12 +240,6 @@ public class Executors {
     /**
      * Creates an Executor that starts a new thread for each task.
      *
-     * <p> Tasks submitted with the {@linkplain ExecutorService#submitTask(Callable)
-     * submitTask} or {@linkplain ExecutorService#submitTasks(Collection) submitTasks}
-     * methods return {@linkplain CompletableFuture} objects that interrupt the
-     * thread when {@linkplain CompletableFuture#cancel(boolean) cancel(true)} is
-     * invoked.
-     *
      * @param threadFactory the factory to use when creating new threads
      * @return a newly created executor
      * @throws NullPointerException if threadFactory is null
@@ -261,12 +255,6 @@ public class Executors {
      * when created. The {@linkplain Thread#getContextClassLoader() context-class-loader}
      * is inherited when submitting a task. The threads have no {@link
      * java.security.Permission permissions}.
-     *
-     * <p> Tasks submitted with the {@linkplain ExecutorService#submitTask(Callable)
-     * submitTask} or {@linkplain ExecutorService#submitTasks(Collection) submitTasks}
-     * methods return {@linkplain CompletableFuture} objects that interrupt the
-     * thread when {@linkplain CompletableFuture#cancel(boolean) cancel(true)} is
-     * invoked.
      *
      * @return a newly created executor
      * @since 99

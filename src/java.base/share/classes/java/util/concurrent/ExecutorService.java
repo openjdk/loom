@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * An {@link Executor} that provides methods to manage termination and
@@ -268,6 +269,43 @@ public interface ExecutorService extends Executor, AutoCloseable {
     Future<?> submit(Runnable task);
 
     /**
+     * Submits the given value-returning tasks for execution and returns a
+     * lazily populated stream of completed Future objects with the result
+     * of each task.
+     *
+     * <p> Invoking the stream's {@linkplain Stream#close() close()} method
+     * cancels any remaining tasks as if by invoking {@linkplain
+     * Future#cancel(boolean) cancel(true)} on each remaining task.
+     *
+     * <p> If a thread is interrupted while waiting on the stream for a task to
+     * complete then the remaining tasks are cancelled, as if by invoking
+     * {@linkplain Future#cancel(boolean) cancel(true)}, and {@link
+     * CancellationException} is thrown with the interrupt status set.
+     *
+     * @implSpec
+     * The default implementation {@link #submit(Callable) submits} the tasks
+     * for execution and returns a stream that is lazily populated when the
+     * tasks complete.
+     *
+     * @apiNote This method is not atomic. RejectedExecutionException may
+     * be thrown after some tasks have been submitted for execution. This
+     * method makes a best effort attempt to cancel the tasks that it
+     * submitted when RejectedExecutionException is thrown.
+     *
+     * @param tasks the collection of tasks
+     * @param <T> the type of the values returned from the tasks
+     * @return stream of completed Futures
+     * @throws RejectedExecutionException if any task cannot be
+     *         scheduled for execution
+     * @throws NullPointerException if tasks or any of its elements are {@code null}
+     * @see CompletionService
+     * @since 99
+     */
+    default <T> Stream<Future<T>> submit(Collection<? extends Callable<T>> tasks) {
+        return ExecutorServiceHelper.submit(this, tasks);
+    }
+
+    /**
      * Executes the given tasks, returning a list of Futures holding
      * their status and results when all complete.
      * {@link Future#isDone} is {@code true} for each
@@ -307,10 +345,10 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * completes with an exception.
      *
      * @implSpec
-     * The default implementation invokes {@link #submitTasks(Collection)} to
-     * submit the tasks for execution. It then waits until all tasks have
-     * completed, or in the case that {@code cancelOnException} is true, that
-     * a task completes with an exception.
+     * The default implementation {@link #submit(Callable) submits} the tasks
+     * for execution. It then waits until all tasks have completed, or in the
+     * case that {@code cancelOnException} is true, that a task completes with
+     * an exception.
      *
      * @param tasks the collection of tasks
      * @param cancelOnException true to cancel unfinished tasks when
@@ -329,38 +367,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
     default <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
                                           boolean cancelOnException)
             throws InterruptedException {
-
-        List<CompletableFuture<T>> cfs = submitTasks(tasks);
-        try {
-            if (cancelOnException) {
-                // wait until a task fails or all tasks complete
-                CompletableFuture.completed(cfs)
-                        .filter(CompletableFuture::isCompletedExceptionally)
-                        .findAny();
-            } else {
-                // wait until all tasks complete
-                CompletableFuture.completed(cfs)
-                        .mapToLong(e -> 1L)
-                        .sum();
-            }
-        } catch (CancellationException e) {
-            if (Thread.interrupted()) {
-                throw new InterruptedException();
-            } else {
-                throw e;
-            }
-        } finally {
-            // cancel remaining
-            for (Future<T> f : cfs) {
-                if (!f.isDone()) {
-                    f.cancel(true);
-                }
-            }
-        }
-
-        @SuppressWarnings("unchecked")
-        List<Future<T>> futures = (List) cfs;
-        return futures;
+        return ExecutorServiceHelper.invokeAll(this, tasks, cancelOnException);
     }
 
     /**
