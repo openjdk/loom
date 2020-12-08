@@ -32,8 +32,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,14 +69,14 @@ public class Completed {
      */
     public void testBasic2() {
         try (var executor = Executors.newVirtualThreadExecutor()) {
-            var cf1 = executor.submitTask(() -> {
+            CompletableFuture<String> cf1 = submitTask(() -> {
                 Thread.sleep(Duration.ofMillis(500));
                 return "foo";
-            });
-            var cf2 = executor.submitTask(() -> {
+            }, executor);
+            CompletableFuture<String> cf2 = submitTask(() -> {
                 Thread.sleep(Duration.ofSeconds(1));
                 return "bar";
-            });
+            }, executor);
 
             long count = CompletableFuture.completed(cf1, cf2).mapToLong(e -> 1L).sum();
             assertTrue(count == 2);
@@ -84,6 +86,19 @@ public class Completed {
                     .collect(Collectors.toSet());
             assertEquals(results, Set.of("foo", "bar"));
         }
+    }
+
+    private <T> CompletableFuture<T> submitTask(Callable<T> task, Executor executor) {
+        var future = new CompletableFuture<T>();
+        executor.execute(() -> {;
+            try {
+                T result = task.call();
+                future.complete(result);
+            } catch (Throwable e) {
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
     }
 
     /**

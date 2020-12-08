@@ -545,26 +545,26 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * @throws NullPointerException if the task is null
      * @since 99
      */
-    default <T> CompletableFuture<T> submitTask(Callable<T> task) {
-        class RunnableCompletableFuture<T>
-                extends CompletableFuture<T> implements RunnableFuture<T> {
-            private final Callable<T> task;
-            RunnableCompletableFuture(Callable<T> task) {
-                this.task = Objects.requireNonNull(task);
-            }
-            public void run() {
-                try {
-                    T result = task.call();
-                    complete(result);
-                } catch (Throwable e) {
-                    completeExceptionally(e);
-                }
-            }
-        }
-        var future = new RunnableCompletableFuture<>(task);
-        execute(future);
-        return future;
-    }
+//    default <T> CompletableFuture<T> submitTask(Callable<T> task) {
+//        class RunnableCompletableFuture<T>
+//                extends CompletableFuture<T> implements RunnableFuture<T> {
+//            private final Callable<T> task;
+//            RunnableCompletableFuture(Callable<T> task) {
+//                this.task = Objects.requireNonNull(task);
+//            }
+//            public void run() {
+//                try {
+//                    T result = task.call();
+//                    complete(result);
+//                } catch (Throwable e) {
+//                    completeExceptionally(e);
+//                }
+//            }
+//        }
+//        var future = new RunnableCompletableFuture<>(task);
+//        execute(future);
+//        return future;
+//    }
 
     /**
      * Submits the given value-returning tasks for execution and returns a list
@@ -593,20 +593,20 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * @see CompletableFuture#completed(Collection)
      * @see CompletableFuture#completed(CompletableFuture[])
      */
-    default <T> List<CompletableFuture<T>> submitTasks(Collection<? extends Callable<T>> tasks) {
-        List<CompletableFuture<T>> futures = new ArrayList<>();
-        try {
-            for (Callable<T> t : tasks) {
-                futures.add(submitTask(t));
-            }
-            return futures;
-        } catch (Throwable e) {
-            for (Future<T> f : futures) {
-                if (!f.isDone()) {
-                    f.cancel(true);
-                }
-            }
-            throw e;
-        }
-    }
+//    default <T> List<CompletableFuture<T>> submitTasks(Collection<? extends Callable<T>> tasks) {
+//        List<CompletableFuture<T>> futures = new ArrayList<>();
+//        try {
+//            for (Callable<T> t : tasks) {
+//                futures.add(submitTask(t));
+//            }
+//            return futures;
+//        } catch (Throwable e) {
+//            for (Future<T> f : futures) {
+//                if (!f.isDone()) {
+//                    f.cancel(true);
+//                }
+//            }
+//            throw e;
+//        }
+//    }
 }
