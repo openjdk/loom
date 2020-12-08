@@ -59,6 +59,20 @@ class StackChunkFrameStream : public StackObj {
     get_cb();
   }
 
+  StackChunkFrameStream(oop chunk, const frame& f) {
+    assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
+    _end = jdk_internal_misc_StackChunk::end_address(chunk);
+
+    assert (jdk_internal_misc_StackChunk::is_in_chunk(chunk, f.sp()), "");
+    _sp = f.sp();
+    if (f.cb() != NULL) {
+      _oopmap = NULL;
+      _cb = f.cb();
+    } else {
+      get_cb();
+    }
+  }
+
   bool is_done() const { return _sp >= _end; }
 
   void next() { _sp += cb()->frame_size(); get_cb(); }
@@ -67,8 +81,9 @@ class StackChunkFrameStream : public StackObj {
   void set_end(intptr_t* end) { _end = end; }
 
   // Query
-  intptr_t*      sp() const { return _sp; }
-  inline address pc() const { return get_pc(); }
+  intptr_t*      end() const { return _end; }
+  intptr_t*      sp() const  { return _sp; }
+  inline address pc() const  { return get_pc(); }
 
   CodeBlob* cb() const { return _cb; }
 

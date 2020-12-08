@@ -65,11 +65,6 @@ static inline void copy_to_stack(void* from, void* to, size_t size) {
   cont_thaw_chunk_memcpy(from, to, size);
 }
 
-ContinuationEntry* ContinuationEntry::from_frame(const frame& f) {
-  assert (Continuation::is_continuation_enterSpecial(f), "");
-  return (ContinuationEntry*)f.unextended_sp();
-}
-
 frame ContinuationEntry::to_frame() {
   static CodeBlob* cb = CodeCache::find_blob(entry_pc());
   return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);
@@ -248,17 +243,6 @@ template<typename FKind>
 inline address* hframe::return_pc_address() const {
   assert (FKind::interpreted, "");
   return (address*)&interpreted_link_address()[frame::return_addr_offset];
-}
-
-const CodeBlob* hframe::get_cb() const {
-  if (_cb_imd == NULL) {
-    int slot;
-    _cb_imd = CodeCache::find_blob_and_oopmap(_pc, slot);
-    if (_oop_map == NULL && slot >= 0) {
-      _oop_map = ((CodeBlob*)_cb_imd)->oop_map_for_slot(slot, _pc);
-    }
-  }
-  return (CodeBlob*)_cb_imd;
 }
 
 const ImmutableOopMap* hframe::get_oop_map() const {
@@ -720,8 +704,9 @@ inline frame ContinuationHelper::last_frame(JavaThread* thread) {
   //   StubRoutines::cont_doYield_stub(), StubRoutines::cont_doYield_stub()->oop_map_for_slot(0, anchor->last_Java_pc()), true);
 }
 
-template<typename FKind, op_mode mode>
-static inline frame sender_for_compiled_frame(const frame& f) {
+template <typename ConfigT, op_mode mode>
+template<typename FKind>
+inline frame Freeze<ConfigT, mode>::sender_for_compiled_frame(const frame& f) {
 #ifdef CONT_DOUBLE_NOP
   CachedCompiledMetadata md;
   // tty->print_cr(">>> sender fast: %d !FKind::stub: %d", fast, !FKind::stub);
@@ -769,24 +754,14 @@ static inline frame sender_for_compiled_frame(const frame& f) {
   }
 }
 
-static inline frame sender_for_interpreted_frame(const frame& f) {
+template <typename ConfigT, op_mode mode>
+inline frame Freeze<ConfigT, mode>::sender_for_interpreted_frame(const frame& f) {
   return frame(f.sender_sp(), f.interpreter_frame_sender_sp(), f.link(), f.sender_pc());
 }
 
 // inline void Freeze<ConfigT, mode>::update_register_map_stub(RegisterMap* map, const frame& f) {
 //   update_register_map(map, link_address_stub(f));
 // }
-
-template <typename ConfigT, op_mode mode>
-template<typename FKind>
-inline frame Freeze<ConfigT, mode>::sender(const frame& f) {
-  assert (FKind::is_instance(f), "");
-  if (FKind::interpreted) {
-    return sender_for_interpreted_frame(f);
-  } else {
-    return sender_for_compiled_frame<FKind, mode>(f);
-  }
-}
 
 static inline int callee_link_index(const hframe& f) {
   return f.sp() - (frame::sender_sp_offset << LogElemsPerWord);
@@ -892,22 +867,10 @@ inline void Freeze<ConfigT, mode>::relativize_interpreted_frame_metadata(const f
   ContMirror::relativize(vfp, hfp, frame::interpreter_frame_locals_offset);
 }
 
-template <typename ConfigT, op_mode mode>
-frame Freeze<ConfigT, mode>::chunk_start_frame_pd(oop chunk, intptr_t* sp) {
-  address pc = *(address*)(sp - 1);
-  intptr_t* fp = *(intptr_t**)(sp - 2); // TODO PERF -- unnecessary
-  return frame(sp, sp, fp, pc, NULL, NULL, true);
-}
-
-static frame chunk_top_frame_pd(oop chunk, intptr_t* sp, RegisterMap* map) {
-  address pc = *(address*)(sp - 1);
-
-  intptr_t** fp_address = (intptr_t**)(sp - 2);
-  intptr_t* fp = *fp_address;
+static void update_map_for_chunk_frame(RegisterMap* map) {
   if (map->update_map()) {
     frame::update_map_with_saved_link(map, (intptr_t**)(intptr_t)(-2 * BytesPerWord)); // for chunk frames, we store offset
   }
-  return frame(sp, sp, fp, pc, ContinuationCodeBlobLookup::find_blob(pc), NULL, true);
 }
 
 template <typename ConfigT, op_mode mode>
@@ -1230,46 +1193,6 @@ static bool assert_frame_laid_out(frame f) {
   return f.raw_pc() == pc && f.fp() == fp;
 }
 
-static bool assert_entry_frame_laid_out(JavaThread* thread) {
-  assert (thread->has_last_Java_frame(), "Wrong place to use this assertion");
-
-  ContinuationEntry* cont = Continuation::get_continuation_entry_for_continuation(thread, get_continuation(thread));
-  assert (cont != NULL, "");
-
-  intptr_t* unextended_sp = cont->entry_sp();
-  intptr_t* sp;
-  if (cont->argsize() > 0) {
-    sp = cont->bottom_sender_sp();
-  } else {
-    sp = NULL;
-    RegisterMap map(thread, false, false, false);
-    for (frame f = thread->last_frame(); !f.is_first_frame() && f.sp() <= unextended_sp; f = f.sender(&map)) sp = f.sp();
-  }
-  assert (sp != NULL && sp <= cont->bottom_sender_sp(), "sp: %p bottom_sender_sp: %p", sp, cont->bottom_sender_sp());
-  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
-
-  if (pc != StubRoutines::cont_returnBarrier()) {
-    CodeBlob* cb = pc != NULL ? CodeCache::find_blob(pc) : NULL;
-
-    if (cb == NULL || !cb->is_compiled() || !cb->as_compiled_method()->method()->is_continuation_enter_intrinsic()) {
-      pfl();
-
-      tty->print_cr(">>>>>>><<<<<<<<<");
-      tty->print_cr(">>>> entry unextended_sp: %p sp: %p", unextended_sp, sp);
-      if (cb == NULL) tty->print_cr("NULL"); else cb->print_on(tty);
-      os::print_location(tty, (intptr_t)pc);
-     }
-  
-    assert (cb != NULL, "");
-    assert (cb->is_compiled(), "");
-    assert (cb->as_compiled_method()->method()->is_continuation_enter_intrinsic(), "");
-  }
-
-  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);  
-  // assert (cont->entry_fp() == fp, "entry_fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(cont->entry_sp()), p2i(fp));
-  
-  return true;
-}
 #endif
 
 #endif // CPU_X86_CONTINUATION_X86_INLINE_HPP
