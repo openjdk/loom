@@ -36,6 +36,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -316,6 +317,7 @@ public class Submit {
         AtomicBoolean taskStarted = new AtomicBoolean();
         AtomicReference<Throwable> taskException = new AtomicReference<>();
         Callable<String> task = () -> {
+            taskStarted.set(true);
             try {
                 Thread.sleep(Duration.ofDays(1));
             } catch (InterruptedException e) {
@@ -333,8 +335,8 @@ public class Submit {
                 assertTrue(false);
             } catch (NullPointerException expected) { }
 
-            // check task was cancelled
-            if (executed.get()) {
+            // if task ran then it should have been interrupted
+            if (taskStarted.get()) {
                 Throwable exc;
                 while ((exc = taskException.get()) == null) {
                     Thread.sleep(20);
