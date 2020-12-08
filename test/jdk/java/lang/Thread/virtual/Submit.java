@@ -313,6 +313,7 @@ public class Submit {
      * throwing NPE should be cancelled.
      */
     public void testNull3() throws Exception {
+        AtomicBoolean taskStarted = new AtomicBoolean();
         AtomicReference<Throwable> taskException = new AtomicReference<>();
         Callable<String> task = () -> {
             try {
@@ -333,11 +334,13 @@ public class Submit {
             } catch (NullPointerException expected) { }
 
             // check task was cancelled
-            Throwable exc;
-            while ((exc = taskException.get()) == null) {
-                Thread.sleep(20);
+            if (executed.get()) {
+                Throwable exc;
+                while ((exc = taskException.get()) == null) {
+                    Thread.sleep(20);
+                }
+                assertTrue(exc instanceof InterruptedException);
             }
-            assertTrue(exc instanceof InterruptedException);
         }
     }
 
