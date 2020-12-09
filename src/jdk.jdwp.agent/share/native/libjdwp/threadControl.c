@@ -2593,61 +2593,7 @@ threadControl_setEventMode(jvmtiEventMode mode, EventIndex ei, jthread thread)
 
         debugMonitorEnter(threadLock);
         {
-            if (isVThread(thread)) {
-                /* vthread fixme: Getting the carrier thread here is just a hack. It does not work if
-                 * the vthread is not mounted, and even if mounted, does not result in the correct
-                 * behaviour if the vthread changes carrier threads. If the carrier thread is
-                 * NULL we need to defer all the code below, most notably
-                 * threadSetEventNotificationMode(), until after the vthread is mounted. We also need
-                 * to call threadSetEventNotificationMode() each time there is an unmount or mount
-                 * since the thread that needs notifications will change as the vthread moves
-                 * between carrier threads. The best way to manage this might be to move
-                 * HandlerNodes for unmounted vthreads onto a linked list hanging off the vthread's
-                 * ThreadNode. But that also complicates finding HandlerNodes. For example,
-                 * when a breakpoint is cleared, we call eventHandler_freeByID(), which would
-                 * need to also search every vthread for the handler. The other choice is to
-                 * keep handlers where they are now (off the array of handler chains), but
-                 * for every mount/unmount, search all the handlers in all the chains for
-                 * ones that are for the mounting/unmounting vthread. This could be slow,
-                 * although generally speaking we don't have many HandlerNodes because
-                 * they are generated indirectly by the debugger as users do things
-                 * like set breakpoints.
-                 * A hybrid approach might be best. Keep the handler chains as they are now,
-                 * but also have each vthread maintain a list of its handler nodes for faster
-                 * handling during mount/unmount.
-                 *
-                 * And it should also be noted here that if the carrier thread is null, the
-                 * findThread() call ends up returning the current thread, and then
-                 * threadSetEventNotificationMode() is called with a NULL thread, resulting
-                 * in the event being enabled on all threads. This bug actually has the
-                 * desireable affect of making breakpoints that are filtered on an unmounted
-                 * vthread work as expected, because all the carrier threads get the breakpoint
-                 * event enabled. However, for some odd reason it also works as expected if
-                 * the vthread is already mounted. I expected that the breakpoint event would only
-                 * be enabled on the carrier thread in that case, and therefore if the vthread
-                 * was moved to a different carrier thread, you would stop getting breakpoints
-                 * until it moved back to the original carrier thread. That's not the case for some
-                 * reason, and I'm see the breakpoints no matter what carrier thread the vthread
-                 * runs on. It turns out that the agent installs a global breakpoint for
-                 * Thread.resume(), so global breakpoints are always enabled.
-                 * See handleAppResumeBreakpoint.
-                 *
-                 * It also should be noted that this does not cause a problem for single stepping
-                 * because:
-                 *  - There is at most one single step HandlerNode per thread.
-                 *  - VThread mount/unmount events result in explicitly doing the proper
-                 *    enabling/disabling of the JVMTI single step event on the carrier thread.
-                 * There is a potential issue with initiating a StepRequest on and unmounted
-                 * vthread. See the fixme comment in stepControl_beginStep.
-                 */
-              /* vthread fixme: If we save the event mode state with the vthread node, then we can
-                 clear that state when the vthread is umounted and restore it when mounted again.
-                 This is similar to what we already do for single stepping, but could be done
-                 in a generic fashion for all events.
-              */
-                thread = getVThreadThread(thread);
-            }
-            node = findThread(&runningThreads, thread);
+            node = findRunningThread(thread);
             if ((node == NULL) || (!node->isStarted)) {
                 JNIEnv *env;
 
@@ -2777,7 +2723,13 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
         JNIEnv *env = getEnv();
         ThreadNode *threadNode;
         ThreadNode *vthreadNode;
-        jthread vthread;
+        jthread vthread = NULL;
+        jboolean is_vthread = isVThread(thread);
+
+        if (is_vthread) {
+            vthread = thread;
+            thread = getVThreadThread(vthread);
+        }
 
         threadNode = findThread(&runningThreads, thread);
 
@@ -2795,7 +2747,7 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
              * If we are doing a STEP_INTO and are doing class filtering (usually library
              * classes), we are relying on METHOD_ENTRY events to tell us if we've stepped
              * back into user code. We won't get this event if when we resume the
-             * continuation, so we need to let the stepControl now that we got a
+             * continuation, so we need to let the stepControl know that we got a
              * CONTINUATION_RUN event so it can do the right thing in absense of
              * the METHOD_ENTRY event. There's also a FramePop setup situation that
              * stepControl needs to deal with, which is another reason it needs to
@@ -2804,7 +2756,6 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
             stepControl_handleContinuationRun(env, thread, &threadNode->currentStep);
         }
 
-        vthread = getThreadVThread(threadNode->thread);
         if (vthread == NULL) {
             debugMonitorExit(threadLock);
             return; /* Nothing more to do if thread is not executing a vthread. */
@@ -2821,13 +2772,6 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
         JDI_ASSERT(vthreadNode->isStarted);
         JDI_ASSERT(bagSize(vthreadNode->eventBag) == 0);
 
-        // vthread fixme: Can't think of why this should be needed. The agent doesn't
-        // consider yields to be like a suspend and runs to be like a resume. The agent
-        // considers the vthread to be running the whole time it was unmounted.
-        // frameGeneration would have been incremented the last time the vthread was
-        // resumed, and this should suffice.
-        vthreadNode->frameGeneration++; /* Increment, since this is like a thread resume. */
-
         /* If we are not single stepping in this vthread then there is nothing more to do. */
         if (!vthreadNode->currentStep.pending) {
             debugMonitorExit(threadLock);
@@ -2841,74 +2785,6 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
          */
         JDI_ASSERT(!threadNode->currentStep.pending);
         stepControl_handleContinuationRun(env, vthread, &vthreadNode->currentStep);
-
-        /*
-         * Move the single step state from the vthreadNode to threadNode, but only if we aren't
-         * already single stepping on the carrier thread.
-         *
-         * vthread fixme: The notion of the carrier thread already single stepping should
-         * go away once we have vthread events.
-         */
-        if (!threadNode->currentStep.pending) {
-            /* Enable JVMTI single step on the carrier thread if necessary. */
-            if (vthreadNode->instructionStepMode == JVMTI_ENABLE) {
-                stepControl_enableStepping(thread);
-                // vthread fixme: This shouldn't be needed since it is already
-                // done by threadSetEventNotificationMode().
-                threadNode->instructionStepMode = JVMTI_ENABLE;
-            }
-
-            /* Restore the NotifyFramePop that was in place when this vthread yielded. */
-            {
-                jvmtiError error;
-                jint depth;
-                /* NotifyFramePop was originally called with a depth of 0 to indicate the current
-                 * frame. However, frames have been pushed since then, so we need to adjust the
-                 * depth to get to the right frame.
-                 *
-                 * fromStackDepth represents the number of frames on the stack when the STEP_OVER
-                 * was started. NotifyFramePop was called on the method that was entered, which is
-                 * one frame below (fromStackDepth + 1). To account for new frames pushed since
-                 * then, we subtract fromStackDepth from the current number of frames. This
-                 * represents the frame where the STEP_OVER was done, but since we want one
-                 * frame below this point, we also subtract one.
-                 */
-                depth = continuation_frame_count - vthreadNode->currentStep.fromStackDepth;
-                depth--; /* We actually want the frame one below the adjusted fromStackDepth. */
-                if (depth >= 0) {
-                    error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)(gdata->jvmti, thread, depth);
-                    if (error == JVMTI_ERROR_DUPLICATE) {
-                        error = JVMTI_ERROR_NONE;
-                        /* Already being notified, continue without error */
-                    } else if (error != JVMTI_ERROR_NONE) {
-                        EXIT_ERROR(error, "NotifyFramePop failed during mountVThread");
-                    }
-                } else {
-                    /*
-                     * If the depth is less than 0, then that means we were single stepping over
-                     * the Continuation.doYield() call. In this case NotifyFramePop is not going to work
-                     * since there was never one setup (doYield() was never actually entered). So
-                     * all that needs to be done is to restore single stepping, and we'll stop
-                     * on the next bytecode after the doYield() call.
-                     */
-                    JDI_ASSERT(depth == -1);
-                    if (vthreadNode->instructionStepMode == JVMTI_DISABLE) {
-                        stepControl_enableStepping(thread);
-                        // vthread fixme: This shouldn't be needed since it is already
-                        // done by threadSetEventNotificationMode().
-                        threadNode->instructionStepMode = JVMTI_ENABLE;
-                        vthreadNode->instructionStepMode = JVMTI_ENABLE;
-                    }
-                }
-            }
-
-            /* Enable events */
-            threadControl_setEventMode(JVMTI_ENABLE, EI_EXCEPTION_CATCH, thread);
-            threadControl_setEventMode(JVMTI_ENABLE, EI_FRAME_POP, thread);
-            if (vthreadNode->currentStep.methodEnterHandlerNode != NULL) {
-                threadControl_setEventMode(JVMTI_ENABLE, EI_METHOD_ENTRY, thread);
-            }
-        }
     }
     debugMonitorExit(threadLock);
 }
@@ -2916,22 +2792,18 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
 void
 threadControl_continuationYield(jthread thread, jint continuation_frame_count)
 {
-    /* vthread fixme: need to figure out what to do with these 4 ThreadNode fields:
-       unsigned int popFrameEvent : 1;
-       unsigned int popFrameProceed : 1;
-       unsigned int popFrameThread : 1;
-       InvokeRequest currentInvoke;
-    */
     debugMonitorEnter(threadLock);
     {
         JNIEnv *env = getEnv();
-        jthread vthread;
         ThreadNode *threadNode;
-        ThreadNode *vthreadNode = NULL;
         jint total_frame_count;
         jint fromDepth;
         jboolean pending;
-        jboolean is_vthread;
+
+        if (isVThread(thread)) {
+            debugMonitorExit(threadLock);
+            return; /* Nothing to do for vthreads. */
+        }
 
         threadNode = findThread(&runningThreads, thread);
 
@@ -2945,21 +2817,6 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
         JDI_ASSERT(bagSize(threadNode->eventBag) == 0);
         pending = threadNode->currentStep.pending;
 
-        vthread = getThreadVThread(thread);
-        if (vthread != NULL) {
-            vthreadNode = findThread(&runningVThreads, vthread);
-            if (!gdata->notifyDebuggerOfAllVThreads && vthreadNode == NULL) {
-                /* This is not a vthread we are tracking. */
-                debugMonitorExit(threadLock);
-                return;
-            }
-            JDI_ASSERT(vthreadNode != NULL);
-            JDI_ASSERT(vthreadNode->isStarted);
-            JDI_ASSERT(bagSize(vthreadNode->eventBag) == 0);
-            pending = pending || vthreadNode->currentStep.pending;
-        }
-        is_vthread = vthreadNode != NULL;
-
         /*
          * If we are not single stepping in this thread, then there is nothing to do.
          */
@@ -2969,110 +2826,54 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
         }
 
         /* At what depth were we single stepping. */
-        if (is_vthread) {
-            fromDepth = vthreadNode->currentStep.fromStackDepth;
-        } else {
-            fromDepth = threadNode->currentStep.fromStackDepth;
-        }
+        fromDepth = threadNode->currentStep.fromStackDepth;
+
         /*
          * Note the continuation has already been unmounted, so total_frame_count will not
-         * include the continuation frames. Note, even when dealing with a vthread here,
-         * we still awant to get the carrier thread's frame count.
+         * include the continuation frames.
          */
         total_frame_count = getThreadFrameCount(thread);
 
-        if (!is_vthread && threadNode->currentStep.depth == JDWP_STEP_DEPTH(OVER) &&
+        if (threadNode->currentStep.depth == JDWP_STEP_DEPTH(OVER) &&
             total_frame_count == fromDepth) {
             /*
-             * We were stepping over Continuation.doContinue() in Continuation.run(). This
+             * We were stepping over Continuation.enterSpecial() in Continuation.run(). This
              * is a special case. Before the continuation was unmounted due to the yield, the
              * stack looked like:
              *    java.lang.Continuation.yield0
              *    java.lang.Continuation.yield
-             *    <vthread frames>  <-- if vthread, otherwise just additional continuation frames
-             *    java.lang.Continuation.enter  <-- bottommost continuation frame
-             *    java.lang.Continuation.run    <-- doContinue() call jumps into continuation
-             *    java.lang.VirtualThread.runContinuation  <-- if vthread, otherwise will be different
-             *    <scheduler frames>
-             * All frames above run(), starting with enter(), are continuation frames. The
-             * correct thing to do here is just enable single stepping. This will resume single
-             * stepping in Continuation.run() right after the Continuation.doContinue() call.
+             *    <user continuation frames>    <-- bottommost continuation frame
+             *    java.lang.Continuation.run    <-- enterSpecial() call jumps into continuation
+             *    <user non-continuation frames>
+             * All frames above run() are continuation frames. The correct thing to do here
+             * is just enable single stepping. This will resume single stepping in Continuation.run()
+             * right after the Continuation.enterSpecial() call.
              */
             JDI_ASSERT(threadNode->instructionStepMode == JVMTI_DISABLE);
             {
                 stepControl_enableStepping(thread);
                 threadNode->instructionStepMode = JVMTI_ENABLE;
             }
-        } else if (!is_vthread) {
-            /* We were single stepping, but not in a vthread. */
-            if (total_frame_count < fromDepth) { /* Check if fromDepth is in the continuation. */
-                /*
-                 * This means the frame we were single stepping in was part of the set of
-                 * frames that were frozen when this continuation yielded. Because of that
-                 * we need to re-enable single stepping because we won't ever be getting the
-                 * FRAME_POP event for returning to that frame. This will resume single stepping
-                 * in Continuation.run() right after the Continuation.doContinue() call.
-                 */
-                if (threadNode->instructionStepMode == JVMTI_DISABLE) {
-                    stepControl_enableStepping(thread);
-                    threadNode->instructionStepMode = JVMTI_ENABLE;
-                }
-            } else {
-                /*
-                 * We are not single stepping in the continuation, and from the earlier check we
-                 * know we are not single stepping in Continuation.run(), because that would imply
-                 * we were single stepping over the doContinue() call, and we already checked
-                 * for that. There is nothing to do in this case. A NotifyFramePop is already setup
-                 * for a frame further up the stack.
-                 */
+        } else if (total_frame_count < fromDepth) { /* Check if fromDepth is in the continuation. */
+            /*
+             * This means the frame we were single stepping in was part of the set of
+             * frames that were frozen when this continuation yielded. Because of that
+             * we need to re-enable single stepping because we won't ever be getting the
+             * FRAME_POP event for returning to that frame. This will resume single stepping
+             * in Continuation.run() right after the Continuation.doContinue() call.
+             */
+            if (threadNode->instructionStepMode == JVMTI_DISABLE) {
+                stepControl_enableStepping(thread);
+                threadNode->instructionStepMode = JVMTI_ENABLE;
             }
         } else {
             /*
-             * We are single stepping the vthread, not the carrier thread.
+             * We are not single stepping in the continuation, and from the earlier check we
+             * know we are not single stepping in Continuation.run(), because that would imply
+             * we were single stepping over the doContinue() call, and we already checked
+             * for that. There is nothing to do in this case. A NotifyFramePop is already setup
+             * for a frame further up the stack.
              */
-            JDI_ASSERT(vthreadNode->currentStep.is_vthread);
-            if (vthreadNode->currentStep.depth == JDWP_STEP_DEPTH(INTO) &&
-                (continuation_frame_count == fromDepth)) {
-                /* We are stepping into Continuation.doYield(), so leave single stepping enabled.
-                 * This will resume single stepping in Continuation.run() right after the
-                 * Continuation.enter() call.
-                 */
-                // vthread fixme: I think when vthread events are supported, this becomes irrelevant,
-                // and instead single stepping will simply resume automatically when the vthread
-                // is mounted again.
-            } else if (JNI_FALSE /*total_frame_count >= fromDepth*/) { /* Check if fromDepth is NOT in the continuation. */
-                // vthread fixme: the above check doesn't work anymore because fromDepth no longer
-                // includes the non-continuation frames. However, this likely also will no longer
-                // matter once vthread events are supported.
-                /*
-                 * This means the single stepping was initiated stepping in a vthread, but in that small
-                 * window after Thread.setVirtualThread(this) has been called, and before the vthread's
-                 * continuation was actually mounted. An example of this is stepping over the cont.run()
-                 * call in VirtualThread.runContinuation(). In this case we just leave the carrier
-                 * thread's single step state in place. We should eventually get a FramePop event to
-                 * enable single stepping again.
-                 */
-                JDI_ASSERT(vthreadNode->currentStep.depth == JDWP_STEP_DEPTH(OVER));
-            } else {
-                /*
-                 * We were single stepping in the vthread, and now we need to stop doing that since
-                 * we are leaving the vthread.
-                 */
-
-                /* Clean up JVMTI SINGLE_STEP state. */
-                if (vthreadNode->instructionStepMode == JVMTI_ENABLE) {
-                    stepControl_disableStepping(thread);
-                    threadNode->instructionStepMode = JVMTI_DISABLE;
-                    vthreadNode->instructionStepMode = JVMTI_ENABLE; // so we re-enable it during the Run event
-                }
-
-                /* Disable events */
-                threadControl_setEventMode(JVMTI_DISABLE, EI_EXCEPTION_CATCH, thread);
-                threadControl_setEventMode(JVMTI_DISABLE, EI_FRAME_POP, thread);
-                if (vthreadNode->currentStep.methodEnterHandlerNode != NULL) {
-                    threadControl_setEventMode(JVMTI_DISABLE, EI_METHOD_ENTRY, thread);
-                }
-            }
         }
     }
     debugMonitorExit(threadLock);

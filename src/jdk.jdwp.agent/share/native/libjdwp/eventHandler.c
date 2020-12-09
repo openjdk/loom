@@ -595,6 +595,13 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
  * on a vthread that we have not notified the debugger about yet. If the event passes the event
  * filters, then we will notify the debugger with a THREAD_START and add it to our list of
  * vthreads. Otherwise we ignore it.
+ *
+ * vthread fixme: We should be able to get rid of this. Eventually we won't be sending the
+ * the fake THREAD_START event anymore. This just leaves the need to call threadControl_addVThread()
+ * for the vthread so the debug agent can track it. This could probably be deferred until it is
+ * really needed, such as when the event gets sent to the debugger (if one actually gets sent)
+ * or when the debugger sends a command that references the thread. It may mean adding special
+ * checks in more than one place when a vthread lookup fails, and add the vthread at that point.
  */
 static void
 filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSessionID)
@@ -609,11 +616,11 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
      * might not end up happening due to event filtering. Therefore we need to do a dry run
      * with the filtering to see if we really need to add this vthread.
      */
+    debugMonitorEnter(handlerLock);
     {
         HandlerNode *node = getHandlerChain(ei)->first;
         char        *classname  = getClassname(evinfo->clazz);
 
-        debugMonitorEnter(handlerLock);
 
         /* Filter the event over each handler node. */
         while (node != NULL) {
@@ -632,9 +639,9 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
             node = next;
         }
 
-        debugMonitorExit(handlerLock);
         jvmtiDeallocate(classname);
     }
+    debugMonitorExit(handlerLock);
 
     if (needToAddVThread) {
         /* Make sure this vthread gets added to the vthreads list. */
@@ -862,28 +869,12 @@ getMethodClass(jvmtiEnv *jvmti_env, jmethodID method)
     return clazz;
 }
 
-// If passed a carrier thread, returns the mounted vthread. Otherwise just
-// returns whatever thread is passed to it. This is done because currently
-// JVMTI delivers all events on the carrier thread, but we need to treat
-// as being delivered on the vthread.
-static jthread
-getEventTargetThread(jthread thread)
-{
-  jthread vthread = getThreadVThread(thread);
-  if (vthread != NULL) {
-      return vthread;
-  } else {
-      return thread;
-  }
-}
-
 /* Event callback for JVMTI_EVENT_SINGLE_STEP */
 static void JNICALL
 cbSingleStep(jvmtiEnv *jvmti_env, JNIEnv *env,
                         jthread thread, jmethodID method, jlocation location)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbSingleStep: thread=%p", thread));
 
@@ -906,7 +897,6 @@ cbBreakpoint(jvmtiEnv *jvmti_env, JNIEnv *env,
                         jthread thread, jmethodID method, jlocation location)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbBreakpoint: thread=%p", thread));
 
@@ -930,7 +920,6 @@ cbFramePop(jvmtiEnv *jvmti_env, JNIEnv *env,
                         jboolean wasPoppedByException)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     /* JDWP does not return these events when popped due to an exception. */
     if ( wasPoppedByException ) {
@@ -959,7 +948,6 @@ cbException(jvmtiEnv *jvmti_env, JNIEnv *env,
                         jmethodID catch_method, jlocation catch_location)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbException: thread=%p", thread));
 
@@ -985,7 +973,6 @@ static void JNICALL
 cbThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbThreadStart: thread=%p", thread));
 
@@ -1004,7 +991,6 @@ static void JNICALL
 cbThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbThreadEnd: thread=%p", thread));
 
@@ -1024,7 +1010,6 @@ cbClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *env,
                         jthread thread, jclass klass)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbClassPrepare: thread=%p", thread));
 
@@ -1054,7 +1039,6 @@ cbClassLoad(jvmtiEnv *jvmti_env, JNIEnv *env,
                         jthread thread, jclass klass)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbClassLoad: thread=%p", thread));
 
@@ -1077,7 +1061,6 @@ cbFieldAccess(jvmtiEnv *jvmti_env, JNIEnv *env,
                         jobject object, jfieldID field)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbFieldAccess: thread=%p", thread));
 
@@ -1105,7 +1088,6 @@ cbFieldModification(jvmtiEnv *jvmti_env, JNIEnv *env,
         char signature_type, jvalue new_value)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbFieldModification: thread=%p", thread));
 
@@ -1133,7 +1115,6 @@ cbExceptionCatch(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread,
         jmethodID method, jlocation location, jobject exception)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbExceptionCatch: thread=%p", thread));
 
@@ -1157,7 +1138,6 @@ cbMethodEntry(jvmtiEnv *jvmti_env, JNIEnv *env,
                         jthread thread, jmethodID method)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     LOG_CB(("cbMethodEntry: thread=%p", thread));
 
@@ -1180,7 +1160,6 @@ cbMethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
                         jboolean wasPoppedByException, jvalue return_value)
 {
     EventInfo info;
-    thread = getEventTargetThread(thread);
 
     /* JDWP does not return these events when popped due to an exception. */
     if ( wasPoppedByException ) {
@@ -1212,7 +1191,6 @@ cbMonitorContendedEnter(jvmtiEnv *jvmti_env, JNIEnv *env,
     jmethodID  method;
     jlocation  location;
 
-    thread = getEventTargetThread(thread);
     LOG_CB(("cbMonitorContendedEnter: thread=%p", thread));
 
     BEGIN_CALLBACK() {
@@ -1246,7 +1224,6 @@ cbMonitorContendedEntered(jvmtiEnv *jvmti_env, JNIEnv *env,
     jmethodID  method;
     jlocation  location;
 
-    thread = getEventTargetThread(thread);
     LOG_CB(("cbMonitorContendedEntered: thread=%p", thread));
 
     BEGIN_CALLBACK() {
@@ -1281,7 +1258,6 @@ cbMonitorWait(jvmtiEnv *jvmti_env, JNIEnv *env,
     jmethodID  method;
     jlocation  location;
 
-    thread = getEventTargetThread(thread);
     LOG_CB(("cbMonitorWait: thread=%p", thread));
 
     BEGIN_CALLBACK() {
@@ -1324,7 +1300,6 @@ cbMonitorWaited(jvmtiEnv *jvmti_env, JNIEnv *env,
     jmethodID  method;
     jlocation  location;
 
-    thread = getEventTargetThread(thread);
     LOG_CB(("cbMonitorWaited: thread=%p", thread));
 
     BEGIN_CALLBACK() {
@@ -1503,7 +1478,7 @@ cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
     EventInfo info;
 
     LOG_CB(("cbVThreadTerminated: vthread=%p", vthread));
-    /*ttyrmessage("cbVThreadTerminated: vthread=%p", vthread);*/
+    /*tty_message("cbVThreadTerminated: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
     BEGIN_CALLBACK() {
