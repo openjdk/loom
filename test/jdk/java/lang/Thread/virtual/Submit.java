@@ -105,13 +105,15 @@ public class Submit {
      * should be cancelled.
      */
     public void testClose2() throws Exception {
-        AtomicReference<Throwable> task2Exception = new AtomicReference<>();
+        AtomicBoolean taskStarted = new AtomicBoolean();
+        AtomicReference<Throwable> taskException = new AtomicReference<>();
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> {
+            taskStarted.set(true);
             try {
                 Thread.sleep(Duration.ofDays(1));
             } catch (Exception e) {
-                task2Exception.set(e);
+                taskException.set(e);
             }
             return "bar";
         };
@@ -126,12 +128,14 @@ public class Submit {
                 assertEquals(first, "foo");
             }
 
-            // task2 should be cancelled
-            Throwable exc;
-            while ((exc = task2Exception.get()) == null) {
-                Thread.sleep(20);
+            // task2 sleep should be interrupted if task2 started
+            if (taskStarted.get()) {
+                Throwable exc;
+                while ((exc = taskException.get()) == null) {
+                    Thread.sleep(20);
+                }
+                assertTrue(exc instanceof InterruptedException);
             }
-            assertTrue(exc instanceof InterruptedException);
         }
     }
 
@@ -139,13 +143,13 @@ public class Submit {
      * Test closing a stream while blocked waiting for an element.
      */
     public void testClose3() throws Exception {
-        AtomicReference<Throwable> task2Exception = new AtomicReference<>();
+        AtomicReference<Throwable> taskException = new AtomicReference<>();
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> {
             try {
                 Thread.sleep(Duration.ofDays(1));
             } catch (InterruptedException e) {
-                task2Exception.set(e);
+                taskException.set(e);
             }
             return "bar";
         };
@@ -153,7 +157,7 @@ public class Submit {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             try (Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
 
-                // schedule close
+                // schedule close, give enough time for task1 and task2 to run
                 Thread.startVirtualThread(() -> {
                     try {
                         Thread.sleep(Duration.ofSeconds(3));
@@ -170,11 +174,11 @@ public class Submit {
                 Future<String> future1 = futures.get(0);
                 assertEquals(future1.join(), "foo");
 
-                // task2 should be cancelled
+                // task2 sleep should be interrupted
                 Future<String> future2 = futures.get(1);
                 assertTrue(future2.isCancelled());
                 Throwable exc;
-                while ((exc = task2Exception.get()) == null) {
+                while ((exc = taskException.get()) == null) {
                     Thread.sleep(20);
                 }
                 assertTrue(exc instanceof InterruptedException);
@@ -186,13 +190,15 @@ public class Submit {
      * Test invoking an operation on the stream with the interrupt status set.
      */
     public void testInterrupt1() throws Exception {
-        AtomicReference<Throwable> task2Exception = new AtomicReference<>();
+        AtomicBoolean taskStarted = new AtomicBoolean();
+        AtomicReference<Throwable> taskException = new AtomicReference<>();
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> {
+            taskStarted.set(true);
             try {
                 Thread.sleep(Duration.ofDays(1));
             } catch (InterruptedException e) {
-                task2Exception.set(e);
+                taskException.set(e);
             }
             return "bar";
         };
@@ -210,12 +216,14 @@ public class Submit {
                 Thread.interrupted(); // clear interrupt
             }
 
-            // task2 should be cancelled
-            Throwable exc;
-            while ((exc = task2Exception.get()) == null) {
-                Thread.sleep(20);
+            // task2 sleep should be interrupted if task2 started
+            if (taskStarted.get()) {
+                Throwable exc;
+                while ((exc = taskException.get()) == null) {
+                    Thread.sleep(20);
+                }
+                assertTrue(exc instanceof InterruptedException);
             }
-            assertTrue(exc instanceof InterruptedException);
         }
     }
 
@@ -223,13 +231,13 @@ public class Submit {
      * Test interrupt a thread when blocked waiting for an element.
      */
     public void testInterrupt2() throws Exception {
-        AtomicReference<Throwable> task2Exception = new AtomicReference<>();
+        AtomicReference<Throwable> taskException = new AtomicReference<>();
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> {
             try {
                 Thread.sleep(Duration.ofDays(1));
             } catch (InterruptedException e) {
-                task2Exception.set(e);
+                taskException.set(e);
             }
             return "bar";
         };
@@ -240,7 +248,7 @@ public class Submit {
             // schedule main thread to be interrupted
             Thread thread = Thread.currentThread();
             executor.submit(() -> {
-                Thread.sleep(Duration.ofSeconds(1));
+                Thread.sleep(Duration.ofSeconds(3));
                 thread.interrupt();
                 return null;
             });
@@ -257,7 +265,7 @@ public class Submit {
 
             // task2 should be cancelled
             Throwable exc;
-            while ((exc = task2Exception.get()) == null) {
+            while ((exc = taskException.get()) == null) {
                 Thread.sleep(20);
             }
             assertTrue(exc instanceof InterruptedException);
@@ -295,17 +303,6 @@ public class Submit {
             tasks.add(null);
             executor.submit(tasks);
         }
-
-        AtomicReference<Throwable> task2Exception = new AtomicReference<>();
-        Callable<String> task1 = () -> "foo";
-        Callable<String> task2 = () -> {
-            try {
-                Thread.sleep(Duration.ofDays(1));
-            } catch (InterruptedException e) {
-                task2Exception.set(e);
-            }
-            return "bar";
-        };
     }
 
     /**
