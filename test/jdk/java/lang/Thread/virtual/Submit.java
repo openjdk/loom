@@ -234,18 +234,17 @@ public class Submit {
             return "bar";
         };
 
-        Thread thread = Thread.currentThread();
-        Thread.startVirtualThread(() -> {
-            try {
-                Thread.sleep(Duration.ofSeconds(1));
-            } catch (InterruptedException ignore) { }
-            thread.interrupt();
-        });
-
         try (var executor = Executors.newVirtualThreadExecutor();
              Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
 
-            Thread.currentThread().interrupt();
+            // schedule main thread to be interrupted
+            Thread thread = Thread.currentThread();
+            executor.submit(() -> {
+                Thread.sleep(Duration.ofSeconds(1));
+                thread.interrupt();
+                return null;
+            });
+
             try {
                 stream.peek(f -> assertTrue(f.isDone())).mapToLong(x -> 1L).sum();
                 assertTrue(false);
