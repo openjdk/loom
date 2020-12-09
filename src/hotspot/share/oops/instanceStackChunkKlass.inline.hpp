@@ -47,7 +47,6 @@ class StackChunkFrameStream : public StackObj {
   intptr_t* _sp;
   CodeBlob* _cb;
   mutable const ImmutableOopMap* _oopmap;
-  int _oopmap_slot;
 
  public:
   // Iteration
@@ -96,16 +95,17 @@ class StackChunkFrameStream : public StackObj {
     if (_oopmap != NULL) return;
 
     assert (!is_done(), "");
-    get_cb();
-    if (UNLIKELY(_oopmap_slot < 0)) { // we could have marked frames for deoptimization in thaw_chunk
+    address pc1 = pc();
+    int oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
+    if (UNLIKELY(oopmap_slot < 0)) { // we could have marked frames for deoptimization in thaw_chunk
       CompiledMethod* cm = cb()->as_compiled_method();
       assert (cm->is_deopt_pc(pc()), "");
-      address pc1 = *(address*)((address)_sp + cm->orig_pc_offset());
+      pc1 = *(address*)((address)_sp + cm->orig_pc_offset());
       assert (!cm->is_deopt_pc(pc1), "");
       assert (_cb == ContinuationCodeBlobLookup::find_blob(pc1), "");
-      ContinuationCodeBlobLookup::find_blob_and_oopmap(pc1, _oopmap_slot);
-      get_oopmap(pc1);
+      oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
     }
+    get_oopmap(pc1, oopmap_slot);
   }
 
   inline int to_offset(oop chunk) const {
@@ -132,16 +132,16 @@ class StackChunkFrameStream : public StackObj {
     }
 
     assert (pc() != NULL, "");
-    _cb = ContinuationCodeBlobLookup::find_blob_and_oopmap(pc(), _oopmap_slot);
+    _cb = CodeCache::find_blob_fast(pc());
     assert (_cb != NULL && _cb->is_compiled() && _cb->frame_size() > 0, "");
   }
 
-  inline void get_oopmap() const { get_oopmap(pc()); }
-  inline const void get_oopmap(address pc) const {
+  inline void get_oopmap() const { get_oopmap(pc(), CodeCache::find_oopmap_slot_fast(pc())); }
+  inline const void get_oopmap(address pc, int oopmap_slot) const {
     assert (cb() != NULL, "");
-    assert (!cb()->as_compiled_method()->is_deopt_pc(pc), "_oopmap_slot: %d", _oopmap_slot);
-    assert (_oopmap_slot >= 0, "");
-    _oopmap = cb()->oop_map_for_slot(_oopmap_slot, pc);
+    assert (!cb()->as_compiled_method()->is_deopt_pc(pc), "oopmap_slot: %d", oopmap_slot);
+    assert (oopmap_slot >= 0, "");
+    _oopmap = cb()->oop_map_for_slot(oopmap_slot, pc);
     assert (_oopmap != NULL, "");
   }
 

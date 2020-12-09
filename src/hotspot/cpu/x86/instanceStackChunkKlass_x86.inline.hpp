@@ -27,7 +27,6 @@
 
 #include "runtime/frame.inline.hpp"
 
-
 inline address StackChunkFrameStream::get_pc() const {
   assert (!is_done(), "");
   return *(address*)(_sp - 1);
@@ -51,7 +50,6 @@ inline bool StackChunkFrameStream::is_in_frame(void* p0) const {
   intptr_t* p = (intptr_t*)p0;
   int argsize = cb()->is_compiled() ? (_cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord : 0;
   int frame_size = _cb->frame_size() + argsize;
-  // tty->print_cr("offset: %ld fsize: %d, argsize: %d", p - sp, cb->frame_size(), argsize);
   return p == _sp - frame::sender_sp_offset || ((p - _sp) >= 0 && (p - _sp) < frame_size);
 }
 #endif

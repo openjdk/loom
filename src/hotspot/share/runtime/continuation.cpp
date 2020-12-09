@@ -186,9 +186,7 @@ PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 //
 // Nested continuations: must restore fastpath, held_monitor_count, cont_frame->sp (entrySP of parent)
 // Add:
-//  - method/nmethod metadata
 //  - compress interpreted frames
-//  - special native methods: Method.invoke, doPrivileged (+ method handles)
 //  - compiled->intrepreted for serialization (look at scopeDesc)
 //  - caching h-stacks in thread stacks
 //
@@ -420,7 +418,7 @@ private:
   const SelfPD& self() const { return static_cast<const SelfPD&>(*this); }
   SelfPD& self() { return static_cast<SelfPD&>(*this); }
 
-  const ImmutableOopMap* get_oop_map() const { return self().get_oop_map(); };
+  const ImmutableOopMap* get_oop_map() const;
 
   void set_codeblob(address pc) {
     if (_cb_imd == NULL && !_is_interpreted) {// compute lazily
@@ -919,6 +917,20 @@ const CodeBlob* HFrameBase<SelfPD>::get_cb() const {
     }
   }
   return (CodeBlob*)_cb_imd;
+}
+
+template<typename SelfPD>
+const ImmutableOopMap* HFrameBase<SelfPD>::get_oop_map() const {
+  if (_cb_imd == NULL) return NULL;
+  if (((CodeBlob*)_cb_imd)->oop_maps() != NULL) {
+    int slot = CodeCache::find_oopmap_slot_fast(_pc);
+    if (slot >= 0) {
+      return ((CodeBlob*)_cb_imd)->oop_map_for_slot(slot, _pc);
+    }
+    const ImmutableOopMap* oop_map = OopMapSet::find_map(cb(), pc());
+    return oop_map;
+  }
+  return NULL;
 }
 
 template<typename SelfPD>
@@ -3080,7 +3092,7 @@ public:
     if (bottom) {
       log_develop_trace(jvmcont)("Fixing return address on bottom frame: " INTPTR_FORMAT, p2i(_cont.pc()));
       FKind::interpreted ? hf.patch_return_pc<FKind>(_cont.pc())
-                         : caller.patch_pc(_cont.pc(), _cont); // TODO PERF non-temporal store
+                         : caller.patch_pc(_cont.pc(), _cont);
     }
 
     patch_pd<FKind, top, bottom>(f, hf, caller);

@@ -245,26 +245,6 @@ inline address* hframe::return_pc_address() const {
   return (address*)&interpreted_link_address()[frame::return_addr_offset];
 }
 
-const ImmutableOopMap* hframe::get_oop_map() const {
-  if (_cb_imd == NULL) return NULL;
-  if (((CodeBlob*)_cb_imd)->oop_maps() != NULL) {
-    NativePostCallNop* nop = nativePostCallNop_at(_pc);
-    if (nop != NULL &&
-#ifdef CONT_DOUBLE_NOP
-      !nop->is_mode2() &&
-#endif
-      nop->displacement() != 0
-    ) {
-      int slot = ((nop->displacement() >> 24) & 0xff);
-      // tty->print_cr("hframe::get_oop_map slot: %d", slot);
-      return ((CodeBlob*)_cb_imd)->oop_map_for_slot(slot, _pc);
-    }
-    const ImmutableOopMap* oop_map = OopMapSet::find_map(cb(), pc());
-    return oop_map;
-  }
-  return NULL;
-}
-
 intptr_t* hframe::interpreter_frame_metadata_at(int offset) const {
   assert (interpreted_link_address() != NULL, "");
   return interpreted_link_address() + offset;
@@ -807,7 +787,7 @@ template <typename FKind, bool top, bool bottom>
 inline void Freeze<ConfigT, mode>::patch_pd(const frame& f, hframe& hf, const hframe& caller) {
   if (!FKind::interpreted) {
     if (_fp_oop_info._has_fp_oop) {
-      hf.set_fp(_fp_oop_info._fp_index); // TODO PERF non-temporal store
+      hf.set_fp(_fp_oop_info._fp_index);
     }
   } else {
     assert (!_fp_oop_info._has_fp_oop, "only compiled frames");
@@ -819,10 +799,9 @@ inline void Freeze<ConfigT, mode>::patch_pd(const frame& f, hframe& hf, const hf
 
   if ((mode != mode_fast || bottom) && caller.is_interpreted_frame()) {
     FKind::interpreted ? hf.patch_interpreted_link_relative(caller.fp())
-                       : caller.patch_callee_link_relative(caller.fp(), _cont); // TODO PERF non-temporal store
+                       : caller.patch_callee_link_relative(caller.fp(), _cont);
   } else {
     assert (!Interpreter::contains(caller.pc()), "");
-    // TODO PERF non-temporal store
     FKind::interpreted ? hf.patch_interpreted_link(caller.fp())
                        : caller.patch_callee_link(caller.fp(), _cont); // caller.fp() already contains _fp_oop_info._fp_index if appropriate, as it was patched when patch is called on the caller
   }
