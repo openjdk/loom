@@ -1321,7 +1321,6 @@ public:
   static void update_register_map(RegisterMap* map, const hframe& sender, const ContMirror& cont);
   static void update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map);
 
-  static inline frame frame_with(frame& f, intptr_t* sp, address pc, intptr_t* fp);
   static inline frame last_frame(JavaThread* thread);
   static inline void push_pd(const frame& f);
 };
@@ -1477,6 +1476,75 @@ bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, RegisterMapT* map
     }
   }
   return false;
+}
+
+void ContinuationHelper::update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map) { // TODO NOT PD
+  // we need to register the link address for the entry frame
+  if (cont.entry() != NULL) {
+    cont.entry()->update_register_map(map);
+    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame");
+  } else {
+    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: clearing register map.");
+    map->clear();
+  }
+}
+
+template<op_mode mode, typename FrameT>
+FreezeFnT ContinuationHelper::freeze_stub(const FrameT& f) {
+  // static int __counter = 0;
+#ifdef CONT_DOUBLE_NOP
+  if (mode != mode_preempt) {
+    NativePostCallNop* nop = nativePostCallNop_unsafe_at(f.pc());
+    uint32_t ptr = nop->int2_data();
+    if (LIKELY(ptr > (uint32_t)1)) {
+      return (FreezeFnT)OopMapStubGenerator::offset_to_stub(ptr);
+    }
+    assert (ptr == 0 || ptr == 1, "");
+    if (f.cb() == NULL) return NULL; // f.get_cb();
+
+    // __counter++;
+    // if (__counter % 100 == 0) tty->print_cr(">>>> freeze_stub %d %d", ptr, __counter);
+    // if (mode == mode_fast) { 
+    //   tty->print_cr(">>>> freeze_stub"); f.print_on(tty); tty->print_cr("<<<< freeze_stub"); 
+    //   assert(false, "");
+    // }
+  }
+#endif
+
+  FreezeFnT f_fn = (FreezeFnT)f.oop_map()->freeze_stub();
+#ifdef CONT_DOUBLE_NOP
+  // we currently patch explicitly, based on ConfigT etc.
+  // if (LIKELY(nop != NULL && f_fn != NULL && !nop->is_mode2())) {
+  //   nop->patch_int2(OopMapStubGenerator::stub_to_offset((address)f_fn));
+  // }
+#endif
+  return f_fn;
+}
+
+template<op_mode mode, typename FrameT>
+ThawFnT ContinuationHelper::thaw_stub(const FrameT& f) {
+#ifdef CONT_DOUBLE_NOP
+  if (mode != mode_preempt) {
+    NativePostCallNop* nop = nativePostCallNop_unsafe_at(f.pc());
+    uint32_t ptr = nop->int2_data();
+    if (LIKELY(ptr > (uint32_t)1)) {
+      address freeze_stub = OopMapStubGenerator::offset_to_stub(ptr);
+      address thaw_stub = OopMapStubGenerator::thaw_stub(freeze_stub);
+      if (f.cb() == NULL) { // TODO PERF: this is only necessary for new_frame called from thaw, because we need cb for deopt info
+        CodeBlob* cb = OopMapStubGenerator::code_blob(thaw_stub);
+        assert (cb == slow_get_cb(f), "");
+        const_cast<FrameT&>(f).set_cb(cb);
+      }
+      assert (f.cb() != NULL, "");
+      return (ThawFnT)thaw_stub;
+    }
+    assert (ptr == 0 || ptr == 1, "");
+    if (f.cb() == NULL) return NULL; // f.get_cb();
+  }
+#endif
+  assert (f.oop_map() != NULL, "");
+  ThawFnT t_fn = (ThawFnT)f.oop_map()->thaw_stub();
+  return t_fn;
 }
 
 ////////////////////////////////////
@@ -5049,7 +5117,9 @@ static frame derelativize_chunk_frame(frame f, oop chunk, size_t chunk_offset) {
 
 static frame chunk_top_frame(oop chunk, RegisterMap* map, size_t offset, size_t index) {
   frame f = StackChunkFrameStream(chunk).to_frame();
-  update_map_for_chunk_frame(map);
+  if (map->update_map()) {
+    update_map_for_chunk_frame(map);
+  }
   return relativize_chunk_frame(f, chunk, offset, index);
 }
 
@@ -5160,7 +5230,9 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
     if (!fs.is_done()) {
       frame sender = fs.to_frame();
       assert (jdk_internal_misc_StackChunk::is_usable_in_chunk(chunk, sender.unextended_sp()), "");
-      update_map_for_chunk_frame(map);
+      if (map->update_map()) {
+        update_map_for_chunk_frame(map);
+      }
       return relativize_chunk_frame(sender, chunk, chunk_offset, frame_index + 1);
     }
 
