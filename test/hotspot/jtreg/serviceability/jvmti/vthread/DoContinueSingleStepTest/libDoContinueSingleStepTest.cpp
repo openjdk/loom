@@ -211,6 +211,9 @@ setOrClearBreakpoint(JNIEnv *jni, jboolean set, const char *methodName,
   } else {
       err = jvmti->ClearBreakpoint(method, location);
   }
+  if (err == JVMTI_ERROR_DUPLICATE) {
+      return; // TMP workaround
+  }
   check_jvmti_status(jni, err, "setupBreakpoint: error in JVMTI SetBreakpoint");
 }
 
