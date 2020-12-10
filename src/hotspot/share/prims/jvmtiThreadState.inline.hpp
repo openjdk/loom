@@ -83,12 +83,25 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
   // in a case of unmounted virtual thread the thread can be NULL
   JvmtiThreadState *state = thread == NULL ? NULL : thread->jvmti_thread_state();
 
-  if (state == NULL) {
-    if (thread != NULL && thread->is_exiting()) {
-      // don't add a JvmtiThreadState to a thread that is exiting
-      return NULL;
+  if (state == NULL && thread != NULL && thread->is_exiting()) {
+    // don't add a JvmtiThreadState to a thread that is exiting
+    return NULL;
+  }
+  if (state == NULL || state->get_thread_oop() != thread_oop) {
+    // check if java_lang_Thread already has a link to the JvmtiThreadState
+    if (thread_oop != NULL) { // thread_oop can be NULL at early VMStart
+      state = java_lang_Thread::jvmti_thread_state(thread_oop);
     }
-    state = new JvmtiThreadState(thread, thread_oop);
+    if (state == NULL) { // need to create state
+      Thread* current_thread = Thread::current();
+      HandleMark hm(current_thread);
+      Handle thread_oop_h = Handle(current_thread, thread_oop);
+
+      state = new JvmtiThreadState(thread, thread_oop);
+      if (thread_oop_h() != NULL) { // thread_oop can be NULL at early VMStart
+        java_lang_Thread::set_jvmti_thread_state(thread_oop_h(), state);
+      }
+    }
   }
   return state;
 }

@@ -289,7 +289,7 @@ public:
   static jlong recompute_thread_enabled(JvmtiThreadState *state);
   static void event_init();
 
-  static void set_user_enabled(JvmtiEnvBase *env, JavaThread *thread,
+  static void set_user_enabled(JvmtiEnvBase *env, JavaThread *thread, oop thread_oop,
                         jvmtiEvent event_type, bool enabled);
   static void set_event_callbacks(JvmtiEnvBase *env,
                                   const jvmtiEventCallbacks* callbacks,
@@ -856,7 +856,7 @@ JvmtiEventControllerPrivate::env_dispose(JvmtiEnvBase *env) {
 
 
 void
-JvmtiEventControllerPrivate::set_user_enabled(JvmtiEnvBase *env, JavaThread *thread,
+JvmtiEventControllerPrivate::set_user_enabled(JvmtiEnvBase *env, JavaThread *thread, oop thread_oop,
                                           jvmtiEvent event_type, bool enabled) {
   assert(Threads::number_of_threads() == 0 || JvmtiThreadState_lock->is_locked(), "sanity check");
 
@@ -872,7 +872,7 @@ JvmtiEventControllerPrivate::set_user_enabled(JvmtiEnvBase *env, JavaThread *thr
     env->env_event_enable()->set_user_enabled(event_type, enabled);
   } else {
     // create the thread state (if it didn't exist before)
-    JvmtiThreadState *state = JvmtiThreadState::state_for_while_locked(thread);
+    JvmtiThreadState *state = JvmtiThreadState::state_for_while_locked(thread, thread_oop);
     if (state != NULL) {
       state->env_thread_state(env)->event_enable()->set_user_enabled(event_type, enabled);
     }
@@ -1015,14 +1015,18 @@ JvmtiEventController::is_global_event(jvmtiEvent event_type) {
 }
 
 void
-JvmtiEventController::set_user_enabled(JvmtiEnvBase *env, JavaThread *thread, jvmtiEvent event_type, bool enabled) {
+JvmtiEventController::set_user_enabled(JvmtiEnvBase *env, JavaThread *thread, oop thread_oop,
+                                       jvmtiEvent event_type, bool enabled) {
   if (Threads::number_of_threads() == 0) {
     // during early VM start-up locks don't exist, but we are safely single threaded,
     // call the functionality without holding the JvmtiThreadState_lock.
-    JvmtiEventControllerPrivate::set_user_enabled(env, thread, event_type, enabled);
+    JvmtiEventControllerPrivate::set_user_enabled(env, thread, NULL, event_type, enabled);
   } else {
+    Thread* current_thread = Thread::current();
+    HandleMark hm(current_thread);
+    Handle thread_oop_h = Handle(current_thread, thread_oop);
     MutexLocker mu(JvmtiThreadState_lock);
-    JvmtiEventControllerPrivate::set_user_enabled(env, thread, event_type, enabled);
+    JvmtiEventControllerPrivate::set_user_enabled(env, thread, thread_oop_h(), event_type, enabled);
   }
 }
 

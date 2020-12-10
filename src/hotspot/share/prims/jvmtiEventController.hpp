@@ -209,7 +209,7 @@ public:
   // Use (thread == NULL) to enable/disable an event globally.
   // Use (thread != NULL) to enable/disable an event for a particular thread.
   // thread is ignored for events that can only be specified globally
-  static void set_user_enabled(JvmtiEnvBase *env, JavaThread *thread,
+  static void set_user_enabled(JvmtiEnvBase *env, JavaThread *thread, oop thread_oop,
                                jvmtiEvent event_type, bool enabled);
 
   // Setting callbacks changes computed enablement and must be done

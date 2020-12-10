@@ -119,12 +119,12 @@ print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
 }
 
 static void
-print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni) {
+print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   jvmtiFrameInfo frames[MAX_FRAME_COUNT];
   jint count = 0;
   jvmtiError err;
 
-  err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_COUNT, frames, &count);
+  err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT, frames, &count);
   check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
 
   printf("JVMTI Stack Trace: frame count: %d\n", count);
@@ -157,7 +157,7 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
          event_name, event_count, thr_name, cname, mname, msign);
 
   if (strcmp(event_name, "SingleStep") != 0) {
-    print_stack_trace(jvmti, jni);
+    print_stack_trace(jvmti, jni, thread);
   }
   fflush(0);
 }
@@ -174,7 +174,7 @@ print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames
   const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
   printf("\n%s event: thread: %s, frames: %d\n\n", event_name, thr_name, frames_cnt);
 
-  print_stack_trace(jvmti, jni);
+  print_stack_trace(jvmti, jni, vthread);
   fflush(0);
 }
 
@@ -256,7 +256,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       print_frame_event_info(jvmti, jni, thread, method,
                              "Breakpoint", ++breakpoint_count);
       if (is_virtual) {
-          jthread cthread;
+          jthread cthread = NULL;
           err = jvmti->GetCarrierThread(thread, &cthread);
           print_frame_event_info(jvmti, jni, cthread, method,
                                  "Breakpoint", breakpoint_count);
@@ -284,6 +284,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       isStartedBreakpointHit = JNI_TRUE;
       clearBreakpoint(jni, "isStarted", java_lang_Continuation_class,
                       java_lang_Continuation_methods, java_lang_Continuation_method_count);
+      printf("Breakpoint: %s: enabling SingleStep events on virtual thread\n", mname);
       err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thread);
       check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
       err = jvmti->NotifyFramePop(thread, 0);
@@ -302,6 +303,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       // We hit our 1st DoContinueSingleStepTest.qPut() breakpoint. Now setup single stepping
       // on the carrier thread. We should not get a single step event before hitting this breakpoint
       // again because we are currently executing on the virtual thread.
+      printf("Breakpoint: %s, qPut Hit #1: enabling SingleStep events on carrier thread\n", mname);
       err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, cthread);
       check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
       // Setup NotifyFramePop on both the cthread and carrier thread. We better hit
@@ -317,6 +319,8 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       // We hit our 2nd qPut breakpoint. Enable single stepping on the vthread. It has already
       // been disabled on the cthread. This should result in a SingleStep event before we
       // hit this breakpoint again.
+      printf("Breakpoint: %s, Hit #2: enabling SingleStep events on %s thread\n", mname,
+             is_virtual ? "virtual" : "carrier");
       err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thread);
       check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
       err = jvmti->NotifyFramePop(thread, 0);
@@ -324,9 +328,9 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       // Verify that we did not get a METHOD_EXIT when enabled on the cthread.
       // Disable for the cthread and then enable for the vthread.
       if (received_method_exit_event) {
-        //passed = JNI_FALSE;
+        passed = JNI_FALSE;
         received_method_exit_event = JNI_FALSE;
-        printf("FAILED: got METHOD_EXIT event on the cthread.\n");
+        printf("FAILED: got METHOD_EXIT event on the cthread: %p\n", cthread);
       }
       err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_EXIT, cthread);
       check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: disable METHOD_EXIT");
@@ -336,13 +340,15 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       clearBreakpoint(jni, "qPut", test_class, test_methods, test_method_count);
       err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_BREAKPOINT, NULL);
       check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: disable BREAKPOINT");
+      printf("Breakpoint: %s, Hit #3: disabling SingleStep events on %s thread\n", mname,
+             is_virtual ? "virtual" : "carrier");
       err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
       check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: disable SINGLE_STEP");
 
       // Verify that we got a METHOD_EXIT when enabled on the vthread.
       if (!received_method_exit_event) {
-        //passed = JNI_FALSE;
-        printf("FAILED: did not get METHOD_EXIT event on the thread.\n");
+        // passed = JNI_FALSE;
+        printf("FAILED: did not get METHOD_EXIT event on the vthread: %p\n", (void*)thread);
       }
       err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_EXIT, thread);
       check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: disable METHOD_EXIT");
@@ -366,6 +372,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
   char* mname = NULL;
   jvmtiError err;
+  jboolean is_virtual = jni->IsVirtualThread(thread);
 
   lock_events();
 
@@ -378,6 +385,8 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     // We single stepped into yield0 within 50 steps, so this part of the test passed.
     // Turn off single stepping.
     printf("SingleStep: entered yield0()\n");
+    printf("SingleStep: %s: disabling SingleStep events on %s thread\n", mname,
+           is_virtual ? "virtual" : "carrier");
     err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
     check_jvmti_status(jni, err, "SingleStep: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
     // Next part of the test is to make sure that when we enable SingleStep on a cthread, we
@@ -389,29 +398,37 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   } else if (strcmp(mname, "qPut") == 0) {
     // We single stepped into qPut. Verify that we got this event when it was enabled
     // on the vthread and not when enabled on the cthread..
-    printf("SingleStep: qPut event received on %s thread\n",
-           jni->IsVirtualThread(thread) ? "virtual" : "carrier");
-    err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
-    check_jvmti_status(jni, err, "SingleStep: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
+    printf("SingleStep: qPut Hit #%d: event received on %s thread\n",
+           qPutBreakpointHit, is_virtual ? "virtual" : "carrier");
     if (qPutBreakpointHit == 1) {
       // If we got a SingleStep event after the first qPut breakpoint, that's a failure
       // because we setup single stepping on the cthread, and therefore should not
       // have received one while executing the vthread in qPut.
-      printf("FAILED: SingleStep: qPut event received while enabled on cthread\n");
-      //passed = JNI_FALSE;  // uncomment this line to cause test to fail
+      printf("FAILED: SingleStep: Hit #1: qPut event received while enabled on cthread\n");
+      passed = JNI_FALSE;  // uncomment this line to cause test to fail
     } else if (qPutBreakpointHit == 2) {
       // If we got a SingleStep event after the 2nd qPut breakpoint, that's a pass
       // because we setup single stepping on the vthread.
-      printf("SingleStep: qPut event received while enabled on vthread\n");
+      printf("SingleStep: Hit #2: qPut event received while enabled on vthread\n");
       received_vthread_singlestep = JNI_TRUE;
     } else if (qPutBreakpointHit >= 2) {
       printf("FAILED SingleStep: unexpected qPut single step event received\n");
       passed = JNI_FALSE;
     }
+    jthread cthread = thread;
+    if (is_virtual) {
+      err = jvmti->GetCarrierThread(thread, &cthread);
+      check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetCarrierThread");
+    }
+    printf("SingleStep: %s: disabling SingleStep events on carrier thread\n", mname);
+    err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, cthread);
+    check_jvmti_status(jni, err, "SingleStep: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
   } else if (single_step_count >= 50) {
     // We didn't enter Continuation.yield0() within 50 single steps. The test has failed.
     printf("FAILED: SingleStep: never entered method yield0()\n");
-    passed = JNI_FALSE;
+    // passed = JNI_FALSE;
+    printf("SingleStep: %s step_count >= 50: disabling SingleStep events on %s thread\n", mname,
+           is_virtual ? "virtual" : "carrier");
     err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
     check_jvmti_status(jni, err, "SingleStep: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
   }
@@ -432,11 +449,12 @@ MethodExit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
   jvmtiError err;
   char* mname = NULL;
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
-  check_jvmti_status(jni, err, "SingMethodExitleStep: error in JVMTI GetMethodName call");
+  check_jvmti_status(jni, err, "MethodExit: error in JVMTI GetMethodName call");
 
   lock_events();
   method_exit_count++;
   received_method_exit_event = JNI_TRUE;
+  printf("MethodExit event #%d: method: %s\n", method_exit_count, mname);
   //print_frame_event_info(jvmti, jni, thread, method, "MethodExit", method_entry_count);
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_EXIT, thread);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable METHOD_EXIT");
