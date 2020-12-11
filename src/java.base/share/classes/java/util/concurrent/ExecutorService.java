@@ -292,6 +292,18 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * method makes a best effort attempt to cancel the tasks that it
      * submitted when RejectedExecutionException is thrown.
      *
+     * <p> The following example invokes {@code submit} with a collection of
+     * tasks and performs an action on the result of each task that completes
+     * normally.
+     * <pre> {@code
+     *     ExecutorService executor = ...
+     *     Collection<Callable<...>> tasks = ...
+     *     executor.submit(tasks)
+     *                 .filter(Future::isCompletedNormally)
+     *                 .map(Future::join)
+     *                 .forEach(result -> { });
+     * }</pre>
+     *
      * @param tasks the collection of tasks
      * @param <T> the type of the values returned from the tasks
      * @return stream of completed Futures
