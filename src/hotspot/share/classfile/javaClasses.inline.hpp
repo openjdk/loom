@@ -27,6 +27,7 @@
 
 #include "classfile/javaClasses.hpp"
 #include "oops/access.inline.hpp"
+#include "oops/instanceKlass.inline.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/oopsHierarchy.hpp"

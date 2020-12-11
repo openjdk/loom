@@ -1652,6 +1652,12 @@ threadControl_suspendAll(void)
         }
 
         if (error == JVMTI_ERROR_NONE) {
+            /*
+             * Pin all objects to prevent objects from being
+             * garbage collected while the VM is suspended.
+             */
+            commonRef_pinAll();
+
             suspendAllCount++;
         }
 
@@ -1729,6 +1735,11 @@ threadControl_resumeAll(void)
     }
 
     if (suspendAllCount > 0) {
+        /*
+         * Unpin all objects.
+         */
+        commonRef_unpinAll();
+
         suspendAllCount--;
     }
 

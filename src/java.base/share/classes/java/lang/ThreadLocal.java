@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -494,7 +494,7 @@ public class ThreadLocal<T> {
         private Entry getEntry(ThreadLocal<?> key) {
             int i = key.threadLocalHashCode & (table.length - 1);
             Entry e = table[i];
-            if (e != null && e.get() == key)
+            if (e != null && e.refersTo(key))
                 return e;
             else
                 return getEntryAfterMiss(key, i, e);
@@ -514,10 +514,9 @@ public class ThreadLocal<T> {
             int len = tab.length;
 
             while (e != null) {
-                ThreadLocal<?> k = e.get();
-                if (k == key)
+                if (e.refersTo(key))
                     return e;
-                if (k == null)
+                if (e.refersTo(null))
                     expungeStaleEntry(i);
                 else
                     i = nextIndex(i, len);
@@ -546,14 +545,12 @@ public class ThreadLocal<T> {
             for (Entry e = tab[i];
                  e != null;
                  e = tab[i = nextIndex(i, len)]) {
-                ThreadLocal<?> k = e.get();
-
-                if (k == key) {
+                if (e.refersTo(key)) {
                     e.value = value;
                     return;
                 }
 
-                if (k == null) {
+                if (e.refersTo(null)) {
                     replaceStaleEntry(key, value, i);
                     return;
                 }
@@ -575,7 +572,7 @@ public class ThreadLocal<T> {
             for (Entry e = tab[i];
                  e != null;
                  e = tab[i = nextIndex(i, len)]) {
-                if (e.get() == key) {
+                if (e.refersTo(key)) {
                     e.clear();
                     expungeStaleEntry(i);
                     return;
@@ -612,7 +609,7 @@ public class ThreadLocal<T> {
             for (int i = prevIndex(staleSlot, len);
                  (e = tab[i]) != null;
                  i = prevIndex(i, len))
-                if (e.get() == null)
+                if (e.refersTo(null))
                     slotToExpunge = i;
 
             // Find either the key or trailing null slot of run, whichever
@@ -620,14 +617,12 @@ public class ThreadLocal<T> {
             for (int i = nextIndex(staleSlot, len);
                  (e = tab[i]) != null;
                  i = nextIndex(i, len)) {
-                ThreadLocal<?> k = e.get();
-
                 // If we find key, then we need to swap it
                 // with the stale entry to maintain hash table order.
                 // The newly stale slot, or any other stale slot
                 // encountered above it, can then be sent to expungeStaleEntry
                 // to remove or rehash all of the other entries in run.
-                if (k == key) {
+                if (e.refersTo(key)) {
                     e.value = value;
 
                     tab[i] = tab[staleSlot];
@@ -643,7 +638,7 @@ public class ThreadLocal<T> {
                 // If we didn't find stale entry on backward scan, the
                 // first stale entry seen while scanning for key is the
                 // first still present in the run.
-                if (k == null && slotToExpunge == staleSlot)
+                if (e.refersTo(null) && slotToExpunge == staleSlot)
                     slotToExpunge = i;
             }
 
@@ -734,7 +729,7 @@ public class ThreadLocal<T> {
             do {
                 i = nextIndex(i, len);
                 Entry e = tab[i];
-                if (e != null && e.get() == null) {
+                if (e != null && e.refersTo(null)) {
                     n = len;
                     removed = true;
                     i = expungeStaleEntry(i);
@@ -794,7 +789,7 @@ public class ThreadLocal<T> {
             int len = tab.length;
             for (int j = 0; j < len; j++) {
                 Entry e = tab[j];
-                if (e != null && e.get() == null)
+                if (e != null && e.refersTo(null))
                     expungeStaleEntry(j);
             }
         }

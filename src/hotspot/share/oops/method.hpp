@@ -1030,7 +1030,7 @@ public:
   // Printing
   void print_short_name(outputStream* st = tty) const; // prints as klassname::methodname; Exposed so field engineers can debug VM
 #if INCLUDE_JVMTI
-  void print_name(outputStream* st = tty) const; // prints as "virtual void foo(int)"; exposed for TraceRedefineClasses
+  void print_name(outputStream* st = tty) const; // prints as "virtual void foo(int)"; exposed for -Xlog:redefine+class
 #else
   void print_name(outputStream* st = tty) const  PRODUCT_RETURN; // prints as "virtual void foo(int)"
 #endif
