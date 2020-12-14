@@ -25,6 +25,7 @@
 
 package com.sun.management;
 
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -252,4 +253,27 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
      * @see #isThreadAllocatedMemorySupported
      */
     public void setThreadAllocatedMemoryEnabled(boolean enable);
+
+    /**
+     * Write a thread dump to given file. The thread dump is output in JSON format.
+     * If the file already exists then it is replaced. The {@code outputFile} parameter
+     * must be an absolute path.
+     *
+     * @implSpec
+     * The default implementation throws {@code UnsupportedOperationException}.
+     *
+     * @param  outputFile the path file to the file to create
+     * @throws IllegalArgumentException if the file path is not absolute
+     * @throws IOException if an I/O exception is thrown writing to the file
+     * @throws NullPointerException if {@code outputFile} is {@code null}.
+     * @throws SecurityException
+     *         If a security manager is set and its {@link
+     *         SecurityManager#checkWrite(java.lang.String)} method denies write
+     *         access to the file or {@link java.lang.management.ManagementPermission
+     *         ManagementPermission("control")} is denied.
+     * @since 99
+     */
+    public default void dumpThreads(String outputFile) throws IOException {
+        throw new UnsupportedOperationException();
+    }
 }

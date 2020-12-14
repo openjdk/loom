@@ -39,11 +39,13 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.platform.ThreadContainers;
+import jdk.internal.platform.ThreadContainer;
 
 /**
  * An ExecutorService that executes each task in its own thread.
  */
-class ThreadExecutor implements ExecutorService {
+class ThreadExecutor implements ExecutorService, ThreadContainer {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final VarHandle STATE;
     static {
@@ -55,11 +57,13 @@ class ThreadExecutor implements ExecutorService {
         }
     }
 
-    private final ThreadFactory factory;
     //private final Lifetime lifetime = Lifetime.start();   // experimental
     private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
     private final ReentrantLock terminationLock = new ReentrantLock();
     private final Condition terminationCondition = terminationLock.newCondition();
+
+    private final ThreadFactory factory;
+    private final ThreadContainers.Key key;
 
     // states: RUNNING -> SHUTDOWN -> TERMINATED
     private static final int RUNNING    = 0;
@@ -68,8 +72,8 @@ class ThreadExecutor implements ExecutorService {
     private volatile int state;
 
     public ThreadExecutor(ThreadFactory factory) {
-        Objects.requireNonNull(factory);
-        this.factory = factory;
+        this.factory = Objects.requireNonNull(factory);
+        this.key = ThreadContainers.register(this);
     }
 
     /**
@@ -161,8 +165,14 @@ class ThreadExecutor implements ExecutorService {
         try {
             ExecutorService.super.close(); // waits for executor to terminate
         } finally {
+            key.deregister();
             //lifetime.close();
         }
+    }
+
+    @Override
+    public Set<Thread> threads() {
+        return Set.copyOf(threads);
     }
 
     /**
