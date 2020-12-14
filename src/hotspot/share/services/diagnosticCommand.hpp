@@ -924,6 +924,7 @@ public:
   static const char *description() {
     return "Thread dump to JSON formatted file.";
   }
+  static int num_arguments();
   virtual void execute(DCmdSource source, TRAPS);
 };
 

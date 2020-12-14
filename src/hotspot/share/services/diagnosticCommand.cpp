@@ -1120,6 +1120,17 @@ JsonThreadDump::JsonThreadDump(outputStream* output, bool heap) :
   _dcmdparser.add_dcmd_argument(&_filename);
 }
 
+int JsonThreadDump::num_arguments() {
+  ResourceMark rm;
+  JsonThreadDump* dcmd = new JsonThreadDump(NULL, false);
+  if (dcmd != NULL) {
+    DCmdMark mark(dcmd);
+    return dcmd->_dcmdparser.num_arguments();
+  } else {
+    return 0;
+  }
+}
+
 void JsonThreadDump::execute(DCmdSource source, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
