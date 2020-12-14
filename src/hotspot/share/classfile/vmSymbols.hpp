@@ -741,6 +741,10 @@
   template(toFileURL_signature,                    "(Ljava/lang/String;)Ljava/net/URL;")                          \
   template(url_void_signature,                     "(Ljava/net/URL;)V")                                           \
                                                                                                                   \
+  /* Threads.dump_to_file jcmd */                                                                                 \
+  template(jdk_internal_platform_ThreadContainers, "jdk/internal/platform/ThreadContainers")                      \
+  template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
+
   /*end*/
 
 // enum for figuring positions and size of Symbol::_vm_symbols[]

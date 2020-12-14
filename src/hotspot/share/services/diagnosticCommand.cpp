@@ -136,6 +136,7 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<DebugOnCmdStartDCmd>(full_export, true, true));
 #endif // INCLUDE_JVMTI
 
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JsonThreadDump>(full_export, true, false));
 }
 
 #ifndef HAVE_EXTRA_DCMD
@@ -1112,3 +1113,42 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
   }
 }
 #endif // INCLUDE_JVMTI
+
+JsonThreadDump::JsonThreadDump(outputStream* output, bool heap) :
+                               DCmdWithParser(output,heap),
+  _filename("filename", "The file path to the dump file", "STRING", true) {
+  _dcmdparser.add_dcmd_argument(&_filename);
+}
+
+void JsonThreadDump::execute(DCmdSource source, TRAPS) {
+  ResourceMark rm(THREAD);
+  HandleMark hm(THREAD);
+
+  Handle h_path = java_lang_String::create_from_str(_filename.value(), CHECK);
+
+  Symbol* sym = vmSymbols::jdk_internal_platform_ThreadContainers();
+  Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
+  InstanceKlass* ik = InstanceKlass::cast(k);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+
+  JavaValue result(T_VOID);
+  JavaCallArguments args;
+  args.push_oop(h_path);
+  JavaCalls::call_static(&result,
+                         k,
+                         vmSymbols::dumpThreadsToJson_name(),
+                         vmSymbols::string_void_signature(),
+                         &args,
+                         THREAD);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+}

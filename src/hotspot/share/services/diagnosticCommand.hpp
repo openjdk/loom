@@ -913,4 +913,18 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
+class JsonThreadDump : public DCmdWithParser {
+protected:
+  DCmdArgument<char*> _filename;
+public:
+  JsonThreadDump(outputStream *output, bool heap);
+  static const char *name() {
+    return "Thread.dump_to_json_file";
+  }
+  static const char *description() {
+    return "Thread dump to JSON formatted file.";
+  }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
 #endif // SHARE_SERVICES_DIAGNOSTICCOMMAND_HPP

@@ -24,11 +24,14 @@
  */
 package jdk.internal.platform;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
@@ -93,7 +96,17 @@ public class ThreadContainers {
     }
 
     /**
-     * Write a thread dump to output stream in JSON format.
+     * Write a thread dump a file in JSON format.
+     */
+    public static void dumpThreadsToJson(String path) throws IOException {
+        Path file = Path.of(path);
+        try (OutputStream out = Files.newOutputStream(file)) {
+            dumpThreadsToJson(out);
+        }
+    }
+
+    /**
+     * Write a thread dump to the given output stream in JSON format.
      */
     public static void dumpThreadsToJson(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
@@ -101,13 +114,14 @@ public class ThreadContainers {
     }
 
     /**
-     * Write a thread dump to print stream in JSON format.
+     * Write a thread dump to the given print stream in JSON format.
      */
     public static void dumpThreadsToJson(PrintStream out) {
         out.println("{");
         out.println("   \"threadDump\": {");
 
-        Map<Thread, StackTraceElement[]> stacks = Thread.getAllStackTraces();
+        PrivilegedAction<Map<Thread, StackTraceElement[]>> pa = Thread::getAllStackTraces;
+        Map<Thread, StackTraceElement[]> stacks = AccessController.doPrivileged(pa);
         out.println("      \"threads\": [");
 
         // dump kernel threads
