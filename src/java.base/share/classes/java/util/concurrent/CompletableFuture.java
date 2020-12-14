@@ -2935,6 +2935,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new UnsupportedOperationException(); }
         @Override public boolean isCancelled() {
             throw new UnsupportedOperationException(); }
+        @Override public boolean isCompletedNormally() {
+            throw new UnsupportedOperationException(); }
         @Override public boolean isCompletedExceptionally() {
             throw new UnsupportedOperationException(); }
         @Override public int getNumberOfDependents() {
