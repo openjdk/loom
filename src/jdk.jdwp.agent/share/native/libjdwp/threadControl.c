@@ -2737,23 +2737,15 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
     {
         JNIEnv *env = getEnv();
         ThreadNode *threadNode;
-        ThreadNode *vthreadNode;
-        jthread vthread = NULL;
         jboolean is_vthread = isVThread(thread);
 
-        if (is_vthread) {
-            vthread = thread;
-            thread = getVThreadThread(vthread);
+        threadNode = findRunningThread(thread);
+        if (threadNode == NULL && is_vthread && !gdata->notifyDebuggerOfAllVThreads) {
+            debugMonitorExit(threadLock);
+            return; /* This is not a vthread we are tracking, so nothing to do. */
         }
-
-        threadNode = findThread(&runningThreads, thread);
 
         JDI_ASSERT(threadNode != NULL);
-        if (threadNode == NULL) {
-            debugMonitorExit(threadLock);
-            return;
-        }
-
         JDI_ASSERT(threadNode->isStarted);
         JDI_ASSERT(bagSize(threadNode->eventBag) == 0);
 
@@ -2770,36 +2762,6 @@ threadControl_continuationRun(jthread thread, jint continuation_frame_count)
              */
             stepControl_handleContinuationRun(env, thread, &threadNode->currentStep);
         }
-
-        if (vthread == NULL) {
-            debugMonitorExit(threadLock);
-            return; /* Nothing more to do if thread is not executing a vthread. */
-        }
-
-        vthreadNode = findThread(&runningVThreads, vthread);
-        if (!gdata->notifyDebuggerOfAllVThreads && vthreadNode == NULL) {
-            /* This is not a vthread we are tracking, so nothing to do. */
-            debugMonitorExit(threadLock);
-            return;
-        }
-
-        JDI_ASSERT(vthreadNode != NULL);
-        JDI_ASSERT(vthreadNode->isStarted);
-        JDI_ASSERT(bagSize(vthreadNode->eventBag) == 0);
-
-        /* If we are not single stepping in this vthread then there is nothing more to do. */
-        if (!vthreadNode->currentStep.pending) {
-            debugMonitorExit(threadLock);
-            return;
-        }
-        JDI_ASSERT(vthreadNode->currentStep.is_vthread);
-
-        /*
-         * We have to call stepControl_handleContinuationRun here just like we
-         * did above for the threadNode. Note we'll never end up doing this for both.
-         */
-        JDI_ASSERT(!threadNode->currentStep.pending);
-        stepControl_handleContinuationRun(env, vthread, &vthreadNode->currentStep);
     }
     debugMonitorExit(threadLock);
 }
