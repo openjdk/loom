@@ -1503,11 +1503,6 @@ cbVThreadMounted(jvmtiEnv *jvmti_env, JNIEnv *env,
     /*tty_message("cbVThreadMounted: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
-    /* Ignore VIRTUAL_THREAD_MOUNTED events unless we are doing vthread debugging. */
-    if (!gdata->vthreadsSupported) {
-        return;
-    }
-
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
             (gdata->jvmti, vthread, &thread);
     if (error != JVMTI_ERROR_NONE) {
@@ -1531,11 +1526,6 @@ cbVThreadUnmounted(jvmtiEnv *jvmti_env, JNIEnv *env,
     /*tty_message("cbVThreadUnmounted: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
-    /* Ignore VIRTUAL_THREAD_UNMOUNTED events unless we are doing vthread debugging. */
-    if (!gdata->vthreadsSupported) {
-        return;
-    }
-
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
             (gdata->jvmti, vthread, &thread);
     if (error != JVMTI_ERROR_NONE) {
@@ -1554,7 +1544,6 @@ cbContinuationRun(jvmtiEnv *jvmti_env, JNIEnv *env,
 {
     LOG_CB(("cbContinuationRun: thread=%p", thread));
     //tty_message("cbContinuationRun: thread=%p continuation_frame_count=%d", thread, continuation_frame_count);
-    JDI_ASSERT(gdata->vthreadsSupported);
 
     threadControl_continuationRun(thread, continuation_frame_count);
 
@@ -1568,7 +1557,6 @@ cbContinuationYield(jvmtiEnv *jvmti_env, JNIEnv *env,
 {
     LOG_CB(("cbContinuationYield: thread=%p", thread));
     //tty_message("cbContinuationYield: thread=%p continuation_frame_count=%d", thread, continuation_frame_count);
-    JDI_ASSERT(gdata->vthreadsSupported);
 
     threadControl_continuationYield(thread, continuation_frame_count);
 

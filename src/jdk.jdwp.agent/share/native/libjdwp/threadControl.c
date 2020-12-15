@@ -1605,18 +1605,20 @@ threadControl_suspendAll(void)
         jthread *threads;
         jint count;
 
-        /* Tell JVMTI to suspend all virtual threads. */
-        if (suspendAllCount == 0) {
-            error = JVMTI_FUNC_PTR(gdata->jvmti, SuspendAllVirtualThreads)
-                    (gdata->jvmti);
-          if (error != JVMTI_ERROR_NONE) {
-              EXIT_ERROR(error, "cannot suspend all virtual threads");
-          }
-        }
+        if (gdata->vthreadsSupported) {
+            /* Tell JVMTI to suspend all virtual threads. */
+            if (suspendAllCount == 0) {
+                error = JVMTI_FUNC_PTR(gdata->jvmti, SuspendAllVirtualThreads)
+                        (gdata->jvmti);
+                if (error != JVMTI_ERROR_NONE) {
+                    EXIT_ERROR(error, "cannot suspend all virtual threads");
+                }
+            }
 
-        /* Increment suspend count of each virtual thread that we are tracking. */
-        error = enumerateOverThreadList(env, &runningVThreads, incrementSupendCountHelper, NULL);
-        JDI_ASSERT(error == JVMTI_ERROR_NONE);
+            /* Increment suspend count of each virtual thread that we are tracking. */
+            error = enumerateOverThreadList(env, &runningVThreads, incrementSupendCountHelper, NULL);
+            JDI_ASSERT(error == JVMTI_ERROR_NONE);
+        }
 
         threads = allThreads(&count);
         if (threads == NULL) {
@@ -1708,18 +1710,20 @@ threadControl_resumeAll(void)
     eventHandler_lock(); /* for proper lock order */
     debugMonitorEnter(threadLock);
 
-    if (suspendAllCount == 1) {
-        /* Tell JVMTI to resume all virtual threads. */
-        error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeAllVirtualThreads)
-                (gdata->jvmti);
-        if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error, "cannot resume all virtual threads");
+    if (gdata->vthreadsSupported) {
+        if (suspendAllCount == 1) {
+            /* Tell JVMTI to resume all virtual threads. */
+            error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeAllVirtualThreads)
+                    (gdata->jvmti);
+            if (error != JVMTI_ERROR_NONE) {
+                EXIT_ERROR(error, "cannot resume all virtual threads");
+            }
         }
-    }
 
-    /* Decrement suspend count of each virtual thread that we are tracking. */
-    error = enumerateOverThreadList(env, &runningVThreads, decrementSupendCountHelper, NULL);
-    JDI_ASSERT(error == JVMTI_ERROR_NONE);
+        /* Decrement suspend count of each virtual thread that we are tracking. */
+        error = enumerateOverThreadList(env, &runningVThreads, decrementSupendCountHelper, NULL);
+        JDI_ASSERT(error == JVMTI_ERROR_NONE);
+    }
 
     /*
      * Resume only those threads that the debugger has suspended. All
