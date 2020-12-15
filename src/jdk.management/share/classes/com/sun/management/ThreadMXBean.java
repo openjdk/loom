@@ -255,7 +255,7 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
     public void setThreadAllocatedMemoryEnabled(boolean enable);
 
     /**
-     * Write a thread dump to given file. The thread dump is output in JSON format.
+     * Write a thread dump to the given file. The thread dump is output in JSON format.
      * If the file already exists then it is replaced. The {@code outputFile} parameter
      * must be an absolute path.
      *
