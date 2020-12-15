@@ -871,21 +871,6 @@ getVThreadThread(jthread vthread)
 }
 
 /*
- * Return the "live" thread for the specified thread. In other words, returns the
- * carrier thread if the thread is a vthread, otherwise returns the thread itself.
- */
-jthread
-getLiveThread(jthread thread)
-{
-    if (!gdata->vthreadsSupported || !isVThread(thread)) {
-        return thread;
-    } else {
-        return getVThreadThread(thread);
-    }
-}
-
-
-/*
  * vthread fixme: This was moved here from stepControl.c because it is now also called
  * from threadControl.c. However, the need to call it from there may go away. If it does,
  * move this code back to stepControl.c.

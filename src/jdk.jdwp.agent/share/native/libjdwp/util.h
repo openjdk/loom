@@ -383,7 +383,6 @@ jboolean isSameObject(JNIEnv *env, jobject o1, jobject o2);
 
 jthread  getThreadVThread(jthread thread);
 jthread  getVThreadThread(jthread vthread);
-jthread  getLiveThread(jthread thread);
 
 jint getThreadFrameCount(jthread thread);
 

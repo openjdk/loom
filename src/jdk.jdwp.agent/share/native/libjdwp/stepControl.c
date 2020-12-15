@@ -188,7 +188,7 @@ initState(JNIEnv *env, jthread thread, StepRequest *step)
      * TO DO: explain the need for this notification.
      */
     error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)
-                (gdata->jvmti, getLiveThread(thread), 0);
+                (gdata->jvmti, thread, 0);
     if (error == JVMTI_ERROR_OPAQUE_FRAME) {
         step->fromNative = JNI_TRUE;
         error = JVMTI_ERROR_NONE;
@@ -521,7 +521,7 @@ stepControl_handleContinuationRun(JNIEnv *env, jthread thread, StepRequest *step
              * method we return to is filtered, and enable single stepping if not.
              */
             error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)
-                (gdata->jvmti, getLiveThread(thread), 0);
+                (gdata->jvmti, thread, 0);
             if (error == JVMTI_ERROR_DUPLICATE) {
                 error = JVMTI_ERROR_NONE;
             } else if (error != JVMTI_ERROR_NONE) {
@@ -657,7 +657,7 @@ stepControl_handleStep(JNIEnv *env, jthread thread,
                       fromDepth, currentDepth));
 
             error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)
-                        (gdata->jvmti, getLiveThread(thread), 0);
+                        (gdata->jvmti, thread, 0);
             if (error == JVMTI_ERROR_DUPLICATE) {
                 error = JVMTI_ERROR_NONE;
             } else if (error != JVMTI_ERROR_NONE) {
@@ -838,7 +838,7 @@ initEvents(jthread thread, StepRequest *step)
 }
 
 jvmtiError
-stepControl_beginStep(JNIEnv *env, jthread thread,  jint size, jint depth,
+stepControl_beginStep(JNIEnv *env, jthread thread, jint size, jint depth,
                       HandlerNode *node)
 {
     StepRequest *step;
