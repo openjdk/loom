@@ -61,8 +61,8 @@ class PipeImpl
     private static final Random RANDOM_NUMBER_GENERATOR = new SecureRandom();
 
     // Source and sink channels
-    private final SourceChannel source;
-    private final SinkChannel sink;
+    private final SourceChannelImpl source;
+    private final SinkChannelImpl sink;
 
     private static class Initializer
         implements PrivilegedExceptionAction<Void>
@@ -203,11 +203,11 @@ class PipeImpl
         this.sink = initializer.sink;
     }
 
-    public SourceChannel source() {
+    public SourceChannelImpl source() {
         return source;
     }
 
-    public SinkChannel sink() {
+    public SinkChannelInk sink() {
         return sink;
     }
 
