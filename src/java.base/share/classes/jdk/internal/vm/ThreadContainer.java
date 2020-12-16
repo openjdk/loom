@@ -22,7 +22,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.internal.platform;
+
+package jdk.internal.vm;
 
 import java.util.Set;
 

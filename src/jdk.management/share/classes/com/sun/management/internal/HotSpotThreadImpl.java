@@ -29,7 +29,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import com.sun.management.ThreadMXBean;
-import jdk.internal.platform.ThreadContainers;
+import jdk.internal.vm.ThreadContainers;
 import sun.management.ManagementFactoryHelper;
 import sun.management.ThreadImpl;
 import sun.management.Util;
