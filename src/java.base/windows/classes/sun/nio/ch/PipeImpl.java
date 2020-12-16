@@ -207,7 +207,7 @@ class PipeImpl
         return source;
     }
 
-    public SinkChannelInk sink() {
+    public SinkChannelImpl sink() {
         return sink;
     }
 
