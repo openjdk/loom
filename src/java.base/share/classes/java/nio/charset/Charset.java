@@ -802,9 +802,14 @@ public abstract class Charset
      * @return  A char buffer containing the decoded characters
      */
     public final CharBuffer decode(ByteBuffer bb) {
+        CharsetDecoder decoder;
+        if (Thread.currentThread().isVirtual()) {
+            decoder = newDecoder();
+        } else {
+            decoder = ThreadLocalCoders.decoderFor(this);
+        }
         try {
-            return ThreadLocalCoders.decoderFor(this)
-                .onMalformedInput(CodingErrorAction.REPLACE)
+            return decoder.onMalformedInput(CodingErrorAction.REPLACE)
                 .onUnmappableCharacter(CodingErrorAction.REPLACE)
                 .decode(bb);
         } catch (CharacterCodingException x) {
@@ -838,9 +843,14 @@ public abstract class Charset
      * @return  A byte buffer containing the encoded characters
      */
     public final ByteBuffer encode(CharBuffer cb) {
+        CharsetEncoder encoder;
+        if (Thread.currentThread().isVirtual()) {
+            encoder = newEncoder();
+        } else {
+            encoder = ThreadLocalCoders.encoderFor(this);
+        }
         try {
-            return ThreadLocalCoders.encoderFor(this)
-                .onMalformedInput(CodingErrorAction.REPLACE)
+            return encoder.onMalformedInput(CodingErrorAction.REPLACE)
                 .onUnmappableCharacter(CodingErrorAction.REPLACE)
                 .encode(cb);
         } catch (CharacterCodingException x) {

@@ -103,14 +103,10 @@ public class ThreadLocalCoders {
             }
         };
 
-    public static CharsetDecoder decoderFor(Charset cs) {
-        if (Thread.currentThread().isVirtual()) {
-            return cs.newDecoder();
-        } else {
-            CharsetDecoder cd = (CharsetDecoder)decoderCache.forName(cs);
-            cd.reset();
-            return cd;
-        }
+    public static CharsetDecoder decoderFor(Object name) {
+        CharsetDecoder cd = (CharsetDecoder)decoderCache.forName(name);
+        cd.reset();
+        return cd;
     }
 
     private static Cache encoderCache = new Cache(CACHE_SIZE) {
@@ -131,14 +127,10 @@ public class ThreadLocalCoders {
             }
         };
 
-    public static CharsetEncoder encoderFor(Charset cs) {
-        if (Thread.currentThread().isVirtual()) {
-            return cs.newEncoder();
-        } else {
-            CharsetEncoder ce = (CharsetEncoder) encoderCache.forName(cs);
-            ce.reset();
-            return ce;
-        }
+    public static CharsetEncoder encoderFor(Object name) {
+        CharsetEncoder ce = (CharsetEncoder)encoderCache.forName(name);
+        ce.reset();
+        return ce;
     }
 
 }
