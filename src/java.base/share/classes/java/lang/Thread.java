@@ -1599,7 +1599,7 @@ public class Thread implements Runnable {
      * @throws IllegalArgumentException if an unknown characteristic or an invalid
      *         combination of characteristic is specified
      * @throws NullPointerException if task is null
-     * @return an un-started virtual thread
+     * @return an un-started thread
      *
      * @since 99
      */
@@ -1637,7 +1637,7 @@ public class Thread implements Runnable {
      * @throws IllegalArgumentException if an unknown characteristic or an invalid
      *         combination of characteristic is specified
      * @throws NullPointerException if name or task is null
-     * @return an un-started virtual thread
+     * @return an un-started thread
      *
      * @since 99
      */
