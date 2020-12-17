@@ -40,6 +40,7 @@
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "gc/shared/gcId.hpp"
 #include "gc/shared/gcLocker.inline.hpp"
+#include "gc/shared/gcVMOperations.hpp"
 #include "gc/shared/oopStorage.hpp"
 #include "gc/shared/oopStorageSet.hpp"
 #include "gc/shared/workgroup.hpp"
