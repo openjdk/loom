@@ -78,14 +78,6 @@ public class classload001 {
         }
     }
 
-    public static int run(String args[], PrintStream out) {
-        return new classload001().runIt(args, out);
-    }
-
-    private int runIt(String args[], PrintStream out) {
-        return check();
-    }
-
     // classes & arrays used to verify an assertion in the agent
     Class boolCls = Boolean.TYPE;
     Class byteCls = Byte.TYPE;
