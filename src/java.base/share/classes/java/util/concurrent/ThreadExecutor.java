@@ -39,8 +39,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.platform.ThreadContainers;
-import jdk.internal.platform.ThreadContainer;
+import jdk.internal.vm.ThreadContainers;
+import jdk.internal.vm.ThreadContainer;
 
 /**
  * An ExecutorService that executes each task in its own thread.

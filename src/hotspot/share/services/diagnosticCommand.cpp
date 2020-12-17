@@ -1137,7 +1137,7 @@ void JsonThreadDump::execute(DCmdSource source, TRAPS) {
 
   Handle h_path = java_lang_String::create_from_str(_filename.value(), CHECK);
 
-  Symbol* sym = vmSymbols::jdk_internal_platform_ThreadContainers();
+  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadContainers();
   Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
   InstanceKlass* ik = InstanceKlass::cast(k);
   if (HAS_PENDING_EXCEPTION) {

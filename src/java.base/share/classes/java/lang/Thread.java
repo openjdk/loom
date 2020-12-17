@@ -832,14 +832,15 @@ public class Thread implements Runnable {
         Builder disallowThreadLocals();
 
         /**
-         * Inherit threads-locals. Thread locals are inherited when the {@code Thread}
-         * is created with the {@link #build() build} method or when the thread
-         * factory {@link ThreadFactory#newThread(Runnable) newThread} method
-         * is invoked. This method has no effect when thread locals are {@linkplain
+         * Inherit initial values for {@code InheritableThreadLocal}s. Initial
+         * values for inheritable thread locals are inherited at {@code Thread}
+         * construction time, by the {@link #build() build} method or the thread
+         * factory {@link ThreadFactory#newThread(Runnable) newThread} method.
+         * This method has no effect when thread locals are {@linkplain
          * #disallowThreadLocals() disallowed}.
          * @return this builder
          */
-        Builder inheritThreadLocals();
+        Builder inheritInheritableThreadLocals();
 
         /**
          * Sets the daemon status.
@@ -965,7 +966,7 @@ public class Thread implements Runnable {
         private int counter;
         private boolean virtual;
         private boolean disallowThreadLocals;
-        private boolean inheritThreadLocals;
+        private boolean inheritInheritableThreadLocals;
         private boolean daemon;
         private boolean daemonChanged;
         private int priority;
@@ -980,7 +981,7 @@ public class Thread implements Runnable {
                 characteristics |= Thread.VIRTUAL;
             if (disallowThreadLocals)
                 characteristics |= Thread.NO_THREAD_LOCALS;
-            if (inheritThreadLocals)
+            if (inheritInheritableThreadLocals)
                 characteristics |= Thread.INHERIT_THREAD_LOCALS;
             return characteristics;
         }
@@ -1031,14 +1032,14 @@ public class Thread implements Runnable {
         @Override
         public Builder disallowThreadLocals() {
             this.disallowThreadLocals = true;
-            this.inheritThreadLocals = false;
+            this.inheritInheritableThreadLocals = false;
             return this;
         }
 
         @Override
-        public Builder inheritThreadLocals() {
+        public Builder inheritInheritableThreadLocals() {
             if (!disallowThreadLocals)
-                this.inheritThreadLocals = true;
+                this.inheritInheritableThreadLocals = true;
             return this;
         }
 
@@ -1513,7 +1514,7 @@ public class Thread implements Runnable {
      *         the desired stack size for the new thread, or zero to indicate
      *         that this parameter is to be ignored
      *
-     * @param  inheritThreadLocals
+     * @param  inheritInheritableThreadLocals
      *         if {@code true}, inherit initial values for inheritable
      *         thread-locals from the constructing thread, otherwise no initial
      *         values are inherited
@@ -1525,8 +1526,8 @@ public class Thread implements Runnable {
      * @since 9
      */
     public Thread(ThreadGroup group, Runnable task, String name,
-                  long stackSize, boolean inheritThreadLocals) {
-        this(group, name, (inheritThreadLocals ? Thread.INHERIT_THREAD_LOCALS : 0),
+                  long stackSize, boolean inheritInheritableThreadLocals) {
+        this(group, name, (inheritInheritableThreadLocals ? Thread.INHERIT_THREAD_LOCALS : 0),
                 task, stackSize, null);
     }
 
@@ -1598,7 +1599,7 @@ public class Thread implements Runnable {
      * @throws IllegalArgumentException if an unknown characteristic or an invalid
      *         combination of characteristic is specified
      * @throws NullPointerException if task is null
-     * @return an un-started virtual thread
+     * @return an un-started thread
      *
      * @since 99
      */
@@ -1636,7 +1637,7 @@ public class Thread implements Runnable {
      * @throws IllegalArgumentException if an unknown characteristic or an invalid
      *         combination of characteristic is specified
      * @throws NullPointerException if name or task is null
-     * @return an un-started virtual thread
+     * @return an un-started thread
      *
      * @since 99
      */

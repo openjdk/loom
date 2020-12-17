@@ -64,8 +64,7 @@ class WEPollSelectorImpl extends SelectorImpl {
     // interrupt/wakeup
     private final Object interruptLock = new Object();
     private boolean interruptTriggered;
-    private final Pipe pipe;
-    private final FileDescriptor fd0, fd1;
+    private final PipeImpl pipe;
     private final int fd0Val, fd1Val;
 
     WEPollSelectorImpl(SelectorProvider sp) throws IOException {
@@ -76,12 +75,8 @@ class WEPollSelectorImpl extends SelectorImpl {
 
         // wakeup support
         this.pipe = new PipeImpl(sp, false);
-        SourceChannelImpl source = (SourceChannelImpl) pipe.source();
-        SinkChannelImpl sink = (SinkChannelImpl) pipe.sink();
-        this.fd0 = source.getFD();
-        this.fd1 = sink.getFD();
-        this.fd0Val = source.getFDVal();
-        this.fd1Val = sink.getFDVal();
+        this.fd0Val = pipe.source().getFDVal();
+        this.fd1Val = pipe.sink().getFDVal();
 
         // register one end of the pipe for wakeups
         WEPoll.ctl(eph, EPOLL_CTL_ADD, fd0Val, WEPoll.EPOLLIN);
@@ -279,4 +274,3 @@ class WEPollSelectorImpl extends SelectorImpl {
         return ops;
     }
 }
-

@@ -554,13 +554,13 @@ public class BuilderTest {
     }
 
     public void testInheritedThreadLocals1() throws Exception {
-        Thread.Builder builder = Thread.builder().inheritThreadLocals();
+        Thread.Builder builder = Thread.builder().inheritInheritableThreadLocals();
         testInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals2() throws Exception {
         Thread.Builder builder = Thread.builder()
-                .inheritThreadLocals()
+                .inheritInheritableThreadLocals()
                 .disallowThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
@@ -568,19 +568,19 @@ public class BuilderTest {
     public void testInheritedThreadLocals3() throws Exception {
         Thread.Builder builder = Thread.builder()
                 .disallowThreadLocals()
-                .inheritThreadLocals();
+                .inheritInheritableThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals4() throws Exception {
-        Thread.Builder builder = Thread.builder().virtual().inheritThreadLocals();
+        Thread.Builder builder = Thread.builder().virtual().inheritInheritableThreadLocals();
         testInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals5() throws Exception {
         Thread.Builder builder = Thread.builder()
                 .virtual()
-                .inheritThreadLocals()
+                .inheritInheritableThreadLocals()
                 .disallowThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
@@ -589,7 +589,7 @@ public class BuilderTest {
         Thread.Builder builder = Thread.builder()
                 .virtual()
                 .disallowThreadLocals()
-                .inheritThreadLocals();
+                .inheritInheritableThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
 

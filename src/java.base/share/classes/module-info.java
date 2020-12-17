@@ -229,6 +229,7 @@ module java.base {
         jdk.unsupported;
     exports jdk.internal.vm to
         jdk.internal.jvmstat,
+        jdk.management,
         jdk.management.agent;
     exports jdk.internal.vm.annotation to
         java.instrument,

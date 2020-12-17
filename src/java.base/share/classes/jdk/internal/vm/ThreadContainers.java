@@ -22,7 +22,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.internal.platform;
+
+package jdk.internal.vm;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -36,6 +37,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,8 +49,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * when they are closed.
  *
  * This class defines methods to dump threads to an output or print stream in
- * JSON format. Strict JSON does not have trailing commas so the JSON may be
- * rejected by some parsers.
+ * JSON format.
  */
 public class ThreadContainers {
     private ThreadContainers() { }
@@ -70,6 +71,7 @@ public class ThreadContainers {
      */
     public static class Key extends WeakReference<ThreadContainer> {
         long tid;
+
         Key(ThreadContainer executor) {
             super(executor, queue);
             tid = Thread.currentThread().getId();
@@ -120,28 +122,22 @@ public class ThreadContainers {
         out.println("{");
         out.println("   \"threadDump\": {");
 
-        PrivilegedAction<Map<Thread, StackTraceElement[]>> pa = Thread::getAllStackTraces;
-        Map<Thread, StackTraceElement[]> stacks = AccessController.doPrivileged(pa);
         out.println("      \"threads\": [");
-
-        // dump kernel threads
-        for (Map.Entry<Thread, StackTraceElement[]> e : stacks.entrySet()) {
-            Thread thread = e.getKey();
-            dumpThread(thread, out);
-        }
 
         List<Long> creators = new ArrayList<>();   // tid of thread that created container
         List<long[]> members = new ArrayList<>();
 
-        // dump virtual threads
+        // enumerate the thread containers and dump the virtual threads to the output
         for (Map.Entry<WeakReference<ThreadContainer>, Long> e : containers.entrySet()) {
             ThreadContainer container = e.getKey().get();
             long creatorTid = e.getValue();
             if (container != null) {
                 Set<Thread> threads = container.threads();
 
-                // virtual threads
-                threads.stream().filter(Thread::isVirtual).forEach(t -> dumpThread(t, out));
+                // dump virtual threads in this container
+                threads.stream()
+                        .filter(Thread::isVirtual)
+                        .forEach(t -> dumpThread(t, out, true));
 
                 // add to creators/members
                 creators.add(creatorTid);
@@ -150,30 +146,59 @@ public class ThreadContainers {
             }
         }
 
+        // dump kernel threads
+        PrivilegedAction<Map<Thread, StackTraceElement[]>> pa = Thread::getAllStackTraces;
+        Map<Thread, StackTraceElement[]> stacks = AccessController.doPrivileged(pa);
+        Iterator<Map.Entry<Thread, StackTraceElement[]>> iterator = stacks.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Thread, StackTraceElement[]> e = iterator.next();
+            Thread thread = e.getKey();
+            boolean more = iterator.hasNext();
+            dumpThread(thread, out, more);
+        }
+
         out.println("      ], ");
 
         // dump thread containers and tid of the creator/members
         out.println("      \"threadContainers\": [");
-        for (int i = 0; i < creators.size(); i++) {
+        int i = 0;
+        while (i < creators.size()) {
             Long creatorTid = creators.get(i);
             long[] tids = members.get(i);
             out.println("        {");
             out.format("          \"creator\": %d,%n", creatorTid);
-            out.println("          \"members\": [");
-            Arrays.stream(tids).forEach(tid -> out.format("              %d,%n", tid));
-            out.println("          ], ");
-            out.println("        },");
-        }
-        out.println("    ]");
 
-        out.println("  }");
-        out.println("}");
+            out.println("          \"members\": [");
+            int j = 0;
+            while (j < tids.length) {
+                out.format("              %d", tids[j]);
+                j++;
+                if (j < tids.length) {
+                    out.println(",");
+                } else {
+                    out.println();  // last element, no trailing comma
+                }
+            }
+            out.println("          ]");
+
+            i++;
+            if (i < creators.size()) {
+                out.println("        },");
+            } else {
+                out.println("        }");
+            }
+        }
+        out.println("      ]");
+
+
+        out.println("    }");   // end threadDump
+        out.println("}");  // end object
     }
 
     /**
      * Dump the given thread and its stack trace to the print stream.
      */
-    private static void dumpThread(Thread thread, PrintStream out) {
+    private static void dumpThread(Thread thread, PrintStream out, boolean more) {
         PrivilegedAction<StackTraceElement[]> pa = thread::getStackTrace;
         StackTraceElement[] stackTrace = AccessController.doPrivileged(pa);
 
@@ -185,14 +210,18 @@ public class ThreadContainers {
         while (i < stackTrace.length) {
             out.format("              \"%s\"", escape(stackTrace[i].toString()));
             i++;
-            if (i >= stackTrace.length) {
-                out.println();  // last element, no trailing comma
-            } else {
+            if (i < stackTrace.length) {
                 out.println(",");
+            } else {
+                out.println();  // last element, no trailing comma
             }
         }
         out.println("           ]");
-        out.println("         },");
+        if (more) {
+            out.println("         },");
+        } else {
+            out.println("         }");  // last thread, no trailing comma
+        }
     }
 
     /**
