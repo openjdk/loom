@@ -45,8 +45,7 @@ static volatile int eventsCount = 0;
 void JNICALL
 MonitorWait(jvmtiEnv *jvmti, JNIEnv* jni, jthread thr, jobject obj, jlong tout) {
 
-NSK_DISPLAY3("MonitorWait event:\n\tthread: %p, object: %p, timeout: %ld\n",
-thr, obj, (int)tout);
+printf("MonitorWait event:\n\tthread: %p, object: %p, timeout: %d\n", thr, obj, (int)tout);
 
 if (!NSK_VERIFY(thread != NULL)) {
 nsk_jvmti_setFailStatus();

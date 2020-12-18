@@ -405,10 +405,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
              TranslateError(err), err);
       return JNI_ERR;
     }
-    if (!NSK_JVMTI_VERIFY(jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_START, NULL)))
+    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_START, NULL);
+    if (err != JVMTI_ERROR_NONE) {
       return JNI_ERR;
-    if (!NSK_JVMTI_VERIFY(jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_DEATH, NULL)))
+    }
+    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_DEATH, NULL);
+    if (err != JVMTI_ERROR_NONE) {
       return JNI_ERR;
+    }
 
     if (jvmti->CreateRawMonitor("agent_lock", &agent_lock) != JVMTI_ERROR_NONE) {
       return JNI_ERR;
@@ -421,7 +425,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   return JNI_OK;
 }
 
-JNIEXPORT void JNICALL Java_nsk_jvmti_FramePop_framepop002_getReady(JNIEnv *env, jclass cls) {
+JNIEXPORT void JNICALL Java_framepop002_getReady(JNIEnv *env, jclass cls) {
   jvmtiError err;
 
   if (!caps.can_generate_frame_pop_events ||
@@ -446,7 +450,7 @@ JNIEXPORT void JNICALL Java_nsk_jvmti_FramePop_framepop002_getReady(JNIEnv *env,
   watch_events = JNI_TRUE;
 }
 
-JNIEXPORT jint JNICALL Java_nsk_jvmti_FramePop_framepop002_check(JNIEnv *env, jclass cls) {
+JNIEXPORT jint JNICALL Java_framepop002_check(JNIEnv *env, jclass cls) {
   jvmtiError err;
 
   watch_events = JNI_FALSE;
@@ -471,6 +475,14 @@ JNIEXPORT jint JNICALL Java_nsk_jvmti_FramePop_framepop002_check(JNIEnv *env, jc
   }
 
   return result;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

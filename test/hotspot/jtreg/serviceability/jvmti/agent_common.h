@@ -40,14 +40,12 @@
 #define NSK_COMPLAIN1 printf
 #define NSK_COMPLAIN2 printf
 #define NSK_COMPLAIN3 printf
-#define NSK_COMPLAIN4 printf
-#define NSK_COMPLAIN5 printf
 
 
-#define NSK_JNI_VERIFY(jni, action)  action
-#define NSK_JNI_VERIFY_VOID(jni, action)  action
-#define NSK_VERIFY(action) action
-#define NSK_JVMTI_VERIFY(action) action
+
+#define NSK_JNI_VERIFY(jni, action)  (action)
+#define NSK_VERIFY(action) (action)
+#define NSK_JVMTI_VERIFY(action) (action)
 
 #ifdef _WIN32
 
@@ -232,12 +230,12 @@ int nsk_jvmti_resumeSync() {
 /** Create JVMTI environment. */
 jvmtiEnv* nsk_jvmti_createJVMTIEnv(JavaVM* javaVM, void* reserved) {
   jvm = javaVM;
-  if (!NSK_VERIFY(javaVM->GetEnv((void **)&jvmti_env, JVMTI_VERSION_1_1) == JNI_OK)) {
+  if (javaVM->GetEnv((void **)&jvmti_env, JVMTI_VERSION_1_1) != JNI_OK) {
     nsk_jvmti_setFailStatus();
     return NULL;
   }
 
-  if (!NSK_JVMTI_VERIFY(init_agent_data(jvmti_env, &agent_data))) {
+  if (init_agent_data(jvmti_env, &agent_data) != 0) {
     nsk_jvmti_setFailStatus();
     return NULL;
   }

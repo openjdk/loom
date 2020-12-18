@@ -82,7 +82,7 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti_env, JNIEnv *env,
     return;
   }
   if (cls_sig != NULL &&
-      strcmp(cls_sig, "Lnsk/jvmti/MethodEntry/mentry001;") == 0) {
+      strcmp(cls_sig, "Lmentry001;") == 0) {
     if (printdump == JNI_TRUE) {
       printf(">>> retrieving method entry info ...\n");
     }
@@ -202,7 +202,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_MethodEntry_mentry001_enable(JNIEnv *env, jclass cls) {
+Java_mentry001_enable(JNIEnv *env, jclass cls) {
   jvmtiError err;
 
   if (jvmti == NULL) {
@@ -225,7 +225,7 @@ Java_nsk_jvmti_MethodEntry_mentry001_enable(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_MethodEntry_mentry001_check(JNIEnv *env, jclass cls) {
+Java_mentry001_check(JNIEnv *env, jclass cls) {
   jmethodID mid;
 
   mid = env->GetStaticMethodID(cls, "dummy", "()V");
@@ -244,7 +244,7 @@ Java_nsk_jvmti_MethodEntry_mentry001_check(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_MethodEntry_mentry001_chain(JNIEnv *env, jclass cls) {
+Java_mentry001_chain(JNIEnv *env, jclass cls) {
   jvmtiError err;
 
   if (jvmti == NULL) {
@@ -264,6 +264,14 @@ Java_nsk_jvmti_MethodEntry_mentry001_chain(JNIEnv *env, jclass cls) {
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

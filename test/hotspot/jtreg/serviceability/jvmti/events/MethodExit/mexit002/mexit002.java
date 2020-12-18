@@ -43,10 +43,9 @@ import java.io.PrintStream;
  *     Ported from JVMDI.
  *     Fixed the 5004632 bug.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @compile mexit002a.jasm
- * @run main/othervm/native -agentlib:mexit002 nsk.jvmti.MethodExit.mexit002
+ * @run main/othervm/native -agentlib:mexit002 mexit002
  */
 
 
@@ -69,13 +68,9 @@ public class mexit002 {
     native static int check();
 
     public static void main(String args[]) {
-        args = nsk.share.jvmti.JVMTITest.commonInit(args);
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    public static int run(String args[], PrintStream out) {
-        return check();
+        int res = check();
+        if (res != 0) {
+            throw new RuntimeException("Check() returned " + res);
+        }
     }
 }

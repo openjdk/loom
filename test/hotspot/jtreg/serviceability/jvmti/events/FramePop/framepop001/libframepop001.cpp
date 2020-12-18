@@ -48,8 +48,8 @@ static jboolean printdump = JNI_FALSE;
 static size_t eventsExpected = 0;
 static size_t eventsCount = 0;
 static pop_info pops[] = {
-    { "Lnsk/jvmti/FramePop/framepop001;", "chain", "()V", 0 },
-    { "Lnsk/jvmti/FramePop/framepop001a;", "dummy", "()V", 3 },
+    { "Lframepop001;", "chain", "()V", 0 },
+    { "Lframepop001a;", "dummy", "()V", 3 },
 };
 
 void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *env,
@@ -222,7 +222,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_FramePop_framepop001_check(JNIEnv *env, jclass cls) {
+Java_framepop001_check(JNIEnv *env, jclass cls) {
   jvmtiError err;
   jclass clz;
   jmethodID mid;
@@ -263,7 +263,7 @@ Java_nsk_jvmti_FramePop_framepop001_check(JNIEnv *env, jclass cls) {
     result = STATUS_FAILED;
   }
 
-  clz = env->FindClass("nsk/jvmti/FramePop/framepop001a");
+  clz = env->FindClass("framepop001a");
   if (clz == NULL) {
     printf("Cannot find framepop001a class!\n");
     result = STATUS_FAILED;
@@ -284,5 +284,14 @@ Java_nsk_jvmti_FramePop_framepop001_check(JNIEnv *env, jclass cls) {
 
   return result;
 }
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
 
 }

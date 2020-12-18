@@ -48,8 +48,8 @@ static jboolean printdump = JNI_FALSE;
 static size_t eventsExpected = 0;
 static size_t eventsCount = 0;
 static exit_info exits[] = {
-    { "Lnsk/jvmti/MethodExit/mexit002a;", "chain", "()V", -1 },
-    { "Lnsk/jvmti/MethodExit/mexit002a;", "dummy", "()V", 3 }
+    { "Lmexit002a;", "chain", "()V", -1 },
+    { "Lmexit002a;", "dummy", "()V", 3 }
 };
 
 void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
@@ -77,7 +77,7 @@ void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
     return;
   }
   if (cls_sig != NULL &&
-      strcmp(cls_sig, "Lnsk/jvmti/MethodExit/mexit002a;") == 0) {
+      strcmp(cls_sig, "Lmexit002a;") == 0) {
     if (printdump == JNI_TRUE) {
       printf(">>> retrieving method exit info ...\n");
     }
@@ -204,7 +204,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_MethodExit_mexit002_check(JNIEnv *env, jclass cls) {
+Java_mexit002_check(JNIEnv *env, jclass cls) {
   jvmtiError err;
   jclass clz;
   jmethodID mid;
@@ -218,7 +218,7 @@ Java_nsk_jvmti_MethodExit_mexit002_check(JNIEnv *env, jclass cls) {
     return result;
   }
 
-  clz = env->FindClass("nsk/jvmti/MethodExit/mexit002a");
+  clz = env->FindClass("mexit002a");
   if (clz == NULL) {
     printf("Failed to find class \"mexit002a\"!\n");
     return STATUS_FAILED;
@@ -259,10 +259,20 @@ Java_nsk_jvmti_MethodExit_mexit002_check(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_MethodExit_mexit002a_chain(JNIEnv *env, jclass cls) {
+Java_mexit002a_chain(JNIEnv *env, jclass cls) {
   if (printdump == JNI_TRUE) {
     printf(">>> about to exit method chain ...\n");
   }
 }
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+
 
 }

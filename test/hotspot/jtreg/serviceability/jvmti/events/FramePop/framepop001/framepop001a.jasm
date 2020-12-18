@@ -21,8 +21,6 @@
  * questions.
  */
 
-package nsk/jvmti/FramePop;
-
 super public class framepop001a {
 
     public Method "<init>":"()V" stack 1 locals 1 {

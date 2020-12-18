@@ -116,7 +116,7 @@ NSK_DISPLAY0("VMDeath event received\n");
 
 if (bindEv[0] != bindEv[1]) {
 result = STATUS_FAILED;
-NSK_COMPLAIN5(
+printf(
 "TEST FAILED: wrong NativeMethodBind events\n"
 "\tfor tested method \"%s %s\" bound with \"%s\":\n"
 "\tgot: %d\texpected: %d\n\n",
@@ -165,7 +165,7 @@ NSK_DISPLAY3(
 "Calling RegisterNatives() with \"%s %s\"\n"
 "\tfor class \"%s\" ...\n",
 METHODS[0], METHODS[1], CLASS_SIG);
-if (!NSK_JNI_VERIFY_VOID(env, (env->RegisterNatives(testedCls, &meth, 1)) != 0)) {
+if (env->RegisterNatives(testedCls, &meth, 1) != 0) {
 result = STATUS_FAILED;
 NSK_COMPLAIN3("TEST FAILURE: unable to RegisterNatives() \"%s %s\" for class \"%s\"\n\n",
 METHODS[0], METHODS[1], CLASS_SIG);
@@ -173,9 +173,9 @@ METHODS[0], METHODS[1], CLASS_SIG);
 
 NSK_DISPLAY1("Calling UnregisterNatives() for class \"%s\" ...\n",
 CLASS_SIG);
-if (!NSK_JNI_VERIFY_VOID(env, (env->UnregisterNatives(testedCls)) != 0)) {
+if (env->UnregisterNatives(testedCls) != 0) {
 result = STATUS_FAILED;
-NSK_COMPLAIN3("TEST FAILURE: unable to UnregisterNatives() \"%s %s\" for class \"%s\"\n\n",
+NSK_COMPLAIN3("TEST FAILURE: unable to UnregisterNatives() \"%c %c\" for class \"%s\"\n\n",
 METHODS[1][0], METHODS[1][1], CLASS_SIG);
 }
 }

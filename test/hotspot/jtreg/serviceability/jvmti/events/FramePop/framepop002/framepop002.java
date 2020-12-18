@@ -40,9 +40,8 @@ import java.io.PrintStream;
  *     4504077 java: dbx should not hold on to a frameid after thread suspension
  *     Ported from JVMDI.
  *
- * @library /vmTestbase
- *          /test/lib
- * @run main/othervm/native -agentlib:framepop002 nsk.jvmti.FramePop.framepop002
+ * @library /test/lib
+ * @run main/othervm/native -agentlib:framepop002 framepop002
  */
 
 
@@ -69,13 +68,6 @@ public class framepop002 {
     native static int check();
 
     public static void main(String args[]) {
-        args = nsk.share.jvmti.JVMTITest.commonInit(args);
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    public static int run(String args[], PrintStream out) {
         TestThread[] t = new TestThread[THREADS_LIMIT];
         getReady();
         for (int i = 0; i < THREADS_LIMIT; i++) {
@@ -89,7 +81,10 @@ public class framepop002 {
                 throw new Error("Unexpected: " + e);
             }
         }
-        return check();
+        int res = check();
+        if (res != 0) {
+            throw new RuntimeException("Check() returned " + res);
+        }
     }
 
     static class TestThread extends Thread {

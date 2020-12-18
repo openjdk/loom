@@ -21,8 +21,6 @@
  * questions.
  */
 
-package nsk/jvmti/MethodExit;
-
 super public class mexit002a {
 
     public Method "<init>":"()V" stack 1 locals 1 {

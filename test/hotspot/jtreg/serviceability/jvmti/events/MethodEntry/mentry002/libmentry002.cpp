@@ -122,7 +122,7 @@ jint  Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_MethodEntry_mentry002_getReady(JNIEnv *env, jclass cls, jint i) {
+Java_mentry002_getReady(JNIEnv *env, jclass cls, jint i) {
   jvmtiError err;
 
   if (jvmti == NULL) {
@@ -164,7 +164,7 @@ Java_nsk_jvmti_MethodEntry_mentry002_getReady(JNIEnv *env, jclass cls, jint i) {
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_MethodEntry_mentry002_check(JNIEnv *env, jclass cls) {
+Java_mentry002_check(JNIEnv *env, jclass cls) {
   if (printdump == JNI_TRUE) {
     printf(">>> MethodEntry events: %d, MethodExit events: %d\n",
            MethodEntriesCount, MethodExitsCount);
@@ -180,6 +180,14 @@ Java_nsk_jvmti_MethodEntry_mentry002_check(JNIEnv *env, jclass cls) {
     result = STATUS_FAILED;
   }
   return result;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

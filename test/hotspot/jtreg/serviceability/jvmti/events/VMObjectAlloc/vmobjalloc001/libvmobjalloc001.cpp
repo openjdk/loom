@@ -64,7 +64,7 @@ VMObjectAlloc(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject object,
     return;
   }
 
-  NSK_DISPLAY2("VMObjectAlloc: \"%s\", size=%d\n", signature, size);
+  NSK_DISPLAY2("VMObjectAlloc: \"%s\", size=%ld\n", signature, (long)size);
 
   if (signature != NULL)
     jvmti->Deallocate((unsigned char*)signature);

@@ -48,8 +48,8 @@ static jboolean printdump = JNI_FALSE;
 static size_t eventsExpected = 0;
 static size_t eventsCount = 0;
 static exit_info exits[] = {
-    { "Lnsk/jvmti/MethodExit/mexit001a;", "chain", "()V", -1 },
-    { "Lnsk/jvmti/MethodExit/mexit001a;", "dummy", "()V", 3 }
+    { "Lmexit001a;", "chain", "()V", -1 },
+    { "Lmexit001a;", "dummy", "()V", 3 }
 };
 
 void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
@@ -77,7 +77,7 @@ void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
     return;
   }
   if (cls_sig != NULL &&
-      strcmp(cls_sig, "Lnsk/jvmti/MethodExit/mexit001a;") == 0) {
+      strcmp(cls_sig, "Lmexit001a;") == 0) {
     if (printdump == JNI_TRUE) {
       printf(">>> retrieving method exit info ...\n");
     }
@@ -204,7 +204,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_MethodExit_mexit001_init0(JNIEnv *env, jclass cls) {
+Java_mexit001_init0(JNIEnv *env, jclass cls) {
   jvmtiError err;
   if (jvmti == NULL) {
     printf("JVMTI client was not properly loaded!\n");
@@ -226,7 +226,7 @@ Java_nsk_jvmti_MethodExit_mexit001_init0(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_MethodExit_mexit001_check(JNIEnv *env, jclass cls) {
+Java_mexit001_check(JNIEnv *env, jclass cls) {
   jvmtiError err;
   jclass clz;
   jmethodID mid;
@@ -240,9 +240,9 @@ Java_nsk_jvmti_MethodExit_mexit001_check(JNIEnv *env, jclass cls) {
     return result;
   }
 
-  clz = env->FindClass("nsk/jvmti/MethodExit/mexit001a");
+  clz = env->FindClass("mexit001a");
   if (clz == NULL) {
-    printf("Cannot find nsk.jvmti.MethodExit.mexit001a class!\n");
+    printf("Cannot find MethodExit.mexit001a class!\n");
     return STATUS_FAILED;
   }
 
@@ -271,8 +271,18 @@ Java_nsk_jvmti_MethodExit_mexit001_check(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_MethodExit_mexit001a_chain(JNIEnv *env, jclass cls) {
+Java_mexit001a_chain(JNIEnv *env, jclass cls) {
   printf("Executing chain()\n");
 }
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+
 
 }

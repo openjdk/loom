@@ -64,12 +64,6 @@ public class mentry002 {
     native static int check();
 
     public static void main(String args[]) {
-
-        // produce JCK-like exit status.
-        System.exit(run());
-    }
-
-    public static int run() {
         int count;
 
         getReady(MAX_LOOP);
@@ -78,7 +72,10 @@ public class mentry002 {
             emptyMethod();
         }
 
-        return check();
+        int res = check();
+        if (res != 0) {
+            throw new RuntimeException("Check() returned " + res);
+        }
     }
 
     public static void emptyMethod() {}

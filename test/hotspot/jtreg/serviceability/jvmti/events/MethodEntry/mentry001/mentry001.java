@@ -41,9 +41,8 @@ import java.io.PrintStream;
  *     Ported from JVMDI.
  *     Fixed the 5004632 bug.
  *
- * @library /vmTestbase
- *          /test/lib
- * @run main/othervm/native -agentlib:mentry001 nsk.jvmti.MethodEntry.mentry001
+ * @library /test/lib
+ * @run main/othervm/native -agentlib:mentry001 mentry001
  */
 
 
@@ -68,15 +67,11 @@ public class mentry001 {
     native static void chain();
 
     public static void main(String args[]) {
-        args = nsk.share.jvmti.JVMTITest.commonInit(args);
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    public static int run(String args[], PrintStream out) {
         enable();
-        return check();
+        int res = check();
+        if (res != 0) {
+            throw new RuntimeException("Check() returned " + res);
+        }
     }
 
     public static void dummy() {

@@ -154,7 +154,7 @@ Java_nsk_jvmti_NativeMethodBind_nativemethbind001_nativeMethod(
     NSK_DISPLAY3("Calling RegisterNatives() with \"%s %s\"\n"
                  "\tfor class \"%s\" ...\n",
                  METHODS[1][0], METHODS[1][1], CLASS_SIG);
-    if (!NSK_JNI_VERIFY_VOID(env, (env->RegisterNatives(testedCls, &meth, 1)) != 0)) {
+    if (env->RegisterNatives(testedCls, &meth, 1) != 0) {
       result = STATUS_FAILED;
       NSK_COMPLAIN3("TEST FAILURE: unable to RegisterNatives() \"%s %s\" for class \"%s\"\n\n",
                     METHODS[1][0], METHODS[1][1], CLASS_SIG);

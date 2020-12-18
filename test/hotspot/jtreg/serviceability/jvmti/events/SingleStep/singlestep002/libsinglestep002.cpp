@@ -64,8 +64,8 @@ VMDeath(jvmtiEnv *jvmti_env, JNIEnv *env) {
   NSK_DISPLAY0("VMDeath event received\n");
 
   if (wrongStepEv != 0) {
-    NSK_COMPLAIN1(
-        "TEST FAILED: there are %d SingleStep events\n"
+    printf(
+        "TEST FAILED: there are %ld SingleStep events\n"
         "sent during non-live phase of the VM execution\n",
         wrongStepEv);
   }
