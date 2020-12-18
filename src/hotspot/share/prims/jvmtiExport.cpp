@@ -1578,7 +1578,7 @@ void JvmtiExport::post_vthread_terminated(jobject vthread) {
         JvmtiJavaThreadEventTransition jet(cur_thread);
         jvmtiEventVirtualThreadTerminated callback = env->callbacks()->VirtualThreadTerminated;
         if (callback != NULL) {
-          (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
+          (*callback)(env->jvmti_external(), jem.jni_env(), vthread);
         }
       }
     }
