@@ -45,11 +45,9 @@ import java.io.*;
  *     The test has been fixed due to the bug 4967116.
  *     Fixed the 4995867 bug.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:nativemethbind004=-waittime=5
- *      nsk.jvmti.NativeMethodBind.nativemethbind004
+ *      -agentlib:nativemethbind004 nativemethbind004
  */
 
 
@@ -83,10 +81,10 @@ public class nativemethbind004 {
     native int check();
 
     public static void main(String[] argv) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
+
 
         // produce JCK-like exit status
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+        System.exit(run(argv, System.out));
     }
 
     public static int run(String argv[], PrintStream out) {

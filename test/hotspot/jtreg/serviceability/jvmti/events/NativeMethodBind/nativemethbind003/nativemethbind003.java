@@ -21,6 +21,8 @@
  * questions.
  */
 
+import jdk.test.lib.jvmti.DebugeeClass;
+
 import java.io.*;
 
 
@@ -45,11 +47,9 @@ import java.io.*;
  *     The test has been fixed due to the bug 4967116.
  *     Fixed the 4995867 bug.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:nativemethbind003=-waittime=5
- *      nsk.jvmti.NativeMethodBind.nativemethbind003
+ *      -agentlib:nativemethbind003 nativemethbind003
  */
 
 /**
@@ -79,10 +79,10 @@ public class nativemethbind003 {
     native void registerNative();
 
     public static void main(String[] argv) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
+
 
         // produce JCK-like exit status
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+        System.exit(run(argv, System.out));
     }
 
     public static int run(String argv[], PrintStream out) {
@@ -93,7 +93,7 @@ public class nativemethbind003 {
         // register native method 'nativeMethod' with 'TestedClass'
         registerNative();
 
-        return Consts.TEST_PASSED;
+        return DebugeeClass.TEST_PASSED;
     }
 
    /**

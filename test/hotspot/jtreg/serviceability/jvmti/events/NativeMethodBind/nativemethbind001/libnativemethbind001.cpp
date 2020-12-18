@@ -131,7 +131,7 @@ anotherNativeMethod(JNIEnv *env, jobject obj) {
 
 /* dummy method used only to provoke NativeMethodBind event */
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_NativeMethodBind_nativemethbind001_nativeMethod(
+Java_nativemethbind001_nativeMethod(
     JNIEnv *env, jobject obj, jboolean registerNative) {
   jclass testedCls = NULL;
   JNINativeMethod meth;
@@ -163,7 +163,7 @@ Java_nsk_jvmti_NativeMethodBind_nativemethbind001_nativeMethod(
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_NativeMethodBind_nativemethbind001_check(
+Java_nativemethbind001_check(
     JNIEnv *env, jobject obj) {
   int i;
 
@@ -236,6 +236,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   NSK_DISPLAY0("enabling the events done\n\n");
 
   return JNI_OK;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

@@ -142,7 +142,7 @@ NSK_DISPLAY0("inside the nativeMethod()\n");
 
 /* dummy method used only to provoke NativeMethodBind event */
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_NativeMethodBind_nativemethbind003_registerNative(
+Java_nsk_registerNative(
     JNIEnv *env, jobject obj) {
 jclass testedCls = NULL;
 JNINativeMethod meth;
@@ -238,6 +238,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   NSK_DISPLAY0("enabling the events done\n\n");
 
   return JNI_OK;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

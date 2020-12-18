@@ -21,8 +21,6 @@
  * questions.
  */
 
-package nsk/jvmti/FieldModification;
-
 super public class fieldmod001a {
 
     static Field staticBoolean:Z;

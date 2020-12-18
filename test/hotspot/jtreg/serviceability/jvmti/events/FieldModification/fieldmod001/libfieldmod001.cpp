@@ -376,7 +376,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_FieldModification_fieldmod001_getReady(JNIEnv *env, jclass klass,
+Java_fieldmod001_getReady(JNIEnv *env, jclass klass,
                                                       jobject obj1, jobject obj2, jobject arr1, jobject arr2) {
   jvmtiError err;
   jclass cls;
@@ -447,13 +447,21 @@ Java_nsk_jvmti_FieldModification_fieldmod001_getReady(JNIEnv *env, jclass klass,
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_FieldModification_fieldmod001_check(JNIEnv *env, jclass cls) {
+Java_fieldmod001_check(JNIEnv *env, jclass cls) {
   if (eventsCount != eventsExpected) {
     printf("Wrong number of field modification events: %d, expected: %d\n",
            eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }
   return result;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

@@ -21,10 +21,10 @@
  * questions.
  */
 
+import jdk.test.lib.jvmti.DebugeeClass;
+
 import java.io.*;
 
-import nsk.share.*;
-import nsk.share.jvmti.*;
 
 /*
  * @test
@@ -41,9 +41,8 @@ import nsk.share.jvmti.*;
  *     to be sent only during the live phase via the GetPhase() call.
  * COMMENTS
  *
- * @library /vmTestbase
- *          /test/lib
- * @run main/othervm/native -agentlib:singlestep002=-waittime=5 nsk.jvmti.SingleStep.singlestep002
+ * @library /test/lib
+ * @run main/othervm/native -agentlib:singlestep002 singlestep002
  */
 
 
@@ -59,7 +58,6 @@ import nsk.share.jvmti.*;
  * the <code>GetPhase()</code> call.
  */
 public class singlestep002 {
-    private Log log;
 
     static {
         try {
@@ -73,17 +71,16 @@ public class singlestep002 {
     }
 
     public static void main(String[] argv) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
 
         // produce JCK-like exit status
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+        System.exit( new singlestep002().runThis(argv));
     }
 
-    public static int run(String argv[], PrintStream out) {
-        return new singlestep002().runThis(argv, out);
+    public static int run(String argv[]) {
+        return new singlestep002().runThis(argv);
     }
 
-    private int runThis(String argv[], PrintStream out) {
-        return Consts.TEST_PASSED;
+    private int runThis(String argv[]) {
+        return DebugeeClass.TEST_PASSED;
     }
 }

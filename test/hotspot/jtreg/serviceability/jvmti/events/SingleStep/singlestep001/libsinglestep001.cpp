@@ -216,7 +216,7 @@ VMDeath(jvmtiEnv *jvmti_env, JNIEnv* jni_env) {
 /************************/
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_SingleStep_singlestep001_check(
+Java_singlestep001_check(
     JNIEnv *env, jobject obj) {
   int i;
 
@@ -292,6 +292,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
 
   return JNI_OK;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

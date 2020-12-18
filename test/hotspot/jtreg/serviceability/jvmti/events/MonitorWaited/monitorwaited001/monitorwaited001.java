@@ -21,10 +21,10 @@
  * questions.
  */
 
+import jdk.test.lib.jvmti.DebugeeClass;
+
 import java.io.PrintStream;
 
-import nsk.share.*;
-import nsk.share.jvmti.*;
 
 /*
  * @test
@@ -43,11 +43,9 @@ import nsk.share.jvmti.*;
  *     - change signature of agentProc function
  *       and save JNIEnv pointer now passed as argument.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:monitorwaited001=-waittime=5
- *      nsk.jvmti.MonitorWaited.monitorwaited001
+ *      -agentlib:monitorwaited001 monitorwaited001
  */
 
 
@@ -61,34 +59,25 @@ public class monitorwaited001 extends DebugeeClass {
 
     // run test from command line
     public static void main(String argv[]) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
-
-        // JCK-compatible exit
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+        System.exit(run());
     }
 
     // run test from JCK-compatible environment
-    public static int run(String argv[], PrintStream out) {
-        return new monitorwaited001().runIt(argv, out);
+    public static int run() {
+        return new monitorwaited001().runIt();
     }
 
-    /* =================================================================== */
 
-    // scaffold objects
-    ArgumentHandler argHandler = null;
-    Log log = null;
-    int status = Consts.TEST_PASSED;
+    int status = DebugeeClass.TEST_PASSED;
     static long timeout = 0;
 
     // tested thread
     monitorwaited001Thread thread = null;
 
     // run debuggee
-    public int runIt(String argv[], PrintStream out) {
-        argHandler = new ArgumentHandler(argv);
-        log = new Log(out, argHandler);
-        timeout = argHandler.getWaitTime() * 60000; // milliseconds
-        log.display("Timeout = " + timeout + " msc.");
+    public int runIt() {
+        timeout =   60000; // milliseconds
+        System.out.println("Timeout = " + timeout + " msc.");
 
         thread = new monitorwaited001Thread("Debuggee Thread");
 
@@ -104,7 +93,7 @@ public class monitorwaited001 extends DebugeeClass {
         }
 
         Thread.yield();
-        log.display("Thread started");
+        System.out.println("Thread started");
 
         synchronized (thread.waitingMonitor) {
             thread.waitingMonitor.notify();
@@ -117,7 +106,7 @@ public class monitorwaited001 extends DebugeeClass {
             throw new Failure(e);
         }
 
-        log.display("Sync: thread finished");
+        System.out.println("Sync: thread finished");
         status = checkStatus(status);
 
         return status;
@@ -137,7 +126,7 @@ class monitorwaited001Thread extends Thread {
     public void run() {
         synchronized (waitingMonitor) {
 
-            monitorwaited001.checkStatus(Consts.TEST_PASSED);
+            monitorwaited001.checkStatus(DebugeeClass.TEST_PASSED);
 
             // notify about starting
             synchronized (startingMonitor) {
@@ -148,7 +137,7 @@ class monitorwaited001Thread extends Thread {
             try {
                 waitingMonitor.wait(monitorwaited001.timeout);
             } catch (InterruptedException e) {
-                throw new Failure(e);
+                throw new RuntimeException(e);
             }
         }
     }

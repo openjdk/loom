@@ -38,10 +38,9 @@ import java.io.PrintStream;
  *     Fixed according to 4669812 bug.
  *     Ported from JVMDI.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @compile fieldacc001a.jasm
- * @run main/othervm/native -agentlib:fieldacc001 nsk.jvmti.FieldAccess.fieldacc001
+ * @run main/othervm/native -agentlib:fieldacc001 fieldacc001
  */
 
 
@@ -65,16 +64,12 @@ public class fieldacc001 {
     native static int check();
 
     public static void main(String args[]) {
-        args = nsk.share.jvmti.JVMTITest.commonInit(args);
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    public static int run(String args[], PrintStream out) {
         getReady();
         fieldacc001a t = new fieldacc001a();
         t.run();
-        return check();
+        int res = check();
+        if (res != 0) {
+            throw new RuntimeException("Check() returned " + res);
+        }
     }
 }

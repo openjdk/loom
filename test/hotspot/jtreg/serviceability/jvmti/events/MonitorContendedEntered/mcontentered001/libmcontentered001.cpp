@@ -271,12 +271,17 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   return JNI_OK;
 }
 
-JNIEXPORT jint JNICALL Java_nsk_jvmti_MonitorContendedEntered_mcontentered001_getEventCount
+JNIEXPORT jint JNICALL Java_mcontentered001_getEventCount
     (JNIEnv *env, jobject obj)
 {
   return eventsCount;
 }
 
-/* ========================================================================== */
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
 
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
 }

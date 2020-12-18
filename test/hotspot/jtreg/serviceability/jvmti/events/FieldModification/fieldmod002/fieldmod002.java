@@ -38,15 +38,12 @@ import java.io.PrintStream;
  *     Fixed according to 4669812 bug.
  *     Ported from JVMDI.
  *
- * @library /vmTestbase
- *          /test/lib
- * @run main/othervm/native -agentlib:fieldmod002 nsk.jvmti.FieldModification.fieldmod002
+ * @library /test/lib
+ * @run main/othervm/native -agentlib:fieldmod002 fieldmod002
  */
 
 
 public class fieldmod002 {
-
-    final static int JCK_STATUS_BASE = 95;
 
     static {
         try {
@@ -63,10 +60,10 @@ public class fieldmod002 {
     native static int check(Object obj);
 
     public static void main(String args[]) {
-        args = nsk.share.jvmti.JVMTITest.commonInit(args);
+
 
         // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
+        System.exit(run(args, System.out));
     }
 
     public static int run(String args[], PrintStream out) {

@@ -38,9 +38,8 @@ import java.io.PrintStream;
  * COMMENTS
  *     Ported from JVMDI.
  *
- * @library /vmTestbase
- *          /test/lib
- * @run main/othervm/native -agentlib:fieldacc003 nsk.jvmti.FieldAccess.fieldacc003
+ * @library /test/lib
+ * @run main/othervm/native -agentlib:fieldacc003 fieldacc003
  */
 
 
@@ -64,7 +63,6 @@ public class fieldacc003 {
     native static int check();
 
     public static void main(String args[]) {
-        args = nsk.share.jvmti.JVMTITest.commonInit(args);
 
         // produce JCK-like exit status.
         System.exit(run(args, System.out) + JCK_STATUS_BASE);

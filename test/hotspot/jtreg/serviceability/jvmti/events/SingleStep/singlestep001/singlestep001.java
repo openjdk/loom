@@ -22,8 +22,6 @@
  */
 import java.io.*;
 
-import nsk.share.*;
-import nsk.share.jvmti.*;
 
 /*
  * @test
@@ -46,9 +44,8 @@ import nsk.share.jvmti.*;
  *     must be received.
  * COMMENTS
  *
- * @library /vmTestbase
- *          /test/lib
- * @run main/othervm/native -agentlib:singlestep001=-waittime=5 nsk.jvmti.SingleStep.singlestep001
+ * @library /test/lib
+ * @run main/othervm/native -agentlib:singlestep001 singlestep001
  */
 
 
@@ -82,10 +79,10 @@ public class singlestep001 {
     native int check();
 
     public static void main(String[] argv) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
+
 
         // produce JCK-like exit status
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+        System.exit(run(argv, System.out));
     }
 
     public static int run(String argv[], PrintStream out) {
@@ -93,13 +90,13 @@ public class singlestep001 {
     }
 
     private int runThis(String argv[], PrintStream out) {
-        ArgumentHandler argHandler = new ArgumentHandler(argv);
-        Log log = new Log(out, argHandler);
+
+
         Thread.currentThread().setName("singlestep001Thr");
 
-        log.display("\nReaching a breakpoint method ...\n");
+        System.out.println("\nReaching a breakpoint method ...\n");
         bpMethod();
-        log.display("The breakpoint method leaved ...");
+        System.out.println("The breakpoint method leaved ...");
 
         return check();
     }

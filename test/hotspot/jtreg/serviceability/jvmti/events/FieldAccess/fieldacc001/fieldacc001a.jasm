@@ -21,8 +21,6 @@
  * questions.
  */
 
-package nsk/jvmti/FieldAccess;
-
 super public class fieldacc001a {
 
     static Field staticBoolean:Z;

@@ -49,7 +49,7 @@ static jrawMonitorID countLock;
 /* method to be redirected used to check the native method redirection
    through the NativeMethodBind event */
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_NativeMethodBind_nativemethbind004_nativeMethod(
+Java_nativemethbind004_nativeMethod(
     JNIEnv *env, jobject obj) {
 origCalls++;
 NSK_DISPLAY1("inside the nativeMethod(): calls=%d\n",
@@ -127,7 +127,7 @@ unlock(jvmti_env, jni_env);
 /************************/
 
 JNIEXPORT jint JNICALL
-    Java_nsk_jvmti_NativeMethodBind_nativemethbind004_check(
+    Java_nativemethbind004_check(
     JNIEnv *env, jobject obj) {
 
 if (origCalls == 0) {
@@ -211,6 +211,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   NSK_DISPLAY0("enabling the events done\n\n");
 
   return JNI_OK;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

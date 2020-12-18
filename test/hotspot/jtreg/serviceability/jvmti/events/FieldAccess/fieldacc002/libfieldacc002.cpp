@@ -298,7 +298,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   return JNI_OK;
 }
 
-JNIEXPORT void JNICALL Java_nsk_jvmti_FieldAccess_fieldacc002_getReady(JNIEnv *env, jclass clz) {
+JNIEXPORT void JNICALL Java_fieldacc002_getReady(JNIEnv *env, jclass clz) {
   jvmtiError err;
   jclass cls;
   size_t i;
@@ -346,7 +346,7 @@ JNIEXPORT void JNICALL Java_nsk_jvmti_FieldAccess_fieldacc002_getReady(JNIEnv *e
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_FieldAccess_fieldacc002_check(JNIEnv *env, jclass clz, jobject obj) {
+Java_fieldacc002_check(JNIEnv *env, jclass clz, jobject obj) {
   jclass cls;
 
   if (!caps.can_generate_field_access_events) {
@@ -395,6 +395,14 @@ Java_nsk_jvmti_FieldAccess_fieldacc002_check(JNIEnv *env, jclass clz, jobject ob
     result = STATUS_FAILED;
   }
   return result;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

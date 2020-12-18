@@ -375,7 +375,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_FieldModification_fieldmod002_getReady(JNIEnv *env, jclass clz) {
+Java_fieldmod002_getReady(JNIEnv *env, jclass clz) {
   jvmtiError err;
   jclass cls;
   jmethodID ctor;
@@ -454,7 +454,7 @@ Java_nsk_jvmti_FieldModification_fieldmod002_getReady(JNIEnv *env, jclass clz) {
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_FieldModification_fieldmod002_check(JNIEnv *env,
+Java_fieldmod002_check(JNIEnv *env,
                                                    jclass clz, jobject obj) {
   jclass cls;
 
@@ -504,6 +504,14 @@ Java_nsk_jvmti_FieldModification_fieldmod002_check(JNIEnv *env,
     result = STATUS_FAILED;
   }
   return result;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

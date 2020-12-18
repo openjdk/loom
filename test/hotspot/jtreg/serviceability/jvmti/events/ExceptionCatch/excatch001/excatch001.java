@@ -21,9 +21,6 @@
  * questions.
  */
 
-import java.io.PrintStream;
-
-
 /*
  * @test
  *
@@ -40,10 +37,9 @@ import java.io.PrintStream;
  * COMMENTS
  *     Ported from JVMDI.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @compile excatch001a.jasm
- * @run main/othervm/native -agentlib:excatch001 nsk.jvmti.ExceptionCatch.excatch001
+ * @run main/othervm/native -agentlib:excatch001 excatch001
  */
 
 
@@ -66,13 +62,9 @@ public class excatch001 {
     native static int check();
 
     public static void main(String args[]) {
-        args = nsk.share.jvmti.JVMTITest.commonInit(args);
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    public static int run(String args[], PrintStream out) {
-        return check();
+        int res = check();
+        if (res != 0) {
+            throw new RuntimeException("Check() returned " + res);
+        }
     }
 }

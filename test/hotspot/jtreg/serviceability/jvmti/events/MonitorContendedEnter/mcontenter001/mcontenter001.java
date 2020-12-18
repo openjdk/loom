@@ -43,11 +43,9 @@ import java.io.PrintStream;
  *       and save JNIEnv pointer now passed as argument.
  *     1000 ms of sleep added to main thread to reduce probability of bad racing.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:mcontenter001=-waittime=5
- *      nsk.jvmti.MonitorContendedEnter.mcontenter001
+ *      -agentlib:mcontenter001 mcontenter001
  */
 
 /*
@@ -60,7 +58,7 @@ import java.io.PrintStream;
 
     // run test from command line
     public static void main(String argv[]) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
+
 
         // JCK-compatible exit
         System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
@@ -75,7 +73,7 @@ import java.io.PrintStream;
     // scaffold objects
     ArgumentHandler argHandler = null;
     Log log = null;
-    int status = Consts.TEST_PASSED;
+    int status = DebugeeClass.TEST_PASSED;
     long timeout = 0;
 
     // tested thread
@@ -86,7 +84,7 @@ import java.io.PrintStream;
         argHandler = new ArgumentHandler(argv);
         log = new Log(out, argHandler);
         timeout = argHandler.getWaitTime() * 60000; // milliseconds
-        log.display("Timeout = " + timeout + " msc.");
+        System.out.println("Timeout = " + timeout + " msc.");
 
         thread = new mcontenter001Thread("Debuggee Thread");
 
@@ -114,7 +112,7 @@ import java.io.PrintStream;
             }
 
             Thread.yield();
-            log.display("Thread started");
+            System.out.println("Thread started");
         }
 
         // wait for thread finish
@@ -124,7 +122,7 @@ import java.io.PrintStream;
             throw new Failure(e);
         }
 
-        log.display("Sync: thread finished");
+        System.out.println("Sync: thread finished");
         status = checkStatus(status);
 
         return status;
@@ -145,7 +143,7 @@ class mcontenter001Thread extends Thread {
 
     public void run() {
 
-        mcontenter001.checkStatus(Consts.TEST_PASSED);
+        mcontenter001.checkStatus(DebugeeClass.TEST_PASSED);
 
         // notify about starting
         synchronized (startingMonitor) {

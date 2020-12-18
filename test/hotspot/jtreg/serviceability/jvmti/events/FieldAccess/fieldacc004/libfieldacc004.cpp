@@ -265,7 +265,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_FieldAccess_fieldacc004_getReady(JNIEnv *env, jclass klass) {
+Java_fieldacc004_getReady(JNIEnv *env, jclass klass) {
   jvmtiError err;
   jclass cls;
   size_t i;
@@ -312,13 +312,21 @@ Java_nsk_jvmti_FieldAccess_fieldacc004_getReady(JNIEnv *env, jclass klass) {
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_FieldAccess_fieldacc004_check(JNIEnv *env, jclass cls) {
+Java_fieldacc004_check(JNIEnv *env, jclass cls) {
   if (eventsCount != eventsExpected) {
     printf("Wrong number of field access events: %d, expected: %d\n",
            eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }
   return result;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

@@ -240,7 +240,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_Exception_exception001_check(JNIEnv *env, jclass cls) {
+Java_check(JNIEnv *env, jclass cls) {
   jvmtiError err;
   jthread thread;
   jclass clz;

@@ -21,6 +21,8 @@
  * questions.
  */
 
+import jdk.test.lib.jvmti.DebugeeClass;
+
 import java.io.PrintStream;
 
 /*
@@ -40,16 +42,10 @@ import java.io.PrintStream;
  *     - change signature of agentProc function
  *       and save JNIEnv pointer now passed as argument.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:mcontentered001=-waittime=5
- *      nsk.jvmti.MonitorContendedEntered.mcontentered001
+ *      -agentlib:mcontentered001 mcontentered001
  */
-
-
-import nsk.share.*;
-import nsk.share.jvmti.*;
 
 public class mcontentered001 extends DebugeeClass {
 
@@ -60,34 +56,21 @@ public class mcontentered001 extends DebugeeClass {
 
     // run test from command line
     public static void main(String argv[]) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
-
-        // JCK-compatible exit
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+        int result = new mcontentered001().runIt();
     }
 
-    // run test from JCK-compatible environment
-    public static int run(String argv[], PrintStream out) {
-        return new mcontentered001().runIt(argv, out);
-    }
 
-    /* =================================================================== */
-
-    // scaffold objects
-    ArgumentHandler argHandler = null;
-    Log log = null;
-    int status = Consts.TEST_PASSED;
+    int status = TEST_PASSED;
     long timeout = 0;
 
     // tested thread
     mcontentered001Thread thread = null;
 
     // run debuggee
-    public int runIt(String argv[], PrintStream out) {
-        argHandler = new ArgumentHandler(argv);
-        log = new Log(out, argHandler);
-        timeout = argHandler.getWaitTime() * 60000; // milliseconds
-        log.display("Timeout = " + timeout + " msc.");
+    public int runIt() {
+
+        timeout =  60000; // milliseconds
+        System.out.println("Timeout = " + timeout + " msc.");
 
         thread = new mcontentered001Thread("Debuggee Thread");
 
@@ -115,7 +98,7 @@ public class mcontentered001 extends DebugeeClass {
             }
 
             Thread.yield();
-            log.display("Thread started");
+            System.out.println("Thread started");
         }
 
         // wait for thread finish
@@ -125,7 +108,7 @@ public class mcontentered001 extends DebugeeClass {
             throw new Failure(e);
         }
 
-        log.display("Sync: thread finished");
+        System.out.println("Sync: thread finished");
         status = checkStatus(status);
 
         return status;
@@ -146,7 +129,7 @@ class mcontentered001Thread extends Thread {
 
     public void run() {
 
-        mcontentered001.checkStatus(Consts.TEST_PASSED);
+        mcontentered001.checkStatus(DebugeeClass.TEST_PASSED);
 
         // notify about starting
         synchronized (startingMonitor) {

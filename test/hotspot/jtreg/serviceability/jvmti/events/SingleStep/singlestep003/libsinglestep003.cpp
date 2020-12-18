@@ -232,25 +232,24 @@ SingleStep(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
 
 /* dummy method used only to provoke SingleStep events */
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_SingleStep_singlestep003_anotherNativeMethod(
+Java_singlestep003_anotherNativeMethod(
     JNIEnv *env, jobject obj, jint i) {
   NSK_DISPLAY0("inside the anotherNativeMethod()\n\n");
 }
 
 /* dummy method used only to provoke SingleStep events */
 JNIEXPORT void JNICALL
-Java_nsk_jvmti_SingleStep_singlestep003_nativeMethod(
+Java_singlestep003_nativeMethod(
     JNIEnv *env, jobject obj) {
   jint i = 0;
 
   NSK_DISPLAY0("inside the nativeMethod()\n\n");
   i++;
 
-  Java_nsk_jvmti_SingleStep_singlestep003_anotherNativeMethod(env, obj, i);
+  Java_singlestep003_anotherNativeMethod(env, obj, i);
 }
 
-JNIEXPORT jint JNICALL
-Java_nsk_jvmti_SingleStep_singlestep003_check(
+JNIEXPORT jint JNICALL Java_singlestep003_check(
     JNIEnv *env, jobject obj) {
   int i;
 
@@ -333,6 +332,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   return JNI_OK;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

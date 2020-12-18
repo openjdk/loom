@@ -42,11 +42,9 @@ import java.io.*;
  * COMMENTS
  *     Fixed the 4995867 bug.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:nativemethbind002=-waittime=5
- *      nsk.jvmti.NativeMethodBind.nativemethbind002
+ *      -agentlib:nativemethbind002 nativemethbind002
  */
 
 /**
@@ -74,10 +72,10 @@ public class nativemethbind002 {
     native int nativeMethod();
 
     public static void main(String[] argv) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
+
 
         // produce JCK-like exit status
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+        System.exit(run(argv, System.out));
     }
 
     public static int run(String argv[], PrintStream out) {
@@ -85,10 +83,10 @@ public class nativemethbind002 {
     }
 
     private int runThis(String argv[], PrintStream out) {
-        ArgumentHandler argHandler = new ArgumentHandler(argv);
-        Log log = new Log(out, argHandler);
 
-        log.display("\nCalling a native method ...\n");
+
+
+        System.out.println("\nCalling a native method ...\n");
 
         // dummy methods used to provoke the NativeMethodBind event
         // near the dead phase

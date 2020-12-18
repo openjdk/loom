@@ -39,10 +39,9 @@ import java.io.PrintStream;
  * COMMENTS
  *     Ported from JVMDI.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @compile exception001a.jasm
- * @run main/othervm/native -agentlib:exception001 nsk.jvmti.Exception.exception001
+ * @run main/othervm/native -agentlib:exception001 exception001
  */
 
 
@@ -65,6 +64,9 @@ public class exception001 {
     native static int check();
 
     public static void main(String args[]) {
-        return check();
+        check();int result = check();
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
     }
 }

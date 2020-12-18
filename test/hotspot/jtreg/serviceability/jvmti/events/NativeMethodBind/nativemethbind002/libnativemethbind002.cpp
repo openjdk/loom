@@ -109,7 +109,7 @@ exit(95 + STATUS_FAILED);
 
 /* dummy method used only to provoke NativeMethodBind events */
 JNIEXPORT jint JNICALL
-Java_nsk_jvmti_NativeMethodBind_nativemethbind002_nativeMethod(
+Java_nativemethbind002_nativeMethod(
     JNIEnv *env, jobject obj) {
   NSK_DISPLAY0("inside the nativeMethod()\n\n");
 
@@ -174,6 +174,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   NSK_DISPLAY0("enabling the events done\n\n");
 
   return JNI_OK;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
 }
 
 }

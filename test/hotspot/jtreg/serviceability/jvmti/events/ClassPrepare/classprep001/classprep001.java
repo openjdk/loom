@@ -76,7 +76,7 @@ public class classprep001 {
         void run();
     }
 
-    static class TestClass implements TestInterface {
+     static class TestClass implements TestInterface {
         static int i = 0;
         int count = 0;
         static {

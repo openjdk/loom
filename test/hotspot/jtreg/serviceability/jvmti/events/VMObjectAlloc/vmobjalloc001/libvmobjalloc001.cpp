@@ -113,41 +113,45 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiEventCallbacks callbacks;
 
-  /* init framework and parse options */
-  if (!NSK_VERIFY(nsk_jvmti_parseOptions(options)))
-    return JNI_ERR;
-
   timeout = nsk_jvmti_getWaitTime() * 60000;
   NSK_DISPLAY1("Timeout: %d msc\n", (int)timeout);
 
   /* create JVMTI environment */
-  if (!NSK_VERIFY((jvmti =
-      nsk_jvmti_createJVMTIEnv(jvm, reserved)) != NULL))
+  jvmti = nsk_jvmti_createJVMTIEnv(jvm, reserved);
+  if (jvmti == NULL) {
     return JNI_ERR;
+  }
 
   memset(&caps, 0, sizeof(caps));
   caps.can_generate_vm_object_alloc_events = 1;
-  if (!NSK_JVMTI_VERIFY(jvmti->AddCapabilities(&caps))) {
+  if (jvmti->AddCapabilities(&caps) != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
 
   memset(&callbacks, 0, sizeof(callbacks));
   callbacks.VMObjectAlloc= &VMObjectAlloc;
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks))))
+  if (jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks) != JVMTI_ERROR_NONE)) {
     return JNI_ERR;
+  }
 
   /* enable VMObjectAlloc event */
-  if (!NSK_JVMTI_VERIFY(
-      jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_OBJECT_ALLOC, NULL)))
+  if (jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_OBJECT_ALLOC, NULL) != JVMTI_ERROR_NONE) {
     return JNI_ERR;
+  }
 
   /* register agent proc and arg */
-  if (!NSK_VERIFY(nsk_jvmti_setAgentProc(agentProc, NULL)))
+  if (!NSK_VERIFY(nsk_jvmti_setAgentProc(agentProc, NULL))) {
     return JNI_ERR;
+  }
 
   return JNI_OK;
 }
 
-/* ========================================================================== */
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
 
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
 }

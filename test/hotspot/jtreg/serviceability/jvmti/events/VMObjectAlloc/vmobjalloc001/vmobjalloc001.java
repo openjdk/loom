@@ -43,21 +43,18 @@ import jdk.test.lib.jvmti.DebugeeClass;
  *     5010571 TEST_BUG: jvmti tests with VMObjectAlloc callbacks should
  *             be adjusted to new spec
  *
- * @library /vmTestbase
- *          /test/lib
- * @run main/othervm/native
- *      -agentlib:vmobjalloc001=-waittime=5
- *      nsk.jvmti.VMObjectAlloc.vmobjalloc001
+ * @library /test/lib
+ * @run main/othervm/native -agentlib:vmobjalloc001 vmobjalloc001
  */
 
 public class vmobjalloc001 extends DebugeeClass {
 
     // run test from command line
     public static void main(String argv[]) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
+
 
         // JCK-compatible exit
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+        System.exit(run(argv, System.out));
     }
 
     // run test from JCK-compatible environment
@@ -65,19 +62,12 @@ public class vmobjalloc001 extends DebugeeClass {
         return new vmobjalloc001().runIt(argv, out);
     }
 
-    /* =================================================================== */
-
-    // scaffold objects
-    ArgumentHandler argHandler = null;
-    Log log = null;
-    int status = Consts.TEST_PASSED;
+    int status = TEST_PASSED;
 
     // run debuggee
     public int runIt(String argv[], PrintStream out) {
-        argHandler = new ArgumentHandler(argv);
-        log = new Log(out, argHandler);
 
-        log.display("Sync: debuggee started");
+        System.out.println("Sync: debuggee started");
 
         return checkStatus(status);
     }
