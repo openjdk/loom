@@ -1934,6 +1934,7 @@ JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
       if (state == NULL) {
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
       }
+      MutexLocker mu(JvmtiThreadState_lock);
       int frame_number = state->count_frames() - depth;
       state->env_thread_state(this)->set_frame_pop(frame_number);
       return JVMTI_ERROR_NONE;

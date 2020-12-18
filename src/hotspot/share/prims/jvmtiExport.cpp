@@ -1544,7 +1544,7 @@ void JvmtiExport::post_vthread_scheduled(jobject vthread) {
         JvmtiJavaThreadEventTransition jet(cur_thread);
         jvmtiEventVirtualThreadScheduled callback = env->callbacks()->VirtualThreadScheduled;
         if (callback != NULL) {
-          (*callback)(env->jvmti_external(), jem.jni_env(), vthread);
+          (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
       }
     }
@@ -1578,7 +1578,7 @@ void JvmtiExport::post_vthread_terminated(jobject vthread) {
         JvmtiJavaThreadEventTransition jet(cur_thread);
         jvmtiEventVirtualThreadTerminated callback = env->callbacks()->VirtualThreadTerminated;
         if (callback != NULL) {
-          (*callback)(env->jvmti_external(), jem.jni_env(), vthread);
+          (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
       }
     }
@@ -1612,7 +1612,7 @@ void JvmtiExport::post_vthread_mounted(jobject vthread) {
         JvmtiJavaThreadEventTransition jet(cur_thread);
         jvmtiEventVirtualThreadMounted callback = env->callbacks()->VirtualThreadMounted;
         if (callback != NULL) {
-          (*callback)(env->jvmti_external(), jem.jni_env(), vthread);
+          (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
       }
     }
@@ -1646,7 +1646,7 @@ void JvmtiExport::post_vthread_unmounted(jobject vthread) {
         JvmtiJavaThreadEventTransition jet(cur_thread);
         jvmtiEventVirtualThreadUnmounted callback = env->callbacks()->VirtualThreadUnmounted;
         if (callback != NULL) {
-          (*callback)(env->jvmti_external(), jem.jni_env(), vthread);
+          (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
       }
     }
