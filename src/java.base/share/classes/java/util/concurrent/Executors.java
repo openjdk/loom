@@ -250,11 +250,8 @@ public class Executors {
     }
 
     /**
-     * Creates an Executor that starts a new virtual thread for each task. The
-     * threads support thread-locals but do not inherit inheritable thread-locals
-     * when created. The {@linkplain Thread#getContextClassLoader() context-class-loader}
-     * is inherited when submitting a task. The threads have no {@link
-     * java.security.Permission permissions}.
+     * Creates an Executor that starts a new virtual thread for each task as
+     * if by invoking {@link Thread#startVirtualThread(Runnable)}.
      *
      * @return a newly created executor
      * @since 99

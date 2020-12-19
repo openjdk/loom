@@ -485,17 +485,18 @@ public class BuilderTest {
     }
 
     public void testThreadLocals3() throws Exception {
-        Thread.Builder builder = Thread.builder().disallowThreadLocals();
+        Thread.Builder builder = Thread.builder().noThreadLocals();
         testNoThreadLocals(builder);
     }
 
     public void testThreadLocals4() throws Exception {
-        Thread.Builder builder = Thread.builder().virtual().disallowThreadLocals();
+        Thread.Builder builder = Thread.builder().virtual().noThreadLocals();
         testNoThreadLocals(builder);
     }
 
     /**
-     * Tests that a build creates threads that inherit thread locals
+     * Tests that a builder creates threads that inherits the initial values of
+     * inheritable thread locals.
      */
     private void testInheritedThreadLocals(Thread.Builder builder) throws Exception {
         Object value = new Object();
@@ -554,43 +555,37 @@ public class BuilderTest {
     }
 
     public void testInheritedThreadLocals1() throws Exception {
-        Thread.Builder builder = Thread.builder().inheritInheritableThreadLocals();
+        Thread.Builder builder = Thread.builder();
         testInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals2() throws Exception {
-        Thread.Builder builder = Thread.builder()
-                .inheritInheritableThreadLocals()
-                .disallowThreadLocals();
-        testNoInheritedThreadLocals(builder);
+        Thread.Builder builder = Thread.builder().virtual();
+        testInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals3() throws Exception {
-        Thread.Builder builder = Thread.builder()
-                .disallowThreadLocals()
-                .inheritInheritableThreadLocals();
+        Thread.Builder builder = Thread.builder().noInheritInheritableThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals4() throws Exception {
-        Thread.Builder builder = Thread.builder().virtual().inheritInheritableThreadLocals();
-        testInheritedThreadLocals(builder);
+        Thread.Builder builder = Thread.builder().virtual().noInheritInheritableThreadLocals();
+        testNoInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals5() throws Exception {
         Thread.Builder builder = Thread.builder()
-                .virtual()
-                .inheritInheritableThreadLocals()
-                .disallowThreadLocals();
+                .noThreadLocals()
+                .noInheritInheritableThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals6() throws Exception {
         Thread.Builder builder = Thread.builder()
                 .virtual()
-                .disallowThreadLocals()
-                .inheritInheritableThreadLocals();
-        testNoInheritedThreadLocals(builder);
+                .noThreadLocals()
+                .noInheritInheritableThreadLocals();
     }
 
     // test null parameters

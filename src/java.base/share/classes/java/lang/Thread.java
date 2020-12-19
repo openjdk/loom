@@ -590,7 +590,7 @@ public class Thread implements Runnable {
         if ((characteristics & NO_THREAD_LOCALS) != 0) {
             this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
             this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
-        } else if ((characteristics & INHERIT_THREAD_LOCALS) != 0) {
+        } else if ((characteristics & NO_INHERIT_INHERITABLE_THREAD_LOCALS) == 0) {
             ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
             if (parentMap != null
                     && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED
@@ -633,7 +633,7 @@ public class Thread implements Runnable {
         if ((characteristics & NO_THREAD_LOCALS) != 0) {
             this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
             this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
-        } else if ((characteristics & INHERIT_THREAD_LOCALS) != 0) {
+        } else if ((characteristics & NO_INHERIT_INHERITABLE_THREAD_LOCALS) == 0) {
             ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
             if (parentMap != null
                     && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED
@@ -823,24 +823,23 @@ public class Thread implements Runnable {
         Builder virtual(Executor scheduler);
 
         /**
-         * Disallow threads locals. If the thread attempts to set a value for
-         * a thread-local with the {@link ThreadLocal#set(Object)} method then
-         * {@code UnsupportedOperationException} is thrown.
+         * The thread is not allowed to set values for its copy of thread-local
+         * variables. If the thread attempts to set a value for a thread-local with
+         * the {@link ThreadLocal#set(Object)} method then {@code
+         * UnsupportedOperationException} is thrown.
          * @return this builder
          * @see ThreadLocal#set(Object)
          */
-        Builder disallowThreadLocals();
+        Builder noThreadLocals();
 
         /**
-         * Inherit initial values for {@code InheritableThreadLocal}s. Initial
-         * values for inheritable thread locals are inherited at {@code Thread}
-         * construction time, by the {@link #build() build} method or the thread
-         * factory {@link ThreadFactory#newThread(Runnable) newThread} method.
-         * This method has no effect when thread locals are {@linkplain
-         * #disallowThreadLocals() disallowed}.
+         * The thread will not inherit the initial values for {@linkplain
+         * InheritableThreadLocal inheritable-thread-local} variables. The thread will
+         * also not inherit the initial values when {@link #noThreadLocals()} is used
+         * to disallow the thread from setting the values of thread-local variables.
          * @return this builder
          */
-        Builder inheritInheritableThreadLocals();
+        Builder noInheritInheritableThreadLocals();
 
         /**
          * Sets the daemon status.
@@ -965,8 +964,8 @@ public class Thread implements Runnable {
         private String name;
         private int counter;
         private boolean virtual;
-        private boolean disallowThreadLocals;
-        private boolean inheritInheritableThreadLocals;
+        private boolean noThreadLocals;
+        private boolean noInheritInheritableThreadLocals;
         private boolean daemon;
         private boolean daemonChanged;
         private int priority;
@@ -979,10 +978,10 @@ public class Thread implements Runnable {
             int characteristics = 0;
             if (virtual)
                 characteristics |= Thread.VIRTUAL;
-            if (disallowThreadLocals)
+            if (noThreadLocals)
                 characteristics |= Thread.NO_THREAD_LOCALS;
-            if (inheritInheritableThreadLocals)
-                characteristics |= Thread.INHERIT_THREAD_LOCALS;
+            if (noInheritInheritableThreadLocals)
+                characteristics |= Thread.NO_INHERIT_INHERITABLE_THREAD_LOCALS;
             return characteristics;
         }
 
@@ -1030,16 +1029,14 @@ public class Thread implements Runnable {
         }
 
         @Override
-        public Builder disallowThreadLocals() {
-            this.disallowThreadLocals = true;
-            this.inheritInheritableThreadLocals = false;
+        public Builder noThreadLocals() {
+            this.noThreadLocals = true;
             return this;
         }
 
         @Override
-        public Builder inheritInheritableThreadLocals() {
-            if (!disallowThreadLocals)
-                this.inheritInheritableThreadLocals = true;
+        public Builder noInheritInheritableThreadLocals() {
+            this.noInheritInheritableThreadLocals = true;
             return this;
         }
 
@@ -1471,7 +1468,7 @@ public class Thread implements Runnable {
      * @since 1.4
      */
     public Thread(ThreadGroup group, Runnable task, String name, long stackSize) {
-        this(group, name, Thread.INHERIT_THREAD_LOCALS, task, stackSize, null);
+        this(group, name, 0, task, stackSize, null);
     }
 
     /**
@@ -1527,7 +1524,8 @@ public class Thread implements Runnable {
      */
     public Thread(ThreadGroup group, Runnable task, String name,
                   long stackSize, boolean inheritInheritableThreadLocals) {
-        this(group, name, (inheritInheritableThreadLocals ? Thread.INHERIT_THREAD_LOCALS : 0),
+        this(group, name,
+                (inheritInheritableThreadLocals ? 0 : NO_INHERIT_INHERITABLE_THREAD_LOCALS),
                 task, stackSize, null);
     }
 
@@ -1540,57 +1538,57 @@ public class Thread implements Runnable {
     public static final int VIRTUAL = 1 << 0;
 
     /**
-     * Characteristic value signifying that {@link ThreadLocal thread-locals}
-     * are not supported by the thread.
+     * Characteristic value signifying that the thread cannot set values for its
+     * copy of {@link ThreadLocal thread-locals}
      *
      * @apiNote This is for experimental purposes, a lot of existing code will
      * not run if thread locals are not supported.
      *
      * @since 99
+     * @see Builder#noThreadLocals()
+     * @see ThreadLocal#set(Object)
      */
     public static final int NO_THREAD_LOCALS = 1 << 1;
 
     /**
-     * Characteristic value signifying that {@link InheritableThreadLocal
-     * inheritable-thread-locals} are inherihted from the constructing thread.
-     * This characteristic is incompatible with {@linkplain #NO_THREAD_LOCALS},
-     * they may not be used together.
+     * Characteristic value signifying that initial values for {@link
+     * InheritableThreadLocal inheritable-thread-locals} are not inherited from
+     * the constructing thread.
      *
      * @since 99
+     * @see Builder#noInheritInheritableThreadLocals()
      */
-    public static final int INHERIT_THREAD_LOCALS = 1 << 2;
+    public static final int NO_INHERIT_INHERITABLE_THREAD_LOCALS = 1 << 2;
 
     private static int validCharacteristics() {
-        return (VIRTUAL | NO_THREAD_LOCALS | INHERIT_THREAD_LOCALS);
+        return (VIRTUAL | NO_THREAD_LOCALS | NO_INHERIT_INHERITABLE_THREAD_LOCALS);
     }
 
     private static void checkCharacteristics(int characteristics) {
-        if (characteristics != 0) {
-            if ((characteristics & ~validCharacteristics()) != 0)
-                throw new IllegalArgumentException();
-            if ((characteristics & NO_THREAD_LOCALS) != 0
-                    && (characteristics & INHERIT_THREAD_LOCALS) != 0)
-                throw new IllegalArgumentException();
-        }
+        if (characteristics != 0
+                && (characteristics & ~validCharacteristics()) != 0)
+            throw new IllegalArgumentException();
     }
 
     /**
-     * Creates an unnamed thread.
-     *
-     * By default, the thread is scheduled by the operating system, supports
-     * {@linkplain ThreadLocal thread-locals}, and does not inherit any initial
-     * values for {@linkplain InheritableThreadLocal inheritable-thread-locals}.
-     * The {@linkplain ThreadGroup thread-group}, {@link #isDaemon() daemon status},
-     * {@link #getPriority() priority}, and the {@link #getContextClassLoader()
-     * context-class-loader} are inherited from the current thread.
+     * Creates a new unstarted Thread.
      *
      * <p> The characteristic {@link Thread#VIRTUAL VIRTUAL} is used to create
-     * a thread that is scheduled by the Java virtual machine. The thread will
-     * be scheduled using the default scheduler if the current thread is a kernel
-     * thread, or the scheduler for the current thread if it is a virtual thread.
-     * The {@linkplain #getContextClassLoader() context-class-loader} is inherited
-     * from the current thread. The thread will will have no {@link
-     * java.security.Permission permissions}.
+     * a thread that is scheduled by the Java virtual machine. If not set, the
+     * thread is scheduled by the operating system.
+     *
+     * <p> When creating a virtual thread, the thread will be scheduled using
+     * the default scheduler if the current thread is a kernel thread, or the
+     * scheduler for the current thread if it is a virtual thread. The thread
+     * will have no {@link java.security.Permission permissions}.
+     *
+     * <p> By default, the thread supports {@linkplain ThreadLocal thread-locals}
+     * and inherits the initial values of {@linkplain InheritableThreadLocal
+     * inheritable-thread-locals} from the current thread. The {@link
+     * #getContextClassLoader() context-class-loader} is also inherited. When
+     * creating a kernel thread, the {@linkplain ThreadGroup thread-group},
+     * {@link #isDaemon() daemon status} and {@link #getPriority() priority}
+     * are inherited.
      *
      * @apiNote The characteristics will probably be replaced by an enum
      *
@@ -1612,22 +1610,24 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Creates a named thread.
-     *
-     * By default, the thread is scheduled by the operating system, supports
-     * {@linkplain ThreadLocal thread-locals}, and does not inherit any initial
-     * values for {@linkplain InheritableThreadLocal inheritable-thread-locals}.
-     * The {@linkplain ThreadGroup thread-group}, {@link #isDaemon() daemon status},
-     * {@link #getPriority() priority}, and the {@link #getContextClassLoader()
-     * context-class-loader} are inherited from the current thread.
+     * Creates a new unstarted Thread with the given name.
      *
      * <p> The characteristic {@link Thread#VIRTUAL VIRTUAL} is used to create
-     * a thread that is scheduled by the Java virtual machine. The thread will
-     * be scheduled using the default scheduler if the current thread is a kernel
-     * thread, or the scheduler for the current thread if it is a virtual thread.
-     * The {@linkplain #getContextClassLoader() context-class-loader} is inherited
-     * from the current thread. The thread will will have no {@link
-     * java.security.Permission permissions}.
+     * a thread that is scheduled by the Java virtual machine. If not set, the
+     * thread is scheduled by the operating system.
+     *
+     * <p> When creating a virtual thread, the thread will be scheduled using
+     * the default scheduler if the current thread is a kernel thread, or the
+     * scheduler for the current thread if it is a virtual thread. The thread
+     * will have no {@link java.security.Permission permissions}.
+     *
+     * <p> By default, the thread supports {@linkplain ThreadLocal thread-locals}
+     * and inherits the initial values of {@linkplain InheritableThreadLocal
+     * inheritable-thread-locals} from the current thread. The {@link
+     * #getContextClassLoader() context-class-loader} is also inherited. When
+     * creating a kernel thread, the {@linkplain ThreadGroup thread-group},
+     * {@link #isDaemon() daemon status} and {@link #getPriority() priority}
+     * are inherited.
      *
      * @apiNote The characteristics will probably be replaced by an enum
      *
@@ -1655,14 +1655,17 @@ public class Thread implements Runnable {
      * Starts a new virtual thread to execute a task. The thread is scheduled
      * by the Java virtual machine using the default scheduler if the current
      * thread is a kernel thread, or the scheduler for the current thread if
-     * it is a virtual thread. The resulting thread supports {@linkplain
-     * ThreadLocal thread-locals} but does not inherit any initial values for
-     * {@linkplain InheritableThreadLocal inheritable-thread-locals}. It inherits
-     * the {@linkplain #getContextClassLoader() context-class-loader} from the
-     * current thread. It has no {@link java.security.Permission permissions}.
+     * it is a virtual thread.
+     *
+     * <p> The new thread supports thread locals and inherits the initial
+     * value of inheritable thread locals from the current thread. It also
+     * inherits the context-class-loader from the current thread. The thread
+     * has no {@link java.security.Permission permissions}.
+     *
      * @param task the object to run when the thread executes
      * @throws NullPointerException if task is null
      * @return a new, and started, virtual thread
+     *
      * @since 99
      */
     public static Thread startVirtualThread(Runnable task) {

@@ -161,7 +161,7 @@ public class ThreadLocal<T> {
      * if the {@code initialValue} method is not overridden).
      *
      * @return the current thread's value of this thread-local
-     * @see Thread.Builder#disallowThreadLocals()
+     * @see Thread.Builder#noThreadLocals()
      */
     public T get() {
         return get(Thread.currentThread());
@@ -237,10 +237,10 @@ public class ThreadLocal<T> {
      * @param value the value to be stored in the current thread's copy of
      *        this thread-local.
      *
-     * @throws UnsupportedOperationException if the current thread does not
-     *         support thread locals
+     * @throws UnsupportedOperationException if the current thread is not
+     *         allowed to set its copy of thread-local variables
      *
-     * @see Thread.Builder#disallowThreadLocals()
+     * @see Thread.Builder#noThreadLocals()
      */
     public void set(T value) {
         set(Thread.currentThread(), value);
