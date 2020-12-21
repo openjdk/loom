@@ -745,9 +745,8 @@ public class ThreadAPI {
 
     // -- setName/getName --
 
-    // create without a name
+    // start thread without a name, the thread sets its own name
     public void testSetName1() throws Exception {
-        // initially unnamed
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             assertEquals(me.getName(), "<unnamed>");
@@ -756,7 +755,7 @@ public class ThreadAPI {
         });
     }
 
-    // create without a name
+    // start thread without a name, main thread changes the name
     public void testSetName2() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         try {
@@ -771,7 +770,7 @@ public class ThreadAPI {
 
     // create with a name
     public void testSetName3() throws Exception {
-        TestHelper.runInVirtualThread("fred", 0, () -> {
+        TestHelper.runInVirtualThread("fred", () -> {
             Thread me = Thread.currentThread();
             assertEquals(me.getName(), "fred");
             me.setName("joe");
@@ -781,10 +780,7 @@ public class ThreadAPI {
 
     // create with a name
     public void testSetName4() throws Exception {
-        var thread = Thread.newThread("fred", 0, () -> {
-            LockSupport.park();
-        });
-        thread.start();
+        var thread = Thread.startVirtualThread("fred", LockSupport::park);
         try {
             assertEquals(thread.getName(), "fred");
             thread.setName("joe");

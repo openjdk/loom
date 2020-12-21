@@ -1590,18 +1590,18 @@ public class Thread implements Runnable {
      * {@link #isDaemon() daemon status} and {@link #getPriority() priority}
      * are inherited.
      *
-     * @apiNote The characteristics will probably be replaced by an enum
+     * @apiNote TBD if this factory method and the characteristics are needed.
      *
      * @param characteristics characteristics of the thread
      * @param task the object to run when the thread executes
      * @throws IllegalArgumentException if an unknown characteristic or an invalid
      *         combination of characteristic is specified
      * @throws NullPointerException if task is null
-     * @return an un-started thread
+     * @return an unstarted thread
      *
      * @since 99
      */
-    public static Thread newThread(int characteristics, Runnable task) {
+    public static Thread unstartedThread(int characteristics, Runnable task) {
         if ((characteristics & VIRTUAL) != 0) {
             return new VirtualThread(null, null, characteristics, task);
         } else {
@@ -1629,7 +1629,7 @@ public class Thread implements Runnable {
      * {@link #isDaemon() daemon status} and {@link #getPriority() priority}
      * are inherited.
      *
-     * @apiNote The characteristics will probably be replaced by an enum
+     * @apiNote TBD if this factory method and the characteristics are needed.
      *
      * @param name the thread name
      * @param characteristics characteristics of the thread
@@ -1637,11 +1637,11 @@ public class Thread implements Runnable {
      * @throws IllegalArgumentException if an unknown characteristic or an invalid
      *         combination of characteristic is specified
      * @throws NullPointerException if name or task is null
-     * @return an un-started thread
+     * @return an unstarted thread
      *
      * @since 99
      */
-    public static Thread newThread(String name, int characteristics, Runnable task) {
+    public static Thread unstartedThread(String name, int characteristics, Runnable task) {
         Objects.requireNonNull(name);
         Objects.requireNonNull(task);
         if ((characteristics & VIRTUAL) != 0) {
@@ -1662,6 +1662,11 @@ public class Thread implements Runnable {
      * inherits the context-class-loader from the current thread. The thread
      * has no {@link java.security.Permission permissions}.
      *
+     * <p> This method is equivalent to:
+     * <pre>{@code
+     * Thread.builder().virtual().task(task).start();
+     * }</pre>
+     *
      * @param task the object to run when the thread executes
      * @throws NullPointerException if task is null
      * @return a new, and started, virtual thread
@@ -1671,6 +1676,37 @@ public class Thread implements Runnable {
     public static Thread startVirtualThread(Runnable task) {
         Objects.requireNonNull(task);
         var thread = new VirtualThread(null, null, VIRTUAL, task);
+        thread.start();
+        return thread;
+    }
+
+    /**
+     * Starts a new virtual thread to execute a task. The thread is scheduled
+     * by the Java virtual machine using the default scheduler if the current
+     * thread is a kernel thread, or the scheduler for the current thread if
+     * it is a virtual thread.
+     *
+     * <p> The new thread supports thread locals and inherits the initial
+     * value of inheritable thread locals from the current thread. It also
+     * inherits the context-class-loader from the current thread. The thread
+     * has no {@link java.security.Permission permissions}.
+     *
+     * <p> This method works is equivalent to:
+     * <pre>{@code
+     * Thread.builder().virtual().name(name).task(task).start();
+     * }</pre>
+     *
+     * @param name the thread name
+     * @param task the object to run when the thread executes
+     * @throws NullPointerException if name or task is null
+     * @return a new, and started, virtual thread
+     *
+     * @since 99
+     */
+    public static Thread startVirtualThread(String name, Runnable task) {
+        Objects.requireNonNull(name);
+        Objects.requireNonNull(task);
+        var thread = new VirtualThread(null, name, VIRTUAL, task);
         thread.start();
         return thread;
     }

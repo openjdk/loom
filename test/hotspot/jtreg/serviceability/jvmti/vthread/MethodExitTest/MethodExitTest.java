@@ -73,12 +73,9 @@ public class MethodExitTest {
     };
 
     public static void test1() throws Exception {
-        Thread p1 = Thread.newThread("VT-PRODUCER#0", Thread.VIRTUAL, PRODUCER);
-        Thread c1 = Thread.newThread("VT-CONSUMER#1", Thread.VIRTUAL, CONSUMER);
-        Thread c2 = Thread.newThread("VT-CONSUMER#2", Thread.VIRTUAL, CONSUMER);
-        p1.start();
-        c1.start();
-        c2.start();
+        Thread p1 = Thread.startVirtualThread("VT-PRODUCER#0", PRODUCER);
+        Thread c1 = Thread.startVirtualThread("VT-CONSUMER#1", CONSUMER);
+        Thread c2 = Thread.startVirtualThread("VT-CONSUMER#2", CONSUMER);
         p1.join();
         c1.join();
         c2.join();
