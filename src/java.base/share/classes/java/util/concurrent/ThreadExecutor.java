@@ -26,6 +26,11 @@ package java.util.concurrent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.security.AccessController;
+import java.security.Permission;
+import java.security.PrivilegedAction;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -39,6 +44,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.InnocuousThread;
 import jdk.internal.vm.ThreadContainers;
 import jdk.internal.vm.ThreadContainer;
 
@@ -47,6 +53,7 @@ import jdk.internal.vm.ThreadContainer;
  */
 class ThreadExecutor implements ExecutorService, ThreadContainer {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+    private static final Permission MODIFY_THREAD = new RuntimePermission("modifyThread");
     private static final VarHandle STATE;
     static {
         try {
@@ -63,6 +70,7 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
     private final Condition terminationCondition = terminationLock.newCondition();
 
     private final ThreadFactory factory;
+    private final Future<?> timerTask;
     private final ThreadContainers.Key key;
 
     // states: RUNNING -> SHUTDOWN -> TERMINATED
@@ -71,8 +79,26 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
     private static final int TERMINATED = 2;
     private volatile int state;
 
-    public ThreadExecutor(ThreadFactory factory) {
+    /**
+     * Create a ThreadExecutor that creates threads using the give factory. The
+     * ThreadExecutor terminates then the given optional deadline is reached.
+     */
+    ThreadExecutor(ThreadFactory factory, Instant deadline) {
+        Objects.requireNonNull(factory);
+        Future<?> timer = null;
+        if (deadline != null) {
+            Duration timeout = Duration.between(Instant.now(), deadline);
+            if (timeout.isZero() || timeout.isNegative()) {
+                // deadline already reached
+                this.state = TERMINATED;
+            } else {
+                long nanos = NANOSECONDS.convert(timeout);
+                timer = TimerSupport.schedule(this::timeout, nanos, NANOSECONDS);
+            }
+        }
+
         this.factory = Objects.requireNonNull(factory);
+        this.timerTask = timer;
         this.key = ThreadContainers.register(this);
     }
 
@@ -93,9 +119,17 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
     private boolean tryTerminate() {
         assert state >= SHUTDOWN;
         if (threads.isEmpty()) {
+            // set state
+            STATE.set(this, TERMINATED);
+
+            // cancel timer
+            if (timerTask != null && !timerTask.isDone()) {
+                timerTask.cancel(false);
+            }
+
+            // signal any waiters
             terminationLock.lock();
             try {
-                STATE.set(this, TERMINATED);
                 terminationCondition.signalAll();
             } finally {
                 terminationLock.unlock();
@@ -173,6 +207,17 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
     @Override
     public Set<Thread> threads() {
         return Set.copyOf(threads);
+    }
+
+    /**
+     * Invoked when the timeout expires.
+     */
+    private void timeout() {
+        if (!isTerminated()) {
+            // timer task needs permission to invoke shutdownNow
+            PrivilegedAction<List<Runnable>> pa = this::shutdownNow;
+            AccessController.doPrivileged(pa, null, MODIFY_THREAD);
+        }
     }
 
     /**
@@ -487,7 +532,7 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
      * also maintains a count of the number of tasks that attempted to
      * complete up to when the first tasks completes normally.
      */
-    static class AnyResultHolder<T> {
+    private static class AnyResultHolder<T> {
         private static final VarHandle RESULT;
         private static final VarHandle EXCEPTION;
         private static final VarHandle EXCEPTION_COUNT;
@@ -561,6 +606,24 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
          */
         int exceptionCount() {
             return exceptionCount;
+        }
+    }
+
+    /**
+     * Encapsulates a ScheduledThreadPoolExecutor for scheduling tasks.
+     */
+    private static class TimerSupport {
+        private static final ScheduledThreadPoolExecutor STPE;
+        static {
+            STPE = new ScheduledThreadPoolExecutor(0, task -> {
+                Thread thread = InnocuousThread.newThread(task);
+                thread.setDaemon(true);
+                return thread;
+            });
+            STPE.setRemoveOnCancelPolicy(true);
+        }
+        static ScheduledFuture<?> schedule(Runnable task, long delay, TimeUnit unit) {
+            return STPE.schedule(task, delay, unit);
         }
     }
 }

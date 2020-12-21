@@ -246,7 +246,7 @@ public class Executors {
      * @since 99
      */
     public static ExecutorService newThreadExecutor(ThreadFactory threadFactory) {
-        return new ThreadExecutor(threadFactory);
+        return new ThreadExecutor(threadFactory, /*deadline*/ null);
     }
 
     /**
@@ -258,7 +258,7 @@ public class Executors {
      */
     public static ExecutorService newVirtualThreadExecutor() {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        return new ThreadExecutor(factory);
+        return new ThreadExecutor(factory, /*deadline*/ null);
     }
 
     /**
