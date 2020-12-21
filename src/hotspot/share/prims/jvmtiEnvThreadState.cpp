@@ -127,10 +127,11 @@ void JvmtiFramePops::print() {
 // one per JvmtiEnv.
 //
 
-JvmtiEnvThreadState::JvmtiEnvThreadState(JavaThread *thread, JvmtiEnvBase *env) :
+JvmtiEnvThreadState::JvmtiEnvThreadState(JavaThread *thread, JvmtiEnvBase *env, bool is_virtual) :
   _event_enable() {
   _thread                 = thread;
   _env                    = (JvmtiEnv*)env;
+  _is_virtual             = is_virtual;
   _next                   = NULL;
   _frame_pops             = NULL;
   _current_bci            = 0;
@@ -138,6 +139,7 @@ JvmtiEnvThreadState::JvmtiEnvThreadState(JavaThread *thread, JvmtiEnvBase *env) 
   _breakpoint_posted      = false;
   _single_stepping_posted = false;
   _agent_thread_local_storage_data = NULL;
+  _saved_thread           = NULL;
 }
 
 JvmtiEnvThreadState::~JvmtiEnvThreadState()   {
@@ -312,17 +314,22 @@ void JvmtiEnvThreadState::reset_current_location(jvmtiEvent event_type, bool ena
   if (enabled) {
     // If enabling breakpoint, no need to reset.
     // Can't do anything if empty stack.
-    if (event_type == JVMTI_EVENT_SINGLE_STEP && _thread->has_last_Java_frame()) {
+
+    // TMP hacky workaround:
+    // In case of detached cthread use _saved_thread if _thread is NULL.
+    JavaThread* thread = _thread == NULL ? _saved_thread : _thread;
+
+    if (event_type == JVMTI_EVENT_SINGLE_STEP && thread->has_last_Java_frame()) {
       jmethodID method_id;
       int bci;
       // The java thread stack may not be walkable for a running thread
       // so get current location with direct handshake.
       GetCurrentLocationClosure op;
       Thread *current = Thread::current();
-      if (_thread->is_handshake_safe_for(current)) {
-        op.do_thread(_thread);
+      if (thread->is_handshake_safe_for(current)) {
+        op.do_thread(thread);
       } else {
-        Handshake::execute(&op, _thread);
+        Handshake::execute(&op, thread);
         guarantee(op.completed(), "Handshake failed. Target thread is not alive?");
       }
       op.get_current_location(&method_id, &bci);

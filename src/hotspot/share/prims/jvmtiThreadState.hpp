@@ -223,7 +223,9 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   void bind_to(JavaThread* thread);
 
   // Used by the interpreter for fullspeed debugging support
-  bool is_interp_only_mode()                { return _thread->is_interp_only_mode(); }
+  bool is_interp_only_mode()                {
+     return _thread == NULL ?  _saved_interp_only_mode : _thread->is_interp_only_mode();
+  }
   void enter_interp_only_mode();
   void leave_interp_only_mode();
 

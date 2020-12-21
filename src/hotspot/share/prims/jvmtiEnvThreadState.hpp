@@ -110,12 +110,14 @@ class JvmtiEnvThreadState : public CHeapObj<mtInternal> {
 private:
   friend class JvmtiEnv;
   JavaThread        *_thread;
+  JavaThread        *_saved_thread;
   JvmtiEnv          *_env;
   JvmtiEnvThreadState *_next;
   jmethodID         _current_method_id;
   int               _current_bci;
   bool              _breakpoint_posted;
   bool              _single_stepping_posted;
+  bool              _is_virtual; // this state belongs to a virtual thread
   JvmtiEnvThreadEventEnable _event_enable;
   void              *_agent_thread_local_storage_data; // per env and per thread agent allocated data.
 
@@ -135,7 +137,7 @@ private:
   void set_next(JvmtiEnvThreadState* link) { _next = link; }
 
 public:
-  JvmtiEnvThreadState(JavaThread *thread, JvmtiEnvBase *env);
+  JvmtiEnvThreadState(JavaThread *thread, JvmtiEnvBase *env, bool is_virtual);
   ~JvmtiEnvThreadState();
 
   bool is_enabled(jvmtiEvent event_type) { return _event_enable.is_enabled(event_type); }
@@ -164,8 +166,15 @@ public:
   inline bool single_stepping_posted() {
     return _single_stepping_posted;
   }
+  inline bool is_virtual() { return _is_virtual; }
 
-  inline void set_thread(JavaThread* thread) { _thread = thread; }
+  inline void set_thread(JavaThread* thread) {
+    _saved_thread = NULL; // common case;
+    if (!_is_virtual && thread == NULL) {
+      _saved_thread = _thread;
+    }
+    _thread = thread;
+  }
   inline JavaThread *get_thread() { return _thread; }
   inline JvmtiEnv *get_env() { return _env; }
 

@@ -130,13 +130,7 @@ inline void JvmtiThreadState::unbind_from(JavaThread* thread) {
   }
   // save interp_only_mode
   _saved_interp_only_mode = thread->get_interp_only_mode();
-
-#ifdef ASSERT
-  if (is_virtual()) {
-    // unbind from JavaThread
-    set_thread(NULL); // it is to make sure stale _thread value is never used
-  }
-#endif
+  set_thread(NULL); // it is to make sure stale _thread value is never used
 }
 
 inline void JvmtiThreadState::bind_to(JavaThread* thread) {
@@ -148,7 +142,7 @@ inline void JvmtiThreadState::bind_to(JavaThread* thread) {
 
   JvmtiEventController::thread_started(thread);
 
-  if (this != NULL && is_virtual()) {
+  if (this != NULL) {
     // bind to JavaThread
     set_thread(thread);
   }

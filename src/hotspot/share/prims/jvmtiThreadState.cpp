@@ -415,7 +415,7 @@ JvmtiVTSuspender::vthread_is_ext_suspended(oop vt) {
 void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
 
-  JvmtiEnvThreadState *new_ets = new JvmtiEnvThreadState(_thread, env);
+  JvmtiEnvThreadState *new_ets = new JvmtiEnvThreadState(_thread, env, is_virtual());
   // add this environment thread state to the end of the list (order is important)
   {
     // list deallocation (which occurs at a safepoint) cannot occur simultaneously
@@ -435,15 +435,26 @@ void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
 }
 
 void JvmtiThreadState::enter_interp_only_mode() {
-  assert(_thread->get_interp_only_mode() == 0, "entering interp only when mode not zero");
-  _thread->increment_interp_only_mode();
-  invalidate_cur_stack_depth();
+  if (_thread == NULL) {
+    assert(_saved_interp_only_mode == 0, "entering interp only when mode not zero");
+    ++_saved_interp_only_mode;
+    // TBD: invalidate_cur_stack_depth();
+  } else {
+    assert(_thread->get_interp_only_mode() == 0, "entering interp only when mode not zero");
+    _thread->increment_interp_only_mode();
+    invalidate_cur_stack_depth();
+  }
 }
 
 
 void JvmtiThreadState::leave_interp_only_mode() {
-  assert(_thread->get_interp_only_mode() == 1, "leaving interp only when mode not one");
-  _thread->decrement_interp_only_mode();
+  if (_thread == NULL) {
+    assert(_saved_interp_only_mode == 1, "leaving interp only when mode not one");
+    --_saved_interp_only_mode;
+  } else {
+    assert(_thread->get_interp_only_mode() == 1, "leaving interp only when mode not one");
+    _thread->decrement_interp_only_mode();
+  }
 }
 
 
