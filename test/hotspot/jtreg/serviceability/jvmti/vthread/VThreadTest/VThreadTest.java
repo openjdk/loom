@@ -68,7 +68,7 @@ public class VThreadTest {
 
     public static void test1() throws Exception {
         Thread producer = Thread.startVirtualThread("VThread-Producer", PRODUCER);
-        Thread consumer = Thread.startVirtualThread("VThread-Producer", CONSUMER);
+        Thread consumer = Thread.startVirtualThread("VThread-Consumer", CONSUMER);
         producer.join();
         consumer.join();
     }
