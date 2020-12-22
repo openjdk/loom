@@ -127,13 +127,12 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
   err = jvmti->GetMethodName(method, &mname, &msign, NULL);
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetMethodName call");
 
-  printf("\n%s event #%d: thread: %s, method: %s: %s%s\n",
+  printf("%s #%d: thread: %s, method: %s: %s%s\n",
          event_name, event_count, thr_name, cname, mname, msign);
 
   if (strcmp(event_name, "SingleStep") != 0) {
     print_stack_trace(jvmti, jni, thread);
   }
-  fflush(0);
 }
 
 static void
@@ -146,10 +145,9 @@ print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames
   check_jvmti_status(jni, err, "event handler failed during JVMTI GetThreadInfo call");
 
   const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
-  printf("\n%s event: thread: %s, frames: %d\n\n", event_name, thr_name, frames_cnt);
+  printf("%s: thread: %s, frames: %d\n\n", event_name, thr_name, frames_cnt);
 
   print_stack_trace(jvmti, jni, vthread);
-  fflush(0);
 }
 
 static void
@@ -169,8 +167,7 @@ set_or_clear_breakpoint(JNIEnv *jni, jboolean set, const char *methodName,
     check_jvmti_status(jni, err, "setupBreakpoint: error in JVMTI GetMethodName call");
 
     if (strcmp(mname, methodName) == 0) {
-      printf("setupBreakpoint: found method %s() to %s a breakpoint\n", mname, set ? "set" : "clear");
-      fflush(0);
+      // printf("setupBreakpoint: found method %s() to %s a breakpoint\n", mname, set ? "set" : "clear");
       method = meth;
     }
   }
@@ -186,6 +183,7 @@ set_or_clear_breakpoint(JNIEnv *jni, jboolean set, const char *methodName,
       err = jvmti->ClearBreakpoint(method, location);
   }
   check_jvmti_status(jni, err, "setupBreakpoint: error in JVMTI SetBreakpoint");
+  fflush(0);
 }
 
 static void
@@ -215,15 +213,9 @@ breakpoint_hit1(jvmtiEnv *jvmti, JNIEnv* jni,
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_METHOD_EXIT, cthread);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable METHOD_EXIT");
 
-#if 0
-  // Setup NotifyFramePop on both the cthread and carrier thread.
-  // We better hit at least one of them.
-  err = jvmti->NotifyFramePop(thread, 0);
-  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI NotifyFramePop0");
-
+  // Setup NotifyFramePop on the cthread.
   err = jvmti->NotifyFramePop(cthread, 0);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI NotifyFramePop0");
-#endif
 }
 
 static void
@@ -263,9 +255,11 @@ breakpoint_hit2(jvmtiEnv *jvmti, JNIEnv* jni,
   printf("Breakpoint: %s, Hit #2:  enabling VirtualThreadUnmount events on %s thread: %p\n",
           mname, is_virtual ? "virtual" : "carrier", (void*)thread);
 
+#if 0
   // Enable VIRTUAL_THREAD_UNMOUNTED events on the vthread.
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, thread);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable VIRTUAL_THREAD_UNMOUNTED");
+#endif
 }
 
 static void
@@ -289,6 +283,24 @@ breakpoint_hit3(jvmtiEnv *jvmti, JNIEnv* jni,
   printf("Breakpoint: %s, Hit #3: disabling MethodExit events on virtual thread: %p\n", mname, (void*)thread);
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_EXIT, thread);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: disable METHOD_EXIT");
+
+  printf("Breakpoint: %s, Hit #3: setting NotifyFramePop for vthread: %p\n", mname, (void*)thread);
+  err = jvmti->NotifyFramePop(thread, 0);
+  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI NotifyFramePop");
+
+  // Disable VIRTUAL_THREAD_MOUNTED events on the vthread.
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, thread);
+  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: disable VIRTUAL_THREAD_MOUNTED");
+
+#if 0
+  // Disable VIRTUAL_THREAD_UNMOUNTED events on the vthread.
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, thread);
+  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: disable VIRTUAL_THREAD_UNMOUNTED");
+
+  // Disable METHOD_ENTRY events on the vthread.
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_ENTRY, thread);
+  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable METHOD_ENTRY");
+#endif
 }
 
 static void JNICALL
@@ -346,7 +358,8 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "MethodEntry: error in JVMTI GetMethodName call");
 
-  printf("MethodEntry #%d: method: %s, thread: %p\n", method_entry_count, mname, (void*)thread);
+  printf("MethodEntry #%d: Hit #%d: method: %s, thread: %p\n",
+         method_entry_count, brkptBreakpointHit, mname, (void*)thread);
 #endif
 
   // print_frame_event_info(jvmti, jni, thread, method, "MethodEntry", method_entry_count);
@@ -371,29 +384,19 @@ MethodExit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
     received_method_exit_event = JNI_TRUE; // set it for any method as it is not expected
   }
 #if 0
-  printf("Hit #%d: MethodExit #%d: method: %s, thread: %p\n",
-         brkptBreakpointHit, method_exit_count, mname, (void*)thread);
+  if (strstr(mname, "brkpt") == NULL) { // event is NOT in the "brkpt" method
+    printf("MethodExit #%d: Hit #%d: method: %s, thread: %p\n",
+           method_exit_count, brkptBreakpointHit, mname, (void*)thread);
+  }
 #endif
 
   // print_frame_event_info(jvmti, jni, thread, method, "MethodExit", method_entry_count);
-  if (strstr(mname, "brkpt") != NULL) {
-    printf("Hit #%d: MethodExit #%d: method: %s, thread: %p\n",
-           brkptBreakpointHit, method_exit_count, mname, (void*)thread);
+  if (strstr(mname, "brkpt") != NULL) { // event IS in the "brkpt" method
+    printf("MethodExit #%d: Hit #%d: method: %s, thread: %p\n",
+           method_exit_count, brkptBreakpointHit, mname, (void*)thread);
     received_method_exit_event = JNI_TRUE; // set it for brkpt method only if brkptBreakpointHit > 1
     err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_EXIT, thread);
     check_jvmti_status(jni, err, "MethodExit: error in JVMTI SetEventNotificationMode: disable METHOD_EXIT");
-
-    // Disable VIRTUAL_THREAD_MOUNTED events on the vthread.
-    err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, thread);
-    check_jvmti_status(jni, err, "MethodExit: error in JVMTI SetEventNotificationMode: disable VIRTUAL_THREAD_MOUNTED");
-
-    // Disable VIRTUAL_THREAD_UNMOUNTED events on the vthread.
-    err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, thread);
-    check_jvmti_status(jni, err, "MethodExit: error in JVMTI SetEventNotificationMode: disable VIRTUAL_THREAD_UNMOUNTED");
-#if 0
-    err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_ENTRY, thread);
-    check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable METHOD_ENTRY");
-#endif
   }
 
   fflush(0);
@@ -412,10 +415,11 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
   lock_events();
   frame_pop_count++;
 
-  printf("Hit #%d: FramePop #%d: method: %s, thread: %p\n",
-         brkptBreakpointHit, frame_pop_count, mname, (void*)thread);
+  printf("\nFramePop #%d: Hit #%d:  method: %s, thread: %p\n",
+         frame_pop_count, brkptBreakpointHit, mname, (void*)thread);
 
   print_frame_event_info(jvmti, jni, thread, method, "FramePop", frame_pop_count);
+  fflush(0);
   unlock_events();
 }
 
@@ -423,17 +427,14 @@ static void JNICALL
 VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   lock_events();
 
-  printf("VirtualThreadMounted: vthread: %p\n", (void*)vthread);
-  fflush(0);
-
-#if 0
-  printf("Hit #%d: VirtualThreadMounted: setting NotifyFramePop for vthread: %p\n",
-         (void*)vthread); fflush(0);
+  printf("\nVirtualThreadMounted: Hit #%d: setting NotifyFramePop for vthread: %p\n",
+         brkptBreakpointHit, (void*)vthread);
   jvmtiError err = jvmti->NotifyFramePop(vthread, 0);
-  check_jvmti_status(jni, err, "VirtualThreadMounted: error in JVMTI NotifyFramePop0");
-#endif
+  check_jvmti_status(jni, err, "VirtualThreadMounted: error in JVMTI NotifyFramePop");
 
   // processFiberEvent(jvmti, jni, vthread, "VirtualThreadMounted");
+
+  fflush(0);
   unlock_events();
 }
 
@@ -441,10 +442,12 @@ static void JNICALL
 VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   lock_events();
 
-  printf("VirtualThreadUnmounted: vthread: %p\n", (void*)vthread);
-  fflush(0);
+  printf("\nVirtualThreadUnmounted: Hit #%d: vthread: %p\n",
+         brkptBreakpointHit, (void*)vthread);
 
   // processFiberEvent(jvmti, jni, vthread, "VirtualThreadUnmounted");
+
+  fflush(0);
   unlock_events();
 }
 
@@ -535,13 +538,10 @@ Java_MethodExitTest_check(JNIEnv *jni, jclass cls) {
     passed = JNI_FALSE;
     printf("FAILED: method_exit_count == 0\n");
   }
-
-#if 0
   if (frame_pop_count == 0) {
     passed = JNI_FALSE;
     printf("FAILED: frame_pop_count == 0\n");
   }
-#endif
 
   printf("check: finished\n");
   printf("\n");
