@@ -741,8 +741,10 @@
   template(toFileURL_signature,                    "(Ljava/lang/String;)Ljava/net/URL;")                          \
   template(url_void_signature,                     "(Ljava/net/URL;)V")                                           \
                                                                                                                   \
-  /* Threads.dump_to_json_file jcmd */                                                                                 \
+  /* JavaThread.dump and JavaThread.dump_to_json_file jcmd */                                                          \
   template(jdk_internal_vm_ThreadContainers,       "jdk/internal/vm/ThreadContainers")                            \
+  template(dumpThreads_name,                       "dumpThreads")                                                 \
+  template(dumpThreads_signature,                  "()[B")                                                        \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
 
   /*end*/

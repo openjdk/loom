@@ -25,6 +25,7 @@
 
 package jdk.internal.vm;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -36,7 +37,6 @@ import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -98,27 +98,73 @@ public class ThreadContainers {
     }
 
     /**
-     * Write a thread dump a file in JSON format.
+     * Generate a thread dump, returning it as a byte array.
      */
-    public static void dumpThreadsToJson(String path) throws IOException {
-        Path file = Path.of(path);
-        try (OutputStream out = Files.newOutputStream(file)) {
-            dumpThreadsToJson(out);
+    public static byte[] dumpThreads() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream ps = new PrintStream(out);  // default charset
+
+        PrivilegedAction<Map<Thread, StackTraceElement[]>> pa = Thread::getAllStackTraces;
+        Map<Thread, StackTraceElement[]> stacks = AccessController.doPrivileged(pa);
+
+        for (Map.Entry<Thread, StackTraceElement[]> e : stacks.entrySet()) {
+            Thread thread = e.getKey();
+            StackTraceElement[] stackTrace = e.getValue();
+            dumpThread(ps, thread, stackTrace);
         }
+
+        for (Map.Entry<WeakReference<ThreadContainer>, Long> e : containers.entrySet()) {
+            ThreadContainer container = e.getKey().get();
+            if (container != null) {
+                Set<Thread> threads = container.threads();
+
+                // dump virtual threads in this container
+                threads.stream()
+                    .filter(Thread::isVirtual)
+                    .forEach(t -> {
+                        PrivilegedAction<StackTraceElement[]> pa2 = t::getStackTrace;
+                        StackTraceElement[] stackTrace = AccessController.doPrivileged(pa2);
+                        dumpThread(ps, t, stackTrace);
+                    });
+            }
+        }
+
+        ps.flush();
+        return out.toByteArray();
+    }
+
+    private static void dumpThread(PrintStream ps,
+                                   Thread thread,
+                                   StackTraceElement[] stackTrace) {
+        String suffix = thread.isVirtual() ? " virtual" : "";
+        ps.format("\"%s\" #%d%s%n", thread.getName(), thread.getId(), suffix);
+        for (StackTraceElement ste : stackTrace) {
+            ps.format("      %s%n", ste);
+        }
+        ps.println();
     }
 
     /**
-     * Write a thread dump to the given output stream in JSON format.
+     * Write a thread dump, in JSON format, to the given file
      */
-    public static void dumpThreadsToJson(OutputStream out) {
-        PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
-        dumpThreadsToJson(ps);
+    public static void dumpThreadsToJson(String file) throws IOException {
+        dumpThreadsToJson(Path.of(file));
+    }
+
+    /**
+     * Write a thread dump, in JSON format, to the given file
+     */
+    public static void dumpThreadsToJson(Path file) throws IOException {
+        try (OutputStream out = Files.newOutputStream(file);
+             PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
+            dumpThreadsToJson(ps);
+        }
     }
 
     /**
      * Write a thread dump to the given print stream in JSON format.
      */
-    public static void dumpThreadsToJson(PrintStream out) {
+    private static void dumpThreadsToJson(PrintStream out) {
         out.println("{");
         out.println("   \"threadDump\": {");
 
@@ -137,7 +183,7 @@ public class ThreadContainers {
                 // dump virtual threads in this container
                 threads.stream()
                         .filter(Thread::isVirtual)
-                        .forEach(t -> dumpThread(t, out, true));
+                        .forEach(t -> dumpThreadToJson(t, out, true));
 
                 // add to creators/members
                 creators.add(creatorTid);
@@ -154,7 +200,7 @@ public class ThreadContainers {
             Map.Entry<Thread, StackTraceElement[]> e = iterator.next();
             Thread thread = e.getKey();
             boolean more = iterator.hasNext();
-            dumpThread(thread, out, more);
+            dumpThreadToJson(thread, out, more);
         }
 
         out.println("      ], ");
@@ -196,9 +242,9 @@ public class ThreadContainers {
     }
 
     /**
-     * Dump the given thread and its stack trace to the print stream.
+     * Dump the given thread and its stack trace to the print stream in JSON format.
      */
-    private static void dumpThread(Thread thread, PrintStream out, boolean more) {
+    private static void dumpThreadToJson(Thread thread, PrintStream out, boolean more) {
         PrivilegedAction<StackTraceElement[]> pa = thread::getStackTrace;
         StackTraceElement[] stackTrace = AccessController.doPrivileged(pa);
 

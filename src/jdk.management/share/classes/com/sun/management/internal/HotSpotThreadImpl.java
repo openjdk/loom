@@ -25,8 +25,6 @@
 package com.sun.management.internal;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import com.sun.management.ThreadMXBean;
 import jdk.internal.vm.ThreadContainers;
@@ -94,8 +92,6 @@ public class HotSpotThreadImpl extends ThreadImpl implements ThreadMXBean {
         if (sm != null)
             Util.checkControlAccess();
 
-        try (OutputStream out = Files.newOutputStream(file)) {
-            ThreadContainers.dumpThreadsToJson(out);
-        }
+        ThreadContainers.dumpThreadsToJson(file);
     }
 }

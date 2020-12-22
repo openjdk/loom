@@ -913,13 +913,24 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
-class JsonThreadDump : public DCmdWithParser {
+class JavaThreadDumpDCmd : public DCmd {
+public:
+  JavaThreadDumpDCmd(outputStream *output, bool heap) : DCmd(output, heap) { }
+  static const char *name() { return "JavaThread.dump"; }
+  static const char *description() {
+    return "Print java threads with stacktraces.";
+  }
+  static int num_arguments() { return 0; }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
+class JavaThreadJsonDumpDCmd : public DCmdWithParser {
 protected:
   DCmdArgument<char*> _filename;
 public:
-  JsonThreadDump(outputStream *output, bool heap);
+  JavaThreadJsonDumpDCmd(outputStream *output, bool heap);
   static const char *name() {
-    return "Thread.dump_to_json_file";
+    return "JavaThread.dump_to_json_file";
   }
   static const char *description() {
     return "Thread dump to JSON formatted file.";

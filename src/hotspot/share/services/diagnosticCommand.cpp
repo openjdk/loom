@@ -136,7 +136,8 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<DebugOnCmdStartDCmd>(full_export, true, true));
 #endif // INCLUDE_JVMTI
 
-  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JsonThreadDump>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JavaThreadDumpDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JavaThreadJsonDumpDCmd>(full_export, true, false));
 }
 
 #ifndef HAVE_EXTRA_DCMD
@@ -1114,15 +1115,58 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
 }
 #endif // INCLUDE_JVMTI
 
-JsonThreadDump::JsonThreadDump(outputStream* output, bool heap) :
-                               DCmdWithParser(output,heap),
+void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
+  ResourceMark rm(THREAD);
+  HandleMark hm(THREAD);
+
+  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadContainers();
+  Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
+  InstanceKlass* ik = InstanceKlass::cast(k);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+
+  // invoke the dumpThreads method
+  JavaValue result(T_OBJECT);
+  JavaCallArguments args;
+
+  Symbol* signature = vmSymbols::dumpThreads_signature();
+  JavaCalls::call_static(&result,
+                         ik,
+                         vmSymbols::dumpThreads_name(),
+                         signature,
+                         &args,
+                         THREAD);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+
+  // check that result is byte array
+  oop res = (oop)result.get_jobject();
+  assert(res->is_typeArray(), "just checking");
+  assert(TypeArrayKlass::cast(res->klass())->element_type() == T_BYTE, "just checking");
+
+  // copy the bytes to the output stream
+  typeArrayOop ba = typeArrayOop(res);
+  jbyte* addr = typeArrayOop(res)->byte_at_addr(0);
+  output()->print_raw((const char*)addr, ba->length());
+}
+
+JavaThreadJsonDumpDCmd::JavaThreadJsonDumpDCmd(outputStream* output, bool heap) :
+                                               DCmdWithParser(output, heap),
   _filename("filename", "The file path to the dump file", "STRING", true) {
   _dcmdparser.add_dcmd_argument(&_filename);
 }
 
-int JsonThreadDump::num_arguments() {
+int JavaThreadJsonDumpDCmd::num_arguments() {
   ResourceMark rm;
-  JsonThreadDump* dcmd = new JsonThreadDump(NULL, false);
+  JavaThreadJsonDumpDCmd* dcmd = new JavaThreadJsonDumpDCmd(NULL, false);
   if (dcmd != NULL) {
     DCmdMark mark(dcmd);
     return dcmd->_dcmdparser.num_arguments();
@@ -1131,7 +1175,7 @@ int JsonThreadDump::num_arguments() {
   }
 }
 
-void JsonThreadDump::execute(DCmdSource source, TRAPS) {
+void JavaThreadJsonDumpDCmd::execute(DCmdSource source, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 
