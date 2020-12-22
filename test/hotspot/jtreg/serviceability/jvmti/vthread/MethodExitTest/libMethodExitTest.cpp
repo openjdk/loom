@@ -231,7 +231,7 @@ breakpoint_hit1(jvmtiEnv *jvmti, JNIEnv* jni,
 
   if (tls_data != 111) {
     passed = JNI_FALSE;
-    printf("FAILED: GetThreadLocalStorage for carrier thread returned value: %d, expected 111\n", tls_data);
+    printf("FAILED: GetThreadLocalStorage for carrier thread returned value: %d, expected 111\n", (int)tls_data);
   }
 }
 
@@ -290,7 +290,7 @@ breakpoint_hit2(jvmtiEnv *jvmti, JNIEnv* jni,
 
   if (tls_data != 222) {
     passed = JNI_FALSE;
-    printf("FAILED: GetThreadLocalStorage for virtual thread returned value: %d, expected 222\n", tls_data);
+    printf("FAILED: GetThreadLocalStorage for virtual thread returned value: %d, expected 222\n", (int)tls_data);
   }
 }
 
