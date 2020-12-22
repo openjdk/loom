@@ -2181,7 +2181,7 @@ jvmtiEnv *jvmti;
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current"/>
+          <jthread null="current" impl="noconvert"/>
             <description>
               Store to this thread.
             </description>

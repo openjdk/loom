@@ -139,19 +139,34 @@ JvmtiEnv::Deallocate(unsigned char* mem) {
   return deallocate(mem);
 } /* end Deallocate */
 
-// Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
+// Threads_lock NOT held
+// thread - NOT pre-checked
 // data - NULL is a valid value, must be checked
 jvmtiError
-JvmtiEnv::SetThreadLocalStorage(JavaThread* java_thread, const void* data) {
-  JvmtiThreadState* state = java_thread->jvmti_thread_state();
+JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JvmtiThreadState* state = NULL;
+  oop thread_obj = NULL;
+
+  if (thread == NULL) {
+    java_thread = JavaThread::current();
+    state = java_thread->jvmti_thread_state(); 
+  } else {
+    ThreadsListHandle tlh;
+
+    err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    } 
+  }
   if (state == NULL) {
     if (data == NULL) {
       // leaving state unset same as data set to NULL
       return JVMTI_ERROR_NONE;
     }
     // otherwise, create the state
-    state = JvmtiThreadState::state_for(java_thread);
+    state = JvmtiThreadState::state_for(java_thread, thread_obj);
     if (state == NULL) {
       return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
@@ -182,13 +197,14 @@ JvmtiEnv::GetThreadLocalStorage(jthread thread, void** data_ptr) {
     debug_only(VMNativeEntryWrapper __vew;)
 
     JavaThread* java_thread = NULL;
+    oop thread_obj = NULL;
     ThreadsListHandle tlh(current_thread);
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, NULL);
+    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
 
-    JvmtiThreadState* state = java_thread->jvmti_thread_state();
+    JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread, thread_obj);
     *data_ptr = (state == NULL) ? NULL :
       state->env_thread_state(this)->get_agent_thread_local_storage_data();
   }
@@ -1941,7 +1957,7 @@ JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
     }
   }
 
-  JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread);
+  JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_obj);
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
   }
