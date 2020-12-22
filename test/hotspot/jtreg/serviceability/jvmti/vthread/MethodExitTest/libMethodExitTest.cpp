@@ -200,6 +200,8 @@ clear_breakpoint(JNIEnv *jni, const char *methodName,
   set_or_clear_breakpoint(jni, JNI_FALSE, methodName, klass, methods, method_count);
 }
 
+static long tls_data = 0;
+
 static void
 breakpoint_hit1(jvmtiEnv *jvmti, JNIEnv* jni,
                 jthread thread, jthread cthread,
@@ -215,7 +217,22 @@ breakpoint_hit1(jvmtiEnv *jvmti, JNIEnv* jni,
 
   // Setup NotifyFramePop on the cthread.
   err = jvmti->NotifyFramePop(cthread, 0);
-  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI NotifyFramePop0");
+  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI NotifyFramePop");
+
+  // Test SetThreadLocalStorage and GetThreadLocalStorage for carrier thread.
+  printf("Breakpoint: %s, Hit #1: checking Get/GetThreadLocalStorage for carrier thread: %p\n",
+         mname, (void*)cthread); fflush(0);
+
+  err = jvmti->SetThreadLocalStorage(cthread, (void*)111);
+  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetThreadLocalStorage");
+
+  err = jvmti->GetThreadLocalStorage(cthread, (void**)&tls_data);
+  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetThreadLocalStorage");
+
+  if (tls_data != 111) {
+    passed = JNI_FALSE;
+    printf("FAILED: GetThreadLocalStorage for carrier thread returned value: %d, expected 111\n", tls_data);
+  }
 }
 
 static void
@@ -260,6 +277,21 @@ breakpoint_hit2(jvmtiEnv *jvmti, JNIEnv* jni,
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, thread);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable VIRTUAL_THREAD_UNMOUNTED");
 #endif
+
+  // Test SetThreadLocalStorage and GetThreadLocalStorage for virtual thread.
+  printf("Breakpoint: %s, Hit #1: checking Get/GetThreadLocalStorage for virtual thread: %p\n",
+         mname, (void*)thread); fflush(0);
+
+  err = jvmti->SetThreadLocalStorage(thread, (void*)222);
+  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetThreadLocalStorage");
+
+  err = jvmti->GetThreadLocalStorage(thread, (void**)&tls_data);
+  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetThreadLocalStorage");
+
+  if (tls_data != 222) {
+    passed = JNI_FALSE;
+    printf("FAILED: GetThreadLocalStorage for virtual thread returned value: %d, expected 222\n", tls_data);
+  }
 }
 
 static void

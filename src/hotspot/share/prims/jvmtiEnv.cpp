@@ -199,7 +199,8 @@ JvmtiEnv::GetThreadLocalStorage(jthread thread, void** data_ptr) {
     JavaThread* java_thread = NULL;
     oop thread_obj = NULL;
     ThreadsListHandle tlh(current_thread);
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+
+    jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
