@@ -255,17 +255,17 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
     public void setThreadAllocatedMemoryEnabled(boolean enable);
 
     /**
-     * Write a thread dump to the given file. The thread dump is output in JSON format.
-     * If the file already exists then it is replaced. The {@code outputFile} parameter
-     * must be an absolute path.
+     * Generate a thread to the given file and format. The {@code outputFile}
+     * parameter must be an absolute path.
      *
      * @implSpec
      * The default implementation throws {@code UnsupportedOperationException}.
      *
      * @param  outputFile the path file to the file to create
+     * @param  format the format to use (TEXT_PLAIN or JSON)
      * @throws IllegalArgumentException if the file path is not absolute
      * @throws IOException if an I/O exception is thrown writing to the file
-     * @throws NullPointerException if {@code outputFile} is {@code null}.
+     * @throws NullPointerException if either parameter is {@code null}.
      * @throws SecurityException
      *         If a security manager is set and its {@link
      *         SecurityManager#checkWrite(java.lang.String)} method denies write
@@ -273,7 +273,22 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
      *         ManagementPermission("control")} is denied.
      * @since 99
      */
-    public default void dumpThreads(String outputFile) throws IOException {
+    default void dumpThreads(String outputFile, OutputFormat format) throws IOException {
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Thread dump output format.
+     * @since 99
+     */
+    public static enum OutputFormat {
+        /**
+         * Plain text format.
+         */
+        TEXT_PLAIN,
+        /**
+         * JSON (JavaScript Object Notation) format.
+         */
+        JSON,
     }
 }

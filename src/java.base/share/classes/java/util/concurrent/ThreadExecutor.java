@@ -122,6 +122,9 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
             // set state
             STATE.set(this, TERMINATED);
 
+            // remove from thread container registry
+            key.deregister();
+
             // cancel timer
             if (timerTask != null && !timerTask.isDone()) {
                 timerTask.cancel(false);
@@ -199,7 +202,6 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
         try {
             ExecutorService.super.close(); // waits for executor to terminate
         } finally {
-            key.deregister();
             //lifetime.close();
         }
     }

@@ -48,8 +48,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Thread containers register with this class at creation time, and deregister
  * when they are closed.
  *
- * This class defines methods to dump threads to an output or print stream in
- * JSON format.
+ * This class defines methods to dump threads to an output stream or file in
+ * plain text or JSON format.
  */
 public class ThreadContainers {
     private ThreadContainers() { }
@@ -87,8 +87,8 @@ public class ThreadContainers {
     }
 
     /**
-     * Register a ThreadContainer so that its threads can be located for
-     * thread dumping operations.
+     * Register a ThreadContainer so that its threads can be located for thread
+     * dumping operations.
      */
     public static Key register(ThreadContainer container) {
         expungeStaleEntries();
@@ -98,11 +98,20 @@ public class ThreadContainers {
     }
 
     /**
-     * Generate a thread dump, returning it as a byte array.
+     * Generate a thread dump in plain text format to a byte array, UTF-8 encoded.
      */
     public static byte[] dumpThreads() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        PrintStream ps = new PrintStream(out);  // default charset
+        dumpThreads(out);
+        return out.toByteArray();
+    }
+
+    /**
+     * Generate a thread dump in plain text format to the given output stream,
+     * UTF-8 encoded.
+     */
+    public static void dumpThreads(OutputStream out) {
+        PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
 
         PrivilegedAction<Map<Thread, StackTraceElement[]>> pa = Thread::getAllStackTraces;
         Map<Thread, StackTraceElement[]> stacks = AccessController.doPrivileged(pa);
@@ -130,7 +139,6 @@ public class ThreadContainers {
         }
 
         ps.flush();
-        return out.toByteArray();
     }
 
     private static void dumpThread(PrintStream ps,
@@ -145,24 +153,26 @@ public class ThreadContainers {
     }
 
     /**
-     * Write a thread dump, in JSON format, to the given file
+     * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
      */
     public static void dumpThreadsToJson(String file) throws IOException {
-        dumpThreadsToJson(Path.of(file));
-    }
-
-    /**
-     * Write a thread dump, in JSON format, to the given file
-     */
-    public static void dumpThreadsToJson(Path file) throws IOException {
-        try (OutputStream out = Files.newOutputStream(file);
+        try (OutputStream out = Files.newOutputStream(Path.of(file));
              PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
             dumpThreadsToJson(ps);
         }
     }
 
     /**
-     * Write a thread dump to the given print stream in JSON format.
+     * Generate a thread dump in JSON format to the given output stream, UTF-8 encoded.
+     */
+    public static void dumpThreadsToJson(OutputStream out) {
+        PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
+        dumpThreadsToJson(ps);
+        ps.flush();
+    }
+
+    /**
+     * Generate a thread dump to the given print stream in JSON format.
      */
     private static void dumpThreadsToJson(PrintStream out) {
         out.println("{");
