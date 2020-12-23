@@ -137,7 +137,6 @@ void DCmdRegistrant::register_dcmds(){
 #endif // INCLUDE_JVMTI
 
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JavaThreadDumpDCmd>(full_export, true, false));
-  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JavaThreadJsonDumpDCmd>(full_export, true, false));
 }
 
 #ifndef HAVE_EXTRA_DCMD
@@ -1115,7 +1114,44 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
 }
 #endif // INCLUDE_JVMTI
 
+JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
+                                       DCmdWithParser(output, heap),
+  _format("format", "Output format (plain text or JSON)", "STRING", false, NULL),
+  _filepath("filepath", "The file path to the output file", "STRING", false, NULL) {
+  _dcmdparser.add_dcmd_argument(&_format);
+  _dcmdparser.add_dcmd_argument(&_filepath);
+}
+
+int JavaThreadDumpDCmd::num_arguments() {
+  ResourceMark rm;
+  JavaThreadDumpDCmd* dcmd = new JavaThreadDumpDCmd(NULL, false);
+  if (dcmd != NULL) {
+    DCmdMark mark(dcmd);
+    return dcmd->_dcmdparser.num_arguments();
+  } else {
+    return 0;
+  }
+}
+
 void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
+  bool json = (_format.value() != NULL) && (strcmp(_format.value(), "json") == 0);
+  char* path = _filepath.value();
+  if (path == NULL) {
+    if (json) {
+      dumpToOutputStream(vmSymbols::dumpThreadsToJson_name(), vmSymbols::void_byte_array_signature(), CHECK);
+    } else {
+      dumpToOutputStream(vmSymbols::dumpThreads_name(), vmSymbols::void_byte_array_signature(), CHECK);
+    }
+  } else {
+    if (json) {
+      dumpToFile(vmSymbols::dumpThreadsToJson_name(), vmSymbols::string_void_signature(), path, CHECK);
+    } else {
+      dumpToFile(vmSymbols::dumpThreads_name(), vmSymbols::string_void_signature(), path, CHECK);
+    }
+  }
+}
+
+void JavaThreadDumpDCmd::dumpToOutputStream(Symbol* name, Symbol* signature, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 
@@ -1129,14 +1165,12 @@ void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
     return;
   }
 
-  // invoke the dumpThreads method
+  // invoke the ThreadContainers method to generate byte array
   JavaValue result(T_OBJECT);
   JavaCallArguments args;
-
-  Symbol* signature = vmSymbols::dumpThreads_signature();
   JavaCalls::call_static(&result,
                          ik,
-                         vmSymbols::dumpThreads_name(),
+                         name,
                          signature,
                          &args,
                          THREAD);
@@ -1158,28 +1192,11 @@ void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
   output()->print_raw((const char*)addr, ba->length());
 }
 
-JavaThreadJsonDumpDCmd::JavaThreadJsonDumpDCmd(outputStream* output, bool heap) :
-                                               DCmdWithParser(output, heap),
-  _filename("filename", "The file path to the dump file", "STRING", true) {
-  _dcmdparser.add_dcmd_argument(&_filename);
-}
-
-int JavaThreadJsonDumpDCmd::num_arguments() {
-  ResourceMark rm;
-  JavaThreadJsonDumpDCmd* dcmd = new JavaThreadJsonDumpDCmd(NULL, false);
-  if (dcmd != NULL) {
-    DCmdMark mark(dcmd);
-    return dcmd->_dcmdparser.num_arguments();
-  } else {
-    return 0;
-  }
-}
-
-void JavaThreadJsonDumpDCmd::execute(DCmdSource source, TRAPS) {
+void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 
-  Handle h_path = java_lang_String::create_from_str(_filename.value(), CHECK);
+  Handle h_path = java_lang_String::create_from_str(path, CHECK);
 
   Symbol* sym = vmSymbols::jdk_internal_vm_ThreadContainers();
   Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
@@ -1191,13 +1208,14 @@ void JavaThreadJsonDumpDCmd::execute(DCmdSource source, TRAPS) {
     return;
   }
 
+  // invoke the ThreadContainers method to dump to file
   JavaValue result(T_VOID);
   JavaCallArguments args;
   args.push_oop(h_path);
   JavaCalls::call_static(&result,
                          k,
-                         vmSymbols::dumpThreadsToJson_name(),
-                         vmSymbols::string_void_signature(),
+                         name,
+                         signature,
                          &args,
                          THREAD);
   if (HAS_PENDING_EXCEPTION) {

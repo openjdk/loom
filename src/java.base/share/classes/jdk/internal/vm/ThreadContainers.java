@@ -107,6 +107,16 @@ public class ThreadContainers {
     }
 
     /**
+     * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
+     */
+    public static void dumpThreads(String file) throws IOException {
+        try (OutputStream out = Files.newOutputStream(Path.of(file));
+             PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
+            dumpThreads(ps);
+        }
+    }
+
+    /**
      * Generate a thread dump in plain text format to the given output stream,
      * UTF-8 encoded.
      */
@@ -150,6 +160,15 @@ public class ThreadContainers {
             ps.format("      %s%n", ste);
         }
         ps.println();
+    }
+
+    /**
+     * Generate a thread dump in JSON format to a byte array, UTF-8 encoded.
+     */
+    public static byte[] dumpThreadsToJson() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        dumpThreadsToJson(out);
+        return out.toByteArray();
     }
 
     /**

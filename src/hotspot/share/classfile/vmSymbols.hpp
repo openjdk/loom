@@ -599,6 +599,7 @@
   template(char_array_void_signature,                 "([C)V")                                                    \
   template(int_int_void_signature,                    "(II)V")                                                    \
   template(long_long_void_signature,                  "(JJ)V")                                                    \
+  template(void_byte_array_signature,                 "()[B")                                                     \
   template(void_classloader_signature,                "()Ljava/lang/ClassLoader;")                                \
   template(void_object_signature,                     "()Ljava/lang/Object;")                                     \
   template(void_class_signature,                      "()Ljava/lang/Class;")                                      \
@@ -741,10 +742,9 @@
   template(toFileURL_signature,                    "(Ljava/lang/String;)Ljava/net/URL;")                          \
   template(url_void_signature,                     "(Ljava/net/URL;)V")                                           \
                                                                                                                   \
-  /* JavaThread.dump and JavaThread.dump_to_json_file jcmd */                                                          \
+  /* JavaThread.dump jcmd */                                                                                      \
   template(jdk_internal_vm_ThreadContainers,       "jdk/internal/vm/ThreadContainers")                            \
   template(dumpThreads_name,                       "dumpThreads")                                                 \
-  template(dumpThreads_signature,                  "()[B")                                                        \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
 
   /*end*/
