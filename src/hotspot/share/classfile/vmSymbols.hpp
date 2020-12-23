@@ -722,7 +722,6 @@
   template(appendToClassPathForInstrumentation_name,   "appendToClassPathForInstrumentation")                     \
   do_alias(appendToClassPathForInstrumentation_signature, string_void_signature)                                  \
   template(serializePropertiesToByteArray_name,        "serializePropertiesToByteArray")                          \
-  template(serializePropertiesToByteArray_signature,   "()[B")                                                    \
   template(serializeAgentPropertiesToByteArray_name,   "serializeAgentPropertiesToByteArray")                     \
   template(classRedefinedCount_name,                   "classRedefinedCount")                                     \
   template(classLoader_name,                           "classLoader")                                             \
