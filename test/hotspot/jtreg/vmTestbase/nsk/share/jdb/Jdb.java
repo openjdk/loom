@@ -803,7 +803,33 @@ public class Jdb extends LocalProcess implements Finalizable {
     }
 
     /**
-     * Returns as string array all id's for a given <i>threadName</i>.
+     * Returns as string array all id's for a given thread name of <i>threadName</i>.
+     */
+    public String[] getThreadIdsByName(String threadName) {
+        Vector<String> v = new Vector<String>();
+        String[] reply = receiveReplyFor(JdbCommand.threads);
+        Paragrep grep = new Paragrep(reply);
+
+        String[] found = grep.findStrings(threadName);
+        for (int i = 0; i < found.length; i++) {
+            String string = found[i];
+            // Check for "(java.lang.Thread)" or "(java.lang.VirtualThread)"
+            String searchString = "Thread)";
+            int j = string.indexOf(searchString);
+            if (j >= 0) {
+               j += searchString.length(); // The threadID is right after the thread type
+               String threadId = string.substring(j, string.indexOf(" ", j));
+               v.add(threadId);
+            }
+        }
+
+        String[] result = new String[v.size()];
+        v.toArray(result);
+        return result;
+    }
+
+    /**
+     * Returns as string array all id's for a given class type of <i>threadName</i>.
      */
     public String[] getThreadIds(String threadName) {
 

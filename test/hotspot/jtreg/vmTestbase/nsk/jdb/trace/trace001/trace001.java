@@ -101,7 +101,7 @@ public class trace001 extends JdbTest {
         jdb.setBreakpointInMethod(LAST_BREAK);
         reply = jdb.receiveReplyFor(JdbCommand.cont);
 
-        threads = jdb.getThreadIds(DEBUGGEE_THREAD);
+        threads = jdb.getThreadIdsByName(MYTHREAD);
 
         if (threads.length != 2) {
             log.complain("jdb should report 2 instance of " + DEBUGGEE_THREAD);

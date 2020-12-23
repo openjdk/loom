@@ -29,7 +29,7 @@ import nsk.share.jdb.*;
 
 import java.io.*;
 
-/* This is debuggee aplication */
+/* This is the debuggee application */
 public class trace001a {
     public static void main(String args[]) {
        trace001a _trace001a = new trace001a();
@@ -38,7 +38,7 @@ public class trace001a {
 
     static void lastBreak () {}
 
-    static final String MYTHREAD  = "MyThread";
+    static final String MYTHREAD  = nsk.jdb.trace.trace001.trace001.MYTHREAD;
     static final int numThreads   = 2;   // number of threads.
 
     static Object waitnotify = new Object();
@@ -54,7 +54,9 @@ public class trace001a {
 
         for (i = 0; i < numThreads ; i++) {
             locks[i]  = new Object();
-            holder[i] = new MyThread(locks[i],MYTHREAD + "-" + i);
+            String name = MYTHREAD + "-" + i;
+            int characteristics = Thread.VIRTUAL; // set to 0 to test with regular Threads intead of VThreads
+            holder[i] = Thread.unstartedThread(name, characteristics, new MyThread(locks[i], name));
         }
 
         synchronized (waitnotify) {
@@ -95,7 +97,7 @@ public class trace001a {
 }
 
 
-class MyThread extends Thread {
+class MyThread implements Runnable {
     Object lock;
     String name;
 
