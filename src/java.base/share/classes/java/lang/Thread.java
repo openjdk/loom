@@ -712,7 +712,6 @@ public class Thread implements Runnable {
      *                 .name("duke")
      *                 .daemon(true)
      *                 .priority(Thread.NORM_PRIORITY)
-     *                 .inheritThreadLocals()
      *                 .task(...)
      *                 .build();
      *
