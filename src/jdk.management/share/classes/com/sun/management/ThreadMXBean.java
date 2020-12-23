@@ -255,7 +255,7 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
     public void setThreadAllocatedMemoryEnabled(boolean enable);
 
     /**
-     * Generate a thread to the given file and format. The {@code outputFile}
+     * Generate a thread dump to the given file and format. The {@code outputFile}
      * parameter must be an absolute path.
      *
      * @implSpec
