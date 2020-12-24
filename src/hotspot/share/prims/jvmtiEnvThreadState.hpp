@@ -28,6 +28,7 @@
 #include "jvmtifiles/jvmti.h"
 #include "memory/allocation.hpp"
 #include "oops/instanceKlass.hpp"
+#include "prims/jvmtiThreadState.hpp"
 #include "prims/jvmtiEventController.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/growableArray.hpp"
