@@ -154,6 +154,7 @@ JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
     state = java_thread->jvmti_thread_state(); 
   } else {
     ThreadsListHandle tlh;
+    JvmtiVTMTDisabler vtmt_disabler;
 
     err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
@@ -170,6 +171,14 @@ JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
     if (state == NULL) {
       return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
+#ifdef DBG // TMP
+    ResourceMark rm(current_thread);
+    oop name_oop = java_lang_Thread::name(thread_oop);
+    const char* name_str = java_lang_String::as_utf8_string(name_oop);
+    name_str = name_str == NULL ? "<NULL>" : name_str;
+    printf("DBG: state_for_while_locked: %s cthread JvmtiThreadState: %p, %s\n",
+           action, (void*)state, name_str); fflush(0);
+#endif
   }
   state->env_thread_state(this)->set_agent_thread_local_storage_data((void*)data);
   return JVMTI_ERROR_NONE;
@@ -199,6 +208,7 @@ JvmtiEnv::GetThreadLocalStorage(jthread thread, void** data_ptr) {
     JavaThread* java_thread = NULL;
     oop thread_obj = NULL;
     ThreadsListHandle tlh(current_thread);
+    JvmtiVTMTDisabler vtmt_disabler;
 
     jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
@@ -206,6 +216,14 @@ JvmtiEnv::GetThreadLocalStorage(jthread thread, void** data_ptr) {
     }
 
     JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread, thread_obj);
+#ifdef DBG // TMP
+    ResourceMark rm(current_thread);
+    oop name_oop = java_lang_Thread::name(thread_obj);
+    const char* name_str = java_lang_String::as_utf8_string(name_oop);
+    name_str = name_str == NULL ? "<NULL>" : name_str;
+    printf("DBG: GetThreadLocalStorage: cthread JvmtiThreadState: %p, %s\n",
+           (void*)state, name_str); fflush(0);
+#endif
     *data_ptr = (state == NULL) ? NULL :
       state->env_thread_state(this)->get_agent_thread_local_storage_data();
   }

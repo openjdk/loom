@@ -109,15 +109,13 @@ class JvmtiFramePops : public CHeapObj<mtInternal> {
 class JvmtiEnvThreadState : public CHeapObj<mtInternal> {
 private:
   friend class JvmtiEnv;
-  JavaThread        *_thread;
-  JavaThread        *_saved_thread;
+  JvmtiThreadState  *_state;
   JvmtiEnv          *_env;
   JvmtiEnvThreadState *_next;
   jmethodID         _current_method_id;
   int               _current_bci;
   bool              _breakpoint_posted;
   bool              _single_stepping_posted;
-  bool              _is_virtual; // this state belongs to a virtual thread
   JvmtiEnvThreadEventEnable _event_enable;
   void              *_agent_thread_local_storage_data; // per env and per thread agent allocated data.
 
@@ -137,15 +135,15 @@ private:
   void set_next(JvmtiEnvThreadState* link) { _next = link; }
 
 public:
-  JvmtiEnvThreadState(JavaThread *thread, JvmtiEnvBase *env, bool is_virtual);
+  JvmtiEnvThreadState(JvmtiThreadState* state, JvmtiEnvBase *env);
   ~JvmtiEnvThreadState();
 
   bool is_enabled(jvmtiEvent event_type) { return _event_enable.is_enabled(event_type); }
 
   JvmtiEnvThreadEventEnable *event_enable() { return &_event_enable; }
-  void *get_agent_thread_local_storage_data() { return _agent_thread_local_storage_data; }
-  void set_agent_thread_local_storage_data (void *data) { _agent_thread_local_storage_data = data; }
 
+  void *get_agent_thread_local_storage_data(); 
+  void set_agent_thread_local_storage_data (void *data);
 
   // If the thread is in the given method at the given
   // location just return.  Otherwise, reset the current location
@@ -166,16 +164,13 @@ public:
   inline bool single_stepping_posted() {
     return _single_stepping_posted;
   }
-  inline bool is_virtual() { return _is_virtual; }
+  bool is_virtual(); 
 
-  inline void set_thread(JavaThread* thread) {
-    _saved_thread = NULL; // common case;
-    if (!_is_virtual && thread == NULL) {
-      _saved_thread = _thread;
-    }
-    _thread = thread;
-  }
-  inline JavaThread *get_thread() { return _thread; }
+  inline JvmtiThreadState* jvmti_thread_state() { return _state; }
+
+  // use _thread_saved if cthread is detached from JavaThread
+  JavaThread *get_thread_or_saved();
+  JavaThread *get_thread();
   inline JvmtiEnv *get_env() { return _env; }
 
   // lazily initialize _frame_pops

@@ -2059,7 +2059,8 @@ SetFramePopClosure::doit(Thread *target, bool self) {
   ResourceMark rm;
   JavaThread* java_thread = target->as_Java_thread();
 
-  assert(_state->get_thread() == java_thread, "Must be");
+  // TBD: This might need to be corrected for detached carrier and virtual threads.
+  assert(_state->get_thread_or_saved() == java_thread, "Must be");
 
   if (!self && !java_thread->is_external_suspend()) {
     _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;

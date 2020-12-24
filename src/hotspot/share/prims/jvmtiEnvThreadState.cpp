@@ -28,6 +28,7 @@
 #include "jvmtifiles/jvmtiEnv.hpp"
 #include "memory/resourceArea.hpp"
 #include "prims/jvmtiEnvThreadState.hpp"
+#include "prims/jvmtiThreadState.inline.hpp"
 #include "prims/jvmtiEventController.inline.hpp"
 #include "prims/jvmtiImpl.hpp"
 #include "runtime/handles.hpp"
@@ -127,11 +128,10 @@ void JvmtiFramePops::print() {
 // one per JvmtiEnv.
 //
 
-JvmtiEnvThreadState::JvmtiEnvThreadState(JavaThread *thread, JvmtiEnvBase *env, bool is_virtual) :
+JvmtiEnvThreadState::JvmtiEnvThreadState(JvmtiThreadState* state, JvmtiEnvBase *env) :
   _event_enable() {
-  _thread                 = thread;
+  _state                  = state;
   _env                    = (JvmtiEnv*)env;
-  _is_virtual             = is_virtual;
   _next                   = NULL;
   _frame_pops             = NULL;
   _current_bci            = 0;
@@ -139,13 +139,44 @@ JvmtiEnvThreadState::JvmtiEnvThreadState(JavaThread *thread, JvmtiEnvBase *env, 
   _breakpoint_posted      = false;
   _single_stepping_posted = false;
   _agent_thread_local_storage_data = NULL;
-  _saved_thread           = NULL;
 }
 
 JvmtiEnvThreadState::~JvmtiEnvThreadState()   {
   delete _frame_pops;
   _frame_pops = NULL;
 }
+
+bool JvmtiEnvThreadState::is_virtual() {
+  return _state->is_virtual();
+}
+
+// Use _thread_saved if cthread is detached from JavaThread (_thread == NULL).
+JavaThread* JvmtiEnvThreadState::get_thread_or_saved() {
+  return _state->get_thread_or_saved();
+}
+
+JavaThread* JvmtiEnvThreadState::get_thread() {
+  return _state->get_thread();
+}
+
+void* JvmtiEnvThreadState::get_agent_thread_local_storage_data() {
+#ifdef DBG // TMP
+  const char* virt = is_virtual() ? "virtual" : "carrier";
+  printf("DBG: get_LTS:          %s                        env: %p, ets: %p, data: %ld\n\n",
+         virt, (void*)_env, (void*)this, (long)_agent_thread_local_storage_data); fflush(0);
+#endif
+  return _agent_thread_local_storage_data;
+}
+
+void JvmtiEnvThreadState::set_agent_thread_local_storage_data (void *data) {
+  _agent_thread_local_storage_data = data;
+#ifdef DBG // TMP
+  const char* virt = is_virtual() ? "virtual" : "carrier";
+  printf("DBG: set_LTS:          %s                        env: %p, ets: %p, data: %ld\n\n",
+         virt, (void*)_env, (void*)this, (long)data); fflush(0);
+#endif
+}
+
 
 // Given that a new (potential) event has come in,
 // maintain the current JVMTI location on a per-thread per-env basis
@@ -196,8 +227,8 @@ JvmtiFramePops* JvmtiEnvThreadState::get_frame_pops() {
 #ifdef ASSERT
   Thread *current = Thread::current();
 #endif
-  assert(get_thread()->is_handshake_safe_for(current),
-         "frame pop data only accessible from same thread or direct handshake");
+  assert(get_thread() == NULL || get_thread()->is_handshake_safe_for(current),
+         "frame pop data only accessible from same or detached thread or direct handshake");
   if (_frame_pops == NULL) {
     _frame_pops = new JvmtiFramePops();
     assert(_frame_pops != NULL, "_frame_pops != NULL");
@@ -214,8 +245,8 @@ void JvmtiEnvThreadState::set_frame_pop(int frame_number) {
 #ifdef ASSERT
   Thread *current = Thread::current();
 #endif
-  assert(get_thread()->is_handshake_safe_for(current),
-         "frame pop data only accessible from same thread or direct handshake");
+  assert(get_thread() == NULL || get_thread()->is_handshake_safe_for(current),
+         "frame pop data only accessible from same or detached thread or direct handshake");
   JvmtiFramePop fpop(frame_number);
   JvmtiEventController::set_frame_pop(this, fpop);
 }
@@ -225,8 +256,8 @@ void JvmtiEnvThreadState::clear_frame_pop(int frame_number) {
 #ifdef ASSERT
   Thread *current = Thread::current();
 #endif
-  assert(get_thread()->is_handshake_safe_for(current),
-         "frame pop data only accessible from same thread or direct handshake");
+  assert(get_thread() == NULL || get_thread()->is_handshake_safe_for(current),
+         "frame pop data only accessible from same or detached thread or direct handshake");
   JvmtiFramePop fpop(frame_number);
   JvmtiEventController::clear_frame_pop(this, fpop);
 }
@@ -236,9 +267,9 @@ bool JvmtiEnvThreadState::is_frame_pop(int cur_frame_number) {
 #ifdef ASSERT
   Thread *current = Thread::current();
 #endif
-  assert(get_thread()->is_handshake_safe_for(current),
-         "frame pop data only accessible from same thread or direct handshake");
-  if (!get_thread()->is_interp_only_mode() || _frame_pops == NULL) {
+  assert(get_thread() == NULL || get_thread()->is_handshake_safe_for(current),
+         "frame pop data only accessible from same or detached thread or direct handshake");
+  if (!jvmti_thread_state()->is_interp_only_mode() || _frame_pops == NULL) {
     return false;
   }
   JvmtiFramePop fp(cur_frame_number);
@@ -315,9 +346,7 @@ void JvmtiEnvThreadState::reset_current_location(jvmtiEvent event_type, bool ena
     // If enabling breakpoint, no need to reset.
     // Can't do anything if empty stack.
 
-    // TMP hacky workaround:
-    // In case of detached cthread use _saved_thread if _thread is NULL.
-    JavaThread* thread = _thread == NULL ? _saved_thread : _thread;
+    JavaThread* thread = get_thread_or_saved();
 
     if (event_type == JVMTI_EVENT_SINGLE_STEP && thread->has_last_Java_frame()) {
       jmethodID method_id;
