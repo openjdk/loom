@@ -48,6 +48,7 @@ compiler/vectorization/TestMacroLogicVector.java                              82
 vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java   8242890 generic-all
 runtime/clinit/ClassInitBarrier.java                                          8254936 generic-all
 runtime/vthread/RedefineClass.java                                            8253378 generic-all
+gtest/GTestWrapper.java                                                       0000000 generic-all
 
 #############################################################################
 
@@ -109,14 +110,14 @@ containers/docker/TestJFRWithJMX.java 8256417 linux-5.4.17-2011.5.3.el8uek.x86_6
 serviceability/sa/sadebugd/DebugdConnectTest.java 8239062 macosx-x64
 serviceability/sa/TestRevPtrsForInvokeDynamic.java 8241235 generic-all
 
-# Loom SA failures
-serviceability/sa/JhsdbThreadInfoTest.java 8243016 generic-all
-
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorStatIntervalTest.java 8214032 generic-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorStatArrayCorrectnessTest.java 8224150 generic-all
 serviceability/jvmti/ModuleAwareAgents/ThreadStart/MAAThreadStart.java 8225354 windows-all
 
-gtest/GTestWrapper.java                 0000000 generic-all
+serviceability/attach/RemovingUnixDomainSocketTest.java 8248162 linux-x64
+
+# Loom SA failures
+serviceability/sa/JhsdbThreadInfoTest.java 8243016 generic-all
 
 #############################################################################
 
