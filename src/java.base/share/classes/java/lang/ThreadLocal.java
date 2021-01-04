@@ -343,18 +343,6 @@ public class ThreadLocal<T> {
         }
     }
 
-
-    /**
-     * TBD
-     *
-     * @param <T>   TBD
-     * @param klass TBD
-     * @return TBD
-     */
-    public static <T> LightweightThreadLocal<T> forType(Class<T> klass) {
-        return new LightweightThreadLocal<T>(klass);
-    }
-
     /**
      * ThreadLocalMap is a customized hash map suitable only for
      * maintaining thread local values. No operations are exported
