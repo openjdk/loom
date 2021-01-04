@@ -1890,25 +1890,25 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             }
             else if (!queued)
                 queued = tryPushStack(q);
+            else if (interruptible && q.interrupted) {
+                q.thread = null;
+                cleanStack();
+                return null;
+            }
             else {
                 try {
                     ForkJoinPool.managedBlock(q);
                 } catch (InterruptedException ie) { // currently cannot happen
                     q.interrupted = true;
                 }
-                if (q.interrupted && interruptible)
-                    break;
             }
         }
-        if (q != null && queued) {
+        if (q != null) {
             q.thread = null;
-            if (!interruptible && q.interrupted)
+            if (q.interrupted)
                 Thread.currentThread().interrupt();
-            if (r == null)
-                cleanStack();
         }
-        if (r != null || (r = result) != null)
-            postComplete();
+        postComplete();
         return r;
     }
 
@@ -2493,6 +2493,17 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     /**
+     * Returns {@code true} if this CompletableFuture completed normally.
+     *
+     * @return {@code true} if this CompletableFuture completed normally
+     */
+    public boolean isCompletedNormally() {
+        Object r;
+        return ((r = result) != null
+                && (r == NIL || !(r instanceof AltResult)));
+    }
+
+    /**
      * Returns {@code true} if this CompletableFuture completed
      * exceptionally, in any way. Possible causes include
      * cancellation, explicit invocation of {@code
@@ -2923,6 +2934,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         @Override public boolean isDone() {
             throw new UnsupportedOperationException(); }
         @Override public boolean isCancelled() {
+            throw new UnsupportedOperationException(); }
+        @Override public boolean isCompletedNormally() {
             throw new UnsupportedOperationException(); }
         @Override public boolean isCompletedExceptionally() {
             throw new UnsupportedOperationException(); }

@@ -1513,16 +1513,15 @@ jvmtiEnv *jvmti;
     <function id="GetAllThreads" num="4">
       <synopsis>Get All Threads</synopsis>
       <description>
-        Get all live threads.
-        The threads are Java programming language threads;
-        that is, threads that are attached to the VM.
+        Get all live threads that are attached to the VM.
+        The list of threads includes
+        <internallink id="RunAgentThread">agent threads</internallink>.
+        It does not include virtual threads.
         A thread is live if <code>java.lang.Thread.isAlive()</code>
         would return <code>true</code>, that is, the thread has
         been started and has not yet died.
         The universe of threads is determined by the context of the <jvmti/>
         environment, which typically is all threads attached to the VM.
-        Note that this includes <jvmti/> agent threads
-        (see <functionlink id="RunAgentThread"/>).
       </description>
       <origin>jvmdi</origin>
       <capabilities>
@@ -1531,14 +1530,14 @@ jvmtiEnv *jvmti;
         <param id="threads_count_ptr">
           <outptr><jint/></outptr>
           <description>
-            On return, points to the number of running threads.
+            On return, points to the number of threads.
           </description>
         </param>
         <param id="threads_ptr">
           <allocbuf outcount="threads_count_ptr"><jthread/></allocbuf>
             <description>
               On return, points to an array of references, one
-              for each running thread.
+              for each thread.
             </description>
         </param>
       </parameters>
@@ -2182,7 +2181,7 @@ jvmtiEnv *jvmti;
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current"/>
+          <jthread null="current" impl="noconvert"/>
             <description>
               Store to this thread.
             </description>
@@ -2398,7 +2397,8 @@ jvmtiEnv *jvmti;
         <field id="is_daemon">
           <jboolean/>
           <description>
-            Is this a daemon thread group?
+            <code>JNI_FALSE</code>.
+            The concept of daemon thread group no longer exists.
           </description>
         </field>
       </typedef>
@@ -2433,6 +2433,8 @@ jvmtiEnv *jvmti;
       <synopsis>Get Thread Group Children</synopsis>
       <description>
         Get the live threads and the child thread groups in this thread group.
+        Virtual threads are not considered live threads in a thread group
+        and not returned by this function.
       </description>
       <origin>jvmdi</origin>
       <capabilities>
@@ -2652,8 +2654,11 @@ if (err == JVMTI_ERROR_NONE &amp;&amp; count &gt;= 1) {
     <function id="GetAllStackTraces" num="100">
       <synopsis>Get All Stack Traces</synopsis>
       <description>
-        Get information about the stacks of all live threads
-        (including <internallink id="RunAgentThread">agent threads</internallink>).
+        Get the stack traces of all live threads attached to the VM.
+        The list includes the stack traces of
+        <internallink id="RunAgentThread">agent threads</internallink>.
+        It does not include the stack traces of virtual threads.
+        <p/>
         If <paramlink id="max_frame_count"/> is less than the depth of a stack,
         the <paramlink id="max_frame_count"/> topmost frames are returned for that thread,
         otherwise the entire stack is returned.
@@ -3030,7 +3035,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current" frame="depth"/>
+          <jthread null="current" frame="depth" impl="noconvert"/>
           <description>
             The thread of the frame for which the frame pop event will be generated.
           </description>
@@ -10060,9 +10065,11 @@ myInit() {
           there is a <code>jint</code> parameter, the event handler should be
           declared:
 <example>
-    void JNICALL myHandler(jvmtiEnv* jvmti_env, jint myInt, ...)
+    void JNICALL myHandler(jvmtiEnv* jvmti_env, ...)
 </example>
           Note the terminal "<code>...</code>" which indicates varargs.
+          The <code>jint</code> argument inside <code>myHandler</code> needs to be extracted using
+          the <code>va_*</code> syntax of the C programming language.
         </description>
         <parameters>
           <param id="jvmti_env">
@@ -12915,12 +12922,6 @@ myInit() {
             The JNI environment of the event (current) thread.
           </description>
       </param>
-      <param id="thread">
-        <jthread/>
-          <description>
-            Thread scheduling this virtual thread.
-          </description>
-      </param>
       <param id="virtual_thread">
         <jthread/>
           <description>
@@ -12950,12 +12951,6 @@ myInit() {
             The JNI environment of the event (current) thread.
           </description>
       </param>
-      <param id="thread">
-        <jthread/>
-          <description>
-            Thread terminating this virtual thread.
-          </description>
-      </param>
       <param id="virtual_thread">
         <jthread/>
           <description>
@@ -12965,7 +12960,7 @@ myInit() {
     </parameters>
   </event>
 
-  <event label="Virtual Thread Mount"
+  <event label="Virtual Thread Mounted"
          id="VirtualThreadMounted" const="JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED" filtered="thread" num="89" phase="start" since="14">
     <description>
       Virtual thread mount events are generated before its method continue to execute on the mounted thread.
@@ -12985,12 +12980,6 @@ myInit() {
             The JNI environment of the event (current) thread.
           </description>
       </param>
-      <param id="thread">
-        <jthread/>
-          <description>
-            Thread the virtual thread is mounted to.
-          </description>
-      </param>
       <param id="virtual_thread">
         <jthread/>
           <description>
@@ -13000,7 +12989,7 @@ myInit() {
     </parameters>
   </event>
 
-  <event label="Virtual Thread Unmount"
+  <event label="Virtual Thread Unmounted"
          id="VirtualThreadUnmounted" const="JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED" filtered="thread" num="90" phase="start" since="14">
     <description>
       Virtual thread unmount events are generated when the virtual thread is about to be unmounted from the carrier thread.
@@ -13018,12 +13007,6 @@ myInit() {
         </outptr>
           <description>
             The JNI environment of the event (current) thread.
-          </description>
-      </param>
-      <param id="thread">
-        <jthread/>
-          <description>
-            Thread the virtual thread is unmounted from.
           </description>
       </param>
       <param id="virtual_thread">

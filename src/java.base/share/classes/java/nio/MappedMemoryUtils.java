@@ -25,9 +25,9 @@
 
 package java.nio;
 
-import jdk.internal.misc.Unsafe;
-
 import java.io.FileDescriptor;
+import jdk.internal.misc.Blocker;
+import jdk.internal.misc.Unsafe;
 
 /* package */ class MappedMemoryUtils {
 
@@ -94,7 +94,13 @@ import java.io.FileDescriptor;
         } else {
             // force writeback via file descriptor
             long offset = mappingOffset(address, index);
-            force0(fd, mappingAddress(address, offset, index), mappingLength(offset, length));
+            long mappingAddress = mappingAddress(address, offset, index);
+            long mappingLength = mappingLength(offset, length);
+            if (Thread.currentThread().isVirtual()) {
+                Blocker.managedBlock(() -> force0(fd, mappingAddress, mappingLength));
+            } else {
+                force0(fd, mappingAddress, mappingLength);
+            }
         }
     }
 

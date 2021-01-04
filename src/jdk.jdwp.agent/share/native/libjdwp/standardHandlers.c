@@ -85,7 +85,7 @@ handleGarbageCollectionFinish(JNIEnv *env, EventInfo *evinfo,
     JDI_ASSERT_MSG(JNI_FALSE, "Should never call handleGarbageCollectionFinish");
 }
 
-/* HandlerFunction - Invoked from event_callback() */
+/* HandlerFunction - Invoked from event_callback() for METHOD_ENTRY and METHOD_EXIT. */
 static void
 handleFrameEvent(JNIEnv *env, EventInfo *evinfo,
                  HandlerNode *node,
@@ -106,7 +106,6 @@ handleFrameEvent(JNIEnv *env, EventInfo *evinfo,
     FrameNumber fnum = 0;
     jvalue returnValue;
 
-    JDI_ASSERT(!isVThread(evinfo->thread));
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
             (gdata->jvmti, evinfo->thread, fnum, &method, &location);
     if (error != JVMTI_ERROR_NONE) {

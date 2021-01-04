@@ -285,28 +285,16 @@ void eventHelper_releaseEvents(void)
 }
 
 static void
-writeThreadOrVThread(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
-{
-    /*
-     * Write the vthread ref if the event matched a vthread filter, or if the event was not
-     * filtered by thread, and came in on a carrier thread running a vthread. In either
-     * case evinfo->matchesVThread will be true.
-     */
-    jthread thread = (evinfo->matchesVThread ? evinfo->vthread : evinfo->thread);
-    (void)outStream_writeObjectRef(env, out, thread);
-}
-
-static void
 writeSingleStepEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
-    writeThreadOrVThread(env, out, evinfo);
+    (void)outStream_writeObjectRef(env, out, evinfo->thread);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
 }
 
 static void
 writeBreakpointEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
-    writeThreadOrVThread(env, out, evinfo);
+    (void)outStream_writeObjectRef(env, out, evinfo->thread);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
 }
 
@@ -317,7 +305,7 @@ writeFieldAccessEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 
     fieldClassTag = referenceTypeTag(evinfo->u.field_access.field_clazz);
 
-    writeThreadOrVThread(env, out, evinfo);
+    (void)outStream_writeObjectRef(env, out, evinfo->thread);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
     (void)outStream_writeByte(out, fieldClassTag);
     (void)outStream_writeObjectRef(env, out, evinfo->u.field_access.field_clazz);
@@ -334,7 +322,7 @@ writeFieldModificationEvent(JNIEnv *env, PacketOutputStream *out,
 
     fieldClassTag = referenceTypeTag(evinfo->u.field_modification.field_clazz);
 
-    writeThreadOrVThread(env, out, evinfo);
+    (void)outStream_writeObjectRef(env, out, evinfo->thread);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
     (void)outStream_writeByte(out, fieldClassTag);
     (void)outStream_writeObjectRef(env, out, evinfo->u.field_modification.field_clazz);
@@ -348,7 +336,7 @@ writeFieldModificationEvent(JNIEnv *env, PacketOutputStream *out,
 static void
 writeExceptionEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
-    writeThreadOrVThread(env, out, evinfo);
+    (void)outStream_writeObjectRef(env, out, evinfo->thread);
     writeCodeLocation(out, evinfo->clazz, evinfo->method, evinfo->location);
     (void)outStream_writeObjectTag(env, out, evinfo->object);
     (void)outStream_writeObjectRef(env, out, evinfo->object);
@@ -359,14 +347,14 @@ writeExceptionEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 static void
 writeThreadEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
-    writeThreadOrVThread(env, out, evinfo);
+    (void)outStream_writeObjectRef(env, out, evinfo->thread);
 }
 
 static void
 writeMonitorEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
 {
     jclass klass;
-    writeThreadOrVThread(env, out, evinfo);
+    (void)outStream_writeObjectRef(env, out, evinfo->thread);
     (void)outStream_writeObjectTag(env, out, evinfo->object);
     (void)outStream_writeObjectRef(env, out, evinfo->object);
     if (evinfo->ei == EI_MONITOR_WAIT || evinfo->ei == EI_MONITOR_WAITED) {
@@ -405,7 +393,7 @@ writeClassEvent(JNIEnv *env, PacketOutputStream *out, EventInfo *evinfo)
     }
     status = classStatus(evinfo->clazz);
 
-    writeThreadOrVThread(env, out, evinfo);
+    (void)outStream_writeObjectRef(env, out, evinfo->thread);
     (void)outStream_writeByte(out, classTag);
     (void)outStream_writeObjectRef(env, out, evinfo->clazz);
     (void)outStream_writeString(out, signature);
@@ -840,11 +828,9 @@ static void
 saveEventInfoRefs(JNIEnv *env, EventInfo *evinfo)
 {
     jthread *pthread;
-    jthread *pvthread;
     jclass *pclazz;
     jobject *pobject;
     jthread thread;
-    jthread vthread;
     jclass clazz;
     jobject object;
     char sig;
@@ -856,12 +842,6 @@ saveEventInfoRefs(JNIEnv *env, EventInfo *evinfo)
         thread = *pthread;
         *pthread = NULL;
         saveGlobalRef(env, thread, pthread);
-    }
-    if ( evinfo->vthread != NULL ) {
-        pvthread = &(evinfo->vthread);
-        vthread = *pvthread;
-        *pvthread = NULL;
-        saveGlobalRef(env, vthread, pvthread);
     }
     if ( evinfo->clazz != NULL ) {
         pclazz = &(evinfo->clazz);
@@ -925,9 +905,6 @@ tossEventInfoRefs(JNIEnv *env, EventInfo *evinfo)
     char sig;
     if ( evinfo->thread != NULL ) {
         tossGlobalRef(env, &(evinfo->thread));
-    }
-    if ( evinfo->vthread != NULL ) {
-        tossGlobalRef(env, &(evinfo->vthread));
     }
     if ( evinfo->clazz != NULL ) {
         tossGlobalRef(env, &(evinfo->clazz));

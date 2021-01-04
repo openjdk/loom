@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,8 +41,9 @@ abstract class Poller implements Runnable {
 
     static {
         try {
-            READ_POLLER = startPollerThread("Read-Poller", PollerProvider.readPoller());
-            WRITE_POLLER = startPollerThread("Write-Poller", PollerProvider.writePoller());
+            PollerProvider provider = PollerProvider.provider();
+            READ_POLLER = startPollerThread("Read-Poller", provider.readPoller());
+            WRITE_POLLER = startPollerThread("Write-Poller", provider.writePoller());
         } catch (IOException ioe) {
             throw new IOError(ioe);
         }
@@ -123,19 +124,14 @@ abstract class Poller implements Runnable {
     protected Poller() { }
 
     private void register(int fdVal) throws IOException {
-        Thread t = Thread.currentThread();
-        Thread previous = map.putIfAbsent(fdVal, t);
-        if (previous != null) {
-            throw new IllegalStateException();
-        }
+        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
+        assert previous == null;
         implRegister(fdVal);
     }
 
     private void deregister(int fdVal) {
-        Thread t = Thread.currentThread();
-        if (map.remove(fdVal, t)) {
-            implDeregister(fdVal);
-        }
+        Thread previous = map.remove(fdVal);
+        assert previous == null || previous == Thread.currentThread();
     }
 
     private void wakeup(int fdVal) {

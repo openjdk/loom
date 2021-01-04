@@ -341,6 +341,7 @@ final class HttpsClient extends HttpClient
                 boolean compatible = ((ret.proxy != null && ret.proxy.equals(p)) ||
                     (ret.proxy == null && p == Proxy.NO_PROXY))
                      && Objects.equals(ret.getAuthenticatorKey(), ak);
+
                 if (compatible) {
                     ret.lock();
                     try {

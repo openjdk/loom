@@ -27,6 +27,12 @@
  * @summary Basic tests for virtual threads using java.net sockets.
  */
 
+/**
+ * @test
+ * @requires (os.family == "windows")
+ * @run testng/othervm/timeout=300 -Djdk.pollProvider=sun.nio.ch.WSAPollPollerProvider NetSockets
+ */
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -243,7 +249,7 @@ public class NetSockets {
                 Socket s = connection.socket1();
                 ScheduledCloser.schedule(s, DELAY);
                 try {
-                    byte[] ba = new byte[100*10024];
+                    byte[] ba = new byte[100*1024];
                     OutputStream out = s.getOutputStream();
                     for (;;) {
                         out.write(ba);
@@ -262,7 +268,7 @@ public class NetSockets {
                 Socket s = connection.socket1();
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
                 try {
-                    byte[] ba = new byte[100*10024];
+                    byte[] ba = new byte[100*1024];
                     OutputStream out = s.getOutputStream();
                     for (;;) {
                         out.write(ba);

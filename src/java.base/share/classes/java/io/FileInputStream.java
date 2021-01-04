@@ -313,7 +313,11 @@ public class FileInputStream extends InputStream
      *             support seek, or if an I/O error occurs.
      */
     public long skip(long n) throws IOException {
-        return skip0(n);
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> skip0(n));
+        } else {
+            return skip0(n);
+        }
     }
 
     private native long skip0(long n) throws IOException;
@@ -336,7 +340,11 @@ public class FileInputStream extends InputStream
      *             {@code close} or an I/O error occurs.
      */
     public int available() throws IOException {
-        return available0();
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> available0());
+        } else {
+            return available0();
+        }
     }
 
     private native int available0() throws IOException;
@@ -359,7 +367,6 @@ public class FileInputStream extends InputStream
      * @throws     IOException  if an I/O error occurs.
      *
      * @revised 1.4
-     * @spec JSR-51
      */
     public void close() throws IOException {
         if (closed) {
@@ -417,7 +424,6 @@ public class FileInputStream extends InputStream
      * @return  the file channel associated with this file input stream
      *
      * @since 1.4
-     * @spec JSR-51
      */
     public FileChannel getChannel() {
         FileChannel fc = this.channel;

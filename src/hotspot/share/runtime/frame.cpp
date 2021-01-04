@@ -57,13 +57,14 @@
 #include "utilities/decoder.hpp"
 #include "utilities/formatBuffer.hpp"
 
-RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool walk_cont, bool validate_oops) 
-  : _cont(Handle()) {
+RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool process_frames, bool walk_cont, bool validate_oops) :
+    _cont(Handle()) {
   _thread         = thread;
   _update_map     = update_map;
   _validate_oops  = validate_oops;
   _walk_cont      = walk_cont;
   DEBUG_ONLY(_skip_missing = false;)
+  _process_frames = process_frames;
   clear();
   debug_only(_update_for_id = NULL;)
 
@@ -78,13 +79,14 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool walk_cont, bo
 #endif /* PRODUCT */
 }
 
-RegisterMap::RegisterMap(Handle cont, bool update_map, bool validate_oops) 
+RegisterMap::RegisterMap(Handle cont, bool update_map, bool process_frames, bool validate_oops) 
   : _cont(cont) {
   _thread         = NULL;
   _update_map     = update_map;
   _validate_oops  = validate_oops;
   _walk_cont      = true;
   DEBUG_ONLY(_skip_missing = false;)
+    _process_frames = process_frames;
   clear();
   debug_only(_update_for_id = NULL;)
 
@@ -101,6 +103,7 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
   assert(map != NULL, "RegisterMap must be present");
   _thread                = map->thread();
   _update_map            = map->update_map();
+  _process_frames        = map->process_frames();
   _include_argument_oops = map->include_argument_oops();
   debug_only(_update_for_id = map->_update_for_id;)
   _validate_oops = map->_validate_oops;
@@ -347,8 +350,9 @@ bool frame::can_be_deoptimized() const {
 void frame::deoptimize(JavaThread* thread) {
   // tty->print_cr(">>> frame::deoptimize");
   // print_on(tty);
-  assert(thread->frame_anchor()->has_last_Java_frame() &&
-         thread->frame_anchor()->walkable(), "must be");
+  assert(thread == NULL
+         || (thread->frame_anchor()->has_last_Java_frame() &&
+             thread->frame_anchor()->walkable()), "must be");
   // Schedule deoptimization of an nmethod activation with this frame.
   assert(_cb != NULL && _cb->is_compiled(), "must be");
 
@@ -368,7 +372,7 @@ void frame::deoptimize(JavaThread* thread) {
   assert(is_deoptimized_frame(), "must be");
 
 #ifdef ASSERT
-  {
+  if (thread != NULL) {
     frame check = thread->last_frame();
     if (is_older(check.id())) {
       RegisterMap map(thread, false);
@@ -590,7 +594,7 @@ void frame::interpreter_frame_print_on(outputStream* st) const {
     current->obj()->print_value_on(st);
     st->print_cr("]");
     st->print(" - lock   [");
-    current->lock()->print_on(st);
+    current->lock()->print_on(st, current->obj());
     st->print_cr("]");
   }
   // monitor
@@ -999,11 +1003,15 @@ void frame::oops_interpreted_arguments_do(Symbol* signature, bool has_receiver, 
   finder.oops_do();
 }
 
-void frame::oops_code_blob_do(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, const RegisterMap* reg_map) const {
+void frame::oops_code_blob_do(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, DerivedPointerIterationMode derived_mode, const RegisterMap* reg_map) const {
   assert(_cb != NULL, "sanity check");
   assert((oop_map() == NULL) == (_cb->oop_maps() == NULL), "frame and _cb must agree that oopmap is set or not");
   if (oop_map() != NULL) {
-    _oop_map->oops_do(this, reg_map, f, df);
+    if (df != NULL) {
+      _oop_map->oops_do(this, reg_map, f, df);
+    } else {
+      _oop_map->oops_do(this, reg_map, f, derived_mode);
+    }
 
     // Preserve potential arguments for a callee. We handle this by dispatching
     // on the codeblob. For c2i, we do
@@ -1151,8 +1159,7 @@ void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) const {
   entry_frame_call_wrapper()->oops_do(f);
 }
 
-
-void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, const RegisterMap* map, bool use_interpreter_oop_map_cache) const {
+void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, DerivedPointerIterationMode derived_mode, const RegisterMap* map, bool use_interpreter_oop_map_cache) const {
 #ifndef PRODUCT
   // simulate GC crash here to dump java thread in error report
   if (CrashGCForDumpingJavaThread) {
@@ -1165,7 +1172,7 @@ void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosu
   } else if (is_entry_frame()) {
     oops_entry_do(f, map);
   } else if (CodeCache::contains(pc())) {
-    oops_code_blob_do(f, cf, df, map);
+    oops_code_blob_do(f, cf, df, derived_mode, map);
   } else {
     ShouldNotReachHere();
   }
@@ -1209,7 +1216,8 @@ void frame::verify(const RegisterMap* map) const {
 #if COMPILER2_OR_JVMCI
   assert(DerivedPointerTable::is_empty(), "must be empty before verify");
 #endif
-  oops_do_internal(&VerifyOopClosure::verify_oop, NULL, NULL, (RegisterMap*)map, false);
+
+  oops_do_internal(&VerifyOopClosure::verify_oop, NULL, NULL, DerivedPointerIterationMode::_ignore, map, false);
 }
 
 
@@ -1288,6 +1296,8 @@ public:
   }
 };
 
+// callers need a ResourceMark because of name_and_sig_as_C_string() usage,
+// RA allocated string is returned to the caller
 void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_map) {
   // boundaries: sp and the 'real' frame pointer
   values.describe(-1, sp(), err_msg("sp for #%d", frame_no), 0);
@@ -1392,7 +1402,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
         }
         assert(sig_index == sizeargs, "");
       }
-      int out_preserve = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs, false);
+      int out_preserve = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
       assert (out_preserve ==  m->num_stack_arg_slots(), "");
       int sig_index = 0;
       int arg_index = (m->is_static() ? 0 : -1);
@@ -1489,7 +1499,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
 //-----------------------------------------------------------------------------------
 // StackFrameStream implementation
 
-StackFrameStream::StackFrameStream(JavaThread *thread, bool update, bool allow_missing_reg) : _reg_map(thread, update) {
+StackFrameStream::StackFrameStream(JavaThread *thread, bool update, bool process_frames, bool allow_missing_reg) : _reg_map(thread, update, process_frames) {
   assert(thread->has_last_Java_frame(), "sanity check");
   _fr = thread->last_frame();
   _is_done = false;
@@ -1542,7 +1552,7 @@ void FrameValues::validate() {
 }
 #endif // ASSERT
 
-void FrameValues::print(JavaThread* thread) {
+void FrameValues::print_on(JavaThread* thread, outputStream* st) {
   _values.sort(compare);
 
   // Sometimes values like the fp can be invalid values if the
@@ -1575,14 +1585,14 @@ void FrameValues::print(JavaThread* thread) {
   for (int i = max_index; i >= min_index; i--) {
     FrameValue fv = _values.at(i);
     while (cur > fv.location) {
-      tty->print_cr(" " INTPTR_FORMAT ": " INTPTR_FORMAT, p2i(cur), *cur);
+      st->print_cr(" " INTPTR_FORMAT ": " INTPTR_FORMAT, p2i(cur), *cur);
       cur--;
     }
     if (last == fv.location) {
       const char* spacer = "          " LP64_ONLY("        ");
-      tty->print_cr(" %s  %s %s", spacer, spacer, fv.description);
+      st->print_cr(" %s  %s %s", spacer, spacer, fv.description);
     } else {
-      tty->print_cr(" " INTPTR_FORMAT ": " INTPTR_FORMAT " %s", p2i(fv.location), *fv.location, fv.description);
+      st->print_cr(" " INTPTR_FORMAT ": " INTPTR_FORMAT " %s", p2i(fv.location), *fv.location, fv.description);
       last = fv.location;
       cur--;
     }

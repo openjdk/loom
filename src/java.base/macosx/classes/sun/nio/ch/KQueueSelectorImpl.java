@@ -119,11 +119,7 @@ class KQueueSelectorImpl extends SelectorImpl {
 
             do {
                 long startTime = timedPoll ? System.nanoTime() : 0;
-                if (blocking && Thread.currentThread().isVirtual()) {
-                    numEntries = managedPoll(to);
-                } else {
-                    numEntries = implPoll(to);
-                }
+                numEntries = poll(to);
                 if (numEntries == IOStatus.INTERRUPTED && timedPoll) {
                     // timed poll interrupted so need to adjust timeout
                     long adjust = System.nanoTime() - startTime;

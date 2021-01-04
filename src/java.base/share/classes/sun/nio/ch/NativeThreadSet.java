@@ -39,9 +39,12 @@ class NativeThreadSet {
         elts = new long[n];
     }
 
-    // Adds the current native thread to this set, returning its index so that
-    // it can efficiently be removed later.
-    //
+    /**
+     * Adds the current native thread to this set, returning its index so that
+     * it can efficiently be removed later.
+     *
+     * The current continuation will be pinned until the thread is removed.
+     */
     int add() {
         long th = NativeThread.currentKernelThread();
         // 0 and -1 are treated as placeholders, not real thread handles
@@ -61,18 +64,23 @@ class NativeThreadSet {
                 if (elts[i] == 0) {
                     elts[i] = th;
                     used++;
+                    Continuation.pin();
                     return i;
                 }
             }
             assert false;
             return -1;
         }
+
     }
 
-    // Removes the thread at the given index.
-    //
+    /**
+     * Removes the thread at the give index.
+     */
     void remove(int i) {
         synchronized (this) {
+            assert (elts[i] == NativeThread.currentKernelThread()) || (elts[i] == -1);
+            Continuation.unpin();
             elts[i] = 0;
             used--;
             if (used == 0 && waitingToEmpty)

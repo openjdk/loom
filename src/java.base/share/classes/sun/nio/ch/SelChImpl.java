@@ -87,16 +87,16 @@ public interface SelChImpl extends Channel {
     default void park(int event, long nanos) throws IOException {
         if (Thread.currentThread().isVirtual()) {
             Poller.register(getFDVal(), event);
-            if (isOpen()) {
-                try {
+            try {
+                if (isOpen()) {
                     if (nanos == 0) {
                         VirtualThreads.park();
                     } else {
                         VirtualThreads.park(nanos);
                     }
-                } finally {
-                    Poller.deregister(getFDVal(), event);
                 }
+            } finally {
+                Poller.deregister(getFDVal(), event);
             }
         } else {
             long millis;

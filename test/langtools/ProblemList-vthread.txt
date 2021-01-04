@@ -1,3 +1,11 @@
+#####
+## Filed bugs
+
+tools/javac/diags/RunExamples.java                                                              8253918 generic-all
+tools/javac/records/mandated_members/CheckRecordMembers.java                                    8253918 generic-all
+jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
+jdk/javadoc/tool/TestScriptInComment.java                                                       8254093 generic-all
+
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
 
@@ -25,6 +33,10 @@ tools/javac/lambda/T8031967.java
 tools/javac/lambda/LambdaParserTest.java
 jdk/javadoc/doclet/testLinkOption/TestRedirectLinks.java
 
+####
+# Exception: java.lang.ThreadDeath Error: Error while cleaning up threads after test
+
+jdk/jshell/ToolTabSnippetTest.java
 
 ####
 # Uninvestigated timeouts

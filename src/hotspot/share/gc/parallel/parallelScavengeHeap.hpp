@@ -45,6 +45,7 @@
 
 class AdjoiningGenerations;
 class GCHeapSummary;
+class HeapBlockClaimer;
 class MemoryManager;
 class MemoryPool;
 class PSAdaptiveSizePolicy;
@@ -76,6 +77,7 @@ class ParallelScavengeHeap : public CollectedHeap {
 
   virtual void initialize_serviceability();
 
+  void trace_actual_reserved_page_size(const size_t reserved_heap_size, const ReservedSpace rs);
   void trace_heap(GCWhen::Type when, const GCTracer* tracer);
 
  protected:
@@ -204,13 +206,13 @@ class ParallelScavengeHeap : public CollectedHeap {
   void ensure_parsability(bool retire_tlabs);
   void resize_all_tlabs();
 
-  bool supports_tlab_allocation() const { return true; }
-
   size_t tlab_capacity(Thread* thr) const;
   size_t tlab_used(Thread* thr) const;
   size_t unsafe_max_tlab_alloc(Thread* thr) const;
 
   void object_iterate(ObjectClosure* cl);
+  void object_iterate_parallel(ObjectClosure* cl, HeapBlockClaimer* claimer);
+  virtual ParallelObjectIterator* parallel_object_iterator(uint thread_num);
 
   HeapWord* block_start(const void* addr) const;
   bool block_is_obj(const HeapWord* addr) const;

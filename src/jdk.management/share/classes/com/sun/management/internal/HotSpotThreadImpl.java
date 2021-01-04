@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,9 +24,16 @@
  */
 package com.sun.management.internal;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import com.sun.management.ThreadMXBean;
+import com.sun.management.ThreadMXBean.OutputFormat;
+import jdk.internal.vm.ThreadContainers;
 import sun.management.ManagementFactoryHelper;
 import sun.management.ThreadImpl;
+import sun.management.Util;
 import sun.management.VMManagement;
 
 /**
@@ -75,5 +82,24 @@ public class HotSpotThreadImpl extends ThreadImpl implements ThreadMXBean {
     @Override
     public void setThreadAllocatedMemoryEnabled(boolean enable) {
         super.setThreadAllocatedMemoryEnabled(enable);
+    }
+
+    @Override
+    public void dumpThreads(String outputFile, OutputFormat format) throws IOException {
+        Path file = Path.of(outputFile);
+        if (!file.isAbsolute())
+            throw new IllegalArgumentException("'outptuFile' not absolute path");
+
+        // need ManagementPermission("control")
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null)
+            Util.checkControlAccess();
+
+        try (OutputStream out = Files.newOutputStream(file)) {
+            switch (format) {
+                case TEXT_PLAIN -> ThreadContainers.dumpThreads(out);
+                case JSON       -> ThreadContainers.dumpThreadsToJson(out);
+            }
+        }
     }
 }

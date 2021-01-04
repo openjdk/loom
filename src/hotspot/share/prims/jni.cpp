@@ -32,11 +32,13 @@
 #include "classfile/classLoader.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/javaClasses.inline.hpp"
+#include "classfile/javaThreadStatus.hpp"
 #include "classfile/moduleEntry.hpp"
 #include "classfile/modules.hpp"
 #include "classfile/symbolTable.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmSymbols.hpp"
+#include "compiler/compiler_globals.hpp"
 #include "gc/shared/gcLocker.inline.hpp"
 #include "interpreter/linkResolver.hpp"
 #include "jfr/jfrEvents.hpp"
@@ -48,9 +50,10 @@
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
 #include "oops/access.inline.hpp"
-#include "oops/arrayOop.inline.hpp"
+#include "oops/arrayOop.hpp"
 #include "oops/instanceKlass.inline.hpp"
 #include "oops/instanceOop.hpp"
+#include "oops/klass.inline.hpp"
 #include "oops/markWord.hpp"
 #include "oops/method.hpp"
 #include "oops/objArrayKlass.hpp"
@@ -93,7 +96,7 @@
 
 static jint CurrentVersion = JNI_VERSION_10;
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(USE_VECTORED_EXCEPTION_HANDLING)
 extern LONG WINAPI topLevelExceptionFilter(_EXCEPTION_POINTERS* );
 #endif
 
@@ -868,7 +871,6 @@ class JNI_ArgumentPusher : public SignatureIterator {
 
 
 class JNI_ArgumentPusherVaArg : public JNI_ArgumentPusher {
- protected:
   va_list _ap;
 
   void set_ap(va_list rap) {
@@ -902,6 +904,10 @@ class JNI_ArgumentPusherVaArg : public JNI_ArgumentPusher {
   JNI_ArgumentPusherVaArg(jmethodID method_id, va_list rap)
       : JNI_ArgumentPusher(Method::resolve_jmethod_id(method_id)) {
     set_ap(rap);
+  }
+
+  ~JNI_ArgumentPusherVaArg() {
+    va_end(_ap);
   }
 
   virtual void push_arguments_on(JavaCallArguments* arguments) {
@@ -3805,10 +3811,14 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
 
 #ifndef PRODUCT
     if (ReplayCompiles) ciReplay::replay(thread);
+#endif
 
+#ifdef ASSERT
     // Some platforms (like Win*) need a wrapper around these test
     // functions in order to properly handle error conditions.
-    VMError::test_error_handler();
+    if (ErrorHandlerTest != 0) {
+      VMError::controlled_crash(ErrorHandlerTest);
+    }
 #endif
 
     // Since this is not a JVM_ENTRY we have to set the thread state manually before leaving.
@@ -3851,11 +3861,11 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CreateJavaVM(JavaVM **vm, void **penv, void *args) {
   jint result = JNI_ERR;
   // On Windows, let CreateJavaVM run with SEH protection
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(USE_VECTORED_EXCEPTION_HANDLING)
   __try {
 #endif
     result = JNI_CreateJavaVM_inner(vm, penv, args);
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(USE_VECTORED_EXCEPTION_HANDLING)
   } __except(topLevelExceptionFilter((_EXCEPTION_POINTERS*)_exception_info())) {
     // Nothing to do.
   }
@@ -3923,11 +3933,11 @@ static jint JNICALL jni_DestroyJavaVM_inner(JavaVM *vm) {
 jint JNICALL jni_DestroyJavaVM(JavaVM *vm) {
   jint result = JNI_ERR;
   // On Windows, we need SEH protection
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(USE_VECTORED_EXCEPTION_HANDLING)
   __try {
 #endif
     result = jni_DestroyJavaVM_inner(vm);
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(USE_VECTORED_EXCEPTION_HANDLING)
   } __except(topLevelExceptionFilter((_EXCEPTION_POINTERS*)_exception_info())) {
     // Nothing to do.
   }
@@ -3974,7 +3984,7 @@ static jint attach_current_thread(JavaVM *vm, void **penv, void *_args, bool dae
     return JNI_ERR;
   }
   // Enable stack overflow checks
-  thread->create_stack_guard_pages();
+  thread->stack_overflow_state()->create_stack_guard_pages();
 
   thread->initialize_tlab();
 
@@ -4024,7 +4034,7 @@ static jint attach_current_thread(JavaVM *vm, void **penv, void *_args, bool dae
 
   // Set java thread status.
   java_lang_Thread::set_thread_status(thread->threadObj(),
-              java_lang_Thread::RUNNABLE);
+              JavaThreadStatus::RUNNABLE);
 
   // Notify the debugger
   if (JvmtiExport::should_post_thread_life()) {

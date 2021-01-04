@@ -76,7 +76,7 @@ class WSAPollSelectorImpl extends SelectorImpl {
         this.pollArrayCapacity = INITIAL_CAPACITY;
 
         // wakeup support
-        this.pipe = new PipeImpl(null, /*no delay*/ false);
+        this.pipe = new PipeImpl(sp, false);
         SourceChannelImpl source = (SourceChannelImpl) pipe.source();
         SinkChannelImpl sink = (SinkChannelImpl) pipe.sink();
         this.fd0 = source.getFD();
@@ -112,12 +112,7 @@ class WSAPollSelectorImpl extends SelectorImpl {
         processDeregisterQueue();
         try {
             begin(blocking);
-            int numPolled;
-            if (blocking && Thread.currentThread().isVirtual()) {
-                numPolled = managedPoll(to);
-            } else {
-                numPolled = implPoll(to);
-            }
+            int numPolled = poll(to);
             assert numPolled <= pollArraySize;
         } finally {
             end(blocking);

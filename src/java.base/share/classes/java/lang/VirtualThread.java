@@ -24,7 +24,6 @@
  */
 package java.lang;
 
-import java.io.PrintStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.security.AccessControlContext;
@@ -32,7 +31,6 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -44,23 +42,17 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
-import sun.nio.ch.ConsoleStreams;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
-
-import static java.lang.StackWalker.Option.RETAIN_CLASS_REFERENCE;
-import static java.lang.StackWalker.Option.SHOW_REFLECT_FRAMES;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.*;
 
 /**
  * A thread that is scheduled by the Java virtual machine rather than the operating
  * system.
  */
-
 class VirtualThread extends Thread {
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
     private static final Executor DEFAULT_SCHEDULER = createDefaultScheduler();
@@ -153,8 +145,7 @@ class VirtualThread extends Thread {
         this.cont = new Continuation(VTHREAD_SCOPE, target) {
             @Override
             protected void onPinned(Continuation.Pinned reason) {
-                if (TRACE_PINNING_MODE > 0
-                        && !ConsoleStreams.isOutOrErrLocked(Thread.currentThread())) {
+                if (TRACE_PINNING_MODE > 0) {
                     boolean printAll = (TRACE_PINNING_MODE == 1);
                     PinnedThreadPrinter.printStackTrace(System.out, printAll);
                 }
@@ -264,8 +255,8 @@ class VirtualThread extends Thread {
             throw new IllegalStateException();
         }
 
-        boolean firstRun = (initialState == STARTED);
-        mount(firstRun);
+        boolean firstMount = (initialState == STARTED);
+        mount(firstMount);
         try {
             cont.run();
         } finally {
@@ -283,21 +274,18 @@ class VirtualThread extends Thread {
      * is run or continued. It binds the virtual thread to the current carrier thread.
      */
     @ChangesCurrentThread
-    private void mount(boolean firstRun) {
+    private void mount(boolean firstMount) {
         //assert this.carrierThread == null
 
         // notify JVMTI agents
         boolean notifyJvmti = notifyJvmtiEvents;
         if (notifyJvmti) {
-            notifyJvmtiMountBegin(firstRun);
+            notifyJvmtiMountBegin(firstMount);
         }
 
         // sets the carrier thread
         Thread carrier = Thread.currentCarrierThread();
         CARRIER_THREAD.setRelease(this, carrier);
-
-        // set Thread.currentThread() to return this virtual thread
-        carrier.setCurrentThread(this);
 
         // sync up carrier thread interrupt status if needed
         if (interrupted) {
@@ -310,9 +298,12 @@ class VirtualThread extends Thread {
             }
         }
 
+        // set Thread.currentThread() to return this virtual thread
+        carrier.setCurrentThread(this);
+
         // notify JVMTI agents
         if (notifyJvmti) {
-            notifyJvmtiMountEnd(firstRun);
+            notifyJvmtiMountEnd(firstMount);
         }
     }
 
@@ -390,7 +381,7 @@ class VirtualThread extends Thread {
 
         // notify JVMTI agents
         if (notifyAgents && notifyJvmtiEvents) {
-            notifyJvmtiTerminate();
+            notifyJvmtiTerminated();
         }
     }
 
@@ -615,21 +606,10 @@ class VirtualThread extends Thread {
      * Waits up to {@code nanos} nanoseconds for this virtual thread to terminate.
      * A timeout of {@code 0} means to wait forever.
      *
-     * @throws IllegalArgumentException if nanos is negative
-     * @throws IllegalStateException if not started
      * @throws InterruptedException if interrupted while waiting
      * @return true if the thread has terminated
      */
     boolean joinNanos(long nanos) throws InterruptedException {
-        if (nanos < 0)
-            throw new IllegalArgumentException();
-        int s = state();
-        if (s == NEW)
-            throw new IllegalStateException("Not started");
-        if (s == TERMINATED)
-            return true;
-
-        // timed or untimed wait for the thread to terminate
         final ReentrantLock lock = getLock();
         lock.lock();
         try {
@@ -640,11 +620,9 @@ class VirtualThread extends Thread {
                 }
                 return true;
             } else {
-                long startNanos = System.nanoTime();
                 long remainingNanos = nanos;
                 while (remainingNanos > 0 && state() != TERMINATED) {
-                    condition.await(remainingNanos, NANOSECONDS);
-                    remainingNanos = nanos - (System.nanoTime() - startNanos);
+                    remainingNanos = condition.awaitNanos(remainingNanos);
                 }
                 return (state() == TERMINATED);
             }
@@ -687,8 +665,7 @@ class VirtualThread extends Thread {
             boolean oldValue = interrupted;
             if (oldValue)
                 interrupted = false;
-            Thread carrier = carrierThread;
-            if (carrier != null) carrier.clearInterrupt();
+            carrierThread.clearInterrupt();
             return oldValue;
         }
     }
@@ -766,14 +743,57 @@ class VirtualThread extends Thread {
     }
 
     @Override
+    StackTraceElement[] asyncGetStackTrace() {
+        StackTraceElement[] stackTrace;
+        do {
+            stackTrace = (carrierThread != null)
+                    ? super.asyncGetStackTrace()  // mounted
+                    : tryGetStackTrace();         // unmounted
+            if (stackTrace == null) {
+                Thread.yield();
+            }
+        } while (stackTrace == null);
+        return stackTrace;
+    }
+
+    /**
+     * Returns the stack trace for this virtual thread if it newly created,
+     * parked, or terminated. Returns null if the thread is in another state.
+     */
+    private StackTraceElement[] tryGetStackTrace() {
+        if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
+            try {
+                return cont.getStackTrace();
+            } finally {
+                assert state() == PARKED_SUSPENDED;
+                setState(PARKED);
+
+                // may have been unparked while suspended
+                if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
+                    try {
+                        scheduler.execute(runContinuation);
+                    } catch (RejectedExecutionException ignore) { }
+                }
+            }
+        } else {
+            int s = state();
+            if (s == NEW || s == TERMINATED) {
+                return new StackTraceElement[0];   // empty stack
+            } else {
+                return null;
+            }
+        }
+    }
+
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("VirtualThread[");
         String name = getName();
-        if (name.length() > 0) {
-            sb.append(name);
-        } else {
+        if (name.isEmpty() || name.equals("<unnamed>")) {
             sb.append("@");
             sb.append(Integer.toHexString(hashCode()));
+        } else {
+            sb.append(name);
         }
         sb.append(",");
         Thread carrier = carrierThread;
@@ -821,51 +841,6 @@ class VirtualThread extends Thread {
         return condition;
     }
 
-    // -- stack trace support --
-
-    @Override
-    StackTraceElement[] asyncGetStackTrace() {
-        StackTraceElement[] stackTrace;
-        do {
-            stackTrace = (carrierThread != null)
-                    ? super.asyncGetStackTrace()  // mounted
-                    : tryGetStackTrace();         // unmounted
-            if (stackTrace == null) {
-                Thread.yield();
-            }
-        } while (stackTrace == null);
-        return stackTrace;
-    }
-
-    /**
-     * Returns the stack trace for this virtual thread if it newly created,
-     * parked, or terminated. Returns null if the thread is in another state.
-     */
-    private StackTraceElement[] tryGetStackTrace() {
-        if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
-            try {
-                return cont.getStackTrace();
-            } finally {
-                assert state() == PARKED_SUSPENDED;
-                setState(PARKED);
-
-                // may have been unparked while suspended
-                if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
-                    try {
-                        scheduler.execute(runContinuation);
-                    } catch (RejectedExecutionException ignore) { }
-                }
-            }
-        } else {
-            int s = state();
-            if (s == NEW || s == TERMINATED) {
-                return new StackTraceElement[0];   // empty stack
-            } else {
-                return null;
-            }
-        }
-    }
-
     // -- wrappers for VarHandle methods --
 
     private int state() {
@@ -901,45 +876,35 @@ class VirtualThread extends Thread {
     // -- JVM TI support --
 
     private static volatile boolean notifyJvmtiEvents;  // set by VM
-    private static native void notifyVTMTStart(VirtualThread vthread, int callsiteTag);
-    private static native void notifyVTMTFinish(VirtualThread vthread, int callsiteTag);
-    private static native void notifyStarted(Thread carrierThread, VirtualThread vthread);
-    private static native void notifyTerminated(Thread carrierThread, VirtualThread vthread);
-    private static native void notifyMount(Thread carrierThread, VirtualThread vthread);
-    private static native void notifyUnmount(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyMountBegin0(Thread carrierThread, VirtualThread vthread, boolean firstMount);
+    private static native void notifyMountEnd0(Thread carrierThread, VirtualThread vthread, boolean firstMount);
+    private static native void notifyUnmountBegin0(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyUnmountEnd0(Thread carrierThread, VirtualThread vthread);
+    private static native void notifyTerminated0(Thread carrierThread, VirtualThread vthread);
     private static native void registerNatives();
     static {
         registerNatives();
     }
 
-    private void notifyJvmtiMountBegin(boolean firstRun) {
-        notifyVTMTStart(this, 0);
+    private void notifyJvmtiMountBegin(boolean firstMount) {
+        notifyMountBegin0(Thread.currentCarrierThread(), this, firstMount);
     }
 
-    private void notifyJvmtiMountEnd(boolean firstRun) {
-        Thread carrier = Thread.currentCarrierThread();
-        if (firstRun) {
-            notifyStarted(carrier, this);
-        }
-        notifyMount(carrier, this);
-        notifyVTMTFinish(this, 0);
+    private void notifyJvmtiMountEnd(boolean firstMount) {
+        notifyMountEnd0(Thread.currentCarrierThread(), this, firstMount);
     }
 
     private void notifyJvmtiUnmountBegin() {
-        notifyVTMTStart(this, 1);
-        notifyUnmount(Thread.currentCarrierThread(), this);
+        notifyUnmountBegin0(Thread.currentCarrierThread(), this);
     }
 
     private void notifyJvmtiUnmountEnd() {
-        notifyVTMTFinish(this, 1);
+        notifyUnmountEnd0(Thread.currentCarrierThread(), this);
     }
 
-    private void notifyJvmtiTerminate() {
-        notifyVTMTStart(this, 0);
-        notifyTerminated(Thread.currentCarrierThread(), this);
-        notifyVTMTFinish(this, 0);
+    private void notifyJvmtiTerminated() {
+        notifyTerminated0(Thread.currentCarrierThread(), this);
     }
-    
 
     /**
      * Creates the default scheduler as ForkJoinPool.
@@ -950,18 +915,23 @@ class VirtualThread extends Thread {
             return AccessController.doPrivileged(pa);
         };
         PrivilegedAction<Executor> pa = () -> {
-            int parallelism;
+            int parallelism, maxPoolSize;
             String propValue = System.getProperty("jdk.defaultScheduler.parallelism");
             if (propValue != null) {
                 parallelism = Integer.parseInt(propValue);
             } else {
                 parallelism = Runtime.getRuntime().availableProcessors();
             }
-            Thread.UncaughtExceptionHandler ueh = (t, e) -> { };
-            // use FIFO as default
-            propValue = System.getProperty("jdk.defaultScheduler.lifo");
-            boolean asyncMode = (propValue == null) || propValue.equalsIgnoreCase("false");
-            return new ForkJoinPool(parallelism, factory, ueh, asyncMode);
+            propValue = System.getProperty("jdk.defaultScheduler.maxPoolSize");
+            if (propValue != null) {
+                maxPoolSize = Integer.max(parallelism, Integer.parseInt(propValue));
+            } else {
+                maxPoolSize = Integer.max(parallelism << 1, 128);
+            }
+            Thread.UncaughtExceptionHandler handler = (t, e) -> { };
+            boolean asyncMode = true; // FIFO
+            return new ForkJoinPool(parallelism, factory, handler, asyncMode,
+                         0, maxPoolSize, 1, pool -> true, 30, SECONDS);
         };
         return AccessController.doPrivileged(pa);
     }
@@ -1043,50 +1013,7 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Helper class to print the virtual thread stack trace when a carrier thread is
-     * pinned.
-     */
-    private static class PinnedThreadPrinter {
-        static final StackWalker INSTANCE;
-        static {
-            var options = Set.of(SHOW_REFLECT_FRAMES, RETAIN_CLASS_REFERENCE);
-            PrivilegedAction<StackWalker> pa = () -> LiveStackFrame.getStackWalker(options, VTHREAD_SCOPE);
-            INSTANCE = AccessController.doPrivileged(pa);
-        }
-
-        /**
-         * Prints a stack trace of the current virtual thread to the given print
-         * stream. This method is synchronized to reduce interference in the output.
-         * @param printAll true to print all stack frames, false to only print the
-         *        frames that are native or holding a monitor
-         */
-        @ChangesCurrentThread
-        static synchronized void printStackTrace(PrintStream out, boolean printAll) {
-            // switch to carrier thread as the printing may park
-            Thread vthread = Thread.currentThread();
-            Thread carrier = Thread.currentCarrierThread();
-            carrier.setCurrentThread(carrier);
-            try {
-                out.println(Thread.currentThread());
-                INSTANCE.forEach(f -> {
-                    if (f.getDeclaringClass() != PinnedThreadPrinter.class) {
-                        var ste = f.toStackTraceElement();
-                        int monitorCount = ((LiveStackFrame) f).getMonitors().length;
-                        if (monitorCount > 0 || f.isNativeMethod()) {
-                            out.format("    %s <== monitors:%d%n", ste, monitorCount);
-                        } else if (printAll) {
-                            out.format("    %s%n", ste);
-                        }
-                    }
-                });
-            } finally {
-                carrier.setCurrentThread(vthread);
-            }
-        }
-    }
-
-    /**
-     * Reads the value of the jdk.tracePinning property to determine if stack
+     * Reads the value of the jdk.tracePinnedThreads property to determine if stack
      * traces should be printed when a carrier thread is pinned when a virtual thread
      * attempts to park.
      */

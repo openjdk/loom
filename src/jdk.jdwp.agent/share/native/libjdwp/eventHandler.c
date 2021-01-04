@@ -561,7 +561,6 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
             HandlerNode *next = NEXT(node);
             jboolean shouldDelete;
 
-            /* passesFilter() will set evinfo->matchesVThread true if appropriate. */
             if (eventFilterRestricted_passesFilter(env, classname,
                                                    evinfo, node,
                                                    &shouldDelete, JNI_FALSE /* filterOnly */)) {
@@ -596,26 +595,32 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
  * on a vthread that we have not notified the debugger about yet. If the event passes the event
  * filters, then we will notify the debugger with a THREAD_START and add it to our list of
  * vthreads. Otherwise we ignore it.
+ *
+ * vthread fixme: We should be able to get rid of this. Eventually we won't be sending the
+ * the fake THREAD_START event anymore. This just leaves the need to call threadControl_addVThread()
+ * for the vthread so the debug agent can track it. This could probably be deferred until it is
+ * really needed, such as when the event gets sent to the debugger (if one actually gets sent)
+ * or when the debugger sends a command that references the thread. It may mean adding special
+ * checks in more than one place when a vthread lookup fails, and add the vthread at that point.
  */
 static void
-filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSessionID,
-                    jthread thread, jthread vthread)
+filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSessionID)
 {
     jboolean needToAddVThread = JNI_FALSE; /* Assume we won't need to add the vthread. */;
+    jthread vthread = evinfo->thread;
+    JDI_ASSERT(isVThread(vthread));
 
     /*
      * Although we have received a JVMTI event for a vthread that we have not added yet,
      * we only need to add it if we are going to pass the vthread on to the debugger. This
-     * might not end up happening due to event filtering. For example, we got a breakpoint
-     * on a carrier thread running a vthread, but the breakpoint HandlerNode specifies that
-     * event must be on a certain thread, so the event may end up being dropped. Therefore
-     * we need to do a dry run with the filtering to see if we really need to add this vthread.
+     * might not end up happening due to event filtering. Therefore we need to do a dry run
+     * with the filtering to see if we really need to add this vthread.
      */
+    debugMonitorEnter(handlerLock);
     {
         HandlerNode *node = getHandlerChain(ei)->first;
         char        *classname  = getClassname(evinfo->clazz);
 
-        debugMonitorEnter(handlerLock);
 
         /* Filter the event over each handler node. */
         while (node != NULL) {
@@ -623,24 +628,20 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
             HandlerNode *next = NEXT(node);
             jboolean shouldDelete;
 
-            /* passesFilter() will set evinfo->matchesVThread true if appropriate. */
             if (eventFilterRestricted_passesFilter(env, classname,
                                                    evinfo, node,
                                                    &shouldDelete, JNI_TRUE /* filterOnly */)) {
-                if (evinfo->matchesVThread) {
-                    /* If we match even one filter and it matches on the vthread, then we need
-                     * to add the vthread. */
-                    needToAddVThread = JNI_TRUE;
-                    break;
-                }
+                /* If we match even one filter, then we need to add the vthread. */
+                needToAddVThread = JNI_TRUE;
+                break;
             }
             JDI_ASSERT(!shouldDelete);
             node = next;
         }
 
-        debugMonitorExit(handlerLock);
         jvmtiDeallocate(classname);
     }
+    debugMonitorExit(handlerLock);
 
     if (needToAddVThread) {
         /* Make sure this vthread gets added to the vthreads list. */
@@ -657,12 +658,9 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
         EventInfo info;
         struct bag *eventBag = eventHelper_createEventBag();
 
-        JDI_ASSERT(evinfo->vthread != NULL);
         (void)memset(&info,0,sizeof(info));
         info.ei         = EI_VIRTUAL_THREAD_SCHEDULED;
-        info.thread     = thread;
-        info.vthread    = vthread;
-        info.matchesVThread = JNI_TRUE;
+        info.thread     = vthread;
 
         /* Note: filterAndHandleEvent() expects EI_THREAD_START instead of EI_VIRTUAL_THREAD_SCHEDULED. */
         filterAndHandleEvent(env, &info, EI_THREAD_START, eventBag, eventSessionID);
@@ -735,13 +733,7 @@ event_callback_helper(JNIEnv *env, EventInfo *evinfo)
     thread = evinfo->thread;
     if (thread != NULL) {
         if (gdata->vthreadsSupported) {
-            /*
-             * Get the event vthread if one is running on this thread and has not already
-             * been set, which is the case for vthread related JVMTI events.
-             */
-            if (evinfo->vthread == NULL) {
-                evinfo->vthread = getThreadVThread(thread);
-            }
+            evinfo->is_vthread = isVThread(thread);
         }
 
         /*
@@ -792,13 +784,13 @@ event_callback_helper(JNIEnv *env, EventInfo *evinfo)
 
     if (gdata->vthreadsSupported) {
         /* Add the vthread if we haven't added it before. */
-        if (evinfo->vthread != NULL && !threadControl_isKnownVThread(evinfo->vthread)) {
+        if (evinfo->is_vthread && !threadControl_isKnownVThread(thread)) {
             if (gdata->notifyDebuggerOfAllVThreads) {
                 /* Make sure this vthread gets added to the vthreads list. */
-                threadControl_addVThread(evinfo->vthread);
+                threadControl_addVThread(thread);
             } else {
                 /* Add this vthread if it passes the event filters. */
-                filterAndAddVThread(env, evinfo, ei, eventSessionID, thread, evinfo->vthread);
+                filterAndAddVThread(env, evinfo, ei, eventSessionID);
             }
         }
     }
@@ -1207,7 +1199,6 @@ cbMonitorContendedEnter(jvmtiEnv *jvmti_env, JNIEnv *env,
         info.thread     = thread;
         info.object     = object;
         /* get current location of contended monitor enter */
-        JDI_ASSERT(!isVThread(thread));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
                 (gdata->jvmti, thread, 0, &method, &location);
         if (error == JVMTI_ERROR_NONE) {
@@ -1241,7 +1232,6 @@ cbMonitorContendedEntered(jvmtiEnv *jvmti_env, JNIEnv *env,
         info.thread     = thread;
         info.object     = object;
         /* get current location of contended monitor enter */
-        JDI_ASSERT(!isVThread(thread));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
                 (gdata->jvmti, thread, 0, &method, &location);
         if (error == JVMTI_ERROR_NONE) {
@@ -1327,7 +1317,6 @@ cbMonitorWaited(jvmtiEnv *jvmti_env, JNIEnv *env,
         info.u.monitor.timed_out = timed_out;
 
         /* get location of monitor wait() method */
-        JDI_ASSERT(!isVThread(thread));
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
                 (gdata->jvmti, thread, 0, &method, &location);
         if (error == JVMTI_ERROR_NONE) {
@@ -1437,12 +1426,12 @@ cbVMDeath(jvmtiEnv *jvmti_env, JNIEnv *env)
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED */
 static void JNICALL
 cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
-                   jthread thread, jthread vthread)
+                   jthread vthread)
 {
     EventInfo info;
 
-    LOG_CB(("cbVThreadScheduled: thread=%p", thread));
-    /*tty_message("cbVThreadScheduled: thread=%p", thread);*/
+    LOG_CB(("cbVThreadScheduled: vthread=%p", vthread));
+    /*tty_message("cbVThreadScheduled: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
     /*
@@ -1470,16 +1459,10 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
         }
     }
 
-    /* Ignore VIRTUAL_THREAD_SCHEDULED events unless we are notifying the debugger of all vthreads. */
-    if (!gdata->notifyDebuggerOfAllVThreads) {
-        return;
-    }
-
     BEGIN_CALLBACK() {
         (void)memset(&info,0,sizeof(info));
-        info.ei         = EI_VIRTUAL_THREAD_SCHEDULED;
-        info.thread     = thread;
-        info.vthread    = vthread;
+        info.ei         = EI_THREAD_START;
+        info.thread     = vthread;
         event_callback(env, &info);
     } END_CALLBACK();
 
@@ -1489,25 +1472,19 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED */
 static void JNICALL
 cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
-                    jthread thread, jthread vthread)
+                    jthread vthread)
 {
 
     EventInfo info;
 
-    LOG_CB(("cbVThreadTerminated: thread=%p", thread));
-    /*tty_message("cbVThreadTerminated: thread=%p", thread);*/
+    LOG_CB(("cbVThreadTerminated: vthread=%p", vthread));
+    /*tty_message("cbVThreadTerminated: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
-
-    if (!gdata->notifyDebuggerOfAllVThreads && !threadControl_isKnownVThread(vthread)) {
-        /* This is not a vthread we are tracking, so don't deliver a VIRTUAL_THREAD_TERMINATED event for it. */
-        return;
-    }
 
     BEGIN_CALLBACK() {
         (void)memset(&info,0,sizeof(info));
-        info.ei         = EI_VIRTUAL_THREAD_TERMINATED;
-        info.thread     = thread;
-        info.vthread    = vthread;
+        info.ei         = EI_THREAD_END;
+        info.thread     = vthread;
         event_callback(env, &info);
     } END_CALLBACK();
 
@@ -1517,15 +1494,19 @@ cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED */
 static void JNICALL
 cbVThreadMounted(jvmtiEnv *jvmti_env, JNIEnv *env,
-                 jthread thread, jthread vthread)
+                 jthread vthread)
 {
-    LOG_CB(("cbVThreadMounted: thread=%p", thread));
-    /*tty_message("cbVThreadMounted: thread=%p", thread);*/
+    jvmtiError error;
+    jthread thread = NULL;
+
+    LOG_CB(("cbVThreadMounted: vthread=%p", vthread));
+    /*tty_message("cbVThreadMounted: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
-    /* Ignore VIRTUAL_THREAD_MOUNTED events unless we are doing vthread debugging. */
-    if (!gdata->vthreadsSupported) {
-        return;
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
+            (gdata->jvmti, vthread, &thread);
+    if (error != JVMTI_ERROR_NONE) {
+        EXIT_ERROR(error, "could not get carrier thread for vthread");
     }
 
     threadControl_mountVThread(vthread, thread, currentSessionID);
@@ -1536,15 +1517,19 @@ cbVThreadMounted(jvmtiEnv *jvmti_env, JNIEnv *env,
 /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED */
 static void JNICALL
 cbVThreadUnmounted(jvmtiEnv *jvmti_env, JNIEnv *env,
-                   jthread thread, jthread vthread)
+                   jthread vthread)
 {
-    LOG_CB(("cbVThreadUnmounted: thread=%p", thread));
-    /*tty_message("cbVThreadUnmounted: thread=%p", thread);*/
+    jvmtiError error;
+    jthread thread = NULL;
+
+    LOG_CB(("cbVThreadUnmounted: vthread=%p", vthread));
+    /*tty_message("cbVThreadUnmounted: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
-    /* Ignore VIRTUAL_THREAD_UNMOUNTED events unless we are doing vthread debugging. */
-    if (!gdata->vthreadsSupported) {
-        return;
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
+            (gdata->jvmti, vthread, &thread);
+    if (error != JVMTI_ERROR_NONE) {
+        EXIT_ERROR(error, "could not get carrier thread for vthread");
     }
 
     threadControl_unmountVThread(vthread, thread);
@@ -1559,7 +1544,6 @@ cbContinuationRun(jvmtiEnv *jvmti_env, JNIEnv *env,
 {
     LOG_CB(("cbContinuationRun: thread=%p", thread));
     //tty_message("cbContinuationRun: thread=%p continuation_frame_count=%d", thread, continuation_frame_count);
-    JDI_ASSERT(gdata->vthreadsSupported);
 
     threadControl_continuationRun(thread, continuation_frame_count);
 
@@ -1573,7 +1557,6 @@ cbContinuationYield(jvmtiEnv *jvmti_env, JNIEnv *env,
 {
     LOG_CB(("cbContinuationYield: thread=%p", thread));
     //tty_message("cbContinuationYield: thread=%p continuation_frame_count=%d", thread, continuation_frame_count);
-    JDI_ASSERT(gdata->vthreadsSupported);
 
     threadControl_continuationYield(thread, continuation_frame_count);
 
@@ -2065,7 +2048,7 @@ eventHandler_dumpHandlers(EventIndex ei, jboolean dumpPermanent)
       while (nextNode != NULL) {
           HandlerNode *node = nextNode;
           nextNode = NEXT(node);
-          
+
           if (node->permanent && !dumpPermanent) {
               continue; // ignore permanent handlers
           }

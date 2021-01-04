@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -49,17 +49,7 @@ import sun.security.action.GetPropertyAction;
  * @author Dave Brown
  */
 public class HttpClient extends NetworkClient {
-
-    private final ReentrantLock lock = new ReentrantLock();
-
-    protected final void lock() {
-        lock.lock();
-    }
-
-    protected final void unlock() {
-        lock.unlock();
-    }
-
+    private final ReentrantLock clientLock = new ReentrantLock();
 
     // whether this httpclient comes from the cache
     protected boolean cachedHttpClient = false;
@@ -347,7 +337,7 @@ public class HttpClient extends NetworkClient {
                     // This should be fine as it is very rare that a connection
                     // to the same host will not use the same proxy.
                     ret.lock();
-                    try {
+                    try  {
                         ret.inCache = false;
                         ret.closeServer();
                     } finally {
@@ -430,19 +420,10 @@ public class HttpClient extends NetworkClient {
     }
 
     protected boolean available() {
-        lock();
-        try {
-            return lockedAvailable();
-        } finally {
-            unlock();
-        }
-    }
-
-    private boolean lockedAvailable() {
-        assert lock.isHeldByCurrentThread();
         boolean available = true;
         int old = -1;
 
+        lock();
         try {
             try {
                 old = serverSocket.getSoTimeout();
@@ -466,6 +447,8 @@ public class HttpClient extends NetworkClient {
             logFinest("HttpClient.available(): " +
                         "SocketException: not available");
             available = false;
+        } finally {
+            unlock();
         }
         return available;
     }
@@ -564,7 +547,7 @@ public class HttpClient extends NetworkClient {
     private void privilegedOpenServer(final InetSocketAddress server)
          throws IOException
     {
-        lock();
+        assert clientLock.isHeldByCurrentThread();
         try {
             java.security.AccessController.doPrivileged(
                 new java.security.PrivilegedExceptionAction<>() {
@@ -575,8 +558,6 @@ public class HttpClient extends NetworkClient {
             });
         } catch (java.security.PrivilegedActionException pae) {
             throw (IOException) pae.getException();
-        } finally {
-            unlock();
         }
     }
 
@@ -590,59 +571,55 @@ public class HttpClient extends NetworkClient {
         super.openServer(proxyHost, proxyPort);
     }
 
-    protected void openServer() throws IOException {
-        lock();
-        try {
-            lockedOpenServer();
-        } finally {
-            unlock();
-        }
-    }
-
     /*
      */
-    private void lockedOpenServer() throws IOException {
-        assert lock.isHeldByCurrentThread();
+    protected void openServer() throws IOException {
+
         SecurityManager security = System.getSecurityManager();
 
-        if (security != null) {
-            security.checkConnect(host, port);
-        }
+        lock();
+        try {
+            if (security != null) {
+                security.checkConnect(host, port);
+            }
 
-        if (keepingAlive) { // already opened
-            return;
-        }
-
-        if (url.getProtocol().equals("http") ||
-            url.getProtocol().equals("https") ) {
-
-            if ((proxy != null) && (proxy.type() == Proxy.Type.HTTP)) {
-                sun.net.www.URLConnection.setProxiedHost(host);
-                privilegedOpenServer((InetSocketAddress) proxy.address());
-                usingProxy = true;
-                return;
-            } else {
-                // make direct connection
-                openServer(host, port);
-                usingProxy = false;
+            if (keepingAlive) { // already opened
                 return;
             }
 
-        } else {
-            /* we're opening some other kind of url, most likely an
-             * ftp url.
-             */
-            if ((proxy != null) && (proxy.type() == Proxy.Type.HTTP)) {
-                sun.net.www.URLConnection.setProxiedHost(host);
-                privilegedOpenServer((InetSocketAddress) proxy.address());
-                usingProxy = true;
-                return;
+            if (url.getProtocol().equals("http") ||
+                    url.getProtocol().equals("https")) {
+
+                if ((proxy != null) && (proxy.type() == Proxy.Type.HTTP)) {
+                    sun.net.www.URLConnection.setProxiedHost(host);
+                    privilegedOpenServer((InetSocketAddress) proxy.address());
+                    usingProxy = true;
+                    return;
+                } else {
+                    // make direct connection
+                    openServer(host, port);
+                    usingProxy = false;
+                    return;
+                }
+
             } else {
-                // make direct connection
-                super.openServer(host, port);
-                usingProxy = false;
-                return;
+                /* we're opening some other kind of url, most likely an
+                 * ftp url.
+                 */
+                if ((proxy != null) && (proxy.type() == Proxy.Type.HTTP)) {
+                    sun.net.www.URLConnection.setProxiedHost(host);
+                    privilegedOpenServer((InetSocketAddress) proxy.address());
+                    usingProxy = true;
+                    return;
+                } else {
+                    // make direct connection
+                    super.openServer(host, port);
+                    usingProxy = false;
+                    return;
+                }
             }
+        } finally {
+            unlock();
         }
     }
 
@@ -1148,5 +1125,13 @@ public class HttpClient extends NetworkClient {
         if (usingProxy)
             return ((InetSocketAddress)proxy.address()).getPort();
         return -1;
+    }
+
+    public final void lock() {
+        clientLock.lock();
+    }
+
+    public final void unlock() {
+        clientLock.unlock();
     }
 }

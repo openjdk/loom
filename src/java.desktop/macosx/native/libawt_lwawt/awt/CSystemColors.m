@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,6 +32,7 @@
 #import <JavaRuntimeSupport/JavaRuntimeSupport.h>
 
 #import "ThreadUtilities.h"
+#import "JNIUtilities.h"
 
 NSColor **sColors = nil;
 NSColor **appleColors = nil;
@@ -46,8 +47,6 @@ JNF_COCOA_ENTER(env);
 JNF_COCOA_EXIT(env);
 }
 
-static JNF_CLASS_CACHE(jc_LWCToolkit, "sun/lwawt/macosx/LWCToolkit");
-static JNF_STATIC_MEMBER_CACHE(jm_systemColorsChanged, jc_LWCToolkit, "systemColorsChanged", "()V");
 
 + (void)systemColorsDidChange:(NSNotification *)notification {
     AWT_ASSERT_APPKIT_THREAD;
@@ -57,7 +56,11 @@ static JNF_STATIC_MEMBER_CACHE(jm_systemColorsChanged, jc_LWCToolkit, "systemCol
     // Call LWCToolkit with the news. LWCToolkit makes certain to do its duties
     // from a new thread.
     JNIEnv* env = [ThreadUtilities getJNIEnv];
-    JNFCallStaticVoidMethod(env, jm_systemColorsChanged); // AWT_THREADING Safe (event)
+    DECLARE_CLASS(jc_LWCToolkit, "sun/lwawt/macosx/LWCToolkit");
+    DECLARE_STATIC_METHOD(jm_systemColorsChanged, jc_LWCToolkit, "systemColorsChanged", "()V");
+    (*env)->CallStaticVoidMethod(env, jc_LWCToolkit, jm_systemColorsChanged); // AWT_THREADING Safe (event)
+    CHECK_EXCEPTION();
+
 }
 
 
@@ -126,7 +129,7 @@ static JNF_STATIC_MEMBER_CACHE(jm_systemColorsChanged, jc_LWCToolkit, "systemCol
 + (NSColor*)getColor:(NSUInteger)colorIndex useAppleColor:(BOOL)useAppleColor {
     NSColor* result = nil;
 
-    if (colorIndex < (useAppleColor) ? sun_lwawt_macosx_LWCToolkit_NUM_APPLE_COLORS : java_awt_SystemColor_NUM_COLORS) {
+    if (colorIndex < ((useAppleColor) ? sun_lwawt_macosx_LWCToolkit_NUM_APPLE_COLORS : java_awt_SystemColor_NUM_COLORS)) {
         result = (useAppleColor ? appleColors : sColors)[colorIndex];
     }
     else {

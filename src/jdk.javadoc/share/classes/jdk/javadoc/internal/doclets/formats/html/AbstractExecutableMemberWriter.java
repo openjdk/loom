@@ -51,6 +51,7 @@ import static jdk.javadoc.internal.doclets.formats.html.LinkInfoImpl.Kind.EXECUT
 import static jdk.javadoc.internal.doclets.formats.html.LinkInfoImpl.Kind.MEMBER;
 import static jdk.javadoc.internal.doclets.formats.html.LinkInfoImpl.Kind.MEMBER_TYPE_PARAMS;
 import static jdk.javadoc.internal.doclets.formats.html.LinkInfoImpl.Kind.RECEIVER_TYPE;
+import static jdk.javadoc.internal.doclets.formats.html.LinkInfoImpl.Kind.THROWS_TYPE;
 
 /**
  * Print method and constructor info.
@@ -159,7 +160,7 @@ public abstract class AbstractExecutableMemberWriter extends AbstractMemberWrite
      */
     protected void addReceiverAnnotations(ExecutableElement member, TypeMirror rcvrType,
             List<? extends AnnotationMirror> annotationMirrors, Content tree) {
-        writer.addReceiverAnnotationInfo(member, rcvrType, annotationMirrors, tree);
+        tree.add(writer.getAnnotationInfo(member.getReceiverType().getAnnotationMirrors(), false));
         tree.add(Entity.NO_BREAK_SPACE);
         tree.add(utils.getTypeName(rcvrType, false));
         LinkInfoImpl linkInfo = new LinkInfoImpl(configuration, RECEIVER_TYPE, rcvrType);
@@ -211,11 +212,11 @@ public abstract class AbstractExecutableMemberWriter extends AbstractMemberWrite
 
             if (param.getKind() != ElementKind.INSTANCE_INIT) {
                 if (includeAnnotations) {
-                    boolean foundAnnotations =
-                            writer.addAnnotationInfo(param, paramTree);
-                    if (foundAnnotations) {
-                        paramTree.add(DocletConstants.NL);
-                        paramTree.add(" ");
+                    Content annotationInfo = writer.getAnnotationInfo(param, false);
+                    if (!annotationInfo.isEmpty()) {
+                        paramTree.add(annotationInfo)
+                                .add(DocletConstants.NL)
+                                .add(" ");
                     }
                 }
                 addParam(member, param, paramType,
@@ -230,12 +231,11 @@ public abstract class AbstractExecutableMemberWriter extends AbstractMemberWrite
             paramTree.add(" ");
 
             if (includeAnnotations) {
-                boolean foundAnnotations =
-                        writer.addAnnotationInfo(parameters.get(i),
-                        paramTree);
-                if (foundAnnotations) {
-                    paramTree.add(DocletConstants.NL);
-                    paramTree.add(" ");
+                Content annotationInfo = writer.getAnnotationInfo(parameters.get(i), false);
+                if (!annotationInfo.isEmpty()) {
+                    paramTree.add(annotationInfo)
+                            .add(DocletConstants.NL)
+                            .add(" ");
                 }
             }
             addParam(member, parameters.get(i), instMeth.getParameterTypes().get(i),
@@ -254,19 +254,16 @@ public abstract class AbstractExecutableMemberWriter extends AbstractMemberWrite
      */
     protected Content getExceptions(ExecutableElement member) {
         List<? extends TypeMirror> exceptions = utils.asInstantiatedMethodType(typeElement, member).getThrownTypes();
-        Content htmltree = new ContentBuilder();
-        if (!exceptions.isEmpty()) {
-            Content link = writer.getLink(new LinkInfoImpl(configuration, MEMBER, exceptions.get(0)));
-            htmltree.add(link);
-            for (int i = 1; i < exceptions.size(); i++) {
-                htmltree.add(",");
-                htmltree.add(DocletConstants.NL);
-                Content exceptionLink = writer.getLink(new LinkInfoImpl(configuration, MEMBER,
-                        exceptions.get(i)));
-                htmltree.add(exceptionLink);
+        Content htmlTree = new ContentBuilder();
+        for (TypeMirror t : exceptions) {
+            if (!htmlTree.isEmpty()) {
+                htmlTree.add(",");
+                htmlTree.add(DocletConstants.NL);
             }
+            Content link = writer.getLink(new LinkInfoImpl(configuration, THROWS_TYPE, t));
+            htmlTree.add(link);
         }
-        return htmltree;
+        return htmlTree;
     }
 
     protected TypeElement implementsMethodInIntfac(ExecutableElement method,
@@ -294,7 +291,7 @@ public abstract class AbstractExecutableMemberWriter extends AbstractMemberWrite
      * @return the 1.4.x style anchor for the executable element.
      */
     protected String getErasureAnchor(ExecutableElement executableElement) {
-        final StringBuilder buf = new StringBuilder(writer.anchorName(executableElement));
+        final StringBuilder buf = new StringBuilder(executableElement.getSimpleName());
         buf.append("(");
         List<? extends VariableElement> parameters = executableElement.getParameters();
         boolean foundTypeVariable = false;
@@ -303,7 +300,7 @@ public abstract class AbstractExecutableMemberWriter extends AbstractMemberWrite
                 buf.append(",");
             }
             TypeMirror t = parameters.get(i).asType();
-            SimpleTypeVisitor9<Boolean, Void> stv = new SimpleTypeVisitor9<Boolean, Void>() {
+            SimpleTypeVisitor9<Boolean, Void> stv = new SimpleTypeVisitor9<>() {
                 boolean foundTypeVariable = false;
 
                 @Override

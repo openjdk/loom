@@ -30,6 +30,7 @@
 #include "code/vmreg.inline.hpp"
 #include "compiler/oopMap.inline.hpp"
 #include "interpreter/interpreter.hpp"
+#include "interpreter/oopMapCache.hpp"
 #include "runtime/sharedRuntime.hpp"
 
 // Inline functions for Intel frames:
@@ -138,6 +139,8 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   setup(pc);
 }
 
+inline frame::frame(intptr_t* sp) : frame(sp, sp, *(intptr_t**)(sp - frame::sender_sp_offset), *(address*)(sp - 1)) {}
+
 inline void frame::setup(address pc) {
   adjust_unextended_sp();
 
@@ -240,6 +243,37 @@ inline intptr_t* frame::real_fp() const {
   // else rely on fp()
   assert(! is_compiled_frame(), "unknown compiled frame size");
   return fp();
+}
+
+inline int frame::frame_size() const {
+  return is_interpreted_frame()
+    ? sender_sp() - sp()
+    : cb()->frame_size();
+}
+
+inline int frame::num_oops() const {
+  assert (!is_interpreted_frame(), "interpreted");
+  assert (oop_map() != NULL, "");
+  return oop_map()->num_oops() ;
+}
+
+inline int frame::compiled_frame_stack_argsize() const {
+  assert (cb()->is_compiled(), "");
+  return cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size;
+}
+
+inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
+  assert (mask != NULL, "");
+  Method* m = interpreter_frame_method();
+  int   bci = interpreter_frame_bci();
+  m->mask_for(bci, mask); // OopMapCache::compute_one_oop_map(m, bci, mask);
+}
+
+
+inline int frame::interpreted_frame_num_oops(InterpreterOopMap* mask) const {
+  return   mask->num_oops()
+        + 1 // for the mirror oop
+        + ((intptr_t*)interpreter_frame_monitor_begin() - (intptr_t*)interpreter_frame_monitor_end())/BasicObjectLock::size();
 }
 
 // helper to update a map with callee-saved RBP

@@ -125,7 +125,7 @@ JVM_GetPermittedSubclasses
 JVM_GetPrimitiveArrayElement
 JVM_GetProperties
 JVM_GetProtectionDomain
-JVM_GetRandomSeedForCDSDump
+JVM_GetRandomSeedForDumping
 JVM_GetRecordComponents
 JVM_GetSimpleBinaryName
 JVM_GetStackAccessControlContext
@@ -147,13 +147,14 @@ JVM_Interrupt
 JVM_InvokeMethod
 JVM_IsArrayClass
 JVM_IsCDSDumpingEnabled
-JVM_IsCDSSharingEnabled
 JVM_IsConstructorIx
+JVM_IsDumpingClassList
 JVM_IsHiddenClass
 JVM_IsInterface
 JVM_IsPrimitiveClass
 JVM_IsRecord
 JVM_IsSameClassPackage
+JVM_IsSharingEnabled
 JVM_IsSupportedJNIVersion
 JVM_IsThreadAlive
 JVM_IsVMGeneratedMethodIx
@@ -161,6 +162,7 @@ JVM_LatestUserDefinedLoader
 JVM_LoadLibrary
 JVM_LookupDefineClass
 JVM_LookupLambdaProxyClassFromArchive
+JVM_LogLambdaFormInvoker
 JVM_MaxMemory
 JVM_MaxObjectInspectionAge
 JVM_MonitorNotify
@@ -172,11 +174,14 @@ JVM_NativePath
 JVM_NewArray
 JVM_NewInstanceFromConstructor
 JVM_NewMultiArray
+JVM_PhantomReferenceRefersTo
 JVM_RaiseSignal
 JVM_RawMonitorCreate
 JVM_RawMonitorDestroy
 JVM_RawMonitorEnter
 JVM_RawMonitorExit
+JVM_ReferenceClear
+JVM_ReferenceRefersTo
 JVM_RegisterContinuationMethods
 JVM_RegisterLambdaProxyClassForArchiving
 JVM_RegisterSignal
@@ -210,10 +215,9 @@ JVM_DefineModule
 JVM_SetBootLoaderUnnamedModule
 
 # Virtual thread support
-JVM_VTMTStart
-JVM_VTMTFinish
-JVM_VirtualThreadStarted
+JVM_VirtualThreadMountBegin
+JVM_VirtualThreadMountEnd
+JVM_VirtualThreadUnmountBegin
+JVM_VirtualThreadUnmountEnd
 JVM_VirtualThreadTerminated
-JVM_VirtualThreadMount
-JVM_VirtualThreadUnmount
 #

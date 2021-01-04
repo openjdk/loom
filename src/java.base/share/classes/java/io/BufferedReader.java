@@ -86,7 +86,7 @@ public class BufferedReader extends Reader {
 
     /** The skipLF flag when the mark was set */
     private boolean markedSkipLF = false;
-    
+
     private static int defaultCharBufferSize = 8192;
     private static int defaultExpectedLineLength = 80;
     
@@ -254,8 +254,8 @@ public class BufferedReader extends Reader {
      * Reads characters into a portion of an array.
      *
      * <p> This method implements the general contract of the corresponding
-     * <code>{@link Reader#read(char[], int, int) read}</code> method of the
-     * <code>{@link Reader}</code> class.  As an additional convenience, it
+     * {@link Reader#read(char[], int, int) read} method of the
+     * {@link Reader} class.  As an additional convenience, it
      * attempts to read as many characters as possible by repeatedly invoking
      * the {@code read} method of the underlying stream.  This iterated
      * {@code read} continues until one of the following conditions becomes

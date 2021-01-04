@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * An {@link Executor} that provides methods to manage termination and
@@ -268,6 +269,55 @@ public interface ExecutorService extends Executor, AutoCloseable {
     Future<?> submit(Runnable task);
 
     /**
+     * Submits the given value-returning tasks for execution and returns a
+     * lazily populated stream of completed Future objects with the result
+     * of each task.
+     *
+     * <p> Invoking the stream's {@linkplain Stream#close() close()} method
+     * cancels any remaining tasks as if by invoking {@linkplain
+     * Future#cancel(boolean) cancel(true)} on each remaining task.
+     *
+     * <p> If a thread is interrupted while waiting on the stream for a task to
+     * complete then the remaining tasks are cancelled, as if by invoking
+     * {@linkplain Future#cancel(boolean) cancel(true)}, and {@link
+     * CancellationException} is thrown with the interrupt status set.
+     *
+     * @implSpec
+     * The default implementation {@link #submit(Callable) submits} the tasks
+     * for execution and returns a stream that is lazily populated when the
+     * tasks complete.
+     *
+     * @apiNote This method is not atomic. RejectedExecutionException may
+     * be thrown after some tasks have been submitted for execution. This
+     * method makes a best effort attempt to cancel the tasks that it
+     * submitted when RejectedExecutionException is thrown.
+     *
+     * <p> The following example invokes {@code submit} with a collection of
+     * tasks and performs an action on the result of each task that completes
+     * normally.
+     * <pre> {@code
+     *     ExecutorService executor = ...
+     *     Collection<Callable<...>> tasks = ...
+     *     executor.submit(tasks)
+     *                 .filter(Future::isCompletedNormally)
+     *                 .map(Future::join)
+     *                 .forEach(result -> { });
+     * }</pre>
+     *
+     * @param tasks the collection of tasks
+     * @param <T> the type of the values returned from the tasks
+     * @return stream of completed Futures
+     * @throws RejectedExecutionException if any task cannot be
+     *         scheduled for execution
+     * @throws NullPointerException if tasks or any of its elements are {@code null}
+     * @see CompletionService
+     * @since 99
+     */
+    default <T> Stream<Future<T>> submit(Collection<? extends Callable<T>> tasks) {
+        return ExecutorServiceHelper.submit(this, tasks);
+    }
+
+    /**
      * Executes the given tasks, returning a list of Futures holding
      * their status and results when all complete.
      * {@link Future#isDone} is {@code true} for each
@@ -307,10 +357,10 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * completes with an exception.
      *
      * @implSpec
-     * The default implementation invokes {@link #submitTasks(Collection)} to
-     * submit the tasks for execution. It then waits until all tasks have
-     * completed, or in the case that {@code cancelOnException} is true, that
-     * a task completes with an exception.
+     * The default implementation {@link #submit(Callable) submits} the tasks
+     * for execution. It then waits until all tasks have completed, or in the
+     * case that {@code cancelOnException} is true, that a task completes with
+     * an exception.
      *
      * @param tasks the collection of tasks
      * @param cancelOnException true to cancel unfinished tasks when
@@ -329,38 +379,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
     default <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
                                           boolean cancelOnException)
             throws InterruptedException {
-
-        List<CompletableFuture<T>> cfs = submitTasks(tasks);
-        try {
-            if (cancelOnException) {
-                // wait until a task fails or all tasks complete
-                CompletableFuture.completed(cfs)
-                        .filter(CompletableFuture::isCompletedExceptionally)
-                        .findAny();
-            } else {
-                // wait until all tasks complete
-                CompletableFuture.completed(cfs)
-                        .mapToLong(e -> 1L)
-                        .sum();
-            }
-        } catch (CancellationException e) {
-            if (Thread.interrupted()) {
-                throw new InterruptedException();
-            } else {
-                throw e;
-            }
-        } finally {
-            // cancel remaining
-            for (Future<T> f : cfs) {
-                if (!f.isDone()) {
-                    f.cancel(true);
-                }
-            }
-        }
-
-        @SuppressWarnings("unchecked")
-        List<Future<T>> futures = (List) cfs;
-        return futures;
+        return ExecutorServiceHelper.invokeAll(this, tasks, cancelOnException);
     }
 
     /**
@@ -493,12 +512,12 @@ public interface ExecutorService extends Executor, AutoCloseable {
     }
 
     /**
-     * Returns an Executor that stops all tasks executing if a deadline is
-     * reached before it has terminated. The newly created Executor delegates
-     * all operations to this Executor. If the deadline is reached before the
-     * Executor has terminated then it is shutdown, as if by invoking {@link
-     * #shutdownNow()}. The {@code shutdownNow()} method may be invoked on a
-     * thread supporting the deadline mechanism.
+     * Returns an Executor that attempts to stop all tasks executing if a
+     * deadline is reached before it has terminated. The newly created Executor
+     * delegates all operations to this Executor. If the deadline is reached
+     * before the Executor has terminated then it is shutdown, as if by
+     * invoking {@link #shutdownNow()}. The {@code shutdownNow()} method
+     * may be invoked on a thread supporting the deadline mechanism.
      *
      * <p> If this method is invoked with a deadline that has already expired
      * then its {@code shutdownNow()} method is invoked immediately. If the
@@ -507,8 +526,8 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *
      * @implSpec
      * The default implementation schedules a task to run when the deadline
-     * expires. The task invokes the {@code shutdownNow()} method to stop all
-     * executing tasks.
+     * expires. The task invokes the {@code shutdownNow()} method to attempt
+     * to stop all executing tasks.
      *
      * @param deadline the deadline
      * @return a new Executor that delegates operations to this Executor
@@ -538,26 +557,26 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * @throws NullPointerException if the task is null
      * @since 99
      */
-    default <T> CompletableFuture<T> submitTask(Callable<T> task) {
-        class RunnableCompletableFuture<T>
-                extends CompletableFuture<T> implements RunnableFuture<T> {
-            private final Callable<T> task;
-            RunnableCompletableFuture(Callable<T> task) {
-                this.task = Objects.requireNonNull(task);
-            }
-            public void run() {
-                try {
-                    T result = task.call();
-                    complete(result);
-                } catch (Throwable e) {
-                    completeExceptionally(e);
-                }
-            }
-        }
-        var future = new RunnableCompletableFuture<>(task);
-        execute(future);
-        return future;
-    }
+//    default <T> CompletableFuture<T> submitTask(Callable<T> task) {
+//        class RunnableCompletableFuture<T>
+//                extends CompletableFuture<T> implements RunnableFuture<T> {
+//            private final Callable<T> task;
+//            RunnableCompletableFuture(Callable<T> task) {
+//                this.task = Objects.requireNonNull(task);
+//            }
+//            public void run() {
+//                try {
+//                    T result = task.call();
+//                    complete(result);
+//                } catch (Throwable e) {
+//                    completeExceptionally(e);
+//                }
+//            }
+//        }
+//        var future = new RunnableCompletableFuture<>(task);
+//        execute(future);
+//        return future;
+//    }
 
     /**
      * Submits the given value-returning tasks for execution and returns a list
@@ -586,20 +605,20 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * @see CompletableFuture#completed(Collection)
      * @see CompletableFuture#completed(CompletableFuture[])
      */
-    default <T> List<CompletableFuture<T>> submitTasks(Collection<? extends Callable<T>> tasks) {
-        List<CompletableFuture<T>> futures = new ArrayList<>();
-        try {
-            for (Callable<T> t : tasks) {
-                futures.add(submitTask(t));
-            }
-            return futures;
-        } catch (Throwable e) {
-            for (Future<T> f : futures) {
-                if (!f.isDone()) {
-                    f.cancel(true);
-                }
-            }
-            throw e;
-        }
-    }
+//    default <T> List<CompletableFuture<T>> submitTasks(Collection<? extends Callable<T>> tasks) {
+//        List<CompletableFuture<T>> futures = new ArrayList<>();
+//        try {
+//            for (Callable<T> t : tasks) {
+//                futures.add(submitTask(t));
+//            }
+//            return futures;
+//        } catch (Throwable e) {
+//            for (Future<T> f : futures) {
+//                if (!f.isDone()) {
+//                    f.cancel(true);
+//                }
+//            }
+//            throw e;
+//        }
+//    }
 }

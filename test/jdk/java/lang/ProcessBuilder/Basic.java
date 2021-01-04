@@ -30,7 +30,8 @@
  *      8067796 8224905
  * @key intermittent
  * @summary Basic tests for Process and Environment Variable code
- * @modules java.base/java.lang:open
+ * @modules java.base/java.lang:open java.base/java.io:open
+ * @library /test/lib
  * @run main/othervm/timeout=300 Basic
  * @run main/othervm/timeout=300 -Djdk.lang.Process.launchMechanism=fork Basic
  * @author Martin Buchholz
@@ -38,8 +39,9 @@
 
 /*
  * @test
- * @modules java.base/java.lang:open
+ * @modules java.base/java.lang:open java.base/java.io:open
  * @requires (os.family == "linux")
+ * @library /test/lib
  * @run main/othervm/timeout=300 -Djdk.lang.Process.launchMechanism=posix_spawn Basic
  */
 
@@ -55,6 +57,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.security.*;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
@@ -62,6 +65,8 @@ import static java.lang.System.getenv;
 import static java.lang.System.out;
 import static java.lang.Boolean.TRUE;
 import static java.util.AbstractMap.SimpleImmutableEntry;
+
+import jdk.test.lib.Platform;
 
 public class Basic {
 
@@ -400,8 +405,8 @@ public class Basic {
                 if (failed != 0) throw new Error("null PATH");
             } else if (action.equals("PATH search algorithm")) {
                 equal(System.getenv("PATH"), "dir1:dir2:");
-                check(new File("/bin/true").exists());
-                check(new File("/bin/false").exists());
+                check(new File(TrueExe.path()).exists());
+                check(new File(FalseExe.path()).exists());
                 String[] cmd = {"prog"};
                 ProcessBuilder pb1 = new ProcessBuilder(cmd);
                 ProcessBuilder pb2 = new ProcessBuilder(cmd);
@@ -442,13 +447,13 @@ public class Basic {
                         checkPermissionDenied(pb);
 
                         // continue searching if EACCES
-                        copy("/bin/true", "dir2/prog");
+                        copy(TrueExe.path(), "dir2/prog");
                         equal(run(pb).exitValue(), True.exitValue());
                         new File("dir1/prog").delete();
                         new File("dir2/prog").delete();
 
                         new File("dir2/prog").mkdirs();
-                        copy("/bin/true", "dir1/prog");
+                        copy(TrueExe.path(), "dir1/prog");
                         equal(run(pb).exitValue(), True.exitValue());
 
                         // Check empty PATH component means current directory.
@@ -464,10 +469,10 @@ public class Basic {
                             pb.command(command);
                             File prog = new File("./prog");
                             // "Normal" binaries
-                            copy("/bin/true", "./prog");
+                            copy(TrueExe.path(), "./prog");
                             equal(run(pb).exitValue(),
                                   True.exitValue());
-                            copy("/bin/false", "./prog");
+                            copy(FalseExe.path(), "./prog");
                             equal(run(pb).exitValue(),
                                   False.exitValue());
                             prog.delete();
@@ -522,12 +527,12 @@ public class Basic {
                         new File("dir2/prog").delete();
                         new File("prog").delete();
                         new File("dir3").mkdirs();
-                        copy("/bin/true", "dir1/prog");
-                        copy("/bin/false", "dir3/prog");
+                        copy(TrueExe.path(), "dir1/prog");
+                        copy(FalseExe.path(), "dir3/prog");
                         pb.environment().put("PATH","dir3");
                         equal(run(pb).exitValue(), True.exitValue());
-                        copy("/bin/true", "dir3/prog");
-                        copy("/bin/false", "dir1/prog");
+                        copy(TrueExe.path(), "dir3/prog");
+                        copy(FalseExe.path(), "dir1/prog");
                         equal(run(pb).exitValue(), False.exitValue());
 
                     } finally {
@@ -659,6 +664,43 @@ public class Basic {
                     return rc;
                 }
             } catch (Throwable t) { unexpected(t); return -1; }
+        }
+    }
+
+    // On Alpine Linux, /bin/true and /bin/false are just links to /bin/busybox.
+    // Some tests copy /bin/true and /bin/false to files with a different filename.
+    // However, copying the busbox executable into a file with a different name
+    // won't result in the expected return codes. As workaround, we create
+    // executable files that can be copied and produce the expected return
+    // values.
+
+    private static class TrueExe {
+        public static String path() { return path; }
+        private static final String path = path0();
+        private static String path0(){
+            if (!Platform.isBusybox("/bin/true")) {
+                return "/bin/true";
+            } else {
+                File trueExe = new File("true");
+                setFileContents(trueExe, "#!/bin/true\n");
+                trueExe.setExecutable(true);
+                return trueExe.getAbsolutePath();
+            }
+        }
+    }
+
+    private static class FalseExe {
+        public static String path() { return path; }
+        private static final String path = path0();
+        private static String path0(){
+            if (!Platform.isBusybox("/bin/false")) {
+                return "/bin/false";
+            } else {
+                File falseExe = new File("false");
+                setFileContents(falseExe, "#!/bin/false\n");
+                falseExe.setExecutable(true);
+                return falseExe.getAbsolutePath();
+            }
         }
     }
 
@@ -1965,7 +2007,7 @@ public class Basic {
             //----------------------------------------------------------------
             try {
                 new File("suBdiR").mkdirs();
-                copy("/bin/true", "suBdiR/unliKely");
+                copy(TrueExe.path(), "suBdiR/unliKely");
                 final ProcessBuilder pb =
                     new ProcessBuilder(new String[]{"unliKely"});
                 pb.environment().put("PATH", "suBdiR");
@@ -2144,7 +2186,7 @@ public class Basic {
                     // Wait until after the s.read occurs in "thread" by
                     // checking when the input stream monitor is acquired
                     // (BufferedInputStream.read is synchronized)
-                    while (!isLocked(s, 10)) {
+                    while (!isLocked((BufferedInputStream) s, 10)) {
                         Thread.sleep(100);
                     }
                 }
@@ -2749,13 +2791,24 @@ public class Basic {
                 if (k.isAssignableFrom(t.getClass())) pass();
                 else unexpected(t);}}
 
-    static boolean isLocked(final Object monitor, final long millis) throws InterruptedException {
+    static boolean isLocked(BufferedInputStream bis, long millis) throws Exception {
+        Field lockField = BufferedInputStream.class.getDeclaredField("lock");
+        lockField.setAccessible(true);
+        ReentrantLock lock = (ReentrantLock) lockField.get(bis);
+        if (lock != null) {
+            if (lock.tryLock()) {
+                lock.unlock();
+                return false;
+            } else {
+                return true;
+            }
+        }
         return new Thread() {
             volatile boolean unlocked;
 
             @Override
             public void run() {
-                synchronized (monitor) { unlocked = true; }
+                synchronized (bis) { unlocked = true; }
             }
 
             boolean isLocked() throws InterruptedException {

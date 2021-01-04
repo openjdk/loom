@@ -231,7 +231,6 @@ Java_sun_nio_fs_WindowsNativeDispatcher_CreateFile0(JNIEnv* env, jclass this,
     return ptr_to_jlong(handle);
 }
 
-
 JNIEXPORT void JNICALL
 Java_sun_nio_fs_WindowsNativeDispatcher_DeviceIoControlSetSparse(JNIEnv* env, jclass this,
     jlong handle)
@@ -346,7 +345,7 @@ Java_sun_nio_fs_WindowsNativeDispatcher_FindFirstFile1(JNIEnv* env, jclass this,
 }
 
 JNIEXPORT jstring JNICALL
-Java_sun_nio_fs_WindowsNativeDispatcher_FindNextFile(JNIEnv* env, jclass this,
+Java_sun_nio_fs_WindowsNativeDispatcher_FindNextFile0(JNIEnv* env, jclass this,
     jlong handle, jlong dataAddress)
 {
     HANDLE h = (HANDLE)jlong_to_ptr(handle);
@@ -389,7 +388,7 @@ Java_sun_nio_fs_WindowsNativeDispatcher_FindFirstStream0(JNIEnv* env, jclass thi
 }
 
 JNIEXPORT jstring JNICALL
-Java_sun_nio_fs_WindowsNativeDispatcher_FindNextStream(JNIEnv* env, jclass this,
+Java_sun_nio_fs_WindowsNativeDispatcher_FindNextStream0(JNIEnv* env, jclass this,
     jlong handle)
 {
     WIN32_FIND_STREAM_DATA data;
@@ -417,7 +416,7 @@ Java_sun_nio_fs_WindowsNativeDispatcher_FindClose(JNIEnv* env, jclass this,
 
 
 JNIEXPORT void JNICALL
-Java_sun_nio_fs_WindowsNativeDispatcher_GetFileInformationByHandle(JNIEnv* env, jclass this,
+Java_sun_nio_fs_WindowsNativeDispatcher_GetFileInformationByHandle0(JNIEnv* env, jclass this,
     jlong handle, jlong address)
 {
     HANDLE h = (HANDLE)jlong_to_ptr(handle);
@@ -501,7 +500,7 @@ Java_sun_nio_fs_WindowsNativeDispatcher_GetFileAttributesEx0(JNIEnv* env, jclass
 
 
 JNIEXPORT void JNICALL
-Java_sun_nio_fs_WindowsNativeDispatcher_SetFileTime(JNIEnv* env, jclass this,
+Java_sun_nio_fs_WindowsNativeDispatcher_SetFileTime0(JNIEnv* env, jclass this,
     jlong handle, jlong createTime, jlong lastAccessTime, jlong lastWriteTime)
 {
     HANDLE h = (HANDLE)jlong_to_ptr(handle);

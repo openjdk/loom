@@ -297,6 +297,47 @@ class EventRequestManagerImpl extends MirrorImpl
         }
     }
 
+    abstract class ThreadLifecycleEventRequestImpl extends EventRequestImpl {
+        private ThreadReference thread;
+        private boolean notifyVirtualThreads;
+
+        public synchronized void addThreadFilter(ThreadReference thread) {
+            validateMirror(thread);
+            if (isEnabled() || deleted) {
+                throw invalidState();
+            }
+            this.thread = thread;
+        }
+
+        public synchronized void removeVirtualThreadFilter() {
+            if (isEnabled() || deleted) {
+                throw invalidState();
+            }
+            this.notifyVirtualThreads = true;
+        }
+
+        @Override
+        synchronized void set() {
+            // remove ThreadOnly and VirtualThreadsExclude filters
+            Iterator<Object> iterator = filters.iterator();
+            while (iterator.hasNext()) {
+                Object filter = iterator.next();
+                if (filter instanceof JDWP.EventRequest.Set.Modifier.ThreadOnly ||
+                    filter instanceof JDWP.EventRequest.Set.Modifier.VirtualThreadsExclude) {
+                    iterator.remove();
+                }
+            }
+            if (thread != null) {
+                filters.add(JDWP.EventRequest.Set.Modifier.ThreadOnly
+                        .create((ThreadReferenceImpl) thread));
+            } else if (!notifyVirtualThreads && vm.supportsVirtualThreads()) {
+                // add filter that excludes virtual threads
+                filters.add(JDWP.EventRequest.Set.Modifier.VirtualThreadsExclude.create());
+            }
+            super.set();
+        }
+    }
+
     abstract class ClassVisibleEventRequestImpl
                                   extends ThreadVisibleEventRequestImpl {
         public synchronized void addClassFilter(ReferenceType clazz) {
@@ -648,7 +689,7 @@ class EventRequestManagerImpl extends MirrorImpl
         }
     }
 
-    class ThreadDeathRequestImpl extends ThreadVisibleEventRequestImpl
+    class ThreadDeathRequestImpl extends ThreadLifecycleEventRequestImpl
                                  implements ThreadDeathRequest {
         ThreadDeathRequestImpl() {
             requestList().add(this);
@@ -663,7 +704,7 @@ class EventRequestManagerImpl extends MirrorImpl
         }
     }
 
-    class ThreadStartRequestImpl extends ThreadVisibleEventRequestImpl
+    class ThreadStartRequestImpl extends ThreadLifecycleEventRequestImpl
                                  implements ThreadStartRequest {
         ThreadStartRequestImpl() {
             requestList().add(this);

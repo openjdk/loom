@@ -47,6 +47,7 @@ import java.util.regex.Pattern;
 import jdk.internal.access.JavaIOFileDescriptorAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.ref.CleanerFactory;
+import jdk.internal.misc.Blocker;
 import sun.security.action.GetBooleanAction;
 import sun.security.action.GetPropertyAction;
 
@@ -547,7 +548,11 @@ final class ProcessImpl extends Process {
     private static native int getExitCodeProcess(long handle);
 
     public int waitFor() throws InterruptedException {
-        waitForInterruptibly(handle);
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> waitForInterruptibly(handle));
+        } else {
+            waitForInterruptibly(handle);
+        }
         if (Thread.interrupted())
             throw new InterruptedException();
         return exitValue();
@@ -571,7 +576,12 @@ final class ProcessImpl extends Process {
                 // if wraps around then wait a long while
                 msTimeout = Integer.MAX_VALUE;
             }
-            waitForTimeoutInterruptibly(handle, msTimeout);
+            if (Thread.currentThread().isVirtual()) {
+                long millis = msTimeout;
+                Blocker.managedBlock(() -> waitForTimeoutInterruptibly(handle, millis));
+            } else {
+                waitForTimeoutInterruptibly(handle, msTimeout);
+            }
             if (Thread.interrupted())
                 throw new InterruptedException();
             if (getExitCodeProcess(handle) != STILL_ACTIVE) {

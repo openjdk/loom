@@ -25,8 +25,10 @@
 
 package java.io;
 
+import java.util.Arrays;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.VM;
 
 /**
  * Writes text to a character-output stream, buffering characters so as to
@@ -66,13 +68,46 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 
 public class BufferedWriter extends Writer {
+    private static final int DEFAULT_INITIAL_BUFFER_SIZE = 512;
+    private static final int DEFAULT_MAX_BUFFER_SIZE = 8192;
 
     private Writer out;
 
     private char cb[];
     private int nChars, nextChar;
-    
-    private static int defaultCharBufferSize = 8192;
+    private final int maxChars;  // maximum number of buffers chars
+
+    /**
+     * Returns the buffer size to use when no output buffer size specified
+     */
+    private static int initialBufferSize() {
+        if (VM.isBooted() && Thread.currentThread().isVirtual()) {
+            return DEFAULT_INITIAL_BUFFER_SIZE;
+        } else {
+            return DEFAULT_MAX_BUFFER_SIZE;
+        }
+    }
+
+    /**
+     * Creates a buffered character-output stream.
+     */
+    private BufferedWriter(Writer out, int initialSize, int maxSize) {
+        super(out);
+
+        if (initialSize <= 0) {
+            throw new IllegalArgumentException("Buffer size <= 0");
+        }
+
+        this.out = out;
+        this.cb = new char[initialSize];
+        this.nChars = initialSize;
+        this.maxChars = maxSize;
+
+        // use ReentrantLock when BufferedWriter is not sub-classed
+        if (getClass() == BufferedWriter.class) {
+            this.lock = new ReentrantLock();
+        }
+    }
 
     /**
      * Creates a buffered character-output stream that uses a default-sized
@@ -81,7 +116,7 @@ public class BufferedWriter extends Writer {
      * @param  out  A Writer
      */
     public BufferedWriter(Writer out) {
-        this(out, defaultCharBufferSize);
+        this(out, initialBufferSize(), DEFAULT_MAX_BUFFER_SIZE);
     }
 
     /**
@@ -94,24 +129,27 @@ public class BufferedWriter extends Writer {
      * @throws     IllegalArgumentException  If {@code sz <= 0}
      */
     public BufferedWriter(Writer out, int sz) {
-        super(out);
-        if (sz <= 0)
-            throw new IllegalArgumentException("Buffer size <= 0");
-        this.out = out;
-        cb = new char[sz];
-        nChars = sz;
-        nextChar = 0;
-
-        // use ReentrantLock when BufferedWriter is not sub-classed
-        if (getClass() == BufferedWriter.class) {
-            lock = new ReentrantLock();
-        }
+        this(out, sz, sz);
     }
 
     /** Checks to make sure that the stream has not been closed */
     private void ensureOpen() throws IOException {
         if (out == null)
             throw new IOException("Stream closed");
+    }
+
+    /**
+     * Grow char array to fit an additional len characters if needed.
+     * If possible, it grows by len+1 to avoid flushing when len chars
+     * are added.
+     */
+    private void growIfNeeded(int len) {
+        int neededSize = nextChar + len + 1;
+        if (neededSize > nChars && nChars < maxChars) {
+            int newSize = min(neededSize, maxChars);
+            cb = Arrays.copyOf(cb, newSize);
+            nChars = newSize;
+        }
     }
 
     /**
@@ -168,6 +206,7 @@ public class BufferedWriter extends Writer {
 
     private void lockedWrite(int c) throws IOException {
         ensureOpen();
+        growIfNeeded(1);
         if (nextChar >= nChars)
             flushBuffer();
         cb[nextChar++] = (char) c;
@@ -229,8 +268,8 @@ public class BufferedWriter extends Writer {
             return;
         }
 
-        if (len >= nChars) {
-            /* If the request length exceeds the size of the output buffer,
+        if (len >= maxChars) {
+            /* If the request length exceeds the max size of the output buffer,
                flush the buffer and then write the data directly.  In this
                way buffered streams will cascade harmlessly. */
             flushBuffer();
@@ -238,14 +277,16 @@ public class BufferedWriter extends Writer {
             return;
         }
 
+        growIfNeeded(len);
         int b = off, t = off + len;
         while (b < t) {
             int d = min(nChars - nextChar, t - b);
             System.arraycopy(cbuf, b, cb, nextChar, d);
             b += d;
             nextChar += d;
-            if (nextChar >= nChars)
+            if (nextChar >= nChars) {
                 flushBuffer();
+            }
         }
     }
 
@@ -290,7 +331,7 @@ public class BufferedWriter extends Writer {
 
     private void lockedWrite(String s, int off, int len) throws IOException {
         ensureOpen();
-
+        growIfNeeded(len);
         int b = off, t = off + len;
         while (b < t) {
             int d = min(nChars - nextChar, t - b);

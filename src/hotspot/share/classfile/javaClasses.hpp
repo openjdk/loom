@@ -26,11 +26,13 @@
 #define SHARE_CLASSFILE_JAVACLASSES_HPP
 
 #include "classfile/systemDictionary.hpp"
-#include "jvmtifiles/jvmti.h"
 #include "oops/oop.hpp"
 #include "oops/instanceKlass.hpp"
+#include "oops/symbol.hpp"
 #include "runtime/os.hpp"
+#include "utilities/vmEnums.hpp"
 
+class JvmtiThreadState;
 class RecordComponent;
 
 // Interface for manipulating the basic Java classes.
@@ -80,8 +82,10 @@ class RecordComponent;
   f(java_lang_Continuation) \
   f(jdk_internal_misc_StackChunk) \
   f(java_util_concurrent_locks_AbstractOwnableSynchronizer) \
+  f(jdk_internal_invoke_NativeEntryPoint) \
   f(jdk_internal_misc_UnsafeConstants) \
   f(java_lang_boxing_object) \
+  f(vector_VectorPayload) \
   //end
 
 #define BASIC_JAVA_CLASSES_DO(f) \
@@ -325,6 +329,8 @@ class java_lang_Class : AllStatic {
   static oop  class_data(oop java_class);
   static void set_class_data(oop java_class, oop classData);
 
+  static int component_mirror_offset() { return _component_mirror_offset; }
+
   static oop class_loader(oop java_class);
   static void set_module(oop java_class, oop module);
   static oop module(oop java_class);
@@ -371,6 +377,7 @@ class java_lang_Thread : AllStatic {
   static int _contextClassLoader_offset;
   static int _inheritedAccessControlContext_offset;
   static int _eetop_offset;
+  static int _jvmti_thread_state_offset;
   static int _interrupted_offset;
   static int _tid_offset;
   static int _continuation_offset;
@@ -421,44 +428,16 @@ class java_lang_Thread : AllStatic {
   // Continuation
   static inline oop continuation(oop java_thread);
 
+  static JvmtiThreadState* jvmti_thread_state(oop java_thread);
+  static void set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state);
+
   // Blocker object responsible for thread parking
   static oop park_blocker(oop java_thread);
 
-  // Java Thread Status for JVMTI and M&M use.
-  // This thread status info is saved in threadStatus field of
-  // java.lang.Thread java class.
-  enum ThreadStatus {
-    NEW                      = 0,
-    RUNNABLE                 = JVMTI_THREAD_STATE_ALIVE +          // runnable / running
-                               JVMTI_THREAD_STATE_RUNNABLE,
-    SLEEPING                 = JVMTI_THREAD_STATE_ALIVE +          // Thread.sleep()
-                               JVMTI_THREAD_STATE_WAITING +
-                               JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT +
-                               JVMTI_THREAD_STATE_SLEEPING,
-    IN_OBJECT_WAIT           = JVMTI_THREAD_STATE_ALIVE +          // Object.wait()
-                               JVMTI_THREAD_STATE_WAITING +
-                               JVMTI_THREAD_STATE_WAITING_INDEFINITELY +
-                               JVMTI_THREAD_STATE_IN_OBJECT_WAIT,
-    IN_OBJECT_WAIT_TIMED     = JVMTI_THREAD_STATE_ALIVE +          // Object.wait(long)
-                               JVMTI_THREAD_STATE_WAITING +
-                               JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT +
-                               JVMTI_THREAD_STATE_IN_OBJECT_WAIT,
-    PARKED                   = JVMTI_THREAD_STATE_ALIVE +          // LockSupport.park()
-                               JVMTI_THREAD_STATE_WAITING +
-                               JVMTI_THREAD_STATE_WAITING_INDEFINITELY +
-                               JVMTI_THREAD_STATE_PARKED,
-    PARKED_TIMED             = JVMTI_THREAD_STATE_ALIVE +          // LockSupport.park(long)
-                               JVMTI_THREAD_STATE_WAITING +
-                               JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT +
-                               JVMTI_THREAD_STATE_PARKED,
-    BLOCKED_ON_MONITOR_ENTER = JVMTI_THREAD_STATE_ALIVE +          // (re-)entering a synchronization block
-                               JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER,
-    TERMINATED               = JVMTI_THREAD_STATE_TERMINATED
-  };
   // Write thread status info to threadStatus field of java.lang.Thread.
-  static void set_thread_status(oop java_thread_oop, ThreadStatus status);
+  static void set_thread_status(oop java_thread_oop, JavaThreadStatus status);
   // Read thread status info from threadStatus field of java.lang.Thread.
-  static ThreadStatus get_thread_status(oop java_thread_oop);
+  static JavaThreadStatus get_thread_status(oop java_thread_oop);
 
   static const char*  thread_status_name(oop java_thread_oop);
 
@@ -497,8 +476,8 @@ class java_lang_Thread_FieldHolder : AllStatic {
   static bool is_daemon(oop holder);
   static void set_daemon(oop holder);
 
-  static void set_thread_status(oop holder, java_lang_Thread::ThreadStatus status);
-  static java_lang_Thread::ThreadStatus get_thread_status(oop holder);
+  static void set_thread_status(oop holder, JavaThreadStatus);
+  static JavaThreadStatus get_thread_status(oop holder);
 
   friend class JavaClasses;
 };
@@ -525,7 +504,6 @@ class java_lang_ThreadGroup : AllStatic {
   static int _parent_offset;
   static int _name_offset;
   static int _maxPriority_offset;
-  static int _daemon_offset;
 
   static int _ngroups_offset;
   static int _groups_offset;
@@ -543,16 +521,14 @@ class java_lang_ThreadGroup : AllStatic {
   static const char* name(oop java_thread_group);
   // maxPriority in group
   static ThreadPriority maxPriority(oop java_thread_group);
-  // Daemon
-  static bool is_daemon(oop java_thread_group);
 
-  // Number of non-daemon thread groups
+  // Number of strongly reachable thread groups
   static int ngroups(oop java_thread_group);
-  // Non-daemon thread groups
+  // Strongly reachable thread groups
   static objArrayOop groups(oop java_thread_group);
-  // Number of daemon thread groups
+  // Number of weakly reachable thread groups
   static int nweaks(oop java_thread_group);
-  // Daemon thread groups
+  // Weakly reachable thread groups
   static objArrayOop weaks(oop java_thread_group);
 
   // Debugging
@@ -600,7 +576,7 @@ class java_lang_VirtualThread : AllStatic {
   static oop carrier_thread(oop vthread);
   static oop continuation(oop vthread);
   static jshort state(oop vthread);
-  static java_lang_Thread::ThreadStatus map_state_to_thread_status(jint state);
+  static JavaThreadStatus map_state_to_thread_status(jint state);
   static void set_notify_jvmti_events(jboolean enable);
   static void init_static_notify_jvmti_events();
   static jlong set_jfrTraceId(oop vthread, jlong id);
@@ -1006,9 +982,11 @@ class java_lang_ref_Reference: AllStatic {
 
  public:
   // Accessors
-  static inline oop referent(oop ref);
-  static inline void set_referent(oop ref, oop value);
-  static inline void set_referent_raw(oop ref, oop value);
+  static inline oop weak_referent_no_keepalive(oop ref);
+  static inline oop phantom_referent_no_keepalive(oop ref);
+  static inline oop unknown_referent_no_keepalive(oop ref);
+  static inline oop unknown_referent(oop ref);
+  static inline void clear_referent(oop ref);
   static inline HeapWord* referent_addr_raw(oop ref);
   static inline oop next(oop ref);
   static inline void set_next(oop ref, oop value);
@@ -1141,6 +1119,8 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static int _pc_offset;
   static int _argsize_offset;
   static int _mode_offset;
+  static int _gcSP_offset;
+  static int _markCycle_offset;
   static int _numFrames_offset;
   static int _numOops_offset;
   static int _cont_offset;
@@ -1166,6 +1146,10 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline void set_argsize(oop ref, int value);
   static inline bool gc_mode(oop ref);
   static inline void set_gc_mode(oop ref, bool value);
+  static inline int gc_sp(oop ref);
+  static inline void set_gc_sp(oop ref, int value);
+  static inline uint64_t mark_cycle(oop ref);
+  static inline void set_mark_cycle(oop ref, uint64_t value);
   static inline int end(oop ref);
   static inline int numFrames(oop ref);
   static inline void set_numFrames(oop ref, int value);
@@ -1178,6 +1162,14 @@ class jdk_internal_misc_StackChunk: AllStatic {
 
   static inline int parent_offset() { return _parent_offset; }
   static inline int cont_offset()   { return _cont_offset; }
+
+  static inline bool is_stack_chunk(oop ref);
+  static inline bool is_empty(oop ref);
+  static inline intptr_t* start_address(oop ref);
+  static intptr_t* end_address(oop ref);
+  static inline intptr_t* sp_address(oop ref);
+  static bool is_in_chunk(oop chunk, void* p);
+  static bool is_usable_in_chunk(oop ref, void* p);
 };
 
 // Interface to java.lang.invoke.MethodHandle objects
@@ -1269,6 +1261,51 @@ class java_lang_invoke_LambdaForm: AllStatic {
   static int vmentry_offset()          { CHECK_INIT(_vmentry_offset); }
 };
 
+// Interface to java.lang.invoke.NativeEntryPoint objects
+// (These are a private interface for managing adapter code generation.)
+
+class jdk_internal_invoke_NativeEntryPoint: AllStatic {
+  friend class JavaClasses;
+
+ private:
+  static int _addr_offset;  // type is jlong
+  static int _shadow_space_offset;
+  static int _argMoves_offset;
+  static int _returnMoves_offset;
+  static int _need_transition_offset;
+  static int _method_type_offset;
+  static int _name_offset;
+
+  static void compute_offsets();
+
+ public:
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+
+  // Accessors
+  static address    addr(oop entry);
+  static jint       shadow_space(oop entry);
+  static oop        argMoves(oop entry);
+  static oop        returnMoves(oop entry);
+  static jboolean   need_transition(oop entry);
+  static oop        method_type(oop entry);
+  static oop        name(oop entry);
+
+  // Testers
+  static bool is_subclass(Klass* klass) {
+    return SystemDictionary::NativeEntryPoint_klass() != NULL &&
+      klass->is_subclass_of(SystemDictionary::NativeEntryPoint_klass());
+  }
+  static bool is_instance(oop obj);
+
+  // Accessors for code generation:
+  static int addr_offset_in_bytes()            { return _addr_offset;            }
+  static int shadow_space_offset_in_bytes()    { return _shadow_space_offset;    }
+  static int argMoves_offset_in_bytes()        { return _argMoves_offset;        }
+  static int returnMoves_offset_in_bytes()     { return _returnMoves_offset;     }
+  static int need_transition_offset_in_bytes() { return _need_transition_offset; }
+  static int method_type_offset_in_bytes()     { return _method_type_offset;     }
+  static int name_offset_in_bytes()            { return _name_offset;            }
+};
 
 // Interface to java.lang.invoke.MemberName objects
 // (These are a private interface for Java code to query the class hierarchy.)
@@ -1803,6 +1840,24 @@ class jdk_internal_misc_UnsafeConstants : AllStatic {
   static void serialize_offsets(SerializeClosure* f) { }
 };
 
+// Interface to jdk.internal.vm.vector.VectorSupport.VectorPayload objects
+
+class vector_VectorPayload : AllStatic {
+ private:
+  static int _payload_offset;
+ public:
+  static void set_payload(oop o, oop val);
+
+  static void compute_offsets();
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+
+  // Testers
+  static bool is_subclass(Klass* klass) {
+    return klass->is_subclass_of(SystemDictionary::vector_VectorPayload_klass());
+  }
+  static bool is_instance(oop obj);
+};
+
 class java_lang_Integer : AllStatic {
 public:
   static jint value(oop obj);
@@ -1919,8 +1974,8 @@ class java_lang_InternalError : AllStatic {
 class InjectedField {
  public:
   const SystemDictionary::WKID klass_id;
-  const vmSymbols::SID name_index;
-  const vmSymbols::SID signature_index;
+  const vmSymbolID name_index;
+  const vmSymbolID signature_index;
   const bool           may_be_java;
 
 
@@ -1931,8 +1986,8 @@ class InjectedField {
   int compute_offset();
 
   // Find the Symbol for this index
-  static Symbol* lookup_symbol(int symbol_index) {
-    return vmSymbols::symbol_at((vmSymbols::SID)symbol_index);
+  static Symbol* lookup_symbol(vmSymbolID symbol_index) {
+    return Symbol::vm_symbol_at(symbol_index);
   }
 };
 

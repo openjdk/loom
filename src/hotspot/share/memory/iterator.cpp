@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "classfile/classLoaderDataGraph.hpp"
 #include "code/nmethod.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "memory/iterator.inline.hpp"
@@ -72,5 +73,12 @@ void MarkingCodeBlobClosure::do_code_blob(CodeBlob* cb) {
         bs_nm->disarm(nm);
       }
     }
+  }
+}
+
+void CodeBlobToNMethodClosure::do_code_blob(CodeBlob* cb) {
+  nmethod* nm = cb->as_nmethod_or_null();
+  if (nm != NULL) {
+    _nm_cl->do_nmethod(nm);
   }
 }

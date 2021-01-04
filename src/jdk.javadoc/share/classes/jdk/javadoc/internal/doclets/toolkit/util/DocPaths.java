@@ -61,7 +61,7 @@ public class DocPaths {
     /** The name of the file for constant values. */
     public static final DocPath CONSTANT_VALUES = DocPath.create("constant-values.html");
 
-    /** The name of the fie for deprecated elements. */
+    /** The name of the file for deprecated elements. */
     public static final DocPath DEPRECATED_LIST = DocPath.create("deprecated-list.html");
 
     /** The name of the subdirectory for user-provided additional documentation files. */
@@ -274,6 +274,9 @@ public class DocPaths {
 
     /** The name of the search javascript file. */
     public static final DocPath SEARCH_JS = DocPath.create("search.js");
+
+    /** The name of the template for the search javascript file. */
+    public static final DocPath SEARCH_JS_TEMPLATE = DocPath.create("search.js.template");
 
     /** The name of the file for the serialized form info. */
     public static final DocPath SERIALIZED_FORM = DocPath.create("serialized-form.html");

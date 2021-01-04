@@ -106,7 +106,6 @@ public class OutputStreamWriter extends Writer {
         super(out);
         if (charsetName == null)
             throw new NullPointerException("charsetName");
-
         lock = lockFor(this);
         se = StreamEncoder.forOutputStreamWriter(out, lock, charsetName);
     }
@@ -132,7 +131,6 @@ public class OutputStreamWriter extends Writer {
      *         A charset
      *
      * @since 1.4
-     * @spec JSR-51
      */
     public OutputStreamWriter(OutputStream out, Charset cs) {
         super(out);
@@ -152,7 +150,6 @@ public class OutputStreamWriter extends Writer {
      *         A charset encoder
      *
      * @since 1.4
-     * @spec JSR-51
      */
     public OutputStreamWriter(OutputStream out, CharsetEncoder enc) {
         super(out);
@@ -180,7 +177,6 @@ public class OutputStreamWriter extends Writer {
      * @see java.nio.charset.Charset
      *
      * @revised 1.4
-     * @spec JSR-51
      */
     public String getEncoding() {
         return se.getEncoding();

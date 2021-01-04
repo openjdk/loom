@@ -26,6 +26,7 @@
 #include "jvm.h"
 #include "classfile/classLoaderHierarchyDCmd.hpp"
 #include "classfile/classLoaderStats.hpp"
+#include "classfile/javaClasses.hpp"
 #include "code/codeCache.hpp"
 #include "compiler/compileBroker.hpp"
 #include "compiler/directivesParser.hpp"
@@ -110,6 +111,9 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompileQueueDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeListDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeCacheDCmd>(full_export, true, false));
+#ifdef LINUX
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<PerfMapDCmd>(full_export, true, false));
+#endif // LINUX
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<TouchedMethodsDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeHeapAnalyticsDCmd>(full_export, true, false));
 
@@ -132,6 +136,7 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<DebugOnCmdStartDCmd>(full_export, true, true));
 #endif // INCLUDE_JVMTI
 
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JavaThreadDumpDCmd>(full_export, true, false));
 }
 
 #ifndef HAVE_EXTRA_DCMD
@@ -276,7 +281,7 @@ void SetVMFlagDCmd::execute(DCmdSource source, TRAPS) {
   }
 
   FormatBuffer<80> err_msg("%s", "");
-  int ret = WriteableFlags::set_flag(_flag.value(), val, JVMFlag::MANAGEMENT, err_msg);
+  int ret = WriteableFlags::set_flag(_flag.value(), val, JVMFlagOrigin::MANAGEMENT, err_msg);
 
   if (ret != JVMFlag::SUCCESS) {
     output()->print_cr("%s", err_msg.buffer());
@@ -301,6 +306,7 @@ void JVMTIDataDumpDCmd::execute(DCmdSource source, TRAPS) {
 }
 
 #if INCLUDE_SERVICES
+#if INCLUDE_JVMTI
 JVMTIAgentLoadDCmd::JVMTIAgentLoadDCmd(outputStream* output, bool heap) :
                                        DCmdWithParser(output, heap),
   _libpath("library path", "Absolute path of the JVMTI agent to load.",
@@ -360,6 +366,7 @@ int JVMTIAgentLoadDCmd::num_arguments() {
     return 0;
   }
 }
+#endif // INCLUDE_JVMTI
 #endif // INCLUDE_SERVICES
 
 void PrintSystemPropertiesDCmd::execute(DCmdSource source, TRAPS) {
@@ -381,7 +388,7 @@ void PrintSystemPropertiesDCmd::execute(DCmdSource source, TRAPS) {
   JavaValue result(T_OBJECT);
   JavaCallArguments args;
 
-  Symbol* signature = vmSymbols::serializePropertiesToByteArray_signature();
+  Symbol* signature = vmSymbols::void_byte_array_signature();
   JavaCalls::call_static(&result,
                          ik,
                          vmSymbols::serializePropertiesToByteArray_name(),
@@ -893,6 +900,12 @@ void CodeCacheDCmd::execute(DCmdSource source, TRAPS) {
   CodeCache::print_layout(output());
 }
 
+#ifdef LINUX
+void PerfMapDCmd::execute(DCmdSource source, TRAPS) {
+  CodeCache::write_perf_map();
+}
+#endif // LINUX
+
 //---<  BEGIN  >--- CodeHeap State Analytics.
 CodeHeapAnalyticsDCmd::CodeHeapAnalyticsDCmd(outputStream* output, bool heap) :
                                              DCmdWithParser(output, heap),
@@ -1100,3 +1113,115 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
   }
 }
 #endif // INCLUDE_JVMTI
+
+JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
+                                       DCmdWithParser(output, heap),
+  _format("format", "Output format (plain text or JSON)", "STRING", false, NULL),
+  _filepath("filepath", "The file path to the output file", "STRING", false, NULL) {
+  _dcmdparser.add_dcmd_argument(&_format);
+  _dcmdparser.add_dcmd_argument(&_filepath);
+}
+
+int JavaThreadDumpDCmd::num_arguments() {
+  ResourceMark rm;
+  JavaThreadDumpDCmd* dcmd = new JavaThreadDumpDCmd(NULL, false);
+  if (dcmd != NULL) {
+    DCmdMark mark(dcmd);
+    return dcmd->_dcmdparser.num_arguments();
+  } else {
+    return 0;
+  }
+}
+
+void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
+  bool json = (_format.value() != NULL) && (strcmp(_format.value(), "json") == 0);
+  char* path = _filepath.value();
+  if (path == NULL) {
+    if (json) {
+      dumpToOutputStream(vmSymbols::dumpThreadsToJson_name(), vmSymbols::void_byte_array_signature(), CHECK);
+    } else {
+      dumpToOutputStream(vmSymbols::dumpThreads_name(), vmSymbols::void_byte_array_signature(), CHECK);
+    }
+  } else {
+    if (json) {
+      dumpToFile(vmSymbols::dumpThreadsToJson_name(), vmSymbols::string_void_signature(), path, CHECK);
+    } else {
+      dumpToFile(vmSymbols::dumpThreads_name(), vmSymbols::string_void_signature(), path, CHECK);
+    }
+  }
+}
+
+void JavaThreadDumpDCmd::dumpToOutputStream(Symbol* name, Symbol* signature, TRAPS) {
+  ResourceMark rm(THREAD);
+  HandleMark hm(THREAD);
+
+  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadContainers();
+  Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
+  InstanceKlass* ik = InstanceKlass::cast(k);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+
+  // invoke the ThreadContainers method to generate byte array
+  JavaValue result(T_OBJECT);
+  JavaCallArguments args;
+  JavaCalls::call_static(&result,
+                         ik,
+                         name,
+                         signature,
+                         &args,
+                         THREAD);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+
+  // check that result is byte array
+  oop res = (oop)result.get_jobject();
+  assert(res->is_typeArray(), "just checking");
+  assert(TypeArrayKlass::cast(res->klass())->element_type() == T_BYTE, "just checking");
+
+  // copy the bytes to the output stream
+  typeArrayOop ba = typeArrayOop(res);
+  jbyte* addr = typeArrayOop(res)->byte_at_addr(0);
+  output()->print_raw((const char*)addr, ba->length());
+}
+
+void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, TRAPS) {
+  ResourceMark rm(THREAD);
+  HandleMark hm(THREAD);
+
+  Handle h_path = java_lang_String::create_from_str(path, CHECK);
+
+  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadContainers();
+  Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
+  InstanceKlass* ik = InstanceKlass::cast(k);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+
+  // invoke the ThreadContainers method to dump to file
+  JavaValue result(T_VOID);
+  JavaCallArguments args;
+  args.push_oop(h_path);
+  JavaCalls::call_static(&result,
+                         k,
+                         name,
+                         signature,
+                         &args,
+                         THREAD);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+}

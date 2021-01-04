@@ -96,12 +96,6 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
   err = (*jvmti)->ForceEarlyReturnVoid(jvmti, vthread);
   check_jvmti_error_invalid_thread(jni, "ForceEarlyReturnVoid", err);
 
-  err = (*jvmti)->GetThreadLocalStorage(jvmti, vthread, &local_storage_data);
-  check_jvmti_error_invalid_thread(jni, "GetThreadLocalStorage", err);
-  
-  err = (*jvmti)->SetThreadLocalStorage(jvmti, vthread, &local_storage_data);
-  check_jvmti_error_invalid_thread(jni, "SetThreadLocalStorage", err);
-  
   err = (*jvmti)->GetThreadCpuTime(jvmti, vthread, &nanos);
   check_jvmti_error_invalid_thread(jni, "GetThreadCpuTime", err);
 }
@@ -158,7 +152,7 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject thi
 }
 
 static void JNICALL
-VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread) {
+VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   printf("Got VirtualThreadMounted event\n");
   fflush(stdout);
   test_unsupported_jvmti_functions(jvmti, jni, vthread);

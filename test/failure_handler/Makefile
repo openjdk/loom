@@ -38,7 +38,7 @@ SOURCES := ${SRC_DIR}/jdk/test/failurehandler/*.java                   \
 
 CONF_DIR = src/share/conf
 
-JAVA_RELEASE = 7
+JAVA_RELEASE = 15
 
 TARGET_JAR = ${IMAGE_DIR}/lib/jtregFailureHandler.jar
 
@@ -116,4 +116,3 @@ build: classes native
 
 .PHONY: all build classes native test require_env clean
 .DEFAULT: all
-

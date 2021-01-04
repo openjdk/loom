@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -38,6 +38,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+
 import static sun.nio.ch.WEPoll.*;
 
 /**
@@ -63,8 +64,7 @@ class WEPollSelectorImpl extends SelectorImpl {
     // interrupt/wakeup
     private final Object interruptLock = new Object();
     private boolean interruptTriggered;
-    private final Pipe pipe;
-    private final FileDescriptor fd0, fd1;
+    private final PipeImpl pipe;
     private final int fd0Val, fd1Val;
 
     WEPollSelectorImpl(SelectorProvider sp) throws IOException {
@@ -74,13 +74,9 @@ class WEPollSelectorImpl extends SelectorImpl {
         this.pollArrayAddress = WEPoll.allocatePollArray(NUM_EPOLLEVENTS);
 
         // wakeup support
-        this.pipe = new PipeImpl(null, /*no delay*/ false);
-        SourceChannelImpl source = (SourceChannelImpl) pipe.source();
-        SinkChannelImpl sink = (SinkChannelImpl) pipe.sink();
-        this.fd0 = source.getFD();
-        this.fd1 = sink.getFD();
-        this.fd0Val = source.getFDVal();
-        this.fd1Val = sink.getFDVal();
+        this.pipe = new PipeImpl(sp, false);
+        this.fd0Val = pipe.source().getFDVal();
+        this.fd1Val = pipe.sink().getFDVal();
 
         // register one end of the pipe for wakeups
         WEPoll.ctl(eph, EPOLL_CTL_ADD, fd0Val, WEPoll.EPOLLIN);
@@ -106,13 +102,8 @@ class WEPollSelectorImpl extends SelectorImpl {
         processDeregisterQueue();
         try {
             begin(blocking);
-            if (blocking && Thread.currentThread().isVirtual()) {
-                numEntries = managedPoll(to);
-            } else {
-                numEntries = implPoll(to);
-            }
+            numEntries = poll(to);
             assert IOStatus.check(numEntries);
-
         } finally {
             end(blocking);
         }
@@ -283,4 +274,3 @@ class WEPollSelectorImpl extends SelectorImpl {
         return ops;
     }
 }
-

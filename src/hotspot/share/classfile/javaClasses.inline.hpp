@@ -27,6 +27,8 @@
 
 #include "classfile/javaClasses.hpp"
 #include "oops/access.inline.hpp"
+#include "oops/instanceKlass.inline.hpp"
+#include "oops/instanceStackChunkKlass.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "oops/typeArrayOop.inline.hpp"
@@ -101,20 +103,29 @@ bool java_lang_String::is_instance_inlined(oop obj) {
 }
 
 // Accessors
-oop java_lang_ref_Reference::referent(oop ref) {
-  return ref->obj_field(_referent_offset);
+
+oop java_lang_ref_Reference::weak_referent_no_keepalive(oop ref) {
+  return ref->obj_field_access<ON_WEAK_OOP_REF | AS_NO_KEEPALIVE>(_referent_offset);
 }
 
-void java_lang_ref_Reference::set_referent(oop ref, oop value) {
-  ref->obj_field_put(_referent_offset, value);
+oop java_lang_ref_Reference::phantom_referent_no_keepalive(oop ref) {
+  return ref->obj_field_access<ON_PHANTOM_OOP_REF | AS_NO_KEEPALIVE>(_referent_offset);
 }
 
-void java_lang_ref_Reference::set_referent_raw(oop ref, oop value) {
-  ref->obj_field_put_raw(_referent_offset, value);
+oop java_lang_ref_Reference::unknown_referent_no_keepalive(oop ref) {
+  return ref->obj_field_access<ON_UNKNOWN_OOP_REF | AS_NO_KEEPALIVE>(_referent_offset);
+}
+
+oop java_lang_ref_Reference::unknown_referent(oop ref) {
+  return ref->obj_field_access<ON_UNKNOWN_OOP_REF>(_referent_offset);
+}
+
+void java_lang_ref_Reference::clear_referent(oop ref) {
+  ref->obj_field_put_raw(_referent_offset, nullptr);
 }
 
 HeapWord* java_lang_ref_Reference::referent_addr_raw(oop ref) {
-  return ref->obj_field_addr_raw<HeapWord>(_referent_offset);
+  return ref->obj_field_addr<HeapWord>(_referent_offset);
 }
 
 oop java_lang_ref_Reference::next(oop ref) {
@@ -130,7 +141,7 @@ void java_lang_ref_Reference::set_next_raw(oop ref, oop value) {
 }
 
 HeapWord* java_lang_ref_Reference::next_addr_raw(oop ref) {
-  return ref->obj_field_addr_raw<HeapWord>(_next_offset);
+  return ref->obj_field_addr<HeapWord>(_next_offset);
 }
 
 oop java_lang_ref_Reference::discovered(oop ref) {
@@ -146,7 +157,7 @@ void java_lang_ref_Reference::set_discovered_raw(oop ref, oop value) {
 }
 
 HeapWord* java_lang_ref_Reference::discovered_addr_raw(oop ref) {
-  return ref->obj_field_addr_raw<HeapWord>(_discovered_offset);
+  return ref->obj_field_addr<HeapWord>(_discovered_offset);
 }
 
 bool java_lang_ref_Reference::is_final(oop ref) {
@@ -207,7 +218,7 @@ inline void java_lang_Continuation::set_fp(oop ref, const jlong i) {
   ref->long_field_put(_fp_offset, i);
 }
 inline intptr_t** java_lang_Continuation::raw_fp_address(oop ref) {
-  return (intptr_t**)ref->field_addr_raw(_fp_offset);
+  return (intptr_t**)ref->field_addr(_fp_offset);
 }
 inline jint java_lang_Continuation::sp(oop ref) {
   return ref->int_field(_sp_offset);
@@ -290,18 +301,18 @@ inline void jdk_internal_misc_StackChunk::set_parent(oop ref, oop value) {
 
 template<typename P>
 inline bool jdk_internal_misc_StackChunk::is_parent_null(oop ref) {
-  return (oop)RawAccess<>::oop_load((P*)ref->field_addr_raw(_parent_offset)) == NULL;
+  return (oop)RawAccess<>::oop_load((P*)ref->field_addr(_parent_offset)) == NULL;
 }
 
 template<typename P>
 inline void jdk_internal_misc_StackChunk::set_parent_raw(oop ref, oop value) {
-  RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr_raw(_parent_offset), value);
+  RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr(_parent_offset), value);
 }
 inline int jdk_internal_misc_StackChunk::size(oop ref) {
   return ref->int_field(_size_offset);
 }
 inline void jdk_internal_misc_StackChunk::set_size(HeapWord* ref, int value) {
-  *(jint*)((oop)ref)->field_addr_raw(_size_offset) = value; // ref->int_field_put(_size_offset, value);
+  *(jint*)((oop)ref)->field_addr(_size_offset) = value; // ref->int_field_put(_size_offset, value);
 }
 inline int jdk_internal_misc_StackChunk::sp(oop ref) {
   return ref->int_field(_sp_offset);
@@ -327,6 +338,18 @@ inline bool jdk_internal_misc_StackChunk::gc_mode(oop ref) {
 inline void jdk_internal_misc_StackChunk::set_gc_mode(oop ref, bool value) {
   ref->bool_field_put(_mode_offset, (jboolean)value);
 }
+inline int jdk_internal_misc_StackChunk::gc_sp(oop ref) {
+  return ref->int_field(_gcSP_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_gc_sp(oop ref, int value) {
+  ref->int_field_put(_gcSP_offset, value);
+}
+inline uint64_t jdk_internal_misc_StackChunk::mark_cycle(oop ref) {
+  return (uint64_t)ref->long_field(_markCycle_offset);
+}
+inline void jdk_internal_misc_StackChunk::set_mark_cycle(oop ref, uint64_t value) {
+  ref->long_field_put(_markCycle_offset, (jlong)value);
+}
 inline int jdk_internal_misc_StackChunk::end(oop ref) {
   return size(ref) - argsize(ref);
 }
@@ -338,7 +361,7 @@ inline void jdk_internal_misc_StackChunk::set_cont(oop ref, oop value) {
 }
 template<typename P>
 inline void jdk_internal_misc_StackChunk::set_cont_raw(oop ref, oop value) {
-  RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr_raw(_cont_offset), value);
+  RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr(_cont_offset), value);
 }
 inline int jdk_internal_misc_StackChunk::numFrames(oop ref) {
   return ref->int_field(_numFrames_offset);
@@ -351,6 +374,33 @@ inline int jdk_internal_misc_StackChunk::numOops(oop ref) {
 }
 inline void jdk_internal_misc_StackChunk::set_numOops(oop ref, int value) {
   ref->int_field_put(_numOops_offset, value);
+}
+
+inline bool jdk_internal_misc_StackChunk::is_stack_chunk(oop ref) {
+  assert (ref != (oop)NULL && ref->klass() != NULL, "");
+  Klass* k = ref->klass();
+  return k->is_instance_klass() && InstanceKlass::cast(k)->is_stack_chunk_instance_klass();
+}
+
+inline bool jdk_internal_misc_StackChunk::is_empty(oop chunk) {
+  assert (is_stack_chunk(chunk), "");
+  assert ((jdk_internal_misc_StackChunk::sp(chunk) < jdk_internal_misc_StackChunk::end(chunk)) || (jdk_internal_misc_StackChunk::sp(chunk) >= jdk_internal_misc_StackChunk::size(chunk)), "");
+  return jdk_internal_misc_StackChunk::sp(chunk) >= jdk_internal_misc_StackChunk::size(chunk);
+}
+
+inline intptr_t* jdk_internal_misc_StackChunk::start_address(oop chunk) {
+  return (intptr_t*)InstanceStackChunkKlass::start_of_stack(chunk);
+}
+
+inline intptr_t* jdk_internal_misc_StackChunk::sp_address(oop chunk) {
+  return start_address(chunk) + sp(chunk);
+}
+
+inline bool jdk_internal_misc_StackChunk::is_in_chunk(oop chunk, void* p) {
+  assert (is_stack_chunk(chunk), "");
+  HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk);
+  HeapWord* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  return (HeapWord*)p >= start && (HeapWord*)p < end;
 }
 
 inline void java_lang_invoke_CallSite::set_target_volatile(oop site, oop target) {

@@ -49,9 +49,9 @@ class TestHelper {
         };
         Thread t;
         if (name == null) {
-            t = Thread.newThread(characteristics, target);
+            t = Thread.unstartedThread(characteristics, target);
         } else {
-            t = Thread.newThread(name, characteristics, target);
+            t = Thread.unstartedThread(name, characteristics, target);
         }
         t.start();
         t.join();
@@ -71,6 +71,10 @@ class TestHelper {
         throws Exception
     {
         run(null, characteristics, task);
+    }
+
+    static void runInVirtualThread(String name, ThrowingRunnable task) throws Exception {
+        run(name, 0, task);
     }
 
     static void runInVirtualThread(ThrowingRunnable task) throws Exception {

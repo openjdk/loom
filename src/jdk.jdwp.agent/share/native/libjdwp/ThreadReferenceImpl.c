@@ -65,7 +65,6 @@ name(PacketInputStream *in, PacketOutputStream *out)
         }
 
         if ( info.name != NULL ) {
-            threadControl_setName(thread, info.name);
             jvmtiDeallocate(info.name);
         }
     } END_WITH_LOCAL_REFS(env);
@@ -188,29 +187,24 @@ threadGroup(PacketInputStream *in, PacketOutputStream *out)
     return JNI_TRUE;
 }
 
-/*
- * Validate that the thread or vthread is suspended, and returns a thread that can
- * be used for stack operations, even for unmounted vthreads.
- */
-static jthread
+static jboolean
 validateSuspendedThread(PacketOutputStream *out, jthread thread)
 {
     jvmtiError error;
     jint count;
-    jthread result = thread;
 
     error = threadControl_suspendCount(thread, &count);
     if (error != JVMTI_ERROR_NONE) {
         outStream_setError(out, map2jdwpError(error));
-        return NULL;
+        return JNI_FALSE;
     }
 
     if (count == 0) {
         outStream_setError(out, JDWP_ERROR(THREAD_NOT_SUSPENDED));
-        return NULL;
+        return JNI_FALSE;
     }
 
-    return result;
+    return JNI_TRUE;
 }
 
 static jboolean
@@ -225,12 +219,10 @@ frames(PacketInputStream *in, PacketOutputStream *out)
     jint startIndex;
     jint length;
     jvmtiFrameInfo* frames;
-    jthread originalThread;
 
     env = getEnv();
 
     thread = inStream_readThreadRef(env, in);
-    originalThread = thread;
     if (inStream_error(in)) {
         return JNI_TRUE;
     }
@@ -248,8 +240,7 @@ frames(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    thread = validateSuspendedThread(out, thread);
-    if (thread == NULL) {
+    if (!validateSuspendedThread(out, thread)) {
         return JNI_TRUE;
     }
 
@@ -303,7 +294,7 @@ frames(PacketInputStream *in, PacketOutputStream *out)
             error = methodClass(frames[index].method, &clazz);
 
             if (error == JVMTI_ERROR_NONE) {
-                FrameID frame = createFrameID(originalThread, index + startIndex);
+                FrameID frame = createFrameID(thread, index + startIndex);
                 outStream_writeFrameID(out, frame);
                 writeCodeLocation(out, clazz, frames[index].method,
                                   frames[index].location);
@@ -336,8 +327,7 @@ getFrameCount(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    thread = validateSuspendedThread(out, thread);
-    if (thread == NULL) {
+    if (!validateSuspendedThread(out, thread)) {
         return JNI_TRUE;
     }
 
@@ -370,8 +360,7 @@ ownedMonitors(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    thread = validateSuspendedThread(out, thread);
-    if (thread == NULL) {
+    if (!validateSuspendedThread(out, thread)) {
         return JNI_TRUE;
     }
 
@@ -420,8 +409,7 @@ currentContendedMonitor(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    thread = validateSuspendedThread(out, thread);
-    if (thread == NULL) {
+    if (!validateSuspendedThread(out, thread)) {
         return JNI_TRUE;
     }
 
@@ -468,6 +456,7 @@ stop(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
+    /* vthread fixme: add vthread support */
     if (isVThread(thread)) {
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
@@ -552,8 +541,7 @@ ownedMonitorsWithStackDepth(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    thread = validateSuspendedThread(out, thread);
-    if (thread == NULL) {
+    if (!validateSuspendedThread(out, thread)) {
         return JNI_TRUE;
     }
 

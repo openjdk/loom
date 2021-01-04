@@ -25,6 +25,8 @@
  * @test
  * @summary Fuzz tests for java.lang.Continuation
  *
+ * @requires vm.flavor == "server" & (vm.opt.TieredStopAtLevel == null | vm.opt.TieredStopAtLevel == 4)
+ * @requires vm.opt.TieredCompilation == null | vm.opt.TieredCompilation == true
  * @modules java.base java.base/jdk.internal.vm.annotation
  * @library /test/lib
  * @build java.base/java.lang.StackWalkerHelper
@@ -110,8 +112,6 @@ public class Fuzz implements Runnable {
 
         static Op toInterpreted(Op op) { return INTERPRETED.contains(op) ? op : Enum.valueOf(Op.class, op.toString().replace("_C_", "_I_")); }
         static Op toCompiled(Op op)    { return COMPILED.contains(op)    ? op : Enum.valueOf(Op.class, op.toString().replace("_I_", "_C_")); }
-
-        static final Op[] ARRAY = new Op[0];
     }
 
     static class Generator {
@@ -131,8 +131,8 @@ public class Fuzz implements Runnable {
                 highProb.removeAll(Op.INTERPRETED);
                 lowProb.removeAll(Op.INTERPRETED);
             }
-            Op[] highProb0 = highProb.toArray(Op.ARRAY);
-            Op[] lowProb0  = lowProb.toArray(Op.ARRAY);
+            Op[] highProb0 = highProb.toArray(Op[]::new);
+            Op[] lowProb0  = lowProb.toArray(Op[]::new);
             
             int loops = 7;
             Op[] trace = new Op[length];
@@ -174,7 +174,7 @@ public class Fuzz implements Runnable {
 
     static Op[] parse(String line) {
         return Arrays.stream(line.split(", ")).map(s -> Enum.valueOf(Op.class, s))
-            .collect(Collectors.toList()).toArray(Op.ARRAY);
+            .collect(Collectors.toList()).toArray(Op[]::new);
     }
 
     static void testStream(Stream<Op[]> traces) { traces.forEach(Fuzz::testTrace); }
@@ -410,7 +410,7 @@ public class Fuzz implements Runnable {
     int computeResult() {
         // To compute the expected result, we remove all YIELDs from the trace and run it
         Op[] trace0 = Arrays.stream(trace).filter(op -> op != Op.YIELD)
-            .collect(Collectors.toList()).toArray(Op.ARRAY);
+            .collect(Collectors.toList()).toArray(Op[]::new);
         
         Fuzz f0 = new Fuzz(trace0);
         f0.run();

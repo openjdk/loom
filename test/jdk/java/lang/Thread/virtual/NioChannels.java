@@ -27,6 +27,12 @@
  * @summary Basic tests for virtual threads doing blocking I/O with NIO channels
  */
 
+/**
+ * @test
+ * @requires (os.family == "windows")
+ * @run testng/othervm/timeout=300 -Djdk.pollProvider=sun.nio.ch.WSAPollPollerProvider NioChannels
+ */
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -49,7 +55,6 @@ import static org.testng.Assert.*;
 
 @Test
 public class NioChannels {
-
     private static final long DELAY = 4000;
 
     /**
@@ -110,7 +115,7 @@ public class NioChannels {
                 ScheduledReader.schedule(sc2, true, DELAY);
 
                 // write should block
-                ByteBuffer bb = ByteBuffer.allocate(100*10024);
+                ByteBuffer bb = ByteBuffer.allocate(100*1024);
                 for (int i=0; i<1000; i++) {
                     int n = sc1.write(bb);
                     assertTrue(n > 0);
@@ -163,7 +168,7 @@ public class NioChannels {
                 SocketChannel sc = connection.channel1();
                 ScheduledCloser.schedule(sc, DELAY);
                 try {
-                    ByteBuffer bb = ByteBuffer.allocate(100*10024);
+                    ByteBuffer bb = ByteBuffer.allocate(100*1024);
                     for (;;) {
                         int n = sc.write(bb);
                         assertTrue(n > 0);
@@ -183,7 +188,7 @@ public class NioChannels {
                 SocketChannel sc = connection.channel1();
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
                 try {
-                    ByteBuffer bb = ByteBuffer.allocate(100*10024);
+                    ByteBuffer bb = ByteBuffer.allocate(100*1024);
                     for (;;) {
                         int n = sc.write(bb);
                         assertTrue(n > 0);
@@ -455,8 +460,6 @@ public class NioChannels {
         });
     }
 
-
-
     /**
      * Pipe read/write, no blocking.
      */
@@ -515,7 +518,7 @@ public class NioChannels {
                 ScheduledReader.schedule(source, true, DELAY);
 
                 // write should block
-                ByteBuffer bb = ByteBuffer.allocate(100*10024);
+                ByteBuffer bb = ByteBuffer.allocate(100*1024);
                 for (int i=0; i<1000; i++) {
                     int n = sink.write(bb);
                     assertTrue(n > 0);
@@ -568,7 +571,7 @@ public class NioChannels {
             try (Pipe.SinkChannel sink = p.sink()) {
                 ScheduledCloser.schedule(sink, DELAY);
                 try {
-                    ByteBuffer bb = ByteBuffer.allocate(100*10024);
+                    ByteBuffer bb = ByteBuffer.allocate(100*1024);
                     for (;;) {
                         int n = sink.write(bb);
                         assertTrue(n > 0);
@@ -588,7 +591,7 @@ public class NioChannels {
             try (Pipe.SinkChannel sink = p.sink()) {
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
                 try {
-                    ByteBuffer bb = ByteBuffer.allocate(100*10024);
+                    ByteBuffer bb = ByteBuffer.allocate(100*1024);
                     for (;;) {
                         int n = sink.write(bb);
                         assertTrue(n > 0);
@@ -722,7 +725,7 @@ public class NioChannels {
         public void run() {
             try {
                 Thread.sleep(delay);
-                ByteBuffer bb = ByteBuffer.allocate(8192);
+                ByteBuffer bb = ByteBuffer.allocate(100*1024);
                 for (;;) {
                     int n = rbc.read(bb);
                     if (n == -1 || !readAll)

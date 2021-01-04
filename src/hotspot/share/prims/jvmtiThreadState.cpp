@@ -49,10 +49,11 @@ static const int UNKNOWN_STACK_DEPTH = -99;
 
 JvmtiThreadState *JvmtiThreadState::_head = NULL;
 
-JvmtiThreadState::JvmtiThreadState(JavaThread* thread)
+JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
   : _thread_event_enable() {
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
   _thread               = thread;
+  _thread_saved         = NULL;
   _exception_state      = ES_CLEARED;
   _debuggable           = true;
   _hide_single_stepping = false;
@@ -68,6 +69,7 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread)
   _the_class_for_redefinition_verification = NULL;
   _scratch_class_for_redefinition_verification = NULL;
   _cur_stack_depth = UNKNOWN_STACK_DEPTH;
+  _saved_interp_only_mode = 0;
 
   // JVMTI ForceEarlyReturn support
   _pending_step_for_earlyret = false;
@@ -77,6 +79,22 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread)
   _earlyret_oop = NULL;
 
   _jvmti_event_queue = NULL;
+  _is_virtual = false;
+
+  _thread_oop_h = OopHandle(Universe::vm_global(), thread_oop);
+  if (thread_oop != NULL) {
+    java_lang_Thread::set_jvmti_thread_state(thread_oop, (JvmtiThreadState*)this);
+    _is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
+  }
+
+  // thread can be NULL if virtual thread is unmounted
+  if (thread != NULL) {
+    // set this as the state for the thread only if thread_oop is current thread->mounted_vthread()
+    if (thread_oop == NULL || thread->mounted_vthread() == NULL || thread->mounted_vthread() == thread_oop) {
+      thread->set_jvmti_thread_state(this);
+    }
+    thread->set_interp_only_mode(0);
+  }
 
   // add all the JvmtiEnvThreadState to the new JvmtiThreadState
   {
@@ -101,9 +119,6 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread)
     }
     _head = this;
   }
-
-  // set this as the state for the thread
-  thread->set_jvmti_thread_state(this);
 }
 
 
@@ -148,6 +163,10 @@ JvmtiThreadState::~JvmtiThreadState()   {
     _next = NULL;
     _prev = NULL;
   }
+  if (get_thread_oop() != NULL) {
+    java_lang_Thread::set_jvmti_thread_state(get_thread_oop(), NULL);
+  }
+  _thread_oop_h.release(Universe::vm_global());
 }
 
 
@@ -204,7 +223,7 @@ JvmtiVTMTDisabler::disable_VTMT() {
 
   _VTMT_disable_count++;
 
-  // block while some transitions are in progress
+  // Block while some mount/unmount transitions are in progress.
   while (_VTMT_count > 0) {
     ml.wait();
   }
@@ -225,12 +244,13 @@ JvmtiVTMTDisabler::enable_VTMT() {
 
 void
 JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
+  if (!JvmtiExport::can_support_virtual_threads()) {
+    return;
+  }
   JavaThread* thread = JavaThread::current();
-  assert(JvmtiExport::can_support_virtual_threads(),
-         "check_and_self_suspend_vthread sanity check");
-
   HandleMark hm(thread);
   Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
+
   ThreadBlockInVM tbivm(thread);
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
@@ -241,16 +261,19 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     ml.wait();
   }
   _VTMT_count++;
+  thread->set_is_in_VTMT(true);
 }
 
 void
 JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
+  if (!JvmtiExport::can_support_virtual_threads()) {
+    return;
+  }
   JavaThread* thread = JavaThread::current();
-  assert(JvmtiExport::can_support_virtual_threads(),
-         "check_and_self_suspend_vthread sanity check");
-
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+
   _VTMT_count--;
+
   // unblock waiting VTMT disablers
   if (_VTMT_disable_count > 0) {
     ml.notify_all();
@@ -258,12 +281,11 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   if (callsite_tag == 1) { // finish_VTMT for a vthread unmount
     if (thread->is_cthread_pending_suspend()) {
       thread->clear_cthread_pending_suspend();
-      // Safe to do without grabbing SR_lock as the thread is current.
       // The JavaThread* will be suspended upon return to Java.
-      MonitorLocker ml(thread->SR_lock(), Mutex::_no_safepoint_check_flag);
       thread->set_external_suspend();
     }
   }
+  thread->set_is_in_VTMT(false);
 }
 
 /* VThreadList implementation */
@@ -282,12 +304,16 @@ VThreadList::contains(oop vt) const {
   return idx != -1;
 }
 
+static OopHandle NULLHandle = OopHandle(NULL);
+
 void
 VThreadList::append(oop vt) {
   assert(!contains(vt), "VThreadList::append sanity check");
-  // TMP: to work around OopHandle copy constructor assert
-  static OopHandle NULLHandle = OopHandle(NULL);
+
+  // This is to work around assert in OopHandle copy constructor.
   GrowableArrayCHeap<OopHandle, mtServiceability>::append(NULLHandle);
+  pop();
+
   GrowableArrayCHeap<OopHandle, mtServiceability>::append(OopHandle(Universe::vm_global(), vt));
 }
 
@@ -296,15 +322,21 @@ VThreadList::remove(oop vt) {
   int idx = find(vt);
   assert(idx != -1, "VThreadList::remove sanity check");
   at(idx).release(Universe::vm_global());
-  remove_at(idx);
+
+  // To work around assert in OopHandle copy constructor do not use remove_at().
+  for (int i = idx + 1; i < length(); i++) {
+    at_put(i - 1, NULLHandle); // work around assert in OopHandle copy constructor
+    at_put(i - 1, at(i));
+  }
+  pop();
 }
 
 void
 VThreadList::invalidate() {
   for (int idx = length() - 1; idx >= 0; idx--) {
     at(idx).release(Universe::vm_global());
-    remove_at(idx);
   }
+  clear();
 }
 
 /* Virtual Threads Suspend/Resume management */
@@ -384,7 +416,12 @@ JvmtiVTSuspender::vthread_is_ext_suspended(oop vt) {
 void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
 
-  JvmtiEnvThreadState *new_ets = new JvmtiEnvThreadState(_thread, env);
+  JvmtiEnvThreadState *new_ets = new JvmtiEnvThreadState(this, env);
+#ifdef DBG // TMP
+    const char* virt = _is_virtual ? "virtual" : "carrier";
+    printf("DBG: JvmtiThreadState::add_env: %s state: %p, env: %p, ets: %p\n",
+           virt, (void*)this, (void*)env, (void*)new_ets); fflush(0);
+#endif
   // add this environment thread state to the end of the list (order is important)
   {
     // list deallocation (which occurs at a safepoint) cannot occur simultaneously
@@ -404,48 +441,66 @@ void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
 }
 
 void JvmtiThreadState::enter_interp_only_mode() {
-  assert(_thread->get_interp_only_mode() == 0, "entering interp only when mode not zero");
-  _thread->increment_interp_only_mode();
-  invalidate_cur_stack_depth();
+  if (_thread == NULL) {
+    assert(!is_interp_only_mode(), "entering interp only when mode not zero");
+    ++_saved_interp_only_mode;
+    // TBD: It seems, invalidate_cur_stack_depth() has to be called at VTMT?
+  } else {
+#ifdef DBG // TMP
+  if (is_interp_only_mode()) {
+    ResourceMark rm(JavaThread::current());
+    oop name_oop = java_lang_Thread::name(get_thread_oop());
+    const char* name_str = java_lang_String::as_utf8_string(name_oop);
+    name_str = name_str == NULL ? "<NULL>" : name_str;
+
+    const char* virt = is_virtual() ? "virtual" : "carrier";
+    printf("DBG: enter_interp_only_mode: %s state: %p, interp_only: %d, saved_interp_only: %d, %s\n",
+           virt, (void*)this, _thread->get_interp_only_mode(), _saved_interp_only_mode, name_str); fflush(0);
+  }
+#endif
+    assert(!is_interp_only_mode(), "entering interp only when mode not zero");
+    _thread->increment_interp_only_mode();
+    invalidate_cur_stack_depth();
+  }
 }
 
 
 void JvmtiThreadState::leave_interp_only_mode() {
-  assert(_thread->get_interp_only_mode() == 1, "leaving interp only when mode not one");
-  _thread->decrement_interp_only_mode();
+  if (_thread == NULL) {
+    assert(is_interp_only_mode(), "leaving interp only when mode not one");
+    --_saved_interp_only_mode;
+  } else {
+    assert(is_interp_only_mode(), "leaving interp only when mode not one");
+    _thread->decrement_interp_only_mode();
+  }
 }
 
 
 // Helper routine used in several places
-int JvmtiThreadState::count_frames(bool split_carrier_virtual_frames) {
+int JvmtiThreadState::count_frames() {
+  JavaThread* thread = get_thread_or_saved();
+
 #ifdef ASSERT
   Thread *current_thread = Thread::current();
 #endif
-  assert(current_thread == get_thread() ||
-         SafepointSynchronize::is_at_safepoint() ||
-         current_thread == get_thread()->active_handshaker(),
+  assert(SafepointSynchronize::is_at_safepoint() ||
+         thread->is_handshake_safe_for(current_thread),
          "call by myself / at safepoint / at handshake");
 
-  if (!get_thread()->has_last_Java_frame()) return 0;  // no Java frames
+  if (!thread->has_last_Java_frame()) return 0;  // no Java frames
 
+  // TBD: This might need to be corrected for detached carrier threads.
   ResourceMark rm;
-  RegisterMap reg_map(get_thread(), true, true);
-  javaVFrame *jvf = split_carrier_virtual_frames == true
-          ? JvmtiEnvBase::get_last_java_vframe(get_thread(), &reg_map)
-          : get_thread()->last_java_vframe(&reg_map);
-  int n = 0;
-  while (jvf != NULL) {
-    jvf = jvf->java_sender();
-    n++;
-  }
-  return n;
+  RegisterMap reg_map(thread, false, false, true);
+  javaVFrame *jvf = thread->last_java_vframe(&reg_map);
+
+  return (int)JvmtiEnvBase::get_frame_count(jvf);
 }
 
 
 void JvmtiThreadState::invalidate_cur_stack_depth() {
   assert(SafepointSynchronize::is_at_safepoint() ||
-         JavaThread::current() == get_thread() ||
-         Thread::current() == get_thread()->active_handshaker(),
+         get_thread()->is_handshake_safe_for(Thread::current()),
          "bad synchronization with owner thread");
 
   _cur_stack_depth = UNKNOWN_STACK_DEPTH;
@@ -462,7 +517,7 @@ void JvmtiThreadState::incr_cur_stack_depth() {
 #ifdef ASSERT
     // heavy weight assert
     // fixme: remove this before merging loom with main jdk repo
-    jint num_frames = count_frames(false);
+    jint num_frames = count_frames();
     assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync _cur_stack_depth: %d num_frames: %d", _cur_stack_depth, num_frames);
 #endif
   }
@@ -478,7 +533,7 @@ void JvmtiThreadState::decr_cur_stack_depth() {
 #ifdef ASSERT
     // heavy weight assert
     // fixme: remove this before merging loom with main jdk repo
-    jint num_frames = count_frames(false);
+    jint num_frames = count_frames();
     assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync _cur_stack_depth: %d num_frames: %d", _cur_stack_depth, num_frames);
 #endif
     --_cur_stack_depth;
@@ -487,16 +542,16 @@ void JvmtiThreadState::decr_cur_stack_depth() {
 }
 
 int JvmtiThreadState::cur_stack_depth() {
-  JavaThread *current = JavaThread::current();
-  guarantee(current == get_thread() || current == get_thread()->active_handshaker(),
+  Thread *current = Thread::current();
+  guarantee(get_thread()->is_handshake_safe_for(current),
             "must be current thread or direct handshake");
 
   if (!is_interp_only_mode() || _cur_stack_depth == UNKNOWN_STACK_DEPTH) {
-    _cur_stack_depth = count_frames(false);
+    _cur_stack_depth = count_frames();
   } else {
 #ifdef ASSERT
     // heavy weight assert
-    jint num_frames = count_frames(false);
+    jint num_frames = count_frames();
     assert(_cur_stack_depth == num_frames, "cur_stack_depth out of sync _cur_stack_depth: %d num_frames: %d", _cur_stack_depth, num_frames);
 #endif
   }
@@ -659,3 +714,17 @@ void JvmtiThreadState::run_nmethod_entry_barriers() {
     _jvmti_event_queue->run_nmethod_entry_barriers();
   }
 }
+
+oop JvmtiThreadState::get_thread_oop() {
+  return _thread_oop_h.resolve(); 
+}
+
+void JvmtiThreadState::set_thread(JavaThread* thread) {
+  _thread_saved = NULL; // common case;
+  if (!_is_virtual && thread == NULL) {
+    // Save JavaThread* if carrier thread is being detached.
+    _thread_saved = _thread;
+  }
+  _thread = thread;
+}
+

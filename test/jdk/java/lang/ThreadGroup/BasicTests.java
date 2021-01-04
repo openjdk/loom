@@ -419,9 +419,8 @@ public class BasicTests {
         assertTrue(group2.activeGroupCount() == 1);
         assertTrue(group3.activeGroupCount() == 0);
 
-        // change group3 to a daemon group and wait for it to be GC'ed
+        // unreference group3 and wait for it to be GC'ed
         var ref = new WeakReference<>(group3);
-        group3.setDaemon(true);
         group3 = null;
         System.gc();
         while (ref.get() != null) {
@@ -505,11 +504,8 @@ public class BasicTests {
         assertTrue(group3.enumerate(groups, false) == 0);
         assertTrue(groups[0] == null);
 
-        // change group3 to a daemon group
+        // unreference group3 and wait for it to be GC'ed
         var ref = new WeakReference<>(group3);
-        group3.setDaemon(true);
-
-        // clear refs to group3 and wait for it to be GC'ed
         Arrays.setAll(groups, i -> null);
         group3 = null;
         System.gc();
@@ -684,21 +680,16 @@ public class BasicTests {
 
     public void testDestroy() {
         ThreadGroup group = new ThreadGroup("group");
+        assertFalse(group.isDestroyed());
         group.destroy();
         assertFalse(group.isDestroyed());
     }
 
     public void testDaemon() {
         ThreadGroup group = new ThreadGroup("group");
-        assertTrue(group.isDaemon());
-        group.setDaemon(false);
         assertFalse(group.isDaemon());
-        try {
-            group.setDaemon(true);
-            assertTrue(group.isDaemon());
-        } finally {
-            group.setDaemon(false); // allow group to be GC'ed
-        }
+        group.setDaemon(true);
+        assertFalse(group.isDaemon());
     }
 
     public void testList() {

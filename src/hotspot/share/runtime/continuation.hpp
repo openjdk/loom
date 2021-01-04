@@ -88,8 +88,8 @@ public:
 
   static void notify_deopt(JavaThread* thread, intptr_t* sp);
 
-  static oop  get_continutation_for_frame(JavaThread* thread, const frame& f);
-  static ContinuationEntry* last_continuation(JavaThread* thread, oop cont_scope);
+  static oop  get_continuation_for_frame(JavaThread* thread, const frame& f);
+  static ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
   static bool is_mounted(JavaThread* thread, oop cont_scope);
   static bool is_continuation_enterSpecial(const frame& f);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap* map);
@@ -139,25 +139,14 @@ private:
   static address oop_address(objArrayOop ref_stack, int ref_sp, int index);
   static address oop_address(objArrayOop ref_stack, int ref_sp, address stack_address);
 
-  friend class InstanceStackChunkKlass;
-
-public:
-  template <class OopClosureType, bool concurrent_gc> static void stack_chunk_iterate_stack(oop obj, OopClosureType* closure);
-  template <class OopClosureType> static void stack_chunk_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
-
-// public:
-//   // for now, we don't devirtualize the closure for faster compilation
-//   static void stack_chunk_iterate_stack(oop obj, OopClosure* closure, bool do_metadata);
-//   static void stack_chunk_iterate_stack_bounded(oop obj, OopClosure* closure, bool do_metadata, MemRegion mr);
-
 private:
+  friend class InstanceStackChunkKlass;
   static void emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops);
 
 #ifdef ASSERT
 public:
   static bool debug_is_stack_chunk(Klass* klass);
   static bool debug_is_stack_chunk(oop obj);
-  static bool debug_verify_stack_chunk(oop chunk, oop cont = (oop)NULL, size_t* out_size = NULL, int* out_frames = NULL, int* out_oops = NULL);
   static void debug_print_stack_chunk(oop obj);
   static bool debug_is_continuation(Klass* klass);
   static bool debug_is_continuation(oop obj);

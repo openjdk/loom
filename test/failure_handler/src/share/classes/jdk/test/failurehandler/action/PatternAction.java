@@ -59,6 +59,9 @@ public class PatternAction implements Action {
         for (int i = 0, n = args.length; i < n; ++i) {
             args[i] = args[i].replace(pattern, value) ;
         }
+        for (int i = 0, n = args.length; i < n; ++i) {
+            args[i] = args[i].replace("%java", helper.findApp("java").getAbsolutePath());
+        }
         return action.prepareProcess(section.getWriter(), helper);
     }
 

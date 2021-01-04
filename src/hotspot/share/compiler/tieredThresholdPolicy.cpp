@@ -27,6 +27,7 @@
 #include "compiler/compilerOracle.hpp"
 #include "compiler/tieredThresholdPolicy.hpp"
 #include "memory/resourceArea.hpp"
+#include "prims/jvmtiExport.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/globals_extension.hpp"
@@ -46,7 +47,7 @@
 
 bool TieredThresholdPolicy::call_predicate_helper(const methodHandle& method, CompLevel cur_level, int i, int b, double scale) {
   double threshold_scaling;
-  if (CompilerOracle::has_option_value(method, "CompileThresholdScaling", threshold_scaling)) {
+  if (CompilerOracle::has_option_value(method, CompileCommand::CompileThresholdScaling, threshold_scaling)) {
     scale *= threshold_scaling;
   }
   switch(cur_level) {
@@ -77,7 +78,7 @@ bool TieredThresholdPolicy::call_predicate_helper(const methodHandle& method, Co
 
 bool TieredThresholdPolicy::loop_predicate_helper(const methodHandle& method, CompLevel cur_level, int i, int b, double scale) {
   double threshold_scaling;
-  if (CompilerOracle::has_option_value(method, "CompileThresholdScaling", threshold_scaling)) {
+  if (CompilerOracle::has_option_value(method, CompileCommand::CompileThresholdScaling, threshold_scaling)) {
     scale *= threshold_scaling;
   }
   switch(cur_level) {
@@ -294,7 +295,7 @@ void TieredThresholdPolicy::initialize() {
   // Some inlining tuning
 #ifdef X86
   if (FLAG_IS_DEFAULT(InlineSmallCode)) {
-    FLAG_SET_DEFAULT(InlineSmallCode, 2000);
+    FLAG_SET_DEFAULT(InlineSmallCode, 2500);
   }
 #endif
 
@@ -507,16 +508,19 @@ nmethod* TieredThresholdPolicy::event(const methodHandle& method, const methodHa
     // method == inlinee if the event originated in the main method
     method_back_branch_event(method, inlinee, bci, comp_level, nm, THREAD);
     // Check if event led to a higher level OSR compilation
-    CompLevel expected_comp_level = comp_level;
+    CompLevel expected_comp_level = MIN2(CompLevel_full_optimization, static_cast<CompLevel>(comp_level + 1));
     if (!CompilationModeFlag::disable_intermediate() && inlinee->is_not_osr_compilable(expected_comp_level)) {
       // It's not possble to reach the expected level so fall back to simple.
       expected_comp_level = CompLevel_simple;
     }
-    nmethod* osr_nm = inlinee->lookup_osr_nmethod_for(bci, expected_comp_level, false);
-    assert(osr_nm == NULL || osr_nm->comp_level() >= expected_comp_level, "lookup_osr_nmethod_for is broken");
-    if (osr_nm != NULL) {
-      // Perform OSR with new nmethod
-      return osr_nm;
+    CompLevel max_osr_level = static_cast<CompLevel>(inlinee->highest_osr_comp_level());
+    if (max_osr_level >= expected_comp_level) { // fast check to avoid locking in a typical scenario
+      nmethod* osr_nm = inlinee->lookup_osr_nmethod_for(bci, expected_comp_level, false);
+      assert(osr_nm == NULL || osr_nm->comp_level() >= expected_comp_level, "lookup_osr_nmethod_for is broken");
+      if (osr_nm != NULL && osr_nm->comp_level() != comp_level) {
+        // Perform OSR with new nmethod
+        return osr_nm;
+      }
     }
   }
   return NULL;
@@ -786,7 +790,7 @@ bool TieredThresholdPolicy::is_mature(Method* method) {
 // start profiling without waiting for the compiled method to arrive.
 // We also take the load on compilers into the account.
 bool TieredThresholdPolicy::should_create_mdo(const methodHandle& method, CompLevel cur_level) {
-  if (cur_level != CompLevel_none || force_comp_at_level_simple(method)) {
+  if (cur_level != CompLevel_none || force_comp_at_level_simple(method) || !ProfileInterpreter) {
     return false;
   }
   int i = method->invocation_count();
@@ -821,6 +825,18 @@ void TieredThresholdPolicy::create_mdo(const methodHandle& mh, Thread* THREAD) {
   }
   if (mh->method_data() == NULL) {
     Method::build_interpreter_method_data(mh, CHECK_AND_CLEAR);
+  }
+  if (ProfileInterpreter) {
+    MethodData* mdo = mh->method_data();
+    if (mdo != NULL) {
+      JavaThread* jt = THREAD->as_Java_thread();
+      frame last_frame = jt->last_frame();
+      if (last_frame.is_interpreted_frame() && mh == last_frame.interpreter_frame_method()) {
+        int bci = last_frame.interpreter_frame_bci();
+        address dp = mdo->bci_to_dp(bci);
+        last_frame.interpreter_frame_set_mdp(dp);
+      }
+    }
   }
 }
 

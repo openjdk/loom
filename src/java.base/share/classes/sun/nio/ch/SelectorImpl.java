@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.function.Consumer;
 
 import jdk.internal.access.JavaLangAccess;
@@ -236,19 +237,39 @@ public abstract class SelectorImpl
     }
 
     /**
-     * Performs a blocking selection operation on the carrier thread and in a
-     * ForkJoinPool managed blocker.
+     * Returns the ManagedSelect object for this Selector if running on a virtual
+     * thread and its carrier is a ForkJoinWorkerThread, otherwise returns null.
      */
-    protected final int managedPoll(long timeout) {
-        if (managedSelect == null)
-            managedSelect = new ManagedSelect(this);
-        managedSelect.prepare(timeout);
-        try {
-            JLA.executeOnCarrierThread(managedSelect);
-        }  catch (Exception e) {
-            Unsafe.getUnsafe().throwException(e);
+    private ManagedSelect managedSelect() {
+        if (Thread.currentThread().isVirtual()
+                && JLA.currentCarrierThread() instanceof ForkJoinWorkerThread) {
+            if (managedSelect == null)
+                managedSelect = new ManagedSelect(this);
+            return managedSelect;
+        } else {
+            return null;
         }
-        return managedSelect.result();
+    }
+
+    /**
+     * Invoked by doSelect to poll for file descriptors that are ready for I/O
+     * operations. If invoked on a virtual thread mounted on a ForkJoinWorkerThread
+     * then blocking polls are done in ForkJoinPool.ManagedBlocker.
+     */
+    protected final int poll(long timeout) throws IOException {
+        assert Thread.holdsLock(this);
+        ManagedSelect managedSelect;
+        if (timeout != 0 && (managedSelect = managedSelect()) != null) {
+            managedSelect.prepare(timeout);
+            try {
+                JLA.executeOnCarrierThread(managedSelect);
+            } catch (Exception e) {
+                Unsafe.getUnsafe().throwException(e);
+            }
+            return managedSelect.result();
+        } else {
+            return implPoll(timeout);
+        }
     }
 
     /**

@@ -211,6 +211,11 @@ public interface JavaLangAccess {
     void addReadsAllUnnamed(Module m);
 
     /**
+     * Updates module m1 to export a package unconditionally.
+     */
+    void addExports(Module m1, String pkg);
+
+    /**
      * Updates module m1 to export a package to module m2. The export does
      * not result in a strong reference to m2 (m2 can be GC'ed).
      */
@@ -362,6 +367,11 @@ public interface JavaLangAccess {
      * carrier thread.
      */
     Thread currentCarrierThread();
+
+    /**
+     * Sets the Thread object to be returned by Thread.currentThread().
+     */
+    void setCurrentThread(Thread thread);
 
     /**
      * Executes the given value returning task on the current carrier thread.

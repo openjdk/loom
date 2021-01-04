@@ -56,7 +56,6 @@ import sun.nio.ch.FileChannelImpl;
  * than {@code EOFException} is thrown. In particular, an
  * {@code IOException} may be thrown if the stream has been closed.
  *
- * @author  unascribed
  * @since   1.0
  */
 
@@ -122,7 +121,6 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @see        java.lang.SecurityManager#checkRead(java.lang.String)
      * @see        java.lang.SecurityManager#checkWrite(java.lang.String)
      * @revised 1.4
-     * @spec JSR-51
      */
     public RandomAccessFile(String name, String mode)
         throws FileNotFoundException
@@ -209,7 +207,6 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @see        java.lang.SecurityManager#checkWrite(java.lang.String)
      * @see        java.nio.channels.FileChannel#force(boolean)
      * @revised 1.4
-     * @spec JSR-51
      */
     public RandomAccessFile(File file, String mode)
         throws FileNotFoundException
@@ -294,7 +291,6 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @return  the file channel associated with this file
      *
      * @since 1.4
-     * @spec JSR-51
      */
     public final FileChannel getChannel() {
         FileChannel fc = this.channel;
@@ -534,7 +530,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(int b) throws IOException {
-        Blocker.managedBlock(() -> write0(b));
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> write0(b));
+        } else {
+            write0(b);
+        }
     }
 
     private native void write0(int b) throws IOException;
@@ -605,6 +605,9 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
     public void seek(long pos) throws IOException {
         if (pos < 0) {
             throw new IOException("Negative seek offset");
+        }
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> seek0(pos));
         } else {
             seek0(pos);
         }
@@ -618,7 +621,15 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @return     the length of this file, measured in bytes.
      * @throws     IOException  if an I/O error occurs.
      */
-    public native long length() throws IOException;
+    public long length() throws IOException {
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> length0());
+        } else {
+            return length0();
+        }
+    }
+
+    private native long length0() throws IOException;
 
     /**
      * Sets the length of this file.
@@ -639,7 +650,15 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  If an I/O error occurs
      * @since      1.2
      */
-    public native void setLength(long newLength) throws IOException;
+    public void setLength(long newLength) throws IOException {
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> setLength0(newLength));
+        } else {
+            setLength0(newLength);
+        }
+    }
+
+    private native void setLength0(long newLength) throws IOException;
 
     /**
      * Closes this random access file stream and releases any system
@@ -653,7 +672,6 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      *
      * @revised 1.4
-     * @spec JSR-51
      */
     public void close() throws IOException {
         if (closed) {
@@ -708,7 +726,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * Reads a signed eight-bit value from this file. This method reads a
      * byte from the file, starting from the current file pointer.
      * If the byte read is {@code b}, where
-     * <code>0&nbsp;&lt;=&nbsp;b&nbsp;&lt;=&nbsp;255</code>,
+     * {@code 0 <= b <= 255},
      * then the result is:
      * <blockquote><pre>
      *     (byte)(b)
@@ -782,7 +800,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * two bytes from the file, starting at the current file pointer.
      * If the bytes read, in order, are
      * {@code b1} and {@code b2}, where
-     * <code>0&nbsp;&lt;=&nbsp;b1, b2&nbsp;&lt;=&nbsp;255</code>,
+     * {@code 0 <= b1, b2 <= 255},
      * then the result is equal to:
      * <blockquote><pre>
      *     (b1 &lt;&lt; 8) | b2
@@ -810,7 +828,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * bytes from the file, starting at the current file pointer.
      * If the bytes read, in order, are
      * {@code b1} and {@code b2}, where
-     * <code>0&nbsp;&lt;=&nbsp;b1,&nbsp;b2&nbsp;&lt;=&nbsp;255</code>,
+     * {@code 0 <= b1, b2 <= 255},
      * then the result is equal to:
      * <blockquote><pre>
      *     (char)((b1 &lt;&lt; 8) | b2)
@@ -838,7 +856,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * bytes from the file, starting at the current file pointer.
      * If the bytes read, in order, are {@code b1},
      * {@code b2}, {@code b3}, and {@code b4}, where
-     * <code>0&nbsp;&lt;=&nbsp;b1, b2, b3, b4&nbsp;&lt;=&nbsp;255</code>,
+     * {@code 0 <= b1, b2, b3, b4 <= 255},
      * then the result is equal to:
      * <blockquote><pre>
      *     (b1 &lt;&lt; 24) | (b2 &lt;&lt; 16) + (b3 &lt;&lt; 8) + b4

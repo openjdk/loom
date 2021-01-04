@@ -28,6 +28,8 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.Console;
 import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -69,7 +71,6 @@ import jdk.internal.module.ModuleBootstrap;
 import jdk.internal.module.ServicesCatalog;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
-import jdk.internal.HotSpotIntrinsicCandidate;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.VM;
@@ -77,6 +78,7 @@ import jdk.internal.logger.LoggerFinderLoader;
 import jdk.internal.logger.LazyLoggers;
 import jdk.internal.logger.LocalizedLoggerWrapper;
 import jdk.internal.util.SystemProps;
+import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import sun.nio.ch.ConsoleStreams;
@@ -429,7 +431,7 @@ public final class System {
      *          the current time and midnight, January 1, 1970 UTC.
      * @see     java.util.Date
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     public static native long currentTimeMillis();
 
     /**
@@ -473,7 +475,7 @@ public final class System {
      *         high-resolution time source, in nanoseconds
      * @since 1.5
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     public static native long nanoTime();
 
     /**
@@ -568,7 +570,7 @@ public final class System {
      * @throws     NullPointerException if either {@code src} or
      *             {@code dest} is {@code null}.
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     public static native void arraycopy(Object src,  int  srcPos,
                                         Object dest, int destPos,
                                         int length);
@@ -586,7 +588,7 @@ public final class System {
      * @see Object#hashCode
      * @see java.util.Objects#hashCode(Object)
      */
-    @HotSpotIntrinsicCandidate
+    @IntrinsicCandidate
     public static native int identityHashCode(Object x);
 
     /**
@@ -2007,9 +2009,16 @@ public final class System {
 
         lineSeparator = props.getProperty("line.separator");
 
-        setIn0(new BufferedInputStream(ConsoleStreams.in));
-        setOut0(newPrintStream(ConsoleStreams.out, props.getProperty("sun.stdout.encoding")));
-        setErr0(newPrintStream(ConsoleStreams.err, props.getProperty("sun.stderr.encoding")));
+        FileInputStream fdIn = new FileInputStream(FileDescriptor.in);
+        FileOutputStream fdOut = new FileOutputStream(FileDescriptor.out);
+        FileOutputStream fdErr = new FileOutputStream(FileDescriptor.err);
+        setIn0(new BufferedInputStream(fdIn));
+        setOut0(newPrintStream(fdOut, props.getProperty("sun.stdout.encoding")));
+        setErr0(newPrintStream(fdErr, props.getProperty("sun.stderr.encoding")));
+
+//        setIn0(new BufferedInputStream(ConsoleStreams.in));
+//        setOut0(newPrintStream(ConsoleStreams.out, props.getProperty("sun.stdout.encoding")));
+//        setErr0(newPrintStream(ConsoleStreams.err, props.getProperty("sun.stderr.encoding")));
 
         // Setup Java signal handlers for HUP, TERM, and INT (where available).
         Terminator.setup();
@@ -2215,6 +2224,9 @@ public final class System {
             public void addReadsAllUnnamed(Module m) {
                 m.implAddReadsAllUnnamed();
             }
+            public void addExports(Module m, String pn) {
+                m.implAddExports(pn);
+            }
             public void addExports(Module m, String pn, Module other) {
                 m.implAddExports(pn, other);
             }
@@ -2294,6 +2306,11 @@ public final class System {
 
             public Thread currentCarrierThread() {
                 return Thread.currentCarrierThread();
+            }
+
+            @ChangesCurrentThread
+            public void setCurrentThread(Thread thread) {
+                Thread.currentThread().setCurrentThread(thread);
             }
 
             @ChangesCurrentThread

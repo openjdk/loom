@@ -34,7 +34,7 @@
 #include "jfr/recorder/storage/jfrStorage.hpp"
 #include "jfr/support/jfrJavaThread.hpp"
 #include "jfr/support/jfrThreadLocal.hpp"
-#include "jfr/utilities/jfrSpinlock.hpp"
+#include "jfr/utilities/jfrSpinlockHelper.hpp"
 #include "memory/allocation.inline.hpp"
 #include "runtime/os.hpp"
 #include "runtime/thread.inline.hpp"
@@ -283,7 +283,7 @@ traceid JfrThreadLocal::virtual_thread_id(const Thread* t, oop vthread) {
 traceid JfrThreadLocal::assign_thread_id(const Thread* t) {
   assert(t != NULL, "invariant");
   JfrThreadLocal* const tl = t->jfr_thread_local();
-  JfrSpinlock spinlock(&tl->_critical_section);
+  JfrSpinlockHelper spinlock(&tl->_critical_section);
   traceid tid = tl->_thread_id;
   if (tid == 0) {
     tid = t->is_Java_thread() ? JfrJavaThread::java_thread_id((JavaThread*)t) :

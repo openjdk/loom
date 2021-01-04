@@ -33,12 +33,12 @@
   frame pd_last_frame();
 
  public:
-  // Mutators are highly dangerous....
-  intptr_t* last_Java_fp()                       { return _anchor.last_Java_fp(); }
-  void  set_last_Java_fp(intptr_t* fp)           { _anchor.set_last_Java_fp(fp);   }
-
   static ByteSize last_Java_fp_offset()          {
     return byte_offset_of(JavaThread, _anchor) + JavaFrameAnchor::last_Java_fp_offset();
+  }
+
+  static ByteSize saved_rbp_address_offset() {
+    return byte_offset_of(JavaThread, _anchor) + JavaFrameAnchor::saved_rbp_address_offset();
   }
 
   bool pd_get_top_frame_for_signal_handler(frame* fr_addr, void* ucontext,

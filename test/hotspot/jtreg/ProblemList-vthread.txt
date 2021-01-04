@@ -1,12 +1,28 @@
 ### Filed bugs
 
-gc/g1/humongousObjects/TestNoAllocationsInHRegions.java                                         8241630 generic-all
-runtime/cds/serviceability/transformRelatedClasses/TransformInterfaceAndImplementor.java        8253693 generic-all
 runtime/Metaspace/DefineClass.java                                                              8253378 generic-all
+runtime/logging/TestMethodHandlesVerbose.java                                                   8253907 windows-all
+serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.java                  8253617 generic-all
+compiler/jsr292/TestArrayReturnType.java                                                        8255197 generic-all
+
+# Issues caused a lot of test failures
+
+compiler/escapeAnalysis/TestArrayCopy.java                                                      8254093 generic-all
+runtime/cds/serviceability/transformRelatedClasses/TransformInterfaceAndImplementor.java        8253693 generic-all
+
+gc/g1/TestPeriodicCollectionJNI.java                                                            8254852 generic-all
+vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8254852 generic-all
+gc/cslocker/TestCSLocker.java                                                                   8254852 generic-all
+
+gc/g1/humongousObjects/TestNoAllocationsInHRegions.java                                         8241630 generic-all
+vmTestbase/gc/memory/Churn/Churn4/Churn4.java                                                   8241630 generic-all
+vmTestbase/gc/memory/UniThread/Linear1/Linear1.java	                                        8241630 generic-all
+vmTestbase/gc/memory/UniThread/Linear2/Linear2.java                                             8241630 generic-all
+vmTestbase/gc/gctests/RememberedSet/RememberedSet.java                                          8241630 generic-all
+
 runtime/whitebox/WBStackSize.java                                                               8253670 generic-all
 runtime/execstack/Testexecstack.java                                                            8253670 generic-all
 serviceability/dcmd/compiler/CodeCacheTest.java                                                 8253570 generic-all
-serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.java                  8253617 generic-all
 vmTestbase/nsk/stress/stack/stack019.java                                                       8253670 generic-all
 vmTestbase/nsk/stress/stack/stack009.java                                                       8253670 generic-all
 vmTestbase/nsk/stress/stack/stack007.java                                                       8253670 generic-all
@@ -14,6 +30,35 @@ vmTestbase/nsk/stress/stack/stack006.java                                       
 vmTestbase/nsk/stress/stack/stack004.java                                                       8253670 generic-all
 vmTestbase/nsk/stress/stack/stack003.java                                                       8253670 generic-all
 vmTestbase/nsk/stress/except/except010.java                                                     8253670 generic-all
+
+vmTestbase/nsk/stress/strace/strace001.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace002.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace003.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace004.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace005.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace006.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace007.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace008.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace009.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace010.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace011.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace012.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace013.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace014.java                                                     8254188 generic-all
+vmTestbase/nsk/stress/strace/strace015.java                                                     8254188 generic-all
+
+compiler/codegen/TestOopCmp.java                                                                8254187 generic-all
+compiler/memoryinitialization/ZeroTLABTest.java                                                 8254187 generic-all
+gc/epsilon/TestByteArrays.java                                                                  8254187 generic-all
+gc/epsilon/TestManyThreads.java                                                                 8254187 generic-all
+gc/epsilon/TestObjects.java                                                                     8254187 generic-all
+gc/epsilon/TestRefArrays.java                                                                   8254187 generic-all
+gc/survivorAlignment/TestAllocationInEden.java                                                  8254187 generic-all
+
+compiler/codegen/Test6942326.java                                                               8253918 generic-all
+compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java                                       8253918 generic-all
+gc/TestJNIWeak/TestJNIWeak.java                                                                 8253918 generic-all
+runtime/Nestmates/membership/TestNestmateMembership.java                                        8253918 generic-all
 
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
@@ -27,6 +72,7 @@ serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
 serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
 serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java
 serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java
+serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java
 
 ####
 # JVMTI tests failing to find thread
@@ -174,6 +220,7 @@ runtime/ClassUnload/KeepAliveClassLoader.java
 runtime/ClassUnload/DictionaryDependsTest.java
 runtime/ClassUnload/KeepAliveClass.java
 runtime/ClassUnload/ConstantPoolDependsTest.java
+vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 
 
 ##########
@@ -239,6 +286,22 @@ vmTestbase/nsk/jvmti/SetLocalVariable/setlocal004/TestDescription.java
 vmTestbase/nsk/jvmti/StopThread/stopthrd006/TestDescription.java
 vmTestbase/nsk/jvmti/scenarios/events/EM02/em02t012/TestDescription.java
 
+# Events are not handled on vthreads while checking function (GetFrameLocation) does
+vmTestbase/nsk/jvmti/FramePop/framepop001/TestDescription.java
+vmTestbase/nsk/jvmti/GetFrameLocation/frameloc001/TestDescription.java
+vmTestbase/nsk/jvmti/GetLocalVariable/getlocal001/TestDescription.java
+vmTestbase/nsk/jvmti/MethodEntry/mentry001/TestDescription.java
+vmTestbase/nsk/jvmti/MethodExit/mexit001/TestDescription.java
+vmTestbase/nsk/jvmti/MethodExit/mexit002/TestDescription.java
+vmTestbase/nsk/jvmti/NotifyFramePop/nframepop001/TestDescription.java
+vmTestbase/nsk/jvmti/unit/GetLocalVariable/getlocal003/TestDescription.java
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS101/hs101t007/TestDescription.java
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS101/hs101t008/TestDescription.java
+
+# returned JVMTI_ERROR_INVALID_THREAD for non-implented
+vmTestbase/nsk/jvmti/Exception/exception001/TestDescription.java
+vmTestbase/nsk/jvmti/RedefineClasses/redefclass005/TestDescription.java
+vmTestbase/nsk/jvmti/RedefineClasses/redefclass018/TestDescription.java
 
 ####
 ## Breakpoint expects name of virtual thread which is set by test.

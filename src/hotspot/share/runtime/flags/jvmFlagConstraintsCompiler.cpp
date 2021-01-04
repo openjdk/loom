@@ -25,6 +25,7 @@
 #include "precompiled.hpp"
 #include "code/relocInfo.hpp"
 #include "compiler/compilerDefinitions.hpp"
+#include "compiler/compilerDirectives.hpp"
 #include "oops/metadata.hpp"
 #include "runtime/os.hpp"
 #include "interpreter/invocationCounter.hpp"
@@ -285,6 +286,17 @@ JVMFlag::Error ArraycopyDstPrefetchDistanceConstraintFunc(uintx value, bool verb
   return JVMFlag::SUCCESS;
 }
 
+JVMFlag::Error AVX3ThresholdConstraintFunc(int value, bool verbose) {
+  if (value != 0 && !is_power_of_2(value)) {
+    JVMFlag::printError(verbose,
+                        "AVX3Threshold ( %d ) must be 0 or "
+                        "a power of two value between 0 and MAX_INT\n", value);
+    return JVMFlag::VIOLATES_CONSTRAINT;
+  }
+
+  return JVMFlag::SUCCESS;
+}
+
 JVMFlag::Error ArraycopySrcPrefetchDistanceConstraintFunc(uintx value, bool verbose) {
   if (value >= 4032) {
     JVMFlag::printError(verbose,
@@ -402,3 +414,27 @@ JVMFlag::Error LoopStripMiningIterConstraintFunc(uintx value, bool verbose) {
   return JVMFlag::SUCCESS;
 }
 #endif // COMPILER2
+
+JVMFlag::Error DisableIntrinsicConstraintFunc(ccstrlist value, bool verbose) {
+  ControlIntrinsicValidator validator(value, true/*disabled_all*/);
+  if (!validator.is_valid()) {
+    JVMFlag::printError(verbose,
+                        "Unrecognized intrinsic detected in DisableIntrinsic: %s\n",
+                        validator.what());
+    return JVMFlag::VIOLATES_CONSTRAINT;
+  }
+
+  return JVMFlag::SUCCESS;
+}
+
+JVMFlag::Error ControlIntrinsicConstraintFunc(ccstrlist value, bool verbose) {
+  ControlIntrinsicValidator validator(value, false/*disabled_all*/);
+  if (!validator.is_valid()) {
+    JVMFlag::printError(verbose,
+                        "Unrecognized intrinsic detected in ControlIntrinsic: %s\n",
+                        validator.what());
+    return JVMFlag::VIOLATES_CONSTRAINT;
+  }
+
+  return JVMFlag::SUCCESS;
+}
