@@ -31,6 +31,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Iterator;
@@ -58,16 +59,14 @@ public class ThreadDump {
     /**
      * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
      */
-    public static void dumpThreads(String file) throws IOException {
+    public static byte[] dumpThreads(String file) throws IOException {
         PrivilegedAction<Path> pa = () -> Path.of(file).toAbsolutePath();
         Path path = AccessController.doPrivileged(pa);
-
-        try (OutputStream out = Files.newOutputStream(path);
+        try (OutputStream out = Files.newOutputStream(path, StandardOpenOption.CREATE_NEW);
              PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
             dumpThreads(ps);
         }
-
-        // return path.toByteArray
+        return String.format("Created %s%n", path).getBytes("UTF-8");
     }
 
     /**
@@ -122,16 +121,14 @@ public class ThreadDump {
     /**
      * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
      */
-    public static void dumpThreadsToJson(String file) throws IOException {
+    public static byte[] dumpThreadsToJson(String file) throws IOException {
         PrivilegedAction<Path> pa = () -> Path.of(file).toAbsolutePath();
         Path path = AccessController.doPrivileged(pa);
-
-        try (OutputStream out = Files.newOutputStream(path);
+        try (OutputStream out = Files.newOutputStream(path, StandardOpenOption.CREATE_NEW);
              PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
             dumpThreadsToJson(ps);
         }
-
-        // return path.toByteArray
+        return String.format("Created %s%n", path).getBytes("UTF-8");
     }
 
     /**

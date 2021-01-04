@@ -1144,9 +1144,9 @@ void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
     }
   } else {
     if (json) {
-      dumpToFile(vmSymbols::dumpThreadsToJson_name(), vmSymbols::string_void_signature(), path, CHECK);
+      dumpToFile(vmSymbols::dumpThreadsToJson_name(), vmSymbols::string_byte_array_signature(), path, CHECK);
     } else {
-      dumpToFile(vmSymbols::dumpThreads_name(), vmSymbols::string_void_signature(), path, CHECK);
+      dumpToFile(vmSymbols::dumpThreads_name(), vmSymbols::string_byte_array_signature(), path, CHECK);
     }
   }
 }
@@ -1209,7 +1209,7 @@ void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char*
   }
 
   // invoke the ThreadDump method to dump to file
-  JavaValue result(T_VOID);
+  JavaValue result(T_OBJECT);
   JavaCallArguments args;
   args.push_oop(h_path);
   JavaCalls::call_static(&result,
@@ -1224,4 +1224,14 @@ void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char*
     CLEAR_PENDING_EXCEPTION;
     return;
   }
+
+  // check that result is byte array
+  oop res = (oop)result.get_jobject();
+  assert(res->is_typeArray(), "just checking");
+  assert(TypeArrayKlass::cast(res->klass())->element_type() == T_BYTE, "just checking");
+
+  // copy the bytes to the output stream
+  typeArrayOop ba = typeArrayOop(res);
+  jbyte* addr = typeArrayOop(res)->byte_at_addr(0);
+  output()->print_raw((const char*)addr, ba->length());
 }

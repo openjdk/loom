@@ -577,6 +577,7 @@
   template(object_object_signature,                   "(Ljava/lang/Object;)Ljava/lang/Object;")   \
   template(string_void_signature,                     "(Ljava/lang/String;)V")                    \
   template(string_int_signature,                      "(Ljava/lang/String;)I")                    \
+  template(string_byte_array_signature,               "(Ljava/lang/String;)[B")                   \
   template(throwable_void_signature,                  "(Ljava/lang/Throwable;)V")                 \
   template(void_throwable_signature,                  "()Ljava/lang/Throwable;")                  \
   template(throwable_throwable_signature,             "(Ljava/lang/Throwable;)Ljava/lang/Throwable;")             \
