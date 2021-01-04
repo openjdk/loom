@@ -64,7 +64,6 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
         }
     }
 
-    //private final Lifetime lifetime = Lifetime.start();   // experimental
     private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
     private final ReentrantLock terminationLock = new ReentrantLock();
     private final Condition terminationCondition = terminationLock.newCondition();
@@ -202,7 +201,6 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
         try {
             ExecutorService.super.close(); // waits for executor to terminate
         } finally {
-            //lifetime.close();
         }
     }
 
@@ -229,7 +227,6 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
         Thread thread = factory.newThread(task);
         if (thread == null)
             throw new RejectedExecutionException();
-        //JLA.unsafeSetLifetime(thread, lifetime);  // experimental
         return thread;
     }
 
@@ -240,7 +237,6 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
      */
     private void taskComplete(Thread thread) {
         boolean removed = threads.remove(thread);
-        //JLA.removeObserver(thread);
         assert removed;
         if (state == SHUTDOWN) {
             tryTerminate();
