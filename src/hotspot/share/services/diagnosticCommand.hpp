@@ -928,6 +928,13 @@ public:
   static const char *description() {
     return "Java thread dump in plain text or JSON format.";
   }
+  static const char* impact() {
+    return "Medium: Depends on the number of threads.";
+  }
+  static const JavaPermission permission() {
+    JavaPermission p = {"java.lang.management.ManagementPermission", "monitor", NULL};
+    return p;
+  }
   static int num_arguments();
   virtual void execute(DCmdSource source, TRAPS);
 };

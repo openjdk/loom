@@ -1116,9 +1116,9 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
 
 JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
                                        DCmdWithParser(output, heap),
-  _format("format", "Output format (plain text or JSON)", "STRING", false, NULL),
+  _format("-format", "Output format (\"plain\" or \"json\")", "STRING", false, "plain"),
   _filepath("filepath", "The file path to the output file", "STRING", false, NULL) {
-  _dcmdparser.add_dcmd_argument(&_format);
+  _dcmdparser.add_dcmd_option(&_format);
   _dcmdparser.add_dcmd_argument(&_filepath);
 }
 
