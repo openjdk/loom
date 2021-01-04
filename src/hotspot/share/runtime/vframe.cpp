@@ -24,6 +24,7 @@
 
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
+#include "classfile/javaThreadStatus.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "code/codeCache.hpp"
@@ -36,6 +37,7 @@
 #include "memory/resourceArea.hpp"
 #include "oops/instanceKlass.hpp"
 #include "oops/oop.inline.hpp"
+#include "prims/jvmtiExport.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/objectMonitor.hpp"
@@ -99,7 +101,7 @@ vframe* vframe::sender() const {
   frame s = _fr.real_sender(&temp_map);
   if (s.is_first_frame()) return NULL;
   if (Continuation::is_continuation_enterSpecial(s)) {
-    if (Continuation::continuation_scope(Continuation::get_continutation_for_frame(temp_map.thread(), _fr)) == java_lang_VirtualThread::vthread_scope())
+    if (Continuation::continuation_scope(Continuation::get_continuation_for_frame(temp_map.thread(), _fr)) == java_lang_VirtualThread::vthread_scope())
       return NULL;
   }
   return vframe::new_vframe(&s, &temp_map, thread());
@@ -195,7 +197,7 @@ void javaVFrame::print_lock_info_on(outputStream* st, int frame_count) {
         if (sv->type() == T_OBJECT) {
           Handle o = locs->at(0)->get_obj();
           if (java_lang_Thread::get_thread_status(thread()->threadObj()) ==
-                                java_lang_Thread::BLOCKED_ON_MONITOR_ENTER) {
+                                JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER) {
             wait_state = "waiting to re-lock in wait()";
           }
           print_locked_object_class_name(st, o, wait_state);
@@ -774,7 +776,7 @@ void javaVFrame::print_value() const {
     RegisterMap map = *register_map();
     uint size = (map.in_cont() || Continuation::is_cont_barrier_frame(fr()))
       ? Continuation::frame_size(fr(), &map)
-      : fr().frame_size(&map);
+      : fr().frame_size();
 #ifdef _LP64
     if (size > 8*K) warning("SUSPICIOUSLY LARGE FRAME (%d)", size);
 #else

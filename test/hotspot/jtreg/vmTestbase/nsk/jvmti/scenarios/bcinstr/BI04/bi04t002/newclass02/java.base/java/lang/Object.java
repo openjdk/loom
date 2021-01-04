@@ -23,6 +23,7 @@
 
 package java.lang;
 
+import jdk.internal.misc.Blocker;
 import nsk.jvmti.scenarios.bcinstr.BI04.bi04t002a;
 
 /**
@@ -367,7 +368,18 @@ public class Object {
      * @see        java.lang.Object#notifyAll()
      */
     public final void wait(long timeoutMillis) throws InterruptedException {
-        wait0(timeoutMillis);
+        Thread thread = Thread.currentThread();
+        if (thread.isVirtual()) {
+            try {
+                Blocker.managedBlock(() -> wait0(timeoutMillis));
+            } catch (Exception e) {
+                if (e instanceof InterruptedException)
+                    thread.getAndClearInterrupt();
+                throw e;
+            }
+        } else {
+            wait0(timeoutMillis);
+        }
     }
 
     /**

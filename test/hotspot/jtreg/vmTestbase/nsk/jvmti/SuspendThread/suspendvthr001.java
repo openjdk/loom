@@ -112,14 +112,11 @@ public class suspendvthr001 extends DebugeeClass {
 
     Thread start_thread(String name, suspendvthr001Thread thread) {
         System.out.println("## Java: start_thread: Starting thread: " + name);
-        Thread vt = Thread.newThread(name, Thread.VIRTUAL, thread); // create tested vthread
-        vt.start(); // run tested vthread
-        if (!thread.checkReady()) {
-            throw new Failure("## Java: start_thread: Unable to prepare tested vthread: " + name);
-        }
+        Thread vthread = Thread.startVirtualThread(name, thread);
+        thread.ensureReady();
         // testing sync
         log.display("Sync: thread started: " + name);
-        return vt;
+        return vthread;
     }
 }
 
@@ -152,8 +149,8 @@ class suspendvthr001Thread extends Thread {
         }
     }
 
-    // check if thread is ready
-    public boolean checkReady() {
+    // ensure thread is ready
+    public void ensureReady() {
         try {
             while (!threadReady) {
                 sleep(1000);
@@ -161,7 +158,6 @@ class suspendvthr001Thread extends Thread {
         } catch (InterruptedException e) {
             throw new Failure("Interruption while preparing tested thread: \n\t" + e);
         }
-        return threadReady;
     }
 
     // let thread to finish

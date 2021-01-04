@@ -106,12 +106,6 @@ handleFrameEvent(JNIEnv *env, EventInfo *evinfo,
     FrameNumber fnum = 0;
     jvalue returnValue;
 
-    // vthread fixme: this assert should probably be removed. I don't know how to trigger
-    // the ENTER/EXIT events from IDEA, but with jdb it can be done with the "trace"
-    // command. So simply trace a method that will be executed by a vthread, and that
-    // should trigger the assert. Then remove the assert and confirm that tracing
-    // works properly.
-    JDI_ASSERT(!isVThread(evinfo->thread));
     error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameLocation)
             (gdata->jvmti, evinfo->thread, fnum, &method, &location);
     if (error != JVMTI_ERROR_NONE) {

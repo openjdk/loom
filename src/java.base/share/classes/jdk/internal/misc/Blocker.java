@@ -25,11 +25,16 @@
 
 package jdk.internal.misc;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.invoke.MethodType;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinPool.ManagedBlocker;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
@@ -38,15 +43,26 @@ import jdk.internal.access.SharedSecrets;
 
 /**
  * Defines static methods to execute blocking tasks on virtual threads.
- *
- * The managedBlock methods are used to execute blocking tasks on the caller
- * thread or its carrier thread. If the carrier thread is a ForkJoinWorkerThread
- * then the task runs in ForkJoinPool.ManagedBlocker to that its pool may be
- * expanded to support additional parallelism during the blocking operation.
+ * If the carrier thread is a ForkJoinWorkerThread then the task runs in a
+ * ForkJoinPool.ManagedBlocker to that its pool may be expanded to support
+ * additional parallelism during the blocking operation.
  */
 public class Blocker {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+
+    private static final MethodHandle compensatedBlock;
+    static {
+        try {
+            MethodType methodType = MethodType.methodType(void.class, ManagedBlocker.class);
+            Lookup l = MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
+            compensatedBlock = l.findVirtual(ForkJoinPool.class,
+                    "compensatedBlock",
+                    methodType);
+        } catch (Exception e) {
+            throw new InternalError(e);
+        }
+    }
 
     private Blocker() { }
 
@@ -67,7 +83,7 @@ public class Blocker {
     }
 
     private static class CallableBlocker<V, X extends Throwable>
-            implements ForkJoinPool.ManagedBlocker {
+            implements ManagedBlocker {
 
         private final BlockingCallable<V, X> task;
         private boolean done;
@@ -100,7 +116,7 @@ public class Blocker {
     }
 
     private static class RunnableBlocker<X extends Throwable>
-            implements ForkJoinPool.ManagedBlocker {
+            implements ManagedBlocker {
         private final BlockingRunnable<X> task;
         private boolean done;
 
@@ -133,22 +149,18 @@ public class Blocker {
      * this method.
      */
     public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task) {
-        Thread thread = Thread.currentThread();
-        if (thread.isVirtual()) {
-            Thread carrier = JLA.currentCarrierThread();
-            if (carrier instanceof ForkJoinWorkerThread) {
-                JLA.setCurrentThread(carrier);
-                try {
-                    var blocker = new CallableBlocker<>(task);
-                    ForkJoinPool.managedBlock(blocker);
-                    return blocker.result();
-                } catch (Throwable e) {
-                    U.throwException(e);
-                } finally {
-                    JLA.setCurrentThread(thread);
-                }
-                assert false;  // should not get here
+        Thread carrier = JLA.currentCarrierThread();
+        ForkJoinPool pool;
+        if (carrier instanceof ForkJoinWorkerThread
+            && (pool = ((ForkJoinWorkerThread) carrier).getPool()) != null) {
+            try {
+                var blocker = new CallableBlocker<>(task);
+                compensatedBlock.invoke(pool, blocker);
+                return blocker.result();
+            } catch (Throwable e) {
+                U.throwException(e);
             }
+            assert false;  // should not get here
         }
 
         // run directly
@@ -167,21 +179,17 @@ public class Blocker {
      * this method.
      */
     public static <X extends Throwable> void managedBlock(BlockingRunnable<X> task) {
-        Thread thread = Thread.currentThread();
-        if (thread.isVirtual()) {
-            Thread carrier = JLA.currentCarrierThread();
-            if (carrier instanceof ForkJoinWorkerThread) {
-                JLA.setCurrentThread(carrier);
-                try {
-                    ForkJoinPool.managedBlock(new RunnableBlocker<>(task));
-                    return;
-                } catch (Throwable e) {
-                    U.throwException(e);
-                } finally {
-                    JLA.setCurrentThread(thread);
-                }
-                assert false;  // should not get here
+        Thread carrier = JLA.currentCarrierThread();
+        ForkJoinPool pool;
+        if (carrier instanceof ForkJoinWorkerThread
+                && (pool = ((ForkJoinWorkerThread) carrier).getPool()) != null) {
+            try {
+                compensatedBlock.invoke(pool, new RunnableBlocker<>(task));
+                return;
+            } catch (Throwable e) {
+                U.throwException(e);
             }
+            assert false;  // should not get here
         }
 
         // run directly

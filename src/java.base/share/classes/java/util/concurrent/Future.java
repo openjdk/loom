@@ -133,6 +133,38 @@ public interface Future<V> {
     boolean isDone();
 
     /**
+     * Returns {@code true} if this task completed normally.
+     *
+     * @implSpec
+     * The default implementation invokes {@code isDone} to test if the task
+     * has completed. If completed, it invokes {@code get()} and returns
+     * {@code true} if the task completed normally. It returns {@code false}
+     * if the task is not completed or did not complete normally.
+     *
+     * @return {@code true} if this task completed normally
+     * @since 99
+     */
+    default boolean isCompletedNormally() {
+        if (!isDone())
+            return false;
+        boolean interrupted = false;
+        try {
+            while (true) {
+                try {
+                    get();  // may throw InterruptedException when done
+                    return true;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                } catch (ExecutionException | CancellationException e) {
+                    return false;
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
      * Waits if necessary for the computation to complete, and then
      * retrieves its result.
      *
@@ -153,7 +185,7 @@ public interface Future<V> {
      *
      * @implSpec
      * The default implementation invokes {@code get()} to wait for the
-     * computation to complete
+     * computation to complete.
      *
      * @return the computed result
      * @throws CancellationException if the computation was cancelled
@@ -173,9 +205,7 @@ public interface Future<V> {
                 }
             }
         } finally {
-            if (interrupted) {
-                Thread.currentThread().interrupt();
-            }
+            if (interrupted) Thread.currentThread().interrupt();
         }
     }
 

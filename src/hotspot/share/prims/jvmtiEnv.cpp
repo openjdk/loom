@@ -38,6 +38,7 @@
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
 #include "oops/instanceKlass.hpp"
+#include "oops/klass.inline.hpp"
 #include "oops/objArrayOop.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "prims/jniCheck.hpp"
@@ -138,22 +139,46 @@ JvmtiEnv::Deallocate(unsigned char* mem) {
   return deallocate(mem);
 } /* end Deallocate */
 
-// Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
+// Threads_lock NOT held
+// thread - NOT pre-checked
 // data - NULL is a valid value, must be checked
 jvmtiError
-JvmtiEnv::SetThreadLocalStorage(JavaThread* java_thread, const void* data) {
-  JvmtiThreadState* state = java_thread->jvmti_thread_state();
+JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JvmtiThreadState* state = NULL;
+  oop thread_obj = NULL;
+
+  if (thread == NULL) {
+    java_thread = JavaThread::current();
+    state = java_thread->jvmti_thread_state(); 
+  } else {
+    ThreadsListHandle tlh;
+    JvmtiVTMTDisabler vtmt_disabler;
+
+    err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    } 
+  }
   if (state == NULL) {
     if (data == NULL) {
       // leaving state unset same as data set to NULL
       return JVMTI_ERROR_NONE;
     }
     // otherwise, create the state
-    state = JvmtiThreadState::state_for(java_thread);
+    state = JvmtiThreadState::state_for(java_thread, thread_obj);
     if (state == NULL) {
       return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
+#ifdef DBG // TMP
+    ResourceMark rm(current_thread);
+    oop name_oop = java_lang_Thread::name(thread_oop);
+    const char* name_str = java_lang_String::as_utf8_string(name_oop);
+    name_str = name_str == NULL ? "<NULL>" : name_str;
+    printf("DBG: state_for_while_locked: %s cthread JvmtiThreadState: %p, %s\n",
+           action, (void*)state, name_str); fflush(0);
+#endif
   }
   state->env_thread_state(this)->set_agent_thread_local_storage_data((void*)data);
   return JVMTI_ERROR_NONE;
@@ -181,13 +206,24 @@ JvmtiEnv::GetThreadLocalStorage(jthread thread, void** data_ptr) {
     debug_only(VMNativeEntryWrapper __vew;)
 
     JavaThread* java_thread = NULL;
+    oop thread_obj = NULL;
     ThreadsListHandle tlh(current_thread);
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, NULL);
+    JvmtiVTMTDisabler vtmt_disabler;
+
+    jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
 
-    JvmtiThreadState* state = java_thread->jvmti_thread_state();
+    JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread, thread_obj);
+#ifdef DBG // TMP
+    ResourceMark rm(current_thread);
+    oop name_oop = java_lang_Thread::name(thread_obj);
+    const char* name_str = java_lang_String::as_utf8_string(name_oop);
+    name_str = name_str == NULL ? "<NULL>" : name_str;
+    printf("DBG: GetThreadLocalStorage: cthread JvmtiThreadState: %p, %s\n",
+           (void*)state, name_str); fflush(0);
+#endif
     *data_ptr = (state == NULL) ? NULL :
       state->env_thread_state(this)->get_agent_thread_local_storage_data();
   }
@@ -536,41 +572,39 @@ JvmtiEnv::SetEventCallbacks(const jvmtiEventCallbacks* callbacks, jint size_of_c
 // event_thread - NULL is a valid value, must be checked
 jvmtiError
 JvmtiEnv::SetEventNotificationMode(jvmtiEventMode mode, jvmtiEvent event_type, jthread event_thread,   ...) {
+  bool enabled = (mode == JVMTI_ENABLE);
+
+  // event_type must be valid
+  if (!JvmtiEventController::is_valid_event_type(event_type)) {
+    return JVMTI_ERROR_INVALID_EVENT_TYPE;
+  }
+
+  // assure that needed capabilities are present
+  if (enabled && !JvmtiUtil::has_event_capability(event_type, get_capabilities())) {
+    return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+  }
+
+  if (event_type == JVMTI_EVENT_CLASS_FILE_LOAD_HOOK && enabled) {
+    record_class_file_load_hook_enabled();
+  }
+
   if (event_thread == NULL) {
     // Can be called at Agent_OnLoad() time with event_thread == NULL
     // when Thread::current() does not work yet so we cannot create a
     // ThreadsListHandle that is common to both thread-specific and
     // global code paths.
 
-    // event_type must be valid
-    if (!JvmtiEventController::is_valid_event_type(event_type)) {
-      return JVMTI_ERROR_INVALID_EVENT_TYPE;
-    }
-
-    bool enabled = (mode == JVMTI_ENABLE);
-
-    // assure that needed capabilities are present
-    if (enabled && !JvmtiUtil::has_event_capability(event_type, get_capabilities())) {
-      return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
-    }
-
-    if (event_type == JVMTI_EVENT_CLASS_FILE_LOAD_HOOK && enabled) {
-      record_class_file_load_hook_enabled();
-    }
-
-    JvmtiEventController::set_user_enabled(this, (JavaThread*) NULL, event_type, enabled);
+    JvmtiEventController::set_user_enabled(this, (JavaThread*) NULL, (oop) NULL, event_type, enabled);
   } else {
     // We have a specified event_thread.
     JavaThread* java_thread = NULL;
     ThreadsListHandle tlh;
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), event_thread, &java_thread, NULL);
+    oop thread_obj = NULL;
+    JvmtiVTMTDisabler vtmt_disabler;
+
+    jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), event_thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
       return err;
-    }
-
-    // event_type must be valid
-    if (!JvmtiEventController::is_valid_event_type(event_type)) {
-      return JVMTI_ERROR_INVALID_EVENT_TYPE;
     }
 
     // global events cannot be controlled at thread level.
@@ -578,17 +612,12 @@ JvmtiEnv::SetEventNotificationMode(jvmtiEventMode mode, jvmtiEvent event_type, j
       return JVMTI_ERROR_ILLEGAL_ARGUMENT;
     }
 
-    bool enabled = (mode == JVMTI_ENABLE);
-
     // assure that needed capabilities are present
-    if (enabled && !JvmtiUtil::has_event_capability(event_type, get_capabilities())) {
+    if (java_lang_VirtualThread::is_instance(thread_obj) && !JvmtiExport::can_support_virtual_threads()) {
       return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
 
-    if (event_type == JVMTI_EVENT_CLASS_FILE_LOAD_HOOK && enabled) {
-      record_class_file_load_hook_enabled();
-    }
-    JvmtiEventController::set_user_enabled(this, java_thread, event_type, enabled);
+    JvmtiEventController::set_user_enabled(this, java_thread, thread_obj, event_type, enabled);
   }
 
   return JVMTI_ERROR_NONE;
@@ -1242,7 +1271,7 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
   } else {
     priority = java_lang_Thread::priority(thread_obj());
     is_daemon = java_lang_Thread::is_daemon(thread_obj());
-    if (java_lang_Thread::get_thread_status(thread_obj()) == java_lang_Thread::TERMINATED) {
+    if (java_lang_Thread::get_thread_status(thread_obj()) == JavaThreadStatus::TERMINATED) {
       thread_group = Handle(current_thread, NULL);
     } else {
       thread_group = Handle(current_thread, java_lang_Thread::threadGroup(thread_obj()));
@@ -1472,6 +1501,8 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
                                                   monitor_ptr);
       Handshake::execute(&op, java_thread);
       err = op.result();
+    } else {
+      *monitor_ptr = NULL;
     }
     return err;
   }
@@ -1593,17 +1624,11 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
 
   const char* name;
   Handle parent_group;
-  bool is_daemon;
   ThreadPriority max_priority;
 
   name         = java_lang_ThreadGroup::name(group_obj());
   parent_group = Handle(current_thread, java_lang_ThreadGroup::parent(group_obj()));
-  is_daemon    = java_lang_ThreadGroup::is_daemon(group_obj());
   max_priority = java_lang_ThreadGroup::maxPriority(group_obj());
-
-  info_ptr->is_daemon    = is_daemon;
-  info_ptr->max_priority = max_priority;
-  info_ptr->parent       = jni_reference(parent_group);
 
   if (name != NULL) {
     info_ptr->name = (char*)jvmtiMalloc(strlen(name)+1);
@@ -1612,6 +1637,10 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
   } else {
     info_ptr->name = NULL;
   }
+
+  info_ptr->parent       = jni_reference(parent_group);
+  info_ptr->max_priority = max_priority;
+  info_ptr->is_daemon    = JNI_FALSE;
 
   return JVMTI_ERROR_NONE;
 } /* end GetThreadGroupInfo */
@@ -1913,12 +1942,41 @@ JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jl
 
 
 // Threads_lock NOT held, java_thread not protected by lock
-// java_thread - pre-checked
-// java_thread - unchecked
+// thread - NOT pre-checked
 // depth - pre-checked as non-negative
 jvmtiError
-JvmtiEnv::NotifyFramePop(JavaThread* java_thread, jint depth) {
-  JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread);
+JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  ResourceMark rm;
+  JavaThread* java_thread = NULL;
+  oop thread_obj = NULL;
+  ThreadsListHandle tlh;
+  JvmtiVTMTDisabler vtmt_disabler;
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
+
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    if (!JvmtiExport::can_support_virtual_threads()) {
+      return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    }
+    if (java_thread == NULL) {
+      // java_thread is NULL if virtual thread is unmounted
+      JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_obj);
+      if (state == NULL) {
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
+      }
+      MutexLocker mu(JvmtiThreadState_lock);
+      int frame_number = state->count_frames() - depth;
+      state->env_thread_state(this)->set_frame_pop(frame_number);
+      return JVMTI_ERROR_NONE;
+    }
+  }
+
+  JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_obj);
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
   }

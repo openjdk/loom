@@ -161,6 +161,10 @@ public class FutureTask<V> implements RunnableFuture<V> {
         return state != NEW;
     }
 
+    public boolean isCompletedNormally() {
+        return state == NORMAL;
+    }
+
     public boolean cancel(boolean mayInterruptIfRunning) {
         if (!(state == NEW && STATE.compareAndSet
               (this, NEW, mayInterruptIfRunning ? INTERRUPTING : CANCELLED)))

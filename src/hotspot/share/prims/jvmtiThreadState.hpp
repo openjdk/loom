@@ -29,6 +29,7 @@
 #include "memory/allocation.hpp"
 #include "oops/oopHandle.hpp"
 #include "prims/jvmtiEventController.hpp"
+#include "prims/jvmtiExport.hpp"
 #include "runtime/thread.hpp"
 #include "utilities/growableArray.hpp"
 
@@ -143,8 +144,11 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
  private:
   friend class JvmtiEnv;
   JavaThread        *_thread;
+  JavaThread        *_thread_saved;
+  OopHandle         _thread_oop_h;
   // Jvmti Events that cannot be posted in their current context.
   JvmtiDeferredEventQueue* _jvmti_event_queue;
+  bool              _is_virtual; // state belongs to a virtual thread
   bool              _hide_single_stepping;
   bool              _pending_step_for_popframe;
   bool              _pending_step_for_earlyret;
@@ -168,6 +172,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
 
   // This is only valid when is_interp_only_mode() returns true
   int               _cur_stack_depth;
+  int               _saved_interp_only_mode;
 
   JvmtiThreadEventEnable _thread_event_enable;
 
@@ -188,7 +193,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   JvmtiSampledObjectAllocEventCollector* _sampled_object_alloc_event_collector;
 
   // Should only be created by factory methods
-  JvmtiThreadState(JavaThread *thread);
+  JvmtiThreadState(JavaThread *thread, oop thread_oop);
 
   friend class JvmtiEnvThreadStateIterator;
   inline JvmtiEnvThreadState* head_env_thread_state();
@@ -215,8 +220,13 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
 
   void add_env(JvmtiEnvBase *env);
 
+  void unbind_from(JavaThread* thread);
+  void bind_to(JavaThread* thread);
+
   // Used by the interpreter for fullspeed debugging support
-  bool is_interp_only_mode()                { return _thread->is_interp_only_mode(); }
+  bool is_interp_only_mode()                {
+     return _thread == NULL ?  _saved_interp_only_mode != 0 : _thread->is_interp_only_mode();
+  }
   void enter_interp_only_mode();
   void leave_interp_only_mode();
 
@@ -241,6 +251,13 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   int count_frames();
 
   inline JavaThread *get_thread()      { return _thread;              }
+  inline JavaThread *get_thread_or_saved(); // return _thread_saved if _thread is NULL 
+
+  // Needed for virtual threads as they can migrate to different JavaThread's.
+  // Also used for carrier threads to clear/restore _thread.
+  void set_thread(JavaThread* thread);
+  oop get_thread_oop(); 
+  inline bool is_virtual() { return _is_virtual; } // the _thread is virtual
 
   inline bool is_exception_detected()  { return _exception_state == ES_DETECTED;  }
   inline bool is_exception_caught()    { return _exception_state == ES_CAUGHT;  }
@@ -412,10 +429,10 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
 
   // already holding JvmtiThreadState_lock - retrieve or create JvmtiThreadState
   // Can return NULL if JavaThread is exiting.
-  static JvmtiThreadState *state_for_while_locked(JavaThread *thread);
+  static JvmtiThreadState *state_for_while_locked(JavaThread *thread, oop thread_oop = NULL);
   // retrieve or create JvmtiThreadState
   // Can return NULL if JavaThread is exiting.
-  static JvmtiThreadState *state_for(JavaThread *thread);
+  static JvmtiThreadState *state_for(JavaThread *thread, oop thread_oop = NULL);
 
   // JVMTI ForceEarlyReturn support
 
@@ -457,7 +474,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   void nmethods_do(CodeBlobClosure* cf) NOT_JVMTI_RETURN;
 
 public:
-  void set_should_post_on_exceptions(bool val) { _thread->set_should_post_on_exceptions_flag(val ? JNI_TRUE : JNI_FALSE); }
+  void set_should_post_on_exceptions(bool val);
 
   // Thread local event queue, which doesn't require taking the Service_lock.
   void enqueue_event(JvmtiDeferredEvent* event) NOT_JVMTI_RETURN;

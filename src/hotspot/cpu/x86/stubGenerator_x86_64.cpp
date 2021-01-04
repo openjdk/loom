@@ -36,6 +36,7 @@
 #include "oops/method.hpp"
 #include "oops/objArrayKlass.hpp"
 #include "oops/oop.inline.hpp"
+#include "prims/jvmtiExport.hpp"
 #include "prims/methodHandles.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/frame.inline.hpp"
@@ -576,26 +577,6 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  // Support for intptr_t get_previous_fp()
-  //
-  // This routine is used to find the previous frame pointer for the
-  // caller (current_frame_guess). This is used as part of debugging
-  // ps() is seemingly lost trying to find frames.
-  // This code assumes that caller current_frame_guess) has a frame.
-  address generate_get_previous_fp() {
-    StubCodeMark mark(this, "StubRoutines", "get_previous_fp");
-    const Address old_fp(rbp, 0);
-    const Address older_fp(rax, 0);
-    address start = __ pc();
-
-    __ enter();
-    __ movptr(rax, old_fp); // callers fp
-    __ movptr(rax, older_fp); // the frame for ps()
-    __ pop(rbp);
-    __ ret(0);
-
-    return start;
-  }
 
   // Support for intptr_t get_previous_sp()
   //
@@ -7483,7 +7464,6 @@ RuntimeStub* generate_cont_doYield() {
     StubRoutines::_fence_entry                = generate_orderaccess_fence();
 
     // platform dependent
-    StubRoutines::x86::_get_previous_fp_entry = generate_get_previous_fp();
     StubRoutines::x86::_get_previous_sp_entry = generate_get_previous_sp();
 
     StubRoutines::x86::_verify_mxcsr_entry    = generate_verify_mxcsr();

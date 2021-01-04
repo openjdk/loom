@@ -76,8 +76,12 @@ public class ThreadReferenceImpl extends ObjectReferenceImpl
      * when any thread is resumed.
      */
 
-    // This is cached for the life of the thread
+    // The ThreadGroup is cached for the life of the thread
     private ThreadGroupReference threadGroup;
+
+    // Whether a thread is a virtual thread or not is cached
+    private volatile boolean isVirtual;
+    private volatile boolean isVirtualCached;
 
     // This is cached only while this one thread is suspended.  Each time
     // the thread is resumed, we abandon the current cache object and
@@ -601,10 +605,18 @@ public class ThreadReferenceImpl extends ObjectReferenceImpl
 
     @Override
     public boolean isVirtual() {
-        try {
-            return JDWP.ThreadReference.IsVirtual.process(vm, this).isVirtual;
-        } catch (JDWPException exc) {
-            throw exc.toJDIException();
+        if (isVirtualCached) {
+            return isVirtual;
+        } else {
+            boolean result;
+            try {
+                result = JDWP.ThreadReference.IsVirtual.process(vm, this).isVirtual;
+            } catch (JDWPException exc) {
+                throw exc.toJDIException();
+            }
+            isVirtual = result;
+            isVirtualCached = true;
+            return result;
         }
     }
 

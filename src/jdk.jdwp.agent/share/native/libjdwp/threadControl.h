@@ -57,7 +57,6 @@ InvokeRequest *threadControl_getInvokeRequest(jthread);
 jboolean threadControl_isDebugThread(jthread thread);
 jvmtiError threadControl_addDebugThread(jthread thread);
 
-void threadControl_setName(jthread thread, const char *name);
 jvmtiError threadControl_applicationThreadStatus(jthread thread, jdwpThreadStatus *pstatus, jint *suspendStatus);
 jvmtiError threadControl_interrupt(jthread thread);
 jvmtiError threadControl_stop(jthread thread, jobject throwable);

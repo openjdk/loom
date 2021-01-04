@@ -252,6 +252,7 @@ class LIRGenerator: public InstructionVisitor, public BlockClosure {
   void do_isInstance(Intrinsic* x);
   void do_isPrimitive(Intrinsic* x);
   void do_getClass(Intrinsic* x);
+  void do_getObjectSize(Intrinsic* x);
   void do_currentThread0(Intrinsic* x);
   void do_scopedCache(Intrinsic* x);
   void do_vthread(Intrinsic* x);
@@ -266,6 +267,7 @@ class LIRGenerator: public InstructionVisitor, public BlockClosure {
   void do_update_CRC32(Intrinsic* x);
   void do_update_CRC32C(Intrinsic* x);
   void do_vectorizedMismatch(Intrinsic* x);
+  void do_blackhole(Intrinsic* x);
   void do_continuation_doYield(Intrinsic* x);
 
  public:

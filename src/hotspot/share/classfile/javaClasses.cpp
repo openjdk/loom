@@ -26,6 +26,7 @@
 #include "classfile/altHashing.hpp"
 #include "classfile/classLoaderData.inline.hpp"
 #include "classfile/javaClasses.inline.hpp"
+#include "classfile/javaThreadStatus.hpp"
 #include "classfile/moduleEntry.hpp"
 #include "classfile/stringTable.hpp"
 #include "classfile/symbolTable.hpp"
@@ -43,9 +44,10 @@
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
 #include "oops/fieldStreams.inline.hpp"
-#include "oops/instanceKlass.hpp"
+#include "oops/instanceKlass.inline.hpp"
 #include "oops/instanceMirrorKlass.hpp"
 #include "oops/klass.hpp"
+#include "oops/klass.inline.hpp"
 #include "oops/method.inline.hpp"
 #include "oops/objArrayOop.inline.hpp"
 #include "oops/oop.inline.hpp"
@@ -1131,14 +1133,14 @@ void java_lang_Class::fixup_mirror(Klass* k, TRAPS) {
     }
   }
 
-  if (k->is_shared() && k->has_raw_archived_mirror()) {
+  if (k->is_shared() && k->has_archived_mirror_index()) {
     if (HeapShared::open_archive_heap_region_mapped()) {
       bool present = restore_archived_mirror(k, Handle(), Handle(), Handle(), CHECK);
       assert(present, "Missing archived mirror for %s", k->external_name());
       return;
     } else {
       k->clear_java_mirror_handle();
-      k->clear_has_raw_archived_mirror();
+      k->clear_archived_mirror_index();
     }
   }
   create_mirror(k, Handle(), Handle(), Handle(), Handle(), CHECK);
@@ -1404,9 +1406,9 @@ oop java_lang_Class::archive_mirror(Klass* k, TRAPS) {
          "HeapShared::is_heap_object_archiving_allowed() must be true");
 
   // Mirror is already archived
-  if (k->has_raw_archived_mirror()) {
-    assert(k->archived_java_mirror_raw() != NULL, "no archived mirror");
-    return k->archived_java_mirror_raw();
+  if (k->has_archived_mirror_index()) {
+    assert(k->archived_java_mirror() != NULL, "no archived mirror");
+    return k->archived_java_mirror();
   }
 
   // No mirror
@@ -1438,9 +1440,7 @@ oop java_lang_Class::archive_mirror(Klass* k, TRAPS) {
     return NULL;
   }
 
-  k->set_archived_java_mirror_raw(archived_mirror);
-
-  k->set_has_raw_archived_mirror();
+  k->set_archived_java_mirror(archived_mirror);
 
   ResourceMark rm;
   log_trace(cds, heap, mirror)(
@@ -1558,10 +1558,11 @@ bool java_lang_Class::restore_archived_mirror(Klass *k,
     return true;
   }
 
-  oop m = HeapShared::materialize_archived_object(k->archived_java_mirror_raw_narrow());
-  if (m == NULL) {
-    return false;
-  }
+  oop m = k->archived_java_mirror();
+  assert(m != NULL, "must have stored non-null archived mirror");
+
+  // Sanity: clear it now to prevent re-initialization if any of the following fails
+  k->clear_archived_mirror_index();
 
   // mirror is archived, restore
   log_debug(cds, mirror)("Archived mirror is: " PTR_FORMAT, p2i(m));
@@ -1587,7 +1588,6 @@ bool java_lang_Class::restore_archived_mirror(Klass *k,
   }
 
   k->set_java_mirror(mirror);
-  k->clear_has_raw_archived_mirror();
 
   set_mirror_module_field(k, mirror, module, THREAD);
 
@@ -1981,12 +1981,12 @@ void java_lang_Thread_FieldHolder::set_daemon(oop holder) {
   holder->bool_field_put(_daemon_offset, true);
 }
 
-void java_lang_Thread_FieldHolder::set_thread_status(oop holder, java_lang_Thread::ThreadStatus status) {
-  holder->int_field_put(_thread_status_offset, status);
+void java_lang_Thread_FieldHolder::set_thread_status(oop holder, JavaThreadStatus status) {
+  holder->int_field_put(_thread_status_offset, static_cast<int>(status));
 }
 
-java_lang_Thread::ThreadStatus java_lang_Thread_FieldHolder::get_thread_status(oop holder) {
-  return (java_lang_Thread::ThreadStatus)holder->int_field(_thread_status_offset);
+JavaThreadStatus java_lang_Thread_FieldHolder::get_thread_status(oop holder) {
+  return static_cast<JavaThreadStatus>(holder->int_field(_thread_status_offset));
 }
 
 
@@ -2020,6 +2020,7 @@ int java_lang_Thread::_name_offset;
 int java_lang_Thread::_contextClassLoader_offset;
 int java_lang_Thread::_inheritedAccessControlContext_offset;
 int java_lang_Thread::_eetop_offset;
+int java_lang_Thread::_jvmti_thread_state_offset;
 int java_lang_Thread::_interrupted_offset;
 int java_lang_Thread::_tid_offset;
 int java_lang_Thread::_continuation_offset;
@@ -2031,6 +2032,7 @@ int java_lang_Thread::_park_blocker_offset;
   macro(_contextClassLoader_offset, k, vmSymbols::contextClassLoader_name(), classloader_signature, false); \
   macro(_inheritedAccessControlContext_offset, k, vmSymbols::inheritedAccessControlContext_name(), accesscontrolcontext_signature, false); \
   macro(_eetop_offset,         k, "eetop", long_signature, false); \
+  macro(_jvmti_thread_state_offset,  k, "jvmtiThreadState", long_signature, false); \
   macro(_interrupted_offset,   k, "interrupted", bool_signature, false); \
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
@@ -2053,9 +2055,16 @@ JavaThread* java_lang_Thread::thread(oop java_thread) {
   return (JavaThread*)java_thread->address_field(_eetop_offset);
 }
 
-
 void java_lang_Thread::set_thread(oop java_thread, JavaThread* thread) {
   java_thread->address_field_put(_eetop_offset, (address)thread);
+}
+
+JvmtiThreadState* java_lang_Thread::jvmti_thread_state(oop java_thread) {
+  return (JvmtiThreadState*)java_thread->address_field(_jvmti_thread_state_offset);
+}
+
+void java_lang_Thread::set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state) {
+  java_thread->address_field_put(_jvmti_thread_state_offset, (address)state);
 }
 
 oop java_lang_Thread::holder(oop java_thread) {
@@ -2153,14 +2162,13 @@ jlong java_lang_Thread::stackSize(oop java_thread) {
 }
 
 // Write the thread status value to threadStatus field in java.lang.Thread java class.
-void java_lang_Thread::set_thread_status(oop java_thread,
-                                         java_lang_Thread::ThreadStatus status) {
+void java_lang_Thread::set_thread_status(oop java_thread, JavaThreadStatus status) {
   oop holder = java_lang_Thread::holder(java_thread);
   java_lang_Thread_FieldHolder::set_thread_status(holder, status);
 }
 
 // Read thread status value from threadStatus field in java.lang.Thread java class.
-java_lang_Thread::ThreadStatus java_lang_Thread::get_thread_status(oop java_thread) {
+JavaThreadStatus java_lang_Thread::get_thread_status(oop java_thread) {
   // Make sure the caller is operating on behalf of the VM or is
   // running VM code (state == _thread_in_vm).
   assert(Threads_lock->owned_by_self() || Thread::current()->is_VM_thread() ||
@@ -2300,24 +2308,23 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
 
 const char* java_lang_Thread::thread_status_name(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
-  ThreadStatus status = java_lang_Thread_FieldHolder::get_thread_status(holder);
+  JavaThreadStatus status = java_lang_Thread_FieldHolder::get_thread_status(holder);
   switch (status) {
-    case NEW                      : return "NEW";
-    case RUNNABLE                 : return "RUNNABLE";
-    case SLEEPING                 : return "TIMED_WAITING (sleeping)";
-    case IN_OBJECT_WAIT           : return "WAITING (on object monitor)";
-    case IN_OBJECT_WAIT_TIMED     : return "TIMED_WAITING (on object monitor)";
-    case PARKED                   : return "WAITING (parking)";
-    case PARKED_TIMED             : return "TIMED_WAITING (parking)";
-    case BLOCKED_ON_MONITOR_ENTER : return "BLOCKED (on object monitor)";
-    case TERMINATED               : return "TERMINATED";
+    case JavaThreadStatus::NEW                      : return "NEW";
+    case JavaThreadStatus::RUNNABLE                 : return "RUNNABLE";
+    case JavaThreadStatus::SLEEPING                 : return "TIMED_WAITING (sleeping)";
+    case JavaThreadStatus::IN_OBJECT_WAIT           : return "WAITING (on object monitor)";
+    case JavaThreadStatus::IN_OBJECT_WAIT_TIMED     : return "TIMED_WAITING (on object monitor)";
+    case JavaThreadStatus::PARKED                   : return "WAITING (parking)";
+    case JavaThreadStatus::PARKED_TIMED             : return "TIMED_WAITING (parking)";
+    case JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER : return "BLOCKED (on object monitor)";
+    case JavaThreadStatus::TERMINATED               : return "TERMINATED";
     default                       : return "UNKNOWN";
   };
 }
 int java_lang_ThreadGroup::_parent_offset;
 int java_lang_ThreadGroup::_name_offset;
 int java_lang_ThreadGroup::_maxPriority_offset;
-int java_lang_ThreadGroup::_daemon_offset;
 int java_lang_ThreadGroup::_ngroups_offset;
 int java_lang_ThreadGroup::_groups_offset;
 int java_lang_ThreadGroup::_nweaks_offset;
@@ -2342,11 +2349,6 @@ const char* java_lang_ThreadGroup::name(oop java_thread_group) {
 ThreadPriority java_lang_ThreadGroup::maxPriority(oop java_thread_group) {
   assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
   return (ThreadPriority) java_thread_group->int_field(_maxPriority_offset);
-}
-
-bool java_lang_ThreadGroup::is_daemon(oop java_thread_group) {
-  assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
-  return java_thread_group->bool_field(_daemon_offset) != 0;
 }
 
 int java_lang_ThreadGroup::ngroups(oop java_thread_group) {
@@ -2375,7 +2377,6 @@ objArrayOop java_lang_ThreadGroup::weaks(oop java_thread_group) {
   macro(_parent_offset,      k, vmSymbols::parent_name(),      threadgroup_signature,       false); \
   macro(_name_offset,        k, vmSymbols::name_name(),        string_signature,            false); \
   macro(_maxPriority_offset, k, vmSymbols::maxPriority_name(), int_signature,               false); \
-  macro(_daemon_offset,      k, vmSymbols::daemon_name(),      bool_signature,              false); \
   macro(_ngroups_offset,     k, vmSymbols::ngroups_name(),     int_signature,               false); \
   macro(_groups_offset,      k, vmSymbols::groups_name(),      threadgroup_array_signature, false); \
   macro(_nweaks_offset,      k, vmSymbols::nweaks_name(),      int_signature,               false); \
@@ -2443,26 +2444,26 @@ jshort java_lang_VirtualThread::state(oop vthread) {
   return vthread->short_field_acquire(_state_offset);
 }
 
-java_lang_Thread::ThreadStatus java_lang_VirtualThread::map_state_to_thread_status(jint state) {
-  java_lang_Thread::ThreadStatus status = java_lang_Thread::NEW;
+JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(jint state) {
+  JavaThreadStatus status = JavaThreadStatus::NEW;
   switch (state) {
     case NEW :
-      status = java_lang_Thread::NEW;
+      status = JavaThreadStatus::NEW;
       break;
     case STARTED :
     case RUNNABLE :
     case RUNNING :
     case PARKING :
     case YIELDING :
-      status = java_lang_Thread::RUNNABLE;
+      status = JavaThreadStatus::RUNNABLE;
       break;
     case PARKED :
     case PARKED_SUSPENDED :
     case PINNED :
-      status = java_lang_Thread::PARKED;
+      status = JavaThreadStatus::PARKED;
       break;
     case TERMINATED :
-      status = java_lang_Thread::TERMINATED;
+      status = JavaThreadStatus::TERMINATED;
       break;
     default:
       ShouldNotReachHere();
@@ -4176,6 +4177,65 @@ bool java_lang_invoke_LambdaForm::is_instance(oop obj) {
   return obj != NULL && is_subclass(obj->klass());
 }
 
+int jdk_internal_invoke_NativeEntryPoint::_addr_offset;
+int jdk_internal_invoke_NativeEntryPoint::_shadow_space_offset;
+int jdk_internal_invoke_NativeEntryPoint::_argMoves_offset;
+int jdk_internal_invoke_NativeEntryPoint::_returnMoves_offset;
+int jdk_internal_invoke_NativeEntryPoint::_need_transition_offset;
+int jdk_internal_invoke_NativeEntryPoint::_method_type_offset;
+int jdk_internal_invoke_NativeEntryPoint::_name_offset;
+
+#define NEP_FIELDS_DO(macro) \
+  macro(_addr_offset,            k, "addr",           long_signature, false); \
+  macro(_shadow_space_offset,    k, "shadowSpace",    int_signature, false); \
+  macro(_argMoves_offset,        k, "argMoves",       long_array_signature, false); \
+  macro(_returnMoves_offset,     k, "returnMoves",    long_array_signature, false); \
+  macro(_need_transition_offset, k, "needTransition", bool_signature, false); \
+  macro(_method_type_offset,     k, "methodType",     java_lang_invoke_MethodType_signature, false); \
+  macro(_name_offset,            k, "name",           string_signature, false);
+
+bool jdk_internal_invoke_NativeEntryPoint::is_instance(oop obj) {
+  return obj != NULL && is_subclass(obj->klass());
+}
+
+void jdk_internal_invoke_NativeEntryPoint::compute_offsets() {
+  InstanceKlass* k = SystemDictionary::NativeEntryPoint_klass();
+  NEP_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+}
+
+#if INCLUDE_CDS
+void jdk_internal_invoke_NativeEntryPoint::serialize_offsets(SerializeClosure* f) {
+  NEP_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+}
+#endif
+
+address jdk_internal_invoke_NativeEntryPoint::addr(oop entry) {
+  return (address)entry->long_field(_addr_offset);
+}
+
+jint jdk_internal_invoke_NativeEntryPoint::shadow_space(oop entry) {
+  return entry->int_field(_shadow_space_offset);
+}
+
+oop jdk_internal_invoke_NativeEntryPoint::argMoves(oop entry) {
+  return entry->obj_field(_argMoves_offset);
+}
+
+oop jdk_internal_invoke_NativeEntryPoint::returnMoves(oop entry) {
+  return entry->obj_field(_returnMoves_offset);
+}
+
+jboolean jdk_internal_invoke_NativeEntryPoint::need_transition(oop entry) {
+  return entry->bool_field(_need_transition_offset);
+}
+
+oop jdk_internal_invoke_NativeEntryPoint::method_type(oop entry) {
+  return entry->obj_field(_method_type_offset);
+}
+
+oop jdk_internal_invoke_NativeEntryPoint::name(oop entry) {
+  return entry->obj_field(_name_offset);
+}
 
 oop java_lang_invoke_MethodHandle::type(oop mh) {
   return mh->obj_field(_type_offset);
@@ -4528,7 +4588,6 @@ oop java_security_AccessControlContext::create(objArrayHandle context, bool isPr
   result->obj_field_put(_context_offset, context());
   result->obj_field_put(_privilegedContext_offset, privileged_context());
   result->bool_field_put(_isPrivileged_offset, isPrivileged);
-  // whitelist AccessControlContexts created by the JVM
   result->bool_field_put(_isAuthorized_offset, true);
   return result;
 }
@@ -4941,6 +5000,8 @@ int jdk_internal_misc_StackChunk::_sp_offset;
 int jdk_internal_misc_StackChunk::_pc_offset;
 int jdk_internal_misc_StackChunk::_argsize_offset;
 int jdk_internal_misc_StackChunk::_mode_offset;
+int jdk_internal_misc_StackChunk::_gcSP_offset;
+int jdk_internal_misc_StackChunk::_markCycle_offset;
 int jdk_internal_misc_StackChunk::_numFrames_offset;
 int jdk_internal_misc_StackChunk::_numOops_offset;
 int jdk_internal_misc_StackChunk::_cont_offset;
@@ -4952,6 +5013,8 @@ int jdk_internal_misc_StackChunk::_cont_offset;
   macro(_pc_offset,        k, vmSymbols::pc_name(),        long_signature,       false); \
   macro(_argsize_offset,   k, vmSymbols::argsize_name(),   int_signature,        false); \
   macro(_mode_offset,      k, vmSymbols::mode_name(),      bool_signature,       false); \
+  macro(_gcSP_offset,      k, "gcSP",                      int_signature,        false); \
+  macro(_markCycle_offset, k, "markCycle",                 long_signature,       false); \
   macro(_numFrames_offset, k, vmSymbols::numFrames_name(), int_signature,        false); \
   macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false); \
   macro(_cont_offset,      k, "cont",                      continuation_signature, false);
@@ -4966,6 +5029,19 @@ void jdk_internal_misc_StackChunk::serialize_offsets(SerializeClosure* f) {
   STACKCHUNK_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
+
+intptr_t* jdk_internal_misc_StackChunk::end_address(oop chunk) {
+  int argsz = argsize(chunk);
+  if (argsz > 0) argsz += frame::sender_sp_offset;
+  return start_address(chunk) + size(chunk) - argsz;
+}
+
+bool jdk_internal_misc_StackChunk::is_usable_in_chunk(oop chunk, void* p) {
+  assert (is_stack_chunk(chunk), "");
+  HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk) - frame::sender_sp_offset;
+  HeapWord* end = start + jdk_internal_misc_StackChunk::size(chunk);
+  return (HeapWord*)p >= start && (HeapWord*)p < end;
+}
 
 bool java_lang_Continuation::on_local_stack(oop ref, address adr) {
   arrayOop s = stack(ref);

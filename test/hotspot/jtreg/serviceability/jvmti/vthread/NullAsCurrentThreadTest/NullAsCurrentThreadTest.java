@@ -53,9 +53,8 @@ public class NullAsCurrentThreadTest {
     };
 
     void runTest() throws Exception { 
-        Thread vThread = Thread.newThread("TestedVThread", Thread.VIRTUAL, pinnedTask); 
-        vThread.start();
-        vThread.join();
+        Thread vthread = Thread.startVirtualThread("TestedVThread", pinnedTask);
+        vthread.join();
     }
 
     public static void main(String[] args) throws Exception {

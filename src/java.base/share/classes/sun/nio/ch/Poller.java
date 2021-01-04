@@ -29,12 +29,13 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
+import java.util.stream.Stream;
 
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
-abstract class Poller implements Runnable {
+public abstract class Poller implements Runnable {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final Poller READ_POLLER;
     private static final Poller WRITE_POLLER;
@@ -124,19 +125,18 @@ abstract class Poller implements Runnable {
     protected Poller() { }
 
     private void register(int fdVal) throws IOException {
-        Thread t = Thread.currentThread();
-        Thread previous = map.putIfAbsent(fdVal, t);
-        if (previous != null) {
-            throw new IllegalStateException();
-        }
+        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
+        assert previous == null;
         implRegister(fdVal);
     }
 
     private void deregister(int fdVal) {
-        Thread t = Thread.currentThread();
-        if (map.remove(fdVal, t)) {
-            implDeregister(fdVal);
-        }
+        Thread previous = map.remove(fdVal);
+        assert previous == null || previous == Thread.currentThread();
+    }
+
+    private Stream<Thread> registeredThreads() {
+        return map.values().stream();
     }
 
     private void wakeup(int fdVal) {
@@ -166,4 +166,13 @@ abstract class Poller implements Runnable {
      * Deregister (or disarm) the file descriptor
      */
     abstract protected void implDeregister(int fdVal);
+
+
+    /**
+     * Return a stream of all threads blocked waiting for I/O operations.
+     */
+    public static Stream<Thread> blockedThreads() {
+        return Stream.concat(READ_POLLER.registeredThreads(),
+                WRITE_POLLER.registeredThreads());
+    }
 }

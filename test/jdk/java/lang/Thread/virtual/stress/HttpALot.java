@@ -77,7 +77,6 @@ public class HttpALot {
         try {
             ThreadFactory factory = Thread.builder().virtual().name("fetcher-", 0).factory();
             try (var executor = Executors.newThreadExecutor(factory)) {
-                ThreadDumper.monitor(executor);
                 for (int i = 1; i <= requests; i++) {
                     executor.submit(() -> fetch(url)).get();
                 }

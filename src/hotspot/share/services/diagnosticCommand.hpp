@@ -913,4 +913,30 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
+class JavaThreadDumpDCmd : public DCmdWithParser {
+private:
+  void dumpToOutputStream(Symbol* name, Symbol* signature, TRAPS);
+  void dumpToFile(Symbol* name, Symbol* signature, const char* path, TRAPS);
+protected:
+  DCmdArgument<char*> _format;
+  DCmdArgument<char*> _filepath;
+public:
+  JavaThreadDumpDCmd(outputStream *output, bool heap);
+  static const char *name() {
+    return "JavaThread.dump";
+  }
+  static const char *description() {
+    return "Java thread dump in plain text or JSON format.";
+  }
+  static const char* impact() {
+    return "Medium: Depends on the number of threads.";
+  }
+  static const JavaPermission permission() {
+    JavaPermission p = {"java.lang.management.ManagementPermission", "monitor", NULL};
+    return p;
+  }
+  static int num_arguments();
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
 #endif // SHARE_SERVICES_DIAGNOSTICCOMMAND_HPP

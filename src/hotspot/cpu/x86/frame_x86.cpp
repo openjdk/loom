@@ -296,11 +296,6 @@ void frame::patch_pc(Thread* thread, address pc) {
 #endif
 }
 
-int frame::frame_size(RegisterMap* map) const {
-  frame sender = this->sender(map);
-  return sender.sp() - sp();
-}
-
 intptr_t* frame::entry_frame_argument_at(int offset) const {
   // convert offset to index to deal with tsi
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
@@ -361,6 +356,11 @@ frame frame::sender_for_entry_frame(RegisterMap* map) const {
   assert(map->include_argument_oops(), "should be set by clear");
   vmassert(jfa->last_Java_pc() != NULL, "not walkable");
   frame fr(jfa->last_Java_sp(), jfa->last_Java_fp(), jfa->last_Java_pc());
+
+  if (jfa->saved_rbp_address()) {
+    update_map_with_saved_link(map, jfa->saved_rbp_address());
+  }
+
   return fr;
 }
 

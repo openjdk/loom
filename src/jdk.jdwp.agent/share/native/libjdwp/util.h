@@ -65,7 +65,7 @@ typedef struct RefNode {
     jobject      ref;           /* could be strong or weak */
     struct RefNode *next;       /* next RefNode* in bucket chain */
     jint         count;         /* count of references */
-    unsigned     isStrong : 1;  /* 1 means this is a string reference */
+    unsigned     strongCount;   /* count of strong reference */
 } RefNode;
 
 /* Value of a NULL ID */
@@ -133,6 +133,7 @@ typedef struct {
     /* Common References static data */
     jrawMonitorID refLock;
     jlong         nextSeqNum;
+    unsigned      pinAllCount;
     RefNode     **objectsByID;
     int           objectsByIDsize;
     int           objectsByIDcount;
@@ -382,7 +383,6 @@ jboolean isSameObject(JNIEnv *env, jobject o1, jobject o2);
 
 jthread  getThreadVThread(jthread thread);
 jthread  getVThreadThread(jthread vthread);
-jthread  getLiveThread(jthread thread);
 
 jint getThreadFrameCount(jthread thread);
 

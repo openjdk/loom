@@ -41,6 +41,7 @@ class CodeBlobLookup;
 class FrameValues;
 class vframeArray;
 class JavaCallWrapper;
+class InterpreterOopMap;
 
 enum class DerivedPointerIterationMode {
   _with_table,
@@ -80,7 +81,9 @@ class frame {
   // Constructors
   frame();
 
-  frame(bool dummy) {} // no initialization
+  explicit frame(bool dummy) {} // no initialization
+
+  explicit frame(intptr_t* sp);
 
 #ifndef PRODUCT
   // This is a generic constructor which is only used by pns() in debug.cpp.
@@ -173,8 +176,19 @@ class frame {
   // tells whether this frame can be deoptimized
   bool can_be_deoptimized() const;
 
-  // returns the frame size in stack slots
-  int frame_size(RegisterMap* map) const;
+  // the frame size in machine words
+  inline int frame_size() const;
+
+  // the number of oops in the frame for non-interpreted frames
+  inline int num_oops() const;
+
+  // the size, in bytes, of stack-passed arguments
+  inline int compiled_frame_stack_argsize() const;
+
+  inline void interpreted_frame_oop_map(InterpreterOopMap* mask) const;
+
+  // the number of oops in the frame
+  inline int interpreted_frame_num_oops(InterpreterOopMap* mask) const;
 
   // returns the sending frame
   frame sender(RegisterMap* map) const;
@@ -477,7 +491,8 @@ class FrameValues {
 #ifdef ASSERT
   void validate();
 #endif
-  void print(JavaThread* thread);
+  void print(JavaThread* thread) { print_on(thread, tty); }
+  void print_on(JavaThread* thread, outputStream* out);
 };
 
 #endif

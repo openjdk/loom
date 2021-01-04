@@ -27,6 +27,7 @@ package java.io;
 
 import java.util.Arrays;
 import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.VM;
 
 /**
  * The class implements a buffered output stream. By setting up such
@@ -63,6 +64,17 @@ public class BufferedOutputStream extends FilterOutputStream {
     private final int maxBufSize;
 
     /**
+     * Returns the buffer size to use when no output buffer size specified
+     */
+    private static int initialBufferSize() {
+        if (VM.isBooted() && Thread.currentThread().isVirtual()) {
+            return DEFAULT_INITIAL_BUFFER_SIZE;
+        } else {
+            return DEFAULT_MAX_BUFFER_SIZE;
+        }
+    }
+
+    /**
      * Creates a new buffered output stream.
      */
     private BufferedOutputStream(OutputStream out, int initialSize, int maxSize) {
@@ -92,7 +104,7 @@ public class BufferedOutputStream extends FilterOutputStream {
      * @param   out   the underlying output stream.
      */
     public BufferedOutputStream(OutputStream out) {
-        this(out, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE);
+        this(out, initialBufferSize(), DEFAULT_MAX_BUFFER_SIZE);
     }
 
     /**

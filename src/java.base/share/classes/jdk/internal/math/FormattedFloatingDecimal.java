@@ -42,13 +42,29 @@ public class FormattedFloatingDecimal{
     private char[] mantissa;
     private char[] exponent;
 
+    private static final ThreadLocal<Object> threadLocalCharBuffer =
+            new ThreadLocal<Object>() {
+                @Override
+                protected Object initialValue() {
+                    return new char[20];
+                }
+            };
+
+    private static char[] getBuffer() {
+        if (Thread.currentThread().isVirtual()) {
+            return new char[20];
+        } else {
+            return (char[]) threadLocalCharBuffer.get();
+        }
+    }
+
     private FormattedFloatingDecimal(int precision, Form form, FloatingDecimal.BinaryToASCIIConverter fdConverter) {
         if (fdConverter.isExceptional()) {
             this.mantissa = fdConverter.toJavaFormatString().toCharArray();
             this.exponent = null;
             return;
         }
-        char[] digits = new char[20];
+        char[] digits = getBuffer();
         int nDigits = fdConverter.getDigits(digits);
         int decExp = fdConverter.getDecimalExponent();
         int exp;

@@ -100,16 +100,16 @@ public class VThreadMonitorTest {
 
     public static void main(String[] args) throws Exception {
         Thread[] vthreads = new Thread[VT_TOTAL];
+        Thread.Builder builder = Thread.builder().virtual().name("VirtualThread-", 0);
 
         // Create VT threads.
         for (int i = 0; i < VT_COUNT; i++) {
-            vthreads[i] = Thread.newThread("VirtualThread-" + i, Thread.VIRTUAL, VT);
+            vthreads[i] = builder.task(VT).build();
         }
         // Create SLEEPING_VT threads.
         for (int i = VT_COUNT; i < VT_TOTAL; i++) {
-            vthreads[i] = Thread.newThread("VirtualThread-" + i, Thread.VIRTUAL, SLEEPING_VT);
+            vthreads[i] = builder.task(SLEEPING_VT).build();
         }
-
 
         // Make sure one of the VT threads is blocked on monitor lock0.
         synchronized (lock0) {

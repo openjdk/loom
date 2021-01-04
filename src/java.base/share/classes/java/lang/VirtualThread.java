@@ -789,11 +789,11 @@ class VirtualThread extends Thread {
     public String toString() {
         StringBuilder sb = new StringBuilder("VirtualThread[");
         String name = getName();
-        if (name.length() > 0) {
-            sb.append(name);
-        } else {
+        if (name.isEmpty() || name.equals("<unnamed>")) {
             sb.append("@");
             sb.append(Integer.toHexString(hashCode()));
+        } else {
+            sb.append(name);
         }
         sb.append(",");
         Thread carrier = carrierThread;
@@ -813,6 +813,16 @@ class VirtualThread extends Thread {
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    @Override
+    public int hashCode() {
+        return (int) getId();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj == this;
     }
 
     /**

@@ -2224,6 +2224,9 @@ public final class System {
             public void addReadsAllUnnamed(Module m) {
                 m.implAddReadsAllUnnamed();
             }
+            public void addExports(Module m, String pn) {
+                m.implAddExports(pn);
+            }
             public void addExports(Module m, String pn, Module other) {
                 m.implAddExports(pn, other);
             }
@@ -2344,18 +2347,6 @@ public final class System {
 
             public void unparkVirtualThread(Thread thread) {
                 ((VirtualThread) thread).unpark();
-            }
-
-            public void unsafeSetLifetime(Thread thread, Lifetime lt) {
-                thread.unsafeSetLifetime(lt);
-            }
-
-            public void addObserver(Thread thread) {
-                    thread.parentThread.addObserver();
-            }
-
-            public void removeObserver(Thread thread) {
-                thread.parentThread.removeObserver();
             }
         });
     }

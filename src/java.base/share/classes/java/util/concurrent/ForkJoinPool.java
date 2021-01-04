@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.Condition;
-import jdk.internal.misc.VirtualThreads;
 
 /**
  * An {@link ExecutorService} for running {@link ForkJoinTask}s.
@@ -167,7 +166,7 @@ import jdk.internal.misc.VirtualThreads;
  * using a factory that may return {@code null}. However doing so may
  * cause unjoined tasks to never be executed.
  *
- * <p><b>Implementation notes</b>: This implementation restricts the
+ * <p><b>Implementation notes:</b> This implementation restricts the
  * maximum number of running threads to 32767. Attempts to create
  * pools with greater than the maximum number result in
  * {@code IllegalArgumentException}.
@@ -803,11 +802,11 @@ public class ForkJoinPool extends AbstractExecutorService {
     }
 
     /**
-     * Factory for CommonPool unless overridded by System
-     * property. Creates InnocuousForkJoinWorkerThreads if a security
-     * manager is present at time of invocation. Support requires that
-     * we break quite a lot of encapsulation (some via helper methods
-     * in ThreadLocalRandom) to access and set Thread fields.
+     * Factory for CommonPool unless overridden by System property.
+     * Creates InnocuousForkJoinWorkerThreads if a security manager is
+     * present at time of invocation.  Support requires that we break
+     * quite a lot of encapsulation (some via helper methods in
+     * ThreadLocalRandom) to access and set Thread fields.
      */
     static final class DefaultCommonPoolForkJoinWorkerThreadFactory
         implements ForkJoinWorkerThreadFactory {
@@ -1529,7 +1528,7 @@ public class ForkJoinPool extends AbstractExecutorService {
             stealCount += ns;                        // accumulate steals
             lock.unlock();
             long c = ctl;
-            if (w.phase != QUIET)                    // decrement counts
+            if ((cfg & QUIET) == 0) // unless self-signalled, decrement counts
                 do {} while (c != (c = compareAndExchangeCtl(
                                        c, ((RC_MASK & (c - RC_UNIT)) |
                                            (TC_MASK & (c - TC_UNIT)) |
@@ -1689,26 +1688,23 @@ public class ForkJoinPool extends AbstractExecutorService {
                 break;
             else if (mode < 0)
                 return -1;
-            else if ((int)(ctl >> RC_SHIFT) > ac)
+            else if ((c = ctl) == prevCtl)
                 Thread.onSpinWait();         // signal in progress
-            else if (deadline != 0L &&
-                     deadline - System.currentTimeMillis() <= TIMEOUT_SLOP) {
-                if (c != (c = ctl))          // ensure consistent
-                    ac = (int)(c >> RC_SHIFT);
-                else if (compareAndSetCtl(c, ((UC_MASK & (c - TC_UNIT)) |
-                                              (w.stackPred & SP_MASK)))) {
-                    w.phase = QUIET;
-                    return -1;               // drop on timeout
-                }
-            }
-            else if (!(alt = !alt))    // check between park calls
+            else if (!(alt = !alt))          // check between park calls
                 Thread.interrupted();
-            else if (deadline != 0L)
-                LockSupport.parkUntil(deadline);
-            else
+            else if (deadline == 0L)
                 LockSupport.park();
+            else if (deadline - System.currentTimeMillis() > TIMEOUT_SLOP)
+                LockSupport.parkUntil(deadline);
+            else if (((int)c & SMASK) == (w.config & SMASK) &&
+                     compareAndSetCtl(c, ((UC_MASK & (c - TC_UNIT)) |
+                                          (prevCtl & SP_MASK)))) {
+                w.config |= QUIET;           // sentinel for deregisterWorker
+                return -1;                   // drop on timeout
+            }
+            else if ((deadline += keepAlive) == 0L)
+                deadline = 1L;               // not at head; restart timer
         }
-        LockSupport.setCurrentBlocker(null);
         return 0;
     }
 
@@ -2176,7 +2172,8 @@ public class ForkJoinPool extends AbstractExecutorService {
         Thread t; ForkJoinWorkerThread wt; WorkQueue q;
         if (task == null)
             throw new NullPointerException();
-        if (((t = VirtualThreads.currentCarrierThread()) instanceof ForkJoinWorkerThread) &&
+        //if (((t = VirtualThreads.currentCarrierThread()) instanceof ForkJoinWorkerThread) &&
+        if (((t = Thread.currentThread()) instanceof ForkJoinWorkerThread) &&
             (q = (wt = (ForkJoinWorkerThread)t).workQueue) != null &&
             wt.pool == this)
             q.push(task, this);
@@ -2296,10 +2293,9 @@ public class ForkJoinPool extends AbstractExecutorService {
                 return false;
             md = getAndBitwiseOrMode(STOP);
         }
-        if ((md & TERMINATED) == 0) {
+        for (int k = 0; k < 2; ++k) { // twice in case of lagging qs updates
             for (ForkJoinTask<?> t; (t = pollScan(false)) != null; )
-                ForkJoinTask.cancelIgnoringExceptions(t); // help cancel tasks
-
+                ForkJoinTask.cancelIgnoringExceptions(t); // help cancel
             WorkQueue[] qs; int n; WorkQueue q; Thread thread;
             if ((qs = queues) != null && (n = qs.length) > 0) {
                 for (int j = 1; j < n; j += 2) { // unblock other workers
@@ -2312,9 +2308,9 @@ public class ForkJoinPool extends AbstractExecutorService {
                     }
                 }
             }
-
             ReentrantLock lock; Condition cond; // signal when no workers
-            if ((md & SMASK) + (short)(ctl >>> TC_SHIFT) <= 0 &&
+            if (((md = mode) & TERMINATED) == 0 &&
+                (md & SMASK) + (short)(ctl >>> TC_SHIFT) <= 0 &&
                 (getAndBitwiseOrMode(TERMINATED) & TERMINATED) == 0 &&
                 (lock = registrationLock) != null) {
                 lock.lock();
@@ -2687,10 +2683,7 @@ public class ForkJoinPool extends AbstractExecutorService {
                 ForkJoinTask<T> f =
                     new ForkJoinTask.AdaptedInterruptibleCallable<T>(t);
                 futures.add(f);
-                if (isSaturated())
-                    f.doExec();
-                else
-                    externalSubmit(f);
+                externalSubmit(f);
             }
             for (int i = futures.size() - 1; i >= 0; --i)
                 ((ForkJoinTask<?>)futures.get(i)).quietlyJoin();
@@ -2713,10 +2706,7 @@ public class ForkJoinPool extends AbstractExecutorService {
                 ForkJoinTask<T> f =
                     new ForkJoinTask.AdaptedInterruptibleCallable<T>(t);
                 futures.add(f);
-                if (isSaturated())
-                    f.doExec();
-                else
-                    externalSubmit(f);
+                externalSubmit(f);
             }
             long startTime = System.nanoTime(), ns = nanos;
             boolean timedOut = (ns < 0L);
@@ -2749,24 +2739,26 @@ public class ForkJoinPool extends AbstractExecutorService {
         private static final long serialVersionUID = 2838392045355241008L;
         @SuppressWarnings("serial") // Conditionally serializable
         volatile E result;
-        final AtomicInteger count;              // in case all throw
-        InvokeAnyRoot(int n) { count = new AtomicInteger(n); }
+        final AtomicInteger count;  // in case all throw
+        final ForkJoinPool pool;    // to check shutdown while collecting
+        InvokeAnyRoot(int n, ForkJoinPool p) {
+            pool = p;
+            count = new AtomicInteger(n);
+        }
         final void tryComplete(Callable<E> c) { // called by InvokeAnyTasks
             Throwable ex = null;
-            boolean failed = false;
-            if (c != null) {                    // raciness OK
-                if (isCancelled())
+            boolean failed = (c == null || isCancelled() ||
+                              (pool != null && pool.mode < 0));
+            if (!failed && !isDone()) {
+                try {
+                    complete(c.call());
+                } catch (Throwable tx) {
+                    ex = tx;
                     failed = true;
-                else if (!isDone()) {
-                    try {
-                        complete(c.call());
-                    } catch (Throwable tx) {
-                        ex = tx;
-                        failed = true;
-                    }
                 }
             }
-            if (failed && count.getAndDecrement() <= 1)
+            if ((pool != null && pool.mode < 0) ||
+                (failed && count.getAndDecrement() <= 1))
                 trySetThrown(ex != null ? ex : new CancellationException());
         }
         public final boolean exec()         { return false; } // never forked
@@ -2814,21 +2806,18 @@ public class ForkJoinPool extends AbstractExecutorService {
         int n = tasks.size();
         if (n <= 0)
             throw new IllegalArgumentException();
-        InvokeAnyRoot<T> root = new InvokeAnyRoot<T>(n);
+        InvokeAnyRoot<T> root = new InvokeAnyRoot<T>(n, this);
         ArrayList<InvokeAnyTask<T>> fs = new ArrayList<>(n);
-        for (Callable<T> c : tasks) {
-            if (c == null)
-                throw new NullPointerException();
-            InvokeAnyTask<T> f = new InvokeAnyTask<T>(root, c);
-            fs.add(f);
-            if (isSaturated())
-                f.doExec();
-            else
-                externalSubmit(f);
-            if (root.isDone())
-                break;
-        }
         try {
+            for (Callable<T> c : tasks) {
+                if (c == null)
+                    throw new NullPointerException();
+                InvokeAnyTask<T> f = new InvokeAnyTask<T>(root, c);
+                fs.add(f);
+                externalSubmit(f);
+                if (root.isDone())
+                    break;
+            }
             return root.get();
         } finally {
             for (InvokeAnyTask<T> f : fs)
@@ -2844,21 +2833,18 @@ public class ForkJoinPool extends AbstractExecutorService {
         int n = tasks.size();
         if (n <= 0)
             throw new IllegalArgumentException();
-        InvokeAnyRoot<T> root = new InvokeAnyRoot<T>(n);
+        InvokeAnyRoot<T> root = new InvokeAnyRoot<T>(n, this);
         ArrayList<InvokeAnyTask<T>> fs = new ArrayList<>(n);
-        for (Callable<T> c : tasks) {
-            if (c == null)
-                throw new NullPointerException();
-            InvokeAnyTask<T> f = new InvokeAnyTask<T>(root, c);
-            fs.add(f);
-            if (isSaturated())
-                f.doExec();
-            else
-                externalSubmit(f);
-            if (root.isDone())
-                break;
-        }
         try {
+            for (Callable<T> c : tasks) {
+                if (c == null)
+                    throw new NullPointerException();
+                InvokeAnyTask<T> f = new InvokeAnyTask<T>(root, c);
+                fs.add(f);
+                externalSubmit(f);
+                if (root.isDone())
+                    break;
+            }
             return root.get(nanos, TimeUnit.NANOSECONDS);
         } finally {
             for (InvokeAnyTask<T> f : fs)

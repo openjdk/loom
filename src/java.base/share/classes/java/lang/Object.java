@@ -346,7 +346,7 @@ public class Object {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
             try {
-                Blocker.managedBlock(() -> wait(timeoutMillis));
+                Blocker.managedBlock(() -> wait0(timeoutMillis));
             } catch (Exception e) {
                 if (e instanceof InterruptedException)
                     thread.getAndClearInterrupt();

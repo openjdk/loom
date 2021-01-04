@@ -24,12 +24,13 @@
 
 #include "precompiled.hpp"
 #include "classfile/classLoaderDataGraph.hpp"
-#include "classfile/javaClasses.inline.hpp"
+#include "classfile/javaClasses.hpp"
 #include "classfile/moduleEntry.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "jvmtifiles/jvmtiEnv.hpp"
 #include "memory/iterator.hpp"
 #include "memory/resourceArea.hpp"
+#include "oops/klass.inline.hpp"
 #include "oops/objArrayKlass.hpp"
 #include "oops/objArrayOop.hpp"
 #include "oops/oop.inline.hpp"
@@ -258,11 +259,11 @@ JvmtiEnvBase::env_dispose() {
   // Same situation as with events (see above)
   set_native_method_prefixes(0, NULL);
 
-  JvmtiTagMap* tag_map_to_deallocate = _tag_map;
-  set_tag_map(NULL);
-  // A tag map can be big, deallocate it now
-  if (tag_map_to_deallocate != NULL) {
-    delete tag_map_to_deallocate;
+  JvmtiTagMap* tag_map_to_clear = tag_map_acquire();
+  // A tag map can be big, clear it now to save memory until
+  // the destructor runs.
+  if (tag_map_to_clear != NULL) {
+    tag_map_to_clear->clear();
   }
 
   _needs_clean_up = true;
@@ -677,7 +678,7 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
 jint
 JvmtiEnvBase::get_vthread_state(oop thread_oop) {
   jshort vt_state = java_lang_VirtualThread::state(thread_oop);
-  jint state = java_lang_VirtualThread::map_state_to_thread_status(vt_state);
+  jint state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vt_state);
   bool ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
 
   if (ext_suspended && ((state & JVMTI_THREAD_STATE_ALIVE) != 0)) {
@@ -723,7 +724,7 @@ JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle
     group_objs = NEW_RESOURCE_ARRAY(Handle, ngroups + nweaks);
     NULL_CHECK(group_objs, JVMTI_ERROR_OUT_OF_MEMORY);
 
-    // non-daemon subgroups
+    // strongly reachable subgroups
     if (ngroups > 0) {
       objArrayOop groups = java_lang_ThreadGroup::groups(group_hdl());
       for (int j = 0; j < ngroups; j++) {
@@ -733,7 +734,7 @@ JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle
       }
     }
 
-    // daemon subgroups
+    // weakly reachable subgroups
     if (nweaks > 0) {
       objArrayOop weaks = java_lang_ThreadGroup::weaks(group_hdl());
       for (int j = 0; j < nweaks; j++) {
@@ -2058,7 +2059,8 @@ SetFramePopClosure::doit(Thread *target, bool self) {
   ResourceMark rm;
   JavaThread* java_thread = target->as_Java_thread();
 
-  assert(_state->get_thread() == java_thread, "Must be");
+  // TBD: This might need to be corrected for detached carrier and virtual threads.
+  assert(_state->get_thread_or_saved() == java_thread, "Must be");
 
   if (!self && !java_thread->is_external_suspend()) {
     _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
@@ -2199,13 +2201,13 @@ VThreadGetThreadStateClosure::do_thread(Thread *target) {
   jint state;
 
   if (vthread_state == java_lang_VirtualThread::RUNNING && carrier_thread_oop != NULL) {
-    state = java_lang_Thread::get_thread_status(carrier_thread_oop);
+    state = (jint) java_lang_Thread::get_thread_status(carrier_thread_oop);
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread_oop);
     if (java_thread->is_being_ext_suspended()) {
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
   } else {
-    state = java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
+    state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vthread_state);
   }
   if (java_lang_Thread::interrupted(_vthread_h())) {
     state |= JVMTI_THREAD_STATE_INTERRUPTED;

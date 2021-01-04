@@ -34,6 +34,7 @@
 #include "jfr/recorder/checkpoint/jfrCheckpointManager.hpp"
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceId.hpp"
 #include "jfr/recorder/repository/jfrRepository.hpp"
+#include "jfr/recorder/service/jfrEventThrottler.hpp"
 #include "jfr/recorder/service/jfrOptionSet.hpp"
 #include "jfr/recorder/service/jfrPostBox.hpp"
 #include "jfr/recorder/service/jfrRecorderService.hpp"
@@ -294,6 +295,9 @@ bool JfrRecorder::create_components() {
   if (!create_thread_sampling()) {
     return false;
   }
+  if (!create_event_throttler()) {
+    return false;
+  }
   if (!create_virtual_thread_support()) {
     return false;
   }
@@ -370,6 +374,10 @@ bool JfrRecorder::create_thread_sampling() {
   return _thread_sampling != NULL;
 }
 
+bool JfrRecorder::create_event_throttler() {
+  return JfrEventThrottler::create();
+}
+
 bool JfrRecorder::create_virtual_thread_support() {
   // bool parameter, notifyJvmti, enables jvmti events related to VirtualThreads.
   // Thread start events hooks into some of these callbacks for JFR.
@@ -410,6 +418,7 @@ void JfrRecorder::destroy_components() {
     JfrThreadSampling::destroy();
     _thread_sampling = NULL;
   }
+  JfrEventThrottler::destroy();
 }
 
 bool JfrRecorder::create_recorder_thread() {

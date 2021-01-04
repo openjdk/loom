@@ -29,6 +29,7 @@
 #include "utilities/macros.hpp"
 
 class ClassFileParser;
+class StackChunkFrameStream;
 
 // An InstanceStackChunkKlass is a specialization of the InstanceKlass. 
 // It has a header containing metadata, and a blob containing a stack segment
@@ -61,8 +62,11 @@ public:
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
+  static void print_chunk(oop chunk, bool verbose, outputStream* st = tty);
+
 #ifndef PRODUCT
   void oop_print_on(oop obj, outputStream* st);
+  static bool verify(oop chunk, oop cont = (oop)NULL, size_t* out_size = NULL, int* out_frames = NULL, int* out_oops = NULL);
 #endif
   
   // Stack offset is an offset into the Heap
@@ -80,6 +84,8 @@ public:
     return _offset_of_stack;
   }
 
+  static int count_frames(oop obj);
+  
   // Oop fields (and metadata) iterators
   //
   // The InstanceClassLoaderKlass iterators also visit the CLD pointer (or mirror of anonymous klasses.)
@@ -99,15 +105,33 @@ public:
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
+public:
+  template <bool store>
+  static void barriers_for_oops_in_chunk(oop chunk);
+
+  template <bool store>
+  static void barriers_for_oops_in_frame(const StackChunkFrameStream& f);
+
+  static void fix_chunk(oop chunk);
+
 private:
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(oop obj, OopClosureType* closure);
 
-  template <typename T, class OopClosureType>
+  template <class OopClosureType, bool concurrent_gc>
   inline void oop_oop_iterate_stack(oop obj, OopClosureType* closure);
+  template <class OopClosureType>
+  static bool iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f);
+  template <bool concurrent_gc>
+  static void iterate_derived_pointers(oop chunk, const StackChunkFrameStream& f);
 
-  template <typename T, class OopClosureType>
+  template <class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
+  template <class OopClosureType>
+  static bool iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f, MemRegion mr);
+  static void iterate_derived_pointers(oop chunk, const StackChunkFrameStream& f, MemRegion mr);
+
+  static void fix_derived_pointers(const StackChunkFrameStream& f);
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP

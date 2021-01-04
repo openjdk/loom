@@ -481,8 +481,8 @@ class DatagramChannelImpl
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
             Poller.register(getFDVal(), event);
-            if (isOpen()) {
-                try {
+            try {
+                if (isOpen()) {
                     if (nanos == 0) {
                         VirtualThreads.park();
                     } else {
@@ -491,9 +491,9 @@ class DatagramChannelImpl
                     if (!interruptible && thread.isInterrupted()) {
                         throw new InterruptedIOException();
                     }
-                } finally {
-                    Poller.deregister(getFDVal(), event);
                 }
+            } finally {
+                Poller.deregister(getFDVal(), event);
             }
         } else {
             long millis;

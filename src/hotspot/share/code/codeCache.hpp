@@ -157,6 +157,7 @@ class CodeCache : AllStatic {
   static CodeBlob* find_blob_unsafe(void* start);       // Same as find_blob but does not fail if looking up a zombie method
   static CodeBlob* find_blob_fast(void* start);         // Returns the CodeBlob containing the given address
   static CodeBlob* find_blob_and_oopmap(void* start, int& slot);         // Returns the CodeBlob containing the given address
+  static int find_oopmap_slot_fast(void* start);        // Returns a fast oopmap slot if there is any; -1 otherwise
   static nmethod*  find_nmethod(void* start);           // Returns the nmethod containing the given address
   static CompiledMethod* find_compiled(void* start);
 
