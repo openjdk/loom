@@ -815,6 +815,16 @@ class VirtualThread extends Thread {
         return sb.toString();
     }
 
+    @Override
+    public int hashCode() {
+        return (int) getId();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj == this;
+    }
+
     /**
      * Returns the lock object, creating it if needed.
      */

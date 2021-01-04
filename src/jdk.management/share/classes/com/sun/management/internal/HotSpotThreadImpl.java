@@ -30,7 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import com.sun.management.ThreadMXBean;
 import com.sun.management.ThreadMXBean.OutputFormat;
-import jdk.internal.vm.ThreadContainers;
+import jdk.internal.vm.ThreadDump;
 import sun.management.ManagementFactoryHelper;
 import sun.management.ThreadImpl;
 import sun.management.Util;
@@ -97,8 +97,8 @@ public class HotSpotThreadImpl extends ThreadImpl implements ThreadMXBean {
 
         try (OutputStream out = Files.newOutputStream(file)) {
             switch (format) {
-                case TEXT_PLAIN -> ThreadContainers.dumpThreads(out);
-                case JSON       -> ThreadContainers.dumpThreadsToJson(out);
+                case TEXT_PLAIN -> ThreadDump.dumpThreads(out);
+                case JSON       -> ThreadDump.dumpThreadsToJson(out);
             }
         }
     }

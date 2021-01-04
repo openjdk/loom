@@ -743,7 +743,7 @@
   template(url_void_signature,                     "(Ljava/net/URL;)V")                                           \
                                                                                                                   \
   /* JavaThread.dump jcmd */                                                                                      \
-  template(jdk_internal_vm_ThreadContainers,       "jdk/internal/vm/ThreadContainers")                            \
+  template(jdk_internal_vm_ThreadDump,             "jdk/internal/vm/ThreadDump")                                  \
   template(dumpThreads_name,                       "dumpThreads")                                                 \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
 

@@ -1155,7 +1155,7 @@ void JavaThreadDumpDCmd::dumpToOutputStream(Symbol* name, Symbol* signature, TRA
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 
-  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadContainers();
+  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadDump();
   Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
   InstanceKlass* ik = InstanceKlass::cast(k);
   if (HAS_PENDING_EXCEPTION) {
@@ -1165,7 +1165,7 @@ void JavaThreadDumpDCmd::dumpToOutputStream(Symbol* name, Symbol* signature, TRA
     return;
   }
 
-  // invoke the ThreadContainers method to generate byte array
+  // invoke the method on ThreadDump to generate byte array
   JavaValue result(T_OBJECT);
   JavaCallArguments args;
   JavaCalls::call_static(&result,
@@ -1198,7 +1198,7 @@ void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char*
 
   Handle h_path = java_lang_String::create_from_str(path, CHECK);
 
-  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadContainers();
+  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadDump();
   Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
   InstanceKlass* ik = InstanceKlass::cast(k);
   if (HAS_PENDING_EXCEPTION) {
@@ -1208,7 +1208,7 @@ void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char*
     return;
   }
 
-  // invoke the ThreadContainers method to dump to file
+  // invoke the ThreadDump method to dump to file
   JavaValue result(T_VOID);
   JavaCallArguments args;
   args.push_oop(h_path);
