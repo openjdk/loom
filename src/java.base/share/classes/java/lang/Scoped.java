@@ -25,6 +25,9 @@
 
 package java.lang;
 
+import jdk.internal.vm.annotation.ForceInline;
+import jdk.internal.vm.annotation.Stable;
+
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
@@ -33,7 +36,10 @@ import java.util.function.Supplier;
  * */
 public final class Scoped<T> {
 
-    final Class<? super T> type;
+    final @Stable Class<? super T> type;
+    final @Stable int hash;
+
+    public final int hashCode() { return hash; }
 
     static final class Binding<T> {
         final Scoped<T> key;
@@ -58,6 +64,7 @@ public final class Scoped<T> {
 
     private Scoped(Class<? super T> type) {
         this.type = type;
+        this.hash = generateKey();
     }
 
     /**
@@ -94,14 +101,41 @@ public final class Scoped<T> {
      * @return TBD
      */
     @SuppressWarnings("unchecked")
-    public T get() {
+    T slowGet() {
         for (var b = Thread.currentThread().scopeLocalBindings;
              b != null; b = b.prev) {
             if (b.getKey() == this) {
-                return (T)(b.get());
+                T value = (T)b.get();
+                Cache.put(this, value);
+                return value;
             }
         }
         throw new RuntimeException("unbound");
+    }
+
+    /**
+     * TBD
+     *
+     * @return TBD
+     */
+    @ForceInline
+    @SuppressWarnings("unchecked")
+    public T get() {
+        Object[] objects;
+        if ((objects = Thread.scopedCache()) != null) {
+            // This code should perhaps be in class Cache. We do it
+            // here because the generated code is small and fast and
+            // we really want it to be inlined in the caller.
+            int n = (hash & Cache.TABLE_MASK) * 2;
+            if (objects[n] == this) {
+                return (T)objects[n + 1];
+            }
+            n = ((hash >>> Cache.INDEX_BITS) & Cache.TABLE_MASK) * 2;
+            if (objects[n] == this) {
+                return (T)objects[n + 1];
+            }
+        }
+        return slowGet();
     }
 
     /**
@@ -119,6 +153,7 @@ public final class Scoped<T> {
         } finally {
             assert(top == Thread.currentThread().scopeLocalBindings.prev);
             Thread.currentThread().scopeLocalBindings = top;
+            Cache.remove(this);
         }
     }
 
@@ -140,6 +175,7 @@ public final class Scoped<T> {
             return r.call();
         } finally {
             Thread.currentThread().scopeLocalBindings = top;
+            Cache.remove(this);
         }
     }
 
@@ -157,6 +193,102 @@ public final class Scoped<T> {
             return r.get();
         } finally {
             Thread.currentThread().scopeLocalBindings = top;
+            Cache.remove(this);
         }
+    }
+
+    private static class Cache {
+        static final int INDEX_BITS = 4;
+
+        static final int TABLE_SIZE = 1 << INDEX_BITS;
+
+        static final int TABLE_MASK = TABLE_SIZE - 1;
+
+        static void put(Scoped<?> key, Object value) {
+            if (Thread.scopedCache() == null) {
+                Thread.setScopedCache(new Object[TABLE_SIZE * 2]);
+            }
+            setKeyAndObjectAt(chooseVictim(Thread.currentCarrierThread(), key.hashCode()), key, value);
+        }
+
+        private static final void update(Object key, Object value) {
+            Object[] objects;
+            if ((objects = Thread.scopedCache()) != null) {
+
+                int k1 = key.hashCode() & TABLE_MASK;
+                if (getKey(objects, k1) == key) {
+                    setKeyAndObjectAt(k1, key, value);
+                }
+                int k2 = (key.hashCode() >> INDEX_BITS) & TABLE_MASK;
+                if (getKey(objects, k2) == key) {
+                    setKeyAndObjectAt(k2, key, value);
+                }
+            }
+        }
+
+        private static final void remove(Object key) {
+            Object[] objects;
+            if ((objects = Thread.scopedCache()) != null) {
+
+                int k1 = key.hashCode() & TABLE_MASK;
+                if (getKey(objects, k1) == key) {
+                    setKeyAndObjectAt(k1, null, null);
+                }
+                int k2 = (key.hashCode() >> INDEX_BITS) & TABLE_MASK;
+                if (getKey(objects, k2) == key) {
+                    setKeyAndObjectAt(k2, null, null);
+                }
+            }
+        }
+
+        private static void setKeyAndObjectAt(int n, Object key, Object value) {
+            Thread.scopedCache()[n * 2] = key;
+            Thread.scopedCache()[n * 2 + 1] = value;
+        }
+
+        private static Object getKey(Object[] objs, long hash) {
+            int n = (int) (hash & TABLE_MASK);
+            return objs[n * 2];
+        }
+
+        private static void setKey(Object[] objs, long hash, Object key) {
+            int n = (int) (hash & TABLE_MASK);
+            objs[n * 2] = key;
+        }
+
+        @SuppressWarnings("unchecked")  // one map has entries for all types <T>
+        final Object getKey(int n) {
+            return Thread.scopedCache()[n * 2];
+        }
+
+        @SuppressWarnings("unchecked")  // one map has entries for all types <T>
+        private static Object getObject(int n) {
+            return Thread.scopedCache()[n * 2 + 1];
+        }
+
+        private static int chooseVictim(Thread thread, int hash) {
+            // Update the cache to replace one entry with the value we just looked up.
+            // Each value can be in one of two possible places in the cache.
+            // Pick a victim at (pseudo-)random.
+            int k1 = hash & TABLE_MASK;
+            int k2 = (hash >> INDEX_BITS) & TABLE_MASK;
+            int tmp = thread.victims;
+            thread.victims = (tmp << 31) | (tmp >>> 1);
+            return (tmp & 1) == 0 ? k1 : k2;
+        }
+    }
+
+    private static int nextKey = 0xf0f0_f0f0;
+
+    // A Marsaglia xor-shift generator used to generate hashes.
+    private static synchronized int generateKey() {
+        int x = nextKey;
+        do {
+            x ^= x >>> 12;
+            x ^= x << 9;
+            x ^= x >>> 23;
+        } while ((x & Cache.TABLE_MASK)
+                == ((x >>> Cache.INDEX_BITS) & Cache.TABLE_MASK));
+        return (nextKey = x);
     }
 }
