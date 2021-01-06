@@ -173,6 +173,8 @@ public class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
+    Scoped.Binding<?> scopeLocalBindings;
+
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
      * at 2 as this class cannot be used during early startup to generate the
