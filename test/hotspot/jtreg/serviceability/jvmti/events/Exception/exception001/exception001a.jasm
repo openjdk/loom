@@ -21,8 +21,6 @@
  * questions.
  */
 
-package nsk/jvmti/Exception;
-
 /* Reassembled from the following Java pattern:
  *
  * public class exception001a {

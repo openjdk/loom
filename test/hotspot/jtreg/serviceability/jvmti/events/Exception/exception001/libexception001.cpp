@@ -60,17 +60,17 @@ static jvmtiEnv *jvmti = NULL;
 static jvmtiCapabilities caps;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
-static jboolean printdump = JNI_FALSE;
+static jboolean printdump = JNI_TRUE;
 static exceptionInfo exs[] = {
-    { "Lnsk/jvmti/Exception/exception001c;",
-        "Lnsk/jvmti/Exception/exception001b;", "meth1", "()V", 7,
-        "Lnsk/jvmti/Exception/exception001a;", "run", "()V", 14 },
+    { "Lexception001c;",
+        "Lexception001b;", "meth1", "()V", 7,
+        "Lexception001a;", "run", "()V", 14 },
     { "Ljava/lang/ArithmeticException;",
-        "Lnsk/jvmti/Exception/exception001b;", "meth2", "(I)I", 3,
-        "Lnsk/jvmti/Exception/exception001a;", "run", "()V", 24 },
+        "Lexception001b;", "meth2", "(I)I", 3,
+        "Lexception001a;", "run", "()V", 24 },
     { "Ljava/lang/ArrayIndexOutOfBoundsException;",
-        "Lnsk/jvmti/Exception/exception001b;", "meth3", "(I)I", 10,
-        "Lnsk/jvmti/Exception/exception001a;", "run", "()V", 34 }
+        "Lexception001b;", "meth3", "(I)I", 10,
+        "Lexception001a;", "run", "()V", 34 }
 };
 static int eventsCount = 0;
 static int eventsExpected = 0;
@@ -240,7 +240,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_check(JNIEnv *env, jclass cls) {
+Java_exception001_check(JNIEnv *env, jclass cls) {
   jvmtiError err;
   jthread thread;
   jclass clz;
@@ -255,17 +255,17 @@ Java_check(JNIEnv *env, jclass cls) {
     return result;
   }
 
-  clz = env->FindClass("nsk/jvmti/Exception/exception001c");
+  clz = env->FindClass("exception001c");
   if (clz == NULL) {
     printf("Cannot find exception001c class!\n");
     return STATUS_FAILED;
   }
-  clz = env->FindClass("nsk/jvmti/Exception/exception001b");
+  clz = env->FindClass("exception001b");
   if (clz == NULL) {
     printf("Cannot find exception001b class!\n");
     return STATUS_FAILED;
   }
-  clz = env->FindClass("nsk/jvmti/Exception/exception001a");
+  clz = env->FindClass("exception001a");
   if (clz == NULL) {
     printf("Cannot find exception001a class!\n");
     return STATUS_FAILED;
@@ -310,5 +310,14 @@ Java_check(JNIEnv *env, jclass cls) {
   }
   return result;
 }
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
 
 }

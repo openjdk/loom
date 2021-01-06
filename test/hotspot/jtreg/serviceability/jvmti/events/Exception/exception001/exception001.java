@@ -64,7 +64,7 @@ public class exception001 {
     native static int check();
 
     public static void main(String args[]) {
-        check();int result = check();
+        int result = check();
         if (result != 0) {
             throw new RuntimeException("check failed with result " + result);
         }

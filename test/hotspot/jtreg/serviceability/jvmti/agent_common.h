@@ -21,6 +21,9 @@
  * questions.
  */
 
+#ifndef AGENT_COMMON_H
+#define AGENT_COMMON_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -124,6 +127,16 @@ static agent_data_t agent_data;
 
 static jvmtiEnv* jvmti_env = NULL;
 static JavaVM* jvm = NULL;
+
+
+static void
+check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
+  if (err != JVMTI_ERROR_NONE) {
+    printf("check_jvmti_status: JVMTI function returned error: %d\n", err);
+    jni->FatalError(msg);
+  }
+}
+
 
 static jvmtiError init_agent_data(jvmtiEnv *jvmti_env, agent_data_t *data) {
   data->thread_state = NEW;
@@ -545,3 +558,5 @@ const char* TranslateObjectRefKind(jvmtiObjectReferenceKind ref) {
 }
 
 }
+
+#endif
