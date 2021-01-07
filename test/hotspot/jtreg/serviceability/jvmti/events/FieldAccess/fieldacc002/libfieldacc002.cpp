@@ -65,47 +65,47 @@ static jboolean printdump = JNI_FALSE;
 static int eventsExpected = 0;
 static int eventsCount = 0;
 static watch_info watches[] = {
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticBoolean", "Z", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticByte", "B", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticShort", "S", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticInt", "I", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticLong", "J", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticFloat", "F", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticDouble", "D", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticChar", "C", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticObject", "Ljava/lang/Object;", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "staticArrInt", "[I", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticBoolean", "Z", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticByte", "B", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticShort", "S", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticInt", "I", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticLong", "J", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticFloat", "F", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticDouble", "D", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticChar", "C", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticObject", "Ljava/lang/Object;", JNI_TRUE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "staticArrInt", "[I", JNI_TRUE },
 
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceBoolean", "Z", JNI_FALSE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceByte", "B", JNI_FALSE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceShort", "S", JNI_FALSE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceInt", "I", JNI_FALSE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceLong", "J", JNI_FALSE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceFloat", "F", JNI_FALSE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceDouble", "D", JNI_FALSE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceChar", "C", JNI_FALSE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceObject", "Ljava/lang/Object;", JNI_FALSE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldAccess/fieldacc002a;", "instanceArrInt", "[I", JNI_FALSE }
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceBoolean", "Z", JNI_FALSE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceByte", "B", JNI_FALSE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceShort", "S", JNI_FALSE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceInt", "I", JNI_FALSE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceLong", "J", JNI_FALSE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceFloat", "F", JNI_FALSE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceDouble", "D", JNI_FALSE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceChar", "C", JNI_FALSE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceObject", "Ljava/lang/Object;", JNI_FALSE },
+    { NULL, "Lfieldacc002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldacc002a;", "instanceArrInt", "[I", JNI_FALSE }
 };
 
 void JNICALL FieldAccess(jvmtiEnv *jvmti_env, JNIEnv *env,
@@ -311,7 +311,7 @@ JNIEXPORT void JNICALL Java_fieldacc002_getReady(JNIEnv *env, jclass clz) {
     printf(">>> setting field access watches ...\n");
   }
 
-  cls = env->FindClass("nsk/jvmti/FieldAccess/fieldacc002a");
+  cls = env->FindClass("fieldacc002a");
   if (cls == NULL) {
     printf("Cannot find fieldacc002a class!\n");
     result = STATUS_FAILED;
@@ -357,7 +357,7 @@ Java_fieldacc002_check(JNIEnv *env, jclass clz, jobject obj) {
     printf(">>> accessing fields ...\n");
   }
 
-  cls = env->FindClass("nsk/jvmti/FieldAccess/fieldacc002a");
+  cls = env->FindClass("fieldacc002a");
   if (cls == NULL) {
     printf("Cannot find fieldacc002a class!\n");
     return STATUS_FAILED;

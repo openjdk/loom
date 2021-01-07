@@ -65,11 +65,11 @@ static jboolean printdump = JNI_FALSE;
 static int eventsExpected = 0;
 static int eventsCount = 0;
 static watch_info watches[] = {
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc004a;", "run", "()I", 2,
-        "Lnsk/jvmti/FieldAccess/fieldacc004a;", "interfaceObject",
+    { NULL, "Lfieldacc004a;", "run", "()I", 2,
+        "Lfieldacc004a;", "interfaceObject",
         "Ljava/lang/Object;", JNI_TRUE },
-    { NULL, "Lnsk/jvmti/FieldAccess/fieldacc004a;", "run", "()I", 12,
-        "Lnsk/jvmti/FieldAccess/fieldacc004a;", "interfaceArrInt",
+    { NULL, "Lfieldacc004a;", "run", "()I", 12,
+        "Lfieldacc004a;", "interfaceArrInt",
         "[I", JNI_TRUE }
 };
 

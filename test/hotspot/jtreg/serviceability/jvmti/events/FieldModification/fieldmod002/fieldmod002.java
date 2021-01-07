@@ -60,16 +60,12 @@ public class fieldmod002 {
     native static int check(Object obj);
 
     public static void main(String args[]) {
-
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out));
-    }
-
-    public static int run(String args[], PrintStream out) {
         fieldmod002a t = new fieldmod002a();
         getReady();
-        return check(t);
+        int res = check(t);
+        if (res != 0) {
+            throw new RuntimeException("Check() returned " + res);
+        }
     }
 }
 

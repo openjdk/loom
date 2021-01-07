@@ -67,47 +67,47 @@ static jboolean printdump = JNI_FALSE;
 static int eventsExpected = 0;
 static int eventsCount = 0;
 static watch_info watches[] = {
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticBoolean", "Z", JNI_TRUE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticByte", "B", JNI_TRUE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticShort", "S", JNI_TRUE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticInt", "I", JNI_TRUE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticLong", "J", JNI_TRUE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticFloat", "F", JNI_TRUE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticDouble", "D", JNI_TRUE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticChar", "C", JNI_TRUE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticObject", "Ljava/lang/Object;", JNI_TRUE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "staticArrInt", "[I", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticBoolean", "Z", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticByte", "B", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticShort", "S", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticInt", "I", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticLong", "J", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticFloat", "F", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticDouble", "D", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticChar", "C", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticObject", "Ljava/lang/Object;", JNI_TRUE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "staticArrInt", "[I", JNI_TRUE, {} },
 
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceBoolean", "Z", JNI_FALSE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceByte", "B", JNI_FALSE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceShort", "S", JNI_FALSE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceInt", "I", JNI_FALSE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceLong", "J", JNI_FALSE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceFloat", "F", JNI_FALSE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceDouble", "D", JNI_FALSE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceChar", "C", JNI_FALSE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceObject", "Ljava/lang/Object;", JNI_FALSE, {} },
-    { NULL, "Lnsk/jvmti/FieldModification/fieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
-        "Lnsk/jvmti/FieldModification/fieldmod002a;", "instanceArrInt", "[I", JNI_FALSE, {} }
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceBoolean", "Z", JNI_FALSE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceByte", "B", JNI_FALSE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceShort", "S", JNI_FALSE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceInt", "I", JNI_FALSE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceLong", "J", JNI_FALSE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceFloat", "F", JNI_FALSE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceDouble", "D", JNI_FALSE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceChar", "C", JNI_FALSE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceObject", "Ljava/lang/Object;", JNI_FALSE, {} },
+    { NULL, "Lfieldmod002;", "check", "(Ljava/lang/Object;)I", 0,
+        "Lfieldmod002a;", "instanceArrInt", "[I", JNI_FALSE, {} }
 };
 
 void printValue(jvalue val, char *sig) {
@@ -390,7 +390,7 @@ Java_fieldmod002_getReady(JNIEnv *env, jclass clz) {
   if (printdump == JNI_TRUE) {
     printf(">>> setting field modification watches ...\n");
   }
-  cls = env->FindClass("nsk/jvmti/FieldModification/fieldmod002a");
+  cls = env->FindClass("fieldmod002a");
   if (cls == NULL) {
     printf("Cannot find fieldmod001a class!\n");
     result = STATUS_FAILED;
@@ -466,7 +466,7 @@ Java_fieldmod002_check(JNIEnv *env,
     printf(">>> modifying fields ...\n");
   }
 
-  cls = env->FindClass("nsk/jvmti/FieldModification/fieldmod002a");
+  cls = env->FindClass("fieldmod002a");
   if (cls == NULL) {
     printf("Cannot find fieldmod001a class!\n");
     return STATUS_FAILED;
