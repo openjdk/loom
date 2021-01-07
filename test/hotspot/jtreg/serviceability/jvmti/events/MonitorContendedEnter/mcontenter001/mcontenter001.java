@@ -49,7 +49,7 @@ import java.io.PrintStream;
  */
 
 
-    public class mcontenter001 extends DebugeeClass {
+public class mcontenter001 extends DebugeeClass {
 
     // load native library if required
     static {
@@ -58,13 +58,11 @@ import java.io.PrintStream;
 
     // run test from command line
     public static void main(String argv[]) {
-
-
         // JCK-compatible exit
-     int result =  new mcontenter001().runIt();
-     if (result != 0) {
-        throw new RuntimeException("Unexpected status: " + result);
-     }
+        int result =  new mcontenter001().runIt();
+        if (result != 0) {
+            throw new RuntimeException("Unexpected status: " + result);
+        }
     }
 
 
