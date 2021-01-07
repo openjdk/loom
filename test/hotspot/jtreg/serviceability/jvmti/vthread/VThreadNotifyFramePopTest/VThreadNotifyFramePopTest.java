@@ -65,7 +65,7 @@ public class VThreadNotifyFramePopTest {
     }
     static void run4() {
         try {
-            URL url = URI.create("http://wiki.se.oracle.com/").toURL();
+            URL url = URI.create("http://openjdk.java.net/").toURL();
             try (InputStream in = url.openStream()) {
                 brkpoint();
                 in.readAllBytes();
