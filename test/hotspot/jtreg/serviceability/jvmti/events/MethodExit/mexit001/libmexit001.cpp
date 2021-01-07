@@ -38,7 +38,7 @@ typedef struct {
   const char *name;
   const char *sig;
   jlocation loc;
-} exit_info;
+} method_location_info;
 
 static jvmtiEnv *jvmti = NULL;
 static jvmtiCapabilities caps;
@@ -47,7 +47,7 @@ static jint result = PASSED;
 static jboolean printdump = JNI_TRUE;
 static size_t eventsExpected = 0;
 static size_t eventsCount = 0;
-static exit_info exits[] = {
+static method_location_info exits[] = {
     { "Lmexit001a;", "chain", "()V", -1 },
     { "Lmexit001a;", "dummy", "()V", 3 }
 };
@@ -102,7 +102,7 @@ void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
       printf(">>>   location: %s\n", jlong_to_string(loc, buffer));
       printf(">>> ... done\n");
     }
-    if (eventsCount < sizeof(exits)/sizeof(exit_info)) {
+    if (eventsCount < sizeof(exits)/sizeof(method_location_info)) {
       if (cls_sig == NULL ||
           strcmp(cls_sig, exits[eventsCount].cls_sig) != 0) {
         printf("(exit#%" PRIuPTR ") wrong class: \"%s\"",
@@ -214,7 +214,7 @@ Java_mexit001_init0(JNIEnv *env, jclass cls) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_METHOD_EXIT, NULL);
   if (err == JVMTI_ERROR_NONE) {
-    eventsExpected = sizeof(exits)/sizeof(exit_info);
+    eventsExpected = sizeof(exits)/sizeof(method_location_info);
   } else {
     printf("Failed to enable JVMTI_EVENT_METHOD_EXIT event: %s (%d)\n",
            TranslateError(err), err);
