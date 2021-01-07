@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,7 +29,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import com.sun.management.ThreadMXBean;
-import jdk.internal.vm.ThreadContainers;
+import com.sun.management.ThreadMXBean.OutputFormat;
+import jdk.internal.vm.ThreadDump;
 import sun.management.ManagementFactoryHelper;
 import sun.management.ThreadImpl;
 import sun.management.Util;
@@ -84,7 +85,7 @@ public class HotSpotThreadImpl extends ThreadImpl implements ThreadMXBean {
     }
 
     @Override
-    public void dumpThreads(String outputFile) throws IOException {
+    public void dumpThreads(String outputFile, OutputFormat format) throws IOException {
         Path file = Path.of(outputFile);
         if (!file.isAbsolute())
             throw new IllegalArgumentException("'outptuFile' not absolute path");
@@ -95,7 +96,10 @@ public class HotSpotThreadImpl extends ThreadImpl implements ThreadMXBean {
             Util.checkControlAccess();
 
         try (OutputStream out = Files.newOutputStream(file)) {
-            ThreadContainers.dumpThreadsToJson(out);
+            switch (format) {
+                case TEXT_PLAIN -> ThreadDump.dumpThreads(out);
+                case JSON       -> ThreadDump.dumpThreadsToJson(out);
+            }
         }
     }
 }

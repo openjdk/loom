@@ -913,16 +913,27 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
-class JsonThreadDump : public DCmdWithParser {
+class JavaThreadDumpDCmd : public DCmdWithParser {
+private:
+  void dumpToOutputStream(Symbol* name, Symbol* signature, TRAPS);
+  void dumpToFile(Symbol* name, Symbol* signature, const char* path, TRAPS);
 protected:
-  DCmdArgument<char*> _filename;
+  DCmdArgument<char*> _format;
+  DCmdArgument<char*> _filepath;
 public:
-  JsonThreadDump(outputStream *output, bool heap);
+  JavaThreadDumpDCmd(outputStream *output, bool heap);
   static const char *name() {
-    return "Thread.dump_to_json_file";
+    return "JavaThread.dump";
   }
   static const char *description() {
-    return "Thread dump to JSON formatted file.";
+    return "Java thread dump in plain text or JSON format.";
+  }
+  static const char* impact() {
+    return "Medium: Depends on the number of threads.";
+  }
+  static const JavaPermission permission() {
+    JavaPermission p = {"java.lang.management.ManagementPermission", "monitor", NULL};
+    return p;
   }
   static int num_arguments();
   virtual void execute(DCmdSource source, TRAPS);

@@ -25,31 +25,18 @@
 
 package jdk.internal.vm;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 /**
- * A registry of thread containers to support thread dump operations
- * Thread containers register with this class at creation time, and deregister
- * when they are closed.
- *
- * This class defines methods to dump threads to an output or print stream in
- * JSON format.
+ * A registry of thread containers to support thread dump operations. Thread
+ * containers register with this class at creation time, and deregister when
+ * they are closed.
  */
 public class ThreadContainers {
     private ThreadContainers() { }
@@ -87,8 +74,8 @@ public class ThreadContainers {
     }
 
     /**
-     * Register a ThreadContainer so that its threads can be located for
-     * thread dumping operations.
+     * Register a ThreadContainer so that its threads can be located for thread
+     * dumping operations.
      */
     public static Key register(ThreadContainer container) {
         expungeStaleEntries();
@@ -97,138 +84,30 @@ public class ThreadContainers {
         return key;
     }
 
+
     /**
-     * Write a thread dump a file in JSON format.
+     * Return a stream of all threads in all thread containers.
      */
-    public static void dumpThreadsToJson(String path) throws IOException {
-        Path file = Path.of(path);
-        try (OutputStream out = Files.newOutputStream(file)) {
-            dumpThreadsToJson(out);
-        }
+    static Stream<Thread> allThreads() {
+        return containers.keySet()
+                .stream()
+                .map(WeakReference::get)
+                .filter(c -> c != null)
+                .flatMap(c -> c.threads().stream());
     }
 
     /**
-     * Write a thread dump to the given output stream in JSON format.
+     * Return a snapshot of the thread containers and their members.
      */
-    public static void dumpThreadsToJson(OutputStream out) {
-        PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
-        dumpThreadsToJson(ps);
-    }
-
-    /**
-     * Write a thread dump to the given print stream in JSON format.
-     */
-    public static void dumpThreadsToJson(PrintStream out) {
-        out.println("{");
-        out.println("   \"threadDump\": {");
-
-        out.println("      \"threads\": [");
-
-        List<Long> creators = new ArrayList<>();   // tid of thread that created container
-        List<long[]> members = new ArrayList<>();
-
-        // enumerate the thread containers and dump the virtual threads to the output
+    static Map<Long, Set<Thread>> snapshot() {
+        Map<Long, Set<Thread>> map = new HashMap<>();
         for (Map.Entry<WeakReference<ThreadContainer>, Long> e : containers.entrySet()) {
             ThreadContainer container = e.getKey().get();
-            long creatorTid = e.getValue();
             if (container != null) {
-                Set<Thread> threads = container.threads();
-
-                // dump virtual threads in this container
-                threads.stream()
-                        .filter(Thread::isVirtual)
-                        .forEach(t -> dumpThread(t, out, true));
-
-                // add to creators/members
-                creators.add(creatorTid);
-                long[] tids = threads.stream().mapToLong(Thread::getId).toArray();
-                members.add(tids);
+                Long tid = e.getValue();
+                map.put(tid, container.threads());
             }
         }
-
-        // dump kernel threads
-        PrivilegedAction<Map<Thread, StackTraceElement[]>> pa = Thread::getAllStackTraces;
-        Map<Thread, StackTraceElement[]> stacks = AccessController.doPrivileged(pa);
-        Iterator<Map.Entry<Thread, StackTraceElement[]>> iterator = stacks.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<Thread, StackTraceElement[]> e = iterator.next();
-            Thread thread = e.getKey();
-            boolean more = iterator.hasNext();
-            dumpThread(thread, out, more);
-        }
-
-        out.println("      ], ");
-
-        // dump thread containers and tid of the creator/members
-        out.println("      \"threadContainers\": [");
-        int i = 0;
-        while (i < creators.size()) {
-            Long creatorTid = creators.get(i);
-            long[] tids = members.get(i);
-            out.println("        {");
-            out.format("          \"creator\": %d,%n", creatorTid);
-
-            out.println("          \"members\": [");
-            int j = 0;
-            while (j < tids.length) {
-                out.format("              %d", tids[j]);
-                j++;
-                if (j < tids.length) {
-                    out.println(",");
-                } else {
-                    out.println();  // last element, no trailing comma
-                }
-            }
-            out.println("          ]");
-
-            i++;
-            if (i < creators.size()) {
-                out.println("        },");
-            } else {
-                out.println("        }");
-            }
-        }
-        out.println("      ]");
-
-
-        out.println("    }");   // end threadDump
-        out.println("}");  // end object
-    }
-
-    /**
-     * Dump the given thread and its stack trace to the print stream.
-     */
-    private static void dumpThread(Thread thread, PrintStream out, boolean more) {
-        PrivilegedAction<StackTraceElement[]> pa = thread::getStackTrace;
-        StackTraceElement[] stackTrace = AccessController.doPrivileged(pa);
-
-        out.println("         {");
-        out.format("           \"name\": \"%s\",%n", escape(thread.getName()));
-        out.format("           \"tid\": %d,%n", thread.getId());
-        out.format("           \"stack\": [%n");
-        int i = 0;
-        while (i < stackTrace.length) {
-            out.format("              \"%s\"", escape(stackTrace[i].toString()));
-            i++;
-            if (i < stackTrace.length) {
-                out.println(",");
-            } else {
-                out.println();  // last element, no trailing comma
-            }
-        }
-        out.println("           ]");
-        if (more) {
-            out.println("         },");
-        } else {
-            out.println("         }");  // last thread, no trailing comma
-        }
-    }
-
-    /**
-     * Escape any characters that need to be escape in the JSON output.
-     */
-    private static String escape(String name) {
-        // TBD
-        return name;
+        return map;
     }
 }

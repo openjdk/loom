@@ -246,22 +246,19 @@ public class Executors {
      * @since 99
      */
     public static ExecutorService newThreadExecutor(ThreadFactory threadFactory) {
-        return new ThreadExecutor(threadFactory);
+        return new ThreadExecutor(threadFactory, /*deadline*/ null);
     }
 
     /**
-     * Creates an Executor that starts a new virtual thread for each task. The
-     * threads support thread-locals but do not inherit inheritable thread-locals
-     * when created. The {@linkplain Thread#getContextClassLoader() context-class-loader}
-     * is inherited when submitting a task. The threads have no {@link
-     * java.security.Permission permissions}.
+     * Creates an Executor that starts a new virtual thread for each task as
+     * if by invoking {@link Thread#startVirtualThread(Runnable)}.
      *
      * @return a newly created executor
      * @since 99
      */
     public static ExecutorService newVirtualThreadExecutor() {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        return new ThreadExecutor(factory);
+        return new ThreadExecutor(factory, /*deadline*/ null);
     }
 
     /**

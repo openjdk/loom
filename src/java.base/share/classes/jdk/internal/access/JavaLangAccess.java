@@ -334,12 +334,12 @@ public interface JavaLangAccess {
      * @param cause set t's cause to new value
      */
     void setCause(Throwable t, Throwable cause);
-    
+
     /**
      * Get protection domain of the given Class
      */
     ProtectionDomain protectionDomain(Class<?> c);
-    
+
     /**
      * Get a method handle of string concat helper method
      */
@@ -402,23 +402,4 @@ public interface JavaLangAccess {
      * Unparks the given virtual thread.
      */
     void unparkVirtualThread(Thread thread);
-
-    /**
-     * Set the lifetime of a thread to lt.
-     * @param thread
-     * @param lt
-     */
-    void unsafeSetLifetime(Thread thread, Lifetime lt);
-
-    /**
-     * Add an observer to the parent thread.
-     * @param thread
-     */
-    void addObserver(Thread thread);
-
-    /**
-     * Remove an observer from the parent thread.
-     * @param thread
-     */
-    void removeObserver(Thread thread);
 }

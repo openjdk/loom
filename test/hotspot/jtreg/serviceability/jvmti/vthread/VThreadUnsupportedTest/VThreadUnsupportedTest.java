@@ -48,11 +48,10 @@ public class VThreadUnsupportedTest {
     };
 
     void runTest() throws Exception { 
-        Thread vThread = Thread.newThread("VThread", Thread.VIRTUAL, pinnedTask); 
-        vThread.start();
+        Thread vthread = Thread.startVirtualThread("VThread", pinnedTask);
         testJvmtiFunctionsInJNICall();
         isJNITestingCompleted.set(true);
-        vThread.join();
+        vthread.join();
     }
 
     public static void main(String[] args) throws Exception {

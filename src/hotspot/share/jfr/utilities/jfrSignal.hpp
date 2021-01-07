@@ -1,12 +1,10 @@
 /*
- * Copyright (c) 2019, Red Hat, Inc. and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -21,23 +19,33 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
+ *
  */
 
-package java.lang;
+#ifndef SHARE_JFR_UTILITIES_JFRSIGNAL_HPP
+#define SHARE_JFR_UTILITIES_JFRSIGNAL_HPP
 
-/**
- * TBD
- */
-public class UnboundScopedException extends RuntimeException {
-    @java.io.Serial
-        static final long serialVersionUID = 5971360953913194977L;
+#include "runtime/atomic.hpp"
 
-    /**
-     * Constructs a new exception with the specified detail message.
-     * @param   message   the detail message. The detail message is saved for
-     *          later retrieval by the {@link #getMessage()} method.
-     */
-    public UnboundScopedException(String message) {
-        super(message);
+class JfrSignal {
+ private:
+  mutable volatile bool _signaled;
+ public:
+  JfrSignal() : _signaled(false) {}
+
+  void signal() const {
+    if (!Atomic::load_acquire(&_signaled)) {
+      Atomic::release_store(&_signaled, true);
     }
-}
+  }
+
+  bool is_signaled() const {
+    if (Atomic::load_acquire(&_signaled)) {
+      Atomic::release_store(&_signaled, false); // auto-reset
+      return true;
+    }
+    return false;
+  }
+};
+
+#endif // SHARE_JFR_UTILITIES_JFRSIGNAL_HPP

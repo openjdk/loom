@@ -56,7 +56,7 @@ public class ThreadLocals {
         });
     }
 
-    // no thread locals
+    // Thread cannot set values for its copy of thread-locals.
     public void testThreadLocal3() throws Exception {
         Object INITIAL_VALUE = new Object();
         ThreadLocal<Object> LOCAL2 = new ThreadLocal<>() {
@@ -98,7 +98,7 @@ public class ThreadLocals {
     public void testInheritedThreadLocal1() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         for (int i = 0; i < 10; i++) {
-            TestHelper.runInVirtualThread(Thread.INHERIT_THREAD_LOCALS, () -> {
+            TestHelper.runInVirtualThread(() -> {
                 assertTrue(INHERITED_LOCAL.get() == null);
                 Object obj = new Object();
                 INHERITED_LOCAL.set(obj);
@@ -108,13 +108,13 @@ public class ThreadLocals {
         assertTrue(INHERITED_LOCAL.get() == null);
     }
 
-    // inherit thread local from dinosaur thread
+    // initial value inherited from kernel thread
     public void testInheritedThreadLocal2() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         var obj = new Object();
         INHERITED_LOCAL.set(obj);
         try {
-            TestHelper.runInVirtualThread(Thread.INHERIT_THREAD_LOCALS, () -> {
+            TestHelper.runInVirtualThread(() -> {
                 assertTrue(INHERITED_LOCAL.get() == obj);
             });
         } finally {
@@ -122,13 +122,13 @@ public class ThreadLocals {
         }
     }
 
-    // inherit thread local from Virtual thread
+    // initial value inherited from virtual thread
     public void testInheritedThreadLocal3() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         TestHelper.runInVirtualThread(0, () -> {
             var obj = new Object();
             INHERITED_LOCAL.set(obj);
-            TestHelper.runInVirtualThread(Thread.INHERIT_THREAD_LOCALS, () -> {
+            TestHelper.runInVirtualThread(() -> {
                 assertTrue(INHERITED_LOCAL.get() == obj);
             });
             assertTrue(INHERITED_LOCAL.get() == obj);
@@ -137,13 +137,13 @@ public class ThreadLocals {
         assertTrue(INHERITED_LOCAL.get() == null);
     }
 
-    // thread local not inherited from from dinosaur thread
+    // initial value not inherited from kernel thread
     public void testInheritedThreadLocal4() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         var obj = new Object();
         INHERITED_LOCAL.set(obj);
         try {
-            TestHelper.runInVirtualThread(0, () -> {
+            TestHelper.runInVirtualThread(Thread.NO_INHERIT_INHERITABLE_THREAD_LOCALS, () -> {
                 assertTrue(INHERITED_LOCAL.get() == null);
             });
         } finally {
@@ -151,13 +151,13 @@ public class ThreadLocals {
         }
     }
 
-    // thread local not inherited from Virtual thread
+    // initial value not inherited from virtual thread
     public void testInheritedThreadLocal5() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         TestHelper.runInVirtualThread(0, () -> {
             var obj = new Object();
             INHERITED_LOCAL.set(obj);
-            TestHelper.runInVirtualThread(0, () -> {
+            TestHelper.runInVirtualThread(Thread.NO_INHERIT_INHERITABLE_THREAD_LOCALS, () -> {
                 assertTrue(INHERITED_LOCAL.get() == null);
             });
             assertTrue(INHERITED_LOCAL.get() == obj);

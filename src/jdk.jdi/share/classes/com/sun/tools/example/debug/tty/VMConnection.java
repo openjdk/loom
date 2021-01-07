@@ -466,8 +466,10 @@ class VMConnection {
             (new StringTokenizer("uncaught java.lang.Throwable"));
 
         ThreadStartRequest tsr = erm.createThreadStartRequest();
+        tsr.removeVirtualThreadFilter(); // include events for vthreads
         tsr.enable();
         ThreadDeathRequest tdr = erm.createThreadDeathRequest();
+        tdr.removeVirtualThreadFilter(); // include events for vthreads
         tdr.enable();
     }
 

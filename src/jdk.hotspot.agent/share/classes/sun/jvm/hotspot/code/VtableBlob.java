@@ -1,12 +1,11 @@
 /*
  * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, NTT DATA.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -21,28 +20,25 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
+ *
  */
 
-package java.lang;
+package sun.jvm.hotspot.code;
 
-/**
- * TBD
- */
-public class LifetimeError extends Error {
-    static final long serialVersionUID = 1234L;
+import sun.jvm.hotspot.debugger.Address;
 
-    /**
-     * TBD
-     * @param s String
-     */
-    public LifetimeError(String s) {
-        super(s);
+public class VtableBlob extends BufferBlob {
+
+    public VtableBlob(Address addr) {
+        super(addr);
     }
 
-    /**
-     * TBD
-     */
-    public LifetimeError() {
-        super();
+    public boolean isVtableBlob() {
+        return true;
     }
+
+    public String getName() {
+        return "VtableBlob: " + super.getName();
+    }
+
 }

@@ -4,9 +4,7 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -23,31 +21,5 @@
  * questions.
  */
 
-package java.lang;
-
-/**
- * TBD
- * A TemporalResource is a Thing.
- */
-public abstract class TemporalResource implements AutoCloseable {
-    private final Lifetime lt;
-
-   /**
-     * TBD
-     */
-    protected TemporalResource() { lt = Lifetime.start(); }
-
-   /**
-     * TBD
-     */
-    protected void checkAccess() {
-        if (lt == null || Scoped.Cache.isActive(lt)) return;
-        if (!Thread.currentThread().isActive(lt))
-            throw new LifetimeError();
-    }
-
-   /**
-     * TBD
-     */
-     public void close() { lt.close(); }
-}
+@test.A
+module test { }

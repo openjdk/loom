@@ -144,6 +144,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
  private:
   friend class JvmtiEnv;
   JavaThread        *_thread;
+  JavaThread        *_thread_saved;
   OopHandle         _thread_oop_h;
   // Jvmti Events that cannot be posted in their current context.
   JvmtiDeferredEventQueue* _jvmti_event_queue;
@@ -223,7 +224,9 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   void bind_to(JavaThread* thread);
 
   // Used by the interpreter for fullspeed debugging support
-  bool is_interp_only_mode()                { return _thread->is_interp_only_mode(); }
+  bool is_interp_only_mode()                {
+     return _thread == NULL ?  _saved_interp_only_mode != 0 : _thread->is_interp_only_mode();
+  }
   void enter_interp_only_mode();
   void leave_interp_only_mode();
 
@@ -248,8 +251,10 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   int count_frames();
 
   inline JavaThread *get_thread()      { return _thread;              }
+  inline JavaThread *get_thread_or_saved(); // return _thread_saved if _thread is NULL 
 
-  // Needed for virtual threads only as they can migrate to different carrirer threads.
+  // Needed for virtual threads as they can migrate to different JavaThread's.
+  // Also used for carrier threads to clear/restore _thread.
   void set_thread(JavaThread* thread);
   oop get_thread_oop(); 
   inline bool is_virtual() { return _is_virtual; } // the _thread is virtual
@@ -469,7 +474,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   void nmethods_do(CodeBlobClosure* cf) NOT_JVMTI_RETURN;
 
 public:
-  void set_should_post_on_exceptions(bool val) { _thread->set_should_post_on_exceptions_flag(val ? JNI_TRUE : JNI_FALSE); }
+  void set_should_post_on_exceptions(bool val);
 
   // Thread local event queue, which doesn't require taking the Service_lock.
   void enqueue_event(JvmtiDeferredEvent* event) NOT_JVMTI_RETURN;

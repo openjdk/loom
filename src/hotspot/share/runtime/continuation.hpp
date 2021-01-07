@@ -46,7 +46,6 @@ private:
   static volatile intptr_t _nmethod_hit;
   static volatile intptr_t _nmethod_miss;
 
-  static int _flags;
 public:
   static void exploded_miss();
   static void exploded_hit();
@@ -62,8 +61,6 @@ public:
   static address freeze_oops_slow();
   static address default_thaw_oops_stub();
   static address thaw_oops_slow();
-
-  static int flags() { return _flags; }
 };
 
 void continuations_init();
@@ -179,6 +176,20 @@ private:
   int _parent_held_monitor_count;
 
 public:
+  static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
+  static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
+  static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
+  static ByteSize argsize_offset()  { return byte_offset_of(ContinuationEntry, _argsize); }
+
+  static void setup_oopmap(OopMap* map) {
+    map->set_oop(VMRegImpl::stack2reg(in_bytes(cont_offset())  / VMRegImpl::stack_slot_size));
+    map->set_oop(VMRegImpl::stack2reg(in_bytes(chunk_offset()) / VMRegImpl::stack_slot_size));
+  }
+
+  static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
+  static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
+  
+public:
   static size_t size() { return align_up((int)sizeof(ContinuationEntry), 2*wordSize); }
 
   ContinuationEntry* parent() { return _parent; }
@@ -216,14 +227,9 @@ public:
   void set_continuation(oop c) { _cont = c;  }
   void set_chunk(oop c)        { _chunk = c; }
 
-public:
-  static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
-  static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
-  static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
-  static ByteSize argsize_offset()  { return byte_offset_of(ContinuationEntry, _argsize); }
-
-  static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
-  static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
+#ifdef ASSERT
+  static bool assert_entry_frame_laid_out(JavaThread* thread);
+#endif
 };
 
 void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls);

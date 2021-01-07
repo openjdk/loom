@@ -349,11 +349,18 @@ void VM_ChangeSingleStep::doit() {
 
 void JvmtiEventControllerPrivate::enter_interp_only_mode(JvmtiThreadState *state) {
   EC_TRACE(("[%s] # Entering interpreter only mode",
-            JvmtiTrace::safe_get_thread_name(state->get_thread())));
+            JvmtiTrace::safe_get_thread_name(state->get_thread_or_saved())));
   EnterInterpOnlyModeClosure hs;
   JavaThread *target = state->get_thread();
   Thread *current = Thread::current();
-  if (target->is_handshake_safe_for(current)) {
+
+  // TBD: This is TMP workaround. We need a proper synchronization here.
+  if (target == NULL) {
+    state->enter_interp_only_mode(); // increment _saved_interp_only_mode
+    return;
+  }
+
+if (target->is_handshake_safe_for(current)) {
     hs.do_thread(target);
   } else {
     Handshake::execute(&hs, target);
@@ -365,7 +372,7 @@ void JvmtiEventControllerPrivate::enter_interp_only_mode(JvmtiThreadState *state
 void
 JvmtiEventControllerPrivate::leave_interp_only_mode(JvmtiThreadState *state) {
   EC_TRACE(("[%s] # Leaving interpreter only mode",
-            JvmtiTrace::safe_get_thread_name(state->get_thread())));
+            JvmtiTrace::safe_get_thread_name(state->get_thread_or_saved())));
   state->leave_interp_only_mode();
 }
 
@@ -381,7 +388,7 @@ JvmtiEventControllerPrivate::trace_changed(JvmtiThreadState *state, jlong now_en
       if (changed & bit) {
         // it changed, print it
          log_trace(jvmti)("[%s] # %s event %s",
-                      JvmtiTrace::safe_get_thread_name(state->get_thread()),
+                      JvmtiTrace::safe_get_thread_name(state->get_thread_or_saved()),
                       (now_enabled & bit)? "Enabling" : "Disabling", JvmtiTrace::event_name((jvmtiEvent)ei));
       }
     }
@@ -538,7 +545,6 @@ JvmtiEventControllerPrivate::recompute_thread_enabled(JvmtiThreadState *state) {
     // associated JavaThread is exiting
     return (jlong)0;
   }
-
   julong was_any_env_enabled = state->thread_event_enable()->_event_enabled.get_bits();
   julong any_env_enabled = 0;
   // JVMTI_EVENT_FRAME_POP can be disabled (in the case FRAME_POP_BIT is not set),
@@ -884,22 +890,22 @@ JvmtiEventControllerPrivate::set_user_enabled(JvmtiEnvBase *env, JavaThread *thr
 void
 JvmtiEventControllerPrivate::set_frame_pop(JvmtiEnvThreadState *ets, JvmtiFramePop fpop) {
   EC_TRACE(("[%s] # set frame pop - frame=%d",
-            JvmtiTrace::safe_get_thread_name(ets->get_thread()),
+            JvmtiTrace::safe_get_thread_name(ets->get_thread_or_saved()),
             fpop.frame_number() ));
 
   ets->get_frame_pops()->set(fpop);
-  recompute_thread_enabled(ets->get_thread()->jvmti_thread_state());
+  recompute_thread_enabled(ets->jvmti_thread_state());
 }
 
 
 void
 JvmtiEventControllerPrivate::clear_frame_pop(JvmtiEnvThreadState *ets, JvmtiFramePop fpop) {
   EC_TRACE(("[%s] # clear frame pop - frame=%d",
-            JvmtiTrace::safe_get_thread_name(ets->get_thread()),
+            JvmtiTrace::safe_get_thread_name(ets->get_thread_or_saved()),
             fpop.frame_number() ));
 
   ets->get_frame_pops()->clear(fpop);
-  recompute_thread_enabled(ets->get_thread()->jvmti_thread_state());
+  recompute_thread_enabled(ets->jvmti_thread_state());
 }
 
 
@@ -908,12 +914,12 @@ JvmtiEventControllerPrivate::clear_to_frame_pop(JvmtiEnvThreadState *ets, JvmtiF
   int cleared_cnt = ets->get_frame_pops()->clear_to(fpop);
 
   EC_TRACE(("[%s] # clear to frame pop - frame=%d, count=%d",
-            JvmtiTrace::safe_get_thread_name(ets->get_thread()),
+            JvmtiTrace::safe_get_thread_name(ets->get_thread_or_saved()),
             fpop.frame_number(),
             cleared_cnt ));
 
   if (cleared_cnt > 0) {
-    recompute_thread_enabled(ets->get_thread()->jvmti_thread_state());
+    recompute_thread_enabled(ets->jvmti_thread_state());
   }
 }
 
