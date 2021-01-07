@@ -84,20 +84,10 @@ public class nativemethbind001 {
     native int check();
 
     public static void main(String[] argv) {
-
-
-        // produce JCK-like exit status
-        System.exit(run(argv, System.out));
+        new nativemethbind001().runThis();
     }
 
-    public static int run(String argv[], PrintStream out) {
-        return new nativemethbind001().runThis(argv, out);
-    }
-
-    private int runThis(String argv[], PrintStream out) {
-
-
-
+    private void runThis() {
         System.out.println("\nCalling native methods ...\n");
 
         // dummy method used to provoke the NativeMethodBind event
@@ -107,7 +97,10 @@ public class nativemethbind001 {
         // event
         nativeMethod(false);
 
-        return check();
+        int result = check();
+        if (result != 0) {
+            throw new RuntimeException("runThis() returned " + result);
+        }
     }
 
    /**

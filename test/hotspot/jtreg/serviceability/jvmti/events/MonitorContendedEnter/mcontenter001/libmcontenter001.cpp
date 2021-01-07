@@ -209,11 +209,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiEventCallbacks callbacks;
 
-  /* init framework and parse options */
-  if (!NSK_VERIFY(nsk_jvmti_parseOptions(options)))
-    return JNI_ERR;
-
-  timeout = nsk_jvmti_getWaitTime() * 60000;
+  timeout = 60000; //TODO fix
   NSK_DISPLAY1("Timeout: %d msc\n", (int)timeout);
 
   /* create JVMTI environment */

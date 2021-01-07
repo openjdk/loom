@@ -46,7 +46,7 @@ static volatile int bindEv[][2] = {
 };
 
 static const char *CLASS_SIG =
-    "Lnsk/jvmti/NativeMethodBind/nativemethbind001$TestedClass;";
+    "Lnativemethbind001$TestedClass;";
 
 static volatile jint result = PASSED;
 static jvmtiEnv *jvmti = NULL;
@@ -54,13 +54,19 @@ static jvmtiEventCallbacks callbacks;
 static jrawMonitorID countLock;
 
 static void lock(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
-  if (!NSK_JVMTI_VERIFY(jvmti_env->RawMonitorEnter(countLock)))
+  jvmtiError err;
+  err = jvmti_env->RawMonitorEnter(countLock);
+  if (err != JVMTI_ERROR_NONE) {
     jni_env->FatalError("failed to enter a raw monitor\n");
+  }
 }
 
 static void unlock(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
-  if (!NSK_JVMTI_VERIFY(jvmti_env->RawMonitorExit(countLock)))
+  jvmtiError err;
+  err = jvmti_env->RawMonitorExit(countLock);
+  if (err != JVMTI_ERROR_NONE) {
     jni_env->FatalError("failed to exit a raw monitor\n");
+  }
 }
 
 /** callback functions **/
@@ -70,12 +76,15 @@ NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
   jvmtiPhase phase;
   char *methNam, *methSig;
   int i;
+  jvmtiError err;
 
   lock(jvmti_env, jni_env);
 
-  NSK_DISPLAY0(">>>> NativeMethodBind event received\n");
+  printf(">>>> NativeMethodBind event received\n");
 
-  if (!NSK_JVMTI_VERIFY(jvmti_env->GetPhase(&phase))) {
+  err = jvmti_env->GetPhase(&phase);
+  if (err != JVMTI_ERROR_NONE) {
+    printf(">>>> Error getting phase\n");
     result = STATUS_FAILED;
     unlock(jvmti_env, jni_env);
     return;
@@ -86,21 +95,22 @@ NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
     return;
   }
 
-  if (!NSK_JVMTI_VERIFY(jvmti_env->GetMethodName(method, &methNam, &methSig, NULL))) {
+  err = jvmti_env->GetMethodName(method, &methNam, &methSig, NULL);
+  if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    NSK_COMPLAIN0("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
+    printf("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
     unlock(jvmti_env, jni_env);
     return;
   }
 
-  NSK_DISPLAY2("method: \"%s %s\"\n", methNam, methSig);
+  printf("method: \"%s %s\"\n", methNam, methSig);
 
   for (i=0; i<METH_NUM; i++) {
     if ((strcmp(methNam,METHODS[i][0]) == 0) &&
         (strcmp(methSig,METHODS[i][1]) == 0)) {
       bindEv[i][0]++;
 
-      NSK_DISPLAY1(
+      printf(
           "CHECK PASSED: NativeMethodBind event received for the method:\n"
           "\t\"%s\" as expected\n",
           methNam);
@@ -108,16 +118,18 @@ NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
     }
   }
 
-  if (!NSK_JVMTI_VERIFY(jvmti_env->Deallocate((unsigned char*) methNam))) {
+  err = jvmti_env->Deallocate((unsigned char*) methNam);
+  if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
+    printf("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
   }
-  if (!NSK_JVMTI_VERIFY(jvmti_env->Deallocate((unsigned char*) methSig))) {
+  err =  jvmti_env->Deallocate((unsigned char*) methSig);
+  if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
+    printf("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
   }
 
-  NSK_DISPLAY0("<<<<\n\n");
+  printf("<<<<\n\n");
 
   unlock(jvmti_env, jni_env);
 }
@@ -196,44 +208,56 @@ JNIEXPORT jint JNI_OnLoad_nativemethbind001(JavaVM *jvm, char *options, void *re
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
+  jvmtiError err;
+  jint res;
 
-  /* init framework and parse options */
-  if (!NSK_VERIFY(nsk_jvmti_parseOptions(options)))
+  res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
+  if (res != JNI_OK || jvmti == NULL) {
+    printf("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
-
-  /* create JVMTI environment */
-  if (!NSK_VERIFY((jvmti =
-      nsk_jvmti_createJVMTIEnv(jvm, reserved)) != NULL))
-    return JNI_ERR;
+  }
 
   /* create a raw monitor */
-  if (!NSK_JVMTI_VERIFY(jvmti->CreateRawMonitor("_counter_lock", &countLock)))
+  err = jvmti->CreateRawMonitor("_counter_lock", &countLock);
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
+  }
 
   /* add capability to generate compiled method events */
   memset(&caps, 0, sizeof(jvmtiCapabilities));
   caps.can_generate_native_method_bind_events = 1;
-  if (!NSK_JVMTI_VERIFY(jvmti->AddCapabilities(&caps)))
-    return JNI_ERR;
 
-  if (!NSK_JVMTI_VERIFY(jvmti->GetCapabilities(&caps)))
+  // TODO Fix!!
+  err = jvmti->AddCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
-  if (!caps.can_generate_native_method_bind_events)
-    NSK_DISPLAY0("Warning: generation of native method bind events is not implemented\n");
+  }
+
+  err = jvmti->GetCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    return JNI_ERR;
+  }
+
+  if (!caps.can_generate_native_method_bind_events) {
+    printf("Warning: generation of native method bind events is not implemented\n");
+  }
 
   /* set event callback */
-  NSK_DISPLAY0("setting event callbacks ...\n");
+  printf("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.NativeMethodBind = &NativeMethodBind;
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks))))
+  err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
+  if (err != JVMTI_ERROR_NONE)
     return JNI_ERR;
 
-  NSK_DISPLAY0("setting event callbacks done\nenabling JVMTI events ...\n");
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventNotificationMode(JVMTI_ENABLE,
+  printf("setting event callbacks done\nenabling JVMTI events ...\n");
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                                         JVMTI_EVENT_NATIVE_METHOD_BIND,
-                                                        NULL)))
-    return JNI_ERR;
-  NSK_DISPLAY0("enabling the events done\n\n");
+                                                        NULL);
+  if (err != JVMTI_ERROR_NONE){
+      return JNI_ERR;
+  }
+  printf("enabling the events done\n\n");
 
   return JNI_OK;
 }

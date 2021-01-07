@@ -48,7 +48,7 @@ import java.io.PrintStream;
  *      -agentlib:mcontenter001 mcontenter001
  */
 
-/*
+
     public class mcontenter001 extends DebugeeClass {
 
     // load native library if required
@@ -61,18 +61,13 @@ import java.io.PrintStream;
 
 
         // JCK-compatible exit
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+     int result =  new mcontenter001().runIt();
+     if (result != 0) {
+        throw new RuntimeException("Unexpected status: " + result);
+     }
     }
 
-    // run test from JCK-compatible environment
-    public static int run(String argv[], PrintStream out) {
-        return new mcontenter001().runIt(argv, out);
-    }
 
-
-    // scaffold objects
-    ArgumentHandler argHandler = null;
-    Log log = null;
     int status = DebugeeClass.TEST_PASSED;
     long timeout = 0;
 
@@ -80,10 +75,8 @@ import java.io.PrintStream;
     mcontenter001Thread thread = null;
 
     // run debuggee
-    public int runIt(String argv[], PrintStream out) {
-        argHandler = new ArgumentHandler(argv);
-        log = new Log(out, argHandler);
-        timeout = argHandler.getWaitTime() * 60000; // milliseconds
+    public int runIt() {
+        timeout = 60000; // milliseconds TODO fix
         System.out.println("Timeout = " + timeout + " msc.");
 
         thread = new mcontenter001Thread("Debuggee Thread");
@@ -155,4 +148,3 @@ class mcontenter001Thread extends Thread {
         }
     }
 }
-*/

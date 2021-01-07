@@ -81,20 +81,16 @@ public class nativemethbind004 {
     native int check();
 
     public static void main(String[] argv) {
-
-
-        // produce JCK-like exit status
-        System.exit(run(argv, System.out));
+        new nativemethbind004().runThis();
     }
 
-    public static int run(String argv[], PrintStream out) {
-        return new nativemethbind004().runThis(argv, out);
-    }
-
-    private int runThis(String argv[], PrintStream out) {
+    private void runThis() {
         // invoke native method to be redirected
         nativeMethod();
 
-        return check();
+        int res = check();
+        if (res != 0) {
+            throw new RuntimeException("Check() returned " + res);
+        }
     }
 }

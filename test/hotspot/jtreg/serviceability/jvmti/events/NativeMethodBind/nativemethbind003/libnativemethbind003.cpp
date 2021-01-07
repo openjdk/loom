@@ -43,7 +43,7 @@ static volatile int bindEv[] = {
 };
 
 static const char *CLASS_SIG =
-    "Lnsk/jvmti/NativeMethodBind/nativemethbind003$TestedClass;";
+    "Lnativemethbind003$TestedClass;";
 
 static volatile jint result = PASSED;
 static jvmtiEnv *jvmti = NULL;
@@ -51,13 +51,19 @@ static jvmtiEventCallbacks callbacks;
 static jrawMonitorID countLock;
 
 static void lock(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
-  if (!NSK_JVMTI_VERIFY(jvmti_env->RawMonitorEnter(countLock)))
+  jvmtiError err;
+  err = jvmti_env->RawMonitorEnter(countLock);
+  if (err != JVMTI_ERROR_NONE) {
     jni_env->FatalError("failed to enter a raw monitor\n");
+  }
 }
 
 static void unlock(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
-  if (!NSK_JVMTI_VERIFY(jvmti_env->RawMonitorExit(countLock)))
+  jvmtiError err;
+  err = jvmti_env->RawMonitorExit(countLock);
+  if (err != JVMTI_ERROR_NONE) {
     jni_env->FatalError("failed to exit a raw monitor\n");
+  }
 }
 
 /** callback functions **/
@@ -142,7 +148,7 @@ NSK_DISPLAY0("inside the nativeMethod()\n");
 
 /* dummy method used only to provoke NativeMethodBind event */
 JNIEXPORT void JNICALL
-Java_nsk_registerNative(
+Java_nativemethbind003_registerNative(
     JNIEnv *env, jobject obj) {
 jclass testedCls = NULL;
 JNINativeMethod meth;
@@ -193,28 +199,37 @@ JNIEXPORT jint JNI_OnLoad_nativemethbind003(JavaVM *jvm, char *options, void *re
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
+  jvmtiError err;
+  jint res;
 
-  /* init framework and parse options */
-  if (!NSK_VERIFY(nsk_jvmti_parseOptions(options)))
+  res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
+  if (res != JNI_OK || jvmti == NULL) {
+    printf("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
+  }
 
-  /* create JVMTI environment */
-  if (!NSK_VERIFY((jvmti =
-      nsk_jvmti_createJVMTIEnv(jvm, reserved)) != NULL))
-    return JNI_ERR;
 
   /* create a raw monitor */
-  if (!NSK_JVMTI_VERIFY(jvmti->CreateRawMonitor("_counter_lock", &countLock)))
+  err = jvmti->CreateRawMonitor("_counter_lock", &countLock);
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
+  }
+
 
   /* add capability to generate compiled method events */
   memset(&caps, 0, sizeof(jvmtiCapabilities));
   caps.can_generate_native_method_bind_events = 1;
-  if (!NSK_JVMTI_VERIFY(jvmti->AddCapabilities(&caps)))
+  // TODO Fix!!
+  err = jvmti->AddCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
+  }
 
-  if (!NSK_JVMTI_VERIFY(jvmti->GetCapabilities(&caps)))
+  err = jvmti->GetCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
+  }
+
   if (!caps.can_generate_native_method_bind_events)
     NSK_DISPLAY0("Warning: generation of native method bind events is not implemented\n");
 
@@ -223,18 +238,23 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.NativeMethodBind = &NativeMethodBind;
   callbacks.VMDeath = &VMDeath;
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks))))
+  err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
+  if (err != JVMTI_ERROR_NONE)
     return JNI_ERR;
 
   NSK_DISPLAY0("setting event callbacks done\nenabling JVMTI events ...\n");
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                                        JVMTI_EVENT_NATIVE_METHOD_BIND,
-                                                        NULL)))
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
+                                        JVMTI_EVENT_NATIVE_METHOD_BIND,
+                                        NULL);
+  if (err != JVMTI_ERROR_NONE){
     return JNI_ERR;
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                                        JVMTI_EVENT_VM_DEATH,
-                                                        NULL)))
+  }
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
+                                        JVMTI_EVENT_VM_DEATH,
+                                        NULL);
+  if (err != JVMTI_ERROR_NONE){
     return JNI_ERR;
+  }
   NSK_DISPLAY0("enabling the events done\n\n");
 
   return JNI_OK;

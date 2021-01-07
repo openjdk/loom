@@ -79,21 +79,12 @@ public class nativemethbind003 {
     native void registerNative();
 
     public static void main(String[] argv) {
-
-
-        // produce JCK-like exit status
-        System.exit(run(argv, System.out));
+        new nativemethbind003().runThis();
     }
 
-    public static int run(String argv[], PrintStream out) {
-        return new nativemethbind003().runThis(argv, out);
-    }
-
-    private int runThis(String argv[], PrintStream out) {
+    private void runThis() {
         // register native method 'nativeMethod' with 'TestedClass'
         registerNative();
-
-        return DebugeeClass.TEST_PASSED;
     }
 
    /**
