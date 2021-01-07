@@ -51,24 +51,19 @@ public class vmobjalloc001 extends DebugeeClass {
 
     // run test from command line
     public static void main(String argv[]) {
-
-
-        // JCK-compatible exit
-        System.exit(run(argv, System.out));
-    }
-
-    // run test from JCK-compatible environment
-    public static int run(String argv[], PrintStream out) {
-        return new vmobjalloc001().runIt(argv, out);
+        new vmobjalloc001().runIt();
     }
 
     int status = TEST_PASSED;
 
     // run debuggee
-    public int runIt(String argv[], PrintStream out) {
+    public void runIt() {
 
         System.out.println("Sync: debuggee started");
-
-        return checkStatus(status);
+        int result = checkStatus(status);
+        if (result != 0) {
+            throw new RuntimeException("checkStatus() returned " + result);
+        }
+        System.out.println("TEST PASSED");
     }
 }

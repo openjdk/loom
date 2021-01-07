@@ -112,15 +112,25 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEnv* jvmti = NULL;
   jvmtiCapabilities caps;
   jvmtiEventCallbacks callbacks;
+  jvmtiError err;
+  jint res;
 
-  timeout = nsk_jvmti_getWaitTime() * 60000;
+  timeout = 60000; // TODO Fix timeout
   NSK_DISPLAY1("Timeout: %d msc\n", (int)timeout);
 
   /* create JVMTI environment */
-  jvmti = nsk_jvmti_createJVMTIEnv(jvm, reserved);
-  if (jvmti == NULL) {
+  res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
+  if (res != JNI_OK || jvmti == NULL) {
+    printf("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
+
+  jvmti_env = jvmti;
+  err = init_agent_data(jvmti_env, &agent_data);
+  if (err != JVMTI_ERROR_NONE) {
+    return JNI_ERR;
+  }
+
 
   memset(&caps, 0, sizeof(caps));
   caps.can_generate_vm_object_alloc_events = 1;
@@ -140,9 +150,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   /* register agent proc and arg */
-  if (!NSK_VERIFY(nsk_jvmti_setAgentProc(agentProc, NULL))) {
-    return JNI_ERR;
-  }
+  nsk_jvmti_setAgentProc(agentProc, NULL);
 
   return JNI_OK;
 }
