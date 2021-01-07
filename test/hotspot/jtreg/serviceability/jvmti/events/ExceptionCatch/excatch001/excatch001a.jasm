@@ -21,8 +21,6 @@
  * questions.
  */
 
-package nsk/jvmti/ExceptionCatch;
-
 /* Reassembled from the following Java pattern:
  *
  * public class excatch001a {

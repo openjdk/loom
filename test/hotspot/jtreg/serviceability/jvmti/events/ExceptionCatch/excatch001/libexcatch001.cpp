@@ -54,12 +54,12 @@ static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
 static jboolean printdump = JNI_FALSE;
 static exceptionInfo exs[] = {
-  { "Lnsk/jvmti/ExceptionCatch/excatch001c;",
-    "Lnsk/jvmti/ExceptionCatch/excatch001a;", "run", "()V", 14 },
+  { "Lexcatch001c;",
+    "Lexcatch001a;", "run", "()V", 14 },
   { "Ljava/lang/ArithmeticException;",
-    "Lnsk/jvmti/ExceptionCatch/excatch001a;", "run", "()V", 24 },
+    "Lexcatch001a;", "run", "()V", 24 },
   { "Ljava/lang/ArrayIndexOutOfBoundsException;",
-    "Lnsk/jvmti/ExceptionCatch/excatch001a;", "run", "()V", 34 }
+    "Lexcatch001a;", "run", "()V", 34 }
 };
 static int eventsCount = 0;
 static int eventsExpected = 0;
@@ -210,17 +210,17 @@ Java_excatch001_check(JNIEnv *env, jclass cls) {
         return result;
     }
 
-    clz = env->FindClass("nsk/jvmti/ExceptionCatch/excatch001c");
+    clz = env->FindClass("excatch001c");
     if (clz == NULL) {
         printf("Cannot find excatch001c class!\n");
         return STATUS_FAILED;
     }
-    clz = env->FindClass("nsk/jvmti/ExceptionCatch/excatch001b");
+    clz = env->FindClass("excatch001b");
     if (clz == NULL) {
         printf("Cannot find excatch001b class!\n");
         return STATUS_FAILED;
     }
-    clz = env->FindClass("nsk/jvmti/ExceptionCatch/excatch001a");
+    clz = env->FindClass("excatch001a");
     if (clz == NULL) {
         printf("Cannot find excatch001a class!\n");
         return STATUS_FAILED;
@@ -258,5 +258,15 @@ Java_excatch001_check(JNIEnv *env, jclass cls) {
     }
     return result;
 }
+
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  return Agent_Initialize(jvm, options, reserved);
+}
+
 
 }
