@@ -33,7 +33,7 @@ package jdk.test.lib.jvmti;
  */
 public class DebugeeClass {
 
-    public static final int TEST_PASSED = 95;
+    public static final int TEST_PASSED = 0;
     /**
      * This method is used for synchronization status between agent and debuggee class.
      */

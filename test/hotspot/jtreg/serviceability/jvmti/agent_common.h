@@ -72,10 +72,23 @@ extern "C" {
 
 #define NSK_STATUS_PASSED       0
 #define NSK_STATUS_FAILED       2
+
+static jvmtiEnv* jvmti_env = NULL;
+static JavaVM* jvm = NULL;
+static JNIEnv* jni_env = NULL;
+
 static volatile int currentAgentStatus = NSK_STATUS_PASSED;
+
+static jthread agentThread = NULL;
+static jvmtiStartFunction agentThreadProc = NULL;
+static void* agentThreadArg = NULL;
 
 void nsk_jvmti_setFailStatus() {
   currentAgentStatus = NSK_STATUS_FAILED;
+}
+
+jint nsk_jvmti_getStatus() {
+  return currentAgentStatus;
 }
 
 int  nsk_jvmti_getWaitTime() {
@@ -117,16 +130,13 @@ typedef struct agent_data_t {
 } agent_data_t;
 
 int nsk_jvmti_setAgentProc(jvmtiStartFunction proc, void* arg) {
-//  agentThreadProc = proc;
-//  agentThreadArg = arg;
+  agentThreadProc = proc;
+  agentThreadArg = arg;
   return NSK_TRUE;
 }
 
 
 static agent_data_t agent_data;
-
-static jvmtiEnv* jvmti_env = NULL;
-static JavaVM* jvm = NULL;
 
 
 static void
@@ -154,7 +164,7 @@ jint createRawMonitor(jvmtiEnv *env, const char *name, jrawMonitorID *monitor) {
 }
 
 void exitOnError(jvmtiError error) {
-  if (!NSK_JVMTI_VERIFY(error)) {
+  if (error != JVMTI_ERROR_NONE) {
     exit(error);
   }
 }
@@ -240,6 +250,171 @@ int nsk_jvmti_resumeSync() {
   return NSK_TRUE;
 }
 
+/* ============================================================================= */
+static void set_agent_thread_state(thread_state_t value) {
+  rawMonitorEnter(jvmti_env, agent_data.monitor);
+  agent_data.thread_state = value;
+  rawMonitorNotify(jvmti_env, agent_data.monitor);
+  rawMonitorExit(jvmti_env, agent_data.monitor);
+}
+
+/** Wrapper for user agent thread. */
+static void JNICALL
+agentThreadWrapper(jvmtiEnv* jvmti_env, JNIEnv* agentJNI, void* arg) {
+  jni_env = agentJNI;
+
+  /* run user agent proc */
+  {
+    set_agent_thread_state(RUNNABLE);
+
+    // TODO was NSK_TRACE
+    (*agentThreadProc)(jvmti_env, agentJNI, agentThreadArg);
+
+    set_agent_thread_state(TERMINATED);
+  }
+
+  /* finalize agent thread */
+  {
+    /* gelete global ref for agent thread */
+    agentJNI->DeleteGlobalRef(agentThread);
+    agentThread = NULL;
+  }
+}
+
+
+/** Start wrapper for user agent thread. */
+static jthread startAgentThreadWrapper(JNIEnv *jni_env, jvmtiEnv* jvmti_env) {
+  const jint  THREAD_PRIORITY = JVMTI_THREAD_MAX_PRIORITY;
+  const char* THREAD_NAME = "JVMTI agent thread";
+  const char* THREAD_CLASS_NAME = "java/lang/Thread";
+  const char* THREAD_CTOR_NAME = "<init>";
+  const char* THREAD_CTOR_SIGNATURE = "(Ljava/lang/String;)V";
+
+  jobject threadName = NULL;
+  jclass threadClass = NULL;
+  jmethodID threadCtor = NULL;
+  jobject threadObject = NULL;
+  jobject threadGlobalRef = NULL;
+  jvmtiError err;
+
+  threadClass = jni_env->FindClass(THREAD_CLASS_NAME);
+  if (threadClass == NULL) {
+    return NULL;
+  }
+
+  threadCtor = jni_env->GetMethodID(threadClass, THREAD_CTOR_NAME, THREAD_CTOR_SIGNATURE);
+  if (threadCtor == NULL) {
+    return NULL;
+  }
+
+  threadName = jni_env->NewStringUTF(THREAD_NAME);
+  if (threadName == NULL) {
+    return NULL;
+  }
+
+  threadObject = jni_env->NewObject(threadClass, threadCtor, threadName);
+  if (threadObject == NULL) {
+    return NULL;
+  }
+
+  threadGlobalRef = jni_env->NewGlobalRef(threadObject);
+  if (threadGlobalRef == NULL) {
+    jni_env->DeleteLocalRef(threadObject);
+    return NULL;
+  }
+  agentThread = (jthread)threadGlobalRef;
+
+  err = jvmti_env->RunAgentThread(agentThread, &agentThreadWrapper, agentThreadArg, THREAD_PRIORITY);
+  if (err != JVMTI_ERROR_NONE) {
+    jni_env->DeleteGlobalRef(threadGlobalRef);
+    jni_env->DeleteLocalRef(threadObject);
+    return NULL;
+  }
+  return agentThread;
+}
+
+/** Run registered user agent thread via wrapper. */
+static jthread nsk_jvmti_runAgentThread(JNIEnv *jni_env, jvmtiEnv* jvmti_env) {
+  /* start agent thread wrapper */
+  jthread thread = startAgentThreadWrapper(jni_env, jvmti_env);
+  if (thread == NULL) {
+    nsk_jvmti_setFailStatus();
+    return NULL;
+  }
+
+  return thread;
+}
+
+/** Sync point called from Java code. */
+static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debuggeeStatus) {
+  jint result = NSK_STATUS_FAILED;
+
+  printf("PPPPPPPPPPPPPPPP 1\n");
+  printf("Data %p %p\n", jvmti_env, agent_data.monitor);
+  rawMonitorEnter(jvmti_env, agent_data.monitor);
+  printf("PPPPPPPPPPPPPPPP 2\n");
+  /* save last debugee status */
+  agent_data.last_debuggee_status = debuggeeStatus;
+  printf("PPPPPPPPPPPPPPPP 3\n");
+  /* we don't enter if-stmt in second call */
+  if (agent_data.thread_state == NEW) {
+    if (nsk_jvmti_runAgentThread(jni_env, jvmti_env) == NULL)
+      goto monitor_exit_and_return;
+
+    /* SP2.2-w - wait for agent thread */
+    while (agent_data.thread_state == NEW) {
+      rawMonitorWait(jvmti_env, agent_data.monitor, 0);
+    }
+  }
+  printf("PPPPPPPPPPPPPPPP 4\n");
+  /* wait for sync permit */
+  /* we don't enter loop in first call */
+  while (agent_data.thread_state != WAITING && agent_data.thread_state != TERMINATED) {
+    /* SP4.2-w - second wait for agent thread */
+    rawMonitorWait(jvmti_env, agent_data.monitor, 0);
+  }
+  printf("PPPPPPPPPPPPPPPP 5\n");
+  if (agent_data.thread_state != TERMINATED) {
+    agent_data.thread_state = SUSPENDED;
+    /* SP3.2-n - notify to start test */
+    /* SP6.2-n - notify to end test */
+    rawMonitorNotify(jvmti_env, agent_data.monitor);
+  } else {
+    NSK_COMPLAIN0("Debuggee status sync aborted because agent thread has finished\n");
+    goto monitor_exit_and_return;
+  }
+  printf("PPPPPPPPPPPPPPPP 6\n");
+  /* update status from debuggee */
+  if (debuggeeStatus != NSK_STATUS_PASSED) {
+    printf("FAIL: Status is %d\n", debuggeeStatus);
+    nsk_jvmti_setFailStatus();
+  }
+  printf("PPPPPPPPPPPPPPPP 7\n");
+  while (agent_data.thread_state == SUSPENDED) {
+    /* SP5.2-w - wait while testing */
+    /* SP7.2 - wait for agent end */
+    rawMonitorWait(jvmti_env, agent_data.monitor, 0);
+  }
+  printf("PPPPPPPPPPPPPPPP 8\n");
+  agent_data.last_debuggee_status = nsk_jvmti_getStatus();
+  result = agent_data.last_debuggee_status;
+  printf("PPPPPPPPPPPPPPPP 9\n");
+
+  monitor_exit_and_return:
+  rawMonitorExit(jvmti_env, agent_data.monitor);
+  return result;
+}
+
+/** Native function for Java code to provide sync point. */
+JNIEXPORT jint JNICALL
+Java_jdk_test_lib_jvmti_DebugeeClass_checkStatus(JNIEnv* jni_env, jclass cls, jint debuggeeStatus) {
+  jint status;
+  // TODO NSK_TRACE
+  printf("SSSSSSSSSTATUS %d\n", debuggeeStatus);
+  status = syncDebuggeeStatus(jni_env, jvmti_env, debuggeeStatus);
+  return status;
+}
+
 /** Create JVMTI environment. */
 jvmtiEnv* nsk_jvmti_createJVMTIEnv(JavaVM* javaVM, void* reserved) {
   jvm = javaVM;
@@ -319,7 +494,6 @@ const char* TranslateState(jint flags) {
     if (flags & JVMTI_THREAD_STATE_IN_NATIVE) {
         strcat(str, " IN_NATIVE");
     }
-
 
     return str;
 }
