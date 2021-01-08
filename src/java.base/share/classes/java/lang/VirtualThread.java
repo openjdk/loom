@@ -44,6 +44,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.vm.ThreadDumper;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
@@ -225,6 +226,7 @@ class VirtualThread extends Thread {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
+        ThreadDumper.notifyStart(this);  // no-op if threads not tracked
         try {
             scheduler.execute(runContinuation);
         } catch (RejectedExecutionException ree) {
@@ -383,6 +385,9 @@ class VirtualThread extends Thread {
         if (notifyAgents && notifyJvmtiEvents) {
             notifyJvmtiTerminated();
         }
+
+        // notify thread dumper, no-op if not tracking threads
+        ThreadDumper.notifyTerminate(this);
     }
 
     /**

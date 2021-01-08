@@ -40,19 +40,18 @@ import java.util.Set;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Stream;
+
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
-import jdk.internal.access.JavaLangAccess;
-import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.InnocuousThread;
-import jdk.internal.vm.ThreadContainers;
 import jdk.internal.vm.ThreadContainer;
+import jdk.internal.vm.ThreadDumper;
 
 /**
  * An ExecutorService that executes each task in its own thread.
  */
 class ThreadExecutor implements ExecutorService, ThreadContainer {
-    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final Permission MODIFY_THREAD = new RuntimePermission("modifyThread");
     private static final VarHandle STATE;
     static {
@@ -70,7 +69,7 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
 
     private final ThreadFactory factory;
     private final Future<?> timerTask;
-    private final ThreadContainers.Key key;
+    private final ThreadDumper.Key key;
 
     // states: RUNNING -> SHUTDOWN -> TERMINATED
     private static final int RUNNING    = 0;
@@ -98,7 +97,7 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
 
         this.factory = Objects.requireNonNull(factory);
         this.timerTask = timer;
-        this.key = ThreadContainers.register(this);
+        this.key = ThreadDumper.notifyCreate(this);
     }
 
     /**
@@ -120,9 +119,6 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
         if (threads.isEmpty()) {
             // set state
             STATE.set(this, TERMINATED);
-
-            // remove from thread container registry
-            key.deregister();
 
             // cancel timer
             if (timerTask != null && !timerTask.isDone()) {
@@ -201,12 +197,13 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
         try {
             ExecutorService.super.close(); // waits for executor to terminate
         } finally {
+            key.close();
         }
     }
 
     @Override
-    public Set<Thread> threads() {
-        return Set.copyOf(threads);
+    public Stream<Thread> threads() {
+        return threads.stream();
     }
 
     /**

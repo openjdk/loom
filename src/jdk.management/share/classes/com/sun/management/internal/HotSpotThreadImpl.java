@@ -28,9 +28,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import com.sun.management.ThreadMXBean;
 import com.sun.management.ThreadMXBean.OutputFormat;
-import jdk.internal.vm.ThreadDump;
+import jdk.internal.vm.ThreadDumper;
 import sun.management.ManagementFactoryHelper;
 import sun.management.ThreadImpl;
 import sun.management.Util;
@@ -96,10 +99,27 @@ public class HotSpotThreadImpl extends ThreadImpl implements ThreadMXBean {
             Util.checkControlAccess();
 
         try (OutputStream out = Files.newOutputStream(file)) {
-            switch (format) {
-                case TEXT_PLAIN -> ThreadDump.dumpThreads(out);
-                case JSON       -> ThreadDump.dumpThreadsToJson(out);
+            PrivilegedExceptionAction<Void> pae = () -> {
+                dumpThreads(out, format);
+                return null;
+            };
+            try {
+                AccessController.doPrivileged(pae);
+            } catch (PrivilegedActionException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof IOException)
+                    throw (IOException) cause;
+                if (cause instanceof RuntimeException)
+                    throw (RuntimeException) cause;
+                throw new RuntimeException(cause);
             }
+        }
+    }
+
+    private void dumpThreads(OutputStream out, OutputFormat format) throws IOException {
+        switch (format) {
+            case TEXT_PLAIN -> ThreadDumper.dumpThreads(out);
+            case JSON       -> ThreadDumper.dumpThreadsToJson(out);
         }
     }
 }
