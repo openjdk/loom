@@ -20,9 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
- 
-import java.io.*;
 
+import java.io.*;
 
 /*
  * @test
