@@ -44,7 +44,7 @@ import jdk.test.lib.jvmti.DebugeeClass;
  *
  * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:monitorwait001 monitorwait001 -waittime=5
+ *      -agentlib:monitorwait monitorwait001
  */
 
 
@@ -53,18 +53,15 @@ public class monitorwait001 extends DebugeeClass {
 
     // load native library if required
     static {
-        loadLibrary("monitorwait001");
+        loadLibrary("monitorwait");
     }
 
     // run test from command line
     public static void main(String argv[]) {
-        // JCK-compatible exit
-        System.exit(run());
-    }
-
-    // run test from JCK-compatible environment
-    public static int run() {
-        return new monitorwait001().runIt();
+        int result = new monitorwait001().runIt();
+        if (result != 0) {
+            throw new RuntimeException("Unexpected status: " + result);
+        }
     }
 
 
@@ -76,7 +73,7 @@ public class monitorwait001 extends DebugeeClass {
 
     // run debuggee
     public int runIt() {
-        timeout = 60000; // milliseconds
+        timeout = 60000; //TODO fix timeout milliseconds
         System.out.println("Timeout = " + timeout + " msc.");
 
         thread = new monitorwait001Thread("Debuggee Thread");

@@ -210,10 +210,10 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *agentJNI, void *arg) {
     return;
   }
 
-/* clear events count */
+  /* clear events count */
   eventsCount = 0;
 
-/* resume debugee to catch MonitorContendedEntered event */
+  /* resume debugee to catch MonitorContendedEntered event */
   if (!((nsk_jvmti_resumeSync() == NSK_TRUE) && (nsk_jvmti_waitForSync(timeout) ==NSK_TRUE))) {
     return;
   }

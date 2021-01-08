@@ -57,6 +57,9 @@ public class mcontentered001 extends DebugeeClass {
     // run test from command line
     public static void main(String argv[]) {
         int result = new mcontentered001().runIt();
+        if (result != 0) {
+            throw new RuntimeException("Unexpected status: " + result);
+        }
     }
 
 

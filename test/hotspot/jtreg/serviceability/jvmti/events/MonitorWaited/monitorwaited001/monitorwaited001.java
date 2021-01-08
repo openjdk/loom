@@ -45,7 +45,7 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:monitorwaited001 monitorwaited001
+ *      -agentlib:monitorwaited monitorwaited001
  */
 
 
@@ -54,17 +54,15 @@ public class monitorwaited001 extends DebugeeClass {
 
     // load native library if required
     static {
-        loadLibrary("monitorwaited001");
+        loadLibrary("monitorwaited");
     }
 
     // run test from command line
     public static void main(String argv[]) {
-        System.exit(run());
-    }
-
-    // run test from JCK-compatible environment
-    public static int run() {
-        return new monitorwaited001().runIt();
+        int result = new monitorwaited001().runIt();
+        if (result != 0) {
+            throw new RuntimeException("Unexpected status: " + result);
+        }
     }
 
 

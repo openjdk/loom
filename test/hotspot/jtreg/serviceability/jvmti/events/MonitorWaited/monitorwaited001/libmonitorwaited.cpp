@@ -31,7 +31,7 @@ extern "C" {
 /* ========================================================================== */
 
 /* scaffold objects */
-static JNIEnv* jni = NULL;
+static JNIEnv *jni = NULL;
 static jvmtiEnv *jvmti = NULL;
 static jlong timeout = 0;
 
@@ -43,56 +43,63 @@ static volatile int eventsCount = 0;
 /* ========================================================================== */
 
 void JNICALL
-MonitorWaited(jvmtiEnv *jvmti, JNIEnv* jni,
-    jthread thr, jobject obj, jboolean timed_out) {
+MonitorWaited(jvmtiEnv *jvmti, JNIEnv *jni,
+              jthread thr, jobject obj, jboolean timed_out) {
 
-NSK_DISPLAY3("MonitorWaited event:\n\tthread: %p, object: %p, timed_out: %s\n",
-thr, obj, (timed_out == JNI_TRUE) ? "true" : "false");
+  NSK_DISPLAY3("MonitorWaited event:\n\tthread: %p, object: %p, timed_out: %s\n",
+               thr, obj, (timed_out == JNI_TRUE) ? "true" : "false");
 
-if (!NSK_VERIFY(thread != NULL)) {
-nsk_jvmti_setFailStatus();
-return;
-}
+  if (thread == NULL) {
+    nsk_jvmti_setFailStatus();
+    return;
+  }
+
 
 /* check if event is for tested thread and for tested object */
-if (jni->IsSameObject(thread, thr) &&
-jni->IsSameObject(object, obj)) {
-eventsCount++;
-if (timed_out == JNI_TRUE) {
-NSK_COMPLAIN0("Unexpected timed_out value: true\n");
-nsk_jvmti_setFailStatus();
-}
-}
+  if (jni->IsSameObject(thread, thr) &&
+      jni->IsSameObject(object, obj)) {
+    eventsCount++;
+    if (timed_out == JNI_TRUE) {
+      NSK_COMPLAIN0("Unexpected timed_out value: true\n");
+      nsk_jvmti_setFailStatus();
+    }
+  }
 }
 
 /* ========================================================================== */
 
 static int prepare() {
-  const char* THREAD_NAME = "Debuggee Thread";
+  const char *THREAD_NAME = "Debuggee Thread";
   jclass klass = NULL;
   jfieldID field = NULL;
   jvmtiThreadInfo info;
   jthread *threads = NULL;
   jint threads_count = 0;
+  jvmtiError err;
   int i;
 
   NSK_DISPLAY0("Prepare: find tested thread\n");
 
   /* get all live threads */
-  if (!NSK_JVMTI_VERIFY(jvmti->GetAllThreads(&threads_count, &threads)))
+  err = jvmti->GetAllThreads(&threads_count, &threads);
+  if (err != JVMTI_ERROR_NONE) {
     return NSK_FALSE;
+  }
 
-  if (!NSK_VERIFY(threads_count > 0 && threads != NULL))
+  if (!(threads_count > 0 && threads != NULL)) {
     return NSK_FALSE;
+  }
 
   /* find tested thread */
   for (i = 0; i < threads_count; i++) {
-    if (!NSK_VERIFY(threads[i] != NULL))
+    if (threads[i] == NULL)
       return NSK_FALSE;
 
     /* get thread information */
-    if (!NSK_JVMTI_VERIFY(jvmti->GetThreadInfo(threads[i], &info)))
+    err = jvmti->GetThreadInfo(threads[i], &info);
+    if (err != JVMTI_ERROR_NONE) {
       return NSK_FALSE;
+    }
 
     NSK_DISPLAY3("    thread #%d (%s): %p\n", i, info.name, threads[i]);
 
@@ -103,8 +110,10 @@ static int prepare() {
   }
 
   /* deallocate threads list */
-  if (!NSK_JVMTI_VERIFY(jvmti->Deallocate((unsigned char*)threads)))
+  err = jvmti->Deallocate((unsigned char *) threads);
+  if (err != JVMTI_ERROR_NONE) {
     return NSK_FALSE;
+  }
 
   if (thread == NULL) {
     NSK_COMPLAIN0("Debuggee thread not found");
@@ -112,41 +121,53 @@ static int prepare() {
   }
 
   /* make thread accessable for a long time */
-  if (!NSK_JNI_VERIFY(jni, (thread = jni->NewGlobalRef(thread)) != NULL))
+  thread = jni->NewGlobalRef(thread);
+  if (thread == NULL) {
     return NSK_FALSE;
+  }
 
   /* get tested thread class */
-  if (!NSK_JNI_VERIFY(jni, (klass = jni->GetObjectClass(thread)) != NULL))
+  klass = jni->GetObjectClass(thread);
+  if (klass == NULL) {
     return NSK_FALSE;
+  }
 
   /* get tested thread field 'waitingMonitor' */
-  if (!NSK_JNI_VERIFY(jni, (field =
-      jni->GetFieldID(klass, "waitingMonitor", "Ljava/lang/Object;")) != NULL))
+  field = jni->GetFieldID(klass, "waitingMonitor", "Ljava/lang/Object;");
+  if (field == NULL) {
     return NSK_FALSE;
+  }
 
-  /* get 'waitingMonitor' object */
-  if (!NSK_JNI_VERIFY(jni, (object = jni->GetObjectField(thread, field)) != NULL))
+  /* get 'endingMonitor' object */
+  object = jni->GetObjectField(thread, field);
+  if (object == NULL) {
     return NSK_FALSE;
+  }
 
   /* make object accessable for a long time */
-  if (!NSK_JNI_VERIFY(jni, (object = jni->NewGlobalRef(object)) != NULL))
+  object = jni->NewGlobalRef(object);
+  if (object == NULL) {
     return NSK_FALSE;
+  }
 
-  /* enable MonitorWaited event */
-  if (!NSK_JVMTI_VERIFY(
-      jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_WAITED, NULL)))
+  /* enable MonitorWait event */
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_WAITED, NULL);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Prepare: 11\n");
     return NSK_FALSE;
-
+  }
   return NSK_TRUE;
 }
 
 static int clean() {
-
+  jvmtiError err;
   /* disable MonitorWaited event */
-  if (!NSK_JVMTI_VERIFY(
-      jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_MONITOR_WAITED, NULL)))
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
+                                        JVMTI_EVENT_MONITOR_WAITED,
+                                        NULL);
+  if (err != JVMTI_ERROR_NONE) {
     nsk_jvmti_setFailStatus();
-
+  }
   return NSK_TRUE;
 }
 
@@ -155,41 +176,41 @@ static int clean() {
 /* agent algorithm
  */
 static void JNICALL
-agentProc(jvmtiEnv* jvmti, JNIEnv* agentJNI, void* arg) {
-jni = agentJNI;
+agentProc(jvmtiEnv *jvmti, JNIEnv *agentJNI, void *arg) {
+  jni = agentJNI;
 
 /* wait for initial sync */
-if (!nsk_jvmti_waitForSync(timeout))
-return;
+  if (!nsk_jvmti_waitForSync(timeout))
+    return;
 
-if (!prepare()) {
-nsk_jvmti_setFailStatus();
-return;
-}
+  if (!prepare()) {
+    nsk_jvmti_setFailStatus();
+    return;
+  }
 
-/* clear events count */
-eventsCount = 0;
+  /* clear events count */
+  eventsCount = 0;
 
-/* resume debugee to catch MonitorWaited event */
-if (!(NSK_VERIFY(nsk_jvmti_resumeSync()) &&
-NSK_VERIFY(nsk_jvmti_waitForSync(timeout))))
-return;
+  /* resume debugee to catch MonitorWaited event */
+  if (!((nsk_jvmti_resumeSync() == NSK_TRUE) && (nsk_jvmti_waitForSync(timeout) == NSK_TRUE))) {
+    return;
+  }
 
-NSK_DISPLAY1("Number of MonitorWaited events: %d\n", eventsCount);
+  NSK_DISPLAY1("Number of MonitorWaited events: %d\n", eventsCount);
 
-if (eventsCount == 0) {
-NSK_COMPLAIN0("No any MonitorWaited event\n");
-nsk_jvmti_setFailStatus();
-}
+  if (eventsCount == 0) {
+    NSK_COMPLAIN0("No any MonitorWaited event\n");
+    nsk_jvmti_setFailStatus();
+  }
 
-if (!clean()) {
-nsk_jvmti_setFailStatus();
-return;
-}
+  if (!clean()) {
+    nsk_jvmti_setFailStatus();
+    return;
+  }
 
 /* resume debugee after last sync */
-if (!nsk_jvmti_resumeSync())
-return;
+  if (!nsk_jvmti_resumeSync())
+    return;
 }
 
 /* ========================================================================== */
@@ -210,39 +231,58 @@ JNIEXPORT jint JNI_OnLoad_monitorwaited001(JavaVM *jvm, char *options, void *res
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiEventCallbacks callbacks;
+  jvmtiError err;
+  jint res;
 
-  /* init framework and parse options */
-  if (!NSK_VERIFY(nsk_jvmti_parseOptions(options)))
+  timeout = 60000; //TODO fix
+  NSK_DISPLAY1("Timeout: %d msc\n", (int) timeout);
+
+  res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti == NULL) {
+    printf("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
+  }
 
-  timeout = nsk_jvmti_getWaitTime() * 60000;
-  NSK_DISPLAY1("Timeout: %d msc\n", (int)timeout);
-
-  /* create JVMTI environment */
-  if (!NSK_VERIFY((jvmti =
-      nsk_jvmti_createJVMTIEnv(jvm, reserved)) != NULL))
+  jvmti_env = jvmti;
+  err = init_agent_data(jvmti_env, &agent_data);
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
+  }
 
-  if (!NSK_JVMTI_VERIFY(jvmti->GetPotentialCapabilities(&caps)))
+  err = jvmti->GetPotentialCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
     return JNI_ERR;
+  }
 
-  if (!NSK_JVMTI_VERIFY(jvmti->AddCapabilities(&caps)))
+  err = jvmti->AddCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
     return JNI_ERR;
+  }
 
-  if (!NSK_JVMTI_VERIFY(jvmti->GetCapabilities(&caps)))
+  err = jvmti->GetCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(GetCapabilities) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
     return JNI_ERR;
+  }
 
-  if (!NSK_VERIFY(caps.can_generate_monitor_events))
+  if (!caps.can_generate_monitor_events) {
     return JNI_ERR;
+  }
 
   memset(&callbacks, 0, sizeof(callbacks));
   callbacks.MonitorWaited = &MonitorWaited;
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks))))
+  err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
+  }
 
   /* register agent proc and arg */
-  if (!NSK_VERIFY(nsk_jvmti_setAgentProc(agentProc, NULL)))
-    return JNI_ERR;
+  nsk_jvmti_setAgentProc(agentProc, NULL);
 
   return JNI_OK;
 }
