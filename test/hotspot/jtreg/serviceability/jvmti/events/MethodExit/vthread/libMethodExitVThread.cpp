@@ -23,7 +23,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <inttypes.h>
 #include "jvmti.h"
 #include "../../../agent_common.h"
 
@@ -45,7 +44,7 @@ static jvmtiCapabilities caps;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
 static jboolean printdump = JNI_TRUE;
-static size_t eventsCount = 0;
+static jint eventsCount = 0;
 
 
 static method_location_info expected_exits[] = {
@@ -187,7 +186,6 @@ JNIEXPORT jint JNICALL
 Java_MethodExitVThreadTest_init0(JNIEnv *env, jclass cls) {
   jvmtiError err;
   jthread thread;
-  jvmtiThreadInfo inf;
   if (jvmti == NULL) {
     env->FatalError("JVMTI client was not properly loaded!");
   }
@@ -198,8 +196,6 @@ Java_MethodExitVThreadTest_init0(JNIEnv *env, jclass cls) {
     env->FatalError("Error in GetCurrentThread.");
   }
 
-
-  jclass cls_thread = env->GetObjectClass(thread);
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_METHOD_EXIT, thread);
@@ -216,8 +212,6 @@ Java_MethodExitVThreadTest_init0(JNIEnv *env, jclass cls) {
 JNIEXPORT jint JNICALL
 Java_MethodExitVThreadTest_check(JNIEnv *env, jclass cls) {
   jvmtiError err;
-  jclass clz;
-  jmethodID mid;
   jthread thread;
 
   if (jvmti == NULL) {
