@@ -44,14 +44,14 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:mcontentered001 mcontentered001
+ *      -agentlib:mcontentered mcontentered001
  */
 
 public class mcontentered001 extends DebugeeClass {
 
     // load native library if required
     static {
-        loadLibrary("mcontentered001");
+        loadLibrary("mcontentered");
     }
 
     // run test from command line

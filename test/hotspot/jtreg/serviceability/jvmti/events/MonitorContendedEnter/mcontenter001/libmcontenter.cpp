@@ -56,8 +56,10 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj) {
 
 /* check if event is for tested thread and for tested object */
   if (jni->IsSameObject(thread, thr) &&
-      jni->IsSameObject(object, obj))
+      jni->IsSameObject(object, obj)) {
     eventsCount++;
+    printf("Increasing eventCount to %d\n", eventsCount);
+  }
 }
 
 /* ========================================================================== */
@@ -80,11 +82,10 @@ static int prepare() {
     return NSK_FALSE;
   }
 
-  printf("Prepare: 1\n");
   if (!(threads_count > 0 && threads != NULL)) {
     return NSK_FALSE;
   }
-  printf("Prepare: 2\n");
+
   /* find tested thread */
   for (i = 0; i < threads_count; i++) {
     if (!NSK_VERIFY(threads[i] != NULL))
@@ -103,49 +104,48 @@ static int prepare() {
       thread = threads[i];
     }
   }
-  printf("Prepare: 3\n");
+
   /* deallocate threads list */
   err = jvmti->Deallocate((unsigned char *) threads);
   if (err != JVMTI_ERROR_NONE) {
     return NSK_FALSE;
   }
-  printf("Prepare: 4\n");
+
   if (thread == NULL) {
     NSK_COMPLAIN0("Debuggee thread not found");
     return NSK_FALSE;
   }
 
-  printf("Prepare: 5\n");
   /* make thread accessable for a long time */
   thread = jni->NewGlobalRef(thread);
   if (thread == NULL) {
     return NSK_FALSE;
   }
-  printf("Prepare: 6\n");
+
   /* get tested thread class */
   klass = jni->GetObjectClass(thread);
   if (klass == NULL) {
     return NSK_FALSE;
   }
-  printf("Prepare: 7\n");
+
   /* get tested thread field 'endingMonitor' */
   field = jni->GetFieldID(klass, "endingMonitor", "Ljava/lang/Object;");
   if (field == NULL) {
     return NSK_FALSE;
   }
-  printf("Prepare: 8\n");
+
   /* get 'endingMonitor' object */
   object = jni->GetObjectField(thread, field);
   if (object == NULL) {
     return NSK_FALSE;
   }
-  printf("Prepare: 9\n");
+
   /* make object accessable for a long time */
   object = jni->NewGlobalRef(object);
   if (object == NULL) {
     return NSK_FALSE;
   }
-  printf("Prepare: 10\n");
+
   /* enable MonitorContendedEnter event */
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_CONTENDED_ENTER, NULL);
   if (err != JVMTI_ERROR_NONE) {
@@ -157,6 +157,7 @@ static int prepare() {
 
 static int clean() {
   jvmtiError err;
+  printf("Disabling events\n");
   /* disable MonitorContendedEnter event */
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_MONITOR_CONTENDED_ENTER,
@@ -175,50 +176,35 @@ static int clean() {
 static void JNICALL
 agentProc(jvmtiEnv *jvmti, JNIEnv *agentJNI, void *arg) {
   jni = agentJNI;
-  printf("AAAAAAAAAAA 1\n");
-/* wait for initial sync */
-  if (!nsk_jvmti_waitForSync(timeout)) {
-    printf("AAAAAAAAAAA 2 RET\n");
 
+  /* wait for initial sync */
+  if (!nsk_jvmti_waitForSync(timeout)) {
     return;
   }
 
-  printf("AAAAAAAAAAA 3\n");
-
   if (!prepare()) {
-    printf("AAAAAAAAAAA 4\n");
-
     nsk_jvmti_setFailStatus();
     return;
   }
 
-  printf("AAAAAAAAAAA 5\n");
-
-/* clear events count */
+  /* clear events count */
   eventsCount = 0;
 
-/* resume debugee to catch MonitorContendedEnter event */
-  if (!(nsk_jvmti_resumeSync()) && nsk_jvmti_waitForSync(timeout)) {
-    printf("AAAAAAAAAAA 6\n");
-
+  /* resume debugee to catch MonitorContendedEnter event */
+  if (!((nsk_jvmti_resumeSync() == NSK_TRUE) && (nsk_jvmti_waitForSync(timeout) ==NSK_TRUE))) {
     return;
   }
   NSK_DISPLAY1("Number of MonitorContendedEnter events: %d\n", eventsCount);
-  printf("AAAAAAAAAAA 7\n");
 
   if (eventsCount == 0) {
     NSK_COMPLAIN0("No any MonitorContendedEnter event\n");
     nsk_jvmti_setFailStatus();
   }
 
-  printf("AAAAAAAAAAA 8\n");
-
   if (!clean()) {
     nsk_jvmti_setFailStatus();
     return;
   }
-
-  printf("AAAAAAAAAAA 9\n");
 
 /* resume debugee after last sync */
   if (!nsk_jvmti_resumeSync())
@@ -289,8 +275,6 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   memset(&callbacks, 0, sizeof(callbacks));
   callbacks.MonitorContendedEnter = &MonitorContendedEnter;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_CONTENDED_ENTER, NULL);
-
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }

@@ -45,7 +45,7 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:mcontenter001 mcontenter001
+ *      -agentlib:mcontenter mcontenter001
  */
 
 
@@ -53,7 +53,7 @@ public class mcontenter001 extends DebugeeClass {
 
     // load native library if required
     static {
-        loadLibrary("mcontenter001");
+        loadLibrary("mcontenter");
     }
 
     // run test from command line
