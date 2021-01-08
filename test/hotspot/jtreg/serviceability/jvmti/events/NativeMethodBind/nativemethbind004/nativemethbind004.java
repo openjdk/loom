@@ -47,7 +47,7 @@ import java.io.*;
  *
  * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:nativemethbind004 nativemethbind004
+ *      -agentlib:nativemethbind04 nativemethbind004
  */
 
 
@@ -68,7 +68,7 @@ import java.io.*;
 public class nativemethbind004 {
     static {
         try {
-            System.loadLibrary("nativemethbind004");
+            System.loadLibrary("nativemethbind04");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load \"nativemethbind004\" library");
             System.err.println("java.library.path:"

@@ -39,7 +39,7 @@ import java.io.PrintStream;
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:fieldmod002 fieldmod002
+ * @run main/othervm/native -agentlib:fieldmod02 fieldmod002
  */
 
 
@@ -47,7 +47,7 @@ public class fieldmod002 {
 
     static {
         try {
-            System.loadLibrary("fieldmod002");
+            System.loadLibrary("fieldmod02");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load fieldmod002 library");
             System.err.println("java.library.path:"

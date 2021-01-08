@@ -39,14 +39,12 @@
 #define NSK_DISPLAY3 printf
 #define NSK_DISPLAY4 printf
 
+
 #define NSK_COMPLAIN0 printf
 #define NSK_COMPLAIN1 printf
 #define NSK_COMPLAIN3 printf
 
 
-
-#define NSK_JNI_VERIFY(jni, action)  (action)
-#define NSK_JVMTI_VERIFY(action) (action)
 
 #ifdef _WIN32
 
@@ -137,8 +135,7 @@ int nsk_jvmti_setAgentProc(jvmtiStartFunction proc, void* arg) {
 static agent_data_t agent_data;
 
 
-static void
-check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
+static void check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
   if (err != JVMTI_ERROR_NONE) {
     printf("check_jvmti_status: JVMTI function returned error: %d\n", err);
     jni->FatalError(msg);
@@ -155,7 +152,7 @@ static jvmtiError init_agent_data(jvmtiEnv *jvmti_env, agent_data_t *data) {
 
 jint createRawMonitor(jvmtiEnv *env, const char *name, jrawMonitorID *monitor) {
   jvmtiError error = env->CreateRawMonitor(name, monitor);
-  if (!NSK_JVMTI_VERIFY(error)) {
+  if (error != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
   return JNI_OK;
@@ -347,13 +344,12 @@ static jthread nsk_jvmti_runAgentThread(JNIEnv *jni_env, jvmtiEnv* jvmti_env) {
 static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debuggeeStatus) {
   jint result = NSK_STATUS_FAILED;
 
-  printf("PPPPPPPPPPPPPPPP 1\n");
   printf("Data %p %p\n", jvmti_env, agent_data.monitor);
   rawMonitorEnter(jvmti_env, agent_data.monitor);
-  printf("PPPPPPPPPPPPPPPP 2\n");
+
   /* save last debugee status */
   agent_data.last_debuggee_status = debuggeeStatus;
-  printf("PPPPPPPPPPPPPPPP 3\n");
+
   /* we don't enter if-stmt in second call */
   if (agent_data.thread_state == NEW) {
     if (nsk_jvmti_runAgentThread(jni_env, jvmti_env) == NULL)
@@ -364,14 +360,14 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
       rawMonitorWait(jvmti_env, agent_data.monitor, 0);
     }
   }
-  printf("PPPPPPPPPPPPPPPP 4\n");
+
   /* wait for sync permit */
   /* we don't enter loop in first call */
   while (agent_data.thread_state != WAITING && agent_data.thread_state != TERMINATED) {
     /* SP4.2-w - second wait for agent thread */
     rawMonitorWait(jvmti_env, agent_data.monitor, 0);
   }
-  printf("PPPPPPPPPPPPPPPP 5\n");
+
   if (agent_data.thread_state != TERMINATED) {
     agent_data.thread_state = SUSPENDED;
     /* SP3.2-n - notify to start test */
@@ -381,22 +377,21 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
     NSK_COMPLAIN0("Debuggee status sync aborted because agent thread has finished\n");
     goto monitor_exit_and_return;
   }
-  printf("PPPPPPPPPPPPPPPP 6\n");
+
   /* update status from debuggee */
   if (debuggeeStatus != NSK_STATUS_PASSED) {
     printf("FAIL: Status is %d\n", debuggeeStatus);
     nsk_jvmti_setFailStatus();
   }
-  printf("PPPPPPPPPPPPPPPP 7\n");
+
   while (agent_data.thread_state == SUSPENDED) {
     /* SP5.2-w - wait while testing */
     /* SP7.2 - wait for agent end */
     rawMonitorWait(jvmti_env, agent_data.monitor, 0);
   }
-  printf("PPPPPPPPPPPPPPPP 8\n");
+
   agent_data.last_debuggee_status = nsk_jvmti_getStatus();
   result = agent_data.last_debuggee_status;
-  printf("PPPPPPPPPPPPPPPP 9\n");
 
   monitor_exit_and_return:
   rawMonitorExit(jvmti_env, agent_data.monitor);
@@ -408,7 +403,6 @@ JNIEXPORT jint JNICALL
 Java_jdk_test_lib_jvmti_DebugeeClass_checkStatus(JNIEnv* jni_env, jclass cls, jint debuggeeStatus) {
   jint status;
   // TODO NSK_TRACE
-  printf("SSSSSSSSSTATUS %d\n", debuggeeStatus);
   status = syncDebuggeeStatus(jni_env, jvmti_env, debuggeeStatus);
   return status;
 }
@@ -429,9 +423,6 @@ jvmtiEnv* nsk_jvmti_createJVMTIEnv(JavaVM* javaVM, void* reserved) {
   return jvmti_env;
 }
 
-int nsk_jvmti_parseOptions(const char options[]) {
-  return 0;
-}
 
 const char* TranslateState(jint flags) {
     static char str[15 * 20];

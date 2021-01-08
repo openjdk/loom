@@ -45,7 +45,7 @@ import java.io.*;
  * COMMENTS
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:singlestep001 singlestep001
+ * @run main/othervm/native -agentlib:singlestep01 singlestep001
  */
 
 
@@ -67,7 +67,7 @@ import java.io.*;
 public class singlestep001 {
     static {
         try {
-            System.loadLibrary("singlestep001");
+            System.loadLibrary("singlestep01");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load \"singlestep001\" library");
             System.err.println("java.library.path:"

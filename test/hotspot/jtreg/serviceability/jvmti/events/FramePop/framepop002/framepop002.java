@@ -41,7 +41,7 @@ import java.io.PrintStream;
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:framepop002 framepop002
+ * @run main/othervm/native -agentlib:framepop02 framepop002
  */
 
 
@@ -55,7 +55,7 @@ public class framepop002 {
 
     static {
         try {
-            System.loadLibrary("framepop002");
+            System.loadLibrary("framepop02");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load framepop002 library");
             System.err.println("java.library.path:"

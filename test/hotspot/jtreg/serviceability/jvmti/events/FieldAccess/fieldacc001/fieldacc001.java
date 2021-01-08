@@ -40,7 +40,7 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @compile fieldacc001a.jasm
- * @run main/othervm/native -agentlib:fieldacc001 fieldacc001
+ * @run main/othervm/native -agentlib:fieldacc01 fieldacc001
  */
 
 
@@ -51,7 +51,7 @@ public class fieldacc001 {
 
     static {
         try {
-            System.loadLibrary("fieldacc001");
+            System.loadLibrary("fieldacc01");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load fieldacc001 library");
             System.err.println("java.library.path:"

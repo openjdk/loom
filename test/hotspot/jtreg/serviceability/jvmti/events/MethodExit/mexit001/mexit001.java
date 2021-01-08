@@ -44,7 +44,7 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @compile mexit001a.jasm
- * @run main/othervm/native -agentlib:mexit001 mexit001
+ * @run main/othervm/native -agentlib:mexit01 mexit001
  */
 
 public class mexit001 {
@@ -53,7 +53,7 @@ public class mexit001 {
 
     static {
         try {
-            System.loadLibrary("mexit001");
+            System.loadLibrary("mexit01");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load mexit001 library");
             System.err.println("java.library.path:"

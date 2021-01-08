@@ -38,7 +38,7 @@ import java.io.PrintStream;
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:fieldacc004 fieldacc004
+ * @run main/othervm/native -agentlib:fieldacc04 fieldacc004
  */
 
 
@@ -48,7 +48,7 @@ public class fieldacc004 {
 
     static {
         try {
-            System.loadLibrary("fieldacc004");
+            System.loadLibrary("fieldacc04");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load fieldacc004 library");
             System.err.println("java.library.path:"

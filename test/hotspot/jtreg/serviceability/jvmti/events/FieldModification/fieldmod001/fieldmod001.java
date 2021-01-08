@@ -40,7 +40,7 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @compile fieldmod001a.jasm
- * @run main/othervm/native -agentlib:fieldmod001 fieldmod001
+ * @run main/othervm/native -agentlib:fieldmod01 fieldmod001
  */
 
 public class fieldmod001 {
@@ -49,7 +49,7 @@ public class fieldmod001 {
 
     static {
         try {
-            System.loadLibrary("fieldmod001");
+            System.loadLibrary("fieldmod01");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load fieldmod001 library");
             System.err.println("java.library.path:"

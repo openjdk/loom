@@ -39,7 +39,7 @@
  *
  * @library /test/lib
  * @compile excatch001a.jasm
- * @run main/othervm/native -agentlib:excatch001 excatch001
+ * @run main/othervm/native -agentlib:excatch excatch001
  */
 
 
@@ -50,7 +50,7 @@ public class excatch001 {
 
     static {
         try {
-            System.loadLibrary("excatch001");
+            System.loadLibrary("excatch");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load excatch001 library");
             System.err.println("java.library.path:"

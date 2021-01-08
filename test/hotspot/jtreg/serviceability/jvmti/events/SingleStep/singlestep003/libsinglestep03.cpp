@@ -222,7 +222,7 @@ SingleStep(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
               methNam, methSig, sig);
         } else {
           result = STATUS_FAILED;
-          NSK_COMPLAIN3(
+          printf(
               "TEST FAILED: SingleStep event received for the method:\n"
               "\t \"%s %s\" of class \"%s\"\n",
               methNam, methSig, sig);

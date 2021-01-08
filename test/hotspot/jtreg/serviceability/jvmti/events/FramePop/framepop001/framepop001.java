@@ -42,7 +42,7 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @compile framepop001a.jasm
- * @run main/othervm/native -agentlib:framepop001 framepop001
+ * @run main/othervm/native -agentlib:framepop01 framepop001
  */
 
 
@@ -53,7 +53,7 @@ public class framepop001 {
 
     static {
         try {
-            System.loadLibrary("framepop001");
+            System.loadLibrary("framepop01");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load framepop001 library");
             System.err.println("java.library.path:"

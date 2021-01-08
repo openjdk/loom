@@ -56,10 +56,12 @@ JNIEXPORT void JNICALL
 VMObjectAlloc(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject object,
               jclass object_klass, jlong size) {
   char *signature, *generic;
+  jvmtiError err;
 
   eventsCount++;
 
-  if (!NSK_JVMTI_VERIFY(jvmti->GetClassSignature(object_klass, &signature, &generic))) {
+  err = jvmti->GetClassSignature(object_klass, &signature, &generic);
+  if (err != JVMTI_ERROR_NONE) {
     nsk_jvmti_setFailStatus();
     return;
   }

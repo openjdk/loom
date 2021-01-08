@@ -42,7 +42,7 @@ import java.io.PrintStream;
  *     Fixed the 5004632 bug.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:mentry001 mentry001
+ * @run main/othervm/native -agentlib:mentry01 mentry001
  */
 
 
@@ -53,7 +53,7 @@ public class mentry001 {
 
     static {
         try {
-            System.loadLibrary("mentry001");
+            System.loadLibrary("mentry01");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load mentry001 library");
             System.err.println("java.library.path:"

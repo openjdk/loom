@@ -41,7 +41,7 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @compile exception001a.jasm
- * @run main/othervm/native -agentlib:exception001 exception001
+ * @run main/othervm/native -agentlib:exception exception001
  */
 
 
@@ -52,7 +52,7 @@ public class exception001 {
 
     static {
         try {
-            System.loadLibrary("exception001");
+            System.loadLibrary("exception");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load exception001 library");
             System.err.println("java.library.path:"

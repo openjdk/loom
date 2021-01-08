@@ -40,7 +40,7 @@ import java.io.PrintStream;
  *     Ported from JVMDI test /nsk/regression/b4248826.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:mentry002 mentry002
+ * @run main/othervm/native -agentlib:mentry02 mentry002
  */
 
 
@@ -51,7 +51,7 @@ public class mentry002 {
 
     static {
         try {
-            System.loadLibrary("mentry002");
+            System.loadLibrary("mentry02");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load mentry002 library");
             System.err.println("java.library.path:"

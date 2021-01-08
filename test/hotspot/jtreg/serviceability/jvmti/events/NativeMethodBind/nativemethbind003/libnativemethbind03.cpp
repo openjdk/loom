@@ -71,13 +71,16 @@ void JNICALL
 NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
                  jmethodID method, void *addr, void **new_addr) {
   jvmtiPhase phase;
+  jvmtiError err;
   char *methNam, *methSig;
 
   lock(jvmti_env, jni_env);
 
   NSK_DISPLAY0(">>>> NativeMethodBind event received\n");
 
-  if (!NSK_JVMTI_VERIFY(jvmti_env->GetPhase(&phase))) {
+  err = jvmti_env->GetPhase(&phase);
+  if (err != JVMTI_ERROR_NONE) {
+    printf(">>>> Error getting phase\n");
     result = STATUS_FAILED;
     unlock(jvmti_env, jni_env);
     return;
@@ -88,7 +91,8 @@ NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
     return;
   }
 
-  if (!NSK_JVMTI_VERIFY(jvmti_env->GetMethodName(method, &methNam, &methSig, NULL))) {
+  err = jvmti_env->GetMethodName(method, &methNam, &methSig, NULL);
+  if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
     unlock(jvmti_env, jni_env);
@@ -102,13 +106,20 @@ NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
     NSK_DISPLAY2("\tmethod: \"%s %s\"\n", methNam, methSig);
   }
 
-  if (!NSK_JVMTI_VERIFY(jvmti_env->Deallocate((unsigned char *) methNam))) {
-    result = STATUS_FAILED;
-    NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory storing method name\n\n");
+  if (methNam != NULL) {
+    err = jvmti_env->Deallocate((unsigned char *) methNam);
+    if (err != JVMTI_ERROR_NONE) {
+      result = STATUS_FAILED;
+      printf("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
+    }
   }
-  if (!NSK_JVMTI_VERIFY(jvmti_env->Deallocate((unsigned char *) methSig))) {
-    result = STATUS_FAILED;
-    NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory storing method signature\n\n");
+
+  if (methSig != NULL) {
+    err = jvmti_env->Deallocate((unsigned char *) methSig);
+    if (err != JVMTI_ERROR_NONE) {
+      result = STATUS_FAILED;
+      printf("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
+    }
   }
 
   NSK_DISPLAY0("<<<<\n\n");
