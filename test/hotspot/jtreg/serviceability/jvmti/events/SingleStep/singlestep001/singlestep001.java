@@ -79,17 +79,13 @@ public class singlestep001 {
     native int check();
 
     public static void main(String[] argv) {
-
-
-        // produce JCK-like exit status
-        System.exit(run(argv, System.out));
+        int result = new singlestep001().runThis();
+        if (result != 0) {
+            throw new RuntimeException("Unexpected status: " + result);
+        }
     }
 
-    public static int run(String argv[], PrintStream out) {
-        return new singlestep001().runThis(argv, out);
-    }
-
-    private int runThis(String argv[], PrintStream out) {
+    private int runThis() {
 
 
         Thread.currentThread().setName("singlestep001Thr");

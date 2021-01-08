@@ -152,7 +152,8 @@ Java_nativemethbind001_nativeMethod(
 
   if (registerNative == JNI_TRUE) {
     NSK_DISPLAY1("Finding class \"%s\" ...\n", CLASS_SIG);
-    if (!NSK_JNI_VERIFY(env, (testedCls = env->FindClass(CLASS_SIG)) != NULL)) {
+    testedCls = env->FindClass(CLASS_SIG);
+    if (testedCls == NULL) {
       result = STATUS_FAILED;
       NSK_COMPLAIN1("TEST FAILURE: unable to find class \"%s\"\n\n",
                     CLASS_SIG);

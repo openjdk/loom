@@ -68,122 +68,123 @@ static void unlock(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
 
 /** callback functions **/
 void JNICALL
-NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
-jmethodID method, void *addr, void **new_addr) {
-jvmtiPhase phase;
-char *methNam, *methSig;
+NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
+                 jmethodID method, void *addr, void **new_addr) {
+  jvmtiPhase phase;
+  char *methNam, *methSig;
 
-lock(jvmti_env, jni_env);
+  lock(jvmti_env, jni_env);
 
-NSK_DISPLAY0(">>>> NativeMethodBind event received\n");
+  NSK_DISPLAY0(">>>> NativeMethodBind event received\n");
 
-if (!NSK_JVMTI_VERIFY(jvmti_env->GetPhase(&phase))) {
-result = STATUS_FAILED;
-unlock(jvmti_env, jni_env);
-return;
-}
+  if (!NSK_JVMTI_VERIFY(jvmti_env->GetPhase(&phase))) {
+    result = STATUS_FAILED;
+    unlock(jvmti_env, jni_env);
+    return;
+  }
 
-if (phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_START) {
-unlock(jvmti_env, jni_env);
-return;
-}
+  if (phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_START) {
+    unlock(jvmti_env, jni_env);
+    return;
+  }
 
-if (!NSK_JVMTI_VERIFY(jvmti_env->GetMethodName(method, &methNam, &methSig, NULL))) {
-result = STATUS_FAILED;
-NSK_COMPLAIN0("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
-unlock(jvmti_env, jni_env);
-return;
-}
+  if (!NSK_JVMTI_VERIFY(jvmti_env->GetMethodName(method, &methNam, &methSig, NULL))) {
+    result = STATUS_FAILED;
+    NSK_COMPLAIN0("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
+    unlock(jvmti_env, jni_env);
+    return;
+  }
 
-if ((strcmp(methNam,METHODS[0]) == 0) &&
-(strcmp(methSig,METHODS[1]) == 0)) {
-bindEv[0]++;
+  if ((strcmp(methNam, METHODS[0]) == 0) &&
+      (strcmp(methSig, METHODS[1]) == 0)) {
+    bindEv[0]++;
 
-NSK_DISPLAY2("\tmethod: \"%s %s\"\n", methNam, methSig);
-}
+    NSK_DISPLAY2("\tmethod: \"%s %s\"\n", methNam, methSig);
+  }
 
-if (!NSK_JVMTI_VERIFY(jvmti_env->Deallocate((unsigned char*) methNam))) {
-result = STATUS_FAILED;
-NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory storing method name\n\n");
-}
-if (!NSK_JVMTI_VERIFY(jvmti_env->Deallocate((unsigned char*) methSig))) {
-result = STATUS_FAILED;
-NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory storing method signature\n\n");
-}
+  if (!NSK_JVMTI_VERIFY(jvmti_env->Deallocate((unsigned char *) methNam))) {
+    result = STATUS_FAILED;
+    NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory storing method name\n\n");
+  }
+  if (!NSK_JVMTI_VERIFY(jvmti_env->Deallocate((unsigned char *) methSig))) {
+    result = STATUS_FAILED;
+    NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory storing method signature\n\n");
+  }
 
-NSK_DISPLAY0("<<<<\n\n");
+  NSK_DISPLAY0("<<<<\n\n");
 
-unlock(jvmti_env, jni_env);
+  unlock(jvmti_env, jni_env);
 }
 
 void JNICALL
 VMDeath(jvmtiEnv *jvmti_env, JNIEnv *env) {
-NSK_DISPLAY0("VMDeath event received\n");
+  NSK_DISPLAY0("VMDeath event received\n");
 
-if (bindEv[0] != bindEv[1]) {
-result = STATUS_FAILED;
-printf(
-"TEST FAILED: wrong NativeMethodBind events\n"
-"\tfor tested method \"%s %s\" bound with \"%s\":\n"
-"\tgot: %d\texpected: %d\n\n",
-METHODS[0], METHODS[1], CLASS_SIG, bindEv[0], bindEv[1]);
-} else {
-NSK_DISPLAY4(
-"CHECK PASSED: %d NativeMethodBind event(s)\n"
-"\tfor tested method \"%s %s\" bound with \"%s\"\n"
-"\tas expected\n",
-bindEv[0], METHODS[0], METHODS[1], CLASS_SIG);
-}
+  if (bindEv[0] != bindEv[1]) {
+    result = STATUS_FAILED;
+    printf(
+        "TEST FAILED: wrong NativeMethodBind events\n"
+        "\tfor tested method \"%s %s\" bound with \"%s\":\n"
+        "\tgot: %d\texpected: %d\n\n",
+        METHODS[0], METHODS[1], CLASS_SIG, bindEv[0], bindEv[1]);
+  } else {
+    NSK_DISPLAY4(
+        "CHECK PASSED: %d NativeMethodBind event(s)\n"
+        "\tfor tested method \"%s %s\" bound with \"%s\"\n"
+        "\tas expected\n",
+        bindEv[0], METHODS[0], METHODS[1], CLASS_SIG);
+  }
 
-if (result == STATUS_FAILED)
-exit(95 + STATUS_FAILED);
+  if (result == STATUS_FAILED)
+    exit(95 + STATUS_FAILED);
 }
 /************************/
 
 /* dummy method used only to provoke NativeMethodBind event */
 static void JNICALL
 nativeMethod(JNIEnv *env, jobject obj) {
-NSK_DISPLAY0("inside the nativeMethod()\n");
+  NSK_DISPLAY0("inside the nativeMethod()\n");
 }
 
 /* dummy method used only to provoke NativeMethodBind event */
 JNIEXPORT void JNICALL
 Java_nativemethbind003_registerNative(
     JNIEnv *env, jobject obj) {
-jclass testedCls = NULL;
-JNINativeMethod meth;
+  jclass testedCls = NULL;
+  JNINativeMethod meth;
 
-NSK_DISPLAY1("Inside the registerNative()\n"
-"Finding class \"%s\" ...\n",
-CLASS_SIG);
-if (!NSK_JNI_VERIFY(env, (testedCls = env->FindClass(CLASS_SIG)) != NULL)) {
-result = STATUS_FAILED;
-NSK_COMPLAIN1("TEST FAILURE: unable to find class \"%s\"\n\n",
-CLASS_SIG);
-return;
-}
+  NSK_DISPLAY1("Inside the registerNative()\n"
+               "Finding class \"%s\" ...\n",
+               CLASS_SIG);
+  testedCls = env->FindClass(CLASS_SIG);
+  if (testedCls == NULL) {
+    result = STATUS_FAILED;
+    NSK_COMPLAIN1("TEST FAILURE: unable to find class \"%s\"\n\n",
+                  CLASS_SIG);
+    return;
+  }
 
-meth.name = (char*) METHODS[0];
-meth.signature = (char*) METHODS[1];
-meth.fnPtr = (void*) nativeMethod;
+  meth.name = (char *) METHODS[0];
+  meth.signature = (char *) METHODS[1];
+  meth.fnPtr = (void *) nativeMethod;
 
-NSK_DISPLAY3(
-"Calling RegisterNatives() with \"%s %s\"\n"
-"\tfor class \"%s\" ...\n",
-METHODS[0], METHODS[1], CLASS_SIG);
-if (env->RegisterNatives(testedCls, &meth, 1) != 0) {
-result = STATUS_FAILED;
-NSK_COMPLAIN3("TEST FAILURE: unable to RegisterNatives() \"%s %s\" for class \"%s\"\n\n",
-METHODS[0], METHODS[1], CLASS_SIG);
-}
+  NSK_DISPLAY3(
+      "Calling RegisterNatives() with \"%s %s\"\n"
+      "\tfor class \"%s\" ...\n",
+      METHODS[0], METHODS[1], CLASS_SIG);
+  if (env->RegisterNatives(testedCls, &meth, 1) != 0) {
+    result = STATUS_FAILED;
+    NSK_COMPLAIN3("TEST FAILURE: unable to RegisterNatives() \"%s %s\" for class \"%s\"\n\n",
+                  METHODS[0], METHODS[1], CLASS_SIG);
+  }
 
-NSK_DISPLAY1("Calling UnregisterNatives() for class \"%s\" ...\n",
-CLASS_SIG);
-if (env->UnregisterNatives(testedCls) != 0) {
-result = STATUS_FAILED;
-NSK_COMPLAIN3("TEST FAILURE: unable to UnregisterNatives() \"%c %c\" for class \"%s\"\n\n",
-METHODS[1][0], METHODS[1][1], CLASS_SIG);
-}
+  NSK_DISPLAY1("Calling UnregisterNatives() for class \"%s\" ...\n",
+               CLASS_SIG);
+  if (env->UnregisterNatives(testedCls) != 0) {
+    result = STATUS_FAILED;
+    NSK_COMPLAIN3("TEST FAILURE: unable to UnregisterNatives() \"%c %c\" for class \"%s\"\n\n",
+                  METHODS[1][0], METHODS[1][1], CLASS_SIG);
+  }
 }
 
 #ifdef STATIC_BUILD
@@ -246,13 +247,13 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_NATIVE_METHOD_BIND,
                                         NULL);
-  if (err != JVMTI_ERROR_NONE){
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_VM_DEATH,
                                         NULL);
-  if (err != JVMTI_ERROR_NONE){
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
   NSK_DISPLAY0("enabling the events done\n\n");

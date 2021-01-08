@@ -22,9 +22,7 @@
  */
 
 import jdk.test.lib.jvmti.DebugeeClass;
-
 import java.io.*;
-
 
 /*
  * @test
@@ -71,13 +69,7 @@ public class singlestep002 {
     }
 
     public static void main(String[] argv) {
-
-        // produce JCK-like exit status
-        System.exit( new singlestep002().runThis(argv));
-    }
-
-    public static int run(String argv[]) {
-        return new singlestep002().runThis(argv);
+        new singlestep002().runThis(argv);
     }
 
     private int runThis(String argv[]) {

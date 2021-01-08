@@ -41,13 +41,11 @@
 
 #define NSK_COMPLAIN0 printf
 #define NSK_COMPLAIN1 printf
-#define NSK_COMPLAIN2 printf
 #define NSK_COMPLAIN3 printf
 
 
 
 #define NSK_JNI_VERIFY(jni, action)  (action)
-#define NSK_VERIFY(action) (action)
 #define NSK_JVMTI_VERIFY(action) (action)
 
 #ifdef _WIN32

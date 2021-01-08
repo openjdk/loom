@@ -89,8 +89,9 @@ static int prepare() {
 
   /* find tested thread */
   for (i = 0; i < threads_count; i++) {
-    if (!NSK_VERIFY(threads[i] != NULL))
+    if (threads[i] == NULL) {
       return NSK_FALSE;
+    }
 
     /* get thread information */
     err = jvmti->GetThreadInfo(threads[i], &info);

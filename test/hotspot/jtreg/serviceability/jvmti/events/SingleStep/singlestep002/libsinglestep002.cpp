@@ -44,8 +44,11 @@ void JNICALL
 SingleStep(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
            jmethodID method, jlocation location) {
   jvmtiPhase phase;
+  jvmtiError err;
 
-  if (!NSK_JVMTI_VERIFY(jvmti_env->GetPhase(&phase))) {
+
+  err = jvmti_env->GetPhase(&phase);
+  if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to obtain phase of the VM execution during SingleStep callback\n\n");
   }
@@ -87,24 +90,31 @@ JNIEXPORT jint JNI_OnLoad_singlestep002(JavaVM *jvm, char *options, void *reserv
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
-  /* init framework and parse options */
-  if (!NSK_VERIFY(nsk_jvmti_parseOptions(options)))
-    return JNI_ERR;
+  jvmtiError err;
+  jint res;
 
-  /* create JVMTI environment */
-  if (!NSK_VERIFY((jvmti =
-      nsk_jvmti_createJVMTIEnv(jvm, reserved)) != NULL))
+  res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti == NULL) {
+    printf("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
+  }
 
   /* add capability to generate compiled method events */
   memset(&caps, 0, sizeof(jvmtiCapabilities));
   caps.can_generate_single_step_events = 1;
-  if (!NSK_JVMTI_VERIFY(jvmti->AddCapabilities(&caps)))
+  err = jvmti->AddCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
     return JNI_ERR;
+  }
 
-  if (!NSK_JVMTI_VERIFY(jvmti->GetCapabilities(&caps)))
+  err = jvmti->GetCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(GetCapabilities) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
     return JNI_ERR;
-
+  }
   if (!caps.can_generate_single_step_events)
     NSK_DISPLAY0("Warning: generation of single step events is not implemented\n");
 
@@ -113,14 +123,21 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.SingleStep = &SingleStep;
   callbacks.VMDeath = &VMDeath;
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks))))
+  err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
+  }
 
   NSK_DISPLAY0("setting event callbacks done\nenabling JVMTI events ...\n");
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, NULL)))
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, NULL);
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
-  if (!NSK_JVMTI_VERIFY(jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_DEATH, NULL)))
+  }
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_DEATH, NULL);
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
+  }
+
   NSK_DISPLAY0("enabling the events done\n\n");
 
   return JNI_OK;

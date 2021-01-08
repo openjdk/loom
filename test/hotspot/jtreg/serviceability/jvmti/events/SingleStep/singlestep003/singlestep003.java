@@ -80,19 +80,13 @@ public class singlestep003 {
     native int check();
 
     public static void main(String[] argv) {
-
-
-        // produce JCK-like exit status
-        System.exit(run(argv, System.out));
+        int result = new singlestep003().runThis();
+        if (result != 0) {
+            throw new RuntimeException("Unexpected status: " + result);
+        }
     }
 
-    public static int run(String argv[], PrintStream out) {
-        return new singlestep003().runThis(argv, out);
-    }
-
-    private int runThis(String argv[], PrintStream out) {
-
-
+    private int runThis() {
 
         System.out.println("\nReaching a breakpoint method ...\n");
         bpMethod();
