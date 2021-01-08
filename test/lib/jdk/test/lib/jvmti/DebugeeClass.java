@@ -34,6 +34,8 @@ package jdk.test.lib.jvmti;
 public class DebugeeClass {
 
     public static final int TEST_PASSED = 0;
+    public static final int TEST_FAILED = 2;
+
     /**
      * This method is used for synchronization status between agent and debuggee class.
      */
