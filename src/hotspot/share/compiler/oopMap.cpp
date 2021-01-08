@@ -50,6 +50,9 @@
 #ifdef COMPILER2
 #include "opto/optoreg.hpp"
 #endif
+#if INCLUDE_JVMCI
+#include "jvmci/jvmci_globals.hpp"
+#endif
 
 // OopMapStream
 

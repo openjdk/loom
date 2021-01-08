@@ -26,6 +26,7 @@
 #define SHARE_VM_COMPILER_OOPMAP_INLINE_HPP
 
 #include "gc/shared/collectedHeap.hpp"
+#include "gc/shared/gc_globals.hpp"
 #include "memory/universe.hpp"
 #include "oops/compressedOops.hpp"
 
