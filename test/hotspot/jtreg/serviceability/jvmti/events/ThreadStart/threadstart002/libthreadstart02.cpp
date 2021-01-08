@@ -448,8 +448,6 @@ JNIEXPORT jint JNI_OnLoad_threadstart002(JavaVM *jvm, char *options, void *reser
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
-
-  jvmtiError err;
   jint res;
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
