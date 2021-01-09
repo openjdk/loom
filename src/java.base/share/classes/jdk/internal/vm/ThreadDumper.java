@@ -149,11 +149,11 @@ public class ThreadDumper {
      */
     private final static class Node
             extends WeakReference<ThreadContainer> implements Key {
-        private final Thread owner;
+        private final long owner;
         private volatile Node next;
         Node(ThreadContainer container, Node next) {
             super(container);
-            this.owner = Thread.currentThread();
+            this.owner = Thread.currentThread().getId();
             this.next = next;
         }
         ThreadContainer containerOrNull() {
@@ -163,7 +163,7 @@ public class ThreadDumper {
             return next;
         }
         void setNext(Node next) {
-            assert Thread.currentThread() == owner;
+            assert Thread.currentThread().getId() == owner;
             this.next = next;
         }
         @Override
@@ -172,7 +172,7 @@ public class ThreadDumper {
             if (head == this) {
                 // pop
                 ThreadFields.setCurrentThreadHeadNode(head.next());
-            } else if (Thread.currentThread() == owner) {
+            } else if (Thread.currentThread().getId() == owner) {
                 // out of order close by owner, need to unlink node
                 Node current = head;
                 while (current != null && current.next() != this) {
