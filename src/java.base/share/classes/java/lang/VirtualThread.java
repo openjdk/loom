@@ -795,8 +795,8 @@ class VirtualThread extends Thread {
         StringBuilder sb = new StringBuilder("VirtualThread[");
         String name = getName();
         if (name.isEmpty() || name.equals("<unnamed>")) {
-            sb.append("@");
-            sb.append(Integer.toHexString(hashCode()));
+            sb.append("#");
+            sb.append(getId());
         } else {
             sb.append(name);
         }
