@@ -56,8 +56,8 @@ package java.util.concurrent;
  * <pre> {@code
  * interface ArchiveSearcher { String search(String target); }
  * class App {
- *   ExecutorService executor = ...
- *   ArchiveSearcher searcher = ...
+ *   ExecutorService executor = ...;
+ *   ArchiveSearcher searcher = ...;
  *   void showSearch(String target) throws InterruptedException {
  *     Callable<String> task = () -> searcher.search(target);
  *     Future<String> future = executor.submit(task);

@@ -357,7 +357,7 @@ import java.lang.invoke.VarHandle;
  * within this method to ensure thread safety of accesses to fields of
  * this task or other completed tasks.
  *
- * <p><b>Completion Traversals</b>. If using {@code onCompletion} to
+ * <p><b>Completion Traversals.</b> If using {@code onCompletion} to
  * process completions is inapplicable or inconvenient, you can use
  * methods {@link #firstComplete} and {@link #nextComplete} to create
  * custom traversals.  For example, to define a MapReducer that only
