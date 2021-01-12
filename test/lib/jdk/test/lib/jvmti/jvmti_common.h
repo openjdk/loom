@@ -44,30 +44,7 @@
 #define NSK_COMPLAIN1 printf
 #define NSK_COMPLAIN3 printf
 
-
-
-#ifdef _WIN32
-
-#define LL "I64"
-#include <STDDEF.H>
-
-#else // !_WIN32
-
-#include <stdint.h>
-
-#ifdef _LP64
-#define LL "l"
-#else
-#define LL "ll"
-#endif
-
-#endif // !_WIN32
-
-
 extern "C" {
-
-#define NSK_STATUS_PASSED       0
-#define NSK_STATUS_FAILED       2
 
 char *jlong_to_string(jlong value, char *string) {
   char buffer[32];

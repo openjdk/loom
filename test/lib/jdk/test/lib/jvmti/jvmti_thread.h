@@ -30,11 +30,34 @@
 #include <string.h>
 #include <ctype.h>
 
+
+
+#ifdef _WIN32
+
+#define LL "I64"
+#include <STDDEF.H>
+
+#else // !_WIN32
+
+#include <stdint.h>
+
+#ifdef _LP64
+#define LL "l"
+#else
+#define LL "ll"
+#endif
+
+#endif // !_WIN32
+
+
 extern "C" {
 
-static jvmtiEnv* jvmti_env = NULL;
-static JavaVM* jvm = NULL;
-static JNIEnv* jni_env = NULL;
+
+#define NSK_STATUS_PASSED       0
+#define NSK_STATUS_FAILED       2
+
+static jvmtiEnv* agent_jvmti_env = NULL;
+static JNIEnv* agent_jni_env = NULL;
 
 static volatile int currentAgentStatus = NSK_STATUS_PASSED;
 
@@ -70,7 +93,7 @@ static agent_data_t agent_data;
 static jvmtiError init_agent_data(jvmtiEnv *jvmti_env, agent_data_t *data) {
   data->thread_state = NEW;
   data->last_debuggee_status = NSK_STATUS_PASSED;
-
+  agent_jvmti_env = jvmti_env;
   return jvmti_env->CreateRawMonitor("agent_data_monitor", &data->monitor);
 }
 
@@ -116,18 +139,18 @@ int nsk_jvmti_waitForSync(jlong timeout) {
   jlong t = 0;
   int result = NSK_TRUE;
 
-  rawMonitorEnter(jvmti_env, agent_data.monitor);
+  rawMonitorEnter(agent_jvmti_env, agent_data.monitor);
 
   agent_data.thread_state = WAITING;
 
   /* SP2.2-n - notify agent is waiting and wait */
   /* SP4.1-n - notify agent is waiting and wait */
-  rawMonitorNotify(jvmti_env, agent_data.monitor);
+  rawMonitorNotify(agent_jvmti_env, agent_data.monitor);
 
   while (agent_data.thread_state == WAITING) {
     /* SP3.2-w - wait to start test */
     /* SP6.2-w - wait to end test */
-    rawMonitorWait(jvmti_env, agent_data.monitor, inc_timeout);
+    rawMonitorWait(agent_jvmti_env, agent_data.monitor, inc_timeout);
 
     if (timeout == 0) continue;
 
@@ -142,7 +165,7 @@ int nsk_jvmti_waitForSync(jlong timeout) {
     result = NSK_FALSE;
   }
 
-  rawMonitorExit(jvmti_env, agent_data.monitor);
+  rawMonitorExit(agent_jvmti_env, agent_data.monitor);
 
   return result;
 }
@@ -150,14 +173,14 @@ int nsk_jvmti_waitForSync(jlong timeout) {
 /** Resume java code suspended on sync point. */
 int nsk_jvmti_resumeSync() {
   int result;
-  rawMonitorEnter(jvmti_env, agent_data.monitor);
+  rawMonitorEnter(agent_jvmti_env, agent_data.monitor);
 
   if (agent_data.thread_state == SUSPENDED) {
     result = NSK_TRUE;
     agent_data.thread_state = RUNNABLE;
     /* SP5.2-n - notify suspend done */
     /* SP7.2-n - notify agent end */
-    rawMonitorNotify(jvmti_env, agent_data.monitor);
+    rawMonitorNotify(agent_jvmti_env, agent_data.monitor);
   }
   else {
     NSK_COMPLAIN0("Debuggee was not suspended on status sync\n");
@@ -165,22 +188,22 @@ int nsk_jvmti_resumeSync() {
     result = NSK_FALSE;
   }
 
-  rawMonitorExit(jvmti_env, agent_data.monitor);
+  rawMonitorExit(agent_jvmti_env, agent_data.monitor);
   return NSK_TRUE;
 }
 
 /* ============================================================================= */
 static void set_agent_thread_state(thread_state_t value) {
-  rawMonitorEnter(jvmti_env, agent_data.monitor);
+  rawMonitorEnter(agent_jvmti_env, agent_data.monitor);
   agent_data.thread_state = value;
-  rawMonitorNotify(jvmti_env, agent_data.monitor);
-  rawMonitorExit(jvmti_env, agent_data.monitor);
+  rawMonitorNotify(agent_jvmti_env, agent_data.monitor);
+  rawMonitorExit(agent_jvmti_env, agent_data.monitor);
 }
 
 /** Wrapper for user agent thread. */
 static void JNICALL
 agentThreadWrapper(jvmtiEnv* jvmti_env, JNIEnv* agentJNI, void* arg) {
-  jni_env = agentJNI;
+  agent_jni_env = agentJNI;
 
   /* run user agent proc */
   {
@@ -327,24 +350,8 @@ JNIEXPORT jint JNICALL
 Java_jdk_test_lib_jvmti_DebugeeClass_checkStatus(JNIEnv* jni_env, jclass cls, jint debuggeeStatus) {
   jint status;
   // TODO NSK_TRACE
-  status = syncDebuggeeStatus(jni_env, jvmti_env, debuggeeStatus);
+  status = syncDebuggeeStatus(jni_env, agent_jvmti_env, debuggeeStatus);
   return status;
-}
-
-/** Create JVMTI environment. */
-jvmtiEnv* nsk_jvmti_createJVMTIEnv(JavaVM* javaVM, void* reserved) {
-  jvm = javaVM;
-  if (javaVM->GetEnv((void **)&jvmti_env, JVMTI_VERSION_1_1) != JNI_OK) {
-    nsk_jvmti_setFailStatus();
-    return NULL;
-  }
-
-  if (init_agent_data(jvmti_env, &agent_data) != 0) {
-    nsk_jvmti_setFailStatus();
-    return NULL;
-  }
-
-  return jvmti_env;
 }
 
 }

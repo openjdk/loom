@@ -243,8 +243,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  jvmti_env = jvmti;
-  err = init_agent_data(jvmti_env, &agent_data);
+  err = init_agent_data(jvmti, &agent_data);
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
