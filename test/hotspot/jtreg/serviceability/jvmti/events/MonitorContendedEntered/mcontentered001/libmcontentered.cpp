@@ -25,6 +25,7 @@
 #include <string.h>
 #include <jvmti.h>
 #include "jvmti_common.h"
+#include "jvmti_thread.h"
 
 extern "C" {
 
