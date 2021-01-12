@@ -50,10 +50,6 @@ jint nsk_jvmti_getStatus() {
   return currentAgentStatus;
 }
 
-int  nsk_jvmti_getWaitTime() {
-  return 1;
-}
-
 typedef enum { NEW, RUNNABLE, WAITING, SUSPENDED, TERMINATED } thread_state_t;
 
 typedef struct agent_data_t {

@@ -144,13 +144,16 @@ JNIEXPORT jint JNI_OnLoad_threadend002(JavaVM *jvm, char *options, void *reserve
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiError err;
+  jint res;
 
+  timeout = 60 * 1000; // TODO change timeout
 
-  timeout = nsk_jvmti_getWaitTime() * 60 * 1000;
-
-  jvmti = nsk_jvmti_createJVMTIEnv(jvm, reserved);
-  if (jvmti == NULL)
+  res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti == NULL) {
+    printf("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
+  }
 
   if (!setCallBacks()) {
     return JNI_ERR;
