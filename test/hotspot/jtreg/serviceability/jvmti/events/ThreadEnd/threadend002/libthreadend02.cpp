@@ -155,6 +155,12 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
+
+  err = init_agent_data(jvmti, &agent_data);
+  if (err != JVMTI_ERROR_NONE) {
+    return JNI_ERR;
+  }
+
   if (!setCallBacks()) {
     return JNI_ERR;
   }
