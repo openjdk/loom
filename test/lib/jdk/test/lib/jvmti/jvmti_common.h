@@ -21,8 +21,8 @@
  * questions.
  */
 
-#ifndef AGENT_COMMON_H
-#define AGENT_COMMON_H
+#ifndef JVMTI_COMMON_H
+#define JVMTI_COMMON_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -130,7 +130,6 @@ int nsk_jvmti_setAgentProc(jvmtiStartFunction proc, void* arg) {
   agentThreadArg = arg;
   return NSK_TRUE;
 }
-
 
 static agent_data_t agent_data;
 
