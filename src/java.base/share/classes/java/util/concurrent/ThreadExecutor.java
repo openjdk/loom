@@ -67,6 +67,7 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
     private final ReentrantLock terminationLock = new ReentrantLock();
     private final Condition terminationCondition = terminationLock.newCondition();
 
+    private final long creatorTid;
     private final ThreadFactory factory;
     private final Future<?> timerTask;
     private final ThreadDumper.Key key;
@@ -95,6 +96,7 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
             }
         }
 
+        this.creatorTid = Thread.currentThread().getId();
         this.factory = Objects.requireNonNull(factory);
         this.timerTask = timer;
         this.key = ThreadDumper.notifyCreate(this);
@@ -199,6 +201,11 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
         } finally {
             key.close();
         }
+    }
+
+    @Override
+    public long creatorTid() {
+        return creatorTid;
     }
 
     @Override

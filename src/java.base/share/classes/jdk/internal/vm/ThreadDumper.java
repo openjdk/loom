@@ -39,7 +39,9 @@ import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -226,15 +228,6 @@ public class ThreadDumper {
     }
 
     /**
-     * A container, the owner thread identifier, and optionally a reference to the
-     * enclosing container.
-     */
-    private record ThreadContainerInfo(ThreadContainer container,
-                                       long owner,
-                                       ThreadContainer enclosingContainer) {
-    }
-
-    /**
      * Return a String that can be used to identify the given container.
      */
     private static String id(ThreadContainer container) {
@@ -247,50 +240,13 @@ public class ThreadDumper {
     }
 
     /**
-     * Returns a stream of the ThreadContainerInfo objects, one for each "active"
-     * container created by the given thread.
-     */
-    private static Stream<ThreadContainerInfo> containerInfos(Thread thread) {
-        Node head = ThreadFields.threadHeadNode(thread);
-        if (head == null) {
-            return Stream.empty();
-        } else {
-            List<ThreadContainerInfo> list = new ArrayList<>();
-            Node node = head;
-            while (node != null) {
-                Node next = node.next();
-                ThreadContainer container = node.containerOrNull();
-                if (container != null) {
-                    long owner = node.owner();
-                    ThreadContainer parent;
-                    if (next != null) {
-                        parent = next.containerOrNull();
-                    } else {
-                        parent = null;
-                    }
-                    list.add(new ThreadContainerInfo(container, owner, parent));
-                }
-                node = next;
-            }
-            return list.stream();
-        }
-    }
-
-    /**
-     * Returns a stream of the "active" containers created by the given thread.
-     */
-    private static Stream<ThreadContainer> containers(Thread thread) {
-        return containerInfos(thread).map(ThreadContainerInfo::container);
-    }
-
-    /**
      * Returns a stream of the virtual threads that are found by walking the
      * graph from the given set of root threads.
      */
     private static Stream<Thread> virtualThreads(Set<Thread> roots) {
         Set<Thread> threads = new HashSet<>();
         Deque<ThreadContainer> stack = new ArrayDeque<>();
-        roots.stream().flatMap(t -> containers(t)).forEach(stack::push);
+        roots.stream().flatMap(t -> containers(t).stream()).forEach(stack::push);
         while (!stack.isEmpty()) {
             ThreadContainer container = stack.pop();
             container.threads().forEach(t -> {
@@ -304,28 +260,57 @@ public class ThreadDumper {
     }
 
     /**
-     * Returns a set of ThreadContainerInfo objects, one for each container that
-     * is found by walking the graph from the given set of root threads.
+     * Returns the list of "active" containers created by the given thread. The
+     * list is ordered, enclosing containers before nested containers.
      */
-    private static Set<ThreadContainerInfo> findContainerInfos(Set<Thread> roots) {
-        Set<ThreadContainerInfo> infos = new HashSet<>();
+    private static List<ThreadContainer> containers(Thread thread) {
+        Node head = ThreadFields.threadHeadNode(thread);
+        if (head == null) {
+            return List.of();
+        } else {
+            List<ThreadContainer> list = new ArrayList<>();
+            Node node = head;
+            while (node != null) {
+                Node next = node.next();
+                ThreadContainer container = node.containerOrNull();
+                if (container != null) {
+                    list.add(container);
+                }
+                node = next;
+            }
+            Collections.reverse(list);
+            return list;
+        }
+    }
+
+    /**
+     * Returns a map of "active" containers found by walking the graph from the given
+     * set of root threads. The map is keyed on the identifier of the thread that
+     * created the containers. Each map value is a list of containers created by that
+     * thread, in creation order, so that enclosing containers are best nested
+     * containers.
+     */
+    private static Map<Long, List<ThreadContainer>> findContainers(Set<Thread> roots) {
+        Map<Long, List<ThreadContainer>> map = new HashMap<>();
         Deque<ThreadContainer> stack = new ArrayDeque<>();
-        roots.stream()
-                .flatMap(t -> containerInfos(t))
-                .forEach(i -> {
-                    infos.add(i);
-                    stack.push(i.container());
-                });
+        roots.stream().forEach(t -> {
+            List<ThreadContainer> containers = containers(t);
+            if (!containers.isEmpty()) {
+                map.put(t.getId(), containers);
+                containers.forEach(stack::push);
+            }
+        });
         while (!stack.isEmpty()) {
             ThreadContainer container = stack.pop();
-            container.threads()
-                    .flatMap(t -> containerInfos(t))
-                    .forEach(i -> {
-                        infos.add(i);
-                        stack.push(i.container());
-                    });
+            container.threads().forEach(t -> {
+                List<ThreadContainer> containers = containers(t);
+                if (!containers.isEmpty()) {
+                    map.put(t.getId(), containers);
+                    containers.forEach(stack::push);
+                }
+            });
         }
-        return infos;
+        return map;
     }
 
     /**
@@ -432,49 +417,52 @@ public class ThreadDumper {
         Map<Thread, StackTraceElement[]> allTraceTraces = Thread.getAllStackTraces();
 
         Set<Thread> roots = allTraceTraces.keySet();
-        Set<ThreadContainerInfo> containerInfos = findContainerInfos(roots);
+        Map<Long, List<ThreadContainer>> map = findContainers(roots);
 
+        // threadContainers
         out.println("      \"threadContainers\": [");
+        Iterator<Map.Entry<Long, List<ThreadContainer>>> iterator = map.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Long, List<ThreadContainer>> e = iterator.next();
+            long creatorTid = e.getKey();
+            List<ThreadContainer> containers = e.getValue();
 
-        Iterator<ThreadContainerInfo> iterator1 = containerInfos.iterator();
-        while (iterator1.hasNext()) {
-            ThreadContainerInfo info = iterator1.next();
             out.println("        {");
+            out.format("          \"creatorTid\": %d,%n", creatorTid);
+            out.println("          \"containerIds\": [");
 
-            out.format("          \"containerId\": \"%s\",%n", escape(id(info.container())));
-            if (info.enclosingContainer() != null) {
-                out.format("          \"enclosingContainerId\": \"%s\",%n",
-                        escape(id(info.enclosingContainer())));
-            } else {
-                out.println("          \"enclosingContainerId\": null,");
-            }
-            out.format("          \"ownerTid\": \"%s\",%n", info.owner());
+            int i = 0;
+            while (i < containers.size()) {
+                ThreadContainer container = containers.get(i++);
+                out.println("            {");
+                out.format("              \"containerId\": \"%s\",%n", escape(id(container)));
 
-            out.println("          \"memberTids\": [");
-            long[] members = info.container().threads().mapToLong(Thread::getId).toArray();
-            int j = 0;
-            while (j < members.length) {
-                out.format("              %d", members[j]);
-                j++;
-                if (j < members.length) {
-                    out.println(",");
-                } else {
-                    out.println();  // last element, no trailing comma
+                out.println("              \"memberTids\": [");
+                long[] members = container.threads().mapToLong(Thread::getId).toArray();
+                int j = 0 ;
+                while (j < members.length) {
+                    long tid = members[j++];
+                    out.format("                %d", tid);
+                    if (j < members.length) out.print(",");
+                    out.println();
                 }
-            }
-            out.println("          ]");
+                out.println("              ]");   // end of memberTids
 
-            boolean more = iterator1.hasNext();
-            if (more) {
-                out.println("        },");
-            } else {
-                out.println("        }"); // last element, no trailing comma
+                out.print("            }");
+                if (i < containers.size()) out.print(",");
+                out.println();
             }
+
+            out.println("          ]");   // end of containerIds
+
+            out.print("        }");
+            if (iterator.hasNext()) out.print(",");
+            out.println();
         }
 
-        out.println("      ],");   // end of threadExecutors
+        out.println("      ],");   // end of threadContainers
 
-        // thread array
+        // threads
         out.println("      \"threads\": [");
 
         // virtual threads
@@ -482,8 +470,8 @@ public class ThreadDumper {
         if (threads != null) {
             threads.forEach(t -> dumpThreadToJson(t, t.getStackTrace(), out, true));
         } else {
-            Stream<Thread> managedThreads = containerInfos.stream()
-                    .map(ThreadContainerInfo::container)
+            Stream<Thread> managedThreads = map.values().stream()
+                    .flatMap(l -> l.stream())
                     .flatMap(c -> c.threads());
             Stream.concat(managedThreads, Poller.blockedThreads())
                     .filter(Thread::isVirtual)
@@ -492,12 +480,12 @@ public class ThreadDumper {
         }
 
         // platform threads
-        Iterator<Map.Entry<Thread, StackTraceElement[]>> iterator2 = allTraceTraces.entrySet().iterator();
-        while (iterator2.hasNext()) {
-            Map.Entry<Thread, StackTraceElement[]> e = iterator2.next();
+        Iterator<Map.Entry<Thread, StackTraceElement[]>> platformThreads = allTraceTraces.entrySet().iterator();
+        while (platformThreads.hasNext()) {
+            Map.Entry<Thread, StackTraceElement[]> e = platformThreads.next();
             Thread thread = e.getKey();
             StackTraceElement[] stackTrace = e.getValue();
-            boolean more = iterator2.hasNext();
+            boolean more = platformThreads.hasNext();
             dumpThreadToJson(thread, stackTrace, out, more);
         }
 

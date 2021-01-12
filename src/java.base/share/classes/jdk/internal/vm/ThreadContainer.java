@@ -32,6 +32,11 @@ import java.util.stream.Stream;
  */
 public interface ThreadContainer {
     /**
+     * Return the identifier of the Thread that created the container.
+     */
+    long creatorTid();
+
+    /**
      * Returns a possible-empty stream of the Threads.
      */
     Stream<Thread> threads();
