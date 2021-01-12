@@ -43,14 +43,14 @@ static int MethodEntriesCount = 0;
 static int MethodExitsCount = 0;
 static jmethodID mid = NULL;
 
-void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
                          jthread thr, jmethodID method) {
   if (mid == method) {
     MethodEntriesCount++;
   }
 }
 
-void JNICALL MethodExit(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL MethodExit(jvmtiEnv *jvmti, JNIEnv *jni,
                         jthread thr, jmethodID method,
                         jboolean was_poped_by_exc, jvalue return_value) {
   if (mid == method) {
@@ -122,7 +122,7 @@ jint  Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_mentry002_getReady(JNIEnv *env, jclass cls, jint i) {
+Java_mentry002_getReady(JNIEnv *jni, jclass cls, jint i) {
   jvmtiError err;
 
   if (jvmti == NULL) {
@@ -135,7 +135,7 @@ Java_mentry002_getReady(JNIEnv *env, jclass cls, jint i) {
     return;
   }
 
-  mid = env->GetStaticMethodID(cls, "emptyMethod", "()V");
+  mid = jni->GetStaticMethodID(cls, "emptyMethod", "()V");
   if (mid == NULL) {
     printf("Cannot find Method ID for emptyMethod\n");
     result = STATUS_FAILED;
@@ -164,7 +164,7 @@ Java_mentry002_getReady(JNIEnv *env, jclass cls, jint i) {
 }
 
 JNIEXPORT jint JNICALL
-Java_mentry002_check(JNIEnv *env, jclass cls) {
+Java_mentry002_check(JNIEnv *jni, jclass cls) {
   if (printdump == JNI_TRUE) {
     printf(">>> MethodEntry events: %d, MethodExit events: %d\n",
            MethodEntriesCount, MethodExitsCount);

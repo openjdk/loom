@@ -61,27 +61,27 @@ static void initCounters() {
     bpEvents[i] = 0;
 }
 
-static void setBP(jvmtiEnv *jvmti, JNIEnv *env, jclass klass) {
+static void setBP(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass) {
   jmethodID mid;
   jvmtiError err;
   int i;
 
   for (i = 0; i < METH_NUM; i++) {
-    mid = env->GetMethodID(klass, METHODS[i][0], METHODS[i][1]);
+    mid = jni->GetMethodID(klass, METHODS[i][0], METHODS[i][1]);
     if (mid == nullptr) {
-      env->FatalError("failed to get ID for the java method\n");
+      jni->FatalError("failed to get ID for the java method\n");
     }
 
     err = jvmti->SetBreakpoint(mid, 0);
     if (err != JVMTI_ERROR_NONE) {
-      env->FatalError("failed to set breakpoint\n");
+      jni->FatalError("failed to set breakpoint\n");
     }
   }
 }
 
 /** callback functions **/
 void JNICALL
-ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
+ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
   char *sig, *generic;
   jvmtiError err;
 
@@ -91,12 +91,12 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
     // GetClassSignature may be called only during the start or the live phase
     err = jvmti->GetClassSignature(klass, &sig, &generic);
     if (err != JVMTI_ERROR_NONE) {
-      env->FatalError("failed to obtain a class signature\n");
+      jni->FatalError("failed to obtain a class signature\n");
     }
 
     if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
       printf("ClassLoad event received for the class %s setting breakpoints ...\n", sig);
-      setBP(jvmti, env, klass);
+      setBP(jvmti, jni, klass);
     }
   }
 
@@ -104,7 +104,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
 }
 
 void JNICALL
-Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni_env, jthread thread,
+Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
            jmethodID method, jlocation location) {
   jclass klass;
   char *clsSig, *generic, *methNam, *methSig;
@@ -200,7 +200,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni_env, jthread thread,
 }
 
 void JNICALL
-VMStart(jvmtiEnv *jvmti, JNIEnv *jni_env) {
+VMStart(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_TRUE;
@@ -209,7 +209,7 @@ VMStart(jvmtiEnv *jvmti, JNIEnv *jni_env) {
 }
 
 void JNICALL
-VMDeath(jvmtiEnv *jvmti, JNIEnv *jni_env) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_FALSE;
@@ -219,7 +219,7 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv *jni_env) {
 /************************/
 
 JNIEXPORT jint JNICALL Java_breakpoint001_check(
-    JNIEnv *env, jobject obj) {
+    JNIEnv *jni, jobject obj) {
   int i;
 
   for (i = 0; i < METH_NUM; i++) {
@@ -248,7 +248,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
       return JNI_ERR;
       */
 
-  /* create JVMTI environment */
+  /* create JVMTI jniironment */
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
     printf("Wrong result of a valid call to GetEnv!\n");

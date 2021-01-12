@@ -126,12 +126,12 @@ void printInfo(jvmtiEnv *jvmti, jthread thr, jmethodID method, int depth) {
 }
 
 static
-void pop(jvmtiEnv *jvmti, JNIEnv *env, jthread thr, jmethodID method, int depth) {
+void pop(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method, int depth) {
   item_t old;
   int i, count = 0;
 
   for (i = 0; i < thr_count; i++) {
-    if (env->IsSameObject(threads[i].thread, thr)) {
+    if (jni->IsSameObject(threads[i].thread, thr)) {
       break;
     }
   }
@@ -170,12 +170,12 @@ void pop(jvmtiEnv *jvmti, JNIEnv *env, jthread thr, jmethodID method, int depth)
 }
 
 static
-void push(JNIEnv *env, jthread thr, jmethodID method, int depth) {
+void push(JNIEnv *jni, jthread thr, jmethodID method, int depth) {
   item_t new_item;
   int i;
 
   for (i = 0; i < thr_count; i++) {
-    if (env->IsSameObject(threads[i].thread, thr)) {
+    if (jni->IsSameObject(threads[i].thread, thr)) {
       break;
     }
   }
@@ -188,7 +188,7 @@ void push(JNIEnv *env, jthread thr, jmethodID method, int depth) {
       result = STATUS_FAILED;
       return;
     }
-    threads[i].thread = env->NewGlobalRef(thr);
+    threads[i].thread = jni->NewGlobalRef(thr);
     threads[i].tos = NULL;
   }
 
@@ -208,7 +208,7 @@ void push(JNIEnv *env, jthread thr, jmethodID method, int depth) {
   max_depth = (max_depth < depth) ? depth : max_depth;
 }
 
-void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
                          jthread thr, jmethodID method) {
   jvmtiError err;
   jboolean isNative;
@@ -255,7 +255,7 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *env,
         printInfo(jvmti, thr, method, frameCount);
         result = STATUS_FAILED;
       }
-      push((JNIEnv *)env, thr, method, frameCount);
+      push((JNIEnv *)jni, thr, method, frameCount);
       err = jvmti->RawMonitorExit(event_lock);
       if (err != JVMTI_ERROR_NONE) {
         printf("(RawMonitorExit) unexpected error: %s (%d)\n",
@@ -276,7 +276,7 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *env,
   jvmti->RawMonitorExit(agent_lock);
 }
 
-void JNICALL VMStart(jvmtiEnv *jvmti, JNIEnv* jni_env) {
+void JNICALL VMStart(jvmtiEnv *jvmti, JNIEnv* jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_TRUE;
@@ -285,7 +285,7 @@ void JNICALL VMStart(jvmtiEnv *jvmti, JNIEnv* jni_env) {
 }
 
 
-void JNICALL VMDeath(jvmtiEnv *jvmti, JNIEnv* jni_env) {
+void JNICALL VMDeath(jvmtiEnv *jvmti, JNIEnv* jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_FALSE;
@@ -293,7 +293,7 @@ void JNICALL VMDeath(jvmtiEnv *jvmti, JNIEnv* jni_env) {
   jvmti->RawMonitorExit(agent_lock);
 }
 
-void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *jni,
                       jthread thr, jmethodID method, jboolean wasPopedByException) {
   jvmtiError err;
   jint frameCount;
@@ -326,7 +326,7 @@ void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *env,
       printInfo(jvmti, thr, method, frameCount);
       result = STATUS_FAILED;
     }
-    pop(jvmti, (JNIEnv *)env, thr, method, frameCount);
+    pop(jvmti, (JNIEnv *)jni, thr, method, frameCount);
     err = jvmti->RawMonitorExit(event_lock);
     if (err != JVMTI_ERROR_NONE) {
       printf("(RawMonitorExit) unexpected error: %s (%d)\n",
@@ -425,7 +425,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   return JNI_OK;
 }
 
-JNIEXPORT void JNICALL Java_framepop002_getReady(JNIEnv *env, jclass cls) {
+JNIEXPORT void JNICALL Java_framepop002_getReady(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
   if (!caps.can_generate_frame_pop_events ||
@@ -450,7 +450,7 @@ JNIEXPORT void JNICALL Java_framepop002_getReady(JNIEnv *env, jclass cls) {
   watch_events = JNI_TRUE;
 }
 
-JNIEXPORT jint JNICALL Java_framepop002_check(JNIEnv *env, jclass cls) {
+JNIEXPORT jint JNICALL Java_framepop002_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
   watch_events = JNI_FALSE;

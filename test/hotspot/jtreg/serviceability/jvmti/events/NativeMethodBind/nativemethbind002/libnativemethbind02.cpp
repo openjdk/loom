@@ -40,41 +40,41 @@ static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
 static jrawMonitorID countLock;
 
-static void lock(jvmtiEnv *jvmti, JNIEnv *jni_env) {
+static void lock(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmtiError err;
   err = jvmti->RawMonitorEnter(countLock);
   if (err != JVMTI_ERROR_NONE) {
-    jni_env->FatalError("failed to enter a raw monitor\n");
+    jni->FatalError("failed to enter a raw monitor\n");
   }
 }
 
-static void unlock(jvmtiEnv *jvmti, JNIEnv *jni_env) {
+static void unlock(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmtiError err;
   err = jvmti->RawMonitorExit(countLock);
     if (err != JVMTI_ERROR_NONE) {
-      jni_env->FatalError("failed to exit a raw monitor\n");
+      jni->FatalError("failed to exit a raw monitor\n");
     }
 }
 
 /** callback functions **/
 void JNICALL
-NativeMethodBind(jvmtiEnv *jvmti, JNIEnv* jni_env, jthread thread,
+NativeMethodBind(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 jmethodID method, void *addr, void **new_addr) {
   jvmtiPhase phase;
   jvmtiError err;
   char *methNam = NULL, *methSig = NULL;
 
-  lock(jvmti, jni_env);
+  lock(jvmti, jni);
   err = jvmti->GetPhase(&phase);
   if (err != JVMTI_ERROR_NONE) {
     printf(">>>> Error getting phase\n");
     result = STATUS_FAILED;
-    unlock(jvmti, jni_env);
+    unlock(jvmti, jni);
     return;
   }
 
   if (phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_START) {
-    unlock(jvmti, jni_env);
+    unlock(jvmti, jni);
     return;
   }
 
@@ -83,7 +83,7 @@ jmethodID method, void *addr, void **new_addr) {
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
-    unlock(jvmti, jni_env);
+    unlock(jvmti, jni);
     return;
   } else {
     NSK_DISPLAY2("NativeMethodBind received for \"%s %s\"\n",
@@ -106,11 +106,11 @@ jmethodID method, void *addr, void **new_addr) {
     }
   }
 
-  unlock(jvmti, jni_env);
+  unlock(jvmti, jni);
 }
 
 void JNICALL
-VMDeath(jvmtiEnv *jvmti, JNIEnv *env) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
 NSK_DISPLAY0("VMDeath event received\n");
 
 if (wrongBindEv != 0) {
@@ -128,7 +128,7 @@ exit(95 + STATUS_FAILED);
 /* dummy method used only to provoke NativeMethodBind events */
 JNIEXPORT jint JNICALL
 Java_nativemethbind002_nativeMethod(
-    JNIEnv *env, jobject obj) {
+    JNIEnv *jni, jobject obj) {
   NSK_DISPLAY0("inside the nativeMethod()\n\n");
 
   return PASSED;

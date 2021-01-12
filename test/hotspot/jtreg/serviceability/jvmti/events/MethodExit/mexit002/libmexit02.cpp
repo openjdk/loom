@@ -52,7 +52,7 @@ static method_location_info exits[] = {
     { "Lmexit002a;", "dummy", "()V", 3 }
 };
 
-void JNICALL MethodExit(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL MethodExit(jvmtiEnv *jvmti, JNIEnv *jni,
                         jthread thr, jmethodID method,
                         jboolean was_poped_by_exc, jvalue return_value) {
   jvmtiError err;
@@ -204,7 +204,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_mexit002_check(JNIEnv *env, jclass cls) {
+Java_mexit002_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
   jclass clz;
   jmethodID mid;
@@ -218,13 +218,13 @@ Java_mexit002_check(JNIEnv *env, jclass cls) {
     return result;
   }
 
-  clz = env->FindClass("mexit002a");
+  clz = jni->FindClass("mexit002a");
   if (clz == NULL) {
     printf("Failed to find class \"mexit002a\"!\n");
     return STATUS_FAILED;
   }
 
-  mid = env->GetStaticMethodID(clz, "dummy", "()V");
+  mid = jni->GetStaticMethodID(clz, "dummy", "()V");
   if (mid == NULL) {
     printf("Failed to get method \"dummy\"!\n");
     return STATUS_FAILED;
@@ -240,7 +240,7 @@ Java_mexit002_check(JNIEnv *env, jclass cls) {
     result = STATUS_FAILED;
   }
 
-  env->CallStaticVoidMethod(clz, mid);
+  jni->CallStaticVoidMethod(clz, mid);
 
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_METHOD_EXIT, NULL);
@@ -259,7 +259,7 @@ Java_mexit002_check(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT void JNICALL
-Java_mexit002a_chain(JNIEnv *env, jclass cls) {
+Java_mexit002a_chain(JNIEnv *jni, jclass cls) {
   if (printdump == JNI_TRUE) {
     printf(">>> about to exit method chain ...\n");
   }

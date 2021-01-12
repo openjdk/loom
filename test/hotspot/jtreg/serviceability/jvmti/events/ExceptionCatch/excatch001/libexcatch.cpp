@@ -65,7 +65,7 @@ static int eventsCount = 0;
 static int eventsExpected = 0;
 
 void JNICALL
-ExceptionCatch(jvmtiEnv *jvmti, JNIEnv *env, jthread thr,
+ExceptionCatch(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
         jmethodID method, jlocation location, jobject exception) {
     jvmtiError err;
     jclass cls;
@@ -76,7 +76,7 @@ ExceptionCatch(jvmtiEnv *jvmti, JNIEnv *env, jthread thr,
     if (printdump == JNI_TRUE) {
         printf(">>> retrieving ExceptionCatch info ...\n");
     }
-    cls = env->GetObjectClass(exception);
+    cls = jni->GetObjectClass(exception);
     err = jvmti->GetClassSignature(cls, &ex.name, &generic);
     if (err != JVMTI_ERROR_NONE) {
         printf("(GetClassSignature#e) unexpected error: %s (%d)\n",
@@ -196,7 +196,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_excatch001_check(JNIEnv *env, jclass cls) {
+Java_excatch001_check(JNIEnv *jni, jclass cls) {
     jvmtiError err;
     jclass clz;
     jmethodID mid;
@@ -210,22 +210,22 @@ Java_excatch001_check(JNIEnv *env, jclass cls) {
         return result;
     }
 
-    clz = env->FindClass("excatch001c");
+    clz = jni->FindClass("excatch001c");
     if (clz == NULL) {
         printf("Cannot find excatch001c class!\n");
         return STATUS_FAILED;
     }
-    clz = env->FindClass("excatch001b");
+    clz = jni->FindClass("excatch001b");
     if (clz == NULL) {
         printf("Cannot find excatch001b class!\n");
         return STATUS_FAILED;
     }
-    clz = env->FindClass("excatch001a");
+    clz = jni->FindClass("excatch001a");
     if (clz == NULL) {
         printf("Cannot find excatch001a class!\n");
         return STATUS_FAILED;
     }
-    mid = env->GetStaticMethodID(clz, "run", "()V");
+    mid = jni->GetStaticMethodID(clz, "run", "()V");
     if (mid == NULL) {
         printf("Cannot find method run!\n");
         return STATUS_FAILED;
@@ -241,7 +241,7 @@ Java_excatch001_check(JNIEnv *env, jclass cls) {
         result = STATUS_FAILED;
     }
 
-    env->CallStaticVoidMethod(clz, mid);
+    jni->CallStaticVoidMethod(clz, mid);
 
     err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
             JVMTI_EVENT_EXCEPTION_CATCH, NULL);

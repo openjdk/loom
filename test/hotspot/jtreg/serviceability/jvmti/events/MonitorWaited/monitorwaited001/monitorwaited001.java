@@ -34,7 +34,7 @@ import java.io.PrintStream;
  * VM Testbase readme:
  * DESCRIPTION
  *     The test exercises JVMTI event callback function
- *         MonitorWaited(jni_env, thread, object, timed_out).
+ *         MonitorWaited(jni, thread, object, timed_out).
  *     The test checks if the thread, object, and timed_out parameters of
  *     the function contain expected values for callback when a thread finishes
  *     waiting on an object.

@@ -92,32 +92,32 @@ static int findSig(char *sig, int expected) {
   return -1; /* the signature not found */
 }
 
-static void lock(jvmtiEnv *jvmti, JNIEnv *jni_env) {
+static void lock(jvmtiEnv *jvmti, JNIEnv *jni) {
   if (jvmti->RawMonitorEnter(countLock) != JVMTI_ERROR_NONE) {
-    jni_env->FatalError("failed to enter a raw monitor\n");
+    jni->FatalError("failed to enter a raw monitor\n");
   }
 }
 
-static void unlock(jvmtiEnv *jvmti, JNIEnv *jni_env) {
+static void unlock(jvmtiEnv *jvmti, JNIEnv *jni) {
   if (jvmti->RawMonitorExit(countLock) != JVMTI_ERROR_NONE) {
-    jni_env->FatalError("failed to exit a raw monitor\n");
+    jni->FatalError("failed to exit a raw monitor\n");
   }
 }
 
 /** callback functions **/
 void JNICALL
-ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
+ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
   int i = 0;
   char *sig, *generic;
   jvmtiError err;
 
-  lock(jvmti, env);
+  lock(jvmti, jni);
 
   err = jvmti->GetClassSignature(klass, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILURE: unable to obtain a class signature. Error %d\n", err);
-    unlock(jvmti, env);
+    unlock(jvmti, jni);
     return;
   }
 
@@ -139,13 +139,13 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
     }
   }
 
-  unlock(jvmti, env);
+  unlock(jvmti, jni);
 }
 /************************/
 
 JNIEXPORT jint JNICALL
 Java_classload001_check(
-    JNIEnv *env, jobject obj) {
+    JNIEnv *jni, jobject obj) {
   size_t i;
 
   for (i=0; i<EXP_SIG_NUM; i++)
@@ -177,7 +177,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
   jint res;
 
-  /* create JVMTI environment */
+  /* create JVMTI jniironment */
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
     printf("Wrong result of a valid call to GetEnv!\n");

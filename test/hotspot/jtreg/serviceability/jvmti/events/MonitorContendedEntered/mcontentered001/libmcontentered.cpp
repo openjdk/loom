@@ -308,7 +308,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL Java_mcontentered001_getEventCount
-    (JNIEnv *env, jobject obj) {
+    (JNIEnv *jni, jobject obj) {
   return eventsCount;
 }
 

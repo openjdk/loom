@@ -52,7 +52,7 @@ static pop_info pops[] = {
     { "Lframepop001a;", "dummy", "()V", 3 },
 };
 
-void JNICALL Breakpoint(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni,
                         jthread thr, jmethodID method, jlocation location) {
   jvmtiError err;
 
@@ -75,7 +75,7 @@ void JNICALL Breakpoint(jvmtiEnv *jvmti, JNIEnv *env,
   }
 }
 
-void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *jni,
                       jthread thr, jmethodID method, jboolean wasPopedByException) {
   jvmtiError err;
   char *cls_sig, *name, *sig, *generic;
@@ -222,7 +222,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_framepop001_check(JNIEnv *env, jclass cls) {
+Java_framepop001_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
   jclass clz;
   jmethodID mid;
@@ -237,7 +237,7 @@ Java_framepop001_check(JNIEnv *env, jclass cls) {
     return result;
   }
 
-  mid = env->GetStaticMethodID(cls, "chain", "()V");
+  mid = jni->GetStaticMethodID(cls, "chain", "()V");
   if (mid == 0) {
     printf("Cannot find Method ID for method chain\n");
     return STATUS_FAILED;
@@ -263,18 +263,18 @@ Java_framepop001_check(JNIEnv *env, jclass cls) {
     result = STATUS_FAILED;
   }
 
-  clz = env->FindClass("framepop001a");
+  clz = jni->FindClass("framepop001a");
   if (clz == NULL) {
     printf("Cannot find framepop001a class!\n");
     result = STATUS_FAILED;
     return STATUS_FAILED;
   }
-  mid = env->GetStaticMethodID(clz, "dummy", "()V");
+  mid = jni->GetStaticMethodID(clz, "dummy", "()V");
   if (mid == 0) {
     printf("Cannot find Method ID for method dummy\n");
     return STATUS_FAILED;
   }
-  env->CallStaticVoidMethod(clz, mid);
+  jni->CallStaticVoidMethod(clz, mid);
 
   if (eventsCount != eventsExpected) {
     printf("Wrong number of frame pop events: %" PRIuPTR ", expected: %" PRIuPTR "\n",

@@ -41,7 +41,7 @@ static jvmtiCapabilities caps;
 
 /** callback functions **/
 void JNICALL
-SingleStep(jvmtiEnv *jvmti, JNIEnv* jni_env, jthread thread,
+SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
   jvmtiPhase phase;
   jvmtiError err;
@@ -63,7 +63,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni_env, jthread thread,
 }
 
 void JNICALL
-VMDeath(jvmtiEnv *jvmti, JNIEnv *env) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
   NSK_DISPLAY0("VMDeath event received\n");
 
   if (wrongStepEv != 0) {

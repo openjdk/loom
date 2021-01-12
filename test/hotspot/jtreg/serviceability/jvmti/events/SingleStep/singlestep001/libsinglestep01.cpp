@@ -55,25 +55,25 @@ static jvmtiEventCallbacks callbacks;
 static volatile int callbacksEnabled = NSK_FALSE;
 static jrawMonitorID agent_lock;
 
-static void setBP(jvmtiEnv *jvmti, JNIEnv *env, jclass klass) {
+static void setBP(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass) {
   jmethodID mid;
   jvmtiError err;
 
-  mid = env->GetMethodID(klass, METHODS[0], METHOD_SIGS[0]);
+  mid = jni->GetMethodID(klass, METHODS[0], METHOD_SIGS[0]);
   if (mid == NULL) {
-    env->FatalError("failed to get ID for the java method\n");
+    jni->FatalError("failed to get ID for the java method\n");
   }
 
   printf("Setting breakpoint....");
   err = jvmti->SetBreakpoint(mid, 0);
   if (err != JVMTI_ERROR_NONE) {
-    env->FatalError("failed to set breakpoint\n");
+    jni->FatalError("failed to set breakpoint\n");
   }
 }
 
 /** callback functions **/
 void JNICALL
-ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
+ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
   char *sig, *generic;
   jvmtiError err;
 
@@ -82,14 +82,14 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
   if (callbacksEnabled) {
     err = jvmti->GetClassSignature(klass, &sig, &generic);
     if (err != JVMTI_ERROR_NONE) {
-      env->FatalError("failed to obtain a class signature\n");
+      jni->FatalError("failed to obtain a class signature\n");
     }
     if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
       NSK_DISPLAY1(
           "ClassLoad event received for the class \"%s\"\n"
           "\tsetting breakpoint ...\n",
           sig);
-      setBP(jvmti, env, klass);
+      setBP(jvmti, jni, klass);
     }
   }
 
@@ -97,7 +97,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
 }
 
 void JNICALL
-Breakpoint(jvmtiEnv *jvmti, JNIEnv *env, jthread thr, jmethodID method,
+Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method,
            jlocation loc) {
   jclass klass;
   char *sig, *generic;
@@ -118,7 +118,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *env, jthread thr, jmethodID method,
 
   err = jvmti->GetClassSignature(klass, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    env->FatalError("Breakpoint: failed to obtain a class signature\n");
+    jni->FatalError("Breakpoint: failed to obtain a class signature\n");
   }
 
   if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
@@ -137,7 +137,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *env, jthread thr, jmethodID method,
 }
 
 void JNICALL
-SingleStep(jvmtiEnv *jvmti, JNIEnv* jni_env, jthread thread,
+SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
   jclass klass;
   char *sig, *generic, *methNam, *methSig;
@@ -219,7 +219,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni_env, jthread thread,
 }
 
 void JNICALL
-VMStart(jvmtiEnv *jvmti, JNIEnv* jni_env) {
+VMStart(jvmtiEnv *jvmti, JNIEnv* jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_TRUE;
@@ -228,7 +228,7 @@ VMStart(jvmtiEnv *jvmti, JNIEnv* jni_env) {
 }
 
 void JNICALL
-VMDeath(jvmtiEnv *jvmti, JNIEnv* jni_env) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv* jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_FALSE;
@@ -239,7 +239,7 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv* jni_env) {
 
 JNIEXPORT jint JNICALL
 Java_singlestep001_check(
-    JNIEnv *env, jobject obj) {
+    JNIEnv *jni, jobject obj) {
   int i;
 
   for (i=0; i<METH_NUM; i++)

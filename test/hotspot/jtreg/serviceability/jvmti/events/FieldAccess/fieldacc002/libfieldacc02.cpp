@@ -108,7 +108,7 @@ static watch_info watches[] = {
         "Lfieldacc002a;", "instanceArrInt", "[I", JNI_FALSE }
 };
 
-void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
                          jthread thr, jmethodID method,
                          jlocation location, jclass field_klass, jobject obj, jfieldID field) {
   jvmtiError err;
@@ -298,7 +298,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   return JNI_OK;
 }
 
-JNIEXPORT void JNICALL Java_fieldacc002_getReady(JNIEnv *env, jclass clz) {
+JNIEXPORT void JNICALL Java_fieldacc002_getReady(JNIEnv *jni, jclass clz) {
   jvmtiError err;
   jclass cls;
   size_t i;
@@ -311,7 +311,7 @@ JNIEXPORT void JNICALL Java_fieldacc002_getReady(JNIEnv *env, jclass clz) {
     printf(">>> setting field access watches ...\n");
   }
 
-  cls = env->FindClass("fieldacc002a");
+  cls = jni->FindClass("fieldacc002a");
   if (cls == NULL) {
     printf("Cannot find fieldacc002a class!\n");
     result = STATUS_FAILED;
@@ -319,10 +319,10 @@ JNIEXPORT void JNICALL Java_fieldacc002_getReady(JNIEnv *env, jclass clz) {
   }
   for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watches[i].is_static == JNI_TRUE) {
-      watches[i].fid = env->GetStaticFieldID(
+      watches[i].fid = jni->GetStaticFieldID(
           cls, watches[i].f_name, watches[i].f_sig);
     } else {
-      watches[i].fid = env->GetFieldID(
+      watches[i].fid = jni->GetFieldID(
           cls, watches[i].f_name, watches[i].f_sig);
     }
     if (watches[i].fid == NULL) {
@@ -346,7 +346,7 @@ JNIEXPORT void JNICALL Java_fieldacc002_getReady(JNIEnv *env, jclass clz) {
 }
 
 JNIEXPORT jint JNICALL
-Java_fieldacc002_check(JNIEnv *env, jclass clz, jobject obj) {
+Java_fieldacc002_check(JNIEnv *jni, jclass clz, jobject obj) {
   jclass cls;
 
   if (!caps.can_generate_field_access_events) {
@@ -357,33 +357,33 @@ Java_fieldacc002_check(JNIEnv *env, jclass clz, jobject obj) {
     printf(">>> accessing fields ...\n");
   }
 
-  cls = env->FindClass("fieldacc002a");
+  cls = jni->FindClass("fieldacc002a");
   if (cls == NULL) {
     printf("Cannot find fieldacc002a class!\n");
     return STATUS_FAILED;
   }
 
-  env->GetStaticBooleanField(cls, watches[0].fid);
-  env->GetStaticByteField(cls, watches[1].fid);
-  env->GetStaticShortField(cls, watches[2].fid);
-  env->GetStaticIntField(cls, watches[3].fid);
-  env->GetStaticLongField(cls, watches[4].fid);
-  env->GetStaticFloatField(cls, watches[5].fid);
-  env->GetStaticDoubleField(cls, watches[6].fid);
-  env->GetStaticCharField(cls, watches[7].fid);
-  env->GetStaticObjectField(cls, watches[8].fid);
-  env->GetStaticObjectField(cls, watches[9].fid);
+  jni->GetStaticBooleanField(cls, watches[0].fid);
+  jni->GetStaticByteField(cls, watches[1].fid);
+  jni->GetStaticShortField(cls, watches[2].fid);
+  jni->GetStaticIntField(cls, watches[3].fid);
+  jni->GetStaticLongField(cls, watches[4].fid);
+  jni->GetStaticFloatField(cls, watches[5].fid);
+  jni->GetStaticDoubleField(cls, watches[6].fid);
+  jni->GetStaticCharField(cls, watches[7].fid);
+  jni->GetStaticObjectField(cls, watches[8].fid);
+  jni->GetStaticObjectField(cls, watches[9].fid);
 
-  env->GetBooleanField(obj, watches[10].fid);
-  env->GetByteField(obj, watches[11].fid);
-  env->GetShortField(obj, watches[12].fid);
-  env->GetIntField(obj, watches[13].fid);
-  env->GetLongField(obj, watches[14].fid);
-  env->GetFloatField(obj, watches[15].fid);
-  env->GetDoubleField(obj, watches[16].fid);
-  env->GetCharField(obj, watches[17].fid);
-  env->GetObjectField(obj, watches[18].fid);
-  env->GetObjectField(obj, watches[19].fid);
+  jni->GetBooleanField(obj, watches[10].fid);
+  jni->GetByteField(obj, watches[11].fid);
+  jni->GetShortField(obj, watches[12].fid);
+  jni->GetIntField(obj, watches[13].fid);
+  jni->GetLongField(obj, watches[14].fid);
+  jni->GetFloatField(obj, watches[15].fid);
+  jni->GetDoubleField(obj, watches[16].fid);
+  jni->GetCharField(obj, watches[17].fid);
+  jni->GetObjectField(obj, watches[18].fid);
+  jni->GetObjectField(obj, watches[19].fid);
 
   if (printdump == JNI_TRUE) {
     printf(">>> ... done\n");

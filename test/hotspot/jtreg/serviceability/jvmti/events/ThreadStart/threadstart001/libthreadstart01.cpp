@@ -42,7 +42,7 @@ static int eventsCount = 0;
 static int eventsExpected = 0;
 static const char *prefix = NULL;
 
-void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *env, jthread thread) {
+void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   jvmtiError err;
   jvmtiThreadInfo inf;
   char name[32];
@@ -105,7 +105,7 @@ jint  Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_threadstart001_getReady(JNIEnv *env,
+Java_threadstart001_getReady(JNIEnv *jni,
                                                    jclass cls, jint i, jstring name) {
   jvmtiError err;
 
@@ -114,7 +114,7 @@ Java_threadstart001_getReady(JNIEnv *env,
     return;
   }
 
-  prefix = env->GetStringUTFChars(name, NULL);
+  prefix = jni->GetStringUTFChars(name, NULL);
   if (prefix == NULL) {
     printf("Failed to copy UTF-8 string!\n");
     result = STATUS_FAILED;
@@ -133,7 +133,7 @@ Java_threadstart001_getReady(JNIEnv *env,
 }
 
 JNIEXPORT jint JNICALL
-Java_threadstart001_check(JNIEnv *env, jclass cls) {
+Java_threadstart001_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
   if (jvmti == NULL) {

@@ -115,7 +115,7 @@ static jint NSK_JVMTI_VERIFY(jvmtiError err) {
 
 static void JNICALL
 debug_agent(jvmtiEnv* jvmti, JNIEnv* jni, void *p) {
-JNIEnv *env = jni;
+//JNIEnv *jni = jni;
 jint thrStat;
 jobject temp;
 
@@ -168,8 +168,8 @@ NSK_COMPLAIN1("[agent] Failed to suspend thread#%d\n", eventsCount);
 NSK_DISPLAY2(">>> [agent] thread#%d %s suspended ...\n", eventsCount, inf.name);
 
 /* these dummy calls provoke VM to hang */
-temp = env->NewGlobalRef(next_thread);
-env->DeleteGlobalRef(temp);
+temp = jni->NewGlobalRef(next_thread);
+  jni->DeleteGlobalRef(temp);
 
 if (!NSK_JVMTI_VERIFY(jvmti->ResumeThread(next_thread))) {
 result = STATUS_FAILED;
@@ -188,10 +188,10 @@ inf.name, TranslateState(thrStat), thrStat);
 
 if (thrStat & JVMTI_THREAD_STATE_SUSPENDED) {
 NSK_COMPLAIN1("[agent] \"%s\" was not resumed\n", inf.name);
-env->FatalError("[agent] could not recover");
+  jni->FatalError("[agent] could not recover");
 }
 
-env->DeleteGlobalRef(next_thread);
+  jni->DeleteGlobalRef(next_thread);
 next_thread = NULL;
 
 /* Notify ThreadStart callback that thread has been resumed */
@@ -226,14 +226,14 @@ result = STATUS_FAILED;
 NSK_DISPLAY0(">>> [agent] done.\n");
 }
 
-void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *env, jthread thread) {
+void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
 jint thrStat;
 jvmtiPhase phase;
 
 NSK_DISPLAY0(">>> [ThreadStart hook] start\n");
 
 /* skip if thread is 'agent thread' */
-if (env->IsSameObject(agent_thread, thread) == JNI_TRUE) {
+if (jni->IsSameObject(agent_thread, thread) == JNI_TRUE) {
 NSK_DISPLAY0(">>> [ThreadStart hook] skip agent thread\n");
 NSK_DISPLAY0(">>> [ThreadStart hook] end\n");
 return;
@@ -306,7 +306,7 @@ result = STATUS_FAILED;
 }
 
 /* Store thread */
-next_thread = env->NewGlobalRef(thread);
+next_thread = jni->NewGlobalRef(thread);
 debug_agent_timed_out = JNI_TRUE;
 
 /* Notify agent thread about new started thread and let agent thread to work with it */
@@ -328,7 +328,7 @@ result = STATUS_FAILED;
 
 if (debug_agent_timed_out == JNI_TRUE) {
 NSK_COMPLAIN1("[ThreadStart hook] \"%s\": debug agent timed out\n", inf.name);
-env->FatalError("[ThreadStart hook] could not recover");
+  jni->FatalError("[ThreadStart hook] could not recover");
 }
 
 /* Release thr_resume_lock lock */
@@ -348,7 +348,7 @@ TranslateState(thrStat), thrStat);
 
 if (thrStat & JVMTI_THREAD_STATE_SUSPENDED) {
 NSK_COMPLAIN1("[ThreadStart hook] \"%s\" was self-suspended\n", inf.name);
-env->FatalError("[ThreadStart hook] could not recover");
+  jni->FatalError("[ThreadStart hook] could not recover");
 }
 
 eventsCount++;
@@ -362,7 +362,7 @@ result = STATUS_FAILED;
 NSK_DISPLAY0(">>> [ThreadStart hook] end\n");
 }
 
-void JNICALL VMInit(jvmtiEnv *jvmti, JNIEnv *env, jthread thr) {
+void JNICALL VMInit(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr) {
 jclass cls = NULL;
 jmethodID mid = NULL;
 
@@ -374,28 +374,28 @@ return;
 }
 
 /* Start agent thread */
-cls = env->FindClass("java/lang/Thread");
+cls = jni->FindClass("java/lang/Thread");
 if (cls == NULL) {
 result = STATUS_FAILED;
 NSK_COMPLAIN0("TEST FAILED: Cannot start agent thread: FindClass() failed\n");
 return;
 }
 
-mid = env->GetMethodID(cls, "<init>", "()V");
+mid = jni->GetMethodID(cls, "<init>", "()V");
 if (mid == NULL) {
 result = STATUS_FAILED;
 NSK_COMPLAIN0("TEST FAILED: Cannot start agent thread: GetMethodID() failed\n");
 return;
 }
 
-agent_thread = env->NewObject(cls, mid);
+agent_thread = jni->NewObject(cls, mid);
 if (agent_thread == NULL) {
 result = STATUS_FAILED;
 NSK_COMPLAIN0("Cannot start agent thread: NewObject() failed\n");
 return;
 }
 
-agent_thread = (jthread) env->NewGlobalRef(agent_thread);
+agent_thread = (jthread) jni->NewGlobalRef(agent_thread);
 if (agent_thread == NULL) {
 result = STATUS_FAILED;
 NSK_COMPLAIN0("Cannot create global reference for agent_thread\n");
@@ -430,7 +430,7 @@ NSK_COMPLAIN0("TEST FAILED: failed to exit agent_start_lock\n");
 NSK_DISPLAY0(">>> VMInit event: end\n");
 }
 
-void JNICALL VMDeath(jvmtiEnv *jvmti, JNIEnv *env) {
+void JNICALL VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
 NSK_DISPLAY0(">>> VMDeath event\n");
 
 terminate_debug_agent = JNI_TRUE;
@@ -520,7 +520,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_threadstart002_check(JNIEnv *env, jclass cls) {
+Java_threadstart002_check(JNIEnv *jni, jclass cls) {
   if (eventsCount == 0) {
     NSK_COMPLAIN0("None of thread start events!\n");
     result = STATUS_FAILED;

@@ -46,7 +46,7 @@ static int startsExpected = 0;
 static int endsCount = 0;
 static int endsExpected = 0;
 
-void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *env, jthread thread) {
+void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   jvmtiError err;
   jvmtiThreadInfo inf;
 
@@ -64,7 +64,7 @@ void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *env, jthread thread) {
   }
 }
 
-void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *env, jthread thread) {
+void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   jvmtiError err;
   jvmtiThreadInfo inf;
 
@@ -144,7 +144,7 @@ threadProc(jvmtiEnv* jvmti, JNIEnv* jni, void *unused) {
 }
 
 JNIEXPORT jint JNICALL
-Java_threadstart003_check(JNIEnv *env,
+Java_threadstart003_check(JNIEnv *jni,
                                                 jclass cls, jthread thr, jstring name) {
   jvmtiError err;
 
@@ -153,7 +153,7 @@ Java_threadstart003_check(JNIEnv *env,
     return STATUS_FAILED;
   }
 
-  threadName = env->GetStringUTFChars(name, NULL);
+  threadName = jni->GetStringUTFChars(name, NULL);
   if (threadName == NULL) {
     printf("Failed to copy UTF-8 string!\n");
     return STATUS_FAILED;

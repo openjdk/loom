@@ -33,7 +33,7 @@ import java.io.PrintStream;
  * VM Testbase readme:
  * DESCRIPTION
  *     The test exercises JVMTI event callback function
- *         MonitorContendedEntered(jni_env, thread, object).
+ *         MonitorContendedEntered(jni, thread, object).
  *     The test checks if the thread and object parameters of the function
  *     contain expected values for callback when a thread enters a Java language
  *     monitor after waiting for it to be released by another thread.

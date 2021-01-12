@@ -33,7 +33,7 @@ import jdk.test.lib.jvmti.DebugeeClass;
  * VM Testbase readme:
  * DESCRIPTION
  *     The test exercises JVMTI event callback function
- *         MonitorWait(jni_env, thread, object, timeout).
+ *         MonitorWait(jni, thread, object, timeout).
  *     The test checks if the thread, object, and timeout parameters of
  *     the function contain expected values for callback when a thread is
  *     about to wait on an object.

@@ -108,7 +108,7 @@ static watch_info watches[] = {
 };
 
 
-void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
                          jthread thr, jmethodID method,
                          jlocation location, jclass field_klass, jobject obj, jfieldID field) {
   jvmtiError err;
@@ -301,7 +301,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
 
 JNIEXPORT void JNICALL
-Java_fieldacc001_getReady(JNIEnv *env, jclass klass) {
+Java_fieldacc001_getReady(JNIEnv *jni, jclass klass) {
   jvmtiError err;
   jclass cls;
   size_t i;
@@ -313,7 +313,7 @@ Java_fieldacc001_getReady(JNIEnv *env, jclass klass) {
   if (printdump == JNI_TRUE) {
     printf(">>> setting field access watches ...\n");
   }
-  cls = env->FindClass("fieldacc001a");
+  cls = jni->FindClass("fieldacc001a");
   if (cls == NULL) {
     printf("Cannot find fieldacc001a class!\n");
     result = STATUS_FAILED;
@@ -321,10 +321,10 @@ Java_fieldacc001_getReady(JNIEnv *env, jclass klass) {
   }
   for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watches[i].is_static == JNI_TRUE) {
-      watches[i].fid = env->GetStaticFieldID(
+      watches[i].fid = jni->GetStaticFieldID(
           cls, watches[i].f_name, watches[i].f_sig);
     } else {
-      watches[i].fid = env->GetFieldID(
+      watches[i].fid = jni->GetFieldID(
           cls, watches[i].f_name, watches[i].f_sig);
     }
     if (watches[i].fid == NULL) {
@@ -347,7 +347,7 @@ Java_fieldacc001_getReady(JNIEnv *env, jclass klass) {
 }
 
 JNIEXPORT jint JNICALL
-Java_fieldacc001_check(JNIEnv *env, jclass cls) {
+Java_fieldacc001_check(JNIEnv *jni, jclass cls) {
   if (eventsCount != eventsExpected) {
     printf("Wrong number of field access events: %d, expected: %d\n",
            eventsCount, eventsExpected);

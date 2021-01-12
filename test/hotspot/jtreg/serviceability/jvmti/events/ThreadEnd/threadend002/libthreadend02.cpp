@@ -42,7 +42,7 @@ static int eventCount = 0;
 /* ============================================================================= */
 
 JNIEXPORT void JNICALL
-cbThreadEnd(jvmtiEnv* jvmti, JNIEnv* jni_env, jthread thread) {
+cbThreadEnd(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
 
   eventCount++;
 }

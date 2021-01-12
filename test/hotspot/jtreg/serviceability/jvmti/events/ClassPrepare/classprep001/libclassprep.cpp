@@ -88,7 +88,7 @@ void printStatus(jint status) {
   printf(" (0x%x)\n", status);
 }
 
-void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni,
                           jthread thr, jclass cls) {
   jvmtiError err;
   writable_class_info inf;
@@ -267,7 +267,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_classprep001_getReady(JNIEnv *env, jclass cls) {
+Java_classprep001_getReady(JNIEnv *jni, jclass cls) {
   jvmtiError err;
   jthread prep_thread;
 
@@ -295,7 +295,7 @@ Java_classprep001_getReady(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT jint JNICALL
-Java_classprep001_check(JNIEnv *env, jclass cls) {
+Java_classprep001_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
   jthread prep_thread;
 

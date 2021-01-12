@@ -50,7 +50,7 @@ static jrawMonitorID countLock;
    through the NativeMethodBind event */
 JNIEXPORT void JNICALL
 Java_nativemethbind004_nativeMethod(
-    JNIEnv *env, jobject obj) {
+    JNIEnv *jni, jobject obj) {
 origCalls++;
 NSK_DISPLAY1("inside the nativeMethod(): calls=%d\n",
 origCalls);
@@ -59,37 +59,37 @@ origCalls);
 /* redirected method used to check the native method redirection
    through the NativeMethodBind event */
 static void JNICALL
-redirNativeMethod(JNIEnv *env, jobject obj) {
+redirNativeMethod(JNIEnv *jni, jobject obj) {
 redirCalls++;
 NSK_DISPLAY1("inside the redirNativeMethod(): calls=%d\n",
 redirCalls);
 }
 
-static void lock(jvmtiEnv *jvmti, JNIEnv *jni_env) {
+static void lock(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmtiError err;
   err = jvmti->RawMonitorEnter(countLock);
   if (err != JVMTI_ERROR_NONE) {
-    jni_env->FatalError("failed to enter a raw monitor\n");
+    jni->FatalError("failed to enter a raw monitor\n");
   }
 }
 
-static void unlock(jvmtiEnv *jvmti, JNIEnv *jni_env) {
+static void unlock(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmtiError err;
   err = jvmti->RawMonitorExit(countLock);
   if (err != JVMTI_ERROR_NONE) {
-    jni_env->FatalError("failed to exit a raw monitor\n");
+    jni->FatalError("failed to exit a raw monitor\n");
   }
 }
 
 /** callback functions **/
 void JNICALL
-NativeMethodBind(jvmtiEnv *jvmti, JNIEnv* jni_env, jthread thread,
+NativeMethodBind(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 jmethodID method, void *addr, void **new_addr) {
 jvmtiPhase phase;
   jvmtiError err;
 
 char *methNam, *methSig;
-lock(jvmti, jni_env);
+lock(jvmti, jni);
 
 NSK_DISPLAY0(">>>> NativeMethodBind event received\n");
 
@@ -97,12 +97,12 @@ NSK_DISPLAY0(">>>> NativeMethodBind event received\n");
   if (err != JVMTI_ERROR_NONE) {
     printf(">>>> Error getting phase\n");
     result = STATUS_FAILED;
-    unlock(jvmti, jni_env);
+    unlock(jvmti, jni);
     return;
   }
 
 if (phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_START) {
-unlock(jvmti, jni_env);
+unlock(jvmti, jni);
 return;
 }
 
@@ -110,7 +110,7 @@ return;
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
-    unlock(jvmti, jni_env);
+    unlock(jvmti, jni);
     return;
   }
 
@@ -139,13 +139,13 @@ methNam, methSig, addr, (void*) redirNativeMethod);
   }
 NSK_DISPLAY0("<<<<\n\n");
 
-unlock(jvmti, jni_env);
+unlock(jvmti, jni);
 }
 /************************/
 
 JNIEXPORT jint JNICALL
     Java_nativemethbind004_check(
-    JNIEnv *env, jobject obj) {
+    JNIEnv *jni, jobject obj) {
 
 if (origCalls == 0) {
 NSK_DISPLAY0(

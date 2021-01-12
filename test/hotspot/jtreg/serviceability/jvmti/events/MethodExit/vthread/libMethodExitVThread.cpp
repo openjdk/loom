@@ -53,7 +53,7 @@ static method_location_info expected_exits[] = {
     { "LMethodExitVThreadTest;", "method2", "()V", 0 }
 };
 
-void JNICALL MethodExit(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL MethodExit(jvmtiEnv *jvmti, JNIEnv *jni,
                         jthread thr, jmethodID method,
                         jboolean was_poped_by_exc, jvalue return_value) {
   jvmtiError err;
@@ -183,17 +183,17 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_MethodExitVThreadTest_init0(JNIEnv *env, jclass cls) {
+Java_MethodExitVThreadTest_init0(JNIEnv *jni, jclass cls) {
   jvmtiError err;
   jthread thread;
   if (jvmti == NULL) {
-    env->FatalError("JVMTI client was not properly loaded!");
+    jni->FatalError("JVMTI client was not properly loaded!");
   }
 
 
   err = jvmti->GetCurrentThread(&thread);
   if (err != JVMTI_ERROR_NONE) {
-    env->FatalError("Error in GetCurrentThread.");
+    jni->FatalError("Error in GetCurrentThread.");
   }
 
 
@@ -202,7 +202,7 @@ Java_MethodExitVThreadTest_init0(JNIEnv *env, jclass cls) {
   if (err != JVMTI_ERROR_NONE) {
     printf("Failed to enable JVMTI_EVENT_METHOD_EXIT event: %s (%d)\n",
            TranslateError(err), err);
-    env->FatalError("Failed to enable JVMTI_EVENT_METHOD_EXIT event.");
+    jni->FatalError("Failed to enable JVMTI_EVENT_METHOD_EXIT event.");
   }
 
   // TODO: should we return result instead?
@@ -210,21 +210,21 @@ Java_MethodExitVThreadTest_init0(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT jint JNICALL
-Java_MethodExitVThreadTest_check(JNIEnv *env, jclass cls) {
+Java_MethodExitVThreadTest_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
   jthread thread;
 
   if (jvmti == NULL) {
-    env->FatalError("JVMTI client was not properly loaded!");
+    jni->FatalError("JVMTI client was not properly loaded!");
   }
 
   if (!caps.can_generate_method_exit_events) {
-    env->FatalError("Error method exit is not supported.");
+    jni->FatalError("Error method exit is not supported.");
   }
 
   err = jvmti->GetCurrentThread(&thread);
   if (err != JVMTI_ERROR_NONE) {
-    env->FatalError("Error in GetCurrentThread.");
+    jni->FatalError("Error in GetCurrentThread.");
   }
 
 
@@ -233,7 +233,7 @@ Java_MethodExitVThreadTest_check(JNIEnv *env, jclass cls) {
   if (err != JVMTI_ERROR_NONE) {
     printf("Failed to disable JVMTI_EVENT_METHOD_EXIT event: %s (%d)\n",
            TranslateError(err), err);
-    env->FatalError("Failed to disable JVMTI_EVENT_METHOD_EXIT event.");
+    jni->FatalError("Failed to disable JVMTI_EVENT_METHOD_EXIT event.");
   }
   return eventsCount;
 }

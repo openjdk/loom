@@ -146,7 +146,7 @@ void printValue(jvalue val, char *sig) {
   }
 }
 
-int isEqual(JNIEnv *env, char *sig, jvalue v1, jvalue v2) {
+int isEqual(JNIEnv *jni, char *sig, jvalue v1, jvalue v2) {
   switch (*sig) {
     case 'J':
       return (v1.j == v2.j);
@@ -156,7 +156,7 @@ int isEqual(JNIEnv *env, char *sig, jvalue v1, jvalue v2) {
       return (v1.d == v2.d);
     case 'L':
     case '[':
-      return env->IsSameObject(v1.l, v2.l);
+      return jni->IsSameObject(v1.l, v2.l);
     case 'Z':
       return (v1.z == v2.z);
     case 'B':
@@ -172,7 +172,7 @@ int isEqual(JNIEnv *env, char *sig, jvalue v1, jvalue v2) {
   }
 }
 
-void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *jni,
                                jthread thr, jmethodID method, jlocation location,
                                jclass field_klass, jobject obj,
                                jfieldID field, char sig, jvalue new_value) {
@@ -291,7 +291,7 @@ void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *env,
                (watches[i].is_static == JNI_TRUE) ? "static" : "instance");
         result = STATUS_FAILED;
       }
-      if (!isEqual((JNIEnv *)env, watch.f_sig, watch.val, watches[i].val)) {
+      if (!isEqual((JNIEnv *)jni, watch.f_sig, watch.val, watches[i].val)) {
         printf("(watch#%" PRIuPTR ") wrong new value: ", i);
         printValue(watch.val, watch.f_sig);
         printf(", expected: ");
@@ -376,7 +376,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_fieldmod001_getReady(JNIEnv *env, jclass klass,
+Java_fieldmod001_getReady(JNIEnv *jni, jclass klass,
                                                       jobject obj1, jobject obj2, jobject arr1, jobject arr2) {
   jvmtiError err;
   jclass cls;
@@ -389,7 +389,7 @@ Java_fieldmod001_getReady(JNIEnv *env, jclass klass,
   if (printdump == JNI_TRUE) {
     printf(">>> setting field modification watches ...\n");
   }
-  cls = env->FindClass("fieldmod001a");
+  cls = jni->FindClass("fieldmod001a");
   if (cls == NULL) {
     printf("Cannot find fieldmod001a class!\n");
     result = STATUS_FAILED;
@@ -397,10 +397,10 @@ Java_fieldmod001_getReady(JNIEnv *env, jclass klass,
   }
   for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watches[i].is_static == JNI_TRUE) {
-      watches[i].fid = env->GetStaticFieldID(
+      watches[i].fid = jni->GetStaticFieldID(
           cls, watches[i].f_name, watches[i].f_sig);
     } else {
-      watches[i].fid = env->GetFieldID(
+      watches[i].fid = jni->GetFieldID(
           cls, watches[i].f_name, watches[i].f_sig);
     }
     if (watches[i].fid == NULL) {
@@ -427,8 +427,8 @@ Java_fieldmod001_getReady(JNIEnv *env, jclass klass,
   watches[5].val.f = 0.5F;
   watches[6].val.d = 0.6;
   watches[7].val.c = 0x61;
-  watches[8].val.l = env->NewGlobalRef(obj1);
-  watches[9].val.l = env->NewGlobalRef(arr1);
+  watches[8].val.l = jni->NewGlobalRef(obj1);
+  watches[9].val.l = jni->NewGlobalRef(arr1);
 
   watches[10].val.z = JNI_FALSE;
   watches[11].val.b = 10;
@@ -438,8 +438,8 @@ Java_fieldmod001_getReady(JNIEnv *env, jclass klass,
   watches[15].val.f = 0.05F;
   watches[16].val.d = 0.06;
   watches[17].val.c = 0x7a;
-  watches[18].val.l = env->NewGlobalRef(obj2);
-  watches[19].val.l = env->NewGlobalRef(arr2);
+  watches[18].val.l = jni->NewGlobalRef(obj2);
+  watches[19].val.l = jni->NewGlobalRef(arr2);
 
   if (printdump == JNI_TRUE) {
     printf(">>> ... done\n");
@@ -447,7 +447,7 @@ Java_fieldmod001_getReady(JNIEnv *env, jclass klass,
 }
 
 JNIEXPORT jint JNICALL
-Java_fieldmod001_check(JNIEnv *env, jclass cls) {
+Java_fieldmod001_check(JNIEnv *jni, jclass cls) {
   if (eventsCount != eventsExpected) {
     printf("Wrong number of field modification events: %d, expected: %d\n",
            eventsCount, eventsExpected);

@@ -58,7 +58,7 @@ static entry_info entries[] = {
     { "chain", "()V", -1 }
 };
 
-void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
                          jthread thr, jmethodID method) {
   jvmtiError err;
   char *cls_sig, *generic;
@@ -202,7 +202,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_mentry001_enable(JNIEnv *env, jclass cls) {
+Java_mentry001_enable(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
   if (jvmti == NULL) {
@@ -225,16 +225,16 @@ Java_mentry001_enable(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT jint JNICALL
-Java_mentry001_check(JNIEnv *env, jclass cls) {
+Java_mentry001_check(JNIEnv *jni, jclass cls) {
   jmethodID mid;
 
-  mid = env->GetStaticMethodID(cls, "dummy", "()V");
+  mid = jni->GetStaticMethodID(cls, "dummy", "()V");
   if (mid == NULL) {
     printf("Cannot find metod \"dummy()\"!\n");
     return STATUS_FAILED;
   }
 
-  env->CallStaticVoidMethod(cls, mid);
+  jni->CallStaticVoidMethod(cls, mid);
   if (eventsCount != eventsExpected) {
     printf("Wrong number of MethodEntry events: %" PRIuPTR ", expected: %" PRIuPTR "\n",
            eventsCount, eventsExpected);
@@ -244,7 +244,7 @@ Java_mentry001_check(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT void JNICALL
-Java_mentry001_chain(JNIEnv *env, jclass cls) {
+Java_mentry001_chain(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
   if (jvmti == NULL) {

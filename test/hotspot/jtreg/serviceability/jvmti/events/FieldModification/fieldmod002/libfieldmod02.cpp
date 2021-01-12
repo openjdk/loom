@@ -146,7 +146,7 @@ void printValue(jvalue val, char *sig) {
   }
 }
 
-int isEqual(JNIEnv *env, char *sig, jvalue v1, jvalue v2) {
+int isEqual(JNIEnv *jni, char *sig, jvalue v1, jvalue v2) {
   switch (*sig) {
     case 'J':
       return (v1.j == v2.j);
@@ -156,7 +156,7 @@ int isEqual(JNIEnv *env, char *sig, jvalue v1, jvalue v2) {
       return (v1.d == v2.d);
     case 'L':
     case '[':
-      return env->IsSameObject(v1.l, v2.l);
+      return jni->IsSameObject(v1.l, v2.l);
     case 'Z':
       return (v1.z == v2.z);
     case 'B':
@@ -172,7 +172,7 @@ int isEqual(JNIEnv *env, char *sig, jvalue v1, jvalue v2) {
   }
 }
 
-void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *env,
+void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *jni,
                                jthread thr, jmethodID method, jlocation location,
                                jclass field_klass, jobject obj,
                                jfieldID field, char sig, jvalue new_value) {
@@ -290,7 +290,7 @@ void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *env,
                (watches[i].is_static == JNI_TRUE) ? "static" : "instance");
         result = STATUS_FAILED;
       }
-      if (!isEqual((JNIEnv *)env, watch.f_sig, watch.val, watches[i].val)) {
+      if (!isEqual((JNIEnv *)jni, watch.f_sig, watch.val, watches[i].val)) {
         printf("(watch#%" PRIuPTR ") wrong new value: ", i);
         printValue(watch.val, watch.f_sig);
         printf(", expected: ");
@@ -375,7 +375,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_fieldmod002_getReady(JNIEnv *env, jclass clz) {
+Java_fieldmod002_getReady(JNIEnv *jni, jclass clz) {
   jvmtiError err;
   jclass cls;
   jmethodID ctor;
@@ -390,7 +390,7 @@ Java_fieldmod002_getReady(JNIEnv *env, jclass clz) {
   if (printdump == JNI_TRUE) {
     printf(">>> setting field modification watches ...\n");
   }
-  cls = env->FindClass("fieldmod002a");
+  cls = jni->FindClass("fieldmod002a");
   if (cls == NULL) {
     printf("Cannot find fieldmod001a class!\n");
     result = STATUS_FAILED;
@@ -398,10 +398,10 @@ Java_fieldmod002_getReady(JNIEnv *env, jclass clz) {
   }
   for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watches[i].is_static == JNI_TRUE) {
-      watches[i].fid = env->GetStaticFieldID(
+      watches[i].fid = jni->GetStaticFieldID(
           cls, watches[i].f_name, watches[i].f_sig);
     } else {
-      watches[i].fid = env->GetFieldID(
+      watches[i].fid = jni->GetFieldID(
           cls, watches[i].f_name, watches[i].f_sig);
     }
     if (watches[i].fid == NULL) {
@@ -420,11 +420,11 @@ Java_fieldmod002_getReady(JNIEnv *env, jclass clz) {
     }
   }
 
-  ctor = env->GetMethodID(cls, "<init>", "()V");
-  obj1 = env->NewGlobalRef(env->NewObject(cls, ctor));
-  obj2 = env->NewGlobalRef(env->NewObject(cls, ctor));
-  arr1 = (jintArray) env->NewGlobalRef(env->NewIntArray((jsize) 1));
-  arr2 = (jintArray) env->NewGlobalRef(env->NewIntArray((jsize) 1));
+  ctor = jni->GetMethodID(cls, "<init>", "()V");
+  obj1 = jni->NewGlobalRef(jni->NewObject(cls, ctor));
+  obj2 = jni->NewGlobalRef(jni->NewObject(cls, ctor));
+  arr1 = (jintArray) jni->NewGlobalRef(jni->NewIntArray((jsize) 1));
+  arr2 = (jintArray) jni->NewGlobalRef(jni->NewIntArray((jsize) 1));
 
   watches[0].val.z = JNI_TRUE;
   watches[1].val.b = 1;
@@ -454,7 +454,7 @@ Java_fieldmod002_getReady(JNIEnv *env, jclass clz) {
 }
 
 JNIEXPORT jint JNICALL
-Java_fieldmod002_check(JNIEnv *env,
+Java_fieldmod002_check(JNIEnv *jni,
                                                    jclass clz, jobject obj) {
   jclass cls;
 
@@ -466,33 +466,33 @@ Java_fieldmod002_check(JNIEnv *env,
     printf(">>> modifying fields ...\n");
   }
 
-  cls = env->FindClass("fieldmod002a");
+  cls = jni->FindClass("fieldmod002a");
   if (cls == NULL) {
     printf("Cannot find fieldmod001a class!\n");
     return STATUS_FAILED;
   }
 
-  env->SetStaticBooleanField(cls, watches[0].fid, watches[0].val.z);
-  env->SetStaticByteField(cls, watches[1].fid, watches[1].val.b);
-  env->SetStaticShortField(cls, watches[2].fid, watches[2].val.s);
-  env->SetStaticIntField(cls, watches[3].fid, watches[3].val.i);
-  env->SetStaticLongField(cls, watches[4].fid, watches[4].val.j);
-  env->SetStaticFloatField(cls, watches[5].fid, watches[5].val.f);
-  env->SetStaticDoubleField(cls, watches[6].fid, watches[6].val.d);
-  env->SetStaticCharField(cls, watches[7].fid, watches[7].val.c);
-  env->SetStaticObjectField(cls, watches[8].fid, watches[8].val.l);
-  env->SetStaticObjectField(cls, watches[9].fid, watches[9].val.l);
+  jni->SetStaticBooleanField(cls, watches[0].fid, watches[0].val.z);
+  jni->SetStaticByteField(cls, watches[1].fid, watches[1].val.b);
+  jni->SetStaticShortField(cls, watches[2].fid, watches[2].val.s);
+  jni->SetStaticIntField(cls, watches[3].fid, watches[3].val.i);
+  jni->SetStaticLongField(cls, watches[4].fid, watches[4].val.j);
+  jni->SetStaticFloatField(cls, watches[5].fid, watches[5].val.f);
+  jni->SetStaticDoubleField(cls, watches[6].fid, watches[6].val.d);
+  jni->SetStaticCharField(cls, watches[7].fid, watches[7].val.c);
+  jni->SetStaticObjectField(cls, watches[8].fid, watches[8].val.l);
+  jni->SetStaticObjectField(cls, watches[9].fid, watches[9].val.l);
 
-  env->SetBooleanField(obj, watches[10].fid, watches[10].val.z);
-  env->SetByteField(obj, watches[11].fid, watches[11].val.b);
-  env->SetShortField(obj, watches[12].fid, watches[12].val.s);
-  env->SetIntField(obj, watches[13].fid, watches[13].val.i);
-  env->SetLongField(obj, watches[14].fid, watches[14].val.j);
-  env->SetFloatField(obj, watches[15].fid, watches[15].val.f);
-  env->SetDoubleField(obj, watches[16].fid, watches[16].val.d);
-  env->SetCharField(obj, watches[17].fid, watches[17].val.c);
-  env->SetObjectField(obj, watches[18].fid, watches[18].val.l);
-  env->SetObjectField(obj, watches[19].fid, watches[19].val.l);
+  jni->SetBooleanField(obj, watches[10].fid, watches[10].val.z);
+  jni->SetByteField(obj, watches[11].fid, watches[11].val.b);
+  jni->SetShortField(obj, watches[12].fid, watches[12].val.s);
+  jni->SetIntField(obj, watches[13].fid, watches[13].val.i);
+  jni->SetLongField(obj, watches[14].fid, watches[14].val.j);
+  jni->SetFloatField(obj, watches[15].fid, watches[15].val.f);
+  jni->SetDoubleField(obj, watches[16].fid, watches[16].val.d);
+  jni->SetCharField(obj, watches[17].fid, watches[17].val.c);
+  jni->SetObjectField(obj, watches[18].fid, watches[18].val.l);
+  jni->SetObjectField(obj, watches[19].fid, watches[19].val.l);
 
   if (printdump == JNI_TRUE) {
     printf(">>> ... done\n");
