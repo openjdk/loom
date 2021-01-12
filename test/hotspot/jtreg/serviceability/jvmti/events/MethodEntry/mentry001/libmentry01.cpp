@@ -58,7 +58,7 @@ static entry_info entries[] = {
     { "chain", "()V", -1 }
 };
 
-void JNICALL MethodEntry(jvmtiEnv *jvmti_env, JNIEnv *env,
+void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *env,
                          jthread thr, jmethodID method) {
   jvmtiError err;
   char *cls_sig, *generic;
@@ -67,14 +67,14 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti_env, JNIEnv *env,
   jmethodID mid;
   char buffer[32];
 
-  err = jvmti_env->GetMethodDeclaringClass(method, &cls);
+  err = jvmti->GetMethodDeclaringClass(method, &cls);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetClassSignature(cls, &cls_sig, &generic);
+  err = jvmti->GetClassSignature(cls, &cls_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassSignature) unexpected error: %s (%d)\n",
            TranslateError(err), err);
@@ -86,7 +86,7 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti_env, JNIEnv *env,
     if (printdump == JNI_TRUE) {
       printf(">>> retrieving method entry info ...\n");
     }
-    err = jvmti_env->GetMethodName(method,
+    err = jvmti->GetMethodName(method,
                                    &entry.name, &entry.sig, &generic);
     if (err != JVMTI_ERROR_NONE) {
       printf("(GetMethodName) unexpected error: %s (%d)\n",
@@ -94,7 +94,7 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti_env, JNIEnv *env,
       result = STATUS_FAILED;
       return;
     }
-    err = jvmti_env->GetFrameLocation(thr, 0, &mid, &entry.loc);
+    err = jvmti->GetFrameLocation(thr, 0, &mid, &entry.loc);
     if (err != JVMTI_ERROR_NONE) {
       printf("(GetFrameLocation) unexpected error: %s (%d)\n",
              TranslateError(err), err);

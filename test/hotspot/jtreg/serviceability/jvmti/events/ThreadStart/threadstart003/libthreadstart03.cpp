@@ -46,11 +46,11 @@ static int startsExpected = 0;
 static int endsCount = 0;
 static int endsExpected = 0;
 
-void JNICALL ThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread) {
+void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *env, jthread thread) {
   jvmtiError err;
   jvmtiThreadInfo inf;
 
-  err = jvmti_env->GetThreadInfo(thread, &inf);
+  err = jvmti->GetThreadInfo(thread, &inf);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetThreadInfo, start) unexpected error: %s (%d)\n",
            TranslateError(err), err);
@@ -64,11 +64,11 @@ void JNICALL ThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread) {
   }
 }
 
-void JNICALL ThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread) {
+void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *env, jthread thread) {
   jvmtiError err;
   jvmtiThreadInfo inf;
 
-  err = jvmti_env->GetThreadInfo(thread, &inf);
+  err = jvmti->GetThreadInfo(thread, &inf);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetThreadInfo, end) unexpected error: %s (%d)\n",
            TranslateError(err), err);

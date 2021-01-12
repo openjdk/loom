@@ -43,14 +43,14 @@ static int MethodEntriesCount = 0;
 static int MethodExitsCount = 0;
 static jmethodID mid = NULL;
 
-void JNICALL MethodEntry(jvmtiEnv *jvmti_env, JNIEnv *env,
+void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *env,
                          jthread thr, jmethodID method) {
   if (mid == method) {
     MethodEntriesCount++;
   }
 }
 
-void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
+void JNICALL MethodExit(jvmtiEnv *jvmti, JNIEnv *env,
                         jthread thr, jmethodID method,
                         jboolean was_poped_by_exc, jvalue return_value) {
   if (mid == method) {

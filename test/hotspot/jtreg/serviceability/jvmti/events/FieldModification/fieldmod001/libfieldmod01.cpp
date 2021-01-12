@@ -172,7 +172,7 @@ int isEqual(JNIEnv *env, char *sig, jvalue v1, jvalue v2) {
   }
 }
 
-void JNICALL FieldModification(jvmtiEnv *jvmti_env, JNIEnv *env,
+void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *env,
                                jthread thr, jmethodID method, jlocation location,
                                jclass field_klass, jobject obj,
                                jfieldID field, char sig, jvalue new_value) {
@@ -190,14 +190,14 @@ void JNICALL FieldModification(jvmtiEnv *jvmti_env, JNIEnv *env,
   watch.loc = location;
   watch.val = new_value;
   watch.is_static = (obj == NULL) ? JNI_TRUE : JNI_FALSE;
-  err = jvmti_env->GetMethodDeclaringClass(method, &cls);
+  err = jvmti->GetMethodDeclaringClass(method, &cls);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetClassSignature(cls,
+  err = jvmti->GetClassSignature(cls,
                                      &watch.m_cls, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassSignature) unexpected error: %s (%d)\n",
@@ -205,7 +205,7 @@ void JNICALL FieldModification(jvmtiEnv *jvmti_env, JNIEnv *env,
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetMethodName(method,
+  err = jvmti->GetMethodName(method,
                                  &watch.m_name, &watch.m_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetMethodName) unexpected error: %s (%d)\n",
@@ -213,7 +213,7 @@ void JNICALL FieldModification(jvmtiEnv *jvmti_env, JNIEnv *env,
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetClassSignature(field_klass,
+  err = jvmti->GetClassSignature(field_klass,
                                      &watch.f_cls, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassSignature) unexpected error: %s (%d)\n",
@@ -221,7 +221,7 @@ void JNICALL FieldModification(jvmtiEnv *jvmti_env, JNIEnv *env,
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetFieldName(field_klass, field,
+  err = jvmti->GetFieldName(field_klass, field,
                                 &watch.f_name, &watch.f_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetFieldName) unexpected error: %s (%d)\n",

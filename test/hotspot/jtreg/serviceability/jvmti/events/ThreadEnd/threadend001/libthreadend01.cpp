@@ -42,12 +42,12 @@ static int eventsCount = 0;
 static int eventsExpected = 0;
 static const char *prefix = NULL;
 
-void JNICALL ThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread) {
+void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *env, jthread thread) {
   jvmtiError err;
   jvmtiThreadInfo inf;
   char name[32];
 
-  err = jvmti_env->GetThreadInfo(thread, &inf);
+  err = jvmti->GetThreadInfo(thread, &inf);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetThreadInfo#%d) unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);

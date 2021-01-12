@@ -59,7 +59,7 @@ static jvmtiEventCallbacks callbacks;
 static volatile int callbacksEnabled = NSK_FALSE;
 static jrawMonitorID agent_lock;
 
-static void setBP(jvmtiEnv *jvmti_env, JNIEnv *env, jclass klass) {
+static void setBP(jvmtiEnv *jvmti, JNIEnv *env, jclass klass) {
   jmethodID mid;
   jvmtiError err;
 
@@ -68,7 +68,7 @@ static void setBP(jvmtiEnv *jvmti_env, JNIEnv *env, jclass klass) {
     env->FatalError("failed to get ID for the java method\n");
   }
 
-  err = jvmti_env->SetBreakpoint(mid, 0);
+  err = jvmti->SetBreakpoint(mid, 0);
   if (err != JVMTI_ERROR_NONE) {
     env->FatalError("failed to set breakpoint\n");
   }
@@ -76,7 +76,7 @@ static void setBP(jvmtiEnv *jvmti_env, JNIEnv *env, jclass klass) {
 
 /** callback functions **/
 void JNICALL
-ClassLoad(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread, jclass klass) {
+ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
   char *sig, *generic;
   jvmtiError err;
 
@@ -87,7 +87,7 @@ ClassLoad(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread, jclass klass) {
     return;
   }
 
-  err = jvmti_env->GetClassSignature(klass, &sig, &generic);
+  err = jvmti->GetClassSignature(klass, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     env->FatalError("failed to obtain a class signature\n");
   }
@@ -97,14 +97,14 @@ ClassLoad(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread, jclass klass) {
         "ClassLoad event received for the class \"%s\"\n"
         "\tsetting breakpoint ...\n",
         sig);
-    setBP(jvmti_env, env, klass);
+    setBP(jvmti, env, klass);
   }
 
   jvmti->RawMonitorExit(agent_lock);
 }
 
 void JNICALL
-VMStart(jvmtiEnv *jvmti_env, JNIEnv* jni_env) {
+VMStart(jvmtiEnv *jvmti, JNIEnv* jni_env) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_TRUE;
@@ -114,7 +114,7 @@ VMStart(jvmtiEnv *jvmti_env, JNIEnv* jni_env) {
 
 
 void JNICALL
-VMDeath(jvmtiEnv *jvmti_env, JNIEnv* jni_env) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv* jni_env) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_FALSE;
@@ -123,7 +123,7 @@ VMDeath(jvmtiEnv *jvmti_env, JNIEnv* jni_env) {
 }
 
 void JNICALL
-Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thr, jmethodID method,
+Breakpoint(jvmtiEnv *jvmti, JNIEnv *env, jthread thr, jmethodID method,
            jlocation loc) {
   jclass klass;
   char *sig, *generic;
@@ -137,12 +137,12 @@ Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thr, jmethodID method,
   }
 
   NSK_DISPLAY0("Breakpoint event received\n");
-  err = jvmti_env->GetMethodDeclaringClass(method, &klass);
+  err = jvmti->GetMethodDeclaringClass(method, &klass);
   if (err != JVMTI_ERROR_NONE) {
     NSK_COMPLAIN0("TEST FAILURE: unable to get method declaring class\n\n");
   }
 
-  err = jvmti_env->GetClassSignature(klass, &sig, &generic);
+  err = jvmti->GetClassSignature(klass, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     env->FatalError("Breakpoint: failed to obtain a class signature\n");
   }
@@ -151,7 +151,7 @@ Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thr, jmethodID method,
   if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
     NSK_DISPLAY1("method declaring class \"%s\"\n\tenabling SingleStep events ...\n",
                  sig);
-    err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thr);
+    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thr);
     if (err != JVMTI_ERROR_NONE) {
       result = STATUS_FAILED;
       NSK_COMPLAIN0("TEST FAILURE: cannot enable SingleStep events\n\n");
@@ -166,7 +166,7 @@ Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thr, jmethodID method,
 }
 
 void JNICALL
-SingleStep(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
+SingleStep(jvmtiEnv *jvmti, JNIEnv* jni_env, jthread thread,
            jmethodID method, jlocation location) {
   jvmtiError err;
   jclass klass;
@@ -179,21 +179,21 @@ SingleStep(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
 
   NSK_DISPLAY0(">>>> SingleStep event received\n");
 
-  err = jvmti_env->GetMethodName(method, &methNam, &methSig, NULL);
+  err = jvmti->GetMethodName(method, &methNam, &methSig, NULL);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to get method name during SingleStep callback\n\n");
     return;
   }
 
-  err = jvmti_env->GetMethodDeclaringClass(method, &klass);
+  err = jvmti->GetMethodDeclaringClass(method, &klass);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to get method declaring class during SingleStep callback\n\n");
     return;
   }
 
-  err = jvmti_env->GetClassSignature(klass, &sig, &generic);
+  err = jvmti->GetClassSignature(klass, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to obtain a class signature during SingleStep callback\n\n");
@@ -230,7 +230,7 @@ SingleStep(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
 
         if (i == (METH_NUM-1)) {
           NSK_DISPLAY0("Disabling the single step event generation\n");
-          err = jvmti_env->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
+          err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
           if (err != JVMTI_ERROR_NONE) {
             result = STATUS_FAILED;
             NSK_COMPLAIN0("TEST FAILED: cannot disable SingleStep events\n\n");
@@ -240,12 +240,12 @@ SingleStep(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
     }
   }
 
-  err = jvmti_env->Deallocate((unsigned char*) methNam);
+  err = jvmti->Deallocate((unsigned char*) methNam);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
   }
-  err = jvmti_env->Deallocate((unsigned char*) methSig);
+  err = jvmti->Deallocate((unsigned char*) methSig);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");

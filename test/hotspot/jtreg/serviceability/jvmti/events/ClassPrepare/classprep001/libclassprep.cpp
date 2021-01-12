@@ -88,7 +88,7 @@ void printStatus(jint status) {
   printf(" (0x%x)\n", status);
 }
 
-void JNICALL ClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *env,
+void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *env,
                           jthread thr, jclass cls) {
   jvmtiError err;
   writable_class_info inf;
@@ -98,34 +98,34 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *env,
   char *name, *sig, *generic;
   int i;
 
-  err = jvmti_env->GetClassSignature(cls, &inf.sig, &generic);
+  err = jvmti->GetClassSignature(cls, &inf.sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassSignature#%" PRIuPTR ") unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetClassStatus(cls, &inf.status);
+  err = jvmti->GetClassStatus(cls, &inf.status);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassStatus#%" PRIuPTR ") unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
   }
-  err = jvmti_env->GetClassMethods(cls, &inf.mcount, &methods);
+  err = jvmti->GetClassMethods(cls, &inf.mcount, &methods);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetClassFields(cls, &inf.fcount, &fields);
+  err = jvmti->GetClassFields(cls, &inf.fcount, &fields);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetImplementedInterfaces(cls,
+  err = jvmti->GetImplementedInterfaces(cls,
                                             &inf.icount, &interfaces);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetImplementedInterfaces#%" PRIuPTR ") unexpected error: %s (%d)\n",
@@ -145,7 +145,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *env,
       if (methods[i] == NULL) {
         printf(" null");
       } else {
-        err = jvmti_env->GetMethodName(methods[i],
+        err = jvmti->GetMethodName(methods[i],
                                        &name, &sig, &generic);
         if (err == JVMTI_ERROR_NONE) {
           printf(" \"%s%s\"", name, sig);
@@ -161,7 +161,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *env,
       if (fields[i] == NULL) {
         printf(" null");
       } else {
-        err = jvmti_env->GetFieldName(cls, fields[i],
+        err = jvmti->GetFieldName(cls, fields[i],
                                       &name, &sig, &generic);
         if (err == JVMTI_ERROR_NONE) {
           printf(" \"%s, %s\"", name, sig);
@@ -177,7 +177,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *env,
       if (interfaces[i] == NULL) {
         printf(" null");
       } else {
-        err = jvmti_env->GetClassSignature(
+        err = jvmti->GetClassSignature(
             interfaces[i], &sig, &generic);
         if (err == JVMTI_ERROR_NONE) {
           printf(" \"%s\"", sig);

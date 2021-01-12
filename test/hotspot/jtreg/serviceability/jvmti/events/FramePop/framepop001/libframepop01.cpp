@@ -52,11 +52,11 @@ static pop_info pops[] = {
     { "Lframepop001a;", "dummy", "()V", 3 },
 };
 
-void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *env,
+void JNICALL Breakpoint(jvmtiEnv *jvmti, JNIEnv *env,
                         jthread thr, jmethodID method, jlocation location) {
   jvmtiError err;
 
-  err = jvmti_env->NotifyFramePop(thr, 0);
+  err = jvmti->NotifyFramePop(thr, 0);
   if (err == JVMTI_ERROR_NONE) {
     eventsExpected++;
   } else {
@@ -65,7 +65,7 @@ void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *env,
     result = STATUS_FAILED;
   }
 
-  err = jvmti_env->NotifyFramePop(thr, 1);
+  err = jvmti->NotifyFramePop(thr, 1);
   if (err == JVMTI_ERROR_NONE) {
     eventsExpected++;
   } else {
@@ -75,7 +75,7 @@ void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *env,
   }
 }
 
-void JNICALL FramePop(jvmtiEnv *jvmti_env, JNIEnv *env,
+void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *env,
                       jthread thr, jmethodID method, jboolean wasPopedByException) {
   jvmtiError err;
   char *cls_sig, *name, *sig, *generic;
@@ -86,28 +86,28 @@ void JNICALL FramePop(jvmtiEnv *jvmti_env, JNIEnv *env,
   if (printdump == JNI_TRUE) {
     printf(">>> retrieving frame pop info ...\n");
   }
-  err = jvmti_env->GetMethodDeclaringClass(method, &cls);
+  err = jvmti->GetMethodDeclaringClass(method, &cls);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetClassSignature(cls, &cls_sig, &generic);
+  err = jvmti->GetClassSignature(cls, &cls_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassSignature) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetMethodName(method, &name, &sig, &generic);
+  err = jvmti->GetMethodName(method, &name, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetMethodName) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetFrameLocation(thr, 0, &mid, &loc);
+  err = jvmti->GetFrameLocation(thr, 0, &mid, &loc);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetFrameLocation) unexpected error: %s (%d)\n",
            TranslateError(err), err);

@@ -41,13 +41,13 @@ static jvmtiCapabilities caps;
 
 /** callback functions **/
 void JNICALL
-SingleStep(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
+SingleStep(jvmtiEnv *jvmti, JNIEnv* jni_env, jthread thread,
            jmethodID method, jlocation location) {
   jvmtiPhase phase;
   jvmtiError err;
 
 
-  err = jvmti_env->GetPhase(&phase);
+  err = jvmti->GetPhase(&phase);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to obtain phase of the VM execution during SingleStep callback\n\n");
@@ -63,7 +63,7 @@ SingleStep(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
 }
 
 void JNICALL
-VMDeath(jvmtiEnv *jvmti_env, JNIEnv *env) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv *env) {
   NSK_DISPLAY0("VMDeath event received\n");
 
   if (wrongStepEv != 0) {

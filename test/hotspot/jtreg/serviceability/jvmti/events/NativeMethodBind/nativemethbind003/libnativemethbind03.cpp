@@ -50,17 +50,17 @@ static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
 static jrawMonitorID countLock;
 
-static void lock(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
+static void lock(jvmtiEnv *jvmti, JNIEnv *jni_env) {
   jvmtiError err;
-  err = jvmti_env->RawMonitorEnter(countLock);
+  err = jvmti->RawMonitorEnter(countLock);
   if (err != JVMTI_ERROR_NONE) {
     jni_env->FatalError("failed to enter a raw monitor\n");
   }
 }
 
-static void unlock(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
+static void unlock(jvmtiEnv *jvmti, JNIEnv *jni_env) {
   jvmtiError err;
-  err = jvmti_env->RawMonitorExit(countLock);
+  err = jvmti->RawMonitorExit(countLock);
   if (err != JVMTI_ERROR_NONE) {
     jni_env->FatalError("failed to exit a raw monitor\n");
   }
@@ -68,34 +68,34 @@ static void unlock(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
 
 /** callback functions **/
 void JNICALL
-NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
+NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni_env, jthread thread,
                  jmethodID method, void *addr, void **new_addr) {
   jvmtiPhase phase;
   jvmtiError err;
   char *methNam, *methSig;
 
-  lock(jvmti_env, jni_env);
+  lock(jvmti, jni_env);
 
   NSK_DISPLAY0(">>>> NativeMethodBind event received\n");
 
-  err = jvmti_env->GetPhase(&phase);
+  err = jvmti->GetPhase(&phase);
   if (err != JVMTI_ERROR_NONE) {
     printf(">>>> Error getting phase\n");
     result = STATUS_FAILED;
-    unlock(jvmti_env, jni_env);
+    unlock(jvmti, jni_env);
     return;
   }
 
   if (phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_START) {
-    unlock(jvmti_env, jni_env);
+    unlock(jvmti, jni_env);
     return;
   }
 
-  err = jvmti_env->GetMethodName(method, &methNam, &methSig, NULL);
+  err = jvmti->GetMethodName(method, &methNam, &methSig, NULL);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
-    unlock(jvmti_env, jni_env);
+    unlock(jvmti, jni_env);
     return;
   }
 
@@ -107,7 +107,7 @@ NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
   }
 
   if (methNam != NULL) {
-    err = jvmti_env->Deallocate((unsigned char *) methNam);
+    err = jvmti->Deallocate((unsigned char *) methNam);
     if (err != JVMTI_ERROR_NONE) {
       result = STATUS_FAILED;
       printf("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
@@ -115,7 +115,7 @@ NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
   }
 
   if (methSig != NULL) {
-    err = jvmti_env->Deallocate((unsigned char *) methSig);
+    err = jvmti->Deallocate((unsigned char *) methSig);
     if (err != JVMTI_ERROR_NONE) {
       result = STATUS_FAILED;
       printf("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
@@ -124,11 +124,11 @@ NativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
 
   NSK_DISPLAY0("<<<<\n\n");
 
-  unlock(jvmti_env, jni_env);
+  unlock(jvmti, jni_env);
 }
 
 void JNICALL
-VMDeath(jvmtiEnv *jvmti_env, JNIEnv *env) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv *env) {
   NSK_DISPLAY0("VMDeath event received\n");
 
   if (bindEv[0] != bindEv[1]) {

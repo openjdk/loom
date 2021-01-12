@@ -53,7 +53,7 @@ static method_location_info expected_exits[] = {
     { "LMethodExitVThreadTest;", "method2", "()V", 0 }
 };
 
-void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
+void JNICALL MethodExit(jvmtiEnv *jvmti, JNIEnv *env,
                         jthread thr, jmethodID method,
                         jboolean was_poped_by_exc, jvalue return_value) {
   jvmtiError err;
@@ -63,14 +63,14 @@ void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
   jlocation loc;
   char buffer[32];
 
-  err = jvmti_env->GetMethodDeclaringClass(method, &cls);
+  err = jvmti->GetMethodDeclaringClass(method, &cls);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti_env->GetClassSignature(cls, &cls_sig, &generic);
+  err = jvmti->GetClassSignature(cls, &cls_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassSignature) unexpected error: %s (%d)\n",
            TranslateError(err), err);
@@ -81,7 +81,7 @@ void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
     if (printdump == JNI_TRUE) {
       printf(">>> retrieving method exit info ...\n");
     }
-    err = jvmti_env->GetMethodName(method,
+    err = jvmti->GetMethodName(method,
                                    &name, &sig, &generic);
     if (err != JVMTI_ERROR_NONE) {
       printf("(GetMethodName) unexpected error: %s (%d)\n",
@@ -89,7 +89,7 @@ void JNICALL MethodExit(jvmtiEnv *jvmti_env, JNIEnv *env,
       result = STATUS_FAILED;
       return;
     }
-    err = jvmti_env->GetFrameLocation(thr, 0, &mid, &loc);
+    err = jvmti->GetFrameLocation(thr, 0, &mid, &loc);
     if (err != JVMTI_ERROR_NONE) {
       printf("(GetFrameLocation) unexpected error: %s (%d)\n",
              TranslateError(err), err);

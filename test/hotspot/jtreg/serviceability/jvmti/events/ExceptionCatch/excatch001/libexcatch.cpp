@@ -65,7 +65,7 @@ static int eventsCount = 0;
 static int eventsExpected = 0;
 
 void JNICALL
-ExceptionCatch(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thr,
+ExceptionCatch(jvmtiEnv *jvmti, JNIEnv *env, jthread thr,
         jmethodID method, jlocation location, jobject exception) {
     jvmtiError err;
     jclass cls;
@@ -77,28 +77,28 @@ ExceptionCatch(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thr,
         printf(">>> retrieving ExceptionCatch info ...\n");
     }
     cls = env->GetObjectClass(exception);
-    err = jvmti_env->GetClassSignature(cls, &ex.name, &generic);
+    err = jvmti->GetClassSignature(cls, &ex.name, &generic);
     if (err != JVMTI_ERROR_NONE) {
         printf("(GetClassSignature#e) unexpected error: %s (%d)\n",
                TranslateError(err), err);
         result = STATUS_FAILED;
         return;
     }
-    err = jvmti_env->GetMethodDeclaringClass(method, &cls);
+    err = jvmti->GetMethodDeclaringClass(method, &cls);
     if (err != JVMTI_ERROR_NONE) {
         printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
                TranslateError(err), err);
         result = STATUS_FAILED;
         return;
     }
-    err = jvmti_env->GetClassSignature(cls, &ex.c_cls, &generic);
+    err = jvmti->GetClassSignature(cls, &ex.c_cls, &generic);
     if (err != JVMTI_ERROR_NONE) {
         printf("(GetClassSignature#c) unexpected error: %s (%d)\n",
                TranslateError(err), err);
         result = STATUS_FAILED;
         return;
     }
-    err = jvmti_env->GetMethodName(method,
+    err = jvmti->GetMethodName(method,
         &ex.c_name, &ex.c_sig, &generic);
     if (err != JVMTI_ERROR_NONE) {
         printf("(GetMethodName) unexpected error: %s (%d)\n",

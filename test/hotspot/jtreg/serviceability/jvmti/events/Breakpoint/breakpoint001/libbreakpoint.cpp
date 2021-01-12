@@ -61,7 +61,7 @@ static void initCounters() {
     bpEvents[i] = 0;
 }
 
-static void setBP(jvmtiEnv *jvmti_env, JNIEnv *env, jclass klass) {
+static void setBP(jvmtiEnv *jvmti, JNIEnv *env, jclass klass) {
   jmethodID mid;
   jvmtiError err;
   int i;
@@ -72,7 +72,7 @@ static void setBP(jvmtiEnv *jvmti_env, JNIEnv *env, jclass klass) {
       env->FatalError("failed to get ID for the java method\n");
     }
 
-    err = jvmti_env->SetBreakpoint(mid, 0);
+    err = jvmti->SetBreakpoint(mid, 0);
     if (err != JVMTI_ERROR_NONE) {
       env->FatalError("failed to set breakpoint\n");
     }
@@ -81,7 +81,7 @@ static void setBP(jvmtiEnv *jvmti_env, JNIEnv *env, jclass klass) {
 
 /** callback functions **/
 void JNICALL
-ClassLoad(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread, jclass klass) {
+ClassLoad(jvmtiEnv *jvmti, JNIEnv *env, jthread thread, jclass klass) {
   char *sig, *generic;
   jvmtiError err;
 
@@ -89,14 +89,14 @@ ClassLoad(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread, jclass klass) {
 
   if (callbacksEnabled) {
     // GetClassSignature may be called only during the start or the live phase
-    err = jvmti_env->GetClassSignature(klass, &sig, &generic);
+    err = jvmti->GetClassSignature(klass, &sig, &generic);
     if (err != JVMTI_ERROR_NONE) {
       env->FatalError("failed to obtain a class signature\n");
     }
 
     if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
       printf("ClassLoad event received for the class %s setting breakpoints ...\n", sig);
-      setBP(jvmti_env, env, klass);
+      setBP(jvmti, env, klass);
     }
   }
 
@@ -104,7 +104,7 @@ ClassLoad(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread, jclass klass) {
 }
 
 void JNICALL
-Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
+Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni_env, jthread thread,
            jmethodID method, jlocation location) {
   jclass klass;
   char *clsSig, *generic, *methNam, *methSig;
@@ -116,7 +116,7 @@ Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
   printf(">>>> Breakpoint event received\n");
 
 /* checking thread info */
-  err = jvmti_env->GetThreadInfo(thread, &thr_info);
+  err = jvmti->GetThreadInfo(thread, &thr_info);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILED: unable to get thread info during Breakpoint callback\n\n");
@@ -145,13 +145,13 @@ Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
            (long) location);
 
 /* checking method info */
-  err = jvmti_env->GetMethodDeclaringClass(method, &klass);
+  err = jvmti->GetMethodDeclaringClass(method, &klass);
   if (err != JVMTI_ERROR_NONE) {
     result = checkStatus = STATUS_FAILED;
     printf("TEST FAILED: unable to get method declaring class during Breakpoint callback\n\n");
     return;
   }
-  err = jvmti_env->GetClassSignature(klass, &clsSig, &generic);
+  err = jvmti->GetClassSignature(klass, &clsSig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     result = checkStatus = STATUS_FAILED;
     printf("TEST FAILED: unable to obtain a class signature during Breakpoint callback\n\n");
@@ -168,7 +168,7 @@ Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
     printf("CHECK PASSED: class signature: \"%s\"\n",
            clsSig);
 
-  err = jvmti_env->GetMethodName(method, &methNam, &methSig, NULL);
+  err = jvmti->GetMethodName(method, &methNam, &methSig, NULL);
   if (err != JVMTI_ERROR_NONE) {
     result = checkStatus = STATUS_FAILED;
     printf("TEST FAILED: unable to get method name during Breakpoint callback\n\n");
@@ -184,13 +184,13 @@ Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
         bpEvents[i]++;
       break;
     }
-  err = jvmti_env->Deallocate((unsigned char *) methNam);
+  err = jvmti->Deallocate((unsigned char *) methNam);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
   }
 
-  err = jvmti_env->Deallocate((unsigned char *) methSig);
+  err = jvmti->Deallocate((unsigned char *) methSig);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
@@ -200,7 +200,7 @@ Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
 }
 
 void JNICALL
-VMStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
+VMStart(jvmtiEnv *jvmti, JNIEnv *jni_env) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_TRUE;
@@ -209,7 +209,7 @@ VMStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
 }
 
 void JNICALL
-VMDeath(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv *jni_env) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_FALSE;
