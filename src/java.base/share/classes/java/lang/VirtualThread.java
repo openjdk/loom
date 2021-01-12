@@ -111,7 +111,7 @@ class VirtualThread extends Thread {
     /**
      * Creates a new {@code VirtualThread} to run the given task with the given
      * scheduler. If the given scheduler is {@code null} and the current thread
-     * is a kernel thread then the newly created virtual thread will use the
+     * is a platform thread then the newly created virtual thread will use the
      * default scheduler. If given scheduler is {@code null} and the current
      * thread is a virtual thread then the current thread's scheduler is used.
      *
@@ -241,7 +241,7 @@ class VirtualThread extends Thread {
      */
     @ChangesCurrentThread
     private void runContinuation() {
-        // the carrier thread should be a kernel thread
+        // the carrier thread should be a platform thread
         if (Thread.currentThread().isVirtual()) {
             throw new IllegalCallerException();
         }
