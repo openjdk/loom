@@ -133,6 +133,8 @@ final class ForEachOps {
             implements TerminalOp<T, Void>, TerminalSink<T, Void> {
         private final boolean ordered;
 
+        final Scoped.Snapshot snapshot = Scoped.snapshot();
+
         protected ForEachOp(boolean ordered) {
             this.ordered = ordered;
         }
@@ -180,6 +182,7 @@ final class ForEachOps {
 
             @Override
             public void accept(T t) {
+                // snapshot.runWithSnapshot(() -> consumer.accept(t));
                 consumer.accept(t);
             }
         }
@@ -202,6 +205,7 @@ final class ForEachOps {
             @Override
             public void accept(int t) {
                 consumer.accept(t);
+                // snapshot.runWithSnapshot(() -> consumer.accept(t));
             }
         }
 
@@ -223,6 +227,7 @@ final class ForEachOps {
             @Override
             public void accept(long t) {
                 consumer.accept(t);
+                // snapshot.runWithSnapshot(() -> consumer.accept(t));
             }
         }
 

@@ -33,7 +33,8 @@ import java.util.function.Supplier;
 
 /**
  * TBD
- * */
+ * @param <T> TBD
+ */
 public final class Scoped<T> {
 
     final @Stable Class<? super T> type;
@@ -41,16 +42,31 @@ public final class Scoped<T> {
 
     public final int hashCode() { return hash; }
 
-    static final class Binding<T> {
+    static abstract class AbstractBinding {
+        AbstractBinding(AbstractBinding prev) {
+            this.prev = prev;
+        }
+
+        abstract Object find(Scoped<?> key);
+
+        final AbstractBinding prev() {
+            return prev;
+        }
+
+        final AbstractBinding prev;
+
+        static final Object UNBOUND_SENTINEL = new Object();
+    }
+
+    static class Binding<T> extends AbstractBinding {
         final Scoped<T> key;
         final T value;
-        final Binding<?> prev;
 
-        Binding(Scoped<T> key, T value, Binding<?> prev) {
+        Binding(Scoped<T> key, T value, AbstractBinding prev) {
+            super(prev);
             key.type.cast(value);
             this.key = key;
             this.value = value;
-            this.prev = prev;
         }
 
         final T get() {
@@ -59,6 +75,23 @@ public final class Scoped<T> {
 
         final Scoped<T> getKey() {
             return key;
+        }
+
+        @SuppressWarnings("rawtypes")
+        Object find(Scoped<?> key) {
+            for (AbstractBinding b = this; b != null;) {
+                if (b instanceof Binding) {
+                    Binding<?> binding = (Binding<?>) b;
+                    if (binding.getKey() == key) {
+                        Object value = binding.get();
+                        return value;
+                    }
+                    b = binding.prev();
+                } else {
+                    return b.find(key);
+                }
+            }
+            return UNBOUND_SENTINEL;
         }
     }
 
@@ -86,13 +119,8 @@ public final class Scoped<T> {
      */
     @SuppressWarnings("unchecked")
     public boolean isBound() {
-        for (var b = Thread.currentThread().scopeLocalBindings;
-             b != null; b = b.prev) {
-            if (b.getKey() == this) {
-                return true;
-            }
-        }
-        return false;
+        var result = Thread.currentThread().scopeLocalBindings.find(this);
+        return (result != AbstractBinding.UNBOUND_SENTINEL);
     }
 
     /**
@@ -102,13 +130,9 @@ public final class Scoped<T> {
      */
     @SuppressWarnings("unchecked")
     T slowGet() {
-        for (var b = Thread.currentThread().scopeLocalBindings;
-             b != null; b = b.prev) {
-            if (b.getKey() == this) {
-                T value = (T)b.get();
-                Cache.put(this, value);
-                return value;
-            }
+        var result = Thread.currentThread().scopeLocalBindings.find(this);
+        if (result != AbstractBinding.UNBOUND_SENTINEL) {
+            return (T)result;
         }
         throw new RuntimeException("unbound");
     }
@@ -145,13 +169,14 @@ public final class Scoped<T> {
      * @param value   TBD
      */
     public void runWithBinding(T value, Runnable r) {
-        Binding<?> top = Thread.currentThread().scopeLocalBindings;
+        AbstractBinding top = Thread.currentThread().scopeLocalBindings;
+        Thread.setScopedCache(null);
         try {
             Thread.currentThread().scopeLocalBindings =
                     new Binding<T>(this, value, top);
             r.run();
         } finally {
-            assert(top == Thread.currentThread().scopeLocalBindings.prev);
+            // assert(top == Thread.currentThread().scopeLocalBindings.prev);
             Thread.currentThread().scopeLocalBindings = top;
             Cache.remove(this);
         }
@@ -168,7 +193,7 @@ public final class Scoped<T> {
      * @throws Exception TBD
      */
     public <X> X callWithBinding(T value, Callable<X> r) throws Exception {
-        Binding<?> top = Thread.currentThread().scopeLocalBindings;
+        AbstractBinding top = Thread.currentThread().scopeLocalBindings;
         try {
             Thread.currentThread().scopeLocalBindings =
                     new Binding<T>(this, value, top);
@@ -186,7 +211,7 @@ public final class Scoped<T> {
      * @return TBD
      */
     public <X> X getWithBinding(T value, Supplier<X> r) {
-        Binding<?> top = Thread.currentThread().scopeLocalBindings;
+        AbstractBinding top = Thread.currentThread().scopeLocalBindings;
         try {
             Thread.currentThread().scopeLocalBindings =
                     new Binding<T>(this, value, top);
@@ -290,5 +315,140 @@ public final class Scoped<T> {
         } while ((x & Cache.TABLE_MASK)
                 == ((x >>> Cache.INDEX_BITS) & Cache.TABLE_MASK));
         return (nextKey = x);
+    }
+
+    /**
+     * TBD
+     */
+     public static class Snapshot {
+        private AbstractBinding bindings;
+
+        /**
+         * TBD
+         * @return TBD
+         */
+        private Snapshot() {
+            bindings = Thread.currentThread().scopeLocalBindings;
+        }
+
+        /**
+         * TBD
+         * @param r TBD
+         */
+        @SuppressWarnings("rawtypes")
+        public void runWithSnapshot(Runnable r) {
+            var prev = Thread.currentThread().scopeLocalBindings;
+            var cache = Thread.scopedCache();
+            Thread.setScopedCache(null);
+            try {
+                Thread.currentThread().scopeLocalBindings = bindings;
+                r.run();
+            } finally {
+                Thread.currentThread().scopeLocalBindings = prev;
+                Thread.setScopedCache(cache);
+            }
+        }
+
+        /**
+         * @param r TBD
+         * @param <T> type
+         * @return T tbd
+         * @throws Exception TBD
+         */
+        public <T> T callWithSnapshot(Callable<T> r) throws Exception {
+            var prev = Thread.currentThread().scopeLocalBindings;
+            var cache = Thread.scopedCache();
+            Thread.setScopedCache(null);
+            try {
+                Thread.currentThread().scopeLocalBindings = bindings;
+                return r.call();
+            } finally {
+                Thread.currentThread().scopeLocalBindings = prev;
+                Thread.setScopedCache(cache);
+            }
+        }
+    }
+
+    /**
+     * TBD
+     * @return TBD
+     */
+    public static Snapshot snapshot() {
+        return new Snapshot();
+    }
+
+    /**
+     * TBD
+     */
+    public static final class FutureBindings<T> {
+        final Binding<?> top;
+
+        private FutureBindings() {
+            top = null;
+        }
+
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        private FutureBindings(Scoped<?> key, Object value, Binding<?> prev) {
+            top = new Binding(key, value, prev);
+        }
+
+        /**
+         * TBD
+         * @param key TBD
+         * @param value TBD
+         * @return TBD
+         */
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        public static final FutureBindings of(Scoped<?> key, Object value) {
+            return new FutureBindings(key, value, null);
+        }
+
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        private FutureBindings add(Scoped<?> key, Object value) {
+            return new FutureBindings(key, value, top);
+        }
+
+        /**
+         * @param r TBD
+         * @param <T> type
+         * @return T tbd
+         * @throws Exception TBD
+         */
+        public <T> T callWithBindings(Callable<T> r) throws Exception {
+            var prev = Thread.currentThread().scopeLocalBindings;
+            var cache = Thread.scopedCache();
+            Thread.setScopedCache(null);
+            try {
+                Thread.currentThread().scopeLocalBindings = new MultiBinding(top, prev);
+                return r.call();
+            } finally {
+                Thread.currentThread().scopeLocalBindings = prev;
+                Thread.setScopedCache(cache);
+            }
+        }
+    }
+
+    static final class MultiBinding extends AbstractBinding {
+        final Binding<?> head;
+
+        private MultiBinding(AbstractBinding prev) {
+            super(prev);
+            head = null;
+        }
+
+        MultiBinding(Binding<?> head, AbstractBinding prev) {
+            super(prev);
+            this.head = head;
+        }
+
+        Object find(Scoped<?> key) {
+            for (Binding<?> b = head; b != null; b = (Binding<?>)b.prev) {
+                if (b.getKey() == key) {
+                    Object value = b.get();
+                    return value;
+                }
+            }
+            return UNBOUND_SENTINEL;
+        }
     }
 }
