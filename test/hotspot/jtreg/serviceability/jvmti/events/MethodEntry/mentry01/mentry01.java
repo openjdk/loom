@@ -39,7 +39,7 @@ import java.io.PrintStream;
  *         location in the method being entered.
  * COMMENTS
  *     Ported from JVMDI.
- *     Fixed the 504632 bug.
+ *     Fixed the 5004632 bug.
  *
  * @library /test/lib
  * @run main/othervm/native -agentlib:mentry01 mentry01
