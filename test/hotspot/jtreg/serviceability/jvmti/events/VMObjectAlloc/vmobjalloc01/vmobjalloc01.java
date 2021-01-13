@@ -44,7 +44,7 @@ import jdk.test.lib.jvmti.DebugeeClass;
  *             be adjusted to new spec
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:vmobjalloc vmobjalloc01
+ * @run main/othervm/native -agentlib:vmobjalloc01 vmobjalloc01
  */
 
 public class vmobjalloc01 extends DebugeeClass {
