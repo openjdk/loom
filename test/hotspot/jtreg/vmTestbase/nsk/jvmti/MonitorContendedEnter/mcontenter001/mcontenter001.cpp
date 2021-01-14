@@ -46,7 +46,7 @@ static volatile int eventsCount = 0;
 void JNICALL
 MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv* jni, jthread thr, jobject obj) {
 
-    NSK_DISPLAY2("MonitorContendedEnter event:\n\tthread: %p, object: %p\n",
+    printf("MonitorContendedEnter event:\n\tthread: %p, object: %p\n",
         thr, obj);
 
     if (!NSK_VERIFY(thread != NULL)) {
