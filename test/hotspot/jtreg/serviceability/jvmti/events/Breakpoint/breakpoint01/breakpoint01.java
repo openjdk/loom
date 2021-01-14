@@ -71,16 +71,29 @@ public class breakpoint01 {
     native int check();
 
     public static void main(String[] argv) {
-       new breakpoint01().runThis();
+        int result = new breakpoint01().runThis();
+        if (result !=0 ) {
+            throw new RuntimeException("Check returned " + result);
+        }
     }
 
     private int runThis() {
+        Runnable virtualThreadTest = () -> {
+            Thread.currentThread().setName("breakpoint01Thr");
+            System.out.println("Reaching a breakpoint method ...");
+            bpMethodV();
+            System.out.println("The breakpoint method leaved ...");
+        };
+
+        Thread thread = Thread.startVirtualThread(virtualThreadTest);
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         Thread.currentThread().setName("breakpoint01Thr");
-
-        System.out.println("Reaching a breakpoint method ...");
         bpMethod();
-        System.out.println("The breakpoint method leaved ...");
-
         return check();
     }
 
@@ -95,6 +108,20 @@ public class breakpoint01 {
      * dummy method used only to reach breakpoint set in the agent
      */
     private int bpMethod2() {
+        return 0;
+    }
+
+    /**
+     * dummy method used only to reach breakpoint set in the agent
+     */
+    private void bpMethodV() {
+        int dummyVar = bpMethod2V();
+    }
+
+    /**
+     * dummy method used only to reach breakpoint set in the agent
+     */
+    private int bpMethod2V() {
         return 0;
     }
 }

@@ -79,6 +79,28 @@ static void check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
   }
 }
 
+/* JVMTI helper wrappers. Check errors and fail or return null if jvmti operation failed. */
+
+// Monitors often created in Agent_Initialize(..) where JNIEnv* jni doesn't exist.
+jrawMonitorID CreateRawMonitor(jvmtiEnv *jvmti, const char* name) {
+  jrawMonitorID lock;
+  jvmtiError err;
+  err = jvmti->CreateRawMonitor(name, &lock);
+  if (err != JVMTI_ERROR_NONE) {
+    return nullptr;
+  }
+  return lock;
+}
+
+void RawMonitorEnter(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
+  check_jvmti_status(jni, jvmti->RawMonitorEnter(lock), "Fatal Error in RawMonitorEnter.");
+}
+
+void RawMonitorExit(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
+  check_jvmti_status(jni, jvmti->RawMonitorExit(lock), "Fatal Error in RawMonitorEnter.");
+}
+
+/* Commonly used helper functions */
 const char* TranslateState(jint flags) {
     static char str[15 * 20];
 
