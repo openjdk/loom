@@ -528,8 +528,13 @@ void InstanceStackChunkKlass::print_chunk(oop chunk, bool verbose, outputStream*
     st->print_cr("------ chunk frames end: " INTPTR_FORMAT, p2i(end));
     for (StackChunkFrameStream fs(chunk); !fs.is_done(); fs.next()) {
       frame f = fs.to_frame();
-      st->print_cr("-- frame size: %d argsize: %d", f.frame_size(), f.compiled_frame_stack_argsize());
+      st->print_cr("-- frame sp: " INTPTR_FORMAT " size: %d argsize: %d", p2i(fs.sp()), f.frame_size(), f.compiled_frame_stack_argsize());
       f.print_on(st);
+      const ImmutableOopMap* oopmap = fs.oopmap();
+      if (oopmap != NULL) {
+        oopmap->print_on(st);
+        st->cr();
+      }
     }
     st->print_cr("------");
   } else {
