@@ -953,7 +953,7 @@ public class FileChannelImpl
 
         @Override
         public long address() {
-            return address;
+            return address + pagePosition;
         }
 
         @Override
