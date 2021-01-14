@@ -249,10 +249,12 @@ public class SharedSecrets {
     }
 
     public static JavaIOPrintWriterAccess getJavaIOPrintWriterAccess() {
-        if (javaIOPrintStreamAccess == null) {
+        var access = javaIOPrintWriterAccess;
+        if (access == null) {
             ensureClassInitialized(PrintWriter.class);
+            access = javaIOPrintWriterAccess;
         }
-        return javaIOPrintWriterAccess;
+        return access;
     }
 
     public static void setJavaIOCPrintStreamAccess(JavaIOPrintStreamAccess a) {
@@ -260,10 +262,12 @@ public class SharedSecrets {
     }
 
     public static JavaIOPrintStreamAccess getJavaIOPrintStreamAccess() {
-        if (javaIOPrintStreamAccess == null) {
+        var access = javaIOPrintStreamAccess;
+        if (access == null) {
             ensureClassInitialized(PrintStream.class);
+            access = javaIOPrintStreamAccess;
         }
-        return javaIOPrintStreamAccess;
+        return access;
     }
 
     public static void setJavaIOFileDescriptorAccess(JavaIOFileDescriptorAccess jiofda) {
