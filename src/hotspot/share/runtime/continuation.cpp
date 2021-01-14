@@ -1803,8 +1803,9 @@ private:
   void write_oop(T* p) {
     assert(_current < _limit, "");
     oop obj = NativeAccess<>::oop_load(p);
-    OopT* addr = _array->obj_at_address<OopT>(_current++); // depends on UseCompressedOops
-    NativeAccess<IS_DEST_UNINITIALIZED>::oop_store(addr, obj);
+    _array->obj_at_put(_current++, obj);
+    // OopT* addr = _array->obj_at_address<OopT>(_current++); // depends on UseCompressedOops
+    // NativeAccess<IS_DEST_UNINITIALIZED>::oop_store(addr, obj); // TODO RICKARD: Native doesn't work becase there doesn't seem to be a "finish" with bulk barriers
   }
 };
 
