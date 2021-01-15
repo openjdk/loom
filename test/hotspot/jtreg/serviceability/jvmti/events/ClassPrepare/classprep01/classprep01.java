@@ -46,8 +46,6 @@ import java.io.PrintStream;
 
 public class classprep01 {
 
-    final static int JCK_STATUS_BASE = 95;
-
     static {
         try {
             System.loadLibrary("classprep01");
@@ -62,16 +60,39 @@ public class classprep01 {
     native static void getReady();
     native static int check();
 
+    static volatile int result;
     public static void main(String args[]) {
+        testKernel();
+        testVirtual();
+    }
+    public static void testVirtual() {
+
+        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+            getReady();
+            new TestClassVirtual().run();
+            result = check();
+        });
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
+    }
+    public static void testKernel() {
         getReady();
         new TestClass().run();
-        int result = check();
+        result = check();
         if (result != 0) {
             throw new RuntimeException("check failed with result " + result);
         }
     }
 
-    static interface TestInterface {
+
+    interface TestInterface {
         int constant = Integer.parseInt("10");
         void run();
     }
@@ -86,4 +107,23 @@ public class classprep01 {
             count++;
         }
     }
+
+
+    interface TestInterfaceVirtual {
+        int constant = Integer.parseInt("10");
+        void run();
+    }
+
+    static class TestClassVirtual implements TestInterfaceVirtual {
+        static int i = 0;
+        int count = 0;
+        static {
+            i++;
+        }
+        public void run() {
+            count++;
+        }
+    }
+
+
 }

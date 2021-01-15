@@ -263,7 +263,6 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   initCounters();
 
-  /* add capability to generate compiled method events */
   memset(&caps, 0, sizeof(jvmtiCapabilities));
   caps.can_generate_breakpoint_events = 1;
   caps.can_support_virtual_threads = 1;
