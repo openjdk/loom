@@ -33,12 +33,18 @@ import java.util.function.Supplier;
 
 /**
  * TBD
+ *
  * @param <T> TBD
  */
 public final class Scoped<T> {
 
     final @Stable Class<? super T> type;
     final @Stable int hash;
+
+    // Is this scope-local value inheritable? We could handle this by
+    // making Scoped an abstract base class and scopeLocalBindings() a
+    // virtual method, but that seems a little excessive.
+    final @Stable boolean isInheritable;
 
     public final int hashCode() { return hash; }
 
@@ -130,7 +136,8 @@ public final class Scoped<T> {
         }
     }
 
-    private Scoped(Class<? super T> type) {
+    private Scoped(Class<? super T> type, boolean isInheritable) {
+        this.isInheritable = isInheritable;
         this.type = type;
         this.hash = generateKey();
     }
@@ -144,7 +151,35 @@ public final class Scoped<T> {
      * @return TBD
      */
     public static <U,T extends U> Scoped<T> forType(Class<U> type) {
-        return new Scoped<T>(type);
+        return new Scoped<T>(type, false);
+    }
+
+    /**
+     * TBD
+     *
+     * @param <T>   TBD
+     * @param <U>   TBD
+     * @param type TBD
+     * @return TBD
+     */
+    public static <U,T extends U> Scoped<T> inheritableForType(Class<U> type) {
+        return new Scoped<T>(type, true);
+    }
+
+    private final AbstractBinding scopeLocalBindings() {
+        Thread currentThread = Thread.currentThread();
+        return isInheritable
+                ? currentThread.inheritableScopeLocalBindings
+                : currentThread.noninheritableScopeLocalBindings;
+    }
+
+    private final void setScopeLocalBindings(AbstractBinding bindings) {
+        Thread currentThread = Thread.currentThread();
+        if (isInheritable) {
+            currentThread.inheritableScopeLocalBindings = bindings;
+        } else {
+            currentThread.noninheritableScopeLocalBindings = bindings;
+        }
     }
 
     /**
@@ -154,7 +189,7 @@ public final class Scoped<T> {
      */
     @SuppressWarnings("unchecked")
     public boolean isBound() {
-        var bindings = Thread.currentThread().scopeLocalBindings;
+        var bindings = scopeLocalBindings();
         if (bindings == null) {
             return false;
         }
@@ -168,7 +203,7 @@ public final class Scoped<T> {
      */
     @SuppressWarnings("unchecked")
     T slowGet() {
-        var bindings = Thread.currentThread().scopeLocalBindings;
+        var bindings = scopeLocalBindings();
         if (bindings == null) {
             throw new RuntimeException("unbound");
         }
@@ -212,15 +247,14 @@ public final class Scoped<T> {
      * @param value   TBD
      */
     public void runWithBinding(T value, Runnable r) {
-        AbstractBinding top = Thread.currentThread().scopeLocalBindings;
+        AbstractBinding top = scopeLocalBindings();
         Cache.update(this, value);
         try {
-            Thread.currentThread().scopeLocalBindings =
-                    new Binding<T>(this, value, top);
+            setScopeLocalBindings(new Binding<T>(this, value, top));
             r.run();
         } finally {
             // assert(top == Thread.currentThread().scopeLocalBindings.prev);
-            Thread.currentThread().scopeLocalBindings = top;
+            setScopeLocalBindings(top);
             Cache.remove(this);
         }
     }
@@ -236,14 +270,13 @@ public final class Scoped<T> {
      * @throws Exception TBD
      */
     public <X> X callWithBinding(T value, Callable<X> r) throws Exception {
-        AbstractBinding top = Thread.currentThread().scopeLocalBindings;
+        AbstractBinding top = scopeLocalBindings();
         Cache.update(this, value);
         try {
-            Thread.currentThread().scopeLocalBindings =
-                    new Binding<T>(this, value, top);
+            setScopeLocalBindings(new Binding<T>(this, value, top));
             return r.call();
         } finally {
-            Thread.currentThread().scopeLocalBindings = top;
+            setScopeLocalBindings(top);
             Cache.remove(this);
         }
     }
@@ -359,7 +392,7 @@ public final class Scoped<T> {
          * @return TBD
          */
         private Snapshot() {
-            bindings = Thread.currentThread().scopeLocalBindings;
+            bindings = Thread.currentThread().inheritableScopeLocalBindings;
         }
 
         /**
@@ -368,14 +401,14 @@ public final class Scoped<T> {
          */
         @SuppressWarnings("rawtypes")
         public void runWithSnapshot(Runnable r) {
-            var prev = Thread.currentThread().scopeLocalBindings;
+            var prev = Thread.currentThread().inheritableScopeLocalBindings;
             var cache = Thread.scopedCache();
             Cache.invalidate();
             try {
-                Thread.currentThread().scopeLocalBindings = bindings;
+                Thread.currentThread().inheritableScopeLocalBindings = bindings;
                 r.run();
             } finally {
-                Thread.currentThread().scopeLocalBindings = prev;
+                Thread.currentThread().inheritableScopeLocalBindings = prev;
                 Thread.setScopedCache(cache);
             }
         }
@@ -387,14 +420,14 @@ public final class Scoped<T> {
          * @throws Exception TBD
          */
         public <T> T callWithSnapshot(Callable<T> r) throws Exception {
-            var prev = Thread.currentThread().scopeLocalBindings;
+            var prev = Thread.currentThread().inheritableScopeLocalBindings;
             var cache = Thread.scopedCache();
             Cache.invalidate();
             try {
-                Thread.currentThread().scopeLocalBindings = bindings;
+                Thread.currentThread().inheritableScopeLocalBindings = bindings;
                 return r.call();
             } finally {
-                Thread.currentThread().scopeLocalBindings = prev;
+                Thread.currentThread().inheritableScopeLocalBindings = prev;
                 Thread.setScopedCache(cache);
             }
         }
@@ -408,62 +441,62 @@ public final class Scoped<T> {
         return new Snapshot();
     }
 
-    /**
-     * TBD
-     */
-    public static final class FutureBindings {
-        private final Binding<?> top;
+    // /**
+    //  * TBD
+    //  */
+    // public static final class FutureBindings {
+    //     private final Binding<?> top;
 
-        private FutureBindings() {
-            top = null;
-        }
+    //     private FutureBindings() {
+    //         top = null;
+    //     }
 
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        private FutureBindings(Scoped<?> key, Object value, Binding<?> prev) {
-            top = new Binding(key, value, prev);
-        }
+    //     @SuppressWarnings({"rawtypes", "unchecked"})
+    //     private FutureBindings(Scoped<?> key, Object value, Binding<?> prev) {
+    //         top = new Binding(key, value, prev);
+    //     }
 
-        /**
-         * TBD
-         * @param key TBD
-         * @param value TBD
-         * @param <T> TBD
-         * @return TBD
-         */
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        public static final <T> FutureBindings of(Scoped<T> key, T value) {
-            return new FutureBindings(key, value, null);
-        }
+    //     /**
+    //      * TBD
+    //      * @param key TBD
+    //      * @param value TBD
+    //      * @param <T> TBD
+    //      * @return TBD
+    //      */
+    //     @SuppressWarnings({"rawtypes", "unchecked"})
+    //     public static final <T> FutureBindings of(Scoped<T> key, T value) {
+    //         return new FutureBindings(key, value, null);
+    //     }
 
-        /**
-         *
-         * @param key TBD
-         * @param value TBD
-         * @param <T> TBD
-         * @return TBD
-         */
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        public <T> FutureBindings add(Scoped<T> key, T value) {
-            return new FutureBindings(key, value, top);
-        }
+    //     /**
+    //      *
+    //      * @param key TBD
+    //      * @param value TBD
+    //      * @param <T> TBD
+    //      * @return TBD
+    //      */
+    //     @SuppressWarnings({"rawtypes", "unchecked"})
+    //     public <T> FutureBindings add(Scoped<T> key, T value) {
+    //         return new FutureBindings(key, value, top);
+    //     }
 
-        /**
-         * @param r TBD
-         * @param <T> type
-         * @return T tbd
-         * @throws Exception TBD
-         */
-        public <T> T callWithBindings(Callable<T> r) throws Exception {
-            var prev = Thread.currentThread().scopeLocalBindings;
-            var cache = Thread.scopedCache();
-            Cache.invalidate();
-            try {
-                Thread.currentThread().scopeLocalBindings = new MultiBinding(top, prev);
-                return r.call();
-            } finally {
-                Thread.currentThread().scopeLocalBindings = prev;
-                Thread.setScopedCache(cache);
-            }
-        }
-    }
+    //     /**
+    //      * @param r TBD
+    //      * @param <T> type
+    //      * @return T tbd
+    //      * @throws Exception TBD
+    //      */
+    //     public <T> T callWithBindings(Callable<T> r) throws Exception {
+    //         var prev = Thread.currentThread().scopeLocalBindings;
+    //         var cache = Thread.scopedCache();
+    //         Cache.invalidate();
+    //         try {
+    //             Thread.currentThread().scopeLocalBindings = new MultiBinding(top, prev);
+    //             return r.call();
+    //         } finally {
+    //             Thread.currentThread().scopeLocalBindings = prev;
+    //             Thread.setScopedCache(cache);
+    //         }
+    //     }
+    // }
 }
