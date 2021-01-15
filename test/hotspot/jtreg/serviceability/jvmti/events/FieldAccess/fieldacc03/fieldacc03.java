@@ -59,20 +59,39 @@ public class fieldacc03 {
         }
     }
 
+    static volatile int result;
     native static void getReady();
     native static int check();
 
     public static void main(String args[]) {
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
+        testKernel();
+        testVirtual();
     }
+    public static void testVirtual() {
+        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+            getReady();
+            fieldacc03a t = new fieldacc03a();
+            t.run();
+            result = check();
+        });
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
-    public static int run(String args[], PrintStream out) {
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
+    }
+    public static void testKernel() {
         getReady();
         fieldacc03a t = new fieldacc03a();
         t.run();
-        return check();
+        result = check();
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
     }
 }
 

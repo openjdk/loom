@@ -63,7 +63,7 @@ static jvmtiEnv *jvmti;
 static jvmtiEventCallbacks callbacks;
 static jvmtiCapabilities caps;
 static jint result = PASSED;
-static jboolean printdump = JNI_FALSE;
+static volatile jboolean isVirtualExpected = JNI_FALSE;
 static int eventsExpected = 0;
 static int eventsCount = 0;
 static watch_info watches[] = {
@@ -183,9 +183,8 @@ void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *jni,
   size_t i;
 
   eventsCount++;
-  if (printdump == JNI_TRUE) {
-    printf(">>> retrieving modification watch info ...\n");
-  }
+  printf(">>> retrieving modification watch info ...\n");
+
   watch.fid = field;
   watch.loc = location;
   watch.val = new_value;
@@ -229,18 +228,18 @@ void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *jni,
     result = STATUS_FAILED;
     return;
   }
-  if (printdump == JNI_TRUE) {
-    printf(">>>      class: \"%s\"\n", watch.m_cls);
-    printf(">>>     method: \"%s%s\"\n", watch.m_name, watch.m_sig);
-    printf(">>>   location: 0x%x%08x\n",
-           (jint)(watch.loc >> 32), (jint)watch.loc);
-    printf(">>>  field cls: \"%s\"\n", watch.f_cls);
-    printf(">>>      field: \"%s:%s\"\n", watch.f_name, watch.f_sig);
-    printf(">>>     object: 0x%p\n", obj);
-    printf(">>>  new value: ");
-    printValue(watch.val, watch.f_sig);
-    printf("\n");
-  }
+
+  printf(">>>      class: \"%s\"\n", watch.m_cls);
+  printf(">>>     method: \"%s%s\"\n", watch.m_name, watch.m_sig);
+  printf(">>>   location: 0x%x%08x\n",
+         (jint)(watch.loc >> 32), (jint)watch.loc);
+  printf(">>>  field cls: \"%s\"\n", watch.f_cls);
+  printf(">>>      field: \"%s:%s\"\n", watch.f_name, watch.f_sig);
+  printf(">>>     object: 0x%p\n", obj);
+  printf(">>>  new value: ");
+  printValue(watch.val, watch.f_sig);
+  printf("\n");
+
   for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watch.fid == watches[i].fid) {
       if (watch.m_cls == NULL ||
@@ -299,6 +298,11 @@ void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *jni,
         printf("\n");
         result = STATUS_FAILED;
       }
+      jboolean isVirtual = jni->IsVirtualThread(thr);
+      if (isVirtualExpected != isVirtual) {
+        printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
+        result = STATUS_FAILED;
+      }
       return;
     }
   }
@@ -318,12 +322,9 @@ JNIEXPORT jint JNI_OnLoad_fieldmod01(JavaVM *jvm, char *options, void *reserved)
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiCapabilities caps;
   jvmtiError err;
   jint res;
-
-  if (options != NULL && strcmp(options, "printdump") == 0) {
-    printdump = JNI_TRUE;
-  }
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
@@ -331,12 +332,10 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->GetPotentialCapabilities(&caps);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    return JNI_ERR;
-  }
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_generate_field_modification_events = 1;
+  caps.can_support_virtual_threads = 1;
+
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
@@ -376,19 +375,25 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_fieldmod01_getReady(JNIEnv *jni, jclass klass,
-                                                      jobject obj1, jobject obj2, jobject arr1, jobject arr2) {
+Java_fieldmod01_getReady(JNIEnv *jni, jclass klass, jobject obj1, jobject obj2, jobject arr1, jobject arr2) {
   jvmtiError err;
   jclass cls;
   size_t i;
+  jthread thread;
 
-  if (!caps.can_generate_field_modification_events) {
+  err = jvmti->GetCurrentThread(&thread);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
+    result = STATUS_FAILED;
     return;
   }
 
-  if (printdump == JNI_TRUE) {
-    printf(">>> setting field modification watches ...\n");
-  }
+  eventsCount = 0;
+  eventsExpected = 0;
+  isVirtualExpected = jni->IsVirtualThread(thread);
+
+  printf(">>> setting field modification watches ...\n");
+
   cls = jni->FindClass("fieldmod01a");
   if (cls == NULL) {
     printf("Cannot find fieldmod01a class!\n");
@@ -441,17 +446,33 @@ Java_fieldmod01_getReady(JNIEnv *jni, jclass klass,
   watches[18].val.l = jni->NewGlobalRef(obj2);
   watches[19].val.l = jni->NewGlobalRef(arr2);
 
-  if (printdump == JNI_TRUE) {
-    printf(">>> ... done\n");
-  }
+  printf(">>> ... done\n");
+
 }
 
 JNIEXPORT jint JNICALL
-Java_fieldmod01_check(JNIEnv *jni, jclass cls) {
+Java_fieldmod01_check(JNIEnv *jni, jclass clz) {
   if (eventsCount != eventsExpected) {
     printf("Wrong number of field modification events: %d, expected: %d\n",
            eventsCount, eventsExpected);
     result = STATUS_FAILED;
+  }
+
+  jclass cls = jni->FindClass("fieldmod01a");
+  if (cls == NULL) {
+    printf("Cannot find fieldmod01a class!\n");
+    result = STATUS_FAILED;
+    return result;
+  }
+  for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
+    jvmtiError err = jvmti->ClearFieldModificationWatch(cls, watches[i].fid);
+    if (err == JVMTI_ERROR_NONE) {
+      eventsExpected++;
+    } else {
+      printf("(ClearFieldModificationWatch#%" PRIuPTR ") unexpected error: %s (%d)\n",
+             i, TranslateError(err), err);
+      result = STATUS_FAILED;
+    }
   }
   return result;
 }

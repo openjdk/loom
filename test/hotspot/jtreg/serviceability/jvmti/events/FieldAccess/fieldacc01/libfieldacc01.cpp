@@ -61,9 +61,9 @@ static jvmtiEnv *jvmti;
 static jvmtiEventCallbacks callbacks;
 static jvmtiCapabilities caps;
 static jint result = PASSED;
-static jboolean printdump = JNI_FALSE;
-static int eventsExpected = 0;
-static int eventsCount = 0;
+static volatile jboolean isVirtualExpected = JNI_FALSE;
+static volatile int eventsExpected = 0;
+static volatile int eventsCount = 0;
 static watch_info watches[] = {
     { NULL, "Lfieldacc01a;", "run", "()I", 2,
         "Lfieldacc01a;", "staticBoolean", "Z", JNI_TRUE },
@@ -118,9 +118,8 @@ void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
   size_t i;
 
   eventsCount++;
-  if (printdump == JNI_TRUE) {
-    printf(">>> retrieving access watch info ...\n");
-  }
+  printf(">>> retrieving access watch info ...\n");
+
   watch.fid = field;
   watch.loc = location;
   watch.is_static = (obj == NULL) ? JNI_TRUE : JNI_FALSE;
@@ -131,48 +130,43 @@ void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti->GetClassSignature(cls,
-                                     &watch.m_cls, &generic);
+  err = jvmti->GetClassSignature(cls, &watch.m_cls, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassSignature) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti->GetMethodName(method,
-                                 &watch.m_name, &watch.m_sig, &generic);
+  err = jvmti->GetMethodName(method, &watch.m_name, &watch.m_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetMethodName) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti->GetClassSignature(field_klass,
-                                     &watch.f_cls, &generic);
+  err = jvmti->GetClassSignature(field_klass, &watch.f_cls, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetClassSignature) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti->GetFieldName(field_klass, field,
-                                &watch.f_name, &watch.f_sig, &generic);
+  err = jvmti->GetFieldName(field_klass, field, &watch.f_name, &watch.f_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetFieldName) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  if (printdump == JNI_TRUE) {
-    printf(">>>      class: \"%s\"\n", watch.m_cls);
-    printf(">>>     method: \"%s%s\"\n", watch.m_name, watch.m_sig);
-    printf(">>>   location: 0x%x%08x\n",
-           (jint)(watch.loc >> 32), (jint)watch.loc);
-    printf(">>>  field cls: \"%s\"\n", watch.f_cls);
-    printf(">>>      field: \"%s:%s\"\n", watch.f_name, watch.f_sig);
-    printf(">>>     object: 0x%p\n", obj);
-    printf(">>> ... done\n");
-  }
+  printf(">>>      class: \"%s\"\n", watch.m_cls);
+  printf(">>>     method: \"%s%s\"\n", watch.m_name, watch.m_sig);
+  printf(">>>   location: 0x%x%08x\n",
+         (jint)(watch.loc >> 32), (jint)watch.loc);
+  printf(">>>  field cls: \"%s\"\n", watch.f_cls);
+  printf(">>>      field: \"%s:%s\"\n", watch.f_name, watch.f_sig);
+  printf(">>>     object: 0x%p\n", obj);
+  printf(">>> ... done\n");
+
   for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watch.fid == watches[i].fid) {
       if (watch.m_cls == NULL ||
@@ -223,6 +217,11 @@ void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
                (watches[i].is_static == JNI_TRUE) ? "static" : "instance");
         result = STATUS_FAILED;
       }
+      jboolean isVirtual = jni->IsVirtualThread(thr);
+      if (isVirtualExpected != isVirtual) {
+        printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
+        result = STATUS_FAILED;
+      }
       return;
     }
   }
@@ -242,12 +241,9 @@ JNIEXPORT jint JNI_OnLoad_fieldacc01(JavaVM *jvm, char *options, void *reserved)
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiCapabilities caps;
   jvmtiError err;
   jint res;
-
-  if (options != NULL && strcmp(options, "printdump") == 0) {
-    printdump = JNI_TRUE;
-  }
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
@@ -255,12 +251,9 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->GetPotentialCapabilities(&caps);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    return JNI_ERR;
-  }
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_generate_field_access_events = 1;
+  caps.can_support_virtual_threads = 1;
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
@@ -305,20 +298,27 @@ Java_fieldacc01_getReady(JNIEnv *jni, jclass klass) {
   jvmtiError err;
   jclass cls;
   size_t i;
+  jthread thread;
 
-  if (!caps.can_generate_field_access_events) {
-    return;
-  }
+  printf(">>> setting field access watches ...\n");
 
-  if (printdump == JNI_TRUE) {
-    printf(">>> setting field access watches ...\n");
-  }
   cls = jni->FindClass("fieldacc01a");
   if (cls == NULL) {
     printf("Cannot find fieldacc01a class!\n");
     result = STATUS_FAILED;
     return;
   }
+  err = jvmti->GetCurrentThread(&thread);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
+    result = STATUS_FAILED;
+    return;
+  }
+
+  eventsCount = 0;
+  eventsExpected = 0;
+  isVirtualExpected = jni->IsVirtualThread(thread);
+
   for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watches[i].is_static == JNI_TRUE) {
       watches[i].fid = jni->GetStaticFieldID(
@@ -341,17 +341,38 @@ Java_fieldacc01_getReady(JNIEnv *jni, jclass klass) {
       result = STATUS_FAILED;
     }
   }
-  if (printdump == JNI_TRUE) {
-    printf(">>> ... done\n");
-  }
+
+  printf(">>> ... done\n");
 }
 
 JNIEXPORT jint JNICALL
-Java_fieldacc01_check(JNIEnv *jni, jclass cls) {
+Java_fieldacc01_check(JNIEnv *jni, jclass klass) {
+  jvmtiError err;
+  size_t i;
+  jclass cls;
+
   if (eventsCount != eventsExpected) {
     printf("Wrong number of field access events: %d, expected: %d\n",
            eventsCount, eventsExpected);
     result = STATUS_FAILED;
+  }
+
+  cls = jni->FindClass("fieldacc01a");
+  if (cls == NULL) {
+    printf("Cannot find fieldacc01a class!\n");
+    result = STATUS_FAILED;
+    return result;
+  }
+
+  for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
+    err = jvmti->ClearFieldAccessWatch(cls, watches[i].fid);
+    if (err == JVMTI_ERROR_NONE) {
+      eventsExpected++;
+    } else {
+      printf("(ClearFieldAccessWatch#%" PRIuPTR ") unexpected error: %s (%d)\n",
+             i, TranslateError(err), err);
+      result = STATUS_FAILED;
+    }
   }
   return result;
 }

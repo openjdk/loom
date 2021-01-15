@@ -56,15 +56,36 @@ public class fieldmod02 {
         }
     }
 
+    static volatile int result;
     native static void getReady();
     native static int check(Object obj);
 
     public static void main(String args[]) {
+        testKernel();
+        testVirtual();
+    }
+    public static void testVirtual() {
+        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+            fieldmod02a t = new fieldmod02a();
+            getReady();
+            result = check(t);
+        });
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
+    }
+    public static void testKernel() {
         fieldmod02a t = new fieldmod02a();
         getReady();
-        int res = check(t);
-        if (res != 0) {
-            throw new RuntimeException("Check() returned " + res);
+        result = check(t);
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
         }
     }
 }

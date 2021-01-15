@@ -21,9 +21,6 @@
  * questions.
  */
 
-import java.io.PrintStream;
-
-
 /*
  * @test
  *
@@ -60,16 +57,39 @@ public class fieldacc01 {
         }
     }
 
+    static volatile int result;
     native static void getReady();
     native static int check();
 
     public static void main(String args[]) {
+        testKernel();
+        testVirtual();
+    }
+    public static void testVirtual() {
+
+        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+            getReady();
+            fieldacc01a t = new fieldacc01a();
+            t.run();
+            result = check();
+        });
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
+    }
+    public static void testKernel() {
         getReady();
         fieldacc01a t = new fieldacc01a();
         t.run();
-        int res = check();
-        if (res != 0) {
-            throw new RuntimeException("Check() returned " + res);
+        result = check();
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
         }
     }
 }
