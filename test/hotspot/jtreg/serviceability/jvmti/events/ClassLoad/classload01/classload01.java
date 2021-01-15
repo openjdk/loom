@@ -72,10 +72,27 @@ public class classload01 {
     native int check();
 
     public static void main(String args[]) {
+        Runnable virtualThreadTest = () -> {
+            System.out.println("Loading class inside of virtual thread ...");
+            loadClass();
+            System.out.println("Loading class inside of virtual thread ...");
+        };
+
+        Thread thread = Thread.startVirtualThread(virtualThreadTest);
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         int result = new classload01().check();
-        if (result !=0 ) {
+        if (result != 0) {
             throw new RuntimeException("Check returned " + result);
         }
+    }
+
+    static void loadClass() {
+        Object obj = new TestedClassVirtual();
     }
 
     // classes & arrays used to verify an assertion in the agent
@@ -109,4 +126,10 @@ public class classload01 {
     TestedClass testedCls[] = {new TestedClass()};
 
     class TestedClass {}
+}
+
+class TestedClassVirtual {
+    TestedClassVirtual() {
+        System.out.println(this.getClass().getName() + " loading in virtual thread.");
+    }
 }

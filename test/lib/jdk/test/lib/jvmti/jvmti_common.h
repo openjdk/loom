@@ -100,6 +100,12 @@ void RawMonitorExit(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
   check_jvmti_status(jni, jvmti->RawMonitorExit(lock), "Fatal Error in RawMonitorEnter.");
 }
 
+void print_thread_info(JNIEnv* jni, jvmtiEnv *jvmti, jthread thread_obj) {
+  jvmtiThreadInfo thread_info;
+  check_jvmti_status(jni, jvmti->GetThreadInfo(thread_obj, &thread_info), "Error in GetThreadInfo");
+  printf("Thread: %p, name: %s \n", thread_obj, thread_info.name);
+}
+
 /* Commonly used helper functions */
 const char* TranslateState(jint flags) {
     static char str[15 * 20];

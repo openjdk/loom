@@ -22,11 +22,12 @@
  */
 
 #include <stdio.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <jvmti.h>
+
+#include "jvmti_common.h"
 
 extern "C" {
 
@@ -36,9 +37,16 @@ extern "C" {
 /* classes which must have the class load event */
 static const char *expSigs[] = {
     "Lclassload01;",
-    "Lclassload01$TestedClass;"
+    "Lclassload01$TestedClass;",
+    "LTestedClassVirtual;",
 };
 #define EXP_SIG_NUM (sizeof(expSigs)/sizeof(char*))
+
+static const jboolean expThreadIsVirtual[] = {
+    JNI_FALSE,
+    JNI_FALSE,
+    JNI_TRUE
+};
 
 /* classes which must not have the class load event */
 static const char *unexpSigs[] = {
@@ -74,34 +82,25 @@ static jrawMonitorID countLock;
 static void initCounters() {
   size_t i;
 
-  for (i=0; i<EXP_SIG_NUM; i++)
+  for (i = 0; i < EXP_SIG_NUM; i++) {
     clsEvents[i] = 0;
+  }
 
-  for (i=0; i<UNEXP_SIG_NUM; i++)
+  for (i = 0; i < UNEXP_SIG_NUM; i++) {
     primClsEvents[i] = 0;
+  }
 }
 
 static int findSig(char *sig, int expected) {
   unsigned int i;
 
-  for (i=0; i<((expected == 1) ? EXP_SIG_NUM : UNEXP_SIG_NUM); i++)
+  for (i = 0; i < ((expected == 1) ? EXP_SIG_NUM : UNEXP_SIG_NUM); i++) {
     if (sig != NULL &&
-        strcmp(((expected == 1) ? expSigs[i] : unexpSigs[i]), sig) == 0)
+        strcmp(((expected == 1) ? expSigs[i] : unexpSigs[i]), sig) == 0) {
       return i; /* the signature found, return index */
-
+    }
+  }
   return -1; /* the signature not found */
-}
-
-static void lock(jvmtiEnv *jvmti, JNIEnv *jni) {
-  if (jvmti->RawMonitorEnter(countLock) != JVMTI_ERROR_NONE) {
-    jni->FatalError("failed to enter a raw monitor\n");
-  }
-}
-
-static void unlock(jvmtiEnv *jvmti, JNIEnv *jni) {
-  if (jvmti->RawMonitorExit(countLock) != JVMTI_ERROR_NONE) {
-    jni->FatalError("failed to exit a raw monitor\n");
-  }
 }
 
 /** callback functions **/
@@ -111,23 +110,28 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
   char *sig, *generic;
   jvmtiError err;
 
-  lock(jvmti, jni);
+  RawMonitorEnter(jni, jvmti, countLock);
 
   err = jvmti->GetClassSignature(klass, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILURE: unable to obtain a class signature. Error %d\n", err);
-    unlock(jvmti, jni);
+    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
   i = findSig(sig, 1);
   if (i != -1) {
-    clsEvents[i]++;
-    printf("CHECK PASSED: ClassLoad event received for the class \"%s\" as expected\n",
-                 sig);
-  }
-  else {
+    jboolean is_virtual_thread = jni->IsVirtualThread(thread);
+    print_thread_info(jni, jvmti, thread);
+    if (is_virtual_thread != expThreadIsVirtual[i]) {
+      printf("TEST FAILED: IsVirtualThread(thread) is not expected: %d\n", is_virtual_thread);
+      result = STATUS_FAILED;
+    } else {
+      clsEvents[i]++;
+      printf("CHECK PASSED: ClassLoad event received for the class \"%s\" as expected\n", sig);
+    }
+  } else {
     i = findSig(sig, 0);
     if (i != -1) {
       result = STATUS_FAILED;
@@ -139,26 +143,27 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
     }
   }
 
-  unlock(jvmti, jni);
+  RawMonitorExit(jni, jvmti, countLock);
 }
 /************************/
 
 JNIEXPORT jint JNICALL
-Java_classload01_check(
-    JNIEnv *jni, jobject obj) {
+Java_classload01_check(JNIEnv *jni, jobject obj) {
   size_t i;
 
-  for (i=0; i<EXP_SIG_NUM; i++)
+  for (i = 0; i < EXP_SIG_NUM; i++) {
     if (clsEvents[i] != 1) {
       result = STATUS_FAILED;
       printf("TEST FAILED: wrong number of JVMTI_EVENT_CLASS_LOAD events for \"%s\":\n\tgot: %d\texpected: 1\n",
-                    expSigs[i], clsEvents[i]);
+             expSigs[i], clsEvents[i]);
     }
+  }
 
-  for (i=0; i<UNEXP_SIG_NUM; i++)
-    if (primClsEvents[i] != 0)
+  for (i = 0; i < UNEXP_SIG_NUM; i++) {
+    if (primClsEvents[i] != 0) {
       printf("TEST FAILED: there are JVMTI_EVENT_CLASS_LOAD events for the primitive classes\n");
-
+    }
+  }
   return result;
 }
 
@@ -174,20 +179,40 @@ JNIEXPORT jint JNI_OnLoad_classload01(JavaVM *jvm, char *options, void *reserved
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiCapabilities caps;
   jvmtiError err;
   jint res;
 
-  /* create JVMTI environment */
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
     printf("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
+  /* add capability to generate compiled method events */
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_support_virtual_threads = 1;
+
+  err = jvmti->AddCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    return JNI_ERR;
+  }
+
+  err = jvmti->GetCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    return JNI_ERR;
+  }
+
+  if (!caps.can_support_virtual_threads) {
+    printf("ERROR: virtual thread support is not implemented.\n");
+    return JNI_ERR;
+  }
+
+
   initCounters();
 
-  err = jvmti->CreateRawMonitor("_counter_lock", &countLock);
-  if (err != JVMTI_ERROR_NONE) {
+  countLock = CreateRawMonitor(jvmti, "_counter_lock");
+  if (countLock == nullptr) {
     printf("Error in CreateRawMonitor %d/n", err);
     return JNI_ERR;
   }
