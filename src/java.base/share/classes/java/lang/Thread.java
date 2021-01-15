@@ -582,6 +582,8 @@ public class Thread implements Runnable {
             }
         }
 
+        this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+
         int priority;
         boolean daemon;
         if (primordial) {
@@ -624,6 +626,8 @@ public class Thread implements Runnable {
                 this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
             }
         }
+
+        this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
 
         // no additional fields
         this.holder = null;
@@ -1776,6 +1780,8 @@ public class Thread implements Runnable {
             inheritedAccessControlContext = null;
             nioBlocker = null;
             uncaughtExceptionHandler = null;
+            setScopedCache(null);
+            inheritableScopeLocalBindings = noninheritableScopeLocalBindings = null;
         }
     }
 

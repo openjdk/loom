@@ -338,7 +338,6 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
         final ThreadExecutor executor;
         final Callable<T> task;
         final Thread thread;
-        private final Scoped.Snapshot snapshot = Scoped.snapshot();
 
         ThreadBoundFuture(ThreadExecutor executor, Callable<T> task) {
             this.executor = executor;
@@ -358,8 +357,7 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
                 throw new IllegalCallerException();
             }
             try {
-                T result = snapshot.callWithSnapshot(task);
-                // T result = task.call();
+                T result = task.call();
                 complete(result);
             } catch (Throwable e) {
                 completeExceptionally(e);

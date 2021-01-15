@@ -29,7 +29,6 @@ import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
 
 import java.util.concurrent.Callable;
-import java.util.function.Supplier;
 
 /**
  * TBD
@@ -61,7 +60,7 @@ public final class Scoped<T> {
 
         final AbstractBinding prev;
 
-        static final Object UNBOUND_SENTINEL = new Object();
+        static final Object NIL = new Object();
 
         @SuppressWarnings("rawtypes")
         final Object findLoop(Scoped<?> key) {
@@ -74,12 +73,12 @@ public final class Scoped<T> {
                     }
                 } else {
                     Object value;
-                    if ((value = b.find(key)) != UNBOUND_SENTINEL) {
+                    if ((value = b.find(key)) != NIL) {
                         return value;
                     }
                 }
             }
-            return UNBOUND_SENTINEL;
+            return NIL;
         }
     }
 
@@ -107,7 +106,7 @@ public final class Scoped<T> {
             if (getKey() == key) {
                 return value;
             } else {
-                return UNBOUND_SENTINEL;
+                return NIL;
             }
         }
     }
@@ -132,7 +131,7 @@ public final class Scoped<T> {
                     return value;
                 }
             }
-            return UNBOUND_SENTINEL;
+            return NIL;
         }
     }
 
@@ -193,7 +192,7 @@ public final class Scoped<T> {
         if (bindings == null) {
             return false;
         }
-        return (bindings.findLoop(this) != AbstractBinding.UNBOUND_SENTINEL);
+        return (bindings.findLoop(this) != AbstractBinding.NIL);
     }
 
     /**
@@ -208,7 +207,7 @@ public final class Scoped<T> {
             throw new RuntimeException("unbound");
         }
         var result = bindings.findLoop(this);
-        if (result != AbstractBinding.UNBOUND_SENTINEL) {
+        if (result != AbstractBinding.NIL) {
             Cache.put(this, result);
             return (T)result;
         }
@@ -385,7 +384,7 @@ public final class Scoped<T> {
      * TBD
      */
      public static class Snapshot {
-        private AbstractBinding bindings;
+        private final AbstractBinding bindings;
 
         /**
          * TBD
