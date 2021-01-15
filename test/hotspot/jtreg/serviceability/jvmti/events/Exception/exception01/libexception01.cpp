@@ -56,11 +56,9 @@ typedef struct {
   jlocation c_loc;
 } exceptionInfo;
 
-static jvmtiEnv *jvmti = NULL;
-static jvmtiCapabilities caps;
+static jvmtiEnv *jvmti_env = NULL;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
-static jboolean printdump = JNI_TRUE;
 static exceptionInfo exs[] = {
     { "Lexception01c;",
         "Lexception01b;", "meth1", "()V", 7,
@@ -72,6 +70,7 @@ static exceptionInfo exs[] = {
         "Lexception01b;", "meth3", "(I)I", 10,
         "Lexception01a;", "run", "()V", 34 }
 };
+static jboolean isVirtualExpected = JNI_FALSE;
 static int eventsCount = 0;
 static int eventsExpected = 0;
 
@@ -85,9 +84,8 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
   char *generic;
   size_t i;
 
-  if (printdump == JNI_TRUE) {
-    printf(">>> retrieving Exception info ...\n");
-  }
+  printf(">>> retrieving Exception info ...\n");
+
   cls = jni->GetObjectClass(exception);
   err = jvmti->GetClassSignature(cls, &ex.name, &generic);
   if (err != JVMTI_ERROR_NONE) {
@@ -110,8 +108,7 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti->GetMethodName(method,
-                                 &ex.t_name, &ex.t_sig, &generic);
+  err = jvmti->GetMethodName(method, &ex.t_name, &ex.t_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetMethodName#t) unexpected error: %s (%d)\n",
            TranslateError(err), err);
@@ -142,16 +139,16 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
     return;
   }
   ex.c_loc = catch_location;
-  if (printdump == JNI_TRUE) {
-    printf(">>> %s\n", ex.name);
-    printf(">>>   thrown at %s.%s%s:0x%x%08x\n",
-           ex.t_cls, ex.t_name, ex.t_sig,
-           (jint)(ex.t_loc >> 32), (jint)ex.t_loc);
-    printf(">>>    catch at %s.%s%s:0x%x%08x\n",
-           ex.c_cls, ex.c_name, ex.c_sig,
-           (jint)(ex.c_loc >> 32), (jint)ex.c_loc);
-    printf(">>> ... done\n");
-  }
+  printf(">>> %s\n", ex.name);
+  printf(">>>   thrown at %s.%s%s:0x%x%08x\n",
+         ex.t_cls, ex.t_name, ex.t_sig,
+         (jint)(ex.t_loc >> 32), (jint)ex.t_loc);
+  printf(">>>    catch at %s.%s%s:0x%x%08x\n",
+         ex.c_cls, ex.c_name, ex.c_sig,
+         (jint)(ex.c_loc >> 32), (jint)ex.c_loc);
+  printf(">>> ... done\n");
+
+
   for (i = 0; i < sizeof(exs)/sizeof(exceptionInfo); i++) {
     if (ex.name != NULL && strcmp(ex.name, exs[i].name) == 0
         && ex.t_cls != NULL && strcmp(ex.t_cls, exs[i].t_cls) == 0
@@ -161,7 +158,13 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
         && ex.c_name != NULL && strcmp(ex.c_name, exs[i].c_name) == 0
         && ex.c_sig != NULL && strcmp(ex.c_sig, exs[i].c_sig) == 0
         && ex.t_loc == exs[i].t_loc && ex.c_loc == exs[i].c_loc) {
-      eventsCount++;
+      jboolean isVirtual = jni->IsVirtualThread(thr);
+      if (isVirtualExpected != isVirtual) {
+        printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
+        result = STATUS_FAILED;
+      } else {
+        eventsCount++;
+      }
       break;
     }
   }
@@ -192,32 +195,26 @@ JNIEXPORT jint JNI_OnLoad_exception01(JavaVM *jvm, char *options, void *reserved
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
   jint res;
+  jvmtiCapabilities caps;
 
-  if (options != NULL && strcmp(options, "printdump") == 0) {
-    printdump = JNI_TRUE;
-  }
-
-  res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
-  if (res != JNI_OK || jvmti == NULL) {
+  res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti_env == NULL) {
     printf("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
-  err = jvmti->GetPotentialCapabilities(&caps);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    return JNI_ERR;
-  }
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_generate_exception_events = 1;
+  caps.can_support_virtual_threads = 1;
 
-  err = jvmti->AddCapabilities(&caps);
+  err = jvmti_env->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("(AddCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
-  err = jvmti->GetCapabilities(&caps);
+  err = jvmti_env->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("(GetCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
@@ -226,7 +223,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   if (caps.can_generate_exception_events) {
     callbacks.Exception = &Exception;
-    err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
+    err = jvmti_env->SetEventCallbacks(&callbacks, sizeof(callbacks));
     if (err != JVMTI_ERROR_NONE) {
       printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
              TranslateError(err), err);
@@ -246,13 +243,9 @@ Java_exception01_check(JNIEnv *jni, jclass cls) {
   jclass clz;
   jmethodID mid;
 
-  if (jvmti == NULL) {
+  if (jvmti_env == NULL) {
     printf("JVMTI client was not properly loaded!\n");
     return STATUS_FAILED;
-  }
-
-  if (!caps.can_generate_exception_events) {
-    return result;
   }
 
   clz = jni->FindClass("exception01c");
@@ -276,15 +269,15 @@ Java_exception01_check(JNIEnv *jni, jclass cls) {
     return STATUS_FAILED;
   }
 
-  err = jvmti->GetCurrentThread(&thread);
+  err = jvmti_env->GetCurrentThread(&thread);
   if (err != JVMTI_ERROR_NONE) {
     printf("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return STATUS_FAILED;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                        JVMTI_EVENT_EXCEPTION, thread);
+  err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE,
+                                            JVMTI_EVENT_EXCEPTION, thread);
   if (err == JVMTI_ERROR_NONE) {
     eventsExpected = sizeof(exs)/sizeof(exceptionInfo);
   } else {
@@ -293,10 +286,13 @@ Java_exception01_check(JNIEnv *jni, jclass cls) {
     result = STATUS_FAILED;
   }
 
+  eventsCount = 0;
+  isVirtualExpected = jni->IsVirtualThread(thread);
+
   jni->CallStaticVoidMethod(clz, mid);
 
-  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
-                                        JVMTI_EVENT_EXCEPTION, thread);
+  err = jvmti_env->SetEventNotificationMode(JVMTI_DISABLE,
+                                            JVMTI_EVENT_EXCEPTION, thread);
   if (err != JVMTI_ERROR_NONE) {
     printf("Failed to disable JVMTI_EVENT_EXCEPTION: %s (%d)\n",
            TranslateError(err), err);

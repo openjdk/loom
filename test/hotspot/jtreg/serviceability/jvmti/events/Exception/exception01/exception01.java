@@ -34,7 +34,7 @@ import java.io.PrintStream;
  *     The test checks if the parameters of the function contain
  *     the expected values for the following exceptions thrown by Java methods:
  *       - custom class exception01c extending Throwable
- *       - ArithmeticException caused by division with zero devisor
+ *       - ArithmeticException caused by division with zero divisor
  *       - IndexOutOfBoundsException caused by using out of range array index
  * COMMENTS
  *     Ported from JVMDI.
@@ -48,8 +48,6 @@ import java.io.PrintStream;
 
 public class exception01 {
 
-    final static int JCK_STATUS_BASE = 95;
-
     static {
         try {
             System.loadLibrary("exception01");
@@ -61,12 +59,33 @@ public class exception01 {
         }
     }
 
+    static volatile int result;
     native static int check();
 
     public static void main(String args[]) {
-        int result = check();
+        testKernel();
+        testVirtual();
+    }
+    public static void testVirtual() {
+
+        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+            result = check();
+        });
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         if (result != 0) {
             throw new RuntimeException("check failed with result " + result);
         }
     }
+    public static void testKernel() {
+        result = check();
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
+    }
+
 }
