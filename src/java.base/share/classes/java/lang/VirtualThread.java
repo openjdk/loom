@@ -231,7 +231,7 @@ class VirtualThread extends Thread {
             scheduler.execute(runContinuation);
         } catch (RejectedExecutionException ree) {
             // assume executor has been shutdown
-            afterTerminate(false);
+            afterTerminate(/*executed*/ false);
             throw ree;
         }
     }
@@ -264,7 +264,7 @@ class VirtualThread extends Thread {
         } finally {
             unmount();
             if (cont.isDone()) {
-                afterTerminate(true);
+                afterTerminate(/*executed*/ true);
             } else {
                 afterYield();
             }
@@ -364,9 +364,9 @@ class VirtualThread extends Thread {
      * Invokes when the virtual thread terminates to set the state to TERMINATED
      * and notify anyone waiting for the virtual thread to terminate.
      *
-     * @param notifyAgents true to notify JVMTI agents
+     * @param executed true if the thread executed, false if it failed to start
      */
-    private void afterTerminate(boolean notifyAgents) {
+    private void afterTerminate(boolean executed) {
         assert state() == STARTED || state() == RUNNING;
         setState(TERMINATED);   // final state
 
@@ -382,12 +382,18 @@ class VirtualThread extends Thread {
         }
 
         // notify JVMTI agents
-        if (notifyAgents && notifyJvmtiEvents) {
+        if (executed && notifyJvmtiEvents) {
             notifyJvmtiTerminated();
         }
 
         // notify thread dumper, no-op if not tracking threads
         ThreadDumper.notifyTerminate(this);
+
+        // clear references to thread locals, this method is assumed to be
+        // called on its carrier thread on which it terminated.
+        if (executed) {
+            clearReferences();
+        }
     }
 
     /**

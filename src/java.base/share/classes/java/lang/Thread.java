@@ -1750,23 +1750,29 @@ public class Thread implements Runnable {
     }
 
     /**
+     * Null out reference after Thread termination (JDK-4006245)
+     */
+    void clearReferences() {
+        threadLocals = null;
+        inheritableThreadLocals = null;
+        inheritedAccessControlContext = null;
+        if (uncaughtExceptionHandler != null)
+            uncaughtExceptionHandler = null;
+        if (nioBlocker != null)
+            nioBlocker = null;
+    }
+
+    /**
      * This method is called by the system to give a Thread
      * a chance to clean up before it actually exits.
      */
     private void exit() {
-        // assert !isVirtual();
         try {
             if (threadLocals != null && TerminatingThreadLocal.REGISTRY.isPresent()) {
                 TerminatingThreadLocal.threadTerminated();
             }
         } finally {
-            /* Aggressively null out all reference fields: see bug 4006245 */
-            /* Speed the release of some of these resources */
-            threadLocals = null;
-            inheritableThreadLocals = null;
-            inheritedAccessControlContext = null;
-            nioBlocker = null;
-            uncaughtExceptionHandler = null;
+            clearReferences();
         }
     }
 
@@ -3050,6 +3056,8 @@ public class Thread implements Runnable {
      * @return the uncaught exception handler for this thread
      */
     public UncaughtExceptionHandler getUncaughtExceptionHandler() {
+        if (getState() == State.TERMINATED)
+            return null;
         return uncaughtExceptionHandler != null ?
             uncaughtExceptionHandler : getThreadGroup();
     }
