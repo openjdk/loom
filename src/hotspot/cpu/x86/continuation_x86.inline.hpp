@@ -249,32 +249,13 @@ void ContinuationEntry::update_register_map(RegisterMap* map) {
   frame::update_map_with_saved_link(map, fp);
 }
 
-void ContinuationHelper::set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
-  JavaFrameAnchor* anchor = thread->frame_anchor();
-  anchor->set_last_Java_sp(cont->entry_sp());
+void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* cont) {
   anchor->set_last_Java_fp(cont->entry_fp());
-  anchor->set_last_Java_pc(cont->entry_pc());
-
-  assert (thread->has_last_Java_frame(), "");
-  assert(thread->last_frame().cb() != NULL, "");
-  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
-  print_vframe(thread->last_frame());
 }
 
-void ContinuationHelper::set_anchor(JavaThread* thread, intptr_t* sp) {
+void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
-  address   pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
-  assert (pc != NULL, "");
-
-  JavaFrameAnchor* anchor = thread->frame_anchor();
-  anchor->set_last_Java_sp(sp);
   anchor->set_last_Java_fp(fp);
-  anchor->set_last_Java_pc(pc);
-
-  assert (thread->has_last_Java_frame(), "");
-  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
-  print_vframe(thread->last_frame());
-  assert(thread->last_frame().cb() != NULL, "");
 }
 
 #ifdef CONT_DOUBLE_NOP
@@ -511,7 +492,7 @@ hframe hframe::sender(const ContMirror& cont, int num_oops) const {
     // log_develop_trace(jvmcont)("real_fp: %d sender_fp: %ld", link_index, sender_fp);
   } else {
     sender_md = ContinuationCodeBlobLookup::find_blob(sender_pc);
-    sender_pc = hframe::deopt_original_pc(cont, sender_pc, (CodeBlob*)sender_md, sender_sp); // TODO PERF: unnecessary in the long term solution of unrolling deopted frames on freeze
+    sender_pc = Compiled::deopt_original_pc(cont.stack_address(sender_sp), sender_pc, (CodeBlob*)sender_md); // TODO PERF: unnecessary in the long term solution of unrolling deopted frames on freeze
     // a stub can only appear as the topmost frame; all senders must be compiled/interpreted Java frames so we can call deopt_original_pc, which assumes a compiled Java frame
   }
   return hframe(sender_sp, sender_ref_sp, sender_fp, sender_pc, sender_md, is_sender_interpreted);

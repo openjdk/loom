@@ -156,8 +156,11 @@ public:
 // Metadata stored in the continuation entry frame
 class ContinuationEntry {
 public:
-  DEBUG_ONLY(int cookie;)
-  DEBUG_ONLY(static ByteSize cookie_offset() { return byte_offset_of(ContinuationEntry, cookie); })
+#ifdef ASSERT
+  int cookie;
+  static ByteSize cookie_offset() { return byte_offset_of(ContinuationEntry, cookie); }
+  void verify_cookie() { assert(this->cookie == 0x1234, ""); }
+#endif
 
 public: 
   static int return_pc_offset; // friend gen_continuation_enter
