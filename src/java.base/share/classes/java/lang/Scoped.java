@@ -111,30 +111,6 @@ public final class Scoped<T> {
         }
     }
 
-    static final class MultiBinding extends AbstractBinding {
-        final Binding<?> head;
-
-        private MultiBinding(AbstractBinding prev) {
-            super(prev);
-            head = null;
-        }
-
-        MultiBinding(Binding<?> head, AbstractBinding prev) {
-            super(prev);
-            this.head = head;
-        }
-
-        Object find(Scoped<?> key) {
-            for (Binding<?> b = head; b != null; b = (Binding<?>)b.prev) {
-                if (b.getKey() == key) {
-                    Object value = b.get();
-                    return value;
-                }
-            }
-            return NIL;
-        }
-    }
-
     private Scoped(Class<? super T> type, boolean isInheritable) {
         this.isInheritable = isInheritable;
         this.type = type;
@@ -383,7 +359,7 @@ public final class Scoped<T> {
     /**
      * TBD
      */
-     public static class Snapshot {
+     public static final class Snapshot {
         private final AbstractBinding bindings;
 
         /**
@@ -436,66 +412,7 @@ public final class Scoped<T> {
      * TBD
      * @return TBD
      */
-    public static Snapshot snapshot() {
+    public static final Snapshot snapshot() {
         return new Snapshot();
     }
-
-    // /**
-    //  * TBD
-    //  */
-    // public static final class FutureBindings {
-    //     private final Binding<?> top;
-
-    //     private FutureBindings() {
-    //         top = null;
-    //     }
-
-    //     @SuppressWarnings({"rawtypes", "unchecked"})
-    //     private FutureBindings(Scoped<?> key, Object value, Binding<?> prev) {
-    //         top = new Binding(key, value, prev);
-    //     }
-
-    //     /**
-    //      * TBD
-    //      * @param key TBD
-    //      * @param value TBD
-    //      * @param <T> TBD
-    //      * @return TBD
-    //      */
-    //     @SuppressWarnings({"rawtypes", "unchecked"})
-    //     public static final <T> FutureBindings of(Scoped<T> key, T value) {
-    //         return new FutureBindings(key, value, null);
-    //     }
-
-    //     /**
-    //      *
-    //      * @param key TBD
-    //      * @param value TBD
-    //      * @param <T> TBD
-    //      * @return TBD
-    //      */
-    //     @SuppressWarnings({"rawtypes", "unchecked"})
-    //     public <T> FutureBindings add(Scoped<T> key, T value) {
-    //         return new FutureBindings(key, value, top);
-    //     }
-
-    //     /**
-    //      * @param r TBD
-    //      * @param <T> type
-    //      * @return T tbd
-    //      * @throws Exception TBD
-    //      */
-    //     public <T> T callWithBindings(Callable<T> r) throws Exception {
-    //         var prev = Thread.currentThread().scopeLocalBindings;
-    //         var cache = Thread.scopedCache();
-    //         Cache.invalidate();
-    //         try {
-    //             Thread.currentThread().scopeLocalBindings = new MultiBinding(top, prev);
-    //             return r.call();
-    //         } finally {
-    //             Thread.currentThread().scopeLocalBindings = prev;
-    //             Thread.setScopedCache(cache);
-    //         }
-    //     }
-    // }
 }
