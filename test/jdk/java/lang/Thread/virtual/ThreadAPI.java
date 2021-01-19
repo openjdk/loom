@@ -1160,6 +1160,7 @@ public class ThreadAPI {
         });
         thread.join();
         assertTrue(exception.get() instanceof FooException);
+        assertTrue(thread.getUncaughtExceptionHandler() == null);
     }
 
     // default UncaughtExceptionHandler
@@ -1169,8 +1170,9 @@ public class ThreadAPI {
         Thread.UncaughtExceptionHandler handler = (thread, exc) -> exception.set(exc);
         Thread.UncaughtExceptionHandler savedHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(handler);
+        Thread thread;
         try {
-            Thread thread = Thread.startVirtualThread(() -> {
+            thread = Thread.startVirtualThread(() -> {
                 Thread me = Thread.currentThread();
                 throw new FooException();
             });
@@ -1179,8 +1181,18 @@ public class ThreadAPI {
             Thread.setDefaultUncaughtExceptionHandler(savedHandler);
         }
         assertTrue(exception.get() instanceof FooException);
+        assertTrue(thread.getUncaughtExceptionHandler() == null);
     }
 
+    // no UncaughtExceptionHandler set
+    public void testUncaughtExceptionHandler3() throws Exception {
+        class FooException extends RuntimeException { }
+        Thread thread = Thread.startVirtualThread(() -> {
+            throw new FooException();
+        });
+        thread.join();
+        assertTrue(thread.getUncaughtExceptionHandler() == null);
+    }
 
     // -- Thread.getId --
 

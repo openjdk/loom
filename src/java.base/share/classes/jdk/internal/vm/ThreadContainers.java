@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -93,7 +94,7 @@ public class ThreadContainers {
                 .stream()
                 .map(WeakReference::get)
                 .filter(c -> c != null)
-                .flatMap(c -> c.threads().stream());
+                .flatMap(c -> c.threads());
     }
 
     /**
@@ -105,7 +106,8 @@ public class ThreadContainers {
             ThreadContainer container = e.getKey().get();
             if (container != null) {
                 Long tid = e.getValue();
-                map.put(tid, container.threads());
+                Set<Thread> threads = container.threads().collect(Collectors.toSet());;
+                map.put(tid, threads);
             }
         }
         return map;

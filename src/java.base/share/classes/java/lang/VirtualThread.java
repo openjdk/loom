@@ -44,6 +44,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.vm.ThreadDumper;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
@@ -110,7 +111,7 @@ class VirtualThread extends Thread {
     /**
      * Creates a new {@code VirtualThread} to run the given task with the given
      * scheduler. If the given scheduler is {@code null} and the current thread
-     * is a kernel thread then the newly created virtual thread will use the
+     * is a platform thread then the newly created virtual thread will use the
      * default scheduler. If given scheduler is {@code null} and the current
      * thread is a virtual thread then the current thread's scheduler is used.
      *
@@ -225,11 +226,12 @@ class VirtualThread extends Thread {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
+        ThreadDumper.notifyStart(this);  // no-op if threads not tracked
         try {
             scheduler.execute(runContinuation);
         } catch (RejectedExecutionException ree) {
             // assume executor has been shutdown
-            afterTerminate(false);
+            afterTerminate(/*executed*/ false);
             throw ree;
         }
     }
@@ -239,7 +241,7 @@ class VirtualThread extends Thread {
      */
     @ChangesCurrentThread
     private void runContinuation() {
-        // the carrier thread should be a kernel thread
+        // the carrier thread should be a platform thread
         if (Thread.currentThread().isVirtual()) {
             throw new IllegalCallerException();
         }
@@ -262,7 +264,7 @@ class VirtualThread extends Thread {
         } finally {
             unmount();
             if (cont.isDone()) {
-                afterTerminate(true);
+                afterTerminate(/*executed*/ true);
             } else {
                 afterYield();
             }
@@ -362,9 +364,9 @@ class VirtualThread extends Thread {
      * Invokes when the virtual thread terminates to set the state to TERMINATED
      * and notify anyone waiting for the virtual thread to terminate.
      *
-     * @param notifyAgents true to notify JVMTI agents
+     * @param executed true if the thread executed, false if it failed to start
      */
-    private void afterTerminate(boolean notifyAgents) {
+    private void afterTerminate(boolean executed) {
         assert state() == STARTED || state() == RUNNING;
         setState(TERMINATED);   // final state
 
@@ -380,8 +382,17 @@ class VirtualThread extends Thread {
         }
 
         // notify JVMTI agents
-        if (notifyAgents && notifyJvmtiEvents) {
+        if (executed && notifyJvmtiEvents) {
             notifyJvmtiTerminated();
+        }
+
+        // notify thread dumper, no-op if not tracking threads
+        ThreadDumper.notifyTerminate(this);
+
+        // clear references to thread locals, this method is assumed to be
+        // called on its carrier thread on which it terminated.
+        if (executed) {
+            clearReferences();
         }
     }
 
@@ -790,8 +801,8 @@ class VirtualThread extends Thread {
         StringBuilder sb = new StringBuilder("VirtualThread[");
         String name = getName();
         if (name.isEmpty() || name.equals("<unnamed>")) {
-            sb.append("@");
-            sb.append(Integer.toHexString(hashCode()));
+            sb.append("#");
+            sb.append(getId());
         } else {
             sb.append(name);
         }

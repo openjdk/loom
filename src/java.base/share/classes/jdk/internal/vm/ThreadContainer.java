@@ -25,14 +25,19 @@
 
 package jdk.internal.vm;
 
-import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * A container for Threads.
  */
 public interface ThreadContainer {
     /**
-     * Returns a possible-empty snapshot of the Threads.
+     * Return the identifier of the Thread that created the container.
      */
-    Set<Thread> threads();
+    long creatorTid();
+
+    /**
+     * Returns a possible-empty stream of the Threads.
+     */
+    Stream<Thread> threads();
 }

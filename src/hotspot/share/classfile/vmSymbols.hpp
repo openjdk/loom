@@ -290,7 +290,6 @@
   template(signature_name,                            "signature")                                \
   template(slot_name,                                 "slot")                                     \
   template(trusted_final_name,                        "trustedFinal")                             \
-  template(blackhole_name,                            "<blackhole>")  /*fake name*/               \
                                                                                                   \
   /* Support for annotations (JDK 1.5 and above) */                                               \
                                                                                                   \
@@ -744,7 +743,7 @@
   template(url_void_signature,                     "(Ljava/net/URL;)V")                                           \
                                                                                                                   \
   /* JavaThread.dump jcmd */                                                                                      \
-  template(jdk_internal_vm_ThreadDump,             "jdk/internal/vm/ThreadDump")                                  \
+  template(jdk_internal_vm_ThreadDumper,           "jdk/internal/vm/ThreadDumper")                                \
   template(dumpThreads_name,                       "dumpThreads")                                                 \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
 

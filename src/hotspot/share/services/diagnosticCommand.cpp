@@ -1155,7 +1155,7 @@ void JavaThreadDumpDCmd::dumpToOutputStream(Symbol* name, Symbol* signature, TRA
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 
-  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadDump();
+  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadDumper();
   Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
   InstanceKlass* ik = InstanceKlass::cast(k);
   if (HAS_PENDING_EXCEPTION) {
@@ -1198,7 +1198,7 @@ void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char*
 
   Handle h_path = java_lang_String::create_from_str(path, CHECK);
 
-  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadDump();
+  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadDumper();
   Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
   InstanceKlass* ik = InstanceKlass::cast(k);
   if (HAS_PENDING_EXCEPTION) {

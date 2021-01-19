@@ -277,7 +277,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * </dl>
  *
- * <p><b>Extension example</b>. Most extensions of this class
+ * <p><b>Extension example.</b> Most extensions of this class
  * override one or more of the protected hook methods. For example,
  * here is a subclass that adds a simple pause/resume feature:
  *
@@ -2095,10 +2095,12 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * <pre> {@code
      * new RejectedExecutionHandler() {
      *   public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
-     *     Future<?> dropped = e.getQueue().poll();
-     *     if (dropped != null)
-     *        dropped.cancel(false); // also consider logging the failure
-     *     e.execute(r);             // retry
+     *     Runnable dropped = e.getQueue().poll();
+     *     if (dropped instanceof Future<?>) {
+     *       ((Future<?>)dropped).cancel(false);
+     *       // also consider logging the failure
+     *     }
+     *     e.execute(r);  // retry
      * }}}</pre>
      */
     public static class DiscardOldestPolicy implements RejectedExecutionHandler {
