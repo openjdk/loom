@@ -21,8 +21,6 @@
  * questions.
  */
 
-import java.io.PrintStream;
-
 /*
  * @test
  *
@@ -35,21 +33,17 @@ import java.io.PrintStream;
  *       - if clazz, method and frame parameters contain expected values
  *         for event generated upon exit from single method in single frame
  *         specified in call to NotifyFramePop.
- *       - if GetFrameLocation indentifies the executable location
+ *       - if GetFrameLocation identifies the executable location
  *         in the returning method, immediately prior to the return.
  * COMMENTS
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @compile framepop01a.jasm
+ * @compile framepop01a.java
  * @run main/othervm/native -agentlib:framepop01 framepop01
  */
 
-
-
 public class framepop01 {
-
-    final static int JCK_STATUS_BASE = 95;
 
     static {
         try {
@@ -62,12 +56,31 @@ public class framepop01 {
         }
     }
 
+    static volatile int result;
     native static int check();
 
     public static void main(String args[]) {
-        int res = check();
-        if (res != 0) {
-            throw new RuntimeException("Check() returned " + res);
+        testVirtual();
+        testKernel();
+    }
+    public static void testVirtual() {
+        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+            result = check();
+        });
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
+    }
+    public static void testKernel() {
+        result = check();
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
         }
     }
 

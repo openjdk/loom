@@ -52,7 +52,7 @@ static jvmtiCapabilities caps;
 static jvmtiEventCallbacks callbacks;
 static jrawMonitorID event_lock;
 static jint result = PASSED;
-static jboolean printdump = JNI_FALSE;
+static jboolean printdump = JNI_TRUE;
 static jboolean watch_events = JNI_FALSE;
 
 static int pop_count = 0;
@@ -351,6 +351,7 @@ JNIEXPORT jint JNI_OnLoad_framepop02(JavaVM *jvm, char *options, void *reserved)
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiCapabilities caps;
   jvmtiError err;
   jint res;
 
@@ -371,12 +372,11 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->GetPotentialCapabilities(&caps);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    return JNI_ERR;
-  }
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_generate_frame_pop_events = 1;
+  caps.can_generate_method_entry_events = 1;
+  caps.can_support_virtual_threads = 1;
+
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
@@ -427,11 +427,6 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
 JNIEXPORT void JNICALL Java_framepop02_getReady(JNIEnv *jni, jclass cls) {
   jvmtiError err;
-
-  if (!caps.can_generate_frame_pop_events ||
-      !caps.can_generate_method_entry_events) {
-    return ;
-  }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_METHOD_ENTRY, NULL);

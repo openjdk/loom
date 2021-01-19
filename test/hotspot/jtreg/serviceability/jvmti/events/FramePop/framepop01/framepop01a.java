@@ -21,16 +21,9 @@
  * questions.
  */
 
-super public class framepop01a {
-
-    public Method "<init>":"()V" stack 1 locals 1 {
-        aload_0;
-        invokespecial   Method java/lang/Object."<init>":"()V";
-        return;
-    }
-
-    public static Method dummy:"()V" stack 0 locals 0 {
-        invokestatic    Method framepop01.chain:"()V";
-        return; // bci=3
+public class framepop01a {
+    public static void dummy() {
+        framepop01.chain();
     }
 }
+

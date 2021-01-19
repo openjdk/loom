@@ -44,7 +44,7 @@ static jvmtiEnv *jvmti = NULL;
 static jvmtiCapabilities caps;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
-static jboolean printdump = JNI_FALSE;
+static volatile jboolean isVirtualExpected = JNI_FALSE;
 static size_t eventsExpected = 0;
 static size_t eventsCount = 0;
 static pop_info pops[] = {
@@ -52,100 +52,89 @@ static pop_info pops[] = {
     { "Lframepop01a;", "dummy", "()V", 3 },
 };
 
-void JNICALL Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni,
-                        jthread thr, jmethodID method, jlocation location) {
+void JNICALL Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jmethodID method, jlocation location) {
   jvmtiError err;
 
-  err = jvmti->NotifyFramePop(thr, 0);
+  err = jvmti->NotifyFramePop(thread, 0);
   if (err == JVMTI_ERROR_NONE) {
     eventsExpected++;
   } else {
-    printf("(NotifyFramePop#0) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(NotifyFramePop#0) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
-  err = jvmti->NotifyFramePop(thr, 1);
+  err = jvmti->NotifyFramePop(thread, 1);
   if (err == JVMTI_ERROR_NONE) {
     eventsExpected++;
   } else {
-    printf("(NotifyFramePop#1) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(NotifyFramePop#1) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 }
 
-void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *jni,
-                      jthread thr, jmethodID method, jboolean wasPopedByException) {
+void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread_obj, jmethodID method, jboolean wasPopedByException) {
   jvmtiError err;
   char *cls_sig, *name, *sig, *generic;
   jclass cls;
   jmethodID mid;
   jlocation loc;
 
-  if (printdump == JNI_TRUE) {
-    printf(">>> retrieving frame pop info ...\n");
-  }
+  printf(">>> retrieving frame pop info ...\n");
+
   err = jvmti->GetMethodDeclaringClass(method, &cls);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetClassSignature(cls, &cls_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassSignature) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(GetClassSignature) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetMethodName(method, &name, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodName) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(GetMethodName) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
-  err = jvmti->GetFrameLocation(thr, 0, &mid, &loc);
+  err = jvmti->GetFrameLocation(thread_obj, 0, &mid, &loc);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetFrameLocation) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(GetFrameLocation) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
-  if (printdump == JNI_TRUE) {
-    printf(">>>      class: \"%s\"\n", cls_sig);
-    printf(">>>     method: \"%s%s\"\n", name, sig);
-    printf(">>>   location: 0x%x%08x\n",
-           (jint)(loc >> 32), (jint)loc);
-    printf(">>> ... done\n");
-  }
+
+  printf(">>>      class: \"%s\"\n", cls_sig);
+  printf(">>>     method: \"%s%s\"\n", name, sig);
+  printf(">>>   location: 0x%x%08x\n", (jint)(loc >> 32), (jint)loc);
+  print_thread_info(jni, jvmti, thread_obj);
+  printf(">>> ... done\n");
+
   if (eventsCount < sizeof(pops)/sizeof(pop_info)) {
-    if (cls_sig == NULL ||
-        strcmp(cls_sig, pops[eventsCount].cls_sig) != 0) {
-      printf("(pop#%" PRIuPTR ") wrong class: \"%s\"",
-             eventsCount, cls_sig);
+    if (cls_sig == NULL || strcmp(cls_sig, pops[eventsCount].cls_sig) != 0) {
+      printf("(pop#%" PRIuPTR ") wrong class: \"%s\"", eventsCount, cls_sig);
       printf(", expected: \"%s\"\n", pops[eventsCount].cls_sig);
       result = STATUS_FAILED;
     }
-    if (name == NULL ||
-        strcmp(name, pops[eventsCount].name) != 0) {
-      printf("(pop#%" PRIuPTR ") wrong method name: \"%s\"",
-             eventsCount, name);
+    if (name == NULL || strcmp(name, pops[eventsCount].name) != 0) {
+      printf("(pop#%" PRIuPTR ") wrong method name: \"%s\"", eventsCount, name);
       printf(", expected: \"%s\"\n", pops[eventsCount].name);
       result = STATUS_FAILED;
     }
-    if (sig == NULL ||
-        strcmp(sig, pops[eventsCount].sig) != 0) {
-      printf("(pop#%" PRIuPTR ") wrong method sig: \"%s\"",
-             eventsCount, sig);
+    if (sig == NULL || strcmp(sig, pops[eventsCount].sig) != 0) {
+      printf("(pop#%" PRIuPTR ") wrong method sig: \"%s\"", eventsCount, sig);
       printf(", expected: \"%s\"\n", pops[eventsCount].sig);
       result = STATUS_FAILED;
     }
     if (loc != pops[eventsCount].loc) {
-      printf("(pop#%" PRIuPTR ") wrong location: 0x%x%08x",
-             eventsCount, (jint)(loc >> 32), (jint)loc);
+      printf("(pop#%" PRIuPTR ") wrong location: 0x%x%08x", eventsCount, (jint)(loc >> 32), (jint)loc);
       printf(", expected: 0x%x\n", (jint)pops[eventsCount].loc);
+      result = STATUS_FAILED;
+    }
+    jboolean isVirtual = jni->IsVirtualThread(thread_obj);
+    if (isVirtualExpected != isVirtual) {
+      printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
       result = STATUS_FAILED;
     }
   } else {
@@ -170,12 +159,9 @@ JNIEXPORT jint JNI_OnLoad_framepop01(JavaVM *jvm, char *options, void *reserved)
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiCapabilities caps;
   jvmtiError err;
   jint res;
-
-  if (options != NULL && strcmp(options, "printdump") == 0) {
-    printdump = JNI_TRUE;
-  }
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
@@ -183,35 +169,29 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->GetPotentialCapabilities(&caps);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    return JNI_ERR;
-  }
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_generate_frame_pop_events = 1;
+  caps.can_generate_breakpoint_events = 1;
+  caps.can_support_virtual_threads = 1;
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(GetCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
-  if (caps.can_generate_frame_pop_events &&
-      caps.can_generate_breakpoint_events) {
+  if (caps.can_generate_frame_pop_events && caps.can_generate_breakpoint_events) {
     callbacks.Breakpoint = &Breakpoint;
     callbacks.FramePop = &FramePop;
     err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
     if (err != JVMTI_ERROR_NONE) {
-      printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
-             TranslateError(err), err);
+      printf("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
       return JNI_ERR;
     }
   } else {
@@ -226,15 +206,18 @@ Java_framepop01_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
   jclass clz;
   jmethodID mid;
+  jthread thread;
+
+  err = jvmti->GetCurrentThread(&thread);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
+    result = STATUS_FAILED;
+    return STATUS_FAILED;
+  }
 
   if (jvmti == NULL) {
     printf("JVMTI client was not properly loaded!\n");
     return STATUS_FAILED;
-  }
-
-  if (!caps.can_generate_frame_pop_events ||
-      !caps.can_generate_breakpoint_events) {
-    return result;
   }
 
   mid = jni->GetStaticMethodID(cls, "chain", "()V");
@@ -244,22 +227,19 @@ Java_framepop01_check(JNIEnv *jni, jclass cls) {
   }
   err = jvmti->SetBreakpoint(mid, 0);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to SetBreakpoint: %s (%d)\n",
-           TranslateError(err), err);
+    printf("Failed to SetBreakpoint: %s (%d)\n", TranslateError(err), err);
     return STATUS_FAILED;
   }
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_FRAME_POP, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to enable JVMTI_EVENT_FRAME_POP event: %s (%d)\n",
-           TranslateError(err), err);
+    printf("Failed to enable JVMTI_EVENT_FRAME_POP event: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_BREAKPOINT, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to enable BREAKPOINT event: %s (%d)\n",
-           TranslateError(err), err);
+    printf("Failed to enable BREAKPOINT event: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
@@ -269,16 +249,33 @@ Java_framepop01_check(JNIEnv *jni, jclass cls) {
     result = STATUS_FAILED;
     return STATUS_FAILED;
   }
+
   mid = jni->GetStaticMethodID(clz, "dummy", "()V");
   if (mid == 0) {
     printf("Cannot find Method ID for method dummy\n");
     return STATUS_FAILED;
   }
+
+  isVirtualExpected = jni->IsVirtualThread(thread);
+
   jni->CallStaticVoidMethod(clz, mid);
 
+  eventsCount = 0;
+  eventsExpected = 0;
+
+  mid = jni->GetStaticMethodID(cls, "chain", "()V");
+  if (mid == 0) {
+    printf("Cannot find Method ID for method chain\n");
+    return STATUS_FAILED;
+  }
+  err = jvmti->ClearBreakpoint(mid, 0);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Failed to ClearBreakpoint: %s (%d)\n", TranslateError(err), err);
+    return STATUS_FAILED;
+  }
+
   if (eventsCount != eventsExpected) {
-    printf("Wrong number of frame pop events: %" PRIuPTR ", expected: %" PRIuPTR "\n",
-           eventsCount, eventsExpected);
+    printf("Wrong number of frame pop events: %" PRIuPTR ", expected: %" PRIuPTR "\n", eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }
 
