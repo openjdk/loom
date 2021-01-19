@@ -466,7 +466,11 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         int s; boolean completed;
         if ((s = status) >= 0) {
             try {
-                completed = snapshot.callWithSnapshot(() -> exec());
+                if (snapshot != null) {
+                    completed = snapshot.callWithSnapshot(() -> exec());
+                } else {
+                    completed = exec();
+                }
             } catch (Throwable rex) {
                 s = trySetException(rex);
                 completed = false;
