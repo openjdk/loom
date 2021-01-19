@@ -47,50 +47,18 @@ public final class Scoped<T> {
 
     public final int hashCode() { return hash; }
 
-    static abstract class AbstractBinding {
-        AbstractBinding(AbstractBinding prev) {
-            this.prev = prev;
-        }
-
-        abstract Object find(Scoped<?> key);
-
-        final AbstractBinding prev() {
-            return prev;
-        }
-
-        final AbstractBinding prev;
-
-        static final Object NIL = new Object();
-
-        @SuppressWarnings("rawtypes")
-        final Object findLoop(Scoped<?> key) {
-            for (AbstractBinding b = this; b != null; b = b.prev()) {
-                if (b instanceof Binding) {
-                    Binding<?> binding = (Binding<?>) b;
-                    if (binding.getKey() == key) {
-                        Object value = binding.get();
-                        return value;
-                    }
-                } else {
-                    Object value;
-                    if ((value = b.find(key)) != NIL) {
-                        return value;
-                    }
-                }
-            }
-            return NIL;
-        }
-    }
-
-    static class Binding<T> extends AbstractBinding {
+    static class Binding<T> {
         final Scoped<T> key;
         final T value;
+        final Binding<?> prev;
 
-        Binding(Scoped<T> key, T value, AbstractBinding prev) {
-            super(prev);
+        private static final Object NIL = new Object();
+
+        Binding(Scoped<T> key, T value, Binding<?> prev) {
             key.type.cast(value);
             this.key = key;
             this.value = value;
+            this.prev = prev;
         }
 
         final T get() {
@@ -101,13 +69,14 @@ public final class Scoped<T> {
             return key;
         }
 
-        @SuppressWarnings("rawtypes")
         Object find(Scoped<?> key) {
-            if (getKey() == key) {
-                return value;
-            } else {
-                return NIL;
+            for (Binding<?> b = this; b != null; b = b.prev) {
+                if (b.getKey() == key) {
+                    Object value = b.get();
+                    return value;
+                }
             }
+            return NIL;
         }
     }
 
@@ -141,14 +110,14 @@ public final class Scoped<T> {
         return new Scoped<T>(type, true);
     }
 
-    private final AbstractBinding scopeLocalBindings() {
+    private final Binding<?> scopeLocalBindings() {
         Thread currentThread = Thread.currentThread();
         return isInheritable
                 ? currentThread.inheritableScopeLocalBindings
                 : currentThread.noninheritableScopeLocalBindings;
     }
 
-    private final void setScopeLocalBindings(AbstractBinding bindings) {
+    private final void setScopeLocalBindings(Binding<?> bindings) {
         Thread currentThread = Thread.currentThread();
         if (isInheritable) {
             currentThread.inheritableScopeLocalBindings = bindings;
@@ -168,7 +137,7 @@ public final class Scoped<T> {
         if (bindings == null) {
             return false;
         }
-        return (bindings.findLoop(this) != AbstractBinding.NIL);
+        return (bindings.find(this) != Binding.NIL);
     }
 
     /**
@@ -182,10 +151,10 @@ public final class Scoped<T> {
         if (bindings == null) {
             throw new RuntimeException("unbound");
         }
-        var result = bindings.findLoop(this);
-        if (result != AbstractBinding.NIL) {
-            Cache.put(this, result);
-            return (T)result;
+        for (var b = bindings; b != null; b = b.prev) {
+            if (b.getKey() == this) {
+                return(T)b.get();
+            }
         }
         throw new RuntimeException("unbound");
     }
@@ -222,7 +191,7 @@ public final class Scoped<T> {
      * @param value   TBD
      */
     public void runWithBinding(T value, Runnable r) {
-        AbstractBinding top = scopeLocalBindings();
+        Binding<?> top = scopeLocalBindings();
         Cache.update(this, value);
         try {
             setScopeLocalBindings(new Binding<T>(this, value, top));
@@ -245,7 +214,7 @@ public final class Scoped<T> {
      * @throws Exception TBD
      */
     public <X> X callWithBinding(T value, Callable<X> r) throws Exception {
-        AbstractBinding top = scopeLocalBindings();
+        Binding<?> top = scopeLocalBindings();
         Cache.update(this, value);
         try {
             setScopeLocalBindings(new Binding<T>(this, value, top));
@@ -257,10 +226,9 @@ public final class Scoped<T> {
     }
 
     private static class Cache {
-        static final int INDEX_BITS = 4;
 
+        static final int INDEX_BITS = 4;  // Must be a power of 2
         static final int TABLE_SIZE = 1 << INDEX_BITS;
-
         static final int TABLE_MASK = TABLE_SIZE - 1;
 
         static void put(Scoped<?> key, Object value) {
@@ -344,7 +312,9 @@ public final class Scoped<T> {
     private static int nextKey = 0xf0f0_f0f0;
 
     // A Marsaglia xor-shift generator used to generate hashes. This one has full period, so
-    // it generates 2**32 - 1 hashes before it repeats.
+    // it generates 2**32 - 1 hashes before it repeats. We're going to use the lowest n bits
+    // and the next n bits as cache indexes, so we make sure that those indexes are
+    // different.
     private static synchronized int generateKey() {
         int x = nextKey;
         do {
@@ -360,7 +330,7 @@ public final class Scoped<T> {
      * TBD
      */
      public static final class Snapshot {
-        private final AbstractBinding bindings;
+        private final Binding<?> bindings;
 
         /**
          * TBD
