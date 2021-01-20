@@ -45,19 +45,17 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:monitorwaited monitorwaited01
+ *      -agentlib:monitorwaited01 monitorwaited01
  */
 
 
 
 public class monitorwaited01 extends DebugeeClass {
 
-    // load native library if required
     static {
-        loadLibrary("monitorwaited");
+        loadLibrary("monitorwaited01");
     }
 
-    // run test from command line
     public static void main(String argv[]) {
         int result = new monitorwaited01().runIt();
         if (result != 0) {

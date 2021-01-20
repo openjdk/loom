@@ -45,24 +45,21 @@ static volatile int eventsCount = 0;
 /* ========================================================================== */
 
 void JNICALL
-MonitorWaited(jvmtiEnv *jvmti, JNIEnv *jni,
-              jthread thr, jobject obj, jboolean timed_out) {
+MonitorWait(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj, jlong tout) {
 
-  NSK_DISPLAY3("MonitorWaited event:\n\tthread: %p, object: %p, timed_out: %s\n",
-               thr, obj, (timed_out == JNI_TRUE) ? "true" : "false");
+  printf("MonitorWait event:\n\tthread: %p, object: %p, timeout: %d\n", thr, obj, (int) tout);
 
   if (thread == NULL) {
     nsk_jvmti_setFailStatus();
     return;
   }
 
-
 /* check if event is for tested thread and for tested object */
   if (jni->IsSameObject(thread, thr) &&
       jni->IsSameObject(object, obj)) {
     eventsCount++;
-    if (timed_out == JNI_TRUE) {
-      NSK_COMPLAIN0("Unexpected timed_out value: true\n");
+    if (tout != timeout) {
+      NSK_COMPLAIN1("Unexpected timeout value: %d\n", (int) tout);
       nsk_jvmti_setFailStatus();
     }
   }
@@ -80,7 +77,7 @@ static int prepare() {
   jvmtiError err;
   int i;
 
-  NSK_DISPLAY0("Prepare: find tested thread\n");
+  printf("Prepare: find tested thread\n");
 
   /* get all live threads */
   err = jvmti->GetAllThreads(&threads_count, &threads);
@@ -94,8 +91,9 @@ static int prepare() {
 
   /* find tested thread */
   for (i = 0; i < threads_count; i++) {
-    if (threads[i] == NULL)
+    if (threads[i] == NULL) {
       return NSK_FALSE;
+    }
 
     /* get thread information */
     err = jvmti->GetThreadInfo(threads[i], &info);
@@ -153,7 +151,7 @@ static int prepare() {
   }
 
   /* enable MonitorWait event */
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_WAITED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_WAIT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("Prepare: 11\n");
     return NSK_FALSE;
@@ -163,9 +161,9 @@ static int prepare() {
 
 static int clean() {
   jvmtiError err;
-  /* disable MonitorWaited event */
+  /* disable MonitorWait event */
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
-                                        JVMTI_EVENT_MONITOR_WAITED,
+                                        JVMTI_EVENT_MONITOR_WAIT,
                                         NULL);
   if (err != JVMTI_ERROR_NONE) {
     nsk_jvmti_setFailStatus();
@@ -193,15 +191,15 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *agentJNI, void *arg) {
   /* clear events count */
   eventsCount = 0;
 
-  /* resume debugee to catch MonitorWaited event */
-  if (!((nsk_jvmti_resumeSync() == NSK_TRUE) && (nsk_jvmti_waitForSync(timeout) == NSK_TRUE))) {
+  /* resume debugee to catch MonitorWait event */
+  if (!((nsk_jvmti_resumeSync() == NSK_TRUE) && (nsk_jvmti_waitForSync(timeout) ==NSK_TRUE))) {
     return;
   }
 
-  NSK_DISPLAY1("Number of MonitorWaited events: %d\n", eventsCount);
+  NSK_DISPLAY1("Number of MonitorWait events: %d\n", eventsCount);
 
   if (eventsCount == 0) {
-    NSK_COMPLAIN0("No any MonitorWaited event\n");
+    NSK_COMPLAIN0("No any MonitorWait event\n");
     nsk_jvmti_setFailStatus();
   }
 
@@ -220,13 +218,13 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *agentJNI, void *arg) {
 /* agent library initialization
  */
 #ifdef STATIC_BUILD
-JNIEXPORT jint JNICALL Agent_OnLoad_monitorwaited01(JavaVM *jvm, char *options, void *reserved) {
+JNIEXPORT jint JNICALL Agent_OnLoad_monitorwait01(JavaVM *jvm, char *options, void *reserved) {
     return Agent_Initialize(jvm, options, reserved);
 }
-JNIEXPORT jint JNICALL Agent_OnAttach_monitorwaited01(JavaVM *jvm, char *options, void *reserved) {
+JNIEXPORT jint JNICALL Agent_OnAttach_monitorwait01(JavaVM *jvm, char *options, void *reserved) {
     return Agent_Initialize(jvm, options, reserved);
 }
-JNIEXPORT jint JNI_OnLoad_monitorwaited01(JavaVM *jvm, char *options, void *reserved) {
+JNIEXPORT jint JNI_OnLoad_monitorwait01(JavaVM *jvm, char *options, void *reserved) {
     return JNI_VERSION_1_8;
 }
 #endif
@@ -250,12 +248,9 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->GetPotentialCapabilities(&caps);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    return JNI_ERR;
-  }
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_generate_monitor_events = 1;
+  caps.can_support_virtual_threads = 1;
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
@@ -276,7 +271,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   memset(&callbacks, 0, sizeof(callbacks));
-  callbacks.MonitorWaited = &MonitorWaited;
+  callbacks.MonitorWait = &MonitorWait;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
@@ -295,5 +290,4 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 
 JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
   return Agent_Initialize(jvm, options, reserved);
 }
-
 }

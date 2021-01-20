@@ -44,19 +44,17 @@ import jdk.test.lib.jvmti.DebugeeClass;
  *
  * @library /test/lib
  * @run main/othervm/native
- *      -agentlib:monitorwait monitorwait01
+ *      -agentlib:monitorwait01 monitorwait01
  */
 
 
 
 public class monitorwait01 extends DebugeeClass {
 
-    // load native library if required
     static {
-        loadLibrary("monitorwait");
+        loadLibrary("monitorwait01");
     }
 
-    // run test from command line
     public static void main(String argv[]) {
         int result = new monitorwait01().runIt();
         if (result != 0) {

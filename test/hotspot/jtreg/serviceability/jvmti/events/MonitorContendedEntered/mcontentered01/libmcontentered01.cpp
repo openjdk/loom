@@ -272,12 +272,9 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->GetPotentialCapabilities(&caps);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    return JNI_ERR;
-  }
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_generate_monitor_events = 1;
+  caps.can_support_virtual_threads = 1;
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
@@ -292,6 +289,11 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
            TranslateError(err), err);
     return JNI_ERR;
   }
+
+  if (!caps.can_generate_monitor_events) {
+    return JNI_ERR;
+  }
+  
   memset(&callbacks, 0, sizeof(callbacks));
   callbacks.MonitorContendedEntered = &MonitorContendedEntered;
   callbacks.MonitorContendedEnter = &MonitorContendedEnter;

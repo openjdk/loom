@@ -35,7 +35,7 @@ import java.io.PrintStream;
  *     The test exercises JVMTI event callback function
  *         MonitorContendedEnter(jni, thread, object).
  *     The test checks if the thread and object parameters of the function
- *     contain expected values for callback when a thread is attemping
+ *     contain expected values for callback when a thread is attempting
  *     to enter a Java language monitor already acquired by another thread.
  * COMMENTS
  *     The test updated to match new JVMTI spec 0.2.90:
@@ -44,21 +44,17 @@ import java.io.PrintStream;
  *     1000 ms of sleep added to main thread to reduce probability of bad racing.
  *
  * @library /test/lib
- * @run main/othervm/native
- *      -agentlib:mcontenter01 mcontenter01
+ * @run main/othervm/native -agentlib:mcontenter01 mcontenter01
  */
 
 
 public class mcontenter01 extends DebugeeClass {
 
-    // load native library if required
     static {
         loadLibrary("mcontenter01");
     }
 
-    // run test from command line
     public static void main(String argv[]) {
-        // JCK-compatible exit
         int result =  new mcontenter01().runIt();
         if (result != 0) {
             throw new RuntimeException("Unexpected status: " + result);
