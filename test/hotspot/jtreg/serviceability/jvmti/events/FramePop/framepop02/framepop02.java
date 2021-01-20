@@ -68,8 +68,7 @@ public class framepop02 {
         Thread[] t = new Thread[THREADS_LIMIT];
         getReady();
         for (int i = 0; i < THREADS_LIMIT; i++) {
-            t[i] = Thread.unstartedThread(TEST_THREAD_NAME_BASE + i, 1, new TestTask());
-            t[i].start();
+            t[i] = Thread.builder().name(TEST_THREAD_NAME_BASE + i).virtual().task(new TestTask()).start();
         }
         for (int i = 0; i < THREADS_LIMIT; i++) {
             try {
