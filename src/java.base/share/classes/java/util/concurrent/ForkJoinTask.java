@@ -438,8 +438,6 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         return (s & THROWN) != 0;
     }
 
-    final Scoped.Snapshot snapshot = Scoped.snapshot();
-
     /**
      * Unless done, calls exec and records status if completed, but
      * doesn't wait for completion otherwise.
@@ -450,11 +448,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         int s; boolean completed;
         if ((s = status) >= 0) {
             try {
-                if (snapshot != null) {
-                    completed = snapshot.callWithSnapshot(() -> exec());
-                } else {
-                    completed = exec();
-                }
+                completed = exec();
             } catch (Throwable rex) {
                 s = trySetException(rex);
                 completed = false;
