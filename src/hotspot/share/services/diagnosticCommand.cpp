@@ -1117,7 +1117,7 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
 JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
                                        DCmdWithParser(output, heap),
   _format("-format", "Output format (\"plain\" or \"json\")", "STRING", false, "plain"),
-  _filepath("filepath", "The file path to the output file", "STRING", false, NULL) {
+  _filepath("filepath", "The file path to the output file", "STRING", true) {
   _dcmdparser.add_dcmd_option(&_format);
   _dcmdparser.add_dcmd_argument(&_filepath);
 }
@@ -1136,60 +1136,11 @@ int JavaThreadDumpDCmd::num_arguments() {
 void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
   bool json = (_format.value() != NULL) && (strcmp(_format.value(), "json") == 0);
   char* path = _filepath.value();
-  if (path == NULL) {
-    if (json) {
-      dumpToOutputStream(vmSymbols::dumpThreadsToJson_name(), vmSymbols::void_byte_array_signature(), CHECK);
-    } else {
-      dumpToOutputStream(vmSymbols::dumpThreads_name(), vmSymbols::void_byte_array_signature(), CHECK);
-    }
+  if (json) {
+    dumpToFile(vmSymbols::dumpThreadsToJson_name(), vmSymbols::string_byte_array_signature(), path, CHECK);
   } else {
-    if (json) {
-      dumpToFile(vmSymbols::dumpThreadsToJson_name(), vmSymbols::string_byte_array_signature(), path, CHECK);
-    } else {
-      dumpToFile(vmSymbols::dumpThreads_name(), vmSymbols::string_byte_array_signature(), path, CHECK);
-    }
+    dumpToFile(vmSymbols::dumpThreads_name(), vmSymbols::string_byte_array_signature(), path, CHECK);
   }
-}
-
-void JavaThreadDumpDCmd::dumpToOutputStream(Symbol* name, Symbol* signature, TRAPS) {
-  ResourceMark rm(THREAD);
-  HandleMark hm(THREAD);
-
-  Symbol* sym = vmSymbols::jdk_internal_vm_ThreadDumper();
-  Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
-  InstanceKlass* ik = InstanceKlass::cast(k);
-  if (HAS_PENDING_EXCEPTION) {
-    java_lang_Throwable::print(PENDING_EXCEPTION, output());
-    output()->cr();
-    CLEAR_PENDING_EXCEPTION;
-    return;
-  }
-
-  // invoke the method on ThreadDump to generate byte array
-  JavaValue result(T_OBJECT);
-  JavaCallArguments args;
-  JavaCalls::call_static(&result,
-                         ik,
-                         name,
-                         signature,
-                         &args,
-                         THREAD);
-  if (HAS_PENDING_EXCEPTION) {
-    java_lang_Throwable::print(PENDING_EXCEPTION, output());
-    output()->cr();
-    CLEAR_PENDING_EXCEPTION;
-    return;
-  }
-
-  // check that result is byte array
-  oop res = (oop)result.get_jobject();
-  assert(res->is_typeArray(), "just checking");
-  assert(TypeArrayKlass::cast(res->klass())->element_type() == T_BYTE, "just checking");
-
-  // copy the bytes to the output stream
-  typeArrayOop ba = typeArrayOop(res);
-  jbyte* addr = typeArrayOop(res)->byte_at_addr(0);
-  output()->print_raw((const char*)addr, ba->length());
 }
 
 void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, TRAPS) {

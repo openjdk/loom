@@ -314,15 +314,6 @@ public class ThreadDumper {
     }
 
     /**
-     * Generate a thread dump in plain text format to a byte array, UTF-8 encoded.
-     */
-    public static byte[] dumpThreads() {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        dumpThreads(out);
-        return out.toByteArray();
-    }
-
-    /**
      * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
      */
     public static byte[] dumpThreads(String file) throws IOException {
@@ -375,15 +366,6 @@ public class ThreadDumper {
             ps.format("      %s%n", ste);
         }
         ps.println();
-    }
-
-    /**
-     * Generate a thread dump in JSON format to a byte array, UTF-8 encoded.
-     */
-    public static byte[] dumpThreadsToJson() {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        dumpThreadsToJson(out);
-        return out.toByteArray();
     }
 
     /**
