@@ -37,7 +37,7 @@ extern "C" {
 static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
-static jboolean printdump = JNI_FALSE;
+static jboolean printdump = JNI_TRUE;
 static int eventsCount = 0;
 static int eventsExpected = 0;
 static const char *prefix = NULL;

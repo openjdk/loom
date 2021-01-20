@@ -41,7 +41,6 @@ typedef struct {
 } pop_info;
 
 static jvmtiEnv *jvmti = NULL;
-static jvmtiCapabilities caps;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
 static volatile jboolean isVirtualExpected = JNI_FALSE;

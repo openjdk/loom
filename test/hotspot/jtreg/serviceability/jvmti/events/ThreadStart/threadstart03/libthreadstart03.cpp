@@ -38,7 +38,7 @@ extern "C" {
 static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
-static jboolean printdump = JNI_FALSE;
+static jboolean printdump = JNI_TRUE;
 static jrawMonitorID wait_lock;
 static const char *threadName = NULL;
 static int startsCount = 0;

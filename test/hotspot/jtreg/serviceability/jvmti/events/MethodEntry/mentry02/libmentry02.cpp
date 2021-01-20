@@ -33,10 +33,9 @@ extern "C" {
 #define STATUS_FAILED 2
 
 static jvmtiEnv *jvmti = NULL;
-static jvmtiCapabilities caps;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
-static jboolean printdump = JNI_FALSE;
+static jboolean isVirtualExpected = JNI_FALSE;
 static int MethodEntriesExpected = 0;
 static int MethodExitsExpected = 0;
 static int MethodEntriesCount = 0;
@@ -44,17 +43,29 @@ static int MethodExitsCount = 0;
 static jmethodID mid = NULL;
 
 void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
-                         jthread thr, jmethodID method) {
+                         jthread thread_obj, jmethodID method) {
   if (mid == method) {
-    MethodEntriesCount++;
+    jboolean isVirtual = jni->IsVirtualThread(thread_obj);
+    if (isVirtualExpected != isVirtual) {
+      printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
+      result = STATUS_FAILED;
+    } else {
+      MethodEntriesCount++;
+    }
   }
 }
 
 void JNICALL MethodExit(jvmtiEnv *jvmti, JNIEnv *jni,
-                        jthread thr, jmethodID method,
+                        jthread thread_obj, jmethodID method,
                         jboolean was_poped_by_exc, jvalue return_value) {
   if (mid == method) {
-    MethodExitsCount++;
+    jboolean isVirtual = jni->IsVirtualThread(thread_obj);
+    if (isVirtualExpected != isVirtual) {
+      printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
+      result = STATUS_FAILED;
+    } else {
+      MethodExitsCount++;
+    }
   }
 }
 
@@ -70,12 +81,9 @@ JNIEXPORT jint JNI_OnLoad_mentry02(JavaVM *jvm, char *options, void *reserved) {
 }
 #endif
 jint  Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiCapabilities caps;
   jint res;
   jvmtiError err;
-
-  if (options != NULL && strcmp(options, "printdump") == 0) {
-    printdump = JNI_TRUE;
-  }
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
@@ -83,12 +91,10 @@ jint  Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->GetPotentialCapabilities(&caps);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    return JNI_ERR;
-  }
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_generate_method_entry_events = 1;
+  caps.can_generate_method_exit_events = 1;
+  caps.can_support_virtual_threads = 1;
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
@@ -130,10 +136,13 @@ Java_mentry02_getReady(JNIEnv *jni, jclass cls, jint i) {
     return;
   }
 
-  if (!caps.can_generate_method_entry_events ||
-      !caps.can_generate_method_exit_events) {
-    return;
+  jthread thread;
+  err = jvmti->GetCurrentThread(&thread);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
+    result = STATUS_FAILED;
   }
+  isVirtualExpected = jni->IsVirtualThread(thread);
 
   mid = jni->GetStaticMethodID(cls, "emptyMethod", "()V");
   if (mid == NULL) {
@@ -145,6 +154,7 @@ Java_mentry02_getReady(JNIEnv *jni, jclass cls, jint i) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_METHOD_ENTRY, NULL);
   if (err == JVMTI_ERROR_NONE) {
+    MethodEntriesCount = 0;
     MethodEntriesExpected = i;
   } else {
     printf("Failed to enable JVMTI_EVENT_METHOD_ENTRY event: %s (%d)\n",
@@ -155,6 +165,7 @@ Java_mentry02_getReady(JNIEnv *jni, jclass cls, jint i) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_METHOD_EXIT, NULL);
   if (err == JVMTI_ERROR_NONE) {
+    MethodExitsCount = 0;
     MethodExitsExpected = i;
   } else {
     printf("Failed to enable JVMTI_EVENT_METHOD_EXIT event: %s (%d)\n",
@@ -165,13 +176,9 @@ Java_mentry02_getReady(JNIEnv *jni, jclass cls, jint i) {
 
 JNIEXPORT jint JNICALL
 Java_mentry02_check(JNIEnv *jni, jclass cls) {
-  if (printdump == JNI_TRUE) {
-    printf(">>> MethodEntry events: %d, MethodExit events: %d\n",
-           MethodEntriesCount, MethodExitsCount);
-  }
+  printf(">>> MethodEntry events: %d, MethodExit events: %d\n", MethodEntriesCount, MethodExitsCount);
   if (MethodEntriesCount != MethodEntriesExpected) {
-    printf("Wrong number of method entry events: %d, expected: %d\n",
-           MethodEntriesCount, MethodEntriesExpected);
+    printf("Wrong number of method entry events: %d, expected: %d\n", MethodEntriesCount, MethodEntriesExpected);
     result = STATUS_FAILED;
   }
   if (MethodExitsCount != MethodExitsExpected) {

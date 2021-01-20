@@ -81,7 +81,9 @@ tier1_loom_runtime = \
   runtime/vthread
 
 tier1_loom_serviceability = \
-  serviceability/jvmti/vthread
+  serviceability/jvmti/vthread \
+  serviceability/jvmti/events
+
 
 tier1_common = \
   sanity/BasicVMTest.java \

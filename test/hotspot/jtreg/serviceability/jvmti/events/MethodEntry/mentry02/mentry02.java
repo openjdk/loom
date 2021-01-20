@@ -60,21 +60,42 @@ public class mentry02 {
         }
     }
 
+    static volatile int result;
     native static void getReady(int i);
     native static int check();
 
     public static void main(String args[]) {
-        int count;
+        testVirtual();
+        testKernel();
+    }
+    public static void testVirtual() {
+        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+            getReady(MAX_LOOP);
 
-        getReady(MAX_LOOP);
-
-        for(int i = 0; i < MAX_LOOP; i++) {
-            emptyMethod();
+            for (int i = 0; i < MAX_LOOP; i++) {
+                emptyMethod();
+            }
+            result = check();
+        });
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
 
-        int res = check();
-        if (res != 0) {
-            throw new RuntimeException("Check() returned " + res);
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
+    }
+    public static void testKernel() {
+        getReady(MAX_LOOP);
+
+        for (int i = 0; i < MAX_LOOP; i++) {
+            emptyMethod();
+        }
+        result = check();
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
         }
     }
 

@@ -48,7 +48,6 @@ typedef struct thr {
 } thr;
 
 static jvmtiEnv *jvmti = NULL;
-static jvmtiCapabilities caps;
 static jvmtiEventCallbacks callbacks;
 static jrawMonitorID event_lock;
 static jint result = PASSED;

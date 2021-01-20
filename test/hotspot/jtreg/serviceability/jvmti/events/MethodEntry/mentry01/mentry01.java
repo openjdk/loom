@@ -49,8 +49,6 @@ import java.io.PrintStream;
 
 public class mentry01 {
 
-    final static int JCK_STATUS_BASE = 95;
-
     static {
         try {
             System.loadLibrary("mentry01");
@@ -62,15 +60,37 @@ public class mentry01 {
         }
     }
 
+    static volatile int result;
+
     native static void enable();
     native static int check();
     native static void chain();
 
+
     public static void main(String args[]) {
+        testVirtual();
+        testKernel();
+    }
+    public static void testVirtual() {
+        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+            enable();
+            result = check();
+        });
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
+    }
+    public static void testKernel() {
         enable();
-        int res = check();
-        if (res != 0) {
-            throw new RuntimeException("Check() returned " + res);
+        result = check();
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
         }
     }
 

@@ -52,8 +52,6 @@ import java.io.PrintStream;
 
 public class mexit02 {
 
-    final static int JCK_STATUS_BASE = 95;
-
     static {
         try {
             System.loadLibrary("mexit02");
@@ -65,12 +63,31 @@ public class mexit02 {
         }
     }
 
+    static volatile int result;
     native static int check();
 
     public static void main(String args[]) {
-        int res = check();
-        if (res != 0) {
-            throw new RuntimeException("Check() returned " + res);
+        testVirtual();
+        testKernel();
+    }
+    public static void testVirtual() {
+        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+            result = check();
+        });
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
+        }
+    }
+    public static void testKernel() {
+        result = check();
+        if (result != 0) {
+            throw new RuntimeException("check failed with result " + result);
         }
     }
 }
