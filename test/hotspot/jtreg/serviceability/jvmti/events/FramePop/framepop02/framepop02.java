@@ -52,7 +52,7 @@ public class framepop02 {
 
     static {
         try {
-          //  System.loadLibrary("framepop02");
+            System.loadLibrary("framepop02");
         } catch (UnsatisfiedLinkError ule) {
             System.err.println("Could not load framepop02 library");
             System.err.println("java.library.path:"
@@ -88,11 +88,11 @@ public class framepop02 {
         int nestingCount = 0;
 
         public void run() {
-           // if (nestingCount < NESTING_DEPTH) {
+            if (nestingCount < NESTING_DEPTH) {
                 nestingCount++;
                 System.out.println(".");
                 run();
-           // }
+            }
         }
     }
 }
