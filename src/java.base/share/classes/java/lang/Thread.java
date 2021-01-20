@@ -786,8 +786,8 @@ public class Thread implements Runnable {
 
         /**
          * The thread will be scheduled by the Java virtual machine rather than
-         * the operating system. The scheduler will be selected when the thread
-         * is {@linkplain #build() created} or {@linkplain #start() started}.
+         * the operating system. The scheduler will be selected when the {@code
+         * Thread} is created.
          * @return this builder
          */
         Builder virtual();
@@ -1521,7 +1521,7 @@ public class Thread implements Runnable {
      *
      * @since 99
      */
-    public static final int VIRTUAL = 1 << 0;
+    static final int VIRTUAL = 1 << 0;
 
     /**
      * Characteristic value signifying that the thread cannot set values for its
@@ -1534,7 +1534,7 @@ public class Thread implements Runnable {
      * @see Builder#noThreadLocals()
      * @see ThreadLocal#set(Object)
      */
-    public static final int NO_THREAD_LOCALS = 1 << 1;
+    static final int NO_THREAD_LOCALS = 1 << 1;
 
     /**
      * Characteristic value signifying that initial values for {@link
@@ -1544,7 +1544,7 @@ public class Thread implements Runnable {
      * @since 99
      * @see Builder#noInheritInheritableThreadLocals()
      */
-    public static final int NO_INHERIT_INHERITABLE_THREAD_LOCALS = 1 << 2;
+    static final int NO_INHERIT_INHERITABLE_THREAD_LOCALS = 1 << 2;
 
     private static int validCharacteristics() {
         return (VIRTUAL | NO_THREAD_LOCALS | NO_INHERIT_INHERITABLE_THREAD_LOCALS);
@@ -1584,10 +1584,8 @@ public class Thread implements Runnable {
      *         combination of characteristic is specified
      * @throws NullPointerException if task is null
      * @return an unstarted thread
-     *
-     * @since 99
      */
-    public static Thread unstartedThread(int characteristics, Runnable task) {
+    static Thread unstartedThread(int characteristics, Runnable task) {
         if ((characteristics & VIRTUAL) != 0) {
             return new VirtualThread(null, null, characteristics, task);
         } else {
@@ -1627,7 +1625,7 @@ public class Thread implements Runnable {
      *
      * @since 99
      */
-    public static Thread unstartedThread(String name, int characteristics, Runnable task) {
+    static Thread unstartedThread(String name, int characteristics, Runnable task) {
         Objects.requireNonNull(name);
         Objects.requireNonNull(task);
         if ((characteristics & VIRTUAL) != 0) {
