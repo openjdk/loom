@@ -37,7 +37,6 @@
 #define NSK_DISPLAY1 printf
 #define NSK_DISPLAY2 printf
 #define NSK_DISPLAY3 printf
-#define NSK_DISPLAY4 printf
 
 
 #define NSK_COMPLAIN0 printf

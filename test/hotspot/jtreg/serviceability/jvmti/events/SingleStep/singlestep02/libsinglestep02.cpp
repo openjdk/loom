@@ -36,7 +36,6 @@ static volatile jint result = PASSED;
 static volatile long wrongStepEv = 0;
 
 static jvmtiEnv *jvmti = NULL;
-static jvmtiEventCallbacks callbacks;
 
 /** callback functions **/
 void JNICALL
@@ -53,8 +52,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
     if (phase != JVMTI_PHASE_LIVE) {
       wrongStepEv++;
       result = STATUS_FAILED;
-      NSK_COMPLAIN1("TEST FAILED: SingleStep event received during non-live phase %s\n",
-                    TranslatePhase(phase));
+      NSK_COMPLAIN1("TEST FAILED: SingleStep event received during non-live phase %s\n", TranslatePhase(phase));
     }
   }
 }
@@ -68,10 +66,12 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
         "TEST FAILED: there are %ld SingleStep events\n"
         "sent during non-live phase of the VM execution\n",
         wrongStepEv);
+    jni->FatalError("Test Failed.");
   }
 
-  if (result == STATUS_FAILED)
-    exit(95 + STATUS_FAILED);
+  if (result == STATUS_FAILED) {
+    jni->FatalError("Test Failed.");
+  }
 }
 /************************/
 
@@ -87,6 +87,7 @@ JNIEXPORT jint JNI_OnLoad_singlestep02(JavaVM *jvm, char *options, void *reserve
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiEventCallbacks callbacks;
   jvmtiCapabilities caps;
   jvmtiError err;
   jint res;
@@ -113,8 +114,10 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
            TranslateError(err), err);
     return JNI_ERR;
   }
-  if (!caps.can_generate_single_step_events)
-    NSK_DISPLAY0("Warning: generation of single step events is not implemented\n");
+  if (!caps.can_generate_single_step_events) {
+    printf("Warning: generation of single step events is not implemented\n");
+    return JNI_ERR;
+  }
 
   /* set event callback */
   NSK_DISPLAY0("setting event callbacks ...\n");

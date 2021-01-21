@@ -48,22 +48,6 @@ import java.io.*;
  * @run main/othervm/native -agentlib:singlestep01 singlestep01
  */
 
-
-
-/**
- * This test exercises the JVMTI event <code>SingleStep</code>.
- * <br>It verifies that this event can be enabled and disabled
- * during program execution.<br>
- * The test works as follows. Breakpoint is set at special method
- * <code>bpMethod()</code>. Upon reaching the breakpoint, agent
- * enables <code>SingleStep</code> event generation. All the received
- * events are counted. When the method <code>bpMethod()</code> is
- * leaved and accordingly, the program returns to the calling method
- * <code>runThis()</code>, the agent disables the event generation.<br>
- * At least one <code>SingleStep</code> event must be received for
- * the each methods mentioned above. Also after disabling the event
- * no more event must be received.
- */
 public class singlestep01 {
     static {
         try {
@@ -76,17 +60,29 @@ public class singlestep01 {
         }
     }
 
+    static volatile int result;
     native int check();
 
-    public static void main(String[] argv) {
-        int result = new singlestep01().runThis();
+    public static void main(String[] argv) throws Exception {
+        Thread thread = Thread.builder().task(() -> {
+             result = new singlestep01().runThis();
+        }).build();
+        thread.start();
+        thread.join();
+        if (result != 0) {
+            throw new RuntimeException("Unexpected status: " + result);
+        }
+        thread = Thread.builder().task(() -> {
+            result = new singlestep01().runThis();
+        }).virtual().build();
+        thread.start();
+        thread.join();
         if (result != 0) {
             throw new RuntimeException("Unexpected status: " + result);
         }
     }
 
     private int runThis() {
-
 
         Thread.currentThread().setName("singlestep01Thr");
 

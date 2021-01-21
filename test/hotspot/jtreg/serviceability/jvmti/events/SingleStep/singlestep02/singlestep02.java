@@ -43,18 +43,6 @@ import java.io.*;
  * @run main/othervm/native -agentlib:singlestep02 singlestep02
  */
 
-
-
-
-/**
- * This test exercises the JVMTI event <code>SingleStep</code>.
- * <br>It verifies that this event is sent only during the live
- * phase of VM execution.<br>
- * The test works as follows. The tested event is enabled in the
- * <code>OnLoad</code> phase. Then all received <code>SingleStep</code>
- * events is checked to be sent only during the live phase via
- * the <code>GetPhase()</code> call.
- */
 public class singlestep02 {
 
     static {
@@ -68,8 +56,8 @@ public class singlestep02 {
         }
     }
 
-    public static void main(String[] argv) {
-        new singlestep02().runThis(argv);
+    public static void main(String[] args) {
+        new singlestep02().runThis(args);
     }
 
     private int runThis(String argv[]) {

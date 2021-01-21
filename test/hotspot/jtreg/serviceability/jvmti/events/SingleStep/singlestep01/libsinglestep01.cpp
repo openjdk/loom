@@ -51,7 +51,8 @@ static const char *CLASS_SIG =
 
 static volatile jint result = PASSED;
 static jvmtiEnv *jvmti = NULL;
-static jvmtiEventCallbacks callbacks;
+
+static volatile jboolean isVirtualExpected = JNI_FALSE;
 
 static volatile int callbacksEnabled = NSK_FALSE;
 static jrawMonitorID agent_lock;
@@ -86,7 +87,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
       jni->FatalError("failed to obtain a class signature\n");
     }
     if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
-      NSK_DISPLAY1(
+      printf(
           "ClassLoad event received for the class \"%s\"\n"
           "\tsetting breakpoint ...\n",
           sig);
@@ -122,7 +123,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method, jlocatio
   }
 
   if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
-    NSK_DISPLAY1("method declaring class \"%s\"\n\tenabling SingleStep events ...\n", sig);
+    printf("method declaring class \"%s\"\n\tenabling SingleStep events ...\n", sig);
     err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thr);
     if (err != JVMTI_ERROR_NONE) {
       result = STATUS_FAILED;
@@ -133,6 +134,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method, jlocatio
     NSK_COMPLAIN1("TEST FAILURE: unexpected breakpoint event in method of class \"%s\"\n\n",
                   sig);
   }
+  isVirtualExpected = jni->IsVirtualThread(thr);
   jvmti->RawMonitorExit(agent_lock);
 }
 
@@ -148,6 +150,8 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
   }
 
   NSK_DISPLAY0(">>>> SingleStep event received\n");
+
+  print_thread_info(jni, jvmti, thread);
 
   err = jvmti->GetMethodName(method, &methNam, &methSig, NULL);
   if (err != JVMTI_ERROR_NONE) {
@@ -184,16 +188,22 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
         (strcmp(methSig, METHOD_SIGS[0]) == 0) &&
         (strcmp(sig, CLASS_SIG) == 0)) {
       stepEv[0]++;
-      NSK_DISPLAY1("CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n",
+      printf("CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n",
                    methNam);
     } else if ((strcmp(methNam, METHODS[1]) == 0) &&
         (strcmp(methSig, METHOD_SIGS[1]) == 0) &&
         (strcmp(sig, CLASS_SIG) == 0)) {
-      stepEv[1]++;
-      NSK_DISPLAY1(
-          "CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n"
-          "\tdisabling the event generation\n",
-          methNam);
+      jboolean isVirtual = jni->IsVirtualThread(thread);
+      if (isVirtualExpected != isVirtual) {
+        printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
+        result = STATUS_FAILED;
+      } else {
+        stepEv[1]++;
+        printf(
+            "CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n"
+            "\tdisabling the event generation\n",
+            methNam);
+      }
       err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
       if (err != JVMTI_ERROR_NONE) {
         result = STATUS_FAILED;
@@ -213,7 +223,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
     NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
   }
 
-  NSK_DISPLAY0("<<<<\n\n");
+  printf("<<<<\n\n");
 }
 
 void JNICALL
@@ -242,6 +252,8 @@ Java_singlestep01_check(JNIEnv *jni, jobject obj) {
       result = STATUS_FAILED;
       NSK_COMPLAIN1("TEST FAILED: no SingleStep events for the method \"%s\"\n\n",
                     METHODS[i]);
+    } else {
+      stepEv[i] = 0;
     }
   }
   return result;
@@ -259,6 +271,7 @@ JNIEXPORT jint JNI_OnLoad_singlestep01(JavaVM *jvm, char *options, void *reserve
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiEventCallbacks callbacks;
   jvmtiCapabilities caps;
   jvmtiError err;
   jint res;
@@ -272,6 +285,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   memset(&caps, 0, sizeof(jvmtiCapabilities));
   caps.can_generate_breakpoint_events = 1;
   caps.can_generate_single_step_events = 1;
+  caps.can_support_virtual_threads = 1;
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
@@ -288,11 +302,11 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   if (!caps.can_generate_single_step_events) {
-    NSK_DISPLAY0("Warning: generation of single step events is not implemented\n");
+    printf("Warning: generation of single step events is not implemented\n");
   }
 
   /* set event callback */
-  NSK_DISPLAY0("setting event callbacks ...\n");
+  printf("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.ClassLoad = &ClassLoad;
   callbacks.Breakpoint = &Breakpoint;
@@ -304,7 +318,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  NSK_DISPLAY0("setting event callbacks done\nenabling JVMTI events ...\n");
+  printf("setting event callbacks done\nenabling JVMTI events ...\n");
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
@@ -322,7 +336,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  NSK_DISPLAY0("enabling the events done\n\n");
+  printf("enabling the events done\n\n");
 
   err = jvmti->CreateRawMonitor("agent lock", &agent_lock);
   if (err != JVMTI_ERROR_NONE) {

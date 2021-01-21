@@ -44,23 +44,10 @@ import java.io.*;
  * COMMENTS
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:singlestep03 singlestep03
+ * @run main/othervm/native -agentlib:singlestep03 singlestep03 kernel
+ * @run main/othervm/native -agentlib:singlestep03 singlestep03 virtual
  */
 
-/**
- * This test exercises the JVMTI event <code>SingleStep</code>.
- * <br>It verifies that no single step event will be generated from
- * within native methods.<br>
- * The test works as follows. Breakpoint is set at special method
- * <code>bpMethod()</code>. Upon reaching the breakpoint, agent
- * enables <code>SingleStep</code> event generation and checks the
- * events. The java part calls native method <code>nativeMethod()</code>
- * which calls another native <code>anotherNativeMethod()</code>
- * in order to provoke the SingleStep events from within native
- * methods. When <code>bpMethod()</code> is leaved and accordingly,
- * the program returns to the calling method <code>runThis()</code>,
- * the agent disables the event generation.
- */
 public class singlestep03 {
     static {
         try {
@@ -73,13 +60,22 @@ public class singlestep03 {
         }
     }
 
+    static volatile int result;
     native void nativeMethod();
     native void anotherNativeMethod(int i);
 
     native int check();
 
-    public static void main(String[] argv) {
-        int result = new singlestep03().runThis();
+    public static void main(String[] args) throws Exception {
+        Thread.Builder threadBuilder = Thread.builder().task(() -> {
+            result = new singlestep03().runThis();
+        });
+        if ("virtual".equals(args[0])) {
+            threadBuilder = threadBuilder.virtual();
+        }
+        Thread thread = threadBuilder.build();
+        thread.start();
+        thread.join();
         if (result != 0) {
             throw new RuntimeException("Unexpected status: " + result);
         }
