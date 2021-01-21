@@ -46,6 +46,12 @@ static bool requires_barriers(oop obj) {
 
 int InstanceStackChunkKlass::_offset_of_stack = 0;
 
+#if INCLUDE_CDS
+void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
+  f->do_u4((u4*)&_offset_of_stack);
+}
+#endif
+
 InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
  : InstanceKlass(parser, InstanceKlass::_misc_kind_stack_chunk, ID) {
    // see oopDesc::size_given_klass TODO perf
@@ -64,11 +70,69 @@ int InstanceStackChunkKlass::oop_size(oop obj) const {
   return instance_size(jdk_internal_misc_StackChunk::size(obj));
 }
 
-#if INCLUDE_CDS
-void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
-  f->do_u4((u4*)&_offset_of_stack);
+int InstanceStackChunkKlass::compact_oop_size(oop obj) const {
+  assert (jdk_internal_misc_StackChunk::is_stack_chunk(obj), "");
+  // We therefore don't trim chunks with ZGC. See copy_compact
+  if (UseZGC) return instance_size(jdk_internal_misc_StackChunk::size(obj));
+  int used_stack_in_words = jdk_internal_misc_StackChunk::size(obj) - jdk_internal_misc_StackChunk::sp(obj) + metadata_words();
+  assert (used_stack_in_words <= jdk_internal_misc_StackChunk::size(obj), "");
+  return align_object_size(size_helper() + used_stack_in_words);
 }
+
+template size_t InstanceStackChunkKlass::copy_compact<false>(oop obj, HeapWord* to_addr);
+template size_t InstanceStackChunkKlass::copy_compact<true>(oop obj, HeapWord* to_addr);
+
+template<bool disjoint>
+size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
+  assert (jdk_internal_misc_StackChunk::is_stack_chunk(obj), "");
+
+  const int from_sp = jdk_internal_misc_StackChunk::sp(obj);
+  assert (from_sp >= metadata_words(), "");
+  assert (obj->compact_size() <= obj->size(), "");
+  assert (UseZGC || (from_sp <= metadata_words()) == (obj->compact_size() == obj->size()), "");
+
+  // from_sp <= metadata_words()
+  //   ? tty->print_cr(">>> InstanceStackChunkKlass::copy_compact disjoint: %d", disjoint)
+  //   : tty->print_cr(">>> InstanceStackChunkKlass::copy_compact disjoint: %d size: %d compact_size: %d saved: %d", disjoint, obj->size(), obj->compact_size(), obj->size() - obj->compact_size());
+
+  // ZGC usually relocates objects into allocating regions that don't require barriers, so they keep/make the chunk mutable.
+  // We therefore don't trim with ZGC.
+  if (from_sp <= metadata_words() || UseZGC) {
+    return disjoint ? obj->copy_disjoint(to_addr) : obj->copy_conjoint(to_addr);
+  }
+#ifdef ASSERT
+  int old_compact_size = obj->compact_size();
+  int old_size = obj->size();
 #endif
+
+  int header = size_helper();
+  int used_stack_in_words = jdk_internal_misc_StackChunk::size(obj) - from_sp + metadata_words();
+  HeapWord* to_end = to_addr + align_object_size(header + used_stack_in_words);
+  
+  // copy header
+  HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
+  disjoint ? Copy::aligned_disjoint_words(from_addr, to_addr, header)
+           : Copy::aligned_conjoint_words(from_addr, to_addr, header);
+
+  // update header
+  jdk_internal_misc_StackChunk::set_size(to_addr, used_stack_in_words);
+  jdk_internal_misc_StackChunk::set_sp(oop(to_addr), metadata_words());
+
+  // copy stack
+  assert ((from_addr + header) == start_of_stack(obj), "");
+  HeapWord* from_start = from_addr + header + from_sp - metadata_words();
+  HeapWord* to_start = to_addr + header;
+  disjoint ? Copy::aligned_disjoint_words(from_start, to_start, used_stack_in_words)
+           : Copy::aligned_conjoint_words(from_start, to_start, used_stack_in_words);
+  assert (to_start + used_stack_in_words <= to_end, "");
+
+  assert (oop(to_addr)->size() == old_compact_size, "");
+  assert (oop(to_addr)->size() == instance_size(used_stack_in_words), "");
+  assert (from_sp <= metadata_words() || oop(to_addr)->size() < old_size, "");
+  assert (Universe::heap()->requires_barriers(oop(to_addr)), "");
+
+  return align_object_size(header + used_stack_in_words);
+}
 
 int InstanceStackChunkKlass::count_frames(oop chunk) {
   int frames = 0;

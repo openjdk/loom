@@ -63,7 +63,7 @@ static uintptr_t relocate_object_inner(ZForwarding* forwarding, uintptr_t from_a
   assert(ZHeap::heap()->is_object_live(from_addr), "Should be live");
 
   // Allocate object
-  const size_t size = ZUtils::object_size(from_addr);
+  const size_t size = ZUtils::object_compact_size(from_addr);
   const uintptr_t to_addr = ZHeap::heap()->alloc_object_non_blocking(size);
   if (to_addr == 0) {
     // Allocation failed
@@ -71,7 +71,7 @@ static uintptr_t relocate_object_inner(ZForwarding* forwarding, uintptr_t from_a
   }
 
   // Copy object
-  ZUtils::object_copy_disjoint(from_addr, to_addr, size);
+  ZUtils::object_copy_disjoint_compact(from_addr, to_addr, size);
 
   // Insert forwarding
   const uintptr_t to_addr_final = forwarding_insert(forwarding, from_addr, to_addr, cursor);
@@ -282,7 +282,7 @@ private:
     }
 
     // Allocate object
-    const size_t size = ZUtils::object_size(from_addr);
+    const size_t size = ZUtils::object_compact_size(from_addr);
     const uintptr_t to_addr = _allocator->alloc_object(_target, size);
     if (to_addr == 0) {
       // Allocation failed
@@ -292,9 +292,9 @@ private:
     // Copy object. Use conjoint copying if we are relocating
     // in-place and the new object overlapps with the old object.
     if (_forwarding->in_place() && to_addr + size > from_addr) {
-      ZUtils::object_copy_conjoint(from_addr, to_addr, size);
+      ZUtils::object_copy_conjoint_compact(from_addr, to_addr, size);
     } else {
-      ZUtils::object_copy_disjoint(from_addr, to_addr, size);
+      ZUtils::object_copy_disjoint_compact(from_addr, to_addr, size);
     }
 
     // Insert forwarding

@@ -295,7 +295,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
   }
 
   // Copy the object:
-  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(p), copy, size);
+  p->copy_disjoint(copy, size);
 
   // Try to install the new forwarding pointer.
   oop copy_val = oop(copy);
