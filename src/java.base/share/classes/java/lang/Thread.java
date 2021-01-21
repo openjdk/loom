@@ -173,6 +173,15 @@ public class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
+
+    // A simple (not very) random string of bits to use when evicting
+    // cache entries.
+    int victims
+        = 0b1100_1001_0000_1111_1101_1010_1010_0010;
+
+    Scoped.Binding<?> noninheritableScopeLocalBindings;
+    Scoped.Binding<?> inheritableScopeLocalBindings;
+
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
      * at 2 as this class cannot be used during early startup to generate the
@@ -573,6 +582,8 @@ public class Thread implements Runnable {
             }
         }
 
+        this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+
         int priority;
         boolean daemon;
         if (primordial) {
@@ -615,6 +626,8 @@ public class Thread implements Runnable {
                 this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
             }
         }
+
+        this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
 
         // no additional fields
         this.holder = null;

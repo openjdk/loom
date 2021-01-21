@@ -3357,7 +3357,7 @@ JVM_ENTRY(jobject, JVM_ScopedCache(JNIEnv* env, jclass threadClass))
   oop theCache = thread->scopedCache();
   if (theCache) {
     arrayOop objs = arrayOop(theCache);
-    assert(objs->length() == ScopedCacheSize * 2 + 2, "wrong length");
+    assert(objs->length() == ScopedCacheSize * 2, "wrong length");
   }
   return JNIHandles::make_local(THREAD, theCache);
 JVM_END
@@ -3367,7 +3367,7 @@ JVM_ENTRY(void, JVM_SetScopedCache(JNIEnv* env, jclass threadClass,
   JVMWrapper("JVM_SetScopedCache");
   arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
   if (objs != NULL) {
-    assert(objs->length() == ScopedCacheSize * 2 + 2, "wrong length");
+    assert(objs->length() == ScopedCacheSize * 2, "wrong length");
   }
   thread->set_scopedCache(objs);
 JVM_END
