@@ -40,8 +40,8 @@ static jvmtiEnv *jvmti = NULL;
 static jlong timeout = 0;
 
 /* test objects */
-static jthread thread = NULL;
-static jobject object = NULL;
+static jthread expected_thread = NULL;
+static jobject expected_object = NULL;
 static volatile int eventsCount = 0;
 
 /* ========================================================================== */
@@ -49,16 +49,21 @@ static volatile int eventsCount = 0;
 void JNICALL
 MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj) {
 
-  printf("MonitorContendedEnter event:\n\tthread: %p, object: %p\n",thr, obj);
+  printf("MonitorContendedEnter event:\n\tthread: %p, object: %p, expected object: %p\n",thr, obj, expected_object);
 
-  if (thread == NULL) {
-    nsk_jvmti_setFailStatus();
-    return;
+  print_thread_info(jni, jvmti, thr);
+
+  if (expected_thread == NULL) {
+    jni->FatalError("expected_thread is NULL.");
   }
 
-/* check if event is for tested thread and for tested object */
-  if (jni->IsSameObject(thread, thr) &&
-      jni->IsSameObject(object, obj)) {
+  if (expected_object == NULL) {
+    jni->FatalError("expected_object is NULL.");
+  }
+
+  /* check if event is for tested thread and for tested object */
+  if (jni->IsSameObject(expected_thread, thr) &&
+      jni->IsSameObject(expected_object, obj)) {
     eventsCount++;
     printf("Increasing eventCount to %d\n", eventsCount);
   }
@@ -67,93 +72,9 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj) {
 /* ========================================================================== */
 
 static int prepare() {
-  const char *THREAD_NAME = "Debuggee Thread";
-  jclass klass = NULL;
-  jfieldID field = NULL;
-  jvmtiThreadInfo info;
-  jthread *threads = NULL;
-  jint threads_count = 0;
-  jvmtiError err;
-  int i;
-
-  printf("Prepare: find tested thread\n");
-
-  /* get all live threads */
-  err = jvmti->GetAllThreads(&threads_count, &threads);
+  jvmtiError err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_CONTENDED_ENTER, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    return NSK_FALSE;
-  }
-
-  if (!(threads_count > 0 && threads != NULL)) {
-    return NSK_FALSE;
-  }
-
-  /* find tested thread */
-  for (i = 0; i < threads_count; i++) {
-    if (threads[i] == NULL) {
-      return NSK_FALSE;
-    }
-
-    /* get thread information */
-    err = jvmti->GetThreadInfo(threads[i], &info);
-    if (err != JVMTI_ERROR_NONE) {
-      return NSK_FALSE;
-    }
-
-    NSK_DISPLAY3("    thread #%d (%s): %p\n", i, info.name, threads[i]);
-
-    /* find by name */
-    if (info.name != NULL && (strcmp(info.name, THREAD_NAME) == 0)) {
-      thread = threads[i];
-    }
-  }
-
-  /* deallocate threads list */
-  err = jvmti->Deallocate((unsigned char *) threads);
-  if (err != JVMTI_ERROR_NONE) {
-    return NSK_FALSE;
-  }
-
-  if (thread == NULL) {
-    NSK_COMPLAIN0("Debuggee thread not found");
-    return NSK_FALSE;
-  }
-
-  /* make thread accessable for a long time */
-  thread = jni->NewGlobalRef(thread);
-  if (thread == NULL) {
-    return NSK_FALSE;
-  }
-
-  /* get tested thread class */
-  klass = jni->GetObjectClass(thread);
-  if (klass == NULL) {
-    return NSK_FALSE;
-  }
-
-  /* get tested thread field 'endingMonitor' */
-  field = jni->GetFieldID(klass, "endingMonitor", "Ljava/lang/Object;");
-  if (field == NULL) {
-    return NSK_FALSE;
-  }
-
-  /* get 'endingMonitor' object */
-  object = jni->GetObjectField(thread, field);
-  if (object == NULL) {
-    return NSK_FALSE;
-  }
-
-  /* make object accessable for a long time */
-  object = jni->NewGlobalRef(object);
-  if (object == NULL) {
-    return NSK_FALSE;
-  }
-
-  /* enable MonitorContendedEnter event */
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_CONTENDED_ENTER, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("Prepare: 11\n");
-    return NSK_FALSE;
+    jni->FatalError("Error enabling JVMTI_EVENT_MONITOR_CONTENDED_ENTER.");
   }
   return NSK_TRUE;
 }
@@ -255,15 +176,13 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    printf("(GetCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -284,10 +203,27 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   return JNI_OK;
 }
 
-JNIEXPORT jint JNICALL Java_mcontenter01_getEventCount
-    (JNIEnv *jni, jobject obj) {
+JNIEXPORT jint JNICALL Java_mcontenter01_getEventCount(JNIEnv *jni, jobject obj) {
   return eventsCount;
 }
+
+JNIEXPORT void JNICALL Java_mcontenter01_setExpected(JNIEnv *jni, jobject clz, jobject obj, jobject thread) {
+  printf("Remembering global reference for monitor object is %p\n", obj);
+  /* make object accessible for a long time */
+  expected_object = jni->NewGlobalRef(obj);
+  if (expected_object == NULL) {
+    jni->FatalError("Error saving global reference to monitor.\n");
+  }
+
+  /* make thread accessable for a long time */
+  expected_thread = jni->NewGlobalRef(thread);
+  if (thread == NULL) {
+    jni->FatalError("Error saving global reference to thread.\n");
+  }
+
+  return;
+}
+
 
 JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   return Agent_Initialize(jvm, options, reserved);

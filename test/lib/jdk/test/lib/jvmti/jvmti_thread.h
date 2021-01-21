@@ -349,7 +349,7 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
 JNIEXPORT jint JNICALL
 Java_jdk_test_lib_jvmti_DebugeeClass_checkStatus(JNIEnv* jni_env, jclass cls, jint debuggeeStatus) {
   jint status;
-  // TODO NSK_TRACE
+  printf("Synchronization point checkStatus(%d) called.\n", debuggeeStatus);
   status = syncDebuggeeStatus(jni_env, agent_jvmti_env, debuggeeStatus);
   return status;
 }

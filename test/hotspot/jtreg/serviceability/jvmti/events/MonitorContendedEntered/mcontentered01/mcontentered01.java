@@ -43,8 +43,8 @@ import java.io.PrintStream;
  *       and save JNIEnv pointer now passed as argument.
  *
  * @library /test/lib
- * @run main/othervm/native
- *      -agentlib:mcontentered01 mcontentered01
+ * @run main/othervm/native -agentlib:mcontentered01 mcontentered01 kernel
+ * @run main/othervm/native -agentlib:mcontentered01 mcontentered01 virtual
  */
 
 public class mcontentered01 extends DebugeeClass {
@@ -55,36 +55,32 @@ public class mcontentered01 extends DebugeeClass {
     }
 
     // run test from command line
-    public static void main(String argv[]) {
-        int result = new mcontentered01().runIt();
+    public static void main(String args[]) {
+        boolean isVirtual = "virtual".equals(args[0]);
+        int result = new mcontentered01().runIt(isVirtual);
         if (result != 0) {
             throw new RuntimeException("Unexpected status: " + result);
         }
     }
 
-
-    int status = TEST_PASSED;
-    long timeout = 0;
-
-    // tested thread
-    mcontentered01Thread thread = null;
-
     // run debuggee
-    public int runIt() {
-
-        timeout =  60000; // milliseconds
+    public int runIt(boolean isVirtual) {
+        int status = TEST_PASSED;
+        long timeout =  60000; // milliseconds
         System.out.println("Timeout = " + timeout + " msc.");
 
-        thread = new mcontentered01Thread("Debuggee Thread");
+        mcontentered01Task task = new mcontentered01Task();
+        Thread thread  = Thread.unstartedThread("Debuggee Thread", isVirtual ? Thread.VIRTUAL : 0, task);
+        setExpected(task.endingMonitor, thread);
 
-        synchronized (thread.endingMonitor) {
+        synchronized (task.endingMonitor) {
 
             // run thread
             try {
                 // start thread
-                synchronized (thread.startingMonitor) {
+                synchronized (task.startingMonitor) {
                     thread.start();
-                    thread.startingMonitor.wait(timeout);
+                    task.startingMonitor.wait(timeout);
                 }
             } catch (InterruptedException e) {
                 throw new Failure(e);
@@ -118,17 +114,14 @@ public class mcontentered01 extends DebugeeClass {
     }
 
     private native int getEventCount();
+    private native void setExpected(Object monitor, Object thread);
 }
 
 /* =================================================================== */
 
-class mcontentered01Thread extends Thread {
+class mcontentered01Task implements Runnable {
     public Object startingMonitor = new Object();
     public Object endingMonitor = new Object();
-
-    public mcontentered01Thread(String name) {
-        super(name);
-    }
 
     public void run() {
 
