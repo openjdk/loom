@@ -93,14 +93,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj) {
 /* ========================================================================== */
 
 static int prepare() {
-  const char *THREAD_NAME = "Debuggee Thread";
-  jclass klass = NULL;
-  jfieldID field = NULL;
-  jvmtiThreadInfo info;
-  jthread *threads = NULL;
-  jint threads_count = 0;
   jvmtiError err;
-  int i;
 
   NSK_DISPLAY0("Prepare: find tested thread\n");
 
