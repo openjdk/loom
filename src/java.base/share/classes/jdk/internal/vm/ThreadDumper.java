@@ -24,13 +24,11 @@
  */
 package jdk.internal.vm;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,6 +44,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
@@ -55,12 +54,10 @@ import sun.security.action.GetPropertyAction;
 /**
  * Thread dump support.
  *
- * This class consists exclusively of static methods that are used to track the
- * creation and termination of thread containers. It can optionally support tracking
- * the start and termination of virtual threads.
- *
  * This class defines methods to dump threads to an output stream or file in
- * plain text or JSON format.
+ * plain text or JSON format. Virtual threads are located if they are created in
+ * a structured way with a ThreadExecutor. This class optionally support tracking
+ * the start and termination of all virtual threads.
  */
 public class ThreadDumper {
     private ThreadDumper() { }
@@ -101,141 +98,74 @@ public class ThreadDumper {
     }
 
     /**
-     * Provides access to Thread.threadDumperHeadNode
+     * A container of threads, backed by a ThreadExecutor.
      */
-    private static class ThreadFields {
-        private static final VarHandle HEAD_NODE;
-        static {
-            try {
-                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
-                    MethodHandles.privateLookupIn(Thread.class, MethodHandles.lookup());
-                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                HEAD_NODE = l.findVarHandle(Thread.class, "threadDumperHeadNode", Object.class);
-            } catch (Exception e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-        /**
-         * Sets the current thread's head node.
-         */
-        static void setCurrentThreadHeadNode(Node node) {
-            HEAD_NODE.setVolatile(Thread.currentThread(), node);
-        }
-        /**
-         * Returns the current thread's head node.
-         */
-        static Node currentThreadHeadNode() {
-            return (Node) HEAD_NODE.getVolatile(Thread.currentThread());
-        }
-        /**
-         * Returns the given thread's head node.
-         */
-        static Node threadHeadNode(Thread thread) {
-            return (Node) HEAD_NODE.getVolatile(thread);
-        }
-    }
+    private static class ThreadContainer {
+        private final Object threadExecutor;
 
-    /**
-     * A key returned by notifyCreate(ThreadContainer). The owner invokes close
-     * to deregister the container.
-     */
-    public interface Key {
-        void close();
-    }
+        ThreadContainer(Object threadExecutor) {
+            this.threadExecutor = Objects.requireNonNull(threadExecutor);
+        }
 
-    /**
-     * A node in a list of nodes that keep track of the thread containers created
-     * by a thread. Invoking the node close method removes it from the current
-     * thread's list of nodes.
-     */
-    private final static class Node
-            extends WeakReference<ThreadContainer> implements Key {
-        private final long owner;
-        private volatile Node next;
-        Node(ThreadContainer container, Node next) {
-            super(container);
-            this.owner = Thread.currentThread().getId();
-            this.next = next;
+        Stream<Thread> threads() {
+            return ThreadExecutorFields.threads(threadExecutor).stream();
         }
-        ThreadContainer containerOrNull() {
-            return get();
-        }
-        long owner() {
-            return owner;
-        }
-        Node next() {
-            return next;
-        }
-        void setNext(Node next) {
-            assert Thread.currentThread().getId() == owner;
-            this.next = next;
-        }
-        @Override
-        public void close() {
-            Node head = ThreadFields.currentThreadHeadNode();
-            if (head == this) {
-                // pop
-                ThreadFields.setCurrentThreadHeadNode(head.next());
-            } else if (Thread.currentThread().getId() == owner) {
-                // out of order close by owner, need to unlink node
-                Node current = head;
-                while (current != null && current.next() != this) {
-                    current = current.next();
-                }
-                if (current != null && current.next() == this) {
-                    current.next = this.next();
-                }
-            }
-        }
-    }
 
-    /**
-     * Expunges stale nodes from the current thread's list of nodes, returning
-     * the (possibly new) head node. This method is O(n) but the list is
-     * unlikely to only have more than 2 or 3 elements.
-     */
-    private static Node expungeStaleNodes() {
-        Node head = ThreadFields.currentThreadHeadNode();
-        Node current = head;
-        Node previous = null;
-        while (current != null) {
-            Node next = current.next();
-            if (current.refersTo(null)) {
-                if (previous == null) {
-                    head = next;
-                } else {
-                    previous.setNext(next);
-                }
+        private static ThreadContainer latestThreadContainer(Thread thread) {
+            Object threadExecutor = ThreadFields.latestThreadExecutor(thread);
+            if (threadExecutor != null) {
+                return new ThreadContainer(threadExecutor);
             } else {
-                previous = current;
+                return null;
             }
-            current = next;
         }
-        return head;
-    }
 
-    /**
-     * Notifies the thread dumper that a thread container has been created.
-     * Returns a registration key can be used to notify the thread dumper
-     * that the thread container has been closed.
-     */
-    public static Key notifyCreate(ThreadContainer container) {
-        Node head = expungeStaleNodes();
-        // push
-        var node = new Node(container, head);
-        ThreadFields.setCurrentThreadHeadNode(node);
-        return node;
-    }
+        private ThreadContainer previous() {
+            Object previous = ThreadExecutorFields.previous(threadExecutor);
+            if (previous != null) {
+                return new ThreadContainer(previous);
+            } else {
+                return null;
+            }
+        }
+        
+        /**
+         * Returns the list of "active" containers created by the given thread. The
+         * list is ordered, enclosing containers before nested containers.
+         */
+        static List<ThreadContainer> containers(Thread thread) {
+            ThreadContainer container = latestThreadContainer(thread);
+            if (container == null) {
+                return List.of();
+            } else {
+                List<ThreadContainer> list = new ArrayList<>();
+                while (container != null) {
+                    list.add(container);
+                    container = container.previous();
+                }
+                Collections.reverse(list);
+                return list;
+            }
+        }
 
-    /**
-     * Return a String that can be used to identify the given container.
-     */
-    private static String id(ThreadContainer container) {
-        if (container != null) {
-            return container.getClass().getName()
-                    + "@" + System.identityHashCode(container);
-        } else {
-            return "null";
+        @Override
+        public int hashCode() {
+            return threadExecutor.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof ThreadContainer other) {
+                return this.threadExecutor == other.threadExecutor;
+            } else {
+                return false;
+            }
+        }
+
+        @Override
+        public String toString() {
+            return threadExecutor.getClass().getName()
+                    + "@" + System.identityHashCode(threadExecutor);
         }
     }
 
@@ -246,41 +176,19 @@ public class ThreadDumper {
     private static Stream<Thread> virtualThreads(Set<Thread> roots) {
         Set<Thread> threads = new HashSet<>();
         Deque<ThreadContainer> stack = new ArrayDeque<>();
-        roots.stream().flatMap(t -> containers(t).stream()).forEach(stack::push);
+        roots.stream()
+                .flatMap(t -> ThreadContainer.containers(t).stream())
+                .forEach(stack::push);
         while (!stack.isEmpty()) {
             ThreadContainer container = stack.pop();
             container.threads().forEach(t -> {
                 if (t.isVirtual()) {
                     threads.add(t);
                 }
-                containers(t).forEach(stack::push);
+                ThreadContainer.containers(t).forEach(stack::push);
             });
         }
         return threads.stream();
-    }
-
-    /**
-     * Returns the list of "active" containers created by the given thread. The
-     * list is ordered, enclosing containers before nested containers.
-     */
-    private static List<ThreadContainer> containers(Thread thread) {
-        Node head = ThreadFields.threadHeadNode(thread);
-        if (head == null) {
-            return List.of();
-        } else {
-            List<ThreadContainer> list = new ArrayList<>();
-            Node node = head;
-            while (node != null) {
-                Node next = node.next();
-                ThreadContainer container = node.containerOrNull();
-                if (container != null) {
-                    list.add(container);
-                }
-                node = next;
-            }
-            Collections.reverse(list);
-            return list;
-        }
     }
 
     /**
@@ -294,7 +202,7 @@ public class ThreadDumper {
         Map<Long, List<ThreadContainer>> map = new HashMap<>();
         Deque<ThreadContainer> stack = new ArrayDeque<>();
         roots.stream().forEach(t -> {
-            List<ThreadContainer> containers = containers(t);
+            List<ThreadContainer> containers = ThreadContainer.containers(t);
             if (!containers.isEmpty()) {
                 map.put(t.getId(), containers);
                 containers.forEach(stack::push);
@@ -303,7 +211,7 @@ public class ThreadDumper {
         while (!stack.isEmpty()) {
             ThreadContainer container = stack.pop();
             container.threads().forEach(t -> {
-                List<ThreadContainer> containers = containers(t);
+                List<ThreadContainer> containers = ThreadContainer.containers(t);
                 if (!containers.isEmpty()) {
                     map.put(t.getId(), containers);
                     containers.forEach(stack::push);
@@ -311,15 +219,6 @@ public class ThreadDumper {
             });
         }
         return map;
-    }
-
-    /**
-     * Generate a thread dump in plain text format to a byte array, UTF-8 encoded.
-     */
-    public static byte[] dumpThreads() {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        dumpThreads(out);
-        return out.toByteArray();
     }
 
     /**
@@ -378,15 +277,6 @@ public class ThreadDumper {
     }
 
     /**
-     * Generate a thread dump in JSON format to a byte array, UTF-8 encoded.
-     */
-    public static byte[] dumpThreadsToJson() {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        dumpThreadsToJson(out);
-        return out.toByteArray();
-    }
-
-    /**
      * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
      */
     public static byte[] dumpThreadsToJson(String file) throws IOException {
@@ -435,7 +325,7 @@ public class ThreadDumper {
             while (i < containers.size()) {
                 ThreadContainer container = containers.get(i++);
                 out.println("            {");
-                out.format("              \"containerId\": \"%s\",%n", escape(id(container)));
+                out.format("              \"containerId\": \"%s\",%n", escape(container.toString()));
 
                 out.println("              \"memberTids\": [");
                 long[] members = container.threads().mapToLong(Thread::getId).toArray();
@@ -541,11 +431,62 @@ public class ThreadDumper {
                 case '\r' -> sb.append("\\r");
                 case '\t' -> sb.append("\\t");
                 default -> {
-                    // TBD handle control characters, Unicode, ...
-                    sb.append(c);
+                    if (c <= 0x1f) {
+                        sb.append(String.format("\\u%04x", c));
+                    } else {
+                        sb.append(c);
+                    }
                 }
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * Provides read access to Thread.latestThreadExecutor
+     */
+    private static class ThreadFields {
+        private static final VarHandle LATEST_THREAD_EXECUTOR;
+        static {
+            try {
+                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
+                    MethodHandles.privateLookupIn(Thread.class, MethodHandles.lookup());
+                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
+                LATEST_THREAD_EXECUTOR = l.findVarHandle(Thread.class, "latestThreadExecutor", Object.class);
+            } catch (Exception e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
+
+        static Object latestThreadExecutor(Thread thread) {
+            return LATEST_THREAD_EXECUTOR.getVolatile(thread);
+        }
+    }
+
+    /**
+     * Provides access to ThreadExecutor
+     */
+    private static class ThreadExecutorFields {
+        private static final VarHandle THREADS;
+        private static final VarHandle PREVIOUS;
+        static {
+            try {
+                Class<?> clazz = Class.forName("java.util.concurrent.ThreadExecutor");
+                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
+                    MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
+                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
+                THREADS = l.findVarHandle(clazz, "threads", Set.class);
+                PREVIOUS = l.findVarHandle(clazz, "previous", clazz);
+            } catch (Exception e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
+        @SuppressWarnings("unchecked")
+        static Set<Thread> threads(Object threadExecutor) {
+            return (Set<Thread>) THREADS.get(threadExecutor);
+        }
+        static Object previous(Object threadExecutor) {
+            return PREVIOUS.get(threadExecutor);
+        }
     }
 }

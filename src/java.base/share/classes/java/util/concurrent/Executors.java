@@ -42,8 +42,10 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import sun.security.util.SecurityConstants;
 
@@ -238,7 +240,25 @@ public class Executors {
     }
 
     /**
-     * Creates an Executor that starts a new thread for each task.
+     * Creates an Executor that starts a new Thread for each task. The Executor
+     * is <i>owned</i> by the Thread that creates it.
+     *
+     * <p> An Executor created by this method is intended to be used in a
+     * <em>structured manner</em>. It is <em>owned</em> by the Thread that creates
+     * it and must be {@linkplain ExecutorService#close() closed} by the thread
+     * when it is finished with the executor. Failure to invoke the {@code
+     * close} method may result in a memory leak. The {@code close} method
+     * throws {@code IllegalCallerException} if invoked by other threads.
+     * Executors created by this method enforce strict nesting and must be
+     * closed in the reverse order that they are created in. The {@code close}
+     * method throws {@code IllegalStateException} if invoked to close
+     * executors created by this method in a different order. Once closed by
+     * its owner, further attempts to close the executor by its owner has no
+     * effect.
+     *
+     * @apiNote
+     * The {@link #newUnownedThreadExecutor(ThreadFactory)} method should be
+     * used to create executors for <em>unstructured</em> usages.
      *
      * @param threadFactory the factory to use when creating new threads
      * @return a newly created executor
@@ -246,19 +266,88 @@ public class Executors {
      * @since 99
      */
     public static ExecutorService newThreadExecutor(ThreadFactory threadFactory) {
-        return new ThreadExecutor(threadFactory, /*deadline*/ null);
+        return new ThreadExecutor(threadFactory, null, false);
     }
 
     /**
-     * Creates an Executor that starts a new virtual thread for each task as
-     * if by invoking {@link Thread#startVirtualThread(Runnable)}.
+     * Creates an Executor that starts a new Thread for each task. The Executor
+     * is <i>owned</i> by the Thread that creates it.
+     *
+     * The Executor is created with a deadline. If the deadline is reached before
+     * the Executor has terminated then it is {@link ExecutorService#shutdown()
+     * shutdown} and its threads are {@linkplain Thread#interrupt() interrupted}
+     * to cancel the remaining tasks.
+     * If this method is invoked with a deadline that has already expired then
+     * it returns an Executor that is already shutdown (any attempt to submit
+     * a task will fail with {@code RejectedExecutionException}).
+     *
+     * @param threadFactory the factory to use when creating new threads
+     * @param deadline the deadline
+     * @return a newly created executor
+     * @throws NullPointerException if threadFactory or deadline is null
+     * @since 99
+     */
+    public static ExecutorService newThreadExecutor(ThreadFactory threadFactory,
+                                                    Instant deadline) {
+        Objects.requireNonNull(threadFactory);
+        Objects.requireNonNull(deadline);
+        return new ThreadExecutor(threadFactory, deadline, false);
+    }
+
+    /**
+     * Creates an Executor that starts a new virtual Thread for each task. The
+     * Executor is <i>owned</i> by the Thread that creates it.
+     *
+     * <p> This method is equivalent to creating an Executor with the {@link
+     * #newThreadExecutor(ThreadFactory)} method and specifying a ThreadFactory
+     * created with {@code Thread.builder().virtual().factory()}.
      *
      * @return a newly created executor
      * @since 99
      */
     public static ExecutorService newVirtualThreadExecutor() {
         ThreadFactory factory = Thread.builder().virtual().factory();
-        return new ThreadExecutor(factory, /*deadline*/ null);
+        return new ThreadExecutor(factory, null, false);
+    }
+
+    /**
+     * Creates an Executor that starts a new virtual Thread for each task. The
+     * Executor is <i>owned</i> by the Thread that creates it.
+     *
+     * <p> This method is equivalent to creating an Executor with the {@link
+     * #newThreadExecutor(ThreadFactory, Instant)} method and specifying a
+     * ThreadFactory created with {@code Thread.builder().virtual().factory()}.
+     *
+     * @param deadline the deadline
+     * @return a newly created executor
+     * @throws NullPointerException if deadline is null
+     * @since 99
+     */
+    public static ExecutorService newVirtualThreadExecutor(Instant deadline) {
+        Objects.requireNonNull(deadline);
+        ThreadFactory factory = Thread.builder().virtual().factory();
+        return new ThreadExecutor(factory, deadline, false);
+    }
+
+    /**
+     * Creates an Executor that starts a new thread for each task.
+     *
+     * The resulting Executor is not owned to any thread, meaning it can be
+     * {@link ExecutorService#close() closed} by any thread with appropriate
+     * permission.
+     *
+     * @apiNote
+     * This method is intended for unstructured usage such as cases where an
+     * Executor is created by a static initializer and the reference stored in
+     * a static final field.
+     *
+     * @param threadFactory the factory to use when creating new threads
+     * @return a newly created executor
+     * @throws NullPointerException if threadFactory is null
+     * @since 99
+     */
+    public static ExecutorService newUnownedThreadExecutor(ThreadFactory threadFactory) {
+        return new ThreadExecutor(threadFactory, null, true);
     }
 
     /**

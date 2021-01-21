@@ -99,18 +99,18 @@ public class HotSpotThreadImpl extends ThreadImpl implements ThreadMXBean {
             Util.checkControlAccess();
 
         try (OutputStream out = Files.newOutputStream(file)) {
-            PrivilegedExceptionAction<Void> pae = () -> {
+            PrivilegedExceptionAction<Void> pa = () -> {
                 dumpThreads(out, format);
                 return null;
             };
             try {
-                AccessController.doPrivileged(pae);
-            } catch (PrivilegedActionException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof IOException)
-                    throw (IOException) cause;
-                if (cause instanceof RuntimeException)
-                    throw (RuntimeException) cause;
+                AccessController.doPrivileged(pa);
+            } catch (PrivilegedActionException pae) {
+                Throwable cause = pae.getCause();
+                if (cause instanceof IOException ioe)
+                    throw ioe;
+                if (cause instanceof RuntimeException e)
+                    throw e;
                 throw new RuntimeException(cause);
             }
         }

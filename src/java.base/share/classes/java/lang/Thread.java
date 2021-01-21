@@ -173,6 +173,15 @@ public class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
+
+    // A simple (not very) random string of bits to use when evicting
+    // cache entries.
+    int victims
+        = 0b1100_1001_0000_1111_1101_1010_1010_0010;
+
+    Scoped.Binding<?> noninheritableScopeLocalBindings;
+    Scoped.Binding<?> inheritableScopeLocalBindings;
+
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
      * at 2 as this class cannot be used during early startup to generate the
@@ -573,6 +582,8 @@ public class Thread implements Runnable {
             }
         }
 
+        this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+
         int priority;
         boolean daemon;
         if (primordial) {
@@ -615,6 +626,8 @@ public class Thread implements Runnable {
                 this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
             }
         }
+
+        this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
 
         // no additional fields
         this.holder = null;
@@ -773,8 +786,8 @@ public class Thread implements Runnable {
 
         /**
          * The thread will be scheduled by the Java virtual machine rather than
-         * the operating system. The scheduler will be selected when the thread
-         * is {@linkplain #build() created} or {@linkplain #start() started}.
+         * the operating system. The scheduler will be selected when the {@code
+         * Thread} is created.
          * @return this builder
          */
         Builder virtual();
@@ -1508,7 +1521,7 @@ public class Thread implements Runnable {
      *
      * @since 99
      */
-    public static final int VIRTUAL = 1 << 0;
+    static final int VIRTUAL = 1 << 0;
 
     /**
      * Characteristic value signifying that the thread cannot set values for its
@@ -1521,7 +1534,7 @@ public class Thread implements Runnable {
      * @see Builder#noThreadLocals()
      * @see ThreadLocal#set(Object)
      */
-    public static final int NO_THREAD_LOCALS = 1 << 1;
+    static final int NO_THREAD_LOCALS = 1 << 1;
 
     /**
      * Characteristic value signifying that initial values for {@link
@@ -1531,7 +1544,7 @@ public class Thread implements Runnable {
      * @since 99
      * @see Builder#noInheritInheritableThreadLocals()
      */
-    public static final int NO_INHERIT_INHERITABLE_THREAD_LOCALS = 1 << 2;
+    static final int NO_INHERIT_INHERITABLE_THREAD_LOCALS = 1 << 2;
 
     private static int validCharacteristics() {
         return (VIRTUAL | NO_THREAD_LOCALS | NO_INHERIT_INHERITABLE_THREAD_LOCALS);
@@ -1571,10 +1584,8 @@ public class Thread implements Runnable {
      *         combination of characteristic is specified
      * @throws NullPointerException if task is null
      * @return an unstarted thread
-     *
-     * @since 99
      */
-    public static Thread unstartedThread(int characteristics, Runnable task) {
+    static Thread unstartedThread(int characteristics, Runnable task) {
         if ((characteristics & VIRTUAL) != 0) {
             return new VirtualThread(null, null, characteristics, task);
         } else {
@@ -1614,7 +1625,7 @@ public class Thread implements Runnable {
      *
      * @since 99
      */
-    public static Thread unstartedThread(String name, int characteristics, Runnable task) {
+    static Thread unstartedThread(String name, int characteristics, Runnable task) {
         Objects.requireNonNull(name);
         Objects.requireNonNull(task);
         if ((characteristics & VIRTUAL) != 0) {
@@ -3207,8 +3218,9 @@ public class Thread implements Runnable {
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
     int threadLocalRandomSecondarySeed;
 
-    // Used by jdk.internal.vm.ThreadDumper to track thread containers
-    private volatile Object threadDumperHeadNode;
+    // Used by java.util.concurrent.ThreadExecutor for thread confined executors
+    // (not a ThreadLocal as it may be accessed from other threads)
+    private volatile Object latestThreadExecutor;
 
     /* Some private helper methods */
     private native void setPriority0(int newPriority);
