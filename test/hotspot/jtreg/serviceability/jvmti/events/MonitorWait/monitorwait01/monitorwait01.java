@@ -43,8 +43,8 @@ import jdk.test.lib.jvmti.DebugeeClass;
  *       and save JNIEnv pointer now passed as argument.
  *
  * @library /test/lib
- * @run main/othervm/native
- *      -agentlib:monitorwait01 monitorwait01
+ * @run main/othervm/native -agentlib:monitorwait01 monitorwait01 kernel
+ * @run main/othervm/native -agentlib:monitorwait01 monitorwait01 virtual
  */
 
 
@@ -55,33 +55,31 @@ public class monitorwait01 extends DebugeeClass {
         loadLibrary("monitorwait01");
     }
 
-    public static void main(String argv[]) {
-        int result = new monitorwait01().runIt();
+    public static void main(String args[]) {
+        boolean isVirtual = "virtual".equals(args[0]);
+        int result = new monitorwait01().runIt(isVirtual);
         if (result != 0) {
             throw new RuntimeException("Unexpected status: " + result);
         }
     }
 
-
-    int status = DebugeeClass.TEST_PASSED;
-    static long timeout = 0;
-
-    // tested thread
-    monitorwait01Thread thread = null;
+    static final long timeout = 60000; //TODO fix timeout milliseconds
 
     // run debuggee
-    public int runIt() {
-        timeout = 60000; //TODO fix timeout milliseconds
+    public int runIt(boolean isVirtual) {
+        int status = DebugeeClass.TEST_PASSED;
         System.out.println("Timeout = " + timeout + " msc.");
 
-        thread = new monitorwait01Thread("Debuggee Thread");
+        monitorwait01Task task = new monitorwait01Task();
+        Thread thread  = Thread.unstartedThread("Debuggee Thread", isVirtual ? Thread.VIRTUAL : 0, task);
+        setExpected(task.waitingMonitor, thread);
 
         // run thread
         try {
             // start thread
-            synchronized (thread.startingMonitor) {
+            synchronized (task.startingMonitor) {
                 thread.start();
-                thread.startingMonitor.wait(timeout);
+                task.startingMonitor.wait(timeout);
             }
         } catch (InterruptedException e) {
             throw new Failure(e);
@@ -90,8 +88,8 @@ public class monitorwait01 extends DebugeeClass {
         Thread.yield();
         System.out.println("Thread started");
 
-        synchronized (thread.waitingMonitor) {
-            thread.waitingMonitor.notify();
+        synchronized (task.waitingMonitor) {
+            task.waitingMonitor.notify();
         }
 
         // wait for thread finish
@@ -106,17 +104,15 @@ public class monitorwait01 extends DebugeeClass {
 
         return status;
     }
+
+    private native void setExpected(Object monitor, Object thread);
 }
 
 /* =================================================================== */
 
-class monitorwait01Thread extends Thread {
+class monitorwait01Task implements Runnable {
     public Object startingMonitor = new Object();
     public Object waitingMonitor = new Object();
-
-    public monitorwait01Thread(String name) {
-        super(name);
-    }
 
     public void run() {
         synchronized (waitingMonitor) {

@@ -38,8 +38,8 @@ static jvmtiEnv *jvmti = NULL;
 static jlong timeout = 0;
 
 /* test objects */
-static jthread thread = NULL;
-static jobject object = NULL;
+static jthread expected_thread = NULL;
+static jobject expected_object = NULL;
 static volatile int eventsCount = 0;
 
 /* ========================================================================== */
@@ -51,15 +51,19 @@ MonitorWaited(jvmtiEnv *jvmti, JNIEnv *jni,
   NSK_DISPLAY3("MonitorWaited event:\n\tthread: %p, object: %p, timed_out: %s\n",
                thr, obj, (timed_out == JNI_TRUE) ? "true" : "false");
 
-  if (thread == NULL) {
-    nsk_jvmti_setFailStatus();
-    return;
+  print_thread_info(jni, jvmti, thr);
+
+  if (expected_thread == NULL) {
+    jni->FatalError("expected_thread is NULL.");
   }
 
+  if (expected_object == NULL) {
+    jni->FatalError("expected_object is NULL.");
+  }
 
 /* check if event is for tested thread and for tested object */
-  if (jni->IsSameObject(thread, thr) &&
-      jni->IsSameObject(object, obj)) {
+  if (jni->IsSameObject(expected_thread, thr) &&
+      jni->IsSameObject(expected_object, obj)) {
     eventsCount++;
     if (timed_out == JNI_TRUE) {
       NSK_COMPLAIN0("Unexpected timed_out value: true\n");
@@ -71,86 +75,7 @@ MonitorWaited(jvmtiEnv *jvmti, JNIEnv *jni,
 /* ========================================================================== */
 
 static int prepare() {
-  const char *THREAD_NAME = "Debuggee Thread";
-  jclass klass = NULL;
-  jfieldID field = NULL;
-  jvmtiThreadInfo info;
-  jthread *threads = NULL;
-  jint threads_count = 0;
   jvmtiError err;
-  int i;
-
-  NSK_DISPLAY0("Prepare: find tested thread\n");
-
-  /* get all live threads */
-  err = jvmti->GetAllThreads(&threads_count, &threads);
-  if (err != JVMTI_ERROR_NONE) {
-    return NSK_FALSE;
-  }
-
-  if (!(threads_count > 0 && threads != NULL)) {
-    return NSK_FALSE;
-  }
-
-  /* find tested thread */
-  for (i = 0; i < threads_count; i++) {
-    if (threads[i] == NULL)
-      return NSK_FALSE;
-
-    /* get thread information */
-    err = jvmti->GetThreadInfo(threads[i], &info);
-    if (err != JVMTI_ERROR_NONE) {
-      return NSK_FALSE;
-    }
-
-    NSK_DISPLAY3("    thread #%d (%s): %p\n", i, info.name, threads[i]);
-
-    /* find by name */
-    if (info.name != NULL && (strcmp(info.name, THREAD_NAME) == 0)) {
-      thread = threads[i];
-    }
-  }
-
-  /* deallocate threads list */
-  err = jvmti->Deallocate((unsigned char *) threads);
-  if (err != JVMTI_ERROR_NONE) {
-    return NSK_FALSE;
-  }
-
-  if (thread == NULL) {
-    NSK_COMPLAIN0("Debuggee thread not found");
-    return NSK_FALSE;
-  }
-
-  /* make thread accessable for a long time */
-  thread = jni->NewGlobalRef(thread);
-  if (thread == NULL) {
-    return NSK_FALSE;
-  }
-
-  /* get tested thread class */
-  klass = jni->GetObjectClass(thread);
-  if (klass == NULL) {
-    return NSK_FALSE;
-  }
-
-  /* get tested thread field 'waitingMonitor' */
-  field = jni->GetFieldID(klass, "waitingMonitor", "Ljava/lang/Object;");
-  if (field == NULL) {
-    return NSK_FALSE;
-  }
-
-  /* get 'endingMonitor' object */
-  object = jni->GetObjectField(thread, field);
-  if (object == NULL) {
-    return NSK_FALSE;
-  }
-
-  /* make object accessable for a long time */
-  object = jni->NewGlobalRef(object);
-  if (object == NULL) {
-    return NSK_FALSE;
-  }
 
   /* enable MonitorWait event */
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_WAITED, NULL);
@@ -170,6 +95,10 @@ static int clean() {
   if (err != JVMTI_ERROR_NONE) {
     nsk_jvmti_setFailStatus();
   }
+
+  jni->DeleteGlobalRef(expected_object);
+  jni->DeleteGlobalRef(expected_thread);
+
   return NSK_TRUE;
 }
 
@@ -283,6 +212,23 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   nsk_jvmti_setAgentProc(agentProc, NULL);
 
   return JNI_OK;
+}
+
+JNIEXPORT void JNICALL Java_monitorwaited01_setExpected(JNIEnv *jni, jobject clz, jobject obj, jobject thread) {
+  printf("Remembering global reference for monitor object is %p\n", obj);
+  /* make object accessible for a long time */
+  expected_object = jni->NewGlobalRef(obj);
+  if (expected_object == NULL) {
+    jni->FatalError("Error saving global reference to monitor.\n");
+  }
+
+  /* make thread accessable for a long time */
+  expected_thread = jni->NewGlobalRef(thread);
+  if (thread == NULL) {
+    jni->FatalError("Error saving global reference to thread.\n");
+  }
+
+  return;
 }
 
 JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
