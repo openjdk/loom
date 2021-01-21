@@ -48,22 +48,9 @@ import java.io.*;
  *     Fixed the 4995867 bug.
  *
  * @library /test/lib
- * @run main/othervm/native
- *      -agentlib:nativemethbind03 nativemethbind03
+ * @run main/othervm/native -agentlib:nativemethbind03 nativemethbind03
  */
 
-/**
- * This test exercises the JVMTI event <code>NativeMethodBind</code>.
- * <br>It verifies that the event will not be sent when the native
- * method is unbound.<p>
- * The test works as follows. The java part invokes the native method
- * <code>registerNative()</code> which registers native method
- * <code>nativeMethod()</code> for the dummy class <code>TestedClass</code>
- * and then unregisters it. Registration/unregistration is made through
- * the JNI RegisterNatives()/UnregisterNatives() calls.<br>
- * In accordance with the spec, it is expected that the NativeMethodBind
- * will be generated only one time for the nativeMethod().
- */
 public class nativemethbind03 {
     static {
         try {

@@ -51,76 +51,59 @@ static jrawMonitorID countLock;
 JNIEXPORT void JNICALL
 Java_nativemethbind04_nativeMethod(
     JNIEnv *jni, jobject obj) {
-origCalls++;
-NSK_DISPLAY1("inside the nativeMethod(): calls=%d\n",
-origCalls);
+  origCalls++;
+  printf("inside the nativeMethod(): calls=%d\n",
+               origCalls);
 }
 
 /* redirected method used to check the native method redirection
    through the NativeMethodBind event */
 static void JNICALL
 redirNativeMethod(JNIEnv *jni, jobject obj) {
-redirCalls++;
-NSK_DISPLAY1("inside the redirNativeMethod(): calls=%d\n",
-redirCalls);
-}
-
-static void lock(jvmtiEnv *jvmti, JNIEnv *jni) {
-  jvmtiError err;
-  err = jvmti->RawMonitorEnter(countLock);
-  if (err != JVMTI_ERROR_NONE) {
-    jni->FatalError("failed to enter a raw monitor\n");
-  }
-}
-
-static void unlock(jvmtiEnv *jvmti, JNIEnv *jni) {
-  jvmtiError err;
-  err = jvmti->RawMonitorExit(countLock);
-  if (err != JVMTI_ERROR_NONE) {
-    jni->FatalError("failed to exit a raw monitor\n");
-  }
+  redirCalls++;
+  printf("inside the redirNativeMethod(): calls=%d\n",
+               redirCalls);
 }
 
 /** callback functions **/
 void JNICALL
-NativeMethodBind(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
-jmethodID method, void *addr, void **new_addr) {
-jvmtiPhase phase;
+NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
+                 jmethodID method, void *addr, void **new_addr) {
+  jvmtiPhase phase;
   jvmtiError err;
 
-char *methNam, *methSig;
-lock(jvmti, jni);
-
-NSK_DISPLAY0(">>>> NativeMethodBind event received\n");
+  char *methNam, *methSig;
+  RawMonitorEnter(jni, jvmti, countLock);
+  printf(">>>> NativeMethodBind event received\n");
 
   err = jvmti->GetPhase(&phase);
   if (err != JVMTI_ERROR_NONE) {
     printf(">>>> Error getting phase\n");
     result = STATUS_FAILED;
-    unlock(jvmti, jni);
+    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
-if (phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_START) {
-unlock(jvmti, jni);
-return;
-}
+  if (phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_START) {
+    RawMonitorExit(jni, jvmti, countLock);
+    return;
+  }
 
   err = jvmti->GetMethodName(method, &methNam, &methSig, NULL);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
-    unlock(jvmti, jni);
+    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
-if ((strcmp(methNam,METHOD[0]) == 0) &&
-(strcmp(methSig,METHOD[1]) == 0)) {
-NSK_DISPLAY4("\tmethod: \"%s %s\"\nRedirecting the method address from 0x%p to 0x%p ...\n",
-methNam, methSig, addr, (void*) redirNativeMethod);
+  if ((strcmp(methNam, METHOD[0]) == 0) &&
+      (strcmp(methSig, METHOD[1]) == 0)) {
+    printf("\tmethod: \"%s %s\"\nRedirecting the method address from 0x%p to 0x%p ...\n",
+                 methNam, methSig, addr, (void *) redirNativeMethod);
 
-*new_addr = (void*) redirNativeMethod;
-}
+    *new_addr = (void *) redirNativeMethod;
+  }
 
   if (methNam != NULL) {
     err = jvmti->Deallocate((unsigned char *) methNam);
@@ -137,42 +120,42 @@ methNam, methSig, addr, (void*) redirNativeMethod);
       printf("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
     }
   }
-NSK_DISPLAY0("<<<<\n\n");
+  printf("<<<<\n\n");
 
-unlock(jvmti, jni);
+  RawMonitorExit(jni, jvmti, countLock);
 }
 /************************/
 
 JNIEXPORT jint JNICALL
-    Java_nativemethbind04_check(
+Java_nativemethbind04_check(
     JNIEnv *jni, jobject obj) {
 
-if (origCalls == 0) {
-NSK_DISPLAY0(
-"CHECK PASSED: original nativeMethod() to be redirected\n"
-"\thas not been invoked as expected\n");
-} else {
-result = STATUS_FAILED;
-NSK_COMPLAIN1(
-"TEST FAILED: nativeMethod() has not been redirected by the NativeMethodBind:\n"
-"\t%d calls\texpected: 0\n\n",
-origCalls);
-}
+  if (origCalls == 0) {
+    printf(
+        "CHECK PASSED: original nativeMethod() to be redirected\n"
+        "\thas not been invoked as expected\n");
+  } else {
+    result = STATUS_FAILED;
+    NSK_COMPLAIN1(
+        "TEST FAILED: nativeMethod() has not been redirected by the NativeMethodBind:\n"
+        "\t%d calls\texpected: 0\n\n",
+        origCalls);
+  }
 
-if (redirCalls == 1) {
-NSK_DISPLAY1(
-"CHECK PASSED: nativeMethod() has been redirected by the NativeMethodBind:\n"
-"\t%d calls of redirected method as expected\n",
-redirCalls);
-} else {
-result = STATUS_FAILED;
-NSK_COMPLAIN1(
-"TEST FAILED: nativeMethod() has not been redirected by the NativeMethodBind:\n"
-"\t%d calls of redirected method\texpected: 1\n\n",
-redirCalls);
-}
+  if (redirCalls == 1) {
+    printf(
+        "CHECK PASSED: nativeMethod() has been redirected by the NativeMethodBind:\n"
+        "\t%d calls of redirected method as expected\n",
+        redirCalls);
+  } else {
+    result = STATUS_FAILED;
+    NSK_COMPLAIN1(
+        "TEST FAILED: nativeMethod() has not been redirected by the NativeMethodBind:\n"
+        "\t%d calls of redirected method\texpected: 1\n\n",
+        redirCalls);
+  }
 
-return result;
+  return result;
 }
 
 #ifdef STATIC_BUILD
@@ -218,7 +201,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
   if (!caps.can_generate_native_method_bind_events)
-    NSK_DISPLAY0("Warning: generation of native method bind events is not implemented\n");
+    printf("Warning: generation of native method bind events is not implemented\n");
 
   /* set event callback */
   printf("setting event callbacks ...\n");
@@ -232,7 +215,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_NATIVE_METHOD_BIND,
                                         NULL);
-  if (err != JVMTI_ERROR_NONE){
+  if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
   printf("enabling the events done\n\n");

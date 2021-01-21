@@ -50,22 +50,6 @@ static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
 static jrawMonitorID countLock;
 
-static void lock(jvmtiEnv *jvmti, JNIEnv *jni) {
-  jvmtiError err;
-  err = jvmti->RawMonitorEnter(countLock);
-  if (err != JVMTI_ERROR_NONE) {
-    jni->FatalError("failed to enter a raw monitor\n");
-  }
-}
-
-static void unlock(jvmtiEnv *jvmti, JNIEnv *jni) {
-  jvmtiError err;
-  err = jvmti->RawMonitorExit(countLock);
-  if (err != JVMTI_ERROR_NONE) {
-    jni->FatalError("failed to exit a raw monitor\n");
-  }
-}
-
 /** callback functions **/
 void JNICALL
 NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
@@ -74,20 +58,20 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
   jvmtiError err;
   char *methNam, *methSig;
 
-  lock(jvmti, jni);
+  RawMonitorEnter(jni, jvmti, countLock);
 
-  NSK_DISPLAY0(">>>> NativeMethodBind event received\n");
+  printf(">>>> NativeMethodBind event received\n");
 
   err = jvmti->GetPhase(&phase);
   if (err != JVMTI_ERROR_NONE) {
     printf(">>>> Error getting phase\n");
     result = STATUS_FAILED;
-    unlock(jvmti, jni);
+    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
   if (phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_START) {
-    unlock(jvmti, jni);
+    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
@@ -95,7 +79,7 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
-    unlock(jvmti, jni);
+    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
@@ -103,7 +87,7 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
       (strcmp(methSig, METHODS[1]) == 0)) {
     bindEv[0]++;
 
-    NSK_DISPLAY2("\tmethod: \"%s %s\"\n", methNam, methSig);
+    printf("\tmethod: \"%s %s\"\n", methNam, methSig);
   }
 
   if (methNam != NULL) {
@@ -122,14 +106,14 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
     }
   }
 
-  NSK_DISPLAY0("<<<<\n\n");
+  printf("<<<<\n\n");
 
-  unlock(jvmti, jni);
+  RawMonitorExit(jni, jvmti, countLock);
 }
 
 void JNICALL
 VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
-  NSK_DISPLAY0("VMDeath event received\n");
+  printf("VMDeath event received\n");
 
   if (bindEv[0] != bindEv[1]) {
     result = STATUS_FAILED;
@@ -139,7 +123,7 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
         "\tgot: %d\texpected: %d\n\n",
         METHODS[0], METHODS[1], CLASS_SIG, bindEv[0], bindEv[1]);
   } else {
-    NSK_DISPLAY4(
+    printf(
         "CHECK PASSED: %d NativeMethodBind event(s)\n"
         "\tfor tested method \"%s %s\" bound with \"%s\"\n"
         "\tas expected\n",
@@ -154,7 +138,7 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
 /* dummy method used only to provoke NativeMethodBind event */
 static void JNICALL
 nativeMethod(JNIEnv *jni, jobject obj) {
-  NSK_DISPLAY0("inside the nativeMethod()\n");
+  printf("inside the nativeMethod()\n");
 }
 
 /* dummy method used only to provoke NativeMethodBind event */
@@ -164,7 +148,7 @@ Java_nativemethbind03_registerNative(
   jclass testedCls = NULL;
   JNINativeMethod meth;
 
-  NSK_DISPLAY1("Inside the registerNative()\n"
+  printf("Inside the registerNative()\n"
                "Finding class \"%s\" ...\n",
                CLASS_SIG);
   testedCls = jni->FindClass(CLASS_SIG);
@@ -179,8 +163,7 @@ Java_nativemethbind03_registerNative(
   meth.signature = (char *) METHODS[1];
   meth.fnPtr = (void *) nativeMethod;
 
-  NSK_DISPLAY3(
-      "Calling RegisterNatives() with \"%s %s\"\n"
+  printf("Calling RegisterNatives() with \"%s %s\"\n"
       "\tfor class \"%s\" ...\n",
       METHODS[0], METHODS[1], CLASS_SIG);
   if (jni->RegisterNatives(testedCls, &meth, 1) != 0) {
@@ -189,7 +172,7 @@ Java_nativemethbind03_registerNative(
                   METHODS[0], METHODS[1], CLASS_SIG);
   }
 
-  NSK_DISPLAY1("Calling UnregisterNatives() for class \"%s\" ...\n",
+  printf("Calling UnregisterNatives() for class \"%s\" ...\n",
                CLASS_SIG);
   if (jni->UnregisterNatives(testedCls) != 0) {
     result = STATUS_FAILED;
@@ -243,10 +226,10 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   if (!caps.can_generate_native_method_bind_events)
-    NSK_DISPLAY0("Warning: generation of native method bind events is not implemented\n");
+    printf("Warning: generation of native method bind events is not implemented\n");
 
   /* set event callback */
-  NSK_DISPLAY0("setting event callbacks ...\n");
+  printf("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.NativeMethodBind = &NativeMethodBind;
   callbacks.VMDeath = &VMDeath;
@@ -254,7 +237,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE)
     return JNI_ERR;
 
-  NSK_DISPLAY0("setting event callbacks done\nenabling JVMTI events ...\n");
+  printf("setting event callbacks done\nenabling JVMTI events ...\n");
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_NATIVE_METHOD_BIND,
                                         NULL);
@@ -267,7 +250,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
-  NSK_DISPLAY0("enabling the events done\n\n");
+  printf("enabling the events done\n\n");
 
   return JNI_OK;
 }

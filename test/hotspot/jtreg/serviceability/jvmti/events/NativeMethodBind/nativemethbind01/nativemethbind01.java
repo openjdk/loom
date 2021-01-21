@@ -47,26 +47,9 @@ import java.io.*;
  *     Fixed the 4995867 bug.
  *
  * @library /test/lib
- * @run main/othervm/native
- *      -agentlib:nativemethbind01 nativemethbind01
+ * @run main/othervm/native -agentlib:nativemethbind01 nativemethbind01
  */
 
-
-/**
- * This test exercises the JVMTI event <code>NativeMethodBind</code>.
- * <br>It verifies that the event will be properly sent:
- * <li>for the native method called for the first time
- * <li>when the JNI RegisterNatives() is called.<p>
- * The test works as follows. The java part invokes the native method
- * <code>nativeMethod()</code> twice. At the first time that method
- * registers another native method <code>anotherNativeMethod()</code> for
- * the dummy class <code>TestedClass</code>. Registration is made through
- * the JNI RegisterNatives() call. Being invoked at the second time, the
- * nativeMethod() just returns.<br>
- * In accordance with the spec, it is expected that the NativeMethodBind
- * will be generated only one time for the nativeMethod(), and only one
- * time for the anotherNativeMethod().
- */
 public class nativemethbind01 {
     static {
         try {

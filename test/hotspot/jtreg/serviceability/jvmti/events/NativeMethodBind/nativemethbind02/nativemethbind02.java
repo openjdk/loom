@@ -43,20 +43,9 @@ import java.io.*;
  *     Fixed the 4995867 bug.
  *
  * @library /test/lib
- * @run main/othervm/native
- *      -agentlib:nativemethbind02 nativemethbind02
+ * @run main/othervm/native -agentlib:nativemethbind02 nativemethbind02
  */
 
-/**
- * This test exercises the JVMTI event <code>NativeMethodBind</code>.
- * <br>It verifies that the events will be sent only during the start
- * and live phase of VM execution.<br>
- * The test works as follows. The NativeMethodBind event is enabled on
- * <code>OnLoad</code> phase. Then the VM phase is checked from the
- * NativeMethodBind callback to be start or live one. The java part calls
- * the dummy native method <code>nativeMethod</code> on exit in order to
- * provoke the NativeMethodBind event near the dead phase.
- */
 public class nativemethbind02 {
     static {
         try {

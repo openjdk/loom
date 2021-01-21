@@ -37,7 +37,6 @@ extern "C" {
 static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
-static jboolean printdump = JNI_TRUE;
 static int eventsCount = 0;
 static int eventsExpected = 0;
 static const char *prefix = NULL;
@@ -53,9 +52,9 @@ void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
   }
-  if (printdump == JNI_TRUE) {
-    printf(">>> %s\n", inf.name);
-  }
+
+  printf(">>> %s\n", inf.name);
+
   if (inf.name != NULL && strstr(inf.name, prefix) == inf.name) {
     sprintf(name, "%s%d", prefix, eventsCount);
     if (strcmp(name, inf.name) != 0) {
@@ -82,10 +81,6 @@ JNIEXPORT jint JNI_OnLoad_threadstart01(JavaVM *jvm, char *options, void *reserv
 jint  Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
   jint res;
-
-  if (options != NULL && strcmp(options, "printdump") == 0) {
-    printdump = JNI_TRUE;
-  }
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {

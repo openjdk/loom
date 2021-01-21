@@ -44,7 +44,7 @@ static const char *METHOD_SIGS[] = {
     "()I"
 };
 
-static volatile long stepEv[] = { 0, 0 };
+static volatile long stepEv[] = {0, 0};
 
 static const char *CLASS_SIG =
     "Lsinglestep01;";
@@ -98,8 +98,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
 }
 
 void JNICALL
-Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method,
-           jlocation loc) {
+Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method, jlocation loc) {
   jclass klass;
   char *sig, *generic;
   jvmtiError err;
@@ -138,7 +137,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method,
 }
 
 void JNICALL
-SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
+SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
            jmethodID method, jlocation location) {
   jclass klass;
   char *sig, *generic, *methNam, *methSig;
@@ -181,17 +180,15 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     if (stepEv[1] == 1) {
       result = STATUS_FAILED;
       NSK_COMPLAIN0("TEST FAILED: SingleStep event received after disabling the event generation\n\n");
-    }
-    else if ((strcmp(methNam,METHODS[0]) == 0) &&
-        (strcmp(methSig,METHOD_SIGS[0]) == 0) &&
-        (strcmp(sig,CLASS_SIG) == 0)) {
+    } else if ((strcmp(methNam, METHODS[0]) == 0) &&
+        (strcmp(methSig, METHOD_SIGS[0]) == 0) &&
+        (strcmp(sig, CLASS_SIG) == 0)) {
       stepEv[0]++;
       NSK_DISPLAY1("CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n",
                    methNam);
-    }
-    else if ((strcmp(methNam,METHODS[1]) == 0) &&
-        (strcmp(methSig,METHOD_SIGS[1]) == 0) &&
-        (strcmp(sig,CLASS_SIG) == 0)) {
+    } else if ((strcmp(methNam, METHODS[1]) == 0) &&
+        (strcmp(methSig, METHOD_SIGS[1]) == 0) &&
+        (strcmp(sig, CLASS_SIG) == 0)) {
       stepEv[1]++;
       NSK_DISPLAY1(
           "CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n"
@@ -205,12 +202,12 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     }
   }
 
-  err = jvmti->Deallocate((unsigned char*) methNam);
+  err = jvmti->Deallocate((unsigned char *) methNam);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
   }
-  err = jvmti->Deallocate((unsigned char*) methSig);
+  err = jvmti->Deallocate((unsigned char *) methSig);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
@@ -220,7 +217,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 }
 
 void JNICALL
-VMStart(jvmtiEnv *jvmti, JNIEnv* jni) {
+VMStart(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_TRUE;
@@ -229,7 +226,7 @@ VMStart(jvmtiEnv *jvmti, JNIEnv* jni) {
 }
 
 void JNICALL
-VMDeath(jvmtiEnv *jvmti, JNIEnv* jni) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_FALSE;
@@ -239,17 +236,14 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv* jni) {
 /************************/
 
 JNIEXPORT jint JNICALL
-Java_singlestep01_check(
-    JNIEnv *jni, jobject obj) {
-  int i;
-
-  for (i=0; i<METH_NUM; i++)
+Java_singlestep01_check(JNIEnv *jni, jobject obj) {
+  for (int i = 0; i < METH_NUM; i++) {
     if (stepEv[i] == 0) {
       result = STATUS_FAILED;
       NSK_COMPLAIN1("TEST FAILED: no SingleStep events for the method \"%s\"\n\n",
                     METHODS[i]);
     }
-
+  }
   return result;
 }
 
@@ -278,6 +272,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   memset(&caps, 0, sizeof(jvmtiCapabilities));
   caps.can_generate_breakpoint_events = 1;
   caps.can_generate_single_step_events = 1;
+
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("(AddCapabilities) unexpected error: %s (%d)\n",
@@ -292,8 +287,9 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  if (!caps.can_generate_single_step_events)
+  if (!caps.can_generate_single_step_events) {
     NSK_DISPLAY0("Warning: generation of single step events is not implemented\n");
+  }
 
   /* set event callback */
   NSK_DISPLAY0("setting event callbacks ...\n");
@@ -307,7 +303,6 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
-
 
   NSK_DISPLAY0("setting event callbacks done\nenabling JVMTI events ...\n");
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_START, NULL);

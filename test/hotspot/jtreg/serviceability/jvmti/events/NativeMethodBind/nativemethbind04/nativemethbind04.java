@@ -46,25 +46,10 @@ import java.io.*;
  *     Fixed the 4995867 bug.
  *
  * @library /test/lib
- * @run main/othervm/native
- *      -agentlib:nativemethbind04 nativemethbind04
+ * @run main/othervm/native -agentlib:nativemethbind04 nativemethbind04
  */
 
 
-/**
- * This test exercises the JVMTI event <code>NativeMethodBind</code>.
- * <br>It verifies that binding native method can be redirected during
- * the event callback.<p>
- * The test works as follows. An agent part enables the NativeMethodBind
- * generation. Then the java part invokes the native method
- * <code>nativeMethod()</code> which leads to the NativeMethodBind generation.
- * In NativeMethodBind callback incoming address of the nativeMethod() is
- * changed to the address of another native method
- * <code>redirNativeMethod()</code>.
- * Both functions nativeMethod() and redirNativeMethod() count their calls.<br>
- * In accordance with the spec, the nativeMethod() should not be invoked
- * and the redirNativeMethod() should be invoked once.
- */
 public class nativemethbind04 {
     static {
         try {

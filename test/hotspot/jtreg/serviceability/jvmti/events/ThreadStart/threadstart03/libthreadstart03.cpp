@@ -38,7 +38,6 @@ extern "C" {
 static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
-static jboolean printdump = JNI_TRUE;
 static jrawMonitorID wait_lock;
 static const char *threadName = NULL;
 static int startsCount = 0;
@@ -56,9 +55,9 @@ void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
-  if (printdump == JNI_TRUE) {
-    printf(">>> start: %s\n", inf.name);
-  }
+
+  printf(">>> start: %s\n", inf.name);
+
   if (inf.name != NULL && strcmp(inf.name, threadName) == 0) {
     startsCount++;
   }
@@ -74,9 +73,9 @@ void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
-  if (printdump == JNI_TRUE) {
-    printf(">>> end: %s\n", inf.name);
-  }
+
+  printf(">>> end: %s\n", inf.name);
+
   if (inf.name != NULL && strcmp(inf.name, threadName) == 0) {
     endsCount++;
   }
@@ -96,10 +95,6 @@ JNIEXPORT jint JNI_OnLoad_threadstart03(JavaVM *jvm, char *options, void *reserv
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
   jint res;
-
-  if (options != NULL && strcmp(options, "printdump") == 0) {
-    printdump = JNI_TRUE;
-  }
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
@@ -186,9 +181,8 @@ Java_threadstart03_check(JNIEnv *jni,
     result = STATUS_FAILED;
   }
 
-  if (printdump == JNI_TRUE) {
-    printf(">>> starting agent thread ...\n");
-  }
+  printf(">>> starting agent thread ...\n");
+
   err = jvmti->RawMonitorEnter(wait_lock);
   if (err != JVMTI_ERROR_NONE) {
     printf("(RawMonitorEnter) unexpected error: %s (%d)\n",
@@ -222,15 +216,14 @@ Java_threadstart03_check(JNIEnv *jni,
     result = STATUS_FAILED;
   }
   // Wait for up to 3 seconds for the thread end event
-  {
-    int i;
-    for (i = 0; i < 3 ; i++) {
-      err = jvmti->RawMonitorWait(wait_lock, (jlong)WAIT_TIME);
-      if (endsCount == endsExpected || err != JVMTI_ERROR_NONE) {
-        break;
-      }
+
+  for (int i = 0; i < 3 ; i++) {
+    err = jvmti->RawMonitorWait(wait_lock, (jlong)WAIT_TIME);
+    if (endsCount == endsExpected || err != JVMTI_ERROR_NONE) {
+      break;
     }
   }
+
   if (err != JVMTI_ERROR_NONE) {
     printf("(RawMonitorWait) unexpected error: %s (%d)\n",
            TranslateError(err), err);

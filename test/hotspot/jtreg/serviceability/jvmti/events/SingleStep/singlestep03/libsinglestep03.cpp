@@ -34,19 +34,19 @@ extern "C" {
 /* tested methods */
 #define METH_NUM 4
 static const char *METHODS[][2] = {
-    { "bpMethod", "()V" },
-    { "nativeMethod", "()V" },
-    { "anotherNativeMethod", "(I)V" },
-    { "runThis", "()I" }
+    {"bpMethod", "()V"},
+    {"nativeMethod", "()V"},
+    {"anotherNativeMethod", "(I)V"},
+    {"runThis", "()I"}
 };
 
 /* event counters for the tested methods and expected numbers
  of the events */
 static volatile long stepEv[][2] = {
-    { 0, 1 },
-    { 0, 0 },
-    { 0, 0 },
-    { 0, 1 }
+    {0, 1},
+    {0, 0},
+    {0, 0},
+    {0, 1}
 };
 
 static const char *CLASS_SIG =
@@ -104,7 +104,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
 }
 
 void JNICALL
-VMStart(jvmtiEnv *jvmti, JNIEnv* jni) {
+VMStart(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_TRUE;
@@ -112,9 +112,8 @@ VMStart(jvmtiEnv *jvmti, JNIEnv* jni) {
   jvmti->RawMonitorExit(agent_lock);
 }
 
-
 void JNICALL
-VMDeath(jvmtiEnv *jvmti, JNIEnv* jni) {
+VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
   jvmti->RawMonitorEnter(agent_lock);
 
   callbacksEnabled = NSK_FALSE;
@@ -147,7 +146,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method,
     jni->FatalError("Breakpoint: failed to obtain a class signature\n");
   }
 
-
   if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
     NSK_DISPLAY1("method declaring class \"%s\"\n\tenabling SingleStep events ...\n",
                  sig);
@@ -166,7 +164,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method,
 }
 
 void JNICALL
-SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
+SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
            jmethodID method, jlocation location) {
   jvmtiError err;
   jclass klass;
@@ -200,18 +198,17 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     return;
   }
 
-
   if (sig != NULL) {
-    if (stepEv[METH_NUM-1][0] == 1) {
+    if (stepEv[METH_NUM - 1][0] == 1) {
       result = STATUS_FAILED;
       NSK_COMPLAIN0("TEST FAILED: SingleStep event received after disabling the event generation\n\n");
       return;
     }
 
-    for (i=0; i<METH_NUM; i++) {
-      if ((strcmp(methNam,METHODS[i][0]) == 0) &&
-          (strcmp(methSig,METHODS[i][1]) == 0) &&
-          (strcmp(sig,CLASS_SIG) == 0)) {
+    for (i = 0; i < METH_NUM; i++) {
+      if ((strcmp(methNam, METHODS[i][0]) == 0) &&
+          (strcmp(methSig, METHODS[i][1]) == 0) &&
+          (strcmp(sig, CLASS_SIG) == 0)) {
         stepEv[i][0]++;
 
         if (stepEv[i][1] == 1) {
@@ -228,7 +225,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
               methNam, methSig, sig);
         }
 
-        if (i == (METH_NUM-1)) {
+        if (i == (METH_NUM - 1)) {
           NSK_DISPLAY0("Disabling the single step event generation\n");
           err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
           if (err != JVMTI_ERROR_NONE) {
@@ -240,12 +237,12 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     }
   }
 
-  err = jvmti->Deallocate((unsigned char*) methNam);
+  err = jvmti->Deallocate((unsigned char *) methNam);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
   }
-  err = jvmti->Deallocate((unsigned char*) methSig);
+  err = jvmti->Deallocate((unsigned char *) methSig);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
@@ -274,17 +271,14 @@ Java_singlestep03_nativeMethod(
   Java_singlestep03_anotherNativeMethod(jni, obj, i);
 }
 
-JNIEXPORT jint JNICALL Java_singlestep03_check(
-    JNIEnv *jni, jobject obj) {
-  int i;
+JNIEXPORT jint JNICALL Java_singlestep03_check(JNIEnv *jni, jobject obj) {
 
-  for (i=0; i<METH_NUM; i++)
+  for (int i = 0; i < METH_NUM; i++)
     if (stepEv[i][0] == 0) {
       if (stepEv[i][1] == 0) {
         NSK_DISPLAY1("CHECK PASSED: no SingleStep events for the method \"%s\" as expected\n\n",
                      METHODS[i][0]);
-      }
-      else {
+      } else {
         result = STATUS_FAILED;
         NSK_COMPLAIN1("TEST FAILED: no SingleStep events for the method \"%s\"\n\n",
                       METHODS[i][0]);

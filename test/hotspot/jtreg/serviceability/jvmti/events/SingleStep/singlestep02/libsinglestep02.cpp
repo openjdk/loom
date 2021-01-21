@@ -37,22 +37,19 @@ static volatile long wrongStepEv = 0;
 
 static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
-static jvmtiCapabilities caps;
 
 /** callback functions **/
 void JNICALL
-SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
+SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
            jmethodID method, jlocation location) {
   jvmtiPhase phase;
   jvmtiError err;
-
 
   err = jvmti->GetPhase(&phase);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     NSK_COMPLAIN0("TEST FAILED: unable to obtain phase of the VM execution during SingleStep callback\n\n");
-  }
-  else {
+  } else {
     if (phase != JVMTI_PHASE_LIVE) {
       wrongStepEv++;
       result = STATUS_FAILED;
@@ -90,6 +87,7 @@ JNIEXPORT jint JNI_OnLoad_singlestep02(JavaVM *jvm, char *options, void *reserve
 }
 #endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiCapabilities caps;
   jvmtiError err;
   jint res;
 
