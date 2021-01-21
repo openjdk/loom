@@ -800,7 +800,7 @@ public:
     if (p->is_forwarded()) {
       HeapWord* compact_from = cast_from_oop<HeapWord*>(p);
       HeapWord* compact_to = cast_from_oop<HeapWord*>(p->forwardee());
-      Copy::aligned_conjoint_words(compact_from, compact_to, size);
+      p->copy_conjoint(compact_to, size);
       oop new_obj = oop(compact_to);
       new_obj->init_mark();
     }
@@ -913,9 +913,9 @@ void ShenandoahMarkCompact::compact_humongous_objects() {
       assert(old_start != new_start, "must be real move");
       assert(r->is_stw_move_allowed(), "Region " SIZE_FORMAT " should be movable", r->index());
 
-      Copy::aligned_conjoint_words(heap->get_region(old_start)->bottom(),
-                                   heap->get_region(new_start)->bottom(),
-                                   ShenandoahHeapRegion::region_size_words()*num_regions);
+      old_obj->copy_conjoint(heap->get_region(old_start)->bottom(),
+                             heap->get_region(new_start)->bottom(),
+                             ShenandoahHeapRegion::region_size_words()*num_regions);
 
       oop new_obj = oop(heap->get_region(new_start)->bottom());
       new_obj->init_mark();

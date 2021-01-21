@@ -92,10 +92,28 @@ class oopDesc {
 
   // Returns the actual oop size of the object
   inline int size();
+  // Returns the size of the object after possible compression during GC promotion/compaction
+  inline int compact_size();
+  // Returns the given size in the common case where there is no special compact size
+  inline int compact_size(int size);
 
   // Sometimes (for complicated concurrency-related reasons), it is useful
   // to be able to figure out the size of an object knowing its klass.
   inline int size_given_klass(Klass* klass);
+  // Returns the size of the object after possible compression during GC promotion/compaction
+  inline int compact_size_given_klass(Klass* klass);
+  // Returns the given size in the common case where there is no special compact size
+  inline int compact_size_given_klass(Klass* klass, int size);
+
+  // Copies the object
+  inline size_t copy_disjoint(HeapWord* to);
+  inline size_t copy_conjoint(HeapWord* to);
+  inline size_t copy_disjoint_compact(HeapWord* to);
+  inline size_t copy_conjoint_compact(HeapWord* to);
+  inline size_t copy_disjoint(HeapWord* to, size_t word_size);
+  inline size_t copy_disjoint_compact(HeapWord* to, size_t word_size);
+  inline size_t copy_conjoint(HeapWord* to, size_t word_size);
+  inline size_t copy_conjoint_compact(HeapWord* to, size_t word_size);
 
   // type test operations (inlined in oop.inline.hpp)
   inline bool is_instance()            const;

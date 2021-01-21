@@ -45,6 +45,7 @@ private:
   static int _offset_of_stack;
 
   InstanceStackChunkKlass(const ClassFileParser& parser);
+  static inline int metadata_words();
 
 public:
   InstanceStackChunkKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
@@ -59,6 +60,10 @@ public:
 
   // Returns the size of the instance including the stack data.
   virtual int oop_size(oop obj) const;
+  virtual int compact_oop_size(oop obj) const;
+
+  virtual size_t copy_disjoint_compact(oop obj, HeapWord* to) { return copy_compact<true> (obj, to); }
+  virtual size_t copy_conjoint_compact(oop obj, HeapWord* to) { return copy_compact<false>(obj, to); }
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
@@ -115,6 +120,9 @@ public:
   static void fix_chunk(oop chunk);
 
 private:
+  template<bool disjoint>
+  size_t copy_compact(oop obj, HeapWord* to);
+  
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(oop obj, OopClosureType* closure);
 

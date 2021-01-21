@@ -27,6 +27,10 @@
 
 #include "runtime/frame.inline.hpp"
 
+int InstanceStackChunkKlass::metadata_words() {
+  return frame::sender_sp_offset;
+}
+
 inline address StackChunkFrameStream::get_pc() const {
   assert (!is_done(), "");
   return *(address*)(_sp - 1);

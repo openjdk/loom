@@ -1716,6 +1716,10 @@ static void default_memcpy(void* from, void* to, size_t size) {
   memcpy(to, from, size << LogBytesPerWord);
 }
 
+static bool requires_barriers(oop obj) {
+  return Universe::heap()->requires_barriers(obj);
+}
+
 class CachedCompiledMetadata; // defined in PD
 template<class P>
 static inline oop safe_load(P *addr) {
@@ -1723,6 +1727,14 @@ static inline oop safe_load(P *addr) {
   obj = (oop)NativeAccess<>::oop_load(&obj);
   return obj;
 }
+
+#ifdef ASSERT
+template <class P>
+static void verify_oop_at(P* p) {
+  oop obj = (oop)NativeAccess<>::oop_load(p);
+  assert(oopDesc::is_oop_or_null(obj), "");
+}
+#endif
 
 template <typename OopT>
 class PersistOops : public OopClosure {
@@ -1854,6 +1866,7 @@ public:
   int nr_oops() const { return _nr_oops; }
 
 };
+
 class CountOops : public OopClosure {
 private:
   int _nr_oops;
@@ -2243,28 +2256,6 @@ class FreezeFrame<Compiled> {
   }
 };
 
-class FreezeOopVerify {
-public:
-  template <typename T>
-    static void verify(T* t);
-};
-
-template <>
-void FreezeOopVerify::verify<narrowOop>(narrowOop* addr) {
-  oop obj = NativeAccess<>::oop_load(addr);
-  assert(oopDesc::is_oop_or_null(obj), "");
-}
-
-template<>
-void FreezeOopVerify::verify<oop>(oop* addr) {
-  oop obj = NativeAccess<>::oop_load(addr);
-  assert(oopDesc::is_oop_or_null(obj), "");
-}
-
-static bool requires_barriers(oop obj) {
-  return Universe::heap()->requires_barriers(obj);
-}
-
 enum freeze_result {
   freeze_ok = 0,
   freeze_pinned_cs = 1,
@@ -2405,7 +2396,6 @@ public:
     _bottom_address += LIKELY(argsize == 0) ? frame_metadata // We add 2 because the chunk does not include the bottommost 2 words (return pc and link)
                                             : -argsize;
 
-
     log_develop_trace(jvmcont)("squash chunk bottom_address: " INTPTR_FORMAT " argsize: %d size: %d oops: %d frames: %d", p2i(_bottom_address), argsize, _size, _oops, _frames);
     if (log_develop_is_enabled(Trace, jvmcont)) InstanceStackChunkKlass::print_chunk(chunk, true);
   }
@@ -2443,6 +2433,7 @@ public:
       ;
   }
 
+#ifdef ASSERT
   void verify() {
     if (_cont.refStack() == NULL) {
       return;
@@ -2450,9 +2441,10 @@ public:
     int len = _cont.refStack()->length();
     for (int i = 0; i < len; ++i) {
       typename ConfigT::OopT* addr = _cont.refStack()->template obj_at_address<typename ConfigT::OopT>(i);
-      FreezeOopVerify::verify(addr);
+      verify_oop_at(addr);
     }
   }
+#endif
 
   freeze_result freeze(intptr_t* sp, bool chunk_available) {
     assert (!chunk_available || (USE_CHUNKS && mode == mode_fast), "");

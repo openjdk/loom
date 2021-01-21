@@ -557,6 +557,9 @@ protected:
   // actual oop size of obj in memory
   virtual int oop_size(oop obj) const = 0;
 
+  // the size of the object in memory after possible compression during GC promotion/compaction
+  virtual int compact_oop_size(oop obj) const { return oop_size(obj); }
+
   // Size of klass in word size.
   virtual int size() const = 0;
 
@@ -577,6 +580,9 @@ protected:
 
   // Returns "interface", "abstract class" or "class".
   const char* external_kind() const;
+
+  virtual size_t copy_disjoint_compact(oop obj, HeapWord* to); // { return obj->copy_disjoint(to); }
+  virtual size_t copy_conjoint_compact(oop obj, HeapWord* to); // { return obj->copy_conjoint(to); }
 
   // type testing operations
 #ifdef ASSERT

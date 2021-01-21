@@ -439,7 +439,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // Get the klass once.  We'll need it again later, and this avoids
   // re-decoding when it's compressed.
   Klass* klass = old->klass();
-  const size_t word_sz = old->size_given_klass(klass);
+  const size_t word_sz = old->compact_size_given_klass(klass);
 
   uint age = 0;
   G1HeapRegionAttr dest_attr = next_region_attr(region_attr, old_mark, age);
@@ -478,7 +478,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   const oop obj = oop(obj_ptr);
   const oop forward_ptr = old->forward_to_atomic(obj, old_mark, memory_order_relaxed);
   if (forward_ptr == NULL) {
-    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(old), obj_ptr, word_sz);
+    old->copy_disjoint_compact(obj_ptr, word_sz);
 
     {
       const uint young_index = from_region->young_index_in_cset();

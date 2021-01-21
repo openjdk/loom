@@ -264,7 +264,7 @@ oop HeapShared::archive_heap_object(oop obj, Thread* THREAD) {
 
   oop archived_oop = (oop)G1CollectedHeap::heap()->archive_mem_allocate(len);
   if (archived_oop != NULL) {
-    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), cast_from_oop<HeapWord*>(archived_oop), len);
+    obj->copy_disjoint(cast_from_oop<HeapWord*>(archived_oop), len);
     MetaspaceShared::relocate_klass_ptr(archived_oop);
     // Reinitialize markword to remove age/marking/locking/etc.
     //

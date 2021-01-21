@@ -2078,6 +2078,9 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, UseContinuationChunks, true,                                \
          "Fast younggen freeze/thaw")                                       \
                                                                             \
+  product(bool, TrimContinuationChunksInGC, false,                          \
+         "Trim stack chunks when copying objects in GC")                    \
+                                                                            \
   product(bool, UseContinuationFastPath, true,                              \
           "Use fast-path frame walking in continuations")                   \
                                                                             \
