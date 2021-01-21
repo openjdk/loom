@@ -35,11 +35,8 @@
 
 package java.util.concurrent;
 
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -536,9 +533,9 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *         {@link java.lang.RuntimePermission}{@code ("modifyThread")}.
      * @since 99
      */
-    default ExecutorService withDeadline(Instant deadline) {
-        return TimedExecutorService.create(this, deadline);
-    }
+//    default ExecutorService withDeadline(Instant deadline) {
+//        return TimedExecutorService.create(this, deadline);
+//    }
 
     /**
      * Submits a value-returning task for execution and returns a

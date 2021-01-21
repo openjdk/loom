@@ -3218,8 +3218,9 @@ public class Thread implements Runnable {
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
     int threadLocalRandomSecondarySeed;
 
-    // Used by jdk.internal.vm.ThreadDumper to track thread containers
-    private volatile Object threadDumperHeadNode;
+    // Used by java.util.concurrent.ThreadExecutor for thread confined executors
+    // (not a ThreadLocal as it may be accessed from other threads)
+    private volatile Object latestThreadExecutor;
 
     /* Some private helper methods */
     private native void setPriority0(int newPriority);
