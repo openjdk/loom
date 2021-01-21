@@ -90,6 +90,8 @@ static int clean() {
     nsk_jvmti_setFailStatus();
   }
 
+  jni->DeleteGlobalRef(expected_object);
+  jni->DeleteGlobalRef(expected_thread);
   return NSK_TRUE;
 }
 

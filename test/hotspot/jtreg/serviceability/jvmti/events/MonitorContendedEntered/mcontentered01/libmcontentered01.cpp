@@ -128,6 +128,10 @@ static int clean() {
   if (err != JVMTI_ERROR_NONE) {
     nsk_jvmti_setFailStatus();
   }
+
+  jni->DeleteGlobalRef(expected_object);
+  jni->DeleteGlobalRef(expected_thread);
+
   return NSK_TRUE;
 }
 
