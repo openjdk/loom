@@ -913,8 +913,7 @@ void ShenandoahMarkCompact::compact_humongous_objects() {
       assert(old_start != new_start, "must be real move");
       assert(r->is_stw_move_allowed(), "Region " SIZE_FORMAT " should be movable", r->index());
 
-      old_obj->copy_conjoint(heap->get_region(old_start)->bottom(),
-                             heap->get_region(new_start)->bottom(),
+      old_obj->copy_conjoint(heap->get_region(new_start)->bottom(),
                              ShenandoahHeapRegion::region_size_words()*num_regions);
 
       oop new_obj = oop(heap->get_region(new_start)->bottom());
