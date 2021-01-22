@@ -67,6 +67,7 @@
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadSMR.hpp"
 #include "runtime/vframe.inline.hpp"
+#include "runtime/vm_version.hpp"
 #include "utilities/macros.hpp"
 
 #ifdef JVMTI_TRACE
@@ -2974,6 +2975,9 @@ jint JvmtiExport::load_agent_library(const char *agent, const char *absParam,
       if (result == JNI_OK) {
         Arguments::add_loaded_agent(agent_lib);
       } else {
+        if (!agent_lib->is_static_lib()) {
+          os::dll_unload(library);
+        }
         delete agent_lib;
       }
 

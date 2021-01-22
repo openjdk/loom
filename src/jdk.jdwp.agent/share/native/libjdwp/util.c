@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2077,6 +2077,7 @@ eventIndex2jvmti(EventIndex i)
     return index2jvmti[i-EI_min];
 }
 
+#ifdef DEBUG
 
 char*
 eventIndex2EventName(EventIndex ei)
@@ -2139,6 +2140,8 @@ eventIndex2EventName(EventIndex ei)
             return "Bad EI";
     }
 }
+
+#endif
 
 EventIndex
 jdwp2EventIndex(jdwpEvent eventType)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1411,7 +1411,37 @@ disableEvents(HandlerNode *node)
     return error != JVMTI_ERROR_NONE? error : error2;
 }
 
+/***** filter (and event) installation and deinstallation *****/
+
+/**
+ * Make the set of event filters that correspond with this
+ * node active (including enabling the corresponding events).
+ */
+jvmtiError
+eventFilterRestricted_install(HandlerNode *node)
+{
+    return enableEvents(node);
+}
+
+/**
+ * Make the set of event filters that correspond with this
+ * node inactive (including disabling the corresponding events
+ * and freeing resources).
+ */
+jvmtiError
+eventFilterRestricted_deinstall(HandlerNode *node)
+{
+    jvmtiError error1, error2;
+
+    error1 = disableEvents(node);
+    error2 = clearFilters(node);
+
+    return error1 != JVMTI_ERROR_NONE? error1 : error2;
+}
+
 /***** debugging *****/
+
+#ifdef DEBUG
 
 void
 eventFilter_dumpHandlerFilters(HandlerNode *node)
@@ -1422,9 +1452,8 @@ eventFilter_dumpHandlerFilters(HandlerNode *node)
     for (i = 0; i < FILTER_COUNT(node); ++i, ++filter) {
         switch (filter->modifier) {
             case JDWP_REQUEST_MODIFIER(ThreadOnly):
-                tty_message("ThreadOnly: thread(%p) isVThread(%d)",
-                            filter->u.ThreadOnly.thread,
-                            isVThread(filter->u.ThreadOnly.thread));
+                tty_message("ThreadOnly: thread(%p)",
+                            filter->u.ThreadOnly.thread);
                 break;
             case JDWP_REQUEST_MODIFIER(ClassOnly): {
                 char *class_name;
@@ -1479,11 +1508,10 @@ eventFilter_dumpHandlerFilters(HandlerNode *node)
                             filter->u.ClassExclude.classPattern);
                 break;
             case JDWP_REQUEST_MODIFIER(Step):
-                tty_message("Step: size(%d) depth(%d) thread(%p) isVThread(%d)",
+                tty_message("Step: size(%d) depth(%d) thread(%p)",
                             filter->u.Step.size,
                             filter->u.Step.depth,
-                            filter->u.Step.thread,
-                            isVThread(filter->u.Step.thread));
+                            filter->u.Step.thread);
                 break;
             case JDWP_REQUEST_MODIFIER(SourceNameMatch):
                 tty_message("SourceNameMatch: sourceNamePattern(%s)",
@@ -1496,31 +1524,4 @@ eventFilter_dumpHandlerFilters(HandlerNode *node)
     }
 }
 
-
-/***** filter (and event) installation and deinstallation *****/
-
-/**
- * Make the set of event filters that correspond with this
- * node active (including enabling the corresponding events).
- */
-jvmtiError
-eventFilterRestricted_install(HandlerNode *node)
-{
-    return enableEvents(node);
-}
-
-/**
- * Make the set of event filters that correspond with this
- * node inactive (including disabling the corresponding events
- * and freeing resources).
- */
-jvmtiError
-eventFilterRestricted_deinstall(HandlerNode *node)
-{
-    jvmtiError error1, error2;
-
-    error1 = disableEvents(node);
-    error2 = clearFilters(node);
-
-    return error1 != JVMTI_ERROR_NONE? error1 : error2;
-}
+#endif /* DEBUG */

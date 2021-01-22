@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -83,5 +83,11 @@ void threadControl_mountVThread(jthread vthread, jthread thread, jbyte sessionID
 
 void threadControl_continuationRun(jthread thread, jint frames_count);
 void threadControl_continuationYield(jthread thread, jint frames_count);
+
+/***** debugging *****/
+
+#ifdef DEBUG
+void threadControl_dumpAllThreads();
+#endif
 
 #endif
