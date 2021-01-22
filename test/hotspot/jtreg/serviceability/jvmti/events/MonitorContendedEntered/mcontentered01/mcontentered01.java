@@ -70,7 +70,8 @@ public class mcontentered01 extends DebugeeClass {
         System.out.println("Timeout = " + timeout + " msc.");
 
         mcontentered01Task task = new mcontentered01Task();
-        Thread thread  = Thread.unstartedThread("Debuggee Thread", isVirtual ? Thread.VIRTUAL : 0, task);
+        Thread.Builder builder = Thread.builder().name("Debuggee Thread").task(task);
+        Thread thread = isVirtual ? builder.virtual().build() : builder.build();
         setExpected(task.endingMonitor, thread);
 
         synchronized (task.endingMonitor) {
