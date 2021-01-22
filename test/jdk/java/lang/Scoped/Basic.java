@@ -27,7 +27,6 @@
  * @summary Basic test for java.lang.Scoped
  */
 
-import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
@@ -200,6 +199,63 @@ public class Basic {
         });
     }
 
+    /**
+     * Test snapshot inheritance.
+     */
+    public void testSnapshotInheritance() throws Exception {
+        Scoped<String> name = Scoped.inheritableForType(String.class);
+        Scoped<String> occupation = Scoped.inheritableForType(String.class);
+        var snapshot
+                = name.callWithBinding("aristotle", () -> Scoped.snapshot());
+        assertFalse(name.isBound());
+        assertBoundInSnapshot(snapshot, name, true);
+        occupation.callWithBinding("undertaker", () -> {
+            assertBoundInSnapshot(snapshot, occupation, false);
+            assertEquals(occupation.get(), "undertaker");
+            assertTrue(occupation.isBound());
+            return null;
+        });
+        assertEqualsInSnapshot(snapshot, name, "aristotle");
+    }
+
+    /**
+     * Test for snapshot non-inheritance.
+     */
+    public void testSnapshotNonInheritance() throws Exception {
+        Scoped<String> name = Scoped.forType(String.class);
+        Scoped<String> occupation = Scoped.forType(String.class);
+        var snapshot
+                = name.callWithBinding("aristotle", () -> Scoped.snapshot());
+        assertFalse(name.isBound());
+        assertBoundInSnapshot(snapshot, name, false);
+        occupation.callWithBinding("undertaker", () -> {
+            assertBoundInSnapshot(snapshot, occupation, true);
+            assertEquals(occupation.get(), "undertaker");
+            assertEqualsInSnapshot(snapshot, occupation, "undertaker");
+            assertTrue(occupation.isBound());
+            return null;
+        });
+        name.callWithBinding("joe", () -> {
+            assertEqualsInSnapshot(snapshot, name, "joe");
+            return null;
+        });
+    }
+
+    private <T> void assertEqualsInSnapshot(Scoped.Snapshot snapshot, Scoped<T> var, T expected)
+            throws Exception {
+        snapshot.callWithSnapshot(() -> {
+            assertEquals(var.get(), expected);
+            return null;
+        });
+    }
+
+    private <T> void assertBoundInSnapshot(Scoped.Snapshot snapshot, Scoped<T> var, boolean expected)
+            throws Exception {
+        snapshot.callWithSnapshot(() -> {
+            assertEquals(var.isBound(), expected);
+            return null;
+        });
+    }
     /**
      * Ensures that a inheritable scope variable is inherited
      */
