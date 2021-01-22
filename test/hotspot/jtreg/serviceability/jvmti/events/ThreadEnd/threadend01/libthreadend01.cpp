@@ -48,18 +48,17 @@ void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
 
   err = jvmti->GetThreadInfo(thread, &inf);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetThreadInfo#%d) unexpected error: %s (%d)\n",
-           eventsCount, TranslateError(err), err);
+    printf("(GetThreadInfo#%d) unexpected error: %s (%d)\n", eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
   }
-  printf(">>> %s\n", inf.name);
+
+  print_thread_info(jni, jvmti, thread);
 
   if (inf.name != NULL && strstr(inf.name, prefix) == inf.name) {
     eventsCount++;
     sprintf(name, "%s%d", prefix, eventsCount);
     if (inf.name == NULL || strcmp(name, inf.name) != 0) {
-      printf("(#%d) wrong thread name: \"%s\"",
-             eventsCount, inf.name);
+      printf("(#%d) wrong thread name: \"%s\"",eventsCount, inf.name);
       printf(", expected: \"%s\"\n", name);
       result = STATUS_FAILED;
     }
@@ -99,8 +98,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_threadend01_getReady(JNIEnv *jni,
-                                               jclass cls, jint i, jstring name) {
+Java_threadend01_getReady(JNIEnv *jni, jclass cls, jint i, jstring name) {
   jvmtiError err;
 
   if (jvmti == NULL) {

@@ -49,7 +49,6 @@ import jdk.test.lib.jvmti.DebugeeClass;
 
 public class vmobjalloc01 extends DebugeeClass {
 
-    // run test from command line
     public static void main(String argv[]) {
         new vmobjalloc01().runIt();
     }

@@ -43,7 +43,6 @@ import java.io.PrintStream;
 
 public class threadstart01 {
 
-    final static int JCK_STATUS_BASE = 95;
     final static int THREADS_LIMIT = 100;
     final static String NAME_PREFIX = "threadstart01-";
 

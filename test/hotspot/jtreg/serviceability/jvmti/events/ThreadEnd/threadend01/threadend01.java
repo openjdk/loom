@@ -43,7 +43,6 @@ import java.io.PrintStream;
 
 public class threadend01 {
 
-    final static int JCK_STATUS_BASE = 95;
     final static int THREADS_LIMIT = 100;
     final static String NAME_PREFIX = "threadend01-";
 
@@ -71,7 +70,7 @@ public class threadend01 {
     }
 
     public static int run(String args[], PrintStream out) {
-        TestThread t = new TestThread(NAME_PREFIX + thrCount);
+        Thread t = new TestThread(NAME_PREFIX + thrCount);
         getReady(THREADS_LIMIT, NAME_PREFIX);
         t.start();
         try {
@@ -86,6 +85,7 @@ public class threadend01 {
         public TestThread(String name) {
             super(name);
         }
+
         public void run() {
             thrCount--;
             if (thrCount > 0) {

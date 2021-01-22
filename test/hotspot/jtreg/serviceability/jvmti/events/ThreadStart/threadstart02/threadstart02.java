@@ -65,17 +65,15 @@ import java.io.PrintStream;
 
 public class threadstart02 {
 
-    final static int JCK_STATUS_BASE = 95;
-
     static {
-    try {
-        System.loadLibrary("threadstart02");
-    } catch (UnsatisfiedLinkError ule) {
-        System.err.println("Could not load threadstart02 library");
-        System.err.println("java.library.path:"
-                + System.getProperty("java.library.path"));
-        throw ule;
-    }
+        try {
+            System.loadLibrary("threadstart02");
+        } catch (UnsatisfiedLinkError ule) {
+            System.err.println("Could not load threadstart02 library");
+            System.err.println("java.library.path:"
+                    + System.getProperty("java.library.path"));
+            throw ule;
+        }
     }
 
     native static int check();

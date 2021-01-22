@@ -50,7 +50,6 @@ public class threadend02 extends DebugeeClass {
         }
     }
 
-    // run test from JCK-compatible environment
     public static int run(String argv[], PrintStream out) {
         return new threadend02().runIt(argv, out);
     }
