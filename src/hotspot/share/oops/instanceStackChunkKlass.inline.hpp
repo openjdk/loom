@@ -26,6 +26,7 @@
 
 #include "compiler/oopMap.hpp"
 #include "classfile/javaClasses.hpp"
+#include "gc/shared/gc_globals.hpp"
 #include "memory/iterator.inline.hpp"
 #include "oops/instanceKlass.inline.hpp"
 #include "oops/instanceStackChunkKlass.hpp"

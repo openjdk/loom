@@ -138,22 +138,6 @@ import java.util.concurrent.locks.LockSupport;
  * #getException} will return either the encountered exception or
  * {@link CancellationException}.
  *
- * <p>By default, method {@link #cancel} ignores its {@code
- * mayInterruptIfRunning} argument, separating task cancellation from
- * the interruption status of threads running tasks. However, the
- * method is overridable to accommodate cases in which running tasks
- * must be cancelled using interrupts. This may arise when adapting
- * Callables that cannot check {@code isCancelled()} task status.
- * Tasks constructed with the {@link #adaptInterruptible} adaptor
- * track and interrupt the running thread upon {@code
- * cancel(true)}. Reliable usage requires awareness of potential
- * consequences: Method bodies should ignore stray interrupts to cope
- * with the inherent possibility that a late interrupt issued by
- * another thread after a given task has completed may (inadvertently)
- * interrupt some future task. Further, interruptible tasks should not
- * in general create subtasks, because an interrupt intended for a
- * given task may be consumed by one of its subtasks, or vice versa.
- *
  * <p>The ForkJoinTask class is not usually directly subclassed.
  * Instead, you subclass one of the abstract classes that support a
  * particular style of fork/join processing, typically {@link
@@ -1521,9 +1505,11 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * @param <T> the type of the callable's result
      * @return the task
      *
-     * @since 15
+     * @since 17
      */
-    public static <T> ForkJoinTask<T> adaptInterruptible(Callable<? extends T> callable) {
+    // adaptInterruptible deferred to its own independent change
+    // https://bugs.openjdk.java.net/browse/JDK-8246587
+    /* TODO: public */ private static <T> ForkJoinTask<T> adaptInterruptible(Callable<? extends T> callable) {
         return new AdaptedInterruptibleCallable<T>(callable);
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,12 +23,14 @@
 
 /**
  * @test
- * @run testng ThreadExecutorTest
- * @summary Basic tests for Executors.newThreadExecutor
+ * @run testng/othervm/timeout=300 ThreadExecutorTest
+ * @summary Basic tests for ThreadExecutor
  */
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -51,6 +53,11 @@ import static org.testng.Assert.*;
 
 @Test
 public class ThreadExecutorTest {
+    // long running interruptible task
+    private static final Callable<Void> SLEEP_FOR_A_DAY = () -> {
+        Thread.sleep(Duration.ofDays(1));
+        return null;
+    };
 
     /**
      * Test that a thread is created for each task.
@@ -103,22 +110,212 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test that shutdownNow stops executing tasks.
+     * Test shutdown.
      */
-    public void testShutdownNow() {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
-        ExecutorService executor = Executors.newThreadExecutor(factory);
-        Future<?> result;
-        try {
-            result = executor.submit(() -> {
-                Thread.sleep(Duration.ofDays(1));
+    public void testShutdown() throws Exception {
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor()) {
+            assertFalse(executor.isShutdown());
+            assertFalse(executor.isTerminated());
+            assertFalse(executor.awaitTermination(10, TimeUnit.MILLISECONDS));
+
+            Future<?> result = executor.submit(SLEEP_FOR_A_DAY);
+            try {
+                executor.shutdown();
+                assertTrue(executor.isShutdown());
+                assertFalse(executor.isTerminated());
+                assertFalse(executor.awaitTermination(1, TimeUnit.SECONDS));
+            } finally {
+                result.cancel(true);
+            }
+        }
+    }
+
+    /**
+     * Test shutdownNow.
+     */
+    public void testShutdownNow() throws Exception {
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor()) {
+            assertFalse(executor.isShutdown());
+            assertFalse(executor.isTerminated());
+            assertFalse(executor.awaitTermination(10, TimeUnit.MILLISECONDS));
+
+            Future<?> result = executor.submit(SLEEP_FOR_A_DAY);
+            try {
+                List<Runnable> tasks = executor.shutdownNow();
+                assertTrue(executor.isShutdown());
+                assertTrue(tasks.isEmpty());
+
+                Throwable e = expectThrows(ExecutionException.class, result::get);
+                assertTrue(e.getCause() instanceof InterruptedException);
+
+                assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
+                assertTrue(executor.isTerminated());
+            } finally {
+                result.cancel(true);
+            }
+        }
+    }
+
+    /**
+     * Test close.
+     */
+    public void testClose1() throws Exception {
+        ExecutorService executor = Executors.newVirtualThreadExecutor();
+        executor.close();
+        assertTrue(executor.isShutdown());
+        assertTrue(executor.isTerminated());
+        assertTrue(executor.awaitTermination(10,  TimeUnit.MILLISECONDS));
+    }
+
+    public void testClose2() throws Exception {
+        ExecutorService executor = Executors.newVirtualThreadExecutor();
+        try (executor) {
+            executor.submit(() -> {
+                Thread.sleep(Duration.ofSeconds(2));
                 return null;
             });
-        } finally {
-            executor.shutdownNow();
         }
-        Throwable e = expectThrows(ExecutionException.class, result::get);
-        assertTrue(e.getCause() instanceof InterruptedException);
+        assertTrue(executor.isShutdown());
+        assertTrue(executor.isTerminated());
+        assertTrue(executor.awaitTermination(10,  TimeUnit.MILLISECONDS));
+    }
+
+    public void testClose3() throws Exception {
+        ExecutorService executor = Executors.newVirtualThreadExecutor();
+        try (executor) {
+            Future<?> result = executor.submit(SLEEP_FOR_A_DAY);
+            ScheduledInterrupter.schedule(Thread.currentThread(), 2000);
+        } finally {
+            assertTrue(Thread.interrupted());
+        }
+        assertTrue(executor.isShutdown());
+        assertTrue(executor.isTerminated());
+        assertTrue(executor.awaitTermination(10,  TimeUnit.MILLISECONDS));
+    }
+
+    /**
+     * Close executor that is already closed.
+     */
+    public void testClose4() throws Exception {
+        var executor1 = Executors.newVirtualThreadExecutor();
+        var executor2 = Executors.newVirtualThreadExecutor();
+        executor2.close();
+        executor2.close(); // already closed
+        executor1.close();
+        executor1.close(); // already closed
+        executor2.close(); // out of order, already closed
+    }
+
+    /**
+     * Attempt to close from a different thread.
+     */
+    public void testClose5() throws Exception {
+        var exception = new AtomicReference<Exception>();
+        try (var executor = Executors.newVirtualThreadExecutor()) {
+            Thread.startVirtualThread(() -> {
+                try {
+                    executor.close();
+                } catch (Exception e) {
+                    exception.set(e);
+                }
+            }).join();
+        }
+        assertTrue(exception.get() instanceof IllegalCallerException);
+    }
+
+    /**
+     * Attempt to close a closed executor from a different thread.
+     * @throws Exception
+     */
+    public void testClose6() throws Exception {
+        var executor = Executors.newVirtualThreadExecutor();
+        executor.close();
+        assertTrue(executor.isTerminated());
+        var exception = new AtomicReference<Exception>();
+        Thread.startVirtualThread(() -> {
+            try {
+                executor.close();
+            } catch (Exception e) {
+                exception.set(e);
+            }
+        }).join();
+        assertTrue(exception.get() instanceof IllegalCallerException);
+    }
+
+    /**
+     * Test that close enforces nesting
+     */
+    public void testClose7() throws Exception {
+        try (var executor1 = Executors.newVirtualThreadExecutor()) {
+            try (var executor2 = Executors.newVirtualThreadExecutor()) {
+                try {
+                    executor1.close();
+                    assertTrue(false);
+                } catch (IllegalStateException expected) { }
+            }
+        }
+    }
+
+    /**
+     * Test closing a shared executor from a different thread.
+     */
+    public void testClose8() throws Exception {
+        var exception = new AtomicReference<Exception>();
+
+        ThreadFactory factory = Thread.builder().virtual().factory();
+        try (var executor = Executors.newUnownedThreadExecutor(factory)) {
+            Thread.startVirtualThread(() -> {
+                try {
+                    executor.close();
+                } catch (Exception e) {
+                    exception.set(e);
+                }
+            }).join();
+        }
+        assertTrue(exception.get() == null);
+    }
+
+    /**
+     * Test awaitTermination.
+     */
+    public void testAwaitTermination1() throws Exception {
+        ExecutorService executor = Executors.newVirtualThreadExecutor();
+        assertFalse(executor.awaitTermination(1, TimeUnit.SECONDS));
+        executor.close();
+        assertTrue(executor.awaitTermination(10, TimeUnit.MILLISECONDS));
+    }
+
+    public void testAwaitTermination2() throws Exception {
+        ExecutorService executor = Executors.newVirtualThreadExecutor();
+        Future<?> result = executor.submit(() -> {
+            Thread.sleep(Duration.ofSeconds(3));
+            return null;
+        });
+        try {
+            executor.shutdown();
+            assertFalse(executor.awaitTermination(1, TimeUnit.SECONDS));
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+        } finally {
+            result.cancel(true);
+        }
+    }
+
+    /**
+     * Test submit method.
+     */
+    public void testSubmit() throws Exception {
+        var ref1 = new AtomicReference<Thread>();
+        var ref2 = new AtomicReference<Thread>();
+        ThreadFactory factory = task -> {
+            assertTrue(ref1.get() == null);
+            Thread vthread = Thread.builder().virtual().task(task).build();
+            ref1.set(vthread);
+            return vthread;
+        };
+        try (ExecutorService executor = Executors.newThreadExecutor(factory)) {
+            executor.submit(() -> ref2.set(Thread.currentThread())).join();
+            assertTrue(ref1.get() != null && ref1.get() == ref2.get());
+        }
     }
 
     /**
@@ -126,17 +323,17 @@ public class ThreadExecutorTest {
      */
     public void testSubmitAfterShutdown() {
         Phaser barrier = new Phaser(2);
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
-        ExecutorService executor = Executors.newThreadExecutor(factory);
-        try {
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor()) {
             // submit task to prevent executor from terminating
             executor.submit(barrier::arriveAndAwaitAdvance);
-            executor.shutdown();
-            assertTrue(executor.isShutdown() && !executor.isTerminated());
-            assertThrows(RejectedExecutionException.class, () -> executor.submit(() -> {}));
-        } finally {
-            // allow task to complete
-            barrier.arriveAndAwaitAdvance();
+            try {
+                executor.shutdown();
+                assertTrue(executor.isShutdown() && !executor.isTerminated());
+                expectThrows(RejectedExecutionException.class,
+                             () -> executor.submit(() -> {  }));
+            } finally {
+                barrier.arriveAndAwaitAdvance();
+            }
         }
     }
 
@@ -145,10 +342,28 @@ public class ThreadExecutorTest {
      */
     public void testSubmitAfterTermination() {
         ThreadFactory factory = Thread.builder().daemon(true).factory();
-        ExecutorService executor = Executors.newThreadExecutor(factory);
+        ExecutorService executor = Executors.newVirtualThreadExecutor();
         executor.shutdown();
         assertTrue(executor.isShutdown() && executor.isTerminated());
-        assertThrows(RejectedExecutionException.class, () -> executor.submit(() -> {}));
+        expectThrows(RejectedExecutionException.class, () -> executor.submit(() -> {}));
+    }
+
+    @Test(expectedExceptions = { NullPointerException.class })
+    public void testSubmitNulls1() {
+        var executor = Executors.newVirtualThreadExecutor();
+        executor.submit((Runnable) null);
+    }
+
+    @Test(expectedExceptions = { NullPointerException.class })
+    public void testSubmitNulls2() {
+        var executor = Executors.newVirtualThreadExecutor();
+        executor.submit((Callable<String>) null);
+    }
+
+    @Test(expectedExceptions = { NullPointerException.class })
+    public void testSubmitNulls3() {
+        var executor = Executors.newVirtualThreadExecutor();
+        executor.submit((Collection<? extends Callable<String>>) null);
     }
 
     /**
@@ -383,6 +598,26 @@ public class ThreadExecutorTest {
     public void testInvokeAnyEmpty2() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             executor.invokeAny(Set.of(), 1, TimeUnit.MINUTES);
+        }
+    }
+
+    /**
+     * Test invokeAll with deadline, deadline expires with running tasks.
+     */
+    public void testInvokeAnyWithDeadline()throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor(deadline)) {
+            try {
+                // execute long running tasks
+                executor.invokeAny(List.of(SLEEP_FOR_A_DAY, SLEEP_FOR_A_DAY));
+                assertTrue(false);
+            } catch (ExecutionException e) {
+                // expected
+            }
+
+            // executor should be shutdown and should terminate
+            assertTrue(executor.isShutdown());
+            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
         }
     }
 
@@ -789,6 +1024,30 @@ public class ThreadExecutorTest {
         }
     }
 
+    /**
+     * Test invokeAll with deadline, deadline expires with running tasks.
+     */
+    public void testInvokeAllWithDeadline()throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor(deadline)) {
+            // execute long running tasks
+            List<Future<Void>> futures = executor.invokeAll(List.of(SLEEP_FOR_A_DAY, SLEEP_FOR_A_DAY));
+            for (Future<Void> f : futures) {
+                assertTrue(f.isDone());
+                try {
+                    Object result = f.get();
+                    assertTrue(false);
+                } catch (ExecutionException | CancellationException e) {
+                    // expected
+                }
+            }
+
+            // executor should be shutdown and should terminate
+            assertTrue(executor.isShutdown());
+            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
+        }
+    }
+
     @Test(expectedExceptions = { NullPointerException.class })
     public void testInvokeAllNull1() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
@@ -831,6 +1090,120 @@ public class ThreadExecutorTest {
         }
     }
 
+    /**
+     * Deadline expires with running tasks, thread blocked in Future::get.
+     */
+    public void testDeadlineDuringFutureGet() throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor(deadline)) {
+            // submit long running task
+            Future<?> future = executor.submit(SLEEP_FOR_A_DAY);
+
+            // task should be interrupted
+            Throwable e = expectThrows(ExecutionException.class, future::get);
+            assertTrue(e.getCause() instanceof InterruptedException);
+
+            // executor should be shutdown and should terminate
+            assertTrue(executor.isShutdown());
+            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
+        }
+    }
+
+    /**
+     * Deadline expires with running tasks, thread blocked waiting on a stream.
+     */
+    public void testDeadlineDuringSubmit()throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor(deadline)) {
+            List<Future<Void>> futures = executor.submit(List.of(SLEEP_FOR_A_DAY, SLEEP_FOR_A_DAY))
+                    .collect(Collectors.toList());
+            for (Future<Void> f : futures) {
+                assertTrue(f.isDone());
+                try {
+                    Object result = f.get();
+                    assertTrue(false);
+                } catch (ExecutionException e) {
+                    assertTrue(e.getCause() instanceof InterruptedException);
+                } catch (CancellationException e) {
+                    // didn't run
+                }
+            }
+
+            // executor should be shutdown and should terminate
+            assertTrue(executor.isShutdown());
+            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
+        }
+    }
+
+    /**
+     * Deadline expires with running tasks, thread blocked in close.
+     */
+    public void testDeadlineDuringClose()throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        Future<?> future;
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor(deadline)) {
+            // submit long running task
+            future = executor.submit(SLEEP_FOR_A_DAY);
+        }
+
+        // task should be interrupted
+        assertTrue(future.isDone());
+        Throwable e = expectThrows(ExecutionException.class, future::get);
+        assertTrue(e.getCause() instanceof InterruptedException);
+    }
+
+    /**
+     * Deadline expires after the executor is shutdown.
+     */
+    public void testDeadlineAfterShutdown()throws Exception {
+        var deadline = Instant.now().plusSeconds(5);
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor(deadline)) {
+            // submit long running task
+            Future<?> future = executor.submit(SLEEP_FOR_A_DAY);
+
+            // shutdown with running task
+            executor.shutdown();
+
+            // task should be interrupted
+            Throwable e = expectThrows(ExecutionException.class, future::get);
+            assertTrue(e.getCause() instanceof InterruptedException);
+
+            // executor should terminate
+            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
+        }
+    }
+
+    /**
+     * Deadline expires after executor has terminated.
+     */
+    public void testDeadlineAfterTerminate()throws Exception {
+        var deadline = Instant.now().plusSeconds(10);
+        Future<?> future;
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor(deadline)) {
+            future = executor.submit(() -> { });
+        }
+        assertTrue(future.get() == null);
+    }
+
+    /**
+     * Deadline has already expired
+     */
+    public void testDeadlineAlreadyExpired1() throws Exception {
+        // now
+        Instant now = Instant.now();
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor(now)) {
+            assertTrue(executor.isTerminated());
+        }
+    }
+
+    public void testDeadlineAlreadyExpired2() throws Exception {
+        // in the past
+        var yesterday = Instant.now().minus(Duration.ofDays(1));
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor(yesterday)) {
+            assertTrue(executor.isTerminated());
+        }
+    }
+
     @Test(expectedExceptions = { RejectedExecutionException.class })
     public void testNoThreads1() throws Exception {
         ExecutorService executor = Executors.newThreadExecutor(task -> null);
@@ -853,6 +1226,33 @@ public class ThreadExecutorTest {
     public void testNoThreads4() throws Exception {
         ExecutorService executor = Executors.newThreadExecutor(task -> null);
         executor.invokeAny(List.of(() -> "foo"));
+    }
+
+    @Test(expectedExceptions = { NullPointerException.class })
+    public void testNulls1() {
+        Executors.newThreadExecutor(null);
+    }
+
+    @Test(expectedExceptions = { NullPointerException.class })
+    public void testNulls2() {
+        ThreadFactory factory = Thread.builder().factory();
+        Executors.newThreadExecutor(factory, null);
+    }
+
+    @Test(expectedExceptions = { NullPointerException.class })
+    public void testNulls3() {
+        Instant deadline = Instant.now().plusSeconds(10);
+        Executors.newThreadExecutor(null, deadline);
+    }
+
+    @Test(expectedExceptions = { NullPointerException.class })
+    public void testNulls4() {
+        Executors.newVirtualThreadExecutor(null);
+    }
+
+    @Test(expectedExceptions = { NullPointerException.class })
+    public void testNulls5() {
+        Executors.newUnownedThreadExecutor(null);
     }
 
     // -- supporting classes --

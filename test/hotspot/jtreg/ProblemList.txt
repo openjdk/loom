@@ -50,6 +50,8 @@ runtime/clinit/ClassInitBarrier.java                                          82
 runtime/vthread/RedefineClass.java                                            8253378 generic-all
 gtest/GTestWrapper.java                                                       0000000 generic-all
 
+serviceability/jvmti/events/FramePop/framepop02/framepop02.java               0000000 generic-all
+
 #############################################################################
 
 # :hotspot_compiler

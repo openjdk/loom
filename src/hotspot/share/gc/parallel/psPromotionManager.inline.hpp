@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,6 +32,7 @@
 #include "gc/parallel/psPromotionManager.hpp"
 #include "gc/parallel/psScavenge.inline.hpp"
 #include "gc/shared/taskqueue.inline.hpp"
+#include "gc/shared/tlab_globals.hpp"
 #include "logging/log.hpp"
 #include "memory/iterator.inline.hpp"
 #include "oops/access.inline.hpp"
@@ -143,7 +144,7 @@ inline oop PSPromotionManager::copy_to_survivor_space(oop o) {
   // The same test as "o->is_forwarded()"
   if (!test_mark.is_marked()) {
     bool new_obj_is_tenured = false;
-    size_t new_obj_size = o->size();
+    size_t new_obj_size = o->compact_size();
 
     // Find the objects age, MT safe.
     uint age = (test_mark.has_displaced_mark_helper() /* o->has_displaced_mark() */) ?
@@ -232,7 +233,7 @@ inline oop PSPromotionManager::copy_to_survivor_space(oop o) {
     assert(new_obj != NULL, "allocation should have succeeded");
 
     // Copy obj
-    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(o), cast_from_oop<HeapWord*>(new_obj), new_obj_size);
+    o->copy_disjoint_compact(cast_from_oop<HeapWord*>(new_obj), new_obj_size);
 
     // Now we have to CAS in the header.
     // Make copy visible to threads reading the forwardee.

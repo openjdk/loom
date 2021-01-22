@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1275,10 +1275,6 @@ void GenCollectedHeap::gc_epilogue(bool full) {
   GenGCEpilogueClosure blk(full);
   generation_iterate(&blk, false);  // not old-to-young.
 
-  if (!CleanChunkPoolAsync) {
-    Chunk::clean_chunk_pool();
-  }
-
   MetaspaceCounters::update_performance_counters();
   CompressedClassSpaceCounters::update_performance_counters();
 };
@@ -1317,13 +1313,13 @@ oop GenCollectedHeap::handle_failed_promotion(Generation* old_gen,
                                               oop obj,
                                               size_t obj_size) {
   guarantee(old_gen == _old_gen, "We only get here with an old generation");
-  assert(obj_size == (size_t)obj->size(), "bad obj_size passed in");
+  assert(obj_size == (size_t)obj->compact_size(), "bad obj_size passed in");
   HeapWord* result = NULL;
 
   result = old_gen->expand_and_allocate(obj_size, false);
 
   if (result != NULL) {
-    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), result, obj_size);
+    obj->copy_disjoint_compact(result, obj_size);
   }
   return oop(result);
 }

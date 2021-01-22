@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -36,6 +36,7 @@
 #include "runtime/atomic.hpp"
 #include "runtime/os.hpp"
 #include "utilities/align.hpp"
+#include "utilities/copy.hpp"
 #include "utilities/macros.hpp"
 
 // Implementation of all inlined member functions defined in oop.hpp
@@ -193,7 +194,7 @@ int oopDesc::size_given_klass(Klass* klass)  {
       // disjunct below to fail if the two comparands are computed across such
       // a concurrent change.
       assert((s == klass->oop_size(this)) ||
-             (Universe::heap()->is_gc_active() && is_objArray() && is_forwarded() && (UseParallelGC || UseG1GC)),
+             (Universe::heap()->is_gc_active() && is_objArray() && is_forwarded() && (get_UseParallelGC() || get_UseG1GC())),
              "wrong array object size");
     } else {
       // Must be zero, so bite the bullet and take the virtual call.
@@ -204,6 +205,31 @@ int oopDesc::size_given_klass(Klass* klass)  {
   assert(s > 0, "Oop size must be greater than zero, not %d", s);
   assert(is_object_aligned(s), "Oop size is not properly aligned: %d", s);
   return s;
+}
+
+int oopDesc::compact_size()  {
+  return compact_size_given_klass(klass());
+}
+
+int oopDesc::compact_size(int size)  {
+  return compact_size_given_klass(klass(), size);
+}
+
+int oopDesc::compact_size_given_klass(Klass* klass) {
+  int lh = klass->layout_helper();
+  if (TrimContinuationChunksInGC && lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
+    return klass->compact_oop_size(this);
+  }
+  return size_given_klass(klass);
+}
+
+int oopDesc::compact_size_given_klass(Klass* klass, int size) {
+  int lh = klass->layout_helper();
+  if (TrimContinuationChunksInGC && lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
+    return klass->compact_oop_size(this);
+  }
+  assert (size == size_given_klass(klass), "");
+  return size;
 }
 
 bool oopDesc::is_instance()  const { return klass()->is_instance_klass();  }
@@ -430,6 +456,56 @@ bool oopDesc::mark_must_be_preserved(markWord m) const {
 
 bool oopDesc::mark_must_be_preserved_for_promotion_failure(markWord m) const {
   return m.must_be_preserved_for_promotion_failure(DeferredObjectToKlass(this));
+}
+
+size_t oopDesc::copy_disjoint(HeapWord* to) { 
+  return copy_disjoint(to, size()); 
+}
+
+size_t oopDesc::copy_conjoint(HeapWord* to) { 
+  return copy_conjoint(to, size()); 
+}
+
+size_t oopDesc::copy_disjoint_compact(HeapWord* to) { 
+  return copy_disjoint_compact(to, compact_size()); 
+}
+
+size_t oopDesc::copy_conjoint_compact(HeapWord* to) { 
+  return copy_conjoint_compact(to, compact_size()); 
+}
+
+size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
+  assert (word_size == (size_t)size(), "");
+  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
+  return word_size;
+}
+
+size_t oopDesc::copy_disjoint_compact(HeapWord* to, size_t word_size) {
+  assert (word_size == (size_t)compact_size(), "");
+  int lh = klass()->layout_helper();
+  if (TrimContinuationChunksInGC && lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
+    size_t res = klass()->copy_disjoint_compact(this, to);
+    assert (word_size == res, "");
+    return res;
+  }
+  return copy_disjoint(to, word_size);
+}
+
+size_t oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
+  assert (word_size == (size_t)size(), "");
+  Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
+  return word_size;
+}
+
+size_t oopDesc::copy_conjoint_compact(HeapWord* to, size_t word_size) {
+  assert (word_size == (size_t)compact_size(), "");
+  int lh = klass()->layout_helper();
+  if (TrimContinuationChunksInGC && lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
+    size_t res = klass()->copy_conjoint_compact(this, to);
+    assert (word_size == res, "");
+    return res;
+  }
+  return copy_conjoint(to, word_size);
 }
 
 #endif // SHARE_OOPS_OOP_INLINE_HPP

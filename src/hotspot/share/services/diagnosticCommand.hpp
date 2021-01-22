@@ -915,7 +915,6 @@ public:
 
 class JavaThreadDumpDCmd : public DCmdWithParser {
 private:
-  void dumpToOutputStream(Symbol* name, Symbol* signature, TRAPS);
   void dumpToFile(Symbol* name, Symbol* signature, const char* path, TRAPS);
 protected:
   DCmdArgument<char*> _format;

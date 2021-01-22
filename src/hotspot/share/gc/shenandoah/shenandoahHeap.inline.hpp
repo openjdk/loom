@@ -29,6 +29,7 @@
 #include "gc/shared/markBitMap.inline.hpp"
 #include "gc/shared/threadLocalAllocBuffer.inline.hpp"
 #include "gc/shared/suspendibleThreadSet.hpp"
+#include "gc/shared/tlab_globals.hpp"
 #include "gc/shenandoah/shenandoahAsserts.hpp"
 #include "gc/shenandoah/shenandoahBarrierSet.inline.hpp"
 #include "gc/shenandoah/shenandoahCollectionSet.inline.hpp"
@@ -294,7 +295,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
   }
 
   // Copy the object:
-  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(p), copy, size);
+  p->copy_disjoint(copy, size);
 
   // Try to install the new forwarding pointer.
   oop copy_val = oop(copy);

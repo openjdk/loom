@@ -29,6 +29,180 @@
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
 
+
+#ifdef ASSERT
+template<typename FKind>
+static intptr_t* slow_real_fp(const frame& f) {
+  assert (FKind::is_instance(f), "");
+  return FKind::interpreted ? f.fp() : f.unextended_sp() + Frame::slow_get_cb(f)->frame_size();
+}
+
+template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
+static intptr_t** slow_link_address(const frame& f) {
+  assert (FKind::is_instance(f), "");
+  return FKind::interpreted
+            ? (intptr_t**)(f.fp() + frame::link_offset)
+            : (intptr_t**)(slow_real_fp<FKind>(f) - frame::sender_sp_offset);
+}
+
+template<typename FKind>
+address* Frame::slow_return_pc_address(const frame& f) {
+  return (address*)(slow_real_fp<FKind>(f) - 1);
+}
+
+bool Frame::assert_frame_laid_out(frame f) {
+  intptr_t* sp = f.sp();
+  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
+  assert (f.raw_pc() == pc, "f.ra_pc: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.raw_pc()), p2i(pc));
+  assert (f.fp() == fp, "f.fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.fp()), p2i(fp));
+  return f.raw_pc() == pc && f.fp() == fp;
+}
+#endif
+
+inline intptr_t** Frame::callee_link_address(const frame& f) {
+  return (intptr_t**)(f.sp() - frame::sender_sp_offset);
+}
+
+static void patch_callee_link(const frame& f, intptr_t* fp) {
+  *Frame::callee_link_address(f) = fp;
+  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), p2i(fp));
+}
+
+template <typename RegisterMapT>
+inline intptr_t** Frame::map_link_address(const RegisterMapT* map) {
+  return (intptr_t**)map->location(rbp->as_VMReg());
+}
+
+static inline intptr_t* noninterpreted_real_fp(intptr_t* unextended_sp, int size_in_words) {
+  return unextended_sp + size_in_words;
+}
+
+template<typename FKind>
+static inline intptr_t* real_fp(const frame& f) {
+  assert (FKind::is_instance(f), "");
+  assert (FKind::interpreted || f.cb() != NULL, "");
+
+  return FKind::interpreted ? f.fp() : f.unextended_sp() + f.cb()->frame_size();
+}
+
+static inline intptr_t** noninterpreted_link_address(intptr_t* unextended_sp, int size_in_words) {
+  return (intptr_t**)(noninterpreted_real_fp(unextended_sp, size_in_words) - frame::sender_sp_offset);
+}
+
+template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
+static inline intptr_t** link_address(const frame& f) {
+  assert (FKind::is_instance(f), "");
+  return FKind::interpreted
+            ? (intptr_t**)(f.fp() + frame::link_offset)
+            : (intptr_t**)(real_fp<FKind>(f) - frame::sender_sp_offset);
+}
+
+template<typename FKind>
+static void patch_link(frame& f, intptr_t* fp) {
+  assert (FKind::interpreted, "");
+  *link_address<FKind>(f) = fp;
+  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": " INTPTR_FORMAT, p2i(link_address<FKind>(f)), p2i(fp));
+}
+
+// static inline intptr_t** link_address_stub(const frame& f) {
+//   assert (!f.is_java_frame(), "");
+//   return (intptr_t**)(f.fp() - frame::sender_sp_offset);
+// }
+
+static inline intptr_t** link_address(const frame& f) {
+  return f.is_interpreted_frame() ? link_address<Interpreted>(f) : link_address<NonInterpretedUnknown>(f);
+}
+
+inline address* Interpreted::return_pc_address(const frame& f) {
+  return (address*)(f.fp() + frame::return_addr_offset);
+}
+
+void Interpreted::patch_sender_sp(frame& f, intptr_t* sp) {
+  assert (f.is_interpreted_frame(), "");
+  *(intptr_t**)(f.fp() + frame::interpreter_frame_sender_sp_offset) = sp;
+  log_trace(jvmcont)("patched sender_sp: " INTPTR_FORMAT, p2i(sp));
+}
+
+inline address* Frame::return_pc_address(const frame& f) {
+  return (address*)(f.real_fp() - 1);
+}
+
+// inline address* Frame::pc_address(const frame& f) {
+//   return (address*)(f.sp() - frame::return_addr_offset);
+// }
+
+inline address Frame::real_pc(const frame& f) {
+  address* pc_addr = &(((address*) f.sp())[-1]);
+  return *pc_addr;
+}
+
+inline void Frame::patch_pc(const frame& f, address pc) {
+  address* pc_addr = &(((address*) f.sp())[-1]);
+  *pc_addr = pc;
+}
+
+inline intptr_t* Interpreted::frame_top(const frame& f, InterpreterOopMap* mask) { // inclusive; this will be copied with the frame
+  intptr_t* res = *(intptr_t**)f.addr_at(frame::interpreter_frame_initial_sp_offset) - expression_stack_size(f, mask);
+  assert (res == (intptr_t*)f.interpreter_frame_monitor_end() - expression_stack_size(f, mask), "");
+  assert (res >= f.unextended_sp(), "");
+  return res;
+  // Not true, but using unextended_sp might work
+  // assert (res == f.unextended_sp(), "res: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(res), p2i(f.unextended_sp() + 1));
+}
+
+inline intptr_t* Interpreted::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
+    return *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) + 1; // exclusive, so we add 1 word
+}
+
+
+void ContinuationHelper::update_map_for_chunk_frame(RegisterMap* map) {
+  frame::update_map_with_saved_link(map, (intptr_t**)(intptr_t)(-2 * BytesPerWord)); // for chunk frames, we store offset
+}
+
+template<typename FKind, typename RegisterMapT>
+inline void ContinuationHelper::update_register_map(RegisterMapT* map, const frame& f) {
+  frame::update_map_with_saved_link(map, link_address<FKind>(f));
+}
+
+template<typename RegisterMapT>
+inline void ContinuationHelper::update_register_map(RegisterMapT* map, intptr_t** link_address) {
+  frame::update_map_with_saved_link(map, link_address);
+}
+
+template<typename RegisterMapT>
+inline void ContinuationHelper::update_register_map_with_callee(RegisterMapT* map, const frame& f) {
+  frame::update_map_with_saved_link(map, Frame::callee_link_address(f));
+}
+
+void ContinuationHelper::update_register_map(RegisterMap* map, const hframe& caller) {
+  // we save the link _index_ in the oop map; it is read and converted back in Continuation::reg_to_location
+  int link_index = caller.callee_link_index();
+  log_develop_trace(jvmcont)("ContinuationHelper::update_register_map: frame::update_map_with_saved_link: %d", link_index);
+  intptr_t link_index0 = link_index;
+  frame::update_map_with_saved_link(map, reinterpret_cast<intptr_t**>(link_index0));
+}
+
+inline void ContinuationHelper::push_pd(const frame& f) {
+  log_develop_trace(jvmcont)("ContinuationHelper::push_pd: " INTPTR_FORMAT, p2i(f.fp()));
+  // os::print_location(tty, (intptr_t)f.fp());
+  *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
+}
+
+// creates the yield stub frame faster than JavaThread::last_frame
+inline frame ContinuationHelper::last_frame(JavaThread* thread) {
+  JavaFrameAnchor* anchor = thread->frame_anchor();
+  assert (anchor->last_Java_sp() != NULL, "");
+  assert (anchor->last_Java_pc() != NULL, "");
+
+  assert (StubRoutines::cont_doYield_stub()->contains(anchor->last_Java_pc()), "must be");
+  assert (StubRoutines::cont_doYield_stub()->oop_maps()->count() == 1, "must be");
+
+  return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(), NULL, NULL, true);
+  // return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(), 
+  //   StubRoutines::cont_doYield_stub(), StubRoutines::cont_doYield_stub()->oop_map_for_slot(0, anchor->last_Java_pc()), true);
+}
+
 const int TwoWordAlignmentMask  = (1 << (LogBytesPerWord+1)) - 1;
 
 MemcpyFnT resolve_freeze_chunk_memcpy() {
@@ -49,7 +223,7 @@ MemcpyFnT resolve_thaw_chunk_memcpy() {
                                       : (MemcpyFnT)StubRoutines::word_memcpy_down();  
 }
 
-static inline void copy_from_stack(void* from, void* to, size_t size) {
+inline void ContinuationHelper::copy_from_stack(void* from, void* to, size_t size) {
   assert (size >= 2, ""); // one word for return address, another for rbp spill
   assert(((intptr_t)from & TwoWordAlignmentMask) == 0, "");
   assert(((intptr_t)to   & WordAlignmentMask)    == 0, "");
@@ -57,7 +231,7 @@ static inline void copy_from_stack(void* from, void* to, size_t size) {
   cont_freeze_chunk_memcpy(from, to, size);
 }
 
-static inline void copy_to_stack(void* from, void* to, size_t size) {
+inline void ContinuationHelper::copy_to_stack(void* from, void* to, size_t size) {
   assert (size >= 2, ""); // one word for return address, another for rbp spill
   assert(((intptr_t)from & WordAlignmentMask)    == 0, "");
   assert(((intptr_t)to   & TwoWordAlignmentMask) == 0, "");
@@ -75,46 +249,14 @@ void ContinuationEntry::update_register_map(RegisterMap* map) {
   frame::update_map_with_saved_link(map, fp);
 }
 
-static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
-  JavaFrameAnchor* anchor = thread->frame_anchor();
-  anchor->set_last_Java_sp(cont->entry_sp());
+void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* cont) {
   anchor->set_last_Java_fp(cont->entry_fp());
-  anchor->set_last_Java_pc(cont->entry_pc());
-
-  assert (thread->has_last_Java_frame(), "");
-  assert(thread->last_frame().cb() != NULL, "");
-  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
-  print_vframe(thread->last_frame());
 }
 
-static void set_anchor(JavaThread* thread, intptr_t* sp) {
+void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
-  address   pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
-  assert (pc != NULL, "");
-
-  JavaFrameAnchor* anchor = thread->frame_anchor();
-  anchor->set_last_Java_sp(sp);
   anchor->set_last_Java_fp(fp);
-  anchor->set_last_Java_pc(pc);
-
-  assert (thread->has_last_Java_frame(), "");
-  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
-  print_vframe(thread->last_frame());
-  assert(thread->last_frame().cb() != NULL, "");
 }
-
-// unused
-// static void set_anchor(JavaThread* thread, const frame& f) {
-//   JavaFrameAnchor* anchor = thread->frame_anchor();
-//   anchor->set_last_Java_sp(f.unextended_sp());
-//   anchor->set_last_Java_fp(f.fp());
-//   anchor->set_last_Java_pc(f.pc());
-
-//   assert (thread->has_last_Java_frame(), "");
-//   assert(thread->last_frame().cb() != NULL, "");
-//   log_develop_trace(jvmcont)("set_anchor:");
-//   print_vframe(thread->last_frame());
-// }
 
 #ifdef CONT_DOUBLE_NOP
 
@@ -350,7 +492,7 @@ hframe hframe::sender(const ContMirror& cont, int num_oops) const {
     // log_develop_trace(jvmcont)("real_fp: %d sender_fp: %ld", link_index, sender_fp);
   } else {
     sender_md = ContinuationCodeBlobLookup::find_blob(sender_pc);
-    sender_pc = hframe::deopt_original_pc(cont, sender_pc, (CodeBlob*)sender_md, sender_sp); // TODO PERF: unnecessary in the long term solution of unrolling deopted frames on freeze
+    sender_pc = Compiled::deopt_original_pc(cont.stack_address(sender_sp), sender_pc, (CodeBlob*)sender_md); // TODO PERF: unnecessary in the long term solution of unrolling deopted frames on freeze
     // a stub can only appear as the topmost frame; all senders must be compiled/interpreted Java frames so we can call deopt_original_pc, which assumes a compiled Java frame
   }
   return hframe(sender_sp, sender_ref_sp, sender_fp, sender_pc, sender_md, is_sender_interpreted);
@@ -444,176 +586,12 @@ hframe ContMirror::from_frame(const frame& f) {
   return hframe(f.cont_sp(), f.cont_ref_sp(), (intptr_t)f.fp(), f.pc(), md, f.is_interpreted_frame());
 }
 
-///////
-
-#ifdef ASSERT
-template<typename FKind>
-static intptr_t* slow_real_fp(const frame& f) {
-  assert (FKind::is_instance(f), "");
-  return FKind::interpreted ? f.fp() : f.unextended_sp() + slow_get_cb(f)->frame_size();
-}
-
-template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
-static intptr_t** slow_link_address(const frame& f) {
-  assert (FKind::is_instance(f), "");
-  return FKind::interpreted
-            ? (intptr_t**)(f.fp() + frame::link_offset)
-            : (intptr_t**)(slow_real_fp<FKind>(f) - frame::sender_sp_offset);
-}
-
-template<typename FKind>
-static address* slow_return_pc_address(const frame& f) {
-  return (address*)(slow_real_fp<FKind>(f) - 1);
-}
+template <typename ConfigT, op_mode mode>
+inline intptr_t* Freeze<ConfigT, mode>::align_bottom(intptr_t* bottom, int argsize) {
+#ifdef _LP64
+  bottom -= (argsize & 1);
 #endif
-
-inline intptr_t** Frame::callee_link_address(const frame& f) {
-  return (intptr_t**)(f.sp() - frame::sender_sp_offset);
-}
-
-static void patch_callee_link(const frame& f, intptr_t* fp) {
-  *Frame::callee_link_address(f) = fp;
-  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), p2i(fp));
-}
-
-template <typename RegisterMapT>
-inline intptr_t** Frame::map_link_address(const RegisterMapT* map) {
-  return (intptr_t**)map->location(rbp->as_VMReg());
-}
-
-static inline intptr_t* noninterpreted_real_fp(intptr_t* unextended_sp, int size_in_words) {
-  return unextended_sp + size_in_words;
-}
-
-template<typename FKind>
-static inline intptr_t* real_fp(const frame& f) {
-  assert (FKind::is_instance(f), "");
-  assert (FKind::interpreted || f.cb() != NULL, "");
-
-  return FKind::interpreted ? f.fp() : f.unextended_sp() + f.cb()->frame_size();
-}
-
-static inline intptr_t** noninterpreted_link_address(intptr_t* unextended_sp, int size_in_words) {
-  return (intptr_t**)(noninterpreted_real_fp(unextended_sp, size_in_words) - frame::sender_sp_offset);
-}
-
-template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
-static inline intptr_t** link_address(const frame& f) {
-  assert (FKind::is_instance(f), "");
-  return FKind::interpreted
-            ? (intptr_t**)(f.fp() + frame::link_offset)
-            : (intptr_t**)(real_fp<FKind>(f) - frame::sender_sp_offset);
-}
-
-template<typename FKind>
-static void patch_link(frame& f, intptr_t* fp) {
-  assert (FKind::interpreted, "");
-  *link_address<FKind>(f) = fp;
-  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": " INTPTR_FORMAT, p2i(link_address<FKind>(f)), p2i(fp));
-}
-
-// static inline intptr_t** link_address_stub(const frame& f) {
-//   assert (!f.is_java_frame(), "");
-//   return (intptr_t**)(f.fp() - frame::sender_sp_offset);
-// }
-
-static inline intptr_t** link_address(const frame& f) {
-  return f.is_interpreted_frame() ? link_address<Interpreted>(f) : link_address<NonInterpretedUnknown>(f);
-}
-
-inline address* Interpreted::return_pc_address(const frame& f) {
-  return (address*)(f.fp() + frame::return_addr_offset);
-}
-
-void Interpreted::patch_sender_sp(frame& f, intptr_t* sp) {
-  assert (f.is_interpreted_frame(), "");
-  *(intptr_t**)(f.fp() + frame::interpreter_frame_sender_sp_offset) = sp;
-  log_trace(jvmcont)("patched sender_sp: " INTPTR_FORMAT, p2i(sp));
-}
-
-inline address* Frame::return_pc_address(const frame& f) {
-  return (address*)(f.real_fp() - 1);
-}
-
-// inline address* Frame::pc_address(const frame& f) {
-//   return (address*)(f.sp() - frame::return_addr_offset);
-// }
-
-inline address Frame::real_pc(const frame& f) {
-  address* pc_addr = &(((address*) f.sp())[-1]);
-  return *pc_addr;
-}
-
-inline void Frame::patch_pc(const frame& f, address pc) {
-  address* pc_addr = &(((address*) f.sp())[-1]);
-  *pc_addr = pc;
-}
-
-inline intptr_t* Interpreted::frame_top(const frame& f, InterpreterOopMap* mask) { // inclusive; this will be copied with the frame
-  intptr_t* res = *(intptr_t**)f.addr_at(frame::interpreter_frame_initial_sp_offset) - expression_stack_size(f, mask);
-  assert (res == (intptr_t*)f.interpreter_frame_monitor_end() - expression_stack_size(f, mask), "");
-  assert (res >= f.unextended_sp(), "");
-  return res;
-  // Not true, but using unextended_sp might work
-  // assert (res == f.unextended_sp(), "res: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(res), p2i(f.unextended_sp() + 1));
-}
-
-inline intptr_t* Interpreted::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
-    return *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) + 1; // exclusive, so we add 1 word
-}
-
-
-/////////
-
-static inline intptr_t** callee_link_address(const frame& f) {
-  return (intptr_t**)(f.sp() - frame::sender_sp_offset);
-}
-
-static void update_map_for_chunk_frame(RegisterMap* map) {
-  frame::update_map_with_saved_link(map, (intptr_t**)(intptr_t)(-2 * BytesPerWord)); // for chunk frames, we store offset
-}
-
-template<typename FKind, typename RegisterMapT>
-inline void ContinuationHelper::update_register_map(RegisterMapT* map, const frame& f) {
-  frame::update_map_with_saved_link(map, link_address<FKind>(f));
-}
-
-template<typename RegisterMapT>
-inline void ContinuationHelper::update_register_map(RegisterMapT* map, intptr_t** link_address) {
-  frame::update_map_with_saved_link(map, link_address);
-}
-
-template<typename RegisterMapT>
-inline void ContinuationHelper::update_register_map_with_callee(RegisterMapT* map, const frame& f) {
-  frame::update_map_with_saved_link(map, callee_link_address(f));
-}
-
-void ContinuationHelper::update_register_map(RegisterMap* map, const hframe& caller, const ContMirror& cont) {
-  // we save the link _index_ in the oop map; it is read and converted back in Continuation::reg_to_location
-  int link_index = caller.callee_link_index();
-  log_develop_trace(jvmcont)("ContinuationHelper::update_register_map: frame::update_map_with_saved_link: %d", link_index);
-  intptr_t link_index0 = link_index;
-  frame::update_map_with_saved_link(map, reinterpret_cast<intptr_t**>(link_index0));
-}
-
-inline void ContinuationHelper::push_pd(const frame& f) {
-  log_develop_trace(jvmcont)("ContinuationHelper::push_pd: " INTPTR_FORMAT, p2i(f.fp()));
-  // os::print_location(tty, (intptr_t)f.fp());
-  *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
-}
-
-// creates the yield stub frame faster than JavaThread::last_frame
-inline frame ContinuationHelper::last_frame(JavaThread* thread) {
-  JavaFrameAnchor* anchor = thread->frame_anchor();
-  assert (anchor->last_Java_sp() != NULL, "");
-  assert (anchor->last_Java_pc() != NULL, "");
-
-  assert (StubRoutines::cont_doYield_stub()->contains(anchor->last_Java_pc()), "must be");
-  assert (StubRoutines::cont_doYield_stub()->oop_maps()->count() == 1, "must be");
-
-  return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(), NULL, NULL, true);
-  // return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(), 
-  //   StubRoutines::cont_doYield_stub(), StubRoutines::cont_doYield_stub()->oop_map_for_slot(0, anchor->last_Java_pc()), true);
+  return bottom;
 }
 
 template <typename ConfigT, op_mode mode>
@@ -634,7 +612,7 @@ inline frame Freeze<ConfigT, mode>::sender_for_compiled_frame(const frame& f) {
 #endif
 
   assert (mode == mode_slow || !FKind::stub || StubRoutines::cont_doYield_stub()->contains(f.pc()), "must be");
-  assert (mode == mode_slow || !FKind::stub || slow_get_cb(f)->frame_size() == frame_metadata, "must be");
+  assert (mode == mode_slow || !FKind::stub || Frame::slow_get_cb(f)->frame_size() == frame_metadata, "must be");
   intptr_t** link_addr = (mode != mode_slow && FKind::stub) ? noninterpreted_link_address(f.unextended_sp(), frame_metadata) : link_address<FKind>(f);
 
   intptr_t* sender_sp = (intptr_t*)(link_addr + frame::sender_sp_offset); //  f.unextended_sp() + (fsize/wordSize); // 
@@ -899,6 +877,28 @@ intptr_t* Thaw<ConfigT, mode>::push_interpreter_return_frame(intptr_t* sp) {
   return sp;
 }
 
+template <typename ConfigT, op_mode mode>
+void Thaw<ConfigT, mode>::patch_chunk_pd(intptr_t* sp) {
+  intptr_t* fp = _cont.entryFP();
+  *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
+  log_develop_trace(jvmcont)("thaw_chunk patching fp at " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(sp - frame::sender_sp_offset), p2i(fp));
+}
+
+template <typename ConfigT, op_mode mode>
+inline void Thaw<ConfigT, mode>::prefetch_chunk_pd(void* start, int size) {
+  size <<= LogBytesPerWord;
+  Prefetch::read_streaming(start, size);
+  Prefetch::read_streaming(start, size - 64);
+}
+
+template <typename ConfigT, op_mode mode>
+inline intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp) {
+#ifdef _LP64
+  vsp = align_down(vsp, 16);
+  assert((intptr_t)vsp % 16 == 0, "");
+#endif
+  return vsp;
+}
 ////////
 
 // Java frames don't have callee saved registers (except for rbp), so we can use a smaller RegisterMap
@@ -1055,49 +1055,5 @@ static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
   }
   st->print_cr("-------");
 }
-
-template <typename ConfigT, op_mode mode>
-void Thaw<ConfigT, mode>::patch_chunk_pd(intptr_t* sp) {
-  intptr_t* fp = _cont.entryFP();
-  *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
-  log_develop_trace(jvmcont)("thaw_chunk patching fp at " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(sp - frame::sender_sp_offset), p2i(fp));
-}
-
-template <typename ConfigT, op_mode mode>
-inline intptr_t* Freeze<ConfigT, mode>::align_bottom(intptr_t* bottom, int argsize) {
-#ifdef _LP64
-  bottom -= (argsize & 1);
-#endif
-  return bottom;
-}
-
-template <typename ConfigT, op_mode mode>
-inline void Thaw<ConfigT, mode>::prefetch_chunk_pd(void* start, int size) {
-  size <<= LogBytesPerWord;
-  Prefetch::read_streaming(start, size);
-  Prefetch::read_streaming(start, size - 64);
-}
-
-template <typename ConfigT, op_mode mode>
-inline intptr_t* Thaw<ConfigT, mode>::align_chunk(intptr_t* vsp) {
-#ifdef _LP64
-  vsp = align_down(vsp, 16);
-  assert((intptr_t)vsp % 16 == 0, "");
-#endif
-  return vsp;
-}
-
-#ifdef ASSERT
-
-static bool assert_frame_laid_out(frame f) {
-  intptr_t* sp = f.sp();
-  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
-  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
-  assert (f.raw_pc() == pc, "f.ra_pc: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.raw_pc()), p2i(pc));
-  assert (f.fp() == fp, "f.fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.fp()), p2i(fp));
-  return f.raw_pc() == pc && f.fp() == fp;
-}
-
-#endif
 
 #endif // CPU_X86_CONTINUATION_X86_INLINE_HPP

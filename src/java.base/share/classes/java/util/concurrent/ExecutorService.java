@@ -35,11 +35,8 @@
 
 package java.util.concurrent;
 
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -121,7 +118,7 @@ import java.util.stream.Stream;
  *       if (!pool.awaitTermination(60, TimeUnit.SECONDS))
  *           System.err.println("Pool did not terminate");
  *     }
- *   } catch (InterruptedException ie) {
+ *   } catch (InterruptedException ex) {
  *     // (Re-)Cancel if current thread also interrupted
  *     pool.shutdownNow();
  *     // Preserve interrupt status
@@ -536,9 +533,9 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *         {@link java.lang.RuntimePermission}{@code ("modifyThread")}.
      * @since 99
      */
-    default ExecutorService withDeadline(Instant deadline) {
-        return TimedExecutorService.create(this, deadline);
-    }
+//    default ExecutorService withDeadline(Instant deadline) {
+//        return TimedExecutorService.create(this, deadline);
+//    }
 
     /**
      * Submits a value-returning task for execution and returns a

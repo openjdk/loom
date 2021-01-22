@@ -138,28 +138,6 @@ extern "C" void pfl();
 extern "C" void find(intptr_t x);
 #endif
 
-int Continuations::_flags = 0;
-int ContinuationEntry::return_pc_offset = 0;
-nmethod* ContinuationEntry::continuation_enter = NULL;
-address ContinuationEntry::return_pc = NULL;
-
-void ContinuationEntry::set_enter_nmethod(nmethod* nm) {
-  assert (return_pc_offset != 0, "");
-  continuation_enter = nm;
-  return_pc = nm->code_begin() + return_pc_offset;
-}
-
-ContinuationEntry* ContinuationEntry::from_frame(const frame& f) {
-  assert (Continuation::is_continuation_enterSpecial(f), "");
-  return (ContinuationEntry*)f.unextended_sp();
-}
-
-template<class P>
-static inline oop safe_load(P *addr) {
-  oop obj = (oop)RawAccess<>::oop_load(addr);
-  obj = (oop)NativeAccess<>::oop_load(&obj);
-  return obj;
-}
 
 PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 // Freeze:
@@ -206,34 +184,20 @@ PERFTEST_ONLY(static int PERFTEST_LEVEL = ContPerfTest;)
 #define ENTER_SPECIAL_SIG "java.lang.Continuation.enterSpecial(Ljava/lang/Continuation;Z)V"
 #define RUN_SIG    "java.lang.Continuation.run()V"
 
-static bool is_stub(CodeBlob* cb);
-static void set_anchor(JavaThread* thread, intptr_t* sp);
-static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont);
-
-static void update_map_for_chunk_frame(RegisterMap* map);
-
-// static void set_anchor(JavaThread* thread, const frame& f); -- unused
-
 // debugging functions
 bool do_verify_after_thaw(JavaThread* thread);
-static void print_oop(void *p, oop obj, outputStream* st = tty);
 static void print_vframe(frame f, const RegisterMap* map = NULL, outputStream* st = tty);
 
 #ifdef ASSERT
+  static void print_oop(void *p, oop obj, outputStream* st = tty);
   static void print_frames(JavaThread* thread, outputStream* st = tty);
-  // template<int x> static void walk_frames(JavaThread* thread);
-  static bool assert_frame_laid_out(frame f);
-  static bool assert_entry_frame_laid_out(JavaThread* thread);
-  //static void print_blob(outputStream* st, address addr);
   static jlong java_tid(JavaThread* thread);
-  // static bool is_deopt_pc(const frame& f, address pc);
-  // static bool is_deopt_pc(address pc);
+
+  // static void print_blob(outputStream* st, address addr);
+  // template<int x> static void walk_frames(JavaThread* thread);
   // void static stop();
   // void static stop(const frame& f);
   // static void print_JavaThread_offsets();
-  // static void trace_codeblob_maps(const frame *fr, const RegisterMap *reg_map);
-
-  static RegisterMap dmap(NULL, false, false, false, false); // global dummy RegisterMap
 #endif
 
 #define ELEMS_PER_WORD (wordSize/sizeof(jint))
@@ -250,8 +214,6 @@ STATIC_ASSERT(elementSizeInBytes == sizeof(ElemType));
 STATIC_ASSERT(elementSizeInBytes == (1 << LogBytesPerElement));
 STATIC_ASSERT(elementSizeInBytes <<  LogElemsPerWord == wordSize);
 
-// #define CHOOSE1(interp, f, ...) ((interp) ? Interpreted::f(__VA_ARGS__) : NonInterpretedUnknown::f(__VA_ARGS__))
-#define CHOOSE2(interp, f, ...) ((interp) ? f<Interpreted>(__VA_ARGS__) : f<NonInterpretedUnknown>(__VA_ARGS__))
 
 static const unsigned char FLAG_LAST_FRAME_INTERPRETED = 1;
 static const unsigned char FLAG_SAFEPOINT_YIELD = 1 << 1;
@@ -293,8 +255,31 @@ public:
   static inline void patch_pc(const frame& f, address pc);
   static address* return_pc_address(const frame& f);
   static address return_pc(const frame& f);
+  static bool is_stub(CodeBlob* cb);
 
-  DEBUG_ONLY(static inline intptr_t* frame_top(const frame &f);)
+#ifdef ASSERT
+  static inline intptr_t* frame_top(const frame &f);
+  static inline bool is_deopt_return(address pc, const frame& sender);
+  // static bool is_deopt_pc(const frame& f, address pc);
+  // static bool is_deopt_pc(address pc);
+  static bool assert_frame_laid_out(frame f);
+
+  static char* method_name(Method* m);
+  static Method* top_java_frame_method(const frame& f);
+  static Method* bottom_java_frame_method(const frame& f)  { return Frame::frame_method(f); }
+  static char* top_java_frame_name(const frame& f) { return method_name(top_java_frame_method(f)); }
+  static char* bottom_java_frame_name(const frame& f) { return method_name(bottom_java_frame_method(f)); }
+  static bool assert_top_java_frame_name(const frame& f, const char* name);
+  static bool assert_bottom_java_frame_name(const frame& f, const char* name);
+
+  template <typename FrameT> static CodeBlob* slow_get_cb(const FrameT& f);
+  template <typename FrameT> static const ImmutableOopMap* slow_get_oopmap(const FrameT& f);
+  template <typename FrameT> static int slow_size(const FrameT& f);
+  template <typename FrameT> static address* slow_return_pc_address(const frame& f);
+  template <typename FrameT> static address slow_return_pc(const FrameT& f);
+  template <typename FrameT> static int slow_stack_argsize(const FrameT& f);
+  template <typename FrameT> static int slow_num_oops(const FrameT& f);
+#endif
 };
 
 template<typename Self>
@@ -342,9 +327,6 @@ public:
   static inline int size(const frame& f);
   static inline int stack_argsize(const frame& f);
   static inline int num_oops(const frame& f);
-
-  template <typename RegisterMapT>
-  static bool is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f);
 };
 
 class NonInterpretedUnknown : public NonInterpreted<NonInterpretedUnknown>  {
@@ -366,6 +348,10 @@ public:
   static const char type = 'c';
 
   typedef FreezeFnT ExtraT;
+
+  template <typename RegisterMapT>
+  static bool is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f);
+  static address deopt_original_pc(intptr_t* sp, address pc, CodeBlob* cb);
 };
 
 DEBUG_ONLY(const char* Compiled::name = "Compiled";)
@@ -381,17 +367,264 @@ public:
 
 DEBUG_ONLY(const char* StubF::name = "Stub";)
 
-typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
-
-static inline void copy_from_stack(void* from, void* to, size_t size);
-static inline void copy_to_stack(void* from, void* to, size_t size);
-
-static bool is_stub(CodeBlob* cb) {
-  return cb != NULL && (cb->is_safepoint_stub() || cb->is_runtime_stub());
+template<typename Self>
+template <typename FrameT>
+bool FrameCommon<Self>::is_instance(const FrameT& f) {
+  return (Self::interpreted == f.is_interpreted_frame()) && (Self::stub == (!Self::interpreted && is_stub(slow_get_cb(f))));
 }
 
-static bool requires_barriers(oop obj) {
-  return Universe::heap()->requires_barriers(obj);
+template <typename FrameT>
+bool NonInterpretedUnknown::is_instance(const FrameT& f) {
+  return (interpreted == f.is_interpreted_frame());
+}
+
+bool Frame::is_stub(CodeBlob* cb) {
+  return cb != NULL && (cb->is_safepoint_stub() || cb->is_runtime_stub());
+}
+inline Method* Frame::frame_method(const frame& f) {
+  Method* m = NULL;
+  if (f.is_interpreted_frame()) {
+    m = f.interpreter_frame_method();
+  } else if (f.is_compiled_frame()) {
+    m = ((CompiledMethod*)f.cb())->method();
+  } else if (f.is_native_frame()) {
+    m = ((CompiledMethod*)f.cb())->method();
+  }
+
+  return m;
+}
+
+address Frame::return_pc(const frame& f) {
+  return *return_pc_address(f);
+}
+
+
+#ifdef ASSERT
+  intptr_t* Frame::frame_top(const frame &f) {
+    if (f.is_interpreted_frame()) {
+      InterpreterOopMap mask;
+      f.interpreted_frame_oop_map(&mask);
+      return Interpreted::frame_top(f, &mask);
+    } else {
+      return Compiled::frame_top(f);
+    }
+  }
+
+
+char* Frame::method_name(Method* m) {
+  return m != NULL ? m->name_and_sig_as_C_string() : NULL;
+}
+
+Method* Frame::top_java_frame_method(const frame& f) {
+  Method* m = NULL;
+  if (f.is_interpreted_frame()) {
+    m = f.interpreter_frame_method();
+  } else if (f.is_compiled_frame()) {
+    CompiledMethod* cm = f.cb()->as_compiled_method();
+    ScopeDesc* scope = cm->scope_desc_at(f.pc());
+    m = scope->method();
+  } else if (f.is_native_frame()) {
+    return f.cb()->as_nmethod()->method();
+  }
+  // m = ((CompiledMethod*)f.cb())->method();
+  return m;
+}
+
+bool Frame::assert_top_java_frame_name(const frame& f, const char* name) {
+  ResourceMark rm;
+  bool res = (strcmp(top_java_frame_name(f), name) == 0);
+  assert (res, "name: %s", top_java_frame_name(f));
+  return res;
+}
+
+bool Frame::assert_bottom_java_frame_name(const frame& f, const char* name) {
+  ResourceMark rm;
+  bool res = (strcmp(bottom_java_frame_name(f), name) == 0);
+  assert (res, "name: %s", bottom_java_frame_name(f));
+  return res;
+}
+
+bool Frame::is_deopt_return(address pc, const frame& sender) {
+  if (sender.is_interpreted_frame()) return false;
+
+  CompiledMethod* cm = sender.cb()->as_compiled_method();
+  return cm->is_deopt_pc(pc);
+}
+
+//bool Frame::is_deopt_pc(const frame& f, address pc) {
+//  return f.is_compiled_frame() && f.cb()->as_compiled_method()->is_deopt_pc(pc);
+//}
+
+//bool Frame::is_deopt_pc(address pc) {
+//  CodeBlob* cb = CodeCache::find_blob(pc);
+//  return cb != NULL && cb->is_compiled() && cb->as_compiled_method()->is_deopt_pc(pc);
+//}
+
+template <typename FrameT>
+CodeBlob* Frame::slow_get_cb(const FrameT& f) {
+  assert (!f.is_interpreted_frame(), "");
+  CodeBlob* cb = f.cb();
+  if (cb == NULL) {
+    cb = CodeCache::find_blob(f.pc());
+  }
+  assert (cb != NULL, "");
+  return cb;
+}
+
+template <typename FrameT>
+const ImmutableOopMap* Frame::slow_get_oopmap(const FrameT& f) {
+  const ImmutableOopMap* oopmap = f.oop_map();
+  if (oopmap == NULL) {
+    oopmap = OopMapSet::find_map(slow_get_cb(f), f.pc());
+  }
+  assert (oopmap != NULL, "");
+  return oopmap;
+}
+
+template <typename FrameT>
+int Frame::slow_size(const FrameT& f) {
+  return slow_get_cb(f)->frame_size() * wordSize;
+}
+
+template <typename FrameT>
+address Frame::slow_return_pc(const FrameT& f) {
+  return *slow_return_pc_address<NonInterpretedUnknown>(f);
+}
+
+template <typename FrameT>
+int Frame::slow_stack_argsize(const FrameT& f) {
+  CodeBlob* cb = slow_get_cb(f);
+  assert (cb->is_compiled(), "");
+  return cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size;
+}
+
+template <typename FrameT>
+int Frame::slow_num_oops(const FrameT& f) {
+  return slow_get_oopmap(f)->num_oops();
+}
+
+#endif
+
+// static void patch_interpreted_bci(frame& f, int bci) {
+//   f.interpreter_frame_set_bcp(f.interpreter_frame_method()->bcp_from(bci));
+// }
+
+address Interpreted::return_pc(const frame& f) {
+  return *return_pc_address(f);
+}
+
+void Interpreted::patch_return_pc(frame& f, address pc) {
+  *return_pc_address(f) = pc;
+}
+
+int Interpreted::num_oops(const frame&f, InterpreterOopMap* mask) {
+  // all locks must be NULL when freezing, but f.oops_do walks them, so we count them
+  return f.interpreted_frame_num_oops(mask);
+}
+
+int Interpreted::size(const frame&f, InterpreterOopMap* mask) {
+  return (Interpreted::frame_bottom(f) - Interpreted::frame_top(f, mask)) * wordSize;
+}
+
+inline int Interpreted::expression_stack_size(const frame &f, InterpreterOopMap* mask) {
+  int size = mask->expression_stack_size();
+  assert (size <= f.interpreter_frame_expression_stack_size(), "size1: %d size2: %d", size, f.interpreter_frame_expression_stack_size());
+  return size;
+}
+
+bool Interpreted::is_owning_locks(const frame& f) {
+  assert (f.interpreter_frame_monitor_end() <= f.interpreter_frame_monitor_begin(), "must be");
+  if (f.interpreter_frame_monitor_end() == f.interpreter_frame_monitor_begin())
+    return false;
+
+  for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(f.interpreter_frame_monitor_begin());
+        current >= f.interpreter_frame_monitor_end();
+        current = f.previous_monitor_in_interpreter_frame(current)) {
+
+      oop obj = current->obj();
+      if (obj != NULL) {
+        return true;
+      }
+  }
+  return false;
+}
+
+template<typename Self>
+inline intptr_t* NonInterpreted<Self>::frame_top(const frame& f) { // inclusive; this will be copied with the frame
+  return f.unextended_sp();
+}
+
+template<typename Self>
+inline intptr_t* NonInterpreted<Self>::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
+  return f.unextended_sp() + f.cb()->frame_size();
+}
+
+template<typename Self>
+inline int NonInterpreted<Self>::size(const frame& f) {
+  assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
+  return f.cb()->frame_size() * wordSize;
+}
+
+template<typename Self>
+inline int NonInterpreted<Self>::stack_argsize(const frame& f) {
+  return f.compiled_frame_stack_argsize();
+}
+
+template<typename Self>
+inline int NonInterpreted<Self>::num_oops(const frame& f) {
+  assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
+  return f.num_oops() + Self::extra_oops;
+}
+
+
+address Compiled::deopt_original_pc(intptr_t* sp, address pc, CodeBlob* cb) {
+  // TODO DEOPT: unnecessary in the long term solution of unroll on freeze
+
+  assert (cb != NULL && cb->is_compiled(), "");
+  CompiledMethod* cm = cb->as_compiled_method();
+  if (cm->is_deopt_pc(pc)) {
+    log_develop_trace(jvmcont)("hframe::deopt_original_pc deoptimized frame");
+    pc = *(address*)((address)sp + cm->orig_pc_offset());
+    assert(pc != NULL, "");
+    assert(cm->insts_contains_inclusive(pc), "original PC must be in the main code section of the the compiled method (or must be immediately following it)");
+    assert(!cm->is_deopt_pc(pc), "");
+    // _deopt_state = is_deoptimized;
+  }
+
+  return pc;
+}
+
+template<typename RegisterMapT>
+bool Compiled::is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f) {
+  // if (!DetectLocksInCompiledFrames) return false;
+  assert (!f.is_interpreted_frame() && Compiled::is_instance(f), "");
+
+  CompiledMethod* cm = f.cb()->as_compiled_method();
+  assert (!cm->is_compiled() || !cm->as_compiled_method()->is_native_method(), ""); // See compiledVFrame::compiledVFrame(...) in vframe_hp.cpp
+
+  if (!cm->has_monitors()) return false;
+
+  frame::update_map_with_saved_link(map, Frame::callee_link_address(f)); // the monitor object could be stored in the link register
+  ResourceMark rm;
+  for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != NULL; scope = scope->sender()) {
+    GrowableArray<MonitorValue*>* mons = scope->monitors();
+    if (mons == NULL || mons->is_empty())
+      continue;
+
+    for (int index = (mons->length()-1); index >= 0; index--) { // see compiledVFrame::monitors()
+      MonitorValue* mon = mons->at(index);
+      if (mon->eliminated())
+        continue; // we ignore scalar-replaced monitors
+      ScopeValue* ov = mon->owner();
+      StackValue* owner_sv = StackValue::create_stack_value(&f, map, ov); // it is an oop
+      oop owner = owner_sv->get_obj()();
+      if (owner != NULL) {
+        //assert(cm->has_monitors(), "");
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 enum op_mode {
@@ -441,8 +674,6 @@ protected:
       _is_interpreted(Interpreter::contains(pc)), _cb_imd(NULL), _oop_map(NULL) {
       set_codeblob(_pc);
     }
-
-  static address deopt_original_pc(const ContMirror& cont, address pc, CodeBlob* cb, int sp);
 
 public:
   inline bool operator==(const HFrameBase& other) const;
@@ -532,16 +763,6 @@ public:
 // defines hframe
 #include CPU_HEADER(hframe)
 
-template<typename Self>
-template <typename FrameT>
-bool FrameCommon<Self>::is_instance(const FrameT& f) {
-  return (Self::interpreted == f.is_interpreted_frame()) && (Self::stub == (!Self::interpreted && is_stub(slow_get_cb(f))));
-}
-
-template <typename FrameT>
-bool NonInterpretedUnknown::is_instance(const FrameT& f) {
-  return (interpreted == f.is_interpreted_frame());
-}
 
 // Mirrors the Java continuation objects.
 // This object is created when we begin a freeze/thaw operation for a continuation, and is destroyed when the operation completes.
@@ -740,47 +961,14 @@ public:
   template<typename Event> void post_jfr_event(Event *e, JavaThread* jt);
 
 #ifdef ASSERT
-  bool chunk_invariant() {
-    // only the topmost chunk can be empty
-    if (_tail == (oop)NULL)
-      return true;
-    assert (jdk_internal_misc_StackChunk::is_stack_chunk(_tail), "");
-    int i = 1;
-    for (oop chunk = jdk_internal_misc_StackChunk::parent(_tail); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
-      if (jdk_internal_misc_StackChunk::is_empty(chunk)) {
-        assert (chunk != _tail, "");
-        tty->print_cr("i: %d", i);
-        InstanceStackChunkKlass::print_chunk(chunk, true);
-        return false;
-      }
-      i++;
-    }
-    return true;
-  }
+  inline bool is_entry_frame(const frame& f);
+  bool chunk_invariant();
 #endif
 };
 
 template<typename SelfPD>
 inline bool HFrameBase<SelfPD>::operator==(const HFrameBase& other) const {
   return  _sp == other._sp && _pc == other._pc;
-}
-
-template<typename SelfPD>
-address HFrameBase<SelfPD>::deopt_original_pc(const ContMirror& cont, address pc, CodeBlob* cb, int sp) {
-  // TODO DEOPT: unnecessary in the long term solution of unroll on freeze
-
-  assert (cb != NULL && cb->is_compiled(), "");
-  CompiledMethod* cm = cb->as_compiled_method();
-  if (cm->is_deopt_pc(pc)) {
-    log_develop_trace(jvmcont)("hframe::deopt_original_pc deoptimized frame");
-    pc = *(address*)((address)cont.stack_address(sp) + cm->orig_pc_offset());
-    assert(pc != NULL, "");
-    assert(cm->insts_contains_inclusive(pc), "original PC must be in the main code section of the the compiled method (or must be immediately following it)");
-    assert(!cm->is_deopt_pc(pc), "");
-    // _deopt_state = is_deoptimized;
-  }
-
-  return pc;
 }
 
 template<typename SelfPD>
@@ -957,6 +1145,149 @@ inline frame HFrameBase<SelfPD>::to_frame(ContMirror& cont) const {
   // print_on(cont, tty);
   return self().to_frame(cont, pc, deopt);
 }
+
+
+
+typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
+class ContinuationHelper {
+public:
+#ifdef CONT_DOUBLE_NOP
+  static inline CachedCompiledMetadata cached_metadata(address pc);
+  template<op_mode mode, typename FrameT> static inline CachedCompiledMetadata cached_metadata(const FrameT& f);
+  template<typename FrameT> static void patch_freeze_stub(const FrameT& f, address freeze_stub);
+#endif
+
+  template<op_mode mode, typename FrameT> static FreezeFnT freeze_stub(const FrameT& f);
+  template<op_mode mode, typename FrameT> static ThawFnT thaw_stub(const FrameT& f);
+
+  static oop get_continuation(JavaThread* thread);
+
+  static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont);
+  static void set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* cont);
+  static void set_anchor(JavaThread* thread, intptr_t* sp);
+  static void set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp);
+  static inline void clear_anchor(JavaThread* thread);
+
+  template<typename FKind, typename RegisterMapT> static inline void update_register_map(RegisterMapT* map, const frame& f);
+  template<typename RegisterMapT> static inline void update_register_map_with_callee(RegisterMapT* map, const frame& f);
+  template<typename RegisterMapT> static inline void update_register_map(RegisterMapT* map, hframe::callee_info callee_info);
+  static void update_register_map(RegisterMap* map, const hframe& sender);
+  static void update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map);
+  static void update_map_for_chunk_frame(RegisterMap* map);
+
+  static inline frame last_frame(JavaThread* thread);
+  static inline void push_pd(const frame& f);
+
+  static inline void copy_from_stack(void* from, void* to, size_t size);
+  static inline void copy_to_stack(void* from, void* to, size_t size);
+};
+
+void ContinuationHelper::set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
+  JavaFrameAnchor* anchor = thread->frame_anchor();
+  anchor->set_last_Java_sp(cont->entry_sp());
+  anchor->set_last_Java_pc(cont->entry_pc());
+  set_anchor_to_entry_pd(anchor, cont);
+
+  assert (thread->has_last_Java_frame(), "");
+  assert(thread->last_frame().cb() != NULL, "");
+  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+  print_vframe(thread->last_frame());
+}
+
+void ContinuationHelper::set_anchor(JavaThread* thread, intptr_t* sp) {
+  address   pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  assert (pc != NULL, "");
+
+  JavaFrameAnchor* anchor = thread->frame_anchor();
+  anchor->set_last_Java_sp(sp);
+  anchor->set_last_Java_pc(pc);
+  set_anchor_pd(anchor, sp);
+
+  assert (thread->has_last_Java_frame(), "");
+  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+  print_vframe(thread->last_frame());
+  assert(thread->last_frame().cb() != NULL, "");
+}
+
+inline void ContinuationHelper::clear_anchor(JavaThread* thread) {
+  thread->frame_anchor()->clear();
+}
+
+void ContinuationHelper::update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map) { // TODO NOT PD
+  // we need to register the link address for the entry frame
+  if (cont.entry() != NULL) {
+    cont.entry()->update_register_map(map);
+    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame");
+  } else {
+    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: clearing register map.");
+    map->clear();
+  }
+}
+
+oop ContinuationHelper::get_continuation(JavaThread* thread) {
+  assert (thread != NULL, "");
+  assert (thread->threadObj() != NULL, "");
+  return java_lang_Thread::continuation(thread->threadObj());
+}
+
+template<op_mode mode, typename FrameT>
+FreezeFnT ContinuationHelper::freeze_stub(const FrameT& f) {
+  // static int __counter = 0;
+#ifdef CONT_DOUBLE_NOP
+  if (mode != mode_preempt) {
+    NativePostCallNop* nop = nativePostCallNop_unsafe_at(f.pc());
+    uint32_t ptr = nop->int2_data();
+    if (LIKELY(ptr > (uint32_t)1)) {
+      return (FreezeFnT)OopMapStubGenerator::offset_to_stub(ptr);
+    }
+    assert (ptr == 0 || ptr == 1, "");
+    if (f.cb() == NULL) return NULL; // f.get_cb();
+
+    // __counter++;
+    // if (__counter % 100 == 0) tty->print_cr(">>>> freeze_stub %d %d", ptr, __counter);
+    // if (mode == mode_fast) { 
+    //   tty->print_cr(">>>> freeze_stub"); f.print_on(tty); tty->print_cr("<<<< freeze_stub"); 
+    //   assert(false, "");
+    // }
+  }
+#endif
+
+  FreezeFnT f_fn = (FreezeFnT)f.oop_map()->freeze_stub();
+#ifdef CONT_DOUBLE_NOP
+  // we currently patch explicitly, based on ConfigT etc.
+  // if (LIKELY(nop != NULL && f_fn != NULL && !nop->is_mode2())) {
+  //   nop->patch_int2(OopMapStubGenerator::stub_to_offset((address)f_fn));
+  // }
+#endif
+  return f_fn;
+}
+
+template<op_mode mode, typename FrameT>
+ThawFnT ContinuationHelper::thaw_stub(const FrameT& f) {
+#ifdef CONT_DOUBLE_NOP
+  if (mode != mode_preempt) {
+    NativePostCallNop* nop = nativePostCallNop_unsafe_at(f.pc());
+    uint32_t ptr = nop->int2_data();
+    if (LIKELY(ptr > (uint32_t)1)) {
+      address freeze_stub = OopMapStubGenerator::offset_to_stub(ptr);
+      address thaw_stub = OopMapStubGenerator::thaw_stub(freeze_stub);
+      if (f.cb() == NULL) { // TODO PERF: this is only necessary for new_frame called from thaw, because we need cb for deopt info
+        CodeBlob* cb = OopMapStubGenerator::code_blob(thaw_stub);
+        assert (cb == slow_get_cb(f), "");
+        const_cast<FrameT&>(f).set_cb(cb);
+      }
+      assert (f.cb() != NULL, "");
+      return (ThawFnT)thaw_stub;
+    }
+    assert (ptr == 0 || ptr == 1, "");
+    if (f.cb() == NULL) return NULL; // f.get_cb();
+  }
+#endif
+  assert (f.oop_map() != NULL, "");
+  ThawFnT t_fn = (ThawFnT)f.oop_map()->thaw_stub();
+  return t_fn;
+}
+
 
 #ifndef PRODUCT
 bool ContMirror::sp_unread() { return _sp == -10; }
@@ -1297,269 +1628,29 @@ template<typename Event> void ContMirror::post_jfr_event(Event* e, JavaThread* j
   }
 }
 
-//////////////////////////// frame functions ///////////////
-
-class CachedCompiledMetadata; // defined in PD
-struct FpOopInfo;
-
-
-
-class ContinuationHelper {
-public:
-#ifdef CONT_DOUBLE_NOP
-  static inline CachedCompiledMetadata cached_metadata(address pc);
-  template<op_mode mode, typename FrameT> static inline CachedCompiledMetadata cached_metadata(const FrameT& f);
-  template<typename FrameT> static void patch_freeze_stub(const FrameT& f, address freeze_stub);
-#endif
-
-  template<op_mode mode, typename FrameT> static FreezeFnT freeze_stub(const FrameT& f);
-  template<op_mode mode, typename FrameT> static ThawFnT thaw_stub(const FrameT& f);
-
-  template<typename FKind, typename RegisterMapT> static inline void update_register_map(RegisterMapT* map, const frame& f);
-  template<typename RegisterMapT> static inline void update_register_map_with_callee(RegisterMapT* map, const frame& f);
-  template<typename RegisterMapT> static inline void update_register_map(RegisterMapT* map, hframe::callee_info callee_info);
-  static void update_register_map(RegisterMap* map, const hframe& sender, const ContMirror& cont);
-  static void update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map);
-
-  static inline frame last_frame(JavaThread* thread);
-  static inline void push_pd(const frame& f);
-};
-
 #ifdef ASSERT
-  static char* method_name(Method* m);
-  static inline Method* top_java_frame_method(const frame& f);
-  static inline Method* bottom_java_frame_method(const frame& f);
-  static char* top_java_frame_name(const frame& f);
-  static char* bottom_java_frame_name(const frame& f);
-  static bool assert_top_java_frame_name(const frame& f, const char* name);
-  static bool assert_bottom_java_frame_name(const frame& f, const char* name);
-  static inline bool is_deopt_return(address pc, const frame& sender);
-
-  template <typename FrameT> static CodeBlob* slow_get_cb(const FrameT& f);
-  template <typename FrameT> static const ImmutableOopMap* slow_get_oopmap(const FrameT& f);
-  template <typename FrameT> static int slow_size(const FrameT& f);
-  template <typename FrameT> static address slow_return_pc(const FrameT& f);
-  template <typename FrameT> static int slow_stack_argsize(const FrameT& f);
-  template <typename FrameT> static int slow_num_oops(const FrameT& f);
-#endif
-
-
-inline Method* Frame::frame_method(const frame& f) {
-  Method* m = NULL;
-  if (f.is_interpreted_frame()) {
-    m = f.interpreter_frame_method();
-  } else if (f.is_compiled_frame()) {
-    m = ((CompiledMethod*)f.cb())->method();
-  } else if (f.is_native_frame()) {
-    m = ((CompiledMethod*)f.cb())->method();
-  }
-
-  return m;
+inline bool ContMirror::is_entry_frame(const frame& f) {
+  return f.sp() == entrySP();
 }
 
-address Frame::return_pc(const frame& f) {
-  return *return_pc_address(f);
-}
-
-// static void patch_interpreted_bci(frame& f, int bci) {
-//   f.interpreter_frame_set_bcp(f.interpreter_frame_method()->bcp_from(bci));
-// }
-
-address Interpreted::return_pc(const frame& f) {
-  return *return_pc_address(f);
-}
-
-void Interpreted::patch_return_pc(frame& f, address pc) {
-  *return_pc_address(f) = pc;
-}
-
-int Interpreted::num_oops(const frame&f, InterpreterOopMap* mask) {
-  // all locks must be NULL when freezing, but f.oops_do walks them, so we count them
-  return f.interpreted_frame_num_oops(mask);
-}
-
-int Interpreted::size(const frame&f, InterpreterOopMap* mask) {
-  return (Interpreted::frame_bottom(f) - Interpreted::frame_top(f, mask)) * wordSize;
-}
-
-inline int Interpreted::expression_stack_size(const frame &f, InterpreterOopMap* mask) {
-  int size = mask->expression_stack_size();
-  assert (size <= f.interpreter_frame_expression_stack_size(), "size1: %d size2: %d", size, f.interpreter_frame_expression_stack_size());
-  return size;
-}
-
-bool Interpreted::is_owning_locks(const frame& f) {
-  assert (f.interpreter_frame_monitor_end() <= f.interpreter_frame_monitor_begin(), "must be");
-  if (f.interpreter_frame_monitor_end() == f.interpreter_frame_monitor_begin())
-    return false;
-
-  for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(f.interpreter_frame_monitor_begin());
-        current >= f.interpreter_frame_monitor_end();
-        current = f.previous_monitor_in_interpreter_frame(current)) {
-
-      oop obj = current->obj();
-      if (obj != NULL) {
-        return true;
-      }
-  }
-  return false;
-}
-
-template<typename Self>
-inline intptr_t* NonInterpreted<Self>::frame_top(const frame& f) { // inclusive; this will be copied with the frame
-  return f.unextended_sp();
-}
-
-template<typename Self>
-inline intptr_t* NonInterpreted<Self>::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
-  return f.unextended_sp() + f.cb()->frame_size();
-}
-
-#ifdef ASSERT
-  intptr_t* Frame::frame_top(const frame &f) {
-    if (f.is_interpreted_frame()) {
-      InterpreterOopMap mask;
-      f.interpreted_frame_oop_map(&mask);
-      return Interpreted::frame_top(f, &mask);
-    } else {
-      return Compiled::frame_top(f);
+bool ContMirror::chunk_invariant() {
+  // only the topmost chunk can be empty
+  if (_tail == (oop)NULL)
+    return true;
+  assert (jdk_internal_misc_StackChunk::is_stack_chunk(_tail), "");
+  int i = 1;
+  for (oop chunk = jdk_internal_misc_StackChunk::parent(_tail); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
+    if (jdk_internal_misc_StackChunk::is_empty(chunk)) {
+      assert (chunk != _tail, "");
+      tty->print_cr("i: %d", i);
+      InstanceStackChunkKlass::print_chunk(chunk, true);
+      return false;
     }
+    i++;
   }
+  return true;
+}
 #endif
-
-template<typename Self>
-inline int NonInterpreted<Self>::size(const frame& f) {
-  assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
-  return f.cb()->frame_size() * wordSize;
-}
-
-template<typename Self>
-inline int NonInterpreted<Self>::stack_argsize(const frame& f) {
-  return f.compiled_frame_stack_argsize();
-}
-
-template<typename Self>
-inline int NonInterpreted<Self>::num_oops(const frame& f) {
-  assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
-  return f.num_oops() + Self::extra_oops;
-}
-
-template<typename Self>
-template<typename RegisterMapT>
-bool NonInterpreted<Self>::is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f) {
-  // if (!DetectLocksInCompiledFrames) return false;
-  assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
-
-  CompiledMethod* cm = f.cb()->as_compiled_method();
-  assert (!cm->is_compiled() || !cm->as_compiled_method()->is_native_method(), ""); // See compiledVFrame::compiledVFrame(...) in vframe_hp.cpp
-
-  if (!cm->has_monitors()) return false;
-
-  ContinuationHelper::update_register_map_with_callee(map, f); // the monitor object could be stored in the link register
-  ResourceMark rm;
-  for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != NULL; scope = scope->sender()) {
-    GrowableArray<MonitorValue*>* mons = scope->monitors();
-    if (mons == NULL || mons->is_empty())
-      continue;
-
-    for (int index = (mons->length()-1); index >= 0; index--) { // see compiledVFrame::monitors()
-      MonitorValue* mon = mons->at(index);
-      if (mon->eliminated())
-        continue; // we ignore scalar-replaced monitors
-      ScopeValue* ov = mon->owner();
-      StackValue* owner_sv = StackValue::create_stack_value(&f, map, ov); // it is an oop
-      oop owner = owner_sv->get_obj()();
-      if (owner != NULL) {
-        //assert(cm->has_monitors(), "");
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-void ContinuationHelper::update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map) { // TODO NOT PD
-  // we need to register the link address for the entry frame
-  if (cont.entry() != NULL) {
-    cont.entry()->update_register_map(map);
-    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame");
-  } else {
-    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: clearing register map.");
-    map->clear();
-  }
-}
-
-template<op_mode mode, typename FrameT>
-FreezeFnT ContinuationHelper::freeze_stub(const FrameT& f) {
-  // static int __counter = 0;
-#ifdef CONT_DOUBLE_NOP
-  if (mode != mode_preempt) {
-    NativePostCallNop* nop = nativePostCallNop_unsafe_at(f.pc());
-    uint32_t ptr = nop->int2_data();
-    if (LIKELY(ptr > (uint32_t)1)) {
-      return (FreezeFnT)OopMapStubGenerator::offset_to_stub(ptr);
-    }
-    assert (ptr == 0 || ptr == 1, "");
-    if (f.cb() == NULL) return NULL; // f.get_cb();
-
-    // __counter++;
-    // if (__counter % 100 == 0) tty->print_cr(">>>> freeze_stub %d %d", ptr, __counter);
-    // if (mode == mode_fast) { 
-    //   tty->print_cr(">>>> freeze_stub"); f.print_on(tty); tty->print_cr("<<<< freeze_stub"); 
-    //   assert(false, "");
-    // }
-  }
-#endif
-
-  FreezeFnT f_fn = (FreezeFnT)f.oop_map()->freeze_stub();
-#ifdef CONT_DOUBLE_NOP
-  // we currently patch explicitly, based on ConfigT etc.
-  // if (LIKELY(nop != NULL && f_fn != NULL && !nop->is_mode2())) {
-  //   nop->patch_int2(OopMapStubGenerator::stub_to_offset((address)f_fn));
-  // }
-#endif
-  return f_fn;
-}
-
-template<op_mode mode, typename FrameT>
-ThawFnT ContinuationHelper::thaw_stub(const FrameT& f) {
-#ifdef CONT_DOUBLE_NOP
-  if (mode != mode_preempt) {
-    NativePostCallNop* nop = nativePostCallNop_unsafe_at(f.pc());
-    uint32_t ptr = nop->int2_data();
-    if (LIKELY(ptr > (uint32_t)1)) {
-      address freeze_stub = OopMapStubGenerator::offset_to_stub(ptr);
-      address thaw_stub = OopMapStubGenerator::thaw_stub(freeze_stub);
-      if (f.cb() == NULL) { // TODO PERF: this is only necessary for new_frame called from thaw, because we need cb for deopt info
-        CodeBlob* cb = OopMapStubGenerator::code_blob(thaw_stub);
-        assert (cb == slow_get_cb(f), "");
-        const_cast<FrameT&>(f).set_cb(cb);
-      }
-      assert (f.cb() != NULL, "");
-      return (ThawFnT)thaw_stub;
-    }
-    assert (ptr == 0 || ptr == 1, "");
-    if (f.cb() == NULL) return NULL; // f.get_cb();
-  }
-#endif
-  assert (f.oop_map() != NULL, "");
-  ThawFnT t_fn = (ThawFnT)f.oop_map()->thaw_stub();
-  return t_fn;
-}
-
-////////////////////////////////////
-
-void Continuation::set_cont_fastpath_thread_state(JavaThread* thread) {
-  bool fast =
-       !thread->is_interp_only_mode()
-    && !JvmtiExport::should_post_continuation_run()
-    && !JvmtiExport::should_post_continuation_yield();
-  thread->set_cont_fastpath_thread_state(fast);
-}
-
-static inline bool is_entry_frame(const ContMirror& cont, const frame& f) {
-  return f.sp() == cont.entrySP();
-}
 
 static int num_java_frames(CompiledMethod* cm, address pc) {
   int count = 0;
@@ -1595,7 +1686,7 @@ static int num_java_frames(ContMirror& cont) {
   }
 
   hframe hf = cont.last_frame<mode_slow>();
-  if (cont.is_flag(FLAG_SAFEPOINT_YIELD) && is_stub(hf.cb())) {
+  if (cont.is_flag(FLAG_SAFEPOINT_YIELD) && Frame::is_stub(hf.cb())) {
     hf = hf.sender<mode_slow>(cont);
   }
   for (; !hf.is_empty(); hf = hf.sender<mode_slow>(cont)) {
@@ -1605,15 +1696,206 @@ static int num_java_frames(ContMirror& cont) {
   return count;
 }
 
-static inline void clear_anchor(JavaThread* thread) {
-  thread->frame_anchor()->clear();
+typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, bool);
+
+static void freeze_compiled_frame_bp() {}
+static void thaw_compiled_frame_bp() {}
+
+static FreezeContFnT cont_freeze_fast = NULL;
+static FreezeContFnT cont_freeze_slow = NULL;
+
+static ThawFnT cont_thaw_oops_slow = NULL;
+
+static FreezeFnT cont_freeze_oops_slow = NULL;
+static FreezeFnT cont_freeze_oops_generate = NULL;
+
+static MemcpyFnT cont_freeze_chunk_memcpy = NULL;
+static MemcpyFnT cont_thaw_chunk_memcpy = NULL;
+
+static void default_memcpy(void* from, void* to, size_t size) {
+  memcpy(to, from, size << LogBytesPerWord);
 }
 
-static oop get_continuation(JavaThread* thread) {
-  assert (thread != NULL, "");
-  assert (thread->threadObj() != NULL, "");
-  return java_lang_Thread::continuation(thread->threadObj());
+static bool requires_barriers(oop obj) {
+  return Universe::heap()->requires_barriers(obj);
 }
+
+class CachedCompiledMetadata; // defined in PD
+template<class P>
+static inline oop safe_load(P *addr) {
+  oop obj = (oop)RawAccess<>::oop_load(addr);
+  obj = (oop)NativeAccess<>::oop_load(&obj);
+  return obj;
+}
+
+#ifdef ASSERT
+template <class P>
+static void verify_oop_at(P* p) {
+  oop obj = (oop)NativeAccess<>::oop_load(p);
+  assert(oopDesc::is_oop_or_null(obj), "");
+}
+#endif
+
+template <typename OopT>
+class PersistOops : public OopClosure {
+private:
+  int _limit;
+  int _current;
+  objArrayOop _array;
+public:
+  PersistOops(int limit, objArrayOop array) : _limit(limit), _current(0), _array(array) {}
+
+  virtual void do_oop(oop* o) { write_oop(o); }
+  virtual void do_oop(narrowOop* o) { write_oop(o); }
+
+private:
+  template <typename T>
+  void write_oop(T* p) {
+    assert(_current < _limit, "");
+    oop obj = NativeAccess<>::oop_load(p);
+    _array->obj_at_put(_current++, obj);
+    // OopT* addr = _array->obj_at_address<OopT>(_current++); // depends on UseCompressedOops
+    // NativeAccess<IS_DEST_UNINITIALIZED>::oop_store(addr, obj); // TODO RICKARD: Native doesn't work becase there doesn't seem to be a "finish" with bulk barriers
+  }
+};
+
+
+/*
+ * This class is mainly responsible for the work that is required to make sure that nmethods that
+ * are referenced from a Continuation stack are kept alive.
+ *
+ * While freezing, for each nmethod a keepalive array is allocated. It contains elements for all the
+ * oops that are either immediates or in the oop section in the nmethod (basically all that would be
+ * published to the closure while running nm->oops_do().).
+ *
+ * The keepalive array is than strongly linked from the oop array in the Continuation, a weak reference
+ * is kept in the nmethod -> the keepalive array.
+ *
+ * Some GCs (currently only G1) have code that considers the weak reference to the keepalive array a
+ * strong reference while this nmethod is on the stack. This is true while we are freezing, it helps
+ * performance because we don't need to allocate and keep oops to this objects in a Handle for such GCs.
+ * As soon as they are linked into the nmethod we know the object will stay alive.
+ */
+template <typename ConfigT>
+class CompiledMethodKeepalive {
+private:
+  typedef typename ConfigT::OopT OopT;
+  typedef CompiledMethodKeepalive<ConfigT> SelfT;
+  typedef typename ConfigT::KeepaliveObjectT KeepaliveObjectT;
+
+  typename KeepaliveObjectT::TypeT _keepalive;
+  CompiledMethod* _method;
+  SelfT* _parent;
+  JavaThread* _thread;
+  int _nr_oops;
+  bool _required;
+
+  void store_keepalive(Thread* thread, oop* keepalive) { _keepalive = KeepaliveObjectT::make_keepalive(thread, keepalive); }
+  oop read_keepalive() { return KeepaliveObjectT::read_keepalive(_keepalive); }
+
+public:
+  CompiledMethodKeepalive(CompiledMethod* cm, SelfT* parent, JavaThread* thread) : _method(cm), _parent(NULL), _thread(thread), _nr_oops(0), _required(false) {
+    oop* keepalive = cm->get_keepalive();
+    if (keepalive != NULL) {
+   //   log_info(jvmcont)("keepalive is %p (%p) for nm %p", keepalive, (void *) *keepalive, cm);
+      WeakHandle wh = WeakHandle::from_raw(keepalive);
+      oop resolved = wh.resolve();
+      if (resolved != NULL) {
+        //log_info(jvmcont)("found keepalive %p (%p)", keepalive, (void *) resolved);
+        store_keepalive(thread, keepalive);
+        return;
+      }
+
+      //log_info(jvmcont)("trying to clear stale keepalive for %p", _method);
+      if (cm->clear_keepalive(keepalive)) {
+        //log_info(jvmcont)("keepalive cleared for %p", _method);
+        thread->keepalive_cleanup()->append(wh);
+        // put on a list for cleanup in a safepoint
+      }
+    }
+  //  log_info(jvmcont)("keepalive is %p for nm %p", keepalive, cm);
+
+    nmethod* nm = cm->as_nmethod_or_null();
+    if (nm != NULL) {
+      _nr_oops = nm->nr_oops();
+      //log_info(jvmcont)("need keepalive for %d oops", _nr_oops);
+      _required = true;
+      _parent = parent;
+    }
+  }
+
+  void write_at(ContMirror& mirror, int index) {
+    //assert(_keepalive != NULL, "");
+    //log_develop_info(jvmcont)("writing mirror at %d\n", index);
+    mirror.add_oop<typename ConfigT::OopWriterT>(read_keepalive(), index);
+    //*(hsp + index)
+  }
+
+  void persist_oops() {
+    if (!_required) {
+      // Even though our first one might have said require, someone else might have written a new entry before we wrote our own.
+      return;
+    }
+
+    nmethod* nm = _method->as_nmethod_or_null();
+    if (nm != NULL) {
+      //assert(_keepalive != NULL && read_keepalive() != NULL, "");
+      PersistOops<OopT> persist(_nr_oops, (objArrayOop) read_keepalive());
+      nm->oops_do(&persist);
+      //log_info(jvmcont)("oops persisted");
+    }
+  }
+
+  void set_handle(Handle keepalive) {
+    WeakHandle wh = WeakHandle(Universe::vm_weak(), keepalive);
+    oop* result = _method->set_keepalive(wh.raw());
+
+    if (result != NULL) {
+      store_keepalive(_thread, result);
+      // someone else managed to do it before us, destroy the weak
+      _required = false;
+      wh.release(Universe::vm_weak());
+    } else {
+      store_keepalive(_thread, wh.raw());
+      //log_info(jvmcont)("Winning cas for %p (%p -> %p (%p))", _method, result, wh.raw(), (void *) wh.resolve());
+    }
+  }
+
+  SelfT* parent() { return _parent; }
+  bool required() const { return _required; }
+  int nr_oops() const { return _nr_oops; }
+
+};
+
+class CountOops : public OopClosure {
+private:
+  int _nr_oops;
+public:
+  CountOops() : _nr_oops(0) {}
+  int nr_oops() const { return _nr_oops; }
+
+
+  virtual void do_oop(oop* o) { _nr_oops++; }
+  virtual void do_oop(narrowOop* o) { _nr_oops++; }
+};
+
+struct FpOopInfo {
+  bool _has_fp_oop; // is fp used to store a derived pointer
+  int _fp_index;    // see FreezeOopFn::do_derived_oop
+
+  FpOopInfo() {}
+  void init() { _has_fp_oop = false; _fp_index = 0; }
+
+  static int flag_offset() { return in_bytes(byte_offset_of(FpOopInfo, _has_fp_oop)); }
+  static int index_offset() { return in_bytes(byte_offset_of(FpOopInfo, _fp_index)); }
+
+  void set_oop_fp_index(int index) {
+    assert(_has_fp_oop == false, "can only have one");
+    _has_fp_oop = true;
+    _fp_index = index;
+  }
+};
+
 
 template<typename RegisterMapT>
 class ContOopBase : public OopClosure, public DerivedOopClosure {
@@ -1660,151 +1942,6 @@ protected:
   }
 };
 
-static MemcpyFnT cont_freeze_chunk_memcpy = NULL;
-static MemcpyFnT cont_thaw_chunk_memcpy = NULL;
-
-static void default_memcpy(void* from, void* to, size_t size) {
-  memcpy(to, from, size << LogBytesPerWord);
-}
-
-///////////// FREEZE ///////
-
-enum freeze_result {
-  freeze_ok = 0,
-  freeze_pinned_cs = 1,
-  freeze_pinned_native = 2,
-  freeze_pinned_monitor = 3,
-  freeze_exception = 4,
-  freeze_retry_slow = 5,
-  freeze_no_chunk = 6,
-};
-
-typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, bool);
-
-static void freeze_compiled_frame_bp() {}
-static void thaw_compiled_frame_bp() {}
-
-static FreezeContFnT cont_freeze_fast = NULL;
-static FreezeContFnT cont_freeze_slow = NULL;
-
-static ThawFnT cont_thaw_oops_slow = NULL;
-
-static FreezeFnT cont_freeze_oops_slow = NULL;
-static FreezeFnT cont_freeze_oops_generate = NULL;
-
-class OopStubs {
-public:
-  static FreezeFnT freeze_oops_slow() { return (FreezeFnT) cont_freeze_oops_slow; }
-  static ThawFnT thaw_oops_slow() { return (ThawFnT) cont_thaw_oops_slow; }
-  static FreezeFnT generate_stub() { return (FreezeFnT) cont_freeze_oops_generate; }
-};
-
-template<op_mode mode>
-static int cont_freeze(JavaThread* thread, intptr_t* sp, bool preempt) {
-  switch (mode) {
-    case mode_fast:    return cont_freeze_fast(thread, sp, preempt);
-    case mode_slow:    return cont_freeze_slow(thread, sp, preempt);
-    default:
-      guarantee(false, "unreachable");
-      return -1;
-  }
-}
-
-class CountOops : public OopClosure {
-private:
-  int _nr_oops;
-public:
-  CountOops() : _nr_oops(0) {}
-  int nr_oops() const { return _nr_oops; }
-
-
-  virtual void do_oop(oop* o) { _nr_oops++; }
-  virtual void do_oop(narrowOop* o) { _nr_oops++; }
-};
-
-struct FpOopInfo {
-  bool _has_fp_oop; // is fp used to store a derived pointer
-  int _fp_index;    // see FreezeOopFn::do_derived_oop
-
-  FpOopInfo() {}
-  void init() { _has_fp_oop = false; _fp_index = 0; }
-
-  static int flag_offset() { return in_bytes(byte_offset_of(FpOopInfo, _has_fp_oop)); }
-  static int index_offset() { return in_bytes(byte_offset_of(FpOopInfo, _fp_index)); }
-
-  void set_oop_fp_index(int index) {
-    assert(_has_fp_oop == false, "can only have one");
-    _has_fp_oop = true;
-    _fp_index = index;
-  }
-};
-
-template <typename OopT>
-class PersistOops : public OopClosure {
-private:
-  int _limit;
-  int _current;
-  objArrayOop _array;
-public:
-  PersistOops(int limit, objArrayOop array) : _limit(limit), _current(0), _array(array) {}
-
-  virtual void do_oop(oop* o) { write_oop(o); }
-  virtual void do_oop(narrowOop* o) { write_oop(o); }
-
-private:
-  template <typename T>
-  void write_oop(T* p) {
-    assert(_current < _limit, "");
-    oop obj = NativeAccess<>::oop_load(p);
-    OopT* addr = _array->obj_at_address<OopT>(_current++); // depends on UseCompressedOops
-    NativeAccess<IS_DEST_UNINITIALIZED>::oop_store(addr, obj);
-  }
-};
-
-template <typename RegisterMapT>
-class ThawOopFn : public ContOopBase<RegisterMapT> {
-private:
-  int _i;
-
-protected:
-  template <class T> inline void do_oop_work(T* p) {
-    this->process(p);
-    oop obj = this->_cont->obj_at(_i); // does a HeapAccess<IN_HEAP_ARRAY> load barrier
-    ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(obj)), "");)
-
-    assert (oopDesc::is_oop_or_null(obj), "invalid oop");
-    log_develop_trace(jvmcont)("i: %d", _i); print_oop(p, obj);
-
-    NativeAccess<IS_DEST_UNINITIALIZED>::oop_store(p, obj);
-    _i++;
-  }
-public:
-  ThawOopFn(ContMirror* cont, frame* fr, int index, void* vsp, RegisterMapT* map)
-    : ContOopBase<RegisterMapT>(cont, fr, map, vsp) { _i = index; }
-  void do_oop(oop* p)       { do_oop_work(p); }
-  void do_oop(narrowOop* p) { do_oop_work(p); }
-
-  void do_derived_oop(oop *base_loc, oop *derived_loc) {
-    oop base = NativeAccess<>::oop_load(base_loc);
-    assert(Universe::heap()->is_in_or_null(base), "not an oop: " INTPTR_FORMAT " (at " INTPTR_FORMAT ")", p2i((oopDesc*)base), p2i(base_loc));
-    assert(derived_loc != base_loc, "Base and derived in same location");
-    DEBUG_ONLY(this->verify(base_loc);)
-    DEBUG_ONLY(this->verify(derived_loc);)
-    assert (oopDesc::is_oop_or_null(base), "invalid oop");
-    ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(base)), "");)
-
-    intptr_t offset = *(intptr_t*)derived_loc;
-
-    log_develop_trace(jvmcont)(
-        "Continuation thaw derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
-        p2i(derived_loc), p2i(*derived_loc), p2i(base), p2i(base_loc), offset);
-
-    oop obj = cast_to_oop(cast_from_oop<intptr_t>(base) + offset);
-    *derived_loc = obj;
-
-    assert(Universe::heap()->is_in_or_null(obj), "");
-  }
-};
 template <typename RegisterMapT, typename OopWriterT>
 class FreezeOopFn : public ContOopBase<RegisterMapT> {
 private:
@@ -1908,6 +2045,59 @@ public:
 #endif
     }
   }
+};
+
+template <typename RegisterMapT>
+class ThawOopFn : public ContOopBase<RegisterMapT> {
+private:
+  int _i;
+
+protected:
+  template <class T> inline void do_oop_work(T* p) {
+    this->process(p);
+    oop obj = this->_cont->obj_at(_i); // does a HeapAccess<IN_HEAP_ARRAY> load barrier
+    ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(obj)), "");)
+
+    assert (oopDesc::is_oop_or_null(obj), "invalid oop");
+#ifdef ASSERT
+    log_develop_trace(jvmcont)("i: %d", _i); print_oop(p, obj);
+#endif
+    NativeAccess<IS_DEST_UNINITIALIZED>::oop_store(p, obj);
+    _i++;
+  }
+public:
+  ThawOopFn(ContMirror* cont, frame* fr, int index, void* vsp, RegisterMapT* map)
+    : ContOopBase<RegisterMapT>(cont, fr, map, vsp) { _i = index; }
+  void do_oop(oop* p)       { do_oop_work(p); }
+  void do_oop(narrowOop* p) { do_oop_work(p); }
+
+  void do_derived_oop(oop *base_loc, oop *derived_loc) {
+    oop base = NativeAccess<>::oop_load(base_loc);
+    assert(Universe::heap()->is_in_or_null(base), "not an oop: " INTPTR_FORMAT " (at " INTPTR_FORMAT ")", p2i((oopDesc*)base), p2i(base_loc));
+    assert(derived_loc != base_loc, "Base and derived in same location");
+    DEBUG_ONLY(this->verify(base_loc);)
+    DEBUG_ONLY(this->verify(derived_loc);)
+    assert (oopDesc::is_oop_or_null(base), "invalid oop");
+    ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(base)), "");)
+
+    intptr_t offset = *(intptr_t*)derived_loc;
+
+    log_develop_trace(jvmcont)(
+        "Continuation thaw derived pointer@" INTPTR_FORMAT " - Derived: " INTPTR_FORMAT " Base: " INTPTR_FORMAT " (@" INTPTR_FORMAT ") (Offset: " INTX_FORMAT ")",
+        p2i(derived_loc), p2i(*derived_loc), p2i(base), p2i(base_loc), offset);
+
+    oop obj = cast_to_oop(cast_from_oop<intptr_t>(base) + offset);
+    *derived_loc = obj;
+
+    assert(Universe::heap()->is_in_or_null(obj), "");
+  }
+};
+
+class OopStubs {
+public:
+  static FreezeFnT freeze_oops_slow() { return (FreezeFnT) cont_freeze_oops_slow; }
+  static ThawFnT thaw_oops_slow() { return (ThawFnT) cont_thaw_oops_slow; }
+  static FreezeFnT generate_stub() { return (FreezeFnT) cont_freeze_oops_generate; }
 };
 
 template <typename OopWriterT>
@@ -2044,113 +2234,6 @@ public:
   static int slow_path_preempt(address vsp, address oops, address link_addr, Extra* extra);
 };
 
-/*
- * This class is mainly responsible for the work that is required to make sure that nmethods that
- * are referenced from a Continuation stack are kept alive.
- *
- * While freezing, for each nmethod a keepalive array is allocated. It contains elements for all the
- * oops that are either immediates or in the oop section in the nmethod (basically all that would be
- * published to the closure while running nm->oops_do().).
- *
- * The keepalive array is than strongly linked from the oop array in the Continuation, a weak reference
- * is kept in the nmethod -> the keepalive array.
- *
- * Some GCs (currently only G1) have code that considers the weak reference to the keepalive array a
- * strong reference while this nmethod is on the stack. This is true while we are freezing, it helps
- * performance because we don't need to allocate and keep oops to this objects in a Handle for such GCs.
- * As soon as they are linked into the nmethod we know the object will stay alive.
- */
-template <typename ConfigT>
-class CompiledMethodKeepalive {
-private:
-  typedef typename ConfigT::OopT OopT;
-  typedef CompiledMethodKeepalive<ConfigT> SelfT;
-  typedef typename ConfigT::KeepaliveObjectT KeepaliveObjectT;
-
-  typename KeepaliveObjectT::TypeT _keepalive;
-  CompiledMethod* _method;
-  SelfT* _parent;
-  JavaThread* _thread;
-  int _nr_oops;
-  bool _required;
-
-  void store_keepalive(Thread* thread, oop* keepalive) { _keepalive = KeepaliveObjectT::make_keepalive(thread, keepalive); }
-  oop read_keepalive() { return KeepaliveObjectT::read_keepalive(_keepalive); }
-
-public:
-  CompiledMethodKeepalive(CompiledMethod* cm, SelfT* parent, JavaThread* thread) : _method(cm), _parent(NULL), _thread(thread), _nr_oops(0), _required(false) {
-    oop* keepalive = cm->get_keepalive();
-    if (keepalive != NULL) {
-   //   log_info(jvmcont)("keepalive is %p (%p) for nm %p", keepalive, (void *) *keepalive, cm);
-      WeakHandle wh = WeakHandle::from_raw(keepalive);
-      oop resolved = wh.resolve();
-      if (resolved != NULL) {
-        //log_info(jvmcont)("found keepalive %p (%p)", keepalive, (void *) resolved);
-        store_keepalive(thread, keepalive);
-        return;
-      }
-
-      //log_info(jvmcont)("trying to clear stale keepalive for %p", _method);
-      if (cm->clear_keepalive(keepalive)) {
-        //log_info(jvmcont)("keepalive cleared for %p", _method);
-        thread->keepalive_cleanup()->append(wh);
-        // put on a list for cleanup in a safepoint
-      }
-    }
-  //  log_info(jvmcont)("keepalive is %p for nm %p", keepalive, cm);
-
-    nmethod* nm = cm->as_nmethod_or_null();
-    if (nm != NULL) {
-      _nr_oops = nm->nr_oops();
-      //log_info(jvmcont)("need keepalive for %d oops", _nr_oops);
-      _required = true;
-      _parent = parent;
-    }
-  }
-
-  void write_at(ContMirror& mirror, int index) {
-    //assert(_keepalive != NULL, "");
-    //log_develop_info(jvmcont)("writing mirror at %d\n", index);
-    mirror.add_oop<typename ConfigT::OopWriterT>(read_keepalive(), index);
-    //*(hsp + index)
-  }
-
-  void persist_oops() {
-    if (!_required) {
-      // Even though our first one might have said require, someone else might have written a new entry before we wrote our own.
-      return;
-    }
-
-    nmethod* nm = _method->as_nmethod_or_null();
-    if (nm != NULL) {
-      //assert(_keepalive != NULL && read_keepalive() != NULL, "");
-      PersistOops<OopT> persist(_nr_oops, (objArrayOop) read_keepalive());
-      nm->oops_do(&persist);
-      //log_info(jvmcont)("oops persisted");
-    }
-  }
-
-  void set_handle(Handle keepalive) {
-    WeakHandle wh = WeakHandle(Universe::vm_weak(), keepalive);
-    oop* result = _method->set_keepalive(wh.raw());
-
-    if (result != NULL) {
-      store_keepalive(_thread, result);
-      // someone else managed to do it before us, destroy the weak
-      _required = false;
-      wh.release(Universe::vm_weak());
-    } else {
-      store_keepalive(_thread, wh.raw());
-      //log_info(jvmcont)("Winning cas for %p (%p -> %p (%p))", _method, result, wh.raw(), (void *) wh.resolve());
-    }
-  }
-
-  SelfT* parent() { return _parent; }
-  bool required() const { return _required; }
-  int nr_oops() const { return _nr_oops; }
-
-};
-
 template <typename FKind>
 class FreezeFrame {
 };
@@ -2173,27 +2256,25 @@ class FreezeFrame<Compiled> {
   }
 };
 
-class FreezeOopVerify {
-public:
-  template <typename T>
-    static void verify(T* t);
+enum freeze_result {
+  freeze_ok = 0,
+  freeze_pinned_cs = 1,
+  freeze_pinned_native = 2,
+  freeze_pinned_monitor = 3,
+  freeze_exception = 4,
+  freeze_retry_slow = 5,
+  freeze_no_chunk = 6,
 };
 
-template <>
-void FreezeOopVerify::verify<narrowOop>(narrowOop* addr) {
-  oop obj = NativeAccess<>::oop_load(addr);
-  assert(oopDesc::is_oop_or_null(obj), "");
-}
-
-template<>
-void FreezeOopVerify::verify<oop>(oop* addr) {
-  oop obj = NativeAccess<>::oop_load(addr);
-  assert(oopDesc::is_oop_or_null(obj), "");
-}
-
-static void verify_cookie(intptr_t *addr) {
-  ContinuationEntry* entry = (ContinuationEntry*)addr;
-  assert(entry->cookie == 0x1234, "");
+template<op_mode mode>
+static int cont_freeze(JavaThread* thread, intptr_t* sp, bool preempt) {
+  switch (mode) {
+    case mode_fast:    return cont_freeze_fast(thread, sp, preempt);
+    case mode_slow:    return cont_freeze_slow(thread, sp, preempt);
+    default:
+      guarantee(false, "unreachable");
+      return -1;
+  }
 }
 
 template <typename ConfigT, op_mode mode>
@@ -2272,7 +2353,7 @@ public:
 
     int argsize = bottom_argsize();
     _bottom_address = _cont.entrySP() - argsize;
-    verify_cookie(_cont.entrySP());
+    DEBUG_ONLY(_cont.entry()->verify_cookie();)
 
     assert (!Interpreter::contains(_cont.entryPC()), "");
     assert (mode != mode_fast || !Interpreter::contains(_cont.entryPC()), "");
@@ -2315,7 +2396,6 @@ public:
     _bottom_address += LIKELY(argsize == 0) ? frame_metadata // We add 2 because the chunk does not include the bottommost 2 words (return pc and link)
                                             : -argsize;
 
-
     log_develop_trace(jvmcont)("squash chunk bottom_address: " INTPTR_FORMAT " argsize: %d size: %d oops: %d frames: %d", p2i(_bottom_address), argsize, _size, _oops, _frames);
     if (log_develop_is_enabled(Trace, jvmcont)) InstanceStackChunkKlass::print_chunk(chunk, true);
   }
@@ -2353,6 +2433,7 @@ public:
       ;
   }
 
+#ifdef ASSERT
   void verify() {
     if (_cont.refStack() == NULL) {
       return;
@@ -2360,9 +2441,10 @@ public:
     int len = _cont.refStack()->length();
     for (int i = 0; i < len; ++i) {
       typename ConfigT::OopT* addr = _cont.refStack()->template obj_at_address<typename ConfigT::OopT>(i);
-      FreezeOopVerify::verify(addr);
+      verify_oop_at(addr);
     }
   }
+#endif
 
   freeze_result freeze(intptr_t* sp, bool chunk_available) {
     assert (!chunk_available || (USE_CHUNKS && mode == mode_fast), "");
@@ -2689,7 +2771,7 @@ public:
     log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i(from + size), size << LogBytesPerWord);
     log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i(to + size), size << LogBytesPerWord);
 
-    copy_from_stack(from, to, size);
+    ContinuationHelper::copy_from_stack(from, to, size);
 
     assert (to >= jdk_internal_misc_StackChunk::start_address(chunk), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(jdk_internal_misc_StackChunk::start_address(chunk)));
     assert (to + size <= jdk_internal_misc_StackChunk::start_address(chunk) + jdk_internal_misc_StackChunk::size(chunk),
@@ -2836,9 +2918,9 @@ public:
       // f.set_sp(f.sp() - 1); // state pushed to the stack
     } else {
   #ifdef ASSERT
-      if (!is_stub(f.cb())) { f.print_value_on(tty, JavaThread::current()); }
+      if (!Frame::is_stub(f.cb())) { f.print_value_on(tty, JavaThread::current()); }
   #endif
-      assert (is_stub(f.cb()), "must be");
+      assert (Frame::is_stub(f.cb()), "must be");
       assert (f.oop_map() != NULL, "must be");
 
       if (Interpreter::contains(StubF::return_pc(f))) {
@@ -2859,8 +2941,8 @@ public:
   template<bool top>
   NOINLINE freeze_result freeze(frame& f, hframe& caller, int callee_argsize) {
     assert (f.unextended_sp() < _bottom_address - SP_WIGGLE, ""); // see recurse_freeze_java_frame
-    assert (f.is_interpreted_frame() || ((top && _preempt) == is_stub(f.cb())), "");
-    assert (mode != mode_fast || (!f.is_interpreted_frame() && slow_get_cb(f)->is_compiled()), "");
+    assert (f.is_interpreted_frame() || ((top && _preempt) == Frame::is_stub(f.cb())), "");
+    assert (mode != mode_fast || (!f.is_interpreted_frame() && Frame::slow_get_cb(f)->is_compiled()), "");
     assert (mode != mode_fast || !f.is_deoptimized_frame(), "");
 
     // Dynamically branch on frame type
@@ -2889,7 +2971,7 @@ public:
       if (mode == mode_slow && _preempt && top && f.interpreter_frame_method()->is_native()) return freeze_pinned_native; // interpreter native entry
 
       return recurse_freeze_interpreted_frame<top>(f, caller, callee_argsize);
-    } else if (mode == mode_slow && _preempt && top && is_stub(f.cb())) {
+    } else if (mode == mode_slow && _preempt && top && Frame::is_stub(f.cb())) {
       return recurse_freeze_stub_frame(f, caller);
     } else {
       return freeze_pinned_native;
@@ -3062,7 +3144,7 @@ public:
     assert (!FULL_STACK || empty, "");
     assert (!empty || _cont.sp() >= _cont.stack_length() || _cont.sp() < 0, "sp: %d stack_length: %d", _cont.sp(), _cont.stack_length());
     assert (is_chunk() || orig_top_frame.is_empty() == empty, "empty: %d f.sp: %d tail: %d", empty, orig_top_frame.sp(), is_chunk());
-    assert (!empty || assert_bottom_java_frame_name(callee, ENTER_SIG), "");
+    assert (!empty || Frame::assert_bottom_java_frame_name(callee, ENTER_SIG), "");
   #endif
 
     if (_cont.is_empty0()) {
@@ -3480,7 +3562,7 @@ static void invlidate_JVMTI_stack(JavaThread* thread) {
 
 static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont) {
   if (JvmtiExport::should_post_continuation_yield() || JvmtiExport::can_post_frame_pop()) {
-    set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible
+    ContinuationHelper::set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible
 
     cont.read_rest();
     int num_frames = num_java_frames(cont);
@@ -3501,7 +3583,7 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
 
   assert (!cont.is_empty(), "");
 
-  set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks
+  ContinuationHelper::set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks
   StackWatermarkSet::after_unwind(thread);
 
   thread->set_cont_yield(false);
@@ -3539,7 +3621,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   log_develop_trace(jvmcont)("~~~~~~~~~ freeze mode: %d sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT,
     mode, p2i(thread->last_continuation()->entry_sp()), p2i(thread->last_continuation()->entry_fp()), p2i(thread->last_continuation()->entry_pc()));
 
-  /* set_anchor(thread, fi); */ print_frames(thread);
+  /* ContinuationHelper::set_anchor(thread, fi); */ print_frames(thread);
 #endif
   // if (mode != mode_fast) tty->print_cr(">>> freeze0 mode: %d", mode);
 
@@ -3559,9 +3641,9 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
 
   thread->set_cont_yield(true);
 
-  oop oopCont = get_continuation(thread);
+  oop oopCont = ContinuationHelper::get_continuation(thread);
   assert (oopCont == thread->last_continuation()->cont_oop(), "");
-  assert (assert_entry_frame_laid_out(thread), "");
+  assert (ContinuationEntry::assert_entry_frame_laid_out(thread), "");
 
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
@@ -3588,7 +3670,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
     freeze_result res = fr.freeze_preempt();
     assert (res != freeze_retry_slow, "");
     // if (LIKELY(res == freeze_ok)) {
-    //   set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
+    //   ContinuationHelper::set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
     // }
     return freeze_epilog(thread, cont, res);
   } else {
@@ -3602,7 +3684,7 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
         res = Freeze<ConfigT, mode_slow>(thread, cont).freeze(sp, false);
       } 
       // else if (LIKELY(res == freeze_ok)) {
-      //   set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
+      //   ContinuationHelper::set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks, as they might be patched and broken
       // }
       assert (res != freeze_retry_slow, "");
       return freeze_epilog(thread, cont, res);
@@ -3697,7 +3779,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   } else { // safepoint yield
     f.set_fp(f.real_fp()); // Instead of this, maybe in ContMirror::set_last_frame always use the real_fp?
     if (!Interpreter::contains(f.pc())) {
-      assert (is_stub(f.cb()), "must be");
+      assert (Frame::is_stub(f.cb()), "must be");
       assert (f.oop_map() != NULL, "must be");
       f.oop_map()->update_register_map(&f, &map); // we have callee-save registers in this case
     }
@@ -3873,8 +3955,8 @@ JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier
   log_develop_trace(jvmcont)("prepare_thaw");
 
   assert (thread == JavaThread::current(), "");
-  oop cont = thread->last_continuation()->cont_oop(); // get_continuation(thread);
-  assert (cont == get_continuation(thread), "cont: %p entry cont: %p", (oopDesc*)cont, (oopDesc*)get_continuation(thread));
+  oop cont = thread->last_continuation()->cont_oop(); // ContinuationHelper::get_continuation(thread);
+  assert (cont == ContinuationHelper::get_continuation(thread), "cont: %p entry cont: %p", (oopDesc*)cont, (oopDesc*)ContinuationHelper::get_continuation(thread));
   assert (verify_continuation<1>(cont), "");
 
   // if the entry frame is interpreted, it may leave a parameter on the stack, which would be left there if the return barrier is hit
@@ -4184,12 +4266,12 @@ public:
 
 #ifdef ASSERT
   intptr_t* sp0 = vsp;
-  set_anchor(_thread, sp0);
+  ContinuationHelper::set_anchor(_thread, sp0);
   print_frames(_thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
   // if (LoomVerifyAfterThaw) {
   //   assert(do_verify_after_thaw(_thread), "partial: %d empty: %d is_last: %d fix: %d", partial, empty, is_last, fix);
   // }
-  clear_anchor(_thread);
+  ContinuationHelper::clear_anchor(_thread);
 #endif
 
     // assert (verify_continuation<100>(_cont.mirror()), "");
@@ -4266,7 +4348,7 @@ public:
     log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(from), p2i(from + size), size << LogBytesPerWord);
     log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d bytes)", p2i(to), p2i(to + size), size << LogBytesPerWord);
 
-    copy_to_stack(from, to, size);
+    ContinuationHelper::copy_to_stack(from, to, size);
   }
 
   void patch_chunk(intptr_t* sp, bool is_last) {
@@ -4310,7 +4392,7 @@ public:
 
     // Dynamically branch on frame type
     if (mode == mode_slow && _preempt && top && !hf.is_interpreted_frame()) {
-      assert (is_stub(hf.cb()), "cb: %s", hf.cb()->name());
+      assert (Frame::is_stub(hf.cb()), "cb: %s", hf.cb()->name());
       recurse_stub_frame(hf, caller, num_frames);
     } else if (mode == mode_fast || !hf.is_interpreted_frame()) {
       recurse_compiled_frame<top>(hf, caller, num_frames);
@@ -4369,7 +4451,7 @@ public:
   #ifdef ASSERT
     log_develop_trace(jvmcont)("Found entry:");
     print_vframe(entry);
-    assert_bottom_java_frame_name(entry, ENTER_SPECIAL_SIG);
+    Frame::assert_bottom_java_frame_name(entry, ENTER_SPECIAL_SIG);
   #endif
 
     _cont.set_argsize(0);
@@ -4395,7 +4477,7 @@ public:
       // }
     }
 
-    assert (is_entry_frame(_cont, entry), "");
+    assert (_cont.is_entry_frame(entry), "");
     assert (_frames == 0, "");
     assert (is_empty == _cont.is_empty() /* _last_frame.is_empty()*/, "hf.is_empty(cont): %d last_frame.is_empty(): %d ", is_empty, _cont.is_empty()/*_last_frame.is_empty()*/);
   }
@@ -4407,7 +4489,7 @@ public:
     log_develop_trace(jvmcont)("============================= THAWING FRAME:");
 
     assert (FKind::is_instance(hf), "");
-    assert (bottom == is_entry_frame(_cont, caller), "");
+    assert (bottom == _cont.is_entry_frame(caller), "");
 
     if (log_develop_is_enabled(Trace, jvmcont)) hf.print(_cont);
 
@@ -4418,7 +4500,7 @@ public:
                                 : thaw_compiled_frame<FKind, top, bottom>(hf, caller, (ThawFnT)extra);
 
     log_develop_trace(jvmcont)("thawed frame:");
-    DEBUG_ONLY(print_vframe(caller, &dmap);)
+    DEBUG_ONLY(print_vframe(caller);)
   }
 
   template <typename FKind>
@@ -4477,7 +4559,7 @@ public:
       Interpreted::patch_sender_sp(f, caller.unextended_sp()); // ContMirror::derelativize(vfp, frame::interpreter_frame_sender_sp_offset);
     }
 
-    assert (!bottom || !_cont.is_empty() || assert_bottom_java_frame_name(f, ENTER_SIG), "");
+    assert (!bottom || !_cont.is_empty() || Frame::assert_bottom_java_frame_name(f, ENTER_SIG), "");
     assert (!bottom || (_cont.is_empty() != Continuation::is_cont_barrier_frame(f)), "cont.is_empty(): %d is_cont_barrier_frame(f): %d ", _cont.is_empty(), Continuation::is_cont_barrier_frame(f));
   }
 
@@ -4544,7 +4626,7 @@ public:
   template<typename FKind, bool top, bool bottom>
   frame thaw_compiled_frame(const hframe& hf, const frame& caller, ThawFnT thaw_stub) {
     thaw_compiled_frame_bp();
-    assert(FKind::stub == is_stub(hf.cb()), "");
+    assert(FKind::stub == Frame::is_stub(hf.cb()), "");
     assert (caller.sp() == caller.unextended_sp(), "");
 
     int fsize;
@@ -4557,7 +4639,7 @@ public:
     if (mode == mode_preempt || UNLIKELY(fsize == 0))
 #endif
       fsize = hf.compiled_frame_size();
-    assert(fsize == slow_size(hf), "fsize: %d slow_size: %d", fsize, slow_size(hf));
+    assert(fsize == Frame::slow_size(hf), "fsize: %d slow_size: %d", fsize, Frame::slow_size(hf));
     log_develop_trace(jvmcont)("fsize: %d", fsize);
 
     intptr_t* vsp = (intptr_t*)((address)caller.unextended_sp() - fsize);
@@ -4622,13 +4704,13 @@ public:
         DEBUG_ONLY(Frame::patch_pc(f, NULL));
 
         f.deoptimize(_thread); // we're assuming there are no monitors; this doesn't revoke biased locks
-        // set_anchor(_thread, f); // deoptimization may need this
+        // ContinuationHelper::set_anchor(_thread, f); // deoptimization may need this
         // Deoptimization::deoptimize(_thread, f, &_map); // gets passed frame by value
-        // clear_anchor(_thread);
+        // ContinuationHelper::clear_anchor(_thread);
 
-        assert (f.is_deoptimized_frame() && is_deopt_return(f.raw_pc(), f),
+        assert (f.is_deoptimized_frame() && Frame::is_deopt_return(f.raw_pc(), f),
           "f.is_deoptimized_frame(): %d is_deopt_return(f.raw_pc()): %d is_deopt_return(f.pc()): %d",
-          f.is_deoptimized_frame(), is_deopt_return(f.raw_pc(), f), is_deopt_return(f.pc(), f));
+          f.is_deoptimized_frame(), Frame::is_deopt_return(f.raw_pc(), f), Frame::is_deopt_return(f.pc(), f));
         maybe_set_fastpath(f.sp());
       }
     }
@@ -4677,9 +4759,9 @@ public:
     Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
     ContinuationHelper::push_pd(f);
 
-    assert(assert_frame_laid_out(f), "");
+    assert(Frame::assert_frame_laid_out(f), "");
 
-    assert ((mode == mode_slow &&_preempt) || !FULL_STACK || assert_top_java_frame_name(f, YIELD0_SIG), "");
+    assert ((mode == mode_slow &&_preempt) || !FULL_STACK || Frame::assert_top_java_frame_name(f, YIELD0_SIG), "");
   }
 
   void recurse_stub_frame(const hframe& hf, frame& caller, int num_frames) {
@@ -4749,14 +4831,14 @@ static int maybe_count_Java_frames(ContMirror& cont, bool return_barrier) {
 
 static void post_JVMTI_continue(JavaThread* thread, ContMirror& cont, intptr_t* sp, int java_frame_count) {
   if (JvmtiExport::should_post_continuation_run()) {
-    set_anchor(thread, sp); // ensure thawed frames are visible
+    ContinuationHelper::set_anchor(thread, sp); // ensure thawed frames are visible
 
     // The call to JVMTI can safepoint, so we need to restore oops.
     Handle conth(thread, cont.mirror());
     JvmtiExport::post_continuation_run(JavaThread::current(), java_frame_count);
     cont.post_safepoint(conth);
 
-    clear_anchor(thread);
+    ContinuationHelper::clear_anchor(thread);
   }
 
   invlidate_JVMTI_stack(thread);
@@ -4804,7 +4886,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   assert (!java_lang_Continuation::done(oopCont), "");
 
-  assert (oopCont == get_continuation(thread), "");
+  assert (oopCont == ContinuationHelper::get_continuation(thread), "");
 
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
@@ -4813,8 +4895,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   cont.read_minimal();
 
 #ifdef ASSERT
-  set_anchor_to_entry(thread, cont.entry());
-  // assert (assert_entry_frame_laid_out(thread), "");
+  ContinuationHelper::set_anchor_to_entry(thread, cont.entry());
   print_frames(thread);
 #endif
 
@@ -4841,13 +4922,13 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   if (pc0 == StubRoutines::cont_interpreter_forced_preempt_return()) {
     sp0 += frame_metadata; // see push_interpreter_return_frame
   }
-  set_anchor(thread, sp0);
+  ContinuationHelper::set_anchor(thread, sp0);
   print_frames(thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
   if (LoomVerifyAfterThaw) {
     assert(do_verify_after_thaw(thread), "");
   }
-  assert (assert_entry_frame_laid_out(thread), "");
-  clear_anchor(thread);
+  assert (ContinuationEntry::assert_entry_frame_laid_out(thread), "");
+  ContinuationHelper::clear_anchor(thread);
 #endif
 
   if (log_develop_is_enabled(Trace, jvmcont)) {
@@ -4932,14 +5013,14 @@ JRT_LEAF(intptr_t*, Continuation::thaw_leaf(JavaThread* thread, int kind))
   ResetNoHandleMark rnhm;
 
   intptr_t* sp = thaw0(thread, (thaw_kind)kind);
-  // clear_anchor(thread);
+  // ContinuationHelper::clear_anchor(thread);
   return sp;
 JRT_END
 
 JRT_ENTRY(intptr_t*, Continuation::thaw(JavaThread* thread, int kind))
   assert((thaw_kind)kind == thaw_top, "");
   intptr_t* sp = thaw0(thread, (thaw_kind)kind);
-  set_anchor(thread, sp); // we're in a full transition that expects last_java_frame
+  ContinuationHelper::set_anchor(thread, sp); // we're in a full transition that expects last_java_frame
   return sp;
 JRT_END
 
@@ -5118,7 +5199,7 @@ static frame derelativize_chunk_frame(frame f, oop chunk, size_t chunk_offset) {
 static frame chunk_top_frame(oop chunk, RegisterMap* map, size_t offset, size_t index) {
   frame f = StackChunkFrameStream(chunk).to_frame();
   if (map->update_map()) {
-    update_map_for_chunk_frame(map);
+    ContinuationHelper::update_map_for_chunk_frame(map);
   }
   return relativize_chunk_frame(f, chunk, offset, index);
 }
@@ -5231,7 +5312,7 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
       frame sender = fs.to_frame();
       assert (jdk_internal_misc_StackChunk::is_usable_in_chunk(chunk, sender.unextended_sp()), "");
       if (map->update_map()) {
-        update_map_for_chunk_frame(map);
+        ContinuationHelper::update_map_for_chunk_frame(map);
       }
       return relativize_chunk_frame(sender, chunk, chunk_offset, frame_index + 1);
     }
@@ -5259,10 +5340,10 @@ static frame sender_for_frame(const frame& f, RegisterMap* map) {
     if (sender.is_empty()) {
       ContinuationHelper::update_register_map_for_entry_frame(cont, map);
     } else { // if (!sender.is_interpreted_frame())
-      if (is_stub(f.cb())) {
+      if (Frame::is_stub(f.cb())) {
         f.oop_map()->update_register_map(&f, map); // we have callee-save registers in this case
       }
-      ContinuationHelper::update_register_map(map, sender, cont);
+      ContinuationHelper::update_register_map(map, sender);
     }
   }
 
@@ -5376,7 +5457,6 @@ address Continuation::oop_address(objArrayOop ref_stack, int ref_sp, int index) 
                                 : (address)ref_stack->obj_at_addr<oop>(index);
 
   log_develop_trace(jvmcont)("oop_address: index: %d", index);
-  // print_oop(p, obj);
   assert (oopDesc::is_oop_or_null(obj), "invalid oop");
   return p;
 }
@@ -5392,7 +5472,7 @@ bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
 }
 
 int Continuation::usp_offset_to_index(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes) {
-  assert (fr.is_compiled_frame() || is_stub(fr.cb()), "");
+  assert (fr.is_compiled_frame() || Frame::is_stub(fr.cb()), "");
   ContMirror cont(map);
 
   if (map->in_chunk()) {
@@ -5409,7 +5489,7 @@ int Continuation::usp_offset_to_index(const frame& fr, const RegisterMap* map, c
     hframe stub = cont.last_frame<mode_slow>();
 
     assert (cont.is_flag(FLAG_SAFEPOINT_YIELD), "must be");
-    assert (is_stub(stub.cb()), "must be");
+    assert (Frame::is_stub(stub.cb()), "must be");
     assert (stub.sender<mode_slow>(cont) == hf, "must be");
 
     hsp = cont.stack_address(stub.sp()) + stub.cb()->frame_size();
@@ -5965,6 +6045,18 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
 }
 JVM_END
 
+
+void Continuation::init() {
+}
+
+void Continuation::set_cont_fastpath_thread_state(JavaThread* thread) {
+  bool fast =
+       !thread->is_interp_only_mode()
+    && !JvmtiExport::should_post_continuation_run()
+    && !JvmtiExport::should_post_continuation_yield();
+  thread->set_cont_fastpath_thread_state(fast);
+}
+
 #define CC (char*)  /*cast a literal from (const char*)*/
 #define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
 
@@ -6168,9 +6260,6 @@ address Continuations::thaw_oops_slow() {
   return (address) OopStubs::thaw_oops_slow();
 }
 
-void Continuation::init() {
-}
-
 class KeepaliveCleanupClosure : public ThreadClosure {
 private:
   int _count;
@@ -6272,6 +6361,7 @@ void Continuation::nmethod_patched(nmethod* nm) {
   }
 }
 
+#ifndef PRODUCT
 static void print_oop(void *p, oop obj, outputStream* st) {
   if (!log_develop_is_enabled(Trace, jvmcont) && st != NULL) return;
 
@@ -6294,6 +6384,7 @@ static void print_oop(void *p, oop obj, outputStream* st) {
     st->cr();
   }
 }
+#endif
 
 void ContMirror::print_hframes(outputStream* st) {
   if (st != NULL && !log_develop_is_enabled(Trace, jvmcont)) return;
@@ -6386,7 +6477,7 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   char buf[1000];
   for (hframe hf = cont.last_frame<mode_slow>(); !hf.is_empty(); hf = hf.sender<mode_slow>(cont)) {
     assert (frames > 0 || (hf.is_interpreted_frame() == cont.is_flag(FLAG_LAST_FRAME_INTERPRETED)), "frames: %d interpreted: %d FLAG_LAST_FRAME_INTERPRETED: %d", frames, hf.is_interpreted_frame(), cont.is_flag(FLAG_LAST_FRAME_INTERPRETED));
-    assert (frames > 0 || ((!hf.is_interpreted_frame() && is_stub(hf.cb())) <= cont.is_flag(FLAG_SAFEPOINT_YIELD)), "frames: %d interpreted: %d stub: %d FLAG_SAFEPOINT_YIELD: %d", frames, hf.is_interpreted_frame(), !hf.is_interpreted_frame() && is_stub(hf.cb()), cont.is_flag(FLAG_SAFEPOINT_YIELD));
+    assert (frames > 0 || ((!hf.is_interpreted_frame() && Frame::is_stub(hf.cb())) <= cont.is_flag(FLAG_SAFEPOINT_YIELD)), "frames: %d interpreted: %d stub: %d FLAG_SAFEPOINT_YIELD: %d", frames, hf.is_interpreted_frame(), !hf.is_interpreted_frame() && Frame::is_stub(hf.cb()), cont.is_flag(FLAG_SAFEPOINT_YIELD));
     if (hf.is_interpreted_frame()) {
       log_develop_trace(jvmcont)("debug_verify_continuation --- I frame %s -- max_size: %lu fsize: %d callee_argsize: %d wiggle: %d",
         hf.method<Interpreted>()->name_and_sig_as_C_string(buf, 1000),
@@ -6410,9 +6501,9 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
 
       max_size += hf.compiled_frame_size();
       callee_compiled = true;
-      assert ((frames == 0 && cont.is_flag(FLAG_SAFEPOINT_YIELD)) || !is_stub(hf.cb()), "");
+      assert ((frames == 0 && cont.is_flag(FLAG_SAFEPOINT_YIELD)) || !Frame::is_stub(hf.cb()), "");
       // FLAG_SAFEPOINT_YIELD is kept on after thawing safepoint stub, so is_stub may not be true if we verify in thaw
-      if (frames == 0 && cont.is_flag(FLAG_SAFEPOINT_YIELD) && is_stub(hf.cb())) {
+      if (frames == 0 && cont.is_flag(FLAG_SAFEPOINT_YIELD) && Frame::is_stub(hf.cb())) {
         callee_argsize = 0;
       } else {
         assert (hf.cb() != NULL && hf.cb()->is_compiled(), "");
@@ -6480,12 +6571,6 @@ static jlong java_tid(JavaThread* thread) {
   return java_lang_Thread::thread_id(thread->threadObj());
 }
 
-// template<int x>
-// NOINLINE static void walk_frames(JavaThread* thread) {
-//   RegisterMap map(thread, false, false, false);
-//   for (frame f = thread->last_frame(); !f.is_first_frame(); f = f.sender(&map));
-// }
-
 static void print_frames(JavaThread* thread, outputStream* st) {
   if (st != NULL && !log_develop_is_enabled(Trace, jvmcont)) return;
   if (st == NULL) st = tty;
@@ -6521,10 +6606,54 @@ static void print_frames(JavaThread* thread, outputStream* st) {
   st->print_cr("======= end frames =========");
 }
 
-static bool assert_entry_frame_laid_out(JavaThread* thread) {
+
+// template<int x>
+// NOINLINE static void walk_frames(JavaThread* thread) {
+//   RegisterMap map(thread, false, false, false);
+//   for (frame f = thread->last_frame(); !f.is_first_frame(); f = f.sender(&map));
+// }
+
+//static void print_blob(outputStream* st, address addr) {
+//  CodeBlob* b = CodeCache::find_blob_unsafe(addr);
+//  st->print("address: " INTPTR_FORMAT " blob: ", p2i(addr));
+//  if (b != NULL) {
+//    b->dump_for_addr(addr, st, false);
+//  } else {
+//    st->print_cr("NULL");
+//  }
+//}
+
+// void static stop() {
+//     print_frames(JavaThread::current(), NULL);
+//     assert (false, "");
+// }
+
+// void static stop(const frame& f) {
+//     f.print_on(tty);
+//     stop();
+// }
+#endif
+
+int ContinuationEntry::return_pc_offset = 0;
+nmethod* ContinuationEntry::continuation_enter = NULL;
+address ContinuationEntry::return_pc = NULL;
+
+void ContinuationEntry::set_enter_nmethod(nmethod* nm) {
+  assert (return_pc_offset != 0, "");
+  continuation_enter = nm;
+  return_pc = nm->code_begin() + return_pc_offset;
+}
+
+ContinuationEntry* ContinuationEntry::from_frame(const frame& f) {
+  assert (Continuation::is_continuation_enterSpecial(f), "");
+  return (ContinuationEntry*)f.unextended_sp();
+}
+
+#ifdef ASSERT
+bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
   assert (thread->has_last_Java_frame(), "Wrong place to use this assertion");
 
-  ContinuationEntry* cont = Continuation::get_continuation_entry_for_continuation(thread, get_continuation(thread));
+  ContinuationEntry* cont = Continuation::get_continuation_entry_for_continuation(thread, ContinuationHelper::get_continuation(thread));
   assert (cont != NULL, "");
 
   intptr_t* unextended_sp = cont->entry_sp();
@@ -6561,133 +6690,6 @@ static bool assert_entry_frame_laid_out(JavaThread* thread) {
   
   return true;
 }
-
-// static inline bool is_not_entrant(const frame& f) {
-//   return  f.is_compiled_frame() ? f.cb()->as_nmethod()->is_not_entrant() : false;
-// }
-
-static char* method_name(Method* m) {
-  return m != NULL ? m->name_and_sig_as_C_string() : NULL;
-}
-
-static inline Method* top_java_frame_method(const frame& f) {
-  Method* m = NULL;
-  if (f.is_interpreted_frame()) {
-    m = f.interpreter_frame_method();
-  } else if (f.is_compiled_frame()) {
-    CompiledMethod* cm = f.cb()->as_compiled_method();
-    ScopeDesc* scope = cm->scope_desc_at(f.pc());
-    m = scope->method();
-  } else if (f.is_native_frame()) {
-    return f.cb()->as_nmethod()->method();
-  }
-  // m = ((CompiledMethod*)f.cb())->method();
-  return m;
-}
-
-static inline Method* bottom_java_frame_method(const frame& f) {
-  return Frame::frame_method(f);
-}
-
-static char* top_java_frame_name(const frame& f) {
-  return method_name(top_java_frame_method(f));
-}
-
-static char* bottom_java_frame_name(const frame& f) {
-  return method_name(bottom_java_frame_method(f));
-}
-
-static bool assert_top_java_frame_name(const frame& f, const char* name) {
-  ResourceMark rm;
-  bool res = (strcmp(top_java_frame_name(f), name) == 0);
-  assert (res, "name: %s", top_java_frame_name(f));
-  return res;
-}
-
-static bool assert_bottom_java_frame_name(const frame& f, const char* name) {
-  ResourceMark rm;
-  bool res = (strcmp(bottom_java_frame_name(f), name) == 0);
-  assert (res, "name: %s", bottom_java_frame_name(f));
-  return res;
-}
-
-static inline bool is_deopt_return(address pc, const frame& sender) {
-  if (sender.is_interpreted_frame()) return false;
-
-  CompiledMethod* cm = sender.cb()->as_compiled_method();
-  return cm->is_deopt_pc(pc);
-}
-
-//static bool is_deopt_pc(const frame& f, address pc) {
-//  return f.is_compiled_frame() && f.cb()->as_compiled_method()->is_deopt_pc(pc);
-//}
-//static bool is_deopt_pc(address pc) {
-//  CodeBlob* cb = CodeCache::find_blob(pc);
-//  return cb != NULL && cb->is_compiled() && cb->as_compiled_method()->is_deopt_pc(pc);
-//}
-
-template <typename FrameT>
-static CodeBlob* slow_get_cb(const FrameT& f) {
-  assert (!f.is_interpreted_frame(), "");
-  CodeBlob* cb = f.cb();
-  if (cb == NULL) {
-    cb = CodeCache::find_blob(f.pc());
-  }
-  assert (cb != NULL, "");
-  return cb;
-}
-
-template <typename FrameT>
-static const ImmutableOopMap* slow_get_oopmap(const FrameT& f) {
-  const ImmutableOopMap* oopmap = f.oop_map();
-  if (oopmap == NULL) {
-    oopmap = OopMapSet::find_map(slow_get_cb(f), f.pc());
-  }
-  assert (oopmap != NULL, "");
-  return oopmap;
-}
-
-template <typename FrameT>
-static int slow_size(const FrameT& f) {
-  return slow_get_cb(f)->frame_size() * wordSize;
-}
-
-template <typename FrameT>
-static address slow_return_pc(const FrameT& f) {
-  return *slow_return_pc_address<NonInterpretedUnknown>(f);
-}
-
-template <typename FrameT>
-static int slow_stack_argsize(const FrameT& f) {
-  CodeBlob* cb = slow_get_cb(f);
-  assert (cb->is_compiled(), "");
-  return cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size;
-}
-
-template <typename FrameT>
-static int slow_num_oops(const FrameT& f) {
-  return slow_get_oopmap(f)->num_oops();
-}
-
-//static void print_blob(outputStream* st, address addr) {
-//  CodeBlob* b = CodeCache::find_blob_unsafe(addr);
-//  st->print("address: " INTPTR_FORMAT " blob: ", p2i(addr));
-//  if (b != NULL) {
-//    b->dump_for_addr(addr, st, false);
-//  } else {
-//    st->print_cr("NULL");
-//  }
-//}
-
-// void static stop() {
-//     print_frames(JavaThread::current(), NULL);
-//     assert (false, "");
-// }
-
-// void static stop(const frame& f) {
-//     f.print_on(tty);
-//     stop();
-// }
 #endif
 
 // #ifdef ASSERT

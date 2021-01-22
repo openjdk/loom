@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -706,7 +706,7 @@ void DefNewGeneration::handle_promotion_failure(oop old) {
 oop DefNewGeneration::copy_to_survivor_space(oop old) {
   assert(is_in_reserved(old) && !old->is_forwarded(),
          "shouldn't be scavenging this oop");
-  size_t s = old->size();
+  size_t s = old->compact_size();
   oop obj = NULL;
 
   // Try allocating obj in to-space (unless too old)
@@ -727,7 +727,7 @@ oop DefNewGeneration::copy_to_survivor_space(oop old) {
     Prefetch::write(obj, interval);
 
     // Copy obj
-    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(old), cast_from_oop<HeapWord*>(obj), s);
+    old->copy_disjoint_compact(cast_from_oop<HeapWord*>(obj), s);
 
     // Increment age if obj still in new generation
     obj->incr_age();
@@ -862,10 +862,6 @@ void DefNewGeneration::gc_epilogue(bool full) {
     eden()->check_mangled_unused_area_complete();
     from()->check_mangled_unused_area_complete();
     to()->check_mangled_unused_area_complete();
-  }
-
-  if (!CleanChunkPoolAsync) {
-    Chunk::clean_chunk_pool();
   }
 
   // update the generation and space performance counters

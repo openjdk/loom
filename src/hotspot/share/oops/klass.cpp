@@ -745,6 +745,14 @@ const char* Klass::signature_name() const {
   return name()->as_C_string();
 }
 
+size_t Klass::copy_disjoint_compact(oop obj, HeapWord* to) { 
+  return obj->copy_disjoint(to); 
+}
+
+size_t Klass::copy_conjoint_compact(oop obj, HeapWord* to) { 
+  return obj->copy_conjoint(to); 
+}
+
 const char* Klass::external_kind() const {
   if (is_interface()) return "interface";
   if (is_abstract()) return "abstract class";

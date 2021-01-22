@@ -168,7 +168,7 @@ public class ThreadLocal<T> {
     }
 
     /**
-     * Returns the value in the current kernel thread's copy of this
+     * Returns the value in the current carrier thread's copy of this
      * thread-local variable.
      */
     T getCarrierThreadLocal() {

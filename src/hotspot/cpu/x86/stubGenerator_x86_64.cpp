@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,6 +29,7 @@
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetAssembler.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
+#include "gc/shared/gc_globals.hpp"
 #include "interpreter/interpreter.hpp"
 #include "memory/universe.hpp"
 #include "nativeInst_x86.hpp"
@@ -47,6 +48,9 @@
 #include "runtime/thread.inline.hpp"
 #ifdef COMPILER2
 #include "opto/runtime.hpp"
+#endif
+#if INCLUDE_JVMCI
+#include "jvmci/jvmci_globals.hpp"
 #endif
 #if INCLUDE_ZGC
 #include "gc/z/zThreadLocalData.hpp"
@@ -7759,8 +7763,7 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   __ subptr(rsp, (int32_t)ContinuationEntry::size()); // place Continuation metadata
 
   OopMap* map = new OopMap(((int)ContinuationEntry::size() + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
-  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::cont_offset())  / VMRegImpl::stack_slot_size));
-  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::chunk_offset()) / VMRegImpl::stack_slot_size));
+  ContinuationEntry::setup_oopmap(map);
 
   __ movptr(rax, Address(r15_thread, JavaThread::cont_entry_offset()));
   __ movptr(Address(rsp, ContinuationEntry::parent_offset()), rax);

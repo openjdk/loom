@@ -141,6 +141,7 @@ java/lang/StackWalker/SecurityExceptions.java
 java/lang/StackWalker/CallerSensitiveMethod/Main.java
 java/lang/SecurityManager/CheckSecurityProvider.java
 java/lang/SecurityManager/PackageAccessTest.java
+java/lang/SecurityManager/modules/CustomSecurityManagerTest.java
 java/lang/reflect/Proxy/nonPublicProxy/NonPublicProxyClass.java
 java/lang/ProcessHandle/PermissionTest.java
 java/lang/ProcessBuilder/SecurityManagerClinit.java
