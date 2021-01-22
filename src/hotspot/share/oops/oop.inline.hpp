@@ -188,14 +188,8 @@ int oopDesc::size_given_klass(Klass* klass)  {
       // skipping the intermediate round to HeapWordSize.
       s = (int)(align_up(size_in_bytes, MinObjAlignmentInBytes) / HeapWordSize);
 
-      // UseParallelGC and UseG1GC can change the length field
-      // of an "old copy" of an object array in the young gen so it indicates
-      // the grey portion of an already copied array. This will cause the first
-      // disjunct below to fail if the two comparands are computed across such
-      // a concurrent change.
-      assert((s == klass->oop_size(this)) ||
-             (Universe::heap()->is_gc_active() && is_objArray() && is_forwarded() && (get_UseParallelGC() || get_UseG1GC())),
-             "wrong array object size");
+
+      assert(s == klass->oop_size(this) || size_might_change(), "wrong array object size");
     } else {
       // Must be zero, so bite the bullet and take the virtual call.
       s = klass->oop_size(this);
@@ -217,7 +211,7 @@ int oopDesc::compact_size(int size)  {
 
 int oopDesc::compact_size_given_klass(Klass* klass) {
   int lh = klass->layout_helper();
-  if (TrimContinuationChunksInGC && lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
+  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
     return klass->compact_oop_size(this);
   }
   return size_given_klass(klass);
@@ -225,7 +219,7 @@ int oopDesc::compact_size_given_klass(Klass* klass) {
 
 int oopDesc::compact_size_given_klass(Klass* klass, int size) {
   int lh = klass->layout_helper();
-  if (TrimContinuationChunksInGC && lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
+  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
     return klass->compact_oop_size(this);
   }
   assert (size == size_given_klass(klass), "");
@@ -475,15 +469,15 @@ size_t oopDesc::copy_conjoint_compact(HeapWord* to) {
 }
 
 size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
-  assert (word_size == (size_t)size(), "");
+  assert(word_size == (size_t)size() || size_might_change(), "");
   Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
   return word_size;
 }
 
 size_t oopDesc::copy_disjoint_compact(HeapWord* to, size_t word_size) {
-  assert (word_size == (size_t)compact_size(), "");
+  assert(word_size == (size_t)compact_size() || size_might_change(), "");
   int lh = klass()->layout_helper();
-  if (TrimContinuationChunksInGC && lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
+  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
     size_t res = klass()->copy_disjoint_compact(this, to);
     assert (word_size == res, "");
     return res;
@@ -492,15 +486,15 @@ size_t oopDesc::copy_disjoint_compact(HeapWord* to, size_t word_size) {
 }
 
 size_t oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
-  assert (word_size == (size_t)size(), "");
+  assert(word_size == (size_t)size() || size_might_change(), "");
   Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
   return word_size;
 }
 
 size_t oopDesc::copy_conjoint_compact(HeapWord* to, size_t word_size) {
-  assert (word_size == (size_t)compact_size(), "");
+  assert(word_size == (size_t)compact_size() || size_might_change(), "");
   int lh = klass()->layout_helper();
-  if (TrimContinuationChunksInGC && lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
+  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
     size_t res = klass()->copy_conjoint_compact(this, to);
     assert (word_size == res, "");
     return res;

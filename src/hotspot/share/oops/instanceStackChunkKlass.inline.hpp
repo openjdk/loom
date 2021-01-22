@@ -48,10 +48,11 @@ class StackChunkFrameStream : public StackObj {
   intptr_t* _sp;
   CodeBlob* _cb;
   mutable const ImmutableOopMap* _oopmap;
+  DEBUG_ONLY(const oop _chunk;)
 
  public:
   // Iteration
-  StackChunkFrameStream(oop chunk, int gc = false) {
+  StackChunkFrameStream(oop chunk, int gc = false) DEBUG_ONLY(: _chunk(chunk)) {
     assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
     _end = jdk_internal_misc_StackChunk::end_address(chunk);
     intptr_t* start = jdk_internal_misc_StackChunk::start_address(chunk);
@@ -59,7 +60,7 @@ class StackChunkFrameStream : public StackObj {
     get_cb();
   }
 
-  StackChunkFrameStream(oop chunk, const frame& f) {
+  StackChunkFrameStream(oop chunk, const frame& f) DEBUG_ONLY(: _chunk(chunk)) {
     assert (jdk_internal_misc_StackChunk::is_stack_chunk(chunk), "");
     _end = jdk_internal_misc_StackChunk::end_address(chunk);
 
