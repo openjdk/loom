@@ -247,8 +247,10 @@ public class Executors {
      * <em>structured manner</em>. It is <em>owned</em> by the Thread that creates
      * it and must be {@linkplain ExecutorService#close() closed} by the thread
      * when it is finished with the executor. Failure to invoke the {@code
-     * close} method may result in a memory leak. The {@code close} method
-     * throws {@code IllegalCallerException} if invoked by other threads.
+     * close} method may result in a memory leak. The {@code close}, {@link
+     * ExecutorService#shutdown() shutdown}, and {@link ExecutorService#shutdownNow()
+     * shutdownNow} methods throw {@code IllegalCallerException} if invoked by
+     * other threads.
      * Executors created by this method enforce strict nesting and must be
      * closed in the reverse order that they are created in. The {@code close}
      * method throws {@code IllegalStateException} if invoked to close
