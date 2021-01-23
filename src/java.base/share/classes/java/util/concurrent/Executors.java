@@ -258,6 +258,10 @@ public class Executors {
      * its owner, further attempts to close the executor by its owner has no
      * effect.
      *
+     * <p> Invoking {@link Future#cancel(boolean) cancel(true)} on a {@link
+     * Future Future} representing the pending result of a task submitted to
+     * the Executor will {@link Thread#interrupt() interrupt} the thread.
+     *
      * @apiNote
      * The {@link #newUnownedThreadExecutor(ThreadFactory)} method should be
      * used to create executors for <em>unstructured</em> usages.
@@ -334,9 +338,9 @@ public class Executors {
     /**
      * Creates an Executor that starts a new thread for each task.
      *
-     * The resulting Executor is not owned to any thread, meaning it can be
-     * {@link ExecutorService#close() closed} by any thread with appropriate
-     * permission.
+     * The resulting Executor is not owned to any thread, meaning any thread can
+     * {@link ExecutorService#shutdown() shutdown} the Executor or invoke {@link
+     * ExecutorService#close() close} if they have the appropriate permission.
      *
      * @apiNote
      * This method is intended for unstructured usage such as cases where an
