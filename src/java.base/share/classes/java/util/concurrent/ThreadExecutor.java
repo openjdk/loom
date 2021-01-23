@@ -136,6 +136,14 @@ class ThreadExecutor implements ExecutorService {
     }
 
     /**
+     * Throws IllegalCallerException is owned but not owned by this thread.
+     */
+    private void checkOwner() {
+        if (owner != null && owner != Thread.currentThread())
+            throw new IllegalCallerException("Not owned by this thread");
+    }
+
+    /**
      * Sets the state to TERMINATED if there are no remaining threads
      * and signals any threads waiting for termination.
      */
@@ -165,7 +173,7 @@ class ThreadExecutor implements ExecutorService {
      * If interruptThreads is true then all running threads are interrupted.
      */
     private void tryShutdownAndTerminate(boolean interruptThreads) {
-        if (state == RUNNING && STATE.compareAndSet(this, RUNNING, SHUTDOWN))
+        if (STATE.compareAndSet(this, RUNNING, SHUTDOWN))
             tryTerminate();
         if (interruptThreads)
             threads.forEach(Thread::interrupt);
@@ -174,6 +182,7 @@ class ThreadExecutor implements ExecutorService {
     @Override
     public void shutdown() {
         checkPermission();
+        checkOwner();
         if (!isShutdown())
             tryShutdownAndTerminate(false);
     }
@@ -181,6 +190,7 @@ class ThreadExecutor implements ExecutorService {
     @Override
     public List<Runnable> shutdownNow() {
         checkPermission();
+        checkOwner();
         if (!isTerminated())
             tryShutdownAndTerminate(true);
         return List.of();
@@ -217,12 +227,9 @@ class ThreadExecutor implements ExecutorService {
     @Override
     public void close() {
         checkPermission();
+        checkOwner();
 
-        if (owner != null) {
-            if (owner != Thread.currentThread())
-                throw new IllegalCallerException("Not owned by this thread");
-            if (closed)
-                return;
+        if (owner != null && !closed) {
             if (ThreadFields.latestThreadExecutor(owner) != this)
                 throw new IllegalStateException("close is out of order");
             // eagerly mark as closed and restore ref to previous executor

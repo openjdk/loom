@@ -112,7 +112,7 @@ public class ThreadExecutorTest {
     /**
      * Test shutdown.
      */
-    public void testShutdown() throws Exception {
+    public void testShutdown1() throws Exception {
         try (ExecutorService executor = Executors.newVirtualThreadExecutor()) {
             assertFalse(executor.isShutdown());
             assertFalse(executor.isTerminated());
@@ -131,9 +131,45 @@ public class ThreadExecutorTest {
     }
 
     /**
+     * Attempt to shutdown from a different thread.
+     */
+    public void testShutdown2() throws Exception {
+        var exception = new AtomicReference<Exception>();
+        try (var executor = Executors.newVirtualThreadExecutor()) {
+            Thread.startVirtualThread(() -> {
+                try {
+                    executor.shutdown();
+                } catch (Exception e) {
+                    exception.set(e);
+                }
+            }).join();
+        }
+        assertTrue(exception.get() instanceof IllegalCallerException);
+    }
+
+    /**
+     * Test shutdown a shared executor from a different thread.
+     */
+    public void testShutdown3() throws Exception {
+        var exception = new AtomicReference<Exception>();
+
+        ThreadFactory factory = Thread.builder().virtual().factory();
+        try (var executor = Executors.newUnownedThreadExecutor(factory)) {
+            Thread.startVirtualThread(() -> {
+                try {
+                    executor.shutdown();
+                } catch (Exception e) {
+                    exception.set(e);
+                }
+            }).join();
+        }
+        assertTrue(exception.get() == null);
+    }
+
+    /**
      * Test shutdownNow.
      */
-    public void testShutdownNow() throws Exception {
+    public void testShutdownNow1() throws Exception {
         try (ExecutorService executor = Executors.newVirtualThreadExecutor()) {
             assertFalse(executor.isShutdown());
             assertFalse(executor.isTerminated());
@@ -155,6 +191,43 @@ public class ThreadExecutorTest {
             }
         }
     }
+
+    /**
+     * Attempt to shutdownNow from a different thread.
+     */
+    public void testShutdownNow2() throws Exception {
+        var exception = new AtomicReference<Exception>();
+        try (var executor = Executors.newVirtualThreadExecutor()) {
+            Thread.startVirtualThread(() -> {
+                try {
+                    executor.shutdownNow();
+                } catch (Exception e) {
+                    exception.set(e);
+                }
+            }).join();
+        }
+        assertTrue(exception.get() instanceof IllegalCallerException);
+    }
+
+    /**
+     * Test shutdownNow a shared executor from a different thread.
+     */
+    public void testShutdownNow3() throws Exception {
+        var exception = new AtomicReference<Exception>();
+
+        ThreadFactory factory = Thread.builder().virtual().factory();
+        try (var executor = Executors.newUnownedThreadExecutor(factory)) {
+            Thread.startVirtualThread(() -> {
+                try {
+                    executor.shutdownNow();
+                } catch (Exception e) {
+                    exception.set(e);
+                }
+            }).join();
+        }
+        assertTrue(exception.get() == null);
+    }
+
 
     /**
      * Test close.
