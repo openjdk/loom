@@ -153,7 +153,9 @@ public final class Scoped<T> {
         }
         for (var b = bindings; b != null; b = b.prev) {
             if (b.getKey() == this) {
-                return(T)b.get();
+                T value = (T)b.get();
+                Cache.put(this, value);
+                return value;
             }
         }
         throw new RuntimeException("unbound");
