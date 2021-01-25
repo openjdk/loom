@@ -637,7 +637,7 @@ public class Thread implements Runnable {
      * The task {@link java.util.concurrent.Executor#execute(Runnable) submitted}
      * to a custom {@link Thread.Builder#virtual(Executor) scheduler}.
      *
-     * @apiNote The follow example creates a scheduler that uses a small set of
+     * @apiNote The following example creates a scheduler that uses a small set of
      * platform threads. It prints the name of each virtual thread before executing
      * its task.
      * <pre>{@code
