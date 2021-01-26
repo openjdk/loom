@@ -25,27 +25,83 @@
 
 package java.lang;
 
+import java.util.Objects;
+import java.util.concurrent.Callable;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
 
-import java.util.concurrent.Callable;
-
 /**
- * TBD
+ * Represents a scoped variable.
  *
- * @param <T> TBD
+ * <p> A scoped variable differs to a normal variable in that it is dynamically
+ * scoped and intended for cases where context needs to be passed from a caller
+ * to a transitive callee without using an explicit parameter. A scoped variable
+ * does not have a default/initial value, it is bound, meaning it gets a value,
+ * when executing an operation specified to {@link #runWithBinding(Object, Runnable)}
+ * or {@link #callWithBinding(Object, Callable)}. Code executed by the operation
+ * uses the {@link #get()} method to get the value of the variable. The variable reverts
+ * to being unbound (or its previous value) when the operation completes.
+ *
+ * <p> Access to the value of a scoped variable is controlled by the accessibility
+ * of the {@code Scoped} object. A {@code Scoped} object  will typically be declared
+ * in a private static field so that it can only be accessed by code in that class
+ * (or other classes within its nest).
+ *
+ * <p> Scoped variables support nested bindings. If a scoped variable has a value
+ * then the {@code runWithBinding} or {@code callWithBinding} can be invoked to run
+ * another operation with a new value. Code executed by this methods "sees" the new
+ * value of the variable. The variable reverts to its previous value when the
+ * operation completes.
+ *
+ * <p> An <em>inheritable scoped variable</em> is created with the {@link
+ * #inheritableForType(Class)} method and provides inheritance of values from
+ * parent thread to child thread that is arranged when the child thread is
+ * created. Unlike {@link InheritableThreadLocal}, inheritable scoped variable
+ * are not copied into the child thread, instead the child thread will access
+ * the same variable as the parent thread. The value of inheritable scoped
+ * variables should be immutable to avoid needing synchronization to coordinate
+ * access.
+ *
+ * <p> As an advanced feature, the {@link #snapshot()} method is defined to obtain
+ * a {@link Snapshot} of the inheritable scoped variables that are currently bound.
+ * This can be used to support cases where inheritance needs to be done at times
+ * other than thread creation.
+ *
+ * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
+ * or method in this class will cause a {@link NullPointerException} to be thrown.
+ *
+ * @apiNote
+ * The following example uses a scoped variable to make credentials available to callees.
+ *
+ * <pre>{@code
+ *   private static final Scoped<Credentials> CREDENTIALS = Scoped.forType(Credentials.class);
+ *
+ *   Credentials creds = ...
+ *   CREDENTIALS.runWithBinding(creds, () -> {
+ *       :
+ *       Connection connection = connectDatabase();
+ *       :
+ *   });
+ *
+ *   Connection connectDatabase() {
+ *       Credentials credentials = CREDENTIALS.get();
+ *       :
+ *   }
+ * }</pre>
+ *
+ * @param <T> the variable type
+ * @since 99
  */
 public final class Scoped<T> {
-
-    final @Stable Class<? super T> type;
-    final @Stable int hash;
+    private final @Stable Class<? super T> type;
+    private final @Stable int hash;
 
     // Is this scope-local value inheritable? We could handle this by
     // making Scoped an abstract base class and scopeLocalBindings() a
     // virtual method, but that seems a little excessive.
-    final @Stable boolean isInheritable;
+    private final @Stable boolean isInheritable;
 
-    public final int hashCode() { return hash; }
+    public int hashCode() { return hash; }
 
     static class Binding<T> {
         final Scoped<T> key;
@@ -81,43 +137,43 @@ public final class Scoped<T> {
     }
 
     private Scoped(Class<? super T> type, boolean isInheritable) {
+        this.type = Objects.requireNonNull(type);
         this.isInheritable = isInheritable;
-        this.type = type;
         this.hash = generateKey();
     }
 
     /**
-     * TBD
+     * Creates a scoped variable to hold a value with the given type.
      *
-     * @param <T>   TBD
+     * @param <T> TBD
      * @param <U>   TBD
      * @param type TBD
-     * @return TBD
+     * @return a scope variable
      */
     public static <U,T extends U> Scoped<T> forType(Class<U> type) {
         return new Scoped<T>(type, false);
     }
 
     /**
-     * TBD
+     Creates an inheritable scoped variable to hold a value with the given type.
      *
-     * @param <T>   TBD
+     * @param <T> TBD
      * @param <U>   TBD
      * @param type TBD
-     * @return TBD
+     * @return a scope variable
      */
     public static <U,T extends U> Scoped<T> inheritableForType(Class<U> type) {
         return new Scoped<T>(type, true);
     }
 
-    private final Binding<?> scopeLocalBindings() {
+    private Binding<?> scopeLocalBindings() {
         Thread currentThread = Thread.currentThread();
         return isInheritable
                 ? currentThread.inheritableScopeLocalBindings
                 : currentThread.noninheritableScopeLocalBindings;
     }
 
-    private final void setScopeLocalBindings(Binding<?> bindings) {
+    private void setScopeLocalBindings(Binding<?> bindings) {
         Thread currentThread = Thread.currentThread();
         if (isInheritable) {
             currentThread.inheritableScopeLocalBindings = bindings;
@@ -127,9 +183,9 @@ public final class Scoped<T> {
     }
 
     /**
-     * TBD
+     * Returns {@code true} if the variable is bound to a value.
      *
-     * @return TBD
+     * @return {@code true} if the variable is bound to a value, otherwise {@code false}
      */
     @SuppressWarnings("unchecked")
     public boolean isBound() {
@@ -140,31 +196,24 @@ public final class Scoped<T> {
         return (bindings.find(this) != Binding.NIL);
     }
 
-    /**
-     * TBD
-     *
-     * @return TBD
-     */
     @SuppressWarnings("unchecked")
-    T slowGet() {
+    private T slowGet() {
         var bindings = scopeLocalBindings();
         if (bindings == null) {
             throw new RuntimeException("unbound");
         }
         for (var b = bindings; b != null; b = b.prev) {
             if (b.getKey() == this) {
-                T value = (T)b.get();
-                Cache.put(this, value);
-                return value;
+                return(T)b.get();
             }
         }
         throw new RuntimeException("unbound");
     }
 
     /**
-     * TBD
-     *
-     * @return TBD
+     * Returns the value the variable.
+     * @return the value the variable
+     * @throws RuntimeException if not bound (exception is TBD)
      */
     @ForceInline
     @SuppressWarnings("unchecked")
@@ -187,17 +236,22 @@ public final class Scoped<T> {
     }
 
     /**
-     * TBD
+     * Runs an operation with this variable bound to the given value. Code
+     * executed by the operation can use the {@link #get()} method to get the
+     * value of the variable. The variable reverts to its previous value or
+     * becomes {@linkplain #isBound() unbound} when the operation completes.
      *
-     * @param r TBD
-     * @param value   TBD
+     * @param value the value for the variable
+     * @param op the operation to run
      */
-    public void runWithBinding(T value, Runnable r) {
+    public void runWithBinding(T value, Runnable op) {
+        Objects.requireNonNull(value);
+        Objects.requireNonNull(op);
         Binding<?> top = scopeLocalBindings();
         Cache.update(this, value);
         try {
             setScopeLocalBindings(new Binding<T>(this, value, top));
-            r.run();
+            op.run();
         } finally {
             // assert(top == Thread.currentThread().scopeLocalBindings.prev);
             setScopeLocalBindings(top);
@@ -206,21 +260,25 @@ public final class Scoped<T> {
     }
 
     /**
-     * TBD
+     * Runs a value-returning operation with this variable bound to the given
+     * value. Code executed by the operation can use the {@link #get()} method to
+     * get the value of the variable. The variable reverts to its previous value or
+     * becomes {@linkplain #isBound() unbound} when the operation completes.
      *
-     * @param <T>   TBD
-     * @param <X>   TBD
-     * @param r TBD
-     * @param value TBD
-     * @return TBD
-     * @throws Exception TBD
+     * @param value the value for the variable
+     * @param op the operation to run
+     * @param <R> the type of the result of the function
+     * @return the result
+     * @throws Exception if the operation completes with an exception
      */
-    public <X> X callWithBinding(T value, Callable<X> r) throws Exception {
+    public <R> R callWithBinding(T value, Callable<R> op) throws Exception {
+        Objects.requireNonNull(value);
+        Objects.requireNonNull(op);
         Binding<?> top = scopeLocalBindings();
         Cache.update(this, value);
         try {
             setScopeLocalBindings(new Binding<T>(this, value, top));
-            return r.call();
+            return op.call();
         } finally {
             setScopeLocalBindings(top);
             Cache.remove(this);
@@ -228,7 +286,6 @@ public final class Scoped<T> {
     }
 
     private static class Cache {
-
         static final int INDEX_BITS = 4;  // Must be a power of 2
         static final int TABLE_SIZE = 1 << INDEX_BITS;
         static final int TABLE_MASK = TABLE_SIZE - 1;
@@ -237,7 +294,8 @@ public final class Scoped<T> {
             if (Thread.scopedCache() == null) {
                 Thread.setScopedCache(new Object[TABLE_SIZE * 2]);
             }
-            setKeyAndObjectAt(chooseVictim(Thread.currentCarrierThread(), key.hashCode()), key, value);
+            int victim = chooseVictim(Thread.currentCarrierThread(), key.hashCode());
+            setKeyAndObjectAt(victim, key, value);
         }
 
         private static final void update(Object key, Object value) {
@@ -329,31 +387,34 @@ public final class Scoped<T> {
     }
 
     /**
-     * TBD
+     * Represents a snapshot of inheritable scoped variables.
+     *
+     * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
+     * or method in this class will cause a {@link NullPointerException} to be thrown.
+     *
+     * @since 99
+     * @see Scoped#snapshot()
      */
-     public static final class Snapshot {
+    public static final class Snapshot {
         private final Binding<?> bindings;
 
-        /**
-         * TBD
-         * @return TBD
-         */
         private Snapshot() {
             bindings = Thread.currentThread().inheritableScopeLocalBindings;
         }
 
         /**
-         * TBD
-         * @param r TBD
+         * Runs an operation with this snapshot of inheritable scoped variables.
+         *
+         * @param op the operation to run
          */
         @SuppressWarnings("rawtypes")
-        public void runWithSnapshot(Runnable r) {
+        public void runWithSnapshot(Runnable op) {
             var prev = Thread.currentThread().inheritableScopeLocalBindings;
             var cache = Thread.scopedCache();
             Cache.invalidate();
             try {
                 Thread.currentThread().inheritableScopeLocalBindings = bindings;
-                r.run();
+                op.run();
             } finally {
                 Thread.currentThread().inheritableScopeLocalBindings = prev;
                 Thread.setScopedCache(cache);
@@ -361,18 +422,21 @@ public final class Scoped<T> {
         }
 
         /**
-         * @param r TBD
-         * @param <T> type
-         * @return T tbd
-         * @throws Exception TBD
+         * Runs a value-returning operation with this snapshot of inheritable
+         * scoped variables.
+         *
+         * @param op the operation to run
+         * @param <R> the type of the result of the function
+         * @return the result
+         * @throws Exception if the operation completes with an exception
          */
-        public <T> T callWithSnapshot(Callable<T> r) throws Exception {
+        public <R> R callWithSnapshot(Callable<R> op) throws Exception {
             var prev = Thread.currentThread().inheritableScopeLocalBindings;
             var cache = Thread.scopedCache();
             Cache.invalidate();
             try {
                 Thread.currentThread().inheritableScopeLocalBindings = bindings;
-                return r.call();
+                return op.call();
             } finally {
                 Thread.currentThread().inheritableScopeLocalBindings = prev;
                 Thread.setScopedCache(cache);
@@ -381,10 +445,12 @@ public final class Scoped<T> {
     }
 
     /**
-     * TBD
-     * @return TBD
+     * Returns a "snapshot" of the inheritable scoped variables that are currently
+     * bound.
+     *
+     * @return a "snapshot" of the inheritable scoped variables
      */
-    public static final Snapshot snapshot() {
+    public static Snapshot snapshot() {
         return new Snapshot();
     }
 }
