@@ -110,9 +110,9 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
 
   int from_size = jdk_internal_misc_StackChunk::size(obj);
   assert (from_sp < from_size || from_sp == from_size + metadata_words(), "sp: %d size: %d", from_sp, from_size);
-  int used_stack_in_words = from_sp < from_size ? from_size - from_sp + metadata_words() : 0;
+  int used_stack_in_words = from_size - from_sp + metadata_words();
   assert (used_stack_in_words >= 0, "");
-  assert (used_stack_in_words >= 0 || jdk_internal_misc_StackChunk::argsize(obj) == 0, "");
+  assert (used_stack_in_words > 0 || jdk_internal_misc_StackChunk::argsize(obj) == 0, "");
   
   // copy header
   HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
