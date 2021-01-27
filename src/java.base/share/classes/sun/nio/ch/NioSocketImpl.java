@@ -53,7 +53,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import jdk.internal.misc.VirtualThreads;
 import jdk.internal.ref.CleanerFactory;
-import jdk.internal.access.SharedSecrets;
 import sun.net.ConnectionResetException;
 import sun.net.NetHooks;
 import sun.net.PlatformSocketImpl;
