@@ -28,6 +28,8 @@ package java.lang;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
+
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
 
@@ -197,6 +199,55 @@ public final class Scoped<T> {
         return (bindings.find(this) != Binding.NIL);
     }
 
+    /**
+     * Return the value of the variable or NIL if not bound.
+     */
+    private Object findBinding() {
+        var bindings = scopeLocalBindings();
+        if (bindings != null) {
+            return bindings.find(this);
+        } else {
+            return Binding.NIL;
+        }
+    }
+
+    /**
+     * Return the value of the variable if bound, otherwise returns {@code other}.
+     * @param other the value to return if not bound, can be {@code null}
+     * @return the value of the variable if bound, otherwise {@code other}
+     */
+    public T orElse(T other) {
+        Object obj = findBinding();
+        if (obj != Binding.NIL) {
+            @SuppressWarnings("unchecked")
+            T value = (T) obj;
+            return value;
+        } else {
+            return other;
+        }
+    }
+
+    /**
+     * Return the value of the variable if bound, otherwise throws an exception
+     * produced by the exception supplying function.
+     * @param <X> Type of the exception to be thrown
+     * @param exceptionSupplier the supplying function that produces an
+     *        exception to be thrown
+     * @return the value of the variable if bound
+     * @throws X if the variable is unbound
+     */
+    public <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
+        Objects.requireNonNull(exceptionSupplier);
+        Object obj = findBinding();
+        if (obj != Binding.NIL) {
+            @SuppressWarnings("unchecked")
+            T value = (T) obj;
+            return value;
+        } else {
+            throw exceptionSupplier.get();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private T slowGet() {
         var bindings = scopeLocalBindings();
@@ -213,7 +264,7 @@ public final class Scoped<T> {
     /**
      * Returns the value the variable.
      * @return the value the variable
-     * @throws NoSuchElementException if not bound (exception is TBD)
+     * @throws NoSuchElementException if the variable is not bound (exception is TBD)
      */
     @ForceInline
     @SuppressWarnings("unchecked")
