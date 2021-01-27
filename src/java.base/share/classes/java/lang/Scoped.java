@@ -25,6 +25,7 @@
 
 package java.lang;
 
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import jdk.internal.vm.annotation.ForceInline;
@@ -199,21 +200,20 @@ public final class Scoped<T> {
     @SuppressWarnings("unchecked")
     private T slowGet() {
         var bindings = scopeLocalBindings();
-        if (bindings == null) {
-            throw new RuntimeException("unbound");
-        }
-        for (var b = bindings; b != null; b = b.prev) {
-            if (b.getKey() == this) {
-                return(T)b.get();
+        if (bindings != null) {
+            for (var b = bindings; b != null; b = b.prev) {
+                if (b.getKey() == this) {
+                    return (T) b.get();
+                }
             }
         }
-        throw new RuntimeException("unbound");
+        throw new NoSuchElementException();
     }
 
     /**
      * Returns the value the variable.
      * @return the value the variable
-     * @throws RuntimeException if not bound (exception is TBD)
+     * @throws NoSuchElementException if not bound (exception is TBD)
      */
     @ForceInline
     @SuppressWarnings("unchecked")
@@ -241,11 +241,10 @@ public final class Scoped<T> {
      * value of the variable. The variable reverts to its previous value or
      * becomes {@linkplain #isBound() unbound} when the operation completes.
      *
-     * @param value the value for the variable
+     * @param value the value for the variable, can be null
      * @param op the operation to run
      */
     public void runWithBinding(T value, Runnable op) {
-        Objects.requireNonNull(value);
         Objects.requireNonNull(op);
         Binding<?> top = scopeLocalBindings();
         Cache.update(this, value);
@@ -265,14 +264,13 @@ public final class Scoped<T> {
      * get the value of the variable. The variable reverts to its previous value or
      * becomes {@linkplain #isBound() unbound} when the operation completes.
      *
-     * @param value the value for the variable
+     * @param value the value for the variable, can be null
      * @param op the operation to run
      * @param <R> the type of the result of the function
      * @return the result
      * @throws Exception if the operation completes with an exception
      */
     public <R> R callWithBinding(T value, Callable<R> op) throws Exception {
-        Objects.requireNonNull(value);
         Objects.requireNonNull(op);
         Binding<?> top = scopeLocalBindings();
         Cache.update(this, value);
