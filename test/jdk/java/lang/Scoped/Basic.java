@@ -52,6 +52,28 @@ public class Basic {
         v.get();
     }
 
+    public void testOrElse() {
+        Scoped<String> name = Scoped.forType(String.class);
+        assertFalse(name.isBound());
+        assertTrue(name.orElse(null) == null);
+        assertEquals(name.orElse("default"), "default");
+        name.runWithBinding("fred", () -> {
+            assertEquals(name.orElse(null), "fred");
+            assertEquals(name.orElse("default"), "fred");
+        });
+    }
+
+    public void testOrElseThrow() {
+        Scoped<String> name = Scoped.forType(String.class);
+        assertFalse(name.isBound());
+        assertThrows(IllegalStateException.class, () -> name.orElseThrow(IllegalStateException::new));
+        assertThrows(NullPointerException.class, () -> name.orElseThrow(null));
+        name.runWithBinding("fred", () -> {
+            assertEquals(name.orElseThrow(IllegalStateException::new), "fred");
+            assertThrows(NullPointerException.class, () -> name.orElseThrow(null));
+        });
+    }
+
     /**
      * Test runWithBinding with non-inheritable scope variable.
      */
