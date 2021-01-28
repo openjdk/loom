@@ -102,7 +102,7 @@ public class FreezeAndThaw {
         static Continuation continuation(int paramCount, int maxDepth,
                                          boolean yieldAtLimit) {
             Runnable task = new Yielder(paramCount, maxDepth, yieldAtLimit);
-            return new Continuation(SCOPE, 2000, task);
+            return new Continuation(SCOPE, task);
         }
     }
 

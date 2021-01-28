@@ -54,7 +54,7 @@ address RegisterMap::pd_location(VMReg reg) const {
         // XMM0-15 case (0 < offset_in_bytes < 16). No need to adjust base register (or offset).
       }
     }
-    address base_location = location(base_reg);
+    address base_location = location(base_reg, (intptr_t*)NULL);
     if (base_location != NULL) {
       return base_location + offset_in_bytes;
     }
@@ -63,7 +63,7 @@ address RegisterMap::pd_location(VMReg reg) const {
 }
 
 address RegisterMap::pd_location(VMReg base_reg, int slot_idx) const {
-  return location(base_reg->next(slot_idx));
+  return location(base_reg->next(slot_idx), (intptr_t*)NULL);
 }
 
 int RegisterMap::link_offset() {

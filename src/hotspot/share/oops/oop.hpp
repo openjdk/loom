@@ -91,7 +91,7 @@ class oopDesc {
   // Returns whether this is an instance of k or an instance of a subclass of k
   inline bool is_a(Klass* k) const;
 
-  // Returns the actual oop size of the object
+  // Returns the actual oop size of the object in machine words
   inline int size();
   // Returns the size of the object after possible compression during GC promotion/compaction
   inline int compact_size();
@@ -121,12 +121,14 @@ class oopDesc {
   inline bool is_array()               const;
   inline bool is_objArray()            const;
   inline bool is_typeArray()           const;
+  inline bool is_stackChunk()          const;
 
   // type test operations that don't require inclusion of oop.inline.hpp.
   bool is_instance_noinline()          const;
   bool is_array_noinline()             const;
   bool is_objArray_noinline()          const;
   bool is_typeArray_noinline()         const;
+  bool is_stackChunk_noinline()        const;
 
  protected:
   inline oop        as_oop() const { return const_cast<oopDesc*>(this); }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,19 +25,41 @@
 #ifndef SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
 #define SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
 
+#include "classfile/vmClasses.hpp"
 #include "oops/instanceKlass.hpp"
+#include "oops/stackChunkOop.hpp"
+#include "runtime/handles.hpp"
 #include "utilities/macros.hpp"
 
+class frame;
 class ClassFileParser;
-class StackChunkFrameStream;
+class ImmutableOopMap;
+class VMRegImpl;
+typedef VMRegImpl* VMReg;
+template <bool mixed = true> class StackChunkFrameStream;
+
 
 // An InstanceStackChunkKlass is a specialization of the InstanceKlass. 
 // It has a header containing metadata, and a blob containing a stack segment
-// (some integral number of stack frames),
+// (some integral number of stack frames)
+//
+// A chunk is said to be "mixed" if it contains interpreter frames or stubs
+// (which can only be a safepoint stub as the topmost frame). Otherwise, it
+// must contain only compiled Java frames.
+//
+// Interpreter frames in chunks have their internal pointers converted to
+// relative offsets from sp. Derived pointers in compiled frames might also
+// be converted to relative offsets from their base.
 
 class InstanceStackChunkKlass: public InstanceKlass {
   friend class VMStructs;
   friend class InstanceKlass;
+  friend class stackChunkOopDesc;
+  friend class Continuations;
+  template <bool mixed> friend class StackChunkFrameStream; 
+  friend class FixChunkIterateStackClosure;
+  template <bool concurrent_gc, typename OopClosureType> friend class OopOopIterateStackClosure;
+
 public:
   static const KlassID ID = InstanceStackChunkKlassID;
 
@@ -45,7 +67,8 @@ private:
   static int _offset_of_stack;
 
   InstanceStackChunkKlass(const ClassFileParser& parser);
-  static inline int metadata_words();
+  static inline int metadata_words(); // size, in words, of frame metadata (e.g. pc and link); same as ContinuationHelper::frame_metadata
+  static inline int align_wiggle();   // size, in words, of maximum shift in frame position due to alignment; same as ContinuationHelper::align_wiggle
 
 public:
   InstanceStackChunkKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
@@ -67,11 +90,12 @@ public:
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
-  static void print_chunk(oop chunk, bool verbose, outputStream* st = tty);
+  static void print_chunk(const stackChunkOop chunk, bool verbose, outputStream* st = tty);
 
+  static inline void assert_mixed_correct(stackChunkOop chunk, bool mixed) PRODUCT_RETURN;
 #ifndef PRODUCT
   void oop_print_on(oop obj, outputStream* st);
-  static bool verify(oop chunk, oop cont = (oop)NULL, size_t* out_size = NULL, int* out_frames = NULL, int* out_oops = NULL);
+  static bool verify(oop obj, size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL);
 #endif
   
   // Stack offset is an offset into the Heap
@@ -89,7 +113,8 @@ public:
     return _offset_of_stack;
   }
 
-  static int count_frames(oop obj);
+  template<bool mixed = true>
+  static int count_frames(stackChunkOop chunk);
   
   // Oop fields (and metadata) iterators
   //
@@ -112,34 +137,131 @@ public:
 
 public:
   template <bool store>
-  static void barriers_for_oops_in_chunk(oop chunk);
+  static void barriers_for_oops_in_chunk(stackChunkOop chunk);
 
-  template <bool store>
-  static void barriers_for_oops_in_frame(const StackChunkFrameStream& f);
+  template <bool mixed, bool store, typename RegisterMapT>
+  static void barriers_for_oops_in_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
-  static void fix_chunk(oop chunk);
+  static void fix_chunk(stackChunkOop chunk);
+
+  static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
+  static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
 private:
   template<bool disjoint>
   size_t copy_compact(oop obj, HeapWord* to);
   
   template <typename T, class OopClosureType>
-  inline void oop_oop_iterate_header(oop obj, OopClosureType* closure);
+  inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
 
-  template <class OopClosureType, bool concurrent_gc>
-  inline void oop_oop_iterate_stack(oop obj, OopClosureType* closure);
-  template <class OopClosureType>
-  static bool iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f);
-  template <bool concurrent_gc>
-  static void iterate_derived_pointers(oop chunk, const StackChunkFrameStream& f);
+  template <bool concurrent_gc, class OopClosureType>
+  inline void oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure);
 
-  template <class OopClosureType>
-  inline void oop_oop_iterate_stack_bounded(oop obj, OopClosureType* closure, MemRegion mr);
-  template <class OopClosureType>
-  static bool iterate_oops(OopClosureType* closure, const StackChunkFrameStream& f, MemRegion mr);
-  static void iterate_derived_pointers(oop chunk, const StackChunkFrameStream& f, MemRegion mr);
+  template <bool concurrent_gc, class OopClosureType>
+  inline void oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
+  
+  template <bool mixed>
+  static void run_nmethod_entry_barrier_if_needed(const StackChunkFrameStream<mixed>& f);
 
-  static void fix_derived_pointers(const StackChunkFrameStream& f);
+  static inline void relativize(intptr_t* const fp, intptr_t* const hfp, int offset);
+  static inline void derelativize(intptr_t* const fp, int offset);
+  
+  typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
+  static void resolve_memcpy_functions();
+  static MemcpyFnT memcpy_fn_from_stack_to_chunk;
+  static MemcpyFnT memcpy_fn_from_chunk_to_stack;
+  template <bool dword_aligned> inline static void copy_from_stack_to_chunk(void* from, void* to, size_t size);
+  template <bool dword_aligned> inline static void copy_from_chunk_to_stack(void* from, void* to, size_t size);
+  static void default_memcpy(void* from, void* to, size_t size);
+};
+
+template <bool mixed>
+class StackChunkFrameStream : public StackObj {
+ private:
+  intptr_t* _end;
+  intptr_t* _sp;
+  intptr_t* _unextended_sp; // used only when mixed
+  CodeBlob* _cb;
+  mutable const ImmutableOopMap* _oopmap;
+
+#ifdef ASSERT
+  stackChunkOop _chunk;
+  int _index;
+  int _has_stub;
+#endif
+
+ public:
+  StackChunkFrameStream() { DEBUG_ONLY(_chunk = nullptr; _index = -1; _has_stub = false;) }
+  inline StackChunkFrameStream(stackChunkOop chunk, bool gc = false);
+  inline StackChunkFrameStream(stackChunkOop chunk, const frame& f);
+
+  bool is_done() const { return _sp >= _end; }
+  bool is_last() const { return next_sp() >= _end; }
+
+  intptr_t* end() { return _end; }
+  void set_end(intptr_t* end) { _end = end; }
+
+  // Query
+  intptr_t* end() const { return _end; }
+
+  intptr_t*        sp() const  { return _sp; }
+  inline address   pc() const  { return get_pc(); }
+  inline intptr_t* fp() const;
+  inline intptr_t* unextended_sp() const { return mixed ? _unextended_sp : _sp; }
+  DEBUG_ONLY(int index() { return _index; })
+  inline address orig_pc() const;
+
+  inline bool is_interpreted() const;
+  inline bool is_stub() const;
+  inline bool is_compiled() const;
+  CodeBlob* cb() const { return _cb; }
+  const ImmutableOopMap* oopmap() const { if (_oopmap == NULL) get_oopmap(); return _oopmap; }
+  inline int frame_size() const;
+  inline int stack_argsize() const;
+  inline int num_oops() const;
+
+  inline void initialize_register_map(RegisterMap* map);
+  template <typename RegisterMapT> inline void next(RegisterMapT* map);
+
+  template <typename RegisterMapT> inline void update_reg_map(RegisterMapT* map);
+  
+  void handle_deopted() const;
+
+  inline int to_offset(stackChunkOop chunk) const { assert (!is_done(), ""); return _sp - chunk->start_address(); }
+
+  inline frame to_frame() const;
+
+#ifdef ASSERT
+  bool is_in_frame(void* p) const;
+  template <typename RegisterMapT> bool is_in_oops(void* p, const RegisterMapT* map) const;
+#endif
+
+  void print_on(outputStream* st) const PRODUCT_RETURN;
+
+ private:
+  inline address get_pc() const;
+  inline void get_cb();
+
+  inline intptr_t* next_sp() const;
+  inline int interpreter_frame_size() const;
+  inline int interpreter_frame_num_oops() const;
+  inline int interpreter_frame_stack_argsize() const;
+  inline void next_for_interpreter_frame();
+  inline intptr_t* next_sp_for_interpreter_frame() const;
+  inline intptr_t* unextended_sp_for_interpreter_frame() const;
+  inline intptr_t* derelativize(int offset) const;
+  inline void get_oopmap() const;
+  inline void get_oopmap(address pc, int oopmap_slot) const;
+  static inline int get_initial_sp(stackChunkOop chunk, bool gc);
+
+  template <typename RegisterMapT> inline void update_reg_map_pd(RegisterMapT* map);
+
+  template <typename RegisterMapT>
+  inline void* reg_to_loc(VMReg reg, const RegisterMapT* map) const;
+
+public:
+  template <class OopClosureType, class RegisterMapT> inline void iterate_oops(OopClosureType* closure, const RegisterMapT* map, MemRegion mr = MemRegion(NULL, SIZE_MAX)) const;
+  template <class DerivedOopClosureType, class RegisterMapT> inline void iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map, MemRegion mr = MemRegion(NULL, SIZE_MAX)) const;
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP

@@ -97,36 +97,21 @@ JavaFrameStream::JavaFrameStream(JavaThread* thread, int mode, Handle cont_scope
   : BaseFrameStream(thread, cont), 
    _vfst(cont.is_null()
       ? vframeStream(thread, cont_scope)
-      : vframeStream(cont)) {
+      : vframeStream(cont(), cont_scope)) {
   _need_method_info = StackWalk::need_method_info(mode);
 }
 
 LiveFrameStream::LiveFrameStream(JavaThread* thread, RegisterMap* rm, Handle cont_scope, Handle cont)
-   : BaseFrameStream(thread, cont), _cont_scope(cont_scope),
-    _cont(cont.not_null() ? cont : Handle(thread, thread->last_continuation()->cont_oop())) {
+   : BaseFrameStream(thread, cont), _cont_scope(cont_scope) {
      
     _map = rm;
     if (cont.is_null()) {
       _jvf  = thread->last_java_vframe(rm);
-      // _cont = Handle(thread, thread->last_continuation()->cont_oop());
+      _cont = thread->last_continuation();
     } else {
-      _jvf  = Continuation::has_last_Java_frame(cont) ? Continuation::last_java_vframe(cont, rm) : NULL;
-      // _cont = cont;
+      _jvf  = Continuation::last_java_vframe(cont, rm);
+      _cont = NULL;
     }
-}
-
-void JavaFrameStream::set_continuation(Handle cont) {
-  BaseFrameStream::set_continuation(cont);
-
-  _vfst = vframeStream(continuation()); // we must not use the handle argument (lifetime; see BaseFrameStream::set_continuation)
-}
-
-void LiveFrameStream::set_continuation(Handle cont) {
-  BaseFrameStream::set_continuation(cont);
-
-  _jvf = Continuation::last_java_vframe(continuation(), _map); // we must not use the handle argument (lifetime; see BaseFrameStream::set_continuation)
-  _cont = continuation(); // *(_cont.raw_value()) = cont(); // preserve handle
-  tty->print_cr("-- LiveFrameStream::set_continuation: %p", (oopDesc*)_cont());
 }
 
 void JavaFrameStream::next() { 
@@ -136,17 +121,16 @@ void JavaFrameStream::next() {
 }
 
 void LiveFrameStream::next() {
-  assert (_cont_scope.is_null() || _cont() != (oop)NULL, "must be");
+  assert (_cont_scope.is_null() || cont() != (oop)NULL, "must be");
 
-  oop cont = _cont();
+  oop cont = this->cont();
   if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_jvf->fr(), _jvf->register_map())) {    
     oop scope = java_lang_Continuation::scope(cont);
-    *(_cont.raw_value()) = java_lang_Continuation::parent(cont);
-    
     if (_cont_scope.not_null() && scope == _cont_scope()) {
       _jvf = NULL;
       return;
     }
+    _cont = _cont->parent();
   }
   assert (!Continuation::is_scope_bottom(_cont_scope(), _jvf->fr(), _jvf->register_map()), "");
   
@@ -202,6 +186,7 @@ int StackWalk::fill_in_frames(jlong mode, BaseFrameStream& stream,
 
   int frames_decoded = 0;
   for (; !stream.at_end(); stream.next()) {
+    assert (stream.continuation() == NULL || stream.continuation() == stream.reg_map()->cont(), "");
     Method* method = stream.method();
 
     if (method == NULL) continue;
@@ -248,8 +233,12 @@ int StackWalk::fill_in_frames(jlong mode, BaseFrameStream& stream,
       ls.print("  %d: done frame method: ", index);
       method->print_short_name(&ls);
     }
+    frames_decoded++;
 
-    if (++frames_decoded >= max_nframes)  break;
+    // We end a batch on continuation bottom to let the Java side skip top frames of the next one
+    if (stream.continuation() != NULL && method->intrinsic_id() == vmIntrinsics::_Continuation_enter) break;
+
+    if (frames_decoded >= max_nframes)  break;
   }
   log_debug(stackwalk)("fill_in_frames done frames_decoded=%d at_end=%d", frames_decoded, stream.at_end());
 
@@ -453,7 +442,7 @@ oop StackWalk::walk(Handle stackStream, jlong mode, int skip_frames, Handle cont
   if (live_frame_info(mode)) {
     assert (use_frames_array(mode), "Bad mode for get live frame");
     RegisterMap regMap = cont.is_null() ? RegisterMap(jt, true, true, true)
-                                        : RegisterMap(cont, true);
+                                        : RegisterMap(cont(), true);
     LiveFrameStream stream(jt, &regMap, cont_scope, cont);
     return fetchFirstBatch(stream, stackStream, mode, skip_frames, frame_count,
                            start_index, frames_array, THREAD);

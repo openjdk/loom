@@ -595,7 +595,7 @@ public:
       const char* name = "cleaning keepalive jweak handles";
       EventSafepointCleanupTask event;
       TraceTime timer(name, TRACETIME_LOG(Info, safepoint, cleanup));
-      Continuations::cleanup_keepalives();
+      // Continuations::cleanup_keepalives();
 
       post_safepoint_cleanup_task_event(event, SafepointSynchronize::safepoint_id(), name);
     }

@@ -26,6 +26,7 @@
 #define SHARE_RUNTIME_REGISTERMAP_HPP
 
 #include "code/vmreg.hpp"
+#include "oops/stackChunkOop.hpp"
 #include "runtime/handles.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
@@ -74,14 +75,11 @@ class RegisterMap : public StackObj {
   LocationValidType _location_valid[location_valid_size];
   bool        _include_argument_oops;   // Should include argument_oop marked locations for compiler
   JavaThread* _thread;                  // Reference to current thread
-  Handle      _cont;                    // The current continuation, if any
-  unsigned    _on_hstack : 1;           // Whether we're on the h-stack
-  unsigned    _in_chunk  : 1;           // Whether we're on an h-stack chunk
+  stackChunkHandle _chunk;              // The current continuation stack chunk, if any
 
   bool        _update_map;              // Tells if the register map need to be
                                         // updated when traversing the stack
   bool        _process_frames;          // Should frames be processed by stack watermark barriers?
-  bool        _validate_oops;           // whether to perform valid oop checks in asserts -- used only in the map use for continuation freeze/thaw
   bool        _walk_cont;               // whether to walk frames on a continuation stack
 
   DEBUG_ONLY(bool  _skip_missing;)
@@ -94,13 +92,11 @@ class RegisterMap : public StackObj {
 
  public:
   DEBUG_ONLY(intptr_t* _update_for_id;) // Assert that RegisterMap is not updated twice for same frame
-  RegisterMap(JavaThread *thread, bool update_map = true, bool process_frames = true, bool walk_cont = false, bool validate_oops = true);
-  RegisterMap(Handle cont, bool update_map = true, bool process_frames = true, bool validate_oops = true);
+  RegisterMap(JavaThread *thread, bool update_map = true, bool process_frames = true, bool walk_cont = false);
+  RegisterMap(oop continuation, bool update_map = true);
   RegisterMap(const RegisterMap* map);
 
-  bool validate_oops() const { return _validate_oops; }
-
-  address location(VMReg reg) const {
+  address location(VMReg reg, intptr_t* sp) const {
     int index = reg->value() / location_valid_type_size;
     assert(0 <= reg->value() && reg->value() < reg_count, "range check");
     assert(0 <= index && index < location_valid_size, "range check");
@@ -115,7 +111,7 @@ class RegisterMap : public StackObj {
     if (slot_idx > 0) {
       return pd_location(base_reg, slot_idx);
     } else {
-      return location(base_reg);
+      return location(base_reg, (intptr_t*)NULL);
     }
   }
 
@@ -133,7 +129,7 @@ class RegisterMap : public StackObj {
     int index = reg->value() / location_valid_type_size;
     assert(0 <= reg->value() && reg->value() < reg_count, "range check");
     assert(0 <= index && index < location_valid_size, "range check");
-    assert(!_validate_oops || _update_map, "updating map that does not need updating");
+    assert(_update_map, "updating map that does not need updating");
     _location[reg->value()] = (intptr_t*) loc;
     _location_valid[index] |= ((LocationValidType)1 << (reg->value() % location_valid_type_size));
     check_location_valid();
@@ -150,11 +146,10 @@ class RegisterMap : public StackObj {
   bool process_frames() const { return _process_frames; }
   bool walk_cont()      const { return _walk_cont; }
 
-  bool in_cont()       const { return (bool)_on_hstack; } // Whether we are currently on the hstack
-  bool in_chunk()      const { return (bool)_in_chunk; }
-  oop  cont()          const { return _cont(); }
-  void set_cont(oop cont);
-  void set_in_cont(bool on_hstack, bool in_chunk);
+  bool in_cont()        const { return _chunk() != NULL; } // Whether we are currently on the hstack
+  oop cont() const;
+  stackChunkHandle stack_chunk() const { return _chunk; }
+  void set_stack_chunk(stackChunkOop chunk);
 
   const RegisterMap* as_RegisterMap() const { return this; }
   RegisterMap* as_RegisterMap() { return this; }
@@ -166,7 +161,7 @@ class RegisterMap : public StackObj {
   void set_skip_missing(bool value) { _skip_missing = value; }
   bool should_skip_missing() const  { return _skip_missing; }
 
-  VMReg find_register_spilled_here(void* p);
+  VMReg find_register_spilled_here(void* p, intptr_t* sp);
 #endif
 
   // the following contains the definition of pd_xxx methods

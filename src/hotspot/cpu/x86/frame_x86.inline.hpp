@@ -112,17 +112,16 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _unextended_sp = unextended_sp;
   _fp = fp;
   _pc = pc;
-  assert(pc != NULL, "no pc?");
   _cb = cb;
   _oop_map = oop_map;
   _deopt_state = not_deoptimized;
 #ifdef ASSERT
   // The following assertion has been disabled because it would sometime trap for Continuation.run, which is not *in* a continuation
   // and therefore does not clear the _cont_fastpath flag, but this is benign even in fast mode (see Freeze::setup_jump)
-  // if (cb != NULL) {
-  //   setup(pc);
-  //   assert(_pc == pc && _deopt_state == not_deoptimized, "");
-  // }
+  if (cb != NULL) {
+    setup(pc);
+    assert(_pc == pc && _deopt_state == not_deoptimized, "");
+  }
 #endif
 }
 
@@ -190,18 +189,6 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   _oop_map = NULL;
 }
 
-inline frame::frame(int sp, int ref_sp, intptr_t fp, address pc, CodeBlob* cb, bool deopt) {
-  _cont_sp._sp = sp;
-  _cont_sp._ref_sp = ref_sp;
-  _unextended_sp = NULL;
-  _fp = (intptr_t*)fp;
-  _pc = pc;
-  assert(pc != NULL, "no pc?");
-  _cb = cb;
-  _deopt_state = deopt ? is_deoptimized : not_deoptimized;
-  _oop_map = NULL;
-}
-
 // Accessors
 
 inline bool frame::equal(frame other) const {
@@ -224,13 +211,15 @@ inline bool frame::is_older(intptr_t* id) const   { assert(this->id() != NULL &&
 
 
 
-inline intptr_t* frame::link() const              { return (intptr_t*) *(intptr_t **)addr_at(link_offset); }
+inline intptr_t* frame::link() const              { return *(intptr_t **)addr_at(link_offset); }
 
 inline intptr_t* frame::unextended_sp() const     { return _unextended_sp; }
 
-inline size_t frame::frame_index() const          { return _frame_index; }
+inline void frame::set_unextended_sp(intptr_t* value) { _unextended_sp = value; }
 
-inline void frame::set_frame_index(size_t index)  { _frame_index = index; }
+inline int frame::offset_unextended_sp() const { return (int)(intptr_t)_unextended_sp; }
+inline void frame::set_offset_unextended_sp(int value) { _unextended_sp = (intptr_t*)(intptr_t)value; }
+
 
 inline intptr_t* frame::real_fp() const {
   if (_cb != NULL) {
@@ -259,7 +248,7 @@ inline int frame::num_oops() const {
 
 inline int frame::compiled_frame_stack_argsize() const {
   assert (cb()->is_compiled(), "");
-  return cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size;
+  return (cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;
 }
 
 inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
@@ -307,23 +296,23 @@ intptr_t** frame::saved_link_address(const RegisterMapT* map) {
 
 // Return address:
 
-inline address* frame::sender_pc_addr()      const { return (address*) addr_at( return_addr_offset); }
+inline address* frame::sender_pc_addr()      const { return (address*) addr_at(return_addr_offset); }
 inline address  frame::sender_pc()           const { return *sender_pc_addr(); }
 
-inline intptr_t*    frame::sender_sp()        const { return            addr_at(   sender_sp_offset); }
+inline intptr_t* frame::sender_sp()          const { return            addr_at(sender_sp_offset); }
 
 inline intptr_t** frame::interpreter_frame_locals_addr() const {
   return (intptr_t**)addr_at(interpreter_frame_locals_offset);
 }
 
+template <bool relative>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
-  return *(intptr_t**)addr_at(interpreter_frame_last_sp_offset);
+  return (intptr_t*)at<relative>(interpreter_frame_last_sp_offset);
 }
 
 inline intptr_t* frame::interpreter_frame_bcp_addr() const {
   return (intptr_t*)addr_at(interpreter_frame_bcp_offset);
 }
-
 
 inline intptr_t* frame::interpreter_frame_mdp_addr() const {
   return (intptr_t*)addr_at(interpreter_frame_mdp_offset);
@@ -350,15 +339,16 @@ inline oop* frame::interpreter_frame_mirror_addr() const {
 }
 
 // top of expression stack
+template <bool relative>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
-  intptr_t* last_sp = interpreter_frame_last_sp();
+  intptr_t* last_sp = interpreter_frame_last_sp<relative>();
   if (last_sp == NULL) {
     return sp();
   } else {
     // sp() may have been extended or shrunk by an adapter.  At least
     // check that we don't fall behind the legal region.
     // For top deoptimized frame last_sp == interpreter_frame_monitor_end.
-    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end(), "bad tos");
+    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end<relative>(), "bad tos");
     return last_sp;
   }
 }
@@ -375,8 +365,9 @@ inline int frame::interpreter_frame_monitor_size() {
 // expression stack
 // (the max_stack arguments are used by the GC; see class FrameClosure)
 
+template <bool relative>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
-  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end();
+  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end<relative>();
   return monitor_end-1;
 }
 
@@ -389,7 +380,7 @@ inline JavaCallWrapper** frame::entry_frame_call_wrapper_addr() const {
 // Compiled frames
 
 inline oop frame::saved_oop_result(RegisterMap* map) const {
-  oop* result_adr = (oop *)map->location(rax->as_VMReg());
+  oop* result_adr = (oop *)map->location(rax->as_VMReg(), sp());
   guarantee(result_adr != NULL, "bad register save location");
   oop result = *result_adr;
 
@@ -400,7 +391,7 @@ inline oop frame::saved_oop_result(RegisterMap* map) const {
 }
 
 inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
-  oop* result_adr = (oop *)map->location(rax->as_VMReg());
+  oop* result_adr = (oop *)map->location(rax->as_VMReg(), sp());
   guarantee(result_adr != NULL, "bad register save location");
 
   *result_adr = obj;
@@ -415,6 +406,10 @@ frame frame::frame_sender(RegisterMap* map) const {
   // Default is we done have to follow them. The sender_for_xxx will
   // update it accordingly
   map->set_include_argument_oops(false);
+
+  if (map->in_cont()) { // already in an h-stack
+    return map->stack_chunk()->sender(*this, map);
+  }
 
   if (is_entry_frame())       return sender_for_entry_frame(map);
   if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
@@ -434,10 +429,6 @@ frame frame::frame_sender(RegisterMap* map) const {
 template <typename LOOKUP, bool stub>
 frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   assert(map != NULL, "map must be set");
-
-  if (map->in_cont()) { // already in an h-stack
-    return Continuation::sender_for_compiled_frame(*this, map);
-  }
 
   // frame owned by optimizing compiler
   assert(_cb->frame_size() >= 0, "must have non-zero frame size");
@@ -482,9 +473,6 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     } else {
       Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &sender_sp);	
     }
-  } else if (map->walk_cont() && Continuation::is_continuation_enterSpecial(*this)) {
-    assert (map->cont() != (oop)NULL, "");
-    map->set_cont(Continuation::continuation_parent(map->cont()));
   }
 
   intptr_t* unextended_sp = sender_sp;

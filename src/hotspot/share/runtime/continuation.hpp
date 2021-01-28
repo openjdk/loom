@@ -34,12 +34,11 @@
 
 // #define CONT_DOUBLE_NOP 1
 
-#define CONT_FULL_STACK (!UseContinuationLazyCopy)
-
 // The order of this struct matters as it's directly manipulated by assembly code (push/pop)
 
 class ContinuationEntry;
 
+// TODO: remove
 class Continuations : public AllStatic {
 private:
   static volatile intptr_t _exploded_miss;
@@ -55,13 +54,6 @@ public:
 
   static void print_statistics();
   static void init();
-
-  static void cleanup_keepalives();
-
-  static address default_freeze_oops_stub();
-  static address freeze_oops_slow();
-  static address default_thaw_oops_stub();
-  static address thaw_oops_slow();
 };
 
 void continuations_init();
@@ -80,8 +72,7 @@ public:
 
   static int freeze(JavaThread* thread, intptr_t* sp);
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
-  static intptr_t* thaw_leaf(JavaThread* thread, int kind);
-//static intptr_t* thaw(JavaThread* thread, int kind);
+  static intptr_t* thaw(JavaThread* thread, int kind);
   static int try_force_yield(JavaThread* thread, oop cont);
 
   static void notify_deopt(JavaThread* thread, intptr_t* sp);
@@ -90,7 +81,7 @@ public:
   static ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
   static bool is_mounted(JavaThread* thread, oop cont_scope);
   static bool is_continuation_enterSpecial(const frame& f);
-  static bool is_continuation_entry_frame(const frame& f, const RegisterMap* map);
+  static bool is_continuation_entry_frame(const frame& f, const RegisterMap *map);
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);
   static bool is_frame_in_continuation(ContinuationEntry* cont, const frame& f);
@@ -99,26 +90,17 @@ public:
   static address get_top_return_pc_post_barrier(JavaThread* thread, address pc);
 
   static frame top_frame(const frame& callee, RegisterMap* map);
-  static frame sender_for_interpreter_frame(const frame& callee, RegisterMap* map);
-  static frame sender_for_compiled_frame(const frame& callee, RegisterMap* map);
-  static int frame_size(const frame& f, const RegisterMap* map);
+  static frame continuation_parent_frame(RegisterMap* map);
 
-  static bool has_last_Java_frame(Handle continuation);
-  static frame last_frame(Handle continuation, RegisterMap *map);
+  static bool has_last_Java_frame(oop continuation);
+  static stackChunkOop last_nonempty_chunk(oop continuation);
+  static frame last_frame(oop continuation, RegisterMap *map);
   static javaVFrame* last_java_vframe(Handle continuation, RegisterMap *map);
 
   // access frame data
   static bool is_in_usable_stack(address addr, const RegisterMap* map);
-  static int usp_offset_to_index(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes);
-  static address usp_offset_to_location(const frame& fr, const RegisterMap* map, const int usp_offset_in_bytes, bool is_oop);
-  static address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg, bool is_oop);
 
-  static address interpreter_frame_expression_stack_at(const frame& fr, const RegisterMap* map, const InterpreterOopMap& oop_mask, int index);
-  static address interpreter_frame_local_at(const frame& fr, const RegisterMap* map, const InterpreterOopMap& oop_mask, int index);
-  static Method* interpreter_frame_method(const frame& fr, const RegisterMap* map);
-  static address interpreter_frame_bcp(const frame& fr, const RegisterMap* map);
-
-  static oop continuation_parent(oop cont);
+  static stackChunkOop continuation_parent_chunk(stackChunkOop chunk);
   static oop continuation_scope(oop cont);
   static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
 
@@ -129,8 +111,6 @@ public:
 #ifndef PRODUCT
   static void describe(FrameValues &values);
 #endif
-
-  static void nmethod_patched(nmethod* nm);
 
 private:
   // declared here as it's used in friend declarations
@@ -145,7 +125,6 @@ private:
 public:
   static bool debug_is_stack_chunk(Klass* klass);
   static bool debug_is_stack_chunk(oop obj);
-  static void debug_print_stack_chunk(oop obj);
   static bool debug_is_continuation(Klass* klass);
   static bool debug_is_continuation(oop obj);
   static bool debug_verify_continuation(oop cont);

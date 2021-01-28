@@ -2067,14 +2067,8 @@ const intx ObjectAlignmentInBytes = 8;
   develop(bool, LoomVerifyAfterThaw, false,                                 \
           "Verify stack after thaw")                                        \
                                                                             \
-  product(bool, UseContinuationLazyCopy, true,                              \
-          "Use lazy-copy in continuations")                                 \
-                                                                            \
   product(bool, UseContinuationStrong, true,                                \
           "The weak keepalive is considered strong on stack")               \
-                                                                            \
-  product(bool, UseContinuationChunks, true,                                \
-         "Fast younggen freeze/thaw")                                       \
                                                                             \
   product(bool, TrimContinuationChunksInGC, false,                          \
          "Trim stack chunks when copying objects in GC")                    \

@@ -33,19 +33,13 @@
  * @build sun.hotspot.WhiteBox
  * @run driver ClassFileInstaller sun.hotspot.WhiteBox
  *
- * @run main/othervm/timeout=300 -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
- * @run main/othervm/timeout=300 -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
- * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
- * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+ * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
  *
  */
 
-// * @run main/othervm/timeout=300 -XX:-UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
-// * @run main/othervm/timeout=300 -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
-// * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
-// * @run main/othervm/timeout=300 -XX:+UseContinuationLazyCopy -XX:+UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+// * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
 
-// * @run main/othervm/timeout=3000 -XX:StartFlightRecording=filename=test.jfr,settings=profile -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+// * @run main/othervm/timeout=3000 -XX:StartFlightRecording=filename=test.jfr,settings=profile -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
 
 // Anything excluded or not compileonly is not compiled; see CompilerOracle::should_exclude
 
@@ -177,12 +171,15 @@ public class Fuzz implements Runnable {
             .collect(Collectors.toList()).toArray(Op[]::new);
     }
 
-    static void testStream(Stream<Op[]> traces) { traces.forEach(Fuzz::testTrace); }
+    static int testCounter;
+
+    static void testStream(Stream<Op[]> traces) { testCounter = 0; traces.forEach(Fuzz::testTrace); }
 
     ////////////////////////////////////////
 
     static void testTrace(Op[] trace) {
-        System.out.println("\nCOMPILE_LEVEL: " + COMPILE_LEVEL + " COMPILE_RUN: " + COMPILE_RUN);
+        testCounter++;
+        System.out.println("\n" + testCounter + ": COMPILE_LEVEL: " + COMPILE_LEVEL + " COMPILE_RUN: " + COMPILE_RUN);
         for (int attempt = 0; attempt < 3; attempt++) {
             if (attempt > 0) System.out.println("RETRYING " + attempt);
 

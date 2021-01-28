@@ -116,10 +116,8 @@
   // use sp() to mean "raw" sp and unextended_sp() to mean the caller's
   // original sp.
 
-  union {
-    intptr_t* _unextended_sp;
-    size_t _frame_index; // used by frames in continuation chunks
-  };
+  intptr_t* _unextended_sp;
+
   void adjust_unextended_sp() NOT_DEBUG_RETURN;
 
   intptr_t* ptr_at_addr(int offset) const {
@@ -146,8 +144,6 @@
 
   frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool dummy); // used for fast frame construction by continuations
 
-  frame(int sp, int ref_sp, intptr_t fp, address pc, CodeBlob* cb, bool deopt); // for continuation frames
-
   frame(intptr_t* sp, intptr_t* fp);
 
   void init(intptr_t* sp, intptr_t* fp, address pc);
@@ -155,13 +151,15 @@
 
   // accessors for the instance variables
   // Note: not necessarily the real 'frame pointer' (see real_fp)
-  intptr_t*   fp() const { return _fp; }
-  intptr_t**  fp_addr() { return &_fp; } // for use in continuations freezing / thawing
+  intptr_t* fp() const { return _fp; }
   void set_fp(intptr_t* newfp) { _fp = newfp; }
+  int offset_fp() const { return (int)(intptr_t)_fp; }
+  void set_offset_fp(int value) { _fp = (intptr_t*)(intptr_t)value; }
 
   inline address* sender_pc_addr() const;
 
   // expression stack tos if we are nested in a java call
+  template <bool relative = false>
   intptr_t* interpreter_frame_last_sp() const;
 
   // helper to update a map with callee-saved RBP

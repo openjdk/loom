@@ -1262,7 +1262,6 @@ JRT_ENTRY(void, Runtime1::patch_code(JavaThread* thread, Runtime1::StubID stub_i
 
     // Since we've patched some oops in the nmethod,
     // (re)register it with the heap.
-    Continuation::nmethod_patched(nm);
     Universe::heap()->register_nmethod(nm);
   }
 JRT_END

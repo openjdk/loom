@@ -60,11 +60,13 @@ public:
   virtual int     bci()=0;
   virtual oop     cont()=0; // returns the current continuation (even when walking a thread)
 
+  virtual const RegisterMap* reg_map()=0;
+
   virtual void    fill_frame(int index, objArrayHandle  frames_array,
                              const methodHandle& method, TRAPS)=0;
   
-  Handle continuation() { return _continuation; }
-  virtual void set_continuation(Handle cont);
+  oop continuation() { return _continuation(); }
+  void set_continuation(Handle cont);
 
   void setup_magic_on_entry(objArrayHandle frames_array);
   bool check_magic(objArrayHandle frames_array);
@@ -89,17 +91,17 @@ private:
 public:
   JavaFrameStream(JavaThread* thread, int mode, Handle cont_scope, Handle cont);
 
-  void next();
-  bool at_end()    { return _vfst.at_end(); }
+  const RegisterMap* reg_map() override { return _vfst.reg_map(); };
 
-  Method* method() { return _vfst.method(); }
-  int bci()        { return _vfst.bci(); }
-  oop cont()       { return _vfst.continuation(); }
+  void next()   override;
+  bool at_end() override { return _vfst.at_end(); }
+
+  Method* method() override { return _vfst.method(); }
+  int bci()        override { return _vfst.bci(); }
+  oop cont()       override { return _vfst.continuation(); }
 
   void fill_frame(int index, objArrayHandle  frames_array,
-                  const methodHandle& method, TRAPS);
-
-  void set_continuation(Handle cont);
+                  const methodHandle& method, TRAPS) override;
 };
 
 class LiveFrameStream : public BaseFrameStream {
@@ -109,11 +111,11 @@ private:
     MODE_COMPILED    = 0x02
   };
 
-  Handle                _cont_scope;  // the delimitation of this walk
+  Handle              _cont_scope;  // the delimitation of this walk
 
-  RegisterMap*          _map;
-  javaVFrame*           _jvf;
-  Handle                _cont; // the current continuation
+  RegisterMap*        _map;
+  javaVFrame*         _jvf;
+  ContinuationEntry* _cont;
 
   void fill_live_stackframe(Handle stackFrame, const methodHandle& method, TRAPS);
   static oop create_primitive_slot_instance(StackValueCollection* values,
@@ -124,17 +126,17 @@ private:
 public:
   LiveFrameStream(JavaThread* thread, RegisterMap* rm, Handle cont_scope, Handle cont);
 
-  void next();
-  bool at_end()    { return _jvf == NULL; }
+  const RegisterMap* reg_map() override { return _map; };
 
-  Method* method() { return _jvf->method(); }
-  int bci()        { return _jvf->bci(); }
-  oop cont()       { return _jvf->continuation(); }
+  void next()   override;
+  bool at_end() override { return _jvf == NULL; }
+
+  Method* method() override { return _jvf->method(); }
+  int bci()        override { return _jvf->bci(); }
+  oop cont() override { return continuation() != NULL ? continuation(): _cont->cont_oop(); }
 
   void fill_frame(int index, objArrayHandle  frames_array,
-                  const methodHandle& method, TRAPS);
-
-  void set_continuation(Handle cont);
+                  const methodHandle& method, TRAPS) override;
 };
 
 class StackWalk : public AllStatic {

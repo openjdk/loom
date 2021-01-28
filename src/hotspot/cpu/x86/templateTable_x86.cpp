@@ -2624,8 +2624,11 @@ void TemplateTable::_return(TosState state) {
 #endif
     __ jcc(Assembler::zero, no_safepoint);
     __ push(state);
+    __ push_cont_fastpath(NOT_LP64(thread) LP64_ONLY(r15_thread));
     __ call_VM(noreg, CAST_FROM_FN_PTR(address,
                                        InterpreterRuntime::at_safepoint));
+    NOT_LP64(__ get_thread(thread);)
+    __ pop_cont_fastpath(NOT_LP64(thread) LP64_ONLY(r15_thread));
     __ pop(state);
     __ bind(no_safepoint);
   }

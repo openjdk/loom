@@ -109,15 +109,6 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
     }
 #endif
     case Location::oop: {
-      if (in_cont && UseCompressedOops) {
-        narrowOop noop = *(narrowOop*) value_addr;
-        oop val = CompressedOops::decode(noop);
-        // TODO: Erik: remove after integration with concurrent stack scanning
-        val = NativeAccess<>::oop_load(&val);
-        Handle h(Thread::current(), val);
-        return new StackValue(h);
-      }
-
       oop val = *(oop *)value_addr;
 #ifdef _LP64
       if (CompressedOops::is_base(val)) {
@@ -131,7 +122,7 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
       // Deoptimization must make sure all oops have passed load barriers
       // TODO: Erik: remove after integration with concurrent stack scanning
       val = NativeAccess<>::oop_load(&val);
-      assert(oopDesc::is_oop_or_null(val, false), "bad oop found");
+      assert(oopDesc::is_oop_or_null(val), "bad oop found at " INTPTR_FORMAT, p2i(value_addr));
       Handle h(Thread::current(), val); // Wrap a handle around the oop
       return new StackValue(h);
     }

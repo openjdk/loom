@@ -651,8 +651,7 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
     jvf = vfs.at_end() ? NULL : vfs.asJavaVFrame();
     jvf = check_and_skip_hidden_frames(java_thread, jvf);
   } else {
-    Handle cont_h(cur_thread, cont);
-    vframeStream vfs(cont_h);
+    vframeStream vfs(cont);
     jvf = vfs.at_end() ? NULL : vfs.asJavaVFrame();
   }
   return jvf;

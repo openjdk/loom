@@ -24,31 +24,27 @@
 /**
  * @test
  * @requires vm.debug != true
- * @run main/othervm -XX:-UseContinuationChunks YieldALot
- * @run main/othervm -XX:+UseContinuationChunks YieldALot
+ * @run main/othervm YieldALot
  * @summary Stress test Thread.yield
  */
 
 /**
  * @test
  * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal YieldALot
- * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal YieldALot
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal YieldALot
  */
 
 
 /**
  * @test
  * @requires vm.debug == true
- * @run main/othervm/timeout=360 -XX:-UseContinuationChunks YieldALot 200000
- * @run main/othervm/timeout=360 -XX:+UseContinuationChunks YieldALot 200000
+ * @run main/othervm/timeout=360 YieldALot 200000
  */
 
 /**
  * @test
  * @requires vm.debug == true & vm.graal.enabled
- * @run main/othervm/timeout=360 -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal YieldALot 200000
- * @run main/othervm/timeout=360 -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal YieldALot 200000
+ * @run main/othervm/timeout=360 -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal YieldALot 200000
  */
 
 import java.time.Duration;

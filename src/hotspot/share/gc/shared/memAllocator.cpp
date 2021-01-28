@@ -433,6 +433,9 @@ oop ClassAllocator::initialize(HeapWord* mem) const {
 }
 
 oop StackChunkAllocator::initialize(HeapWord* mem) const {
+  // const size_t hs = oopDesc::header_size();
+  // Copy::fill_to_aligned_words(mem + hs, vmClasses::StackChunk_klass()->size_helper() - hs);
+
   assert(_stack_size > 0, "");
   assert(_word_size > (size_t)_stack_size, "");
   jdk_internal_misc_StackChunk::set_size(mem, _stack_size);

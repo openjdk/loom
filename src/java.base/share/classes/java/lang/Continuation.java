@@ -25,6 +25,7 @@
 
 package java.lang;
 
+import jdk.internal.misc.StackChunk;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import sun.security.action.GetPropertyAction;
@@ -43,15 +44,16 @@ import java.util.function.Supplier;
  * TBD
  */
 public class Continuation {
+    static {
+        StackChunk.init(); // ensure StackChunk class is initialized
+    }
+
     // private static final WhiteBox WB = sun.hotspot.WhiteBox.WhiteBox.getWhiteBox();
     private static final jdk.internal.misc.Unsafe unsafe = jdk.internal.misc.Unsafe.getUnsafe();
 
     private static final boolean TRACE = isEmptyOrTrue("java.lang.Continuation.trace");
     private static final boolean DEBUG = TRACE | isEmptyOrTrue("java.lang.Continuation.debug");
 
-    private static final byte FLAG_LAST_FRAME_INTERPRETED = 1;
-    private static final byte FLAG_SAFEPOINT_YIELD = 1 << 1;
-    private static final int WATERMARK_THRESHOLD = 10;
     private static final VarHandle MOUNTED;
 
     /** Reason for pinning */
@@ -93,9 +95,9 @@ public class Continuation {
 
     private static Pinned pinnedReason(int reason) {
         switch (reason) {
-            case 1: return Pinned.CRITICAL_SECTION;
-            case 2: return Pinned.NATIVE;
-            case 3: return Pinned.MONITOR;
+            case 2: return Pinned.CRITICAL_SECTION;
+            case 3: return Pinned.NATIVE;
+            case 4: return Pinned.MONITOR;
             default:
                 throw new AssertionError("Unknown pinned reason: " + reason);
         }
@@ -126,33 +128,16 @@ public class Continuation {
     private Continuation parent; // null for native stack
     private Continuation child; // non-null when we're yielded in a child continuation
 
-    private jdk.internal.misc.StackChunk tail;
+    private StackChunk tail;
 
-    // The content of the stack arrays is extremely security-sensitive. Writing can lead to arbitrary code execution, and reading can leak sensitive data
-    private int[] stack = null; // grows down
-    private Object[] refStack = null;
-
-    private long fp = 0; // an index into the h-stack if the top frame is interpreted, otherwise, the value of rbp
-    private int sp = -1; // index into the h-stack
-    private long pc = 0;
-    private int refSP;
-    private int maxSize; // maximal stack size when unpacked
-    private byte flags;
     private boolean done;
     private volatile boolean mounted = false;
     private Object yieldInfo;
+    private boolean preempted;
 
     private short cs; // critical section semaphore
 
     private boolean reset = false; // perftest only
-
-    // monitoring
-    private short numFrames;
-    private short numInterpretedFrames;
-
-    private byte sizeCounter;
-    private int stackWatermark;
-    private int refStackWatermark;
 
     private Object[] scopeLocalCache;
 
@@ -167,17 +152,6 @@ public class Continuation {
     public Continuation(ContinuationScope scope, Runnable target) {
         this.scope = scope;
         this.target = target;
-    }
-
-    /**
-     * TBD
-     * @param scope TBD
-     * @param target TBD
-     * @param stackSize in bytes
-     */
-    public Continuation(ContinuationScope scope, int stackSize, Runnable target) {
-        this(scope, target);
-        getStacks(stackSize, stackSize, stackSize / 8);
     }
 
     @Override
@@ -319,10 +293,6 @@ public class Continuation {
                 this.parent = t.getContinuation();
             t.setContinuation(this);
 
-            int origRefSP = refSP;
-
-            int origSP = sp, origMaxSize = maxSize; long origFP = fp, origPC = pc; // perftest only (used only if reset is true)
-
             try {
                 if (!isStarted()) { // is this the first run? (at this point we know !done)
                     if (TRACE) System.out.println("ENTERING " + id());
@@ -335,20 +305,20 @@ public class Continuation {
                 }
             } finally {
                 fence();
+                StackChunk c = tail;
+
                 try {
-                if (TRACE) System.out.println("run (after) sp: " + sp + " refSP: " + refSP + " maxSize: " + maxSize);
+                if (TRACE) System.out.println("run (after): preemted: " + preempted);
 
                 assert isEmpty() == done : "empty: " + isEmpty() + " done: " + done + " cont: " + Integer.toHexString(System.identityHashCode(this));
                 currentCarrierThread().setContinuation(this.parent);
                 if (parent != null)
                     parent.child = null;
 
-                if (reset) { maxSize = origMaxSize; sp = origSP; fp = origFP; pc = origPC; refSP = origRefSP; } // perftest only
-                postYieldCleanup(origRefSP);
+                postYieldCleanup();
 
                 unmount();
                 } catch (Throwable e) { e.printStackTrace(); System.exit(1); }
-                assert !hasLeak() : "hasLeak1 " + "refSP: " + refSP + " refStack: " + Arrays.toString(refStack);
             }
             // we're now in the parent continuation
 
@@ -365,20 +335,26 @@ public class Continuation {
         }
     }
 
+    private void postYieldCleanup() {
+        if (done) {
+            this.tail = null;
+        }
+    }
+
+    private void finish() {
+        done = true;
+        // assert doneX;
+        // System.out.println("-- done!  " + id());
+        if (TRACE) System.out.println(">>>>>>>> DONE <<<<<<<<<<<<< " + id());
+        assert isEmpty();
+    }
+
     @IntrinsicCandidate
     private static int doYield(int scopes) { throw new Error("Intrinsic not installed"); };
 
     @IntrinsicCandidate
     private native static void enterSpecial(Continuation c, boolean isContinue);
 
-    private void finish() {
-      done = true;
-      assert reset || fence() && isStackEmpty() : "sp: " + sp + " stack.length: " + (stack != null ? stack.length : "null");
-      // assert doneX;
-      // System.out.println("-- done!  " + id());
-      if (TRACE) System.out.println(">>>>>>>> DONE <<<<<<<<<<<<< " + id());
-      assert isEmpty();
-    }
 
     @DontInline
     @IntrinsicCandidate
@@ -397,20 +373,15 @@ public class Continuation {
     }
 
     private boolean isStarted() {
-        return tail != null || (stack != null && sp < stack.length);
+        return tail != null;
     }
 
     private boolean isEmpty() {
-        if (pc != 0) return false;
-        for (jdk.internal.misc.StackChunk c = tail; c != null; c = c.parent) {
-            if (!isEmpty(c))
+        for (StackChunk c = tail; c != null; c = c.parent()) {
+            if (!c.isEmpty())
                 return false;
         }
         return true;
-    }
-
-    private boolean isEmpty(jdk.internal.misc.StackChunk c) {
-        return c.sp >= c.size;
     }
 
     /**
@@ -433,6 +404,9 @@ public class Continuation {
 
     private boolean yield0(ContinuationScope scope, Continuation child) {
         if (TRACE) System.out.println(this + " yielding on scope " + scope + ". child: " + child);
+
+        preempted = false;
+
         if (scope != this.scope)
             this.yieldInfo = scope;
         int res = doYield(0);
@@ -470,26 +444,11 @@ public class Continuation {
             if (TRACE) System.out.println(this + " res: " + res);
         }
         assert yieldInfo == null;
-        assert reset || !hasLeak() : "hasLeak2 " + "refSP: " + refSP + " refStack: " + Arrays.toString(refStack);
 
         return res == 0;
         } catch (Throwable t) {
             t.printStackTrace();
             throw t;
-        }
-    }
-
-    private void postYieldCleanup(int origRefSP) {
-        if (done) {
-            // TODO: The following are disabled just for some testing
-            // this.stack = null;
-            // this.sp = -1;
-            // this.refStack = null;
-            // this.refSP = -1;
-            this.tail = null;
-        } else {
-            if (TRACE && origRefSP < refSP) System.out.println("Nulling refs " + origRefSP + " (inclusive) - " + refSP + " (exclusive)");
-            maybeShrink();
         }
     }
 
@@ -529,11 +488,7 @@ public class Continuation {
      * @return TBD
      */
     public boolean isPreempted() {
-        return isFlag(FLAG_SAFEPOINT_YIELD);
-    }
-
-    private boolean isFlag(byte flag) {
-        return (flags & flag) != 0;
+        return preempted;
     }
 
     /**
@@ -597,180 +552,12 @@ public class Continuation {
     //     this.doneX = true;
     // }
 
-    private long readLong(int[] array, int index) {
-        return (long)array[index] << 32 + array[index+1];
-    }
-
-    private void getStacks(int size, int oops, int frames) {
-        try {
-            boolean allocated = false;
-            allocated |= getStack(size);
-            allocated |= getRefStack(oops);
-            assert allocated : "getStacks called for no good reason";
-        } catch (Throwable t) {
-            t.printStackTrace();
-            throw t;
-        }
-    }
-
-    // size is the size in bytes needed for newly frozen frames
-    private boolean getStack(int size) {
-        size = size >> 2;
-        if (DEBUG)
-            System.out.println("-- getStack size: " + size + " cur: " + (stack != null ? stack.length : 0) + " sp: " + sp);
-
-        if (this.stack == null) {
-            this.stack = new int[size];
-            this.sp = stack.length;
-            if (DEBUG)
-                System.out.println("-- getStack: allocated: " + stack.length + " sp: " + sp );
-        } else {
-            int oldLength = stack.length;
-            int offset = sp >= 0 ? sp : oldLength;
-            int minLength = (oldLength - offset) + size;
-            if (minLength > oldLength) {
-                int newLength = newCapacity(oldLength, minLength);
-                int[] newStack = new int[newLength];
-                int n = oldLength - offset;
-                if (n > 0)
-                    System.arraycopy(stack, offset, newStack, newLength - n, n);
-                this.stack = newStack;
-                // we need to preserve the same offset from the array's _end_
-                this.sp = fixDecreasingIndexAfterResize(sp, oldLength, newLength);
-                if (isFlag(FLAG_LAST_FRAME_INTERPRETED)) {
-                    if (DEBUG) System.out.println("-- getStack CHANGING FP");
-                    this.fp = fixDecreasingIndexAfterResize((int) fp, oldLength, newLength);
-                }
-                if (DEBUG)
-                    System.out.println("-- getStack: allocated: " + newLength + " old: " + oldLength + " sp: " + sp + " fp: " + fp);
-            } else
-                return false;
-        }
-        if (TRACE) System.out.println("--- end of getStack sp: " + sp);
-
-        return true;
-    }
-
-    private boolean getRefStack(int size) {
-        if (DEBUG)
-            System.out.println("-- getRefStack: " + size);
-        if (refStack == null) {
-            this.refStack = new Object[size]; // TODO: nearest power of 2
-            this.refSP = refStack.length;
-            if (DEBUG)
-                System.out.println("-- getRefStack: allocated: " + refStack.length + " refSP: " + refSP);
-        } else if (refSP < size) {
-            int oldLength = refStack.length;
-            int newLength = newCapacity(oldLength, (oldLength - refSP) + size);
-            Object[] newRefStack = new Object[newLength];
-            int n = oldLength - refSP;
-            System.arraycopy(refStack, refSP, newRefStack, newLength - n, n);
-            this.refStack = newRefStack;
-            this.refSP = fixDecreasingIndexAfterResize(refSP, oldLength, newLength);
-            if (DEBUG)
-                System.out.println("-- getRefStack: allocated: " + newLength + " old: " + oldLength + " refSP: " + refSP);
-        } else
-            return false;
-        if (TRACE) System.out.println("--- end of getRefStack: " + refStack.length + " refSP: " + refSP);
-        
-        return true;
-    }
-
-    void maybeShrink() {
-        if (stack == null || refStack == null)
-            return;
-
-        int stackSize = stack.length - sp;
-        int refStackSize = refStack.length - refSP;
-        assert sp >= 0;
-        assert stackSize >= 0;
-
-        if (stackSize > stackWatermark || refStackSize > refStackWatermark) {
-            this.stackWatermark    = Math.max(stackWatermark,    stackSize);
-            this.refStackWatermark = Math.max(refStackWatermark, refStackSize);
-            this.sizeCounter = 0;
-            return;
-        }
-
-        sizeCounter++;
-
-        if (sizeCounter >= WATERMARK_THRESHOLD) {
-            if (stackWatermark < stack.length) resizeStack(stackWatermark);
-            this.stackWatermark = 0;
-
-            if (refStackWatermark < refStack.length) resizeRefStack(refStackWatermark);
-            this.refStackWatermark = 0;
-        }
-    }
-
-    void resizeStack(int newLength) {
-        int oldLength = stack.length;
-        int offset = sp;
-        int n = oldLength - offset;
-        assert newLength >= n;
-        if (DEBUG)
-            System.out.println("-- resizeStack0 length: " + stack.length + " sp: " + sp + " newLength: " + newLength + " used: " + n);
-        int[] newStack = new int[newLength];
-        System.arraycopy(stack, offset, newStack, newLength - n, n);
-        this.stack = newStack;
-
-        this.sp = fixDecreasingIndexAfterResize(sp, oldLength, newLength);
-        if (isFlag(FLAG_LAST_FRAME_INTERPRETED)) {
-            if (DEBUG) System.out.println("-- resizeStack CHANGING FP");
-            this.fp = fixDecreasingIndexAfterResize((int) fp, oldLength, newLength);
-        }
-        if (DEBUG)
-            System.out.println("-- resizeStack1 length: " + stack.length + " sp: " + sp + " fp: " + fp);
-    }
-
-    void resizeRefStack(int newLength) {
-        if (DEBUG)
-            System.out.println("-- resizeRefStack0 length: " + refStack.length + " refSP: " + refSP + " newLength: " + newLength);
-        int oldLength = refStack.length;
-        int n = oldLength - refSP;
-        assert newLength >= n;
-        Object[] newRefStack = new Object[newLength];
-        System.arraycopy(refStack, refSP, newRefStack, newLength - n, n);
-        this.refStack = newRefStack;
-
-        this.refSP = fixDecreasingIndexAfterResize(refSP, oldLength, newLength);
-        if (DEBUG)
-            System.out.println("-- resizeRefStack1 length: " + refStack.length + " refSP: " + refSP);
-    }
-
-    private int fixDecreasingIndexAfterResize(int index, int oldLength, int newLength) {
-        return newLength - (oldLength - index);
-    }
-
-    private int newCapacity(int oldCapacity, int minCapacity) {
-        // overflow-conscious code
-        int newCapacity = oldCapacity + (oldCapacity >> 1);
-        if (newCapacity - minCapacity <= 0) {
-            if (minCapacity < 0) // overflow
-                throw new OutOfMemoryError();
-            return minCapacity;
-        }
-        return newCapacity;
-    }
 
     /**
      * temporary testing
      */
     public void something_something_1() {
-        this.sp = stack.length;
-        this.refSP = refStack.length;
         this.done = false;
-        this.flags = 0;
-
-        this.fp = 0;
-        this.pc = 0;
-
-        this.numFrames = 0;
-        this.numInterpretedFrames = 0;
-    
-        this.sizeCounter = 0;
-        this.stackWatermark = 0;
-        this.refStackWatermark = 0;
 
         setMounted(false);
     }
@@ -810,38 +597,6 @@ public class Continuation {
 
     private void processNmethods(int before, int after) {
 
-    }
-
-    /**
-     * TBD
-     * @return TBD
-     */
-    public int getNumFrames() {
-        return numFrames;
-    }
-
-    /**
-     * TBD
-     * @return TBD
-     */
-    public int getNumInterpretedFrames() {
-        return numInterpretedFrames;
-    }
-
-    /**
-     * TBD
-     * @return TBD
-     */
-    public int getStackUsageInBytes() {
-        return (stack != null ? stack.length - sp + 1 : 0) * 4;
-    }
-
-    /**
-     * TBD
-     * @return TBD
-     */
-    public int getNumRefs() {
-        return (refStack != null ? refStack.length - refSP : 0);
     }
 
     private boolean compareAndSetMounted(boolean expectedValue, boolean newValue) {
@@ -884,26 +639,13 @@ public class Continuation {
     // native methods
     private static native void registerNatives();
 
-    private boolean hasLeak() {
-        assert refStack != null || refSP <= 0 : "refSP: " + refSP;
-        for (int i = 0; i < refSP; i++) {
-            if (refStack[i] != null)
-                return true;
-        }
-        return false;
-    }
-
-    private boolean isStackEmpty() {
-        return (stack == null) || (sp < 0) || (sp >= stack.length);
-    }
-
     private void dump() {
         System.out.println("Continuation@" + Long.toHexString(System.identityHashCode(this)));
         System.out.println("\tparent: " + parent);
-        System.out.println("\tstack.length: " + stack.length);
-        for (int i = 1; i <= 10; i++) {
-            int j = stack.length - i;
-            System.out.println("\tarray[ " + j + "] = " + stack[j]);
+        int i = 0;
+        for (StackChunk c = tail; c != null; c = c.parent()) {
+            System.out.println("\tChunk " + i);
+            System.out.println(c);
         }
     }
 

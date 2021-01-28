@@ -824,8 +824,7 @@ javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
       jvf = JvmtiEnvBase::check_and_skip_hidden_frames(java_thread, jvf);
     }
   } else {
-    Handle cont_h(cur_thread, cont);
-    vframeStream vfs(cont_h);
+    vframeStream vfs(cont);
 
     if (!vfs.at_end()) {
       jvf = vfs.asJavaVFrame();

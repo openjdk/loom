@@ -25,7 +25,7 @@
  * @test
  * @summary Verifies that MethodExit events are delivered on both carrier and virtual threads.
  * @compile MethodExitTest.java
- * @run main/othervm/native -XX:+UseContinuationLazyCopy -agentlib:MethodExitTest -Djdk.defaultScheduler.parallelism=2 MethodExitTest 150
+ * @run main/othervm/native -agentlib:MethodExitTest -Djdk.defaultScheduler.parallelism=2 MethodExitTest 150
  */
 
 import java.util.concurrent.*;

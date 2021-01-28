@@ -25,10 +25,10 @@
  * @test
  * @summary Verifies that single stepping into Continuation.doContinue() properly completes in yield0().
  * @compile DoContinueSingleStepTest.java
- * @run main/othervm/native -XX:+UseContinuationLazyCopy -agentlib:DoContinueSingleStepTest -Djdk.defaultScheduler.parallelism=1 DoContinueSingleStepTest 150
- * @run main/othervm/native -XX:+UseContinuationLazyCopy -agentlib:DoContinueSingleStepTest -Djdk.defaultScheduler.parallelism=1 DoContinueSingleStepTest 500
- * @run main/othervm/native -XX:+UseContinuationLazyCopy -agentlib:DoContinueSingleStepTest -Djdk.defaultScheduler.parallelism=2 DoContinueSingleStepTest 150
- * @run main/othervm/native -XX:+UseContinuationLazyCopy -agentlib:DoContinueSingleStepTest -Djdk.defaultScheduler.parallelism=2 DoContinueSingleStepTest 500
+ * @run main/othervm/native -agentlib:DoContinueSingleStepTest -Djdk.defaultScheduler.parallelism=1 DoContinueSingleStepTest 150
+ * @run main/othervm/native -agentlib:DoContinueSingleStepTest -Djdk.defaultScheduler.parallelism=1 DoContinueSingleStepTest 500
+ * @run main/othervm/native -agentlib:DoContinueSingleStepTest -Djdk.defaultScheduler.parallelism=2 DoContinueSingleStepTest 150
+ * @run main/othervm/native -agentlib:DoContinueSingleStepTest -Djdk.defaultScheduler.parallelism=2 DoContinueSingleStepTest 500
  */
 
 import java.util.concurrent.*;
