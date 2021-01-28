@@ -101,7 +101,7 @@ class ThreadExecutor implements ExecutorService {
             }
         }
 
-        this.factory = Objects.requireNonNull(factory);
+        this.factory = factory;
         this.timerTask = timer;
         if (shared) {
             this.owner = null;
