@@ -30,7 +30,7 @@ import java.io.IOException;
  * WSAPoll based PollerProvider.
  */
 class WSAPollPollerProvider extends PollerProvider {
-    WSAPollPollerProvider() { }
+    public WSAPollPollerProvider() { }
 
     @Override
     Poller readPoller() throws IOException {
