@@ -1452,8 +1452,9 @@ eventFilter_dumpHandlerFilters(HandlerNode *node)
     for (i = 0; i < FILTER_COUNT(node); ++i, ++filter) {
         switch (filter->modifier) {
             case JDWP_REQUEST_MODIFIER(ThreadOnly):
-                tty_message("ThreadOnly: thread(%p)",
-                            filter->u.ThreadOnly.thread);
+                tty_message("ThreadOnly: thread(%p) isVThread(%d)",
+                            filter->u.ThreadOnly.thread,
+                            isVThread(filter->u.ThreadOnly.thread));
                 break;
             case JDWP_REQUEST_MODIFIER(ClassOnly): {
                 char *class_name;
@@ -1508,14 +1509,18 @@ eventFilter_dumpHandlerFilters(HandlerNode *node)
                             filter->u.ClassExclude.classPattern);
                 break;
             case JDWP_REQUEST_MODIFIER(Step):
-                tty_message("Step: size(%d) depth(%d) thread(%p)",
+                tty_message("Step: size(%d) depth(%d) thread(%p) isVThread(%d)",
                             filter->u.Step.size,
                             filter->u.Step.depth,
-                            filter->u.Step.thread);
+                            filter->u.Step.thread,
+                            isVThread(filter->u.Step.thread));
                 break;
             case JDWP_REQUEST_MODIFIER(SourceNameMatch):
                 tty_message("SourceNameMatch: sourceNamePattern(%s)",
                             filter->u.SourceNameOnly.sourceNamePattern);
+                break;
+            case JDWP_REQUEST_MODIFIER(VirtualThreadsExclude):
+                tty_message("VirtualThreadsExclude: enabled");
                 break;
             default:
                 EXIT_ERROR(AGENT_ERROR_ILLEGAL_ARGUMENT, "Invalid filter modifier");

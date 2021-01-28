@@ -2870,6 +2870,8 @@ threadControl_dumpAllThreads()
 {
     tty_message("Dumping runningThreads:\n");
     dumpThreadList(&runningThreads);
+    tty_message("Dumping runningVThreads:\n");
+    dumpThreadList(&runningVThreads);
     tty_message("Dumping otherThreads:\n");
     dumpThreadList(&otherThreads);
 }
