@@ -30,7 +30,7 @@
 /**
  * @test
  * @requires (os.family == "windows")
- * @run testng/othervm/timeout=300 -Djdk.pollProvider=sun.nio.ch.WSAPollPollerProvider NetSockets
+ * @run testng/othervm/timeout=300 -Djdk.PollerProvider=sun.nio.ch.WSAPollPollerProvider NetSockets
  */
 
 import java.io.Closeable;

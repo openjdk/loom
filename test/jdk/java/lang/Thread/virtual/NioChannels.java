@@ -30,7 +30,7 @@
 /**
  * @test
  * @requires (os.family == "windows")
- * @run testng/othervm/timeout=300 -Djdk.pollProvider=sun.nio.ch.WSAPollPollerProvider NioChannels
+ * @run testng/othervm/timeout=300 -Djdk.PollerProvider=sun.nio.ch.WSAPollPollerProvider NioChannels
  */
 
 import java.io.Closeable;
