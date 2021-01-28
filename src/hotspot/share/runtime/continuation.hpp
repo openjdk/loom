@@ -25,6 +25,7 @@
 #ifndef SHARE_VM_RUNTIME_CONTINUATION_HPP
 #define SHARE_VM_RUNTIME_CONTINUATION_HPP
 
+#include "oops/access.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "memory/iterator.hpp"
 #include "runtime/frame.hpp"

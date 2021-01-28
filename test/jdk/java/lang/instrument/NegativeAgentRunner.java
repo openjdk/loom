@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,9 +21,27 @@
  * questions.
  */
 
-/*
- * @test TestHeapDumpOnOutOfMemoryErrorInMetaspace
- * @summary Test verifies that -XX:HeapDumpOnOutOfMemoryError dump heap when OutOfMemory is thrown in metaspace
- * @library /test/lib
- * @run driver/timeout=240 TestHeapDumpOnOutOfMemoryError run metaspace
- */
+package jdk.java.lang.instrument;
+
+import java.lang.RuntimeException;
+import jdk.test.lib.process.ProcessTools;
+import jdk.test.lib.process.OutputAnalyzer;
+
+public class NegativeAgentRunner {
+
+    public static void main(String argv[]) throws Exception {
+        if (argv.length != 2) {
+            throw new RuntimeException("Agent and exception class names are expected in arguments");
+        }
+        String agentClassName = argv[0];
+        String excepClassName = argv[1];
+        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(
+                "-javaagent:" + agentClassName + ".jar",
+                agentClassName);
+        OutputAnalyzer output = new OutputAnalyzer(pb.start());
+        output.shouldContain(excepClassName);
+        if (0 == output.getExitValue()) {
+            throw new RuntimeException("Expected error but got exit value 0");
+        }
+    }
+}

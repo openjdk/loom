@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,22 +23,23 @@
  * questions.
  */
 
-package com.sun.java.swing.plaf.windows;
+#import "StaticTextAccessibility.h"
 
-import javax.swing.AbstractButton;
-import javax.swing.plaf.basic.BasicButtonListener;
+@implementation StaticTextAccessibility
 
-/**
- * Button Listener.
- *
- * @author Rich Schiavi
- */
-public class WindowsButtonListener extends BasicButtonListener {
-    public WindowsButtonListener(AbstractButton b) {
-        super(b);
-    }
-    /*
-     This class is currently not used, but exists in case customers
-     were subclassing it.
-     */
+- (nullable NSString *)accessibilityAttributedString:(NSRange)range
+{
+    return [self accessibilityStringForRangeAttribute:range];
 }
+
+- (nullable NSString *)accessibilityValue
+{
+    return [self accessibilityValueAttribute];
+}
+
+- (NSRange)accessibilityVisibleCharacterRange
+{
+    return [self accessibilityVisibleCharacterRangeAttribute];
+}
+
+@end
