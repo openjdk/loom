@@ -937,17 +937,18 @@ class VirtualThread extends Thread {
         };
         PrivilegedAction<Executor> pa = () -> {
             int parallelism, maxPoolSize;
-            String propValue = System.getProperty("jdk.defaultScheduler.parallelism");
-            if (propValue != null) {
-                parallelism = Integer.parseInt(propValue);
+            String parallelismValue = System.getProperty("jdk.defaultScheduler.parallelism");
+            String maxPoolSizeValue = System.getProperty("jdk.defaultScheduler.maxPoolSize");
+            if (parallelismValue != null) {
+                parallelism = Integer.parseInt(parallelismValue);
             } else {
                 parallelism = Runtime.getRuntime().availableProcessors();
             }
-            propValue = System.getProperty("jdk.defaultScheduler.maxPoolSize");
-            if (propValue != null) {
-                maxPoolSize = Integer.max(parallelism, Integer.parseInt(propValue));
+            if (maxPoolSizeValue != null) {
+                maxPoolSize = Integer.parseInt(maxPoolSizeValue);
+                parallelism = Integer.min(parallelism, maxPoolSize);
             } else {
-                maxPoolSize = Integer.max(parallelism << 1, 128);
+                maxPoolSize = Integer.max(parallelism, 256);
             }
             Thread.UncaughtExceptionHandler handler = (t, e) -> { };
             boolean asyncMode = true; // FIFO
