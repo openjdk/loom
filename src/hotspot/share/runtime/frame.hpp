@@ -25,6 +25,7 @@
 #ifndef SHARE_RUNTIME_FRAME_HPP
 #define SHARE_RUNTIME_FRAME_HPP
 
+#include "compiler/oopMap.hpp"
 #include "runtime/basicLock.hpp"
 #include "runtime/monitorChunk.hpp"
 #include "runtime/registerMap.hpp"
@@ -37,12 +38,14 @@
 typedef class BytecodeInterpreter* interpreterState;
 
 class CodeBlob;
+class CodeBlobLookup;
 class CompiledMethod;
 class FrameValues;
 class vframeArray;
 class JavaCallWrapper;
 class Method;
 class methodHandle;
+class InterpreterOopMap;
 
 enum class DerivedPointerIterationMode {
   _with_table,
