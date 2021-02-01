@@ -143,22 +143,7 @@ class VirtualThread extends Thread {
         }
 
         this.scheduler = scheduler;
-        this.cont = new Continuation(VTHREAD_SCOPE, target) {
-            @Override
-            protected void onPinned(Continuation.Pinned reason) {
-                if (TRACE_PINNING_MODE > 0) {
-                    boolean printAll = (TRACE_PINNING_MODE == 1);
-                    PinnedThreadPrinter.printStackTrace(System.out, printAll);
-                }
-
-                int s = state();
-                if (s == PARKING) {
-                    parkCarrierThread();
-                } else if (s == YIELDING) {
-                    setState(RUNNING);
-                }
-            }
-        };
+        this.cont = new VirtualThreadContinuation(this, target);
 
         this.runContinuation = (scheduler != null)
                 ? new Runner(this)
@@ -177,6 +162,32 @@ class VirtualThread extends Thread {
      */
     static ContinuationScope continuationScope() {
         return VTHREAD_SCOPE;
+    }
+
+    /**
+     * A continuation for a virtual thread.
+     */
+    private static class VirtualThreadContinuation extends Continuation {
+        private final VirtualThread vthread;
+        VirtualThreadContinuation(VirtualThread vthread, Runnable task) {
+            super(VTHREAD_SCOPE, task);
+            this.vthread = vthread;
+        }
+
+        @Override
+        protected void onPinned(Continuation.Pinned reason) {
+            if (TRACE_PINNING_MODE > 0) {
+                boolean printAll = (TRACE_PINNING_MODE == 1);
+                PinnedThreadPrinter.printStackTrace(System.out, printAll);
+            }
+
+            int s = vthread.state();
+            if (s == PARKING) {
+                vthread.parkCarrierThread();
+            } else if (s == YIELDING) {
+                vthread.setState(RUNNING);
+            }
+        }
     }
 
     /**
@@ -212,27 +223,6 @@ class VirtualThread extends Thread {
         @Override
         public Object attachment() {
             return attachment;
-        }
-    }
-
-    /**
-     * Schedules this {@code VirtualThread} to execute.
-     *
-     * @throws IllegalThreadStateException if the thread has already been started
-     * @throws RejectedExecutionException if the scheduler cannot accept a task
-     */
-    @Override
-    public void start() {
-        if (!compareAndSetState(NEW, STARTED)) {
-            throw new IllegalThreadStateException("Already started");
-        }
-        ThreadDumper.notifyStart(this);  // no-op if threads not tracked
-        try {
-            scheduler.execute(runContinuation);
-        } catch (RejectedExecutionException ree) {
-            // assume executor has been shutdown
-            afterTerminate(/*executed*/ false);
-            throw ree;
         }
     }
 
@@ -438,6 +428,27 @@ class VirtualThread extends Thread {
         // restore interrupt status
         if (awaitInterrupted)
             Thread.currentThread().interrupt();
+    }
+
+    /**
+     * Schedules this {@code VirtualThread} to execute.
+     *
+     * @throws IllegalThreadStateException if the thread has already been started
+     * @throws RejectedExecutionException if the scheduler cannot accept a task
+     */
+    @Override
+    public void start() {
+        if (!compareAndSetState(NEW, STARTED)) {
+            throw new IllegalThreadStateException("Already started");
+        }
+        ThreadDumper.notifyStart(this);  // no-op if threads not tracked
+        try {
+            scheduler.execute(runContinuation);
+        } catch (RejectedExecutionException ree) {
+            // assume executor has been shutdown
+            afterTerminate(/*executed*/ false);
+            throw ree;
+        }
     }
 
     /**
