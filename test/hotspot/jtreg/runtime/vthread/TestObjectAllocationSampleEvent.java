@@ -43,24 +43,12 @@ public class TestObjectAllocationSampleEvent {
 }
 
 class Task implements Runnable {
-    
-    private static final int OBJECT_SIZE = 4 * 1024;
-    private static final int OBJECTS_TO_ALLOCATE = 16 * 1000;
-    private static final String BYTE_ARRAY_CLASS_NAME = new byte[0].getClass().getName();
-
-    // Make sure allocation isn't dead code eliminated.
-    public static byte[] tmp;
 
     public void run() {
         
-        try (RecordingStream rs = new RecordingStream()) {
-        }
-        for (int i = 0; i < OBJECTS_TO_ALLOCATE; ++i) {
-            tmp = new byte[OBJECT_SIZE];
-        }
-
         // Needs to wait for crash...
-        try {           
+        try {
+            RecordingStream rs = new RecordingStream();            
             Thread.sleep(1_000);
         } catch(Exception e) {
             throw new RuntimeException(e);
