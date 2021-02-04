@@ -171,7 +171,8 @@ inline void JvmtiThreadState::bind_to(JavaThread* thread) {
   // bind JavaThread to JvmtiThreadState
   thread->set_jvmti_thread_state(this);
 
-  JvmtiEventController::thread_started(thread);
+  // TBD: This is hacky and may need a better solution.
+  JvvmtiEventController::thread_started(thread);
 
   if (this != NULL) {
     // bind to JavaThread

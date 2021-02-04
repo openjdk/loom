@@ -230,13 +230,15 @@ private:
 public:
   JvmtiVirtualThreadEventMark(JavaThread *thread) :
     JvmtiEventMark(thread) {
-    if (JvmtiExport::can_support_virtual_threads()) {
+    JvmtiThreadState* state = thread->jvmti_thread_state();
+    if (JvmtiExport::can_support_virtual_threads() &&
+        state != NULL && state->is_virtual()) {
       _jt = (jthread)(to_jobject(thread->vthread()));
     } else {
       _jt = (jthread)(to_jobject(thread->threadObj()));
     }
   };
- jthread jni_thread() { return _jt; }
+  jthread jni_thread() { return _jt; }
 };
 
 class JvmtiClassEventMark : public JvmtiVirtualThreadEventMark {
@@ -666,7 +668,7 @@ void JvmtiExport::post_early_vm_start() {
     if (env->early_vmstart_env() && env->is_enabled(JVMTI_EVENT_VM_START)) {
       EVT_TRACE(JVMTI_EVENT_VM_START, ("Evt Early VM start event sent" ));
       JavaThread *thread  = JavaThread::current();
-      JvmtiVirtualThreadEventMark jem(thread);
+      JvmtiThreadEventMark jem(thread);
       JvmtiJavaThreadEventTransition jet(thread);
       jvmtiEventVMStart callback = env->callbacks()->VMStart;
       if (callback != NULL) {
@@ -732,7 +734,7 @@ void JvmtiExport::post_vm_initialized() {
       EVT_TRACE(JVMTI_EVENT_VM_INIT, ("Evt VM init event sent" ));
 
       JavaThread *thread  = JavaThread::current();
-      JvmtiVirtualThreadEventMark jem(thread);
+      JvmtiThreadEventMark jem(thread);
       JvmtiJavaThreadEventTransition jet(thread);
       jvmtiEventVMInit callback = env->callbacks()->VMInit;
       if (callback != NULL) {
@@ -1736,7 +1738,7 @@ void JvmtiExport::post_continuation_yield(JavaThread* thread, jint continuation_
       for (int frame_idx = 0; frame_idx < continuation_frame_count; frame_idx++) {
         int frame_num = top_frame_num - frame_idx;
 
-        if (ets->is_frame_pop(frame_num)) {
+        if (!state->is_virtual() && ets->is_frame_pop(frame_num)) {
           // remove the frame's entry
           MutexLocker mu(JvmtiThreadState_lock);
           ets->clear_frame_pop(frame_num);
