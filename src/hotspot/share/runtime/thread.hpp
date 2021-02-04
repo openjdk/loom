@@ -1844,6 +1844,9 @@ public:
   JvmtiThreadState *jvmti_thread_state() const                                   { return _jvmti_thread_state; }
   static ByteSize jvmti_thread_state_offset()                                    { return byte_offset_of(JavaThread, _jvmti_thread_state); }
 
+  // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier. 
+  JvmtiThreadState *rebind_to_jvmti_thread_state_of(oop thread_oop);
+
   // JVMTI PopFrame support
   // Setting and clearing popframe_condition
   // All of these enumerated values are bits. popframe_pending

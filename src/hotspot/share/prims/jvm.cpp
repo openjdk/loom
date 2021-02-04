@@ -3907,13 +3907,8 @@ JVM_END
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread, jboolean first_mount))
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
   oop vt_oop = JNIHandles::resolve(vthread);
-  thread->set_mounted_vthread(vt_oop);
 
-  // unbind JvmtiThreadState of carrier thread from JavaThread
-  thread->jvmti_thread_state()->unbind_from(thread);
-
-  // bind JvmtiThreadState of virtual thread to JavaThread
-  java_lang_Thread::jvmti_thread_state(vt_oop)->bind_to(thread);
+  thread->rebind_to_jvmti_thread_state_of(vt_oop);
 
   if (first_mount) {
     // thread start
@@ -3933,13 +3928,8 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jclass vthread_class,
   }
   oop ct_oop = JNIHandles::resolve(event_thread);
 
-  // unbind JvmtiThreadState of virtual thread from JavaThread
-  thread->jvmti_thread_state()->unbind_from(thread);
+  thread->rebind_to_jvmti_thread_state_of(ct_oop);
 
-  // bind JvmtiThreadState of carrier thread to JavaThread
-  java_lang_Thread::jvmti_thread_state(ct_oop)->bind_to(thread);
-
-  thread->set_mounted_vthread(ct_oop);
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
 JVM_END
 
