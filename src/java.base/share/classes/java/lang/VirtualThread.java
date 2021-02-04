@@ -135,8 +135,8 @@ class VirtualThread extends Thread {
         // choose scheduler if not specified
         if (scheduler == null) {
             Thread parent = Thread.currentThread();
-            if (parent.isVirtual()) {
-                scheduler = ((VirtualThread) parent).scheduler;
+            if (parent instanceof VirtualThread vparent) {
+                scheduler = vparent.scheduler;
             } else {
                 scheduler = DEFAULT_SCHEDULER;
             }
@@ -144,10 +144,11 @@ class VirtualThread extends Thread {
 
         this.scheduler = scheduler;
         this.cont = new VirtualThreadContinuation(this, target);
-
-        this.runContinuation = (scheduler != null)
-                ? new Runner(this)
-                : this::runContinuation;
+        if (scheduler != DEFAULT_SCHEDULER) {
+            this.runContinuation = new CustomRunner(this);
+        } else {
+            this.runContinuation = this::runContinuation;
+        }
     }
 
     /**
@@ -183,7 +184,7 @@ class VirtualThread extends Thread {
 
             int s = vthread.state();
             if (s == PARKING) {
-                vthread.parkCarrierThread();
+                vthread.parkOnCarrierThread();
             } else if (s == YIELDING) {
                 vthread.setState(RUNNING);
             }
@@ -193,19 +194,19 @@ class VirtualThread extends Thread {
     /**
      * The task to execute when using a custom scheduler.
      */
-    private static class Runner implements VirtualThreadTask {
+    private static class CustomRunner implements VirtualThreadTask {
         private final VirtualThread vthread;
         private static final VarHandle ATTACHMENT;
         static {
             try {
                 MethodHandles.Lookup l = MethodHandles.lookup();
-                ATTACHMENT = l.findVarHandle(Runner.class, "attachment", Object.class);
+                ATTACHMENT = l.findVarHandle(CustomRunner.class, "attachment", Object.class);
             } catch (Exception e) {
                 throw new InternalError(e);
             }
         }
         private volatile Object attachment;
-        Runner(VirtualThread vthread) {
+        CustomRunner(VirtualThread vthread) {
             this.vthread = vthread;
         }
         @Override
@@ -267,7 +268,7 @@ class VirtualThread extends Thread {
      */
     @ChangesCurrentThread
     private void mount(boolean firstMount) {
-        //assert this.carrierThread == null
+        //assert this.carrierThread == null;
 
         // notify JVMTI agents
         boolean notifyJvmti = notifyJvmtiEvents;
@@ -387,12 +388,12 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Park the carrier thread until it is signalled or interrupted. This method
-     * is invoked by onPinned when an attempt to park fails because of a synchronized
-     * or native frame on the continuation stack.
+     * Parks on the carrier thread until it is signalled or interrupted.
      */
     @ChangesCurrentThread
-    private void parkCarrierThread() {
+    private void parkOnCarrierThread() {
+        assert state() == PARKING;
+
         boolean awaitInterrupted = false;
 
         // switch to carrier thread
@@ -402,7 +403,6 @@ class VirtualThread extends Thread {
         final ReentrantLock lock = getLock();
         lock.lock();
         try {
-            assert state() == PARKING;
             setState(PINNED);
 
             if (!parkPermit) {
