@@ -26,7 +26,6 @@
 #include "classfile/classLoaderDataGraph.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/moduleEntry.hpp"
-#include "classfile/systemDictionary.hpp"
 #include "jvmtifiles/jvmtiEnv.hpp"
 #include "memory/iterator.hpp"
 #include "memory/resourceArea.hpp"
@@ -703,7 +702,7 @@ JvmtiEnvBase::get_live_threads(JavaThread* current_thread, Handle group_hdl, Han
     NULL_CHECK(thread_objs, JVMTI_ERROR_OUT_OF_MEMORY);
     for (int i = 0; i < nthreads; i++) {
       Handle thread = tle.get_threadObj(i);
-      if (thread()->is_a(SystemDictionary::Thread_klass()) && java_lang_Thread::threadGroup(thread()) == group_hdl()) {
+      if (thread()->is_a(vmClasses::Thread_klass()) && java_lang_Thread::threadGroup(thread()) == group_hdl()) {
         thread_objs[count++] = thread;
       }
     }
@@ -1224,7 +1223,7 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
   if (thread == NULL) {
     java_thread = cur_thread;
     thread_oop = get_vthread_or_thread_oop(java_thread);
-    if (thread_oop == NULL || !thread_oop->is_a(SystemDictionary::Thread_klass())) {
+    if (thread_oop == NULL || !thread_oop->is_a(vmClasses::Thread_klass())) {
       return JVMTI_ERROR_INVALID_THREAD;
     }
   } else {

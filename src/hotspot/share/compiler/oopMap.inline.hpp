@@ -144,14 +144,14 @@ void OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers(con
     if (omv.type() != OopMapValue::derived_oop_value)
       continue;
       
-#ifndef TIERED
+#ifndef COMPILER2
     COMPILER1_PRESENT(ShouldNotReachHere();)
 #if INCLUDE_JVMCI
     if (UseJVMCICompiler) {
       ShouldNotReachHere();
     }
 #endif
-#endif // !TIERED
+#endif // !COMPILER2
 
     oop* loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
 

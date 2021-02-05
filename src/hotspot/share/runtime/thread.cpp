@@ -30,6 +30,7 @@
 #include "classfile/javaThreadStatus.hpp"
 #include "classfile/moduleEntry.hpp"
 #include "classfile/systemDictionary.hpp"
+#include "classfile/vmClasses.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "code/codeCache.hpp"
 #include "code/scopeDesc.hpp"
@@ -854,14 +855,14 @@ static void initialize_class(Symbol* class_name, TRAPS) {
 // Creates the initial ThreadGroup
 static Handle create_initial_thread_group(TRAPS) {
   Handle system_instance = JavaCalls::construct_new_instance(
-                            SystemDictionary::ThreadGroup_klass(),
+                            vmClasses::ThreadGroup_klass(),
                             vmSymbols::void_method_signature(),
                             CHECK_NH);
   Universe::set_system_thread_group(system_instance());
 
   Handle string = java_lang_String::create_from_str("main", CHECK_NH);
   Handle main_instance = JavaCalls::construct_new_instance(
-                            SystemDictionary::ThreadGroup_klass(),
+                            vmClasses::ThreadGroup_klass(),
                             vmSymbols::threadgroup_string_void_signature(),
                             system_instance,
                             string,
@@ -872,7 +873,7 @@ static Handle create_initial_thread_group(TRAPS) {
 // Creates the initial Thread, and sets it to running.
 static void create_initial_thread(Handle thread_group, JavaThread* thread,
                                  TRAPS) {
-  InstanceKlass* ik = SystemDictionary::Thread_klass();
+  InstanceKlass* ik = vmClasses::Thread_klass();
   assert(ik->is_initialized(), "must be");
   instanceHandle thread_oop = ik->allocate_instance_handle(CHECK);
 
@@ -1069,7 +1070,7 @@ void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name
   assert(thread_group.not_null(), "thread group should be specified");
   assert(threadObj() == NULL, "should only create Java thread object once");
 
-  InstanceKlass* ik = SystemDictionary::Thread_klass();
+  InstanceKlass* ik = vmClasses::Thread_klass();
   assert(ik->is_initialized(), "must be");
   instanceHandle thread_oop = ik->allocate_instance_handle(CHECK);
 
@@ -1877,7 +1878,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
     if (uncaught_exception.not_null()) {
       EXCEPTION_MARK;
       // Call method Thread.dispatchUncaughtException().
-      Klass* thread_klass = SystemDictionary::Thread_klass();
+      Klass* thread_klass = vmClasses::Thread_klass();
       JavaValue result(T_VOID);
       JavaCalls::call_virtual(&result,
                               threadObj, thread_klass,
@@ -1900,7 +1901,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
     if (!is_Compiler_thread()) {
       EXCEPTION_MARK;
       JavaValue result(T_VOID);
-      Klass* thread_klass = SystemDictionary::Thread_klass();
+      Klass* thread_klass = vmClasses::Thread_klass();
       JavaCalls::call_virtual(&result,
                               threadObj, thread_klass,
                               vmSymbols::exit_method_name(),
@@ -2157,7 +2158,7 @@ void JavaThread::check_and_handle_async_exceptions(bool check_unsafe_error) {
   // Check for pending async. exception
   if (_pending_async_exception != NULL) {
     // Only overwrite an already pending exception, if it is not a threadDeath.
-    if (!has_pending_exception() || !pending_exception()->is_a(SystemDictionary::ThreadDeath_klass())) {
+    if (!has_pending_exception() || !pending_exception()->is_a(vmClasses::ThreadDeath_klass())) {
 
       // We cannot call Exceptions::_throw(...) here because we cannot block
       set_pending_exception(_pending_async_exception, __FILE__, __LINE__);
@@ -2254,7 +2255,7 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
   {
     // Actually throw the Throwable against the target Thread - however
     // only if there is no thread death exception installed already.
-    if (_pending_async_exception == NULL || !_pending_async_exception->is_a(SystemDictionary::ThreadDeath_klass())) {
+    if (_pending_async_exception == NULL || !_pending_async_exception->is_a(vmClasses::ThreadDeath_klass())) {
       // If the topmost frame is a runtime stub, then we are calling into
       // OptoRuntime from compiled code. Some runtime stubs (new, monitor_exit..)
       // must deoptimize the caller before continuing, as the compiled  exception handler table
@@ -3348,7 +3349,7 @@ void Threads::possibly_parallel_threads_do(bool is_par, ThreadClosure* tc) {
 //     fields in, out, and err. Set up java signal handlers, OS-specific
 //     system settings, and thread group of the main thread.
 static void call_initPhase1(TRAPS) {
-  Klass* klass = SystemDictionary::System_klass();
+  Klass* klass = vmClasses::System_klass();
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result, klass, vmSymbols::initPhase1_name(),
                                          vmSymbols::void_method_signature(), CHECK);
@@ -3368,7 +3369,7 @@ static void call_initPhase1(TRAPS) {
 static void call_initPhase2(TRAPS) {
   TraceTime timer("Initialize module system", TRACETIME_LOG(Info, startuptime));
 
-  Klass* klass = SystemDictionary::System_klass();
+  Klass* klass = vmClasses::System_klass();
 
   JavaValue result(T_INT);
   JavaCallArguments args;
@@ -3390,7 +3391,7 @@ static void call_initPhase2(TRAPS) {
 //     and system class loader may be a custom class loaded from -Xbootclasspath/a,
 //     other modules or the application's classpath.
 static void call_initPhase3(TRAPS) {
-  Klass* klass = SystemDictionary::System_klass();
+  Klass* klass = vmClasses::System_klass();
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result, klass, vmSymbols::initPhase3_name(),
                                          vmSymbols::void_method_signature(), CHECK);
@@ -3422,7 +3423,7 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   initialize_class(vmSymbols::java_lang_Module(), CHECK);
 
 #ifdef ASSERT
-  InstanceKlass *k = SystemDictionary::UnsafeConstants_klass();
+  InstanceKlass *k = vmClasses::UnsafeConstants_klass();
   assert(k->is_not_initialized(), "UnsafeConstants should not already be initialized");
 #endif
 

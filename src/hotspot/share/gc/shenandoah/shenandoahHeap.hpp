@@ -56,7 +56,7 @@ class ShenandoahHeapRegionClosure;
 class ShenandoahCollectionSet;
 class ShenandoahFreeSet;
 class ShenandoahConcurrentMark;
-class ShenandoahMarkCompact;
+class ShenandoahFullGC;
 class ShenandoahMonitoringSupport;
 class ShenandoahPacer;
 class ShenandoahReferenceProcessor;
@@ -125,7 +125,7 @@ class ShenandoahHeap : public CollectedHeap {
   // Supported GC
   friend class ShenandoahConcurrentGC;
   friend class ShenandoahDegenGC;
-  friend class ShenandoahMarkCompact;
+  friend class ShenandoahFullGC;
 
 // ---------- Locks that guard important data structures in Heap
 //
@@ -583,7 +583,6 @@ public:
 
   // SATB barriers hooks
   inline bool requires_marking(const void* entry) const;
-  void force_satb_flush_all_threads();
 
   // Support for bitmap uncommits
   bool commit_bitmap_slice(ShenandoahHeapRegion *r);
@@ -625,16 +624,10 @@ public:
 //
 public:
   template <class T>
-  inline oop evac_update_with_forwarded(T* p);
+  inline void conc_update_with_forwarded(T* p);
 
   template <class T>
-  inline oop maybe_update_with_forwarded(T* p);
-
-  template <class T>
-  inline oop maybe_update_with_forwarded_not_null(T* p, oop obj);
-
-  template <class T>
-  inline oop update_with_forwarded_not_null(T* p, oop obj);
+  inline void update_with_forwarded(T* p);
 
   static inline oop cas_oop(oop n, narrowOop* addr, oop c);
   static inline oop cas_oop(oop n, oop* addr, oop c);

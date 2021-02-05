@@ -5961,7 +5961,7 @@ oop ContMirror::raw_allocate(Klass* klass, size_t size_in_words, size_t elements
 }
 
 oop ContMirror::allocate_stack_chunk(int stack_size) {
-  InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(SystemDictionary::StackChunk_klass());
+  InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
   int size_in_words = klass->instance_size(stack_size);
   StackChunkAllocator allocator(klass, size_in_words, stack_size, _thread);
   HeapWord* start = _thread->tlab().allocate(size_in_words);
@@ -6417,11 +6417,11 @@ void Continuation::debug_print_stack_chunk(oop chunk) {
 }
 
 bool Continuation::debug_is_continuation(Klass* klass) {
-  return klass->is_subtype_of(SystemDictionary::Continuation_klass());
+  return klass->is_subtype_of(vmClasses::Continuation_klass());
 }
 
 bool Continuation::debug_is_continuation(oop obj) {
-  return obj->is_a(SystemDictionary::Continuation_klass());
+  return obj->is_a(vmClasses::Continuation_klass());
 }
 
 bool Continuation::debug_is_continuation_run_frame(const frame& f) {

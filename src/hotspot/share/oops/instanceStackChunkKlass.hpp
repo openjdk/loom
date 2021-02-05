@@ -82,7 +82,7 @@ public:
   static void init_offset_of_stack() {
     // Cache the offset of the static fields in the Class instance
     assert(_offset_of_stack == 0, "once");
-    _offset_of_stack = InstanceStackChunkKlass::cast(SystemDictionary::StackChunk_klass())->size_helper() << LogHeapWordSize;
+    _offset_of_stack = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass())->size_helper() << LogHeapWordSize;
   }
 
   static int offset_of_stack() {
