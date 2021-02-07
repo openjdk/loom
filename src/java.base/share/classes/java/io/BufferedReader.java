@@ -27,6 +27,7 @@ package java.io;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.stream.Stream;
@@ -69,6 +70,9 @@ import jdk.internal.misc.InternalLock;
 
 public class BufferedReader extends Reader {
 
+    // Legacy/undocumented behavior was to the wrapped Reader as the lock.
+    // New behavior is to use "this" or an "internal lock" for trusted classes.
+
     private Reader in;
 
     private char cb[];
@@ -98,17 +102,12 @@ public class BufferedReader extends Reader {
      * @throws IllegalArgumentException  If {@code sz <= 0}
      */
     public BufferedReader(Reader in, int sz) {
-        super(in);
+        Objects.requireNonNull(in);
         if (sz <= 0)
             throw new IllegalArgumentException("Buffer size <= 0");
         this.in = in;
         cb = new char[sz];
         nextChar = nChars = 0;
-
-        // use ExplicitLock when BufferedReader is not sub-classed
-        if (getClass() == BufferedReader.class) {
-            lock = new InternalLock();
-        }
     }
 
     /**

@@ -26,6 +26,7 @@
 package java.io;
 
 import java.util.Arrays;
+import java.util.Objects;
 import jdk.internal.misc.InternalLock;
 import jdk.internal.misc.VM;
 
@@ -67,6 +68,10 @@ import jdk.internal.misc.VM;
  */
 
 public class BufferedWriter extends Writer {
+
+    // Legacy/undocumented behavior was to the wrapped Writer as the lock.
+    // New behavior is to use "this" or an "internal lock" for trusted classes.
+
     private static final int DEFAULT_INITIAL_BUFFER_SIZE = 512;
     private static final int DEFAULT_MAX_BUFFER_SIZE = 8192;
 
@@ -91,8 +96,7 @@ public class BufferedWriter extends Writer {
      * Creates a buffered character-output stream.
      */
     private BufferedWriter(Writer out, int initialSize, int maxSize) {
-        super(out);
-
+        Objects.requireNonNull(out);
         if (initialSize <= 0) {
             throw new IllegalArgumentException("Buffer size <= 0");
         }
@@ -101,11 +105,6 @@ public class BufferedWriter extends Writer {
         this.cb = new char[initialSize];
         this.nChars = initialSize;
         this.maxChars = maxSize;
-
-        // use ExplicitLock when BufferedWriter is not sub-classed
-        if (getClass() == BufferedWriter.class) {
-            this.lock = new InternalLock();
-        }
     }
 
     /**

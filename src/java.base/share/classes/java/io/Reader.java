@@ -153,7 +153,15 @@ public abstract class Reader implements Readable, Closeable {
      * synchronize on the reader itself.
      */
     protected Reader() {
-        this.lock = this;
+        // use InternalLock for trusted classes
+        Class<?> clazz = getClass();
+        if (clazz == InputStreamReader.class
+            || clazz == BufferedReader.class
+            || clazz == FileReader.class) {
+            this.lock = new InternalLock();
+        } else {
+            this.lock = this;
+        }
     }
 
     /**
@@ -163,10 +171,7 @@ public abstract class Reader implements Readable, Closeable {
      * @param lock  The Object to synchronize on.
      */
     protected Reader(Object lock) {
-        if (lock == null) {
-            throw new NullPointerException();
-        }
-        this.lock = lock;
+        this.lock = Objects.requireNonNull(lock);
     }
 
     /**

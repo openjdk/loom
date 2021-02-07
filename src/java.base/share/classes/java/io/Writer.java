@@ -26,6 +26,8 @@
 package java.io;
 
 
+import jdk.internal.misc.InternalLock;
+
 import java.util.Objects;
 
 /**
@@ -149,7 +151,16 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      * synchronize on the writer itself.
      */
     protected Writer() {
-        this.lock = this;
+        // use InternalLock for trusted classes
+        Class<?> clazz = getClass();
+        if (clazz == OutputStreamWriter.class
+                || clazz == BufferedWriter.class
+                || clazz == FileWriter.class
+                || clazz == PrintWriter.class) {
+            this.lock = new InternalLock();
+        } else {
+            this.lock = this;
+        }
     }
 
     /**

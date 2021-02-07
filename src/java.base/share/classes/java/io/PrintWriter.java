@@ -63,6 +63,9 @@ import jdk.internal.misc.InternalLock;
 
 public class PrintWriter extends Writer {
 
+    // Legacy/undocumented behavior was to the wrapped Writer as the lock.
+    // New behavior is to use "this" or an "internal lock" for trusted classes.
+
     /**
      * The underlying character-output stream of this
      * {@code PrintWriter}.
@@ -98,7 +101,7 @@ public class PrintWriter extends Writer {
      *
      * @param  out        A character-output stream
      */
-    public PrintWriter (Writer out) {
+    public PrintWriter(Writer out) {
         this(out, false);
     }
 
@@ -110,16 +113,9 @@ public class PrintWriter extends Writer {
      *                    {@code printf}, or {@code format} methods will
      *                    flush the output buffer
      */
-    public PrintWriter(Writer out,
-                       boolean autoFlush) {
-        super(out);
+    public PrintWriter(Writer out, boolean autoFlush) {
         this.out = out;
         this.autoFlush = autoFlush;
-
-        // use ExplicitLock when PrintWriter is not sub-classed
-        if (getClass() == PrintWriter.class) {
-            this.lock = new InternalLock();
-        }
     }
 
     /**
