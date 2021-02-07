@@ -28,13 +28,20 @@ package jdk.internal.misc;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * ??
+ * A reentrant mutual exclusion lock for internal use. The lock does not
+ * implement {@link java.util.concurrent.locks.Lock} or extend {@link
+ * java.util.concurrent.locks.ReentrantLock} so that it can be used for
+ * special handling in the {@link java.io} classes.
  */
 
 public class InternalLock {
     private final ReentrantLock lock = new ReentrantLock();
 
     public InternalLock() { }
+
+    public boolean tryLock() {
+        return lock.tryLock();
+    }
 
     public void lock() {
         lock.lock();
