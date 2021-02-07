@@ -42,15 +42,13 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.IllegalCharsetNameException;
-import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.InternalLock;
 
 public class StreamDecoder extends Reader
 {
 
     private static final int MIN_BYTE_BUFFER_SIZE = 32;
     private static final int DEFAULT_BYTE_BUFFER_SIZE = 8192;
-
-    private final ReentrantLock decoderLock;
 
     private volatile boolean closed;
 
@@ -126,12 +124,12 @@ public class StreamDecoder extends Reader
     }
 
     private int read0() throws IOException {
-        if (decoderLock != null) {
-            decoderLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedRead0();
             } finally {
-                decoderLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -167,12 +165,12 @@ public class StreamDecoder extends Reader
     }
 
     public int read(char cbuf[], int offset, int length) throws IOException {
-        if (decoderLock != null) {
-            decoderLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedRead(cbuf, offset, length);
             } finally {
-                decoderLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -219,12 +217,12 @@ public class StreamDecoder extends Reader
     }
 
     public boolean ready() throws IOException {
-        if (decoderLock != null) {
-            decoderLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedReady();
             } finally {
-                decoderLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -239,12 +237,12 @@ public class StreamDecoder extends Reader
     }
 
     public void close() throws IOException {
-        if (decoderLock != null) {
-            decoderLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedClose();
             } finally {
-                decoderLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -319,12 +317,6 @@ public class StreamDecoder extends Reader
             bb = ByteBuffer.allocate(DEFAULT_BYTE_BUFFER_SIZE);
         }
         bb.flip();                      // So that bb is initially empty
-
-        if (lock instanceof ReentrantLock) {
-            decoderLock = (ReentrantLock) lock;
-        } else {
-            decoderLock = null;
-        }
     }
 
     StreamDecoder(ReadableByteChannel ch, CharsetDecoder dec, int mbc) {
@@ -338,12 +330,6 @@ public class StreamDecoder extends Reader
                                      ? MIN_BYTE_BUFFER_SIZE
                                      : mbc));
         bb.flip();
-
-        if (lock instanceof ReentrantLock) {
-            decoderLock = (ReentrantLock) lock;
-        } else {
-            decoderLock = null;
-        }
     }
 
     private int readBytes() throws IOException {

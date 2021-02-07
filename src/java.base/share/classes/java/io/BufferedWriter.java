@@ -26,8 +26,7 @@
 package java.io;
 
 import java.util.Arrays;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.InternalLock;
 import jdk.internal.misc.VM;
 
 /**
@@ -103,9 +102,9 @@ public class BufferedWriter extends Writer {
         this.nChars = initialSize;
         this.maxChars = maxSize;
 
-        // use ReentrantLock when BufferedWriter is not sub-classed
+        // use ExplicitLock when BufferedWriter is not sub-classed
         if (getClass() == BufferedWriter.class) {
-            this.lock = new ReentrantLock();
+            this.lock = new InternalLock();
         }
     }
 
@@ -159,13 +158,12 @@ public class BufferedWriter extends Writer {
      */
     void flushBuffer() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedFlushBuffer();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -189,13 +187,12 @@ public class BufferedWriter extends Writer {
      */
     public void write(int c) throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(c);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -244,13 +241,12 @@ public class BufferedWriter extends Writer {
      */
     public void write(char cbuf[], int off, int len) throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(cbuf, off, len);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -314,13 +310,12 @@ public class BufferedWriter extends Writer {
      */
     public void write(String s, int off, int len) throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(s, off, len);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -361,13 +356,12 @@ public class BufferedWriter extends Writer {
      */
     public void flush() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedFlush();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -383,13 +377,12 @@ public class BufferedWriter extends Writer {
 
     public void close() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedClose();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {

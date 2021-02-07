@@ -25,7 +25,6 @@
 
 package sun.nio.cs;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
@@ -38,14 +37,12 @@ import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.IllegalCharsetNameException;
-import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.InternalLock;
 
 public final class StreamEncoder extends Writer {
 
     private static final int INITIAL_BYTE_BUFFER_CAPACITY = 512;
     private static final int MAX_BYTE_BUFFER_CAPACITY= 8192;
-
-    private final ReentrantLock encoderLock;
 
     private volatile boolean closed;
 
@@ -108,12 +105,12 @@ public final class StreamEncoder extends Writer {
     }
 
     public void flushBuffer() throws IOException {
-        if (encoderLock != null) {
-            encoderLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedFlushBuffer();
             } finally {
-                encoderLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (super.lock) {
@@ -136,12 +133,12 @@ public final class StreamEncoder extends Writer {
     }
 
     public void write(char cbuf[], int off, int len) throws IOException {
-        if (encoderLock != null) {
-            encoderLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(cbuf, off, len);
             } finally {
-                encoderLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (super.lock) {
@@ -173,12 +170,12 @@ public final class StreamEncoder extends Writer {
     public void write(CharBuffer cb) throws IOException {
         int position = cb.position();
         try {
-            if (encoderLock != null) {
-                encoderLock.lock();
+            if (lock instanceof InternalLock locker) {
+                locker.lock();
                 try {
                     lockedWrite(cb);
                 } finally {
-                    encoderLock.unlock();
+                    locker.unlock();
                 }
             } else {
                 synchronized (super.lock) {
@@ -196,15 +193,15 @@ public final class StreamEncoder extends Writer {
     }
 
     public void flush() throws IOException {
-        if (encoderLock != null) {
-            encoderLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedFlush();
             } finally {
-                encoderLock.unlock();
+                locker.unlock();
             }
         } else {
-            synchronized (super.lock) {
+            synchronized (lock) {
                 lockedFlush();
             }
         }
@@ -216,15 +213,15 @@ public final class StreamEncoder extends Writer {
     }
 
     public void close() throws IOException {
-        if (encoderLock != null) {
-            encoderLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedClose();
             } finally {
-                encoderLock.unlock();
+                locker.unlock();
             }
         } else {
-            synchronized (super.lock) {
+            synchronized (lock) {
                 lockedClose();
             }
         }
@@ -278,12 +275,6 @@ public final class StreamEncoder extends Writer {
 
         this.bb = ByteBuffer.allocate(INITIAL_BYTE_BUFFER_CAPACITY);
         this.maxBufferCapacity = MAX_BYTE_BUFFER_CAPACITY;
-
-        if (lock instanceof ReentrantLock) {
-            this.encoderLock = (ReentrantLock) lock;
-        } else {
-            this.encoderLock = null;
-        }
     }
 
     private StreamEncoder(WritableByteChannel ch, CharsetEncoder enc, int mbc) {
@@ -299,8 +290,6 @@ public final class StreamEncoder extends Writer {
             this.bb = ByteBuffer.allocate(INITIAL_BYTE_BUFFER_CAPACITY);
             this.maxBufferCapacity = MAX_BYTE_BUFFER_CAPACITY;
         }
-
-        this.encoderLock = new ReentrantLock();
     }
 
     private void writeBytes() throws IOException {

@@ -27,8 +27,8 @@ package java.lang;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.InternalLock;
 
 /**
  * The {@code Throwable} class is the superclass of all errors and
@@ -663,13 +663,12 @@ public class Throwable implements Serializable {
 
     private void printStackTrace(PrintStreamOrWriter s) {
         Object lock = s.lock();
-        if (lock instanceof ReentrantLock) {
-            ReentrantLock l = (ReentrantLock) lock;
-            l.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedPrintStackTrace(s);
             } finally {
-                l.unlock();
+                locker.unlock();
             }
         } else synchronized (lock) {
             lockedPrintStackTrace(s);
@@ -761,8 +760,8 @@ public class Throwable implements Serializable {
 
         boolean isLockedByCurrentThread() {
             Object lock = lock();
-            if (lock instanceof ReentrantLock) {
-                return ((ReentrantLock) lock).isHeldByCurrentThread();
+            if (lock instanceof InternalLock locker) {
+                return locker.isHeldByCurrentThread();
             } else {
                 return Thread.holdsLock(lock);
             }

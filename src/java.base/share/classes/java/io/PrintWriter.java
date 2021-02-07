@@ -31,10 +31,9 @@ import java.util.Locale;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.access.JavaIOPrintWriterAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.InternalLock;
 
 /**
  * Prints formatted representations of objects to a text-output stream.  This
@@ -117,9 +116,9 @@ public class PrintWriter extends Writer {
         this.out = out;
         this.autoFlush = autoFlush;
 
-        // use ReentrantLock when PrintWriter is not sub-classed
+        // use ExplicitLock when PrintWriter is not sub-classed
         if (getClass() == PrintWriter.class) {
-            this.lock = new ReentrantLock();
+            this.lock = new InternalLock();
         }
     }
 
@@ -400,13 +399,12 @@ public class PrintWriter extends Writer {
      */
     public void flush() {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedFlush();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -432,13 +430,12 @@ public class PrintWriter extends Writer {
      */
     public void close() {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedClose();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -513,13 +510,12 @@ public class PrintWriter extends Writer {
      */
     public void write(int c) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(c);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -552,13 +548,12 @@ public class PrintWriter extends Writer {
      */
     public void write(char buf[], int off, int len) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(buf, off, len);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -600,13 +595,12 @@ public class PrintWriter extends Writer {
      */
     public void write(String s, int off, int len) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(s, off, len);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -637,13 +631,12 @@ public class PrintWriter extends Writer {
 
     private void newLine() {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedNewLine();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -809,14 +802,13 @@ public class PrintWriter extends Writer {
      */
     public void println(boolean x) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 print(x);
                 println();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -835,14 +827,13 @@ public class PrintWriter extends Writer {
      */
     public void println(char x) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 print(x);
                 println();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -861,14 +852,13 @@ public class PrintWriter extends Writer {
      */
     public void println(int x) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 print(x);
                 println();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -887,14 +877,13 @@ public class PrintWriter extends Writer {
      */
     public void println(long x) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 print(x);
                 println();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -913,14 +902,13 @@ public class PrintWriter extends Writer {
      */
     public void println(float x) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 print(x);
                 println();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -939,14 +927,13 @@ public class PrintWriter extends Writer {
      */
     public void println(double x) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 print(x);
                 println();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -965,14 +952,13 @@ public class PrintWriter extends Writer {
      */
     public void println(char x[]) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 print(x);
                 println();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -991,14 +977,13 @@ public class PrintWriter extends Writer {
      */
     public void println(String x) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 print(x);
                 println();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -1020,14 +1005,13 @@ public class PrintWriter extends Writer {
     public void println(Object x) {
         String s = String.valueOf(x);
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 print(s);
                 println();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -1180,13 +1164,12 @@ public class PrintWriter extends Writer {
      */
     public PrintWriter format(String format, Object ... args) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedFormat(format, args);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -1255,13 +1238,12 @@ public class PrintWriter extends Writer {
      */
     public PrintWriter format(Locale l, String format, Object ... args) {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedFormat(l, format, args);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {

@@ -27,10 +27,8 @@ package java.io;
 
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
-import java.util.concurrent.locks.ReentrantLock;
-
+import jdk.internal.misc.InternalLock;
 import sun.nio.cs.StreamDecoder;
-
 
 /**
  * An InputStreamReader is a bridge from byte streams to character streams: It
@@ -67,7 +65,7 @@ public class InputStreamReader extends Reader {
 
     private static Object lockFor(InputStreamReader reader) {
         if (reader.getClass() == InputStreamReader.class) {
-            return new ReentrantLock();
+            return new InternalLock();
         } else {
             return reader;
         }

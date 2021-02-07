@@ -160,10 +160,7 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      *         Object to synchronize on
      */
     protected Writer(Object lock) {
-        if (lock == null) {
-            throw new NullPointerException();
-        }
-        this.lock = lock;
+        this.lock = Objects.requireNonNull(lock);
     }
 
     /**

@@ -28,10 +28,8 @@ package java.io;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
-import java.util.concurrent.locks.ReentrantLock;
-
+import jdk.internal.misc.InternalLock;
 import sun.nio.cs.StreamEncoder;
-
 
 /**
  * An OutputStreamWriter is a bridge from character streams to byte streams:
@@ -81,7 +79,7 @@ public class OutputStreamWriter extends Writer {
 
     private static Object lockFor(OutputStreamWriter writer) {
         if (writer.getClass() == OutputStreamWriter.class) {
-            return new ReentrantLock();
+            return new InternalLock();
         } else {
             return writer;
         }

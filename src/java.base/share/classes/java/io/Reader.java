@@ -25,11 +25,9 @@
 
 package java.io;
 
-
 import java.nio.CharBuffer;
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.InternalLock;
 
 /**
  * Abstract class for reading character streams.  The only methods that a
@@ -283,13 +281,12 @@ public abstract class Reader implements Readable, Closeable {
         if (n < 0L)
             throw new IllegalArgumentException("skip value is negative");
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedSkip(n);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
