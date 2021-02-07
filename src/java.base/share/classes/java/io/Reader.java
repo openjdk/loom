@@ -157,7 +157,8 @@ public abstract class Reader implements Readable, Closeable {
         Class<?> clazz = getClass();
         if (clazz == InputStreamReader.class
             || clazz == BufferedReader.class
-            || clazz == FileReader.class) {
+            || clazz == FileReader.class
+            || clazz == sun.nio.cs.StreamDecoder.class) {
             this.lock = new InternalLock();
         } else {
             this.lock = this;

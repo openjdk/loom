@@ -156,7 +156,8 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
         if (clazz == OutputStreamWriter.class
                 || clazz == BufferedWriter.class
                 || clazz == FileWriter.class
-                || clazz == PrintWriter.class) {
+                || clazz == PrintWriter.class
+                || clazz == sun.nio.cs.StreamEncoder.class) {
             this.lock = new InternalLock();
         } else {
             this.lock = this;
