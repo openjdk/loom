@@ -143,7 +143,7 @@ class VirtualThread extends Thread {
         }
 
         this.scheduler = scheduler;
-        this.cont = new VirtualThreadContinuation(this, target);
+        this.cont = new VThreadContinuation(this, target);
         if (scheduler != DEFAULT_SCHEDULER) {
             this.runContinuation = new CustomRunner(this);
         } else {
@@ -168,9 +168,9 @@ class VirtualThread extends Thread {
     /**
      * A continuation for a virtual thread.
      */
-    private static class VirtualThreadContinuation extends Continuation {
+    private static class VThreadContinuation extends Continuation {
         private final VirtualThread vthread;
-        VirtualThreadContinuation(VirtualThread vthread, Runnable task) {
+        VThreadContinuation(VirtualThread vthread, Runnable task) {
             super(VTHREAD_SCOPE, task);
             this.vthread = vthread;
         }
@@ -263,8 +263,7 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Mounts this virtual thread. This method must be invoked before the continuation
-     * is run or continued. It binds the virtual thread to the current carrier thread.
+     * Mounts this virtual thread onto the current carrier thread.
      */
     @ChangesCurrentThread
     private void mount(boolean firstMount) {
@@ -301,8 +300,7 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Unmounts this virtual thread. This method must be invoked after the continuation
-     * yields or terminates. It unbinds this virtual thread from the carrier thread.
+     * Unmounts this virtual thread from the current carrier thread.
      */
     @ChangesCurrentThread
     private void unmount() {
@@ -330,6 +328,17 @@ class VirtualThread extends Thread {
         }
     }
 
+    private void yieldContinuation() {
+        try {
+            Continuation.yield(VTHREAD_SCOPE);
+        } finally {
+            // restore state in case of OutOfMemoryError/other errors
+            if (state() != RUNNING) {
+                setState(RUNNING);
+            }
+        }
+    }
+
     /**
      * Invoked after the continuation yields. If parking then it sets the state
      * and also re-submits the task to continue if unparked while parking.
@@ -337,7 +346,7 @@ class VirtualThread extends Thread {
      */
     private void afterYield() {
         int s = state();
-        assert s == PARKING || s == YIELDING;
+        assert (s == PARKING || s == YIELDING) && (carrierThread == null);
 
         if (s == PARKING) {
             setState(PARKED);
@@ -352,13 +361,14 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Invokes when the virtual thread terminates to set the state to TERMINATED
-     * and notify anyone waiting for the virtual thread to terminate.
+     * Invoked when the task completes (or start failed). This method sets
+     * the state to TERMINATED and notifies anyone waiting for the thread
+     * to terminate.
      *
      * @param executed true if the thread executed, false if it failed to start
      */
     private void afterTerminate(boolean executed) {
-        assert state() == STARTED || state() == RUNNING;
+        assert (state() == STARTED || state() == RUNNING) && (carrierThread == null);
         setState(TERMINATED);   // final state
 
         // notify anyone waiting for this virtual thread to terminate
@@ -506,12 +516,9 @@ class VirtualThread extends Thread {
         // park the thread
         setState(PARKING);
         try {
-            Continuation.yield(VTHREAD_SCOPE);
+            yieldContinuation();
         } finally {
-            // restore state in case of OutOfMemoryError/other errors
-            if (state() != RUNNING) {
-                setState(RUNNING);
-            }
+            assert (Thread.currentThread() == this) && (state() == RUNNING);
         }
     }
 
@@ -528,14 +535,11 @@ class VirtualThread extends Thread {
         // park the thread for the waiting time
         if (nanos > 0) {
             Future<?> unparker = scheduleUnpark(nanos);
+            setState(PARKING);
             try {
-                setState(PARKING);
-                Continuation.yield(VTHREAD_SCOPE);
+                yieldContinuation();
             } finally {
-                // restore state in case of OutOfMemoryError/other errors
-                if (state() != RUNNING) {
-                    setState(RUNNING);
-                }
+                assert (Thread.currentThread() == this) && (state() == RUNNING);
                 cancel(unparker);
             }
         } else {
@@ -608,19 +612,15 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Attempts to yield. A no-op if the continuation is pinned.
+     * Attempts to yield, as in Thread.yield.
      */
     void tryYield() {
         assert Thread.currentThread() == this && state() == RUNNING;
         setState(YIELDING);
         try {
-            Continuation.yield(VTHREAD_SCOPE);
+            yieldContinuation();
         } finally {
-            // restore state in case of OutOfMemoryError/other errors
-            if (state() != RUNNING) {
-                setState(RUNNING);
-            }
-            assert Thread.currentThread() == this;
+            assert Thread.currentThread() == this && state() == RUNNING;
         }
     }
 
