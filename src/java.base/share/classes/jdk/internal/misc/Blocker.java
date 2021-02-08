@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,8 +27,9 @@ package jdk.internal.misc;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
+import java.security.AccessController;
+import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
@@ -54,11 +55,11 @@ public class Blocker {
     private static final MethodHandle compensatedBlock;
     static {
         try {
+            PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
+                MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
+            MethodHandles.Lookup l = AccessController.doPrivileged(pa);
             MethodType methodType = MethodType.methodType(void.class, ManagedBlocker.class);
-            Lookup l = MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
-            compensatedBlock = l.findVirtual(ForkJoinPool.class,
-                    "compensatedBlock",
-                    methodType);
+            compensatedBlock = l.findVirtual(ForkJoinPool.class, "compensatedBlock", methodType);
         } catch (Exception e) {
             throw new InternalError(e);
         }
