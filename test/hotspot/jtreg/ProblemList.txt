@@ -52,6 +52,11 @@ gtest/GTestWrapper.java                                                       00
 runtime/vthread/TestObjectAllocationSampleEvent.java                          8261379 generic-all
 serviceability/jvmti/events/FramePop/framepop02/framepop02.java               0000000 generic-all
 
+serviceability/jvmti/vthread/MethodExitTest/MethodExitTest.java               0000000 generic-all
+serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java       0000000 generic-all
+serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java  0000000 generic-all
+serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java    0000000 generic-all
+
 #############################################################################
 
 # :hotspot_compiler

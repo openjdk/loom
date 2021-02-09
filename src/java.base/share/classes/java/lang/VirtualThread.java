@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,11 +24,14 @@
  */
 package java.lang;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.security.AccessControlContext;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.security.PrivilegedExceptionAction;
 import java.security.ProtectionDomain;
 import java.util.Objects;
 import java.util.concurrent.Executor;
@@ -40,6 +43,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.misc.InnocuousThread;
@@ -56,7 +60,7 @@ import static java.util.concurrent.TimeUnit.*;
  */
 class VirtualThread extends Thread {
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
-    private static final Executor DEFAULT_SCHEDULER = createDefaultScheduler();
+    private static final ForkJoinPool DEFAULT_SCHEDULER = createDefaultScheduler();
     private static final ScheduledExecutorService UNPARKER = createDelayedTaskScheduler();
     private static final int TRACE_PINNING_MODE = tracePinningMode();
 
@@ -122,15 +126,7 @@ class VirtualThread extends Thread {
      */
     VirtualThread(Executor scheduler, String name, int characteristics, Runnable task) {
         super(name, characteristics);
-
         Objects.requireNonNull(task);
-        Runnable target = () -> {
-            try {
-                task.run();
-            } catch (Throwable exc) {
-                dispatchUncaughtException(exc);
-            }
-        };
 
         // choose scheduler if not specified
         if (scheduler == null) {
@@ -143,7 +139,7 @@ class VirtualThread extends Thread {
         }
 
         this.scheduler = scheduler;
-        this.cont = new VThreadContinuation(this, target);
+        this.cont = new VThreadContinuation(this, task);
         if (scheduler != DEFAULT_SCHEDULER) {
             this.runContinuation = new CustomRunner(this);
         } else {
@@ -166,27 +162,42 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * A continuation for a virtual thread.
+     * The continuation that a virtual thread executes.
      */
     private static class VThreadContinuation extends Continuation {
-        private final VirtualThread vthread;
         VThreadContinuation(VirtualThread vthread, Runnable task) {
-            super(VTHREAD_SCOPE, task);
-            this.vthread = vthread;
+            super(VTHREAD_SCOPE, new TaskWrapper(vthread, task));
         }
-
         @Override
         protected void onPinned(Continuation.Pinned reason) {
             if (TRACE_PINNING_MODE > 0) {
                 boolean printAll = (TRACE_PINNING_MODE == 1);
                 PinnedThreadPrinter.printStackTrace(System.out, printAll);
             }
+        }
+    }
 
-            int s = vthread.state();
-            if (s == PARKING) {
-                vthread.parkOnCarrierThread();
-            } else if (s == YIELDING) {
-                vthread.setState(RUNNING);
+    /**
+     * Wraps a task so that it executes in the context of a virtual thread.
+     * The virtual thread is mounted before the task runs, then unmounts when
+     * the task completes.
+     */
+    private static class TaskWrapper implements Runnable {
+        private final VirtualThread vthread;
+        private final Runnable task;
+        TaskWrapper(VirtualThread vthread, Runnable task) {
+            this.vthread = vthread;
+            this.task = task;
+        }
+        @ChangesCurrentThread
+        public void run() {
+            vthread.mount(true);
+            try {
+                task.run();
+            } catch (Throwable exc) {
+                vthread.dispatchUncaughtException(exc);
+            } finally {
+                vthread.unmount();
             }
         }
     }
@@ -230,7 +241,6 @@ class VirtualThread extends Thread {
     /**
      * Runs or continues execution of the continuation on the current thread.
      */
-    @ChangesCurrentThread
     private void runContinuation() {
         // the carrier thread should be a platform thread
         if (Thread.currentThread().isVirtual()) {
@@ -248,18 +258,32 @@ class VirtualThread extends Thread {
             throw new IllegalStateException();
         }
 
-        boolean firstMount = (initialState == STARTED);
-        mount(firstMount);
         try {
             cont.run();
         } finally {
-            unmount();
             if (cont.isDone()) {
                 afterTerminate(/*executed*/ true);
             } else {
                 afterYield();
             }
         }
+    }
+
+    /**
+     * Submits the runContinuation task to the scheduler. If externalExecuteTask
+     * is true then it pushes the tasks current carrier thread's work queue.
+     * @throws RejectedExecutionException
+     */
+    private void submitRunContinuation(boolean externalExecuteTask) {
+        if (externalExecuteTask && scheduler == DEFAULT_SCHEDULER) {
+            ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER, runContinuation);
+        } else {
+            scheduler.execute(runContinuation);
+        }
+    }
+
+    private void submitRunContinuation() {
+        submitRunContinuation(true);
     }
 
     /**
@@ -328,14 +352,27 @@ class VirtualThread extends Thread {
         }
     }
 
+    /**
+     * Unmounts this virtual thread, invokes Continuation.yield, and re-mounts the
+     * thread when continued.
+     */
+    @ChangesCurrentThread
     private void yieldContinuation() {
+        unmount();
+        boolean yielded = false;
         try {
-            Continuation.yield(VTHREAD_SCOPE);
+            yielded = Continuation.yield(VTHREAD_SCOPE);
         } finally {
-            // restore state in case of OutOfMemoryError/other errors
-            if (state() != RUNNING) {
-                setState(RUNNING);
+            mount(false);
+            if (!yielded) {
+                // pinned or resource error
+                if (state() == PARKING) {
+                    parkOnCarrierThread();
+                } else {
+                    setState(RUNNING);
+                }
             }
+            assert (Thread.currentThread() == this) && (state() == RUNNING);
         }
     }
 
@@ -352,11 +389,13 @@ class VirtualThread extends Thread {
             setState(PARKED);
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
-                scheduler.execute(runContinuation);  // may throw REE
+                submitRunContinuation();
             }
         } else if (s == YIELDING) {   // Thread.yield
             setState(RUNNABLE);
-            scheduler.execute(runContinuation);  // may throw REE
+            // submit to random queue periodically
+            int r = ThreadLocalRandom.current().nextInt(8);
+            submitRunContinuation(r != 0);   // 1 in 8
         }
     }
 
@@ -453,7 +492,7 @@ class VirtualThread extends Thread {
         }
         ThreadDumper.notifyStart(this);  // no-op if threads not tracked
         try {
-            scheduler.execute(runContinuation);
+            submitRunContinuation();
         } catch (RejectedExecutionException ree) {
             // assume executor has been shutdown
             afterTerminate(/*executed*/ false);
@@ -595,7 +634,7 @@ class VirtualThread extends Thread {
         if (!getAndSetParkPermit(true) && Thread.currentThread() != this) {
             int s = state();
             if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
-                scheduler.execute(runContinuation);
+                submitRunContinuation();
             } else if (s == PINNED) {
                 // signal pinned thread so that it continues
                 final ReentrantLock lock = getLock();
@@ -793,7 +832,7 @@ class VirtualThread extends Thread {
                 // may have been unparked while suspended
                 if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
                     try {
-                        scheduler.execute(runContinuation);
+                        submitRunContinuation();
                     } catch (RejectedExecutionException ignore) { }
                 }
             }
@@ -939,14 +978,14 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Creates the default scheduler as ForkJoinPool.
+     * Creates the default scheduler.
      */
-    private static Executor createDefaultScheduler() {
+    private static ForkJoinPool createDefaultScheduler() {
         ForkJoinWorkerThreadFactory factory = pool -> {
             PrivilegedAction<ForkJoinWorkerThread> pa = () -> new CarrierThread(pool);
             return AccessController.doPrivileged(pa);
         };
-        PrivilegedAction<Executor> pa = () -> {
+        PrivilegedAction<ForkJoinPool> pa = () -> {
             int parallelism, maxPoolSize;
             String parallelismValue = System.getProperty("jdk.defaultScheduler.parallelism");
             String maxPoolSizeValue = System.getProperty("jdk.defaultScheduler.maxPoolSize");
@@ -967,6 +1006,37 @@ class VirtualThread extends Thread {
                          0, maxPoolSize, 1, pool -> true, 30, SECONDS);
         };
         return AccessController.doPrivileged(pa);
+    }
+
+    /**
+     * Defines static methods to invoke non-public ForkJoinPool methods.
+     */
+    private static class ForkJoinPools {
+        static final MethodHandle externalExecuteTask;
+        static {
+            try {
+                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
+                    MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
+                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
+                MethodType methodType = MethodType.methodType(void.class, Runnable.class);
+                externalExecuteTask = l.findVirtual(ForkJoinPool.class, "externalExecuteTask", methodType);
+            } catch (Exception e) {
+                throw new InternalError(e);
+            }
+        }
+        /**
+         * Invokes the non-public ForkJoinPool.externalExecuteTask method to
+         * submit the task to the current carrier thread's work queue.
+         */
+        static void externalExecuteTask(ForkJoinPool pool, Runnable task) {
+            try {
+                ForkJoinPools.externalExecuteTask.invoke(pool, task);
+            } catch (RuntimeException | Error e) {
+                throw e;
+            } catch (Throwable e) {
+                throw new InternalError(e);
+            }
+        }
     }
 
     /**

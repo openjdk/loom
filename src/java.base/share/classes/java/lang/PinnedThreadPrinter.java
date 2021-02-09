@@ -34,9 +34,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.stream.Collectors;
-import jdk.internal.vm.annotation.ChangesCurrentThread;
-import sun.nio.ch.ConsoleStreams;
-
 import static java.lang.StackWalker.Option.*;
 
 /**
@@ -86,49 +83,32 @@ class PinnedThreadPrinter {
     }
 
     /**
-     * Prints the stack trace of the current virtual thread to the given print
-     * stream.
-     *
-     * This method does nothing if standard output or error locked by the current
-     * thread. This avoid recursive usage if pinned when when printing to either
-     * stream.
+     * Prints the stack trace of the current mounted vthread continuation.
      *
      * @param printAll true to print all stack frames, false to only print the
      *        frames that are native or holding a monitor
      */
-    @ChangesCurrentThread
     static void printStackTrace(PrintStream out, boolean printAll) {
-        assert Thread.currentThread().isVirtual();
-        if (!ConsoleStreams.isOutOrErrLocked(Thread.currentThread())) {
-            // switch to carrier thread as the printing may park
-            Thread vthread = Thread.currentThread();
-            Thread carrier = Thread.currentCarrierThread();
-            carrier.setCurrentThread(carrier);
-            try {
-                List<LiveStackFrame> stack = STACK_WALKER.walk(s ->
-                    s.map(f -> (LiveStackFrame) f)
-                            .filter(f -> f.getDeclaringClass() != PinnedThreadPrinter.class)
-                            .collect(Collectors.toList())
-                );
+        List<LiveStackFrame> stack = STACK_WALKER.walk(s ->
+            s.map(f -> (LiveStackFrame) f)
+                    .filter(f -> f.getDeclaringClass() != PinnedThreadPrinter.class)
+                    .collect(Collectors.toList())
+        );
 
-                // find the closest frame that is causing the thread to be pinned
-                stack.stream()
-                    .filter(f -> (f.isNativeMethod() || f.getMonitors().length > 0))
-                    .map(LiveStackFrame::getDeclaringClass)
-                    .findFirst()
-                    .ifPresent(key -> {
-                        int hash = hash(stack);
-                        synchronized (classToHashes) {
-                            // print the stack trace if not already seen
-                            if (classToHashes.computeIfAbsent(key, k -> new Hashes()).add(hash)) {
-                                printStackTrace(stack, out, printAll);
-                            }
-                        }
-                    });
-            } finally {
-                carrier.setCurrentThread(vthread);
-            }
-        }
+        // find the closest frame that is causing the thread to be pinned
+        stack.stream()
+            .filter(f -> (f.isNativeMethod() || f.getMonitors().length > 0))
+            .map(LiveStackFrame::getDeclaringClass)
+            .findFirst()
+            .ifPresent(key -> {
+                int hash = hash(stack);
+                synchronized (classToHashes) {
+                    // print the stack trace if not already seen
+                    if (classToHashes.computeIfAbsent(key, k -> new Hashes()).add(hash)) {
+                        printStackTrace(stack, out, printAll);
+                    }
+                }
+            });
     }
 
     private static void printStackTrace(List<LiveStackFrame> stack,
