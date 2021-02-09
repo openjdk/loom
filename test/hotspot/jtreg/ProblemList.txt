@@ -55,6 +55,7 @@ serviceability/jvmti/events/FramePop/framepop02/framepop02.java               00
 serviceability/jvmti/vthread/MethodExitTest/MethodExitTest.java               0000000 generic-all
 serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java       0000000 generic-all
 serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java  0000000 generic-all
+serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java    0000000 generic-all
 
 #############################################################################
 
