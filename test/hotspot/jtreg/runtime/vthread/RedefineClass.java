@@ -138,7 +138,7 @@ public class RedefineClass {
 
 
     public static void main(String[] args) throws Exception {
-        Thread main = Thread.startVirutalTHread("test", RedefineClass::main);
+        Thread main = Thread.startVirtualThread("test", RedefineClass::main);
         main.join();
     }
 
