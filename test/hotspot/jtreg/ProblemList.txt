@@ -49,7 +49,7 @@ vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java   82
 runtime/clinit/ClassInitBarrier.java                                          8254936 generic-all
 runtime/vthread/RedefineClass.java                                            8253378 generic-all
 gtest/GTestWrapper.java                                                       0000000 generic-all
-
+runtime/vthread/TestObjectAllocationSampleEvent.java                          8261379 generic-all
 serviceability/jvmti/events/FramePop/framepop02/framepop02.java               0000000 generic-all
 
 #############################################################################
