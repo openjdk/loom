@@ -3891,11 +3891,11 @@ JVM_ENTRY_NO_ENV(jint, JVM_FindSignal(const char *name))
   return os::get_signal_number(name);
 JVM_END
 
-JVM_ENTRY(void, JVM_VirtualThreadMountBegin(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread, jboolean first_mount))
+JVM_ENTRY(void, JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount))
   JvmtiVTMTDisabler::start_VTMT(vthread, 0);
 JVM_END
 
-JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread, jboolean first_mount))
+JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
   oop vt_oop = JNIHandles::resolve(vthread);
 
@@ -3906,33 +3906,36 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jclass vthread_class, job
     if (JvmtiExport::should_post_vthread_scheduled()) {
       JvmtiExport::post_vthread_scheduled(vthread);
     }
-    JFR_ONLY(Jfr::on_thread_start(event_thread, vthread));
+    oop ct_oop = thread->threadObj();
+    jobject cthread = JNIHandles::make_local(Thread::current(), ct_oop);
+    JFR_ONLY(Jfr::on_thread_start(cthread, vthread));
   }
   if (JvmtiExport::should_post_vthread_mounted()) {
     JvmtiExport::post_vthread_mounted(vthread);
   }
 JVM_END
 
-JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread))
+JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread))
   if (JvmtiExport::should_post_vthread_unmounted()) {
     JvmtiExport::post_vthread_unmounted(vthread);
   }
-  oop ct_oop = JNIHandles::resolve(event_thread);
-
+  oop ct_oop = thread->threadObj();
   thread->rebind_to_jvmti_thread_state_of(ct_oop);
 
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
 JVM_END
 
-JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread))
+JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread))
   JvmtiVTMTDisabler::finish_VTMT(vthread, 1);
 JVM_END
 
-JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, jthread event_thread, jobject vthread))
+JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jobject vthread))
   if (JvmtiExport::should_post_vthread_terminated()) {
     JvmtiExport::post_vthread_terminated(vthread);
   }
-  JFR_ONLY(Jfr::on_thread_exit(event_thread, vthread));
+  oop ct_oop = thread->threadObj();
+  jobject cthread = JNIHandles::make_local(Thread::current(), ct_oop);
+  JFR_ONLY(Jfr::on_thread_exit(cthread, vthread));
   thread->set_mounted_vthread(NULL);
   JvmtiVTMTDisabler::start_VTMT(vthread, 0);
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
