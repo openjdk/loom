@@ -31,6 +31,7 @@
 #include "prims/jvmtiThreadState.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
+#include "runtime/jniHandles.hpp"
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/vframe.hpp"
 
