@@ -2313,3 +2313,10 @@ void ShenandoahHeap::flush_liveness_cache(uint worker_id) {
     }
   }
 }
+
+bool ShenandoahHeap::requires_barriers(oop obj) const {
+  ShenandoahHeapRegion* region = heap_region_containing(obj);
+  bool requires_concmark_barriers = is_concurrent_mark_in_progress() && !marking_context()->allocated_after_mark_start(obj);
+  bool requires_loadref_barriers = has_forwarded_objects() && cast_from_oop<HeapWord*>(obj) < heap_region_containing(obj)->get_update_watermark();
+  return requires_concmark_barriers || requires_loadref_barriers;
+}
