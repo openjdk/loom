@@ -199,7 +199,7 @@ void InstanceStackChunkKlass::iterate_derived_pointers(oop chunk, const StackChu
           continue;
       }
 #endif
-#if INCLUDE_ZGC
+#if INCLUDE_SHENANDOAHGC
       if (concurrent_gc && UseShenandoahGC) {
         if (!ShenandoahHeap::heap()->in_collection_set(base)) {
           continue;
