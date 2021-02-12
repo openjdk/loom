@@ -84,10 +84,10 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * to the <i>current thread</i>, will return the {@code Thread} object for the virtual
  * thread.
  *
- * <p> {@code Thread} defines factory methods, and a {@linkplain Builder} API,
- * for creating platform or virtual threads. It also defines (for compatibility and
- * customization reasons) constructors for creating platform threads. Newer code
- * is encouraged to use the factory methods or the builder rather than the constructors.
+ * <p> {@code Thread} defines a {@linkplain Builder} API, for creating threads. It
+ * also defines (for compatibility and customization reasons) constructors for
+ * creating platform threads. The constructors cannot be used to create virtual
+ * threads.
  *
  * <p> Platform threads are designated <i>daemon</i> or <i>non-daemon</i> threads.
  * When the Java virtual machine starts up, there is usually one non-daemon
