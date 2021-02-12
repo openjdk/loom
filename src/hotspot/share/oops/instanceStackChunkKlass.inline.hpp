@@ -41,6 +41,9 @@
 #include "gc/z/zAddress.inline.hpp"
 #define FIX_DERIVED_POINTERS true
 #endif
+#if INCLUDE_SHENANDOAHGC
+#define FIX_DERIVED_POINTERS true
+#endif
 
 class StackChunkFrameStream : public StackObj {
  private:
@@ -196,7 +199,7 @@ void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) 
   if (Devirtualizer::do_metadata(closure)) {
     Devirtualizer::do_klass(closure, this);
   }
-  UseZGC
+  (UseZGC || UseShenandoahGC)
     ? oop_oop_iterate_stack<OopClosureType, true> (obj, closure)
     : oop_oop_iterate_stack<OopClosureType, false>(obj, closure);
   oop_oop_iterate_header<T>(obj, closure);
@@ -206,7 +209,7 @@ template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_reverse(oop obj, OopClosureType* closure) {
   assert(!Devirtualizer::do_metadata(closure), "Code to handle metadata is not implemented");
 
-  UseZGC
+  (UseZGC || UseShenandoahGC)
     ? oop_oop_iterate_stack<OopClosureType, true> (obj, closure)
     : oop_oop_iterate_stack<OopClosureType, false>(obj, closure);
   oop_oop_iterate_header<T>(obj, closure);

@@ -194,9 +194,16 @@ void InstanceStackChunkKlass::iterate_derived_pointers(oop chunk, const StackChu
       assert (!CompressedOops::is_base(base), "");
 
 #if INCLUDE_ZGC
-      if (concurrent_gc) { //  && UseZG
+      if (concurrent_gc && UseZGC) {
         if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) 
           continue;
+      }
+#endif
+#if INCLUDE_SHENANDOAHGC
+      if (concurrent_gc && UseShenandoahGC) {
+        if (!ShenandoahHeap::heap()->in_collection_set(base)) {
+          continue;
+        }
       }
 #endif
 
@@ -392,7 +399,7 @@ NOINLINE void InstanceStackChunkKlass::fix_chunk(oop chunk) {
     num_oops += f.oopmap()->num_oops();
 
     f.cb()->as_compiled_method()->run_nmethod_entry_barrier();
-    if (UseZGC) {
+    if (UseZGC || UseShenandoahGC) {
       iterate_derived_pointers<true>(chunk, f);
       fix_oops(f);
       OrderAccess::loadload();
@@ -504,8 +511,8 @@ bool InstanceStackChunkKlass::verify(oop chunk, oop cont, size_t* out_size, int*
       log_develop_trace(jvmcont)("debug_verify_stack_chunk narrow: %d reg: %d p: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, omv.reg()->is_reg(), p2i(p));
       assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
       assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
-      
-      oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)HeapAccess<>::oop_load((narrowOop*)p) : (oop)HeapAccess<>::oop_load((oop*)p);
+      intptr_t val = *(intptr_t*)p;
+      oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)NativeAccess<>::oop_load((narrowOop*)&val) : (oop)NativeAccess<>::oop_load((oop*)&val);
       if (!SafepointSynchronize::is_at_safepoint()) {
         assert (oopDesc::is_oop_or_null(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
       }
@@ -527,7 +534,7 @@ bool InstanceStackChunkKlass::verify(oop chunk, oop cont, size_t* out_size, int*
       assert (f.is_in_oops(base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
       assert (!f.is_in_oops(derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
       log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
-      oop base = (oop)NativeAccess<>::oop_load((oop*)base_loc); // *(oop*)base_loc;
+      oop base = *base_loc;
       if (base != (oop)NULL) {
         assert (!CompressedOops::is_base(base), "");
         assert (oopDesc::is_oop(base), "");
