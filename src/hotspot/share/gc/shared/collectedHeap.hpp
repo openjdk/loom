@@ -357,8 +357,14 @@ class CollectedHeap : public CHeapObj<mtInternal> {
 
   // Continuation support
   virtual void collect_for_codecache();
-  // If requires_barriers() returns false, then HeapAccesses into the object
-  // are equivalent to RawAccesses.
+
+  // Return true, if accesses to the object would require barriers.
+  // This is used by continuations to copy chunks of a thread stack into StackChunk object or out of a StackChunk
+  // object back into the thread stack. These chunks may contain references to objects. It is crucial that
+  // the GC does not attempt to traverse the object while we modify it, because its structure (oopmap) is changed
+  // when stack chunks are stored into it.
+  // StackChunk objects may be reused, the GC must not assume that a StackChunk object is always a freshly
+  // allocated object.
   virtual bool requires_barriers(oop obj) const = 0;
 
   // Returns "true" iff there is a stop-world GC in progress.  (I assume
