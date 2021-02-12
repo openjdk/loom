@@ -956,9 +956,8 @@ void ShenandoahFullGC::compact_humongous_objects() {
       assert(old_start != new_start, "must be real move");
       assert(r->is_stw_move_allowed(), "Region " SIZE_FORMAT " should be movable", r->index());
 
-      Copy::aligned_conjoint_words(heap->get_region(old_start)->bottom(),
-                                   heap->get_region(new_start)->bottom(),
-                                   words_size);
+      old_obj->copy_conjoint(heap->get_region(new_start)->bottom(),
+                             words_size);
 
       oop new_obj = oop(heap->get_region(new_start)->bottom());
       new_obj->init_mark();
