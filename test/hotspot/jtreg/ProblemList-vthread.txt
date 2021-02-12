@@ -20,16 +20,7 @@ vmTestbase/gc/memory/UniThread/Linear1/Linear1.java	                            
 vmTestbase/gc/memory/UniThread/Linear2/Linear2.java                                             8241630 generic-all
 vmTestbase/gc/gctests/RememberedSet/RememberedSet.java                                          8241630 generic-all
 
-runtime/whitebox/WBStackSize.java                                                               8253670 generic-all
-runtime/execstack/Testexecstack.java                                                            8253670 generic-all
 serviceability/dcmd/compiler/CodeCacheTest.java                                                 8253570 generic-all
-vmTestbase/nsk/stress/stack/stack019.java                                                       8253670 generic-all
-vmTestbase/nsk/stress/stack/stack009.java                                                       8253670 generic-all
-vmTestbase/nsk/stress/stack/stack007.java                                                       8253670 generic-all
-vmTestbase/nsk/stress/stack/stack006.java                                                       8253670 generic-all
-vmTestbase/nsk/stress/stack/stack004.java                                                       8253670 generic-all
-vmTestbase/nsk/stress/stack/stack003.java                                                       8253670 generic-all
-vmTestbase/nsk/stress/except/except010.java                                                     8253670 generic-all
 
 vmTestbase/nsk/stress/strace/strace001.java                                                     8254188 generic-all
 vmTestbase/nsk/stress/strace/strace002.java                                                     8254188 generic-all

@@ -53,6 +53,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.Condition;
+import jdk.internal.misc.VirtualThreads;
 
 /**
  * An {@link ExecutorService} for running {@link ForkJoinTask}s.
@@ -2172,7 +2173,6 @@ public class ForkJoinPool extends AbstractExecutorService {
         Thread t; ForkJoinWorkerThread wt; WorkQueue q;
         if (task == null)
             throw new NullPointerException();
-        //if (((t = VirtualThreads.currentCarrierThread()) instanceof ForkJoinWorkerThread) &&
         if (((t = Thread.currentThread()) instanceof ForkJoinWorkerThread) &&
             (q = (wt = (ForkJoinWorkerThread)t).workQueue) != null &&
             wt.pool == this)
@@ -2180,6 +2180,20 @@ public class ForkJoinPool extends AbstractExecutorService {
         else
             externalPush(task);
         return task;
+    }
+
+    /**
+     * Pushes an external submission to the current thread's work queue if possible.
+     * This method is invoked (reflectively) by the virtual thread implementation.
+     */
+    private void externalExecuteTask(Runnable task) {
+        var forkJoinTask = new ForkJoinTask.RunnableExecuteAction(task);
+        Thread t = VirtualThreads.currentCarrierThread();
+        if (t instanceof ForkJoinWorkerThread wt && wt.pool == this) {
+            wt.workQueue.push(forkJoinTask, this);
+        } else {
+            externalPush(forkJoinTask);
+        }
     }
 
     /**

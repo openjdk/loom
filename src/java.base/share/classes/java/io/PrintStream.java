@@ -30,9 +30,9 @@ import java.util.Locale;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
-import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.access.JavaIOPrintStreamAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.InternalLock;
 
 /**
  * A {@code PrintStream} adds functionality to another output stream,
@@ -67,7 +67,7 @@ public class PrintStream extends FilterOutputStream
     implements Appendable, Closeable
 {
     // initialized to null when PrintStream is sub-classed
-    private final ReentrantLock lock;
+    private final InternalLock lock;
 
     private final boolean autoFlush;
     private boolean trouble = false;
@@ -117,7 +117,7 @@ public class PrintStream extends FilterOutputStream
 
         // use monitors when PrintStream is sub-classed
         if (getClass() == PrintStream.class) {
-            lock = new ReentrantLock();
+            lock = new InternalLock();
         } else {
             lock = null;
         }
@@ -213,7 +213,7 @@ public class PrintStream extends FilterOutputStream
 
         // use monitors when PrintStream is sub-classed
         if (getClass() == PrintStream.class) {
-            lock = new ReentrantLock();
+            lock = new InternalLock();
         } else {
             lock = null;
         }

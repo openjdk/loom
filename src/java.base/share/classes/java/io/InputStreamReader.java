@@ -27,10 +27,8 @@ package java.io;
 
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
-import java.util.concurrent.locks.ReentrantLock;
-
+import java.util.Objects;
 import sun.nio.cs.StreamDecoder;
-
 
 /**
  * An InputStreamReader is a bridge from byte streams to character streams: It
@@ -63,15 +61,10 @@ import sun.nio.cs.StreamDecoder;
 
 public class InputStreamReader extends Reader {
 
-    private final StreamDecoder sd;
+    // Legacy/undocumented behavior was to the wrapped InputStream as the lock.
+    // New behavior is to use "this" or an "internal lock" for trusted classes.
 
-    private static Object lockFor(InputStreamReader reader) {
-        if (reader.getClass() == InputStreamReader.class) {
-            return new ReentrantLock();
-        } else {
-            return reader;
-        }
-    }
+    private final StreamDecoder sd;
 
     /**
      * Creates an InputStreamReader that uses the default charset.
@@ -79,10 +72,8 @@ public class InputStreamReader extends Reader {
      * @param  in   An InputStream
      */
     public InputStreamReader(InputStream in) {
-        super(in);
-        lock = lockFor(this);
-        sd = StreamDecoder.forInputStreamReader(in, lock,
-                Charset.defaultCharset()); // ## check lock object
+        Objects.requireNonNull(in);
+        sd = StreamDecoder.forInputStreamReader(in, lock, Charset.defaultCharset());
     }
 
     /**
@@ -101,10 +92,8 @@ public class InputStreamReader extends Reader {
     public InputStreamReader(InputStream in, String charsetName)
         throws UnsupportedEncodingException
     {
-        super(in);
-        if (charsetName == null)
-            throw new NullPointerException("charsetName");
-        lock = lockFor(this);
+        Objects.requireNonNull(in);
+        Objects.requireNonNull(charsetName, "charsetName");
         sd = StreamDecoder.forInputStreamReader(in, lock, charsetName);
     }
 
@@ -117,10 +106,8 @@ public class InputStreamReader extends Reader {
      * @since 1.4
      */
     public InputStreamReader(InputStream in, Charset cs) {
-        super(in);
-        if (cs == null)
-            throw new NullPointerException("charset");
-        lock = lockFor(this);
+        Objects.requireNonNull(in);
+        Objects.requireNonNull(cs, "charset");
         sd = StreamDecoder.forInputStreamReader(in, lock, cs);
     }
 
@@ -133,10 +120,7 @@ public class InputStreamReader extends Reader {
      * @since 1.4
      */
     public InputStreamReader(InputStream in, CharsetDecoder dec) {
-        super(in);
-        if (dec == null)
-            throw new NullPointerException("charset decoder");
-        lock = lockFor(this);
+        Objects.requireNonNull(dec, "charset decoder");
         sd = StreamDecoder.forInputStreamReader(in, lock, dec);
     }
 

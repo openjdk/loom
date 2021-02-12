@@ -84,10 +84,10 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * to the <i>current thread</i>, will return the {@code Thread} object for the virtual
  * thread.
  *
- * <p> {@code Thread} defines factory methods, and a {@linkplain Builder} API,
- * for creating platform or virtual threads. It also defines (for compatibility and
- * customization reasons) constructors for creating platform threads. Newer code
- * is encouraged to use the factory methods or the builder rather than the constructors.
+ * <p> {@code Thread} defines a {@linkplain Builder} API, for creating threads. It
+ * also defines (for compatibility and customization reasons) constructors for
+ * creating platform threads. The constructors cannot be used to create virtual
+ * threads.
  *
  * <p> Platform threads are designated <i>daemon</i> or <i>non-daemon</i> threads.
  * When the Java virtual machine starts up, there is usually one non-daemon
@@ -312,8 +312,8 @@ public class Thread implements Runnable {
      */
     public static void yield() {
         Thread thread = currentThread();
-        if (thread.isVirtual()) {
-            ((VirtualThread) thread).tryYield();
+        if (thread instanceof VirtualThread vthread) {
+            vthread.tryYield();
         } else {
             yield0();
         }
@@ -357,9 +357,9 @@ public class Thread implements Runnable {
 
     private static void sleepMillis(long millis) throws InterruptedException {
         Thread thread = currentThread();
-        if (thread.isVirtual()) {
+        if (thread instanceof VirtualThread vthread) {
             long nanos = NANOSECONDS.convert(millis, MILLISECONDS);
-            ((VirtualThread) thread).sleepNanos(nanos);
+            vthread.sleepNanos(nanos);
         } else {
             sleep0(millis);
         }
@@ -429,18 +429,18 @@ public class Thread implements Runnable {
             return;
 
         Thread thread = currentThread();
-        if (thread.isVirtual()) {
+        if (thread instanceof VirtualThread vthread) {
             if (ThreadSleepEvent.isTurnedOn()) {
                 ThreadSleepEvent event = new ThreadSleepEvent();
                 try {
                     event.time = nanos;
                     event.begin();
-                    ((VirtualThread) thread).sleepNanos(nanos);
+                    vthread.sleepNanos(nanos);
                 } finally {
                     event.commit();
                 }
             } else {
-                ((VirtualThread) thread).sleepNanos(nanos);
+                vthread.sleepNanos(nanos);
             }
         } else {
             // convert to milliseconds, ceiling rounding mode
@@ -2292,10 +2292,10 @@ public class Thread implements Runnable {
         if (millis < 0)
             throw new IllegalArgumentException("timeout value is negative");
 
-        if (isVirtual()) {
+        if (this instanceof VirtualThread vthread) {
             if (isAlive()) {
                 long nanos = MILLISECONDS.toNanos(millis);
-                ((VirtualThread) this).joinNanos(nanos);
+                vthread.joinNanos(nanos);
             }
             return;
         }
@@ -2417,8 +2417,8 @@ public class Thread implements Runnable {
         if (nanos <= 0)
             return false;
 
-        if (isVirtual()) {
-            return ((VirtualThread) this).joinNanos(nanos);
+        if (this instanceof VirtualThread vthread) {
+            return vthread.joinNanos(nanos);
         } else {
             // convert to milliseconds, ceiling rounding mode
             long millis = MILLISECONDS.convert(nanos, NANOSECONDS);

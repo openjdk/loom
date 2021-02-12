@@ -617,8 +617,11 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   javaVFrame* jvf = NULL;
 
   assert(cont != NULL, "virtual thread continuation must not be NULL");
-  if (java_lang_Continuation::is_mounted(cont)) {
-    oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
+
+  oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
+  // Returned carrier_thread can be NULL for a mounted continuation.
+  // Then treat it as an unmounted case.
+  if (java_lang_Continuation::is_mounted(cont) && carrier_thread != NULL) {
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
 
     if (!java_thread->has_last_Java_frame()) {
@@ -1242,7 +1245,10 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
       oop cont = java_lang_VirtualThread::continuation(thread_oop);
       if (java_lang_Continuation::is_mounted(cont)) {
         oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
-        java_thread = java_lang_Thread::thread(carrier_thread);
+        // Returned carrier_thread can be NULL for a mounted continuation.
+        if (carrier_thread != NULL) {
+          java_thread = java_lang_Thread::thread(carrier_thread);
+        }
       }
     }
   }

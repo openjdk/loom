@@ -25,11 +25,9 @@
 
 package java.io;
 
-
 import java.nio.CharBuffer;
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.InternalLock;
 
 /**
  * Abstract class for reading character streams.  The only methods that a
@@ -155,7 +153,16 @@ public abstract class Reader implements Readable, Closeable {
      * synchronize on the reader itself.
      */
     protected Reader() {
-        this.lock = this;
+        // use InternalLock for trusted classes
+        Class<?> clazz = getClass();
+        if (clazz == InputStreamReader.class
+            || clazz == BufferedReader.class
+            || clazz == FileReader.class
+            || clazz == sun.nio.cs.StreamDecoder.class) {
+            this.lock = new InternalLock();
+        } else {
+            this.lock = this;
+        }
     }
 
     /**
@@ -165,10 +172,7 @@ public abstract class Reader implements Readable, Closeable {
      * @param lock  The Object to synchronize on.
      */
     protected Reader(Object lock) {
-        if (lock == null) {
-            throw new NullPointerException();
-        }
-        this.lock = lock;
+        this.lock = Objects.requireNonNull(lock);
     }
 
     /**
@@ -283,13 +287,12 @@ public abstract class Reader implements Readable, Closeable {
         if (n < 0L)
             throw new IllegalArgumentException("skip value is negative");
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedSkip(n);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {

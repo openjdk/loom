@@ -30,7 +30,9 @@
  *      8067796 8224905
  * @key intermittent
  * @summary Basic tests for Process and Environment Variable code
- * @modules java.base/java.lang:open java.base/java.io:open
+ * @modules java.base/java.lang:open
+ *          java.base/java.io:open
+ *          java.base/jdk.internal.misc
  * @library /test/lib
  * @run main/othervm/timeout=300 Basic
  * @run main/othervm/timeout=300 -Djdk.lang.Process.launchMechanism=fork Basic
@@ -39,7 +41,9 @@
 
 /*
  * @test
- * @modules java.base/java.lang:open java.base/java.io:open
+ * @modules java.base/java.lang:open
+ *          java.base/java.io:open
+ *          java.base/jdk.internal.misc
  * @requires (os.family == "linux")
  * @library /test/lib
  * @run main/othervm/timeout=300 -Djdk.lang.Process.launchMechanism=posix_spawn Basic
@@ -57,7 +61,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 import java.security.*;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
@@ -2794,7 +2797,7 @@ public class Basic {
     static boolean isLocked(BufferedInputStream bis, long millis) throws Exception {
         Field lockField = BufferedInputStream.class.getDeclaredField("lock");
         lockField.setAccessible(true);
-        ReentrantLock lock = (ReentrantLock) lockField.get(bis);
+        var lock = (jdk.internal.misc.InternalLock) lockField.get(bis);
         if (lock != null) {
             if (lock.tryLock()) {
                 lock.unlock();

@@ -1123,19 +1123,19 @@ JVM_GetEnclosingMethodInfo(JNIEnv* env, jclass ofClass);
 /* Virtual thread support.
  */
 JNIEXPORT void JNICALL
-JVM_VirtualThreadMountBegin(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread, jboolean first_mount);
+JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadMountEnd(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread, jboolean first_mount);
+JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadUnmountBegin(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
+JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadUnmountEnd(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
+JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadTerminated(JNIEnv* env, jclass vthread_class, jobject event_thread, jobject vthread);
+JVM_VirtualThreadTerminated(JNIEnv* env, jobject vthread);
 
 /*
  * This structure is used by the launcher to get the default thread

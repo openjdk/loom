@@ -11,12 +11,15 @@ jdk/jfr/event/runtime/TestClassLoadEvent.java                                   
 jdk/jfr/event/runtime/TestJavaBlockedEvent.java                                                 8253378 generic-all
 jdk/jfr/jcmd/TestJcmdStartStopDefault.java                                                      8253378 generic-all
 
+jdk/jfr/event/allocation/TestObjectAllocationSampleEvent.java                                   8261379 generic-all
+
 java/lang/invoke/condy/CondyNestedTest.java                                                     8253670 generic-all
 
 java/util/stream/boottest/java.base/java/util/stream/SpinedBufferTest.java                      8254093 generic-all
 
 java/lang/Thread/GenerifyStackTraces.java                                                       8253918 generic-all
 java/lang/Thread/NullStackTrace.java                                                            8253918 generic-all
+java/lang/Thread/UncaughtExceptionsTest.java                                                    0000000 generic-all
 
 java/lang/Thread/virtual/stress/PinALot.java#id2                                                8255275 generic-all
 

@@ -25,7 +25,7 @@
 
 package java.io;
 
-import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.InternalLock;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.util.ArraysSupport;
 
@@ -65,7 +65,7 @@ public class BufferedInputStream extends FilterInputStream {
             = U.objectFieldOffset(BufferedInputStream.class, "buf");
 
     // initialized to null when BufferedInputStream is sub-classed
-    private final ReentrantLock lock;
+    private final InternalLock lock;
 
     /**
      * The internal buffer array where the data is stored. When necessary,
@@ -206,7 +206,7 @@ public class BufferedInputStream extends FilterInputStream {
 
         // use monitors when BufferedInputStream is sub-classed
         if (getClass() == BufferedInputStream.class) {
-            lock = new ReentrantLock();
+            lock = new InternalLock();
         } else {
             lock = null;
         }

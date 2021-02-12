@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -111,10 +111,18 @@ class RegisterMap : public StackObj {
     }
   }
 
+  address location(VMReg base_reg, int slot_idx) const {
+    if (slot_idx > 0) {
+      return pd_location(base_reg, slot_idx);
+    } else {
+      return location(base_reg);
+    }
+  }
+
   address trusted_location(VMReg reg) const {
     return (address) _location[reg->value()];
   }
-
+    
   void verify(RegisterMap& other) {
     for (int i = 0; i < reg_count; ++i) {
       assert(_location[i] == other._location[i], "");

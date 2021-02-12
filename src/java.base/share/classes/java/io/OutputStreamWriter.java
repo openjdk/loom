@@ -28,10 +28,8 @@ package java.io;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
-import java.util.concurrent.locks.ReentrantLock;
-
+import java.util.Objects;
 import sun.nio.cs.StreamEncoder;
-
 
 /**
  * An OutputStreamWriter is a bridge from character streams to byte streams:
@@ -77,15 +75,10 @@ import sun.nio.cs.StreamEncoder;
 
 public class OutputStreamWriter extends Writer {
 
-    private final StreamEncoder se;
+    // Legacy/undocumented behavior was to the wrapped Writer as the lock.
+    // New behavior is to use "this" or an "internal lock" for trusted classes.
 
-    private static Object lockFor(OutputStreamWriter writer) {
-        if (writer.getClass() == OutputStreamWriter.class) {
-            return new ReentrantLock();
-        } else {
-            return writer;
-        }
-    }
+    private final StreamEncoder se;
 
     /**
      * Creates an OutputStreamWriter that uses the named charset.
@@ -103,10 +96,8 @@ public class OutputStreamWriter extends Writer {
     public OutputStreamWriter(OutputStream out, String charsetName)
         throws UnsupportedEncodingException
     {
-        super(out);
-        if (charsetName == null)
-            throw new NullPointerException("charsetName");
-        lock = lockFor(this);
+        Objects.requireNonNull(out);
+        Objects.requireNonNull(charsetName, "charsetName");
         se = StreamEncoder.forOutputStreamWriter(out, lock, charsetName);
     }
 
@@ -116,8 +107,7 @@ public class OutputStreamWriter extends Writer {
      * @param  out  An OutputStream
      */
     public OutputStreamWriter(OutputStream out) {
-        super(out);
-        lock = lockFor(this);
+        Objects.requireNonNull(out);
         se = StreamEncoder.forOutputStreamWriter(out, lock, Charset.defaultCharset());
     }
 
@@ -133,10 +123,8 @@ public class OutputStreamWriter extends Writer {
      * @since 1.4
      */
     public OutputStreamWriter(OutputStream out, Charset cs) {
-        super(out);
-        if (cs == null)
-            throw new NullPointerException("charset");
-        lock = lockFor(this);
+        Objects.requireNonNull(out);
+        Objects.requireNonNull(cs, "charset");
         se = StreamEncoder.forOutputStreamWriter(out, lock, cs);
     }
 
@@ -152,10 +140,8 @@ public class OutputStreamWriter extends Writer {
      * @since 1.4
      */
     public OutputStreamWriter(OutputStream out, CharsetEncoder enc) {
-        super(out);
-        if (enc == null)
-            throw new NullPointerException("charset encoder");
-        lock = lockFor(this);
+        Objects.requireNonNull(out);
+        Objects.requireNonNull(enc, "charset encoder");
         se = StreamEncoder.forOutputStreamWriter(out, lock, enc);
     }
 
