@@ -113,6 +113,20 @@ class VirtualThread extends Thread {
     private Condition condition;           // created lazily while holding lock
 
     /**
+     * Returns the default scheduler.
+     */
+    static Executor defaultScheduler() {
+        return DEFAULT_SCHEDULER;
+    }
+
+    /**
+     * Returns the continuation scope used for virtual threads.
+     */
+    static ContinuationScope continuationScope() {
+        return VTHREAD_SCOPE;
+    }
+
+    /**
      * Creates a new {@code VirtualThread} to run the given task with the given
      * scheduler. If the given scheduler is {@code null} and the current thread
      * is a platform thread then the newly created virtual thread will use the
@@ -148,56 +162,17 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Returns the default scheduler.
-     */
-    static Executor defaultScheduler() {
-        return DEFAULT_SCHEDULER;
-    }
-
-    /**
-     * Returns the continuation scope used for virtual threads.
-     */
-    static ContinuationScope continuationScope() {
-        return VTHREAD_SCOPE;
-    }
-
-    /**
      * The continuation that a virtual thread executes.
      */
     private static class VThreadContinuation extends Continuation {
         VThreadContinuation(VirtualThread vthread, Runnable task) {
-            super(VTHREAD_SCOPE, new TaskWrapper(vthread, task));
+            super(VTHREAD_SCOPE, () -> vthread.run(task));
         }
         @Override
         protected void onPinned(Continuation.Pinned reason) {
             if (TRACE_PINNING_MODE > 0) {
                 boolean printAll = (TRACE_PINNING_MODE == 1);
                 PinnedThreadPrinter.printStackTrace(System.out, printAll);
-            }
-        }
-    }
-
-    /**
-     * Wraps a task so that it executes in the context of a virtual thread.
-     * The virtual thread is mounted before the task runs, then unmounts when
-     * the task completes.
-     */
-    private static class TaskWrapper implements Runnable {
-        private final VirtualThread vthread;
-        private final Runnable task;
-        TaskWrapper(VirtualThread vthread, Runnable task) {
-            this.vthread = vthread;
-            this.task = task;
-        }
-        @ChangesCurrentThread
-        public void run() {
-            vthread.mount(true);
-            try {
-                task.run();
-            } catch (Throwable exc) {
-                vthread.dispatchUncaughtException(exc);
-            } finally {
-                vthread.unmount();
             }
         }
     }
@@ -287,17 +262,37 @@ class VirtualThread extends Thread {
     }
 
     /**
+     * Runs a task in the context of this virtual thread. The virtual thread is
+     * mounted on the current (carrier) thread before the task runs. It unmounts
+     * from its carrier thread when the task completes.
+     */
+    @ChangesCurrentThread
+    private void run(Runnable task) {
+        boolean notifyJvmti = notifyJvmtiEvents;
+
+        // mount
+        if (notifyJvmti) notifyJvmtiMountBegin(true);
+        mount();
+        if (notifyJvmti) notifyJvmtiMountEnd(true);
+
+        try {
+            task.run();
+        } catch (Throwable exc) {
+            dispatchUncaughtException(exc);
+        } finally {
+            // unmount
+            if (notifyJvmti) notifyJvmtiUnmountBegin();
+            unmount();
+            if (notifyJvmti) notifyJvmtiUnmountEnd();
+        }
+    }
+
+    /**
      * Mounts this virtual thread onto the current carrier thread.
      */
     @ChangesCurrentThread
-    private void mount(boolean firstMount) {
+    private void mount() {
         //assert this.carrierThread == null;
-
-        // notify JVMTI agents
-        boolean notifyJvmti = notifyJvmtiEvents;
-        if (notifyJvmti) {
-            notifyJvmtiMountBegin(firstMount);
-        }
 
         // sets the carrier thread
         Thread carrier = Thread.currentCarrierThread();
@@ -316,11 +311,6 @@ class VirtualThread extends Thread {
 
         // set Thread.currentThread() to return this virtual thread
         carrier.setCurrentThread(this);
-
-        // notify JVMTI agents
-        if (notifyJvmti) {
-            notifyJvmtiMountEnd(firstMount);
-        }
     }
 
     /**
@@ -329,12 +319,6 @@ class VirtualThread extends Thread {
     @ChangesCurrentThread
     private void unmount() {
         //assert this.carrierThread == Thread.currentCarrierThread();
-
-        // notify JVMTI agents
-        boolean notifyJvmti = notifyJvmtiEvents;
-        if (notifyJvmti) {
-            notifyJvmtiUnmountBegin();
-        }
 
         // set Thread.currentThread() to return the carrier thread
         Thread carrier = this.carrierThread;
@@ -345,11 +329,6 @@ class VirtualThread extends Thread {
             CARRIER_THREAD.setRelease(this, null);
         }
         carrier.clearInterrupt();
-
-        // notify JVMTI agents
-        if (notifyJvmti) {
-            notifyJvmtiUnmountEnd();
-        }
     }
 
     /**
@@ -358,12 +337,23 @@ class VirtualThread extends Thread {
      */
     @ChangesCurrentThread
     private void yieldContinuation() {
+        boolean notifyJvmti = notifyJvmtiEvents;
+
+        // unmount
+        if (notifyJvmti) notifyJvmtiUnmountBegin();
         unmount();
+        if (notifyJvmti) notifyJvmtiUnmountEnd();
+
         boolean yielded = false;
         try {
             yielded = Continuation.yield(VTHREAD_SCOPE);
         } finally {
-            mount(false);
+
+            // mount
+            if (notifyJvmti) notifyJvmtiMountBegin(false);
+            mount();
+            if (notifyJvmti) notifyJvmtiMountEnd(false);
+
             if (!yielded) {
                 // pinned or resource error
                 if (state() == PARKING) {
@@ -372,6 +362,7 @@ class VirtualThread extends Thread {
                     setState(RUNNING);
                 }
             }
+
             assert (Thread.currentThread() == this) && (state() == RUNNING);
         }
     }
