@@ -495,6 +495,9 @@ int JvmtiThreadState::count_frames() {
   RegisterMap reg_map(thread, false, false, true);
   javaVFrame *jvf = thread->last_java_vframe(&reg_map);
 
+  if (thread->is_in_VTMT()) {
+    jvf = JvmtiEnvBase::skip_hidden_frames(jvf);
+  }
   return (int)JvmtiEnvBase::get_frame_count(jvf);
 }
 

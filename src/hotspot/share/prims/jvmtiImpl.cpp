@@ -820,6 +820,9 @@ javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
 
     if (!vfs.at_end()) {
       jvf = vfs.asJavaVFrame();
+      if (java_thread->is_in_VTMT()) {
+        jvf = JvmtiEnvBase::skip_hidden_frames(jvf);
+      }
     }
   } else {
     Handle cont_h(cur_thread, cont);

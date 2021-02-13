@@ -611,6 +611,17 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 }
 
 javaVFrame*
+JvmtiEnvBase::skip_hidden_frames(javaVFrame* jvf) {
+  // find the top-most jvf with an annotated method
+  for ( ; jvf != NULL; jvf = jvf->java_sender()) {
+    if (jvf->method()->changes_current_thread()) {
+      break;
+    }
+  }
+  return jvf;
+}
+
+javaVFrame*
 JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   Thread* cur_thread = Thread::current();
   oop cont = java_lang_VirtualThread::continuation(vthread);
@@ -632,6 +643,9 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
     }
     vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
     jvf = vfs.at_end() ? NULL : vfs.asJavaVFrame();
+    if (java_thread->is_in_VTMT()) {
+      jvf = skip_hidden_frames(jvf);
+    }
   } else {
     Handle cont_h(cur_thread, cont);
     vframeStream vfs(cont_h);
@@ -646,6 +660,9 @@ JvmtiEnvBase::get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map_p) {
   javaVFrame *jvf = JvmtiEnvBase::cthread_with_continuation(jt) ?
                         jt->vthread_carrier_last_java_vframe(reg_map_p) :
                         jt->last_java_vframe(reg_map_p);
+  if (jt->is_in_VTMT()) {
+    jvf = skip_hidden_frames(jvf);
+  }
   return jvf;
 }
 
@@ -1071,7 +1088,7 @@ JvmtiEnvBase::get_stack_trace(JavaThread *java_thread,
   if (java_thread->has_last_Java_frame()) {
     RegisterMap reg_map(java_thread, true, true);
     ResourceMark rm(current_thread);
-    javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(java_thread, &reg_map);
+    javaVFrame *jvf = get_last_java_vframe(java_thread, &reg_map);
 
     err = get_stack_trace(jvf, start_depth, max_count, frame_buffer, count_ptr);
   } else {
@@ -1109,7 +1126,7 @@ JvmtiEnvBase::get_frame_count(JavaThread* jt, jint *count_ptr) {
   } else {
     ResourceMark rm(current_thread);
     RegisterMap reg_map(jt, true, true);
-    javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(jt, &reg_map);
+    javaVFrame *jvf = get_last_java_vframe(jt, &reg_map);
 
     *count_ptr = get_frame_count(jvf);
   }

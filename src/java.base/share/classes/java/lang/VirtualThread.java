@@ -271,9 +271,9 @@ class VirtualThread extends Thread {
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // mount
-        if (notifyJvmti) notifyJvmtiMountBegin(true);
+        if (notifyJvmti) notifyMountBegin0(true);
         mount();
-        if (notifyJvmti) notifyJvmtiMountEnd(true);
+        if (notifyJvmti) notifyMountEnd0(true);
 
         try {
             task.run();
@@ -281,9 +281,9 @@ class VirtualThread extends Thread {
             dispatchUncaughtException(exc);
         } finally {
             // unmount
-            if (notifyJvmti) notifyJvmtiUnmountBegin();
+            if (notifyJvmti) notifyUnmountBegin0();
             unmount();
-            if (notifyJvmti) notifyJvmtiUnmountEnd();
+            if (notifyJvmti) notifyUnmountEnd0();
         }
     }
 
@@ -340,9 +340,9 @@ class VirtualThread extends Thread {
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // unmount
-        if (notifyJvmti) notifyJvmtiUnmountBegin();
+        if (notifyJvmti) notifyUnmountBegin0();
         unmount();
-        if (notifyJvmti) notifyJvmtiUnmountEnd();
+        if (notifyJvmti) notifyUnmountEnd0();
 
         boolean yielded = false;
         try {
@@ -350,9 +350,9 @@ class VirtualThread extends Thread {
         } finally {
 
             // mount
-            if (notifyJvmti) notifyJvmtiMountBegin(false);
+            if (notifyJvmti) notifyMountBegin0(false);
             mount();
-            if (notifyJvmti) notifyJvmtiMountEnd(false);
+            if (notifyJvmti) notifyMountEnd0(false);
 
             if (!yielded) {
                 // pinned or resource error
@@ -414,7 +414,7 @@ class VirtualThread extends Thread {
 
         // notify JVMTI agents
         if (executed && notifyJvmtiEvents) {
-            notifyJvmtiTerminated();
+            notifyTerminated0();
         }
 
         // notify thread dumper, no-op if not tracking threads
@@ -946,26 +946,6 @@ class VirtualThread extends Thread {
     private static native void registerNatives();
     static {
         registerNatives();
-    }
-
-    private void notifyJvmtiMountBegin(boolean firstMount) {
-        notifyMountBegin0(firstMount);
-    }
-
-    private void notifyJvmtiMountEnd(boolean firstMount) {
-        notifyMountEnd0(firstMount);
-    }
-
-    private void notifyJvmtiUnmountBegin() {
-        notifyUnmountBegin0();
-    }
-
-    private void notifyJvmtiUnmountEnd() {
-        notifyUnmountEnd0();
-    }
-
-    private void notifyJvmtiTerminated() {
-        notifyTerminated0();
     }
 
     /**
