@@ -2110,7 +2110,7 @@ public class Thread implements Runnable {
         priority(newPriority);
     }
 
-    void priority(int newPriority) {
+    private void priority(int newPriority) {
         ThreadGroup g;
         if (!isVirtual() && (g = getThreadGroup()) != null) {
             int maxPriority = g.getMaxPriority();
@@ -2468,7 +2468,7 @@ public class Thread implements Runnable {
         daemon(on);
     }
 
-    void daemon(boolean on) {
+    private void daemon(boolean on) {
         if (!isVirtual())
             holder.daemon = on;
     }

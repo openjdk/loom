@@ -1001,7 +1001,7 @@ class VirtualThread extends Thread {
          */
         static void externalExecuteTask(ForkJoinPool pool, Runnable task) {
             try {
-                ForkJoinPools.externalExecuteTask.invoke(pool, task);
+                externalExecuteTask.invoke(pool, task);
             } catch (RuntimeException | Error e) {
                 throw e;
             } catch (Throwable e) {
