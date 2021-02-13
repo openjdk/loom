@@ -938,11 +938,11 @@ class VirtualThread extends Thread {
     // -- JVM TI support --
 
     private static volatile boolean notifyJvmtiEvents;  // set by VM
-    private native void notifyMountBegin0(boolean firstMount);
-    private native void notifyMountEnd0(boolean firstMount);
-    private native void notifyUnmountBegin0();
-    private native void notifyUnmountEnd0();
-    private native void notifyTerminated0();
+    private native void notifyJvmtiMountBegin(boolean firstMount);
+    private native void notifyJvmtiMountEnd(boolean firstMount);
+    private native void notifyJvmtiUnmountBegin();
+    private native void notifyJvmtiUnmountEnd();
+    private native void notifyJvmtiTerminated();
     private static native void registerNatives();
     static {
         registerNatives();
