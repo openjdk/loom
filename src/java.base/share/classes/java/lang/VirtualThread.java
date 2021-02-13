@@ -271,9 +271,9 @@ class VirtualThread extends Thread {
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // mount
-        if (notifyJvmti) notifyMountBegin0(true);
+        if (notifyJvmti) notifyJvmtiMountBegin(true);
         mount();
-        if (notifyJvmti) notifyMountEnd0(true);
+        if (notifyJvmti) notifyJvmtiMountEnd(true);
 
         try {
             task.run();
@@ -281,9 +281,9 @@ class VirtualThread extends Thread {
             dispatchUncaughtException(exc);
         } finally {
             // unmount
-            if (notifyJvmti) notifyUnmountBegin0();
+            if (notifyJvmti) notifyJvmtiUnmountBegin();
             unmount();
-            if (notifyJvmti) notifyUnmountEnd0();
+            if (notifyJvmti) notifyJvmtiUnmountEnd();
         }
     }
 
@@ -340,9 +340,9 @@ class VirtualThread extends Thread {
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // unmount
-        if (notifyJvmti) notifyUnmountBegin0();
+        if (notifyJvmti) notifyJvmtiUnmountBegin();
         unmount();
-        if (notifyJvmti) notifyUnmountEnd0();
+        if (notifyJvmti) notifyJvmtiUnmountEnd();
 
         boolean yielded = false;
         try {
@@ -350,9 +350,9 @@ class VirtualThread extends Thread {
         } finally {
 
             // mount
-            if (notifyJvmti) notifyMountBegin0(false);
+            if (notifyJvmti) notifyJvmtiMountBegin(false);
             mount();
-            if (notifyJvmti) notifyMountEnd0(false);
+            if (notifyJvmti) notifyJvmtiMountEnd(false);
 
             if (!yielded) {
                 // pinned or resource error
@@ -414,7 +414,7 @@ class VirtualThread extends Thread {
 
         // notify JVMTI agents
         if (executed && notifyJvmtiEvents) {
-            notifyTerminated0();
+            notifyJvmtiTerminated();
         }
 
         // notify thread dumper, no-op if not tracking threads
