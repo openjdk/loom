@@ -173,11 +173,9 @@ public class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
-
     // A simple (not very) random string of bits to use when evicting
-    // cache entries.
-    int victims
-        = 0b1100_1001_0000_1111_1101_1010_1010_0010;
+    // cache entries from the scoped variable cache.
+    int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
     Scoped.Binding<?> noninheritableScopeLocalBindings;
     Scoped.Binding<?> inheritableScopeLocalBindings;
@@ -246,14 +244,14 @@ public class Thread implements Runnable {
     private Continuation cont;
 
     /**
-     * TBD
+     * Returns the current continuation.
      */
     Continuation getContinuation() {
         return cont;
     }
 
     /**
-     * TBD
+     * Sets the current continuation.
      */
     void setContinuation(Continuation cont) {
         this.cont = cont;
@@ -637,7 +635,7 @@ public class Thread implements Runnable {
      * The task {@link java.util.concurrent.Executor#execute(Runnable) submitted}
      * to a custom {@link Thread.Builder#virtual(Executor) scheduler}.
      *
-     * @apiNote The follow example creates a scheduler that uses a small set of
+     * @apiNote The following example creates a scheduler that uses a small set of
      * platform threads. It prints the name of each virtual thread before executing
      * its task.
      * <pre>{@code
@@ -689,7 +687,11 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Returns a builder for creating {@code Thread} or {@code ThreadFactory} objects.
+     * Returns a builder for creating a {@code Thread} or {@code ThreadFactory}.
+     * A newly created builder defaults to creating threads that are scheduled by
+     * the operating system. The {@link Builder#virtual() virtual()} method may be
+     * used to change it to create threads that are scheduled by the Java virtual
+     * machine.
      *
      * @apiNote The following are examples using the builder:
      *
