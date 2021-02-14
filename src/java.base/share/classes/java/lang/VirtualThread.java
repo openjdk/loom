@@ -154,10 +154,10 @@ class VirtualThread extends Thread {
 
         this.scheduler = scheduler;
         this.cont = new VThreadContinuation(this, task);
-        if (scheduler != DEFAULT_SCHEDULER) {
-            this.runContinuation = new CustomRunner(this);
-        } else {
+        if (scheduler == DEFAULT_SCHEDULER) {
             this.runContinuation = this::runContinuation;
+        } else {
+            this.runContinuation = new CustomRunner(this);
         }
     }
 
@@ -246,7 +246,7 @@ class VirtualThread extends Thread {
 
     /**
      * Submits the runContinuation task to the scheduler. If externalExecuteTask
-     * is true then it pushes the tasks current carrier thread's work queue.
+     * is true then it pushes the task to the current carrier thread's work queue.
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation(boolean externalExecuteTask) {
@@ -265,6 +265,8 @@ class VirtualThread extends Thread {
      * Runs a task in the context of this virtual thread. The virtual thread is
      * mounted on the current (carrier) thread before the task runs. It unmounts
      * from its carrier thread when the task completes.
+     *
+     * When enabled, JVMTI must be notified from this method.
      */
     @ChangesCurrentThread
     private void run(Runnable task) {
@@ -334,6 +336,8 @@ class VirtualThread extends Thread {
     /**
      * Unmounts this virtual thread, invokes Continuation.yield, and re-mounts the
      * thread when continued.
+     *
+     * When enabled, JVMTI must be notified from this method.
      */
     @ChangesCurrentThread
     private void yieldContinuation() {
@@ -428,7 +432,9 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Parks on the carrier thread until it is signalled or interrupted.
+     * Parks on the carrier thread until signalled or interrupted (if the
+     * virtual thread interrupted then the interrupt status is propagated to
+     * the carrier thread.
      */
     @ChangesCurrentThread
     private void parkOnCarrierThread() {
@@ -504,10 +510,11 @@ class VirtualThread extends Thread {
      */
     static void park() {
         Thread thread = Thread.currentThread();
-        if (!thread.isVirtual()) {
+        if (thread instanceof VirtualThread vthread) {
+            vthread.tryPark();
+        } else {
             throw new IllegalCallerException("Not a virtual thread");
         }
-        ((VirtualThread) thread).tryPark();
     }
 
     /**
@@ -527,10 +534,11 @@ class VirtualThread extends Thread {
      */
     static void parkNanos(long nanos) {
         Thread thread = Thread.currentThread();
-        if (!thread.isVirtual()) {
+        if (thread instanceof VirtualThread vthread) {
+            vthread.tryPark(nanos);
+        } else {
             throw new IllegalCallerException("Not a virtual thread");
         }
-        ((VirtualThread) thread).tryPark(nanos);
     }
 
     /**
