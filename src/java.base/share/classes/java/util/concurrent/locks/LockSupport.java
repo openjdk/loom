@@ -35,8 +35,6 @@
 
 package java.util.concurrent.locks;
 
-import java.util.concurrent.TimeUnit;
-
 import jdk.internal.misc.VirtualThreads;
 import jdk.internal.misc.Unsafe;
 
@@ -307,9 +305,7 @@ public class LockSupport {
         Thread t = Thread.currentThread();
         setBlocker(t, blocker);
         if (t.isVirtual()) {
-            long millis = deadline - System.currentTimeMillis();
-            long nanos = TimeUnit.NANOSECONDS.convert(millis, TimeUnit.MILLISECONDS);
-            VirtualThreads.park(nanos);
+            VirtualThreads.parkUntil(deadline);
         } else {
             U.park(true, deadline);
         }
@@ -439,9 +435,7 @@ public class LockSupport {
      */
     public static void parkUntil(long deadline) {
         if (Thread.currentThread().isVirtual()) {
-            long millis = deadline - System.currentTimeMillis();
-            long nanos = TimeUnit.NANOSECONDS.convert(millis, TimeUnit.MILLISECONDS);
-            VirtualThreads.park(nanos);
+            VirtualThreads.parkUntil(deadline);
         } else {
             U.park(true, deadline);
         }

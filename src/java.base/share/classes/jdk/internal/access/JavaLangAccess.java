@@ -394,7 +394,7 @@ public interface JavaLangAccess {
     void parkVirtualThread();
 
     /**
-     * Parks the current virtual thread.for up to the given waiting time.
+     * Parks the current virtual thread for up to the given waiting time.
      */
     void parkVirtualThread(long nanos);
 

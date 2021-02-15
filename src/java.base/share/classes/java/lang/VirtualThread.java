@@ -498,55 +498,14 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Disables the current virtual thread for scheduling purposes.
-     *
-     * <p> If this virtual thread has already been {@link #unpark() unparked} then the
-     * parking permit is consumed and this method completes immediately;
-     * otherwise the current virtual thread is disabled for scheduling purposes and lies
-     * dormant until it is {@linkplain #unpark() unparked} or the thread is
-     * {@link Thread#interrupt() interrupted}.
-     *
-     * @throws IllegalCallerException if not called from a virtual thread
+     * Parks the current virtual thread until it is unparked or interrupted.
+     * If already unparked then the parking permit is consumed and this method
+     * completes immediately (meaning it doesn't yield). It also completes
+     * immediately if the interrupt status is set.
      */
-    static void park() {
-        Thread thread = Thread.currentThread();
-        if (thread instanceof VirtualThread vthread) {
-            vthread.tryPark();
-        } else {
-            throw new IllegalCallerException("Not a virtual thread");
-        }
-    }
+    void park() {
+        assert Thread.currentThread() == this;
 
-    /**
-     * Disables the current virtual thread for scheduling purposes for up to the
-     * given waiting time.
-     *
-     * <p> If this virtual thread has already been {@link #unpark() unparked} then the
-     * parking permit is consumed and this method completes immediately;
-     * otherwise if the time to wait is greater than zero then the current virtual thread
-     * is disabled for scheduling purposes and lies dormant until it is {@link
-     * #unpark unparked}, the waiting time elapses or the thread is
-     * {@linkplain Thread#interrupt() interrupted}.
-     *
-     * @param nanos the maximum number of nanoseconds to wait.
-     *
-     * @throws IllegalCallerException if not called from a virtual thread
-     */
-    static void parkNanos(long nanos) {
-        Thread thread = Thread.currentThread();
-        if (thread instanceof VirtualThread vthread) {
-            vthread.tryPark(nanos);
-        } else {
-            throw new IllegalCallerException("Not a virtual thread");
-        }
-    }
-
-    /**
-     * Try to park. If already been unparked (parking permit available) or the
-     * interrupt status is set then this method completes immediately without
-     * yielding.
-     */
-    private void tryPark() {
         // complete immediately if parking permit available or interrupted
         if (getAndSetParkPermit(false) || interrupted)
             return;
@@ -561,11 +520,17 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Try to park for up to the given waiting time. If already been unparked
-     * (parking permit available) or the interrupt status is set then this method
-     * completes immediately without yielding.
+     * Parks the current virtual thread up to the given waiting time or until it
+     * is unparked or interrupted. If already unparked then the parking permit is
+     * consumed and this method completes immediately (meaning it doesn't yield).
+     * It also completes immediately if the interrupt status is set or the waiting
+     * time is {@code <= 0}.
+     *
+     * @param nanos the maximum number of nanoseconds to wait.
      */
-    private void tryPark(long nanos) {
+    void parkNanos(long nanos) {
+        assert Thread.currentThread() == this;
+
         // complete immediately if parking permit available or interrupted
         if (getAndSetParkPermit(false) || interrupted)
             return;
@@ -580,10 +545,6 @@ class VirtualThread extends Thread {
                 assert (Thread.currentThread() == this) && (state() == RUNNING);
                 cancel(unparker);
             }
-        } else {
-            // consume permit when not parking
-            tryYield();
-            setParkPermit(false);
         }
     }
 
@@ -650,10 +611,10 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Attempts to yield, as in Thread.yield.
+     * Attempts to yield (Thread.yield).
      */
     void tryYield() {
-        assert Thread.currentThread() == this && state() == RUNNING;
+        assert Thread.currentThread() == this;
         setState(YIELDING);
         try {
             yieldContinuation();
@@ -736,7 +697,7 @@ class VirtualThread extends Thread {
      * @implNote This implementation parks the thread for the given sleeping time
      * and will therefore be observed in PARKED state during the sleep. Parking
      * will consume the parking permit so this method makes available the parking
-     * permit after the sleep. This will observed as spurious, but benign, wakeup
+     * permit after the sleep. This will observed as a spurious, but benign, wakeup
      * when the thread subsequently attempts to park.
      *
      * @throws InterruptedException if interrupted while sleeping
@@ -1064,7 +1025,7 @@ class VirtualThread extends Thread {
          */
         private static AccessControlContext innocuousACC() {
             return new AccessControlContext(new ProtectionDomain[] {
-                    new ProtectionDomain(null, null)
+                new ProtectionDomain(null, null)
             });
         }
 

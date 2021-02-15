@@ -2338,11 +2338,11 @@ public final class System {
             }
 
             public void parkVirtualThread() {
-                VirtualThread.park();
+                ((VirtualThread) Thread.currentThread()).park();
             }
 
             public void parkVirtualThread(long nanos) {
-                VirtualThread.parkNanos(nanos);
+                ((VirtualThread) Thread.currentThread()).parkNanos(nanos);
             }
 
             public void unparkVirtualThread(Thread thread) {
