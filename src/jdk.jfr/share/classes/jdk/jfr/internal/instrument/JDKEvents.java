@@ -44,6 +44,7 @@ import jdk.jfr.events.SocketReadEvent;
 import jdk.jfr.events.SocketWriteEvent;
 import jdk.jfr.events.TLSHandshakeEvent;
 import jdk.jfr.events.ThreadSleepEvent;
+import jdk.jfr.events.VirtualThreadSubmitRejectedEvent;
 import jdk.jfr.events.X509CertificateEvent;
 import jdk.jfr.events.X509ValidationEvent;
 import jdk.jfr.internal.JVM;
@@ -61,7 +62,8 @@ public final class JDKEvents {
         X509CertificateEvent.class,
         X509ValidationEvent.class,
         ProcessStartEvent.class,
-        ThreadSleepEvent.class
+        ThreadSleepEvent.class,
+        VirtualThreadSubmitRejectedEvent.class
     };
 
     private static final Class<?>[] eventClasses = {
@@ -81,7 +83,8 @@ public final class JDKEvents {
         jdk.internal.event.X509ValidationEvent.class,
         jdk.internal.event.ProcessStartEvent.class,
         DirectBufferStatisticsEvent.class,
-        jdk.internal.event.ThreadSleepEvent.class
+        jdk.internal.event.ThreadSleepEvent.class,
+        jdk.internal.event.VirtualThreadSubmitRejectedEvent.class
     };
 
     // This is a list of the classes with instrumentation code that should be applied.

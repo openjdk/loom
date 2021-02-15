@@ -46,6 +46,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.event.VirtualThreadSubmitRejectedEvent;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.ThreadDumper;
@@ -250,10 +251,22 @@ class VirtualThread extends Thread {
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation(boolean externalExecuteTask) {
-        if (externalExecuteTask && scheduler == DEFAULT_SCHEDULER) {
-            ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER, runContinuation);
-        } else {
-            scheduler.execute(runContinuation);
+        try {
+            if (externalExecuteTask && scheduler == DEFAULT_SCHEDULER) {
+                ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER, runContinuation);
+            } else {
+                scheduler.execute(runContinuation);
+            }
+        } catch (RejectedExecutionException ree) {
+            // record JFR event
+            var event = new VirtualThreadSubmitRejectedEvent();
+            if (event.shouldCommit()) {
+                event.vthread = this.toString();
+                event.scheduler = scheduler.toString();
+                event.exceptionMessage = ree.getMessage();
+                event.commit();
+            }
+            throw ree;
         }
     }
 

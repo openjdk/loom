@@ -73,6 +73,11 @@
       <setting name="threshold" control="synchronization-threshold">20 ms</setting>
     </event>
 
+    <event name="jdk.VirtualThreadSubmitRejectedEvent">
+      <setting name="enabled">true</setting>
+      <setting name="stackTrace">true</setting>
+    </event>
+
     <event name="jdk.JavaMonitorEnter">
       <setting name="enabled">true</setting>
       <setting name="stackTrace">true</setting>
