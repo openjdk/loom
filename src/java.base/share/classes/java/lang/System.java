@@ -2309,11 +2309,6 @@ public final class System {
             }
 
             @ChangesCurrentThread
-            public void setCurrentThread(Thread thread) {
-                Thread.currentThread().setCurrentThread(thread);
-            }
-
-            @ChangesCurrentThread
             public <V> V executeOnCarrierThread(Callable<V> task) throws Exception {
                 Thread thread = Thread.currentThread();
                 if (thread.isVirtual()) {
