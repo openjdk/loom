@@ -36,7 +36,7 @@ import jdk.internal.vm.annotation.Stable;
 /**
  * Represents a scoped variable.
  *
- * <p> A scoped variable differs from a normal variable in that it is dynamically
+ * <p> A scoped variable differs to a normal variable in that it is dynamically
  * scoped and intended for cases where context needs to be passed from a caller
  * to a transitive callee without using an explicit parameter. A scoped variable
  * does not have a default/initial value, it is bound, meaning it gets a value,
@@ -148,9 +148,9 @@ public final class Scoped<T> {
     /**
      * Creates a scoped variable to hold a value with the given type.
      *
-     * @param <T> the type of the scoped variable's value.
-     * @param <U> a supertype of {@code T}. It should either be {@code T} itself or, if T is a parameterized type, its generic type.
-     * @param type The {@Class} instance {@codeT.class}
+     * @param <T> TBD
+     * @param <U>   TBD
+     * @param type TBD
      * @return a scope variable
      */
     public static <U,T extends U> Scoped<T> forType(Class<U> type) {
@@ -160,9 +160,9 @@ public final class Scoped<T> {
     /**
      Creates an inheritable scoped variable to hold a value with the given type.
      *
-     * @param <T> the type of the scoped variable's value.
-     * @param <U> a supertype of {@code T}. It should either be {@code T} itself or, if T is a parameterized type, its generic type.
-     * @param type The {@Class} instance {@codeT.class}
+     * @param <T> TBD
+     * @param <U>   TBD
+     * @param type TBD
      * @return a scope variable
      */
     public static <U,T extends U> Scoped<T> inheritableForType(Class<U> type) {
@@ -262,8 +262,8 @@ public final class Scoped<T> {
     }
 
     /**
-     * Returns the value of the variable.
-     * @return the value of the variable
+     * Returns the value the variable.
+     * @return the value the variable
      * @throws NoSuchElementException if the variable is not bound (exception is TBD)
      */
     @ForceInline
@@ -334,9 +334,6 @@ public final class Scoped<T> {
         }
     }
 
-    // A small fixed-size key-value cache. When a scope variable's get() method
-    // is called, we record the result of the lookup in this per-thread cache
-    // for fast access in future.
     private static class Cache {
         static final int INDEX_BITS = 4;  // Must be a power of 2
         static final int TABLE_SIZE = 1 << INDEX_BITS;
