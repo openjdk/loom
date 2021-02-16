@@ -1845,11 +1845,11 @@ public class Thread implements Runnable {
      *       an inconsistent state, the damaged objects become visible to
      *       other threads, potentially resulting in arbitrary behavior.  Many
      *       uses of {@code stop} should be replaced by code that simply
-     *       modifies some variable to indicate that the task thread should
-     *       stop running.  The task thread should check this variable
+     *       modifies some variable to indicate that the target thread should
+     *       stop running.  The target thread should check this variable
      *       regularly, and return from its run method in an orderly fashion
      *       if the variable indicates that it is to stop running.  If the
-     *       task thread waits for long periods (on a condition variable,
+     *       target thread waits for long periods (on a condition variable,
      *       for example), the {@code interrupt} method should be used to
      *       interrupt the wait.
      *       For more information, see
@@ -2030,10 +2030,10 @@ public class Thread implements Runnable {
      * @throws     UnsupportedOperationException if invoked on a virtual thread
      * @see #checkAccess
      * @deprecated   This method has been deprecated, as it is
-     *   inherently deadlock-prone.  If the task thread holds a lock on the
+     *   inherently deadlock-prone.  If the target thread holds a lock on the
      *   monitor protecting a critical system resource when it is suspended, no
-     *   thread can access this resource until the task thread is resumed. If
-     *   the thread that would resume the task thread attempts to lock this
+     *   thread can access this resource until the target thread is resumed. If
+     *   the thread that would resume the target thread attempts to lock this
      *   monitor prior to calling {@code resume}, deadlock results.  Such
      *   deadlocks typically manifest themselves as "frozen" processes.
      *   For more information, see
