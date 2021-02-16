@@ -261,7 +261,7 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
      * @implSpec
      * The default implementation throws {@code UnsupportedOperationException}.
      *
-     * @param  outputFile the path file to the file to create
+     * @param  outputFile the path to the file to create
      * @param  format the format to use (TEXT_PLAIN or JSON)
      * @throws IllegalArgumentException if the file path is not absolute
      * @throws IOException if an I/O exception is thrown writing to the file
