@@ -25,7 +25,7 @@
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/moduleEntry.hpp"
-#include "classfile/systemDictionary.hpp"
+#include "classfile/vmClasses.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "code/nmethod.hpp"
 #include "code/pcDesc.hpp"
@@ -62,11 +62,13 @@
 #include "runtime/objectMonitor.hpp"
 #include "runtime/objectMonitor.inline.hpp"
 #include "runtime/os.inline.hpp"
+#include "runtime/osThread.hpp"
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/serviceThread.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadSMR.hpp"
 #include "runtime/vframe.inline.hpp"
+#include "runtime/vm_version.hpp"
 #include "utilities/macros.hpp"
 
 #ifdef JVMTI_TRACE
@@ -228,13 +230,15 @@ private:
 public:
   JvmtiVirtualThreadEventMark(JavaThread *thread) :
     JvmtiEventMark(thread) {
-    if (JvmtiExport::can_support_virtual_threads()) {
+    JvmtiThreadState* state = thread->jvmti_thread_state();
+    if (JvmtiExport::can_support_virtual_threads() &&
+        state != NULL && state->is_virtual()) {
       _jt = (jthread)(to_jobject(thread->vthread()));
     } else {
       _jt = (jthread)(to_jobject(thread->threadObj()));
     }
   };
- jthread jni_thread() { return _jt; }
+  jthread jni_thread() { return _jt; }
 };
 
 class JvmtiClassEventMark : public JvmtiVirtualThreadEventMark {
@@ -444,7 +448,7 @@ JvmtiExport::add_default_read_edges(Handle h_module, TRAPS) {
   // Invoke the transformedByAgent method
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result,
-                         SystemDictionary::module_Modules_klass(),
+                         vmClasses::module_Modules_klass(),
                          vmSymbols::transformedByAgent_name(),
                          vmSymbols::transformedByAgent_signature(),
                          h_module,
@@ -471,7 +475,7 @@ JvmtiExport::add_module_reads(Handle module, Handle to_module, TRAPS) {
   // Invoke the addReads method
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result,
-                         SystemDictionary::module_Modules_klass(),
+                         vmClasses::module_Modules_klass(),
                          vmSymbols::addReads_name(),
                          vmSymbols::addReads_signature(),
                          module,
@@ -501,7 +505,7 @@ JvmtiExport::add_module_exports(Handle module, Handle pkg_name, Handle to_module
   // Invoke the addExports method
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result,
-                         SystemDictionary::module_Modules_klass(),
+                         vmClasses::module_Modules_klass(),
                          vmSymbols::addExports_name(),
                          vmSymbols::addExports_signature(),
                          module,
@@ -536,7 +540,7 @@ JvmtiExport::add_module_opens(Handle module, Handle pkg_name, Handle to_module, 
   // Invoke the addOpens method
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result,
-                         SystemDictionary::module_Modules_klass(),
+                         vmClasses::module_Modules_klass(),
                          vmSymbols::addOpens_name(),
                          vmSymbols::addExports_signature(),
                          module,
@@ -570,7 +574,7 @@ JvmtiExport::add_module_uses(Handle module, Handle service, TRAPS) {
   // Invoke the addUses method
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result,
-                         SystemDictionary::module_Modules_klass(),
+                         vmClasses::module_Modules_klass(),
                          vmSymbols::addUses_name(),
                          vmSymbols::addUses_signature(),
                          module,
@@ -600,7 +604,7 @@ JvmtiExport::add_module_provides(Handle module, Handle service, Handle impl_clas
   // Invoke the addProvides method
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result,
-                         SystemDictionary::module_Modules_klass(),
+                         vmClasses::module_Modules_klass(),
                          vmSymbols::addProvides_name(),
                          vmSymbols::addProvides_signature(),
                          module,
@@ -664,7 +668,7 @@ void JvmtiExport::post_early_vm_start() {
     if (env->early_vmstart_env() && env->is_enabled(JVMTI_EVENT_VM_START)) {
       EVT_TRACE(JVMTI_EVENT_VM_START, ("Evt Early VM start event sent" ));
       JavaThread *thread  = JavaThread::current();
-      JvmtiVirtualThreadEventMark jem(thread);
+      JvmtiThreadEventMark jem(thread);
       JvmtiJavaThreadEventTransition jet(thread);
       jvmtiEventVMStart callback = env->callbacks()->VMStart;
       if (callback != NULL) {
@@ -730,7 +734,7 @@ void JvmtiExport::post_vm_initialized() {
       EVT_TRACE(JVMTI_EVENT_VM_INIT, ("Evt VM init event sent" ));
 
       JavaThread *thread  = JavaThread::current();
-      JvmtiVirtualThreadEventMark jem(thread);
+      JvmtiThreadEventMark jem(thread);
       JvmtiJavaThreadEventTransition jet(thread);
       jvmtiEventVMInit callback = env->callbacks()->VMInit;
       if (callback != NULL) {
@@ -800,7 +804,7 @@ JvmtiExport::cv_external_thread_to_JavaThread(ThreadsList * t_list,
   }
   // Looks like an oop at this point.
 
-  if (!thread_oop->is_a(SystemDictionary::Thread_klass())) {
+  if (!thread_oop->is_a(vmClasses::Thread_klass())) {
     // The oop is not a java.lang.Thread.
     return JVMTI_ERROR_INVALID_THREAD;
   }
@@ -852,7 +856,7 @@ JvmtiExport::cv_oop_to_JavaThread(ThreadsList * t_list, oop thread_oop,
   assert(thread_oop != NULL, "must have an oop");
   assert(jt_pp != NULL, "must have a return JavaThread pointer");
 
-  if (!thread_oop->is_a(SystemDictionary::Thread_klass())) {
+  if (!thread_oop->is_a(vmClasses::Thread_klass())) {
     // The oop is not a java.lang.Thread.
     return JVMTI_ERROR_INVALID_THREAD;
   }
@@ -1092,7 +1096,7 @@ static inline Klass* oop_to_klass(oop obj) {
   Klass* k = obj->klass();
 
   // if the object is a java.lang.Class then return the java mirror
-  if (k == SystemDictionary::Class_klass()) {
+  if (k == vmClasses::Class_klass()) {
     if (!java_lang_Class::is_primitive(obj)) {
       k = java_lang_Class::as_Klass(obj);
       assert(k != NULL, "class for non-primitive mirror must exist");
@@ -1204,6 +1208,10 @@ void JvmtiExport::post_raw_breakpoint(JavaThread *thread, Method* method, addres
   if (state == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
+
   EVT_TRIG_TRACE(JVMTI_EVENT_BREAKPOINT, ("[%s] Trg Breakpoint triggered",
                       JvmtiTrace::safe_get_thread_name(thread)));
   JvmtiEnvThreadStateIterator it(state);
@@ -1734,7 +1742,7 @@ void JvmtiExport::post_continuation_yield(JavaThread* thread, jint continuation_
       for (int frame_idx = 0; frame_idx < continuation_frame_count; frame_idx++) {
         int frame_num = top_frame_num - frame_idx;
 
-        if (ets->is_frame_pop(frame_num)) {
+        if (!state->is_virtual() && ets->is_frame_pop(frame_num)) {
           // remove the frame's entry
           MutexLocker mu(JvmtiThreadState_lock);
           ets->clear_frame_pop(frame_num);
@@ -1759,6 +1767,9 @@ void JvmtiExport::post_object_free(JvmtiEnv* env, jlong tag) {
 void JvmtiExport::post_resource_exhausted(jint resource_exhausted_flags, const char* description) {
 
   JavaThread *thread  = JavaThread::current();
+
+  log_error(jvmti)("Posting Resource Exhausted event: %s",
+                   description != nullptr ? description : "unknown");
 
   // JDK-8213834: handlers of ResourceExhausted may attempt some analysis
   // which often requires running java.
@@ -1804,6 +1815,9 @@ void JvmtiExport::post_method_entry(JavaThread *thread, Method* method, frame cu
 
   state->incr_cur_stack_depth();
 
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
   if (state->is_enabled(JVMTI_EVENT_METHOD_ENTRY)) {
     JvmtiEnvThreadStateIterator it(state);
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1831,19 +1845,13 @@ void JvmtiExport::post_method_exit(JavaThread* thread, Method* method, frame cur
 
   JvmtiThreadState *state = thread->jvmti_thread_state();
 
-#ifdef ASSERT
-  bool null_thread_link = state->get_thread() == NULL;
-  if (null_thread_link) {
-    // Corner case: MethodExit/FramePop event is posted for VirtualThread.notifyUnmount.
-    // JVM_VirtualThreadUnmount has been already cleared _thread in the jvmtiThreadSate of
-    // virtual thread, so we need to temporarily restore JavaThread in jvmtiThreadState.
-    state->set_thread(thread);
-  }
-#endif
-
   if (state == NULL || !state->is_interp_only_mode()) {
     // for any thread that actually wants method exit, interp_only_mode is set
     return;
+  }
+  if (thread->is_in_VTMT()) {
+    state->decr_cur_stack_depth();
+    return; // no events should be posted if thread is in a VTMT transition
   }
 
   // return a flag when a method terminates by throwing an exception
@@ -1879,13 +1887,6 @@ void JvmtiExport::post_method_exit(JavaThread* thread, Method* method, frame cur
     // We have to restore the oop on the stack for interpreter frames
     *(oop*)current_frame.interpreter_frame_tos_address() = result();
   }
-
-#ifdef ASSERT
-  if (null_thread_link) {
-    // restore JavaThread nullness in jvmtiThreadState
-    state->set_thread(NULL);
-  }
-#endif
 }
 
 void JvmtiExport::post_method_exit_inner(JavaThread* thread,
@@ -1912,7 +1913,7 @@ void JvmtiExport::post_method_exit_inner(JavaThread* thread,
         JvmtiMethodEventMark jem(thread, mh);
         JvmtiJavaThreadEventTransition jet(thread);
         jvmtiEventMethodExit callback = env->callbacks()->MethodExit;
-        if (callback != NULL && !thread->is_in_VTMT()) {
+        if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread(),
                       jem.jni_methodID(), exception_exit,  value);
         }
@@ -1939,7 +1940,7 @@ void JvmtiExport::post_method_exit_inner(JavaThread* thread,
           JvmtiMethodEventMark jem(thread, mh);
           JvmtiJavaThreadEventTransition jet(thread);
           jvmtiEventFramePop callback = env->callbacks()->FramePop;
-          if (callback != NULL && !thread->is_in_VTMT()) {
+          if (callback != NULL) {
             (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread(),
                         jem.jni_methodID(), exception_exit);
           }
@@ -1967,6 +1968,10 @@ void JvmtiExport::post_single_step(JavaThread *thread, Method* method, address l
   if (state == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
+
   JvmtiEnvThreadStateIterator it(state);
   for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
     ets->compare_and_set_current_location(mh(), location, JVMTI_EVENT_SINGLE_STEP);
@@ -2582,7 +2587,7 @@ void JvmtiExport::record_vm_internal_object_allocation(oop obj) {
       if (collector != NULL && collector->is_enabled()) {
         // Don't record classes as these will be notified via the ClassLoad
         // event.
-        if (obj->klass() != SystemDictionary::Class_klass()) {
+        if (obj->klass() != vmClasses::Class_klass()) {
           collector->record_allocation(obj);
         }
       }
@@ -2974,6 +2979,9 @@ jint JvmtiExport::load_agent_library(const char *agent, const char *absParam,
       if (result == JNI_OK) {
         Arguments::add_loaded_agent(agent_lib);
       } else {
+        if (!agent_lib->is_static_lib()) {
+          os::dll_unload(library);
+        }
         delete agent_lib;
       }
 

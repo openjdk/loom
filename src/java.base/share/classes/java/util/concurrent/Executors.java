@@ -247,14 +247,20 @@ public class Executors {
      * <em>structured manner</em>. It is <em>owned</em> by the Thread that creates
      * it and must be {@linkplain ExecutorService#close() closed} by the thread
      * when it is finished with the executor. Failure to invoke the {@code
-     * close} method may result in a memory leak. The {@code close} method
-     * throws {@code IllegalCallerException} if invoked by other threads.
+     * close} method may result in a memory leak. The {@code close}, {@link
+     * ExecutorService#shutdown() shutdown}, and {@link ExecutorService#shutdownNow()
+     * shutdownNow} methods throw {@code IllegalCallerException} if invoked by
+     * other threads.
      * Executors created by this method enforce strict nesting and must be
      * closed in the reverse order that they are created in. The {@code close}
      * method throws {@code IllegalStateException} if invoked to close
      * executors created by this method in a different order. Once closed by
      * its owner, further attempts to close the executor by its owner has no
      * effect.
+     *
+     * <p> Invoking {@link Future#cancel(boolean) cancel(true)} on a {@link
+     * Future Future} representing the pending result of a task submitted to
+     * the Executor will {@link Thread#interrupt() interrupt} the thread.
      *
      * @apiNote
      * The {@link #newUnownedThreadExecutor(ThreadFactory)} method should be
@@ -332,9 +338,9 @@ public class Executors {
     /**
      * Creates an Executor that starts a new thread for each task.
      *
-     * The resulting Executor is not owned to any thread, meaning it can be
-     * {@link ExecutorService#close() closed} by any thread with appropriate
-     * permission.
+     * The resulting Executor is not owned to any thread, meaning any thread can
+     * {@link ExecutorService#shutdown() shutdown} the Executor or invoke {@link
+     * ExecutorService#close() close} if they have the appropriate permission.
      *
      * @apiNote
      * This method is intended for unstructured usage such as cases where an

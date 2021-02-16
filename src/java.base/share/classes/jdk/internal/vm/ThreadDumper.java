@@ -108,11 +108,11 @@ public class ThreadDumper {
         }
 
         Stream<Thread> threads() {
-            return ThreadExecutorFields.threads(threadExecutor).stream();
+            return ThreadExecutors.threads(threadExecutor).stream();
         }
 
         private static ThreadContainer latestThreadContainer(Thread thread) {
-            Object threadExecutor = ThreadFields.latestThreadExecutor(thread);
+            Object threadExecutor = Threads.latestThreadExecutor(thread);
             if (threadExecutor != null) {
                 return new ThreadContainer(threadExecutor);
             } else {
@@ -121,7 +121,7 @@ public class ThreadDumper {
         }
 
         private ThreadContainer previous() {
-            Object previous = ThreadExecutorFields.previous(threadExecutor);
+            Object previous = ThreadExecutors.previous(threadExecutor);
             if (previous != null) {
                 return new ThreadContainer(previous);
             } else {
@@ -445,7 +445,7 @@ public class ThreadDumper {
     /**
      * Provides read access to Thread.latestThreadExecutor
      */
-    private static class ThreadFields {
+    private static class Threads {
         private static final VarHandle LATEST_THREAD_EXECUTOR;
         static {
             try {
@@ -466,7 +466,7 @@ public class ThreadDumper {
     /**
      * Provides access to ThreadExecutor
      */
-    private static class ThreadExecutorFields {
+    private static class ThreadExecutors{
         private static final VarHandle THREADS;
         private static final VarHandle PREVIOUS;
         static {

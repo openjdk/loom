@@ -27,7 +27,7 @@
 
 #include "memory/iterator.hpp"
 #include "memory/memRegion.hpp"
-#include "oops/access.hpp"
+#include "oops/accessDecorators.hpp"
 #include "oops/markWord.hpp"
 #include "oops/metadata.hpp"
 #include "runtime/atomic.hpp"
@@ -76,6 +76,7 @@ class oopDesc {
   inline Klass* klass_or_null() const;
   inline Klass* klass_or_null_acquire() const;
 
+  void set_narrow_klass(narrowKlass nk) NOT_CDS_JAVA_HEAP_RETURN;
   inline void set_klass(Klass* k);
   static inline void release_set_klass(HeapWord* mem, Klass* k);
 
@@ -330,9 +331,7 @@ class oopDesc {
   static void* load_klass_raw(oop obj);
   static void* load_oop_raw(oop obj, int offset);
 
-  // Avoid include gc_globals.hpp in oop.inline.hpp
-  DEBUG_ONLY(bool get_UseParallelGC();)
-  DEBUG_ONLY(bool get_UseG1GC();)
+  DEBUG_ONLY(bool size_might_change();)
 };
 
 #endif // SHARE_OOPS_OOP_HPP

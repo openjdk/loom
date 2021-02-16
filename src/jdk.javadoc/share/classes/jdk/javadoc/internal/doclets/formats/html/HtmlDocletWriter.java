@@ -77,6 +77,7 @@ import com.sun.source.doctree.SystemPropertyTree;
 import com.sun.source.doctree.TextTree;
 import com.sun.source.util.SimpleDocTreeVisitor;
 
+import jdk.javadoc.internal.doclets.formats.html.markup.HtmlId;
 import jdk.javadoc.internal.doclint.HtmlTag;
 import jdk.javadoc.internal.doclets.formats.html.markup.ContentBuilder;
 import jdk.javadoc.internal.doclets.formats.html.markup.Entity;
@@ -90,7 +91,6 @@ import jdk.javadoc.internal.doclets.formats.html.markup.Links;
 import jdk.javadoc.internal.doclets.formats.html.markup.RawHtml;
 import jdk.javadoc.internal.doclets.formats.html.markup.Script;
 import jdk.javadoc.internal.doclets.formats.html.markup.StringContent;
-import jdk.javadoc.internal.doclets.formats.html.markup.TableHeader;
 import jdk.javadoc.internal.doclets.toolkit.ClassWriter;
 import jdk.javadoc.internal.doclets.toolkit.Content;
 import jdk.javadoc.internal.doclets.toolkit.Messages;
@@ -177,6 +177,8 @@ public class HtmlDocletWriter {
 
     protected final Comparators comparators;
 
+    protected final HtmlIds htmlIds;
+
     /**
      * To check whether annotation heading is printed or not.
      */
@@ -224,9 +226,10 @@ public class HtmlDocletWriter {
         this.contents = configuration.getContents();
         this.messages = configuration.messages;
         this.resources = configuration.docResources;
-        this.links = new Links(path, configuration.utils);
+        this.links = new Links(path);
         this.utils = configuration.utils;
         this.comparators = utils.comparators;
+        this.htmlIds = configuration.htmlIds;
         this.path = path;
         this.pathToRoot = path.parent().invert();
         this.filename = path.basename();
@@ -607,17 +610,6 @@ public class HtmlDocletWriter {
     }
 
     /**
-     * Given a package, return the name to be used in HTML anchor tag.
-     * @param packageElement the package.
-     * @return the name to be used in HTML anchor tag.
-     */
-    public String getPackageAnchorName(PackageElement packageElement) {
-        return packageElement == null || packageElement.isUnnamed()
-                ? SectionName.UNNAMED_PACKAGE_ANCHOR.getName()
-                : utils.getPackageName(packageElement);
-    }
-
-    /**
      * Return the link to the given package.
      *
      * @param packageElement the package to link to.
@@ -668,7 +660,7 @@ public class HtmlDocletWriter {
             if (flags.contains(ElementFlag.PREVIEW)) {
                 return new ContentBuilder(
                     links.createLink(targetLink, label),
-                    HtmlTree.SUP(links.createLink(targetLink.withFragment(getPreviewSectionAnchor(packageElement)),
+                    HtmlTree.SUP(links.createLink(targetLink.withFragment(htmlIds.forPreviewSection(packageElement).name()),
                                                   contents.previewMark))
                 );
             }
@@ -697,11 +689,11 @@ public class HtmlDocletWriter {
         boolean included = utils.isIncluded(mdle);
         if (included) {
             DocLink targetLink = new DocLink(pathToRoot.resolve(docPaths.moduleSummary(mdle)));
-            Content link = links.createLink(targetLink, label, "", "");
+            Content link = links.createLink(targetLink, label, "");
             if (flags.contains(ElementFlag.PREVIEW) && label != contents.moduleLabel) {
                 link = new ContentBuilder(
                         link,
-                        HtmlTree.SUP(links.createLink(targetLink.withFragment(getPreviewSectionAnchor(mdle)),
+                        HtmlTree.SUP(links.createLink(targetLink.withFragment(htmlIds.forPreviewSection(mdle).name()),
                                                       contents.previewMark))
                 );
             }
@@ -744,7 +736,7 @@ public class HtmlDocletWriter {
                     .resolve(DocPaths.SOURCE_OUTPUT)
                     .resolve(docPaths.forClass(te));
             Content content = links.createLink(href
-                    .fragment(SourceToHTMLConverter.getAnchorName(utils, element)), label, "", "");
+                    .fragment(SourceToHTMLConverter.getAnchorName(utils, element)), label, "");
             htmltree.add(content);
         } else {
             htmltree.add(label);
@@ -771,7 +763,7 @@ public class HtmlDocletWriter {
      */
     public Content getTypeParameterLinks(LinkInfoImpl linkInfo) {
         LinkFactoryImpl factory = new LinkFactoryImpl(this);
-        return factory.getTypeParameterLinks(linkInfo, false);
+        return factory.getTypeParameterLinks(linkInfo);
     }
 
     /*************************************************************
@@ -809,7 +801,7 @@ public class HtmlDocletWriter {
                     (label == null) || label.isEmpty() ? defaultLabel : label,
                     strong,
                     resources.getText("doclet.Href_Class_Or_Interface_Title",
-                        utils.getPackageName(packageElement)), "", true);
+                        utils.getPackageName(packageElement)), true);
             }
         }
         return null;
@@ -861,18 +853,16 @@ public class HtmlDocletWriter {
      * link label.
      *
      * @param typeElement the class to link to.
-     * @param isStrong true if the link should be strong.
      * @return the link with the package portion of the label in plain text.
      */
-    public Content getPreQualifiedClassLink(LinkInfoImpl.Kind context,
-            TypeElement typeElement, boolean isStrong) {
+    public Content getPreQualifiedClassLink(LinkInfoImpl.Kind context, TypeElement typeElement) {
         ContentBuilder classlink = new ContentBuilder();
         PackageElement pkg = utils.containingPackage(typeElement);
         if (pkg != null && ! configuration.shouldExcludeQualifier(pkg.getSimpleName().toString())) {
             classlink.add(getEnclosingPackageName(typeElement));
         }
         classlink.add(getLink(new LinkInfoImpl(configuration,
-                context, typeElement).label(utils.getSimpleName(typeElement)).strong(isStrong)));
+                context, typeElement).label(utils.getSimpleName(typeElement))));
         return classlink;
     }
 
@@ -942,116 +932,76 @@ public class HtmlDocletWriter {
      */
     public Content getDocLink(LinkInfoImpl.Kind context, Element element, CharSequence label) {
         return getDocLink(context, utils.getEnclosingTypeElement(element), element,
-                new StringContent(label));
+                new StringContent(label), false);
     }
 
     /**
      * Return the link for the given member.
      *
      * @param context the id of the context where the link will be printed.
+     * @param typeElement the typeElement that we should link to. This is not
+     *            not necessarily the type containing element since we may be
+     *            inheriting comments.
      * @param element the member being linked to.
      * @param label the label for the link.
-     * @param strong true if the link should be strong.
-     * @return the link for the given member.
-     */
-    public Content getDocLink(LinkInfoImpl.Kind context, Element element, CharSequence label,
-            boolean strong) {
-        return getDocLink(context, utils.getEnclosingTypeElement(element), element, label, strong);
-    }
-
-    /**
-     * Return the link for the given member.
-     *
-     * @param context the id of the context where the link will be printed.
-     * @param typeElement the typeElement that we should link to.  This is not
-                 necessarily equal to element.containingClass().  We may be
-                 inheriting comments.
-     * @param element the member being linked to.
-     * @param label the label for the link.
-     * @param strong true if the link should be strong.
      * @return the link for the given member.
      */
     public Content getDocLink(LinkInfoImpl.Kind context, TypeElement typeElement, Element element,
-            CharSequence label, boolean strong) {
-        return getDocLink(context, typeElement, element, label, strong, false);
-    }
-
-    public Content getDocLink(LinkInfoImpl.Kind context, TypeElement typeElement, Element element,
-            Content label, boolean strong) {
-        return getDocLink(context, typeElement, element, label, strong, false);
+                              CharSequence label) {
+        return getDocLink(context, typeElement, element, label, false);
     }
 
     /**
      * Return the link for the given member.
      *
      * @param context the id of the context where the link will be printed.
-     * @param typeElement the typeElement that we should link to.  This is not
-                 necessarily equal to element.containingClass().  We may be
-                 inheriting comments.
+     * @param typeElement the typeElement that we should link to. This is not
+     *            not necessarily the type containing element since we may be
+     *            inheriting comments.
      * @param element the member being linked to.
      * @param label the label for the link.
-     * @param strong true if the link should be strong.
+     * @return the link for the given member.
+     */
+    public Content getDocLink(LinkInfoImpl.Kind context, TypeElement typeElement, Element element,
+                              CharSequence label, boolean isProperty) {
+        return getDocLink(context, typeElement, element, new StringContent(label), isProperty);
+    }
+
+    /**
+     * Return the link for the given member.
+     *
+     * @param context the id of the context where the link will be printed.
+     * @param typeElement the typeElement that we should link to. This is not
+     *            not necessarily the type containing element since we may be
+     *            inheriting comments.
+     * @param element the member being linked to.
+     * @param label the label for the link.
      * @param isProperty true if the element parameter is a JavaFX property.
      * @return the link for the given member.
      */
     public Content getDocLink(LinkInfoImpl.Kind context, TypeElement typeElement, Element element,
-            CharSequence label, boolean strong, boolean isProperty) {
-        return getDocLink(context, typeElement, element, new StringContent(label), strong, isProperty);
-    }
-
-    public Content getDocLink(LinkInfoImpl.Kind context, TypeElement typeElement, Element element,
-            Content label, boolean strong, boolean isProperty) {
+            Content label, boolean isProperty) {
         if (!utils.isLinkable(typeElement, element)) {
             return label;
         }
 
         if (utils.isExecutableElement(element)) {
             ExecutableElement ee = (ExecutableElement)element;
+            HtmlId id = isProperty ? htmlIds.forProperty(ee) : htmlIds.forMember(ee);
             return getLink(new LinkInfoImpl(configuration, context, typeElement)
                 .label(label)
-                .where(links.getAnchor(ee, isProperty))
-                .targetMember(element)
-                .strong(strong));
+                .where(id.name())
+                .targetMember(element));
         }
 
         if (utils.isVariableElement(element) || utils.isTypeElement(element)) {
             return getLink(new LinkInfoImpl(configuration, context, typeElement)
                 .label(label)
-                .where(links.getName(element.getSimpleName().toString()))
-                .targetMember(element)
-                .strong(strong));
+                .where(element.getSimpleName().toString())
+                .targetMember(element));
         }
 
         return label;
-    }
-
-    /**
-     * Return the link for the given member.
-     *
-     * @param context the id of the context where the link will be added
-     * @param typeElement the typeElement that we should link to.  This is not
-                 necessarily equal to element.containingClass().  We may be
-                 inheriting comments
-     * @param element the member being linked to
-     * @param label the label for the link
-     * @return the link for the given member
-     */
-    public Content getDocLink(LinkInfoImpl.Kind context, TypeElement typeElement, Element element,
-            Content label) {
-        if (! (utils.isIncluded(element) || utils.isLinkable(typeElement))) {
-            return label;
-        } else if (utils.isExecutableElement(element)) {
-            ExecutableElement emd = (ExecutableElement) element;
-            return getLink(new LinkInfoImpl(configuration, context, typeElement)
-                .label(label)
-                .where(links.getAnchor(emd))
-                .targetMember(element));
-        } else if (utils.isVariableElement(element) || utils.isTypeElement(element)) {
-            return getLink(new LinkInfoImpl(configuration, context, typeElement)
-                .label(label).where(links.getName(element.getSimpleName().toString())).targetMember(element));
-        } else {
-            return label;
-        }
     }
 
     public Content seeTagToContent(Element element, DocTree see) {
@@ -1102,8 +1052,8 @@ public class HtmlDocletWriter {
                                 : null;
                 if (elementCrossLink != null) {
                     // Element cross link found
-                    return links.createLink(elementCrossLink,
-                            (label.isEmpty() ? text : label), true);
+                    return links.createExternalLink(elementCrossLink,
+                            (label.isEmpty() ? text : label));
                 } else {
                     // No cross link found so print warning
                     messages.warning(ch.getDocTreePath(see),
@@ -1905,8 +1855,7 @@ public class HtmlDocletWriter {
                 }
                 String simpleName = element.getSimpleName().toString();
                 if (multipleValues || !"value".equals(simpleName)) { // Omit "value=" where unnecessary
-                    annotation.add(getDocLink(LinkInfoImpl.Kind.ANNOTATION,
-                                                     element, simpleName, false));
+                    annotation.add(getDocLink(LinkInfoImpl.Kind.ANNOTATION, element, simpleName));
                     annotation.add("=");
                 }
                 AnnotationValue annotationValue = map.get(element);
@@ -2020,8 +1969,7 @@ public class HtmlDocletWriter {
             }
             @Override
             public Content visitEnumConstant(VariableElement c, Void p) {
-                return getDocLink(LinkInfoImpl.Kind.ANNOTATION,
-                        c, c.getSimpleName(), false);
+                return getDocLink(LinkInfoImpl.Kind.ANNOTATION, c, c.getSimpleName());
             }
             @Override
             public Content visitArray(List<? extends AnnotationValue> vals, Void p) {
@@ -2187,7 +2135,7 @@ public class HtmlDocletWriter {
         if (utils.isPreviewAPI(forWhat)) {
             //in Java platform:
             HtmlTree previewDiv = HtmlTree.DIV(HtmlStyle.previewBlock);
-            previewDiv.setId(getPreviewSectionAnchor(forWhat));
+            previewDiv.setId(htmlIds.forPreviewSection(forWhat));
             String name = (switch (forWhat.getKind()) {
                 case PACKAGE, MODULE ->
                         ((QualifiedNameable) forWhat).getQualifiedName();
@@ -2218,7 +2166,7 @@ public class HtmlDocletWriter {
                 Name name = forWhat.getSimpleName();
                 Content nameCode = HtmlTree.CODE(new StringContent(name));
                 HtmlTree previewDiv = HtmlTree.DIV(HtmlStyle.previewBlock);
-                previewDiv.setId(getPreviewSectionAnchor(forWhat));
+                previewDiv.setId(htmlIds.forPreviewSection(forWhat));
                 Content leadingNote = contents.getContent("doclet.PreviewLeadingNote", nameCode);
                 previewDiv.add(HtmlTree.SPAN(HtmlStyle.previewLabel,
                                              leadingNote));
@@ -2318,15 +2266,6 @@ public class HtmlDocletWriter {
         return contents.getContent(key,
                                    HtmlTree.CODE(new StringContent(className)),
                                    links);
-    }
-
-    public String getPreviewSectionAnchor(Element el) {
-        return "preview-" + switch (el.getKind()) {
-            case CONSTRUCTOR, METHOD ->
-                links.getAnchor((ExecutableElement) el);
-            case PACKAGE -> getPackageAnchorName((PackageElement) el);
-            default -> utils.getFullyQualifiedName(el, false);
-        };
     }
 
 }

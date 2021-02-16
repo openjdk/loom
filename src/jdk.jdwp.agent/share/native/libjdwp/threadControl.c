@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -145,6 +145,11 @@ typedef struct {
 
 static DeferredEventModeList deferredEventModes;
 
+#ifdef DEBUG
+static void dumpThreadList(ThreadList *list);
+static void dumpThread(ThreadNode *node);
+#endif
+
 static jint
 getStackDepth(jthread thread)
 {
@@ -233,6 +238,9 @@ nonTlsSearch(JNIEnv *env, ThreadList *list, jthread thread)
 
 /*
  * Search for a thread on the list. If list==NULL, search all lists.
+ * TODO: TLS cache is temporary diabled for all threads, not added for virtual threads yet
+ * It cause intermittent failures because ThreadNode data is broken.
+ * Need to enable setThreadLocalStorage in 2 places.
  */
 static ThreadNode *
 findThread(ThreadList *list, jthread thread)
@@ -256,7 +264,7 @@ findThread(ThreadList *list, jthread thread)
     }
 
     /* Get thread local storage for quick thread -> node access */
-    node = getThreadLocalStorage(thread);
+    node = NULL;//getThreadLocalStorage(thread);
 
     /* In some rare cases we might get NULL, so we check the list manually for
      *   any threads that we could match.
@@ -272,7 +280,7 @@ findThread(ThreadList *list, jthread thread)
         }
         if ( node != NULL ) {
             /* Here we make another attempt to set TLS, it's ok if this fails */
-            setThreadLocalStorage(thread, (void*)node);
+            //setThreadLocalStorage(thread, (void*)node);
         }
     }
 
@@ -410,7 +418,7 @@ insertThread(JNIEnv *env, ThreadList *list, jthread thread)
          *   which is ok, see findThread, it deals with threads without TLS set.
          */
         if (!is_vthread) {
-            setThreadLocalStorage(node->thread, (void*)node);
+          //setThreadLocalStorage(node->thread, (void*)node);
         }
 
         if (is_vthread) {
@@ -2855,3 +2863,42 @@ threadControl_continuationYield(jthread thread, jint continuation_frame_count)
     }
     debugMonitorExit(threadLock);
 }
+
+/***** debugging *****/
+
+#ifdef DEBUG
+
+void
+threadControl_dumpAllThreads()
+{
+    tty_message("Dumping runningThreads:\n");
+    dumpThreadList(&runningThreads);
+    tty_message("Dumping runningVThreads:\n");
+    dumpThreadList(&runningVThreads);
+    tty_message("Dumping otherThreads:\n");
+    dumpThreadList(&otherThreads);
+}
+
+static void
+dumpThreadList(ThreadList *list)
+{
+    ThreadNode *node;
+    for (node = list->first; node != NULL; node = node->next) {
+        if (!node->isDebugThread) {
+            dumpThread(node);
+        }
+    }
+}
+
+static void
+dumpThread(ThreadNode *node) {
+    tty_message("  Thread: node = %p, jthread = %p", node, node->thread);
+#ifdef DEBUG_THREADNAME
+    tty_message("\tname: %s", node->name);
+#endif
+    // More fields can be printed here when needed. The amount of output is intentionlly
+    // kept small so it doesn't generate too much output.
+    tty_message("\tsuspendCount: %d", node->suspendCount);
+}
+
+#endif /* DEBUG */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2265,19 +2265,19 @@ public final class System {
             }
 
             public String newStringNoRepl(byte[] bytes, Charset cs) throws CharacterCodingException  {
-                return StringCoding.newStringNoRepl(bytes, cs);
+                return String.newStringNoRepl(bytes, cs);
             }
 
             public byte[] getBytesNoRepl(String s, Charset cs) throws CharacterCodingException {
-                return StringCoding.getBytesNoRepl(s, cs);
+                return String.getBytesNoRepl(s, cs);
             }
 
             public String newStringUTF8NoRepl(byte[] bytes, int off, int len) {
-                return StringCoding.newStringUTF8NoRepl(bytes, off, len);
+                return String.newStringUTF8NoRepl(bytes, off, len);
             }
 
             public byte[] getBytesUTF8NoRepl(String s) {
-                return StringCoding.getBytesUTF8NoRepl(s);
+                return String.getBytesUTF8NoRepl(s);
             }
 
             public void setCause(Throwable t, Throwable cause) {
@@ -2309,11 +2309,6 @@ public final class System {
             }
 
             @ChangesCurrentThread
-            public void setCurrentThread(Thread thread) {
-                Thread.currentThread().setCurrentThread(thread);
-            }
-
-            @ChangesCurrentThread
             public <V> V executeOnCarrierThread(Callable<V> task) throws Exception {
                 Thread thread = Thread.currentThread();
                 if (thread.isVirtual()) {
@@ -2338,11 +2333,11 @@ public final class System {
             }
 
             public void parkVirtualThread() {
-                VirtualThread.park();
+                ((VirtualThread) Thread.currentThread()).park();
             }
 
             public void parkVirtualThread(long nanos) {
-                VirtualThread.parkNanos(nanos);
+                ((VirtualThread) Thread.currentThread()).parkNanos(nanos);
             }
 
             public void unparkVirtualThread(Thread thread) {

@@ -26,8 +26,8 @@
 package java.io;
 
 import java.util.Arrays;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.Objects;
+import jdk.internal.misc.InternalLock;
 import jdk.internal.misc.VM;
 
 /**
@@ -68,6 +68,10 @@ import jdk.internal.misc.VM;
  */
 
 public class BufferedWriter extends Writer {
+
+    // Legacy/undocumented behavior was to the wrapped Writer as the lock.
+    // New behavior is to use "this" or an "internal lock" for trusted classes.
+
     private static final int DEFAULT_INITIAL_BUFFER_SIZE = 512;
     private static final int DEFAULT_MAX_BUFFER_SIZE = 8192;
 
@@ -92,8 +96,7 @@ public class BufferedWriter extends Writer {
      * Creates a buffered character-output stream.
      */
     private BufferedWriter(Writer out, int initialSize, int maxSize) {
-        super(out);
-
+        Objects.requireNonNull(out);
         if (initialSize <= 0) {
             throw new IllegalArgumentException("Buffer size <= 0");
         }
@@ -102,11 +105,6 @@ public class BufferedWriter extends Writer {
         this.cb = new char[initialSize];
         this.nChars = initialSize;
         this.maxChars = maxSize;
-
-        // use ReentrantLock when BufferedWriter is not sub-classed
-        if (getClass() == BufferedWriter.class) {
-            this.lock = new ReentrantLock();
-        }
     }
 
     /**
@@ -159,13 +157,12 @@ public class BufferedWriter extends Writer {
      */
     void flushBuffer() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedFlushBuffer();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -189,13 +186,12 @@ public class BufferedWriter extends Writer {
      */
     public void write(int c) throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(c);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -244,13 +240,12 @@ public class BufferedWriter extends Writer {
      */
     public void write(char cbuf[], int off, int len) throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(cbuf, off, len);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -314,13 +309,12 @@ public class BufferedWriter extends Writer {
      */
     public void write(String s, int off, int len) throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedWrite(s, off, len);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -361,13 +355,12 @@ public class BufferedWriter extends Writer {
      */
     public void flush() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedFlush();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -383,13 +376,12 @@ public class BufferedWriter extends Writer {
 
     public void close() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedClose();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {

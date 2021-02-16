@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,7 +26,6 @@
 #include "classfile/classLoaderDataGraph.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/moduleEntry.hpp"
-#include "classfile/systemDictionary.hpp"
 #include "jvmtifiles/jvmtiEnv.hpp"
 #include "memory/iterator.hpp"
 #include "memory/resourceArea.hpp"
@@ -50,6 +49,7 @@
 #include "runtime/jfieldIDWorkaround.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/objectMonitor.inline.hpp"
+#include "runtime/osThread.hpp"
 #include "runtime/signature.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadSMR.hpp"
@@ -611,14 +611,28 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 }
 
 javaVFrame*
+JvmtiEnvBase::skip_hidden_frames(javaVFrame* jvf) {
+  // find the top-most jvf with an annotated method
+  for ( ; jvf != NULL; jvf = jvf->java_sender()) {
+    if (jvf->method()->changes_current_thread()) {
+      break;
+    }
+  }
+  return jvf;
+}
+
+javaVFrame*
 JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   Thread* cur_thread = Thread::current();
   oop cont = java_lang_VirtualThread::continuation(vthread);
   javaVFrame* jvf = NULL;
 
   assert(cont != NULL, "virtual thread continuation must not be NULL");
-  if (java_lang_Continuation::is_mounted(cont)) {
-    oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
+
+  oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
+  // Returned carrier_thread can be NULL for a mounted continuation.
+  // Then treat it as an unmounted case.
+  if (java_lang_Continuation::is_mounted(cont) && carrier_thread != NULL) {
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
 
     if (!java_thread->has_last_Java_frame()) {
@@ -629,6 +643,9 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
     }
     vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
     jvf = vfs.at_end() ? NULL : vfs.asJavaVFrame();
+    if (java_thread->is_in_VTMT()) {
+      jvf = skip_hidden_frames(jvf);
+    }
   } else {
     Handle cont_h(cur_thread, cont);
     vframeStream vfs(cont_h);
@@ -643,6 +660,9 @@ JvmtiEnvBase::get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map_p) {
   javaVFrame *jvf = JvmtiEnvBase::cthread_with_continuation(jt) ?
                         jt->vthread_carrier_last_java_vframe(reg_map_p) :
                         jt->last_java_vframe(reg_map_p);
+  if (jt->is_in_VTMT()) {
+    jvf = skip_hidden_frames(jvf);
+  }
   return jvf;
 }
 
@@ -702,7 +722,7 @@ JvmtiEnvBase::get_live_threads(JavaThread* current_thread, Handle group_hdl, Han
     NULL_CHECK(thread_objs, JVMTI_ERROR_OUT_OF_MEMORY);
     for (int i = 0; i < nthreads; i++) {
       Handle thread = tle.get_threadObj(i);
-      if (thread()->is_a(SystemDictionary::Thread_klass()) && java_lang_Thread::threadGroup(thread()) == group_hdl()) {
+      if (thread()->is_a(vmClasses::Thread_klass()) && java_lang_Thread::threadGroup(thread()) == group_hdl()) {
         thread_objs[count++] = thread;
       }
     }
@@ -1068,7 +1088,7 @@ JvmtiEnvBase::get_stack_trace(JavaThread *java_thread,
   if (java_thread->has_last_Java_frame()) {
     RegisterMap reg_map(java_thread, true, true);
     ResourceMark rm(current_thread);
-    javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(java_thread, &reg_map);
+    javaVFrame *jvf = get_last_java_vframe(java_thread, &reg_map);
 
     err = get_stack_trace(jvf, start_depth, max_count, frame_buffer, count_ptr);
   } else {
@@ -1106,7 +1126,7 @@ JvmtiEnvBase::get_frame_count(JavaThread* jt, jint *count_ptr) {
   } else {
     ResourceMark rm(current_thread);
     RegisterMap reg_map(jt, true, true);
-    javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(jt, &reg_map);
+    javaVFrame *jvf = get_last_java_vframe(jt, &reg_map);
 
     *count_ptr = get_frame_count(jvf);
   }
@@ -1223,7 +1243,7 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
   if (thread == NULL) {
     java_thread = cur_thread;
     thread_oop = get_vthread_or_thread_oop(java_thread);
-    if (thread_oop == NULL || !thread_oop->is_a(SystemDictionary::Thread_klass())) {
+    if (thread_oop == NULL || !thread_oop->is_a(vmClasses::Thread_klass())) {
       return JVMTI_ERROR_INVALID_THREAD;
     }
   } else {
@@ -1242,7 +1262,10 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
       oop cont = java_lang_VirtualThread::continuation(thread_oop);
       if (java_lang_Continuation::is_mounted(cont)) {
         oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
-        java_thread = java_lang_Thread::thread(carrier_thread);
+        // Returned carrier_thread can be NULL for a mounted continuation.
+        if (carrier_thread != NULL) {
+          java_thread = java_lang_Thread::thread(carrier_thread);
+        }
       }
     }
   }

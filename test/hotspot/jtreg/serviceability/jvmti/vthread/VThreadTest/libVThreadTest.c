@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -174,6 +174,7 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
     if (inf->thr_name == NULL && strcmp(event_name, "VirtualThreadTerminated") != 0) {
       fatal(jni, "VThread event: worker thread not found!");
     }
+#if 0
     if (continuation_events_enabled == JNI_TRUE && strcmp(event_name, "VirtualThreadMounted") == 0) {
       if (!inf->just_scheduled) { // There is no ContinuationRun for just scheduled vthreads
         if (inf->was_yield) {
@@ -184,16 +185,19 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
         }
       }
     }
+#endif
     if (strcmp(event_name, "VirtualThreadUnmounted") == 0) {
       if (inf->just_scheduled) {
         fatal(jni, "VirtualThreadUnmounted: event without VirtualThreadMounted before!");
       }
+#if 0
       if (continuation_events_enabled == JNI_TRUE && inf->was_run) {
         fatal(jni, "VirtualThreadUnmounted: event with ContinuationRun before!");
       }
       if (continuation_events_enabled == JNI_TRUE && !inf->was_yield) {
         fatal(jni, "VirtualThreadUnmounted: event without ContinuationYield before!");
       }
+#endif
     }
     inf->just_scheduled = JNI_FALSE;
   }
@@ -626,6 +630,8 @@ static void
 processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_name) {
   static int vthread_events_cnt = 0;
   jthread cthread = NULL;
+  jvmtiThreadInfo thr_info;
+  jvmtiError err;
 
   if (strcmp(event_name, "VirtualThreadTerminated") != 0 &&
       strcmp(event_name, "VirtualThreadScheduled")  != 0) {
@@ -633,7 +639,15 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_n
       return; // No need to test all events
     }
   }
-  jvmtiError err = (*jvmti)->GetCarrierThread(jvmti, vthread, &cthread);
+
+  err = (*jvmti)->GetThreadInfo(jvmti, vthread, &thr_info);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("JVMTI GetThreadInfo returned error: %d\n", err);
+    fatal(jni, "event handler: JVMTI GetThreadInfo failed to return JVMTI_ERROR_NONE");
+  }
+  printf("processVThreadEvent: event: %s, thread: %s\n", event_name, thr_info.name); fflush(0);
+
+  err = (*jvmti)->GetCarrierThread(jvmti, vthread, &cthread);
   if (err != JVMTI_ERROR_NONE) {
     printf("processVThreadEvent: GetCarrierThread returned error code: %d\n", err);
     fatal(jni, "event handler: JVMTI GetCarrierThread failed to return JVMTI_ERROR_NONE");
@@ -660,23 +674,15 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_n
 
 static void JNICALL
 VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  jobject mounted_vthread = NULL;
-
   lock_events();
-
   processVThreadEvent(jvmti, jni, vthread, "VirtualThreadScheduled");
-
   unlock_events();
 }
 
 static void JNICALL
 VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  jobject mounted_vthread = NULL;
-
   lock_events();
-
   processVThreadEvent(jvmti, jni, vthread, "VirtualThreadTerminated");
-
   unlock_events();
 }
 

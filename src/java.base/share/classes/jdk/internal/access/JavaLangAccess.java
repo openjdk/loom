@@ -369,11 +369,6 @@ public interface JavaLangAccess {
     Thread currentCarrierThread();
 
     /**
-     * Sets the Thread object to be returned by Thread.currentThread().
-     */
-    void setCurrentThread(Thread thread);
-
-    /**
      * Executes the given value returning task on the current carrier thread.
      */
     <V> V executeOnCarrierThread(Callable<V> task) throws Exception;
@@ -394,7 +389,7 @@ public interface JavaLangAccess {
     void parkVirtualThread();
 
     /**
-     * Parks the current virtual thread.for up to the given waiting time.
+     * Parks the current virtual thread for up to the given waiting time.
      */
     void parkVirtualThread(long nanos);
 

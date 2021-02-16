@@ -25,15 +25,14 @@
 
 package java.io;
 
-
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import jdk.internal.misc.InternalLock;
 
 /**
  * Reads text from a character-input stream, buffering characters so as to
@@ -71,6 +70,9 @@ import java.util.stream.StreamSupport;
 
 public class BufferedReader extends Reader {
 
+    // Legacy/undocumented behavior was to the wrapped Reader as the lock.
+    // New behavior is to use "this" or an "internal lock" for trusted classes.
+
     private Reader in;
 
     private char cb[];
@@ -100,17 +102,12 @@ public class BufferedReader extends Reader {
      * @throws IllegalArgumentException  If {@code sz <= 0}
      */
     public BufferedReader(Reader in, int sz) {
-        super(in);
+        Objects.requireNonNull(in);
         if (sz <= 0)
             throw new IllegalArgumentException("Buffer size <= 0");
         this.in = in;
         cb = new char[sz];
         nextChar = nChars = 0;
-
-        // use ReentrantLock when BufferedReader is not sub-classed
-        if (getClass() == BufferedReader.class) {
-            lock = new ReentrantLock();
-        }
     }
 
     /**
@@ -183,13 +180,12 @@ public class BufferedReader extends Reader {
      */
     public int read() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedRead();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -298,13 +294,12 @@ public class BufferedReader extends Reader {
      */
     public int read(char cbuf[], int off, int len) throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedRead(cbuf, off, len);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -352,13 +347,12 @@ public class BufferedReader extends Reader {
      */
     String readLine(boolean ignoreLF, boolean[] term) throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedReadLine(ignoreLF, term);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -463,13 +457,12 @@ public class BufferedReader extends Reader {
             throw new IllegalArgumentException("skip value is negative");
         }
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedSkip(n);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -515,13 +508,12 @@ public class BufferedReader extends Reader {
      */
     public boolean ready() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 return lockedReady();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -581,13 +573,12 @@ public class BufferedReader extends Reader {
             throw new IllegalArgumentException("Read-ahead limit < 0");
         }
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedMark(readAheadLimit);
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -611,13 +602,12 @@ public class BufferedReader extends Reader {
      */
     public void reset() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedReset();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {
@@ -638,13 +628,12 @@ public class BufferedReader extends Reader {
 
     public void close() throws IOException {
         Object lock = this.lock;
-        if (lock instanceof Lock) {
-            Lock theLock = (Lock) lock;
-            theLock.lock();
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
             try {
                 lockedClose();
             } finally {
-                theLock.unlock();
+                locker.unlock();
             }
         } else {
             synchronized (lock) {

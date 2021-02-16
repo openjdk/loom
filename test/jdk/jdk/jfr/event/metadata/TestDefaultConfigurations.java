@@ -178,6 +178,7 @@ public class TestDefaultConfigurations {
         insertSetting(doc, EventNames.X509Certificate, "threshold", "0 ns");
         insertSetting(doc, EventNames.X509Validation, "threshold", "0 ns");
         insertSetting(doc, EventNames.ProcessStart, "threshold", "0 ns");
+        insertSetting(doc, EventNames.VirtualThreadSubmitRejectedEvent, "threshold", "0 ns");
 
         return doc;
     }

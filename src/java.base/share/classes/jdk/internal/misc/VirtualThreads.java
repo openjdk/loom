@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,13 +25,13 @@
 
 package jdk.internal.misc;
 
+import java.util.concurrent.TimeUnit;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
- * Supporting methods to park/unpark virtual threads.
+ * Defines static methods to support execution in the context of a virtual thread.
  */
-
 public final class VirtualThreads {
     private static final JavaLangAccess JLA;
     static {
@@ -43,28 +43,52 @@ public final class VirtualThreads {
     private VirtualThreads() { }
 
     /**
-     * Returns the current carrier thread
+     * Returns the current carrier thread.
      */
     public static Thread currentCarrierThread() {
         return JLA.currentCarrierThread();
     }
 
     /**
-     * Parks the current virtual thread
+     * Parks the current virtual thread until it is unparked or interrupted.
+     * If already unparked then the parking permit is consumed and this method
+     * completes immediately (meaning it doesn't yield). It also completes
+     * immediately if the interrupt status is set.
      */
     public static void park() {
         JLA.parkVirtualThread();
     }
 
     /**
-     * Parks the current virtual thread for up to the given waiting time
+     * Parks the current virtual thread up to the given waiting time or until it
+     * is unparked or interrupted. If already unparked then the parking permit is
+     * consumed and this method completes immediately (meaning it doesn't yield).
+     * It also completes immediately if the interrupt status is set or the waiting
+     * time is {@code <= 0}.
+     *
+     * @param nanos the maximum number of nanoseconds to wait.
      */
     public static void park(long nanos) {
         JLA.parkVirtualThread(nanos);
     }
 
     /**
-     * Unparks the given virtual thread
+     * Parks the current virtual thread until the given deadline or until is is
+     * unparked or interrupted. If already unparked then the parking permit is
+     * consumed and this method completes immediately (meaning it doesn't yield).
+     * It also completes immediately if the interrupt status is set or the
+     * deadline has past.
+     *
+     * @param deadline absolute time, in milliseconds, from the epoch
+     */
+    public static void parkUntil(long deadline) {
+        long millis = deadline - System.currentTimeMillis();
+        long nanos = TimeUnit.NANOSECONDS.convert(millis, TimeUnit.MILLISECONDS);
+        park(nanos);
+    }
+
+    /**
+     * Unparks a virtual thread.
      */
     public static void unpark(Thread thread) {
         JLA.unparkVirtualThread(thread);

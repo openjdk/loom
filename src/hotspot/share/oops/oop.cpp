@@ -155,6 +155,14 @@ bool oopDesc::has_klass_gap() {
   return UseCompressedClassPointers;
 }
 
+#if INCLUDE_CDS_JAVA_HEAP
+void oopDesc::set_narrow_klass(narrowKlass nk) {
+  assert(DumpSharedSpaces, "Used by CDS only. Do not abuse!");
+  assert(UseCompressedClassPointers, "must be");
+  _metadata._compressed_klass = nk;
+}
+#endif
+
 void* oopDesc::load_klass_raw(oop obj) {
   if (UseCompressedClassPointers) {
     narrowKlass narrow_klass = obj->_metadata._compressed_klass;
@@ -227,6 +235,12 @@ void oopDesc::verify_forwardee(oop forwardee) {
 #endif
 }
 
-bool oopDesc::get_UseParallelGC() { return UseParallelGC; }
-bool oopDesc::get_UseG1GC()       { return UseG1GC;       }
+bool oopDesc::size_might_change() {
+  // UseParallelGC and UseG1GC can change the length field
+  // of an "old copy" of an object array in the young gen so it indicates
+  // the grey portion of an already copied array. This will cause the first
+  // disjunct below to fail if the two comparands are computed across such
+  // a concurrent change.
+  return Universe::heap()->is_gc_active() && is_objArray() && is_forwarded() && (UseParallelGC || UseG1GC);
+}
 #endif

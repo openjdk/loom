@@ -84,10 +84,10 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * to the <i>current thread</i>, will return the {@code Thread} object for the virtual
  * thread.
  *
- * <p> {@code Thread} defines factory methods, and a {@linkplain Builder} API,
- * for creating platform or virtual threads. It also defines (for compatibility and
- * customization reasons) constructors for creating platform threads. Newer code
- * is encouraged to use the factory methods or the builder rather than the constructors.
+ * <p> {@code Thread} defines a {@linkplain Builder} API, for creating threads. It
+ * also defines (for compatibility and customization reasons) constructors for
+ * creating platform threads. The constructors cannot be used to create virtual
+ * threads.
  *
  * <p> Platform threads are designated <i>daemon</i> or <i>non-daemon</i> threads.
  * When the Java virtual machine starts up, there is usually one non-daemon
@@ -173,11 +173,9 @@ public class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
-
     // A simple (not very) random string of bits to use when evicting
-    // cache entries.
-    int victims
-        = 0b1100_1001_0000_1111_1101_1010_1010_0010;
+    // cache entries from the scoped variable cache.
+    int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
     Scoped.Binding<?> noninheritableScopeLocalBindings;
     Scoped.Binding<?> inheritableScopeLocalBindings;
@@ -246,14 +244,14 @@ public class Thread implements Runnable {
     private Continuation cont;
 
     /**
-     * TBD
+     * Returns the current continuation.
      */
     Continuation getContinuation() {
         return cont;
     }
 
     /**
-     * TBD
+     * Sets the current continuation.
      */
     void setContinuation(Continuation cont) {
         this.cont = cont;
@@ -312,8 +310,8 @@ public class Thread implements Runnable {
      */
     public static void yield() {
         Thread thread = currentThread();
-        if (thread.isVirtual()) {
-            ((VirtualThread) thread).tryYield();
+        if (thread instanceof VirtualThread vthread) {
+            vthread.tryYield();
         } else {
             yield0();
         }
@@ -357,9 +355,9 @@ public class Thread implements Runnable {
 
     private static void sleepMillis(long millis) throws InterruptedException {
         Thread thread = currentThread();
-        if (thread.isVirtual()) {
+        if (thread instanceof VirtualThread vthread) {
             long nanos = NANOSECONDS.convert(millis, MILLISECONDS);
-            ((VirtualThread) thread).sleepNanos(nanos);
+            vthread.sleepNanos(nanos);
         } else {
             sleep0(millis);
         }
@@ -429,18 +427,18 @@ public class Thread implements Runnable {
             return;
 
         Thread thread = currentThread();
-        if (thread.isVirtual()) {
+        if (thread instanceof VirtualThread vthread) {
             if (ThreadSleepEvent.isTurnedOn()) {
                 ThreadSleepEvent event = new ThreadSleepEvent();
                 try {
                     event.time = nanos;
                     event.begin();
-                    ((VirtualThread) thread).sleepNanos(nanos);
+                    vthread.sleepNanos(nanos);
                 } finally {
                     event.commit();
                 }
             } else {
-                ((VirtualThread) thread).sleepNanos(nanos);
+                vthread.sleepNanos(nanos);
             }
         } else {
             // convert to milliseconds, ceiling rounding mode
@@ -637,7 +635,7 @@ public class Thread implements Runnable {
      * The task {@link java.util.concurrent.Executor#execute(Runnable) submitted}
      * to a custom {@link Thread.Builder#virtual(Executor) scheduler}.
      *
-     * @apiNote The follow example creates a scheduler that uses a small set of
+     * @apiNote The following example creates a scheduler that uses a small set of
      * platform threads. It prints the name of each virtual thread before executing
      * its task.
      * <pre>{@code
@@ -689,7 +687,11 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Returns a builder for creating {@code Thread} or {@code ThreadFactory} objects.
+     * Returns a builder for creating a {@code Thread} or {@code ThreadFactory}.
+     * A newly created builder defaults to creating threads that are scheduled by
+     * the operating system. The {@link Builder#virtual() virtual()} method may be
+     * used to change it to create threads that are scheduled by the Java virtual
+     * machine.
      *
      * @apiNote The following are examples using the builder:
      *
@@ -2108,7 +2110,7 @@ public class Thread implements Runnable {
         priority(newPriority);
     }
 
-    void priority(int newPriority) {
+    private void priority(int newPriority) {
         ThreadGroup g;
         if (!isVirtual() && (g = getThreadGroup()) != null) {
             int maxPriority = g.getMaxPriority();
@@ -2292,10 +2294,10 @@ public class Thread implements Runnable {
         if (millis < 0)
             throw new IllegalArgumentException("timeout value is negative");
 
-        if (isVirtual()) {
+        if (this instanceof VirtualThread vthread) {
             if (isAlive()) {
                 long nanos = MILLISECONDS.toNanos(millis);
-                ((VirtualThread) this).joinNanos(nanos);
+                vthread.joinNanos(nanos);
             }
             return;
         }
@@ -2417,8 +2419,8 @@ public class Thread implements Runnable {
         if (nanos <= 0)
             return false;
 
-        if (isVirtual()) {
-            return ((VirtualThread) this).joinNanos(nanos);
+        if (this instanceof VirtualThread vthread) {
+            return vthread.joinNanos(nanos);
         } else {
             // convert to milliseconds, ceiling rounding mode
             long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
@@ -2466,7 +2468,7 @@ public class Thread implements Runnable {
         daemon(on);
     }
 
-    void daemon(boolean on) {
+    private void daemon(boolean on) {
         if (!isVirtual())
             holder.daemon = on;
     }

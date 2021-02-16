@@ -101,7 +101,7 @@ public class VThreadNotifyFramePopTest {
         obj.runTest();
         if (!check()) {
             System.out.println("VThreadNotifyFramePopTest failed!");
-            //throw new RuntimeException("VThreadNotifyFramePopTest failed!");
+            throw new RuntimeException("VThreadNotifyFramePopTest failed!");
         } else {
             System.out.println("VThreadNotifyFramePopTest passed\n");
         }

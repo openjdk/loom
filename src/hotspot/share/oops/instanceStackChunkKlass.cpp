@@ -86,28 +86,33 @@ template<bool disjoint>
 size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   assert (jdk_internal_misc_StackChunk::is_stack_chunk(obj), "");
 
-  const int from_sp = jdk_internal_misc_StackChunk::sp(obj);
+  int from_sp = jdk_internal_misc_StackChunk::sp(obj);
   assert (from_sp >= metadata_words(), "");
   assert (obj->compact_size() <= obj->size(), "");
   assert (UseZGC || (from_sp <= metadata_words()) == (obj->compact_size() == obj->size()), "");
-
-  // from_sp <= metadata_words()
-  //   ? tty->print_cr(">>> InstanceStackChunkKlass::copy_compact disjoint: %d", disjoint)
-  //   : tty->print_cr(">>> InstanceStackChunkKlass::copy_compact disjoint: %d size: %d compact_size: %d saved: %d", disjoint, obj->size(), obj->compact_size(), obj->size() - obj->compact_size());
 
   // ZGC usually relocates objects into allocating regions that don't require barriers, so they keep/make the chunk mutable.
   // We therefore don't trim with ZGC.
   if (from_sp <= metadata_words() || UseZGC) {
     return disjoint ? obj->copy_disjoint(to_addr) : obj->copy_conjoint(to_addr);
   }
+
+  // from_sp <= metadata_words()
+  //   ? tty->print_cr(">>> InstanceStackChunkKlass::copy_compact disjoint: %d", disjoint)
+  //   : tty->print_cr(">>> InstanceStackChunkKlass::copy_compact disjoint: %d size: %d compact_size: %d saved: %d", disjoint, obj->size(), obj->compact_size(), obj->size() - obj->compact_size());
+
 #ifdef ASSERT
   int old_compact_size = obj->compact_size();
   int old_size = obj->size();
 #endif
 
   int header = size_helper();
-  int used_stack_in_words = jdk_internal_misc_StackChunk::size(obj) - from_sp + metadata_words();
-  HeapWord* to_end = to_addr + align_object_size(header + used_stack_in_words);
+
+  int from_size = jdk_internal_misc_StackChunk::size(obj);
+  assert (from_sp < from_size || from_sp == from_size + metadata_words(), "sp: %d size: %d", from_sp, from_size);
+  int used_stack_in_words = from_size - from_sp + metadata_words();
+  assert (used_stack_in_words >= 0, "");
+  assert (used_stack_in_words > 0 || jdk_internal_misc_StackChunk::argsize(obj) == 0, "");
   
   // copy header
   HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
@@ -119,18 +124,21 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   jdk_internal_misc_StackChunk::set_sp(oop(to_addr), metadata_words());
 
   // copy stack
-  assert ((from_addr + header) == start_of_stack(obj), "");
-  HeapWord* from_start = from_addr + header + from_sp - metadata_words();
-  HeapWord* to_start = to_addr + header;
-  disjoint ? Copy::aligned_disjoint_words(from_start, to_start, used_stack_in_words)
-           : Copy::aligned_conjoint_words(from_start, to_start, used_stack_in_words);
-  assert (to_start + used_stack_in_words <= to_end, "");
-
+  if (used_stack_in_words > 0) {
+    assert ((from_addr + header) == start_of_stack(obj), "");
+    HeapWord* from_start = from_addr + header + from_sp - metadata_words();
+    HeapWord* to_start = to_addr + header;
+    disjoint ? Copy::aligned_disjoint_words(from_start, to_start, used_stack_in_words)
+             : Copy::aligned_conjoint_words(from_start, to_start, used_stack_in_words);
+  }
+ 
   assert (oop(to_addr)->size() == old_compact_size, "");
   assert (oop(to_addr)->size() == instance_size(used_stack_in_words), "");
   assert (from_sp <= metadata_words() || oop(to_addr)->size() < old_size, "");
-  assert (Universe::heap()->requires_barriers(oop(to_addr)), "");
+  assert (verify(oop(to_addr)), "");
 
+  // assert (Universe::heap()->requires_barriers(oop(to_addr))); // G1 sometimes compacts a young region and *then* turns it old ((G1CollectedHeap*)Universe::heap())->heap_region_containing(oop(to_addr))->print();
+  
   return align_object_size(header + used_stack_in_words);
 }
 
@@ -186,9 +194,16 @@ void InstanceStackChunkKlass::iterate_derived_pointers(oop chunk, const StackChu
       assert (!CompressedOops::is_base(base), "");
 
 #if INCLUDE_ZGC
-      if (concurrent_gc) { //  && UseZG
+      if (concurrent_gc && UseZGC) {
         if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) 
           continue;
+      }
+#endif
+#if INCLUDE_SHENANDOAHGC
+      if (concurrent_gc && UseShenandoahGC) {
+        if (!ShenandoahHeap::heap()->in_collection_set(base)) {
+          continue;
+        }
       }
 #endif
 
@@ -384,7 +399,7 @@ NOINLINE void InstanceStackChunkKlass::fix_chunk(oop chunk) {
     num_oops += f.oopmap()->num_oops();
 
     f.cb()->as_compiled_method()->run_nmethod_entry_barrier();
-    if (UseZGC) {
+    if (UseZGC || UseShenandoahGC) {
       iterate_derived_pointers<true>(chunk, f);
       fix_oops(f);
       OrderAccess::loadload();
@@ -496,8 +511,8 @@ bool InstanceStackChunkKlass::verify(oop chunk, oop cont, size_t* out_size, int*
       log_develop_trace(jvmcont)("debug_verify_stack_chunk narrow: %d reg: %d p: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, omv.reg()->is_reg(), p2i(p));
       assert (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value, "");
       assert (UseCompressedOops || omv.type() == OopMapValue::oop_value, "");
-      
-      oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)HeapAccess<>::oop_load((narrowOop*)p) : (oop)HeapAccess<>::oop_load((oop*)p);
+      intptr_t val = *(intptr_t*)p;
+      oop obj = omv.type() == OopMapValue::narrowoop_value ? (oop)NativeAccess<>::oop_load((narrowOop*)&val) : (oop)NativeAccess<>::oop_load((oop*)&val);
       if (!SafepointSynchronize::is_at_safepoint()) {
         assert (oopDesc::is_oop_or_null(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
       }
@@ -519,7 +534,7 @@ bool InstanceStackChunkKlass::verify(oop chunk, oop cont, size_t* out_size, int*
       assert (f.is_in_oops(base_loc), "not found: " INTPTR_FORMAT, p2i(base_loc));
       assert (!f.is_in_oops(derived_loc), "found: " INTPTR_FORMAT, p2i(derived_loc));
       log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
-      oop base = (oop)NativeAccess<>::oop_load((oop*)base_loc); // *(oop*)base_loc;
+      oop base = *base_loc;
       if (base != (oop)NULL) {
         assert (!CompressedOops::is_base(base), "");
         assert (oopDesc::is_oop(base), "");

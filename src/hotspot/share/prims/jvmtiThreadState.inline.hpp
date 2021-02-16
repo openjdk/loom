@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2006, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -168,9 +168,13 @@ inline void JvmtiThreadState::bind_to(JavaThread* thread) {
   // restore thread interp_only_mode
   thread->set_interp_only_mode(this == NULL ? 0 : _saved_interp_only_mode);
 
+  // make continuation to notice the interp_only_mode change
+  Continuation::set_cont_fastpath_thread_state(thread);
+
   // bind JavaThread to JvmtiThreadState
   thread->set_jvmti_thread_state(this);
 
+  // TBD: This is hacky and may need a better solution.
   JvmtiEventController::thread_started(thread);
 
   if (this != NULL) {

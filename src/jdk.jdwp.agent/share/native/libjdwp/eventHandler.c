@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2029,6 +2029,8 @@ eventHandler_installExternal(HandlerNode *node)
 
 /***** debugging *****/
 
+#ifdef DEBUG
+
 void
 eventHandler_dumpAllHandlers(jboolean dumpPermanent)
 {
@@ -2063,6 +2065,8 @@ eventHandler_dumpHandlers(EventIndex ei, jboolean dumpPermanent)
 void
 eventHandler_dumpHandler(HandlerNode *node)
 {
-  tty_message("Handler for %s(%d)\n", eventIndex2EventName(node->ei), node->ei);
-  eventFilter_dumpHandlerFilters(node);
+    tty_message("Handler for %s(%d)\n", eventIndex2EventName(node->ei), node->ei);
+    eventFilter_dumpHandlerFilters(node);
 }
+
+#endif /* DEBUG */

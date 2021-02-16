@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,7 +25,7 @@
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/javaThreadStatus.hpp"
-#include "classfile/systemDictionary.hpp"
+#include "classfile/vmClasses.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "code/codeCache.hpp"
 #include "code/debugInfoRec.hpp"
@@ -42,6 +42,7 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/objectMonitor.hpp"
 #include "runtime/objectMonitor.inline.hpp"
+#include "runtime/osThread.hpp"
 #include "runtime/signature.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/synchronizer.hpp"
@@ -165,7 +166,7 @@ GrowableArray<MonitorInfo*>* javaVFrame::locked_monitors() {
 void javaVFrame::print_locked_object_class_name(outputStream* st, Handle obj, const char* lock_state) {
   if (obj.not_null()) {
     st->print("\t- %s <" INTPTR_FORMAT "> ", lock_state, p2i(obj()));
-    if (obj->klass() == SystemDictionary::Class_klass()) {
+    if (obj->klass() == vmClasses::Class_klass()) {
       st->print_cr("(a java.lang.Class for %s)", java_lang_Class::as_external_name(obj()));
     } else {
       Klass* k = obj->klass();
@@ -641,8 +642,8 @@ void vframeStreamCommon::skip_prefixed_method_and_wrappers() {
 
 void vframeStreamCommon::skip_reflection_related_frames() {
   while (!at_end() &&
-          (method()->method_holder()->is_subclass_of(SystemDictionary::reflect_MethodAccessorImpl_klass()) ||
-           method()->method_holder()->is_subclass_of(SystemDictionary::reflect_ConstructorAccessorImpl_klass()))) {
+          (method()->method_holder()->is_subclass_of(vmClasses::reflect_MethodAccessorImpl_klass()) ||
+           method()->method_holder()->is_subclass_of(vmClasses::reflect_ConstructorAccessorImpl_klass()))) {
     next();
   }
 }
@@ -665,14 +666,6 @@ javaVFrame* vframeStreamCommon::asJavaVFrame() {
 
     result = cvf;
   } else {
-    if (_mode == compiled_mode && _frame.is_native_frame()) {
-      // TBD: This is a temporary work around to avoid asserts because of
-      // the native enterSpecial frame on the top. No frames will be found
-      // by the JVMTI functions such as GetStackTrace. Without this return
-      // a carrier thread stack trace with the enterSpecial frame on the top
-      // will be returned by the JVMTI GetStackTrace.
-      return NULL;
-    }
     result = javaVFrame::cast(vframe::new_vframe(&_frame, &_reg_map, _thread));
   }
   guarantee(result->method() == method(), "wrong method");

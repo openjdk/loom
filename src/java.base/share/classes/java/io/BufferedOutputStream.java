@@ -26,7 +26,7 @@
 package java.io;
 
 import java.util.Arrays;
-import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.misc.InternalLock;
 import jdk.internal.misc.VM;
 
 /**
@@ -43,7 +43,7 @@ public class BufferedOutputStream extends FilterOutputStream {
     private static final int DEFAULT_MAX_BUFFER_SIZE = 8192;
 
     // initialized to null when BufferedOutputStream is sub-classed
-    private final ReentrantLock lock;
+    private final InternalLock lock;
 
     /**
      * The internal buffer where data is stored.
@@ -85,8 +85,8 @@ public class BufferedOutputStream extends FilterOutputStream {
         }
 
         if (getClass() == BufferedOutputStream.class) {
-            // use ReentrantLock and resizable buffer when not sub-classed
-            this.lock = new ReentrantLock();
+            // use ExplicitLock and resizable buffer when not sub-classed
+            this.lock = new InternalLock();
             this.buf = new byte[initialSize];    // resizable
             this.maxBufSize = maxSize;
         } else {

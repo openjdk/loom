@@ -26,7 +26,6 @@ package java.util.concurrent;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Spliterator;
@@ -51,7 +50,7 @@ class ExecutorServiceHelper {
         if (tasks.size() == 0)
             return Stream.empty();
         var queue = new LinkedTransferQueue<Future<T>>();
-        var futures = Collections.unmodifiableList(submit(executor, tasks, queue));
+        var futures = List.copyOf(submit(executor, tasks, queue));
         Runnable cancelAll = () -> cancelAll(futures);
         var spliterator = new BlockingQueueSpliterator<>(queue, futures.size(), cancelAll);
         return StreamSupport.stream(spliterator, false).onClose(cancelAll);

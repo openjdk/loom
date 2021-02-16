@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,13 +25,11 @@
 
 package sun.nio.fs;
 
-import java.nio.*;
 import java.nio.file.*;
 import java.nio.charset.*;
 import java.io.*;
 import java.net.URI;
 import java.util.*;
-import java.lang.ref.SoftReference;
 
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
@@ -40,15 +38,11 @@ import static sun.nio.fs.UnixNativeDispatcher.*;
 import static sun.nio.fs.UnixConstants.*;
 
 /**
- * Solaris/Linux implementation of java.nio.file.Path
+ * Linux/Mac implementation of java.nio.file.Path
  */
-
 class UnixPath implements Path {
-    private static JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
-    private static ThreadLocal<SoftReference<CharsetEncoder>> encoder =
-        new ThreadLocal<SoftReference<CharsetEncoder>>();
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
-    // FIXME - eliminate this reference to reduce space
     private final UnixFileSystem fs;
 
     // internal representation
@@ -119,43 +113,13 @@ class UnixPath implements Path {
 
     // encodes the given path-string into a sequence of bytes
     private static byte[] encode(UnixFileSystem fs, String input) {
-        SoftReference<CharsetEncoder> ref = JLA.getCarrierThreadLocal(encoder);
-        CharsetEncoder ce = (ref != null) ? ref.get() : null;
-        if (ce == null) {
-            ce = Util.jnuEncoding().newEncoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT);
-            JLA.setCarrierThreadLocal(encoder, new SoftReference<>(ce));
-        }
-
-        char[] ca = fs.normalizeNativePath(input.toCharArray());
-
-        // size output buffer for worse-case size
-        byte[] ba = new byte[(int)(ca.length * (double)ce.maxBytesPerChar())];
-
-        // encode
-        ByteBuffer bb = ByteBuffer.wrap(ba);
-        CharBuffer cb = CharBuffer.wrap(ca);
-        ce.reset();
-        CoderResult cr = ce.encode(cb, bb, true);
-        boolean error;
-        if (!cr.isUnderflow()) {
-            error = true;
-        } else {
-            cr = ce.flush(bb);
-            error = !cr.isUnderflow();
-        }
-        if (error) {
+        input = fs.normalizeNativePath(input);
+        try {
+            return JLA.getBytesNoRepl(input, Util.jnuEncoding());
+        } catch (CharacterCodingException cce) {
             throw new InvalidPathException(input,
                 "Malformed input or input contains unmappable characters");
         }
-
-        // trim result to actual length if required
-        int len = bb.position();
-        if (len != ba.length)
-            ba = Arrays.copyOf(ba, len);
-
-        return ba;
     }
 
     // package-private
