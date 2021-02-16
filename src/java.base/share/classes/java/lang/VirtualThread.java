@@ -445,9 +445,9 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Parks on the carrier thread until signalled or interrupted (if the
-     * virtual thread interrupted then the interrupt status is propagated to
-     * the carrier thread.
+     * Parks on the carrier thread until signalled or interrupted. If the
+     * virtual thread interrupted then interrupt status will be propagated
+     * to the carrier thread so it will wakeup.
      */
     @ChangesCurrentThread
     private void parkOnCarrierThread() {

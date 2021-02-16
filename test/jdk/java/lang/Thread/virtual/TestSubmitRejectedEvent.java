@@ -23,7 +23,7 @@
 
 /**
  * @test
- * @run testng TestSubmitRejectedEvent
+ * @run testng/othervm TestSubmitRejectedEvent
  * @summary Basic test for JFR VirtualThreadSubmitRejectedEvent
  */
 
@@ -52,6 +52,7 @@ public class TestSubmitRejectedEvent {
     public void testEvent() throws Exception {
         try (Recording recording = new Recording()) {
             recording.enable("jdk.VirtualThreadSubmitRejectedEvent");
+
             int nEventsExpected;
             recording.start();
             try {
@@ -81,27 +82,25 @@ public class TestSubmitRejectedEvent {
 
             // start a thread
             Thread thread = Thread.builder().virtual(scheduler).task(LockSupport::park).start();
-            boolean terminated = thread.join(Duration.ofMillis(100));
+
+            // give time for thread to park
+            boolean terminated = thread.join(Duration.ofMillis(1000));
             assertFalse(terminated);
 
             // shutdown scheduler
             pool.shutdown();
 
-            // try to unpark, an event should be event
+            // unpark, it should fail and an event should be recorded
             try {
                 LockSupport.unpark(thread);
                 assertTrue(false);
-            } catch (RejectedExecutionException expected) {
-                expected.printStackTrace();
-            }
+            } catch (RejectedExecutionException expected) { }
 
-            // try to start another thread, an event should be recorded
+            // start another thread, it should fail and an event should be recorded
             try {
                 Thread.builder().virtual(scheduler).task(LockSupport::park).start();
                 throw new RuntimeException("RejectedExecutionException expected");
-            } catch (RejectedExecutionException expected) {
-                expected.printStackTrace();
-            }
+            } catch (RejectedExecutionException expected) { }
 
             // two events should be recorded
             return 2;
