@@ -152,6 +152,7 @@ runtime/Dictionary/ProtectionDomainCacheTest.java
 serviceability/sa/ClhsdbCDSCore.java
 serviceability/logging/TestLogRotation.java
 compiler/c2/Test8062950.java
+serviceability/sa/TestObjectMonitorIterate.java
 
 ####
 ## Fails when run even in new kernel thread
