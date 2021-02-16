@@ -214,12 +214,15 @@ public class LockSupport {
     public static void park(Object blocker) {
         Thread t = Thread.currentThread();
         setBlocker(t, blocker);
-        if (t.isVirtual()) {
-            VirtualThreads.park();
-        } else {
-            U.park(false, 0L);
+        try {
+            if (t.isVirtual()) {
+                VirtualThreads.park();
+            } else {
+                U.park(false, 0L);
+            }
+        } finally {
+            setBlocker(t, null);
         }
-        setBlocker(t, null);
     }
 
     /**
@@ -259,12 +262,15 @@ public class LockSupport {
         if (nanos > 0) {
             Thread t = Thread.currentThread();
             setBlocker(t, blocker);
-            if (t.isVirtual()) {
-                VirtualThreads.park(nanos);
-            } else {
-                U.park(false, nanos);
+            try {
+                if (t.isVirtual()) {
+                    VirtualThreads.park(nanos);
+                } else {
+                    U.park(false, nanos);
+                }
+            } finally {
+                setBlocker(t, null);
             }
-            setBlocker(t, null);
         }
     }
 
@@ -304,12 +310,15 @@ public class LockSupport {
     public static void parkUntil(Object blocker, long deadline) {
         Thread t = Thread.currentThread();
         setBlocker(t, blocker);
-        if (t.isVirtual()) {
-            VirtualThreads.parkUntil(deadline);
-        } else {
-            U.park(true, deadline);
+        try {
+            if (t.isVirtual()) {
+                VirtualThreads.parkUntil(deadline);
+            } else {
+                U.park(true, deadline);
+            }
+        } finally {
+            setBlocker(t, null);
         }
-        setBlocker(t, null);
     }
 
     /**
