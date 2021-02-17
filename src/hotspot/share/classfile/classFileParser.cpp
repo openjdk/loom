@@ -1088,6 +1088,7 @@ public:
     _method_ForceInline,
     _method_DontInline,
     _method_ChangesCurrentThread,
+    _method_JvmtiMountTransition,
     _method_InjectedProfile,
     _method_LambdaForm_Compiled,
     _method_Hidden,
@@ -2114,6 +2115,11 @@ AnnotationCollector::annotation_index(const ClassLoaderData* loader_data,
       if (!privileged)              break;  // only allow in privileged code
       return _method_ChangesCurrentThread;
     }
+    case VM_SYMBOL_ENUM_NAME(jdk_internal_vm_annotation_JvmtiMountTransition_signature): {
+      if (_location != _in_method)  break;  // only allow for methods
+      if (!privileged)              break;  // only allow in privileged code
+      return _method_JvmtiMountTransition;
+    }
     case VM_SYMBOL_ENUM_NAME(java_lang_invoke_InjectedProfile_signature): {
       if (_location != _in_method)  break;  // only allow for methods
       if (!privileged)              break;  // only allow in privileged code
@@ -2192,6 +2198,8 @@ void MethodAnnotationCollector::apply_to(const methodHandle& m) {
     m->set_dont_inline(true);
   if (has_annotation(_method_ChangesCurrentThread))
     m->set_changes_current_thread(true);
+  if (has_annotation(_method_JvmtiMountTransition))
+    m->set_jvmti_mount_transition(true);
   if (has_annotation(_method_InjectedProfile))
     m->set_has_injected_profile(true);
   if (has_annotation(_method_LambdaForm_Compiled) && m->intrinsic_id() == vmIntrinsics::_none)

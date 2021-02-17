@@ -317,6 +317,7 @@
   template(jdk_internal_vm_annotation_Stable_signature,      "Ljdk/internal/vm/annotation/Stable;") \
                                                                                                   \
   template(jdk_internal_vm_annotation_ChangesCurrentThread_signature,  "Ljdk/internal/vm/annotation/ChangesCurrentThread;")  \
+  template(jdk_internal_vm_annotation_JvmtiMountTransition_signature,  "Ljdk/internal/vm/annotation/JvmtiMountTransition;")  \
                                                                                                   \
   /* Support for JSR 292 & invokedynamic (JDK 1.7 and above) */                                   \
   template(java_lang_invoke_CallSite,                 "java/lang/invoke/CallSite")                \

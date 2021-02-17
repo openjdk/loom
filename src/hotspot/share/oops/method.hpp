@@ -94,6 +94,7 @@ class Method : public Metadata {
     _reserved_stack_access = 1 << 7,
     _scoped                = 1 << 8,
     _changes_current_thread = 1 << 9,
+    _jvmti_mount_transition = 1 << 10,
   };
   mutable u2 _flags;
 
@@ -889,6 +890,13 @@ public:
   }
   void set_changes_current_thread(bool x) {
     _flags = x ? (_flags | _changes_current_thread) : (_flags & ~_changes_current_thread);
+  }
+
+  bool jvmti_mount_transition() {
+    return (_flags & _jvmti_mount_transition) != 0;
+  }
+  void set_jvmti_mount_transition(bool x) {
+    _flags = x ? (_flags | _jvmti_mount_transition) : (_flags & ~_jvmti_mount_transition);
   }
 
   bool is_hidden() const {

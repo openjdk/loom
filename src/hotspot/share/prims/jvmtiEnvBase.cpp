@@ -612,9 +612,10 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 
 javaVFrame*
 JvmtiEnvBase::skip_hidden_frames(javaVFrame* jvf) {
-  // find the top-most jvf with an annotated method
+  // find jvf with a method annotated with @JvmtiMountTransition
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
-    if (jvf->method()->changes_current_thread()) {
+    if (jvf->method()->jvmti_mount_transition()) {
+      jvf = jvf->java_sender(); // skip annotated method
       break;
     }
   }

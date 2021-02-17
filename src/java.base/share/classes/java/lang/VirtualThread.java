@@ -51,6 +51,7 @@ import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.ThreadDumper;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
+import jdk.internal.vm.annotation.JvmtiMountTransition;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
 import static java.util.concurrent.TimeUnit.*;
@@ -920,10 +921,19 @@ class VirtualThread extends Thread {
     // -- JVM TI support --
 
     private static volatile boolean notifyJvmtiEvents;  // set by VM
+
+    @JvmtiMountTransition
     private native void notifyJvmtiMountBegin(boolean firstMount);
+
+    @JvmtiMountTransition
     private native void notifyJvmtiMountEnd(boolean firstMount);
+
+    @JvmtiMountTransition
     private native void notifyJvmtiUnmountBegin();
+
+    @JvmtiMountTransition
     private native void notifyJvmtiUnmountEnd();
+
     private native void notifyJvmtiTerminated();
     private static native void registerNatives();
     static {

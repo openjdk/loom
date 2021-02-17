@@ -1812,12 +1812,12 @@ void JvmtiExport::post_method_entry(JavaThread *thread, Method* method, frame cu
     // for any thread that actually wants method entry, interp_only_mode is set
     return;
   }
+  if (mh->jvmti_mount_transition() || thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
 
   state->incr_cur_stack_depth();
 
-  if (thread->is_in_VTMT()) {
-    return; // no events should be posted if thread is in a VTMT transition
-  }
   if (state->is_enabled(JVMTI_EVENT_METHOD_ENTRY)) {
     JvmtiEnvThreadStateIterator it(state);
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1849,8 +1849,7 @@ void JvmtiExport::post_method_exit(JavaThread* thread, Method* method, frame cur
     // for any thread that actually wants method exit, interp_only_mode is set
     return;
   }
-  if (thread->is_in_VTMT()) {
-    state->decr_cur_stack_depth();
+  if (mh->jvmti_mount_transition() || thread->is_in_VTMT()) {
     return; // no events should be posted if thread is in a VTMT transition
   }
 
