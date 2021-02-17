@@ -431,7 +431,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
     /** The number of pending tasks until completion */
     volatile int pending;
 
-    private Scoped.Snapshot snapshot;
+    private Scoped.Snapshot snapshot = Scoped.snapshot();
 
     /**
      * Creates a new CountedCompleter with the given completer
