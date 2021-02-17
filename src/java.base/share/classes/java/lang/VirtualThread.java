@@ -374,9 +374,11 @@ class VirtualThread extends Thread {
 
             if (!yielded) {
                 // pinned or resource error
-                if (state() == PARKING) {
-                    parkOnCarrierThread();
-                } else {
+                try {
+                    if (state() == PARKING) {
+                        parkOnCarrierThread();
+                    }
+                } finally {
                     setState(RUNNING);
                 }
             }
@@ -454,40 +456,39 @@ class VirtualThread extends Thread {
     private void parkOnCarrierThread() {
         assert state() == PARKING;
 
-        boolean awaitInterrupted = false;
-
         // switch to carrier thread
         Thread carrier = this.carrierThread;
         carrier.setCurrentThread(carrier);
 
-        final ReentrantLock lock = getLock();
-        lock.lock();
+        boolean awaitInterrupted = false;
         try {
-            setState(PINNED);
+            final ReentrantLock lock = getLock();
+            lock.lock();
+            try {
+                setState(PINNED);
+                if (!parkPermit) {
+                    // wait to be signalled or interrupted
+                    getCondition().await();
+                }
+            } catch (InterruptedException e) {
+                awaitInterrupted = true;
+            } finally {
+                lock.unlock();
 
-            if (!parkPermit) {
-                // wait to be signalled or interrupted
-                getCondition().await();
+                // continue running on the carrier thread
+                setState(RUNNING);
+
+                // consume parking permit
+                setParkPermit(false);
             }
-        } catch (InterruptedException e) {
-            awaitInterrupted = true;
         } finally {
-            lock.unlock();
-
-            // continue running on the carrier thread
-            assert state() == PINNED;
-            setState(RUNNING);
-
-            // consume parking permit
-            setParkPermit(false);
-
             // switch back to virtual thread
             carrier.setCurrentThread(this);
-        }
 
-        // restore interrupt status
-        if (awaitInterrupted)
-            Thread.currentThread().interrupt();
+            // restore interrupt status
+            if (awaitInterrupted)
+                Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -935,6 +936,7 @@ class VirtualThread extends Thread {
     private native void notifyJvmtiUnmountEnd();
 
     private native void notifyJvmtiTerminated();
+
     private static native void registerNatives();
     static {
         registerNatives();
