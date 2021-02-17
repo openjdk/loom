@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,7 +42,7 @@ import jdk.internal.misc.InternalLock;
 public final class StreamEncoder extends Writer {
 
     private static final int INITIAL_BYTE_BUFFER_CAPACITY = 512;
-    private static final int MAX_BYTE_BUFFER_CAPACITY= 8192;
+    private static final int MAX_BYTE_BUFFER_CAPACITY = 8192;
 
     private volatile boolean closed;
 
@@ -127,12 +127,12 @@ public final class StreamEncoder extends Writer {
     }
 
     public void write(int c) throws IOException {
-        char cbuf[] = new char[1];
+        char[] cbuf = new char[1];
         cbuf[0] = (char) c;
         write(cbuf, 0, 1);
     }
 
-    public void write(char cbuf[], int off, int len) throws IOException {
+    public void write(char[] cbuf, int off, int len) throws IOException {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
@@ -147,7 +147,7 @@ public final class StreamEncoder extends Writer {
         }
     }
 
-    private void lockedWrite(char cbuf[], int off, int len) throws IOException {
+    private void lockedWrite(char[] cbuf, int off, int len) throws IOException {
         ensureOpen();
         if ((off < 0) || (off > cbuf.length) || (len < 0) ||
                 ((off + len) > cbuf.length) || ((off + len) < 0)) {
@@ -162,7 +162,7 @@ public final class StreamEncoder extends Writer {
         /* Check the len before creating a char buffer */
         if (len < 0)
             throw new IndexOutOfBoundsException();
-        char cbuf[] = new char[len];
+        char[] cbuf = new char[len];
         str.getChars(off, off + len, cbuf, 0);
         write(cbuf, 0, len);
     }
@@ -246,7 +246,6 @@ public final class StreamEncoder extends Writer {
 
     private final Charset cs;
     private final CharsetEncoder encoder;
-
     private ByteBuffer bb;
     private final int maxBufferCapacity;
 
@@ -301,14 +300,14 @@ public final class StreamEncoder extends Writer {
 
         if (rem > 0) {
             if (ch != null) {
-                if (ch.write(bb) != rem)
-                    assert false : rem;
-                } else {
-                    out.write(bb.array(), bb.arrayOffset() + pos, rem); 
-                }
+                int wc = ch.write(bb);
+                assert wc == rem : rem;
+            } else {
+                out.write(bb.array(), bb.arrayOffset() + pos, rem);
             }
-            bb.clear();
         }
+        bb.clear();
+    }
 
     private void flushLeftoverChar(CharBuffer cb, boolean endOfInput)
         throws IOException
@@ -348,7 +347,7 @@ public final class StreamEncoder extends Writer {
         haveLeftoverChar = false;
     }
 
-    void implWrite(char cbuf[], int off, int len)
+    void implWrite(char[] cbuf, int off, int len)
         throws IOException
     {
         CharBuffer cb = CharBuffer.wrap(cbuf, off, len);
@@ -399,14 +398,16 @@ public final class StreamEncoder extends Writer {
     }
 
     void implFlushBuffer() throws IOException {
-        if (bb.position() > 0)
-        writeBytes();
+        if (bb.position() > 0) {
+            writeBytes();
+        }
     }
 
     void implFlush() throws IOException {
         implFlushBuffer();
-        if (out != null)
-        out.flush();
+        if (out != null) {
+            out.flush();
+        }
     }
 
     void implClose() throws IOException {
