@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,21 +24,19 @@
 #include <string.h>
 #include "jvmti.h"
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 static jvmtiEnv *jvmti = NULL;
 static volatile jboolean is_completed_test_in_event = JNI_FALSE;
 
 static void
-fatal(JNIEnv* jni, char* msg) {
-  (*jni)->FatalError(jni, msg);
+fatal(JNIEnv* jni, const char* msg) {
+  jni->FatalError(msg);
   fflush(stdout);
 }
 
 static void
-check(JNIEnv* jni, char* msg, int err) {
+check(JNIEnv* jni, const char* msg, int err) {
   if (err != JVMTI_ERROR_NONE) {
     printf("%s failed with error code %d\n", msg, err);
     fatal(jni, msg);
@@ -46,7 +44,7 @@ check(JNIEnv* jni, char* msg, int err) {
 }
 
 static void
-check_jvmti_error_invalid_thread(JNIEnv* jni, char* msg, int err) {
+check_jvmti_error_invalid_thread(JNIEnv* jni, const char* msg, int err) {
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     printf("%s failed: expected JVMTI_ERROR_INVALID_THREAD instead of: %d\n", msg, err);
     fatal(jni, msg);
@@ -54,7 +52,7 @@ check_jvmti_error_invalid_thread(JNIEnv* jni, char* msg, int err) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_VThreadUnsupportedTest_isCompletedTestInEvent(JNIEnv *env, jobject this) {
+Java_VThreadUnsupportedTest_isCompletedTestInEvent(JNIEnv *env, jobject obj) {
   return is_completed_test_in_event;
 }
 
@@ -70,48 +68,59 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
   void* local_storage_data = NULL;
   jlong nanos;
 
-  is_vthread = (*jni)->IsVirtualThread(jni, vthread);
+  printf("test_unsupported_jvmti_functions: started\n");
+  fflush(0);
+
+  is_vthread = jni->IsVirtualThread(vthread);
   if (is_vthread != JNI_TRUE) {
     fatal(jni, "IsVirtualThread failed to return JNI_TRUE");
   }
 
-  err = (*jvmti)->GetCapabilities(jvmti, &caps);
+  err = jvmti->GetCapabilities(&caps);
   check(jni, "GetCapabilities", err);
 
   if (caps.can_support_virtual_threads != JNI_TRUE) {
     fatal(jni, "Virtual threads are not supported");
   }
 
-  printf("Testing JMTI functions which should not accept a virtual thread argument\n");
+  printf("Testing JVMTI functions which should not accept a virtual thread argument\n");
+  fflush(0);
 
-  err = (*jvmti)->StopThread(jvmti, vthread, vthread);
+  err = jvmti->StopThread(vthread, vthread);
   check_jvmti_error_invalid_thread(jni, "StopThread", err);
   
-  err = (*jvmti)->InterruptThread(jvmti, vthread);
+  err = jvmti->InterruptThread(vthread);
   check_jvmti_error_invalid_thread(jni, "InterruptThread", err);
  
-  err = (*jvmti)->PopFrame(jvmti, vthread);
+  err = jvmti->PopFrame(vthread);
   check_jvmti_error_invalid_thread(jni, "PopFrame", err);
   
-  err = (*jvmti)->ForceEarlyReturnVoid(jvmti, vthread);
+  err = jvmti->ForceEarlyReturnVoid(vthread);
   check_jvmti_error_invalid_thread(jni, "ForceEarlyReturnVoid", err);
 
-  err = (*jvmti)->GetThreadCpuTime(jvmti, vthread, &nanos);
+  err = jvmti->GetThreadCpuTime(vthread, &nanos);
   check_jvmti_error_invalid_thread(jni, "GetThreadCpuTime", err);
+
+  printf("test_unsupported_jvmti_functions: finished\n");
+  fflush(0);
 }
 
 JNIEXPORT jboolean JNICALL
-Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject this) {
+Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj) {
   jvmtiError err = JVMTI_ERROR_NONE;
   jint threads_count = 0;
   jthread *threads = NULL;
   jthread cthread = NULL;
 
-  err = (*jvmti)->GetCurrentThread(jvmti, &cthread);
+  printf("testJvmtiFunctionsInJNICall: started\n");
+  fflush(0);
+
+  err = jvmti->GetCurrentThread(&cthread);
   check(jni, "GetCurrentThread", err);
   printf("\n#### GetCurrentThread returned thread: %p\n", (void*)cthread);
+  fflush(0);
 
-  err = (*jvmti)->GetAllThreads(jvmti, &threads_count, &threads);
+  err = jvmti->GetAllThreads(&threads_count, &threads);
   check(jni, "GetAllThreads", err);
 
   for (int thread_idx = 0; thread_idx < (int) threads_count; thread_idx++) {
@@ -119,23 +128,23 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject thi
     jthread vthread;
 
     jvmtiThreadInfo thr_info;
-    jvmtiError err = (*jvmti)->GetThreadInfo(jvmti, thread, &thr_info);
+    jvmtiError err = jvmti->GetThreadInfo(thread, &thr_info);
     check(jni, "GetThreadInfo", err);
 
-    char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
-    if ((*jni)->IsSameObject(jni, cthread, thread) == JNI_TRUE) {
+    const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
+    if (jni->IsSameObject(cthread, thread) == JNI_TRUE) {
       continue;
     }
-    err = (*jvmti)->SuspendThread(jvmti, thread);
+    err = jvmti->SuspendThread(thread);
     if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
       continue;
     }
     check(jni, "SuspendThread", err);
 
-    err = (*jvmti)->GetVirtualThread(jvmti, thread, &vthread);
+    err = jvmti->GetVirtualThread(thread, &vthread);
     if (err == JVMTI_ERROR_THREAD_NOT_SUSPENDED) {
       // Some system threads might not fully suspended. so just skip them
-      err = (*jvmti)->ResumeThread(jvmti, thread);
+      err = jvmti->ResumeThread(thread);
       check(jni, "ResumeThread", err);
       continue;
     }
@@ -145,9 +154,11 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject thi
       fflush(stdout);
       test_unsupported_jvmti_functions(jvmti, jni, vthread);
     }
-    err = (*jvmti)->ResumeThread(jvmti, thread);
+    err = jvmti->ResumeThread(thread);
     check(jni, "ResumeThread", err);
   }
+  printf("testJvmtiFunctionsInJNICall: finished\n");
+  fflush(0);
   return JNI_TRUE;
 }
 
@@ -166,7 +177,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
 
   printf("Agent_OnLoad started\n");
-  if ((*jvm)->GetEnv(jvm, (void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
+  if (jvm->GetEnv((void **)(&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
 
@@ -182,17 +193,17 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   caps.can_access_local_variables = 1;
   caps.can_get_thread_cpu_time = 1;
 
-  err = (*jvmti)->AddCapabilities(jvmti, &caps);
+  err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI AddCapabilities: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventCallbacks(jvmti, &callbacks, sizeof (jvmtiEventCallbacks));
+  err = jvmti->SetEventCallbacks(&callbacks, sizeof (jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
@@ -201,6 +212,4 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   return 0;
 }
 
-#ifdef __cplusplus
-}
-#endif
+} // extern "C"

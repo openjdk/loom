@@ -26,21 +26,7 @@
 #include "jvmti.h"
 #include "jni.h"
 
-#ifdef __cplusplus
 extern "C" {
-#endif
-
-#ifndef JNI_ENV_ARG
-
-#ifdef __cplusplus
-#define JNI_ENV_ARG(x, y) y
-#define JNI_ENV_PTR(x) x
-#else
-#define JNI_ENV_ARG(x,y) x, y
-#define JNI_ENV_PTR(x) (*x)
-#endif
-
-#endif
 
 #define PASSED 0
 #define FAILED 2
@@ -59,25 +45,25 @@ static void ShowErrorMessage(jvmtiEnv *jvmti, jvmtiError errCode,
   char *errMsg;
   jvmtiError result;
 
-  result = (*jvmti)->GetErrorName(jvmti, errCode, &errMsg);
+  result = jvmti->GetErrorName(errCode, &errMsg);
   if (result == JVMTI_ERROR_NONE) {
     fprintf(stderr, "%s: %s %s (%d)\n", func, msg, errMsg, errCode);
-    (*jvmti)->Deallocate(jvmti, (unsigned char *)errMsg);
+    jvmti->Deallocate((unsigned char *)errMsg);
   } else {
     fprintf(stderr, "%s: %s (%d)\n", func, msg, errCode);
   }
 }
 
-static jboolean CheckLockObject(JNIEnv *env, jobject monitor) {
+static jboolean CheckLockObject(JNIEnv *jni, jobject monitor) {
   if (test_class == NULL) {
     // JNI_OnLoad has not been called yet, so can't possibly be an instance of TEST_CLASS.
     return JNI_FALSE;
   }
-  return (*env)->IsInstanceOf(env, monitor, test_class);
+  return jni->IsInstanceOf(monitor, test_class);
 }
 
 static void
-check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
+check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
                         jthread thread, char* tname, jboolean is_vt,
                         jobject monitor1, jobject monitor2) {
   jvmtiError err;
@@ -85,7 +71,7 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
   jobject contended_monitor = (jobject)5; // initialize to an invalid value
 
   // Test GetCurrentContendedMonitor for a vthread.
-  err = (*jvmti)->GetCurrentContendedMonitor(jvmti, thread, &contended_monitor);
+  err = jvmti->GetCurrentContendedMonitor(thread, &contended_monitor);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func, "error in JVMTI GetCurrentContendedMonitor");
     status = FAILED;
@@ -95,8 +81,8 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
   printf("\n%s: %s: contended monitor: %p\n", func, tname, contended_monitor);
 
   // Check if it is expected monitor.
-  if ((*env)->IsSameObject(env, monitor1, contended_monitor) == JNI_FALSE &&
-      (*env)->IsSameObject(env, monitor2, contended_monitor) == JNI_FALSE) {
+  if (jni->IsSameObject(monitor1, contended_monitor) == JNI_FALSE &&
+      jni->IsSameObject(monitor2, contended_monitor) == JNI_FALSE) {
     printf("FAIL: is_vt: %d: unexpected monitor from GetCurrentContendedMonitor\n", is_vt);
     status = FAILED;
     return;
@@ -104,7 +90,7 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
   printf("%s: GetCurrentContendedMonitor returned expected monitor for %s\n", func, tname);
 
   // Check GetThreadState for a vthread.
-  err = (*jvmti)->GetThreadState(jvmti, thread, &state);
+  err = jvmti->GetThreadState(thread, &state);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func, "error in JVMTI GetThreadState");
     status = FAILED;
@@ -115,14 +101,14 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
 }
 
 static void
-check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
+check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
                     jthread thread, char* tname, jboolean is_vt, jobject monitor) {
   jvmtiError err;
   jint state = 0;
   jint mcount = -1;
   jobject *owned_monitors = NULL;
 
-  err = (*jvmti)->GetOwnedMonitorInfo(jvmti, thread, &mcount, &owned_monitors);
+  err = jvmti->GetOwnedMonitorInfo(thread, &mcount, &owned_monitors);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func,
                      "error in JVMTI GetOwnedMonitorInfo");
@@ -130,7 +116,7 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
     return;
   }
   printf("\n%s: GetOwnedMonitorInfo: %s owns %d monitor(s)\n", func, tname, mcount);
-  (*jvmti)->Deallocate(jvmti, (unsigned char *)owned_monitors);
+  jvmti->Deallocate((unsigned char *)owned_monitors);
 
   if (is_vt == JNI_TRUE && mcount < 2) {
     fprintf(stderr, "%s: FAIL: monitorCount for %s expected to be >= 2\n", func, tname);
@@ -146,7 +132,7 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
   printf("%s: GetOwnedMonitorInfo: returned expected number of monitors for %s\n", func, tname);
 
   // Check GetThreadState for a vthread.
-  err = (*jvmti)->GetThreadState(jvmti, thread, &state);
+  err = jvmti->GetThreadState(thread, &state);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func, "error in JVMTI GetThreadState");
     status = FAILED;
@@ -157,18 +143,18 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *env, const char* func,
 }
 
 JNIEXPORT void JNICALL
-MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject monitor) {
+MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject monitor) {
   jvmtiError err;
   jvmtiThreadInfo vt_info;
   jvmtiThreadInfo ct_info;
   jthread cthread = NULL;
   jobject contended_monitor = NULL;
 
-  if (CheckLockObject(env, monitor) == JNI_FALSE) {
+  if (CheckLockObject(jni, monitor) == JNI_FALSE) {
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetCarrierThread(jvmti, vthread, &cthread);
+  err = jvmti->GetCarrierThread(vthread, &cthread);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
                      "error in JVMTI GetCarrierThread");
@@ -177,7 +163,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject mon
     return;
   }
 
-  err = (*jvmti)->GetThreadInfo(jvmti, vthread, &vt_info);
+  err = jvmti->GetThreadInfo(vthread, &vt_info);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
                      "error in JVMTI GetThreadInfo");
@@ -186,7 +172,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject mon
     return;
   }
 
-  err = (*jvmti)->GetThreadInfo(jvmti, cthread, &ct_info);
+  err = jvmti->GetThreadInfo(cthread, &ct_info);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
                      "error in JVMTI GetThreadInfo");
@@ -195,32 +181,32 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject mon
     return;
   }
 
-  check_contended_monitor(jvmti, env, "MonitorContendedEnter",
+  check_contended_monitor(jvmti, jni, "MonitorContendedEnter",
                           vthread, vt_info.name, JNI_TRUE, monitor, NULL);
-  check_contended_monitor(jvmti, env, "MonitorContendedEnter",
+  check_contended_monitor(jvmti, jni, "MonitorContendedEnter",
                           cthread,  ct_info.name, JNI_FALSE, NULL, NULL);
-  check_owned_monitor(jvmti, env, "MonitorContendedEnter",
+  check_owned_monitor(jvmti, jni, "MonitorContendedEnter",
                       vthread, vt_info.name, JNI_TRUE, monitor);
-  check_owned_monitor(jvmti, env, "MonitorContendedEnter",
+  check_owned_monitor(jvmti, jni, "MonitorContendedEnter",
                       cthread, ct_info.name, JNI_FALSE, monitor);
   event_has_posted = JNI_TRUE;
-  (*jvmti)->Deallocate(jvmti, (unsigned char *)vt_info.name);
-  (*jvmti)->Deallocate(jvmti, (unsigned char *)ct_info.name);
+  jvmti->Deallocate((unsigned char *)vt_info.name);
+  jvmti->Deallocate((unsigned char *)ct_info.name);
 }
 
 JNIEXPORT void JNICALL
-MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject monitor) {
+MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject monitor) {
   jvmtiError err;
   jvmtiThreadInfo vt_info;
   jvmtiThreadInfo ct_info;
   jthread cthread = NULL;
   jobject contended_monitor = (jobject)cthread; // init with a wrong monitor
 
-  if (CheckLockObject(env, monitor) == JNI_FALSE) {
+  if (CheckLockObject(jni, monitor) == JNI_FALSE) {
     return; // Not tested monitor
   }
 
-  err = (*jvmti)->GetCarrierThread(jvmti, vthread, &cthread);
+  err = jvmti->GetCarrierThread(vthread, &cthread);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetCarrierThread");
@@ -228,7 +214,7 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject m
     return;
   }
 
-  err = (*jvmti)->GetThreadInfo(jvmti, vthread, &vt_info);
+  err = jvmti->GetThreadInfo(vthread, &vt_info);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetThreadInfo for virtual thread");
@@ -236,7 +222,7 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject m
     return;
   }
 
-  err = (*jvmti)->GetThreadInfo(jvmti, cthread, &ct_info);
+  err = jvmti->GetThreadInfo(cthread, &ct_info);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetThreadInfo for carrier thread");
@@ -244,12 +230,12 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *env, jthread vthread, jobject m
     return;
   }
 
-  check_contended_monitor(jvmti, env, "MonitorContendedEntered",
+  check_contended_monitor(jvmti, jni, "MonitorContendedEntered",
                           vthread, vt_info.name, JNI_TRUE, NULL, NULL);
-  check_contended_monitor(jvmti, env, "MonitorContendedEntered",
+  check_contended_monitor(jvmti, jni, "MonitorContendedEntered",
                           cthread, ct_info.name, JNI_FALSE, NULL, NULL);
-  (*jvmti)->Deallocate(jvmti, (unsigned char *)vt_info.name);
-  (*jvmti)->Deallocate(jvmti, (unsigned char *)ct_info.name);
+  jvmti->Deallocate((unsigned char *)vt_info.name);
+  jvmti->Deallocate((unsigned char *)ct_info.name);
 }
 
 JNIEXPORT jint JNICALL
@@ -265,18 +251,17 @@ Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
 JNIEXPORT jint JNICALL
 JNI_OnLoad(JavaVM *jvm, void *reserved) {
   jint res;
-  JNIEnv *env;
+  JNIEnv *jni;
 
-  res = JNI_ENV_PTR(jvm)->GetEnv(JNI_ENV_ARG(jvm, (void **) &env),
-                                 JNI_VERSION_9);
-  if (res != JNI_OK || env == NULL) {
+  res = jvm->GetEnv((void **)&jni, JNI_VERSION_9);
+  if (res != JNI_OK || jni == NULL) {
     fprintf(stderr, "Error: GetEnv call failed(%d)!\n", res);
     return JNI_ERR;
   }
 
-  test_class = (*env)->FindClass(env, TEST_CLASS);
+  test_class = jni->FindClass(TEST_CLASS);
   if (test_class != NULL) {
-    test_class = (*env)->NewGlobalRef(env, test_class);
+    test_class = (jclass)jni->NewGlobalRef(test_class);
   }
   if (test_class == NULL) {
     fprintf(stderr, "Error: Could not load class %s!\n", TEST_CLASS);
@@ -294,28 +279,27 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   printf("Agent_OnLoad started\n");
 
-  res = JNI_ENV_PTR(jvm)->GetEnv(JNI_ENV_ARG(jvm, (void **) &jvmti),
-                                 JVMTI_VERSION_9);
+  res = jvm->GetEnv((void **)&jvmti, JVMTI_VERSION);
   if (res != JNI_OK || jvmti == NULL) {
     fprintf(stderr, "Error: wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
-  err = (*jvmti)->GetPotentialCapabilities(jvmti, &caps);
+  err = jvmti->GetPotentialCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "Agent_OnLoad",
                     "error in JVMTI GetPotentialCapabilities");
     return JNI_ERR;
   }
 
-  err = (*jvmti)->AddCapabilities(jvmti, &caps);
+  err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "Agent_OnLoad",
                      "error in JVMTI AddCapabilities");
     return JNI_ERR;
   }
 
-  err = (*jvmti)->GetCapabilities(jvmti, &caps);
+  err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "Agent_OnLoad",
                      "error in JVMTI GetCapabilities");
@@ -339,22 +323,22 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   callbacks.MonitorContendedEnter   = &MonitorContendedEnter;
   callbacks.MonitorContendedEntered = &MonitorContendedEntered;
 
-  err = (*jvmti)->SetEventCallbacks(jvmti, &callbacks, sizeof(jvmtiEventCallbacks));
+  err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "Agent_OnLoad",
                      "error in JVMTI SetEventCallbacks");
     return JNI_ERR;
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE,
-                                           JVMTI_EVENT_MONITOR_CONTENDED_ENTER, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
+                                        JVMTI_EVENT_MONITOR_CONTENDED_ENTER, NULL);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "Agent_OnLoad",
                      "error in JVMTI SetEventNotificationMode #1");
     return JNI_ERR;
   }
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE,
-                                           JVMTI_EVENT_MONITOR_CONTENDED_ENTERED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
+                                        JVMTI_EVENT_MONITOR_CONTENDED_ENTERED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "Agent_OnLoad",
                      "error in JVMTI SetEventNotificationMode #2");
@@ -365,17 +349,17 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_VThreadMonitorTest_hasEventPosted(JNIEnv *env, jclass cls) {
+Java_VThreadMonitorTest_hasEventPosted(JNIEnv *jni, jclass cls) {
   return event_has_posted;
 }
 
 JNIEXPORT void JNICALL
-Java_VThreadMonitorTest_checkContendedMonitor(JNIEnv *env, jclass cls, jthread vthread,
+Java_VThreadMonitorTest_checkContendedMonitor(JNIEnv *jni, jclass cls, jthread vthread,
                                               jobject monitor1, jobject monitor2) {
   jvmtiThreadInfo vt_info;
   jvmtiError err;
 
-  err = (*jvmti)->GetThreadInfo(jvmti, vthread, &vt_info);
+  err = jvmti->GetThreadInfo(vthread, &vt_info);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetThreadInfo");
@@ -383,16 +367,14 @@ Java_VThreadMonitorTest_checkContendedMonitor(JNIEnv *env, jclass cls, jthread v
     return;
   }
 
-  check_contended_monitor(jvmti, env, "checkContendedMonitor",
+  check_contended_monitor(jvmti, jni, "checkContendedMonitor",
                           vthread, vt_info.name, JNI_TRUE, monitor1, monitor2);
-  (*jvmti)->Deallocate(jvmti, (unsigned char *)vt_info.name);
+  jvmti->Deallocate((unsigned char *)vt_info.name);
 }
 
 JNIEXPORT jint JNICALL
-Java_VThreadMonitorTest_check(JNIEnv *env, jclass cls) {
+Java_VThreadMonitorTest_check(JNIEnv *jni, jclass cls) {
   return status;
 }
 
-#ifdef __cplusplus
-}
-#endif
+} // extern "C"

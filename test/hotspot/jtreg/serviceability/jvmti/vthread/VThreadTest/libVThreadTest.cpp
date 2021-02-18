@@ -24,9 +24,7 @@
 #include <string.h>
 #include "jvmti.h"
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 #define MAX_FRAME_COUNT 30
 #define MAX_WORKER_THREADS 10
@@ -35,7 +33,7 @@ typedef struct Tinfo {
   jboolean just_scheduled;
   jboolean was_run;
   jboolean was_yield;
-  char* thr_name;
+  const char* thr_name;
 } Tinfo;
 
 static const int MAX_EVENTS_TO_PROCESS = 20;
@@ -46,22 +44,22 @@ static jboolean continuation_events_enabled = JNI_FALSE;
 
 static void
 lock_events() {
-  (*jvmti)->RawMonitorEnter(jvmti, events_monitor);
+  jvmti->RawMonitorEnter(events_monitor);
 }
 
 static void
 unlock_events() {
-  (*jvmti)->RawMonitorExit(jvmti, events_monitor);
+  jvmti->RawMonitorExit(events_monitor);
 }
 
 static void
-fatal(JNIEnv* jni, char* msg) {
-  (*jni)->FatalError(jni, msg);
+fatal(JNIEnv* jni, const char* msg) {
+  jni->FatalError(msg);
   fflush(stdout);
 }
 
 static Tinfo*
-find_tinfo(JNIEnv* jni, char* thr_name) {
+find_tinfo(JNIEnv* jni, const char* thr_name) {
   Tinfo* inf = NULL;
   int idx = 0;
 
@@ -88,11 +86,11 @@ get_method_class_name(jvmtiEnv *jvmti, JNIEnv *jni, jmethodID method) {
   jclass klass = NULL;
   char*  cname = NULL;
 
-  err = (*jvmti)->GetMethodDeclaringClass(jvmti, method, &klass);
+  err = jvmti->GetMethodDeclaringClass(method, &klass);
   if (err != JVMTI_ERROR_NONE) {
     fatal(jni, "get_method_class_name: error in JVMTI GetMethodDeclaringClass");
   }
-  err = (*jvmti)->GetClassSignature(jvmti, klass, &cname, NULL);
+  err = jvmti->GetClassSignature(klass, &cname, NULL);
   if (err != JVMTI_ERROR_NONE) {
     fatal(jni, "get_method_class_name: error in JVMTI GetClassSignature");
   }
@@ -102,14 +100,14 @@ get_method_class_name(jvmtiEnv *jvmti, JNIEnv *jni, jmethodID method) {
 
 static void
 print_method(jvmtiEnv *jvmti, JNIEnv *jni, jmethodID method, jint depth) {
-  char*  cname = NULL;
-  char*  mname = NULL;
-  char*  msign = NULL;
+  char* cname = NULL;
+  char* mname = NULL;
+  char* msign = NULL;
   jvmtiError err;
 
   cname = get_method_class_name(jvmti, jni, method);
 
-  err = (*jvmti)->GetMethodName(jvmti, method, &mname, &msign, NULL);
+  err = jvmti->GetMethodName(method, &mname, &msign, NULL);
   if (err != JVMTI_ERROR_NONE) {
     fatal(jni, "print_method: error in JVMTI GetMethodName");
   }
@@ -126,12 +124,12 @@ print_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, int count, jvmtiFrameInfo *frame
 }
 
 static jint
-find_method_depth(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char *mname) {
+find_method_depth(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *mname) {
   jvmtiFrameInfo frames[MAX_FRAME_COUNT];
   jint count = -1;
   jvmtiError err;
 
-  err = (*jvmti)->GetStackTrace(jvmti, vthread, 0, MAX_FRAME_COUNT, frames, &count);
+  err = jvmti->GetStackTrace(vthread, 0, MAX_FRAME_COUNT, frames, &count);
   if (err != JVMTI_ERROR_NONE) {
     printf("find_method_depth: JVMTI GetStackTrace  returned error: %d\n", err);
     fatal(jni, "event handler: failed during JVMTI GetStackTrace call");
@@ -142,7 +140,7 @@ find_method_depth(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char *mname) {
     char* name = NULL;
     char* sign = NULL;
 
-    err = (*jvmti)->GetMethodName(jvmti, method, &name, &sign, NULL);
+    err = jvmti->GetMethodName(method, &name, &sign, NULL);
     if (err != JVMTI_ERROR_NONE) {
       printf("find_method_depth: JVMTI GetMethodName with returned error: %d\n", err);
       fatal(jni, "event handler: failed during JVMTI GetMethodName call");
@@ -155,14 +153,14 @@ find_method_depth(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char *mname) {
 }
 
 static void
-print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, char* event_name) {
+print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, const char *event_name) {
   jvmtiThreadInfo thr_info;
-  jvmtiError err = (*jvmti)->GetThreadInfo(jvmti, vthread, &thr_info);
+  jvmtiError err = jvmti->GetThreadInfo(vthread, &thr_info);
 
   if (err != JVMTI_ERROR_NONE) {
     fatal(jni, "event handler failed during JVMTI GetThreadInfo call");
   }
-  char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
+  const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
   printf("\n#### %s event: thread: %s, vthread: %p\n", event_name, thr_name, vthread);
 
   Tinfo* inf = find_tinfo(jni, thr_name); // Find slot with named worker thread
@@ -206,19 +204,19 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
 }
 
 static void
-print_cont_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jint frames_cnt, char* event_name) {
+print_cont_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jint frames_cnt, const char *event_name) {
   static int cont_events_cnt = 0;
   if (cont_events_cnt++ > MAX_EVENTS_TO_PROCESS) {
     return; // No need to test all events
   }
 
   jvmtiThreadInfo thr_info;
-  jvmtiError err = (*jvmti)->GetThreadInfo(jvmti, vthread, &thr_info);
+  jvmtiError err = jvmti->GetThreadInfo(vthread, &thr_info);
 
   if (err != JVMTI_ERROR_NONE) {
     fatal(jni, "event handler failed during JVMTI GetThreadInfo call");
   }
-  char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
+  const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
   printf("\n#### %s event: thread: %s, frames count: %d\n", event_name, thr_name, frames_cnt);
 
   Tinfo* inf = find_tinfo(jni, thr_name); // Find slot with named worker thread
@@ -236,14 +234,14 @@ print_cont_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jint frames
 }
 
 static void
-test_GetVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, char* event_name) {
+test_GetVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, const char *event_name) {
   jobject thread_vthread = NULL;
   jvmtiError err;
 
   printf("\n");
 
   // #1: Test JVMTI GetVirtualThread function NULL thread (current)
-  err = (*jvmti)->GetVirtualThread(jvmti, NULL, &thread_vthread);
+  err = jvmti->GetVirtualThread(NULL, &thread_vthread);
   if (err != JVMTI_ERROR_NONE) {
     fatal(jni, "event handler: JVMTI GetVirtualThread with NULL thread (current) returned error status");
   }
@@ -253,13 +251,13 @@ test_GetVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthr
   printf("JVMTI GetVirtualThread with NULL thread (current) returned non-NULL vthread as expected\n");
 
   // #2: Test JVMTI GetVirtualThread function with a bad thread
-  err = (*jvmti)->GetVirtualThread(jvmti, vthread, &thread_vthread);
+  err = jvmti->GetVirtualThread(vthread, &thread_vthread);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     fatal(jni, "event handler: JVMTI GetVirtualThread with bad thread failed to return JVMTI_ERROR_INVALID_THREAD");
   }
 
   // #3: Test JVMTI GetVirtualThread function with a good thread
-  err = (*jvmti)->GetVirtualThread(jvmti, thread, &thread_vthread);
+  err = jvmti->GetVirtualThread(thread, &thread_vthread);
   if (err != JVMTI_ERROR_NONE) {
     fatal(jni, "event handler: failed during JVMTI GetVirtualThread call");
   }
@@ -270,26 +268,26 @@ test_GetVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthr
 }
 
 static void
-test_GetCarrierThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, char* event_name) {
+test_GetCarrierThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, const char *event_name) {
   jthread vthread_thread = NULL;
   jvmtiError err;
 
   printf("\n");
 
   // #1: Test JVMTI GetCarrierThread function with NULL vthread
-  err = (*jvmti)->GetCarrierThread(jvmti, NULL, &vthread_thread);
+  err = jvmti->GetCarrierThread(NULL, &vthread_thread);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     fatal(jni, "event handler: JVMTI GetCarrierThread with NULL vthread failed to return JVMTI_ERROR_INVALID_THREAD");
   }
 
   // #2: Test JVMTI GetCarrierThread function with a bad vthread
-  err = (*jvmti)->GetCarrierThread(jvmti, thread, &vthread_thread);
+  err = jvmti->GetCarrierThread(thread, &vthread_thread);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     fatal(jni, "event handler: JVMTI GetCarrierThread with bad vthread failed to return JVMTI_ERROR_INVALID_THREAD");
   }
 
   // #3: Test JVMTI GetCarrierThread function with a good vthread
-  err = (*jvmti)->GetCarrierThread(jvmti, vthread, &vthread_thread);
+  err = jvmti->GetCarrierThread(vthread, &vthread_thread);
   if (err != JVMTI_ERROR_NONE) {
     fatal(jni, "event handler: failed during JVMTI GetCarrierThread call");
   }
@@ -300,7 +298,7 @@ test_GetCarrierThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthr
 }
 
 static void
-test_GetThreadInfo(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_name) {
+test_GetThreadInfo(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name) {
   jvmtiError err;
   jvmtiThreadInfo thr_info;
   jvmtiThreadGroupInfo ginfo;
@@ -311,7 +309,7 @@ test_GetThreadInfo(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
   printf("test_GetThreadInfo: started\n");
 
   // #1: Test JVMTI GetThreadInfo function with a good vthread
-  err = (*jvmti)->GetThreadInfo(jvmti, vthread, &thr_info);
+  err = jvmti->GetThreadInfo(vthread, &thr_info);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetThreadInfo returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetThreadInfo failed to return JVMTI_ERROR_NONE");
@@ -320,7 +318,7 @@ test_GetThreadInfo(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
          thr_info.name, thr_info.priority, thr_info.is_daemon);
 
   // #2: Test JVMTI GetThreadGroupInfo
-  err = (*jvmti)->GetThreadGroupInfo(jvmti, thr_info.thread_group, &ginfo);
+  err = jvmti->GetThreadGroupInfo(thr_info.thread_group, &ginfo);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetThreadGroupInfo returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetThreadGroupInfo failed to return JVMTI_ERROR_NONE");
@@ -329,7 +327,7 @@ test_GetThreadInfo(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
          ginfo.name, ginfo.max_priority, ginfo.is_daemon);
 
   // #3: Test JVMTI GetClassLoaderClasses
-  err = (*jvmti)->GetClassLoaderClasses(jvmti, thr_info.context_class_loader, &class_count, &classes);
+  err = jvmti->GetClassLoaderClasses(thr_info.context_class_loader, &class_count, &classes);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetClassLoaderClasses returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetClassLoaderClasses failed to return JVMTI_ERROR_NONE");
@@ -339,7 +337,7 @@ test_GetThreadInfo(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
   // #4: Test the thr_info.context_class_loader has the VThreadTest class
   for (int idx = 0; idx < class_count; idx++) {
     char* sign = NULL;
-    err = (*jvmti)->GetClassSignature(jvmti, classes[idx], &sign, NULL);
+    err = jvmti->GetClassSignature(classes[idx], &sign, NULL);
     if (err != JVMTI_ERROR_NONE) {
       printf("JVMTI GetClassSignature returned error: %d\n", err);
       fatal(jni, "event handler: JVMTI GetClassSignature failed to return JVMTI_ERROR_NONE");
@@ -357,19 +355,19 @@ test_GetThreadInfo(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
 
 
 static int
-test_GetFrameCount(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_name) {
+test_GetFrameCount(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name) {
   int frame_count = -1;
   jvmtiError err;
 
   // #1: Test JVMTI GetFrameCount function with NULL count_ptr pointer
-  err = (*jvmti)->GetFrameCount(jvmti, vthread, NULL);
+  err = jvmti->GetFrameCount(vthread, NULL);
   if (err != JVMTI_ERROR_NULL_POINTER) {
     printf("JVMTI GetFrameCount with NULL count_ptr returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetFrameCount with NULL count_ptr pointer failed to return JVMTI_ERROR_NULL_POINTER");
   }
 
   // #2: Test JVMTI GetFrameCount function with a good vthread
-  err = (*jvmti)->GetFrameCount(jvmti, vthread, &frame_count);
+  err = jvmti->GetFrameCount(vthread, &frame_count);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetFrameCount with good vthread returned error: %d\n", err);
     fatal(jni, "event handler: failed during JVMTI GetFrameCount call");
@@ -383,27 +381,27 @@ test_GetFrameCount(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
 }
 
 static void
-test_GetFrameLocation(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_name, int frame_count) {
+test_GetFrameLocation(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name, int frame_count) {
   jmethodID method = NULL;
   jlocation location = -1;
   jvmtiError err;
 
   // #1: Test JVMTI GetFrameLocation function with negative frame depth
-  err = (*jvmti)->GetFrameLocation(jvmti, vthread, -1, &method, &location);
+  err = jvmti->GetFrameLocation(vthread, -1, &method, &location);
   if (err != JVMTI_ERROR_ILLEGAL_ARGUMENT) {
     printf("JVMTI GetFrameLocation with negative frame depth returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetFrameLocation with negative frame depth failed to return JVMTI_ERROR_ILLEGAL_ARGUMENT");
   }
 
   // #2: Test JVMTI GetFrameLocation function with NULL method_ptr
-  err = (*jvmti)->GetFrameLocation(jvmti, vthread, 0, NULL, &location);
+  err = jvmti->GetFrameLocation(vthread, 0, NULL, &location);
   if (err != JVMTI_ERROR_NULL_POINTER) {
     printf("JVMTI GetFrameLocation with NULL method_ptr returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetFrameLocation with NULL method_ptr failed to return JVMTI_ERROR_NULL_POINTER");
   }
 
   // #3: Test JVMTI GetFrameLocation function with NULL location_ptr
-  err = (*jvmti)->GetFrameLocation(jvmti, vthread, 0, &method, NULL);
+  err = jvmti->GetFrameLocation(vthread, 0, &method, NULL);
   if (err != JVMTI_ERROR_NULL_POINTER) {
     printf("JVMTI GetFrameCount with NULL location_ptr returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetFrameLocation with NULL location_ptr failed to return JVMTI_ERROR_NULL_POINTER");
@@ -411,21 +409,21 @@ test_GetFrameLocation(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event
 
   // #4: Test JVMTI GetFrameLocation function with a good vthread
   if (frame_count == 0) {
-    err = (*jvmti)->GetFrameLocation(jvmti, vthread, 0, &method, &location);
+    err = jvmti->GetFrameLocation(vthread, 0, &method, &location);
     if (err != JVMTI_ERROR_NO_MORE_FRAMES) {
       printf("JVMTI GetFrameLocation for empty stack returned error: %d\n", err);
       fatal(jni, "event handler: JVMTI GetFrameLocation for empty stack failed to return JVMTI_ERROR_NO_MORE_FRAMES");
     }
     printf("JVMTI GetFrameLocation for empty stack returned JVMTI_ERROR_NO_MORE_FRAMES as expected\n");
   } else {
-    err = (*jvmti)->GetFrameLocation(jvmti, vthread, frame_count, &method, &location);
+    err = jvmti->GetFrameLocation(vthread, frame_count, &method, &location);
     if (err != JVMTI_ERROR_NO_MORE_FRAMES) {
       printf("JVMTI GetFrameLocation for bid depth == frame_count returned error: %d\n", err);
       fatal(jni, "event handler: JVMTI GetFrameLocation for too big depth failed to return JVMTI_ERROR_NO_MORE_FRAMES");
     }
     printf("JVMTI GetFrameLocation for too big depth returned JVMTI_ERROR_NO_MORE_FRAMES as expected\n");
 
-    err = (*jvmti)->GetFrameLocation(jvmti, vthread, 1, &method, &location);
+    err = jvmti->GetFrameLocation(vthread, 1, &method, &location);
     if (err != JVMTI_ERROR_NONE) {
       printf("JVMTI GetFrameLocation with good vthread returned error: %d\n", err);
       fatal(jni, "event handler: failed during JVMTI GetFrameCount call");
@@ -438,7 +436,7 @@ test_GetFrameLocation(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event
 }
 
 static void
-test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_name, int frame_count) {
+test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name, int frame_count) {
   jvmtiFrameInfo frames[MAX_FRAME_COUNT];
   int count = -1;
   jmethodID method = NULL;
@@ -447,33 +445,33 @@ test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
   printf("\n");
 
   // #1: Test JVMTI GetStackTrace function with bad start_depth
-  err = (*jvmti)->GetStackTrace(jvmti, vthread, -(frame_count + 1), MAX_FRAME_COUNT, frames, &count);
+  err = jvmti->GetStackTrace(vthread, -(frame_count + 1), MAX_FRAME_COUNT, frames, &count);
   if (err != JVMTI_ERROR_ILLEGAL_ARGUMENT) {
     printf("JVMTI GetStackTrace with negative start_depth returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetStackTrace with verynegative start_depth failed to return JVMTI_ERROR_ILLEGAL_ARGUMENT");
   }
-  err = (*jvmti)->GetStackTrace(jvmti, vthread, (frame_count + 1), MAX_FRAME_COUNT, frames, &count);
+  err = jvmti->GetStackTrace(vthread, (frame_count + 1), MAX_FRAME_COUNT, frames, &count);
   if (err != JVMTI_ERROR_ILLEGAL_ARGUMENT) {
     printf("JVMTI GetStackTrace with very big start_depth returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetStackTrace with very big start_depth failed to return JVMTI_ERROR_ILLEGAL_ARGUMENT");
   }
 
   // #2: Test JVMTI GetStackTrace function with negative max_frame_count
-  err = (*jvmti)->GetStackTrace(jvmti, vthread, 0, -1, frames, &count);
+  err = jvmti->GetStackTrace(vthread, 0, -1, frames, &count);
   if (err != JVMTI_ERROR_ILLEGAL_ARGUMENT) {
     printf("JVMTI GetStackTrace with negative max_frame_count returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetStackTrace with negative max_frame_count failed to return JVMTI_ERROR_ILLEGAL_ARGUMENT");
   }
 
   // #3: Test JVMTI GetStackTrace function with NULL frame_buffer pointer
-  err = (*jvmti)->GetStackTrace(jvmti, vthread, 0, MAX_FRAME_COUNT, NULL, &count);
+  err = jvmti->GetStackTrace(vthread, 0, MAX_FRAME_COUNT, NULL, &count);
   if (err != JVMTI_ERROR_NULL_POINTER) {
     printf("JVMTI GetStackTrace with NULL frame_buffer pointer returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetStackTrace witt NULL frame_buffer pointer failed to return JVMTI_ERROR_NULL_POINTER");
   }
 
   // #4: Test JVMTI GetStackTrace function with NULL count_ptr pointer
-  err = (*jvmti)->GetStackTrace(jvmti, vthread, 0, MAX_FRAME_COUNT, frames, NULL);
+  err = jvmti->GetStackTrace(vthread, 0, MAX_FRAME_COUNT, frames, NULL);
   if (err != JVMTI_ERROR_NULL_POINTER) {
     printf("JVMTI GetStackTrace with NULL count_ptr pointer returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetStackTrace witt NULL count_ptr pointer failed to return JVMTI_ERROR_NULL_POINTER");
@@ -481,13 +479,13 @@ test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
 
   // #5: Test JVMTI GetStackTrace function with a good vthread
   if (frame_count == 0) {
-    err = (*jvmti)->GetStackTrace(jvmti, vthread, 1, MAX_FRAME_COUNT, frames, &count);
+    err = jvmti->GetStackTrace(vthread, 1, MAX_FRAME_COUNT, frames, &count);
     if (err != JVMTI_ERROR_ILLEGAL_ARGUMENT) {
       printf("JVMTI GetStackTrace for empty stack returned error: %d\n", err);
       fatal(jni, "event handler: JVMTI GetStackTrace for empty stack failed to return JVMTI_ERROR_ILLEGAL_ARGUMENT");
     }
   } else {
-    err = (*jvmti)->GetStackTrace(jvmti, vthread, 0, MAX_FRAME_COUNT, frames, &count);
+    err = jvmti->GetStackTrace(vthread, 0, MAX_FRAME_COUNT, frames, &count);
     if (err != JVMTI_ERROR_NONE) {
       printf("JVMTI GetStackTrace with good vthread returned error: %d\n", err);
       fatal(jni, "event handler: failed during JVMTI GetStackTrace call");
@@ -502,7 +500,7 @@ test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_na
 enum Slots { SlotInvalid0 = -1, SlotObj = 0, SlotInt = 1, SlotLong = 2, SlotUnaligned = 3, SlotFloat = 4, SlotDouble = 5 };
 
 static void
-test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, char* event_name, int frame_count) {
+test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, const char *event_name, int frame_count) {
   jmethodID method = NULL;
   jobject obj = NULL;
   jint ii = 0;
@@ -517,7 +515,7 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, ch
   }
 
   // #0: Test JVMTI GetLocalInstance function for carrier thread
-  err = (*jvmti)->GetLocalInstance(jvmti, cthread, 3, &obj);
+  err = jvmti->GetLocalInstance(cthread, 3, &obj);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetLocalInstance for carrier thread top frame Continuation.run() returned error: %d\n", err);
     fatal(jni, "JVMTI GetLocalInstance failed for carrier thread top frame Continuation.run()");
@@ -531,28 +529,28 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, ch
   printf("Testing GetLocal<Type> for method: producer(Ljava/Lang/String;)V at depth: %d\n", depth);
 
   // #1: Test JVMTI GetLocalObject function with negative frame depth
-  err = (*jvmti)->GetLocalObject(jvmti, vthread, -1, SlotObj, &obj);
+  err = jvmti->GetLocalObject(vthread, -1, SlotObj, &obj);
   if (err != JVMTI_ERROR_ILLEGAL_ARGUMENT) {
     printf("JVMTI GetLocalObject with negative frame depth returned error: %d\n", err);
     fatal(jni, "JVMTI GetLocalObject with negative frame depth failed to return JVMTI_ERROR_ILLEGAL_ARGUMENT");
   }
 
   // #2: Test JVMTI GetLocalObject function with big frame depth
-  err = (*jvmti)->GetLocalObject(jvmti, vthread, frame_count, SlotObj, &obj);
+  err = jvmti->GetLocalObject(vthread, frame_count, SlotObj, &obj);
   if (err != JVMTI_ERROR_NO_MORE_FRAMES) {
     printf("JVMTI GetLocalObject with big frame depth returned error: %d\n", err);
     fatal(jni, "JVMTI GetLocalObject with big frame depth failed to return JVMTI_ERROR_NO_MORE_FRAMES");
   }
 
   // #3: Test JVMTI GetLocalObject function with invalid slot -1
-  err = (*jvmti)->GetLocalObject(jvmti, vthread, depth, SlotInvalid0, &obj);
+  err = jvmti->GetLocalObject(vthread, depth, SlotInvalid0, &obj);
   if (err != JVMTI_ERROR_INVALID_SLOT) {
     printf("JVMTI GetLocalObject with invalid slot -1 returned error: %d\n", err);
     fatal(jni, "JVMTI GetLocalObject with invalid slot -1 failed to return JVMTI_ERROR_INVALID_SLOT");
   }
 
   // #4: Test JVMTI GetLocalObject function with unaligned slot 3
-  err = (*jvmti)->GetLocalObject(jvmti, vthread, depth, SlotUnaligned, &obj);
+  err = jvmti->GetLocalObject(vthread, depth, SlotUnaligned, &obj);
   if (err != JVMTI_ERROR_INVALID_SLOT && err != JVMTI_ERROR_TYPE_MISMATCH) {
     printf("JVMTI GetLocalObject with unaligned slot 3 returned error: %d\n", err);
     fatal(jni, "JVMTI GetLocalObject with unaligned slot 3 failed"
@@ -560,28 +558,28 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, ch
   }
 
   // #5: Test JVMTI GetLocalObject function with NULL value_ptr
-  err = (*jvmti)->GetLocalObject(jvmti, vthread, depth, SlotObj, NULL);
+  err = jvmti->GetLocalObject(vthread, depth, SlotObj, NULL);
   if (err != JVMTI_ERROR_NULL_POINTER) {
     printf("JVMTI GetLocalObject with NULL method_ptr returned error: %d\n", err);
     fatal(jni, "JVMTI GetLocalObject with NULL method_ptr failed to return JVMTI_ERROR_NULL_POINTER");
   }
 
   // #6: Test JVMTI GetLocal<Type> functions with a good vthread
-  err = (*jvmti)->GetLocalObject(jvmti, vthread, depth, SlotObj, &obj);
+  err = jvmti->GetLocalObject(vthread, depth, SlotObj, &obj);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetLocalObject with good vthread returned error: %d\n", err);
     fatal(jni, "failed during JVMTI GetLocalObject call");
   }
-  const char* str = (*jni)->GetStringUTFChars(jni, (jstring)obj, NULL);
+  const char* str = jni->GetStringUTFChars((jstring)obj, NULL);
   printf("    local String value at slot %d: %s\n", SlotObj, str);
   const char* exp_str = "msg: ...";
   if (strncmp(str, exp_str, 5) != 0) {
     printf("    Failed: Expected local String value: %s, got: %s\n", exp_str, str);
     fatal(jni, "Got unexpected local String value");
   }
-  (*jni)->ReleaseStringUTFChars(jni, (jstring)obj, str);
+  jni->ReleaseStringUTFChars((jstring)obj, str);
 
-  err = (*jvmti)->GetLocalInt(jvmti, vthread, depth, SlotInt, &ii);
+  err = jvmti->GetLocalInt(vthread, depth, SlotInt, &ii);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetLocalInt with good vthread returned error: %d\n", err);
     fatal(jni, "failed during JVMTI GetLocalInt call");
@@ -592,7 +590,7 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, ch
     fatal(jni, "Got unexpected local int value");
   }
 
-  err = (*jvmti)->GetLocalLong(jvmti, vthread, depth, SlotLong, &ll);
+  err = jvmti->GetLocalLong(vthread, depth, SlotLong, &ll);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetLocalInt with good vthread returned error: %d\n", err);
     fatal(jni, "failed during JVMTI GetLocalInt call");
@@ -603,7 +601,7 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, ch
     fatal(jni, "Got unexpected local long value");
   }
 
-  err = (*jvmti)->GetLocalFloat(jvmti, vthread, depth, SlotFloat, &ff);
+  err = jvmti->GetLocalFloat(vthread, depth, SlotFloat, &ff);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetLocalFloat with good vthread returned error: %d\n", err);
     fatal(jni, "failed during JVMTI GetLocalFloat call");
@@ -614,7 +612,7 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, ch
     fatal(jni, "Got unexpected local float value");
   }
 
-  err = (*jvmti)->GetLocalDouble(jvmti, vthread, depth, SlotDouble, &dd);
+  err = jvmti->GetLocalDouble(vthread, depth, SlotDouble, &dd);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetLocalDouble with good vthread returned error: %d\n", err);
     fatal(jni, "failed during JVMTI GetLocalDouble call");
@@ -627,7 +625,7 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, ch
 }
 
 static void
-processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_name) {
+processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name) {
   static int vthread_events_cnt = 0;
   jthread cthread = NULL;
   jvmtiThreadInfo thr_info;
@@ -640,14 +638,14 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, char* event_n
     }
   }
 
-  err = (*jvmti)->GetThreadInfo(jvmti, vthread, &thr_info);
+  err = jvmti->GetThreadInfo(vthread, &thr_info);
   if (err != JVMTI_ERROR_NONE) {
     printf("JVMTI GetThreadInfo returned error: %d\n", err);
     fatal(jni, "event handler: JVMTI GetThreadInfo failed to return JVMTI_ERROR_NONE");
   }
   printf("processVThreadEvent: event: %s, thread: %s\n", event_name, thr_info.name); fflush(0);
 
-  err = (*jvmti)->GetCarrierThread(jvmti, vthread, &cthread);
+  err = jvmti->GetCarrierThread(vthread, &cthread);
   if (err != JVMTI_ERROR_NONE) {
     printf("processVThreadEvent: GetCarrierThread returned error code: %d\n", err);
     fatal(jni, "event handler: JVMTI GetCarrierThread failed to return JVMTI_ERROR_NONE");
@@ -721,7 +719,7 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
   jvmtiError err;
 
   printf("Agent_OnLoad started\n");
-  if ((*jvm)->GetEnv(jvm, (void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
+  if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
 
@@ -735,9 +733,9 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
   }
 
   memset(&callbacks, 0, sizeof(callbacks));
-  callbacks.VirtualThreadScheduled  = &VirtualThreadScheduled;
+  callbacks.VirtualThreadScheduled = &VirtualThreadScheduled;
   callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
-  callbacks.VirtualThreadMounted   = &VirtualThreadMounted;
+  callbacks.VirtualThreadMounted = &VirtualThreadMounted;
   callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
 
   memset(&caps, 0, sizeof(caps));
@@ -745,56 +743,54 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
   caps.can_access_local_variables = 1;
   if (continuation_events_enabled == JNI_TRUE) {
     caps.can_support_continuations = 1;
-    callbacks.ContinuationRun   = &ContinuationRun;
+    callbacks.ContinuationRun = &ContinuationRun;
     callbacks.ContinuationYield = &ContinuationYield;
   }
-  err = (*jvmti)->AddCapabilities(jvmti, &caps);
+  err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI AddCapabilities: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventCallbacks(jvmti, &callbacks, sizeof(jvmtiEventCallbacks));
+  err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
   if (continuation_events_enabled == JNI_TRUE) {
-    err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_RUN, NULL);
+    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_RUN, NULL);
     if (err != JVMTI_ERROR_NONE) {
       printf("error in JVMTI SetEventNotificationMode: %d\n", err);
     }
 
-    err = (*jvmti)->SetEventNotificationMode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_YIELD, NULL);
+    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_YIELD, NULL);
     if (err != JVMTI_ERROR_NONE) {
       printf("error in JVMTI SetEventNotificationMode: %d\n", err);
     }
   }
 
-  (*jvmti)->CreateRawMonitor(jvmti, "Events Monitor", &events_monitor);
+  jvmti->CreateRawMonitor("Events Monitor", &events_monitor);
   printf("Agent_OnLoad finished\n");
   return 0;
 }
 
-#ifdef __cplusplus
-}
-#endif
+} // extern "C"
