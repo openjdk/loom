@@ -45,6 +45,9 @@
 
 extern "C" {
 
+const char* TranslateState(jint flags);
+const char* TranslateError(jvmtiError err);
+
 char *jlong_to_string(jlong value, char *string) {
   char buffer[32];
   char *pbuf, *pstr;
@@ -73,7 +76,7 @@ char *jlong_to_string(jlong value, char *string) {
 
 static void check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
   if (err != JVMTI_ERROR_NONE) {
-    printf("check_jvmti_status: JVMTI function returned error: %d\n", err);
+    printf("check_jvmti_status: JVMTI function returned error: %s (%d)\n", TranslateError(err), err);
     jni->FatalError(msg);
   }
 }
@@ -101,9 +104,13 @@ void RawMonitorExit(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
 
 void print_thread_info(JNIEnv* jni, jvmtiEnv *jvmti, jthread thread_obj) {
   jvmtiThreadInfo thread_info;
+  jint thread_state;
   check_jvmti_status(jni, jvmti->GetThreadInfo(thread_obj, &thread_info), "Error in GetThreadInfo");
-  printf("Thread: %p, name: %s, attrs: %s %s\n", thread_obj, thread_info.name,
+  check_jvmti_status(jni, jvmti->GetThreadState(thread_obj, &thread_state), "Error in GetThreadInfo");
+  const char* state = TranslateState(thread_state);
+  printf("Thread: %p, name: %s, state: %s, attrs: %s %s\n", thread_obj, thread_info.name, TranslateState(thread_state),
          (jni->IsVirtualThread(thread_obj)? "virtual": "kernel"), (thread_info.is_daemon ? "daemon": ""));
+
 }
 
 /* Commonly used helper functions */
