@@ -36,7 +36,7 @@ fatal(JNIEnv* jni, const char* msg) {
 }
 
 static void
-check(JNIEnv* jni, const char* msg, int err) {
+check(JNIEnv* jni, const char* msg, jvmtiError err) {
   if (err != JVMTI_ERROR_NONE) {
     printf("%s failed with error code %d\n", msg, err);
     fatal(jni, msg);
@@ -44,7 +44,7 @@ check(JNIEnv* jni, const char* msg, int err) {
 }
 
 static void
-check_jvmti_error_invalid_thread(JNIEnv* jni, const char* msg, int err) {
+check_jvmti_error_invalid_thread(JNIEnv* jni, const char* msg, jvmtiError err) {
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     printf("%s failed: expected JVMTI_ERROR_INVALID_THREAD instead of: %d\n", msg, err);
     fatal(jni, msg);

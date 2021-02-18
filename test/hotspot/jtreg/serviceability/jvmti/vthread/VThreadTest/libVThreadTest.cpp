@@ -115,7 +115,7 @@ print_method(jvmtiEnv *jvmti, JNIEnv *jni, jmethodID method, jint depth) {
 }
 
 static void
-print_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, int count, jvmtiFrameInfo *frames) {
+print_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInfo *frames) {
   printf("JVMTI Stack Trace: frame count: %d\n", count);
   for (int depth = 0; depth < count; depth++) {
     print_method(jvmti, jni, frames[depth].method, depth);
@@ -356,7 +356,7 @@ test_GetThreadInfo(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *ev
 
 static int
 test_GetFrameCount(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name) {
-  int frame_count = -1;
+  jint frame_count = -1;
   jvmtiError err;
 
   // #1: Test JVMTI GetFrameCount function with NULL count_ptr pointer
@@ -381,7 +381,7 @@ test_GetFrameCount(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *ev
 }
 
 static void
-test_GetFrameLocation(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name, int frame_count) {
+test_GetFrameLocation(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name, jint frame_count) {
   jmethodID method = NULL;
   jlocation location = -1;
   jvmtiError err;
@@ -436,9 +436,9 @@ test_GetFrameLocation(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char 
 }
 
 static void
-test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name, int frame_count) {
+test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name, jint frame_count) {
   jvmtiFrameInfo frames[MAX_FRAME_COUNT];
-  int count = -1;
+  jint count = -1;
   jmethodID method = NULL;
   jvmtiError err;
 
@@ -500,7 +500,7 @@ test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *ev
 enum Slots { SlotInvalid0 = -1, SlotObj = 0, SlotInt = 1, SlotLong = 2, SlotUnaligned = 3, SlotFloat = 4, SlotDouble = 5 };
 
 static void
-test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, const char *event_name, int frame_count) {
+test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, const char *event_name, jint frame_count) {
   jmethodID method = NULL;
   jobject obj = NULL;
   jint ii = 0;
@@ -664,7 +664,7 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *e
     test_GetThreadInfo(jvmti, jni, vthread, event_name);
     return; // skip testing of GetFrame* for VirtualThreadScheduled events
   }
-  int frame_count = test_GetFrameCount(jvmti, jni, vthread, event_name);
+  jint frame_count = test_GetFrameCount(jvmti, jni, vthread, event_name);
   test_GetFrameLocation(jvmti, jni, vthread, event_name, frame_count);
   test_GetStackTrace(jvmti, jni, vthread, event_name, frame_count);
   test_GetLocal(jvmti, jni, cthread, vthread, event_name, frame_count);
