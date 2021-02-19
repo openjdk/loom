@@ -826,50 +826,6 @@ fieldSignature(jclass clazz, jfieldID field,
     return error;
 }
 
-/**
- * Return vthread that is running on specified thread (must be inside a WITH_LOCAL_REFS)
- */
-jthread
-getThreadVThread(jthread thread)
-{
-    jthread vthread;
-    jvmtiError error;
-
-    JDI_ASSERT(gdata->vthreadsSupported);
-    if ( thread == NULL ) {
-        return NULL;
-    }
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetVirtualThread)
-        (gdata->jvmti, thread, &vthread);
-    if ( error != JVMTI_ERROR_NONE ) {
-        EXIT_ERROR(error,"Error calling GetVirtualThread()");
-        return JNI_FALSE;
-    }
-    return vthread;
-}
-
-/**
- * Return thread that specified vthread is running on (must be inside a WITH_LOCAL_REFS)
- */
-jthread
-getVThreadThread(jthread vthread)
-{
-    jthread thread;
-    jvmtiError error;
-
-    JDI_ASSERT(gdata->vthreadsSupported);
-    if ( vthread == NULL ) {
-        return NULL;
-    }
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
-        (gdata->jvmti, vthread, &thread);
-    if ( error != JVMTI_ERROR_NONE ) {
-        EXIT_ERROR(error,"Error calling GetCarrierThread()");
-        return NULL;
-    }
-    return thread;
-}
-
 JNIEnv *
 getEnv(void)
 {
