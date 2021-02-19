@@ -1491,78 +1491,6 @@ cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
     LOG_MISC(("END cbVThreadTerminated"));
 }
 
-/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED */
-static void JNICALL
-cbVThreadMounted(jvmtiEnv *jvmti_env, JNIEnv *env,
-                 jthread vthread)
-{
-    jvmtiError error;
-    jthread thread = NULL;
-
-    LOG_CB(("cbVThreadMounted: vthread=%p", vthread));
-    /*tty_message("cbVThreadMounted: vthread=%p", vthread);*/
-    JDI_ASSERT(gdata->vthreadsSupported);
-
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
-            (gdata->jvmti, vthread, &thread);
-    if (error != JVMTI_ERROR_NONE) {
-        EXIT_ERROR(error, "could not get carrier thread for vthread");
-    }
-
-    threadControl_mountVThread(vthread, thread, currentSessionID);
-
-    LOG_MISC(("END cbVThreadMounted"));
-}
-
-/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED */
-static void JNICALL
-cbVThreadUnmounted(jvmtiEnv *jvmti_env, JNIEnv *env,
-                   jthread vthread)
-{
-    jvmtiError error;
-    jthread thread = NULL;
-
-    LOG_CB(("cbVThreadUnmounted: vthread=%p", vthread));
-    /*tty_message("cbVThreadUnmounted: vthread=%p", vthread);*/
-    JDI_ASSERT(gdata->vthreadsSupported);
-
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
-            (gdata->jvmti, vthread, &thread);
-    if (error != JVMTI_ERROR_NONE) {
-        EXIT_ERROR(error, "could not get carrier thread for vthread");
-    }
-
-    threadControl_unmountVThread(vthread, thread);
-
-    LOG_MISC(("END cbVThreadUnmounted"));
-}
-
-/* Event callback for JVMTI_EVENT_CONTINUATION_RUN */
-static void JNICALL
-cbContinuationRun(jvmtiEnv *jvmti_env, JNIEnv *env,
-                  jthread thread, jint continuation_frame_count)
-{
-    LOG_CB(("cbContinuationRun: thread=%p", thread));
-    //tty_message("cbContinuationRun: thread=%p continuation_frame_count=%d", thread, continuation_frame_count);
-
-    threadControl_continuationRun(thread, continuation_frame_count);
-
-    LOG_MISC(("END cbContinuationRun"));
-}
-
-/* Event callback for JVMTI_EVENT_CONTINUATION_YIELD */
-static void JNICALL
-cbContinuationYield(jvmtiEnv *jvmti_env, JNIEnv *env,
-                    jthread thread, jint continuation_frame_count)
-{
-    LOG_CB(("cbContinuationYield: thread=%p", thread));
-    //tty_message("cbContinuationYield: thread=%p continuation_frame_count=%d", thread, continuation_frame_count);
-
-    threadControl_continuationYield(thread, continuation_frame_count);
-
-    LOG_MISC(("END cbContinuationYield"));
-}
-
 /**
  * Delete this handler (do not delete permanent handlers):
  * Deinsert handler from active list,
@@ -1763,26 +1691,6 @@ eventHandler_initialize(jbyte sessionID)
         if (error != JVMTI_ERROR_NONE) {
             EXIT_ERROR(error,"Can't enable vthread terminated events");
         }
-        error = threadControl_setEventMode(JVMTI_ENABLE,
-                                           EI_VIRTUAL_THREAD_MOUNTED, NULL);
-        if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable vthread mount events");
-        }
-        error = threadControl_setEventMode(JVMTI_ENABLE,
-                                           EI_VIRTUAL_THREAD_UNMOUNTED, NULL);
-        if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable vthread unmount events");
-        }
-        error = threadControl_setEventMode(JVMTI_ENABLE,
-                                           EI_CONTINUATION_RUN, NULL);
-        if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable continuation run events");
-        }
-        error = threadControl_setEventMode(JVMTI_ENABLE,
-                                           EI_CONTINUATION_YIELD, NULL);
-        if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable continuation yield events");
-        }
     }
 
     (void)memset(&(gdata->callbacks),0,sizeof(gdata->callbacks));
@@ -1830,14 +1738,6 @@ eventHandler_initialize(jbyte sessionID)
     gdata->callbacks.VirtualThreadScheduled     = &cbVThreadScheduled;
     /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED */
     gdata->callbacks.VirtualThreadTerminated    = &cbVThreadTerminated;
-    /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED */
-    gdata->callbacks.VirtualThreadMounted       = &cbVThreadMounted;
-    /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED */
-    gdata->callbacks.VirtualThreadUnmounted     = &cbVThreadUnmounted;
-    /* Event callback for JVMTI_EVENT_CONTINUATION_RUN */
-    gdata->callbacks.ContinuationRun            = &cbContinuationRun;
-    /* Event callback for JVMTI_EVENT_CONTINUATION_YIELD */
-    gdata->callbacks.ContinuationYield          = &cbContinuationYield;
 
     error = JVMTI_FUNC_PTR(gdata->jvmti,SetEventCallbacks)
                 (gdata->jvmti, &(gdata->callbacks), sizeof(gdata->callbacks));

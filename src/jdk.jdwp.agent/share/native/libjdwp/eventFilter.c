@@ -1312,10 +1312,6 @@ enableEvents(HandlerNode *node)
         case EI_GC_FINISH:
         case EI_VIRTUAL_THREAD_SCHEDULED:
         case EI_VIRTUAL_THREAD_TERMINATED:
-        case EI_VIRTUAL_THREAD_MOUNTED:
-        case EI_VIRTUAL_THREAD_UNMOUNTED:
-        case EI_CONTINUATION_RUN:
-        case EI_CONTINUATION_YIELD:
             return error;
 
         case EI_FIELD_ACCESS:
@@ -1377,10 +1373,6 @@ disableEvents(HandlerNode *node)
         case EI_GC_FINISH:
         case EI_VIRTUAL_THREAD_SCHEDULED:
         case EI_VIRTUAL_THREAD_TERMINATED:
-        case EI_VIRTUAL_THREAD_MOUNTED:
-        case EI_VIRTUAL_THREAD_UNMOUNTED:
-        case EI_CONTINUATION_RUN:
-        case EI_CONTINUATION_YIELD:
             return error;
 
         case EI_FIELD_ACCESS:
@@ -1410,6 +1402,7 @@ disableEvents(HandlerNode *node)
     }
     return error != JVMTI_ERROR_NONE? error : error2;
 }
+
 
 /***** filter (and event) installation and deinstallation *****/
 

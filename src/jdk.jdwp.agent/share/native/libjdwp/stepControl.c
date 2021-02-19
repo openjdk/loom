@@ -345,14 +345,8 @@ handleFramePopEvent(JNIEnv *env, EventInfo *evinfo,
                  */
                 LOG_STEP(("handleFramePopEvent: starting singlestep, have methodEnter handler && depth==INTO && fromDepth >= afterPopDepth (%d>=%d)", fromDepth, afterPopDepth));
             } else {
-                /*
-                 * The only way this should happen is if FramePop events were enabled to
-                 * support a CONTINUATION_RUN event while doing a STEP_INTO. See
-                 * stepControl_handleContinuationRun(). Resume stepping in the current frame.
-                 * If it is not the correct frame to resume stepping in, then handleStep()
-                 * will disable single stepping and setup another FramePop request.
-                 */
                 LOG_STEP(("handleFramePopEvent: starting singlestep, have methodEnter handler && depth==INTO && fromDepth < afterPopDepth (%d<%d)", fromDepth, afterPopDepth));
+                JDI_ASSERT(fromDepth >= afterPopDepth);
             }
             enableStepping(thread);
             (void)eventHandler_free(step->methodEnterHandlerNode);
@@ -481,54 +475,6 @@ handleMethodEnterEvent(JNIEnv *env, EventInfo *evinfo,
         EXIT_ERROR(AGENT_ERROR_INVALID_THREAD, "getting step request");
     }
     methodEnterHelper(env, thread, step, evinfo->clazz, evinfo->method);
-    stepControl_unlock();
-}
-
-void
-stepControl_handleContinuationRun(JNIEnv *env, jthread thread, StepRequest *step)
-{
-    stepControl_lock();
-    if (step->methodEnterHandlerNode != NULL) {
-        /*
-         * Looks like we were doing a single step INTO with filtering enabled, so a MethodEntry
-         * handler was installed to detect when we enter an unfiltered method. It's possible
-         * that the continuation method we are resuming execution in is unfiltered, but there
-         * will be no MethodEntry event for it. So we fake one here so the single stepping
-         * state is udpated appropriately.
-         */
-        jboolean steppingEnabled;
-        jclass clazz;
-        jmethodID method;
-        jlocation location;
-        jvmtiError error;
-
-        JDI_ASSERT(step->depth == JDWP_STEP_DEPTH(INTO));
-
-        /*
-         * We leverage the existing MethodEnter handler support for this, but it needs to know
-         * the location of the MethodEnter, so we get this from the current frame.
-         */
-        error = getFrameLocation(thread, &clazz, &method, &location);
-        if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error, "getting frame location");
-        }
-        steppingEnabled = methodEnterHelper(env, thread, step, clazz, method);
-
-        if (!steppingEnabled) {
-            /*
-             * It looks like the continuation is resuming in a filtered method. We need to setup
-             * a FramePop request on the current frame, so when it exits we can check if the
-             * method we return to is filtered, and enable single stepping if not.
-             */
-            error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)
-                (gdata->jvmti, thread, 0);
-            if (error == JVMTI_ERROR_DUPLICATE) {
-                error = JVMTI_ERROR_NONE;
-            } else if (error != JVMTI_ERROR_NONE) {
-                EXIT_ERROR(error, "setting up notify frame pop");
-            }
-        }
-    }
     stepControl_unlock();
 }
 

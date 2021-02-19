@@ -442,12 +442,6 @@ handleEventCommandSingle(JNIEnv *env, PacketOutputStream *out,
              */
             writeThreadEvent(env, out, evinfo);
             break;
-        case EI_VIRTUAL_THREAD_MOUNTED:
-        case EI_VIRTUAL_THREAD_UNMOUNTED:
-        case EI_CONTINUATION_RUN:
-        case EI_CONTINUATION_YIELD:
-            EXIT_ERROR(AGENT_ERROR_INVALID_EVENT_TYPE, "invalid event index");
-            break;
         case EI_CLASS_LOAD:
         case EI_CLASS_PREPARE:
             writeClassEvent(env, out, evinfo);

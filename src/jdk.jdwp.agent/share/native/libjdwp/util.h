@@ -174,12 +174,8 @@ typedef enum {
         EI_VM_DEATH             = 20,
         EI_VIRTUAL_THREAD_SCHEDULED  = 21,
         EI_VIRTUAL_THREAD_TERMINATED = 22,
-        EI_VIRTUAL_THREAD_MOUNTED    = 23,
-        EI_VIRTUAL_THREAD_UNMOUNTED  = 24,
-        EI_CONTINUATION_RUN     = 25,
-        EI_CONTINUATION_YIELD   = 26,
 
-        EI_max                  = 26
+        EI_max                  = 22
 } EventIndex;
 
 /* Agent errors that might be in a jvmtiError for JDWP or internal.
