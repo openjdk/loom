@@ -53,6 +53,7 @@ StorageStructure* init(jvmtiEnv * jvmti, JNIEnv * jni, const char name[]) {
 
 // Fill data
   storage->self_pointer = storage;
+  strncpy(storage->data, name, 100);
 
   return (StorageStructure*) tmp;
 }
@@ -68,8 +69,10 @@ void check(jvmtiEnv * jvmti, JNIEnv * jni, jthread thread, StorageStructure* sto
 //    }
     return;
   }
-  if (storage->self_pointer != storage) {
-    printf("Unexpected value in storage storage=%p, the self pointer=%p\n", storage, storage->self_pointer);
+
+  if (storage->self_pointer != storage || (strcmp(name, storage->data) != 0)) {
+    printf("Unexpected value in storage storage=%p, the self_pointer=%p, date (current thread name): %s\n",
+           storage, storage->self_pointer, storage->data);
     print_thread_info(jni, jvmti, thread);
     jni->FatalError("Incorrect value in storage.");
   }
@@ -122,11 +125,14 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
       }
 
       check_jvmti_status(jni, err, "Error in GetThreadLocalStorage");
-      check(jvmti, jni, testedThread, obtainedStorage, "");
 
+      jvmtiThreadInfo thread_info;
+      check_jvmti_status(jni, jvmti->GetThreadInfo(testedThread, &thread_info), "Error in GetThreadInfo");
 
-      StorageStructure *initialStorage = init(jvmti, jni, "cc");
-    //  printf("SetThreadLocalStorage() for tested thread with pointer: %p\n",(void *) initialStorage);
+      check(jvmti, jni, testedThread, obtainedStorage, thread_info.name);
+
+      // Set for next iteration
+      StorageStructure *initialStorage = init(jvmti, jni, thread_info.name);
 
       err = jvmti->SetThreadLocalStorage(testedThread, (void *) initialStorage);
       if (err != JVMTI_ERROR_THREAD_NOT_ALIVE) {
@@ -150,8 +156,10 @@ void JNICALL VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
 void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   RawMonitorEnter(jni, jvmti, monitor);
   if (main_thread_still_running) {
-    StorageStructure *initialStorage = init(jvmti, jni, "cc");
-//    printf("Setting initial thread storage: %p for ",(void *) initialStorage); print_thread_info(jni, jvmti, thread);
+    jvmtiThreadInfo thread_info;
+    check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo");
+    StorageStructure *initialStorage = init(jvmti, jni, thread_info.name);
+  //  printf("Setting initial thread storage: %p for ",(void *) initialStorage); print_thread_info(jni, jvmti, thread);
     check_jvmti_status(jni, jvmti->SetThreadLocalStorage(thread, (void *) initialStorage), "Error in SetThreadLocalStorage");
   }
   RawMonitorExit(jni, jvmti, monitor);
@@ -161,9 +169,11 @@ void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   RawMonitorEnter(jni, jvmti, monitor);
   if (main_thread_still_running) {
     StorageStructure *obtainedStorage;
+    jvmtiThreadInfo thread_info;
+    check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo");
   //  printf("Final testing of thread storage: %p for ",(void *) thread); print_thread_info(jni, jvmti, thread);
     check_jvmti_status(jni,  jvmti->GetThreadLocalStorage(thread, (void **) &obtainedStorage), "Error in GetThreadLocalStorage");
-    check(jvmti, jni, thread, obtainedStorage, "");
+    check(jvmti, jni, thread, obtainedStorage, thread_info.name);
   }
   RawMonitorExit(jni, jvmti, monitor);
 }

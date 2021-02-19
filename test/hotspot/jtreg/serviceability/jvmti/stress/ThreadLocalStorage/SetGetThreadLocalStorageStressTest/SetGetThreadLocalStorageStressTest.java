@@ -24,9 +24,21 @@
 /*
  * @test
  *
- * @summary Test set/get thread local storage in different locations like:
+ * @summary Test verifies set/get TLS data and verifies it's consistency.
+ * Test set TLS with thread name which it belongs to and verify this information when getting test.
  *  -- cbThreadStart
  *  -- by AgentThread
+ *
+ * Test doesn't verify that TLS is not NULL because for some threads TLS is not initialized initially.
+ * TODO:
+ *  -- verify that TLS is not NULL (not possible to do with jvmti, ThreadStart might be called too late)
+ *  -- add more events where TLS is set *first time*, it is needed to test lazily jvmtThreadState init
+ *  -- support virtual threads
+ *  -- set/get TLS from other JavaThreads (not from agent and current thread)
+ *  -- set/get for suspened (blocked?) threads
+ *  -- split test to "sanity" and "stress" version
+ *  -- update properties to run jvmti stress tests non-concurrently?
+ *
  *
  * @library /test/lib
  * @run main/othervm/native -agentlib:SetGetThreadLocalStorageStress SetGetThreadLocalStorageStressTest
@@ -45,26 +57,26 @@ public class SetGetThreadLocalStorageStressTest extends DebugeeClass {
 
     static int status = DebugeeClass.TEST_PASSED;
 
-
-    // run test from command line
     public static void main(String argv[]) throws InterruptedException {
         int size = 10;
+        int threadNum = Runtime.getRuntime().availableProcessors();
         if (argv.length > 0) {
             size = Integer.parseInt(argv[0]);
         }
 
-        // need to sync start with agent thread
+        // need to sync start with agent thread only when main is started
         checkStatus(status);
 
+        long uniqID = 0;
         for (int c = 0; c < size; c++) {
-            Thread[] threads = new Thread[10];
-            for (int i = 0; i < 10; i++) {
+            Thread[] threads = new Thread[threadNum];
+            for (int i = 0; i < threadNum; i++) {
                 TaskMonitor task = new TaskMonitor();
-
                 threads[i] = Thread.builder()
                         .task(task)
-                        .name("TestedThread")
-                     //   .virtual()
+                        .name("TestedThread-" + uniqID++)
+                        // TODO add virtual testing
+                        //   .virtual()
                         .build();
             }
 
