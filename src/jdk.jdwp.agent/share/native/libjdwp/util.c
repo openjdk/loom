@@ -870,25 +870,6 @@ getVThreadThread(jthread vthread)
     return thread;
 }
 
-/*
- * vthread fixme: This was moved here from stepControl.c because it is now also called
- * from threadControl.c. However, the need to call it from there may go away. If it does,
- * move this code back to stepControl.c.
- */
-jint
-getThreadFrameCount(jthread thread)
-{
-    jint count = 0;
-    jvmtiError error;
-
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameCount)
-                    (gdata->jvmti, thread, &count);
-    if (error != JVMTI_ERROR_NONE) {
-        EXIT_ERROR(error, "getting frame count");
-    }
-    return count;
-}
-
 JNIEnv *
 getEnv(void)
 {

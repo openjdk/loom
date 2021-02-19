@@ -32,6 +32,20 @@
 
 static jrawMonitorID stepLock;
 
+static jint
+getFrameCount(jthread thread)
+{
+    jint count = 0;
+    jvmtiError error;
+
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameCount)
+                    (gdata->jvmti, thread, &count);
+    if (error != JVMTI_ERROR_NONE) {
+        EXIT_ERROR(error, "getting frame count");
+    }
+    return count;
+}
+
 /*
  * Most enabling/disabling of JVMTI events happens implicitly through
  * the inserting and freeing of handlers for those events. Stepping is
@@ -167,7 +181,7 @@ initState(JNIEnv *env, jthread thread, StepRequest *step)
     step->fromLine = -1;
     step->fromNative = JNI_FALSE;
     step->frameExited = JNI_FALSE;
-    step->fromStackDepth = getThreadFrameCount(thread);
+    step->fromStackDepth = getFrameCount(thread);
 
     if (step->fromStackDepth <= 0) {
         /*
@@ -275,7 +289,7 @@ handleFramePopEvent(JNIEnv *env, EventInfo *evinfo,
         jint fromDepth;
         jint afterPopDepth;
 
-        currentDepth = getThreadFrameCount(thread);
+        currentDepth = getFrameCount(thread);
         fromDepth = step->fromStackDepth;
         afterPopDepth = currentDepth-1;
 
@@ -378,7 +392,7 @@ handleExceptionCatchEvent(JNIEnv *env, EventInfo *evinfo,
          *  Determine where we are on the call stack relative to where
          *  we started.
          */
-        jint currentDepth = getThreadFrameCount(thread);
+        jint currentDepth = getFrameCount(thread);
         jint fromDepth = step->fromStackDepth;
 
         LOG_STEP(("handleExceptionCatchEvent: fromDepth=%d, currentDepth=%d",
@@ -557,7 +571,7 @@ stepControl_handleStep(JNIEnv *env, jthread thread,
      *  Determine where we are on the call stack relative to where
      *  we started.
      */
-    currentDepth = getThreadFrameCount(thread);
+    currentDepth = getFrameCount(thread);
     fromDepth = step->fromStackDepth;
 
     if (fromDepth > currentDepth) {

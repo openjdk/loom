@@ -380,8 +380,6 @@ jboolean isSameObject(JNIEnv *env, jobject o1, jobject o2);
 jthread  getThreadVThread(jthread thread);
 jthread  getVThreadThread(jthread vthread);
 
-jint getThreadFrameCount(jthread thread);
-
 jint objectHashCode(jobject);
 
 jvmtiError allInterfaces(jclass clazz, jclass **ppinterfaces, jint *count);
