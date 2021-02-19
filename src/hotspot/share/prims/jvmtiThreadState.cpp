@@ -83,19 +83,6 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
   _is_virtual = false;
 
   _thread_oop_h = OopHandle(Universe::vm_global(), thread_oop);
-  if (thread_oop != NULL) {
-    java_lang_Thread::set_jvmti_thread_state(thread_oop, (JvmtiThreadState*)this);
-    _is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
-  }
-
-  // thread can be NULL if virtual thread is unmounted
-  if (thread != NULL) {
-    // set this as the state for the thread only if thread_oop is current thread->mounted_vthread()
-    if (thread_oop == NULL || thread->mounted_vthread() == NULL || thread->mounted_vthread() == thread_oop) {
-      thread->set_jvmti_thread_state(this);
-    }
-    thread->set_interp_only_mode(0);
-  }
 
   // add all the JvmtiEnvThreadState to the new JvmtiThreadState
   {
@@ -119,6 +106,20 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
       _head->_prev = this;
     }
     _head = this;
+  }
+
+  if (thread_oop != NULL) {
+    java_lang_Thread::set_jvmti_thread_state(thread_oop, (JvmtiThreadState*)this);
+    _is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
+  }
+
+  // thread can be NULL if virtual thread is unmounted
+  if (thread != NULL) {
+    // set this as the state for the thread only if thread_oop is current thread->mounted_vthread()
+    if (thread_oop == NULL || thread->mounted_vthread() == NULL || thread->mounted_vthread() == thread_oop) {
+      thread->set_jvmti_thread_state(this);
+    }
+    thread->set_interp_only_mode(0);
   }
 }
 
