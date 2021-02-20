@@ -611,7 +611,12 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 }
 
 javaVFrame*
-JvmtiEnvBase::skip_hidden_frames(javaVFrame* jvf) {
+JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
+  // The second condition is needed to hide notification methods
+  // as jt->is_in_VTMT() can be not set yet. 
+  if (!jt->is_in_VTMT() && !jvf->method()->jvmti_mount_transition()) {
+    return jvf; // no frames to skip
+  }
   // find jvf with a method annotated with @JvmtiMountTransition
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
     if (jvf->method()->jvmti_mount_transition()) {
@@ -644,9 +649,7 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
     }
     vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
     jvf = vfs.at_end() ? NULL : vfs.asJavaVFrame();
-    if (java_thread->is_in_VTMT()) {
-      jvf = skip_hidden_frames(jvf);
-    }
+    jvf = check_and_skip_hidden_frames(java_thread, jvf);
   } else {
     Handle cont_h(cur_thread, cont);
     vframeStream vfs(cont_h);
@@ -661,9 +664,7 @@ JvmtiEnvBase::get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map_p) {
   javaVFrame *jvf = JvmtiEnvBase::cthread_with_continuation(jt) ?
                         jt->vthread_carrier_last_java_vframe(reg_map_p) :
                         jt->last_java_vframe(reg_map_p);
-  if (jt->is_in_VTMT()) {
-    jvf = skip_hidden_frames(jvf);
-  }
+  jvf = check_and_skip_hidden_frames(jt, jvf);
   return jvf;
 }
 
@@ -2096,7 +2097,7 @@ SetFramePopClosure::doit(Thread *target, bool self) {
     _result = JVMTI_ERROR_NO_MORE_FRAMES;
     return;
   }
-
+  vf = JvmtiEnvBase::check_and_skip_hidden_frames(java_thread, (javaVFrame*)vf);
   if (!vf->is_java_frame() || ((javaVFrame*) vf)->method()->is_native()) {
     _result = JVMTI_ERROR_OPAQUE_FRAME;
     return;

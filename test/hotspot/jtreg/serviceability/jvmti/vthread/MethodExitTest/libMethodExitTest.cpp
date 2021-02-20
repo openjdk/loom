@@ -532,7 +532,7 @@ VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
 
   lock_events();
 
-  err = jvmti->GetFrameLocation(vthread, 1, &method, &loc);
+  err = jvmti->GetFrameLocation(vthread, 0, &method, &loc);
   check_jvmti_status(jni, err, "VirtualThreadMounted: error in JVMTI GetFrameLocation");
 
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
@@ -543,7 +543,7 @@ VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   printf("\nHit #%d: VirtualThreadMounted #%d: enabling FramePop for method: %s::%s on virtual thread: %p\n",
          brkptBreakpointHit, ++vthread_mounted_count, cname, mname, (void*)vthread);
 
-  err = jvmti->NotifyFramePop(vthread, 1);
+  err = jvmti->NotifyFramePop(vthread, 0);
   check_jvmti_status(jni, err, "VirtualThreadMounted: error in JVMTI NotifyFramePop");
 
   print_frame_event_info(jvmti, jni, vthread, method, "VirtualThreadMounted", vthread_mounted_count);
@@ -566,7 +566,7 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
  
   lock_events();
 
-  err = jvmti->GetFrameLocation(vthread, 1, &method, &loc);
+  err = jvmti->GetFrameLocation(vthread, 0, &method, &loc);
   check_jvmti_status(jni, err, "VirtualThreadUnmounted: error in JVMTI GetFrameLocation");
 
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
@@ -577,7 +577,7 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   printf("\nHit #%d: VirtualThreadUnmounted #%d: enabling FramePop for method: %s::%s on virtual thread: %p\n",
          brkptBreakpointHit, ++vthread_unmounted_count, cname, mname, (void*)vthread);
 
-  err = jvmti->NotifyFramePop(vthread, 1);
+  err = jvmti->NotifyFramePop(vthread, 0);
   check_jvmti_status(jni, err, "VirtualThreadUnmounted: error in JVMTI NotifyFramePop");
 
   print_frame_event_info(jvmti, jni, vthread, method, "VirtualThreadUnmounted", vthread_unmounted_count);

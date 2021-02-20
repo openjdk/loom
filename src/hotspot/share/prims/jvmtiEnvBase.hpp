@@ -321,8 +321,8 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   // get a field descriptor for the specified class and field
   static bool get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd);
 
-  // skip frames hidden in mount/unmount transitions
-  static javaVFrame* skip_hidden_frames(javaVFrame* jvf);
+  // check and skip frames hidden in mount/unmount transitions
+  static javaVFrame* check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf);
 
   // get virtual thread last java vframe
   static javaVFrame* get_vthread_jvf(oop vthread);
