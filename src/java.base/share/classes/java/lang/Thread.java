@@ -1094,7 +1094,7 @@ public class Thread implements Runnable {
                 return new VirtualThreadFactory(scheduler, name, counter, characteristics, uhe);
             } else {
                 return new PlatformThreadFactory(group, name, counter, characteristics,
-                                                 daemon, priority, uhe);
+                                                 daemonChanged, daemon, priority, uhe);
             }
         }
     }
@@ -1166,6 +1166,7 @@ public class Thread implements Runnable {
         private final ThreadGroup group;
         private final String name;
         private final int characteristics;
+        private final boolean daemonChanged;
         private final boolean daemon;
         private final int priority;
         private final UncaughtExceptionHandler uhe;
@@ -1174,6 +1175,7 @@ public class Thread implements Runnable {
                             String name,
                             int start,
                             int characteristics,
+                            boolean daemonChanged,
                             boolean daemon,
                             int priority,
                             UncaughtExceptionHandler uhe) {
@@ -1181,6 +1183,7 @@ public class Thread implements Runnable {
             this.group = group;
             this.name = name;
             this.characteristics = characteristics;
+            this.daemonChanged = daemonChanged;
             this.daemon = daemon;
             this.priority = priority;
             this.uhe = uhe;
@@ -1196,8 +1199,8 @@ public class Thread implements Runnable {
                 name += next();
             }
             Thread thread = new Thread(group, name, characteristics, task, 0, null);
-            if (daemon)
-                thread.daemon(true);
+            if (daemonChanged)
+                thread.daemon(daemon);
             if (priority != 0)
                 thread.priority(priority);
             if (uhe != null)
