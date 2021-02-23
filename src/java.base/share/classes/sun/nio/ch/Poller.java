@@ -43,7 +43,7 @@ public abstract class Poller {
     static {
         try {
             PollerProvider provider = PollerProvider.provider();
-            READ_POLLER = startPollerThread("Read-Poller",  provider.readPoller());
+            READ_POLLER = startPollerThread("Read-Poller", provider.readPoller());
             WRITE_POLLER = startPollerThread("Write-Poller", provider.writePoller());
         } catch (IOException ioe) {
             throw new IOError(ioe);
@@ -53,7 +53,7 @@ public abstract class Poller {
     private static Poller startPollerThread(String name, Poller poller) {
         try {
             Thread thread = JLA.executeOnCarrierThread(() -> {
-                Runnable task = poller::eventLoop;
+                Runnable task = poller::pollerLoop;
                 return InnocuousThread.newSystemThread(name, task);
             });
             thread.setDaemon(true);
@@ -164,11 +164,14 @@ public abstract class Poller {
      * file descriptor.
      *
      * @param timeout if positive then block for up to {@code timeout} milliseconds,
-     *     if zero then don't block, if -1 then blocking indefinitely
+     *     if zero then don't block, if -1 then block indefinitely
      */
     abstract int poll(int timeout) throws IOException;
 
-    private void eventLoop() {
+    /**
+     * Poll forever for events.
+     */
+    private void pollerLoop() {
         try {
             for (;;) {
                 poll(-1);
