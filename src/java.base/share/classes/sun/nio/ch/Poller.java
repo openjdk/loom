@@ -35,7 +35,7 @@ import jdk.internal.misc.InnocuousThread;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
-public abstract class Poller implements Runnable {
+public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final Poller READ_POLLER;
     private static final Poller WRITE_POLLER;
@@ -43,7 +43,7 @@ public abstract class Poller implements Runnable {
     static {
         try {
             PollerProvider provider = PollerProvider.provider();
-            READ_POLLER = startPollerThread("Read-Poller", provider.readPoller());
+            READ_POLLER = startPollerThread("Read-Poller",  provider.readPoller());
             WRITE_POLLER = startPollerThread("Write-Poller", provider.writePoller());
         } catch (IOException ioe) {
             throw new IOError(ioe);
@@ -52,10 +52,12 @@ public abstract class Poller implements Runnable {
 
     private static Poller startPollerThread(String name, Poller poller) {
         try {
-            Thread t = JLA.executeOnCarrierThread(() ->
-                    InnocuousThread.newSystemThread(name, poller));
-            t.setDaemon(true);
-            t.start();
+            Thread thread = JLA.executeOnCarrierThread(() -> {
+                Runnable task = poller::eventLoop;
+                return InnocuousThread.newSystemThread(name, task);
+            });
+            thread.setDaemon(true);
+            thread.start();
             return poller;
         } catch (Exception e) {
             throw new InternalError(e);
@@ -158,14 +160,33 @@ public abstract class Poller implements Runnable {
     }
 
     /**
+     * Poll for events. The {@link #polled(int)} method is invoked for each polled
+     * file descriptor.
+     *
+     * @param timeout if positive then block for up to {@code timeout} milliseconds,
+     *     if zero then don't block, if -1 then blocking indefinitely
+     */
+    abstract int poll(int timeout) throws IOException;
+
+    private void eventLoop() {
+        try {
+            for (;;) {
+                poll(-1);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
      * Register the file descriptor
      */
-    abstract protected void implRegister(int fdVal) throws IOException;
+    abstract void implRegister(int fdVal) throws IOException;
 
     /**
      * Deregister (or disarm) the file descriptor
      */
-    abstract protected void implDeregister(int fdVal);
+    abstract void implDeregister(int fdVal);
 
 
     /**
