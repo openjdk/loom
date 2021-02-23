@@ -96,9 +96,9 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
   while(true) {
     jthread *threads = NULL;
     jint count = 0;
-    rawMonitorEnter(jvmti, monitor);
+    RawMonitorEnter(jni, jvmti, monitor);
     if (!main_thread_still_running) {
-      rawMonitorExit(jvmti, monitor);
+      RawMonitorExit(jni, jvmti, monitor);
       return;
     }
     check_jvmti_status(jni, jvmti->GetAllThreads(&count, &threads), "Error in GetAllThreads");
@@ -173,6 +173,7 @@ void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
     check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo");
   //  printf("Final testing of thread storage: %p for ",(void *) thread); print_thread_info(jni, jvmti, thread);
     check_jvmti_status(jni,  jvmti->GetThreadLocalStorage(thread, (void **) &obtainedStorage), "Error in GetThreadLocalStorage");
+    check_jvmti_status(jni,  jvmti->SetThreadLocalStorage(thread, NULL), "Error in SetThreadLocalStorage");
     check(jvmti, jni, thread, obtainedStorage, thread_info.name);
   }
   RawMonitorExit(jni, jvmti, monitor);

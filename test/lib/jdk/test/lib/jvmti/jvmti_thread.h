@@ -111,27 +111,6 @@ void exitOnError(jvmtiError error) {
   }
 }
 
-void rawMonitorEnter(jvmtiEnv *env, jrawMonitorID monitor) {
-  jvmtiError error = env->RawMonitorEnter(monitor);
-  exitOnError(error);
-}
-
-void rawMonitorExit(jvmtiEnv *env, jrawMonitorID monitor) {
-  jvmtiError error = env->RawMonitorExit(monitor);
-  exitOnError(error);
-}
-
-void rawMonitorNotify(jvmtiEnv *env, jrawMonitorID monitor) {
-  jvmtiError error = env->RawMonitorNotify(monitor);
-  exitOnError(error);
-}
-
-void rawMonitorWait(jvmtiEnv *env, jrawMonitorID monitor, jlong millis) {
-  jvmtiError error = env->RawMonitorWait(monitor, millis);
-  exitOnError(error);
-}
-
-
 /** Wait for sync point with Java code. */
 int nsk_jvmti_waitForSync(jlong timeout) {
   static const int inc_timeout = 1000;
@@ -139,18 +118,18 @@ int nsk_jvmti_waitForSync(jlong timeout) {
   jlong t = 0;
   int result = NSK_TRUE;
 
-  rawMonitorEnter(agent_jvmti_env, agent_data.monitor);
+  RawMonitorEnter(agent_jni_env, agent_jvmti_env, agent_data.monitor);
 
   agent_data.thread_state = WAITING;
 
   /* SP2.2-n - notify agent is waiting and wait */
   /* SP4.1-n - notify agent is waiting and wait */
-  rawMonitorNotify(agent_jvmti_env, agent_data.monitor);
+  RawMonitorNotify(agent_jni_env, agent_jvmti_env, agent_data.monitor);
 
   while (agent_data.thread_state == WAITING) {
     /* SP3.2-w - wait to start test */
     /* SP6.2-w - wait to end test */
-    rawMonitorWait(agent_jvmti_env, agent_data.monitor, inc_timeout);
+    RawMonitorWait(agent_jni_env, agent_jvmti_env, agent_data.monitor, inc_timeout);
 
     if (timeout == 0) continue;
 
@@ -165,7 +144,7 @@ int nsk_jvmti_waitForSync(jlong timeout) {
     result = NSK_FALSE;
   }
 
-  rawMonitorExit(agent_jvmti_env, agent_data.monitor);
+  RawMonitorExit(agent_jni_env, agent_jvmti_env, agent_data.monitor);
 
   return result;
 }
@@ -173,14 +152,14 @@ int nsk_jvmti_waitForSync(jlong timeout) {
 /** Resume java code suspended on sync point. */
 int nsk_jvmti_resumeSync() {
   int result;
-  rawMonitorEnter(agent_jvmti_env, agent_data.monitor);
+  RawMonitorEnter(agent_jni_env, agent_jvmti_env, agent_data.monitor);
 
   if (agent_data.thread_state == SUSPENDED) {
     result = NSK_TRUE;
     agent_data.thread_state = RUNNABLE;
     /* SP5.2-n - notify suspend done */
     /* SP7.2-n - notify agent end */
-    rawMonitorNotify(agent_jvmti_env, agent_data.monitor);
+    RawMonitorNotify(agent_jni_env, agent_jvmti_env, agent_data.monitor);
   }
   else {
     NSK_COMPLAIN0("Debuggee was not suspended on status sync\n");
@@ -188,16 +167,16 @@ int nsk_jvmti_resumeSync() {
     result = NSK_FALSE;
   }
 
-  rawMonitorExit(agent_jvmti_env, agent_data.monitor);
+  RawMonitorExit(agent_jni_env, agent_jvmti_env, agent_data.monitor);
   return NSK_TRUE;
 }
 
 /* ============================================================================= */
 static void set_agent_thread_state(thread_state_t value) {
-  rawMonitorEnter(agent_jvmti_env, agent_data.monitor);
+  RawMonitorEnter(agent_jni_env, agent_jvmti_env, agent_data.monitor);
   agent_data.thread_state = value;
-  rawMonitorNotify(agent_jvmti_env, agent_data.monitor);
-  rawMonitorExit(agent_jvmti_env, agent_data.monitor);
+  RawMonitorNotify(agent_jni_env, agent_jvmti_env, agent_data.monitor);
+  RawMonitorExit(agent_jni_env, agent_jvmti_env, agent_data.monitor);
 }
 
 /** Wrapper for user agent thread. */
@@ -292,7 +271,7 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
   jint result = NSK_STATUS_FAILED;
 
   printf("Data %p %p\n", jvmti_env, agent_data.monitor);
-  rawMonitorEnter(jvmti_env, agent_data.monitor);
+  RawMonitorEnter(jni_env, jvmti_env, agent_data.monitor);
 
   /* save last debugee status */
   agent_data.last_debuggee_status = debuggeeStatus;
@@ -304,7 +283,7 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
 
     /* SP2.2-w - wait for agent thread */
     while (agent_data.thread_state == NEW) {
-      rawMonitorWait(jvmti_env, agent_data.monitor, 0);
+      RawMonitorWait(jni_env, jvmti_env, agent_data.monitor, 0);
     }
   }
 
@@ -312,14 +291,14 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
   /* we don't enter loop in first call */
   while (agent_data.thread_state != WAITING && agent_data.thread_state != TERMINATED) {
     /* SP4.2-w - second wait for agent thread */
-    rawMonitorWait(jvmti_env, agent_data.monitor, 0);
+    RawMonitorWait(jni_env, jvmti_env, agent_data.monitor, 0);
   }
 
   if (agent_data.thread_state != TERMINATED) {
     agent_data.thread_state = SUSPENDED;
     /* SP3.2-n - notify to start test */
     /* SP6.2-n - notify to end test */
-    rawMonitorNotify(jvmti_env, agent_data.monitor);
+    RawMonitorNotify(jni_env, jvmti_env, agent_data.monitor);
   } else {
     NSK_COMPLAIN0("Debuggee status sync aborted because agent thread has finished\n");
     goto monitor_exit_and_return;
@@ -334,14 +313,14 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
   while (agent_data.thread_state == SUSPENDED) {
     /* SP5.2-w - wait while testing */
     /* SP7.2 - wait for agent end */
-    rawMonitorWait(jvmti_env, agent_data.monitor, 0);
+    RawMonitorWait(jni_env, jvmti_env, agent_data.monitor, 0);
   }
 
   agent_data.last_debuggee_status = nsk_jvmti_getStatus();
   result = agent_data.last_debuggee_status;
 
   monitor_exit_and_return:
-  rawMonitorExit(jvmti_env, agent_data.monitor);
+  RawMonitorExit(jni_env, jvmti_env, agent_data.monitor);
   return result;
 }
 

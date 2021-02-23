@@ -94,6 +94,7 @@ jrawMonitorID CreateRawMonitor(jvmtiEnv *jvmti, const char* name) {
   return lock;
 }
 
+
 void RawMonitorEnter(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
   check_jvmti_status(jni, jvmti->RawMonitorEnter(lock), "Fatal Error in RawMonitorEnter.");
 }
@@ -101,6 +102,15 @@ void RawMonitorEnter(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
 void RawMonitorExit(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
   check_jvmti_status(jni, jvmti->RawMonitorExit(lock), "Fatal Error in RawMonitorEnter.");
 }
+
+void RawMonitorNotify(JNIEnv* jni, jvmtiEnv *env, jrawMonitorID monitor) {
+  check_jvmti_status(jni, env->RawMonitorNotify(monitor), "Fatal Error in RawMonitorNotify.");
+}
+
+void RawMonitorWait(JNIEnv* jni, jvmtiEnv *env, jrawMonitorID monitor, jlong millis) {
+  check_jvmti_status(jni, env->RawMonitorWait(monitor, millis), "Fatal Error in RawMonitorWait.");
+}
+
 
 void print_thread_info(JNIEnv* jni, jvmtiEnv *jvmti, jthread thread_obj) {
   jvmtiThreadInfo thread_info;
