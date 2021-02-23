@@ -264,7 +264,7 @@ findThread(ThreadList *list, jthread thread)
     }
 
     /* Get thread local storage for quick thread -> node access */
-    node = NULL;//getThreadLocalStorage(thread);
+    node = getThreadLocalStorage(thread);
 
     /* In some rare cases we might get NULL, so we check the list manually for
      *   any threads that we could match.
@@ -280,7 +280,7 @@ findThread(ThreadList *list, jthread thread)
         }
         if ( node != NULL ) {
             /* Here we make another attempt to set TLS, it's ok if this fails */
-            //setThreadLocalStorage(thread, (void*)node);
+            setThreadLocalStorage(thread, (void*)node);
         }
     }
 
@@ -418,7 +418,7 @@ insertThread(JNIEnv *env, ThreadList *list, jthread thread)
          *   which is ok, see findThread, it deals with threads without TLS set.
          */
         if (!is_vthread) {
-          //setThreadLocalStorage(node->thread, (void*)node);
+          setThreadLocalStorage(node->thread, (void*)node);
         }
 
         if (is_vthread) {
