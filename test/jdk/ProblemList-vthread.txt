@@ -62,6 +62,10 @@ java/util/stream/test/org/openjdk/tests/java/util/stream/mapMultiOpTest.java    
 jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
 sun/util/resources/cldr/TimeZoneNamesTest.java                                                  8253918 generic-all
 
+# Failed because of known bug but reproduced only in loom-tier3 with wrapper only now
+java/lang/invoke/MethodHandles/CatchExceptionTest.java                                          8146623 generic-all
+
+
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
 #
