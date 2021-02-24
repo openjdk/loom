@@ -46,6 +46,11 @@ class EPollPoller extends Poller {
     }
 
     @Override
+    int fdVal() {
+        return epfd;
+    }
+
+    @Override
     void implRegister(int fdVal) throws IOException {
         // re-arm
         int err = EPoll.ctl(epfd, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));

@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.stream.Stream;
 
 import jdk.internal.module.ServicesCatalog;
@@ -407,7 +408,10 @@ public interface JavaLangAccess {
     void parkVirtualThread(long nanos);
 
     /**
-     * Unparks the given virtual thread.
+     * Unparks a virtual thread.
+     * @param tryPush true to push the thread's task to the current carrier thread's
+     *     work queue when invoked from a virtual thread.
+     * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
-    void unparkVirtualThread(Thread thread);
+    void unparkVirtualThread(Thread thread, boolean tryPush);
 }

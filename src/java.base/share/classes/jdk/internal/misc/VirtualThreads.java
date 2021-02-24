@@ -26,6 +26,7 @@
 package jdk.internal.misc;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.RejectedExecutionException;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
@@ -88,9 +89,21 @@ public final class VirtualThreads {
     }
 
     /**
-     * Unparks a virtual thread.
+     * Unparks a virtual thread. The thread's task is pushed to the current carrier
+     * thread's work queue when invoked from a virtual thread.
+     * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     public static void unpark(Thread thread) {
-        JLA.unparkVirtualThread(thread);
+        JLA.unparkVirtualThread(thread, true);
+    }
+
+    /**
+     * Unparks a virtual thread.
+     * @param tryPush true to push the thread's task to the current carrier thread's
+     *     work queue when invoked from a virtual thread.
+     * @throws RejectedExecutionException if the scheduler cannot accept a task
+     */
+    public static void unpark(Thread thread, boolean tryPush) {
+        JLA.unparkVirtualThread(thread, tryPush);
     }
 }

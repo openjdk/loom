@@ -44,6 +44,11 @@ class KQueuePoller extends Poller {
     }
 
     @Override
+    int fdVal() {
+        return kqfd;
+    }
+
+    @Override
     void implRegister(int fdVal) throws IOException {
         int err = KQueue.register(kqfd, fdVal, filter, (EV_ADD|EV_ONESHOT));
         if (err != 0)

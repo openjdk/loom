@@ -247,13 +247,13 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler. If externalExecuteTask
-     * is true then it pushes the task to the current carrier thread's work queue.
+     * Submits the runContinuation task to the scheduler. If {@code tryPush} is true
+     * then it pushes the task to the current carrier thread's work queue if possible.
      * @throws RejectedExecutionException
      */
-    private void submitRunContinuation(boolean externalExecuteTask) {
+    private void submitRunContinuation(boolean tryPush) {
         try {
-            if (externalExecuteTask && scheduler == DEFAULT_SCHEDULER) {
+            if (tryPush && (scheduler == DEFAULT_SCHEDULER)) {
                 ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER, runContinuation);
             } else {
                 scheduler.execute(runContinuation);
@@ -573,7 +573,7 @@ class VirtualThread extends Thread {
         // need to switch to carrier thread to avoid nested parking
         carrier.setCurrentThread(carrier);
         try {
-            return UNPARKER.schedule(this::unpark, nanos, NANOSECONDS);
+            return UNPARKER.schedule(() -> unpark(), nanos, NANOSECONDS);
         } finally {
             carrier.setCurrentThread(this);
         }
@@ -602,14 +602,15 @@ class VirtualThread extends Thread {
      * {@link #park() parked} then it will be unblocked, otherwise its next call
      * to {@code park} or {@linkplain #parkNanos(long) parkNanos} is guaranteed
      * not to block.
-     *
+     * @param tryPush true to push the task to the current carrier thread's work queue
+     *     when invoked from a virtual thread
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
-    void unpark() {
+    void unpark(boolean tryPush) {
         if (!getAndSetParkPermit(true) && Thread.currentThread() != this) {
             int s = state();
             if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
-                submitRunContinuation();
+                submitRunContinuation(tryPush);
             } else if (s == PINNED) {
                 // signal pinned thread so that it continues
                 final ReentrantLock lock = getLock();
@@ -623,6 +624,15 @@ class VirtualThread extends Thread {
                 }
             }
         }
+    }
+
+    /**
+     * Re-enables this virtual thread for scheduling. The task is pushed to the
+     * current carrier thread's work queue when invoked from a virtual thread.
+     * @throws RejectedExecutionException if the scheduler cannot accept a task
+     */
+    private void unpark() {
+        unpark(true);
     }
 
     /**
