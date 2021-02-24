@@ -778,9 +778,17 @@ public class Thread implements Runnable {
 
         /**
          * Sets the thread name to be the concatenation of a string prefix and
-         * a counter value.
+         * the string representation of a counter value. The counter's initial
+         * value is {@code start}. It is incremented after a {@code Thread} is
+         * created with this builder so that the next thread is named with
+         * the new counter value. A {@code ThreadFactory} created with this
+         * builder is seeded with the current value of the counter. The {@code
+         * ThreadFactory} increments its copy of the counter after {@link
+         * ThreadFactory#newThread(Runnable) newThread} is used to create a
+         * {@code Thread}.
+         *
          * @param prefix thread name prefix
-         * @param start counter start
+         * @param start the starting value of the counter
          * @return this builder
          * @throws IllegalArgumentException if count is negative
          */
