@@ -98,8 +98,8 @@ jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
 ####
 # Other virtual threads tests, failing with wrapper
 
-java/lang/Thread/virtual/NioChannels.java#0
-java/lang/Thread/virtual/NioChannels.java#1
+java/lang/Thread/virtual/NioChannels.java#id0
+java/lang/Thread/virtual/NioChannels.java#id1
 
 
 ####
