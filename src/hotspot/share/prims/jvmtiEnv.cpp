@@ -151,19 +151,24 @@ JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
   JvmtiThreadState* state = NULL;
   oop thread_obj = NULL;
 
+  JvmtiVTMTDisabler vtmt_disabler;
   if (thread == NULL) {
     java_thread = JavaThread::current();
     state = java_thread->jvmti_thread_state();
   } else {
     ThreadsListHandle tlh;
-    JvmtiVTMTDisabler vtmt_disabler;
-
     err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
+    state = java_lang_Thread::jvmti_thread_state(thread_obj);
   }
   if (state == NULL) {
+    if (data == NULL) {
+      // leaving state unset same as data set to NULL
+      return JVMTI_ERROR_NONE;
+    }
+    // otherwise, create the state
     state = JvmtiThreadState::state_for(java_thread, thread_obj);
     if (state == NULL) {
       return JVMTI_ERROR_THREAD_NOT_ALIVE;
