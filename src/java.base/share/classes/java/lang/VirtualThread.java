@@ -663,7 +663,13 @@ class VirtualThread extends Thread {
                 return (state() == TERMINATED);
             }
         } finally {
-            lock.unlock();
+            // Unlike synchronized/wait, the Condition.await() method does not
+            // necessarily reacquire the lock on exit, for example if the thread
+            // is stopped or if CTRL+C is caused in jshell. In that case we
+            // would enter the finally block without the lock held and unlocking
+            // would cause an IllegalMonitorStateException
+            if (lock.isHeldByCurrentThread())
+                lock.unlock();
         }
     }
 
