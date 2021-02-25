@@ -41,6 +41,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.IllegalCharsetNameException;
+import java.nio.charset.UnsupportedCharsetException;
 import jdk.internal.misc.InternalLock;
 
 public class StreamDecoder extends Reader {
@@ -71,13 +72,14 @@ public class StreamDecoder extends Reader {
         throws UnsupportedEncodingException
     {
         String csn = charsetName;
-        if (csn == null)
+        if (csn == null) {
             csn = Charset.defaultCharset().name();
+        }
         try {
-            if (Charset.isSupported(csn))
-                return new StreamDecoder(in, lock, Charset.forName(csn));
-        } catch (IllegalCharsetNameException x) { }
-        throw new UnsupportedEncodingException (csn);
+            return new StreamDecoder(in, lock, Charset.forName(csn));
+        } catch (IllegalCharsetNameException | UnsupportedCharsetException x) {
+            throw new UnsupportedEncodingException (csn);
+        }
     }
 
     public static StreamDecoder forInputStreamReader(InputStream in,
@@ -276,9 +278,9 @@ public class StreamDecoder extends Reader {
 
     StreamDecoder(InputStream in, Object lock, Charset cs) {
         this(in, lock,
-         cs.newDecoder()
-         .onMalformedInput(CodingErrorAction.REPLACE)
-         .onUnmappableCharacter(CodingErrorAction.REPLACE));
+            cs.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE));
     }
 
     StreamDecoder(InputStream in, Object lock, CharsetDecoder dec) {
@@ -318,7 +320,6 @@ public class StreamDecoder extends Reader {
                 int pos = bb.position();
                 assert (pos <= lim);
                 int rem = (pos <= lim ? lim - pos : 0);
-                assert rem > 0;
                 int n = in.read(bb.array(), bb.arrayOffset() + pos, rem);
                 if (n < 0)
                     return n;
@@ -384,8 +385,9 @@ public class StreamDecoder extends Reader {
         }
 
         if (cb.position() == 0) {
-            if (eof)
+            if (eof) {
                 return -1;
+            }
             assert false;
         }
         return cb.position();
@@ -400,7 +402,7 @@ public class StreamDecoder extends Reader {
     private boolean inReady() {
         try {
             return (((in != null) && (in.available() > 0))
-                || (ch instanceof FileChannel)); // ## RBC.available()?
+                    || (ch instanceof FileChannel)); // ## RBC.available()?
         } catch (IOException x) {
             return false;
         }
@@ -417,5 +419,4 @@ public class StreamDecoder extends Reader {
             in.close();
         }
     }
-
 }

@@ -37,6 +37,7 @@ import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.IllegalCharsetNameException;
+import java.nio.charset.UnsupportedCharsetException;
 import jdk.internal.misc.InternalLock;
 
 public final class StreamEncoder extends Writer {
@@ -58,13 +59,14 @@ public final class StreamEncoder extends Writer {
         throws UnsupportedEncodingException
     {
         String csn = charsetName;
-        if (csn == null)
+        if (csn == null) {
             csn = Charset.defaultCharset().name();
+        }
         try {
-            if (Charset.isSupported(csn))
-                return new StreamEncoder(out, lock, Charset.forName(csn));
-        } catch (IllegalCharsetNameException x) { }
-        throw new UnsupportedEncodingException (csn);
+            return new StreamEncoder(out, lock, Charset.forName(csn));
+        } catch (IllegalCharsetNameException | UnsupportedCharsetException x) {
+            throw new UnsupportedEncodingException (csn);
+        }
     }
 
     public static StreamEncoder forOutputStreamWriter(OutputStream out,
@@ -260,9 +262,9 @@ public final class StreamEncoder extends Writer {
 
     private StreamEncoder(OutputStream out, Object lock, Charset cs) {
         this(out, lock,
-         cs.newEncoder()
-         .onMalformedInput(CodingErrorAction.REPLACE)
-         .onUnmappableCharacter(CodingErrorAction.REPLACE));
+            cs.newEncoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE));
     }
 
     private StreamEncoder(OutputStream out, Object lock, CharsetEncoder enc) {
