@@ -33,7 +33,6 @@
  * TODO:
  *  -- verify that TLS is not NULL (not possible to do with jvmti, ThreadStart might be called too late)
  *  -- add more events where TLS is set *first time*, it is needed to test lazily jvmtThreadState init
- *  -- support virtual threads
  *  -- set/get TLS from other JavaThreads (not from agent and current thread)
  *  -- set/get for suspened (blocked?) threads
  *  -- split test to "sanity" and "stress" version
@@ -47,19 +46,29 @@
 
 import jdk.test.lib.jvmti.DebugeeClass;
 
+import java.util.ArrayList;
+import java.util.concurrent.locks.LockSupport;
+
 
 public class SetGetThreadLocalStorageStressTest extends DebugeeClass {
+
+    static final int DEFAULT_ITERATIONS = 10;
 
     static {
         System.loadLibrary("SetGetThreadLocalStorageStress");
     }
 
-
     static int status = DebugeeClass.TEST_PASSED;
 
     public static void main(String argv[]) throws InterruptedException {
-        int size = 10;
-        int threadNum = Runtime.getRuntime().availableProcessors();
+        int size = DEFAULT_ITERATIONS;
+        int kernelThreadNum = Runtime.getRuntime().availableProcessors() / 4;
+        int virtualThreadNum = Runtime.getRuntime().availableProcessors();
+
+        if (kernelThreadNum == 0) {
+            kernelThreadNum = 2;
+        }
+
         if (argv.length > 0) {
             size = Integer.parseInt(argv[0]);
         }
@@ -69,15 +78,22 @@ public class SetGetThreadLocalStorageStressTest extends DebugeeClass {
 
         long uniqID = 0;
         for (int c = 0; c < size; c++) {
-            Thread[] threads = new Thread[threadNum];
-            for (int i = 0; i < threadNum; i++) {
+            ArrayList<Thread> threads = new ArrayList<>(kernelThreadNum + virtualThreadNum);
+            for (int i = 0; i < kernelThreadNum; i++) {
                 TaskMonitor task = new TaskMonitor();
-                threads[i] = Thread.builder()
+                threads.add(Thread.builder()
                         .task(task)
-                        .name("TestedThread-" + uniqID++)
-                        // TODO add virtual testing
-                        //   .virtual()
-                        .build();
+                        .name("KernelThread-" + uniqID++)
+                        .build());
+            }
+
+            for (int i = 0; i < virtualThreadNum; i++) {
+                TaskMonitor task = new TaskMonitor();
+                threads.add(Thread.builder()
+                        .task(task)
+                        .name("VirtualThread-" + uniqID++)
+                        .virtual()
+                        .build());
             }
 
             for (Thread t : threads) {
@@ -93,25 +109,8 @@ public class SetGetThreadLocalStorageStressTest extends DebugeeClass {
 
 
 class TaskMonitor implements Runnable {
-    public Object startingMonitor = new Object();
-    public Object runningMonitor = new Object();
-    public Object endingMonitor = new Object();
 
-    // run thread continuously
     public void run() {
-        // notify about starting
-        synchronized (startingMonitor) {
-            startingMonitor.notifyAll();
-        }
-
-        // notify about running
-        synchronized (runningMonitor) {
-            runningMonitor.notifyAll();
-        }
-
-        // wait for finish permit
-        synchronized (endingMonitor) {
-            // just finish
-        }
+        LockSupport.parkNanos(1);
     }
 }

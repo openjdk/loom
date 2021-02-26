@@ -26,18 +26,13 @@
 #include <jvmti_common.h>
 #include <jvmti_thread.h>
 
-extern "C" {
-
-/* scaffold objects */
-static jlong timeout = 0;
 
 /* constant names */
 #define THREAD_NAME     "TestedThread"
 
 /* constants */
 #define STORAGE_DATA_SIZE       1024
-
-const char* MAIN_THREAD_NAME = "main";
+#define THREAD_NAME_LENGTH      100
 
 /* storage structure */
 typedef struct _StorageStructure {
@@ -45,47 +40,83 @@ typedef struct _StorageStructure {
   char data[STORAGE_DATA_SIZE];
 } StorageStructure;
 
-StorageStructure* init(jvmtiEnv * jvmti, JNIEnv * jni, const char name[]) {
+StorageStructure* check_tls(jvmtiEnv * jvmti, JNIEnv * jni, jthread thread, const char* source) {
+  jvmtiThreadInfo thread_info;
+  check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo");
+
+  StorageStructure *storage;
+
+  jvmtiError err = jvmti->GetThreadLocalStorage(thread, (void **) &storage);
+  if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
+    return NULL;
+  }
+  check_jvmti_status(jni, err, "Error in GetThreadLocalStorage");
+  printf("Check %s with %p in %s\n", thread_info.name, storage, source);
+  fflush(0);
+
+  if (storage == NULL) {
+    // Might be not set
+    return NULL;
+  }
+
+  if (storage->self_pointer != storage || (strcmp(thread_info.name, storage->data) != 0)) {
+    printf("Unexpected value in storage storage=%p, the self_pointer=%p, data (owner thread name): %s\n",
+           storage, storage->self_pointer, storage->data);
+    print_thread_info(jni, jvmti, thread);
+    jni->FatalError("Incorrect value in storage.");
+  }
+  return storage;
+}
+
+void check_delete_tls(jvmtiEnv * jvmti, JNIEnv * jni, jthread thread, const char* source) {
+  StorageStructure *storage = check_tls(jvmti, jni, thread, source);
+
+  if (storage == NULL) {
+    return;
+  }
+
+  check_jvmti_status(jni, jvmti->Deallocate((unsigned char *)storage), "Deallocation failed.");
+  jvmtiError err = jvmti->SetThreadLocalStorage(thread, NULL);
+  if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
+    return;
+  }
+  check_jvmti_status(jni, err, "Error in SetThreadLocalStorage");
+}
+
+
+void check_reset_tls(jvmtiEnv * jvmti, JNIEnv * jni, jthread thread, const char* source) {
+  check_delete_tls(jvmti, jni, thread, source);
+  jvmtiThreadInfo thread_info;
+  check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo");
+
   unsigned char *tmp;
   check_jvmti_status(jni, jvmti->Allocate(sizeof(StorageStructure), &tmp), "Allocation failed.");
 
   StorageStructure* storage = (StorageStructure *)tmp;
 
-// Fill data
+  printf("Init %s with %p in %s\n", thread_info.name, storage, source);
+  fflush(0);
+
+  // Fill data
   storage->self_pointer = storage;
-  strncpy(storage->data, name, 100);
-
-  return (StorageStructure*) tmp;
-}
-
-void check(jvmtiEnv * jvmti, JNIEnv * jni, jthread thread, StorageStructure* storage, const char name[]) {
-  if (storage == NULL) {
-    jvmtiThreadInfo thread_info;
-    check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo");
-//    if (strncmp(THREAD_NAME, thread_info.name, strlen(THREAD_NAME)) == 0) {
-//      printf("Error in thread\n");
-//      print_thread_info(jni, jvmti, thread);
-//      jni->FatalError("Unexpected NULL for initialized storage");
-//    }
+  strncpy(storage->data, thread_info.name, THREAD_NAME_LENGTH);
+  jvmtiError err = jvmti->SetThreadLocalStorage(thread, (void *) storage);
+  if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
     return;
   }
+  check_jvmti_status(jni, err, "Error in SetThreadLocalStorage");
 
-  if (storage->self_pointer != storage || (strcmp(name, storage->data) != 0)) {
-    printf("Unexpected value in storage storage=%p, the self_pointer=%p, date (current thread name): %s\n",
-           storage, storage->self_pointer, storage->data);
-    print_thread_info(jni, jvmti, thread);
-    jni->FatalError("Incorrect value in storage.");
-  }
-  check_jvmti_status(jni, jvmti->Deallocate((unsigned char *)storage), "Deallocation failed.");
+  check_tls(jvmti, jni, thread, "check_reset_tls");
 }
 
-
 jrawMonitorID monitor;
-int main_thread_still_running = true;
+int is_vm_running = false;
 
 /** Agent algorithm. */
 static void JNICALL
 agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
+  /* scaffold objects */
+  static jlong timeout = 0;
   printf("Wait for thread to start\n");
   if (!nsk_jvmti_waitForSync(timeout))
     return;
@@ -97,7 +128,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     jthread *threads = NULL;
     jint count = 0;
     RawMonitorEnter(jni, jvmti, monitor);
-    if (!main_thread_still_running) {
+    if (!is_vm_running) {
       RawMonitorExit(jni, jvmti, monitor);
       return;
     }
@@ -105,6 +136,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     for (int i = 0; i < count; i++) {
       jthread testedThread = NULL;
       jvmtiError err;
+
 
       err = jvmti->GetVirtualThread(threads[i], &testedThread);
       if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
@@ -114,74 +146,91 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
 
       if (testedThread == NULL) {
         testedThread = threads[i];
-      }
-
-      StorageStructure *obtainedStorage;
-      //printf("GetThreadLocalStorage() for tested thread\n");
-      err = jvmti->GetThreadLocalStorage(testedThread, (void **) &obtainedStorage);
-
-      if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
         continue;
       }
 
-      check_jvmti_status(jni, err, "Error in GetThreadLocalStorage");
+      check_reset_tls(jvmti, jni, testedThread, "agentThread");
 
-      jvmtiThreadInfo thread_info;
-      check_jvmti_status(jni, jvmti->GetThreadInfo(testedThread, &thread_info), "Error in GetThreadInfo");
-
-      check(jvmti, jni, testedThread, obtainedStorage, thread_info.name);
-
-      // Set for next iteration
-      StorageStructure *initialStorage = init(jvmti, jni, thread_info.name);
-
-      err = jvmti->SetThreadLocalStorage(testedThread, (void *) initialStorage);
-      if (err != JVMTI_ERROR_THREAD_NOT_ALIVE) {
-        check_jvmti_status(jni, err, "Error in SetThreadLocalStorage");
-      }
     }
     RawMonitorExit(jni, jvmti, monitor);
-    check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) threads), "");
+    check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) threads), "Error Deallocating memory.");
   }
 
 }
 
 /** callback functions **/
+void JNICALL VMInit(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
+  RawMonitorEnter(jni, jvmti, monitor);
+  printf("Starting ...\n");
+  is_vm_running = true;
+  RawMonitorExit(jni, jvmti, monitor);
+}
+
 void JNICALL VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
   RawMonitorEnter(jni, jvmti, monitor);
-  printf("Exiting....");
-  main_thread_still_running = false;
+  printf("Exiting ...\n");
+  is_vm_running = false;
   RawMonitorExit(jni, jvmti, monitor);
 }
 
 void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   RawMonitorEnter(jni, jvmti, monitor);
-  if (main_thread_still_running) {
-    jvmtiThreadInfo thread_info;
-    check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo");
-    StorageStructure *initialStorage = init(jvmti, jni, thread_info.name);
-  //  printf("Setting initial thread storage: %p for ",(void *) initialStorage); print_thread_info(jni, jvmti, thread);
-    check_jvmti_status(jni, jvmti->SetThreadLocalStorage(thread, (void *) initialStorage), "Error in SetThreadLocalStorage");
+  if (is_vm_running) {
+    check_reset_tls(jvmti, jni, thread, "ThreadStart");
   }
   RawMonitorExit(jni, jvmti, monitor);
 }
 
 void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   RawMonitorEnter(jni, jvmti, monitor);
-  if (main_thread_still_running) {
-    StorageStructure *obtainedStorage;
-    jvmtiThreadInfo thread_info;
-    check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo");
-  //  printf("Final testing of thread storage: %p for ",(void *) thread); print_thread_info(jni, jvmti, thread);
-    check_jvmti_status(jni,  jvmti->GetThreadLocalStorage(thread, (void **) &obtainedStorage), "Error in GetThreadLocalStorage");
-    check_jvmti_status(jni,  jvmti->SetThreadLocalStorage(thread, NULL), "Error in SetThreadLocalStorage");
-    check(jvmti, jni, thread, obtainedStorage, thread_info.name);
+  if (is_vm_running) {
+    check_reset_tls(jvmti, jni, thread, "ThreadEnd");
+  }
+  RawMonitorExit(jni, jvmti, monitor);
+}
+
+void JNICALL
+MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
+  fflush(0);
+  int p = ((long) method / 128 % 100);
+  if (p < 1) {
+    RawMonitorEnter(jni, jvmti, monitor);
+    if (is_vm_running) {
+      jvmtiThreadInfo thread_info;
+      check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo11");
+      if (strcmp("main", thread_info.name) == 0) {
+        // Skip main() method entries
+        RawMonitorExit(jni, jvmti, monitor);
+        return;
+      }
+      check_reset_tls(jvmti, jni, thread, "MethodEntry");
+    }
+    RawMonitorExit(jni, jvmti, monitor);
+  }
+}
+
+
+static void JNICALL
+VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
+  RawMonitorEnter(jni, jvmti, monitor);
+  if (is_vm_running) {
+    check_reset_tls(jvmti, jni, vthread, "VirtualThreadScheduled");
+  }
+  RawMonitorExit(jni, jvmti, monitor);
+}
+
+static void JNICALL
+VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
+  RawMonitorEnter(jni, jvmti, monitor);
+  if (is_vm_running) {
+    check_reset_tls(jvmti, jni, vthread, "VirtualThreadTerminated");
   }
   RawMonitorExit(jni, jvmti, monitor);
 }
 
 /* ============================================================================= */
 
-jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEnv * jvmti = NULL;
 
   jvmtiEventCallbacks callbacks;
@@ -201,6 +250,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   /* add capability to generate compiled method events */
   memset(&caps, 0, sizeof(jvmtiCapabilities));
   caps.can_support_virtual_threads = 1;
+  caps.can_generate_method_entry_events = 1;
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("(AddCapabilities) unexpected error: %s (%d)\n",
@@ -218,18 +268,26 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   /* set event callback */
   printf("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
+  callbacks.VMInit = &VMInit;
   callbacks.VMDeath = &VMDeath;
   callbacks.ThreadStart = &ThreadStart;
   callbacks.ThreadEnd = &ThreadEnd;
+  callbacks.MethodEntry = &MethodEntry;
+  callbacks.VirtualThreadScheduled = &VirtualThreadScheduled;
+  callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
+
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
+  jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_INIT, NULL);
   jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_DEATH, NULL);
   jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_START, NULL);
   jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_END, NULL);
+  jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
+  jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL);
 
-
+  //jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_METHOD_ENTRY, NULL);
 
   err = init_agent_data(jvmti, &agent_data);
   if (err != JVMTI_ERROR_NONE) {
@@ -240,22 +298,6 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (nsk_jvmti_setAgentProc(agentProc, NULL) != NSK_TRUE) {
     return JNI_ERR;
   }
-
-
   return JNI_OK;
-  }
-
-/* ============================================================================= */
-
 }
 
-
-JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-  return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
-  return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNI_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-  return JNI_VERSION_9;
-}
