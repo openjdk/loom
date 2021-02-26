@@ -188,7 +188,7 @@ void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   }
   RawMonitorExit(jni, jvmti, monitor);
 }
-
+/*
 void JNICALL
 MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
   fflush(0);
@@ -208,7 +208,7 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
     RawMonitorExit(jni, jvmti, monitor);
   }
 }
-
+*/
 
 static void JNICALL
 VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
@@ -272,7 +272,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.VMDeath = &VMDeath;
   callbacks.ThreadStart = &ThreadStart;
   callbacks.ThreadEnd = &ThreadEnd;
-  callbacks.MethodEntry = &MethodEntry;
+ // callbacks.MethodEntry = &MethodEntry;
   callbacks.VirtualThreadScheduled = &VirtualThreadScheduled;
   callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
 
