@@ -31,20 +31,6 @@ static jvmtiEnv *jvmti = NULL;
 static volatile jboolean is_completed_test_in_event = JNI_FALSE;
 
 static void
-fatal(JNIEnv* jni, const char* msg) {
-  jni->FatalError(msg);
-  fflush(stdout);
-}
-
-static void
-check(JNIEnv* jni, const char* msg, jvmtiError err) {
-  if (err != JVMTI_ERROR_NONE) {
-    printf("%s failed with error code %d\n", msg, err);
-    fatal(jni, msg);
-  }
-}
-
-static void
 check_jvmti_error_invalid_thread(JNIEnv* jni, const char* msg, jvmtiError err) {
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     printf("%s failed: expected JVMTI_ERROR_INVALID_THREAD instead of: %d\n", msg, err);
@@ -78,7 +64,7 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
   }
 
   err = jvmti->GetCapabilities(&caps);
-  check(jni, "GetCapabilities", err);
+  check_jvmti_status(jni, err, "GetCapabilities");
 
   if (caps.can_support_virtual_threads != JNI_TRUE) {
     fatal(jni, "Virtual threads are not supported");
@@ -117,12 +103,12 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
   fflush(0);
 
   err = jvmti->GetCurrentThread(&cthread);
-  check(jni, "GetCurrentThread", err);
+  check_jvmti_status(jni, err, "GetCurrentThread");
   printf("\n#### GetCurrentThread returned thread: %p\n", (void*)cthread);
   fflush(0);
 
   err = jvmti->GetAllThreads(&threads_count, &threads);
-  check(jni, "GetAllThreads", err);
+  check_jvmti_status(jni, err, "GetAllThreads");
 
   for (int thread_idx = 0; thread_idx < (int) threads_count; thread_idx++) {
     jthread thread = threads[thread_idx];
@@ -130,7 +116,7 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
 
     jvmtiThreadInfo thr_info;
     jvmtiError err = jvmti->GetThreadInfo(thread, &thr_info);
-    check(jni, "GetThreadInfo", err);
+    check_jvmti_status(jni, err, "GetThreadInfo");
 
     const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
     if (jni->IsSameObject(cthread, thread) == JNI_TRUE) {
@@ -140,23 +126,23 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
     if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
       continue;
     }
-    check(jni, "SuspendThread", err);
+    check_jvmti_status(jni, err, "SuspendThread");
 
     err = jvmti->GetVirtualThread(thread, &vthread);
     if (err == JVMTI_ERROR_THREAD_NOT_SUSPENDED) {
       // Some system threads might not fully suspended. so just skip them
       err = jvmti->ResumeThread(thread);
-      check(jni, "ResumeThread", err);
+      check_jvmti_status(jni, err, "ResumeThread");
       continue;
     }
-    check(jni, "GetVirtualThread", err);
+    check_jvmti_status(jni, err, "GetVirtualThread");
     if (vthread != NULL) {
       printf("\n#### Found carrier thread: %s\n", thr_name);
       fflush(stdout);
       test_unsupported_jvmti_functions(jvmti, jni, vthread);
     }
     err = jvmti->ResumeThread(thread);
-    check(jni, "ResumeThread", err);
+    check_jvmti_status(jni, err, "ResumeThread");
   }
   printf("testJvmtiFunctionsInJNICall: finished\n");
   fflush(0);

@@ -47,55 +47,6 @@ unlock_events() {
   jvmti->RawMonitorExit(event_mon);
 }
 
-static jclass
-find_class(JNIEnv *jni, jobject loader, const char* cname) {
-  jclass *classes = NULL;
-  jint count = 0;
-  jvmtiError err;
-
-  err = jvmti->GetClassLoaderClasses(loader, &count, &classes);
-  check_jvmti_status(jni, err, "find_class: error in JVMTI GetClassLoaderClasses");
-
-  // Find the jmethodID of the specified method
-  while (--count >= 0) {
-    char* name = NULL;
-    jclass klass = classes[count];
-
-    err = jvmti->GetClassSignature(klass, &name, NULL);
-    check_jvmti_status(jni, err, "find_class: error in JVMTI GetClassSignature call");
-
-    if (strcmp(name, cname) == 0) {
-      printf("found class %s\n", cname); fflush(0);
-      return klass;
-    }
-  }
-  return NULL;
-}
-
-static jmethodID
-find_method(JNIEnv *jni, jclass klass, const char* mname) { jmethodID *methods = NULL;
-  jint count = 0;
-  jvmtiError err;
-
-  err = jvmti->GetClassMethods(klass, &count, &methods);
-  check_jvmti_status(jni, err, "find_method: error in JVMTI GetClassMethods");
-
-  // Find the jmethodID of the specified method
-  while (--count >= 0) {
-    char* name = NULL;
-    jmethodID method = methods[count];
-
-    err = jvmti->GetMethodName(method, &name, NULL, NULL);
-    check_jvmti_status(jni, err, "find_method: error in JVMTI GetMethodName call");
-
-    if (strcmp(name, mname) == 0) {
-      printf("found method %s\n", mname); fflush(0);
-      return method;
-    }
-  }
-  return NULL;
-}
-
 static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
                        const char* event_name, int event_count) {
@@ -144,7 +95,7 @@ set_breakpoint(JNIEnv *jni, jclass klass, const char *mname)
   jvmtiError err;
 
   // Find the jmethodID of the specified method
-  method = find_method(jni, klass, mname);
+  method = find_method(jvmti, jni, klass, mname);
 
   if (method == NULL) {
     jni->FatalError("Error in set_breakpoint: not found method");
@@ -363,8 +314,8 @@ Java_BreakpointInYieldTest_enableEvents(JNIEnv *jni, jclass klass, jthread threa
 
   printf("enableEvents: started\n");
 
-  jclass k1 = find_class(jni, NULL, "Ljava/lang/VirtualThread;");
-  jclass k2 = find_class(jni, NULL, "Ljava/lang/Continuation;");
+  jclass k1 = find_class(jvmti, jni, NULL, "Ljava/lang/VirtualThread;");
+  jclass k2 = find_class(jvmti, jni, NULL, "Ljava/lang/Continuation;");
   if (k1 == NULL || k2 == NULL) {
     jni->FatalError("Did not find one of the classes by name: VirtualThread or Continuation");
   }

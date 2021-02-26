@@ -74,6 +74,12 @@ char *jlong_to_string(jlong value, char *string) {
   return string;
 }
 
+static void fatal(JNIEnv* jni, const char* msg) {
+  jni->FatalError(msg);
+  fflush(stdout);
+}
+
+
 static void check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
   if (err != JVMTI_ERROR_NONE) {
     printf("check_jvmti_status: JVMTI function returned error: %s (%d)\n", TranslateError(err), err);
@@ -197,6 +203,55 @@ print_stack_trace_frames(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInf
     print_method(jvmti, jni, frames[depth].method, depth);
   }
   printf("\n");
+}
+
+static jclass
+find_class(jvmtiEnv *jvmti, JNIEnv *jni, jobject loader, const char* cname) {
+  jclass *classes = NULL;
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetClassLoaderClasses(loader, &count, &classes);
+  check_jvmti_status(jni, err, "find_class: error in JVMTI GetClassLoaderClasses");
+
+  // Find the jmethodID of the specified method
+  while (--count >= 0) {
+    char* name = NULL;
+    jclass klass = classes[count];
+
+    err = jvmti->GetClassSignature(klass, &name, NULL);
+    check_jvmti_status(jni, err, "find_class: error in JVMTI GetClassSignature call");
+
+    if (strcmp(name, cname) == 0) {
+      printf("found class %s\n", cname); fflush(0);
+      return klass;
+    }
+  }
+  return NULL;
+}
+
+static jmethodID
+find_method(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass, const char* mname) { jmethodID *methods = NULL;
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetClassMethods(klass, &count, &methods);
+  check_jvmti_status(jni, err, "find_method: error in JVMTI GetClassMethods");
+
+  // Find the jmethodID of the specified method
+  while (--count >= 0) {
+    char* name = NULL;
+    jmethodID method = methods[count];
+
+    err = jvmti->GetMethodName(method, &name, NULL, NULL);
+    check_jvmti_status(jni, err, "find_method: error in JVMTI GetMethodName call");
+
+    if (strcmp(name, mname) == 0) {
+      printf("found method %s\n", mname); fflush(0);
+      return method;
+    }
+  }
+  return NULL;
 }
 
 
