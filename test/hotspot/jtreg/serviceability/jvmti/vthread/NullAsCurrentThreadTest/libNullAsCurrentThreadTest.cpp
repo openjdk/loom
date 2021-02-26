@@ -33,12 +33,6 @@ static int vt_support_enabled = 0;
 static jboolean failed_status = JNI_FALSE;
 
 static void
-fatal(JNIEnv* jni, const char* msg) {
-  jni->FatalError(msg);
-  fflush(stdout);
-}
-
-static void
 check(JNIEnv* jni, const char* msg, int err) {
   if (err != JVMTI_ERROR_NONE) {
     printf("Agent: %s failed with error code %d\n", msg, err);

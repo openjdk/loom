@@ -53,12 +53,6 @@ unlock_events() {
   jvmti->RawMonitorExit(events_monitor);
 }
 
-static void
-fatal(JNIEnv* jni, const char* msg) {
-  jni->FatalError(msg);
-  fflush(stdout);
-}
-
 static Tinfo*
 find_tinfo(JNIEnv* jni, const char* thr_name) {
   Tinfo* inf = NULL;
