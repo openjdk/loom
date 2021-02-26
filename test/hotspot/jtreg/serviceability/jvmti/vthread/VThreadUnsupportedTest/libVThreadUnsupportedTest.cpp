@@ -23,6 +23,7 @@
 
 #include <string.h>
 #include "jvmti.h"
+#include "jvmti_common.h"
 
 extern "C" {
 

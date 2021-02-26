@@ -111,6 +111,38 @@ void RawMonitorWait(JNIEnv* jni, jvmtiEnv *env, jrawMonitorID monitor, jlong mil
   check_jvmti_status(jni, env->RawMonitorWait(monitor, millis), "Fatal Error in RawMonitorWait.");
 }
 
+static char* get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
+  jvmtiError err;
+  jclass klass = NULL;
+  char*  cname = NULL;
+
+  err = jvmti->GetMethodDeclaringClass(method, &klass);
+  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetMethodDeclaringClass");
+
+  err = jvmti->GetClassSignature(klass, &cname, NULL);
+  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetClassSignature");
+
+  cname[strlen(cname) - 1] = '\0'; // get rid of trailing ';'
+  return cname + 1;                // get rid of leading 'L'
+}
+
+
+static void
+print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
+  char*  cname = NULL;
+  char*  mname = NULL;
+  char*  msign = NULL;
+  jvmtiError err;
+
+  cname = get_method_class_name(jvmti, jni, method);
+
+  err = jvmti->GetMethodName(method, &mname, &msign, NULL);
+  check_jvmti_status(jni, err, "print_method: error in JVMTI GetMethodName");
+
+  printf("%2d: %s: %s%s\n", depth, cname, mname, msign);
+  fflush(0);
+}
+
 
 void print_thread_info(JNIEnv* jni, jvmtiEnv *jvmti, jthread thread_obj) {
   jvmtiThreadInfo thread_info;
@@ -120,8 +152,53 @@ void print_thread_info(JNIEnv* jni, jvmtiEnv *jvmti, jthread thread_obj) {
   const char* state = TranslateState(thread_state);
   printf("Thread: %p, name: %s, state: %s, attrs: %s %s\n", thread_obj, thread_info.name, TranslateState(thread_state),
          (jni->IsVirtualThread(thread_obj)? "virtual": "kernel"), (thread_info.is_daemon ? "daemon": ""));
-
 }
+
+#define MAX_FRAME_COUNT_PRINT_STACK_TRACE 20
+
+
+static void
+print_current_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni) {
+  jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
+  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
+
+  printf("JVMTI Stack Trace: frame count: %d\n", count);
+  for (int depth = 0; depth < count; depth++) {
+    print_method(jvmti, jni, frames[depth].method, depth);
+  }
+  printf("\n");
+}
+
+
+static void
+print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
+  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
+
+  printf("JVMTI Stack Trace: frame count: %d\n", count);
+  for (int depth = 0; depth < count; depth++) {
+    print_method(jvmti, jni, frames[depth].method, depth);
+  }
+  printf("\n");
+}
+
+static void
+print_stack_trace_frames(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInfo *frames) {
+  printf("JVMTI Stack Trace: frame count: %d\n", count);
+  for (int depth = 0; depth < count; depth++) {
+    print_method(jvmti, jni, frames[depth].method, depth);
+  }
+  printf("\n");
+}
+
 
 /* Commonly used helper functions */
 const char* TranslateState(jint flags) {

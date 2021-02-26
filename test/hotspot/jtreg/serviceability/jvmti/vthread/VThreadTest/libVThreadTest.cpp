@@ -23,6 +23,7 @@
 
 #include <string.h>
 #include "jvmti.h"
+#include "jvmti_common.h"
 
 extern "C" {
 
@@ -78,49 +79,6 @@ find_tinfo(JNIEnv* jni, const char* thr_name) {
     fatal(jni, "find_tinfo: found more than 10 worker threads!");
   }
   return inf; // return slot
-}
-
-static char*
-get_method_class_name(jvmtiEnv *jvmti, JNIEnv *jni, jmethodID method) {
-  jvmtiError err;
-  jclass klass = NULL;
-  char*  cname = NULL;
-
-  err = jvmti->GetMethodDeclaringClass(method, &klass);
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "get_method_class_name: error in JVMTI GetMethodDeclaringClass");
-  }
-  err = jvmti->GetClassSignature(klass, &cname, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "get_method_class_name: error in JVMTI GetClassSignature");
-  }
-  cname[strlen(cname) - 1] = '\0'; // get rid of trailing ';'
-  return cname + 1;                // get rid of leading 'L'
-}
-
-static void
-print_method(jvmtiEnv *jvmti, JNIEnv *jni, jmethodID method, jint depth) {
-  char* cname = NULL;
-  char* mname = NULL;
-  char* msign = NULL;
-  jvmtiError err;
-
-  cname = get_method_class_name(jvmti, jni, method);
-
-  err = jvmti->GetMethodName(method, &mname, &msign, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "print_method: error in JVMTI GetMethodName");
-  }
-  printf("%2d: %s: %s%s\n", depth, cname, mname, msign);
-}
-
-static void
-print_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInfo *frames) {
-  printf("JVMTI Stack Trace: frame count: %d\n", count);
-  for (int depth = 0; depth < count; depth++) {
-    print_method(jvmti, jni, frames[depth].method, depth);
-  }
-  printf("\n");
 }
 
 static jint
@@ -493,7 +451,7 @@ test_GetStackTrace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *ev
     if (count <= 0) {
       fatal(jni, "event handler: JVMTI GetStackTrace with good vthread returned negative frame count\n");
     }
-    print_stack_trace(jvmti, jni, count, frames);
+    print_stack_trace_frames(jvmti, jni, count, frames);
   }
 }
 

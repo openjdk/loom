@@ -23,6 +23,7 @@
 
 #include <string.h>
 #include "jvmti.h"
+#include "jvmti_common.h"
 
 extern "C" {
 
@@ -46,14 +47,6 @@ check(JNIEnv* jni, const char* msg, int err) {
 }
 
 static void
-check_jvmti_error(JNIEnv* jni, const char* msg, int err) {
-  if (err != JVMTI_ERROR_NONE) {
-    printf("Agent: %s failed with error code: %d\n", msg, err);
-    fatal(jni, msg);
-  }
-}
-
-static void
 checkStackTraces(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiFrameInfo* frames0, jvmtiFrameInfo* frames1, jint cnt) {
   jvmtiError err;
 
@@ -68,11 +61,11 @@ checkStackTraces(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiFrameInfo* frames0, jvmtiFra
     char* sign1 = NULL;
 
     err = jvmti->GetMethodName(method0, &name0, &sign0, NULL);
-    check_jvmti_error(jni, "GetMethodName", err);
+    check_jvmti_status(jni, err, "GetMethodName");
 
     if (method0 != method1) {
       err = jvmti->GetMethodName(method1, &name1, &sign1, NULL);
-      check_jvmti_error(jni, "GetMethodName", err);
+      check_jvmti_status(jni, err, "GetMethodName");
 
       failed_status = JNI_TRUE;
       printf("\t methods at frame depth #%d do not match: %s%s != %s%s\n",
@@ -131,10 +124,10 @@ testGetThreadState(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
   jint state1 = 0;
 
   err = jvmti->GetThreadState(NULL, &state0);
-  check_jvmti_error(jni, "GetThreadState", err);
+  check_jvmti_status(jni, err, "GetThreadState");
 
   err = jvmti->GetThreadState(thread, &state1);
-  check_jvmti_error(jni, "GetThreadState", err);
+  check_jvmti_status(jni, err, "GetThreadState");
 
   if (state0 != state1) {
     failed_status = JNI_TRUE;
@@ -152,10 +145,10 @@ testGetFrameCount(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
   jint count1 = 0;
 
   err = jvmti->GetFrameCount(thread, &count0);
-  check_jvmti_error(jni, "GetFrameCount", err);
+  check_jvmti_status(jni, err,"GetFrameCount");
 
   err = jvmti->GetFrameCount(NULL, &count1);
-  check_jvmti_error(jni, "GetFrameCount", err);
+  check_jvmti_status(jni, err,"GetFrameCount");
 
   if (count0 != count1) {
     failed_status = JNI_TRUE;
@@ -180,17 +173,17 @@ testGetFrameLocation(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
   char* sign1 = NULL;
 
   err = jvmti->GetFrameLocation(NULL, DEPTH, &method0, &loc0);
-  check_jvmti_error(jni, "GetFrameLocation", err);
+  check_jvmti_status(jni, err, "GetFrameLocation");
 
   err = jvmti->GetFrameLocation(thread, DEPTH, &method1, &loc1);
-  check_jvmti_error(jni, "GetFrameLocation", err);
+  check_jvmti_status(jni, err, "GetFrameLocation");
 
   err = jvmti->GetMethodName(method0, &name0, &sign0, NULL);
-  check_jvmti_error(jni, "GetMethodName", err);
+  check_jvmti_status(jni, err, "GetMethodName");
 
   if (method0 != method1) {
     err = jvmti->GetMethodName(method1, &name1, &sign1, NULL);
-    check_jvmti_error(jni, "GetMethodName", err);
+    check_jvmti_status(jni, err, "GetMethodName");
 
     failed_status = JNI_TRUE;
     printf("Agent: GetFrameLocation: current thread frame #1 methods do not match:\n"
@@ -208,8 +201,8 @@ testGetFrameLocation(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
 static void
 testGetStackTrace(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
   jvmtiError err;
-  jvmtiFrameInfo frames0[MAX_FRAME_CNT]; 
-  jvmtiFrameInfo frames1[MAX_FRAME_CNT]; 
+  jvmtiFrameInfo frames0[MAX_FRAME_CNT];
+  jvmtiFrameInfo frames1[MAX_FRAME_CNT];
   jint count0 = 0;
   jint count1 = 0;
 
@@ -217,10 +210,10 @@ testGetStackTrace(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
   memset(frames1, 0, sizeof(frames1));
 
   err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_CNT, frames0, &count0);
-  check_jvmti_error(jni, "GetStackTrace", err);
+  check_jvmti_status(jni, err, "GetStackTrace");
 
   err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_CNT, frames1, &count1);
-  check_jvmti_error(jni, "GetStackTrace", err);
+  check_jvmti_status(jni, err, "GetStackTrace");
 
   if (count0 != count1) {
     failed_status = JNI_TRUE;
@@ -235,14 +228,14 @@ testGetOwnedMonitorInfo(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
   jvmtiError err;
   jint count0 = 0;
   jint count1 = 0;
-  jobject* monitors0 = NULL; 
-  jobject* monitors1 = NULL; 
+  jobject* monitors0 = NULL;
+  jobject* monitors1 = NULL;
 
   err = jvmti->GetOwnedMonitorInfo(thread, &count0, &monitors0);
-  check_jvmti_error(jni, "GetOwnedMonitorInfo", err);
+  check_jvmti_status(jni, err, "GetOwnedMonitorInfo");
 
   err = jvmti->GetOwnedMonitorInfo(thread, &count1, &monitors1);
-  check_jvmti_error(jni, "GetOwnedMonitorInfo", err);
+  check_jvmti_status(jni, err, "GetOwnedMonitorInfo");
 
   if (count0 != count1) {
     failed_status = JNI_TRUE;
@@ -261,10 +254,10 @@ testGetOwnedMonitorInfo(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
     printf("\t monitor #%d: %p\n", idx, (void*)mon0);
   }
   err = jvmti->Deallocate((unsigned char*)monitors0);
-  check_jvmti_error(jni, "Deallocate", err);
+  check_jvmti_status(jni, err, "Deallocate");
 
   err = jvmti->Deallocate((unsigned char*)monitors1);
-  check_jvmti_error(jni, "Deallocate", err);
+  check_jvmti_status(jni, err, "Deallocate");
 }
 
 static void
@@ -272,14 +265,14 @@ testGetOwnedMonitorStackDepthInfo(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) 
   jvmtiError err;
   jint count0 = 0;
   jint count1 = 0;
-  jvmtiMonitorStackDepthInfo* inf0 = NULL;     
-  jvmtiMonitorStackDepthInfo* inf1 = NULL;     
-  
+  jvmtiMonitorStackDepthInfo* inf0 = NULL;
+  jvmtiMonitorStackDepthInfo* inf1 = NULL;
+
   err = jvmti->GetOwnedMonitorStackDepthInfo(NULL, &count0, &inf0);
-  check_jvmti_error(jni, "GetOwnedMonitorStackDepthInfo", err);
+  check_jvmti_status(jni, err, "GetOwnedMonitorStackDepthInfo");
 
   err = jvmti->GetOwnedMonitorStackDepthInfo(thread, &count1, &inf1);
-  check_jvmti_error(jni, "GetOwnedMonitorStackDepthInfo", err);
+  check_jvmti_status(jni, err, "GetOwnedMonitorStackDepthInfo");
 
   if (count0 != count1) {
     failed_status = JNI_TRUE;
@@ -302,23 +295,23 @@ testGetOwnedMonitorStackDepthInfo(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) 
     printf("\t monitor #%d at depth %d: %p\n", idx, slot0.stack_depth, (void*)slot0.monitor);
   }
   err = jvmti->Deallocate((unsigned char*)inf0);
-  check_jvmti_error(jni, "Deallocate", err);
+  check_jvmti_status(jni, err, "Deallocate");
 
   err = jvmti->Deallocate((unsigned char*)inf1);
-  check_jvmti_error(jni, "Deallocate", err);
+  check_jvmti_status(jni, err, "Deallocate");
 }
 
 static void
 testGetCurrentContendedMonitor(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
   jvmtiError err;
-  jobject monitor0 = NULL;     
-  jobject monitor1 = NULL;     
-  
+  jobject monitor0 = NULL;
+  jobject monitor1 = NULL;
+
   err = jvmti->GetCurrentContendedMonitor(NULL, &monitor0);
-  check_jvmti_error(jni, "GetCurrentContendedMonitor", err);
+  check_jvmti_status(jni, err, "GetCurrentContendedMonitor");
 
   err = jvmti->GetCurrentContendedMonitor(thread, &monitor1);
-  check_jvmti_error(jni, "GetCurrentContendedMonitor", err);
+  check_jvmti_status(jni, err, "GetCurrentContendedMonitor");
 
   if (jni->IsSameObject(monitor0, monitor1) == JNI_FALSE) {
     failed_status = JNI_TRUE;

@@ -23,10 +23,9 @@
 
 #include <string.h>
 #include "jvmti.h"
+#include "jvmti_common.h"
 
 extern "C" {
-
-#define MAX_FRAME_COUNT 40
 
 static jvmtiEnv *jvmti = NULL;
 static jthread exp_thread = NULL;
@@ -46,14 +45,6 @@ lock_events() {
 static void
 unlock_events() {
   jvmti->RawMonitorExit(event_mon);
-}
-
-static void
-check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
-  if (err != JVMTI_ERROR_NONE) {
-    printf("check_jvmti_status: JVMTI function returned error: %d\n", err);
-    jni->FatalError(msg);
-  }
 }
 
 static jclass
@@ -103,54 +94,6 @@ find_method(JNIEnv *jni, jclass klass, const char* mname) { jmethodID *methods =
     }
   }
   return NULL;
-}
-
-static char*
-get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
-  jvmtiError err;
-  jclass klass = NULL;
-  char*  cname = NULL;
-
-  err = jvmti->GetMethodDeclaringClass(method, &klass);
-  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetMethodDeclaringClass");
-
-  err = jvmti->GetClassSignature(klass, &cname, NULL);
-  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetClassSignature");
-
-  cname[strlen(cname) - 1] = '\0'; // get rid of trailing ';'
-  return cname + 1;                // get rid of leading 'L'
-}
-
-static void
-print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
-  char*  cname = NULL;
-  char*  mname = NULL;
-  char*  msign = NULL;
-  jvmtiError err;
-
-  cname = get_method_class_name(jvmti, jni, method);
-
-  err = jvmti->GetMethodName(method, &mname, &msign, NULL);
-  check_jvmti_status(jni, err, "print_method: error in JVMTI GetMethodName");
-
-  printf("%2d: %s: %s%s\n", depth, cname, mname, msign);
-  fflush(0);
-}
-
-static void
-print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
-  jvmtiFrameInfo frames[MAX_FRAME_COUNT];
-  jint count = 0;
-  jvmtiError err;
-
-  err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT, frames, &count);
-  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
-
-  printf("JVMTI Stack Trace: frame count: %d\n", count);
-  for (int depth = 0; depth < count; depth++) {
-    print_method(jvmti, jni, frames[depth].method, depth);
-  }
-  printf("\n");
 }
 
 static void
