@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1095,10 +1095,16 @@ public class Thread implements Runnable {
             }
         }
         private final String name;
+        private final int characteristics;
+        private final UncaughtExceptionHandler uhe;
+
         private final boolean hasCounter;
         private volatile int count;
 
-        BaseThreadFactory(String name, int start) {
+        BaseThreadFactory(String name,
+                          int start,
+                          int characteristics,
+                          UncaughtExceptionHandler uhe)  {
             this.name = name;
             if (name != null && start >= 0) {
                 this.hasCounter = true;
@@ -1106,6 +1112,16 @@ public class Thread implements Runnable {
             } else {
                 this.hasCounter = false;
             }
+            this.characteristics = characteristics;
+            this.uhe = uhe;
+        }
+
+        int characteristics() {
+            return characteristics;
+        }
+
+        UncaughtExceptionHandler uncaughtExceptionHandler() {
+            return uhe;
         }
 
         String nextThreadName() {
@@ -1119,12 +1135,10 @@ public class Thread implements Runnable {
 
     private static class PlatformThreadFactory extends BaseThreadFactory {
         private final ThreadGroup group;
-        private final int characteristics;
         private final boolean daemonChanged;
         private final boolean daemon;
         private final int priority;
         private final long stackSize;
-        private final UncaughtExceptionHandler uhe;
 
         PlatformThreadFactory(ThreadGroup group,
                               String name,
@@ -1135,14 +1149,12 @@ public class Thread implements Runnable {
                               int priority,
                               long stackSize,
                               UncaughtExceptionHandler uhe) {
-            super(name, start);
+            super(name, start, characteristics, uhe);
             this.group = group;
-            this.characteristics = characteristics;
             this.daemonChanged = daemonChanged;
             this.daemon = daemon;
             this.priority = priority;
             this.stackSize = stackSize;
-            this.uhe = uhe;
         }
 
         @Override
@@ -1155,11 +1167,12 @@ public class Thread implements Runnable {
         public Thread newThread(Runnable task) {
             Objects.requireNonNull(task);
             String name = nextThreadName();
-            Thread thread = new Thread(group, name, characteristics, task, stackSize, null);
+            Thread thread = new Thread(group, name, characteristics(), task, stackSize, null);
             if (daemonChanged)
                 thread.daemon(daemon);
             if (priority != 0)
                 thread.priority(priority);
+            UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
             return thread;
@@ -1168,25 +1181,22 @@ public class Thread implements Runnable {
 
     private static class VirtualThreadFactory extends BaseThreadFactory {
         private final Executor scheduler;
-        private final int characteristics;
-        private final UncaughtExceptionHandler uhe;
 
         VirtualThreadFactory(Executor scheduler,
                              String name,
                              int start,
                              int characteristics,
                              UncaughtExceptionHandler uhe) {
-            super(name, start);
+            super(name, start, characteristics, uhe);
             this.scheduler = scheduler;
-            this.characteristics = characteristics;
-            this.uhe = uhe;
         }
 
         @Override
         public Thread newThread(Runnable task) {
             Objects.requireNonNull(task);
             String name = nextThreadName();
-            Thread thread = new VirtualThread(scheduler, name, characteristics, task);
+            Thread thread = new VirtualThread(scheduler, name, characteristics(), task);
+            UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
             return thread;
