@@ -743,8 +743,7 @@ event_callback_helper(JNIEnv *env, EventInfo *evinfo)
          * resources can be allocated.  This must be done before
          * grabbing any locks.
          */
-        eventBag = threadControl_onEventHandlerEntry(
-            eventSessionID, evinfo, currentException);
+        eventBag = threadControl_onEventHandlerEntry(eventSessionID, evinfo, currentException);
         if ( eventBag == NULL ) {
             jboolean invoking;
             do {
