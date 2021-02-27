@@ -696,13 +696,13 @@ public class Thread implements Runnable {
      *   // Starts a daemon thread with name "duke"
      *   Thread thread = Thread.builder()
      *                 .name("duke")
-     *                 .daemon(true)
+     *                 .daemon()
      *                 .priority(Thread.NORM_PRIORITY)
      *                 .task(runnable)
      *                 .start();
      *
      *   // A ThreadFactory that creates daemon threads named "worker-0", "worker-1", ...
-     *   ThreadFactory factory = Thread.builder().daemon(true).name("worker-", 0).factory();
+     *   ThreadFactory factory = Thread.builder().daemon().name("worker-", 0).factory();
      *
      *   // Start an unnamed virtual thread
      *   Thread thread = Thread.builder().virtual().task(runnable).start();
@@ -875,6 +875,18 @@ public class Thread implements Runnable {
          * @return this builder
          */
         Builder daemon(boolean on);
+
+        /**
+         * Sets the daemon status to {@code true}.
+         * The {@link #isDaemon() daemon status} of virtual threads is always {@code true}.
+         * Setting the daemon status of a virtual thread has no effect.??
+         * @implSpec The default implementation invokes {@linkplain #daemon(boolean)} with
+         * a value of {@code true}.
+         * @return this builder
+         */
+        default Builder daemon() {
+            return daemon(true);
+        }
 
         /**
          * Sets the thread priority.
