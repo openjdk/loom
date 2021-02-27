@@ -675,7 +675,7 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
  * consumes the event.
  */
 static void
-event_callback_helper(JNIEnv *env, EventInfo *evinfo)
+event_callback(JNIEnv *env, EventInfo *evinfo)
 {
     struct bag *eventBag;
     jbyte eventSessionID = currentSessionID; /* session could change */
@@ -826,16 +826,6 @@ event_callback_helper(JNIEnv *env, EventInfo *evinfo)
     if (thread != NULL) {
         threadControl_onEventHandlerExit(evinfo->ei, thread, eventBag);
     }
-}
-
-static void
-event_callback(JNIEnv *env, EventInfo *evinfo)
-{
-    /* vthread fixme: There are a bunch of WITH_LOCAL_REFS that we can remove now that
-     * we are doing one here. */
-    WITH_LOCAL_REFS(env, 64) {
-        event_callback_helper(env, evinfo);
-    } END_WITH_LOCAL_REFS(env);
 }
 
 /* Returns a local ref to the declaring class for an object. */
