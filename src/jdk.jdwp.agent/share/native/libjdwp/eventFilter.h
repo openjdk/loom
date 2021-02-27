@@ -66,7 +66,6 @@ jvmtiError eventFilter_setStepFilter(HandlerNode *node,
                                jint index,
                                jthread thread,
                                jint size, jint depth);
-void eventFilter_setStepFilterThread(HandlerNode *node, jthread thread);
 jvmtiError eventFilter_setSourceNameMatchFilter(HandlerNode *node,
                                                 jint index,
                                                 char *sourceNamePattern);
