@@ -43,8 +43,6 @@
 #define NSK_COMPLAIN1 printf
 #define NSK_COMPLAIN3 printf
 
-extern "C" {
-
 const char* TranslateState(jint flags);
 const char* TranslateError(jvmtiError err);
 
@@ -109,13 +107,27 @@ void RawMonitorExit(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
   check_jvmti_status(jni, jvmti->RawMonitorExit(lock), "Fatal Error in RawMonitorEnter.");
 }
 
-void RawMonitorNotify(JNIEnv* jni, jvmtiEnv *env, jrawMonitorID monitor) {
-  check_jvmti_status(jni, env->RawMonitorNotify(monitor), "Fatal Error in RawMonitorNotify.");
+void RawMonitorNotify(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID monitor) {
+  check_jvmti_status(jni, jvmti->RawMonitorNotify(monitor), "Fatal Error in RawMonitorNotify.");
 }
 
-void RawMonitorWait(JNIEnv* jni, jvmtiEnv *env, jrawMonitorID monitor, jlong millis) {
-  check_jvmti_status(jni, env->RawMonitorWait(monitor, millis), "Fatal Error in RawMonitorWait.");
+void RawMonitorWait(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID monitor, jlong millis) {
+  check_jvmti_status(jni, jvmti->RawMonitorWait(monitor, millis), "Fatal Error in RawMonitorWait.");
 }
+
+class RawMonitorMark {
+ private:
+  JNIEnv* _jni;
+  jvmtiEnv* _jvmti;
+  jrawMonitorID _monitor;
+ public:
+  RawMonitorMark(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID monitor):_jni(jni), _jvmti(jvmti), _monitor(monitor) {
+    RawMonitorEnter(_jni, _jvmti, _monitor);
+  }
+  ~RawMonitorMark() {
+    RawMonitorExit(_jni, _jvmti, _monitor);
+  }
+};
 
 static char* get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
   jvmtiError err;
@@ -550,8 +562,6 @@ const char* TranslateObjectRefKind(jvmtiObjectReferenceKind ref) {
     default:
         return ("<unknown reference kind>");
     }
-}
-
 }
 
 #endif

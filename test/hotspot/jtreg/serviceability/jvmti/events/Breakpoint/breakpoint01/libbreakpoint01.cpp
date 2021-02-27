@@ -89,8 +89,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
   char *sig, *generic;
   jvmtiError err;
 
-  RawMonitorEnter(jni, jvmti, agent_lock);
-
+  RawMonitorMark rmm(jni, jvmti, agent_lock);
   if (callbacksEnabled) {
     // GetClassSignature may be called only during the start or the live phase
     err = jvmti->GetClassSignature(klass, &sig, &generic);
@@ -103,8 +102,6 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
       setBP(jvmti, jni, klass);
     }
   }
-
-  RawMonitorExit(jni, jvmti, agent_lock);
 }
 
 void JNICALL
@@ -213,20 +210,14 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jmethodID method, jloca
 
 void JNICALL
 VMStart(jvmtiEnv *jvmti, JNIEnv *jni) {
-  RawMonitorEnter(jni, jvmti, agent_lock);
-
+  RawMonitorMark rmm(jni, jvmti, agent_lock);
   callbacksEnabled = NSK_TRUE;
-
-  RawMonitorExit(jni, jvmti, agent_lock);
 }
 
 void JNICALL
 VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
-  RawMonitorEnter(jni, jvmti, agent_lock);
-
+  RawMonitorMark rmm(jni, jvmti, agent_lock);
   callbacksEnabled = NSK_FALSE;
-
-  RawMonitorExit(jni, jvmti, agent_lock);
 }
 /************************/
 
