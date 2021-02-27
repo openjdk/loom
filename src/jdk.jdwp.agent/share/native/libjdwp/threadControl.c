@@ -235,12 +235,8 @@ nonTlsSearch(JNIEnv *env, ThreadList *list, jthread thread)
  * All assume that the threadLock is held before calling.
  */
 
-
 /*
  * Search for a thread on the list. If list==NULL, search all lists.
- * TODO: TLS cache is temporary diabled for all threads, not added for virtual threads yet
- * It cause intermittent failures because ThreadNode data is broken.
- * Need to enable setThreadLocalStorage in 2 places.
  */
 static ThreadNode *
 findThread(ThreadList *list, jthread thread)
