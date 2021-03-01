@@ -50,6 +50,7 @@ class RecordComponent;
   f(java_lang_Thread) \
   f(java_lang_Thread_FieldHolder) \
   f(java_lang_Thread_VirtualThreads) \
+  f(java_lang_Thread_ClassLoaders) \
   f(java_lang_ThreadGroup) \
   f(java_lang_VirtualThread) \
   f(java_lang_InternalError) \
