@@ -153,7 +153,7 @@ public class Thread implements Runnable {
     private final long tid;
 
     // context ClassLoader
-    private ClassLoader contextClassLoader;
+    private volatile ClassLoader contextClassLoader;
 
     // inherited AccessControlContext, TBD: move this to FieldHolder
     private AccessControlContext inheritedAccessControlContext;
