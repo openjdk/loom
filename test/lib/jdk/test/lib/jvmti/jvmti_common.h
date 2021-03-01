@@ -88,7 +88,7 @@ static void check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
 /* JVMTI helper wrappers. Check errors and fail or return null if jvmti operation failed. */
 
 // Monitors often created in Agent_Initialize(..) where JNIEnv* jni doesn't exist.
-jrawMonitorID CreateRawMonitor(jvmtiEnv *jvmti, const char* name) {
+jrawMonitorID create_raw_monitor(jvmtiEnv *jvmti, const char* name) {
   jrawMonitorID lock;
   jvmtiError err;
   err = jvmti->CreateRawMonitor(name, &lock);
@@ -98,35 +98,32 @@ jrawMonitorID CreateRawMonitor(jvmtiEnv *jvmti, const char* name) {
   return lock;
 }
 
-
-void RawMonitorEnter(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
-  check_jvmti_status(jni, jvmti->RawMonitorEnter(lock), "Fatal Error in RawMonitorEnter.");
-}
-
-void RawMonitorExit(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
-  check_jvmti_status(jni, jvmti->RawMonitorExit(lock), "Fatal Error in RawMonitorEnter.");
-}
-
-void RawMonitorNotify(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID monitor) {
-  check_jvmti_status(jni, jvmti->RawMonitorNotify(monitor), "Fatal Error in RawMonitorNotify.");
-}
-
-void RawMonitorWait(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID monitor, jlong millis) {
-  check_jvmti_status(jni, jvmti->RawMonitorWait(monitor, millis), "Fatal Error in RawMonitorWait.");
-}
-
-class RawMonitorMark {
+class RawMonitorLocker {
  private:
-  JNIEnv* _jni;
   jvmtiEnv* _jvmti;
+  JNIEnv* _jni;
   jrawMonitorID _monitor;
  public:
-  RawMonitorMark(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID monitor):_jni(jni), _jvmti(jvmti), _monitor(monitor) {
-    RawMonitorEnter(_jni, _jvmti, _monitor);
+  RawMonitorLocker(jvmtiEnv *jvmti,JNIEnv* jni, jrawMonitorID monitor):_jvmti(jvmti), _jni(jni), _monitor(monitor) {
+    check_jvmti_status(_jni, _jvmti->RawMonitorEnter(_monitor), "Fatal Error in RawMonitorEnter.");
   }
-  ~RawMonitorMark() {
-    RawMonitorExit(_jni, _jvmti, _monitor);
+  ~RawMonitorLocker() {
+    check_jvmti_status(_jni, _jvmti->RawMonitorExit(_monitor), "Fatal Error in RawMonitorEnter.");
+
   }
+
+  void wait(jlong millis) {
+    check_jvmti_status(_jni, _jvmti->RawMonitorWait(_monitor, millis), "Fatal Error in RawMonitorWait.");
+  }
+
+  void wait() {
+    wait(0);
+  }
+
+  void notify() {
+    check_jvmti_status(_jni, _jvmti->RawMonitorNotify(_monitor), "Fatal Error in RawMonitorNotify.");
+  }
+
 };
 
 static char* get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
@@ -265,7 +262,6 @@ find_method(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass, const char* mname) { jme
   }
   return NULL;
 }
-
 
 /* Commonly used helper functions */
 const char* TranslateState(jint flags) {

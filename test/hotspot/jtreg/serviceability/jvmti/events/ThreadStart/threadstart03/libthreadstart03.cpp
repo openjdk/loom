@@ -117,30 +117,12 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 static void JNICALL
 threadProc(jvmtiEnv* jvmti, JNIEnv* jni, void *unused) {
   jvmtiError err;
-
-  err = jvmti->RawMonitorEnter(wait_lock);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RawMonitorEnter) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
-  }
-  err = jvmti->RawMonitorNotify(wait_lock);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RawMonitorNotify) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
-  }
-  err = jvmti->RawMonitorExit(wait_lock);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RawMonitorExit) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
-  }
+  RawMonitorLocker wait_locker(jvmti, jni, wait_lock);
+  wait_locker.notify();
 }
 
 JNIEXPORT jint JNICALL
-Java_threadstart03_check(JNIEnv *jni,
-                                                jclass cls, jthread thr, jstring name) {
+Java_threadstart03_check(JNIEnv *jni, jclass cls, jthread thr, jstring name) {
   jvmtiError err;
 
   if (jvmti == NULL) {
@@ -154,12 +136,7 @@ Java_threadstart03_check(JNIEnv *jni,
     return STATUS_FAILED;
   }
 
-  err = jvmti->CreateRawMonitor("_wait_lock", &wait_lock);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(CreateRawMonitor) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    return STATUS_FAILED;
-  }
+  wait_lock = create_raw_monitor(jvmti, "_wait_lock");
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_THREAD_START, NULL);
@@ -183,57 +160,29 @@ Java_threadstart03_check(JNIEnv *jni,
 
   printf(">>> starting agent thread ...\n");
 
-  err = jvmti->RawMonitorEnter(wait_lock);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RawMonitorEnter) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
-  }
-  err = jvmti->RunAgentThread(thr, threadProc,
-                              NULL, JVMTI_THREAD_MAX_PRIORITY);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RunAgentThread) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
-  }
-  err = jvmti->RawMonitorWait(wait_lock, 0);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RawMonitorWait) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
-  }
-  err = jvmti->RawMonitorExit(wait_lock);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RawMonitorExit) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
-  }
-
-  err = jvmti->RawMonitorEnter(wait_lock);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RawMonitorEnter) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
-  }
-  // Wait for up to 3 seconds for the thread end event
-
-  for (int i = 0; i < 3 ; i++) {
-    err = jvmti->RawMonitorWait(wait_lock, (jlong)WAIT_TIME);
-    if (endsCount == endsExpected || err != JVMTI_ERROR_NONE) {
-      break;
+  {
+    RawMonitorLocker wait_locker(jvmti, jni, wait_lock);
+    err = jvmti->RunAgentThread(thr, threadProc,
+                                NULL, JVMTI_THREAD_MAX_PRIORITY);
+    if (err != JVMTI_ERROR_NONE) {
+      printf("(RunAgentThread) unexpected error: %s (%d)\n",
+             TranslateError(err), err);
+      result = STATUS_FAILED;
     }
+    wait_locker.wait();
   }
 
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RawMonitorWait) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
-  }
-  err = jvmti->RawMonitorExit(wait_lock);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(RawMonitorExit) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
-    result = STATUS_FAILED;
+  {
+    RawMonitorLocker wait_locker(jvmti, jni, wait_lock);
+    // Wait for up to 3 seconds for the thread end event
+
+    for (int i = 0; i < 3; i++) {
+      wait_locker.wait( (jlong) WAIT_TIME);
+      if (endsCount == endsExpected || err != JVMTI_ERROR_NONE) {
+        break;
+      }
+    }
+
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,

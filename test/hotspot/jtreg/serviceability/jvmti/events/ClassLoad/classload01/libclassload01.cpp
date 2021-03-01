@@ -77,7 +77,7 @@ static volatile int primClsEvents[UNEXP_SIG_NUM];
 static jint result = PASSED;
 static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
-static jrawMonitorID countLock;
+static jrawMonitorID counter_lock;
 
 static void initCounters() {
   size_t i;
@@ -110,13 +110,12 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
   char *sig, *generic;
   jvmtiError err;
 
-  RawMonitorEnter(jni, jvmti, countLock);
+  RawMonitorLocker rml(jvmti, jni, counter_lock);
 
   err = jvmti->GetClassSignature(klass, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILURE: unable to obtain a class signature. Error %d\n", err);
-    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
@@ -142,8 +141,6 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
           sig);
     }
   }
-
-  RawMonitorExit(jni, jvmti, countLock);
 }
 /************************/
 
@@ -210,11 +207,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   initCounters();
 
-  countLock = CreateRawMonitor(jvmti, "_counter_lock");
-  if (countLock == nullptr) {
-    printf("Error in CreateRawMonitor %d/n", err);
-    return JNI_ERR;
-  }
+  counter_lock = create_raw_monitor(jvmti, "_counter_lock");
 
   printf("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));

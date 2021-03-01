@@ -127,16 +127,14 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
   while(true) {
     jthread *threads = NULL;
     jint count = 0;
-    RawMonitorEnter(jni, jvmti, monitor);
+    RawMonitorLocker rml(jvmti, jni, monitor);
     if (!is_vm_running) {
-      RawMonitorExit(jni, jvmti, monitor);
       return;
     }
     check_jvmti_status(jni, jvmti->GetAllThreads(&count, &threads), "Error in GetAllThreads");
     for (int i = 0; i < count; i++) {
       jthread testedThread = NULL;
       jvmtiError err;
-
 
       err = jvmti->GetVirtualThread(threads[i], &testedThread);
       if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
@@ -152,7 +150,6 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
       check_reset_tls(jvmti, jni, testedThread, "agentThread");
 
     }
-    RawMonitorExit(jni, jvmti, monitor);
     check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) threads), "Error Deallocating memory.");
   }
 
@@ -160,33 +157,29 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
 
 /** callback functions **/
 void JNICALL VMInit(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
-  RawMonitorEnter(jni, jvmti, monitor);
+  RawMonitorLocker rml(jvmti, jni, monitor);
   printf("Starting ...\n");
   is_vm_running = true;
-  RawMonitorExit(jni, jvmti, monitor);
 }
 
 void JNICALL VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
-  RawMonitorEnter(jni, jvmti, monitor);
+  RawMonitorLocker rml(jvmti, jni, monitor);
   printf("Exiting ...\n");
   is_vm_running = false;
-  RawMonitorExit(jni, jvmti, monitor);
 }
 
 void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
-  RawMonitorEnter(jni, jvmti, monitor);
+  RawMonitorLocker rml(jvmti, jni, monitor);
   if (is_vm_running) {
     check_reset_tls(jvmti, jni, thread, "ThreadStart");
   }
-  RawMonitorExit(jni, jvmti, monitor);
 }
 
 void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
-  RawMonitorEnter(jni, jvmti, monitor);
+  RawMonitorLocker rml(jvmti, jni, monitor);
   if (is_vm_running) {
     check_reset_tls(jvmti, jni, thread, "ThreadEnd");
   }
-  RawMonitorExit(jni, jvmti, monitor);
 }
 /*
 void JNICALL
@@ -194,38 +187,34 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
   fflush(0);
   int p = ((long) method / 128 % 100);
   if (p < 1) {
-    RawMonitorEnter(jni, jvmti, monitor);
+    RawMonitorLocker rml(jvmti, jni, monitor);
     if (is_vm_running) {
       jvmtiThreadInfo thread_info;
       check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo11");
       if (strcmp("main", thread_info.name) == 0) {
         // Skip main() method entries
-        RawMonitorExit(jni, jvmti, monitor);
         return;
       }
       check_reset_tls(jvmti, jni, thread, "MethodEntry");
     }
-    RawMonitorExit(jni, jvmti, monitor);
   }
 }
 */
 
 static void JNICALL
 VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  RawMonitorEnter(jni, jvmti, monitor);
+  RawMonitorLocker rml(jvmti, jni, monitor);
   if (is_vm_running) {
     check_reset_tls(jvmti, jni, vthread, "VirtualThreadScheduled");
   }
-  RawMonitorExit(jni, jvmti, monitor);
 }
 
 static void JNICALL
 VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  RawMonitorEnter(jni, jvmti, monitor);
+  RawMonitorLocker rml(jvmti, jni, monitor);
   if (is_vm_running) {
     check_reset_tls(jvmti, jni, vthread, "VirtualThreadTerminated");
   }
-  RawMonitorExit(jni, jvmti, monitor);
 }
 
 /* ============================================================================= */
@@ -244,7 +233,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  createRawMonitor(jvmti, "Monitor", &monitor);
+  monitor = create_raw_monitor(jvmti, "Monitor");
 
 
   /* add capability to generate compiled method events */

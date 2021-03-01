@@ -51,7 +51,7 @@ static const char *CLASS_SIG =
 static volatile jint result = PASSED;
 static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
-static jrawMonitorID countLock;
+static jrawMonitorID counter_lock;
 
 /** callback functions **/
 void JNICALL
@@ -62,7 +62,7 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   int i;
   jvmtiError err;
 
-  RawMonitorEnter(jni, jvmti, countLock);
+  RawMonitorLocker rml(jvmti, jni, counter_lock);
 
   printf(">>>> NativeMethodBind event received\n");
 
@@ -70,12 +70,10 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   if (err != JVMTI_ERROR_NONE) {
     printf(">>>> Error getting phase\n");
     result = STATUS_FAILED;
-    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
   if (phase != JVMTI_PHASE_START && phase != JVMTI_PHASE_LIVE) {
-    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
@@ -83,7 +81,6 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
     printf("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
-    RawMonitorExit(jni, jvmti, countLock);
     return;
   }
 
@@ -114,8 +111,6 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   }
 
   printf("<<<<\n\n");
-
-  RawMonitorExit(jni, jvmti, countLock);
 }
 /************************/
 
@@ -203,10 +198,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   /* create a raw monitor */
-  err = jvmti->CreateRawMonitor("_counter_lock", &countLock);
-  if (err != JVMTI_ERROR_NONE) {
-    return JNI_ERR;
-  }
+  counter_lock = create_raw_monitor(jvmti, "_counter_lock");
 
   /* add capability to generate compiled method events */
   memset(&caps, 0, sizeof(jvmtiCapabilities));
