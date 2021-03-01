@@ -64,6 +64,7 @@
   template(java_lang_Thread,                          "java/lang/Thread")                         \
   template(java_lang_Thread_FieldHolder,              "java/lang/Thread$FieldHolder")             \
   template(java_lang_Thread_VirtualThreads,           "java/lang/Thread$VirtualThreads")          \
+  template(java_lang_Thread_ClassLoaders,             "java/lang/Thread$ClassLoaders")            \
   template(java_lang_ThreadGroup,                     "java/lang/ThreadGroup")                    \
   template(java_lang_VirtualThread,                   "java/lang/VirtualThread")                  \
   template(java_lang_Cloneable,                       "java/lang/Cloneable")                      \

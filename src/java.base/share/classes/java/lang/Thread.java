@@ -85,14 +85,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * to the <i>current thread</i>, will return the {@code Thread} object for the virtual
  * thread.
  *
- * <p> {@code Thread} defines a {@linkplain Builder} API, for creating threads. It
- * also defines (for compatibility and customization reasons) constructors for
- * creating platform threads. The constructors cannot be used to create virtual
- * threads.
- *
  * <p> Platform threads are designated <i>daemon</i> or <i>non-daemon</i> threads.
  * When the Java virtual machine starts up, there is usually one non-daemon
- * thread (the thread that typically calls the applications's {@code main} method).
+ * thread (the thread that typically calls the application's {@code main} method).
  * The Java virtual machine terminates when all started non-daemon threads have
  * terminated. Unstarted daemon threads do not prevent the Java virtual machine from
  * termination. The Java virtual machine can also be terminated by invoking the
@@ -100,6 +95,30 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * if there are non-daemon threads still running. The daemon status of virtual
  * threads is meaningless and have no influence on when the Java virtual
  * machine terminates.
+ *
+ * <p> In addition to the daemon status, platform threads have a {@linkplain
+ * #getPriority() thread priority} and are members of a {@linkplain ThreadGroup
+ * thread group}.
+ *
+ * <p> Threads have an optional name and optionally support {@link ThreadLocal}
+ * variables. Thread local variables are local to a thread, meaning a thread can
+ * set its copy of a variable to a value that is independent of the value set by
+ * other threads.
+ *
+ * <p> {@code Thread} defines a {@linkplain Builder} API, for creating threads. It
+ * also defines (for customization reasons) constructors for creating platform threads.
+ * The constructors cannot be used to create virtual threads. By default, creating
+ * a {@code Thread} inherits the initial values of {@link InheritableThreadLocal}
+ * variables and a number of characteristics from the parent thread:
+ * <ul>
+ *     <li> Platform threads inherit the daemon status, priority, and thread-group.
+ *     <li> Virtual threads are scheduled by the same scheduler as the parent thread
+ *          when the parent thread is a virtual thread. Virtual threads use the default
+ *          scheduler when the parent thread is a platform thread and scheduler has not
+ *          been selected.
+ *     <li> The {@linkplain #getContextClassLoader() context-class-loader} is treated
+ *          as an inheritable thread local and is inherited by default.
+ * </ul>
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -542,11 +561,6 @@ public class Thread implements Runnable {
             }
         }
 
-        /* can't create a platform thread in the virtual thread group */
-        if ((VM.initLevel() >= 1) && g == VirtualThreads.THREAD_GROUP) {
-            g = VirtualThreads.OFFSPRING_THREAD_GROUP;
-        }
-
         /* checkAccess regardless of whether or not threadgroup is
            explicitly passed in. */
         g.checkAccess();
@@ -563,13 +577,13 @@ public class Thread implements Runnable {
 
         this.name = name;
         this.tid = primordial ? 1 : ThreadIdentifiers.next();
-        this.contextClassLoader = contextClassLoader(parent);
         this.inheritedAccessControlContext = (acc != null) ? acc : AccessController.getContext();
 
         // thread locals
         if ((characteristics & NO_THREAD_LOCALS) != 0) {
             this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
             this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
+            this.contextClassLoader = ClassLoaders.NOT_SUPPORTED;
         } else if ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0) {
             ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
             if (parentMap != null
@@ -577,6 +591,7 @@ public class Thread implements Runnable {
                     && parentMap.size() > 0) {
                 this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
             }
+            this.contextClassLoader = contextClassLoader(parent);
         }
 
         // scoped variables
@@ -606,13 +621,13 @@ public class Thread implements Runnable {
 
         this.name = (name != null) ? name : "<unnamed>";
         this.tid = ThreadIdentifiers.next();
-        this.contextClassLoader = contextClassLoader(parent);
         this.inheritedAccessControlContext = VirtualThreads.ACCESS_CONTROL_CONTEXT;
 
         // thread locals
         if ((characteristics & NO_THREAD_LOCALS) != 0) {
             this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
             this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
+            this.contextClassLoader = ClassLoaders.NOT_SUPPORTED;
         } else if ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0) {
             ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
             if (parentMap != null
@@ -620,8 +635,10 @@ public class Thread implements Runnable {
                     && parentMap.size() > 0) {
                 this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
             }
+            this.contextClassLoader = contextClassLoader(parent);
         }
 
+        // scoped variables
         this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
 
         // no additional fields
@@ -729,21 +746,6 @@ public class Thread implements Runnable {
      *     <li> The {@linkplain #build() build} method creates an unstarted {@code Thread}.
      *     <li> The {@linkplain #start() start} method creates and starts a {@code Thread}.
      *     <li> The {@linkplain #factory() factory} method creates a {@code ThreadFactory}.
-     * </ul>
-     *
-     * <p> By default, Threads created with a builder, or with a {@code ThreadFactory}
-     * created from a builder, inherit the initial values of {@link
-     * InheritableThreadLocal} variables and some characteristics from the parent
-     * thread. Inheritance occurs when the {@code Thread} is created.
-     * <ul>
-     *     <li> Platform threads inherit the {@linkplain #isDaemon() daemon status},
-     *          {@linkplain #getPriority() thread priority} and {@linkplain ThreadGroup
-     *          thread-group}.
-     *     <li> Virtual threads inherit the scheduler when the parent thread is a
-     *          virtual thread. Virtual threads use the default scheduler when the
-     *          parent thread is a platform thread and scheduler has not been selected.
-     *     <li> The {@linkplain #getContextClassLoader() context-class-loader} is always
-     *          inherited (for security reasons, TBD if we should re-examine that).
      * </ul>
      *
      * <p> Virtual threads created with a builder, or with a {@code ThreadFactory}
@@ -2101,8 +2103,8 @@ public class Thread implements Runnable {
      * Returns an estimate of the number of active threads in the current
      * thread's {@linkplain java.lang.ThreadGroup thread group} and its
      * subgroups. Virtual threads are not considered active threads in a
-     * thread group so this method returns {@code 0} when invoked from
-     * a virtual thread.
+     * thread group so this method does not include virtual threads in the
+     * estimate.
      *
      * <p> The value returned is only an estimate because the number of
      * threads may change dynamically while this method traverses internal
@@ -2124,7 +2126,7 @@ public class Thread implements Runnable {
      * invokes the {@link java.lang.ThreadGroup#enumerate(Thread[])}
      * method of the current thread's thread group. Virtual threads are
      * not considered active threads in a thread group so this method
-     * returns {@code 0} when invoked from a virtual thread.
+     * does not enumerate virtual threads.
      *
      * <p> An application might use the {@linkplain #activeCount activeCount}
      * method to get an estimate of how big the array should be, however
@@ -2428,15 +2430,15 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Returns the context {@code ClassLoader} for this thread. The context
-     * {@code ClassLoader} is provided by the creator of the thread for use
-     * by code running in this thread when loading classes and resources.
-     * If not {@linkplain #setContextClassLoader set}, the default is the
-     * {@code ClassLoader} context of the parent thread. The context
-     * {@code ClassLoader} of the
-     * primordial thread is typically set to the class loader used to load the
-     * application.
+     * Returns the context {@code ClassLoader} for this thread.
+     * The context {@code ClassLoader} may be set by the creator of the thread
+     * for use by code running in this thread when loading classes and resources.
+     * If not {@linkplain #setContextClassLoader set}, the default is to inherit
+     * the context class loader from the parent thread when creating the
+     * {@code Thread}.
      *
+     * <p> The context {@code ClassLoader} of the primordial thread is typically
+     * set to the class loader used to load the application.
      *
      * @return  the context {@code ClassLoader} for this thread, or {@code null}
      *          indicating the system class loader (or, failing that, the
@@ -2452,7 +2454,8 @@ public class Thread implements Runnable {
      */
     @CallerSensitive
     public ClassLoader getContextClassLoader() {
-        if (contextClassLoader == null)
+        if (contextClassLoader == null
+                || contextClassLoader == ClassLoaders.NOT_SUPPORTED)
             return null;
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
@@ -2463,13 +2466,11 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Sets the context ClassLoader for this Thread. The context
-     * ClassLoader can be set when a thread is created, and allows
-     * the creator of the thread to provide the appropriate class loader,
-     * through {@code getContextClassLoader}, to code running in the thread
-     * when loading classes and resources.
+     * Sets the context {@code ClassLoader} for this thread.
+     * The context {@code ClassLoader} may be set by the creator of the thread
+     * for use by code running in this thread when loading classes and resources.
      *
-     * <p>If a security manager is present, its {@link
+     * <p> If a security manager is present, its {@link
      * SecurityManager#checkPermission(java.security.Permission) checkPermission}
      * method is invoked with a {@link RuntimePermission RuntimePermission}{@code
      * ("setContextClassLoader")} permission to see if setting the context
@@ -2478,6 +2479,9 @@ public class Thread implements Runnable {
      * @param  cl
      *         the context ClassLoader for this Thread, or null  indicating the
      *         system class loader (or, failing that, the bootstrap class loader)
+     *
+     * @throws  UnsupportedOperationException if this thread is not allowed
+     *          to have its copy of thread-local variables
      *
      * @throws  SecurityException
      *          if the current thread cannot set the context ClassLoader
@@ -2489,8 +2493,20 @@ public class Thread implements Runnable {
         if (sm != null) {
             sm.checkPermission(new RuntimePermission("setContextClassLoader"));
         }
+        if (contextClassLoader == ClassLoaders.NOT_SUPPORTED) {
+            throw new UnsupportedOperationException();
+        }
         contextClassLoader = cl;
     }
+
+    private static class ClassLoaders {
+        static final ClassLoader NOT_SUPPORTED;
+        static {
+            PrivilegedAction<ClassLoader> pa = () -> new ClassLoader(null) { };
+            NOT_SUPPORTED = AccessController.doPrivileged(pa);
+        }
+    }
+
 
     /**
      * Returns {@code true} if and only if the current thread holds the
@@ -3073,9 +3089,6 @@ public class Thread implements Runnable {
         // Thread group for virtual threads.
         static final ThreadGroup THREAD_GROUP;
 
-        // Thread group for platform threads created by virtual threads
-        static final ThreadGroup OFFSPRING_THREAD_GROUP;
-
         // AccessControlContext that doesn't support any permissions.
         static final AccessControlContext ACCESS_CONTROL_CONTEXT;
 
@@ -3090,15 +3103,7 @@ public class Thread implements Runnable {
                 }
             };
             ThreadGroup root = AccessController.doPrivileged(pa);
-
-            var vgroup = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY);
-            THREAD_GROUP = vgroup;
-
-            int priority = NORM_PRIORITY;
-            if (System.getSecurityManager() != null) {
-                priority = MIN_PRIORITY;
-            }
-            OFFSPRING_THREAD_GROUP = new ThreadGroup(vgroup, "VirtualThreads-offspring", priority);
+            THREAD_GROUP = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY);
 
             ACCESS_CONTROL_CONTEXT = new AccessControlContext(new ProtectionDomain[] {
                 new ProtectionDomain(null, null)

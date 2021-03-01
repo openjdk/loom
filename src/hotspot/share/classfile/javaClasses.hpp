@@ -497,6 +497,21 @@ class java_lang_Thread_VirtualThreads : AllStatic {
 };
 
 
+// Interface to java.lang.Thread$ClassLoaders objects
+
+class java_lang_Thread_ClassLoaders : AllStatic {
+ private:
+  static int _static_NOT_SUPPORTED_offset;
+
+  static void compute_offsets();
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+ public:
+  static oop get_NOT_SUPPORTED();
+
+  friend class JavaClasses;
+};
+
+
 // Interface to java.lang.ThreadGroup objects
 
 class java_lang_ThreadGroup : AllStatic {
