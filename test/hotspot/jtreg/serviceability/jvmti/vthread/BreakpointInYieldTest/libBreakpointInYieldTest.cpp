@@ -38,16 +38,6 @@ static jboolean passed = JNI_TRUE;
 
 
 static void
-lock_events() {
-  jvmti->RawMonitorEnter(event_mon);
-}
-
-static void
-unlock_events() {
-  jvmti->RawMonitorExit(event_mon);
-}
-
-static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
                        const char* event_name, int event_count) {
   char* cname = NULL;
@@ -123,7 +113,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread cthread,
     return;
   }
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   printf("Breakpoint: %s: Stack Trace of %s thread: %p\n",
          mname, virt, (void*)cthread);
@@ -131,7 +121,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread cthread,
   print_frame_event_info(jvmti, jni, cthread, method,
                          "Breakpoint", ++breakpoint_count);
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -143,11 +132,10 @@ ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   err = jvmti->GetThreadInfo(thread, &thr_info);
   check_jvmti_status(jni, err, "ThreadStart: error in JVMTI GetThreadInfo call");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   printf("\nThreadStart: thread: %p, name: %s\n", (void*)thread, thr_info.name);
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -159,11 +147,10 @@ VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   err = jvmti->GetThreadInfo(thread, &thr_info);
   check_jvmti_status(jni, err, "VirtualThreadScheduled: error in JVMTI GetThreadInfo call");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   printf("\nVirtualThreadScheduled: thread: %p, name: %s\n",(void*)thread, thr_info.name);
   fflush(0);
-  unlock_events();
 }
 
 #if 0
@@ -259,11 +246,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.ContinuationYield = &ContinuationYield;
 #endif
 
-  err = jvmti->CreateRawMonitor("Events Monitor", &event_mon);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI CreateRawMonitor: %d\n", err);
-    return JNI_ERR;
-  }
+  event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {

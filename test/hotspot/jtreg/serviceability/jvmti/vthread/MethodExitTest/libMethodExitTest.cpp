@@ -45,16 +45,6 @@ jint test_method_count = 0;
 jclass test_class = NULL;
 
 static void
-lock_events() {
-  jvmti->RawMonitorEnter(event_mon);
-}
-
-static void
-unlock_events() {
-  jvmti->RawMonitorExit(event_mon);
-}
-
-static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
                        const char* event_name, int event_count) {
   char* cname = NULL;
@@ -327,7 +317,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     return;
   }
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   brkptBreakpointHit++;
   print_frame_event_info(jvmti, jni, thread, method,
@@ -350,12 +340,11 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   }
 
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
 MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   method_entry_count++;
 
   jvmtiError err;
@@ -370,7 +359,6 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
   // print_frame_event_info(jvmti, jni, thread, method, "MethodEntry", method_entry_count);
 
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -382,7 +370,7 @@ MethodExit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "MethodExit: error in JVMTI GetMethodName call");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   method_exit_count++;
 
   if (brkptBreakpointHit == 1) {
@@ -399,7 +387,6 @@ MethodExit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
   }
 
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -411,7 +398,7 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "FramePop: error in JVMTI GetMethodName call");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   frame_pop_count++;
 
   printf("\nHit #%d: FramePop #%d: method: %s on thread: %p\n",
@@ -419,7 +406,6 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
 
   print_frame_event_info(jvmti, jni, thread, method, "FramePop", frame_pop_count);
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -431,7 +417,7 @@ ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread cthread) {
   err = jvmti->GetThreadInfo(cthread, &thr_info);
   check_jvmti_status(jni, err, "ThreadStart: error in JVMTI GetThreadInfo call");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   printf("\nThreadStart: cthread: %p, name: %s\n", (void*)cthread, thr_info.name);
 
@@ -440,7 +426,6 @@ ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread cthread) {
   check_jvmti_status(jni, err, "ThreadStart: error in JVMTI SetThreadLocalStorage");
 
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -454,7 +439,7 @@ VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   err = jvmti->GetThreadInfo(vthread, &thr_info);
   check_jvmti_status(jni, err, "ThreadStart: error in JVMTI GetThreadInfo call");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   printf("\nVirtualThreadScheduled: %s thread: %p, name: %s\n", virt, (void*)vthread, thr_info.name);
 
@@ -463,7 +448,6 @@ VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   check_jvmti_status(jni, err, "VirtualThreadMounted: error in JVMTI SetThreadLocalStorage");
 
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -474,7 +458,7 @@ VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   char* cname = NULL;
   jvmtiError err;
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   err = jvmti->GetFrameLocation(vthread, 0, &method, &loc);
   check_jvmti_status(jni, err, "VirtualThreadMounted: error in JVMTI GetFrameLocation");
@@ -497,7 +481,6 @@ VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   check_jvmti_status(jni, err, "VirtualThreadMounted: error in JVMTI SetThreadLocalStorage");
 
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -507,8 +490,8 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   char* mname = NULL;
   char* cname = NULL;
   jvmtiError err;
- 
-  lock_events();
+
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   err = jvmti->GetFrameLocation(vthread, 0, &method, &loc);
   check_jvmti_status(jni, err, "VirtualThreadUnmounted: error in JVMTI GetFrameLocation");
@@ -527,7 +510,6 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   print_frame_event_info(jvmti, jni, vthread, method, "VirtualThreadUnmounted", vthread_unmounted_count);
 
   fflush(0);
-  unlock_events();
 }
 
 #if 0
@@ -625,10 +607,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   }
 #endif
 
-  err = jvmti->CreateRawMonitor("Events Monitor", &event_mon);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI CreateRawMonitor: %d\n", err);
-  }
+  event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
   printf("Agent_OnLoad finished\n");
   fflush(0);

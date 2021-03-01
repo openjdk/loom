@@ -267,10 +267,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = jvmti->CreateRawMonitor("Events Monitor", &event_mon);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI CreateRawMonitor: %d\n", err);
-  }
+  event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
   printf("Agent_OnLoad finished\n");
   fflush(0);

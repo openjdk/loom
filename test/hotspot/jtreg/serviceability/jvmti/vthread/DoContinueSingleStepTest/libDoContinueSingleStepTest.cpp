@@ -71,16 +71,6 @@ jint test_method_count = 0;
 jclass test_class = NULL;
 
 static void
-lock_events() {
-  jvmti->RawMonitorEnter(event_mon);
-}
-
-static void
-unlock_events() {
-  jvmti->RawMonitorExit(event_mon);
-}
-
-static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
                        const char* event_name, int event_count) {
   char* cname = NULL;
@@ -188,7 +178,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   jvmtiError err;
   jboolean is_virtual = jni->IsVirtualThread(thread);
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetMethodName call");
@@ -199,7 +189,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   if (strcmp(mname, "run") == 0) {
       // We hit our Continuation.run() breakpoint. Now setup the Continuation.isStarted() breakpoint.
       if (runBreakpointHit) {
-          unlock_events();
           return; // ignore if we've already seen one
       }
       print_frame_event_info(jvmti, jni, thread, method,
@@ -225,7 +214,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       // We hit our Continuation.isStarted() breakpoint. Now setup single stepping so we can
       // step into Continuation.doContinue().
       if (isStartedBreakpointHit) {
-          unlock_events();
           return; // ignore if we've already seen one
       }
       print_frame_event_info(jvmti, jni, thread, method,
@@ -313,7 +301,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       printf(" Breakpoint: unexpected breakpoint in method %s()\n", mname);
   }
 
-  unlock_events();
 }
 
 static void JNICALL
@@ -323,7 +310,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   jvmtiError err;
   jboolean is_virtual = jni->IsVirtualThread(thread);
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "SingleStep: error in JVMTI GetMethodName call");
@@ -381,15 +368,13 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
     check_jvmti_status(jni, err, "SingleStep: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
   }
-  unlock_events();
 }
 
 static void JNICALL
 MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   method_entry_count++;
   //print_frame_event_info(jvmti, jni, thread, method, "MethodEntry", method_entry_count);
-  unlock_events();
 }
 
 static void JNICALL
@@ -400,65 +385,57 @@ MethodExit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "MethodExit: error in JVMTI GetMethodName call");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   method_exit_count++;
   received_method_exit_event = JNI_TRUE;
   printf("MethodExit event #%d: method: %s\n", method_exit_count, mname);
   //print_frame_event_info(jvmti, jni, thread, method, "MethodExit", method_entry_count);
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_EXIT, thread);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable METHOD_EXIT");
-  unlock_events();
 }
 
 static void JNICALL
 FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
          jboolean was_popped_by_exception) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   frame_pop_count++;
   print_frame_event_info(jvmti, jni, thread, method, "FramePop", frame_pop_count);
-  unlock_events();
 }
 
 static void JNICALL
 VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   //processFiberEvent(jvmti, jni, vthread, "VirtualThreadScheduled");
-  unlock_events();
 }
 
 static void JNICALL
 VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   //processFiberEvent(jvmti, jni, vthread, "VirtualThreadTerminated");
-  unlock_events();
 }
 
 static void JNICALL
 VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   //processFiberEvent(jvmti, jni, vthread, "VirtualThreadMounted");
-  unlock_events();
 }
 
 static void JNICALL
 VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   //processFiberEvent(jvmti, jni, vthread, "VirtualThreadUnmounted");
-  unlock_events();
 }
 
 static void JNICALL
 ContinuationRun(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames_count) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   //print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationRun");
-  unlock_events();
 }
 
 static void JNICALL
 ContinuationYield(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames_count) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   //print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationYield");
-  unlock_events();
 }
 
 JNIEXPORT jint JNICALL
@@ -539,10 +516,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
       printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = jvmti->CreateRawMonitor("Events Monitor", &event_mon);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI CreateRawMonitor: %d\n", err);
-  }
+  event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
   printf("Agent_OnLoad finished\n");
   fflush(0);

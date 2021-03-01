@@ -740,7 +740,7 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
     }
   }
 
-  jvmti->CreateRawMonitor("Events Monitor", &events_monitor);
+  events_monitor = create_raw_monitor(jvmti, "Events Monitor");
   printf("Agent_OnLoad finished\n");
   return 0;
 }

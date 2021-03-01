@@ -35,16 +35,6 @@ static int breakpoint_count = 0;
 static int single_step_count = 0;
 
 static void
-lock_events() {
-  jvmti->RawMonitorEnter(event_mon);
-}
-
-static void
-unlock_events() {
-  jvmti->RawMonitorExit(event_mon);
-}
-
-static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
                        const char* event_name, int event_count) {
   char* cname = NULL;
@@ -94,7 +84,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   char* mname = NULL;
   jvmtiError err;
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetMethodName call");
@@ -107,8 +97,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thread);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
-
-  unlock_events();
 }
 
 static void JNICALL
@@ -117,7 +105,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   char* mname = NULL;
   jvmtiError err;
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "SingleStep: error in JVMTI GetMethodName call");
@@ -127,8 +115,6 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   }
   print_frame_event_info(jvmti, jni, thread, method,
                          "SingleStep", ++single_step_count);
-
-  unlock_events();
 }
 
 
@@ -161,10 +147,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
-  err = jvmti->CreateRawMonitor("Events Monitor", &event_mon);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI CreateRawMonitor: %d\n", err);
-  }
+  event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
   printf("Agent_OnLoad finished\n");
   fflush(0);

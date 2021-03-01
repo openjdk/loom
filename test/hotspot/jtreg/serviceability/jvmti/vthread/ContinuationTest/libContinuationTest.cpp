@@ -37,16 +37,6 @@ static int method_entry_count = 0;
 static int frame_pop_count = 0;
 
 static void
-lock_events() {
-  jvmti->RawMonitorEnter(event_mon);
-}
-
-static void
-unlock_events() {
-  jvmti->RawMonitorExit(event_mon);
-}
-
-static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method, const char* event_name) {
   char* cname = NULL;
   char* mname = NULL;
@@ -95,7 +85,7 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
   char* mname = NULL;
   jvmtiError err;
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "MethodEntry: error in JVMTI GetMethodName call");
@@ -129,30 +119,26 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
     }
   }
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
 FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
          jboolean was_popped_by_exception) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   frame_pop_count++;
   print_frame_event_info(jvmti, jni, thread, method, "FramePop");
-  unlock_events();
 }
 
 static void JNICALL
 ContinuationRun(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_count) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   print_cont_event_info(jvmti, jni, thread, frames_count, "ContinuationRun");
-  unlock_events();
 }
 
 static void JNICALL
 ContinuationYield(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_count) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   print_cont_event_info(jvmti, jni, thread, frames_count, "ContinuationYield");
-  unlock_events();
 }
 
 JNIEXPORT jint JNICALL
@@ -187,10 +173,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
-  err = jvmti->CreateRawMonitor("Events Monitor", &event_mon);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI CreateRawMonitor: %d\n", err);
-  }
+  event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
   printf("Agent_OnLoad finished\n");
   fflush(0);
