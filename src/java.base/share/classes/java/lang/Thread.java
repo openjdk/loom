@@ -879,7 +879,7 @@ public class Thread implements Runnable {
         /**
          * Sets the daemon status to {@code true}.
          * The {@link #isDaemon() daemon status} of virtual threads is always {@code true}.
-         * Setting the daemon status of a virtual thread has no effect.??
+         * Setting the daemon status of a virtual thread has no effect.
          * @implSpec The default implementation invokes {@linkplain #daemon(boolean)} with
          * a value of {@code true}.
          * @return this builder
