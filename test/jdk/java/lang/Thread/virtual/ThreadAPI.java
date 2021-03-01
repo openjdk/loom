@@ -1143,6 +1143,33 @@ public class ThreadAPI {
         }
     }
 
+    // no support for thread locals
+    public void testContextClassLoader5() throws Exception {
+        ClassLoader loader = new ClassLoader() { };
+        TestHelper.runInVirtualThread(TestHelper.NO_THREAD_LOCALS, () -> {
+            Thread t = Thread.currentThread();
+            assertTrue(t.getContextClassLoader() == null);
+            assertThrows(UnsupportedOperationException.class,
+                         () -> t.setContextClassLoader(loader));
+            assertTrue(t.getContextClassLoader() == null);
+        });
+    }
+
+    // do no inherit the initial value of threads locals
+    public void testContextClassLoader6() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            ClassLoader loader = new ClassLoader() { };
+            Thread.currentThread().setContextClassLoader(loader);
+            int characteristics = TestHelper.NO_INHERIT_INHERITABLE_THREAD_LOCALS;
+            TestHelper.runInVirtualThread(characteristics, () -> {
+                Thread t = Thread.currentThread();
+                assertTrue(t.getContextClassLoader() == null);
+                t.setContextClassLoader(loader);
+                assertTrue(t.getContextClassLoader() == loader);
+            });
+        });
+    }
+
 
     // -- Thread.UncaughtExceptionHandler --
 
@@ -1525,7 +1552,7 @@ public class ThreadAPI {
             ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
             Thread child = new Thread(() -> { });
             ThreadGroup group = child.getThreadGroup();
-            assertTrue(group != vgroup);
+            assertTrue(group == vgroup);
         });
     }
 
