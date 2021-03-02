@@ -23,10 +23,10 @@
 
 #include <string.h>
 #include "jvmti.h"
+#include "jvmti_common.h"
+
 
 extern "C" {
-
-#define MAX_FRAME_COUNT 40
 
 static jvmtiEnv *jvmti = NULL;
 static jrawMonitorID event_mon = NULL;
@@ -39,166 +39,6 @@ static int cont_run_count = 0;
 static int cont_yield_count = 0;
 static jboolean pass_status = JNI_TRUE;
 
-
-static void
-lock_events() {
-  jvmti->RawMonitorEnter(event_mon);
-}
-
-static void
-unlock_events() {
-  jvmti->RawMonitorExit(event_mon);
-}
-
-static void
-check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
-  if (err != JVMTI_ERROR_NONE) {
-    printf("check_jvmti_status: JVMTI function returned error: %d\n", err);
-    jni->FatalError(msg);
-  }
-}
-
-static void
-deallocate(jvmtiEnv *jvmti, JNIEnv* jni, void* ptr) {
-  jvmtiError err;
-
-  err = jvmti->Deallocate((unsigned char*)ptr);
-  check_jvmti_status(jni, err, "deallocate: error in JVMTI Deallocate call");
-}
-
-static char*
-get_thread_name(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
-  jvmtiThreadInfo thr_info;
-  jvmtiError err;
-
-  memset(&thr_info, 0, sizeof(thr_info));
-  err = jvmti->GetThreadInfo(thread, &thr_info);
-  check_jvmti_status(jni, err, "get_thread_name: error in JVMTI GetThreadInfo call");
-
-  return thr_info.name == NULL ? (char*)"<Unnamed thread>" : thr_info.name;
-}
-
-static char*
-get_method_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
-  char*  mname = NULL;
-  jvmtiError err;
-
-  err = jvmti->GetMethodName(method, &mname, NULL, NULL);
-  check_jvmti_status(jni, err, "get_method_name: error in JVMTI GetMethodName call");
-
-  return mname;
-}
-
-static char*
-get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
-  jclass klass = NULL;
-  char*  cname = NULL;
-  char*  result = NULL;
-  jvmtiError err;
-
-  err = jvmti->GetMethodDeclaringClass(method, &klass);
-  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetMethodDeclaringClass");
-
-  err = jvmti->GetClassSignature(klass, &cname, NULL);
-  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetClassSignature");
-
-  size_t len = strlen(cname) - 2; // get rid of leading 'L' and trailing ';'
-
-  err = jvmti->Allocate((jlong)(len + 1), (unsigned char**)&result);
-  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI Allocate");
-
-  strncpy(result, cname + 1, len); // skip leading 'L'
-  result[len] = '\0';
-  return result;
-}
-
-static jclass
-find_class(jvmtiEnv *jvmti, JNIEnv *jni, jobject loader, const char* cname) {
-  jclass *classes = NULL;
-  jint count = 0;
-  jvmtiError err;
-
-  err = jvmti->GetClassLoaderClasses(loader, &count, &classes);
-  check_jvmti_status(jni, err, "find_class: error in JVMTI GetClassLoaderClasses");
-
-  // Find the jmethodID of the specified method
-  while (--count >= 0) {
-    char* name = NULL;
-    jclass klass = classes[count];
-
-    err = jvmti->GetClassSignature(klass, &name, NULL);
-    check_jvmti_status(jni, err, "find_class: error in JVMTI GetClassSignature call");
-
-    bool found = (strcmp(name, cname) == 0);
-    deallocate(jvmti, jni, (void*)name);
-    if (found) {
-      return klass;
-    }
-  }
-  return NULL;
-}
-
-static jmethodID
-find_method(JNIEnv *jni, jclass klass, const char* mname) {
-  jmethodID *methods = NULL;
-  jmethodID method = NULL;
-  jint count = 0;
-  jvmtiError err;
-
-  err = jvmti->GetClassMethods(klass, &count, &methods);
-  check_jvmti_status(jni, err, "find_method: error in JVMTI GetClassMethods");
-
-  // Find the jmethodID of the specified method
-  while (--count >= 0) {
-    char* name = NULL;
-
-    jmethodID meth = methods[count];
-
-    err = jvmti->GetMethodName(meth, &name, NULL, NULL);
-    check_jvmti_status(jni, err, "find_method: error in JVMTI GetMethodName call");
-
-    bool found = (strcmp(name, mname) == 0);
-    deallocate(jvmti, jni, (void*)name);
-    if (found) {
-      method = meth;
-      break;
-    }
-  }
-  deallocate(jvmti, jni, (void*)methods);
-  return method;
-}
-
-static void
-print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
-  char*  cname = NULL;
-  char*  mname = NULL;
-  char*  msign = NULL;
-  jvmtiError err;
-
-  cname = get_method_class_name(jvmti, jni, method);
-
-  err = jvmti->GetMethodName(method, &mname, &msign, NULL);
-  check_jvmti_status(jni, err, "print_method: error in JVMTI GetMethodName");
-
-  printf("%2d: %s: %s%s\n", depth, cname, mname, msign);
-  fflush(0);
-}
-
-static void
-print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
-  jvmtiFrameInfo frames[MAX_FRAME_COUNT];
-  jint count = 0;
-  jvmtiError err;
-
-  err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT, frames, &count);
-  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
-
-  printf("JVMTI Stack Trace: frame count: %d\n", count);
-  for (int depth = 0; depth < count; depth++) {
-    print_method(jvmti, jni, frames[depth].method, depth);
-  }
-  printf("\n");
-}
 
 static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
@@ -236,7 +76,7 @@ static void
 set_breakpoint(JNIEnv *jni, jclass klass, const char *mname)
 {
   jlocation location = (jlocation)0L;
-  jmethodID method = find_method(jni, klass, mname);
+  jmethodID method = find_method(jvmti, jni, klass, mname);
   jvmtiError err;
 
   // Find the jmethodID of the specified method
@@ -264,14 +104,15 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   char* tname = get_thread_name(jvmti, jni, thread);
   const char* virt = jni->IsVirtualThread(thread) ? "virtual" : "carrier";
 
-  lock_events();
+  {
+    RawMonitorLocker rml(jvmti, jni, event_mon);
 
-  printf("Breakpoint: %s: Stack Trace of %s thread: %s\n", mname, virt, tname);
+    printf("Breakpoint: %s: Stack Trace of %s thread: %s\n", mname, virt, tname);
 
-  print_frame_event_info(jvmti, jni, thread, method,
-                         "Breakpoint", ++breakpoint_count);
-  fflush(0);
-  unlock_events();
+    print_frame_event_info(jvmti, jni, thread, method,
+                           "Breakpoint", ++breakpoint_count);
+    fflush(0);
+  }
 
   deallocate(jvmti, jni, (void*)tname);
   deallocate(jvmti, jni, (void*)mname);
@@ -281,11 +122,11 @@ static void JNICALL
 ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   char* tname = get_thread_name(jvmti, jni, thread);
 
-  lock_events();
-
-  printf("\nThreadStart: thread: %p, name: %s\n", (void*)thread, tname);
-  fflush(0);
-  unlock_events();
+  {
+    RawMonitorLocker rml(jvmti, jni, event_mon);
+    printf("\nThreadStart: thread: %p, name: %s\n", (void *) thread, tname);
+    fflush(0);
+  }
 
   deallocate(jvmti, jni, (void*)tname);
 }
@@ -295,11 +136,11 @@ VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   char* tname = get_thread_name(jvmti, jni, thread);
   const char* virt = jni->IsVirtualThread(thread) ? "virtual" : "carrier";
 
-  lock_events();
-
-  printf("\nVirtualThreadScheduled: %s, thread: %s\n", virt, tname);
-  fflush(0);
-  unlock_events();
+  {
+    RawMonitorLocker rml(jvmti, jni, event_mon);
+    printf("\nVirtualThreadScheduled: %s, thread: %s\n", virt, tname);
+    fflush(0);
+  }
 
   deallocate(jvmti, jni, (void*)tname);
 }
@@ -313,12 +154,11 @@ VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   err = jvmti->GetFrameLocation(thread, 0, &method, &loc);
   check_jvmti_status(jni, err, "VirtualThreadMounted: error in JVMTI GetFrameLocation");
 
-  lock_events();
 
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   print_frame_event_info(jvmti, jni, thread, method,
                          "VirtualThreadMounted", ++vt_mounted_count);
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -330,12 +170,11 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   err = jvmti->GetFrameLocation(thread, 0, &method, &loc);
   check_jvmti_status(jni, err, "VirtualThreadMUnmounted: error in JVMTI GetFrameLocation");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   print_frame_event_info(jvmti, jni, thread, method,
                          "VirtualThreadUnmounted", ++vt_unmounted_count);
   fflush(0);
-  unlock_events();
 }
 
 #if 0
@@ -362,22 +201,20 @@ MethodExit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
 
 static void JNICALL
 ContinuationRun(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint fcount) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   print_cont_event_info(jvmti, jni, thread, fcount, "ContinuationRun", cont_run_count++);  
 
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
 ContinuationYield(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint fcount) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   print_cont_event_info(jvmti, jni, thread, fcount, "ContinuationYield", cont_yield_count++);  
 
   fflush(0);
-  unlock_events();
 }
 
 JNIEXPORT jint JNICALL
@@ -476,7 +313,7 @@ JNIEXPORT void JNICALL
 Java_BreakpointInYieldTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread) {
   jvmtiError err;
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   printf("enableEvents: started\n");
 
@@ -493,8 +330,6 @@ Java_BreakpointInYieldTest_enableEvents(JNIEnv *jni, jclass klass, jthread threa
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI SetEventNotificationMode: enable BREAKPOINT");
 
   printf("enableEvents: finished\n");
-
-  unlock_events();
   fflush(0);
 }
 

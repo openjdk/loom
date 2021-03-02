@@ -130,10 +130,22 @@ class RawMonitorLocker {
 
 };
 
-static char* get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
+
+static void
+deallocate(jvmtiEnv *jvmti, JNIEnv* jni, void* ptr) {
   jvmtiError err;
+
+  err = jvmti->Deallocate((unsigned char*)ptr);
+  check_jvmti_status(jni, err, "deallocate: error in JVMTI Deallocate call");
+}
+
+
+static char*
+get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
   jclass klass = NULL;
   char*  cname = NULL;
+  char*  result = NULL;
+  jvmtiError err;
 
   err = jvmti->GetMethodDeclaringClass(method, &klass);
   check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetMethodDeclaringClass");
@@ -141,8 +153,14 @@ static char* get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID metho
   err = jvmti->GetClassSignature(klass, &cname, NULL);
   check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetClassSignature");
 
-  cname[strlen(cname) - 1] = '\0'; // get rid of trailing ';'
-  return cname + 1;                // get rid of leading 'L'
+  size_t len = strlen(cname) - 2; // get rid of leading 'L' and trailing ';'
+
+  err = jvmti->Allocate((jlong)(len + 1), (unsigned char**)&result);
+  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI Allocate");
+
+  strncpy(result, cname + 1, len); // skip leading 'L'
+  result[len] = '\0';
+  return result;
 }
 
 
@@ -162,7 +180,6 @@ print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
   fflush(0);
 }
 
-
 void print_thread_info(JNIEnv* jni, jvmtiEnv *jvmti, jthread thread_obj) {
   jvmtiThreadInfo thread_info;
   jint thread_state;
@@ -173,7 +190,7 @@ void print_thread_info(JNIEnv* jni, jvmtiEnv *jvmti, jthread thread_obj) {
          (jni->IsVirtualThread(thread_obj)? "virtual": "kernel"), (thread_info.is_daemon ? "daemon": ""));
 }
 
-#define MAX_FRAME_COUNT_PRINT_STACK_TRACE 20
+#define MAX_FRAME_COUNT_PRINT_STACK_TRACE 200
 
 
 static void
@@ -209,6 +226,7 @@ print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   printf("\n");
 }
 
+
 static void
 print_stack_trace_frames(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInfo *frames) {
   printf("JVMTI Stack Trace: frame count: %d\n", count);
@@ -217,6 +235,30 @@ print_stack_trace_frames(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInf
   }
   printf("\n");
 }
+
+static char*
+get_thread_name(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  jvmtiThreadInfo thr_info;
+  jvmtiError err;
+
+  memset(&thr_info, 0, sizeof(thr_info));
+  err = jvmti->GetThreadInfo(thread, &thr_info);
+  check_jvmti_status(jni, err, "get_thread_name: error in JVMTI GetThreadInfo call");
+
+  return thr_info.name == NULL ? (char*)"<Unnamed thread>" : thr_info.name;
+}
+
+static char*
+get_method_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
+  char*  mname = NULL;
+  jvmtiError err;
+
+  err = jvmti->GetMethodName(method, &mname, NULL, NULL);
+  check_jvmti_status(jni, err, "get_method_name: error in JVMTI GetMethodName call");
+
+  return mname;
+}
+
 
 static jclass
 find_class(jvmtiEnv *jvmti, JNIEnv *jni, jobject loader, const char* cname) {
@@ -235,8 +277,9 @@ find_class(jvmtiEnv *jvmti, JNIEnv *jni, jobject loader, const char* cname) {
     err = jvmti->GetClassSignature(klass, &name, NULL);
     check_jvmti_status(jni, err, "find_class: error in JVMTI GetClassSignature call");
 
-    if (strcmp(name, cname) == 0) {
-      printf("found class %s\n", cname); fflush(0);
+    bool found = (strcmp(name, cname) == 0);
+    deallocate(jvmti, jni, (void*)name);
+    if (found) {
       return klass;
     }
   }
@@ -244,7 +287,9 @@ find_class(jvmtiEnv *jvmti, JNIEnv *jni, jobject loader, const char* cname) {
 }
 
 static jmethodID
-find_method(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass, const char* mname) { jmethodID *methods = NULL;
+find_method(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass, const char* mname) {
+  jmethodID *methods = NULL;
+  jmethodID method = NULL;
   jint count = 0;
   jvmtiError err;
 
@@ -254,17 +299,21 @@ find_method(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass, const char* mname) { jme
   // Find the jmethodID of the specified method
   while (--count >= 0) {
     char* name = NULL;
-    jmethodID method = methods[count];
 
-    err = jvmti->GetMethodName(method, &name, NULL, NULL);
+    jmethodID meth = methods[count];
+
+    err = jvmti->GetMethodName(meth, &name, NULL, NULL);
     check_jvmti_status(jni, err, "find_method: error in JVMTI GetMethodName call");
 
-    if (strcmp(name, mname) == 0) {
-      printf("found method %s\n", mname); fflush(0);
-      return method;
+    bool found = (strcmp(name, mname) == 0);
+    deallocate(jvmti, jni, (void*)name);
+    if (found) {
+      method = meth;
+      break;
     }
   }
-  return NULL;
+  deallocate(jvmti, jni, (void*)methods);
+  return method;
 }
 
 /* Commonly used helper functions */
