@@ -116,7 +116,6 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
 static void JNICALL
 threadProc(jvmtiEnv* jvmti, JNIEnv* jni, void *unused) {
-  jvmtiError err;
   RawMonitorLocker wait_locker(jvmti, jni, wait_lock);
   wait_locker.notify();
 }
