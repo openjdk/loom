@@ -43,15 +43,6 @@ static jrawMonitorID events_monitor = NULL;
 static Tinfo tinfo[MAX_WORKER_THREADS];
 static jboolean continuation_events_enabled = JNI_FALSE;
 
-static void
-lock_events() {
-  jvmti->RawMonitorEnter(events_monitor);
-}
-
-static void
-unlock_events() {
-  jvmti->RawMonitorExit(events_monitor);
-}
 
 static Tinfo*
 find_tinfo(JNIEnv* jni, const char* thr_name) {
@@ -624,44 +615,38 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *e
 
 static void JNICALL
 VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, events_monitor);
   processVThreadEvent(jvmti, jni, vthread, "VirtualThreadScheduled");
-  unlock_events();
 }
 
 static void JNICALL
 VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, events_monitor);
   processVThreadEvent(jvmti, jni, vthread, "VirtualThreadTerminated");
-  unlock_events();
 }
 
 static void JNICALL
 VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, events_monitor);
   processVThreadEvent(jvmti, jni, vthread, "VirtualThreadMounted");
-  unlock_events();
 }
 
 static void JNICALL
 VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, events_monitor);
   processVThreadEvent(jvmti, jni, vthread, "VirtualThreadUnmounted");
-  unlock_events();
 }
 
 static void JNICALL
 ContinuationRun(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jint frames_count) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, events_monitor);
   print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationRun");
-  unlock_events();
 }
 
 static void JNICALL
 ContinuationYield(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jint frames_count) {
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, events_monitor);
   print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationYield");
-  unlock_events();
 }
 
 extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,

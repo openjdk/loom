@@ -124,6 +124,10 @@ class RawMonitorLocker {
     check_jvmti_status(_jni, _jvmti->RawMonitorNotify(_monitor), "Fatal Error in RawMonitorNotify.");
   }
 
+  void notify_all() {
+    check_jvmti_status(_jni, _jvmti->RawMonitorNotifyAll(_monitor), "Fatal Error in RawMonitorNotifyAll.");
+  }
+
 };
 
 static char* get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {

@@ -46,16 +46,6 @@ jint url_method_count = 0;
 jclass url_class = NULL;
 
 static void
-lock_events() {
-  jvmti->RawMonitorEnter(event_mon);
-}
-
-static void
-unlock_events() {
-  jvmti->RawMonitorExit(event_mon);
-}
-
-static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
                        const char* event_name, int event_count) {
   char* cname = NULL;
@@ -192,7 +182,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetMethodName call");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
 
   brkptBreakpointHit++;
   print_frame_event_info(jvmti, jni, thread, method, "Breakpoint", ++breakpoint_count);
@@ -207,7 +197,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   }
 
   fflush(0);
-  unlock_events();
 }
 
 static void JNICALL
@@ -219,7 +208,7 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
   err = jvmti->GetMethodName(method, &mname, NULL, NULL);
   check_jvmti_status(jni, err, "FramePop: error in JVMTI GetMethodName call");
 
-  lock_events();
+  RawMonitorLocker rml(jvmti, jni, event_mon);
   received_frame_pop_event = JNI_TRUE;
   frame_pop_count++;
 
@@ -228,7 +217,6 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
 
   print_frame_event_info(jvmti, jni, thread, method, "FramePop", frame_pop_count);
   fflush(0);
-  unlock_events();
 }
 
 
