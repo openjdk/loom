@@ -49,7 +49,6 @@ import java.util.concurrent.locks.LockSupport;
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
-import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -108,14 +107,15 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * <p> {@code Thread} defines a {@linkplain Builder} API, for creating threads. It
  * also defines (for customization reasons) constructors for creating platform threads.
  * The constructors cannot be used to create virtual threads. By default, creating
- * a {@code Thread} inherits the initial values of {@link InheritableThreadLocal}
- * variables and a number of characteristics from the parent thread:
+ * a {@code Thread} inherits the initial values of {@linkplain InheritableThreadLocal
+ * inheritable-thread-locals}, {@linkplain Scoped#inheritableForType(Class)
+ * inheritable-scoped-variables}, and a number of properties from the parent thread:
  * <ul>
  *     <li> Platform threads inherit the daemon status, priority, and thread-group.
  *     <li> Virtual threads are scheduled by the same scheduler as the parent thread
  *          when the parent thread is a virtual thread. Virtual threads use the default
- *          scheduler when the parent thread is a platform thread and scheduler has not
- *          been selected.
+ *          scheduler when the parent thread is a platform thread and the scheduler has
+ *          not been selected.
  *     <li> The {@linkplain #getContextClassLoader() context-class-loader} is treated
  *          as an inheritable thread local and is inherited by default.
  * </ul>
@@ -579,23 +579,26 @@ public class Thread implements Runnable {
         this.tid = primordial ? 1 : ThreadIdentifiers.next();
         this.inheritedAccessControlContext = (acc != null) ? acc : AccessController.getContext();
 
-        // thread locals
-        if ((characteristics & NO_THREAD_LOCALS) != 0) {
-            this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
-            this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
-            this.contextClassLoader = ClassLoaders.NOT_SUPPORTED;
-        } else if ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0) {
-            ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
-            if (parentMap != null
-                    && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED
-                    && parentMap.size() > 0) {
-                this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
+        // thread locals and scoped variables
+        if (!primordial) {
+            if ((characteristics & NO_THREAD_LOCALS) != 0) {
+                this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
+                this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
+                this.contextClassLoader = ClassLoaders.NOT_SUPPORTED;
+            } else if ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0) {
+                ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
+                if (parentMap != null
+                        && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED
+                        && parentMap.size() > 0) {
+                    this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
+                }
+                ClassLoader parentLoader = contextClassLoader(parent);
+                if (parentLoader != ClassLoaders.NOT_SUPPORTED) {
+                    this.contextClassLoader = parentLoader;
+                }
             }
-            this.contextClassLoader = contextClassLoader(parent);
+            this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
         }
-
-        // scoped variables
-        this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
 
         int priority;
         boolean daemon;
@@ -635,7 +638,10 @@ public class Thread implements Runnable {
                     && parentMap.size() > 0) {
                 this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
             }
-            this.contextClassLoader = contextClassLoader(parent);
+            ClassLoader parentLoader = contextClassLoader(parent);
+            if (parentLoader != ClassLoaders.NOT_SUPPORTED) {
+                this.contextClassLoader = parentLoader;
+            }
         }
 
         // scoped variables
@@ -2434,8 +2440,7 @@ public class Thread implements Runnable {
      * The context {@code ClassLoader} may be set by the creator of the thread
      * for use by code running in this thread when loading classes and resources.
      * If not {@linkplain #setContextClassLoader set}, the default is to inherit
-     * the context class loader from the parent thread when creating the
-     * {@code Thread}.
+     * the context class loader from the parent thread.
      *
      * <p> The context {@code ClassLoader} of the primordial thread is typically
      * set to the class loader used to load the application.
@@ -2494,7 +2499,8 @@ public class Thread implements Runnable {
             sm.checkPermission(new RuntimePermission("setContextClassLoader"));
         }
         if (contextClassLoader == ClassLoaders.NOT_SUPPORTED) {
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(
+                "Thread is not allowed to set values for its copy of thread-local variables");
         }
         contextClassLoader = cl;
     }
@@ -2502,7 +2508,12 @@ public class Thread implements Runnable {
     private static class ClassLoaders {
         static final ClassLoader NOT_SUPPORTED;
         static {
-            PrivilegedAction<ClassLoader> pa = () -> new ClassLoader(null) { };
+            PrivilegedAction<ClassLoader> pa = new PrivilegedAction<>() {
+                @Override
+                public ClassLoader run() {
+                    return new ClassLoader(null) { };
+                }
+            };
             NOT_SUPPORTED = AccessController.doPrivileged(pa);
         }
     }
