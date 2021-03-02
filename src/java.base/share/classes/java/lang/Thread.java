@@ -99,25 +99,30 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * #getPriority() thread priority} and are members of a {@linkplain ThreadGroup
  * thread group}.
  *
- * <p> Threads have an optional name and optionally support {@link ThreadLocal}
- * variables. Thread local variables are local to a thread, meaning a thread can
- * set its copy of a variable to a value that is independent of the value set by
- * other threads.
+ * <p> Threads have a thread {@linkplain #getName() name}. The name can be specified
+ * when creating a thread or can be {@linkplain #setName(String) set} at any time.
+ * Platform threads get an automatically generated thread name by default, virtual
+ * threads do not get a name by default.
+ *
+ * <p> Threads support {@link ThreadLocal} variables. These are variables that are
+ * local to a thread, meaning a thread can set its copy of a variable to a value that
+ * is independent of the value set by other threads. They also support {@link
+ * InheritableThreadLocal} variables that are thread local variables that are
+ * inherited from the parent thread. Thread supports a special inheritable thread
+ * local for the thread {@linkplain #getContextClassLoader() context-class-loader}.
  *
  * <p> {@code Thread} defines a {@linkplain Builder} API, for creating threads. It
  * also defines (for customization reasons) constructors for creating platform threads.
  * The constructors cannot be used to create virtual threads. By default, creating
- * a {@code Thread} inherits the initial values of {@linkplain InheritableThreadLocal
- * inheritable-thread-locals}, {@linkplain Scoped#inheritableForType(Class)
- * inheritable-scoped-variables}, and a number of properties from the parent thread:
+ * a {@code Thread} inherits the initial values of {@code InheritableThreadLocal}
+ * variables, {@linkplain Scoped#inheritableForType(Class) inheritable-scoped-variables},
+ * and a number of properties from the parent thread:
  * <ul>
  *     <li> Platform threads inherit the daemon status, priority, and thread-group.
  *     <li> Virtual threads are scheduled by the same scheduler as the parent thread
  *          when the parent thread is a virtual thread. Virtual threads use the default
  *          scheduler when the parent thread is a platform thread and the scheduler has
  *          not been selected.
- *     <li> The {@linkplain #getContextClassLoader() context-class-loader} is treated
- *          as an inheritable thread local and is inherited by default.
  * </ul>
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
