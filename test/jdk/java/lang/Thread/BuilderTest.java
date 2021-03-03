@@ -565,27 +565,22 @@ public class BuilderTest {
     }
 
     public void testInheritedThreadLocals3() throws Exception {
-        Thread.Builder builder = Thread.builder().noThreadLocals();
+        Thread.Builder builder = Thread.builder().noInheritThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals4() throws Exception {
-        Thread.Builder builder = Thread.builder().virtual().noThreadLocals();
+        Thread.Builder builder = Thread.builder().virtual().noInheritThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals5() throws Exception {
-        Thread.Builder builder = Thread.builder()
-                .noThreadLocals()
-                .noThreadLocals();
+        Thread.Builder builder = Thread.builder().noThreadLocals();
         testNoInheritedThreadLocals(builder);
     }
 
     public void testInheritedThreadLocals6() throws Exception {
-        Thread.Builder builder = Thread.builder()
-                .virtual()
-                .noThreadLocals()
-                .noThreadLocals();
+        Thread.Builder builder = Thread.builder().virtual().noThreadLocals();
     }
 
     // test null parameters
