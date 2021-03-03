@@ -1160,7 +1160,7 @@ public class ThreadAPI {
         TestHelper.runInVirtualThread(() -> {
             ClassLoader loader = new ClassLoader() { };
             Thread.currentThread().setContextClassLoader(loader);
-            int characteristics = TestHelper.NO_INHERIT_INHERITABLE_THREAD_LOCALS;
+            int characteristics = TestHelper.NO_INHERIT_THREAD_LOCALS;
             TestHelper.runInVirtualThread(characteristics, () -> {
                 Thread t = Thread.currentThread();
                 assertTrue(t.getContextClassLoader() == null);

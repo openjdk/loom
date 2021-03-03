@@ -639,7 +639,7 @@ final class TransportContext implements ConnectionContext {
                 new HandshakeCompletedEvent((SSLSocket)transport, conSession);
             Thread.builder()
                     .virtual()
-                    .noInheritInheritableThreadLocals()
+                    .noInheritThreadLocals()
                     .name("HandshakeCompletedNotify-Thread")
                     .task(new NotifyHandshake(sslConfig.handshakeListeners, hce))
                     .start();

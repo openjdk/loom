@@ -816,7 +816,7 @@ public class Thread implements Runnable {
          * to disallow the thread from setting the values of thread-local variables.
          * @return this builder
          */
-        Builder noInheritInheritableThreadLocals();
+        Builder noInheritThreadLocals();
         
         /**
          * Sets the uncaught exception handler.
@@ -1008,7 +1008,7 @@ public class Thread implements Runnable {
         }
 
         @Override
-        public Builder noInheritInheritableThreadLocals() {
+        public Builder noInheritThreadLocals() {
             characteristics |= Thread.NO_INHERIT_THREAD_LOCALS;
             return this;
         }
