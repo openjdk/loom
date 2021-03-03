@@ -75,7 +75,7 @@ public class BufferedReader extends Reader {
 
     private Reader in;
 
-    private char cb[];
+    private char[] cb;
     private int nChars, nextChar;
 
     private static final int INVALIDATED = -2;
@@ -150,7 +150,7 @@ public class BufferedReader extends Reader {
                     dst = delta;
                 } else {
                     /* Reallocate buffer to accommodate read-ahead limit */
-                    char ncb[] = new char[readAheadLimit];
+                    char[] ncb = new char[readAheadLimit];
                     System.arraycopy(cb, markedChar, ncb, 0, delta);
                     cb = ncb;
                     markedChar = 0;
@@ -255,7 +255,8 @@ public class BufferedReader extends Reader {
      * attempts to read as many characters as possible by repeatedly invoking
      * the {@code read} method of the underlying stream.  This iterated
      * {@code read} continues until one of the following conditions becomes
-     * true: <ul>
+     * true:
+     * <ul>
      *
      *   <li> The specified number of characters have been read,
      *
@@ -266,7 +267,8 @@ public class BufferedReader extends Reader {
      *   returns {@code false}, indicating that further input requests
      *   would block.
      *
-     * </ul> If the first {@code read} on the underlying stream returns
+     * </ul>
+     * If the first {@code read} on the underlying stream returns
      * {@code -1} to indicate end-of-file then this method returns
      * {@code -1}.  Otherwise this method returns the number of characters
      * actually read.
@@ -282,15 +284,14 @@ public class BufferedReader extends Reader {
      * Thus redundant {@code BufferedReader}s will not copy data
      * unnecessarily.
      *
-     * @param      cbuf  Destination buffer
-     * @param      off   Offset at which to start storing characters
-     * @param      len   Maximum number of characters to read
+     * @param      cbuf  {@inheritDoc}
+     * @param      off   {@inheritDoc}
+     * @param      len   {@inheritDoc}
      *
-     * @return     The number of characters read, or -1 if the end of the
-     *             stream has been reached
+     * @return     {@inheritDoc}
      *
-     * @throws     IOException  If an I/O error occurs
      * @throws     IndexOutOfBoundsException {@inheritDoc}
+     * @throws     IOException  {@inheritDoc}
      */
     public int read(char cbuf[], int off, int len) throws IOException {
         Object lock = this.lock;
@@ -310,10 +311,8 @@ public class BufferedReader extends Reader {
 
     private int lockedRead(char cbuf[], int off, int len) throws IOException {
         ensureOpen();
-        if ((off < 0) || (off > cbuf.length) || (len < 0) ||
-            ((off + len) > cbuf.length) || ((off + len) < 0)) {
-            throw new IndexOutOfBoundsException();
-        } else if (len == 0) {
+        Objects.checkFromIndexSize(off, len, cbuf.length);
+        if (len == 0) {
             return 0;
         }
 
