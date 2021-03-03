@@ -99,10 +99,12 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * #getPriority() thread priority} and are members of a {@linkplain ThreadGroup
  * thread group}.
  *
- * <p> Threads have a thread {@linkplain #getName() name}. The name can be specified
- * when creating a thread or can be {@linkplain #setName(String) set} at any time.
- * Platform threads get an automatically generated thread name by default, virtual
- * threads do not get a name by default.
+ * <p> Threads have an {@linkplain #getId() identifier} and a {@linkplain
+ * #getName() name}. The identifier is generated when a {@ocde Thread} is created
+ * and cannot be changed. A thread name can be specified when creating a thread
+ * or can be {@linkplain #setName(String) set} at any time. Platform threads get
+ * an automatically generated thread name by default. Virtual threads do not get
+ * a name by default.
  *
  * <p> Threads support {@link ThreadLocal} variables. These are variables that are
  * local to a thread, meaning a thread can set its copy of a variable to a value that
