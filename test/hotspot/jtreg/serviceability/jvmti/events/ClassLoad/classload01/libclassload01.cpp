@@ -122,7 +122,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
   i = findSig(sig, 1);
   if (i != -1) {
     jboolean is_virtual_thread = jni->IsVirtualThread(thread);
-    print_thread_info(jni, jvmti, thread);
+    print_thread_info(jvmti, jni, thread);
     if (is_virtual_thread != expThreadIsVirtual[i]) {
       printf("TEST FAILED: IsVirtualThread(thread) is not expected: %d\n", is_virtual_thread);
       result = STATUS_FAILED;

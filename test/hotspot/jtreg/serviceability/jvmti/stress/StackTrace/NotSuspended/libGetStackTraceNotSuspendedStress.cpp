@@ -41,7 +41,7 @@ static void test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   check_jvmti_status(jni, err, "GetStackTrace returns error.");
   if (count < 0) {
     printf("Stacktrace in virtual thread is incorrect.\n");
-    print_thread_info(jni, jvmti, vthread);
+    print_thread_info(jvmti, jni, vthread);
     print_stack_trace_frames(jvmti, jni, count, frames);
     fatal(jni, "Incorrect frame count.");
   }

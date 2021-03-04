@@ -62,7 +62,7 @@ StorageStructure* check_tls(jvmtiEnv * jvmti, JNIEnv * jni, jthread thread, cons
   if (storage->self_pointer != storage || (strcmp(thread_info.name, storage->data) != 0)) {
     printf("Unexpected value in storage storage=%p, the self_pointer=%p, data (owner thread name): %s\n",
            storage, storage->self_pointer, storage->data);
-    print_thread_info(jni, jvmti, thread);
+    print_thread_info(jvmti, jni, thread);
     jni->FatalError("Incorrect value in storage.");
   }
   return storage;

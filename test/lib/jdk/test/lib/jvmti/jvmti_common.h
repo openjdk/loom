@@ -180,7 +180,7 @@ print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
   fflush(0);
 }
 
-void print_thread_info(JNIEnv* jni, jvmtiEnv *jvmti, jthread thread_obj) {
+void print_thread_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread_obj) {
   jvmtiThreadInfo thread_info;
   jint thread_state;
   check_jvmti_status(jni, jvmti->GetThreadInfo(thread_obj, &thread_info), "Error in GetThreadInfo");

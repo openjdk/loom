@@ -147,7 +147,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
 
   NSK_DISPLAY0(">>>> SingleStep event received\n");
 
-  print_thread_info(jni, jvmti, thread);
+  print_thread_info(jvmti, jni, thread);
 
   err = jvmti->GetMethodName(method, &methNam, &methSig, NULL);
   if (err != JVMTI_ERROR_NONE) {
