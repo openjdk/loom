@@ -190,43 +190,6 @@ void print_thread_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread_obj) {
          (jni->IsVirtualThread(thread_obj)? "virtual": "kernel"), (thread_info.is_daemon ? "daemon": ""));
 }
 
-#define MAX_FRAME_COUNT_PRINT_STACK_TRACE 200
-
-
-static void
-print_current_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni) {
-  jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
-  jint count = 0;
-  jvmtiError err;
-
-  err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
-  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
-
-  printf("JVMTI Stack Trace: frame count: %d\n", count);
-  for (int depth = 0; depth < count; depth++) {
-    print_method(jvmti, jni, frames[depth].method, depth);
-  }
-  printf("\n");
-}
-
-
-static void
-print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
-  jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
-  jint count = 0;
-  jvmtiError err;
-
-  err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
-  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
-
-  printf("JVMTI Stack Trace: frame count: %d\n", count);
-  for (int depth = 0; depth < count; depth++) {
-    print_method(jvmti, jni, frames[depth].method, depth);
-  }
-  printf("\n");
-}
-
-
 static void
 print_stack_trace_frames(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInfo *frames) {
   printf("JVMTI Stack Trace: frame count: %d\n", count);
@@ -315,6 +278,43 @@ find_method(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass, const char* mname) {
   deallocate(jvmti, jni, (void*)methods);
   return method;
 }
+
+#define MAX_FRAME_COUNT_PRINT_STACK_TRACE 200
+
+static void
+print_current_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni) {
+  jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
+  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
+
+  printf("JVMTI Stack Trace for current thread: frame count: %d\n", count);
+  for (int depth = 0; depth < count; depth++) {
+    print_method(jvmti, jni, frames[depth].method, depth);
+  }
+  printf("\n");
+}
+
+static void
+print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
+  char* tname = get_thread_name(jvmti, jni, thread);
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
+  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
+
+  printf("JVMTI Stack Trace for thread %s: frame count: %d\n", tname, count);
+  for (int depth = 0; depth < count; depth++) {
+    print_method(jvmti, jni, frames[depth].method, depth);
+  }
+  deallocate(jvmti, jni, (void*)tname);
+  printf("\n");
+}
+
 
 /* Commonly used helper functions */
 const char* TranslateState(jint flags) {

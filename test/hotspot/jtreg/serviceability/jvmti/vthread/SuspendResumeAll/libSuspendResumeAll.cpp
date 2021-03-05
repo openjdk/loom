@@ -30,7 +30,6 @@ extern "C" {
 
 /* ============================================================================= */
 
-#define MAX_FRAME_CNT 40
 #define VTHREAD_CNT   30
 
 static const char* CTHREAD_NAME_START = "ForkJoinPool";
@@ -43,45 +42,27 @@ static jthread tested_vthreads[VTHREAD_CNT];
 static int vthread_no = 0;
 static jlong timeout = 5 * 60 * 1000; // 5 minutes
 
-static void
-print_stack_trace1(JNIEnv* jni, jthread thread, char* tname) {
-  jvmtiFrameInfo frames[MAX_FRAME_CNT];
-  jint count = 0;
-
-  jvmtiError err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_CNT, frames, &count);
-  check_jvmti_status(jni, err, "print_stack_trace1: error in JVMTI GetStackTrace");
-
-  printf("JVMTI Stack Trace for thread %s: frame count: %d\n", tname, count);
-  for (int depth = 0; depth < count; depth++) {
-    print_method(jvmti, jni, frames[depth].method, depth);
-  }
-  printf("\n");
-}
 
 static void
-test_get_stack_trace(JNIEnv *jni, jthread thread, char* tname) {
-  print_stack_trace1(jni, thread, tname);
+test_get_stack_trace(JNIEnv *jni, jthread thread) {
+  print_stack_trace(jvmti, jni, thread);
 }
 
 static void
 test_get_thread_list_stack_traces(JNIEnv *jni, bool is_virt, jint thread_cnt, jthread* thread_list) {
   jvmtiStackInfo* stack_info_arr = NULL;
-  jvmtiThreadInfo info;
 
   printf("## Agent: test_get_thread_list_stack_traces started: is virtual: %d, count: %d\n\n",
          is_virt, thread_cnt);
 
   jvmtiError err = jvmti->GetThreadListStackTraces(thread_cnt, thread_list,
-                                        MAX_FRAME_CNT, &stack_info_arr);
+                                        MAX_FRAME_COUNT_PRINT_STACK_TRACE, &stack_info_arr);
   check_jvmti_status(jni, err, "test_get_thread_list_stack_traces: error in JVMTI GetThreadListStackTraces");
 
   for (int idx = 0; idx < thread_cnt; idx++) {
-    jvmtiStackInfo sinfo = stack_info_arr[idx];
-    jthread thread = sinfo.thread;
-    err = jvmti->GetThreadInfo(thread, &info);
-    check_jvmti_status(jni, err, "test_get_thread_list_stack_traces: error in JVMTI GetThreadListStackTraces");
+    jthread thread = stack_info_arr[idx].thread;
 
-    print_stack_trace1(jni, thread, info.name);
+    print_stack_trace(jvmti, jni, thread);
   }
   printf("## Agent: test_get_thread_list_stack_traces finished: virtual: %d, count: %d\n\n",
          is_virt, thread_cnt);
@@ -351,7 +332,7 @@ test_jvmti_functions_for_one_thread(JNIEnv* jni, jthread thread) {
   test_get_frame_location(jni, thread, tname);
 
   // test JVMTI GetStackTrace
-  test_get_stack_trace(jni, thread, tname);
+  test_get_stack_trace(jni, thread);
 }
 
 static void
