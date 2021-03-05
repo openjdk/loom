@@ -257,7 +257,7 @@ test_vthread_suspend_all(const jthread* thread_list) {
     jvmtiThreadInfo info;
 
     printf("\n## Agent: test_vthread_suspend_all started\n"); fflush(0);
-    if (!NSK_JVMTI_VERIFY(jvmti->SuspendAllVirtualThreads())) {
+    if (!NSK_JVMTI_VERIFY(jvmti->SuspendAllVirtualThreads(0, NULL))) {
         nsk_jvmti_setFailStatus();
         return;
     }
@@ -276,7 +276,7 @@ test_vthread_resume_all(const jthread* thread_list) {
     jvmtiThreadInfo info;
 
     printf("\n## Agent: test_vthread_resume_all started\n"); fflush(0);
-    if (!NSK_JVMTI_VERIFY(jvmti->ResumeAllVirtualThreads())) {
+    if (!NSK_JVMTI_VERIFY(jvmti->ResumeAllVirtualThreads(0, NULL))) {
         nsk_jvmti_setFailStatus();
     }
     for (int idx = 0; idx < VTHREAD_CNT; idx++) {

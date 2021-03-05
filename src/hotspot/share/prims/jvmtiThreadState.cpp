@@ -358,6 +358,7 @@ JvmtiVTSuspender::register_all_vthreads_suspend() {
 
   _vthread_suspend_mode = vthread_suspend_all;
   _vthread_suspend_list->invalidate();
+  _vthread_resume_list->invalidate();
 }
 
 void
@@ -365,6 +366,7 @@ JvmtiVTSuspender::register_all_vthreads_resume() {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   _vthread_suspend_mode = vthread_suspend_none;
+  _vthread_suspend_list->invalidate(); 
   _vthread_resume_list->invalidate();
 }
 

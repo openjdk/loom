@@ -1617,7 +1617,7 @@ threadControl_suspendAll(void)
             /* Tell JVMTI to suspend all virtual threads. */
             if (suspendAllCount == 0) {
                 error = JVMTI_FUNC_PTR(gdata->jvmti, SuspendAllVirtualThreads)
-                        (gdata->jvmti);
+                        (gdata->jvmti, 0, NULL);
                 if (error != JVMTI_ERROR_NONE) {
                     EXIT_ERROR(error, "cannot suspend all virtual threads");
                 }
@@ -1722,7 +1722,7 @@ threadControl_resumeAll(void)
         if (suspendAllCount == 1) {
             /* Tell JVMTI to resume all virtual threads. */
             error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeAllVirtualThreads)
-                    (gdata->jvmti);
+                    (gdata->jvmti, 0, NULL);
             if (error != JVMTI_ERROR_NONE) {
                 EXIT_ERROR(error, "cannot resume all virtual threads");
             }

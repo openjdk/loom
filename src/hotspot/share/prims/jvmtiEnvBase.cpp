@@ -1443,6 +1443,33 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
 }
 
 jvmtiError
+JvmtiEnvBase::check_thread_list(jint count, const jthread* list) {
+  if (list == NULL && count != 0) {
+    return JVMTI_ERROR_NULL_POINTER;
+  }
+  for (int i = 0; i < count; i++) {
+    jthread thread = list[i];
+    oop thread_oop = JNIHandles::resolve_external_guard(thread);
+    if (thread_oop == NULL || !thread_oop->is_a(vmClasses::VirtualThread_klass())) {
+      return JVMTI_ERROR_INVALID_THREAD;
+    }
+  }
+  return JVMTI_ERROR_NONE;
+}
+
+bool
+JvmtiEnvBase::is_in_thread_list(jint count, const jthread* list, oop jt_oop) {
+  for (int idx = 0; idx < count; idx++) {
+    jthread thread = list[idx];
+    oop thread_oop = JNIHandles::resolve_external_guard(thread);
+    if (thread_oop == jt_oop) {
+      return true;
+    }
+  } 
+  return false;
+}
+
+jvmtiError
 JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend,
                              int* need_safepoint_p) {
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
