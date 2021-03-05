@@ -1581,7 +1581,7 @@ public class Thread implements Runnable {
      * <p> The thread has no {@link Permission permissions}.
      *
      * <p> This method is equivalent to:
-     * <pre>{@code Thread.builder().virtual().name(name).build(task).start(); }</pre>
+     * <pre>{@code Thread.builder().virtual().name(name).task(task).start(); }</pre>
      *
      * @param name the thread name
      * @param task the object to run when the thread executes
@@ -1601,7 +1601,7 @@ public class Thread implements Runnable {
      * Creates a platform thread to execute a task and schedules it to execute.
      *
      * <p> This method is equivalent to:
-     * <pre>{@code Thread.builder().build(task).start(); }</pre>
+     * <pre>{@code Thread.builder().task(task).start(); }</pre>
      *
      * @param task the object to run when the thread executes
      * @return a new, and started, platform thread
