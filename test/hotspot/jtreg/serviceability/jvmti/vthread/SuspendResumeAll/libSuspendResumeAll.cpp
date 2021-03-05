@@ -300,7 +300,6 @@ test_vthread_resume_half(JNIEnv* jni, const jthread* thread_list) {
 static void
 test_threads_suspend_resume(JNIEnv* jni, jint thread_cnt, jthread* tested_threads) {
   jvmtiThreadInfo info;
-  jvmtiError err;
 
   for (int idx = 0; idx < thread_cnt; idx++) {
     jthread thread = tested_threads[idx];
@@ -310,7 +309,6 @@ test_threads_suspend_resume(JNIEnv* jni, jint thread_cnt, jthread* tested_thread
     test_thread_suspend(jni, thread, idx, tname);
     test_thread_resume(jni, thread, idx, tname);
 
-    check_jvmti_status(jni, err, "test_threads_suspend_resume: error in JVMTI Deallocate");
     deallocate(jvmti, jni, (void*)tname);
   }
 }
