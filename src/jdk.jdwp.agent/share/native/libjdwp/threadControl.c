@@ -2565,7 +2565,7 @@ threadControl_reset(void)
         if (suspendAllCount > 0) {
             /* Tell JVMTI to resume all virtual threads. */
             jvmtiError error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeAllVirtualThreads)
-                    (gdata->jvmti);
+              (gdata->jvmti, 0, NULL);
             if (error != JVMTI_ERROR_NONE) {
                 EXIT_ERROR(error, "cannot resume all virtual threads");
             }
