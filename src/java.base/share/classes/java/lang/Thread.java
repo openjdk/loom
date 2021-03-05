@@ -1555,25 +1555,15 @@ public class Thread implements Runnable {
     private static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     /**
-     * Starts a new virtual thread to execute a task. The thread is scheduled
-     * by the Java virtual machine using the default scheduler if the current
-     * thread is a platform thread, or the scheduler for the current thread if
-     * it is a virtual thread.
+     * Creates a virtual thread to execute a task and schedules it to execute.
      *
-     * <p> The new thread supports thread locals and inherits the initial
-     * value of inheritable thread locals from the current thread. It also
-     * inherits the context-class-loader from the current thread. The thread
-     * has no {@link java.security.Permission permissions}.
+     * <p> The thread has no {@link Permission permissions}.
      *
      * <p> This method is equivalent to:
-     * <pre>{@code
-     * Thread.builder().virtual().task(task).start();
-     * }</pre>
+     * <pre>{@code Thread.builder().virtual().build(task).start(); }</pre>
      *
      * @param task the object to run when the thread executes
-     * @throws NullPointerException if task is null
      * @return a new, and started, virtual thread
-     *
      * @since 99
      */
     public static Thread startVirtualThread(Runnable task) {
@@ -1588,26 +1578,37 @@ public class Thread implements Runnable {
      * thread is a platform thread, or the scheduler for the current thread if
      * it is a virtual thread.
      *
-     * <p> The new thread supports thread locals and inherits the initial
-     * value of inheritable thread locals from the current thread. It also
-     * inherits the context-class-loader from the current thread. The thread
-     * has no {@link java.security.Permission permissions}.
+     * <p> The thread has no {@link Permission permissions}.
      *
-     * <p> This method works is equivalent to:
-     * <pre>{@code
-     * Thread.builder().virtual().name(name).task(task).start();
-     * }</pre>
+     * <p> This method is equivalent to:
+     * <pre>{@code Thread.builder().virtual().name(name).build(task).start(); }</pre>
      *
      * @param name the thread name
      * @param task the object to run when the thread executes
-     * @throws NullPointerException if name or task is null
      * @return a new, and started, virtual thread
      *
      * @since 99
      */
+    @Deprecated(forRemoval = true)
     public static Thread startVirtualThread(String name, Runnable task) {
         Objects.requireNonNull(name);
         var thread = new VirtualThread(null, name, 0, task);
+        thread.start();
+        return thread;
+    }
+
+    /**
+     * Creates a platform thread to execute a task and schedules it to execute.
+     *
+     * <p> This method is equivalent to:
+     * <pre>{@code Thread.builder().build(task).start(); }</pre>
+     *
+     * @param task the object to run when the thread executes
+     * @return a new, and started, platform thread
+     * @since 99
+     */
+    public static Thread startPlatformThread(Runnable task) {
+        var thread = new Thread(Objects.requireNonNull(task));
         thread.start();
         return thread;
     }
