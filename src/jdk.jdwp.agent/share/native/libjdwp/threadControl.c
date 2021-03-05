@@ -235,12 +235,8 @@ nonTlsSearch(JNIEnv *env, ThreadList *list, jthread thread)
  * All assume that the threadLock is held before calling.
  */
 
-
 /*
  * Search for a thread on the list. If list==NULL, search all lists.
- * TODO: TLS cache is temporary diabled for all threads, not added for virtual threads yet
- * It cause intermittent failures because ThreadNode data is broken.
- * Need to enable setThreadLocalStorage in 2 places.
  */
 static ThreadNode *
 findThread(ThreadList *list, jthread thread)
@@ -1285,9 +1281,13 @@ commonResumeList(JNIEnv *env)
     /* count number of threads to hard resume */
     (void) enumerateOverThreadList(env, &runningThreads, resumeCountHelper,
                                    &reqCnt);
+    (void) enumerateOverThreadList(env, &runningVThreads, resumeCountHelper,
+                                   &reqCnt);
     if (reqCnt == 0) {
         /* nothing to hard resume so do just the accounting part */
         (void) enumerateOverThreadList(env, &runningThreads, resumeCopyHelper,
+                                       NULL);
+        (void) enumerateOverThreadList(env, &runningVThreads, resumeCopyHelper,
                                        NULL);
         return JVMTI_ERROR_NONE;
     }
@@ -1307,13 +1307,15 @@ commonResumeList(JNIEnv *env)
     reqPtr = reqList;
     (void) enumerateOverThreadList(env, &runningThreads, resumeCopyHelper,
                                    &reqPtr);
+    (void) enumerateOverThreadList(env, &runningVThreads, resumeCopyHelper,
+                                   &reqPtr);
 
     error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeThreadList)
                 (gdata->jvmti, reqCnt, reqList, results);
     for (i = 0; i < reqCnt; i++) {
         ThreadNode *node;
 
-        node = findThread(&runningThreads, reqList[i]);
+        node = findRunningThread(reqList[i]);
         if (node == NULL) {
             EXIT_ERROR(AGENT_ERROR_INVALID_THREAD,"missing entry in running thread table");
         }
@@ -1623,7 +1625,12 @@ threadControl_suspendAll(void)
                 }
             }
 
-            /* Increment suspend count of each virtual thread that we are tracking. */
+            /*
+             * Increment suspendCount of each virtual thread that we are tracking. Note the
+             * compliment to this that happens during the resumeAll() is handled by
+             * commonResumeList(), so it's a bit orthogonal to how we handle incrementing
+             * the suspendCount.
+             */
             error = enumerateOverThreadList(env, &runningVThreads, incrementSupendCountHelper, NULL);
             JDI_ASSERT(error == JVMTI_ERROR_NONE);
         }
@@ -1682,16 +1689,6 @@ threadControl_suspendAll(void)
 }
 
 static jvmtiError
-decrementSupendCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
-{
-    // Some vthreads might already have a suspendCount of 0. Just ignore them.
-    if (node->suspendCount > 0) {
-        node->suspendCount--;
-    }
-    return JVMTI_ERROR_NONE;
-}
-
-static jvmtiError
 resumeHelper(JNIEnv *env, ThreadNode *node, void *ignored)
 {
     /*
@@ -1727,10 +1724,6 @@ threadControl_resumeAll(void)
                 EXIT_ERROR(error, "cannot resume all virtual threads");
             }
         }
-
-        /* Decrement suspend count of each virtual thread that we are tracking. */
-        error = enumerateOverThreadList(env, &runningVThreads, decrementSupendCountHelper, NULL);
-        JDI_ASSERT(error == JVMTI_ERROR_NONE);
     }
 
     /*
@@ -2567,6 +2560,18 @@ threadControl_reset(void)
     env = getEnv();
     eventHandler_lock(); /* for proper lock order */
     debugMonitorEnter(threadLock);
+
+    if (gdata->vthreadsSupported) {
+        if (suspendAllCount > 0) {
+            /* Tell JVMTI to resume all virtual threads. */
+            jvmtiError error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeAllVirtualThreads)
+                    (gdata->jvmti);
+            if (error != JVMTI_ERROR_NONE) {
+                EXIT_ERROR(error, "cannot resume all virtual threads");
+            }
+        }
+    }
+
     (void)enumerateOverThreadList(env, &runningThreads, resetHelper, NULL);
     (void)enumerateOverThreadList(env, &otherThreads, resetHelper, NULL);
     (void)enumerateOverThreadList(env, &runningVThreads, resetHelper, NULL);

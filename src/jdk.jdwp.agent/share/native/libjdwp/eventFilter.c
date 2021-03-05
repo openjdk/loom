@@ -977,27 +977,6 @@ eventFilter_setStepFilter(HandlerNode *node, jint index,
     return JVMTI_ERROR_NONE;
 }
 
-/*
- * Finds the step filter in a node, and sets the thread for that filter.
- * vthread fixme: not used. delete once we know for sure we'll never need it.
- */
-void
-eventFilter_setStepFilterThread(HandlerNode *node, jthread thread)
-{
-    JNIEnv *env = getEnv();
-    Filter *filter = FILTERS_ARRAY(node);
-    int i;
-    for (i = 0; i < FILTER_COUNT(node); ++i, ++filter) {
-        switch (filter->modifier) {
-          case JDWP_REQUEST_MODIFIER(Step):
-            tossGlobalRef(env, &(filter->u.Step.thread));
-            saveGlobalRef(env, thread, &(filter->u.Step.thread));
-            return;
-        }
-    }
-    JDI_ASSERT(JNI_FALSE); /* We should have found a step filter, but didn't. */
-}
-
 jvmtiError
 eventFilter_setSourceNameMatchFilter(HandlerNode *node,
                                     jint index,
