@@ -100,9 +100,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * thread group}.
  *
  * <p> Threads have an {@linkplain #getId() identifier} and a {@linkplain
- * #getName() name}. The identifier is generated when a {@ocde Thread} is created
+ * #getName() name}. The identifier is generated when a {@code Thread} is created
  * and cannot be changed. A thread name can be specified when creating a thread
- * or can be {@linkplain #setName(String) set} at any time. Platform threads get
+ * or can be {@linkplain #setName(String) changed} at any time. Platform threads get
  * an automatically generated thread name by default. Virtual threads do not get
  * a name by default.
  *
