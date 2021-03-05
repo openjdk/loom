@@ -157,10 +157,10 @@ test_thread_suspend_list(JNIEnv* jni, const jthread* thread_list) {
 
   for (int idx = 0; idx < VTHREAD_CNT; idx++) {
     jthread thread = thread_list[idx];
-    err = jvmti->GetThreadInfo(thread, &info);
-    check_jvmti_status(jni, err, "test_thread_suspend_list: error in JVMTI GetThreadInfo");
+    char* tname = get_thread_name(jvmti, jni, thread);
 
-    check_suspended_state(jni, thread, idx, info.name,"SuspendThreadList");
+    check_suspended_state(jni, thread, idx, tname,"SuspendThreadList");
+    deallocate(jvmti, jni, (void*)tname);
   }
   printf("\n## Agent: test_thread_suspend_list finished\n"); fflush(0);
 }
@@ -177,10 +177,10 @@ test_thread_resume_list(JNIEnv* jni, const jthread* thread_list) {
 
   for (int idx = 0; idx < VTHREAD_CNT; idx++) {
     jthread thread = thread_list[idx];
-    err = jvmti->GetThreadInfo(thread, &info);
-    check_jvmti_status(jni, err, "test_thread_resume_list: error in JVMTI GetThreadInfo");
+    char* tname = get_thread_name(jvmti, jni, thread);
 
-    check_resumed_state(jni, thread, idx, info.name, "ResumeThreadList");
+    check_resumed_state(jni, thread, idx, tname, "ResumeThreadList");
+    deallocate(jvmti, jni, (void*)tname);
   }
   printf("\n## Agent: test_thread_resume_list: finished\n"); fflush(0);
 }
@@ -202,19 +202,19 @@ test_vthread_suspend_all(JNIEnv* jni, const jthread* thread_list, int suspend_ma
 
   for (int idx = 0; idx < VTHREAD_CNT; idx++) {
     jthread thread = thread_list[idx];
-    err = jvmti->GetThreadInfo(thread, &info);
-    check_jvmti_status(jni, err, "test_vthread_suspend_all: error in JVMTI GetThreadInfo");
+    char* tname = get_thread_name(jvmti, jni, thread);
 
     if (idx < EXCLUDE_CNT && ((1 << idx) & suspend_mask) == 0) {
       // thread is in exclude list and initially resumed: expected to remain resumed
-      check_resumed_state(jni, thread, idx, info.name, "SuspendAllVirtualThreads");
+      check_resumed_state(jni, thread, idx, tname, "SuspendAllVirtualThreads");
 
       err = jvmti->SuspendThread(thread);
       check_jvmti_status(jni, err, "test_vthread_suspend_all: error in JVMTI SuspendThread");
     } else {
       // thread is not in exclude list or was initially suspended: expected to be suspended
-      check_suspended_state(jni, thread, idx, info.name, "SuspendAllVirtualThreads");
+      check_suspended_state(jni, thread, idx, tname, "SuspendAllVirtualThreads");
     } 
+    deallocate(jvmti, jni, (void*)tname);
   }
   printf("\n## Agent: test_vthread_suspend_all finished\n"); fflush(0);
 }
@@ -236,19 +236,19 @@ test_vthread_resume_all(JNIEnv* jni, const jthread* thread_list, int suspend_mas
 
   for (int idx = 0; idx < VTHREAD_CNT; idx++) {
     jthread thread = thread_list[idx];
-    err = jvmti->GetThreadInfo(thread, &info);
-    check_jvmti_status(jni, err, "test_vthread_resume_all: error in JVMTI GetThreadInfo");
+    char* tname = get_thread_name(jvmti, jni, thread);
 
     if (idx < EXCLUDE_CNT && ((1 << idx) & suspend_mask) != 0) {
       // thread is in exclude list and suspended: expected to remain suspended
-      check_suspended_state(jni, thread, idx, info.name, "ResumeAllVirtualThreads");
+      check_suspended_state(jni, thread, idx, tname, "ResumeAllVirtualThreads");
 
       err = jvmti->ResumeThread(thread); // is expected to be resumed later 
       check_jvmti_status(jni, err, "test_vthread_resume_all: error in JVMTI ResumeThread");
     } else {
       // thread is not in exclude list or was initially resumed: expected to be resumed
-      check_resumed_state(jni, thread, idx, info.name, "ResumeAllVirtualThreads");
+      check_resumed_state(jni, thread, idx, tname, "ResumeAllVirtualThreads");
     }
+    deallocate(jvmti, jni, (void*)tname);
   }
   printf("\n## Agent: test_vthread_resume_all: finished\n"); fflush(0);
 }
@@ -264,13 +264,13 @@ test_vthread_suspend_half(JNIEnv* jni, const jthread* thread_list) {
       continue; // skip odd indeces
     }
     jthread thread = thread_list[idx];
-    err = jvmti->GetThreadInfo(thread, &info);
-    check_jvmti_status(jni, err, "test_vthread_suspend_half: error in JVMTI GetThreadInfo");
+    char* tname = get_thread_name(jvmti, jni, thread);
 
     err = jvmti->SuspendThread(thread);
     check_jvmti_status(jni, err, "test_vthread_suspend_half: error in JVMTI SuspendThread");
 
-    check_suspended_state(jni, thread, idx, info.name, "SuspendThread");
+    check_suspended_state(jni, thread, idx, tname, "SuspendThread");
+    deallocate(jvmti, jni, (void*)tname);
   }
   printf("\n## Agent: test_vthread_suspend_half finished\n"); fflush(0);
 }
@@ -286,14 +286,13 @@ test_vthread_resume_half(JNIEnv* jni, const jthread* thread_list) {
       continue; // skip odd indeces
     }
     jthread thread = thread_list[idx];
-
-    err = jvmti->GetThreadInfo(thread, &info);
-    check_jvmti_status(jni, err, "test_vthread_resume_half: error in JVMTI GetThreadInfo");
+    char* tname = get_thread_name(jvmti, jni, thread);
 
     err = jvmti->ResumeThread(thread); 
     check_jvmti_status(jni, err, "test_vthread_resume_half: error in JVMTI ResumeThread");
 
-    check_resumed_state(jni, thread, idx, info.name, "ResumeThread");
+    check_resumed_state(jni, thread, idx, tname, "ResumeThread");
+    deallocate(jvmti, jni, (void*)tname);
   }
   printf("\n## Agent: test_vthread_resume_half: finished\n"); fflush(0);
 }
@@ -305,15 +304,14 @@ test_threads_suspend_resume(JNIEnv* jni, jint thread_cnt, jthread* tested_thread
 
   for (int idx = 0; idx < thread_cnt; idx++) {
     jthread thread = tested_threads[idx];
-    err = jvmti->GetThreadInfo(thread, &info);
-    check_jvmti_status(jni, err, "test_threads_suspend_resume: error in JVMTI GetThreadInfo");
+    char* tname = get_thread_name(jvmti, jni, thread);
 
     printf("\n");
-    test_thread_suspend(jni, thread, idx, info.name);
-    test_thread_resume(jni, thread, idx, info.name);
+    test_thread_suspend(jni, thread, idx, tname);
+    test_thread_resume(jni, thread, idx, tname);
 
-    err = jvmti->Deallocate((unsigned char*)info.name);
     check_jvmti_status(jni, err, "test_threads_suspend_resume: error in JVMTI Deallocate");
+    deallocate(jvmti, jni, (void*)tname);
   }
 }
 
@@ -333,6 +331,8 @@ test_jvmti_functions_for_one_thread(JNIEnv* jni, jthread thread) {
 
   // test JVMTI GetStackTrace
   test_get_stack_trace(jni, thread);
+
+  deallocate(jvmti, jni, (void*)tname);
 }
 
 static void
@@ -368,16 +368,14 @@ get_cthreads(JNIEnv* jni, jthread** cthreads_p) {
 
   for (int idx = 0; idx < all_cnt; idx++) {
     jthread thread = tested_cthreads[idx];
-    err = jvmti->GetThreadInfo(thread, &info);
-    check_jvmti_status(jni, err, "get_cthreads: error in JVMTI GetThreadInfo");
+    char* tname = get_thread_name(jvmti, jni, thread);
 
-    char* tname = info.name;
     if (strncmp(tname, CTHREAD_NAME_START, CTHREAD_NAME_START_LEN) != 0) {
       continue;
     }
     tested_cthreads[ct_cnt++] = thread;
-    err = jvmti->Deallocate((unsigned char*)tname);
     check_jvmti_status(jni, err, "get_cthreads: error in JVMTI Deallocate");
+    deallocate(jvmti, jni, (void*)tname);
   }
   *cthreads_p = tested_cthreads;
   return ct_cnt;
