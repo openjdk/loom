@@ -85,6 +85,8 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static jvmtiError suspend_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend,
                                    int* need_safepoint_p);
   static jvmtiError resume_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend);
+  static jvmtiError check_thread_list(jint count, const jthread* list);
+  static bool is_in_thread_list(jint count, const jthread* list, oop jt_oop);
  private:
 
   enum {

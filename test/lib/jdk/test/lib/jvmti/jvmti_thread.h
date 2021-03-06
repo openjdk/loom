@@ -319,6 +319,21 @@ Java_jdk_test_lib_jvmti_DebugeeClass_checkStatus(JNIEnv* jni_env, jclass cls, ji
   return status;
 }
 
+
+/** Native function for Java code to reset agent data. */
+JNIEXPORT void JNICALL
+Java_jdk_test_lib_jvmti_DebugeeClass_resetAgentData(JNIEnv* jni, jclass cls) {
+  RawMonitorLocker monitor_locker(agent_jvmti_env, jni, agent_data.monitor);
+  /* wait for agentThreadWrapper() to finish */
+  while (agent_data.thread_state != TERMINATED) {
+    monitor_locker.wait(10);
+  }
+  agent_data.thread_state = NEW;
+  agent_data.last_debuggee_status = NSK_STATUS_PASSED;
+}
+
+
+
 }
 
 #endif

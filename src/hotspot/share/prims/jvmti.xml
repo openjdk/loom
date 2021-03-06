@@ -2316,8 +2316,30 @@ jvmtiEnv *jvmti;
         <required id="can_support_virtual_threads"></required>
       </capabilities>
       <parameters>
+        <param id="except_count">
+          <jint min="0"/>
+          <description>
+            The number of threads in the list of threads not to be suspended.
+          </description>
+        </param>
+        <param id="except_list">
+            <inbuf incount="except_count">
+              <jthread/>
+              <nullok>not an error if <code>except_count == 0</code></nullok>
+            </inbuf>
+            <description>
+              The list of threads not to be suspended.
+            </description>
+        </param>
       </parameters>
       <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          A thread in <paramlink id="except_list"></paramlink> was invalid.
+        </error>
+        <error id="JVMTI_ERROR_NULL_POINTER">
+          Both <paramlink id="except_list"></paramlink> was <code>NULL</code>
+          and <paramlink id="except_count"></paramlink> was non-zero.
+        </error>
       </errors>
     </function>
 
@@ -2326,7 +2348,7 @@ jvmtiEnv *jvmti;
       <description>
         Resume all virtual threads except those already resumed.
         Virtual threads may be suspended with
-        <functionlink id="RsuspendAllVirtualThreads"></functionlink> or
+        <functionlink id="SuspendAllVirtualThreads"></functionlink> or
         <functionlink id="SuspendThreadList"></functionlink> or
         <functionlink id="SuspendThread"></functionlink>.
         Virtual threads that are currently resumed do not change state.
@@ -2337,8 +2359,30 @@ jvmtiEnv *jvmti;
         <required id="can_support_virtual_threads"></required>
       </capabilities>
       <parameters>
+        <param id="except_count">
+          <jint min="0"/>
+          <description>
+            The number of threads in the list of threads not to be resumed.
+          </description>
+        </param>
+        <param id="except_list">
+            <inbuf incount="except_count">
+              <jthread/>
+              <nullok>not an error if <code>except_count == 0</code></nullok>
+            </inbuf>
+            <description>
+              The list of threads not to be resumed.
+            </description>
+        </param>
       </parameters>
       <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          A thread in <paramlink id="except_list"></paramlink> was invalid.
+        </error>
+        <error id="JVMTI_ERROR_NULL_POINTER">
+          Both <paramlink id="except_list"></paramlink> was <code>NULL</code>
+          and <paramlink id="except_count"></paramlink> was non-zero.
+        </error>
       </errors>
     </function>
 

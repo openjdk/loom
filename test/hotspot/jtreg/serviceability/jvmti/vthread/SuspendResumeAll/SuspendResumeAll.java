@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,17 +21,26 @@
  * questions.
  */
 
-package nsk.jvmti.SuspendThread;
+/*
+ * @test
+ * @summary Test for SuspendAllVirtualThreads/ResumeAllVirtualThreads.
+ * @library /test/lib
+ * @run driver jdk.test.lib.FileInstaller . .
+ * @run main/othervm/native
+ *      -Djava.util.concurrent.ForkJoinPool.common.parallelism=1
+ *      -agentlib:SuspendResumeAll
+ *      SuspendResumeAll
+ */
 
 import java.io.PrintStream;
-import nsk.share.*;
-import nsk.share.jvmti.*;
+import java.util.concurrent.*;
+import jdk.test.lib.jvmti.DebugeeClass;
 
-public class suspendvthr001 extends DebugeeClass {
+public class SuspendResumeAll extends DebugeeClass {
 
     // load native library if required
     static {
-        System.loadLibrary("suspendvthr001");
+        System.loadLibrary("SuspendResumeAll");
     }
 
     native static int GetStatus();
@@ -40,58 +49,47 @@ public class suspendvthr001 extends DebugeeClass {
         try {
             Thread.sleep(millis);
         } catch (InterruptedException e) {
-            throw new Failure("Interruption in suspendvthr001Thread.sleep: \n\t" + e);
+            throw new RuntimeException("Interruption in TestedThread.sleep: \n\t" + e);
         }
     }
 
     // run test from command line
     public static void main(String argv[]) {
-        argv = nsk.share.jvmti.JVMTITest.commonInit(argv);
-
-        // JCK-compatible exit
-        System.exit(run(argv, System.out) + Consts.JCK_STATUS_BASE);
+        int status = run(argv, System.out);
+        if (status != DebugeeClass.TEST_PASSED) {
+            throw new RuntimeException("FAILED: unexpected status: " + status);
+        }
     }
 
-    // run test from JCK-compatible environment
     public static int run(String argv[], PrintStream out) {
-        return new suspendvthr001().runIt(argv, out);
+        return new SuspendResumeAll().runIt(argv, out);
     }
 
     private static final int VTHREADS_CNT = 30;
-
-    // scaffold objects
-    ArgumentHandler argHandler = null;
-    Log log = null;
-    long timeout = 0;
-    int status = Consts.TEST_PASSED;
+    int status = DebugeeClass.TEST_PASSED;
 
     // run debuggee
     public int runIt(String argv[], PrintStream out) {
-        argHandler = new ArgumentHandler(argv);
-        log = new Log(out, argHandler);
-        timeout = argHandler.getWaitTime() * 60 * 1000; // milliseconds
-
         System.out.println("\n## Java: runIt: Starting threads");
         status = test_vthreads();
-        if (status != Consts.TEST_PASSED) {
+        if (status != DebugeeClass.TEST_PASSED) {
             System.out.println("\n## Java: runIt FAILED: status from native Agent: " + status);
-            return status;
         }
         return status;
     }
 
     private int test_vthreads() {
-        suspendvthr001Thread[] threads = new suspendvthr001Thread[VTHREADS_CNT];
+        TestedThread[] threads = new TestedThread[VTHREADS_CNT];
         Thread vts[] = new Thread[VTHREADS_CNT];
 
         for (int i = 0; i < VTHREADS_CNT; i++) {
             String name = "TestedThread" + i;
-            suspendvthr001Thread thread = new suspendvthr001Thread(name);
+            TestedThread thread = new TestedThread(name);
             threads[i] = thread;
             vts[i] = start_thread(name, thread);
         }
         status = checkStatus(status);
-        if (status != Consts.TEST_PASSED) {
+        if (status != DebugeeClass.TEST_PASSED) {
             return status;
         }
         sleep(3000); // let tested vthreads work while they are tested in native agent
@@ -100,33 +98,31 @@ public class suspendvthr001 extends DebugeeClass {
         try {
             for (int i = 0; i < VTHREADS_CNT; i++) {
                 // let thread to finish
-                suspendvthr001Thread thread = threads[i];
+                TestedThread thread = threads[i];
                 thread.letFinish();
                 vts[i].join();
             }
         } catch (InterruptedException e) {
-            throw new Failure(e);
+            throw new RuntimeException(e);
         }
         return GetStatus();
     }
 
-    Thread start_thread(String name, suspendvthr001Thread thread) {
-        System.out.println("## Java: start_thread: Starting thread: " + name);
+    Thread start_thread(String name, TestedThread thread) {
         Thread vthread = Thread.startVirtualThread(name, thread);
-        thread.ensureReady();
-        // testing sync
-        log.display("Sync: thread started: " + name);
+        thread.ensureReady(); // testing sync
+        System.out.println("## Java: started thread: " + name);
         return vthread;
     }
 }
 
 // class for tested threads
-class suspendvthr001Thread extends Thread {
+class TestedThread extends Thread {
     private volatile boolean threadReady = false;
     private volatile boolean shouldFinish = false;
 
     // make thread with specific name
-    public suspendvthr001Thread(String name) {
+    public TestedThread(String name) {
         super(name);
     }
 
@@ -139,7 +135,7 @@ class suspendvthr001Thread extends Thread {
         while (!shouldFinish) {
             if (n <= 0) {
                 n = 1000;
-                suspendvthr001.sleep(10);
+                SuspendResumeAll.sleep(10);
             }
             if (i > n) {
                 i = 0;
@@ -156,7 +152,7 @@ class suspendvthr001Thread extends Thread {
                 sleep(1000);
             }
         } catch (InterruptedException e) {
-            throw new Failure("Interruption while preparing tested thread: \n\t" + e);
+            throw new RuntimeException("Interruption while preparing tested thread: \n\t" + e);
         }
     }
 

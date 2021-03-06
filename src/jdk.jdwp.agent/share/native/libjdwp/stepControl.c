@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -84,14 +84,6 @@ disableStepping(jthread thread)
     if (error != JVMTI_ERROR_NONE) {
         EXIT_ERROR(error, "disabling single step");
     }
-}
-
-void stepControl_enableStepping(jthread thread) {
-  enableStepping(thread);
-}
-
-void stepControl_disableStepping(jthread thread) {
-  disableStepping(thread);
 }
 
 static jvmtiError
@@ -358,13 +350,12 @@ handleFramePopEvent(JNIEnv *env, EventInfo *evinfo,
                  * Resume stepping in the original frame.
                  */
                 LOG_STEP(("handleFramePopEvent: starting singlestep, have methodEnter handler && depth==INTO && fromDepth >= afterPopDepth (%d>=%d)", fromDepth, afterPopDepth));
+                enableStepping(thread);
+                (void)eventHandler_free(step->methodEnterHandlerNode);
+                step->methodEnterHandlerNode = NULL;
             } else {
                 LOG_STEP(("handleFramePopEvent: starting singlestep, have methodEnter handler && depth==INTO && fromDepth < afterPopDepth (%d<%d)", fromDepth, afterPopDepth));
-                JDI_ASSERT(fromDepth >= afterPopDepth);
             }
-            enableStepping(thread);
-            (void)eventHandler_free(step->methodEnterHandlerNode);
-            step->methodEnterHandlerNode = NULL;
         }
         LOG_STEP(("handleFramePopEvent: finished"));
     }
@@ -613,7 +604,7 @@ stepControl_handleStep(JNIEnv *env, jthread thread,
                                 "installing event method enter handler");
                 }
             }
-            LOG_STEP(("stepControl_handleStep: NotifyFramePop, (fromDepth currentDepth)(%d %d) ",
+            LOG_STEP(("stepControl_handleStep: NotifyFramePop (fromDepth=%d currentDepth=%d)",
                       fromDepth, currentDepth));
 
             error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)

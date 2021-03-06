@@ -32,9 +32,7 @@ extern "C" {
 
 typedef struct Tinfo {
   jboolean just_scheduled;
-  jboolean was_run;
-  jboolean was_yield;
-  const char* thr_name;
+  const char* tname;
 } Tinfo;
 
 static const int MAX_EVENTS_TO_PROCESS = 20;
@@ -45,18 +43,18 @@ static jboolean continuation_events_enabled = JNI_FALSE;
 
 
 static Tinfo*
-find_tinfo(JNIEnv* jni, const char* thr_name) {
+find_tinfo(JNIEnv* jni, const char* tname) {
   Tinfo* inf = NULL;
   int idx = 0;
 
   // Find slot with named worker thread or empty slot
   for (; idx < MAX_WORKER_THREADS; idx++) {
     inf = &tinfo[idx];
-    if (inf->thr_name == NULL) {
-      inf->thr_name = thr_name;
+    if (inf->tname == NULL) {
+      inf->tname = tname;
       break;
     }
-    if (strcmp(inf->thr_name, thr_name) == 0) {
+    if (strcmp(inf->tname, tname) == 0) {
       break;
     }
   }
@@ -97,83 +95,44 @@ find_method_depth(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *mna
 
 static void
 print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, const char *event_name) {
-  jvmtiThreadInfo thr_info;
-  jvmtiError err = jvmti->GetThreadInfo(vthread, &thr_info);
+  char* tname = get_thread_name(jvmti, jni, vthread);
+  Tinfo* inf = find_tinfo(jni, tname); // Find slot with named worker thread
 
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler failed during JVMTI GetThreadInfo call");
-  }
-  const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
-  printf("\n#### %s event: thread: %s, vthread: %p\n", event_name, thr_name, vthread);
-
-  Tinfo* inf = find_tinfo(jni, thr_name); // Find slot with named worker thread
+  printf("\n#### %s event: thread: %s, vthread: %p\n", event_name, tname, vthread);
 
   if (strcmp(event_name, "VirtualThreadScheduled") == 0) {
     inf->just_scheduled = JNI_TRUE;
   }
   else {
-    if (inf->thr_name == NULL && strcmp(event_name, "VirtualThreadTerminated") != 0) {
+    if (inf->tname == NULL && strcmp(event_name, "VirtualThreadTerminated") != 0) {
       fatal(jni, "VThread event: worker thread not found!");
     }
-#if 0
-    if (continuation_events_enabled == JNI_TRUE && strcmp(event_name, "VirtualThreadMounted") == 0) {
-      if (!inf->just_scheduled) { // There is no ContinuationRun for just scheduled vthreads
-        if (inf->was_yield) {
-          fatal(jni, "VirtualThreadMounted: event with ContinuationYield before!");
-        }
-        if (inf->was_run) {
-          fatal(jni, "VirtualThreadMounted: event with ContinuationRun before!");
-        }
-      }
-    }
-#endif
     if (strcmp(event_name, "VirtualThreadUnmounted") == 0) {
       if (inf->just_scheduled) {
         fatal(jni, "VirtualThreadUnmounted: event without VirtualThreadMounted before!");
       }
-#if 0
-      if (continuation_events_enabled == JNI_TRUE && inf->was_run) {
-        fatal(jni, "VirtualThreadUnmounted: event with ContinuationRun before!");
-      }
-      if (continuation_events_enabled == JNI_TRUE && !inf->was_yield) {
-        fatal(jni, "VirtualThreadUnmounted: event without ContinuationYield before!");
-      }
-#endif
     }
     inf->just_scheduled = JNI_FALSE;
   }
-  inf->was_run = JNI_FALSE;
-  inf->was_yield = JNI_FALSE;
+  //deallocate(jvmti, jni, (void*)tname);
 }
 
 static void
-print_cont_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jint frames_cnt, const char *event_name) {
+print_cont_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jint frames_cnt, const char *event_name) {
   static int cont_events_cnt = 0;
   if (cont_events_cnt++ > MAX_EVENTS_TO_PROCESS) {
     return; // No need to test all events
   }
 
-  jvmtiThreadInfo thr_info;
-  jvmtiError err = jvmti->GetThreadInfo(vthread, &thr_info);
+  char* tname = get_thread_name(jvmti, jni, thread);
+  Tinfo* inf = find_tinfo(jni, tname); // Find slot with named worker thread
 
-  if (err != JVMTI_ERROR_NONE) {
-    fatal(jni, "event handler failed during JVMTI GetThreadInfo call");
-  }
-  const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
-  printf("\n#### %s event: thread: %s, frames count: %d\n", event_name, thr_name, frames_cnt);
+  printf("\n#### %s event: thread: %s, frames count: %d\n", event_name, tname, frames_cnt);
 
-  Tinfo* inf = find_tinfo(jni, thr_name); // Find slot with named worker thread
-  if (inf->thr_name == NULL) {
+  if (inf->tname == NULL) {
     fatal(jni, "Continuation event: worker thread not found!");
   }
-  if (strcmp(event_name, "ContinuationRun") == 0) {
-    inf->was_run = JNI_TRUE;
-    inf->was_yield = JNI_FALSE;
-  }
-  if (strcmp(event_name, "ContinuationYield") == 0) {
-    inf->was_run = JNI_FALSE;
-    inf->was_yield = JNI_TRUE;
-  }
+  //deallocate(jvmti, jni, (void*)tname);
 }
 
 static void

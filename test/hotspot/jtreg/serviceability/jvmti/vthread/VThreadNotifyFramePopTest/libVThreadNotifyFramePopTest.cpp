@@ -48,43 +48,36 @@ jclass url_class = NULL;
 static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
                        const char* event_name, int event_count) {
-  char* cname = NULL;
+  char* tname = get_thread_name(jvmti, jni, thread);
+  char* cname = get_method_class_name(jvmti, jni, method);
   char* mname = NULL;
   char* msign = NULL;
-  jvmtiThreadInfo thr_info;
   jvmtiError err;
-
-  memset(&thr_info, 0, sizeof(thr_info));
-  err = jvmti->GetThreadInfo(thread, &thr_info);
-  check_jvmti_status(jni, err, "event handler: error in JVMTI GetThreadInfo call");
-  const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
-
-  cname = get_method_class_name(jvmti, jni, method);
 
   err = jvmti->GetMethodName(method, &mname, &msign, NULL);
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetMethodName call");
 
   printf("%s #%d: thread: %s, method: %s.%s%s\n",
-         event_name, event_count, thr_name, cname, mname, msign);
+         event_name, event_count, tname, cname, mname, msign);
 
   if (strcmp(event_name, "SingleStep") != 0) {
     print_stack_trace(jvmti, jni, thread);
   }
+  deallocate(jvmti, jni, (void*)tname);
+  deallocate(jvmti, jni, (void*)cname);
+  deallocate(jvmti, jni, (void*)mname);
+  deallocate(jvmti, jni, (void*)msign);
 }
 
 static void
-print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames_cnt, const char* event_name) {
-  jvmtiThreadInfo thr_info;
-  jvmtiError err;
+print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_cnt, const char* event_name) {
+  char* tname = get_thread_name(jvmti, jni, thread);
 
-  memset(&thr_info, 0, sizeof(thr_info));
-  err = jvmti->GetThreadInfo(vthread, &thr_info);
-  check_jvmti_status(jni, err, "event handler failed during JVMTI GetThreadInfo call");
+  printf("%s: thread: %s, frames: %d\n\n", event_name, tname, frames_cnt);
 
-  const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
-  printf("%s: thread: %s, frames: %d\n\n", event_name, thr_name, frames_cnt);
+  print_stack_trace(jvmti, jni, thread);
 
-  print_stack_trace(jvmti, jni, vthread);
+  deallocate(jvmti, jni, (void*)tname);
 }
 
 static void
@@ -92,20 +85,18 @@ set_or_clear_breakpoint(JNIEnv *jni, jboolean set, const char *methodName,
                      jclass klass, jmethodID methods[], int method_count) {
   jlocation location = (jlocation)0L;
   jmethodID method = NULL;
-  char* mname = NULL;
   jvmtiError err;
 
   // Find the jmethodID of the specified method
   while (--method_count >= 0) {
     jmethodID meth = methods[method_count];
-
-    err = jvmti->GetMethodName(meth, &mname, NULL, NULL);
-    check_jvmti_status(jni, err, "setupBreakpoint: error in JVMTI GetMethodName call");
+    char* mname = get_method_name(jvmti, jni, meth);
 
     if (strcmp(mname, methodName) == 0) {
       // printf("setupBreakpoint: found method %s() to %s a breakpoint\n", mname, set ? "set" : "clear");
       method = meth;
     }
+    deallocate(jvmti, jni, (void*)mname);
   }
   if (method == NULL) {
       printf("setupBreakpoint: not found method %s() to %s a breakpoint\n",
@@ -119,6 +110,7 @@ set_or_clear_breakpoint(JNIEnv *jni, jboolean set, const char *methodName,
       err = jvmti->ClearBreakpoint(method, location);
   }
   check_jvmti_status(jni, err, "setupBreakpoint: error in JVMTI SetBreakpoint");
+
   fflush(0);
 }
 
@@ -176,11 +168,7 @@ breakpoint_hit2(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, char* mname) {
 static void JNICALL
 Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
-  char* mname = NULL;
-  jvmtiError err;
-
-  err = jvmti->GetMethodName(method, &mname, NULL, NULL);
-  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetMethodName call");
+  char* mname = get_method_name(jvmti, jni, method);
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
 
@@ -195,20 +183,17 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     printf("FAILED: Breakpoint: too many breakpoints hit.\n");
     passed = JNI_FALSE;
   }
-
   fflush(0);
+  deallocate(jvmti, jni, (void*)mname);
 }
 
 static void JNICALL
 FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
          jboolean was_popped_by_exception) {
-  jvmtiError err;
-  char* mname = NULL;
-
-  err = jvmti->GetMethodName(method, &mname, NULL, NULL);
-  check_jvmti_status(jni, err, "FramePop: error in JVMTI GetMethodName call");
+  char* mname = get_method_name(jvmti, jni, method);
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
+
   received_frame_pop_event = JNI_TRUE;
   frame_pop_count++;
 
@@ -216,7 +201,9 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
          frame_pop_count, brkptBreakpointHit, mname, (void*)thread);
 
   print_frame_event_info(jvmti, jni, thread, method, "FramePop", frame_pop_count);
+
   fflush(0);
+  deallocate(jvmti, jni, (void*)mname);
 }
 
 
