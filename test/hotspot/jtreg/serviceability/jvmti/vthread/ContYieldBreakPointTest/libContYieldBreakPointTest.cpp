@@ -37,59 +37,50 @@ static int single_step_count = 0;
 static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
                        const char* event_name, int event_count) {
-  char* cname = NULL;
+  char* tname = get_thread_name(jvmti, jni, thread);
+  char* cname = get_method_class_name(jvmti, jni, method);
   char* mname = NULL;
   char* msign = NULL;
-  jvmtiThreadInfo thr_info;
   jvmtiError err;
-
-  memset(&thr_info, 0, sizeof(thr_info));
-  err = jvmti->GetThreadInfo(thread, &thr_info);
-  check_jvmti_status(jni, err, "event handler: error in JVMTI GetThreadInfo call");
-  const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
-
-  cname = get_method_class_name(jvmti, jni, method);
 
   err = jvmti->GetMethodName(method, &mname, &msign, NULL);
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetMethodName call");
 
   printf("\n%s event #%d: thread: %s, method: %s: %s%s\n",
-         event_name, event_count, thr_name, cname, mname, msign);
+         event_name, event_count, tname, cname, mname, msign);
 
   if (strcmp(event_name, "SingleStep") != 0) {
     print_current_stack_trace(jvmti, jni);
   }
   fflush(0);
+  deallocate(jvmti, jni, (void*)tname);
+  deallocate(jvmti, jni, (void*)cname);
+  deallocate(jvmti, jni, (void*)mname);
+  deallocate(jvmti, jni, (void*)msign);
 }
 
-static void
+ void
 print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_cnt, const char* event_name) {
-  jvmtiThreadInfo thr_info;
-  jvmtiError err;
+  char* tname = get_thread_name(jvmti, jni, thread);
 
-  memset(&thr_info, 0, sizeof(thr_info));
-  err = jvmti->GetThreadInfo(thread, &thr_info);
-  check_jvmti_status(jni, err, "event handler failed during JVMTI GetThreadInfo call");
-
-  const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
-  printf("\n%s event: thread: %s, frames: %d\n\n", event_name, thr_name, frames_cnt);
+  printf("\n%s event: thread: %s, frames: %d\n\n", event_name, tname, frames_cnt);
 
   print_current_stack_trace(jvmti, jni);
+
   fflush(0);
+  deallocate(jvmti, jni, (void*)tname);
 }
 
 static void JNICALL
 Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
-  char* mname = NULL;
+  char* mname = get_method_name(jvmti, jni, method);
   jvmtiError err;
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
 
-  err = jvmti->GetMethodName(method, &mname, NULL, NULL);
-  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetMethodName call");
-
   if (strcmp(mname, "yield0") != 0) {
+    deallocate(jvmti, jni, (void*)mname);
     return; // ignore unrelated events
   }
   print_frame_event_info(jvmti, jni, thread, method,
@@ -97,24 +88,25 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thread);
   check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
+
+  deallocate(jvmti, jni, (void*)mname);
 }
 
 static void JNICALL
 SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
-  char* mname = NULL;
-  jvmtiError err;
+  char* mname = get_method_name(jvmti, jni, method);
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
 
-  err = jvmti->GetMethodName(method, &mname, NULL, NULL);
-  check_jvmti_status(jni, err, "SingleStep: error in JVMTI GetMethodName call");
-
   if (strcmp(mname, "yield0") != 0) {
+    deallocate(jvmti, jni, (void*)mname);
     return; // ignore unrelated events
   }
   print_frame_event_info(jvmti, jni, thread, method,
                          "SingleStep", ++single_step_count);
+
+  deallocate(jvmti, jni, (void*)mname);
 }
 
 
@@ -171,16 +163,14 @@ Java_ContYieldBreakPointTest_enableEvents(JNIEnv *jni, jclass klass, jthread thr
   // Find jmethodID of Continuation.yield0()
   while (--method_count >= 0) {
     jmethodID meth = methods[method_count];
-    char* mname = NULL;
-
-    err = jvmti->GetMethodName(meth, &mname, NULL, NULL);
-    check_jvmti_status(jni, err, "enableEvents: error in JVMTI GetMethodName call");
+    char* mname = get_method_name(jvmti, jni, meth);
 
     if (strcmp(mname, "yield0") == 0) {
       printf("enableEvents: found method %s() to set a breakpoint\n", mname);
       fflush(0);
       method = meth;
     }
+    deallocate(jvmti, jni, (void*)mname);
   }
   if (method == NULL) {
     jni->FatalError("Error in enableEvents: not found method fibTest()");

@@ -113,12 +113,8 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
   for (int thread_idx = 0; thread_idx < (int) threads_count; thread_idx++) {
     jthread thread = threads[thread_idx];
     jthread vthread;
+    char* tname = get_thread_name(jvmti, jni, thread);
 
-    jvmtiThreadInfo thr_info;
-    jvmtiError err = jvmti->GetThreadInfo(thread, &thr_info);
-    check_jvmti_status(jni, err, "GetThreadInfo");
-
-    const char* thr_name = (thr_info.name == NULL) ? "<Unnamed thread>" : thr_info.name;
     if (jni->IsSameObject(cthread, thread) == JNI_TRUE) {
       continue;
     }
@@ -137,12 +133,14 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
     }
     check_jvmti_status(jni, err, "GetVirtualThread");
     if (vthread != NULL) {
-      printf("\n#### Found carrier thread: %s\n", thr_name);
+      printf("\n#### Found carrier thread: %s\n", tname);
       fflush(stdout);
       test_unsupported_jvmti_functions(jvmti, jni, vthread);
     }
     err = jvmti->ResumeThread(thread);
     check_jvmti_status(jni, err, "ResumeThread");
+
+    deallocate(jvmti, jni, (void*)tname);
   }
   printf("testJvmtiFunctionsInJNICall: finished\n");
   fflush(0);

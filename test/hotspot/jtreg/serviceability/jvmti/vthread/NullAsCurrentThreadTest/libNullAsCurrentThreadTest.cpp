@@ -66,6 +66,10 @@ checkStackTraces(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiFrameInfo* frames0, jvmtiFra
              idx, name0, sign0, name1, sign1);
     }
     printf("\t%s%s\n", name0, sign0);
+    deallocate(jvmti, jni, (void*)name0);
+    deallocate(jvmti, jni, (void*)name1);
+    deallocate(jvmti, jni, (void*)sign0);
+    deallocate(jvmti, jni, (void*)sign1);
   }
   printf("\n");
 }

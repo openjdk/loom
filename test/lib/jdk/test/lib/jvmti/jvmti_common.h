@@ -52,7 +52,8 @@
 const char* TranslateState(jint flags);
 const char* TranslateError(jvmtiError err);
 
-char *jlong_to_string(jlong value, char *string) {
+char*
+jlong_to_string(jlong value, char *string) {
   char buffer[32];
   char *pbuf, *pstr;
 
@@ -78,13 +79,15 @@ char *jlong_to_string(jlong value, char *string) {
   return string;
 }
 
-static void fatal(JNIEnv* jni, const char* msg) {
+static void
+fatal(JNIEnv* jni, const char* msg) {
   jni->FatalError(msg);
   fflush(stdout);
 }
 
 
-static void check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
+static void
+check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
   if (err != JVMTI_ERROR_NONE) {
     printf("check_jvmti_status: JVMTI function returned error: %s (%d)\n", TranslateError(err), err);
     jni->FatalError(msg);
@@ -94,7 +97,8 @@ static void check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
 /* JVMTI helper wrappers. Check errors and fail or return null if jvmti operation failed. */
 
 // Monitors often created in Agent_Initialize(..) where JNIEnv* jni doesn't exist.
-jrawMonitorID create_raw_monitor(jvmtiEnv *jvmti, const char* name) {
+jrawMonitorID
+create_raw_monitor(jvmtiEnv *jvmti, const char* name) {
   jrawMonitorID lock;
   jvmtiError err;
   err = jvmti->CreateRawMonitor(name, &lock);
@@ -186,7 +190,8 @@ print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
   fflush(0);
 }
 
-void print_thread_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread_obj) {
+void
+print_thread_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread_obj) {
   jvmtiThreadInfo thread_info;
   jint thread_state;
   check_jvmti_status(jni, jvmti->GetThreadInfo(thread_obj, &thread_info), "Error in GetThreadInfo");
@@ -323,7 +328,8 @@ print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 
 
 /* Commonly used helper functions */
-const char* TranslateState(jint flags) {
+const char*
+TranslateState(jint flags) {
     static char str[15 * 20];
 
     if (flags == 0)
@@ -386,7 +392,8 @@ const char* TranslateState(jint flags) {
     return str;
 }
 
-const char* TranslateEvent(jvmtiEvent event_type) {
+const char*
+TranslateEvent(jvmtiEvent event_type) {
     switch (event_type) {
     case JVMTI_EVENT_VM_INIT:
         return ("JVMTI_EVENT_VM_INIT");
@@ -453,7 +460,8 @@ const char* TranslateEvent(jvmtiEvent event_type) {
     }
 }
 
-const char* TranslateError(jvmtiError err) {
+const char*
+TranslateError(jvmtiError err) {
     switch (err) {
     case JVMTI_ERROR_NONE:
         return ("JVMTI_ERROR_NONE");
@@ -556,7 +564,8 @@ const char* TranslateError(jvmtiError err) {
     }
 }
 
-const char* TranslatePhase(jvmtiPhase phase) {
+const char*
+TranslatePhase(jvmtiPhase phase) {
     switch (phase) {
     case JVMTI_PHASE_ONLOAD:
         return ("JVMTI_PHASE_ONLOAD");
@@ -573,7 +582,8 @@ const char* TranslatePhase(jvmtiPhase phase) {
     }
 }
 
-const char* TranslateRootKind(jvmtiHeapRootKind root) {
+const char*
+TranslateRootKind(jvmtiHeapRootKind root) {
     switch (root) {
     case JVMTI_HEAP_ROOT_JNI_GLOBAL:
         return ("JVMTI_HEAP_ROOT_JNI_GLOBAL");
@@ -594,7 +604,8 @@ const char* TranslateRootKind(jvmtiHeapRootKind root) {
     }
 }
 
-const char* TranslateObjectRefKind(jvmtiObjectReferenceKind ref) {
+const char*
+TranslateObjectRefKind(jvmtiObjectReferenceKind ref) {
     switch (ref) {
     case JVMTI_REFERENCE_CLASS:
         return ("JVMTI_REFERENCE_CLASS");
@@ -619,7 +630,8 @@ const char* TranslateObjectRefKind(jvmtiObjectReferenceKind ref) {
     }
 }
 
-int isThreadExpected(jvmtiEnv *jvmti, jthread thread) {
+int
+isThreadExpected(jvmtiEnv *jvmti, jthread thread) {
     static const char *vm_jfr_buffer_thread_name = "VM JFR Buffer Thread";
     static const char *jfr_request_timer_thread_name = "JFR request timer";
     static const char *graal_management_bean_registration_thread_name =
@@ -649,7 +661,8 @@ int isThreadExpected(jvmtiEnv *jvmti, jthread thread) {
     return 1;
 }
 
-jthread nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
+jthread
+nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
   jthread* threads = NULL;
   jint count = 0;
   jthread foundThread = NULL;
@@ -679,14 +692,16 @@ jthread nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) 
 }
 
 /** Enable or disable given events. */
-int nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int size, jvmtiEvent list[], jthread thread) {
+int
+nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int size, jvmtiEvent list[], jthread thread) {
   for (int i = 0; i < size; i++) {
     check_jvmti_status(jni, jvmti->SetEventNotificationMode(enable, list[i], thread), "");
   }
   return NSK_TRUE;
 }
 
-void nsk_jvmti_sleep(jlong timeout) {
+void
+nsk_jvmti_sleep(jlong timeout) {
   int seconds = (int)((timeout + 999) / 1000);
 #ifdef _WIN32
   Sleep(1000L * seconds);

@@ -529,8 +529,8 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, co
 static void
 processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name) {
   static int vthread_events_cnt = 0;
+  char* tname = get_thread_name(jvmti, jni, vthread);
   jthread cthread = NULL;
-  jvmtiThreadInfo thr_info;
   jvmtiError err;
 
   if (strcmp(event_name, "VirtualThreadTerminated") != 0 &&
@@ -539,13 +539,7 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *e
       return; // No need to test all events
     }
   }
-
-  err = jvmti->GetThreadInfo(vthread, &thr_info);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("JVMTI GetThreadInfo returned error: %d\n", err);
-    fatal(jni, "event handler: JVMTI GetThreadInfo failed to return JVMTI_ERROR_NONE");
-  }
-  printf("processVThreadEvent: event: %s, thread: %s\n", event_name, thr_info.name); fflush(0);
+  printf("processVThreadEvent: event: %s, thread: %s\n", event_name, tname); fflush(0);
 
   err = jvmti->GetCarrierThread(vthread, &cthread);
   if (err != JVMTI_ERROR_NONE) {
@@ -554,6 +548,8 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *e
   }
 
   print_vthread_event_info(jvmti, jni, cthread, vthread, event_name);
+
+  deallocate(jvmti, jni, (void*)tname);
 
   if (strcmp(event_name, "VirtualThreadTerminated") == 0) {
     return; // skip further testing as GetVirtualThread can return NULL
