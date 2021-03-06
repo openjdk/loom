@@ -77,7 +77,6 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
   char* cname = NULL;
   char* mname = NULL;
   char* msign = NULL;
-  jvmtiThreadInfo thr_info;
   jvmtiError err;
 
   cname = get_method_class_name(jvmti, jni, method);
