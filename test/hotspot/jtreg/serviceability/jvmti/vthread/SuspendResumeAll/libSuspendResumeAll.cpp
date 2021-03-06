@@ -148,7 +148,6 @@ test_thread_resume(JNIEnv* jni, jthread thread, int thr_idx, char* tname) {
 static void
 test_thread_suspend_list(JNIEnv* jni, const jthread* thread_list) {
   jvmtiError results[VTHREAD_CNT] = {JVMTI_ERROR_NONE}; // VTHREAD_CNT is max
-  jvmtiThreadInfo info;
 
   printf("\n## Agent: test_thread_suspend_list started\n"); fflush(0);
 
@@ -168,7 +167,6 @@ test_thread_suspend_list(JNIEnv* jni, const jthread* thread_list) {
 static void
 test_thread_resume_list(JNIEnv* jni, const jthread* thread_list) {
   jvmtiError results[VTHREAD_CNT] = {JVMTI_ERROR_NONE}; // VTHREAD_CNT is max
-  jvmtiThreadInfo info;
 
   printf("\n## Agent: test_thread_resume_list: started\n"); fflush(0);
 
@@ -187,7 +185,6 @@ test_thread_resume_list(JNIEnv* jni, const jthread* thread_list) {
 
 static void
 test_vthread_suspend_all(JNIEnv* jni, const jthread* thread_list, int suspend_mask) {
-  jvmtiThreadInfo info;
 
   printf("\n## Agent: test_vthread_suspend_all started\n"); fflush(0);
 
@@ -221,7 +218,6 @@ test_vthread_suspend_all(JNIEnv* jni, const jthread* thread_list, int suspend_ma
 
 static void
 test_vthread_resume_all(JNIEnv* jni, const jthread* thread_list, int suspend_mask) {
-  jvmtiThreadInfo info;
 
   printf("\n## Agent: test_vthread_resume_all started\n"); fflush(0);
 
@@ -255,7 +251,6 @@ test_vthread_resume_all(JNIEnv* jni, const jthread* thread_list, int suspend_mas
 
 static void
 test_vthread_suspend_half(JNIEnv* jni, const jthread* thread_list) {
-  jvmtiThreadInfo info;
   jvmtiError err;
 
   printf("\n## Agent: test_vthread_suspend_half started\n"); fflush(0);
@@ -277,7 +272,6 @@ test_vthread_suspend_half(JNIEnv* jni, const jthread* thread_list) {
 
 static void
 test_vthread_resume_half(JNIEnv* jni, const jthread* thread_list) {
-  jvmtiThreadInfo info;
   jvmtiError err;
 
   printf("\n## Agent: test_vthread_resume_half started\n"); fflush(0);
@@ -299,7 +293,6 @@ test_vthread_resume_half(JNIEnv* jni, const jthread* thread_list) {
 
 static void
 test_threads_suspend_resume(JNIEnv* jni, jint thread_cnt, jthread* tested_threads) {
-  jvmtiThreadInfo info;
 
   for (int idx = 0; idx < thread_cnt; idx++) {
     jthread thread = tested_threads[idx];
@@ -356,7 +349,6 @@ test_jvmti_functions_for_threads(JNIEnv* jni, bool is_virt, jint thread_cnt, jth
 
 static jint
 get_cthreads(JNIEnv* jni, jthread** cthreads_p) {
-  jvmtiThreadInfo info;
   jthread* tested_cthreads = NULL;
   jint all_cnt = 0;
   jint ct_cnt = 0;
