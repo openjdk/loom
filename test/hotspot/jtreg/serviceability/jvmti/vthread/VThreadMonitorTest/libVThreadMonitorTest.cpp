@@ -29,14 +29,14 @@
 
 extern "C" {
 
-#define PASSED 0
-#define FAILED 2
+#define STATUS_PASSED 0
+#define STATUS_FAILED 2
 
 #define TEST_CLASS "VThreadMonitorTest"
 
 static jvmtiEnv *jvmti = NULL;
 static volatile jboolean event_has_posted = JNI_FALSE;
-static volatile jint status = PASSED;
+static volatile jint status = STATUS_PASSED;
 static volatile jclass test_class = NULL;
 
 static jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved);
@@ -75,7 +75,7 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
   err = jvmti->GetCurrentContendedMonitor(thread, &contended_monitor);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func, "error in JVMTI GetCurrentContendedMonitor");
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
 
@@ -85,7 +85,7 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
   if (jni->IsSameObject(monitor1, contended_monitor) == JNI_FALSE &&
       jni->IsSameObject(monitor2, contended_monitor) == JNI_FALSE) {
     printf("FAIL: is_vt: %d: unexpected monitor from GetCurrentContendedMonitor\n", is_vt);
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
   printf("%s: GetCurrentContendedMonitor returned expected monitor for %s\n", func, tname);
@@ -94,7 +94,7 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
   err = jvmti->GetThreadState(thread, &state);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func, "error in JVMTI GetThreadState");
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
   printf("%s: GetThreadState returned state for %s: %0x\n\n", func, tname, state);
@@ -113,7 +113,7 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func,
                      "error in JVMTI GetOwnedMonitorInfo");
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
   printf("\n%s: GetOwnedMonitorInfo: %s owns %d monitor(s)\n", func, tname, mcount);
@@ -121,12 +121,12 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
 
   if (is_vt == JNI_TRUE && mcount < 2) {
     fprintf(stderr, "%s: FAIL: monitorCount for %s expected to be >= 2\n", func, tname);
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
   if (is_vt == JNI_FALSE && mcount != 0) {
     fprintf(stderr, "%s: FAIL: monitorCount for %s expected to be 0\n", func, tname);
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
 
@@ -136,7 +136,7 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
   err = jvmti->GetThreadState(thread, &state);
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, func, "error in JVMTI GetThreadState");
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
   printf("%s: GetThreadState returned state for %s: %0x\n\n", func, tname, state);
@@ -160,7 +160,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject mon
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
                      "error in JVMTI GetCarrierThread");
     event_has_posted = JNI_TRUE;
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
 
@@ -168,7 +168,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject mon
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
                      "error in JVMTI GetThreadInfo");
-    status = FAILED;
+    status = STATUS_FAILED;
     event_has_posted = JNI_TRUE;
     return;
   }
@@ -177,7 +177,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject mon
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
                      "error in JVMTI GetThreadInfo");
-    status = FAILED;
+    status = STATUS_FAILED;
     event_has_posted = JNI_TRUE;
     return;
   }
@@ -211,7 +211,7 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject m
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetCarrierThread");
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
 
@@ -219,7 +219,7 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject m
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetThreadInfo for virtual thread");
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
 
@@ -227,7 +227,7 @@ MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject m
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetThreadInfo for carrier thread");
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
 
@@ -364,7 +364,7 @@ Java_VThreadMonitorTest_checkContendedMonitor(JNIEnv *jni, jclass cls, jthread v
   if (err != JVMTI_ERROR_NONE) {
     ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
                      "error in JVMTI GetThreadInfo");
-    status = FAILED;
+    status = STATUS_FAILED;
     return;
   }
 
