@@ -141,7 +141,7 @@ public class Thread implements Runnable {
 
     /* Reserved for exclusive use by the JVM, TBD: move to FieldHolder */
     private long eetop;
- 
+
     // used by JVMTI to store JvmtiThreadState link
     private volatile long jvmtiThreadState;
 
@@ -184,21 +184,29 @@ public class Thread implements Runnable {
     // inherited AccessControlContext, TBD: move this to FieldHolder
     private AccessControlContext inheritedAccessControlContext;
 
-    /* For autonumbering anonymous threads. */
-    private static int threadInitNumber;
-    private static synchronized int nextThreadNum() {
-        return threadInitNumber++;
+    /* For auto-numbering anonymous threads. */
+    private static class ThreadNumbering {
+        private static final Unsafe U = Unsafe.getUnsafe();
+        private static final long NEXT_NUMBER =
+            U.objectFieldOffset(ThreadNumbering.class, "nextNumber");
+        private static volatile int nextNumber;
+        static int next() {
+            return U.getAndAddInt(ThreadNumbering.class, NEXT_NUMBER, 1);
+        }
+    }
+    static String nextThreadName() {
+        return "Thread-" + ThreadNumbering.next();
     }
 
     /* ThreadLocal values pertaining to this thread. This map is maintained
      * by the ThreadLocal class. */
-    ThreadLocal.ThreadLocalMap threadLocals = null;
+    ThreadLocal.ThreadLocalMap threadLocals;
 
     /*
      * InheritableThreadLocal values pertaining to this thread. This map is
      * maintained by the InheritableThreadLocal class.
      */
-    ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
+    ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
     // A simple (not very) random string of bits to use when evicting
     // cache entries from the scoped variable cache.
@@ -218,7 +226,7 @@ public class Thread implements Runnable {
             U.objectFieldOffset(ThreadIdentifiers.class, "nextTid");
         private static final long TID_MASK = (1L << 48) - 1;
         private static volatile long nextTid = 2;
-        private static long next() {
+        static long next() {
             return U.getAndAddLong(ThreadIdentifiers.class, NEXT_TID_OFFSET, 1);
         }
     }
@@ -1027,7 +1035,7 @@ public class Thread implements Runnable {
 
         private String nextThreadName() {
             if (name == null) {
-                return (virtual) ? name : "Thread-" + nextThreadNum();
+                return (virtual) ? name : Thread.nextThreadName();
             } else if (counter >= 0) {
                 return name + (counter++);
             } else {
@@ -1187,7 +1195,7 @@ public class Thread implements Runnable {
         @Override
         String nextThreadName() {
             String name = super.nextThreadName();
-            return (name != null) ? name : "Thread-" + nextThreadNum();
+            return (name != null) ? name : Thread.nextThreadName();
         }
 
         @Override
@@ -1250,7 +1258,7 @@ public class Thread implements Runnable {
      * {@code "Thread-"+}<i>n</i>, where <i>n</i> is an integer.
      */
     public Thread() {
-        this(null, null, "Thread-" + nextThreadNum(), 0);
+        this(null, null, Thread.nextThreadName(), 0);
     }
 
     /**
@@ -1266,7 +1274,7 @@ public class Thread implements Runnable {
      *         nothing.
      */
     public Thread(Runnable task) {
-        this(null, task, "Thread-" + nextThreadNum(), 0);
+        this(null, task, Thread.nextThreadName(), 0);
     }
 
     /**
@@ -1275,7 +1283,7 @@ public class Thread implements Runnable {
      * This is not a public constructor.
      */
     Thread(Runnable task, AccessControlContext acc) {
-        this(null, "Thread-" + nextThreadNum(), 0, task, 0, acc);
+        this(null, Thread.nextThreadName(), 0, task, 0, acc);
     }
 
     /**
@@ -1302,7 +1310,7 @@ public class Thread implements Runnable {
      *          thread group
      */
     public Thread(ThreadGroup group, Runnable task) {
-        this(group, task, "Thread-" + nextThreadNum(), 0);
+        this(group, task, Thread.nextThreadName(), 0);
     }
 
     /**
