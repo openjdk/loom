@@ -113,12 +113,14 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * inherited from the parent thread. Thread supports a special inheritable thread
  * local for the thread {@linkplain #getContextClassLoader() context-class-loader}.
  *
- * <p> {@code Thread} defines a {@linkplain Builder} API, for creating threads. It
+ * <p> {@code Thread} defines a {@link Builder} API, for creating threads. It
  * also defines (for customization reasons) constructors for creating platform threads.
- * The constructors cannot be used to create virtual threads. By default, creating
- * a {@code Thread} inherits the initial values of {@code InheritableThreadLocal}
- * variables, {@linkplain Scoped#inheritableForType(Class) inheritable-scoped-variables},
- * and a number of properties from the parent thread:
+ * The constructors cannot be used to create virtual threads.
+ *
+ * <h2><a id="inheritance">Inheritance</a></h2>
+ * Creating a {@code Thread} will inherit, by default, the initial values of {@code
+ * InheritableThreadLocal} variables, {@linkplain Scoped#inheritableForType(Class)
+ * inheritable-scoped-variables}, and a number of properties from the parent thread:
  * <ul>
  *     <li> Platform threads inherit the daemon status, priority, and thread-group.
  *     <li> Virtual threads are scheduled by the same scheduler as the parent thread
@@ -131,6 +133,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @since   1.0
+ * @see ThreadBuilder
+ * @see java.util.concurrent.ThreadFactory
  */
 public class Thread implements Runnable {
     /* Make sure registerNatives is the first thing <clinit> does. */
@@ -274,6 +278,19 @@ public class Thread implements Runnable {
      * The maximum priority that a thread can have.
      */
     public static final int MAX_PRIORITY = 10;
+
+    /**
+     * Characteristic value signifying that the thread cannot set values for its
+     * copy of {@link ThreadLocal thread-locals}
+     */
+    private static final int NO_THREAD_LOCALS = 1 << 1;
+
+    /**
+     * Characteristic value signifying that initial values for {@link
+     * InheritableThreadLocal inheritable-thread-locals} are not inherited from
+     * the constructing thread.
+     */
+    private static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     // current inner-most continuation
     private Continuation cont;
@@ -1256,9 +1273,11 @@ public class Thread implements Runnable {
      * {@code (null, null, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
      * {@code "Thread-"+}<i>n</i>, where <i>n</i> is an integer.
+     *
+     * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread() {
-        this(null, null, Thread.nextThreadName(), 0);
+        this(null, null, nextThreadName(), 0);
     }
 
     /**
@@ -1272,9 +1291,11 @@ public class Thread implements Runnable {
      *         the object whose {@code run} method is invoked when this thread
      *         is started. If {@code null}, this classes {@code run} method does
      *         nothing.
+     *
+     * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(Runnable task) {
-        this(null, task, Thread.nextThreadName(), 0);
+        this(null, task, nextThreadName(), 0);
     }
 
     /**
@@ -1283,7 +1304,7 @@ public class Thread implements Runnable {
      * This is not a public constructor.
      */
     Thread(Runnable task, AccessControlContext acc) {
-        this(null, Thread.nextThreadName(), 0, task, 0, acc);
+        this(null, nextThreadName(), 0, task, 0, acc);
     }
 
     /**
@@ -1308,9 +1329,11 @@ public class Thread implements Runnable {
      * @throws  SecurityException
      *          if the current thread cannot create a thread in the specified
      *          thread group
+     *
+     * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(ThreadGroup group, Runnable task) {
-        this(group, task, Thread.nextThreadName(), 0);
+        this(group, task, nextThreadName(), 0);
     }
 
     /**
@@ -1320,6 +1343,8 @@ public class Thread implements Runnable {
      *
      * @param   name
      *          the name of the new thread
+     *
+     * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(String name) {
         this(null, null, name, 0);
@@ -1344,6 +1369,8 @@ public class Thread implements Runnable {
      * @throws  SecurityException
      *          if the current thread cannot create a thread in the specified
      *          thread group
+     *
+     * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(ThreadGroup group, String name) {
         this(group, null, name, 0);
@@ -1360,6 +1387,8 @@ public class Thread implements Runnable {
      *
      * @param  name
      *         the name of the new thread
+     *
+     * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(Runnable task, String name) {
         this(null, task, name, 0);
@@ -1408,6 +1437,8 @@ public class Thread implements Runnable {
      * @throws  SecurityException
      *          if the current thread cannot create a thread in the specified
      *          thread group or cannot override the context class loader methods.
+     *
+     * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name) {
         this(group, task, name, 0);
@@ -1486,6 +1517,7 @@ public class Thread implements Runnable {
      *          thread group
      *
      * @since 1.4
+     * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name, long stackSize) {
         this(group, name, 0, task, stackSize, null);
@@ -1541,6 +1573,7 @@ public class Thread implements Runnable {
      *          thread group
      *
      * @since 9
+     * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name,
                   long stackSize, boolean inheritInheritableThreadLocals) {
@@ -1548,19 +1581,6 @@ public class Thread implements Runnable {
                 (inheritInheritableThreadLocals ? 0 : NO_INHERIT_THREAD_LOCALS),
                 task, stackSize, null);
     }
-
-    /**
-     * Characteristic value signifying that the thread cannot set values for its
-     * copy of {@link ThreadLocal thread-locals}
-     */
-    private static final int NO_THREAD_LOCALS = 1 << 1;
-
-    /**
-     * Characteristic value signifying that initial values for {@link
-     * InheritableThreadLocal inheritable-thread-locals} are not inherited from
-     * the constructing thread.
-     */
-    private static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     /**
      * Creates a virtual thread to execute a task and schedules it to execute.
@@ -1645,7 +1665,6 @@ public class Thread implements Runnable {
      * @throws     java.util.concurrent.RejectedExecutionException if the thread
      *             is virtual and the scheduler cannot accept a task
      * @see        #run()
-     * @see        Builder#start()
      */
     public synchronized void start() {
         /**
@@ -2031,12 +2050,14 @@ public class Thread implements Runnable {
         if (newPriority > MAX_PRIORITY || newPriority < MIN_PRIORITY) {
             throw new IllegalArgumentException();
         }
-        priority(newPriority);
+        if (!isVirtual()) {
+            priority(newPriority);
+        }
     }
 
     private void priority(int newPriority) {
-        ThreadGroup g;
-        if (!isVirtual() && (g = getThreadGroup()) != null) {
+        ThreadGroup g = holder.group;
+        if (g != null) {
             int maxPriority = g.getMaxPriority();
             if (newPriority > maxPriority) {
                 newPriority = maxPriority;
@@ -2389,12 +2410,13 @@ public class Thread implements Runnable {
         checkAccess();
         if (isAlive())
             throw new IllegalThreadStateException();
-        daemon(on);
+        if (!isVirtual()) {
+            daemon(on);
+        }
     }
 
     private void daemon(boolean on) {
-        if (!isVirtual())
-            holder.daemon = on;
+        holder.daemon = on;
     }
 
     /**
