@@ -133,8 +133,6 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @since   1.0
- * @see ThreadBuilder
- * @see java.util.concurrent.ThreadFactory
  */
 public class Thread implements Runnable {
     /* Make sure registerNatives is the first thing <clinit> does. */
