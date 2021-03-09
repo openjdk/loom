@@ -63,26 +63,30 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * virtual machine allows an application to have multiple threads of
  * execution running concurrently.
  *
- * <p> {@code Thread} supports the creation of threads that are scheduled by the
- * operating system. These <i>platform threads</i> are sometimes known as <i>kernel
- * threads</i> or <i>heavyweight threads</i> and will usually have a large stack and
- * other resources that are maintained by the operating system. Platforms threads are
- * suitable for executing all types of tasks but may be a limited resource.
+ * <p> {@code Thread} provides a {@link Builder} and other APIs to create and
+ * start threads that execute {@link Runnable} tasks. Starting a thread schedules
+ * it to execute concurrently with the thread that caused it start. The newly
+ * started thread invokes the task's {@link Runnable#run() run} method. Thread
+ * defines the {@link #join() join} method to wait for a thread to terminate.
  *
- * <a id="virtual-threads"></a>
- * <p> {@code Thread} also supports the creation of <i>virtual threads</i> that
- * are scheduled by the Java virtual machine using a small set of platform threads
- * that are used as <em>carrier threads</em>.
- * Virtual threads will typically require few resources and a single Java virtual
- * machine may support millions of virtual threads. Virtual threads are suitable
- * for executing tasks that spend most of the time blocked, often waiting for
- * synchronous blocking I/O operations to complete.
- * Locking and I/O operations are the <i>scheduling points</i> where a carrier thread
- * is re-scheduled from one virtual thread to another. Code executing in virtual
- * threads will usually not be aware of the underlying carrier thread, and in
- * particular, the {@linkplain Thread#currentThread()} method, to obtain a reference
- * to the <i>current thread</i>, will return the {@code Thread} object for the virtual
- * thread.
+ * <p> Threads have a unique {@linkplain #getId() identifier} and a {@linkplain
+ * #getName() name}. The identifier is generated when a {@code Thread} is created
+ * and cannot be changed. The thread name can be specified when creating a thread
+ * or can be {@linkplain #setName(String) changed} at a later time.
+ *
+ * <p> Threads support {@link ThreadLocal} variables. These are variables that are
+ * local to a thread, meaning a thread can have a copy of a variable that is set to
+ * a value that is independent of the value set by other threads. Thread also supports
+ * {@link InheritableThreadLocal} variables that are thread local variables that are
+ * inherited from the parent thread. Thread supports a special inheritable thread
+ * local for the thread {@linkplain #getContextClassLoader() context-class-loader}.
+ *
+ * <h2><a id="platform-threads">Platform threads</a></h2>
+ * <p> {@code Thread} supports the creation of <i>platform threads</i> that are
+ * typically mapped 1:1 to kernel threads scheduled by the operating system.
+ * Platform threads will usually have a large stack and other resources that are
+ * maintained by the operating system. Platforms threads are suitable for executing
+ * all types of tasks but may be a limited resource.
  *
  * <p> Platform threads are designated <i>daemon</i> or <i>non-daemon</i> threads.
  * When the Java virtual machine starts up, there is usually one non-daemon
@@ -91,31 +95,42 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * terminated. Unstarted daemon threads do not prevent the Java virtual machine from
  * termination. The Java virtual machine can also be terminated by invoking the
  * {@linkplain Runtime#exit(int)} method, in which case it will terminate even
- * if there are non-daemon threads still running. The daemon status of virtual
- * threads is meaningless and have no influence on when the Java virtual
- * machine terminates.
+ * if there are non-daemon threads still running.
  *
  * <p> In addition to the daemon status, platform threads have a {@linkplain
  * #getPriority() thread priority} and are members of a {@linkplain ThreadGroup
  * thread group}.
  *
- * <p> Threads have an {@linkplain #getId() identifier} and a {@linkplain
- * #getName() name}. The identifier is generated when a {@code Thread} is created
- * and cannot be changed. A thread name can be specified when creating a thread
- * or can be {@linkplain #setName(String) changed} at any time. Platform threads get
- * an automatically generated thread name by default. Virtual threads do not get
- * a name by default.
+ * <p> Platform threads get an automatically generated thread name by default.
  *
- * <p> Threads support {@link ThreadLocal} variables. These are variables that are
- * local to a thread, meaning a thread can set its copy of a variable to a value that
- * is independent of the value set by other threads. They also support {@link
- * InheritableThreadLocal} variables that are thread local variables that are
- * inherited from the parent thread. Thread supports a special inheritable thread
- * local for the thread {@linkplain #getContextClassLoader() context-class-loader}.
+ * <h2><a id="virtual-threads">Virtual threads</a></h2>
+ * <p> {@code Thread} also supports the creation of <i>virtual threads</i>.
+ * Virtual threads are typically <i>user-mode threads</i> scheduled by the Java
+ * virtual machine rather than the operating system. Virtual threads will typically
+ * require few resources and a single Java virtual machine may support millions of
+ * virtual threads. Virtual threads are suitable for executing tasks that spend most
+ * of the time blocked, often waiting for I/O operations to complete. Virtual threads
+ * are not intended for long running CPU intensive operations.
  *
- * <p> {@code Thread} defines a {@link Builder} API, for creating threads. It
- * also defines (for customization reasons) constructors for creating platform threads.
- * The constructors cannot be used to create virtual threads.
+ * <p> Virtual threads typically employ a small set of platform threads are use
+ * as <em>carrier threads</em>. Locking and I/O operations are the <i>scheduling
+ * points</i> where a carrier thread is re-scheduled from one virtual thread to
+ * another. Code executing in a virtual thread will usually not be aware of the
+ * underlying carrier thread, and in particular, the {@linkplain Thread#currentThread()}
+ * method, to obtain a reference to the <i>current thread</i>, will return the {@code
+ * Thread} object for the virtual thread, not the underlying carrier thread.
+ *
+ * <p> Virtual threads gets a fixed name by default.
+ *
+ * <h2>Creating and starting threads</h2>
+ *
+ * <p> As noted above {@code Thread} defines a {@link Builder} API for creating and
+ * starting threads.
+ *
+ * <p> In addition to the builder, {@code Thread} defines (for historical and
+ * customization reasons) public constructors for creating platform threads. Most
+ * applications should have little need to use these constructors directly or
+ * extend {@code Thread}. The constructors cannot be used to create virtual threads.
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
  * Creating a {@code Thread} will inherit, by default, the initial values of {@code
