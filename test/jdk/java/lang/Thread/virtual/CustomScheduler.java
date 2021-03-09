@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -55,7 +55,7 @@ public class CustomScheduler {
                 ref.set(vthread);
                 pool.execute(task);
             };
-            Thread thread = Thread.builder().virtual(scheduler).task(() -> { }).start();
+            Thread thread = Thread.ofVirtual().scheduler(scheduler).start(() -> { });
             thread.join();
             assertTrue(ref.get() == thread);
         }
@@ -81,14 +81,13 @@ public class CustomScheduler {
                 pool.execute(task);
             };
 
-            Thread.builder()
-                    .virtual(scheduler)
-                    .task(() -> {
+            Thread.ofVirtual()
+                    .scheduler(scheduler)
+                    .start(() -> {
                         long nanos = Duration.ofSeconds(2).toNanos();
                         LockSupport.parkNanos(nanos);
                         LockSupport.parkNanos(nanos);
                     })
-                    .start()
                     .join();
 
             var expected = new ArrayList<>();
@@ -120,7 +119,7 @@ public class CustomScheduler {
             }
             assertTrue(exc.get() instanceof IllegalCallerException);
         };
-        Thread.builder().virtual(scheduler).task(LockSupport::park).start();
+        Thread.ofVirtual().scheduler(scheduler).start(LockSupport::park);
     }
 
     /**
@@ -141,7 +140,7 @@ public class CustomScheduler {
                 assertTrue(false);
             } catch (IllegalStateException expected) { }
         };
-        Thread.builder().virtual(scheduler).task(() -> { }).start();
+        Thread.ofVirtual().scheduler(scheduler).start(() -> { });
     }
 
     /**
@@ -151,10 +150,10 @@ public class CustomScheduler {
     public void testParkWithInterruptSet() {
         Thread carrier = Thread.currentThread();
         try {
-            Thread vthread = Thread.builder().virtual(Runnable::run).task(() -> {
+            Thread vthread = Thread.ofVirtual().scheduler(Runnable::run).start(() -> {
                 Thread.currentThread().interrupt();
                 Thread.yield();
-            }).start();
+            });
             assertTrue(vthread.isInterrupted());
             assertFalse(carrier.isInterrupted());
         } finally {
@@ -169,9 +168,9 @@ public class CustomScheduler {
     public void testTerminateWithInterruptSet() {
         Thread carrier = Thread.currentThread();
         try {
-            Thread vthread = Thread.builder().virtual(Runnable::run).task(() -> {
+            Thread vthread = Thread.ofVirtual().scheduler(Runnable::run).start(() -> {
                 Thread.currentThread().interrupt();
-            }).start();
+            });
             assertTrue(vthread.isInterrupted());
             assertFalse(carrier.isInterrupted());
         } finally {
@@ -189,9 +188,9 @@ public class CustomScheduler {
         };
         try {
             AtomicBoolean interrupted = new AtomicBoolean();
-            Thread vthread = Thread.builder().virtual(scheduler).task(() -> {
+            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
                 interrupted.set(Thread.currentThread().isInterrupted());
-            }).start();
+            });
             assertFalse(vthread.isInterrupted());
         } finally {
             Thread.interrupted();
@@ -215,23 +214,21 @@ public class CustomScheduler {
             }
         };
 
-        Thread vthread1 = Thread.builder()
-                .virtual(scheduler)
-                .task(() -> {
+        Thread vthread1 = Thread.ofVirtual()
+                .scheduler(scheduler)
+                .unstarted(() -> {
                     checkCarrierInterruptStatus.run();
                     LockSupport.park();
                     checkCarrierInterruptStatus.run();
-                })
-                .build();
+                });
 
-        Thread vthread2 = Thread.builder()
-                .virtual(scheduler)
-                .task(() -> {
+        Thread vthread2 = Thread.ofVirtual()
+                .scheduler(scheduler)
+                .unstarted(() -> {
                     checkCarrierInterruptStatus.run();
                     LockSupport.unpark(vthread1);
                     checkCarrierInterruptStatus.run();
-                })
-                .build();
+                });
 
         try {
             vthread1.start();

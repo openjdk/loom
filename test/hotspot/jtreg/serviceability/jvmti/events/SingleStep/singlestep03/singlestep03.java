@@ -67,14 +67,15 @@ public class singlestep03 {
     native int check();
 
     public static void main(String[] args) throws Exception {
-        Thread.Builder threadBuilder = Thread.builder().task(() -> {
+        Thread.Builder builder;
+        if ("virtual".equals(args[0])) {
+            builder = Thread.ofVirtual();
+        } else {
+            builder = Thread.ofPlatform();
+        }
+        Thread thread = builder.start(() -> {
             result = new singlestep03().runThis();
         });
-        if ("virtual".equals(args[0])) {
-            threadBuilder = threadBuilder.virtual();
-        }
-        Thread thread = threadBuilder.build();
-        thread.start();
         thread.join();
         if (result != 0) {
             throw new RuntimeException("Unexpected status: " + result);

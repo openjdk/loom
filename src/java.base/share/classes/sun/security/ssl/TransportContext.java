@@ -637,12 +637,10 @@ final class TransportContext implements ConnectionContext {
                 !sslConfig.handshakeListeners.isEmpty()) {
             HandshakeCompletedEvent hce =
                 new HandshakeCompletedEvent((SSLSocket)transport, conSession);
-            Thread.builder()
-                    .virtual()
-                    .noInheritThreadLocals()
+            Thread.ofVirtual()
                     .name("HandshakeCompletedNotify-Thread")
-                    .task(new NotifyHandshake(sslConfig.handshakeListeners, hce))
-                    .start();
+                    .inheritInheritableThreadLocals(false)
+                    .start(new NotifyHandshake(sslConfig.handshakeListeners, hce));
         }
 
         return HandshakeStatus.FINISHED;

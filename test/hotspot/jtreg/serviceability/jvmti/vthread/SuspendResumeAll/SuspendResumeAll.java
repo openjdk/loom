@@ -109,7 +109,7 @@ public class SuspendResumeAll extends DebugeeClass {
     }
 
     Thread start_thread(String name, TestedThread thread) {
-        Thread vthread = Thread.startVirtualThread(name, thread);
+        Thread vthread =  Thread.ofVirtual().name(name).start(thread);
         thread.ensureReady(); // testing sync
         System.out.println("## Java: started thread: " + name);
         return vthread;

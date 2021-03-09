@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -38,7 +38,7 @@ public class Collectable {
 
     // ensure that an unstarted virtual thread can be GC"ed
     public void testGC1() {
-        var thread = Thread.builder().virtual().task(() -> { }).build();
+        var thread = Thread.ofVirtual().unstarted(() -> { });
         var ref = new WeakReference<>(thread);
         thread = null;
         waitUntilCleared(ref);

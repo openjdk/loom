@@ -69,7 +69,7 @@ public class mentry02 {
         testKernel();
     }
     public static void testVirtual() {
-        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+        Thread thread = Thread.startVirtualThread(() -> {
             getReady(MAX_LOOP);
 
             for (int i = 0; i < MAX_LOOP; i++) {

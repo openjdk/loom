@@ -48,7 +48,7 @@ public class VThreadUnsupportedTest {
     };
 
     void runTest() throws Exception { 
-        Thread vthread = Thread.startVirtualThread("VThread", pinnedTask);
+        Thread vthread = Thread.ofVirtual().name("VThread").start(pinnedTask);
         testJvmtiFunctionsInJNICall();
         isJNITestingCompleted.set(true);
         vthread.join();

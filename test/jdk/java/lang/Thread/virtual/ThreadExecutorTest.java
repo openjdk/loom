@@ -66,7 +66,7 @@ public class ThreadExecutorTest {
         final int NUM_TASKS = 1000;
         AtomicInteger threadCount = new AtomicInteger();
 
-        ThreadFactory factory1 = Thread.builder().virtual().factory();
+        ThreadFactory factory1 = Thread.ofVirtual().factory();
         ThreadFactory factory2 = task -> {
             threadCount.addAndGet(1);
             return factory1.newThread(task);
@@ -153,7 +153,7 @@ public class ThreadExecutorTest {
     public void testShutdown3() throws Exception {
         var exception = new AtomicReference<Exception>();
 
-        ThreadFactory factory = Thread.builder().virtual().factory();
+        ThreadFactory factory = Thread.ofVirtual().factory();
         try (var executor = Executors.newUnownedThreadExecutor(factory)) {
             Thread.startVirtualThread(() -> {
                 try {
@@ -215,7 +215,7 @@ public class ThreadExecutorTest {
     public void testShutdownNow3() throws Exception {
         var exception = new AtomicReference<Exception>();
 
-        ThreadFactory factory = Thread.builder().virtual().factory();
+        ThreadFactory factory = Thread.ofVirtual().factory();
         try (var executor = Executors.newUnownedThreadExecutor(factory)) {
             Thread.startVirtualThread(() -> {
                 try {
@@ -335,7 +335,7 @@ public class ThreadExecutorTest {
     public void testClose8() throws Exception {
         var exception = new AtomicReference<Exception>();
 
-        ThreadFactory factory = Thread.builder().virtual().factory();
+        ThreadFactory factory = Thread.ofVirtual().factory();
         try (var executor = Executors.newUnownedThreadExecutor(factory)) {
             Thread.startVirtualThread(() -> {
                 try {
@@ -381,7 +381,7 @@ public class ThreadExecutorTest {
         var ref2 = new AtomicReference<Thread>();
         ThreadFactory factory = task -> {
             assertTrue(ref1.get() == null);
-            Thread vthread = Thread.builder().virtual().task(task).build();
+            Thread vthread = Thread.ofVirtual().unstarted(task);
             ref1.set(vthread);
             return vthread;
         };
@@ -414,7 +414,7 @@ public class ThreadExecutorTest {
      * Test submit when the Executor is terminated.
      */
     public void testSubmitAfterTermination() {
-        ThreadFactory factory = Thread.builder().daemon(true).factory();
+        ThreadFactory factory = Thread.ofPlatform().daemon(true).factory();
         ExecutorService executor = Executors.newVirtualThreadExecutor();
         executor.shutdown();
         assertTrue(executor.isShutdown() && executor.isTerminated());
@@ -1308,7 +1308,7 @@ public class ThreadExecutorTest {
 
     @Test(expectedExceptions = { NullPointerException.class })
     public void testNulls2() {
-        ThreadFactory factory = Thread.builder().factory();
+        ThreadFactory factory = Thread.ofPlatform().factory();
         Executors.newThreadExecutor(factory, null);
     }
 

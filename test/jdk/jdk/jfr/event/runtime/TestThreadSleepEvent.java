@@ -58,14 +58,13 @@ public class TestThreadSleepEvent {
             recording.enable(EVENT_NAME).withoutThreshold().withStackTrace();
             recording.start();
             Thread.sleep(SLEEP_TIME_MS);
-            Thread virtualThread  = Thread.builder().virtual().factory().newThread(() -> {
+            Thread virtualThread  = Thread.ofVirtual().start(() -> {
                 try {
                     Thread.sleep(SLEEP_TIME_MS);
                 } catch (InterruptedException ie) {
                     throw new RuntimeException(ie);
                 }
             });
-            virtualThread.start();
             virtualThread.join();
             recording.stop();
 

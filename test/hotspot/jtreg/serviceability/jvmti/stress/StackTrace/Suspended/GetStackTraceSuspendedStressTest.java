@@ -68,8 +68,8 @@ public class GetStackTraceSuspendedStressTest extends DebugeeClass {
     public static void test1() throws Exception {
         List<Thread> threads = new ArrayList<>();
         for (int i = 0; i < 100; i++) {
-            threads.add(Thread.builder().task(PRODUCER).name("VThread-Producer-" + i).virtual().build());
-            threads.add(Thread.builder().task(CONSUMER).name("VThread-Consumer-" + i).virtual().build());
+            threads.add(Thread.ofVirtual().name("VThread-Producer-" + i).unstarted(PRODUCER));
+            threads.add(Thread.ofVirtual().name("VThread-Consumer-" + i).unstarted(CONSUMER));
         }
 
         for (Thread t: threads) {

@@ -431,7 +431,7 @@ public class Basic {
         Object valueInParent = v.get();
 
         // check inherited by platform thread
-        ThreadFactory factory = Thread.builder().factory();
+        ThreadFactory factory = Thread.ofPlatform().factory();
         try (var executor = Executors.newThreadExecutor(factory)) {
             Object valueInChild = executor.submit(v::get).join();
             assertEquals(valueInChild, valueInParent);
@@ -451,7 +451,7 @@ public class Basic {
         assertTrue(v.isBound());
 
         // check not inherited by platform thread
-        ThreadFactory factory = Thread.builder().factory();
+        ThreadFactory factory = Thread.ofPlatform().factory();
         try (var executor = Executors.newThreadExecutor(factory)) {
             boolean boundInChild = executor.submit(v::isBound).join();
             assertFalse(boundInChild);

@@ -50,7 +50,7 @@ public class ContVsThread {
     static final ContinuationScope scope = new ContinuationScope() { };
 
     // ThreadFactory that uses the current Thread as the carrier thread
-    static final ThreadFactory vthreadFactory = Thread.builder().virtual(Runnable::run).factory();
+    static final ThreadFactory vthreadFactory = Thread.ofVirtual().scheduler(Runnable::run).factory();
 
     Object obj;
 
@@ -99,10 +99,9 @@ public class ContVsThread {
         while (true) { yieldN(5); }
     });
 
-    static final Thread parkingVThread = Thread.builder()
-            .virtual(Runnable::run)
-            .task(() -> { while (true) { LockSupport.park(); } })
-            .start();
+    static final Thread parkingVThread = Thread.ofVirtual()
+            .scheduler(Runnable::run)
+            .start(() -> { while (true) { LockSupport.park(); } });
 
     @Benchmark
     public void contRunYield() {

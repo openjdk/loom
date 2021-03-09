@@ -25,8 +25,6 @@
 
 package java.lang;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
@@ -125,7 +123,11 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * <h2>Creating and starting threads</h2>
  *
  * <p> As noted above {@code Thread} defines a {@link Builder} API for creating and
- * starting threads.
+ * starting threads. The following example starts a platform thread with name
+ * "greeter" that prints a message:
+ * <pre>{@code    Runnable runnable = () -> System.out.println("hello world");
+ *   Thread thread = Thread.ofPlatform().name("greeter").start(runnable);
+ *   thread.join(); }</pre>
  *
  * <p> In addition to the builder, {@code Thread} defines (for historical and
  * customization reasons) public constructors for creating platform threads. Most
@@ -296,14 +298,14 @@ public class Thread implements Runnable {
      * Characteristic value signifying that the thread cannot set values for its
      * copy of {@link ThreadLocal thread-locals}
      */
-    private static final int NO_THREAD_LOCALS = 1 << 1;
+    static final int NO_THREAD_LOCALS = 1 << 1;
 
     /**
      * Characteristic value signifying that initial values for {@link
      * InheritableThreadLocal inheritable-thread-locals} are not inherited from
      * the constructing thread.
      */
-    private static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
+    static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     // current inner-most continuation
     private Continuation cont;
@@ -579,8 +581,8 @@ public class Thread implements Runnable {
      * @param acc the AccessControlContext to inherit, or
      *            AccessController.getContext() if null
      */
-    private Thread(ThreadGroup g, String name, int characteristics, Runnable task,
-                   long stackSize, AccessControlContext acc) {
+    Thread(ThreadGroup g, String name, int characteristics, Runnable task,
+           long stackSize, AccessControlContext acc) {
         if (name == null) {
             throw new NullPointerException("name cannot be null");
         }
@@ -698,7 +700,7 @@ public class Thread implements Runnable {
 
     /**
      * The task {@link java.util.concurrent.Executor#execute(Runnable) submitted}
-     * to a custom {@link Thread.Builder#virtual(Executor) scheduler}.
+     * to a custom {@link Thread.Builder.OfVirtual#scheduler(Executor) scheduler}.
      *
      * @apiNote The following example creates a scheduler that uses a small set of
      * platform threads. It prints the name of each virtual thread before executing
@@ -712,7 +714,7 @@ public class Thread implements Runnable {
      *     };
      * }</pre>
      *
-     * @see Thread.Builder#virtual(Executor)
+     * @see Thread.Builder.OfVirtual#scheduler(Executor)
      * @since 99
      */
     public interface VirtualThreadTask extends Runnable {
@@ -752,66 +754,100 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Returns a builder for creating a {@code Thread} or {@code ThreadFactory}.
-     * A newly created builder defaults to creating threads that are scheduled by
-     * the operating system. The {@link Builder#virtual() virtual()} method may be
-     * used to change it to create threads that are scheduled by the Java virtual
-     * machine.
+     * Returns a builder for creating a platform {@code Thread} or {@code ThreadFactory}
+     * that creates platform threads.
      *
      * @apiNote The following are examples using the builder:
      *
      * <pre>{@code
-     *   // Starts a daemon thread with name "duke"
-     *   Thread thread = Thread.builder()
-     *                 .name("duke")
-     *                 .daemon()
-     *                 .priority(Thread.NORM_PRIORITY)
-     *                 .task(runnable)
-     *                 .start();
+     *   // Create a thread with name "duke".
+     *   // The thread's start method must be invoked to schedule it to execute.
+     *   Thread thread = Thread.ofPlatform().name("duke").unstarted(runnable);
+     *
+     *   // Start a daemon thread to run a task
+     *   Thread thread = Thread.ofPlatform().daemon().start(runnable);
      *
      *   // A ThreadFactory that creates daemon threads named "worker-0", "worker-1", ...
-     *   ThreadFactory factory = Thread.builder().daemon().name("worker-", 0).factory();
-     *
-     *   // Start an unnamed virtual thread
-     *   Thread thread = Thread.builder().virtual().task(runnable).start();
-     *
-     *   // A ThreadFactory that creates virtual threads
-     *   ThreadFactory factory = Thread.builder().virtual().factory();
+     *   ThreadFactory factory = Thread.ofPlatform().daemon().name("worker-", 0).factory();
      * }</pre>
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
      * @since 99
      */
-    public static Builder builder() {
-        return new BuilderImpl();
+    public static Builder.OfPlatform ofPlatform() {
+        return new ThreadBuilders.PlatformThreadBuilder();
+    }
+
+    /**
+     * Returns a builder for creating a virtual {@code Thread} or {@code ThreadFactory}
+     * that creates virtual threads.
+     *
+     * @apiNote The following are examples using the builder:
+     *
+     * <pre>{@code
+     *   // Start a virtual thread to run a task.
+     *   Thread thread = Thread.ofVirtual().start(runnable);
+     *
+     *   // A ThreadFactory that creates virtual threads
+     *   ThreadFactory factory = Thread.ofVirtual().factory();
+     * }</pre>
+     *
+     * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
+     * @since 99
+     */
+    public static Builder.OfVirtual ofVirtual() {
+        return new ThreadBuilders.VirtualThreadBuilder();
     }
 
     /**
      * A builder for {@link Thread} and {@link ThreadFactory} objects.
      *
-     * <p> {@code Builder} defines methods to set {@code Thread} characteristics.
-     * {@code Thread} and {@code ThreadFactory} objects are created from the builder
-     * with the following methods:
+     * <p> {@code Builder} defines methods to set {@code Thread} properties such
+     * as the thread {@link #name(String) name}. This includes properties that would
+     * otherwise be <a href="Thread.html#inheritance">inherited</a>. Once set, a
+     * {@code Thread} or {@code ThreadFactory} is created with the following methods:
      *
      * <ul>
-     *     <li> The {@linkplain #build() build} method creates an unstarted {@code Thread}.
-     *     <li> The {@linkplain #start() start} method creates and starts a {@code Thread}.
+     *     <li> The {@linkplain #unstarted(Runnable) unstarted} method creates a new
+     *          <em>unstarted</em> {@code Thread} to run a task. The {@code Thread}'s
+     *          {@link Thread#start() start} method must be invoked to schedule the
+     *          thread to execute.
+     *     <li> The {@linkplain #start(Runnable) start} method creates a new {@code
+     *          Thread} to run a task and schedules the thread to execute.
      *     <li> The {@linkplain #factory() factory} method creates a {@code ThreadFactory}.
      * </ul>
      *
-     * <p> Virtual threads created with a builder, or with a {@code ThreadFactory}
-     * created from a builder, have no {@link Permission permissions}.
-     *
-     * <p> A {@code Builder} is not thread safe. The {@code ThreadFactory}
+     * <p> A {@code Thread.Builder} is not thread safe. The {@code ThreadFactory}
      * returned by the builder's {@code factory()} method is thread safe.
      *
      * <p> Unless otherwise specified, passing a null argument to a method in
      * this interface causes a {@code NullPointerException} to be thrown.
      *
-     * @see #builder()
+     * @apiNote The following are examples using the builder:
+     *
+     * <pre>{@code
+     *   // Start a virtual thread to run a task.
+     *   Thread thread = Thread.ofVirtual().start(runnable);
+     *
+     *   // A ThreadFactory that creates virtual threads
+     *   ThreadFactory factory = Thread.ofVirtual().factory();
+     *
+     *   // Create a thread with name "duke".
+     *   // The thread's start method must be invoked to schedule it to execute.
+     *   Thread thread = Thread.ofPlatform().name("duke").unstarted(runnable);
+     *
+     *   // Start a daemon thread to run a task
+     *   Thread thread = Thread.ofPlatform().daemon().start(runnable);
+     *
+     *   // A ThreadFactory that creates daemon threads named "worker-0", "worker-1", ...
+     *   ThreadFactory factory = Thread.ofPlatform().daemon().name("worker-", 0).factory();
+     * }</pre>
+     *
+     * @see Thread#ofPlatform()
+     * @see Thread#ofVirtual()
      * @since 99
      */
-    public interface Builder {
+    public interface Builder {    // sealed, permits ...
         /**
          * Sets the thread name.
          * @param name thread name
@@ -830,32 +866,53 @@ public class Thread implements Runnable {
          * ThreadFactory#newThread(Runnable) newThread} is used to create a
          * {@code Thread}.
          *
+         * @apiNote
+         * <pre>{@code
+         *   Thread.Builder builder = Thread.ofPlatform().name("worker-", 0);
+         *   Thread t1 = builder.start(task1);   // name "worker-0"
+         *   Thread t2 = builder.start(task2);   // name "worker-1"
+         * }</pre>
+         *
          * @param prefix thread name prefix
          * @param start the starting value of the counter
          * @return this builder
          * @throws IllegalArgumentException if count is negative
          */
-        Builder name(String prefix, int start);
+        Builder name(String prefix, long start);
 
         /**
-         * The thread is not allowed to set values for its copy of thread-local
-         * variables. If the thread attempts to set a value for a thread-local with
-         * the {@link ThreadLocal#set(Object)} method then {@code
-         * UnsupportedOperationException} is thrown.
+         * Sets whether the thread is allowed to set values for its copy of {@linkplain
+         * ThreadLocal thread-local} variables. The default is to allow. If not allowed,
+         * then any attempt by the thread to set a value for a thread-local with the
+         * {@link ThreadLocal#set(Object) set} method throws {@code
+         * UnsupportedOperationException} and the {@link ThreadLocal#get() get} method
+         * always returns the {@linkplain ThreadLocal#initialValue() initial-value}.
+         *
+         * @apiNote This method is intended for cases where there are a large number of
+         * threads and where potentially unbounded memory usage due to thread locals is
+         * a concern. Disallowing a thread to set its copy of thread-local variables
+         * creates the potential for exceptions at run-time so great care is required
+         * when the thread is used to invoke arbitrary code.
+         *
+         * @param allow {@code true} to allow, {@code false} to disallow
          * @return this builder
-         * @see ThreadLocal#set(Object)
          */
-        Builder noThreadLocals();
+        Builder allowSetThreadLocals(boolean allow);
 
         /**
-         * The thread will not inherit the initial values for {@linkplain
-         * InheritableThreadLocal inheritable-thread-local} variables. The thread will
-         * also not inherit the initial values when {@link #noThreadLocals()} is used
-         * to disallow the thread from setting the values of thread-local variables.
+         * Sets whether the thread inherits the initial values of {@linkplain
+         * InheritableThreadLocal inheritable-thread-local} variables. The default
+         * is to inherit.
+         *
+         * <p> The initial values of {@code InheritableThreadLocal}s are never inherited
+         * when {@link #allowSetThreadLocals(boolean)} is used to disallow the thread
+         * to have its own copy of thread-local variables.
+         *
+         * @param inherit {@code true} to inherit, {@code false} to not inherit
          * @return this builder
          */
-        Builder noInheritThreadLocals();
-        
+        Builder inheritInheritableThreadLocals(boolean inherit);
+
         /**
          * Sets the uncaught exception handler.
          * @param ueh uncaught exception handler
@@ -864,38 +921,33 @@ public class Thread implements Runnable {
         Builder uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
 
         /**
-         * Sets the task for the thread to run.
-         * @param task the task to run
-         * @return this builder
-         */
-        Builder task(Runnable task);
-
-        /**
-         * Creates a new unstarted {@code Thread} from the current state of the builder.
-         *
+         * Creates a new {@code Thread} from the current state of the builder to
+         * run the given task. The {@code Thread}'s {@link Thread#start() start}
+         * method must be invoked to schedule the thread to execute.
+         * @param task the object to run when the thread executes
          * @return a new unstarted Thread
-         * @throws IllegalStateException if the task object to run object has not been set
          * @throws SecurityException if a thread group has been set and the current thread
          *         cannot create a thread in that thread group
+         * @see <a href="Thread.html#inheritance">Inheritance</a>
          */
-        Thread build();
+        Thread unstarted(Runnable task);
 
         /**
-         * Creates a new {@code Thread} from the current state of the builder
-         * and starts it as if by invoking the {@linkplain Thread#start() start}
-         * method.
+         * Creates a new {@code Thread} from the current state of the builder and
+         * schedules it to execute.
          *
-         * @implSpec The default implementation invokes {@linkplain #build() build}
-         * to create a {@code Thread} and then invokes its {@linkplain Thread#start()
-         * start} method to start it.
+         * @implSpec The default implementation invokes {@linkplain #unstarted(Runnable)
+         * unstarted} to create a {@code Thread} and then invokes its {@linkplain
+         * Thread#start() start} method to schedule it to execute.
          *
-         * @return The started thread
-         * @throws IllegalStateException if the task object to run object has not been set
+         * @param task the object to run when the thread executes
+         * @return a new started Thread
          * @throws SecurityException if a thread group has been set and the current thread
          *         cannot create a thread in that thread group
+         * @see <a href="Thread.html#inheritance">Inheritance</a>
          */
-        default Thread start() {
-            Thread thread = build();
+        default Thread start(Runnable task) {
+            Thread thread = unstarted(task);
             thread.start();
             return thread;
         }
@@ -909,362 +961,106 @@ public class Thread implements Runnable {
          */
         ThreadFactory factory();
 
-        // platform threads
-
         /**
-         * Sets the thread group. The thread group of a virtual thread cannot
-         * be selected at build time. Setting the thread group of a virtual
-         * thread has no effect.
-         * @param group the thread group
-         * @return this builder
-         */
-        Builder group(ThreadGroup group);
-
-        /**
-         * Sets the daemon status.
-         * The {@link #isDaemon() daemon status} of virtual threads is always {@code true}.
-         * Setting the daemon status of a virtual thread has no effect.
-         * @param on {@code true} to create daemon threads
-         * @return this builder
-         */
-        Builder daemon(boolean on);
-
-        /**
-         * Sets the daemon status to {@code true}.
-         * The {@link #isDaemon() daemon status} of virtual threads is always {@code true}.
-         * Setting the daemon status of a virtual thread has no effect.
-         * @implSpec The default implementation invokes {@linkplain #daemon(boolean)} with
-         * a value of {@code true}.
-         * @return this builder
-         */
-        default Builder daemon() {
-            return daemon(true);
-        }
-
-        /**
-         * Sets the thread priority.
-         * The priority of virtual threads is always {@linkplain Thread#NORM_PRIORITY}.
-         * Setting the priority of a virtual thread has no effect.
-         * @param priority priority
-         * @return this builder
-         * @throws IllegalArgumentException if the priority is less than
-         *        {@link Thread#MIN_PRIORITY} or greater than {@link Thread#MAX_PRIORITY}
-         */
-        Builder priority(int priority);
-
-        /**
-         * Sets the desired stack size. Setting the stack size of a virtual thread
-         * has no effect.
+         * A builder for creating a platform {@link Thread} or {@link ThreadFactory}
+         * that creates platform threads.
          *
-         * <p> The stack size is the approximate number of bytes of address space
-         * that the Java virtual machine is to allocate for the thread's stack. The
-         * effect is highly platform dependent and the Java virtual machine is free
-         * to treat the {@code stackSize} parameter as a "suggestion". If the value
-         * is unreasonably low for the platform then a platform specific minimum
-         * may be used. If the value is unreasonably high then a platform specific
-         * maximum may be used. A value of zero is always ignored.
+         * @see Thread#ofPlatform()
+         * @since 99
+         */
+        interface OfPlatform extends Builder {
+            @Override OfPlatform name(String name);
+            /** @throws IllegalArgumentException {@inheritDoc} */
+            @Override OfPlatform name(String prefix, long start);
+            @Override OfPlatform allowSetThreadLocals(boolean allow);
+            @Override OfPlatform inheritInheritableThreadLocals(boolean inherit);
+            @Override OfPlatform uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+
+            /**
+             * Sets the thread group.
+             * @param group the thread group
+             * @return this builder
+             */
+            OfPlatform group(ThreadGroup group);
+
+            /**
+             * Sets the daemon status.
+             * @param on {@code true} to create daemon threads
+             * @return this builder
+             */
+            OfPlatform daemon(boolean on);
+
+            /**
+             * Sets the daemon status to {@code true}.
+             * @implSpec The default implementation invokes {@linkplain #daemon(boolean)} with
+             * a value of {@code true}.
+             * @return this builder
+             */
+            default OfPlatform daemon() {
+                return daemon(true);
+            }
+
+            /**
+             * Sets the thread priority.
+             * @param priority priority
+             * @return this builder
+             * @throws IllegalArgumentException if the priority is less than
+             *        {@link Thread#MIN_PRIORITY} or greater than {@link Thread#MAX_PRIORITY}
+             */
+            OfPlatform priority(int priority);
+
+            /**
+             * Sets the desired stack size.
+             *
+             * <p> The stack size is the approximate number of bytes of address space
+             * that the Java virtual machine is to allocate for the thread's stack. The
+             * effect is highly platform dependent and the Java virtual machine is free
+             * to treat the {@code stackSize} parameter as a "suggestion". If the value
+             * is unreasonably low for the platform then a platform specific minimum
+             * may be used. If the value is unreasonably high then a platform specific
+             * maximum may be used. A value of zero is always ignored.
+             *
+             * @param stackSize the desired stack size
+             * @return this builder
+             * @throws IllegalArgumentException if the stack size is negative
+             */
+            OfPlatform stackSize(long stackSize);
+        }
+
+        /**
+         * A builder for creating a virtual {@link Thread} or {@link ThreadFactory}
+         * that creates virtual threads.
          *
-         * @param stackSize the desired stack size
-         * @return this builder
-         * @throws IllegalArgumentException if the stack size is negative
+         * <p> Virtual threads created with a builder, or with a {@code ThreadFactory}
+         * created from a builder, have no {@link Permission permissions}.
+         *
+         * @see Thread#ofVirtual()
+         * @since 99
          */
-        Builder stackSize(long stackSize);
+        interface OfVirtual extends Builder {
+            @Override OfVirtual name(String name);
+            /** @throws IllegalArgumentException {@inheritDoc} */
+            @Override OfVirtual name(String prefix, long start);
+            @Override OfVirtual allowSetThreadLocals(boolean allow);
+            @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
+            @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
 
-        // virtual threads
-
-        /**
-         * The thread will be scheduled by the Java virtual machine rather than
-         * the operating system. The scheduler will be selected when the {@code
-         * Thread} is created.
-         * @return this builder
-         */
-        Builder virtual();
-
-        /**
-         * The thread will be scheduled by the Java virtual machine rather than
-         * the operating system with the given scheduler. The scheduler's {@link
-         * Executor#execute(Runnable) execute} method is invoked with tasks of
-         * type {@link VirtualThreadTask}. It may be invoked in the context of
-         * a virtual thread. The scheduler should arrange to execute these tasks
-         * on a platform thread. Attempting to execute the task on a virtual thread
-         * causes an exception to be thrown (see {@link VirtualThreadTask#run()}).
-         * The {@code execute} method may be invoked at sensitive times (e.g. when
-         * unparking a thread) so care should be taken to not directly execute the
-         * task on the <em>current thread</em>.
-         * @param scheduler the scheduler or {@code null} for the default scheduler
-         * @return this builder
-         */
-        Builder virtual(Executor scheduler);
-    }
-
-    /**
-     * Builder implementation.
-     */
-    private static class BuilderImpl implements Builder {
-        private boolean virtual;
-
-        // common
-        private String name;
-        private int counter;
-        private int characteristics;
-        private UncaughtExceptionHandler uhe;
-        private Runnable task;
-
-        // platform threads
-        private ThreadGroup group;
-        private boolean daemon;
-        private boolean daemonChanged;
-        private int priority;
-        private long stackSize;
-
-        // virtual threads
-        private Executor scheduler;
-
-        BuilderImpl() {  }
-
-        @Override
-        public Builder name(String name) {
-            this.name = Objects.requireNonNull(name);
-            this.counter = -1;
-            return this;
-        }
-
-        @Override
-        public Builder name(String prefix, int start) {
-            Objects.requireNonNull(prefix);
-            if (start < 0)
-                throw new IllegalArgumentException("'start' is negative");
-            this.name = prefix;
-            this.counter = start;
-            return this;
-        }
-
-        @Override
-        public Builder noThreadLocals() {
-            characteristics |= Thread.NO_THREAD_LOCALS;
-            return this;
-        }
-
-        @Override
-        public Builder noInheritThreadLocals() {
-            characteristics |= Thread.NO_INHERIT_THREAD_LOCALS;
-            return this;
-        }
-
-        @Override
-        public Builder uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
-            this.uhe = Objects.requireNonNull(ueh);
-            return this;
-        }
-
-        @Override
-        public Builder task(Runnable task) {
-            this.task = Objects.requireNonNull(task);
-            return this;
-        }
-
-        private String nextThreadName() {
-            if (name == null) {
-                return (virtual) ? name : Thread.nextThreadName();
-            } else if (counter >= 0) {
-                return name + (counter++);
-            } else {
-                return name;
-            }
-        }
-
-        @Override
-        public Thread build() {
-            Runnable task = this.task;
-            if (task == null)
-                throw new IllegalStateException("No task specified");
-            Thread thread;
-            String name = nextThreadName();
-            if (virtual) {
-                thread = new VirtualThread(scheduler, name, characteristics, task);
-            } else {
-                thread = new Thread(group, name, characteristics, task, stackSize, null);
-                if (daemonChanged)
-                    thread.daemon(daemon);
-                if (priority != 0)
-                    thread.priority(priority);
-            }
-            if (uhe != null)
-                thread.uncaughtExceptionHandler(uhe);
-            return thread;
-        }
-
-        @Override
-        public ThreadFactory factory() {
-            if (virtual) {
-                return new VirtualThreadFactory(scheduler, name, counter, characteristics, uhe);
-            } else {
-                return new PlatformThreadFactory(group, name, counter, characteristics,
-                                                 daemonChanged, daemon, priority, stackSize, uhe);
-            }
-        }
-
-        @Override
-        public Builder group(ThreadGroup group) {
-            this.group = Objects.requireNonNull(group);
-            return this;
-        }
-
-        @Override
-        public Builder daemon(boolean on) {
-            daemon = on;
-            daemonChanged = true;
-            return this;
-        }
-
-        @Override
-        public Builder priority(int priority) {
-            if (priority < Thread.MIN_PRIORITY || priority > Thread.MAX_PRIORITY)
-                throw new IllegalArgumentException();
-            this.priority = priority;
-            return this;
-        }
-
-        @Override
-        public Builder stackSize(long stackSize) {
-            if (stackSize < 0L)
-                throw new IllegalArgumentException();
-            this.stackSize = stackSize;
-            return this;
-        }
-
-        @Override
-        public Builder virtual() {
-            this.virtual = true;
-            return this;
-        }
-
-        @Override
-        public Builder virtual(Executor scheduler) {
-            if (scheduler == null)
-                scheduler = VirtualThread.defaultScheduler();
-            this.scheduler = scheduler;
-            this.virtual = true;
-            return this;
-        }
-    }
-
-    private static abstract class BaseThreadFactory implements ThreadFactory {
-        private static final VarHandle COUNT;
-        static {
-            try {
-                MethodHandles.Lookup l = MethodHandles.lookup();
-                COUNT = l.findVarHandle(BaseThreadFactory.class, "count", int.class);
-            } catch (Exception e) {
-                throw new InternalError(e);
-            }
-        }
-        private final String name;
-        private final int characteristics;
-        private final UncaughtExceptionHandler uhe;
-
-        private final boolean hasCounter;
-        private volatile int count;
-
-        BaseThreadFactory(String name,
-                          int start,
-                          int characteristics,
-                          UncaughtExceptionHandler uhe)  {
-            this.name = name;
-            if (name != null && start >= 0) {
-                this.hasCounter = true;
-                this.count = start;
-            } else {
-                this.hasCounter = false;
-            }
-            this.characteristics = characteristics;
-            this.uhe = uhe;
-        }
-
-        int characteristics() {
-            return characteristics;
-        }
-
-        UncaughtExceptionHandler uncaughtExceptionHandler() {
-            return uhe;
-        }
-
-        String nextThreadName() {
-            if (hasCounter) {
-                return name + (int) COUNT.getAndAdd(this, 1);
-            } else {
-                return name;
-            }
-        }
-    }
-
-    private static class PlatformThreadFactory extends BaseThreadFactory {
-        private final ThreadGroup group;
-        private final boolean daemonChanged;
-        private final boolean daemon;
-        private final int priority;
-        private final long stackSize;
-
-        PlatformThreadFactory(ThreadGroup group,
-                              String name,
-                              int start,
-                              int characteristics,
-                              boolean daemonChanged,
-                              boolean daemon,
-                              int priority,
-                              long stackSize,
-                              UncaughtExceptionHandler uhe) {
-            super(name, start, characteristics, uhe);
-            this.group = group;
-            this.daemonChanged = daemonChanged;
-            this.daemon = daemon;
-            this.priority = priority;
-            this.stackSize = stackSize;
-        }
-
-        @Override
-        String nextThreadName() {
-            String name = super.nextThreadName();
-            return (name != null) ? name : Thread.nextThreadName();
-        }
-
-        @Override
-        public Thread newThread(Runnable task) {
-            Objects.requireNonNull(task);
-            String name = nextThreadName();
-            Thread thread = new Thread(group, name, characteristics(), task, stackSize, null);
-            if (daemonChanged)
-                thread.daemon(daemon);
-            if (priority != 0)
-                thread.priority(priority);
-            UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
-            if (uhe != null)
-                thread.uncaughtExceptionHandler(uhe);
-            return thread;
-        }
-    }
-
-    private static class VirtualThreadFactory extends BaseThreadFactory {
-        private final Executor scheduler;
-
-        VirtualThreadFactory(Executor scheduler,
-                             String name,
-                             int start,
-                             int characteristics,
-                             UncaughtExceptionHandler uhe) {
-            super(name, start, characteristics, uhe);
-            this.scheduler = scheduler;
-        }
-
-        @Override
-        public Thread newThread(Runnable task) {
-            Objects.requireNonNull(task);
-            String name = nextThreadName();
-            Thread thread = new VirtualThread(scheduler, name, characteristics(), task);
-            UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
-            if (uhe != null)
-                thread.uncaughtExceptionHandler(uhe);
-            return thread;
+            /**
+             * Sets the scheduler.
+             * The thread will be scheduled by the Java virtual machine with the given
+             * scheduler. The scheduler's {@link Executor#execute(Runnable) execute}
+             * method is invoked with tasks of type {@link Thread.VirtualThreadTask}. It may
+             * be invoked in the context of a virtual thread. The scheduler should
+             * arrange to execute these tasks on a platform thread. Attempting to execute
+             * the task on a virtual thread causes an exception to be thrown (see
+             * {@link Thread.VirtualThreadTask#run()}). The {@code execute} method may be
+             * invoked at sensitive times (e.g. when unparking a thread) so care should
+             * be taken to not directly execute the task on the <em>current thread</em>.
+             *
+             * @param scheduler the scheduler or {@code null} for the default scheduler
+             * @return this builder
+             */
+            OfVirtual scheduler(Executor scheduler);
         }
     }
 
@@ -1300,6 +1096,9 @@ public class Thread implements Runnable {
      * name. Automatically generated names are of the form
      * {@code "Thread-"+}<i>n</i>, where <i>n</i> is an integer.
      *
+     * <p> For a non-null task, invoking this constructor directly is equivalent to:
+     * <pre>{@code Thread.ofPlatform().unstarted(task); }</pre>
+     *
      * @param  task
      *         the object whose {@code run} method is invoked when this thread
      *         is started. If {@code null}, this classes {@code run} method does
@@ -1326,6 +1125,10 @@ public class Thread implements Runnable {
      * {@code (group, task, gname)} ,where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
      * {@code "Thread-"+}<i>n</i>, where <i>n</i> is an integer.
+     *
+     * <p> For a non-null group and task, invoking this constructor directly is
+     * equivalent to:
+     * <pre>{@code Thread.ofPlatform().group(group).unstarted(task); }</pre>
      *
      * @param  group
      *         the thread group. If {@code null} and there is a security
@@ -1394,6 +1197,10 @@ public class Thread implements Runnable {
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, task, name)}.
      *
+     * <p> For a non-null task and name, invoking this constructor directly is
+     * equivalent to:
+     * <pre>{@code Thread.ofPlatform().name(name).unstarted(task); }</pre>
+     *
      * @param  task
      *         the object whose {@code run} method is invoked when this thread
      *         is started. If {@code null}, this thread's run method is invoked.
@@ -1431,6 +1238,10 @@ public class Thread implements Runnable {
      * thread if and only if the thread creating it is currently marked
      * as a daemon thread. The method {@linkplain #setDaemon setDaemon}
      * may be used to change whether or not a thread is a daemon.
+     *
+     * <p> For a non-null group, task, and name, invoking this constructor directly
+     * is equivalent to:
+     * <pre>{@code Thread.ofPlatform().group(group).name(name).unstarted(task); }</pre>
      *
      * @param  group
      *         the thread group. If {@code null} and there is a security
@@ -1505,6 +1316,9 @@ public class Thread implements Runnable {
      * document their implementation's behavior with respect to the
      * {@code stackSize} parameter.
      *
+     * <p> For a non-null group, task, and name, invoking this constructor directly
+     * is equivalent to:
+     * <pre>{@code Thread.ofPlatform().group(group).name(name).stackSize(stackSize).unstarted(task); }</pre>
      *
      * @param  group
      *         the thread group. If {@code null} and there is a security
@@ -1557,6 +1371,15 @@ public class Thread implements Runnable {
      * parameter will cause this constructor to behave exactly like the
      * {@code Thread(ThreadGroup, Runnable, String, long)} constructor.
      *
+     * <p> For a non-null group, task, and name, invoking this constructor directly
+     * is equivalent to:
+     * <pre>{@code Thread.ofPlatform()
+     *      .group(group)
+     *      .name(name)
+     *      .stackSize(stackSize)
+     *      .inheritInheritableThreadLocals(inheritInheritableThreadLocals)
+     *      .unstarted(task); }</pre>
+     *
      * @param  group
      *         the thread group. If {@code null} and there is a security
      *         manager, the group is determined by {@linkplain
@@ -1596,60 +1419,37 @@ public class Thread implements Runnable {
     }
 
     /**
+     * Creates a platform thread to execute a task and schedules it to execute.
+     *
+     * <p> This method is equivalent to:
+     * <pre>{@code Thread.ofPlatform().start(task); }</pre>
+     *
+     * @param task the object to run when the thread executes
+     * @return a new, and started, platform thread
+     * @see <a href="#inheritance">Inheritance</a>
+     * @since 99
+     */
+    public static Thread startPlatformThread(Runnable task) {
+        var thread = new Thread(Objects.requireNonNull(task));
+        thread.start();
+        return thread;
+    }
+
+    /**
      * Creates a virtual thread to execute a task and schedules it to execute.
      *
      * <p> The thread has no {@link Permission permissions}.
      *
      * <p> This method is equivalent to:
-     * <pre>{@code Thread.builder().virtual().build(task).start(); }</pre>
+     * <pre>{@code Thread.ofVirtual().start(task); }</pre>
      *
      * @param task the object to run when the thread executes
      * @return a new, and started, virtual thread
+     * @see <a href="#inheritance">Inheritance</a>
      * @since 99
      */
     public static Thread startVirtualThread(Runnable task) {
         var thread = new VirtualThread(null, null, 0, task);
-        thread.start();
-        return thread;
-    }
-
-    /**
-     * Starts a new virtual thread to execute a task. The thread is scheduled
-     * by the Java virtual machine using the default scheduler if the current
-     * thread is a platform thread, or the scheduler for the current thread if
-     * it is a virtual thread.
-     *
-     * <p> The thread has no {@link Permission permissions}.
-     *
-     * <p> This method is equivalent to:
-     * <pre>{@code Thread.builder().virtual().name(name).task(task).start(); }</pre>
-     *
-     * @param name the thread name
-     * @param task the object to run when the thread executes
-     * @return a new, and started, virtual thread
-     *
-     * @since 99
-     */
-    @Deprecated(forRemoval = true)
-    public static Thread startVirtualThread(String name, Runnable task) {
-        Objects.requireNonNull(name);
-        var thread = new VirtualThread(null, name, 0, task);
-        thread.start();
-        return thread;
-    }
-
-    /**
-     * Creates a platform thread to execute a task and schedules it to execute.
-     *
-     * <p> This method is equivalent to:
-     * <pre>{@code Thread.builder().task(task).start(); }</pre>
-     *
-     * @param task the object to run when the thread executes
-     * @return a new, and started, platform thread
-     * @since 99
-     */
-    public static Thread startPlatformThread(Runnable task) {
-        var thread = new Thread(Objects.requireNonNull(task));
         thread.start();
         return thread;
     }
@@ -1677,7 +1477,6 @@ public class Thread implements Runnable {
      * @throws     IllegalThreadStateException  if the thread was already started.
      * @throws     java.util.concurrent.RejectedExecutionException if the thread
      *             is virtual and the scheduler cannot accept a task
-     * @see        #run()
      */
     public synchronized void start() {
         /**
@@ -2068,7 +1867,7 @@ public class Thread implements Runnable {
         }
     }
 
-    private void priority(int newPriority) {
+    void priority(int newPriority) {
         ThreadGroup g = holder.group;
         if (g != null) {
             int maxPriority = g.getMaxPriority();
@@ -2230,9 +2029,9 @@ public class Thread implements Runnable {
      * This method returns immediately, without waiting, if the thread has not
      * been {@link #start() started}.
      *
-     * <p> For non-{@linkplain #isVirtual() virtual threads}, this
-     * implementation uses a loop of {@code this.wait} calls
-     * conditioned on {@code this.isAlive}. As a thread terminates the
+     * @implNote
+     * For platform threads, the implementation uses a loop of {@code this.wait}
+     * calls conditioned on {@code this.isAlive}. As a thread terminates the
      * {@code this.notifyAll} method is invoked. It is recommended that
      * applications not use {@code wait}, {@code notify}, or
      * {@code notifyAll} on {@code Thread} instances.
@@ -2285,10 +2084,9 @@ public class Thread implements Runnable {
      * This method returns immediately, without waiting, if the thread has not
      * been {@link #start() started}.
      *
-     * <p> For non-{@link #isVirtual() virtual threads}, this
-     * implementation uses a loop of {@code this.wait} calls
-     * <p> This implementation uses a loop of {@code this.wait} calls
-     * conditioned on {@code this.isAlive}. As a thread terminates the
+     * @implNote
+     * For platform threads, the implementation uses a loop of {@code this.wait}
+     * calls conditioned on {@code this.isAlive}. As a thread terminates the
      * {@code this.notifyAll} method is invoked. It is recommended that
      * applications not use {@code wait}, {@code notify}, or
      * {@code notifyAll} on {@code Thread} instances.
@@ -2428,7 +2226,7 @@ public class Thread implements Runnable {
         }
     }
 
-    private void daemon(boolean on) {
+    void daemon(boolean on) {
         holder.daemon = on;
     }
 
@@ -2470,8 +2268,9 @@ public class Thread implements Runnable {
 
     /**
      * Returns a string representation of this thread. The string representation
-     * will usually include the thread's name. The default implementation
-     * includes the thread's name, priority, and the name of the thread group.
+     * will usually include the thread's name. The default implementation for
+     * platform threads includes the thread's name, priority, and the name of
+     * the thread group.
      *
      * @return  a string representation of this thread.
      */
@@ -2537,7 +2336,7 @@ public class Thread implements Runnable {
      *         system class loader (or, failing that, the bootstrap class loader)
      *
      * @throws  UnsupportedOperationException if this thread is not allowed
-     *          to have its copy of thread-local variables
+     *          to set values for its copy of thread-local variables
      *
      * @throws  SecurityException
      *          if the current thread cannot set the context ClassLoader
@@ -3073,8 +2872,8 @@ public class Thread implements Runnable {
         uncaughtExceptionHandler(eh);
     }
 
-    private void uncaughtExceptionHandler(UncaughtExceptionHandler eh) {
-        uncaughtExceptionHandler = eh;
+    void uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
+        uncaughtExceptionHandler = ueh;
     }
 
     /**

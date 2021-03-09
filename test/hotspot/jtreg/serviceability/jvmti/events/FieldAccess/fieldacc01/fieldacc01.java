@@ -67,7 +67,7 @@ public class fieldacc01 {
     }
     public static void testVirtual() {
 
-        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+        Thread thread = Thread.startVirtualThread(() -> {
             getReady();
             fieldacc01a t = new fieldacc01a();
             t.run();

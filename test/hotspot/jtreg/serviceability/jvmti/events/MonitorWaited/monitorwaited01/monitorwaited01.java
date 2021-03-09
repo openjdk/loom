@@ -73,8 +73,13 @@ public class monitorwaited01 extends DebugeeClass {
         System.out.println("Timeout = " + timeout + " msc.");
 
         monitorwaited01Task task = new monitorwaited01Task();
-        Thread.Builder builder = Thread.builder().name("Debuggee Thread").task(task);
-        Thread thread = isVirtual ? builder.virtual().build() : builder.build();
+        Thread.Builder builder;
+        if (isVirtual) {
+            builder = Thread.ofVirtual();
+        } else {
+            builder = Thread.ofPlatform();
+        }
+        Thread thread = builder.name("Debuggee Thread").unstarted(task);
         setExpected(task.waitingMonitor, thread);
 
         // run thread

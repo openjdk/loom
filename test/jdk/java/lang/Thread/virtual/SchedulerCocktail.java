@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -92,7 +92,7 @@ public class SchedulerCocktail {
      */
     public void testStartVirtualThread3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual(SCHEDULER_1).task(() -> {
+        Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
             try {
                 Thread.startVirtualThread(() -> {
                     ref.set(scheduler(Thread.currentThread()));
@@ -100,7 +100,7 @@ public class SchedulerCocktail {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == SCHEDULER_1);
     }
 
@@ -110,9 +110,9 @@ public class SchedulerCocktail {
      */
     public void testBuilderNoScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual().task(() -> {
+        Thread.ofVirtual().start(() -> {
             ref.set(scheduler(Thread.currentThread()));
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == DEFAULT_SCHEDULER);
     }
 
@@ -124,9 +124,9 @@ public class SchedulerCocktail {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.startVirtualThread(() -> {
             try {
-                Thread.builder().virtual().task(() -> {
+                Thread.ofVirtual().start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
-                }).start().join();
+                }).join();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -140,15 +140,15 @@ public class SchedulerCocktail {
      */
     public void testBuilderNoScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual(SCHEDULER_1).task(() -> {
+        Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
             try {
-                Thread.builder().virtual().task(() -> {
+                Thread.ofVirtual().start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
-                }).start().join();
+                }).join();
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == SCHEDULER_1);
     }
 
@@ -158,9 +158,9 @@ public class SchedulerCocktail {
      */
     public void testBuilderCustomScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual(SCHEDULER_1).task(() -> {
+        Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
             ref.set(scheduler(Thread.currentThread()));
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == SCHEDULER_1);
     }
 
@@ -172,9 +172,9 @@ public class SchedulerCocktail {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.startVirtualThread(() -> {
             try {
-                Thread.builder().virtual(SCHEDULER_1).task(() -> {
+                Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
-                }).start().join();
+                }).join();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -188,15 +188,15 @@ public class SchedulerCocktail {
      */
     public void testBuilderCustomScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual(SCHEDULER_1).task(() -> {
+        Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
             try {
-                Thread.builder().virtual(SCHEDULER_2).task(() -> {
+                Thread.ofVirtual().scheduler(SCHEDULER_2).start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
-                }).start().join();
+                }).join();
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == SCHEDULER_2);
     }
 
@@ -206,9 +206,9 @@ public class SchedulerCocktail {
      */
     public void testBuilderNullScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual(null).task(() -> {
+        Thread.ofVirtual().scheduler(null).start(() -> {
             ref.set(scheduler(Thread.currentThread()));
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == DEFAULT_SCHEDULER);
     }
 
@@ -220,9 +220,9 @@ public class SchedulerCocktail {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.startVirtualThread(() -> {
             try {
-                Thread.builder().virtual(null).task(() -> {
+                Thread.ofVirtual().scheduler(null).start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
-                }).start().join();
+                }).join();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -236,15 +236,15 @@ public class SchedulerCocktail {
      */
     public void testBuilderNullScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual(SCHEDULER_1).task(() -> {
+        Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
             try {
-                Thread.builder().virtual(null).task(() -> {
+                Thread.ofVirtual().scheduler(null).start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
-                }).start().join();
+                }).join();
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == DEFAULT_SCHEDULER);
     }
 
@@ -254,7 +254,7 @@ public class SchedulerCocktail {
      */
     public void testThreadFactoryNoScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        ThreadFactory factory = Thread.builder().virtual().factory();
+        ThreadFactory factory = Thread.ofVirtual().factory();
         Thread thread = factory.newThread(() -> {
             ref.set(scheduler(Thread.currentThread()));
         });
@@ -272,7 +272,7 @@ public class SchedulerCocktail {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.startVirtualThread(() -> {
             try {
-                ThreadFactory factory = Thread.builder().virtual().factory();
+                ThreadFactory factory = Thread.ofVirtual().factory();
                 Thread thread = factory.newThread(() -> {
                     ref.set(scheduler(Thread.currentThread()));
                 });
@@ -292,9 +292,9 @@ public class SchedulerCocktail {
      */
     public void testThreadFactoryNoScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual(SCHEDULER_1).task(() -> {
+        Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
             try {
-                ThreadFactory factory = Thread.builder().virtual().factory();
+                ThreadFactory factory = Thread.ofVirtual().factory();
                 Thread thread = factory.newThread(() -> {
                     ref.set(scheduler(Thread.currentThread()));
                 });
@@ -303,7 +303,7 @@ public class SchedulerCocktail {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == SCHEDULER_1);
     }
 
@@ -313,7 +313,7 @@ public class SchedulerCocktail {
      */
     public void testThreadFactoryCustomScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        ThreadFactory factory = Thread.builder().virtual(SCHEDULER_1).factory();
+        ThreadFactory factory = Thread.ofVirtual().scheduler(SCHEDULER_1).factory();
         Thread thread = factory.newThread(() -> {
             ref.set(scheduler(Thread.currentThread()));
         });
@@ -331,7 +331,7 @@ public class SchedulerCocktail {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.startVirtualThread(() -> {
             try {
-                ThreadFactory factory = Thread.builder().virtual(SCHEDULER_1).factory();
+                ThreadFactory factory = Thread.ofVirtual().scheduler(SCHEDULER_1).factory();
                 Thread thread = factory.newThread(() -> {
                     ref.set(scheduler(Thread.currentThread()));
                 });
@@ -351,9 +351,9 @@ public class SchedulerCocktail {
      */
     public void testThreadFactoryCustomScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual(SCHEDULER_1).task(() -> {
+        Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
             try {
-                ThreadFactory factory = Thread.builder().virtual(SCHEDULER_2).factory();
+                ThreadFactory factory = Thread.ofVirtual().scheduler(SCHEDULER_2).factory();
                 Thread thread = factory.newThread(() -> {
                     ref.set(scheduler(Thread.currentThread()));
                 });
@@ -362,7 +362,7 @@ public class SchedulerCocktail {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == SCHEDULER_2);
     }
 
@@ -372,7 +372,7 @@ public class SchedulerCocktail {
      */
     public void testThreadFactoryNullScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        ThreadFactory factory = Thread.builder().virtual(null).factory();
+        ThreadFactory factory = Thread.ofVirtual().scheduler(null).factory();
         Thread thread = factory.newThread(() -> {
             ref.set(scheduler(Thread.currentThread()));
         });
@@ -390,7 +390,7 @@ public class SchedulerCocktail {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.startVirtualThread(() -> {
             try {
-                ThreadFactory factory = Thread.builder().virtual(null).factory();
+                ThreadFactory factory = Thread.ofVirtual().scheduler(null).factory();
                 Thread thread = factory.newThread(() -> {
                     ref.set(scheduler(Thread.currentThread()));
                 });
@@ -410,9 +410,9 @@ public class SchedulerCocktail {
      */
     public void testThreadFactoryNullScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.builder().virtual(SCHEDULER_1).task(() -> {
+        Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
             try {
-                ThreadFactory factory = Thread.builder().virtual(null).factory();
+                ThreadFactory factory = Thread.ofVirtual().scheduler(null).factory();
                 Thread thread = factory.newThread(() -> {
                     ref.set(scheduler(Thread.currentThread()));
                 });
@@ -421,7 +421,7 @@ public class SchedulerCocktail {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }).start().join();
+        }).join();
         assertTrue(ref.get() == DEFAULT_SCHEDULER);
     }
 

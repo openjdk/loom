@@ -81,19 +81,16 @@ public class SetGetThreadLocalStorageStressTest extends DebugeeClass {
             ArrayList<Thread> threads = new ArrayList<>(kernelThreadNum + virtualThreadNum);
             for (int i = 0; i < kernelThreadNum; i++) {
                 TaskMonitor task = new TaskMonitor();
-                threads.add(Thread.builder()
-                        .task(task)
+                threads.add(Thread.ofPlatform()
                         .name("KernelThread-" + uniqID++)
-                        .build());
+                        .unstarted(task));
             }
 
             for (int i = 0; i < virtualThreadNum; i++) {
                 TaskMonitor task = new TaskMonitor();
-                threads.add(Thread.builder()
-                        .task(task)
+                threads.add(Thread.ofVirtual()
                         .name("VirtualThread-" + uniqID++)
-                        .virtual()
-                        .build());
+                        .unstarted(task));
             }
 
             for (Thread t : threads) {

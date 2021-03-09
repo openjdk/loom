@@ -240,7 +240,7 @@ public class ThreadLocal<T> {
      * @throws UnsupportedOperationException if the current thread is not
      *         allowed to set its copy of thread-local variables
      *
-     * @see Thread.Builder#noThreadLocals()
+     * @see Thread.Builder#allowSetThreadLocals(boolean)
      */
     public void set(T value) {
         set(Thread.currentThread(), value);
