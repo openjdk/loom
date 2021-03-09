@@ -37,7 +37,7 @@ import static org.testng.Assert.*;
 
 @Test
 public class BuilderTest {
-    
+
     // platform thread
     public void testPlatformThread1() throws Exception {
         Thread parent = Thread.currentThread();
