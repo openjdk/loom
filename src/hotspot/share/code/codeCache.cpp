@@ -1212,13 +1212,23 @@ int CodeCache::mark_for_deoptimization(Method* dependee) {
   return number_of_marked_CodeBlobs;
 }
 
-void CodeCache::make_marked_nmethods_not_entrant() {
+void CodeCache::make_marked_nmethods_not_entrant(GrowableArray<CompiledMethod*>* marked) {
   assert_locked_or_safepoint(CodeCache_lock);
   CompiledMethodIterator iter(CompiledMethodIterator::only_alive_and_not_unloading);
   while(iter.next()) {
     CompiledMethod* nm = iter.method();
     if (nm->is_marked_for_deoptimization()) {
       nm->make_not_entrant();
+      marked->append(nm);
+    }
+  }
+}
+
+void CodeCache::make_marked_nmethods_deoptimized(GrowableArray<CompiledMethod*>* marked) {
+  for (int i = 0; i < marked->length(); i++) {
+    CompiledMethod* nm = marked->at(i);
+    if (nm->is_marked_for_deoptimization()) {
+      nm->make_deoptimized();
     }
   }
 }

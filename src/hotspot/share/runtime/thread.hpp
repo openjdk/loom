@@ -1667,6 +1667,7 @@ private:
   void make_zombies();
 
   void deoptimize_marked_methods();
+  void deoptimize_marked_methods_only_anchors();
 
  public:
   // Returns the running thread as a JavaThread

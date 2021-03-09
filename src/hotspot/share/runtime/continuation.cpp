@@ -178,6 +178,7 @@ extern "C" void find(intptr_t x);
 bool do_verify_after_thaw(JavaThread* thread);
 template<int x> NOINLINE static bool do_verify_after_thaw1(JavaThread* thread) { return do_verify_after_thaw(thread); }
 static void print_vframe(frame f, const RegisterMap* map = nullptr, outputStream* st = tty);
+void do_deopt_after_thaw(JavaThread* thread);
 
 #ifdef ASSERT
   template <bool relative>
@@ -2317,6 +2318,9 @@ inline bool can_thaw_fast() {
   intptr_t* sp0 = vsp;
   ContinuationHelper::set_anchor(_thread, sp0);
   print_frames(_thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
+  if (LoomDeoptAfterThaw) {
+    do_deopt_after_thaw(_thread);
+  }
   // if (LoomVerifyAfterThaw) {
   //   assert(do_verify_after_thaw(_thread), "partial: %d empty: %d is_last: %d fix: %d", partial, empty, is_last, fix);
   // }
@@ -2830,6 +2834,22 @@ public:
     tty->print_cr("*** (narrow) non-oop %x found at " PTR_FORMAT, (int)(*p), p2i(p));
   }
 };
+
+void do_deopt_after_thaw(JavaThread* thread) {
+  int i = 0;
+  StackFrameStream fst(thread, true, false);
+  fst.register_map()->set_include_argument_oops(false);
+  ContinuationHelper::update_register_map_with_callee(fst.register_map(), *fst.current());
+  for (; !fst.is_done(); fst.next()) {
+    if (fst.current()->cb()->is_compiled()) {
+      CompiledMethod* cm = fst.current()->cb()->as_compiled_method();
+      if (!cm->method()->is_continuation_enter_intrinsic()) {
+        cm->make_deoptimized();
+      }
+    }
+  }
+}
+
 
 bool do_verify_after_thaw(JavaThread* thread) {
   assert(thread->has_last_Java_frame(), "");

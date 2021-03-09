@@ -248,6 +248,8 @@ public:
   bool  is_marked_for_deoptimization() const { return _mark_for_deoptimization_status != not_marked; }
   void  mark_for_deoptimization(bool inc_recompile_counts = true);
 
+  virtual void  make_deoptimized() { assert(false, "not supported"); };
+
   bool update_recompile_counts() const {
     // Update recompile counts when either the update is explicitly requested (deoptimize)
     // or the nmethod is not marked for deoptimization at all (not_marked).
@@ -337,7 +339,7 @@ public:
 
   virtual int orig_pc_offset() = 0;
 private:
-  address* orig_pc_addr(const frame* fr) { return (address*) ((address)fr->unextended_sp() + orig_pc_offset()); };
+  address* orig_pc_addr(const frame* fr);
 
 public:
   virtual bool can_convert_to_zombie() = 0;

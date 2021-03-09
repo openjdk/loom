@@ -44,6 +44,7 @@
 #include "prims/methodHandles.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/deoptimization.hpp"
+#include "runtime/frame.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/mutexLocker.hpp"
@@ -625,6 +626,10 @@ void CompiledMethod::cleanup_inline_caches(bool clean_all) {
     run_nmethod_entry_barrier();
     InlineCacheBuffer::refill_ic_stubs();
   }
+}
+
+address* CompiledMethod::orig_pc_addr(const frame* fr) { 
+  return (address*) ((address)fr->unextended_sp() + orig_pc_offset()); 
 }
 
 // Called to clean up after class unloading for live nmethods and from the sweeper

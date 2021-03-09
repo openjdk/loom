@@ -533,11 +533,15 @@ template <bool mixed>
 inline void StackChunkFrameStream<mixed>::get_oopmap(address pc, int oopmap_slot) const {
   assert (cb() != nullptr, "");
   assert (!is_compiled() || !cb()->as_compiled_method()->is_deopt_pc(pc), "oopmap_slot: %d", oopmap_slot);
-  assert (oopmap_slot >= 0, "");
-  assert (cb()->oop_map_for_slot(oopmap_slot, pc) != nullptr, "");
-  assert (cb()->oop_map_for_slot(oopmap_slot, pc) == cb()->oop_map_for_return_address(pc), "");
+  if (oopmap_slot >= 0) {
+    assert (oopmap_slot >= 0, "");
+    assert (cb()->oop_map_for_slot(oopmap_slot, pc) != nullptr, "");
+    assert (cb()->oop_map_for_slot(oopmap_slot, pc) == cb()->oop_map_for_return_address(pc), "");
 
-  _oopmap = cb()->oop_map_for_slot(oopmap_slot, pc);
+    _oopmap = cb()->oop_map_for_slot(oopmap_slot, pc);
+  } else {
+    _oopmap = cb()->oop_map_for_return_address(pc);
+  }
   assert (_oopmap != nullptr, "");
 }
 
@@ -619,8 +623,11 @@ void StackChunkFrameStream<mixed>::handle_deopted() const {
   address pc1 = pc();
   int oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
   if (UNLIKELY(oopmap_slot < 0)) { // we could have marked frames for deoptimization in thaw_chunk
-    pc1 = orig_pc();
-    oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
+    CompiledMethod* cm = cb()->as_compiled_method();
+    if (cm->is_deopt_pc(pc1)) {
+      pc1 = orig_pc();
+      oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
+    }
   }
   get_oopmap(pc1, oopmap_slot);
 }

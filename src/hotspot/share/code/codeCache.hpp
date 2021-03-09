@@ -276,7 +276,8 @@ class CodeCache : AllStatic {
  public:
   static void mark_all_nmethods_for_deoptimization();
   static int  mark_for_deoptimization(Method* dependee);
-  static void make_marked_nmethods_not_entrant();
+  static void make_marked_nmethods_not_entrant(GrowableArray<CompiledMethod*>* marked);
+  static void make_marked_nmethods_deoptimized(GrowableArray<CompiledMethod*>* marked);
 
   // Flushing and deoptimization
   static void flush_dependents_on(InstanceKlass* dependee);

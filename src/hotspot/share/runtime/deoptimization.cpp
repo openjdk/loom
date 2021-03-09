@@ -893,14 +893,17 @@ void Deoptimization::deoptimize_all_marked(nmethod* nmethod_only) {
   ResourceMark rm;
   DeoptimizationMarker dm;
 
+  GrowableArray<CompiledMethod*>* marked = new GrowableArray<CompiledMethod*>();
   // Make the dependent methods not entrant
   if (nmethod_only != NULL) {
     nmethod_only->mark_for_deoptimization();
     nmethod_only->make_not_entrant();
+    marked->append(nmethod_only);
   } else {
     MutexLocker mu(SafepointSynchronize::is_at_safepoint() ? NULL : CodeCache_lock, Mutex::_no_safepoint_check_flag);
-    CodeCache::make_marked_nmethods_not_entrant();
+    CodeCache::make_marked_nmethods_not_entrant(marked);
   }
+  CodeCache::make_marked_nmethods_deoptimized(marked);
 
   DeoptimizeMarkedClosure deopt;
   if (SafepointSynchronize::is_at_safepoint()) {

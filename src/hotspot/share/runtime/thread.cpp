@@ -2288,6 +2288,24 @@ void JavaThread::deoptimize_marked_methods() {
   }
 }
 
+void JavaThread::deoptimize_marked_methods_only_anchors() {
+  if (!has_last_Java_frame()) return;
+  bool java_callee = false;
+  StackFrameStream fst(this, false /* update */, true /* process_frames */);
+  for (; !fst.is_done(); fst.next()) {
+    if (fst.current()->should_be_deoptimized()) {
+      if (!java_callee) {
+        //tty->print_cr("Patching RA");
+        Deoptimization::deoptimize(this, *fst.current());
+      } else {
+        //tty->print_cr("Not patching RA");
+      }
+    }
+    java_callee = fst.current()->is_compiled_frame();
+  }
+}
+
+
 void JavaThread::oops_do_no_frames(OopClosure* f, CodeBlobClosure* cf) {
   // Verify that the deferred card marks have been flushed.
   assert(deferred_card_mark().is_empty(), "Should be empty during GC");
