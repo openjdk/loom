@@ -1083,6 +1083,9 @@ public class Thread implements Runnable {
      * name. Automatically generated names are of the form
      * {@code "Thread-"+}<i>n</i>, where <i>n</i> is an integer.
      *
+     * <p> This constructor is only useful when extending {@code Thread} to
+     * override the {@link #run()} method.
+     *
      * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread() {
@@ -1157,6 +1160,9 @@ public class Thread implements Runnable {
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, null, name)}.
      *
+     * <p> This constructor is only useful when extending {@code Thread} to
+     * override the {@link #run()} method.
+     *
      * @param   name
      *          the name of the new thread
      *
@@ -1170,6 +1176,9 @@ public class Thread implements Runnable {
      * Allocates a new {@code Thread} object. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (group, null, name)}.
+     *
+     * <p> This constructor is only useful when extending {@code Thread} to
+     * override the {@link #run()} method.
      *
      * @param  group
      *         the thread group. If {@code null} and there is a security
@@ -2010,7 +2019,7 @@ public class Thread implements Runnable {
      *
      * @deprecated This method is obsolete. Code that needs to enumerate the
      *     active platform threads can invoke the thread group's {@link
-     *     ThreadGroup#enumerate(Thread[])} ()} method.
+     *     ThreadGroup#enumerate(Thread[])} method.
      */
     @Deprecated(since = "99")
     public static int enumerate(Thread tarray[]) {
