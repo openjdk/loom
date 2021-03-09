@@ -1909,6 +1909,12 @@ public class Thread implements Runnable {
      * with no arguments. This may result in throwing a
      * {@code SecurityException}.
      *
+     * @implNote
+     * If this thread is the current thread, and is a platform thread that isn't
+     * mapped to a native thread attached to the VM with the Java Native Interface
+     * {@code AttachCurrentThread} function, then a best effort attempt is made to
+     * change the operating system thread name too.
+     *
      * @param      name   the new name for this thread.
      * @throws     SecurityException  if the current thread cannot modify this
      *             thread.
@@ -1922,7 +1928,7 @@ public class Thread implements Runnable {
         }
 
         this.name = name;
-        if (!isVirtual() && holder.threadStatus != 0) {
+        if (!isVirtual() && Thread.currentThread() == this) {
             setNativeName(name);
         }
     }
