@@ -1970,7 +1970,12 @@ public class Thread implements Runnable {
      * @return  an estimate of the number of active threads in the current
      *          thread's thread group and in any other thread group that
      *          has the current thread's thread group as an ancestor
+     *
+     * @deprecated This method is obsolete. Code that needs an estimate of the
+     *     number of active platform threads in a thread group can invoke the
+     *     thread group's {@link ThreadGroup#activeCount()} method.
      */
+    @Deprecated(since = "99")
     public static int activeCount() {
         return currentThread().getThreadGroup().activeCount();
     }
@@ -2002,7 +2007,12 @@ public class Thread implements Runnable {
      * @throws  SecurityException
      *          if {@link java.lang.ThreadGroup#checkAccess} determines that
      *          the current thread cannot access its thread group
+     *
+     * @deprecated This method is obsolete. Code that needs to enumerate the
+     *     active platform threads can invoke the thread group's {@link
+     *     ThreadGroup#enumerate(Thread[])} ()} method.
      */
+    @Deprecated(since = "99")
     public static int enumerate(Thread tarray[]) {
         return currentThread().getThreadGroup().enumerate(tarray);
     }
