@@ -56,6 +56,13 @@ import jdk.internal.misc.VM;
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
+ * @apiNote
+ * Thread groups provided a way in early JDK release to group threads and provide
+ * a form of <i>job control</i> for threads. Thread groups supported the isolation
+ * of applets and defined methods intended for diagnostic purposes. The concept
+ * of thread group is obsolete. It should be rare for new applications to create
+ * thread groups or interact with its class.
+ *
  * @since   1.0
  */
 public class ThreadGroup implements Thread.UncaughtExceptionHandler {
