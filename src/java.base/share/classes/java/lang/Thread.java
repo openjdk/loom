@@ -122,12 +122,29 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <h2>Creating and starting threads</h2>
  *
- * <p> As noted above {@code Thread} defines a {@link Builder} API for creating and
- * starting threads. The following example starts a platform thread with name
- * "greeter" that prints a message:
- * <pre>{@code    Runnable runnable = () -> System.out.println("hello world");
- *   Thread thread = Thread.ofPlatform().name("greeter").start(runnable);
- *   thread.join(); }</pre>
+ * <p> As noted above, {@code Thread} defines a {@link Builder} API for creating and
+ * starting threads. The {@link #ofPlatform()} and {@link #ofVirtual()} methods are
+ * used to create builders for platform and virtual threads respectively.
+ * The following are examples that use the builder:
+ * <pre>{@code
+ *   Runnable runnable = ...
+ *
+ *   // Start a daemon thread to run a task
+ *   Thread thread = Thread.ofPlatform().daemon().start(runnable);
+ *
+ *   // Create an unstarted thread with name "duke", its start() method
+ *   // must be invoked to schedule it to execute.
+ *   Thread thread = Thread.ofPlatform().name("duke").unstarted(runnable);
+ *
+ *   // A ThreadFactory that creates daemon threads named "worker-0", "worker-1", ...
+ *   ThreadFactory factory = Thread.ofPlatform().daemon().name("worker-", 0).factory();
+ *
+ *   // Start a virtual thread to run a task
+ *   Thread thread = Thread.ofVirtual().start(runnable);
+ *
+ *   // A ThreadFactory that creates virtual threads
+ *   ThreadFactory factory = Thread.ofVirtual().factory();
+ * }</pre>
  *
  * <p> In addition to the builder, {@code Thread} defines (for historical and
  * customization reasons) public constructors for creating platform threads. Most
@@ -758,14 +775,13 @@ public class Thread implements Runnable {
      * that creates platform threads.
      *
      * @apiNote The following are examples using the builder:
-     *
      * <pre>{@code
-     *   // Create a thread with name "duke".
-     *   // The thread's start method must be invoked to schedule it to execute.
-     *   Thread thread = Thread.ofPlatform().name("duke").unstarted(runnable);
-     *
      *   // Start a daemon thread to run a task
      *   Thread thread = Thread.ofPlatform().daemon().start(runnable);
+     *
+     *   // Create an unstarted thread with name "duke", its start() method
+     *   // must be invoked to schedule it to execute.
+     *   Thread thread = Thread.ofPlatform().name("duke").unstarted(runnable);
      *
      *   // A ThreadFactory that creates daemon threads named "worker-0", "worker-1", ...
      *   ThreadFactory factory = Thread.ofPlatform().daemon().name("worker-", 0).factory();
@@ -783,7 +799,6 @@ public class Thread implements Runnable {
      * that creates virtual threads.
      *
      * @apiNote The following are examples using the builder:
-     *
      * <pre>{@code
      *   // Start a virtual thread to run a task.
      *   Thread thread = Thread.ofVirtual().start(runnable);
@@ -822,26 +837,6 @@ public class Thread implements Runnable {
      *
      * <p> Unless otherwise specified, passing a null argument to a method in
      * this interface causes a {@code NullPointerException} to be thrown.
-     *
-     * @apiNote The following are examples using the builder:
-     *
-     * <pre>{@code
-     *   // Start a virtual thread to run a task.
-     *   Thread thread = Thread.ofVirtual().start(runnable);
-     *
-     *   // A ThreadFactory that creates virtual threads
-     *   ThreadFactory factory = Thread.ofVirtual().factory();
-     *
-     *   // Create a thread with name "duke".
-     *   // The thread's start method must be invoked to schedule it to execute.
-     *   Thread thread = Thread.ofPlatform().name("duke").unstarted(runnable);
-     *
-     *   // Start a daemon thread to run a task
-     *   Thread thread = Thread.ofPlatform().daemon().start(runnable);
-     *
-     *   // A ThreadFactory that creates daemon threads named "worker-0", "worker-1", ...
-     *   ThreadFactory factory = Thread.ofPlatform().daemon().name("worker-", 0).factory();
-     * }</pre>
      *
      * @see Thread#ofPlatform()
      * @see Thread#ofVirtual()
