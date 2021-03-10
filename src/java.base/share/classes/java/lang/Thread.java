@@ -297,7 +297,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * The minimum priority that a thread can have.
+     * The minimum priority that a platform thread can have.
      */
     public static final int MIN_PRIORITY = 1;
 
@@ -307,7 +307,7 @@ public class Thread implements Runnable {
     public static final int NORM_PRIORITY = 5;
 
     /**
-     * The maximum priority that a thread can have.
+     * The maximum priority that a platform thread can have.
      */
     public static final int MAX_PRIORITY = 10;
 
