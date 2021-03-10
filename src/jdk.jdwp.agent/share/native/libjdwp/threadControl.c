@@ -2303,7 +2303,11 @@ threadControl_onEventHandlerExit(EventIndex ei, jthread thread,
         env = getEnv();
         if (ei == EI_THREAD_END) {
             jboolean inResume = (node->resumeFrameDepth > 0);
-            removeThread(env, &runningThreads, thread);
+            if (isVThread(thread)) {
+                removeThread(env, &runningVThreads, thread);
+            } else {
+                removeThread(env, &runningThreads, thread);
+            }
             node = NULL;   /* has been freed */
 
             /*
