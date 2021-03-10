@@ -959,7 +959,7 @@ abstract public class TestScaffold extends TargetAdapter {
         if (wrapper.equals("Virtual")) {
             MainThreadGroup tg = new MainThreadGroup();
             // TODO fix to set virtual scheduler group when become available
-            Thread vthread = Thread.builder().virtual().task(() -> {
+            Thread vthread = Thread.ofVirtual().start(() -> {
                 try {
                     mainMethod.invoke(null, new Object[] { classArgs });
                 } catch (InvocationTargetException e) {
@@ -967,8 +967,7 @@ abstract public class TestScaffold extends TargetAdapter {
                 } catch (Throwable error) {
                     tg.uncaughtThrowable = error;
                 }
-            }).build();
-            vthread.start();
+            });
             vthread.join();
         } else if (wrapper.equals("Kernel")) {
             MainThreadGroup tg = new MainThreadGroup();

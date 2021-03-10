@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -75,7 +75,7 @@ public class HttpALot {
         // go
         server.start();
         try {
-            ThreadFactory factory = Thread.builder().virtual().name("fetcher-", 0).factory();
+            ThreadFactory factory = Thread.ofVirtual().name("fetcher-", 0).factory();
             try (var executor = Executors.newThreadExecutor(factory)) {
                 for (int i = 1; i <= requests; i++) {
                     executor.submit(() -> fetch(url)).get();

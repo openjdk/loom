@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.stream.Stream;
 
 import jdk.internal.module.ServicesCatalog;
@@ -330,6 +331,19 @@ public interface JavaLangAccess {
     byte[] getBytesUTF8NoRepl(String s);
 
     /**
+     * Inflated copy from byte[] to char[], as defined by StringLatin1.inflate
+     */
+    void inflateBytesToChars(byte[] src, int srcOff, char[] dst, int dstOff, int len);
+
+    /**
+     * Decodes ASCII from the source byte array into the destination
+     * char array.
+     *
+     * @return the number of bytes successfully decoded, at most len
+     */
+    int decodeASCII(byte[] src, int srcOff, char[] dst, int dstOff, int len);
+
+    /**
      * Set the cause of Throwable
      * @param cause set t's cause to new value
      */
@@ -394,7 +408,10 @@ public interface JavaLangAccess {
     void parkVirtualThread(long nanos);
 
     /**
-     * Unparks the given virtual thread.
+     * Unparks a virtual thread.
+     * @param tryPush true to push the thread's task to the current carrier thread's
+     *     work queue when invoked from a virtual thread.
+     * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
-    void unparkVirtualThread(Thread thread);
+    void unparkVirtualThread(Thread thread, boolean tryPush);
 }

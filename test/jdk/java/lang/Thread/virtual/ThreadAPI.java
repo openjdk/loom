@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -76,13 +76,13 @@ public class ThreadAPI {
         var ref2 = new AtomicReference<Thread>();
         var ref3 = new AtomicReference<Thread>();
         var lock = new Object();
-        var thread = Thread.builder().virtual().task(() -> {
+        var thread = Thread.ofVirtual().unstarted(() -> {
             ref1.set(Thread.currentThread());
             synchronized (lock) {
                 ref2.set(Thread.currentThread());
             }
             ref3.set(Thread.currentThread());
-        }).build();
+        });
         synchronized (lock) {
             thread.start();
             Thread.sleep(100); // give time for virtual thread to block
@@ -99,7 +99,7 @@ public class ThreadAPI {
         var ref2 = new AtomicReference<Thread>();
         var ref3 = new AtomicReference<Thread>();
         var lock = new ReentrantLock();
-        var thread = Thread.builder().virtual().task(() -> {
+        var thread = Thread.ofVirtual().unstarted(() -> {
             ref1.set(Thread.currentThread());
             lock.lock();
             try {
@@ -108,7 +108,7 @@ public class ThreadAPI {
                 lock.unlock();
             }
             ref3.set(Thread.currentThread());
-        }).build();
+        });
         lock.lock();
         try {
             thread.start();
@@ -127,7 +127,7 @@ public class ThreadAPI {
 
     public void testRun1() throws Exception {
         var ref = new AtomicBoolean();
-        var thread = Thread.builder().virtual().task(() -> ref.set(true)).build();
+        var thread = Thread.ofVirtual().unstarted(() -> ref.set(true));
         thread.run();
         assertFalse(ref.get());
     }
@@ -243,7 +243,7 @@ public class ThreadAPI {
 
     // join before start
     public void testJoin1() throws Exception {
-        var thread = Thread.builder().virtual().task(() -> { }).build();
+        var thread = Thread.ofVirtual().unstarted(() -> { });
 
         // invoke join from dinosaur thread
         thread.join();
@@ -629,7 +629,7 @@ public class ThreadAPI {
 
     // interrupt before started
     public void testInterrupt2() throws Exception {
-        var thread = Thread.builder().virtual().task(() -> { }).build();
+        var thread = Thread.ofVirtual().unstarted(() -> { });
         thread.interrupt();
         assertTrue(thread.isInterrupted());
     }
@@ -780,7 +780,7 @@ public class ThreadAPI {
 
     // create with a name
     public void testSetName4() throws Exception {
-        var thread = Thread.startVirtualThread("fred", LockSupport::park);
+        var thread = Thread.ofVirtual().name("fred").start(LockSupport::park);
         try {
             assertEquals(thread.getName(), "fred");
             thread.setName("joe");
@@ -827,8 +827,9 @@ public class ThreadAPI {
 
     // unstarted
     public void testSetDaemon1() {
-        var thread = Thread.builder().virtual().task(() -> { }).build();
+        var thread = Thread.ofVirtual().unstarted(() -> { });
         assertTrue(thread.isDaemon());
+        thread.setDaemon(true);
         thread.setDaemon(false);
         assertTrue(thread.isDaemon());
     }
@@ -837,7 +838,6 @@ public class ThreadAPI {
         var thread = Thread.startVirtualThread(LockSupport::park);
         try {
             assertTrue(thread.isDaemon());
-            assertThrows(IllegalThreadStateException.class, () -> thread.setDaemon(true));
         } finally {
             LockSupport.unpark(thread);
             thread.join();
@@ -850,7 +850,7 @@ public class ThreadAPI {
     public void testYield1() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = Thread.builder().virtual(scheduler).factory();
+            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -872,7 +872,7 @@ public class ThreadAPI {
     public void testYield2() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = Thread.builder().virtual(scheduler).factory();
+            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -1143,6 +1143,33 @@ public class ThreadAPI {
         }
     }
 
+    // no support for thread locals
+    public void testContextClassLoader5() throws Exception {
+        ClassLoader loader = new ClassLoader() { };
+        TestHelper.runInVirtualThread(TestHelper.NO_THREAD_LOCALS, () -> {
+            Thread t = Thread.currentThread();
+            assertTrue(t.getContextClassLoader() == null);
+            assertThrows(UnsupportedOperationException.class,
+                         () -> t.setContextClassLoader(loader));
+            assertTrue(t.getContextClassLoader() == null);
+        });
+    }
+
+    // do no inherit the initial value of threads locals
+    public void testContextClassLoader6() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            ClassLoader loader = new ClassLoader() { };
+            Thread.currentThread().setContextClassLoader(loader);
+            int characteristics = TestHelper.NO_INHERIT_THREAD_LOCALS;
+            TestHelper.runInVirtualThread(characteristics, () -> {
+                Thread t = Thread.currentThread();
+                assertTrue(t.getContextClassLoader() == null);
+                t.setContextClassLoader(loader);
+                assertTrue(t.getContextClassLoader() == loader);
+            });
+        });
+    }
+
 
     // -- Thread.UncaughtExceptionHandler --
 
@@ -1214,7 +1241,7 @@ public class ThreadAPI {
 
     // NEW
     public void testGetState1() {
-        var thread = Thread.builder().virtual().task(() -> { }).build();
+        var thread = Thread.ofVirtual().unstarted(() -> { });
         assertTrue(thread.getState() == Thread.State.NEW);
     }
 
@@ -1230,9 +1257,9 @@ public class ThreadAPI {
     public void testGetState3() throws Exception {
         AtomicBoolean completed = new AtomicBoolean();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder builder = Thread.builder().virtual(scheduler);
-            Thread t1 = builder.task(() -> {
-                Thread t2 = builder.task(LockSupport::park).build();
+            Thread.Builder.OfVirtual builder = Thread.ofVirtual().scheduler(scheduler);
+            Thread t1 = builder.start(() -> {
+                Thread t2 = builder.unstarted(LockSupport::park);
                 assertTrue(t2.getState() == Thread.State.NEW);
 
                 // runnable (not mounted)
@@ -1248,7 +1275,7 @@ public class ThreadAPI {
                 assertTrue(t2.getState() == Thread.State.RUNNABLE);
 
                 completed.set(true);
-            }).start();
+            });
             t1.join();
         }
         assertTrue(completed.get() == true);
@@ -1305,7 +1332,7 @@ public class ThreadAPI {
     // -- isAlive --
 
     public void testIsAlive1() throws Exception {
-        var thread = Thread.builder().virtual().task(LockSupport::park).build();
+        var thread = Thread.ofVirtual().unstarted(LockSupport::park);
         assertFalse(thread.isAlive());
         thread.start();
         try {
@@ -1368,13 +1395,13 @@ public class ThreadAPI {
             };
 
             Object lock = new Object();
-            Thread vthread = Thread.builder().virtual(scheduler).task(() -> {
+            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
                 synchronized (lock) {
                     try {
                         lock.wait();
                     } catch (Exception e) { }
                 }
-            }).start();
+            });
 
             // get carrier Thread
             Thread carrier;
@@ -1426,7 +1453,7 @@ public class ThreadAPI {
 
     // not started
     public void testGetStackTrace4() {
-        var thread = Thread.builder().virtual().task(() -> { }).build();
+        var thread = Thread.ofVirtual().unstarted(() -> { });
         StackTraceElement[] stack = thread.getStackTrace();
         assertTrue(stack.length == 0);
     }
@@ -1459,13 +1486,13 @@ public class ThreadAPI {
             };
 
             Object lock = new Object();
-            Thread vthread = Thread.builder().virtual(scheduler).task(() -> {
+            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
                 synchronized (lock) {
                     try {
                         lock.wait();
                     } catch (Exception e) { }
                 }
-            }).start();
+            });
 
             // get carrier Thread
             Thread carrier;
@@ -1507,7 +1534,7 @@ public class ThreadAPI {
     // -- ThreadGroup --
 
     public void testThreadGroup1() throws Exception {
-        var thread = Thread.builder().virtual().task(LockSupport::park).build();
+        var thread = Thread.ofVirtual().unstarted(LockSupport::park);
         var vgroup = thread.getThreadGroup();
         thread.start();
         try {
@@ -1519,13 +1546,13 @@ public class ThreadAPI {
         assertTrue(thread.getThreadGroup() == null);
     }
 
-    // thread group of kernel threads created by virtual threads
+    // platform thread created by virtual thread
     public void testThreadGroup2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
             Thread child = new Thread(() -> { });
             ThreadGroup group = child.getThreadGroup();
-            assertTrue(group != vgroup);
+            assertTrue(group == vgroup);
         });
     }
 
@@ -1553,7 +1580,7 @@ public class ThreadAPI {
 
     // not started
     public void testToString1() {
-        Thread thread = Thread.builder().virtual().task(() -> { }).build();
+        Thread thread = Thread.ofVirtual().unstarted(() -> { });
         thread.setName("fred");
         assertTrue(thread.toString().contains("fred"));
     }

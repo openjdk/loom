@@ -72,8 +72,7 @@ public class TestDeepVirtualStackTrace {
         try (Recording r = new Recording()) {
             r.enable(eventName).withoutThreshold();
             r.start();
-            Thread vt = Thread.builder().virtual().task(eventEmitter).build();
-            vt.start();
+            Thread vt = Thread.ofVirtual().start(eventEmitter);
             vt.join();
             r.stop();
             List<RecordedEvent> events = Events.fromRecording(r);

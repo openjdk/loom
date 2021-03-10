@@ -78,12 +78,6 @@ jthread *threadControl_allVThreads(jint *numVThreads);
 void threadControl_addVThread(jthread vthread);
 jboolean threadControl_isKnownVThread(jthread vthread);
 
-void threadControl_unmountVThread(jthread vthread, jthread thread);
-void threadControl_mountVThread(jthread vthread, jthread thread, jbyte sessionID);
-
-void threadControl_continuationRun(jthread thread, jint frames_count);
-void threadControl_continuationYield(jthread thread, jint frames_count);
-
 /***** debugging *****/
 
 #ifdef DEBUG

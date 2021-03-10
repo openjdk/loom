@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,8 +32,10 @@
 /**
  * @test
  * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot
- * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot
+ * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions
+ *     -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot
+ * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions
+ *     -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot
  */
 
 /**
@@ -46,8 +48,10 @@
 /**
  * @test
  * @requires vm.debug == true & vm.graal.enabled
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot 1000
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internalGetStackTraceALot 1000
+ * @run main/othervm/timeout=300 -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions
+ *     -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot 1000
+ * @run main/othervm/timeout=300 -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions
+ *     -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internalGetStackTraceALot 1000
  */
 
 import java.time.Duration;
@@ -64,7 +68,7 @@ public class GetStackTraceALot {
         private int next;
 
         RoundRobinExecutor() {
-            var factory = Thread.builder().name("worker-", 1).daemon(true).factory();
+            var factory = Thread.ofPlatform().name("worker-", 1).daemon(true).factory();
             var executors = new ExecutorService[2];
             for (int i = 0; i < executors.length; i++) {
                 executors[i] = Executors.newSingleThreadExecutor(factory);
@@ -96,7 +100,7 @@ public class GetStackTraceALot {
         AtomicInteger count = new AtomicInteger();
 
         try (RoundRobinExecutor executor = new RoundRobinExecutor()) {
-            Thread thread = Thread.builder().virtual(executor).task(() -> {
+            Thread thread = Thread.ofVirtual().scheduler(executor).start(() -> {
                 while (count.incrementAndGet() < ITERATIONS) {
                     long start = System.nanoTime();
                     while ((System.nanoTime() - start) < SPIN_NANOS) {
@@ -104,7 +108,7 @@ public class GetStackTraceALot {
                     }
                     LockSupport.parkNanos(500_000);
                 }
-            }).start();
+            });
 
             long start = System.nanoTime();
             while (thread.isAlive()) {

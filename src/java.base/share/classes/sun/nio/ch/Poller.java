@@ -28,35 +28,52 @@ import java.io.IOError;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
-
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.VirtualThreads;
 
-public abstract class Poller implements Runnable {
+/**
+ * A Poller of file descriptors. A virtual thread registers a file descriptors with
+ * a Poller. The thread is unparked when the file descriptor is ready for I/O.
+ */
+public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final Poller READ_POLLER;
     private static final Poller WRITE_POLLER;
-
     static {
+        PollerProvider provider = PollerProvider.provider();
         try {
-            PollerProvider provider = PollerProvider.provider();
-            READ_POLLER = startPollerThread("Read-Poller", provider.readPoller());
-            WRITE_POLLER = startPollerThread("Write-Poller", provider.writePoller());
+            READ_POLLER = provider.readPoller();
+            WRITE_POLLER = provider.writePoller();
+            READ_POLLER.startPollerThread("Read-Poller");
+            WRITE_POLLER.startPollerThread("Write-Poller");
         } catch (IOException ioe) {
             throw new IOError(ioe);
         }
     }
 
-    private static Poller startPollerThread(String name, Poller poller) {
+    /**
+     * Start a platform thread with the given name to poll file descriptors
+     * registered with this poller.
+     */
+    private void startPollerThread(String name) {
+        Runnable task = () -> {
+            try {
+                for (;;) {
+                    poll();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        };
         try {
-            Thread t = JLA.executeOnCarrierThread(() ->
-                    InnocuousThread.newSystemThread(name, poller));
-            t.setDaemon(true);
-            t.start();
-            return poller;
+            Thread thread = JLA.executeOnCarrierThread(() ->
+                InnocuousThread.newSystemThread(name, task)
+            );
+            thread.setDaemon(true);
+            thread.start();
         } catch (Exception e) {
             throw new InternalError(e);
         }
@@ -125,6 +142,7 @@ public abstract class Poller implements Runnable {
     protected Poller() { }
 
     private void register(int fdVal) throws IOException {
+        assert Thread.currentThread().isVirtual();
         Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
         assert previous == null;
         implRegister(fdVal);
@@ -143,30 +161,63 @@ public abstract class Poller implements Runnable {
         Thread t = map.remove(fdVal);
         if (t != null) {
             implDeregister(fdVal);
-            LockSupport.unpark(t);
+            VirtualThreads.unpark(t);
         }
     }
 
     /**
      * Called by the polling facility when the file descriptor is polled
      */
-    final protected void polled(int fdVal) {
+    final void polled(int fdVal, boolean tryPush) {
         Thread t = map.remove(fdVal);
         if (t != null) {
-            LockSupport.unpark(t);
+            VirtualThreads.unpark(t, tryPush);
         }
+    }
+
+    final void polled(int fdVal) {
+        polled(fdVal, false);
+    }
+
+    /**
+     * Poll for events. The {@link #polled(int, boolean)} method is invoked for each
+     * polled file descriptor.
+     *
+     * @param timeout if positive then block for up to {@code timeout} milliseconds,
+     *     if zero then don't block, if -1 then block indefinitely
+     */
+    abstract int poll(int timeout) throws IOException;
+
+    /**
+     * Poll for events, blocks indefinitely.
+     */
+    final int poll() throws IOException {
+        return poll(-1);
+    }
+
+    /**
+     * Poll for events, non-blocking.
+     */
+    final int pollNow() throws IOException {
+        return poll(0);
+    }
+
+    /**
+     * Returns the poller's file descriptor, or -1 if none.
+     */
+    int fdVal() {
+        return -1;
     }
 
     /**
      * Register the file descriptor
      */
-    abstract protected void implRegister(int fdVal) throws IOException;
+    abstract void implRegister(int fdVal) throws IOException;
 
     /**
      * Deregister (or disarm) the file descriptor
      */
-    abstract protected void implDeregister(int fdVal);
-
+    abstract void implDeregister(int fdVal);
 
     /**
      * Return a stream of all threads blocked waiting for I/O operations.

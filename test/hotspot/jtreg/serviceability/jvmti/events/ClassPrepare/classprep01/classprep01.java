@@ -67,7 +67,7 @@ public class classprep01 {
     }
     public static void testVirtual() {
 
-        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+        Thread thread = Thread.startVirtualThread(() -> {
             getReady();
             new TestClassVirtual().run();
             result = check();

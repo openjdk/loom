@@ -54,6 +54,7 @@ package java.util.concurrent;
  * to known values before returning it.
  * @since 1.5
  * @author Doug Lea
+ * @see Thread.Builder#factory()
  */
 public interface ThreadFactory {
 
@@ -64,6 +65,8 @@ public interface ThreadFactory {
      * @param r a runnable to be executed by new thread instance
      * @return constructed thread, or {@code null} if the request to
      *         create a thread is rejected
+     *
+     * @see <a href="../../lang/Thread.html#inheritance">Inheritance</a>
      */
     Thread newThread(Runnable r);
 }

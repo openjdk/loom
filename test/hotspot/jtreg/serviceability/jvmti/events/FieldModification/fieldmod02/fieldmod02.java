@@ -65,7 +65,7 @@ public class fieldmod02 {
         testVirtual();
     }
     public static void testVirtual() {
-        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+        Thread thread = Thread.startVirtualThread(() -> {
             fieldmod02a t = new fieldmod02a();
             getReady();
             result = check(t);

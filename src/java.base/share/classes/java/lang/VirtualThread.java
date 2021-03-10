@@ -51,6 +51,7 @@ import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.ThreadDumper;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
+import jdk.internal.vm.annotation.JvmtiMountTransition;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
 import static java.util.concurrent.TimeUnit.*;
@@ -246,13 +247,13 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler. If externalExecuteTask
-     * is true then it pushes the task to the current carrier thread's work queue.
+     * Submits the runContinuation task to the scheduler. If {@code tryPush} is true
+     * then it pushes the task to the current carrier thread's work queue if possible.
      * @throws RejectedExecutionException
      */
-    private void submitRunContinuation(boolean externalExecuteTask) {
+    private void submitRunContinuation(boolean tryPush) {
         try {
-            if (externalExecuteTask && scheduler == DEFAULT_SCHEDULER) {
+            if (tryPush && (scheduler == DEFAULT_SCHEDULER)) {
                 ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER, runContinuation);
             } else {
                 scheduler.execute(runContinuation);
@@ -373,9 +374,11 @@ class VirtualThread extends Thread {
 
             if (!yielded) {
                 // pinned or resource error
-                if (state() == PARKING) {
-                    parkOnCarrierThread();
-                } else {
+                try {
+                    if (state() == PARKING) {
+                        parkOnCarrierThread();
+                    }
+                } finally {
                     setState(RUNNING);
                 }
             }
@@ -453,40 +456,39 @@ class VirtualThread extends Thread {
     private void parkOnCarrierThread() {
         assert state() == PARKING;
 
-        boolean awaitInterrupted = false;
-
         // switch to carrier thread
         Thread carrier = this.carrierThread;
         carrier.setCurrentThread(carrier);
 
-        final ReentrantLock lock = getLock();
-        lock.lock();
+        boolean awaitInterrupted = false;
         try {
-            setState(PINNED);
+            final ReentrantLock lock = getLock();
+            lock.lock();
+            try {
+                setState(PINNED);
+                if (!parkPermit) {
+                    // wait to be signalled or interrupted
+                    getCondition().await();
+                }
+            } catch (InterruptedException e) {
+                awaitInterrupted = true;
+            } finally {
+                lock.unlock();
 
-            if (!parkPermit) {
-                // wait to be signalled or interrupted
-                getCondition().await();
+                // continue running on the carrier thread
+                setState(RUNNING);
+
+                // consume parking permit
+                setParkPermit(false);
             }
-        } catch (InterruptedException e) {
-            awaitInterrupted = true;
         } finally {
-            lock.unlock();
-
-            // continue running on the carrier thread
-            assert state() == PINNED;
-            setState(RUNNING);
-
-            // consume parking permit
-            setParkPermit(false);
-
             // switch back to virtual thread
             carrier.setCurrentThread(this);
-        }
 
-        // restore interrupt status
-        if (awaitInterrupted)
-            Thread.currentThread().interrupt();
+            // restore interrupt status
+            if (awaitInterrupted)
+                Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -571,7 +573,7 @@ class VirtualThread extends Thread {
         // need to switch to carrier thread to avoid nested parking
         carrier.setCurrentThread(carrier);
         try {
-            return UNPARKER.schedule(this::unpark, nanos, NANOSECONDS);
+            return UNPARKER.schedule(() -> unpark(), nanos, NANOSECONDS);
         } finally {
             carrier.setCurrentThread(this);
         }
@@ -600,14 +602,15 @@ class VirtualThread extends Thread {
      * {@link #park() parked} then it will be unblocked, otherwise its next call
      * to {@code park} or {@linkplain #parkNanos(long) parkNanos} is guaranteed
      * not to block.
-     *
+     * @param tryPush true to push the task to the current carrier thread's work queue
+     *     when invoked from a virtual thread
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
-    void unpark() {
+    void unpark(boolean tryPush) {
         if (!getAndSetParkPermit(true) && Thread.currentThread() != this) {
             int s = state();
             if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
-                submitRunContinuation();
+                submitRunContinuation(tryPush);
             } else if (s == PINNED) {
                 // signal pinned thread so that it continues
                 final ReentrantLock lock = getLock();
@@ -621,6 +624,15 @@ class VirtualThread extends Thread {
                 }
             }
         }
+    }
+
+    /**
+     * Re-enables this virtual thread for scheduling. The task is pushed to the
+     * current carrier thread's work queue when invoked from a virtual thread.
+     * @throws RejectedExecutionException if the scheduler cannot accept a task
+     */
+    private void unpark() {
+        unpark(true);
     }
 
     /**
@@ -920,11 +932,21 @@ class VirtualThread extends Thread {
     // -- JVM TI support --
 
     private static volatile boolean notifyJvmtiEvents;  // set by VM
+
+    @JvmtiMountTransition
     private native void notifyJvmtiMountBegin(boolean firstMount);
+
+    @JvmtiMountTransition
     private native void notifyJvmtiMountEnd(boolean firstMount);
+
+    @JvmtiMountTransition
     private native void notifyJvmtiUnmountBegin();
+
+    @JvmtiMountTransition
     private native void notifyJvmtiUnmountEnd();
+
     private native void notifyJvmtiTerminated();
+
     private static native void registerNatives();
     static {
         registerNatives();

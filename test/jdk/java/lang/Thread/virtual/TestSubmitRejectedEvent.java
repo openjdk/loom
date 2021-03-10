@@ -35,6 +35,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.LockSupport;
 import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
@@ -79,9 +80,11 @@ public class TestSubmitRejectedEvent {
     static int doStuff() throws Exception {
         try (ExecutorService pool = Executors.newCachedThreadPool()) {
             Executor scheduler = task -> pool.execute(task);
+            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
 
             // start a thread
-            Thread thread = Thread.builder().virtual(scheduler).task(LockSupport::park).start();
+            Thread thread = factory.newThread(LockSupport::park);
+            thread.start();
 
             // give time for thread to park
             boolean terminated = thread.join(Duration.ofMillis(1000));
@@ -98,7 +101,7 @@ public class TestSubmitRejectedEvent {
 
             // start another thread, it should fail and an event should be recorded
             try {
-                Thread.builder().virtual(scheduler).task(LockSupport::park).start();
+                factory.newThread(LockSupport::park).start();
                 throw new RuntimeException("RejectedExecutionException expected");
             } catch (RejectedExecutionException expected) { }
 

@@ -36,7 +36,7 @@ public class TestManyVirtualThreads {
         try (Recording r = new Recording()) {
             r.start();
 
-            ThreadFactory factory = Thread.builder().virtual().factory();
+            ThreadFactory factory = Thread.ofVirtual().factory();
             CompletableFuture<?>[] c = new CompletableFuture[STARTER_THREADS];
             for (int j = 0; j < STARTER_THREADS; j++) {
                 c[j] = CompletableFuture.runAsync(() -> {

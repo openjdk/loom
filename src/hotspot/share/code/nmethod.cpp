@@ -49,6 +49,7 @@
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
 #include "oops/access.inline.hpp"
+#include "oops/klass.inline.hpp"
 #include "oops/method.inline.hpp"
 #include "oops/methodData.hpp"
 #include "oops/oop.inline.hpp"
@@ -510,7 +511,7 @@ nmethod* nmethod::new_nmethod(const methodHandle& method,
   ImplicitExceptionTable* nul_chk_table,
   AbstractCompiler* compiler,
   int comp_level,
-  const GrowableArrayView<BufferBlob*>& native_invokers
+  const GrowableArrayView<RuntimeStub*>& native_invokers
 #if INCLUDE_JVMCI
   , char* speculations,
   int speculations_len,
@@ -750,7 +751,7 @@ nmethod::nmethod(
   ImplicitExceptionTable* nul_chk_table,
   AbstractCompiler* compiler,
   int comp_level,
-  const GrowableArrayView<BufferBlob*>& native_invokers
+  const GrowableArrayView<RuntimeStub*>& native_invokers
 #if INCLUDE_JVMCI
   , char* speculations,
   int speculations_len,
@@ -1093,7 +1094,7 @@ void nmethod::copy_values(GrowableArray<Metadata*>* array) {
 }
 
 void nmethod::free_native_invokers() {
-  for (BufferBlob** it = native_invokers_begin(); it < native_invokers_end(); it++) {
+  for (RuntimeStub** it = native_invokers_begin(); it < native_invokers_end(); it++) {
     CodeCache::free(*it);
   }
 }
@@ -2769,7 +2770,7 @@ void nmethod::print_pcs_on(outputStream* st) {
 void nmethod::print_native_invokers() {
   ResourceMark m;       // in case methods get printed via debugger
   tty->print_cr("Native invokers:");
-  for (BufferBlob** itt = native_invokers_begin(); itt < native_invokers_end(); itt++) {
+  for (RuntimeStub** itt = native_invokers_begin(); itt < native_invokers_end(); itt++) {
     (*itt)->print_on(tty);
   }
 }

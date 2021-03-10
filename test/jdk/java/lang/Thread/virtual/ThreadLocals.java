@@ -143,7 +143,7 @@ public class ThreadLocals {
         var obj = new Object();
         INHERITED_LOCAL.set(obj);
         try {
-            int characteristics = TestHelper.NO_INHERIT_INHERITABLE_THREAD_LOCALS;
+            int characteristics = TestHelper.NO_INHERIT_THREAD_LOCALS;
             TestHelper.runInVirtualThread(characteristics, () -> {
                 assertTrue(INHERITED_LOCAL.get() == null);
             });
@@ -158,7 +158,7 @@ public class ThreadLocals {
         TestHelper.runInVirtualThread(() -> {
             var obj = new Object();
             INHERITED_LOCAL.set(obj);
-            int characteristics = TestHelper.NO_INHERIT_INHERITABLE_THREAD_LOCALS;
+            int characteristics = TestHelper.NO_INHERIT_THREAD_LOCALS;
             TestHelper.runInVirtualThread(characteristics, () -> {
                 assertTrue(INHERITED_LOCAL.get() == null);
             });

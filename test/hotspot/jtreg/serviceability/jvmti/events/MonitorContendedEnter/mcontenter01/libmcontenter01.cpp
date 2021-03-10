@@ -51,7 +51,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj) {
 
   printf("MonitorContendedEnter event:\n\tthread: %p, object: %p, expected object: %p\n",thr, obj, expected_object);
 
-  print_thread_info(jni, jvmti, thr);
+  print_thread_info(jvmti, jni, thr);
 
   if (expected_thread == NULL) {
     jni->FatalError("expected_thread is NULL.");

@@ -34,6 +34,7 @@
 #include "memory/allocation.inline.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/instanceKlass.hpp"
+#include "oops/klass.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/oopHandle.inline.hpp"
 #include "prims/jvmtiAgentThread.hpp"
@@ -820,9 +821,7 @@ javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
 
     if (!vfs.at_end()) {
       jvf = vfs.asJavaVFrame();
-      if (java_thread->is_in_VTMT()) {
-        jvf = JvmtiEnvBase::skip_hidden_frames(jvf);
-      }
+      jvf = JvmtiEnvBase::check_and_skip_hidden_frames(java_thread, jvf);
     }
   } else {
     Handle cont_h(cur_thread, cont);

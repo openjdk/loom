@@ -50,6 +50,7 @@ class RecordComponent;
   f(java_lang_Thread) \
   f(java_lang_Thread_FieldHolder) \
   f(java_lang_Thread_VirtualThreads) \
+  f(java_lang_Thread_ClassLoaders) \
   f(java_lang_ThreadGroup) \
   f(java_lang_VirtualThread) \
   f(java_lang_InternalError) \
@@ -492,6 +493,21 @@ class java_lang_Thread_VirtualThreads : AllStatic {
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
  public:
   static oop get_THREAD_GROUP();
+
+  friend class JavaClasses;
+};
+
+
+// Interface to java.lang.Thread$ClassLoaders objects
+
+class java_lang_Thread_ClassLoaders : AllStatic {
+ private:
+  static int _static_NOT_SUPPORTED_offset;
+
+  static void compute_offsets();
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+ public:
+  static oop get_NOT_SUPPORTED();
 
   friend class JavaClasses;
 };

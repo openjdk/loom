@@ -52,7 +52,7 @@ void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
     result = STATUS_FAILED;
   }
 
-  print_thread_info(jni, jvmti, thread);
+  print_thread_info(jvmti, jni, thread);
 
   if (inf.name != NULL && strstr(inf.name, prefix) == inf.name) {
     eventsCount++;

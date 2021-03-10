@@ -148,7 +148,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
   printf(">>> [class prepare event #%" PRIuPTR "]", eventsCount);
   printf(" \"%s\"\n", inf.sig);
   printf(">>> Got ClassPrep event in thread.\n");
-  print_thread_info(jni, jvmti, thr);
+  print_thread_info(jvmti, jni, thr);
   printf(">>>   status: ");
   printStatus(inf.status);
   printf(">>>   %d methods:", inf.mcount);
@@ -322,7 +322,7 @@ Java_classprep01_getReady(JNIEnv *jni, jclass cls) {
     eventsExpected = sizeof(kernel_classes)/sizeof(class_info);
   }
   printf("Requesting enabling JVMTI_EVENT_CLASS_PREPARE in thread.\n");
-  print_thread_info(jni, jvmti, prep_thread);
+  print_thread_info(jvmti, jni, prep_thread);
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_CLASS_PREPARE, prep_thread);
@@ -350,7 +350,7 @@ Java_classprep01_check(JNIEnv *jni, jclass cls) {
   }
 
   printf("Requesting disabling JVMTI_EVENT_CLASS_PREPARE in thread.\n");
-  print_thread_info(jni, jvmti, prep_thread);
+  print_thread_info(jvmti, jni, prep_thread);
 
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_CLASS_PREPARE, prep_thread);

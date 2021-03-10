@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -113,7 +113,7 @@ class WSAPollPoller extends Poller {
      * Register the file descriptor.
      */
     @Override
-    protected void implRegister(int fdVal) {
+    void implRegister(int fdVal) {
         Integer fd = Integer.valueOf(fdVal);
         synchronized (updateLock) {
             registerQueue.add(fd);
@@ -126,7 +126,7 @@ class WSAPollPoller extends Poller {
      * has removed the file descriptor from the poll array.
      */
     @Override
-    protected void implDeregister(int fdVal) {
+    void implDeregister(int fdVal) {
         boolean interrupted = false;
         var request = new DeregisterRequest(fdVal);
         synchronized (request) {
@@ -145,35 +145,28 @@ class WSAPollPoller extends Poller {
         }
     }
 
-    /**
-     * Poller run loop.
-     */
     @Override
-    public void run() {
-        try {
-            for (;;) {
-                // process any updates
-                synchronized (updateLock) {
-                    processRegisterQueue();
-                    processDeregisterQueue();
-                }
-
-                // poll for wakeup and/or events
-                int numPolled = WSAPoll.poll(pollArrayAddress, pollArraySize, -1);
-                boolean polledWakeup = (getRevents(0) != 0);
-                if (polledWakeup) {
-                    numPolled--;
-                }
-                processEvents(numPolled);
-
-                // clear wakeup
-                if (polledWakeup) {
-                    clearWakeup();
-                }
-            }
-        } catch (Throwable e) {
-            e.printStackTrace();
+    int poll(int timeout) throws IOException {
+        // process any updates
+        synchronized (updateLock) {
+            processRegisterQueue();
+            processDeregisterQueue();
         }
+
+        // poll for wakeup and/or events
+        int numPolled = WSAPoll.poll(pollArrayAddress, pollArraySize, timeout);
+        boolean polledWakeup = (getRevents(0) != 0);
+        if (polledWakeup) {
+            numPolled--;
+        }
+        processEvents(numPolled);
+
+        // clear wakeup
+        if (polledWakeup) {
+            clearWakeup();
+        }
+
+        return numPolled;
     }
 
     /**

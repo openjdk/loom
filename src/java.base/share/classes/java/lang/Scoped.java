@@ -158,7 +158,7 @@ public final class Scoped<T> {
     }
 
     /**
-     Creates an inheritable scoped variable to hold a value with the given type.
+     * Creates an inheritable scoped variable to hold a value with the given type.
      *
      * @param <T> TBD
      * @param <U>   TBD

@@ -64,6 +64,7 @@
   template(java_lang_Thread,                          "java/lang/Thread")                         \
   template(java_lang_Thread_FieldHolder,              "java/lang/Thread$FieldHolder")             \
   template(java_lang_Thread_VirtualThreads,           "java/lang/Thread$VirtualThreads")          \
+  template(java_lang_Thread_ClassLoaders,             "java/lang/Thread$ClassLoaders")            \
   template(java_lang_ThreadGroup,                     "java/lang/ThreadGroup")                    \
   template(java_lang_VirtualThread,                   "java/lang/VirtualThread")                  \
   template(java_lang_Cloneable,                       "java/lang/Cloneable")                      \
@@ -317,6 +318,7 @@
   template(jdk_internal_vm_annotation_Stable_signature,      "Ljdk/internal/vm/annotation/Stable;") \
                                                                                                   \
   template(jdk_internal_vm_annotation_ChangesCurrentThread_signature,  "Ljdk/internal/vm/annotation/ChangesCurrentThread;")  \
+  template(jdk_internal_vm_annotation_JvmtiMountTransition_signature,  "Ljdk/internal/vm/annotation/JvmtiMountTransition;")  \
                                                                                                   \
   /* Support for JSR 292 & invokedynamic (JDK 1.7 and above) */                                   \
   template(java_lang_invoke_CallSite,                 "java/lang/invoke/CallSite")                \

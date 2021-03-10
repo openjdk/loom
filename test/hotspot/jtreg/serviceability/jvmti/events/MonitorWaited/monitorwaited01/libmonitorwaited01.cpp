@@ -51,7 +51,7 @@ MonitorWaited(jvmtiEnv *jvmti, JNIEnv *jni,
   NSK_DISPLAY3("MonitorWaited event:\n\tthread: %p, object: %p, timed_out: %s\n",
                thr, obj, (timed_out == JNI_TRUE) ? "true" : "false");
 
-  print_thread_info(jni, jvmti, thr);
+  print_thread_info(jvmti, jni, thr);
 
   if (expected_thread == NULL) {
     jni->FatalError("expected_thread is NULL.");

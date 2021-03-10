@@ -305,7 +305,6 @@ DEF_Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
     if (gdata->vthreadsSupported) {
         needed_capabilities.can_support_virtual_threads         = 1;
     }
-    needed_capabilities.can_support_continuations               = 1;
 
     /* And what potential ones that would be nice to have */
     needed_capabilities.can_force_early_return

@@ -32,8 +32,8 @@ public class IsVirtualThread {
     public static void main(String[] args) throws Exception {
         test(Thread.currentThread());
 
-        // test kernel thread
-        Thread thread = Thread.builder().task(LockSupport::park).build();
+        // test platform thread
+        Thread thread = Thread.ofPlatform().unstarted(LockSupport::park);
         test(thread);   // not started
         thread.start();
         test(thread);   // started, probably parked
@@ -42,7 +42,7 @@ public class IsVirtualThread {
         test(thread);   // terminated
 
         // test virtual thread
-        Thread vthread = Thread.builder().virtual().task(LockSupport::park).build();
+        Thread vthread = Thread.ofVirtual().unstarted(LockSupport::park);
         test(vthread);   // not started
         vthread.start();
         test(vthread);   // started, probably parked

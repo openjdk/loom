@@ -75,7 +75,7 @@ public class thrinfo001 {
         } catch (InterruptedException e) {}
         checkInfo(t_b, t_b.getThreadGroup(), 2);
 
-        Thread t_c = Thread.builder().task(new thrinfo001c()).name("vthread").virtual().build();
+        Thread t_c = Thread.ofVirtual().name("vthread").unstarted(new thrinfo001c());
         checkInfo(t_c, t_c.getThreadGroup(), 3);
         t_c.start();
         try {

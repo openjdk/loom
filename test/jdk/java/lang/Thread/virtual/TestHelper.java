@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 class TestHelper {
 
     static final int NO_THREAD_LOCALS = 1 << 1;
-    static final int NO_INHERIT_INHERITABLE_THREAD_LOCALS = 1 << 2;
+    static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     interface ThrowingRunnable {
         void run() throws Exception;
@@ -50,14 +50,14 @@ class TestHelper {
             }
         };
 
-        Thread.Builder builder = Thread.builder().virtual().task(target);
+        Thread.Builder builder = Thread.ofVirtual();
         if (name != null)
             builder.name(name);
-        if ((characteristics & NO_THREAD_LOCALS) != 0)
-            builder.noThreadLocals();
-        if ((characteristics & NO_INHERIT_INHERITABLE_THREAD_LOCALS) != 0)
-            builder.noInheritInheritableThreadLocals();
-        Thread thread = builder.start();
+        boolean allow = ((characteristics & NO_THREAD_LOCALS)  == 0);
+        builder.allowSetThreadLocals(allow);
+        boolean inherit = ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0);
+        builder.inheritInheritableThreadLocals(inherit);
+        Thread thread = builder.start(target);
         thread.join();
         Exception e = exc.get();
         if (e != null) {

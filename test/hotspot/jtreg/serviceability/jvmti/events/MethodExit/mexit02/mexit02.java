@@ -71,7 +71,7 @@ public class mexit02 {
         testKernel();
     }
     public static void testVirtual() {
-        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+        Thread thread = Thread.startVirtualThread(() -> {
             result = check();
         });
         try {

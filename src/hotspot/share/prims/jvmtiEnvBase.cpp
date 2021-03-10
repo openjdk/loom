@@ -611,10 +611,16 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 }
 
 javaVFrame*
-JvmtiEnvBase::skip_hidden_frames(javaVFrame* jvf) {
-  // find the top-most jvf with an annotated method
+JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
+  // The second condition is needed to hide notification methods
+  // as jt->is_in_VTMT() can be not set yet. 
+  if (!jt->is_in_VTMT() && !jvf->method()->jvmti_mount_transition()) {
+    return jvf; // no frames to skip
+  }
+  // find jvf with a method annotated with @JvmtiMountTransition
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
-    if (jvf->method()->changes_current_thread()) {
+    if (jvf->method()->jvmti_mount_transition()) {
+      jvf = jvf->java_sender(); // skip annotated method
       break;
     }
   }
@@ -643,9 +649,7 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
     }
     vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
     jvf = vfs.at_end() ? NULL : vfs.asJavaVFrame();
-    if (java_thread->is_in_VTMT()) {
-      jvf = skip_hidden_frames(jvf);
-    }
+    jvf = check_and_skip_hidden_frames(java_thread, jvf);
   } else {
     Handle cont_h(cur_thread, cont);
     vframeStream vfs(cont_h);
@@ -660,9 +664,7 @@ JvmtiEnvBase::get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map_p) {
   javaVFrame *jvf = JvmtiEnvBase::cthread_with_continuation(jt) ?
                         jt->vthread_carrier_last_java_vframe(reg_map_p) :
                         jt->last_java_vframe(reg_map_p);
-  if (jt->is_in_VTMT()) {
-    jvf = skip_hidden_frames(jvf);
-  }
+  jvf = check_and_skip_hidden_frames(jt, jvf);
   return jvf;
 }
 
@@ -1441,6 +1443,33 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
 }
 
 jvmtiError
+JvmtiEnvBase::check_thread_list(jint count, const jthread* list) {
+  if (list == NULL && count != 0) {
+    return JVMTI_ERROR_NULL_POINTER;
+  }
+  for (int i = 0; i < count; i++) {
+    jthread thread = list[i];
+    oop thread_oop = JNIHandles::resolve_external_guard(thread);
+    if (thread_oop == NULL || !thread_oop->is_a(vmClasses::VirtualThread_klass())) {
+      return JVMTI_ERROR_INVALID_THREAD;
+    }
+  }
+  return JVMTI_ERROR_NONE;
+}
+
+bool
+JvmtiEnvBase::is_in_thread_list(jint count, const jthread* list, oop jt_oop) {
+  for (int idx = 0; idx < count; idx++) {
+    jthread thread = list[idx];
+    oop thread_oop = JNIHandles::resolve_external_guard(thread);
+    if (thread_oop == jt_oop) {
+      return true;
+    }
+  } 
+  return false;
+}
+
+jvmtiError
 JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend,
                              int* need_safepoint_p) {
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
@@ -2095,7 +2124,7 @@ SetFramePopClosure::doit(Thread *target, bool self) {
     _result = JVMTI_ERROR_NO_MORE_FRAMES;
     return;
   }
-
+  vf = JvmtiEnvBase::check_and_skip_hidden_frames(java_thread, (javaVFrame*)vf);
   if (!vf->is_java_frame() || ((javaVFrame*) vf)->method()->is_native()) {
     _result = JVMTI_ERROR_OPAQUE_FRAME;
     return;

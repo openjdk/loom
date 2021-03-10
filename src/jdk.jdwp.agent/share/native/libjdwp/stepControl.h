@@ -65,13 +65,7 @@ jvmtiError stepControl_endStep(jthread thread);
 void stepControl_clearRequest(jthread thread, StepRequest *step);
 void stepControl_resetRequest(jthread thread);
 
-void stepControl_enableStepping(jthread thread);
-void stepControl_disableStepping(jthread thread);
-
 void stepControl_lock(void);
 void stepControl_unlock(void);
-
-void
-stepControl_handleContinuationRun(JNIEnv *env, jthread thread, StepRequest *step);
 
 #endif

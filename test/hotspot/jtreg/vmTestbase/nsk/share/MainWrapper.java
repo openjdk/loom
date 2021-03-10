@@ -45,7 +45,14 @@ public final class MainWrapper {
         Finalizer finalizer = new Finalizer(new FinalizableObject());
         finalizer.activate();
 
-        Thread.Builder tb = Thread.builder().task(() -> {
+        Thread.Builder tb;
+        if (wrapperName.equals("Virtual")) {
+            tb = Thread.ofVirtual();
+        } else {
+            tb = Thread.ofPlatform();
+        }
+        tb.name("main");
+        Thread t = tb.unstarted(() -> {
                 try {
                     Class c = Class.forName(className);
                     Method mainMethod = c.getMethod("main", new Class[] { String[].class });
@@ -58,10 +65,6 @@ public final class MainWrapper {
                     e.printStackTrace();
                 }
             });
-        if (wrapperName.equals("Virtual")) {
-            tb = tb.virtual();
-        }
-        Thread t = tb.name("main").build();
         Thread.currentThread().setName("old-m-a-i-n");
         t.start();
         t.join();

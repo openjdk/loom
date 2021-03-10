@@ -80,10 +80,9 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
   char *sig, *generic;
   jvmtiError err;
 
-  jvmti->RawMonitorEnter(agent_lock);
+  RawMonitorLocker rml(jvmti, jni, agent_lock);
 
   if (!callbacksEnabled) {
-    jvmti->RawMonitorExit(agent_lock);
     return;
   }
 
@@ -99,26 +98,18 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
         sig);
     setBP(jvmti, jni, klass);
   }
-
-  jvmti->RawMonitorExit(agent_lock);
 }
 
 void JNICALL
 VMStart(jvmtiEnv *jvmti, JNIEnv *jni) {
-  jvmti->RawMonitorEnter(agent_lock);
-
+  RawMonitorLocker rml(jvmti, jni, agent_lock);
   callbacksEnabled = NSK_TRUE;
-
-  jvmti->RawMonitorExit(agent_lock);
 }
 
 void JNICALL
 VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
-  jvmti->RawMonitorEnter(agent_lock);
-
+  RawMonitorLocker rml(jvmti, jni, agent_lock);
   callbacksEnabled = NSK_FALSE;
-
-  jvmti->RawMonitorExit(agent_lock);
 }
 
 void JNICALL
@@ -128,10 +119,9 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method,
   char *sig, *generic;
   jvmtiError err;
 
-  jvmti->RawMonitorEnter(agent_lock);
+  RawMonitorLocker rml(jvmti, jni, agent_lock);
 
   if (!callbacksEnabled) {
-    jvmti->RawMonitorExit(agent_lock);
     return;
   }
 
@@ -160,7 +150,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method,
                   sig);
   }
 
-  jvmti->RawMonitorExit(agent_lock);
 }
 
 void JNICALL
@@ -364,10 +353,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   NSK_DISPLAY0("enabling the events done\n\n");
 
-  err = jvmti->CreateRawMonitor("agent lock", &agent_lock);
-  if (err != JVMTI_ERROR_NONE) {
-    return JNI_ERR;
-  }
+  agent_lock = create_raw_monitor(jvmti, "agent lock");
 
   return JNI_OK;
 }

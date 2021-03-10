@@ -49,14 +49,15 @@ name(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    WITH_LOCAL_REFS(env, 3) {
-        /* Get the thread name */
+    WITH_LOCAL_REFS(env, 1) {
+
         jvmtiThreadInfo info;
         jvmtiError error;
 
         (void)memset(&info, 0, sizeof(info));
+
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
-            (gdata->jvmti, thread, &info);
+                                (gdata->jvmti, thread, &info);
 
         if (error != JVMTI_ERROR_NONE) {
             outStream_setError(out, map2jdwpError(error));
@@ -64,9 +65,9 @@ name(PacketInputStream *in, PacketOutputStream *out)
             (void)outStream_writeString(out, info.name);
         }
 
-        if ( info.name != NULL ) {
+        if ( info.name != NULL )
             jvmtiDeallocate(info.name);
-        }
+
     } END_WITH_LOCAL_REFS(env);
 
     return JNI_TRUE;
@@ -169,9 +170,11 @@ threadGroup(PacketInputStream *in, PacketOutputStream *out)
 
         jvmtiThreadInfo info;
         jvmtiError error;
+
         (void)memset(&info, 0, sizeof(info));
+
         error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
-            (gdata->jvmti, thread, &info);
+                                (gdata->jvmti, thread, &info);
 
         if (error != JVMTI_ERROR_NONE) {
             outStream_setError(out, map2jdwpError(error));

@@ -64,18 +64,16 @@ public class singlestep01 {
     native int check();
 
     public static void main(String[] argv) throws Exception {
-        Thread thread = Thread.builder().task(() -> {
+        Thread thread = Thread.ofPlatform().start(() -> {
              result = new singlestep01().runThis();
-        }).build();
-        thread.start();
+        });
         thread.join();
         if (result != 0) {
             throw new RuntimeException("Unexpected status: " + result);
         }
-        thread = Thread.builder().task(() -> {
+        thread = Thread.ofVirtual().start(() -> {
             result = new singlestep01().runThis();
-        }).virtual().build();
-        thread.start();
+        });
         thread.join();
         if (result != 0) {
             throw new RuntimeException("Unexpected status: " + result);
