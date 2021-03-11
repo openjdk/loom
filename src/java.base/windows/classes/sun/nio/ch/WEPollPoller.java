@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -45,7 +45,7 @@ class WEPollPoller extends Poller {
     }
 
     @Override
-    protected void implRegister(int fdVal) throws IOException {
+    void implRegister(int fdVal) throws IOException {
         // re-arm
         int err = WEPoll.ctl(handle, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
         if (err == ENOENT)
@@ -55,24 +55,21 @@ class WEPollPoller extends Poller {
     }
 
     @Override
-    protected void implDeregister(int fdVal) {
+    void implDeregister(int fdVal) {
         WEPoll.ctl(handle, EPOLL_CTL_DEL, fdVal, 0);
     }
 
     @Override
-    public void run() {
-        try {
-            for (;;) {
-                int n = WEPoll.wait(handle, address, MAX_EVENTS_TO_POLL, -1);
-                while (n-- > 0) {
-                    long event = WEPoll.getEvent(address, n);
-                    long s = (int) WEPoll.getSocket(event);
-                    polled((int) s);
-                }
-            }
-        } catch (Throwable t) {
-            t.printStackTrace();
+    int poll(int timeout) throws IOException {
+        int n = WEPoll.wait(handle, address, MAX_EVENTS_TO_POLL, timeout);
+        int i = 0;
+        while (i < n) {
+            long event = WEPoll.getEvent(address, i);
+            long s = (int) WEPoll.getSocket(event);
+            polled((int) s);
+            i++;
         }
+        return n;
     }
 }
 

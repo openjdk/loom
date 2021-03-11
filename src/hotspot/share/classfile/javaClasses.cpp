@@ -2026,6 +2026,30 @@ oop java_lang_Thread_VirtualThreads::get_THREAD_GROUP() {
 }
 
 
+int java_lang_Thread_ClassLoaders::_static_NOT_SUPPORTED_offset = 0;
+
+#define THREAD_CLASS_LOADERS_STATIC_FIELDS_DO(macro) \
+  macro(_static_NOT_SUPPORTED_offset, k, "NOT_SUPPORTED", classloader_signature, true);
+
+void java_lang_Thread_ClassLoaders::compute_offsets() {
+  assert(_static_NOT_SUPPORTED_offset == 0, "offsets should be initialized only once");
+
+  InstanceKlass* k = vmClasses::Thread_ClassLoaders_klass();
+  THREAD_CLASS_LOADERS_STATIC_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+}
+
+#if INCLUDE_CDS
+void java_lang_Thread_ClassLoaders::serialize_offsets(SerializeClosure* f) {
+  THREAD_CLASS_LOADERS_STATIC_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+}
+#endif
+
+oop java_lang_Thread_ClassLoaders::get_NOT_SUPPORTED() {
+  InstanceKlass* k = vmClasses::Thread_ClassLoaders_klass();
+  oop base = k->static_field_base_raw();
+  return base->obj_field(_static_NOT_SUPPORTED_offset);
+}
+
 int java_lang_Thread::_holder_offset;
 int java_lang_Thread::_name_offset;
 int java_lang_Thread::_contextClassLoader_offset;

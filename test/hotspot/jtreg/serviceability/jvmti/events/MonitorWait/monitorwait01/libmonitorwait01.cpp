@@ -49,7 +49,7 @@ MonitorWait(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj, jlong tout) 
 
   printf("MonitorWait event:\n\tthread: %p, object: %p, timeout: %d\n", thr, obj, (int) tout);
 
-  print_thread_info(jni, jvmti, thr);
+  print_thread_info(jvmti, jni, thr);
 
   if (expected_thread == NULL) {
     jni->FatalError("expected_thread is NULL.");

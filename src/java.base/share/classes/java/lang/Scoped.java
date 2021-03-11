@@ -207,7 +207,7 @@ public final class Scoped<T> {
     }
 
     /**
-     Creates an inheritable scoped variable to hold a value with the given type.
+     * Creates an inheritable scoped variable to hold a value with the given type.
      *
      * @param <T> the type of the scoped variable's value.
      * @param <U> a supertype of {@code T}. It should either be {@code T} itself or, if T is a parameterized type, its generic type.

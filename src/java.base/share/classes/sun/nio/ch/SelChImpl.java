@@ -28,10 +28,8 @@ package sun.nio.ch;
 import java.nio.channels.Channel;
 import java.io.FileDescriptor;
 import java.io.IOException;
-
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
-
 import jdk.internal.misc.VirtualThreads;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
  * An interface that allows translation (and more!).
@@ -110,7 +108,7 @@ public interface SelChImpl extends Channel {
     }
 
     /**
-     * Disables the current thread or scheduling purposes until this
+     * Disables the current thread for scheduling purposes until this
      * channel is ready for I/O, or asynchronously closed.
      *
      * <p> This method does <em>not</em> report which of these caused the

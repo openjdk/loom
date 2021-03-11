@@ -107,7 +107,7 @@ void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread_obj, jmethodI
   printf(">>>      class: \"%s\"\n", cls_sig);
   printf(">>>     method: \"%s%s\"\n", name, sig);
   printf(">>>   location: 0x%x%08x\n", (jint)(loc >> 32), (jint)loc);
-  print_thread_info(jni, jvmti, thread_obj);
+  print_thread_info(jvmti, jni, thread_obj);
   printf(">>> ... done\n");
 
   if (eventsCount < sizeof(pops)/sizeof(pop_info)) {

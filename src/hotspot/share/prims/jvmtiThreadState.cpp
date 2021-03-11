@@ -83,19 +83,6 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
   _is_virtual = false;
 
   _thread_oop_h = OopHandle(Universe::vm_global(), thread_oop);
-  if (thread_oop != NULL) {
-    java_lang_Thread::set_jvmti_thread_state(thread_oop, (JvmtiThreadState*)this);
-    _is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
-  }
-
-  // thread can be NULL if virtual thread is unmounted
-  if (thread != NULL) {
-    // set this as the state for the thread only if thread_oop is current thread->mounted_vthread()
-    if (thread_oop == NULL || thread->mounted_vthread() == NULL || thread->mounted_vthread() == thread_oop) {
-      thread->set_jvmti_thread_state(this);
-    }
-    thread->set_interp_only_mode(0);
-  }
 
   // add all the JvmtiEnvThreadState to the new JvmtiThreadState
   {
@@ -119,6 +106,20 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
       _head->_prev = this;
     }
     _head = this;
+  }
+
+  if (thread_oop != NULL) {
+    java_lang_Thread::set_jvmti_thread_state(thread_oop, (JvmtiThreadState*)this);
+    _is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
+  }
+
+  // thread can be NULL if virtual thread is unmounted
+  if (thread != NULL) {
+    // set this as the state for the thread only if thread_oop is current thread->mounted_vthread()
+    if (thread_oop == NULL || thread->mounted_vthread() == NULL || thread->mounted_vthread() == thread_oop) {
+      thread->set_jvmti_thread_state(this);
+    }
+    thread->set_interp_only_mode(0);
   }
 }
 
@@ -215,9 +216,6 @@ unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
 
 void
 JvmtiVTMTDisabler::disable_VTMT() {
-  if (!JvmtiExport::can_support_virtual_threads()) {
-    return;
-  }
   JavaThread* thread = JavaThread::current();
   ThreadBlockInVM tbivm(thread);
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
@@ -232,9 +230,6 @@ JvmtiVTMTDisabler::disable_VTMT() {
 
 void
 JvmtiVTMTDisabler::enable_VTMT() {
-  if (!JvmtiExport::can_support_virtual_threads()) {
-    return;
-  }
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
   assert(_VTMT_count == 0 && _VTMT_disable_count > 0, "VTMT sanity check");
 
@@ -245,9 +240,6 @@ JvmtiVTMTDisabler::enable_VTMT() {
 
 void
 JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
-  if (!JvmtiExport::can_support_virtual_threads()) {
-    return;
-  }
   JavaThread* thread = JavaThread::current();
   HandleMark hm(thread);
   Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
@@ -267,9 +259,6 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 
 void
 JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
-  if (!JvmtiExport::can_support_virtual_threads()) {
-    return;
-  }
   JavaThread* thread = JavaThread::current();
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
@@ -357,6 +346,7 @@ JvmtiVTSuspender::register_all_vthreads_suspend() {
 
   _vthread_suspend_mode = vthread_suspend_all;
   _vthread_suspend_list->invalidate();
+  _vthread_resume_list->invalidate();
 }
 
 void
@@ -364,6 +354,7 @@ JvmtiVTSuspender::register_all_vthreads_resume() {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   _vthread_suspend_mode = vthread_suspend_none;
+  _vthread_suspend_list->invalidate(); 
   _vthread_resume_list->invalidate();
 }
 
@@ -495,9 +486,7 @@ int JvmtiThreadState::count_frames() {
   RegisterMap reg_map(thread, false, false, true);
   javaVFrame *jvf = thread->last_java_vframe(&reg_map);
 
-  if (thread->is_in_VTMT()) {
-    jvf = JvmtiEnvBase::skip_hidden_frames(jvf);
-  }
+  jvf = JvmtiEnvBase::check_and_skip_hidden_frames(thread, jvf);
   return (int)JvmtiEnvBase::get_frame_count(jvf);
 }
 

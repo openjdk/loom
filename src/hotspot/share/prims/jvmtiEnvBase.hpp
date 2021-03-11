@@ -25,7 +25,6 @@
 #ifndef SHARE_PRIMS_JVMTIENVBASE_HPP
 #define SHARE_PRIMS_JVMTIENVBASE_HPP
 
-#include "classfile/classLoader.hpp"
 #include "prims/jvmtiEnvThreadState.hpp"
 #include "prims/jvmtiEventController.hpp"
 #include "prims/jvmtiThreadState.hpp"
@@ -34,7 +33,7 @@
 #include "runtime/fieldDescriptor.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/thread.hpp"
-#include "runtime/vmOperations.hpp"
+#include "runtime/vmOperation.hpp"
 #include "utilities/growableArray.hpp"
 #include "utilities/macros.hpp"
 
@@ -86,6 +85,8 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static jvmtiError suspend_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend,
                                    int* need_safepoint_p);
   static jvmtiError resume_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend);
+  static jvmtiError check_thread_list(jint count, const jthread* list);
+  static bool is_in_thread_list(jint count, const jthread* list, oop jt_oop);
  private:
 
   enum {
@@ -167,11 +168,11 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
     return err;
   }
 
-  // If can_support_virtual_threads capability is enabled and there is a virtual thread mounted
-  // to the JavaThread* then return virtual thread oop. Otherwise, return thread oop.
+  // If there is a virtual thread mounted to the JavaThread* then
+  // return virtual thread oop. Otherwise, return thread oop.
   static oop get_vthread_or_thread_oop(JavaThread* jt) {
     oop result = jt->threadObj();
-    if (JvmtiExport::can_support_virtual_threads() && jt->mounted_vthread() != NULL) {
+    if (jt->mounted_vthread() != NULL) {
       result = jt->mounted_vthread();
     }
     return result;
@@ -322,13 +323,13 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   // get a field descriptor for the specified class and field
   static bool get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd);
 
-  // skip frames hidden in mount/unmount transitions
-  static javaVFrame* skip_hidden_frames(javaVFrame* jvf);
+  // check and skip frames hidden in mount/unmount transitions
+  static javaVFrame* check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf);
 
   // get virtual thread last java vframe
   static javaVFrame* get_vthread_jvf(oop vthread);
 
-  // get carrier thread last java vframe depending on can_support_virtual_threads capability
+  // get carrier thread last java vframe
   static javaVFrame* get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map);
 
   // get ordinary thread thread state

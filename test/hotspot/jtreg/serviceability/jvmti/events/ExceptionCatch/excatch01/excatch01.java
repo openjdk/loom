@@ -66,7 +66,7 @@ public class excatch01 {
     }
     public static void testVirtual() {
 
-        Thread thread = Thread.startVirtualThread("VirtualThread", () -> {
+        Thread thread = Thread.startVirtualThread(() -> {
             result = check();
         });
         try {

@@ -162,6 +162,11 @@ public:
   void prepare_for_verify();
   void verify(VerifyOption vo);
 
+// WhiteBox testing support.
+  bool supports_concurrent_gc_breakpoints() const {
+    return true;
+  }
+
 // ---------- Heap counters and metrics
 //
 private:
@@ -462,7 +467,7 @@ public:
   bool is_in(const void* p) const;
 
   // TODO: Shenandoah might have some property that could be useful here.
-  bool requires_barriers(oop obj) const override;
+  bool requires_barriers(oop obj) const;
 
   MemRegion reserved_region() const { return _reserved; }
   bool is_in_reserved(const void* addr) const { return _reserved.contains(addr); }

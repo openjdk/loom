@@ -95,7 +95,6 @@ class JvmtiExport : public AllStatic {
   JVMTI_SUPPORT_FLAG(can_pop_frame)
   JVMTI_SUPPORT_FLAG(can_force_early_return)
   JVMTI_SUPPORT_FLAG(can_support_virtual_threads)
-  JVMTI_SUPPORT_FLAG(can_support_continuations)
 
   JVMTI_SUPPORT_FLAG(early_vmstart_recorded)
   JVMTI_SUPPORT_FLAG(can_get_owned_monitor_info) // includes can_get_owned_monitor_stack_depth_info
@@ -132,9 +131,6 @@ class JvmtiExport : public AllStatic {
   JVMTI_SUPPORT_FLAG(should_clean_up_heap_objects)
   JVMTI_SUPPORT_FLAG(should_post_vm_object_alloc)
   JVMTI_SUPPORT_FLAG(should_post_sampled_object_alloc)
-
-  JVMTI_SUPPORT_FLAG(should_post_continuation_run)
-  JVMTI_SUPPORT_FLAG(should_post_continuation_yield)
 
   JVMTI_SUPPORT_FLAG(should_post_vthread_scheduled)
   JVMTI_SUPPORT_FLAG(should_post_vthread_terminated)
@@ -350,9 +346,8 @@ class JvmtiExport : public AllStatic {
   static void post_vthread_terminated    (jthread vthread) NOT_JVMTI_RETURN;
   static void post_vthread_mounted       (jthread vthread) NOT_JVMTI_RETURN;
   static void post_vthread_unmounted     (jthread vthread) NOT_JVMTI_RETURN;
-  
-  static void post_continuation_run      (JavaThread* thread, jint continuation_frame_count) NOT_JVMTI_RETURN;
-  static void post_continuation_yield    (JavaThread* thread, jint continuation_frame_count) NOT_JVMTI_RETURN;
+
+  static void continuation_yield_cleanup (JavaThread* thread, jint continuation_frame_count) NOT_JVMTI_RETURN;
 
   // Support for java.lang.instrument agent loading.
   static bool _should_post_class_file_load_hook;

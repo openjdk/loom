@@ -67,8 +67,9 @@ public class framepop02 {
     public static void main(String args[]) {
         Thread[] t = new Thread[THREADS_LIMIT];
         getReady();
+        Thread.Builder builder = Thread.ofVirtual().name(TEST_THREAD_NAME_BASE, 0);
         for (int i = 0; i < THREADS_LIMIT; i++) {
-            t[i] = Thread.builder().name(TEST_THREAD_NAME_BASE + i).virtual().task(new TestTask()).start();
+            t[i] = builder.start(new TestTask());
         }
         for (int i = 0; i < THREADS_LIMIT; i++) {
             try {

@@ -131,7 +131,6 @@ jvmtiCapabilities JvmtiManageCapabilities::init_onload_capabilities() {
   jc.can_generate_early_vmstart = 1;
   jc.can_generate_early_class_hook_events = 1;
   jc.can_support_virtual_threads = 1;
-  jc.can_support_continuations = 1;
   return jc;
 }
 
@@ -273,9 +272,8 @@ jvmtiError JvmtiManageCapabilities::add_capabilities(const jvmtiCapabilities *cu
   either(current, desired, result);
 
   // special case for virtual thread events
-  if (result->can_support_virtual_threads == 1) {
-    java_lang_VirtualThread::set_notify_jvmti_events(true);
-  }
+  // TBD: There can be a performance impact after check for can_support_virtual_threads has been removed.
+  java_lang_VirtualThread::set_notify_jvmti_events(true);
 
   update();
 
@@ -376,7 +374,6 @@ void JvmtiManageCapabilities::update() {
   JvmtiExport::set_can_pop_frame(avail.can_pop_frame);
   JvmtiExport::set_can_force_early_return(avail.can_force_early_return);
   JvmtiExport::set_can_support_virtual_threads(avail.can_support_virtual_threads);
-  JvmtiExport::set_can_support_continuations(avail.can_support_continuations);
   JvmtiExport::set_should_clean_up_heap_objects(avail.can_generate_breakpoint_events);
   JvmtiExport::set_can_get_owned_monitor_info(avail.can_get_owned_monitor_info ||
                                               avail.can_get_owned_monitor_stack_depth_info);
@@ -472,8 +469,6 @@ void JvmtiManageCapabilities:: print(const jvmtiCapabilities* cap) {
     log_trace(jvmti)("can_generate_early_class_hook_events");
   if (cap->can_support_virtual_threads)
     log_trace(jvmti)("can_support_virtual_threads");
-  if (cap->can_support_continuations)
-    log_trace(jvmti)("can_support_continuations");
 }
 
 #endif

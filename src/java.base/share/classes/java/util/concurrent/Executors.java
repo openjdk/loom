@@ -306,13 +306,13 @@ public class Executors {
      *
      * <p> This method is equivalent to creating an Executor with the {@link
      * #newThreadExecutor(ThreadFactory)} method and specifying a ThreadFactory
-     * created with {@code Thread.builder().virtual().factory()}.
+     * created with {@code Thread.ofVirtual().factory()}.
      *
      * @return a newly created executor
      * @since 99
      */
     public static ExecutorService newVirtualThreadExecutor() {
-        ThreadFactory factory = Thread.builder().virtual().factory();
+        ThreadFactory factory = Thread.ofVirtual().factory();
         return new ThreadExecutor(factory, null, false);
     }
 
@@ -322,7 +322,7 @@ public class Executors {
      *
      * <p> This method is equivalent to creating an Executor with the {@link
      * #newThreadExecutor(ThreadFactory, Instant)} method and specifying a
-     * ThreadFactory created with {@code Thread.builder().virtual().factory()}.
+     * ThreadFactory created with {@code Thread.ofVirtual().factory()}.
      *
      * @param deadline the deadline
      * @return a newly created executor
@@ -331,7 +331,7 @@ public class Executors {
      */
     public static ExecutorService newVirtualThreadExecutor(Instant deadline) {
         Objects.requireNonNull(deadline);
-        ThreadFactory factory = Thread.builder().virtual().factory();
+        ThreadFactory factory = Thread.ofVirtual().factory();
         return new ThreadExecutor(factory, deadline, false);
     }
 

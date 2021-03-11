@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,6 +31,20 @@
 #include "SDE.h"
 
 static jrawMonitorID stepLock;
+
+static jint
+getFrameCount(jthread thread)
+{
+    jint count = 0;
+    jvmtiError error;
+
+    error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameCount)
+                    (gdata->jvmti, thread, &count);
+    if (error != JVMTI_ERROR_NONE) {
+        EXIT_ERROR(error, "getting frame count");
+    }
+    return count;
+}
 
 /*
  * Most enabling/disabling of JVMTI events happens implicitly through
@@ -70,14 +84,6 @@ disableStepping(jthread thread)
     if (error != JVMTI_ERROR_NONE) {
         EXIT_ERROR(error, "disabling single step");
     }
-}
-
-void stepControl_enableStepping(jthread thread) {
-  enableStepping(thread);
-}
-
-void stepControl_disableStepping(jthread thread) {
-  disableStepping(thread);
 }
 
 static jvmtiError
@@ -167,7 +173,7 @@ initState(JNIEnv *env, jthread thread, StepRequest *step)
     step->fromLine = -1;
     step->fromNative = JNI_FALSE;
     step->frameExited = JNI_FALSE;
-    step->fromStackDepth = getThreadFrameCount(thread);
+    step->fromStackDepth = getFrameCount(thread);
 
     if (step->fromStackDepth <= 0) {
         /*
@@ -275,7 +281,7 @@ handleFramePopEvent(JNIEnv *env, EventInfo *evinfo,
         jint fromDepth;
         jint afterPopDepth;
 
-        currentDepth = getThreadFrameCount(thread);
+        currentDepth = getFrameCount(thread);
         fromDepth = step->fromStackDepth;
         afterPopDepth = currentDepth-1;
 
@@ -344,19 +350,12 @@ handleFramePopEvent(JNIEnv *env, EventInfo *evinfo,
                  * Resume stepping in the original frame.
                  */
                 LOG_STEP(("handleFramePopEvent: starting singlestep, have methodEnter handler && depth==INTO && fromDepth >= afterPopDepth (%d>=%d)", fromDepth, afterPopDepth));
+                enableStepping(thread);
+                (void)eventHandler_free(step->methodEnterHandlerNode);
+                step->methodEnterHandlerNode = NULL;
             } else {
-                /*
-                 * The only way this should happen is if FramePop events were enabled to
-                 * support a CONTINUATION_RUN event while doing a STEP_INTO. See
-                 * stepControl_handleContinuationRun(). Resume stepping in the current frame.
-                 * If it is not the correct frame to resume stepping in, then handleStep()
-                 * will disable single stepping and setup another FramePop request.
-                 */
                 LOG_STEP(("handleFramePopEvent: starting singlestep, have methodEnter handler && depth==INTO && fromDepth < afterPopDepth (%d<%d)", fromDepth, afterPopDepth));
             }
-            enableStepping(thread);
-            (void)eventHandler_free(step->methodEnterHandlerNode);
-            step->methodEnterHandlerNode = NULL;
         }
         LOG_STEP(("handleFramePopEvent: finished"));
     }
@@ -384,7 +383,7 @@ handleExceptionCatchEvent(JNIEnv *env, EventInfo *evinfo,
          *  Determine where we are on the call stack relative to where
          *  we started.
          */
-        jint currentDepth = getThreadFrameCount(thread);
+        jint currentDepth = getFrameCount(thread);
         jint fromDepth = step->fromStackDepth;
 
         LOG_STEP(("handleExceptionCatchEvent: fromDepth=%d, currentDepth=%d",
@@ -484,54 +483,6 @@ handleMethodEnterEvent(JNIEnv *env, EventInfo *evinfo,
     stepControl_unlock();
 }
 
-void
-stepControl_handleContinuationRun(JNIEnv *env, jthread thread, StepRequest *step)
-{
-    stepControl_lock();
-    if (step->methodEnterHandlerNode != NULL) {
-        /*
-         * Looks like we were doing a single step INTO with filtering enabled, so a MethodEntry
-         * handler was installed to detect when we enter an unfiltered method. It's possible
-         * that the continuation method we are resuming execution in is unfiltered, but there
-         * will be no MethodEntry event for it. So we fake one here so the single stepping
-         * state is udpated appropriately.
-         */
-        jboolean steppingEnabled;
-        jclass clazz;
-        jmethodID method;
-        jlocation location;
-        jvmtiError error;
-
-        JDI_ASSERT(step->depth == JDWP_STEP_DEPTH(INTO));
-
-        /*
-         * We leverage the existing MethodEnter handler support for this, but it needs to know
-         * the location of the MethodEnter, so we get this from the current frame.
-         */
-        error = getFrameLocation(thread, &clazz, &method, &location);
-        if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error, "getting frame location");
-        }
-        steppingEnabled = methodEnterHelper(env, thread, step, clazz, method);
-
-        if (!steppingEnabled) {
-            /*
-             * It looks like the continuation is resuming in a filtered method. We need to setup
-             * a FramePop request on the current frame, so when it exits we can check if the
-             * method we return to is filtered, and enable single stepping if not.
-             */
-            error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)
-                (gdata->jvmti, thread, 0);
-            if (error == JVMTI_ERROR_DUPLICATE) {
-                error = JVMTI_ERROR_NONE;
-            } else if (error != JVMTI_ERROR_NONE) {
-                EXIT_ERROR(error, "setting up notify frame pop");
-            }
-        }
-    }
-    stepControl_unlock();
-}
-
 static void
 completeStep(JNIEnv *env, jthread thread, StepRequest *step)
 {
@@ -611,7 +562,7 @@ stepControl_handleStep(JNIEnv *env, jthread thread,
      *  Determine where we are on the call stack relative to where
      *  we started.
      */
-    currentDepth = getThreadFrameCount(thread);
+    currentDepth = getFrameCount(thread);
     fromDepth = step->fromStackDepth;
 
     if (fromDepth > currentDepth) {
@@ -653,7 +604,7 @@ stepControl_handleStep(JNIEnv *env, jthread thread,
                                 "installing event method enter handler");
                 }
             }
-            LOG_STEP(("stepControl_handleStep: NotifyFramePop, (fromDepth currentDepth)(%d %d) ",
+            LOG_STEP(("stepControl_handleStep: NotifyFramePop (fromDepth=%d currentDepth=%d)",
                       fromDepth, currentDepth));
 
             error = JVMTI_FUNC_PTR(gdata->jvmti,NotifyFramePop)

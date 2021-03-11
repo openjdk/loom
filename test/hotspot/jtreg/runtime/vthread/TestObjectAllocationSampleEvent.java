@@ -34,10 +34,8 @@ import jdk.jfr.consumer.RecordingStream;
  */
 public class TestObjectAllocationSampleEvent {
 
-
     public static void main(String... args) throws Exception {
-        Thread thread = Thread.builder().task(new Task()).virtual().build();
-        thread.start();
+        Thread thread = Thread.ofVirtual().start(new Task());
         thread.join();
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -46,7 +46,12 @@ class EPollPoller extends Poller {
     }
 
     @Override
-    protected void implRegister(int fdVal) throws IOException {
+    int fdVal() {
+        return epfd;
+    }
+
+    @Override
+    void implRegister(int fdVal) throws IOException {
         // re-arm
         int err = EPoll.ctl(epfd, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
         if (err == ENOENT)
@@ -56,24 +61,21 @@ class EPollPoller extends Poller {
     }
 
     @Override
-    protected void implDeregister(int fdVal) {
+    void implDeregister(int fdVal) {
         EPoll.ctl(epfd, EPOLL_CTL_DEL, fdVal, 0);
     }
 
     @Override
-    public void run() {
-        try {
-            for (;;) {
-                int n = EPoll.wait(epfd, address, MAX_EVENTS_TO_POLL, -1);
-                while (n-- > 0) {
-                    long eventAddress = EPoll.getEvent(address, n);
-                    int fdVal = EPoll.getDescriptor(eventAddress);
-                    polled(fdVal);
-                }
-            }
-        } catch (Throwable t) {
-            t.printStackTrace();
+    int poll(int timeout) throws IOException {
+        int n = EPoll.wait(epfd, address, MAX_EVENTS_TO_POLL, timeout);
+        int i = 0;
+        while (i < n) {
+            long eventAddress = EPoll.getEvent(address, i);
+            int fdVal = EPoll.getDescriptor(eventAddress);
+            polled(fdVal);
+            i++;
         }
+        return n;
     }
 }
 

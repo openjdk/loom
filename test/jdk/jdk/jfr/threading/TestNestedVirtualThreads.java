@@ -29,9 +29,9 @@ public class TestNestedVirtualThreads {
     public static void main(String... args) throws Exception {
         try (Recording r = new Recording()) {
             r.start();
-            ThreadFactory factory1 = Thread.builder().virtual().factory();
+            ThreadFactory factory1 = Thread.ofVirtual().factory();
             Thread vt1 = factory1.newThread(() -> {
-                ThreadFactory factory2 = Thread.builder().virtual().factory();
+                ThreadFactory factory2 = Thread.ofVirtual().factory();
                 Thread vt2 = factory2.newThread(() -> {
                     NestedEvent event = new NestedEvent();
                     event.commit();

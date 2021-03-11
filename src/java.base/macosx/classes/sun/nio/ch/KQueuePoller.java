@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -44,30 +44,32 @@ class KQueuePoller extends Poller {
     }
 
     @Override
-    protected void implRegister(int fdVal) throws IOException {
+    int fdVal() {
+        return kqfd;
+    }
+
+    @Override
+    void implRegister(int fdVal) throws IOException {
         int err = KQueue.register(kqfd, fdVal, filter, (EV_ADD|EV_ONESHOT));
         if (err != 0)
             throw new IOException("kevent failed: " + err);
     }
 
     @Override
-    protected void implDeregister(int fdVal) {
+    void implDeregister(int fdVal) {
         KQueue.register(kqfd, fdVal, filter, EV_DELETE);
     }
 
     @Override
-    public void run() {
-        try {
-            for (;;) {
-                int n = KQueue.poll(kqfd, address, MAX_EVENTS_TO_POLL, -1L);
-                while (n-- > 0) {
-                    long keventAddress = KQueue.getEvent(address, n);
-                    int fdVal = KQueue.getDescriptor(keventAddress);
-                    polled(fdVal);
-                }
-            }
-        } catch (Throwable t) {
-            t.printStackTrace();
+    int poll(int timeout) throws IOException {
+        int n = KQueue.poll(kqfd, address, MAX_EVENTS_TO_POLL, timeout);
+        int i = 0;
+        while (i < n) {
+            long keventAddress = KQueue.getEvent(address, i);
+            int fdVal = KQueue.getDescriptor(keventAddress);
+            polled(fdVal);
+            i++;
         }
+        return n;
     }
 }

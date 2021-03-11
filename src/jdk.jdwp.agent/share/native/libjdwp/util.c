@@ -826,69 +826,6 @@ fieldSignature(jclass clazz, jfieldID field,
     return error;
 }
 
-/**
- * Return vthread that is running on specified thread (must be inside a WITH_LOCAL_REFS)
- */
-jthread
-getThreadVThread(jthread thread)
-{
-    jthread vthread;
-    jvmtiError error;
-
-    JDI_ASSERT(gdata->vthreadsSupported);
-    if ( thread == NULL ) {
-        return NULL;
-    }
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetVirtualThread)
-        (gdata->jvmti, thread, &vthread);
-    if ( error != JVMTI_ERROR_NONE ) {
-        EXIT_ERROR(error,"Error calling GetVirtualThread()");
-        return JNI_FALSE;
-    }
-    return vthread;
-}
-
-/**
- * Return thread that specified vthread is running on (must be inside a WITH_LOCAL_REFS)
- */
-jthread
-getVThreadThread(jthread vthread)
-{
-    jthread thread;
-    jvmtiError error;
-
-    JDI_ASSERT(gdata->vthreadsSupported);
-    if ( vthread == NULL ) {
-        return NULL;
-    }
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetCarrierThread)
-        (gdata->jvmti, vthread, &thread);
-    if ( error != JVMTI_ERROR_NONE ) {
-        EXIT_ERROR(error,"Error calling GetCarrierThread()");
-        return NULL;
-    }
-    return thread;
-}
-
-/*
- * vthread fixme: This was moved here from stepControl.c because it is now also called
- * from threadControl.c. However, the need to call it from there may go away. If it does,
- * move this code back to stepControl.c.
- */
-jint
-getThreadFrameCount(jthread thread)
-{
-    jint count = 0;
-    jvmtiError error;
-
-    error = JVMTI_FUNC_PTR(gdata->jvmti,GetFrameCount)
-                    (gdata->jvmti, thread, &count);
-    if (error != JVMTI_ERROR_NONE) {
-        EXIT_ERROR(error, "getting frame count");
-    }
-    return count;
-}
-
 JNIEnv *
 getEnv(void)
 {
@@ -2023,10 +1960,6 @@ eventIndexInit(void)
     index2jvmti[EI_VM_DEATH           -EI_min] = JVMTI_EVENT_VM_DEATH;
     index2jvmti[EI_VIRTUAL_THREAD_SCHEDULED    -EI_min] = JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED;
     index2jvmti[EI_VIRTUAL_THREAD_TERMINATED   -EI_min] = JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED;
-    index2jvmti[EI_VIRTUAL_THREAD_MOUNTED      -EI_min] = JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED;
-    index2jvmti[EI_VIRTUAL_THREAD_UNMOUNTED    -EI_min] = JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED;
-    index2jvmti[EI_CONTINUATION_RUN   -EI_min] = JVMTI_EVENT_CONTINUATION_RUN;
-    index2jvmti[EI_CONTINUATION_YIELD -EI_min] = JVMTI_EVENT_CONTINUATION_YIELD;
 
     index2jdwp[EI_SINGLE_STEP         -EI_min] = JDWP_EVENT(SINGLE_STEP);
     index2jdwp[EI_BREAKPOINT          -EI_min] = JDWP_EVENT(BREAKPOINT);
@@ -2051,12 +1984,6 @@ eventIndexInit(void)
     /* Just map VIRTUAL_THREAD_SCHEDULED/TERMINATED to THREAD_START/END. */
     index2jdwp[EI_VIRTUAL_THREAD_SCHEDULED     -EI_min] = JDWP_EVENT(THREAD_START);
     index2jdwp[EI_VIRTUAL_THREAD_TERMINATED    -EI_min] = JDWP_EVENT(THREAD_END);
-    /* vthread fixme: these don't actually map to anything in JDWP. Need a way to make them
-     * produce an error if referenced. */
-    index2jdwp[EI_VIRTUAL_THREAD_MOUNTED       -EI_min] = -1;
-    index2jdwp[EI_VIRTUAL_THREAD_UNMOUNTED     -EI_min] = -1;
-    index2jdwp[EI_CONTINUATION_RUN    -EI_min] = -1;
-    index2jdwp[EI_CONTINUATION_YIELD  -EI_min] = -1;
 }
 
 jdwpEvent
@@ -2127,14 +2054,6 @@ eventIndex2EventName(EventIndex ei)
             return "EI_VIRTUAL_THREAD_SCHEDULED";
         case EI_VIRTUAL_THREAD_TERMINATED:
             return "EI_VIRTUAL_THREAD_TERMINATED";
-        case EI_VIRTUAL_THREAD_MOUNTED:
-            return "EI_VIRTUAL_THREAD_MOUNTED";
-        case EI_VIRTUAL_THREAD_UNMOUNTED:
-            return "EI_VIRTUAL_THREAD_UNMOUNTED";
-        case EI_CONTINUATION_RUN:
-            return "EI_CONTINUATION_RUN";
-        case EI_CONTINUATION_YIELD:
-            return "EI_CONTINUATION_YIELD";
         default:
             JDI_ASSERT(JNI_FALSE);
             return "Bad EI";
@@ -2253,15 +2172,6 @@ jvmti2EventIndex(jvmtiEvent kind)
             return EI_VIRTUAL_THREAD_SCHEDULED;
         case JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED:
             return EI_VIRTUAL_THREAD_TERMINATED;
-        case JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED:
-            return EI_VIRTUAL_THREAD_MOUNTED;
-        case JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED:
-            return EI_VIRTUAL_THREAD_UNMOUNTED;
-        /* continuation events */
-        case JVMTI_EVENT_CONTINUATION_RUN:
-            return EI_CONTINUATION_RUN;
-        case JVMTI_EVENT_CONTINUATION_YIELD:
-            return EI_CONTINUATION_YIELD;
 
         default:
             EXIT_ERROR(AGENT_ERROR_INVALID_INDEX,"JVMTI to EventIndex mapping");

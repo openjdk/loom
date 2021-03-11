@@ -4,6 +4,7 @@ runtime/Metaspace/DefineClass.java                                              
 runtime/logging/TestMethodHandlesVerbose.java                                                   8253907 windows-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorArrayAllSampledTest.java                  8253617 generic-all
 compiler/jsr292/TestArrayReturnType.java                                                        8255197 generic-all
+runtime/exceptionMsgs/AbstractMethodError/AbstractMethodErrorTest.java                          8262400 generic-all
 
 # Issues caused a lot of test failures
 
@@ -15,8 +16,9 @@ vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                  
 gc/cslocker/TestCSLocker.java                                                                   8254852 generic-all
 
 gc/g1/humongousObjects/TestNoAllocationsInHRegions.java                                         8241630 generic-all
+gc/g1/TestGreyReclaimedHumongousObjects.java                                                    8241630 generic-all
 vmTestbase/gc/memory/Churn/Churn4/Churn4.java                                                   8241630 generic-all
-vmTestbase/gc/memory/UniThread/Linear1/Linear1.java	                                        8241630 generic-all
+vmTestbase/gc/memory/UniThread/Linear1/Linear1.java                                             8241630 generic-all
 vmTestbase/gc/memory/UniThread/Linear2/Linear2.java                                             8241630 generic-all
 vmTestbase/gc/gctests/RememberedSet/RememberedSet.java                                          8241630 generic-all
 
@@ -57,14 +59,6 @@ runtime/Nestmates/membership/TestNestmateMembership.java                        
 ####
 # Virtual thread/Continuation tests
 
-serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id1
-serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id0
-serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
-serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
-serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java
-serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java
-serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java
-
 serviceability/jvmti/events/Breakpoint/breakpoint01/breakpoint01.java
 serviceability/jvmti/events/ClassLoad/classload01/classload01.java
 serviceability/jvmti/events/ClassPrepare/classprep01/classprep01.java
@@ -99,6 +93,60 @@ serviceability/jvmti/events/ThreadStart/threadstart01/threadstart01.java
 serviceability/jvmti/events/ThreadStart/threadstart02/threadstart02.java
 serviceability/jvmti/events/ThreadStart/threadstart03/threadstart03.java
 serviceability/jvmti/events/VMObjectAlloc/vmobjalloc01/vmobjalloc01.java
+
+serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java
+serviceability/jvmti/stress/StackTrace/Suspended/GetStackTraceSuspendedStressTest.java
+serviceability/jvmti/stress/ThreadLocalStorage/SetGetThreadLocalStorageStressTest/SetGetThreadLocalStorageStressTest.java
+
+serviceability/jvmti/thread/GetThreadState/thrstat01/thrstat01.java
+serviceability/jvmti/thread/GetThreadState/thrstat03/thrstat03.java
+serviceability/jvmti/thread/GetThreadState/thrstat04/thrstat04.java
+serviceability/jvmti/thread/GetThreadState/thrstat05/thrstat05.java
+serviceability/jvmti/thread/GetThreadState/thrstat02/thrstat02.java
+serviceability/jvmti/thread/GetFrameCount/framecnt01/framecnt01.java
+serviceability/jvmti/thread/GetFrameCount/framecnt02/framecnt02.java
+serviceability/jvmti/thread/GetFrameCount/framecnt03/framecnt03.java
+serviceability/jvmti/thread/GetFrameLocation/frameloc01/frameloc01.java
+serviceability/jvmti/thread/GetFrameLocation/frameloc02/frameloc02.java
+serviceability/jvmti/thread/GetFrameLocation/frameloc03/frameloc03.java
+serviceability/jvmti/thread/GetThreadInfo/thrinfo02/thrinfo02.java
+serviceability/jvmti/thread/GetThreadInfo/thrinfo01/thrinfo01.java
+serviceability/jvmti/thread/SuspendThread/suspendthrd01/suspendthrd01.java
+serviceability/jvmti/thread/SuspendThread/suspendthrd03/suspendthrd03.java
+serviceability/jvmti/thread/SuspendThread/suspendthrd02/suspendthrd02.java
+serviceability/jvmti/thread/ResumeThreadList/resumethrdlst02/resumethrdlst02.java
+serviceability/jvmti/thread/ResumeThreadList/resumethrdlst01/resumethrdlst01.java
+serviceability/jvmti/thread/SuspendThreadList/suspendthrdlst02/suspendthrdlst02.java
+serviceability/jvmti/thread/SuspendThreadList/suspendthrdlst01/suspendthrdlst01.java
+serviceability/jvmti/thread/GetAllThreads/allthr01/allthr01.java
+serviceability/jvmti/thread/GetAllThreads/allthr02/allthr02.java
+serviceability/jvmti/thread/ResumeThread/resumethrd02/resumethrd02.java
+serviceability/jvmti/thread/ResumeThread/resumethrd01/resumethrd01.java
+serviceability/jvmti/thread/GetStackTrace/getstacktr06/getstacktr06.java
+serviceability/jvmti/thread/GetStackTrace/getstacktr01/getstacktr01.java
+serviceability/jvmti/thread/GetStackTrace/getstacktr08/getstacktr08.java
+serviceability/jvmti/thread/GetStackTrace/getstacktr09/getstacktr09.java
+serviceability/jvmti/thread/GetStackTrace/getstacktr07/getstacktr07.java
+serviceability/jvmti/thread/GetStackTrace/getstacktr02/getstacktr02.java
+serviceability/jvmti/thread/GetStackTrace/getstacktr05/getstacktr05.java
+serviceability/jvmti/thread/GetStackTrace/getstacktr04/getstacktr04.java
+serviceability/jvmti/thread/GetStackTrace/getstacktr03/getstacktr03.java
+
+serviceability/jvmti/vthread/BreakpointInYieldTest/BreakpointInYieldTest.java
+serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java
+serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
+serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java
+serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
+serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java
+serviceability/jvmti/vthread/MethodExitTest/MethodExitTest.java
+serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java
+serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java
+serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java
+serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java
+serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id0
+serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id1
+serviceability/jvmti/vthread/VThreadUnsupportedTest/VThreadUnsupportedTest.java
+serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java
 
 ####
 # JVMTI tests failing to find thread
@@ -152,6 +200,7 @@ runtime/Dictionary/ProtectionDomainCacheTest.java
 serviceability/sa/ClhsdbCDSCore.java
 serviceability/logging/TestLogRotation.java
 compiler/c2/Test8062950.java
+serviceability/sa/TestObjectMonitorIterate.java
 
 ####
 ## Fails when run even in new kernel thread
@@ -350,130 +399,6 @@ vmTestbase/nsk/jvmti/GetFrameLocation/frameloc002/TestDescription.java
 
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
 vmTestbase/nsk/jdi/ThreadStartEvent/thread/thread001/TestDescription.java
-
-
-####
-## Requires "main" to be a in a list of all threads (failed to find it in all threads, check "main" with breakpoint event's thread, etc)
-
-vmTestbase/nsk/jdi/BreakpointEvent/_itself_/breakpoint001/TestDescription.java
-vmTestbase/nsk/jdi/ClassPrepareEvent/referenceType/refType001/TestDescription.java
-vmTestbase/nsk/jdi/ClassPrepareEvent/thread/thread001/TestDescription.java
-vmTestbase/nsk/jdi/ClassPrepareRequest/addSourceNameFilter/addSourceNameFilter002/addSourceNameFilter002.java
-vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod007/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod009/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod010/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod011/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod012/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod013/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod014/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/newInstance/newinstance007/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/newInstance/newinstance009/TestDescription.java
-vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq001/TestDescription.java
-vmTestbase/nsk/jdi/EventRequestManager/_bounds_/requests001/TestDescription.java
-vmTestbase/nsk/jdi/EventRequestManager/createStepRequest/crstepreq001/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/eventIterator/eventiterator002/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume001/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume002/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume003/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume004/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume005/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume006/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume007/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume010/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume011/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume012/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/resume/resume013/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy001/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy002/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy003/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy004/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy005/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy006/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy007/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy008/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy009/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy010/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy011/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy012/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy013/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy014/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy015/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy016/TestDescription.java
-vmTestbase/nsk/jdi/EventSet/suspendPolicy/suspendpolicy017/TestDescription.java
-vmTestbase/nsk/jdi/ReferenceType/defaultStratum/defaultStratum003/defaultStratum003.java
-vmTestbase/nsk/jdi/ReferenceType/defaultStratum/defaultStratum004/defaultStratum004.java
-vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location001/TestDescription.java
-vmTestbase/nsk/jdi/ExceptionEvent/exception/exception001/TestDescription.java
-vmTestbase/nsk/jdi/Method/isObsolete/isobsolete001/TestDescription.java
-vmTestbase/nsk/jdi/Method/isObsolete/isobsolete002/TestDescription.java
-vmTestbase/nsk/jdi/Method/isObsolete/isobsolete003/TestDescription.java
-vmTestbase/nsk/jdi/MethodEntryEvent/method/method001/TestDescription.java
-vmTestbase/nsk/jdi/MethodEntryEvent/method/method002/TestDescription.java
-vmTestbase/nsk/jdi/MethodExitEvent/method/method001/TestDescription.java
-vmTestbase/nsk/jdi/MethodExitEvent/method/method002/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod002/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod003/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod004/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod005/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod006/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod007/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod008/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod009/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod010/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod011/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod012/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod013/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod014/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/entryCount/entrycount002/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/owningThread/owningthread002/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/setValue/setvalue002/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/setValue/setvalue003/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/setValue/setvalue004/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/setValue/setvalue005/TestDescription.java
-vmTestbase/nsk/jdi/ReferenceType/sourceName/sourcename004/TestDescription.java
-vmTestbase/nsk/jdi/ReferenceType/sourceNames/sourcenames002/TestDescription.java
-vmTestbase/nsk/jdi/StackFrame/_bounds_/bounds002/TestDescription.java
-vmTestbase/nsk/jdi/StackFrame/getValue/getvalue003/TestDescription.java
-vmTestbase/nsk/jdi/StackFrame/getValues/getvalues003/TestDescription.java
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue005/setvalue005.java
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue006/setvalue006.java
-vmTestbase/nsk/jdi/StepEvent/_itself_/stepEvent003/stepEvent003.java
-vmTestbase/nsk/jdi/StepEvent/_itself_/stepEvent004/stepEvent004.java
-vmTestbase/nsk/jdi/StepEvent/_itself_/stepevent001/TestDescription.java
-vmTestbase/nsk/jdi/StepRequest/_bounds_/filters001/TestDescription.java
-vmTestbase/nsk/jdi/ThreadDeathRequest/addThreadFilter/addthreadfilter002/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/_bounds_/bounds001/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/currentContendedMonitor/currentcm001/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/isSuspended/issuspended001/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/isSuspended/issuspended002/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/isSuspended/issuspended003/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/isSuspended/issuspended004/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/ownedMonitors/ownedmonitors001/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/ownedMonitors/ownedmonitors002/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/stop/stop002/TestDescription.java
-vmTestbase/nsk/jdi/ThreadStartRequest/addThreadFilter/addthreadfilter002/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/canGetCurrentContendedMonitor/cangccm001/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/canGetOwnedMonitorInfo/cangetinfo001/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/dispose/dispose004/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses012/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses013/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses014/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses015/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses016/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses020/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses022/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses024/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses025/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses026/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses027/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses028/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses030/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses031/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses032/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/setDefaultStratum/setDefaultStratum003/setDefaultStratum003.java
-vmTestbase/nsk/jdi/VirtualMachine/suspend/suspend001/TestDescription.java
-vmTestbase/nsk/jdi/WatchpointEvent/object/object001/TestDescription.java
-
 
 ####
 ## Requires communicationBreakpoint to be sent to "main"

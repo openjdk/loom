@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,6 +32,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.LockSupport;
 
 import org.testng.annotations.Test;
@@ -118,16 +119,19 @@ public class Reflection {
     public void testInvokeStatic6() throws Exception {
         Method parkMethod = Parker.class.getDeclaredMethod("park");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread vthread = Thread.builder().virtual(scheduler).task(() -> {
+            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+
+            Thread vthread = factory.newThread(() -> {
                 try {
                     parkMethod.invoke(null);   // blocks
                 } catch (Exception e) { }
-            }).start();
+            });
+            vthread.start();
 
             Thread.sleep(100); // give thread time to be scheduled
 
             // unpark with another virtual thread, runs on same carrier thread
-            Thread.builder().virtual(scheduler).task(() -> LockSupport.unpark(vthread));
+            factory.newThread(() -> LockSupport.unpark(vthread)).start();
         }
     }
 
@@ -254,16 +258,19 @@ public class Reflection {
     public void testNewInstance6() throws Exception {
         Constructor<?> ctor = Parker.class.getDeclaredConstructor();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread vthread = Thread.builder().virtual(scheduler).task(() -> {
+            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+
+            Thread vthread = factory.newThread(() -> {
                 try {
                     ctor.newInstance();
                 } catch (Exception e) { }
-            }).start();
+            });
+            vthread.start();
 
             Thread.sleep(100); // give thread time to be scheduled
 
             // unpark with another virtual thread, runs on same carrier thread
-            Thread.builder().virtual(scheduler).task(() -> LockSupport.unpark(vthread));
+            factory.newThread(() -> LockSupport.unpark(vthread)).start();
         }
     }
 

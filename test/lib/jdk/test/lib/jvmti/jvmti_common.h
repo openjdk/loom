@@ -30,6 +30,12 @@
 #include <string.h>
 #include <ctype.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 #define NSK_TRUE 1
 #define NSK_FALSE 0
 
@@ -43,9 +49,11 @@
 #define NSK_COMPLAIN1 printf
 #define NSK_COMPLAIN3 printf
 
-extern "C" {
+const char* TranslateState(jint flags);
+const char* TranslateError(jvmtiError err);
 
-char *jlong_to_string(jlong value, char *string) {
+char*
+jlong_to_string(jlong value, char *string) {
   char buffer[32];
   char *pbuf, *pstr;
 
@@ -71,9 +79,17 @@ char *jlong_to_string(jlong value, char *string) {
   return string;
 }
 
-static void check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
+static void
+fatal(JNIEnv* jni, const char* msg) {
+  jni->FatalError(msg);
+  fflush(stdout);
+}
+
+
+static void
+check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
   if (err != JVMTI_ERROR_NONE) {
-    printf("check_jvmti_status: JVMTI function returned error: %d\n", err);
+    printf("check_jvmti_status: JVMTI function returned error: %s (%d)\n", TranslateError(err), err);
     jni->FatalError(msg);
   }
 }
@@ -81,7 +97,8 @@ static void check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
 /* JVMTI helper wrappers. Check errors and fail or return null if jvmti operation failed. */
 
 // Monitors often created in Agent_Initialize(..) where JNIEnv* jni doesn't exist.
-jrawMonitorID CreateRawMonitor(jvmtiEnv *jvmti, const char* name) {
+jrawMonitorID
+create_raw_monitor(jvmtiEnv *jvmti, const char* name) {
   jrawMonitorID lock;
   jvmtiError err;
   err = jvmti->CreateRawMonitor(name, &lock);
@@ -91,23 +108,228 @@ jrawMonitorID CreateRawMonitor(jvmtiEnv *jvmti, const char* name) {
   return lock;
 }
 
-void RawMonitorEnter(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
-  check_jvmti_status(jni, jvmti->RawMonitorEnter(lock), "Fatal Error in RawMonitorEnter.");
+class RawMonitorLocker {
+ private:
+  jvmtiEnv* _jvmti;
+  JNIEnv* _jni;
+  jrawMonitorID _monitor;
+ public:
+  RawMonitorLocker(jvmtiEnv *jvmti,JNIEnv* jni, jrawMonitorID monitor):_jvmti(jvmti), _jni(jni), _monitor(monitor) {
+    check_jvmti_status(_jni, _jvmti->RawMonitorEnter(_monitor), "Fatal Error in RawMonitorEnter.");
+  }
+  ~RawMonitorLocker() {
+    check_jvmti_status(_jni, _jvmti->RawMonitorExit(_monitor), "Fatal Error in RawMonitorEnter.");
+
+  }
+
+  void wait(jlong millis) {
+    check_jvmti_status(_jni, _jvmti->RawMonitorWait(_monitor, millis), "Fatal Error in RawMonitorWait.");
+  }
+
+  void wait() {
+    wait(0);
+  }
+
+  void notify() {
+    check_jvmti_status(_jni, _jvmti->RawMonitorNotify(_monitor), "Fatal Error in RawMonitorNotify.");
+  }
+
+  void notify_all() {
+    check_jvmti_status(_jni, _jvmti->RawMonitorNotifyAll(_monitor), "Fatal Error in RawMonitorNotifyAll.");
+  }
+
+};
+
+
+static void
+deallocate(jvmtiEnv *jvmti, JNIEnv* jni, void* ptr) {
+  jvmtiError err;
+
+  err = jvmti->Deallocate((unsigned char*)ptr);
+  check_jvmti_status(jni, err, "deallocate: error in JVMTI Deallocate call");
 }
 
-void RawMonitorExit(JNIEnv* jni, jvmtiEnv *jvmti, jrawMonitorID lock) {
-  check_jvmti_status(jni, jvmti->RawMonitorExit(lock), "Fatal Error in RawMonitorEnter.");
+
+static char*
+get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
+  jclass klass = NULL;
+  char*  cname = NULL;
+  char*  result = NULL;
+  jvmtiError err;
+
+  err = jvmti->GetMethodDeclaringClass(method, &klass);
+  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetMethodDeclaringClass");
+
+  err = jvmti->GetClassSignature(klass, &cname, NULL);
+  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI GetClassSignature");
+
+  size_t len = strlen(cname) - 2; // get rid of leading 'L' and trailing ';'
+
+  err = jvmti->Allocate((jlong)(len + 1), (unsigned char**)&result);
+  check_jvmti_status(jni, err, "get_method_class_name: error in JVMTI Allocate");
+
+  strncpy(result, cname + 1, len); // skip leading 'L'
+  result[len] = '\0';
+  return result;
 }
 
-void print_thread_info(JNIEnv* jni, jvmtiEnv *jvmti, jthread thread_obj) {
+
+static void
+print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
+  char*  cname = NULL;
+  char*  mname = NULL;
+  char*  msign = NULL;
+  jvmtiError err;
+
+  cname = get_method_class_name(jvmti, jni, method);
+
+  err = jvmti->GetMethodName(method, &mname, &msign, NULL);
+  check_jvmti_status(jni, err, "print_method: error in JVMTI GetMethodName");
+
+  printf("%2d: %s: %s%s\n", depth, cname, mname, msign);
+  fflush(0);
+}
+
+void
+print_thread_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread_obj) {
   jvmtiThreadInfo thread_info;
+  jint thread_state;
   check_jvmti_status(jni, jvmti->GetThreadInfo(thread_obj, &thread_info), "Error in GetThreadInfo");
-  printf("Thread: %p, name: %s, attrs: %s %s\n", thread_obj, thread_info.name,
+  check_jvmti_status(jni, jvmti->GetThreadState(thread_obj, &thread_state), "Error in GetThreadInfo");
+  const char* state = TranslateState(thread_state);
+  printf("Thread: %p, name: %s, state: %s, attrs: %s %s\n", thread_obj, thread_info.name, TranslateState(thread_state),
          (jni->IsVirtualThread(thread_obj)? "virtual": "kernel"), (thread_info.is_daemon ? "daemon": ""));
 }
 
+static void
+print_stack_trace_frames(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInfo *frames) {
+  printf("JVMTI Stack Trace: frame count: %d\n", count);
+  for (int depth = 0; depth < count; depth++) {
+    print_method(jvmti, jni, frames[depth].method, depth);
+  }
+  printf("\n");
+}
+
+static char*
+get_thread_name(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  jvmtiThreadInfo thr_info;
+  jvmtiError err;
+
+  memset(&thr_info, 0, sizeof(thr_info));
+  err = jvmti->GetThreadInfo(thread, &thr_info);
+  check_jvmti_status(jni, err, "get_thread_name: error in JVMTI GetThreadInfo call");
+
+  return thr_info.name == NULL ? (char*)"<Unnamed thread>" : thr_info.name;
+}
+
+static char*
+get_method_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
+  char*  mname = NULL;
+  jvmtiError err;
+
+  err = jvmti->GetMethodName(method, &mname, NULL, NULL);
+  check_jvmti_status(jni, err, "get_method_name: error in JVMTI GetMethodName call");
+
+  return mname;
+}
+
+
+static jclass
+find_class(jvmtiEnv *jvmti, JNIEnv *jni, jobject loader, const char* cname) {
+  jclass *classes = NULL;
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetClassLoaderClasses(loader, &count, &classes);
+  check_jvmti_status(jni, err, "find_class: error in JVMTI GetClassLoaderClasses");
+
+  // Find the jmethodID of the specified method
+  while (--count >= 0) {
+    char* name = NULL;
+    jclass klass = classes[count];
+
+    err = jvmti->GetClassSignature(klass, &name, NULL);
+    check_jvmti_status(jni, err, "find_class: error in JVMTI GetClassSignature call");
+
+    bool found = (strcmp(name, cname) == 0);
+    deallocate(jvmti, jni, (void*)name);
+    if (found) {
+      return klass;
+    }
+  }
+  return NULL;
+}
+
+static jmethodID
+find_method(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass, const char* mname) {
+  jmethodID *methods = NULL;
+  jmethodID method = NULL;
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetClassMethods(klass, &count, &methods);
+  check_jvmti_status(jni, err, "find_method: error in JVMTI GetClassMethods");
+
+  // Find the jmethodID of the specified method
+  while (--count >= 0) {
+    char* name = NULL;
+
+    jmethodID meth = methods[count];
+
+    err = jvmti->GetMethodName(meth, &name, NULL, NULL);
+    check_jvmti_status(jni, err, "find_method: error in JVMTI GetMethodName call");
+
+    bool found = (strcmp(name, mname) == 0);
+    deallocate(jvmti, jni, (void*)name);
+    if (found) {
+      method = meth;
+      break;
+    }
+  }
+  deallocate(jvmti, jni, (void*)methods);
+  return method;
+}
+
+#define MAX_FRAME_COUNT_PRINT_STACK_TRACE 200
+
+static void
+print_current_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni) {
+  jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
+  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
+
+  printf("JVMTI Stack Trace for current thread: frame count: %d\n", count);
+  for (int depth = 0; depth < count; depth++) {
+    print_method(jvmti, jni, frames[depth].method, depth);
+  }
+  printf("\n");
+}
+
+static void
+print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
+  char* tname = get_thread_name(jvmti, jni, thread);
+  jint count = 0;
+  jvmtiError err;
+
+  err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
+  check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
+
+  printf("JVMTI Stack Trace for thread %s: frame count: %d\n", tname, count);
+  for (int depth = 0; depth < count; depth++) {
+    print_method(jvmti, jni, frames[depth].method, depth);
+  }
+  deallocate(jvmti, jni, (void*)tname);
+  printf("\n");
+}
+
+
 /* Commonly used helper functions */
-const char* TranslateState(jint flags) {
+const char*
+TranslateState(jint flags) {
     static char str[15 * 20];
 
     if (flags == 0)
@@ -170,7 +392,8 @@ const char* TranslateState(jint flags) {
     return str;
 }
 
-const char* TranslateEvent(jvmtiEvent event_type) {
+const char*
+TranslateEvent(jvmtiEvent event_type) {
     switch (event_type) {
     case JVMTI_EVENT_VM_INIT:
         return ("JVMTI_EVENT_VM_INIT");
@@ -237,7 +460,8 @@ const char* TranslateEvent(jvmtiEvent event_type) {
     }
 }
 
-const char* TranslateError(jvmtiError err) {
+const char*
+TranslateError(jvmtiError err) {
     switch (err) {
     case JVMTI_ERROR_NONE:
         return ("JVMTI_ERROR_NONE");
@@ -340,7 +564,8 @@ const char* TranslateError(jvmtiError err) {
     }
 }
 
-const char* TranslatePhase(jvmtiPhase phase) {
+const char*
+TranslatePhase(jvmtiPhase phase) {
     switch (phase) {
     case JVMTI_PHASE_ONLOAD:
         return ("JVMTI_PHASE_ONLOAD");
@@ -357,7 +582,8 @@ const char* TranslatePhase(jvmtiPhase phase) {
     }
 }
 
-const char* TranslateRootKind(jvmtiHeapRootKind root) {
+const char*
+TranslateRootKind(jvmtiHeapRootKind root) {
     switch (root) {
     case JVMTI_HEAP_ROOT_JNI_GLOBAL:
         return ("JVMTI_HEAP_ROOT_JNI_GLOBAL");
@@ -378,7 +604,8 @@ const char* TranslateRootKind(jvmtiHeapRootKind root) {
     }
 }
 
-const char* TranslateObjectRefKind(jvmtiObjectReferenceKind ref) {
+const char*
+TranslateObjectRefKind(jvmtiObjectReferenceKind ref) {
     switch (ref) {
     case JVMTI_REFERENCE_CLASS:
         return ("JVMTI_REFERENCE_CLASS");
@@ -403,6 +630,84 @@ const char* TranslateObjectRefKind(jvmtiObjectReferenceKind ref) {
     }
 }
 
+int
+isThreadExpected(jvmtiEnv *jvmti, jthread thread) {
+    static const char *vm_jfr_buffer_thread_name = "VM JFR Buffer Thread";
+    static const char *jfr_request_timer_thread_name = "JFR request timer";
+    static const char *graal_management_bean_registration_thread_name =
+                                            "HotSpotGraalManagement Bean Registration";
+    static const char *graal_compiler_thread_name_prefix = "JVMCI CompilerThread";
+    static const size_t prefixLength = strlen(graal_compiler_thread_name_prefix);
+
+    jvmtiThreadInfo threadinfo;
+    jvmtiError err = jvmti->GetThreadInfo(thread, &threadinfo);
+    if (err != JVMTI_ERROR_NONE) {
+      return 0;
+    }
+
+    if (strcmp(threadinfo.name, vm_jfr_buffer_thread_name) == 0)
+        return 0;
+
+    if (strcmp(threadinfo.name, jfr_request_timer_thread_name) == 0)
+        return 0;
+
+    if (strcmp(threadinfo.name, graal_management_bean_registration_thread_name) == 0)
+        return 0;
+
+    if ((strlen(threadinfo.name) > prefixLength) &&
+         strncmp(threadinfo.name, graal_compiler_thread_name_prefix, prefixLength) == 0)
+        return 0;
+
+    return 1;
+}
+
+jthread
+nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
+  jthread* threads = NULL;
+  jint count = 0;
+  jthread foundThread = NULL;
+  int i;
+
+  if (name == NULL) {
+    return NULL;
+  }
+
+  check_jvmti_status(jni, jvmti->GetAllThreads(&count, &threads), "");
+
+  for (i = 0; i < count; i++) {
+    jvmtiThreadInfo info;
+
+    check_jvmti_status(jni, jvmti->GetThreadInfo(threads[i], &info), "");
+
+    if (info.name != NULL && strcmp(name, info.name) == 0) {
+      foundThread = threads[i];
+      break;
+    }
+  }
+
+  check_jvmti_status(jni, jvmti->Deallocate((unsigned char*)threads), "");
+
+  foundThread = (jthread) jni->NewGlobalRef(foundThread);
+  return foundThread;
+}
+
+/** Enable or disable given events. */
+int
+nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int size, jvmtiEvent list[], jthread thread) {
+  for (int i = 0; i < size; i++) {
+    check_jvmti_status(jni, jvmti->SetEventNotificationMode(enable, list[i], thread), "");
+  }
+  return NSK_TRUE;
+}
+
+void
+nsk_jvmti_sleep(jlong timeout) {
+  int seconds = (int)((timeout + 999) / 1000);
+#ifdef _WIN32
+  Sleep(1000L * seconds);
+#else
+  sleep(seconds);
+#endif
 }
 
 #endif

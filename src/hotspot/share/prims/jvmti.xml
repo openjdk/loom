@@ -2316,8 +2316,30 @@ jvmtiEnv *jvmti;
         <required id="can_support_virtual_threads"></required>
       </capabilities>
       <parameters>
+        <param id="except_count">
+          <jint min="0"/>
+          <description>
+            The number of threads in the list of threads not to be suspended.
+          </description>
+        </param>
+        <param id="except_list">
+            <inbuf incount="except_count">
+              <jthread/>
+              <nullok>not an error if <code>except_count == 0</code></nullok>
+            </inbuf>
+            <description>
+              The list of threads not to be suspended.
+            </description>
+        </param>
       </parameters>
       <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          A thread in <paramlink id="except_list"></paramlink> was invalid.
+        </error>
+        <error id="JVMTI_ERROR_NULL_POINTER">
+          Both <paramlink id="except_list"></paramlink> was <code>NULL</code>
+          and <paramlink id="except_count"></paramlink> was non-zero.
+        </error>
       </errors>
     </function>
 
@@ -2326,7 +2348,7 @@ jvmtiEnv *jvmti;
       <description>
         Resume all virtual threads except those already resumed.
         Virtual threads may be suspended with
-        <functionlink id="RsuspendAllVirtualThreads"></functionlink> or
+        <functionlink id="SuspendAllVirtualThreads"></functionlink> or
         <functionlink id="SuspendThreadList"></functionlink> or
         <functionlink id="SuspendThread"></functionlink>.
         Virtual threads that are currently resumed do not change state.
@@ -2337,8 +2359,30 @@ jvmtiEnv *jvmti;
         <required id="can_support_virtual_threads"></required>
       </capabilities>
       <parameters>
+        <param id="except_count">
+          <jint min="0"/>
+          <description>
+            The number of threads in the list of threads not to be resumed.
+          </description>
+        </param>
+        <param id="except_list">
+            <inbuf incount="except_count">
+              <jthread/>
+              <nullok>not an error if <code>except_count == 0</code></nullok>
+            </inbuf>
+            <description>
+              The list of threads not to be resumed.
+            </description>
+        </param>
       </parameters>
       <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          A thread in <paramlink id="except_list"></paramlink> was invalid.
+        </error>
+        <error id="JVMTI_ERROR_NULL_POINTER">
+          Both <paramlink id="except_list"></paramlink> was <code>NULL</code>
+          and <paramlink id="except_count"></paramlink> was non-zero.
+        </error>
       </errors>
     </function>
 
@@ -10565,14 +10609,6 @@ myInit() {
           <eventlink id="VirtualThreadUnmounted"></eventlink>.
         </description>
       </capabilityfield>
-      <capabilityfield id="can_support_continuations" since="14">
-        <description>
-          Can support continuations. If this capability is enabled then
-          the following events can be enabled:
-          <eventlink id="ContinuationRun"></eventlink> and
-          <eventlink id="ContinuationYield"></eventlink>.
-        </description>
-      </capabilityfield>
     </capabilitiestypedef>
 
     <function id="GetPotentialCapabilities" jkernel="yes" phase="onload" num="140">
@@ -13019,77 +13055,6 @@ myInit() {
       </param>
     </parameters>
   </event>
-
-  <event label="Continuation Run"
-         id="ContinuationRun" const="JVMTI_EVENT_CONTINUATION_RUN" filtered="thread" num="91" phase="start" since="14">
-    <description>
-      Continuation run events are generated before the continuation is continued execution on current thread.
-      <p/>
-      The event is sent on the <paramlink id="thread"></paramlink> the continuation is about to leave.
-    </description>
-    <origin>new</origin>
-    <capabilities>
-      <required id="can_support_continuations">Can support continuations</required>
-    </capabilities>
-    <parameters>
-      <param id="jni_env">
-        <outptr>
-          <struct>JNIEnv</struct>
-        </outptr>
-          <description>
-            The JNI environment of the event (current) thread.
-          </description>
-      </param>
-      <param id="thread">
-        <jthread/>
-          <description>
-            Thread the continuation is executed on.
-          </description>
-      </param>
-      <param id="continuation_frame_count">
-        <jint min="1"/>
-          <description>
-            Number of frames the continuation is executing.
-          </description>
-      </param>
-    </parameters>
-  </event>
-
-  <event label="Continuation Yield"
-         id="ContinuationYield" const="JVMTI_EVENT_CONTINUATION_YIELD" filtered="thread" num="92" phase="start" since="14">
-    <description>
-      Continuation yield events are generated before the continuation actually yields on current thread.
-      <p/>
-      The event is sent on the <paramlink id="thread"></paramlink> the continuation is about to leave.
-    </description>
-    <origin>new</origin>
-    <capabilities>
-      <required id="can_support_continuations">Can support continuations</required>
-    </capabilities>
-    <parameters>
-      <param id="jni_env">
-        <outptr>
-          <struct>JNIEnv</struct>
-        </outptr>
-          <description>
-            The JNI environment of the event (current) thread.
-          </description>
-      </param>
-      <param id="thread">
-        <jthread/>
-          <description>
-            Thread the continuation is executed on.
-          </description>
-      </param>
-      <param id="continuation_frame_count">
-        <jint min="1"/>
-          <description>
-            Number of frames the continuation is executing.
-          </description>
-      </param>
-    </parameters>
-  </event>
-
 
   <event label="Class Load"
          id="ClassLoad" const="JVMTI_EVENT_CLASS_LOAD" filtered="thread" phase="start" num="55">

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -81,17 +81,17 @@ public class Monitoring {
             };
 
             // start virtual thread so carrier Thread can be captured
-            Thread.builder().virtual(scheduler).task(() -> { }).start().join();
+            Thread.ofVirtual().scheduler(scheduler).start(() -> { }).join();
             Thread carrier = carrierRef.get();
             assertTrue(carrier != null && !carrier.isVirtual());
 
             try (Selector sel = Selector.open()) {
                 // start virtual thread that blocks in a native method
-                Thread.builder().virtual(scheduler).task(() -> {
+                Thread.ofVirtual().scheduler(scheduler).start(() -> {
                     try {
                         sel.select();
                     } catch (Exception e) { }
-                }).start();
+                });
 
                 // invoke getThreadInfo get and check the stack trace
                 long tid = carrier.getId();

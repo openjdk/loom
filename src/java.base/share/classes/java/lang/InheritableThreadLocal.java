@@ -47,6 +47,7 @@ package java.lang;
  * @author  Josh Bloch and Doug Lea
  * @see     ThreadLocal
  * @since   1.2
+ * @see Thread.Builder#inheritInheritableThreadLocals(boolean)
  */
 
 public class InheritableThreadLocal<T> extends ThreadLocal<T> {
