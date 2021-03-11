@@ -1831,12 +1831,12 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
 
         public void run() {
-        if (snapshot != null) {
-            snapshot.runWithSnapshot(this::doRun);
-        } else {
-            doRun();
+            if (snapshot != null) {
+                snapshot.runWithSnapshot(this::doRun);
+            } else {
+                doRun();
+            }
         }
-
     }
 
     static CompletableFuture<Void> asyncRunStage(Executor e, Runnable f) {
