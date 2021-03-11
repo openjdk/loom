@@ -272,9 +272,8 @@ jvmtiError JvmtiManageCapabilities::add_capabilities(const jvmtiCapabilities *cu
   either(current, desired, result);
 
   // special case for virtual thread events
-  if (result->can_support_virtual_threads == 1) {
-    java_lang_VirtualThread::set_notify_jvmti_events(true);
-  }
+  // TBD: There can be a performance impact after check for can_support_virtual_threads has been removed.
+  java_lang_VirtualThread::set_notify_jvmti_events(true);
 
   update();
 

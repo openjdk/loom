@@ -216,9 +216,6 @@ unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
 
 void
 JvmtiVTMTDisabler::disable_VTMT() {
-  if (!JvmtiExport::can_support_virtual_threads()) {
-    return;
-  }
   JavaThread* thread = JavaThread::current();
   ThreadBlockInVM tbivm(thread);
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
@@ -233,9 +230,6 @@ JvmtiVTMTDisabler::disable_VTMT() {
 
 void
 JvmtiVTMTDisabler::enable_VTMT() {
-  if (!JvmtiExport::can_support_virtual_threads()) {
-    return;
-  }
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
   assert(_VTMT_count == 0 && _VTMT_disable_count > 0, "VTMT sanity check");
 
@@ -246,9 +240,6 @@ JvmtiVTMTDisabler::enable_VTMT() {
 
 void
 JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
-  if (!JvmtiExport::can_support_virtual_threads()) {
-    return;
-  }
   JavaThread* thread = JavaThread::current();
   HandleMark hm(thread);
   Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
@@ -268,9 +259,6 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 
 void
 JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
-  if (!JvmtiExport::can_support_virtual_threads()) {
-    return;
-  }
   JavaThread* thread = JavaThread::current();
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 

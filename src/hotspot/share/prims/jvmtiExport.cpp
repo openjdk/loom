@@ -231,8 +231,7 @@ public:
   JvmtiVirtualThreadEventMark(JavaThread *thread) :
     JvmtiEventMark(thread) {
     JvmtiThreadState* state = thread->jvmti_thread_state();
-    if (JvmtiExport::can_support_virtual_threads() &&
-        state != NULL && state->is_virtual()) {
+    if (state != NULL && state->is_virtual()) {
       _jt = (jthread)(to_jobject(thread->vthread()));
     } else {
       _jt = (jthread)(to_jobject(thread->threadObj()));

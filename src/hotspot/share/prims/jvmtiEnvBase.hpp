@@ -168,11 +168,11 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
     return err;
   }
 
-  // If can_support_virtual_threads capability is enabled and there is a virtual thread mounted
-  // to the JavaThread* then return virtual thread oop. Otherwise, return thread oop.
+  // If there is a virtual thread mounted to the JavaThread* then
+  // return virtual thread oop. Otherwise, return thread oop.
   static oop get_vthread_or_thread_oop(JavaThread* jt) {
     oop result = jt->threadObj();
-    if (JvmtiExport::can_support_virtual_threads() && jt->mounted_vthread() != NULL) {
+    if (jt->mounted_vthread() != NULL) {
       result = jt->mounted_vthread();
     }
     return result;
@@ -329,7 +329,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   // get virtual thread last java vframe
   static javaVFrame* get_vthread_jvf(oop vthread);
 
-  // get carrier thread last java vframe depending on can_support_virtual_threads capability
+  // get carrier thread last java vframe
   static javaVFrame* get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map);
 
   // get ordinary thread thread state
