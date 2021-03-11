@@ -1568,8 +1568,9 @@ contains(JNIEnv *env, jthread *list, jint count, jthread item)
 
 
 static jvmtiError
-incrementSupendCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
+incrementSuspendCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
 {
+    node->toBeResumed = JNI_TRUE;
     node->suspendCount++;
     return JVMTI_ERROR_NONE;
 }
@@ -1631,7 +1632,7 @@ threadControl_suspendAll(void)
              * commonResumeList(), so it's a bit orthogonal to how we handle incrementing
              * the suspendCount.
              */
-            error = enumerateOverThreadList(env, &runningVThreads, incrementSupendCountHelper, NULL);
+            error = enumerateOverThreadList(env, &runningVThreads, incrementSuspendCountHelper, NULL);
             JDI_ASSERT(error == JVMTI_ERROR_NONE);
         }
 
