@@ -1072,7 +1072,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, null, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
@@ -1088,7 +1088,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, task, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
@@ -1118,7 +1118,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (group, task, gname)} ,where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
@@ -1151,7 +1151,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, null, name)}.
      *
@@ -1168,7 +1168,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (group, null, name)}.
      *
@@ -1197,7 +1197,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, task, name)}.
      *
@@ -1219,7 +1219,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object so that it has {@code task}
+     * Allocates a new platform {@code Thread} so that it has {@code task}
      * as its run object, has the specified {@code name} as its name,
      * and belongs to the thread group referred to by {@code group}.
      *
@@ -1273,7 +1273,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object so that it has {@code task}
+     * Allocates a new platform {@code Thread} so that it has {@code task}
      * as its run object, has the specified {@code name} as its name,
      * and belongs to the thread group referred to by {@code group}, and has
      * the specified <i>stack size</i>.
@@ -1355,7 +1355,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object so that it has {@code task}
+     * Allocates a new platform {@code Thread} so that it has {@code task}
      * as its run object, has the specified {@code name} as its name,
      * belongs to the thread group referred to by {@code group}, has
      * the specified {@code stackSize}, and inherits initial values for
