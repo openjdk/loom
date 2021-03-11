@@ -1279,7 +1279,6 @@ public class Thread implements Runnable {
      * the specified <i>stack size</i>.
      *
      * <p>This constructor is identical to {@link
-     * <p>This constructor is identical to {@link
      * #Thread(ThreadGroup,Runnable,String)} with the exception of the fact
      * that it allows the thread stack size to be specified.  The stack size
      * is the approximate number of bytes of address space that the virtual
