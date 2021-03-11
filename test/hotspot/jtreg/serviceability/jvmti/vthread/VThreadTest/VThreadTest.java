@@ -24,13 +24,7 @@
 /**
  * @test
  * @summary Verifies JVMTI support for VThreads.
- * @run main/othervm/native -agentlib:VThreadTest=DisableContinuationEvents VThreadTest
- */
-
-/**
- * @test
- * @summary Verifies JVMTI support for VThreads.
- * @run main/othervm/native -agentlib:VThreadTest=EnableContinuationEvents VThreadTest
+ * @run main/othervm/native -agentlib:VThreadTest VThreadTest
  */
 
 import java.util.concurrent.*;

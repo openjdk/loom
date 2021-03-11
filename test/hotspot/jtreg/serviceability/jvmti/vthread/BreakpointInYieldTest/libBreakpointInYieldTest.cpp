@@ -35,8 +35,6 @@ static int method_exit_count = 0;
 static int breakpoint_count = 0;
 static int vt_mounted_count = 0;
 static int vt_unmounted_count = 0;
-static int cont_run_count = 0;
-static int cont_yield_count = 0;
 static jboolean pass_status = JNI_TRUE;
 
 
@@ -59,27 +57,12 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
 }
 
 static void
-print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
-                      jint frames_cnt, const char* event_name, int event_count) {
-  char* tname = get_thread_name(jvmti, jni, thread);
-  const char* virt = jni->IsVirtualThread(thread) ? "virtual" : "carrier";
-
-  printf("\n%s #%d: %s thread: %s, frames: %d\n",
-          event_name, event_count, virt, tname, frames_cnt);
-
-  print_stack_trace(jvmti, jni, thread);
-
-  deallocate(jvmti, jni, (void*)tname);
-}
-
-static void
 set_breakpoint(JNIEnv *jni, jclass klass, const char *mname)
 {
-  jlocation location = (jlocation)0L;
-  jmethodID method = find_method(jvmti, jni, klass, mname);
-  jvmtiError err;
-
   // Find the jmethodID of the specified method
+  jmethodID method = find_method(jvmti, jni, klass, mname);
+  jlocation location = (jlocation)0L;
+  jvmtiError err;
 
   if (method == NULL) {
     jni->FatalError("Error in set_breakpoint: not found method");
@@ -177,46 +160,6 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   fflush(0);
 }
 
-#if 0
-static void JNICALL
-MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
-  lock_events();
-
-  print_frame_event_info(jvmti, jni, thread, method, "MethodEntry", method_entry_count++);
-
-  fflush(0);
-  unlock_events();
-}
-
-static void JNICALL
-MethodExit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
-           jboolean was_popped_by_exception, jvalue return_value) {
-  lock_events();
-
-  print_frame_event_info(jvmti, jni, thread, method, "MethodExit", method_exit_count++);
-  fflush(0);
-  unlock_events();
-}
-#endif
-
-static void JNICALL
-ContinuationRun(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint fcount) {
-  RawMonitorLocker rml(jvmti, jni, event_mon);
-
-  print_cont_event_info(jvmti, jni, thread, fcount, "ContinuationRun", cont_run_count++);  
-
-  fflush(0);
-}
-
-static void JNICALL
-ContinuationYield(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint fcount) {
-  RawMonitorLocker rml(jvmti, jni, event_mon);
-
-  print_cont_event_info(jvmti, jni, thread, fcount, "ContinuationYield", cont_yield_count++);  
-
-  fflush(0);
-}
-
 JNIEXPORT jint JNICALL
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEventCallbacks callbacks;
@@ -238,17 +181,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   memset(&caps, 0, sizeof(caps));
   caps.can_support_virtual_threads = 1;
   caps.can_generate_breakpoint_events = 1;
-
-#if 0
-  caps.can_generate_method_entry_events = 1;
-  caps.can_generate_method_exit_events = 1;
-  callbacks.MethodEntry = &MethodEntry;
-  callbacks.MethodExit  = &MethodExit;
-#endif
-
-  caps.can_support_continuations = 1;
-  callbacks.ContinuationRun   = &ContinuationRun;
-  callbacks.ContinuationYield = &ContinuationYield;
 
   err = jvmti->CreateRawMonitor("Events Monitor", &event_mon);
   if (err != JVMTI_ERROR_NONE) {
@@ -291,18 +223,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_RUN, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
-    return JNI_ERR;
-  }
-
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_YIELD, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
-    return JNI_ERR;
-  }
-
   printf("Agent_OnLoad finished\n");
   fflush(0);
 
@@ -339,8 +259,6 @@ Java_BreakpointInYieldTest_check(JNIEnv *jni, jclass cls) {
   printf("check: breakpoint_count:     %d\n", breakpoint_count);
   printf("check: vt_mounted_count:     %d\n", vt_mounted_count);
   printf("check: vt_unmounted_count:   %d\n", vt_unmounted_count);
-  printf("check: cont_run_count:       %d\n", cont_run_count);
-  printf("check: cont_yield_count:     %d\n", cont_yield_count);
   printf("\n");
   fflush(0);
 

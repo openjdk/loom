@@ -81,7 +81,7 @@ public:
   static int freeze(JavaThread* thread, intptr_t* sp);
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static intptr_t* thaw_leaf(JavaThread* thread, int kind);
-  static intptr_t* thaw(JavaThread* thread, int kind);
+//static intptr_t* thaw(JavaThread* thread, int kind);
   static int try_force_yield(JavaThread* thread, oop cont);
 
   static void notify_deopt(JavaThread* thread, intptr_t* sp);

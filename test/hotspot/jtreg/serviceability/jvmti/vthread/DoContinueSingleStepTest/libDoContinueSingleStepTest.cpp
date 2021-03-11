@@ -98,18 +98,6 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
 }
 
 static void
-print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_cnt, const char* event_name) {
-  char* tname = get_thread_name(jvmti, jni, thread);
-
-  printf("\n%s event: thread: %s, frames: %d\n\n", event_name, tname, frames_cnt);
-
-  print_stack_trace(jvmti, jni, thread);
-
-  fflush(0);
-  deallocate(jvmti, jni, (void*)tname);
-}
-
-static void
 setOrClearBreakpoint(JNIEnv *jni, jboolean set, const char *methodName,
                      jclass klass, jmethodID methods[], int method_count)
 {
@@ -421,18 +409,6 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   //processFiberEvent(jvmti, jni, vthread, "VirtualThreadUnmounted");
 }
 
-static void JNICALL
-ContinuationRun(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames_count) {
-  RawMonitorLocker rml(jvmti, jni, event_mon);
-  //print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationRun");
-}
-
-static void JNICALL
-ContinuationYield(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint frames_count) {
-  RawMonitorLocker rml(jvmti, jni, event_mon);
-  //print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationYield");
-}
-
 JNIEXPORT jint JNICALL
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEventCallbacks callbacks;
@@ -454,8 +430,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
   callbacks.VirtualThreadMounted   = &VirtualThreadMounted;
   callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
-  callbacks.ContinuationRun   = &ContinuationRun;
-  callbacks.ContinuationYield = &ContinuationYield;
 
   memset(&caps, 0, sizeof(caps));
   caps.can_generate_breakpoint_events = 1;
@@ -464,7 +438,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   caps.can_generate_method_entry_events = 1;
   caps.can_generate_method_exit_events = 1;
   caps.can_support_virtual_threads = 1;
-  caps.can_support_continuations = 1;
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
@@ -499,16 +472,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
-  }
-
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_RUN, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-      printf("error in JVMTI SetEventNotificationMode: %d\n", err);
-  }
-
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_YIELD, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-      printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
   event_mon = create_raw_monitor(jvmti, "Events Monitor");

@@ -7182,11 +7182,7 @@ RuntimeStub* generate_cont_doYield() {
 
     __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
     if (ContPerfTest > 112) {
-      if (!return_barrier && JvmtiExport::can_support_continuations()) {
-        __ call_VM(noreg, CAST_FROM_FN_PTR(address, Continuation::thaw), c_rarg1);
-      } else {
-        __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw_leaf), r15_thread, c_rarg1);
-      }
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw_leaf), r15_thread, c_rarg1);
     }
     __ movptr(rbx, rax); // rbx is now the sp of the yielding frame
 

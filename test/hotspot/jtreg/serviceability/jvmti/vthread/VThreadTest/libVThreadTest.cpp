@@ -39,7 +39,6 @@ static const int MAX_EVENTS_TO_PROCESS = 20;
 static jvmtiEnv *jvmti = NULL;
 static jrawMonitorID events_monitor = NULL;
 static Tinfo tinfo[MAX_WORKER_THREADS];
-static jboolean continuation_events_enabled = JNI_FALSE;
 
 
 static Tinfo*
@@ -113,24 +112,6 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
       }
     }
     inf->just_scheduled = JNI_FALSE;
-  }
-  //deallocate(jvmti, jni, (void*)tname);
-}
-
-static void
-print_cont_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jint frames_cnt, const char *event_name) {
-  static int cont_events_cnt = 0;
-  if (cont_events_cnt++ > MAX_EVENTS_TO_PROCESS) {
-    return; // No need to test all events
-  }
-
-  char* tname = get_thread_name(jvmti, jni, thread);
-  Tinfo* inf = find_tinfo(jni, tname); // Find slot with named worker thread
-
-  printf("\n#### %s event: thread: %s, frames count: %d\n", event_name, tname, frames_cnt);
-
-  if (inf->tname == NULL) {
-    fatal(jni, "Continuation event: worker thread not found!");
   }
   //deallocate(jvmti, jni, (void*)tname);
 }
@@ -592,19 +573,8 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   processVThreadEvent(jvmti, jni, vthread, "VirtualThreadUnmounted");
 }
 
-static void JNICALL
-ContinuationRun(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jint frames_count) {
-  RawMonitorLocker rml(jvmti, jni, events_monitor);
-  print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationRun");
-}
-
-static void JNICALL
-ContinuationYield(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jint frames_count) {
-  RawMonitorLocker rml(jvmti, jni, events_monitor);
-  print_cont_event_info(jvmti, jni, vthread, frames_count, "ContinuationYield");
-}
-
-extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
+JNIEXPORT jint JNICALL
+Agent_OnLoad(JavaVM *jvm, char *options,
                                            void *reserved) {
   jvmtiEventCallbacks callbacks;
   jvmtiCapabilities caps;
@@ -613,15 +583,6 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
   printf("Agent_OnLoad started\n");
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
-  }
-
-  if (strcmp(options, "EnableContinuationEvents") == 0) {
-    continuation_events_enabled = JNI_TRUE;
-  } else if (strcmp(options, "DisableContinuationEvents") == 0) {
-    continuation_events_enabled = JNI_FALSE;
-  } else {
-    printf("bad option passed to Agent_OnLoad: \"%s\"\n", options);
-    return 2;
   }
 
   memset(&callbacks, 0, sizeof(callbacks));
@@ -633,11 +594,7 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
   memset(&caps, 0, sizeof(caps));
   caps.can_support_virtual_threads = 1;
   caps.can_access_local_variables = 1;
-  if (continuation_events_enabled == JNI_TRUE) {
-    caps.can_support_continuations = 1;
-    callbacks.ContinuationRun = &ContinuationRun;
-    callbacks.ContinuationYield = &ContinuationYield;
-  }
+
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI AddCapabilities: %d\n", err);
@@ -666,18 +623,6 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options,
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
-  }
-
-  if (continuation_events_enabled == JNI_TRUE) {
-    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_RUN, NULL);
-    if (err != JVMTI_ERROR_NONE) {
-      printf("error in JVMTI SetEventNotificationMode: %d\n", err);
-    }
-
-    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_YIELD, NULL);
-    if (err != JVMTI_ERROR_NONE) {
-      printf("error in JVMTI SetEventNotificationMode: %d\n", err);
-    }
   }
 
   events_monitor = create_raw_monitor(jvmti, "Events Monitor");

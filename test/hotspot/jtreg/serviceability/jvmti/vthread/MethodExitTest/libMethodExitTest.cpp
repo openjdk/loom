@@ -478,30 +478,6 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   deallocate(jvmti, jni, (void*)cname);
 }
 
-#if 0
-static void JNICALL
-ContinuationRun(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint fcount) {
-  lock_events();
-
-  printf("\nHit #%d: ContinuationRun: vthread: %p\n",
-         brkptBreakpointHit, (void*)vthread);
-
-  fflush(0);
-  unlock_events();
-}
-
-static void JNICALL
-ContinuationYield(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, jint fcount) {
-  lock_events();
-
-  printf("\nHit #%d: ContinuationYield: vthread: %p\n",
-         brkptBreakpointHit, (void*)vthread);
-  
-  fflush(0);
-  unlock_events();
-}
-#endif
-
 JNIEXPORT jint JNICALL
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEventCallbacks callbacks;
@@ -530,12 +506,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   caps.can_generate_method_exit_events = 1;
   caps.can_support_virtual_threads = 1;
 
-#if 0
-  caps.can_support_continuations = 1;
-  callbacks.ContinuationRun   = &ContinuationRun;
-  callbacks.ContinuationYield = &ContinuationYield;
-#endif
-
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
@@ -560,18 +530,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
-
-#if 0
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_RUN, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
-  }
-
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CONTINUATION_YIELD, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
-  }
-#endif
 
   event_mon = create_raw_monitor(jvmti, "Events Monitor");
 

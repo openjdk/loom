@@ -3552,7 +3552,7 @@ int early_return(int res, JavaThread* thread) {
   return res;
 }
 
-static void invlidate_JVMTI_stack(JavaThread* thread) {
+static void invalidate_JVMTI_stack(JavaThread* thread) {
   if (thread->is_interp_only_mode()) {
     JvmtiThreadState *jvmti_state = thread->jvmti_thread_state();
     if (jvmti_state != NULL)
@@ -3560,8 +3560,8 @@ static void invlidate_JVMTI_stack(JavaThread* thread) {
   }
 }
 
-static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont) {
-  if (JvmtiExport::should_post_continuation_yield() || JvmtiExport::can_post_frame_pop()) {
+static void JVMTI_yield_cleanup(JavaThread* thread, ContMirror& cont) {
+  if (JvmtiExport::can_post_frame_pop()) {
     ContinuationHelper::set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible
 
     cont.read_rest();
@@ -3569,11 +3569,10 @@ static void post_JVMTI_yield(JavaThread* thread, ContMirror& cont) {
 
     // The call to JVMTI can safepoint, so we need to restore oops.
     Handle conth(Thread::current(), cont.mirror());
-    JvmtiExport::post_continuation_yield(JavaThread::current(), num_frames);
+    JvmtiExport::continuation_yield_cleanup(JavaThread::current(), num_frames);
     cont.post_safepoint(conth);
   }
-
-  invlidate_JVMTI_stack(thread);
+  invalidate_JVMTI_stack(thread);
 }
 
 static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
@@ -3601,7 +3600,7 @@ static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res
 #if CONT_JFR
   cont.post_jfr_event(&event, thread);
 #endif
-  post_JVMTI_yield(thread, cont); // can safepoint
+  JVMTI_yield_cleanup(thread, cont); // can safepoint
   return freeze_epilog(thread, cont);
 }
 
@@ -4821,27 +4820,9 @@ public:
 
 };
 
-static int maybe_count_Java_frames(ContMirror& cont, bool return_barrier) {
-  if (!return_barrier && JvmtiExport::should_post_continuation_run()) {
-    cont.read_rest();
-    return num_java_frames(cont);
-  }
-  return -1;
-}
 
-static void post_JVMTI_continue(JavaThread* thread, ContMirror& cont, intptr_t* sp, int java_frame_count) {
-  if (JvmtiExport::should_post_continuation_run()) {
-    ContinuationHelper::set_anchor(thread, sp); // ensure thawed frames are visible
-
-    // The call to JVMTI can safepoint, so we need to restore oops.
-    Handle conth(thread, cont.mirror());
-    JvmtiExport::post_continuation_run(JavaThread::current(), java_frame_count);
-    cont.post_safepoint(conth);
-
-    ContinuationHelper::clear_anchor(thread);
-  }
-
-  invlidate_JVMTI_stack(thread);
+static void JVMTI_continue_cleanup(JavaThread* thread) {
+  invalidate_JVMTI_stack(thread);
 }
 
 static inline bool can_thaw_fast(ContMirror& cont) {
@@ -4849,7 +4830,6 @@ static inline bool can_thaw_fast(ContMirror& cont) {
     return false;
 
   assert (!cont.thread()->is_interp_only_mode(), "");
-  assert (!JvmtiExport::should_post_continuation_run(), "");
 
   if (LIKELY(!CONT_FULL_STACK)) {
     for (oop chunk = cont.tail(); chunk != (oop)NULL; chunk = jdk_internal_misc_StackChunk::parent(chunk)) {
@@ -4901,15 +4881,13 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   intptr_t* sp;
   if (UNLIKELY(cont.is_flag(FLAG_SAFEPOINT_YIELD))) {
-    int java_frame_count = maybe_count_Java_frames(cont, kind);
     sp = cont_thaw<mode_slow>(thread, cont, kind);
-    if (kind == thaw_top) post_JVMTI_continue(thread, cont, sp, java_frame_count);
+    if (kind == thaw_top) JVMTI_continue_cleanup(thread);
   } else if (LIKELY(can_thaw_fast(cont))) {
     sp = cont_thaw<mode_fast>(thread, cont, kind);
   } else {
-    int java_frame_count = maybe_count_Java_frames(cont, kind);
     sp = cont_thaw<mode_slow>(thread, cont, kind);
-    if (kind == thaw_top) post_JVMTI_continue(thread, cont, sp, java_frame_count);
+    if (kind == thaw_top) JVMTI_continue_cleanup(thread);
   }
 
   thread->reset_held_monitor_count();
@@ -5017,12 +4995,14 @@ JRT_LEAF(intptr_t*, Continuation::thaw_leaf(JavaThread* thread, int kind))
   return sp;
 JRT_END
 
+#if 0
 JRT_ENTRY(intptr_t*, Continuation::thaw(JavaThread* thread, int kind))
   assert((thaw_kind)kind == thaw_top, "");
   intptr_t* sp = thaw0(thread, (thaw_kind)kind);
   ContinuationHelper::set_anchor(thread, sp); // we're in a full transition that expects last_java_frame
   return sp;
 JRT_END
+#endif
 
 bool Continuation::is_continuation_enterSpecial(const frame& f) {
   if (f.cb() == NULL || !f.cb()->is_compiled()) return false;
@@ -6050,10 +6030,7 @@ void Continuation::init() {
 }
 
 void Continuation::set_cont_fastpath_thread_state(JavaThread* thread) {
-  bool fast =
-       !thread->is_interp_only_mode()
-    && !JvmtiExport::should_post_continuation_run()
-    && !JvmtiExport::should_post_continuation_yield();
+  bool fast = !thread->is_interp_only_mode();
   thread->set_cont_fastpath_thread_state(fast);
 }
 
