@@ -472,6 +472,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         implements Runnable, AsynchronousCompletionTask {
         volatile Completion next;      // Treiber stack link
 
+        private Scoped.Snapshot snapshot = Scoped.snapshot();
+
         /**
          * Performs completion action if triggered, returning a
          * dependent that may need propagation, if one exists.
@@ -483,8 +485,21 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         /** Returns true if possibly still triggerable. Used by cleanStack. */
         abstract boolean isLive();
 
-        public final void run()                { tryFire(ASYNC); }
-        public final boolean exec()            { tryFire(ASYNC); return false; }
+        public final void run() {
+            if (snapshot != null) {
+                snapshot.runWithSnapshot(() -> tryFire(ASYNC));
+            } else {
+                tryFire(ASYNC);
+            }
+        }
+        public final boolean exec() {
+            if (snapshot != null) {
+                snapshot.runWithSnapshot(() -> tryFire(ASYNC));
+            } else {
+                tryFire(ASYNC);
+            }
+            return false;
+        }
         public final Void getRawResult()       { return null; }
         public final void setRawResult(Void v) {}
     }
@@ -1799,7 +1814,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         public final void setRawResult(Void v) {}
         public final boolean exec() { run(); return false; }
 
-        public void run() {
+        private void doRun() {
             CompletableFuture<Void> d; Runnable f;
             if ((d = dep) != null && (f = fn) != null) {
                 dep = null; fn = null;
@@ -1814,6 +1829,14 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 d.postComplete();
             }
         }
+
+        public void run() {
+        if (snapshot != null) {
+            snapshot.runWithSnapshot(this::doRun);
+        } else {
+            doRun();
+        }
+
     }
 
     static CompletableFuture<Void> asyncRunStage(Executor e, Runnable f) {
