@@ -161,7 +161,7 @@ public class ThreadLocal<T> {
      * if the {@code initialValue} method is not overridden).
      *
      * @return the current thread's value of this thread-local
-     * @see Thread.Builder#noThreadLocals()
+     * @see Thread.Builder#allowSetThreadLocals(boolean)
      */
     public T get() {
         return get(Thread.currentThread());
