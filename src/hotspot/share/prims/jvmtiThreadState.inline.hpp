@@ -78,8 +78,6 @@ void JvmtiThreadState::set_head_env_thread_state(JvmtiEnvThreadState* ets) {
 inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *thread, oop thread_oop) {
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
   assert(thread != NULL || thread_oop != NULL, "sanity check");
-  assert(thread_oop == NULL || !java_lang_VirtualThread::is_instance(thread_oop) ||
-         JvmtiExport::can_support_virtual_threads(), "sanity check");
 
   if (thread_oop == NULL) { // then thread should not be NULL (see assert above)
     thread_oop = thread->mounted_vthread() != NULL ? thread->mounted_vthread() : thread->threadObj();
