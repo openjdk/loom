@@ -28,6 +28,7 @@
  */
 
 import java.util.NoSuchElementException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
@@ -408,9 +409,17 @@ public class Basic {
         });
     }
 
+    private <R> R callWithSnapshot(Scoped.Snapshot snapshot, Callable<R> c) {
+        try {
+            return snapshot == null ? c.call() : snapshot.callWithSnapshot(c);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private <T> void assertEqualsInSnapshot(Scoped.Snapshot snapshot, Scoped<T> var, T expected)
             throws Exception {
-        snapshot.callWithSnapshot(() -> {
+        callWithSnapshot(snapshot, () -> {
             assertEquals(var.get(), expected);
             return null;
         });
@@ -418,7 +427,7 @@ public class Basic {
 
     private <T> void assertBoundInSnapshot(Scoped.Snapshot snapshot, Scoped<T> var, boolean expected)
             throws Exception {
-        snapshot.callWithSnapshot(() -> {
+        callWithSnapshot(snapshot, () -> {
             assertEquals(var.isBound(), expected);
             return null;
         });
