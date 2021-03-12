@@ -24,8 +24,8 @@
 /*
  * @test
  *
- * @summary converted from VM Testbase nsk/jvmti_env/GetAllThreads/allthr002.
- * VM Testbase keywords: [quick, jpda, jvmti_env, noras]
+ * @summary converted from VM Testbase nsk/jvmti/GetAllThreads/allthr002.
+ * VM Testbase keywords: [quick, jpda, jvmti, noras]
  * VM Testbase readme:
  * DESCRIPTION
  *     The test exercises JVMTI function GetAllThreads(threadsCountPtr, threadsPtr)
