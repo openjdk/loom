@@ -1427,11 +1427,11 @@ void LIRGenerator::do_getObjectSize(Intrinsic* x) {
   __ branch_destination(L_done->label());
 }
 
-void LIRGenerator::do_scopedCache(Intrinsic* x) {
+void LIRGenerator::do_scopeLocalCache(Intrinsic* x) {
   assert(x->number_of_arguments() == 0, "wrong type");
   LIR_Opr temp = new_register(T_ADDRESS);
   LIR_Opr reg = rlock_result(x);
-  __ move(new LIR_Address(getThreadPointer(), in_bytes(JavaThread::scopedCache_offset()), T_ADDRESS), temp);
+  __ move(new LIR_Address(getThreadPointer(), in_bytes(JavaThread::scopeLocalCache_offset()), T_ADDRESS), temp);
   // threadObj = ((OopHandle)_vthread)->resolve();
   access_load(IN_NATIVE, T_OBJECT,
               LIR_OprFact::address(new LIR_Address(temp, T_OBJECT)), reg);
@@ -3160,7 +3160,7 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
   case vmIntrinsics::_getObjectSize:  do_getObjectSize(x); break;
   case vmIntrinsics::_currentThread0: do_currentThread0(x); break;
   case vmIntrinsics::_currentThread:  do_vthread(x);       break;
-  case vmIntrinsics::_scopedCache:    do_scopedCache(x);   break;
+  case vmIntrinsics::_scopeLocalCache: do_scopeLocalCache(x); break;
 
   case vmIntrinsics::_dlog:           // fall through
   case vmIntrinsics::_dlog10:         // fall through

@@ -233,9 +233,9 @@ class LibraryCallKit : public GraphKit {
   bool inline_unsafe_writebackSync0(bool is_pre);
   bool inline_unsafe_copyMemory();
   bool inline_native_currentThread0();
-  bool inline_native_scopedCache();
-  Node* scopedCache_helper();
-  bool inline_native_setScopedCache();
+  bool inline_native_scopeLocalCache();
+  Node* scopeLocalCache_helper();
+  bool inline_native_setScopeLocalCache();
   bool inline_native_currentThread();
   bool inline_native_setCurrentThread();
 

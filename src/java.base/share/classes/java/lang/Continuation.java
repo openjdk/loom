@@ -154,7 +154,7 @@ public class Continuation {
     private int stackWatermark;
     private int refStackWatermark;
 
-    private Object[] scopedCache;
+    private Object[] scopeLocalCache;
 
     // private long[] nmethods = null; // grows up
     // private int numNmethods = 0;
@@ -290,12 +290,12 @@ public class Continuation {
     private void mount() {
         if (!compareAndSetMounted(false, true))
             throw new IllegalStateException("Mounted!!!!");
-        Thread.setScopedCache(scopedCache);
+        Thread.setScopeLocalCache(scopeLocalCache);
     }
 
     private void unmount() {
-        scopedCache = Thread.scopedCache();
-        Thread.setScopedCache(null);
+        scopeLocalCache = Thread.scopeLocalCache();
+        Thread.setScopeLocalCache(null);
         setMounted(false);
     }
     

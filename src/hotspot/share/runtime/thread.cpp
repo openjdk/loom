@@ -1071,11 +1071,11 @@ void JavaThread::set_threadOopHandles(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
   _threadObj   = OopHandle(_thread_oop_storage, p);
   _vthread     = OopHandle(_thread_oop_storage, p);
-  _scopedCache = OopHandle(_thread_oop_storage, NULL);
+  _scopeLocalCache = OopHandle(_thread_oop_storage, NULL);
 }
 
-oop JavaThread::scopedCache() const {
-  return _scopedCache.resolve();
+oop JavaThread::scopeLocalCache() const {
+  return _scopeLocalCache.resolve();
 }
 
 oop JavaThread::vthread() const {
@@ -1087,9 +1087,9 @@ void JavaThread::set_vthread(oop p) {
   _vthread.replace(p);
 }
 
-void JavaThread::set_scopedCache(oop p) {
+void JavaThread::set_scopeLocalCache(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
-  _scopedCache.replace(p);
+  _scopeLocalCache.replace(p);
 }
 
 OopStorage* JavaThread::thread_oop_storage() {
@@ -2307,7 +2307,7 @@ void JavaThread::deoptimize() {
         // search for the current bci in that string.
         address pc = fst.current()->pc();
         nmethod* nm =  (nmethod*) fst.current()->cb();
-        ScopeDesc* sd = nm->scope_desc_at(pc);
+        ScopeLocalesc* sd = nm->scope_desc_at(pc);
         char buffer[8];
         jio_snprintf(buffer, sizeof(buffer), "%d", sd->bci());
         size_t len = strlen(buffer);

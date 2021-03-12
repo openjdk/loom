@@ -46,11 +46,11 @@ import jdk.internal.vm.annotation.Stable;
  * to being unbound (or its previous value) when the operation completes.
  *
  * <p> Access to the value of a scoped variable is controlled by the accessibility
- * of the {@code Scoped} object. A {@code Scoped} object  will typically be declared
+ * of the {@code ScopeLocal} object. A {@code ScopeLocal} object  will typically be declared
  * in a private static field so that it can only be accessed by code in that class
  * (or other classes within its nest).
  *
- * <p> Scoped variables support nested bindings. If a scoped variable has a value
+ * <p> ScopeLocal variables support nested bindings. If a scoped variable has a value
  * then the {@code runWithBinding} or {@code callWithBinding} can be invoked to run
  * another operation with a new value. Code executed by this methods "sees" the new
  * value of the variable. The variable reverts to its previous value when the
@@ -77,7 +77,7 @@ import jdk.internal.vm.annotation.Stable;
  * The following example uses a scoped variable to make credentials available to callees.
  *
  * <pre>{@code
- *   private static final Scoped<Credentials> CREDENTIALS = Scoped.forType(Credentials.class);
+ *   private static final ScopeLocal<Credentials> CREDENTIALS = ScopeLocal.forType(Credentials.class);
  *
  *   Credentials creds = ...
  *   CREDENTIALS.runWithBinding(creds, () -> {
@@ -95,12 +95,12 @@ import jdk.internal.vm.annotation.Stable;
  * @param <T> the variable type
  * @since 99
  */
-public final class Scoped<T> {
+public final class ScopeLocal<T> {
     private final @Stable Class<? super T> type;
     private final @Stable int hash;
 
     // Is this scope-local value inheritable? We could handle this by
-    // making Scoped an abstract base class and scopeLocalBindings() a
+    // making ScopeLocal an abstract base class and scopeLocalBindings() a
     // virtual method, but that seems a little excessive.
     private final @Stable boolean isInheritable;
 
@@ -113,17 +113,17 @@ public final class Scoped<T> {
      * or method in this class will cause a {@link NullPointerException} to be thrown.
      *
      * @since 99
-     * @see Scoped#snapshot()
+     * @see ScopeLocal#snapshot()
      */
 
     public static class Snapshot {
-        final Scoped<?> key;
+        final ScopeLocal<?> key;
         final Object value;
         final Snapshot prev;
 
         private static final Object NIL = new Object();
 
-        Snapshot(Scoped<?> key, Object value, Snapshot prev) {
+        Snapshot(ScopeLocal<?> key, Object value, Snapshot prev) {
             key.type.cast(value);
             this.key = key;
             this.value = value;
@@ -134,11 +134,11 @@ public final class Scoped<T> {
             return value;
         }
 
-        final Scoped<?> getKey() {
+        final ScopeLocal<?> getKey() {
             return key;
         }
 
-        Object find(Scoped<?> key) {
+        Object find(ScopeLocal<?> key) {
             for (Snapshot b = this; b != null; b = b.prev) {
                 if (b.getKey() == key) {
                     Object value = b.get();
@@ -154,14 +154,14 @@ public final class Scoped<T> {
          */
         public void runWithSnapshot(Runnable op) {
             var prev = Thread.currentThread().inheritableScopeLocalBindings;
-            var cache = Thread.scopedCache();
+            var cache = Thread.scopeLocalCache();
             Cache.invalidate();
             try {
                 Thread.currentThread().inheritableScopeLocalBindings = this;
                 op.run();
             } finally {
                 Thread.currentThread().inheritableScopeLocalBindings = prev;
-                Thread.setScopedCache(cache);
+                Thread.setScopeLocalCache(cache);
             }
         }
 
@@ -176,19 +176,19 @@ public final class Scoped<T> {
          */
         public <R> R callWithSnapshot(Callable<R> op) throws Exception {
             var prev = Thread.currentThread().inheritableScopeLocalBindings;
-            var cache = Thread.scopedCache();
+            var cache = Thread.scopeLocalCache();
             Cache.invalidate();
             try {
                 Thread.currentThread().inheritableScopeLocalBindings = this;
                 return op.call();
             } finally {
                 Thread.currentThread().inheritableScopeLocalBindings = prev;
-                Thread.setScopedCache(cache);
+                Thread.setScopeLocalCache(cache);
             }
         }
     }
 
-    private Scoped(Class<? super T> type, boolean isInheritable) {
+    private ScopeLocal(Class<? super T> type, boolean isInheritable) {
         this.type = Objects.requireNonNull(type);
         this.isInheritable = isInheritable;
         this.hash = generateKey();
@@ -202,8 +202,8 @@ public final class Scoped<T> {
      * @param type The {@Class} instance {@codeT.class}
      * @return a scope variable
      */
-    public static <U,T extends U> Scoped<T> forType(Class<U> type) {
-        return new Scoped<T>(type, false);
+    public static <U,T extends U> ScopeLocal<T> forType(Class<U> type) {
+        return new ScopeLocal<T>(type, false);
     }
 
     /**
@@ -214,8 +214,8 @@ public final class Scoped<T> {
      * @param type The {@Class} instance {@codeT.class}
      * @return a scope variable
      */
-    public static <U,T extends U> Scoped<T> inheritableForType(Class<U> type) {
-        return new Scoped<T>(type, true);
+    public static <U,T extends U> ScopeLocal<T> inheritableForType(Class<U> type) {
+        return new ScopeLocal<T>(type, true);
     }
 
     private Snapshot scopeLocalBindings() {
@@ -319,7 +319,7 @@ public final class Scoped<T> {
     @SuppressWarnings("unchecked")
     public T get() {
         Object[] objects;
-        if ((objects = Thread.scopedCache()) != null) {
+        if ((objects = Thread.scopeLocalCache()) != null) {
             // This code should perhaps be in class Cache. We do it
             // here because the generated code is small and fast and
             // we really want it to be inlined in the caller.
@@ -391,9 +391,9 @@ public final class Scoped<T> {
         static final int TABLE_SIZE = 1 << INDEX_BITS;
         static final int TABLE_MASK = TABLE_SIZE - 1;
 
-        static void put(Scoped<?> key, Object value) {
-            if (Thread.scopedCache() == null) {
-                Thread.setScopedCache(new Object[TABLE_SIZE * 2]);
+        static void put(ScopeLocal<?> key, Object value) {
+            if (Thread.scopeLocalCache() == null) {
+                Thread.setScopeLocalCache(new Object[TABLE_SIZE * 2]);
             }
             int victim = chooseVictim(Thread.currentCarrierThread(), key.hashCode());
             setKeyAndObjectAt(victim, key, value);
@@ -401,7 +401,7 @@ public final class Scoped<T> {
 
         private static final void update(Object key, Object value) {
             Object[] objects;
-            if ((objects = Thread.scopedCache()) != null) {
+            if ((objects = Thread.scopeLocalCache()) != null) {
 
                 int k1 = key.hashCode() & TABLE_MASK;
                 if (getKey(objects, k1) == key) {
@@ -416,7 +416,7 @@ public final class Scoped<T> {
 
         private static final void remove(Object key) {
             Object[] objects;
-            if ((objects = Thread.scopedCache()) != null) {
+            if ((objects = Thread.scopeLocalCache()) != null) {
 
                 int k1 = key.hashCode() & TABLE_MASK;
                 if (getKey(objects, k1) == key) {
@@ -430,8 +430,8 @@ public final class Scoped<T> {
         }
 
         private static void setKeyAndObjectAt(int n, Object key, Object value) {
-            Thread.scopedCache()[n * 2] = key;
-            Thread.scopedCache()[n * 2 + 1] = value;
+            Thread.scopeLocalCache()[n * 2] = key;
+            Thread.scopeLocalCache()[n * 2 + 1] = value;
         }
 
         private static Object getKey(Object[] objs, long hash) {
@@ -456,7 +456,7 @@ public final class Scoped<T> {
         }
 
         public static void invalidate() {
-            Thread.setScopedCache(null);
+            Thread.setScopeLocalCache(null);
         }
     }
 
