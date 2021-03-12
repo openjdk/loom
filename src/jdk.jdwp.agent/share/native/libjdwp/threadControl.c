@@ -2691,6 +2691,11 @@ threadControl_allVThreads(jint *numVThreads)
     ThreadNode *node;
     jthread* vthreads;
 
+    if (!gdata->enumerateVThreads) {
+      *numVThreads = 0;
+      return NULL;
+    }
+
     env = getEnv();
     debugMonitorEnter(threadLock);
 

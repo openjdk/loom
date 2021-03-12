@@ -647,25 +647,29 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
         /* Make sure this vthread gets added to the vthreads list. */
         threadControl_addVThread(vthread);
 
-        /*
-         * When the VIRTUAL_THREAD_SCHEDULED event arrived for this vthread, we ignored it since we don't
-         * want to notify the debugger about vthreads until there is a non-vthread event that
-         * arrives on it (like a breakpoint). Now that this has happened, we need to send
-         * a VIRTUAL_THREAD_SCHEDULED event (which will be converted into a THREAD_START event) so
-         * the debugger will know about the vthread. Otherwise it will be unhappy when it gets
-         * an event for a vthread that it never got a THREAD_START event for.
-         */
-        EventInfo info;
-        struct bag *eventBag = eventHelper_createEventBag();
+        if (gdata->fakeVThreadStartEvent) {
+            /* vthread fixme: this shouldn't be needed if ei == EI_THREAD_START. */
+            /*
+             * When the VIRTUAL_THREAD_SCHEDULED event arrived for this vthread, we ignored it since we don't
+             * want to notify the debugger about vthreads until there is a non-vthread event that
+             * arrives on it (like a breakpoint). Now that this has happened, we need to send
+             * a VIRTUAL_THREAD_SCHEDULED event (which will be converted into a THREAD_START event) so
+             * the debugger will know about the vthread. Otherwise it will be unhappy when it gets
+             * an event for a vthread that it never got a THREAD_START event for.
+             */
+            EventInfo info;
+            struct bag *eventBag = eventHelper_createEventBag();
 
-        (void)memset(&info,0,sizeof(info));
-        info.ei         = EI_VIRTUAL_THREAD_SCHEDULED;
-        info.thread     = vthread;
+            (void)memset(&info,0,sizeof(info));
+            info.ei         = EI_VIRTUAL_THREAD_SCHEDULED;
+            info.thread     = vthread;
 
-        /* Note: filterAndHandleEvent() expects EI_THREAD_START instead of EI_VIRTUAL_THREAD_SCHEDULED. */
-        filterAndHandleEvent(env, &info, EI_THREAD_START, eventBag, eventSessionID);
-        JDI_ASSERT(bagSize(eventBag) == 0);
-        bagDestroyBag(eventBag);
+            /* Note: filterAndHandleEvent() expects EI_THREAD_START instead of EI_VIRTUAL_THREAD_SCHEDULED
+             * in order for getHandlerChain(ei) to work properly. */
+            filterAndHandleEvent(env, &info, EI_THREAD_START, eventBag, eventSessionID);
+            JDI_ASSERT(bagSize(eventBag) == 0);
+            bagDestroyBag(eventBag);
+        }
     }
 }
 
@@ -784,9 +788,13 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
     if (gdata->vthreadsSupported) {
         /* Add the vthread if we haven't added it before. */
         if (evinfo->is_vthread && !threadControl_isKnownVThread(thread)) {
-            if (gdata->notifyDebuggerOfAllVThreads) {
+            if (gdata->trackAllVThreads) {
                 /* Make sure this vthread gets added to the vthreads list. */
                 threadControl_addVThread(thread);
+                /* vthread fixme: we need to fake a THREAD_START event here just like
+                 * filterAndAddVThread() does. This is needed when the debug
+                 * agent is started after some vthreads have already been started.
+                 */
             } else {
                 /* Add this vthread if it passes the event filters. */
                 filterAndAddVThread(env, evinfo, ei, eventSessionID);
@@ -1446,6 +1454,11 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
             }
             debugMonitorExit(callbackBlock);
         }
+    }
+
+    /* Ignore VIRTUAL_THREAD_SCHEDULED events unless we are notifying the debugger of all vthreads. */
+    if (!gdata->trackAllVThreads || !gdata->enumerateVThreads) {
+        return;
     }
 
     BEGIN_CALLBACK() {
