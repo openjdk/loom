@@ -1566,7 +1566,8 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
     return JVMTI_ERROR_NONE;
   }
   // A case of a carrier thread executing a mounted virtual thread.
-  if (java_thread->is_cthread_pending_suspend()) {
+  if (java_thread->is_cthread_pending_suspend() &&
+      !java_lang_VirtualThread::is_instance(thread_oop)) {
     java_thread->clear_cthread_pending_suspend();
     return JVMTI_ERROR_NONE;
   }
