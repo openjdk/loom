@@ -24,8 +24,8 @@
 /*
  * @test
  *
- * @summary converted from VM Testbase nsk/jvmti/GetAllThreads/allthr002.
- * VM Testbase keywords: [quick, jpda, jvmti, noras]
+ * @summary converted from VM Testbase nsk/jvmti_env/GetAllThreads/allthr002.
+ * VM Testbase keywords: [quick, jpda, jvmti_env, noras]
  * VM Testbase readme:
  * DESCRIPTION
  *     The test exercises JVMTI function GetAllThreads(threadsCountPtr, threadsPtr)
@@ -36,35 +36,28 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:allthr02 allthr02
+ * @run main/othervm/native -agentlib:GetAllThreadsNullTest GetAllThreadsNullTest
  */
 
-import java.io.PrintStream;
-
-public class allthr02 {
-
-    final static int JCK_STATUS_BASE = 95;
+public class GetAllThreadsNullTest {
 
     static {
         try {
-            System.loadLibrary("allthr02");
+            System.loadLibrary("GetAllThreadsNullTest");
         } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load allthr002 library");
+            System.err.println("Could not load GetAllThreadsNullTest library");
             System.err.println("java.library.path:"
                 + System.getProperty("java.library.path"));
             throw ule;
         }
     }
 
-    native static int check();
+    native static boolean check();
 
     public static void main(String args[]) {
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
+        if (!check()) {
+            throw new RuntimeException("GetAllThreads doesn't fail if one of parameter is NULL.");
+        }
     }
 
-    public static int run(String args[], PrintStream out) {
-        return check();
-    }
 }
