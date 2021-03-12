@@ -36,7 +36,7 @@
  *     - chack thread against specific error code JVMTI_ERROR_THREAD_NOT_ALIVE
  *       instead of general JVMTI_ERROR_INVALID_THREAD
  *
- * @library //test/lib
+ * @library /test/lib
  * @run main/othervm/native -agentlib:getstacktr09 getstacktr09
  */
 
