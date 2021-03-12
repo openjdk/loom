@@ -1810,6 +1810,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             this.dep = dep; this.fn = fn;
         }
 
+        private Scoped.Snapshot snapshot = Scoped.snapshot();
+
         public final Void getRawResult() { return null; }
         public final void setRawResult(Void v) {}
         public final boolean exec() { run(); return false; }
