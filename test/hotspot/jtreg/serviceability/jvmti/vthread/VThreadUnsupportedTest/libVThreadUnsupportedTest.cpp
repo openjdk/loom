@@ -75,13 +75,13 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
 
   err = jvmti->StopThread(vthread, vthread);
   check_jvmti_error_invalid_thread(jni, "StopThread", err);
-  
+
   err = jvmti->InterruptThread(vthread);
   check_jvmti_error_invalid_thread(jni, "InterruptThread", err);
- 
+
   err = jvmti->PopFrame(vthread);
   check_jvmti_error_invalid_thread(jni, "PopFrame", err);
-  
+
   err = jvmti->ForceEarlyReturnVoid(vthread);
   check_jvmti_error_invalid_thread(jni, "ForceEarlyReturnVoid", err);
 
@@ -152,6 +152,11 @@ VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   printf("Got VirtualThreadMounted event\n");
   fflush(stdout);
   test_unsupported_jvmti_functions(jvmti, jni, vthread);
+
+  jlong nanos;
+  jvmtiError err = jvmti->GetCurrentThreadCpuTime(&nanos);
+  check_jvmti_error_invalid_thread(jni, "GetCurrentThreadCpuTime", err);
+
   is_completed_test_in_event = JNI_TRUE;
 }
 
@@ -177,6 +182,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   caps.can_support_virtual_threads = 1;
   caps.can_access_local_variables = 1;
   caps.can_get_thread_cpu_time = 1;
+  caps.can_get_current_thread_cpu_time = 1;
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {

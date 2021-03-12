@@ -3819,6 +3819,16 @@ JvmtiEnv::GetCurrentThreadCpuTimerInfo(jvmtiTimerInfo* info_ptr) {
 // nanos_ptr - pre-checked for NULL
 jvmtiError
 JvmtiEnv::GetCurrentThreadCpuTime(jlong* nanos_ptr) {
+  Thread* thread = Thread::current();
+
+  // Surprizingly the GetCurrentThreadCpuTime is used by non-JavaThread's.
+  if (thread->is_Java_thread()) {
+    oop thread_obj = get_vthread_or_thread_oop(thread->as_Java_thread());
+
+    if (java_lang_VirtualThread::is_instance(thread_obj)) {
+      return JVMTI_ERROR_INVALID_THREAD;
+    }
+  }
   *nanos_ptr = os::current_thread_cpu_time();
   return JVMTI_ERROR_NONE;
 } /* end GetCurrentThreadCpuTime */
