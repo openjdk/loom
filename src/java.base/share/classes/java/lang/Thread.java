@@ -153,7 +153,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
  * Creating a {@code Thread} will inherit, by default, the initial values of {@code
- * InheritableThreadLocal} variables, {@linkplain Scoped#inheritableForType(Class)
+ * InheritableThreadLocal} variables, {@linkplain ScopeLocal#inheritableForType(Class)
  * inheritable-scoped-variables}, and a number of properties from the parent thread:
  * <ul>
  *     <li> Platform threads inherit the daemon status, priority, and thread-group.

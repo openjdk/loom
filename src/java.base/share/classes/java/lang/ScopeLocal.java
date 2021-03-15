@@ -199,7 +199,7 @@ public final class ScopeLocal<T> {
      *
      * @param <T> the type of the scoped variable's value.
      * @param <U> a supertype of {@code T}. It should either be {@code T} itself or, if T is a parameterized type, its generic type.
-     * @param type The {@Class} instance {@codeT.class}
+     * @param type The {@code Class} instance {@code T.class}
      * @return a scope variable
      */
     public static <U,T extends U> ScopeLocal<T> forType(Class<U> type) {
@@ -211,7 +211,7 @@ public final class ScopeLocal<T> {
      *
      * @param <T> the type of the scoped variable's value.
      * @param <U> a supertype of {@code T}. It should either be {@code T} itself or, if T is a parameterized type, its generic type.
-     * @param type The {@Class} instance {@codeT.class}
+     * @param type The {@code Class} instance {@code T.class}
      * @return a scope variable
      */
     public static <U,T extends U> ScopeLocal<T> inheritableForType(Class<U> type) {
