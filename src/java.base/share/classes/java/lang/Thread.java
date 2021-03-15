@@ -248,8 +248,8 @@ public class Thread implements Runnable {
     // cache entries from the scoped variable cache.
     int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
-    Scoped.Binding<?> noninheritableScopeLocalBindings;
-    Scoped.Binding<?> inheritableScopeLocalBindings;
+    ScopeLocal.Snapshot noninheritableScopeLocalBindings;
+    ScopeLocal.Snapshot inheritableScopeLocalBindings;
 
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
@@ -364,17 +364,17 @@ public class Thread implements Runnable {
     @IntrinsicCandidate
     private static native Thread currentThread0();
 
-    // Scoped support:
+    // ScopeLocal support:
 
     /**
      * TBD
      * @return TBD
      */
     @IntrinsicCandidate
-    static native Object[] scopedCache();
+    static native Object[] scopeLocalCache();
 
     @IntrinsicCandidate
-    static native void setScopedCache(Object[] cache);
+    static native void setScopeLocalCache(Object[] cache);
 
     /**
      * A hint to the scheduler that the current thread is willing to yield

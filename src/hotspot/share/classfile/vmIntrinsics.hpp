@@ -234,18 +234,18 @@ class methodHandle;
    do_signature(arraycopy_signature,                             "(Ljava/lang/Object;ILjava/lang/Object;II)V")          \
                                                                                                                         \
   do_intrinsic(_currentThread0,           java_lang_Thread,       currentThread0_name, currentThread_signature,   F_S)  \
-  do_intrinsic(_currentThread,            java_lang_Thread,       currentThread_name, currentThread_signature,   F_S)   \
-  do_intrinsic(_scopedCache,              java_lang_Thread,       scopedCache_name, scopedCache_signature,   F_S)       \
-  do_intrinsic(_setScopedCache,           java_lang_Thread,       setScopedCache_name, setScopedCache_signature,   F_S) \
+  do_intrinsic(_currentThread,            java_lang_Thread,       currentThread_name, currentThread_signature,    F_S)  \
+  do_intrinsic(_scopeLocalCache,          java_lang_Thread,       scopeLocalCache_name, scopeLocalCache_signature, F_S)  \
+  do_intrinsic(_setScopeLocalCache,       java_lang_Thread,       setScopeLocalCache_name, setScopeLocalCache_signature, F_S) \
   do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
    do_name(     currentThread0_name,                             "currentThread0")                                      \
    do_name(     currentThread_name,                              "currentThread")                                       \
-   do_name(     scopedCache_name,                                "scopedCache")                                         \
-   do_name(     setScopedCache_name,                             "setScopedCache")                                      \
+   do_name(     scopeLocalCache_name,                            "scopeLocalCache")                                     \
+   do_name(     setScopeLocalCache_name,                         "setScopeLocalCache")                                  \
    do_name(     setCurrentThread_name,                           "setCurrentThread")                                    \
    do_signature(currentThread_signature,                         "()Ljava/lang/Thread;")                                \
-   do_signature(scopedCache_signature,                           "()[Ljava/lang/Object;")                               \
-   do_signature(setScopedCache_signature,                        "([Ljava/lang/Object;)V")                              \
+   do_signature(scopeLocalCache_signature,                       "()[Ljava/lang/Object;")                               \
+   do_signature(setScopeLocalCache_signature,                    "([Ljava/lang/Object;)V")                              \
                                                                                                                         \
   /* reflective intrinsics, for java/lang/Class, etc. */                                                                \
   do_intrinsic(_isAssignableFrom,         java_lang_Class,        isAssignableFrom_name, class_boolean_signature, F_RN) \
