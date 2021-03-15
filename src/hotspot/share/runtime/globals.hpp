@@ -2088,7 +2088,7 @@ const intx ObjectAlignmentInBytes = 8;
   develop(bool, VerifyContinuations, true,                                  \
           "Verify continuation consistency")                                \
                                                                             \
-  product(intx, ScopedCacheSize, 16,                                        \
+  product(intx, ScopeLocalCacheSize, 16,                                    \
           "Size of the cache for scoped values")                            \
            range(0, max_intx)                                               \
                                                                             \

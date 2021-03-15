@@ -2230,7 +2230,7 @@ void JavaThread::deoptimize() {
         // search for the current bci in that string.
         address pc = fst.current()->pc();
         nmethod* nm =  (nmethod*) fst.current()->cb();
-        ScopeLocalesc* sd = nm->scope_desc_at(pc);
+        ScopeDesc* sd = nm->scope_desc_at(pc);
         char buffer[8];
         jio_snprintf(buffer, sizeof(buffer), "%d", sd->bci());
         size_t len = strlen(buffer);

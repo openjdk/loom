@@ -4852,7 +4852,7 @@ public:
     } else if (fd->name() == vmSymbols::data_cache_line_flush_size_name()) {
       mirror->int_field_put(fd->offset(), _data_cache_line_flush_size);
     } else if (fd->name() == vmSymbols::scoped_cache_shift_name()) {
-      mirror->int_field_put(fd->offset(), ScopedCacheSize ? exact_log2(ScopedCacheSize) : -1);
+      mirror->int_field_put(fd->offset(), ScopeLocalCacheSize ? exact_log2(ScopeLocalCacheSize) : -1);
     } else {
       assert(false, "unexpected UnsafeConstants field");
     }
