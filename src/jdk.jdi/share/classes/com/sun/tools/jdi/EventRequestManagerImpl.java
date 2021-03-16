@@ -299,7 +299,7 @@ class EventRequestManagerImpl extends MirrorImpl
 
     abstract class ThreadLifecycleEventRequestImpl extends EventRequestImpl {
         private ThreadReference thread;
-        private boolean notifyVirtualThreads;
+        private boolean filterVirtualThreads;
 
         public synchronized void addThreadFilter(ThreadReference thread) {
             validateMirror(thread);
@@ -309,11 +309,11 @@ class EventRequestManagerImpl extends MirrorImpl
             this.thread = thread;
         }
 
-        public synchronized void removeVirtualThreadFilter() {
+        public synchronized void addVirtualThreadFilter() {
             if (isEnabled() || deleted) {
                 throw invalidState();
             }
-            this.notifyVirtualThreads = true;
+            this.filterVirtualThreads = true;
         }
 
         @Override
@@ -330,7 +330,7 @@ class EventRequestManagerImpl extends MirrorImpl
             if (thread != null) {
                 filters.add(JDWP.EventRequest.Set.Modifier.ThreadOnly
                         .create((ThreadReferenceImpl) thread));
-            } else if (!notifyVirtualThreads && vm.supportsVirtualThreads()) {
+            } else if (filterVirtualThreads && vm.supportsVirtualThreads()) {
                 // add filter that excludes virtual threads
                 filters.add(JDWP.EventRequest.Set.Modifier.VirtualThreadsExclude.create());
             }
