@@ -835,7 +835,7 @@ class VirtualMachineImpl extends MirrorImpl
 
     public boolean supportsVirtualThreads() {
         validateVM();
-        return versionInfo().jdwpMajor >= 16;   // version is TBD
+        return versionInfo().jdwpMajor >= 17;   // version is TBD
     }
 
     public void setDebugTraceMode(int traceFlags) {
