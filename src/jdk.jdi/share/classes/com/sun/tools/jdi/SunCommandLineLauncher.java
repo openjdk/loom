@@ -213,7 +213,9 @@ public class SunCommandLineLauncher extends AbstractLauncher {
 
             String xrun = "transport=" + transport().name() +
                           ",address=" + address +
-                          ",suspend=" + (wait? 'y' : 'n');
+                          ",suspend=" + (wait? 'y' : 'n') +
+                          ",enumeratevthreads=y" +
+                          ",trackvthreads=all";
             // Quote only if necessary in case the quote arg value is bogus
             if (hasWhitespace(xrun)) {
                 xrun = quote + xrun + quote;

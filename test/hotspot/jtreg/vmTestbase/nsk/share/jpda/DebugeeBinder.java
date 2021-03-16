@@ -340,7 +340,9 @@ public class DebugeeBinder extends Log.Logger implements Finalizable {
         String jdwpArgs = "-Xrunjdwp:"
                         + "server=" + server
                         + ",transport=" + argumentHandler.getTransportName()
-                        + ",address=" + transportAddress;
+                        + ",address=" + transportAddress
+                        + ",enumeratevthreads=y"
+                        + ",trackvthreads=all";
 
         if (! argumentHandler.isDefaultJVMDIStrictMode()) {
             if (argumentHandler.isJVMDIStrictMode())
