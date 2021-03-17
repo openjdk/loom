@@ -92,9 +92,9 @@ typedef struct SourceNameFilter {
     char *sourceNamePattern;
 } SourceNameFilter;
 
-typedef struct VirtualThreadsExcludeFilter {
+typedef struct PlatformThreadsFilter {
     char unused;  // to avoid an empty struct
-} VirtualThreadsExcludeFilter;
+} PlatformThreadsFilter;
 
 typedef struct Filter_ {
     jbyte modifier;
@@ -111,7 +111,7 @@ typedef struct Filter_ {
         struct MatchFilter ClassMatch;
         struct MatchFilter ClassExclude;
         struct SourceNameFilter SourceNameOnly;
-        struct VirtualThreadsExcludeFilter VirtualThreadsExclude;
+        struct PlatformThreadsFilter PlatformThreadsOnly;
     } u;
 } Filter;
 
@@ -567,7 +567,7 @@ eventFilterRestricted_passesFilter(JNIEnv *env,
               break;
           }
 
-        case JDWP_REQUEST_MODIFIER(VirtualThreadsExclude): {
+        case JDWP_REQUEST_MODIFIER(PlatformThreadsOnly): {
             jboolean isVirtual = JNI_FUNC_PTR(env, IsVirtualThread)(env, thread);
             if (isVirtual) {
                 return JNI_FALSE;
@@ -996,16 +996,16 @@ eventFilter_setSourceNameMatchFilter(HandlerNode *node,
 
 }
 
-jvmtiError eventFilter_setVirtualThreadsExcludeFilter(HandlerNode *node, jint index)
+jvmtiError eventFilter_setPlatformThreadsOnlyFilter(HandlerNode *node, jint index)
 {
-    VirtualThreadsExcludeFilter *filter = &FILTER(node, index).u.VirtualThreadsExclude;
+    PlatformThreadsFilter *filter = &FILTER(node, index).u.PlatformThreadsOnly;
     if (index >= FILTER_COUNT(node)) {
         return AGENT_ERROR_ILLEGAL_ARGUMENT;
     }
     if (NODE_EI(node) != EI_THREAD_START && NODE_EI(node) != EI_THREAD_END) {
         return AGENT_ERROR_ILLEGAL_ARGUMENT;
     }
-    FILTER(node, index).modifier = JDWP_REQUEST_MODIFIER(VirtualThreadsExclude);
+    FILTER(node, index).modifier = JDWP_REQUEST_MODIFIER(PlatformThreadsOnly);
     return JVMTI_ERROR_NONE;
 
 }
@@ -1491,8 +1491,8 @@ eventFilter_dumpHandlerFilters(HandlerNode *node)
                 tty_message("SourceNameMatch: sourceNamePattern(%s)",
                             filter->u.SourceNameOnly.sourceNamePattern);
                 break;
-            case JDWP_REQUEST_MODIFIER(VirtualThreadsExclude):
-                tty_message("VirtualThreadsExclude: enabled");
+            case JDWP_REQUEST_MODIFIER(PlatformThreadsOnly):
+                tty_message("PlatformThreadsOnly: enabled");
                 break;
             default:
                 EXIT_ERROR(AGENT_ERROR_ILLEGAL_ARGUMENT, "Invalid filter modifier");

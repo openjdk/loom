@@ -299,7 +299,7 @@ class EventRequestManagerImpl extends MirrorImpl
 
     abstract class ThreadLifecycleEventRequestImpl extends EventRequestImpl {
         private ThreadReference thread;
-        private boolean filterVirtualThreads;
+        private boolean platformThreadsOnly;
 
         public synchronized void addThreadFilter(ThreadReference thread) {
             validateMirror(thread);
@@ -309,30 +309,30 @@ class EventRequestManagerImpl extends MirrorImpl
             this.thread = thread;
         }
 
-        public synchronized void addVirtualThreadFilter() {
+        public synchronized void addPlatformThreadsOnlyFilter() {
             if (isEnabled() || deleted) {
                 throw invalidState();
             }
-            this.filterVirtualThreads = true;
+            this.platformThreadsOnly = true;
         }
 
         @Override
         synchronized void set() {
-            // remove ThreadOnly and VirtualThreadsExclude filters
+            // remove ThreadOnly and PlatformThreads filters
             Iterator<Object> iterator = filters.iterator();
             while (iterator.hasNext()) {
                 Object filter = iterator.next();
                 if (filter instanceof JDWP.EventRequest.Set.Modifier.ThreadOnly ||
-                    filter instanceof JDWP.EventRequest.Set.Modifier.VirtualThreadsExclude) {
+                    filter instanceof JDWP.EventRequest.Set.Modifier.PlatformThreadsOnly) {
                     iterator.remove();
                 }
             }
             if (thread != null) {
                 filters.add(JDWP.EventRequest.Set.Modifier.ThreadOnly
                         .create((ThreadReferenceImpl) thread));
-            } else if (filterVirtualThreads && vm.supportsVirtualThreads()) {
-                // add filter that excludes virtual threads
-                filters.add(JDWP.EventRequest.Set.Modifier.VirtualThreadsExclude.create());
+            } else if (platformThreadsOnly && vm.supportsVirtualThreads()) {
+                // add filter that restricts events to platform threads only
+                filters.add(JDWP.EventRequest.Set.Modifier.PlatformThreadsOnly.create());
             }
             super.set();
         }

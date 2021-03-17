@@ -207,8 +207,8 @@ readAndSetFilters(JNIEnv *env, PacketInputStream *in, HandlerNode *node,
                 break;
             }
 
-            case JDWP_REQUEST_MODIFIER(VirtualThreadsExclude):
-                serror = map2jdwpError(eventFilter_setVirtualThreadsExcludeFilter(node, i));
+            case JDWP_REQUEST_MODIFIER(PlatformThreadsOnly):
+                serror = map2jdwpError(eventFilter_setPlatformThreadsOnlyFilter(node, i));
                 break;
 
             default:
