@@ -132,8 +132,8 @@ class JvmtiExport : public AllStatic {
   JVMTI_SUPPORT_FLAG(should_post_vm_object_alloc)
   JVMTI_SUPPORT_FLAG(should_post_sampled_object_alloc)
 
-  JVMTI_SUPPORT_FLAG(should_post_vthread_scheduled)
-  JVMTI_SUPPORT_FLAG(should_post_vthread_terminated)
+  JVMTI_SUPPORT_FLAG(should_post_vthread_start)
+  JVMTI_SUPPORT_FLAG(should_post_vthread_end)
   JVMTI_SUPPORT_FLAG(should_post_vthread_mounted)
   JVMTI_SUPPORT_FLAG(should_post_vthread_unmounted)
 
@@ -342,8 +342,8 @@ class JvmtiExport : public AllStatic {
   static void post_thread_start          (JavaThread *thread) NOT_JVMTI_RETURN;
   static void post_thread_end            (JavaThread *thread) NOT_JVMTI_RETURN;
 
-  static void post_vthread_scheduled     (jthread vthread) NOT_JVMTI_RETURN;
-  static void post_vthread_terminated    (jthread vthread) NOT_JVMTI_RETURN;
+  static void post_vthread_start         (jthread vthread) NOT_JVMTI_RETURN;
+  static void post_vthread_end           (jthread vthread) NOT_JVMTI_RETURN;
   static void post_vthread_mounted       (jthread vthread) NOT_JVMTI_RETURN;
   static void post_vthread_unmounted     (jthread vthread) NOT_JVMTI_RETURN;
 

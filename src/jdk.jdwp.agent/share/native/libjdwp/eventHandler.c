@@ -650,10 +650,10 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
         if (gdata->fakeVThreadStartEvent) {
             /* vthread fixme: this shouldn't be needed if ei == EI_THREAD_START. */
             /*
-             * When the VIRTUAL_THREAD_SCHEDULED event arrived for this vthread, we ignored it since we don't
+             * When the VIRTUAL_THREAD_START event arrived for this vthread, we ignored it since we don't
              * want to notify the debugger about vthreads until there is a non-vthread event that
              * arrives on it (like a breakpoint). Now that this has happened, we need to send
-             * a VIRTUAL_THREAD_SCHEDULED event (which will be converted into a THREAD_START event) so
+             * a VIRTUAL_THREAD_START event (which will be converted into a THREAD_START event) so
              * the debugger will know about the vthread. Otherwise it will be unhappy when it gets
              * an event for a vthread that it never got a THREAD_START event for.
              */
@@ -661,10 +661,10 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
             struct bag *eventBag = eventHelper_createEventBag();
 
             (void)memset(&info,0,sizeof(info));
-            info.ei         = EI_VIRTUAL_THREAD_SCHEDULED;
+            info.ei         = EI_VIRTUAL_THREAD_START;
             info.thread     = vthread;
 
-            /* Note: filterAndHandleEvent() expects EI_THREAD_START instead of EI_VIRTUAL_THREAD_SCHEDULED
+            /* Note: filterAndHandleEvent() expects EI_THREAD_START instead of EI_VIRTUAL_THREAD_START
              * in order for getHandlerChain(ei) to work properly. */
             filterAndHandleEvent(env, &info, EI_THREAD_START, eventBag, eventSessionID);
             JDI_ASSERT(bagSize(eventBag) == 0);
@@ -777,11 +777,11 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
         }
     }
 
-    /* We want the vthread scheduled/terminated events to mimic thread start/end events */
-    if (ei == EI_VIRTUAL_THREAD_SCHEDULED) {
+    /* We want the vthread start/end events to mimic thread start/end events */
+    if (ei == EI_VIRTUAL_THREAD_START) {
         ei = EI_THREAD_START;
     }
-    if (ei == EI_VIRTUAL_THREAD_TERMINATED) {
+    if (ei == EI_VIRTUAL_THREAD_END) {
         ei = EI_THREAD_END;
     }
 
@@ -1420,15 +1420,14 @@ cbVMDeath(jvmtiEnv *jvmti_env, JNIEnv *env)
     LOG_MISC(("END cbVMDeath"));
 }
 
-/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED */
+/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_START */
 static void JNICALL
-cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
-                   jthread vthread)
+cbVThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
 {
     EventInfo info;
 
-    LOG_CB(("cbVThreadScheduled: vthread=%p", vthread));
-    /*tty_message("cbVThreadScheduled: vthread=%p", vthread);*/
+    LOG_CB(("cbVThreadStart: vthread=%p", vthread));
+    /*tty_message("cbVThreadStart: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
     /*
@@ -1456,7 +1455,7 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
         }
     }
 
-    /* Ignore VIRTUAL_THREAD_SCHEDULED events unless we are notifying the debugger of all vthreads. */
+    /* Ignore VIRTUAL_THREAD_START events unless we are notifying the debugger of all vthreads. */
     if (!gdata->trackAllVThreads || !gdata->enumerateVThreads) {
         return;
     }
@@ -1468,19 +1467,18 @@ cbVThreadScheduled(jvmtiEnv *jvmti_env, JNIEnv *env,
         event_callback(env, &info);
     } END_CALLBACK();
 
-    LOG_MISC(("END cbVThreadScheduled"));
+    LOG_MISC(("END cbVThreadStart"));
 }
 
-/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED */
+/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_END */
 static void JNICALL
-cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
-                    jthread vthread)
+cbVThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
 {
 
     EventInfo info;
 
-    LOG_CB(("cbVThreadTerminated: vthread=%p", vthread));
-    /*tty_message("cbVThreadTerminated: vthread=%p", vthread);*/
+    LOG_CB(("cbVThreadEnd: vthread=%p", vthread));
+    /*tty_message("cbVThreadEnd: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
     BEGIN_CALLBACK() {
@@ -1490,7 +1488,7 @@ cbVThreadTerminated(jvmtiEnv *jvmti_env, JNIEnv *env,
         event_callback(env, &info);
     } END_CALLBACK();
 
-    LOG_MISC(("END cbVThreadTerminated"));
+    LOG_MISC(("END cbVThreadEnd"));
 }
 
 /**
@@ -1684,14 +1682,14 @@ eventHandler_initialize(jbyte sessionID)
     /* Only enable vthread events if vthread support is enabled. */
     if (gdata->vthreadsSupported) {
         error = threadControl_setEventMode(JVMTI_ENABLE,
-                                           EI_VIRTUAL_THREAD_SCHEDULED, NULL);
+                                           EI_VIRTUAL_THREAD_START, NULL);
         if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable vthread scheduled events");
+            EXIT_ERROR(error,"Can't enable vthread start events");
         }
         error = threadControl_setEventMode(JVMTI_ENABLE,
-                                           EI_VIRTUAL_THREAD_TERMINATED, NULL);
+                                           EI_VIRTUAL_THREAD_END, NULL);
         if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error,"Can't enable vthread terminated events");
+            EXIT_ERROR(error,"Can't enable vthread end events");
         }
     }
 
@@ -1736,10 +1734,10 @@ eventHandler_initialize(jbyte sessionID)
     gdata->callbacks.VMDeath                    = &cbVMDeath;
     /* Event callback for JVMTI_EVENT_GARBAGE_COLLECTION_FINISH */
     gdata->callbacks.GarbageCollectionFinish    = &cbGarbageCollectionFinish;
-    /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED */
-    gdata->callbacks.VirtualThreadScheduled     = &cbVThreadScheduled;
-    /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED */
-    gdata->callbacks.VirtualThreadTerminated    = &cbVThreadTerminated;
+    /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_START */
+    gdata->callbacks.VirtualThreadStart         = &cbVThreadStart;
+    /* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_END */
+    gdata->callbacks.VirtualThreadEnd           = &cbVThreadEnd;
 
     error = JVMTI_FUNC_PTR(gdata->jvmti,SetEventCallbacks)
                 (gdata->jvmti, &(gdata->callbacks), sizeof(gdata->callbacks));

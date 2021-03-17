@@ -1289,8 +1289,8 @@ enableEvents(HandlerNode *node)
         case EI_VM_DEATH:
         case EI_CLASS_PREPARE:
         case EI_GC_FINISH:
-        case EI_VIRTUAL_THREAD_SCHEDULED:
-        case EI_VIRTUAL_THREAD_TERMINATED:
+        case EI_VIRTUAL_THREAD_START:
+        case EI_VIRTUAL_THREAD_END:
             return error;
 
         case EI_FIELD_ACCESS:
@@ -1350,8 +1350,8 @@ disableEvents(HandlerNode *node)
         case EI_VM_DEATH:
         case EI_CLASS_PREPARE:
         case EI_GC_FINISH:
-        case EI_VIRTUAL_THREAD_SCHEDULED:
-        case EI_VIRTUAL_THREAD_TERMINATED:
+        case EI_VIRTUAL_THREAD_START:
+        case EI_VIRTUAL_THREAD_END:
             return error;
 
         case EI_FIELD_ACCESS:

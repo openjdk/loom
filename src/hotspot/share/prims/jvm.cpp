@@ -3907,8 +3907,14 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
 
   if (first_mount) {
     // thread start
-    if (JvmtiExport::should_post_vthread_scheduled()) {
-      JvmtiExport::post_vthread_scheduled(vthread);
+    if (JvmtiExport::can_support_virtual_threads()) {
+      if (JvmtiExport::should_post_vthread_start()) {
+        JvmtiExport::post_vthread_start(vthread);
+      }
+    } else { // compatibility for vthread unaware agents: legacy thread_start
+      if (JvmtiExport::should_post_thread_life()) {
+        JvmtiExport::post_thread_start(thread);
+      }
     }
     oop ct_oop = thread->threadObj();
     jobject cthread = JNIHandles::make_local(thread, ct_oop);
@@ -3934,8 +3940,14 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread))
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jobject vthread))
-  if (JvmtiExport::should_post_vthread_terminated()) {
-    JvmtiExport::post_vthread_terminated(vthread);
+  if (JvmtiExport::can_support_virtual_threads()) {
+    if (JvmtiExport::should_post_vthread_end()) {
+      JvmtiExport::post_vthread_end(vthread);
+    }
+  } else { // compatibility for vthread unaware agents: legacy thread_end
+    if (JvmtiExport::should_post_thread_life()) {
+      JvmtiExport::post_thread_end(thread);
+    }
   }
   oop ct_oop = thread->threadObj();
   jobject cthread = JNIHandles::make_local(thread, ct_oop);

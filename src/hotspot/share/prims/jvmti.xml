@@ -10603,8 +10603,8 @@ myInit() {
           <functionlink id="GetLocalFloat"></functionlink>
           <functionlink id="GetLocalDouble"></functionlink>
           and the following events can be enabled:
-          <eventlink id="VirtualThreadScheduled"></eventlink>,
-          <eventlink id="VirtualThreadTerminated"></eventlink>,
+          <eventlink id="VirtualThreadStart"></eventlink>,
+          <eventlink id="VirtualThreadEnd"></eventlink>,
           <eventlink id="VirtualThreadMounted"></eventlink> and
           <eventlink id="VirtualThreadUnmounted"></eventlink>.
         </description>
@@ -12940,10 +12940,10 @@ myInit() {
     </parameters>
   </event>
 
- <event label="Virtual Thread Scheduled"
-         id="VirtualThreadScheduled" const="JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED" filtered="thread" num="87" phase="start" since="14">
+ <event label="Virtual Thread Start"
+         id="VirtualThreadStart" const="JVMTI_EVENT_VIRTUAL_THREAD_START" filtered="thread" num="87" phase="start" since="14">
     <description>
-      Virtual thread scheduled events are generated before its initial method executes.
+      Virtual thread started events are generated before its initial method executes.
       <p/>
       The event is sent on the <paramlink id="thread"></paramlink>.
     </description>
@@ -12963,16 +12963,16 @@ myInit() {
       <param id="virtual_thread">
         <jthread/>
           <description>
-            Virtual thread scheduled for execution.
+            Virtual thread started for execution.
           </description>
       </param>
     </parameters>
   </event>
 
-  <event label="Virtual Thread Terminated"
-         id="VirtualThreadTerminated" const="JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED" filtered="thread" num="88" phase="start" since="14">
+  <event label="Virtual Thread End"
+         id="VirtualThreadEnd" const="JVMTI_EVENT_VIRTUAL_THREAD_END" filtered="thread" num="88" phase="start" since="14">
     <description>
-      Virtual thread terminated events are generated after its initial method has finished execution.
+      Virtual thread end events are generated after its initial method has finished execution.
       <p/>
       The event is sent on the <paramlink id="thread"></paramlink>.
     </description>
@@ -12992,7 +12992,7 @@ myInit() {
       <param id="virtual_thread">
         <jthread/>
           <description>
-            Virtual thread being terminated.
+            Virtual thread being ended.
           </description>
       </param>
     </parameters>

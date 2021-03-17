@@ -151,8 +151,8 @@ standardHandlers_defaultHandler(EventIndex ei)
         case EI_MONITOR_CONTENDED_ENTERED:
         case EI_MONITOR_WAIT:
         case EI_MONITOR_WAITED:
-        case EI_VIRTUAL_THREAD_SCHEDULED:
-        case EI_VIRTUAL_THREAD_TERMINATED:
+        case EI_VIRTUAL_THREAD_START:
+        case EI_VIRTUAL_THREAD_END:
             return &genericHandler;
 
         case EI_CLASS_PREPARE:

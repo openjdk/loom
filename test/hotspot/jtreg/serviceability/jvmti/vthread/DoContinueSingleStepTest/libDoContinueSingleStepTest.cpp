@@ -386,15 +386,15 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
 }
 
 static void JNICALL
-VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
+VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   RawMonitorLocker rml(jvmti, jni, event_mon);
-  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadScheduled");
+  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadStart");
 }
 
 static void JNICALL
-VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
+VirtualThreadEnd(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   RawMonitorLocker rml(jvmti, jni, event_mon);
-  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadTerminated");
+  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadEnd");
 }
 
 static void JNICALL
@@ -425,9 +425,9 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.SingleStep  = &SingleStep;
   callbacks.FramePop    = &FramePop;
   callbacks.MethodEntry = &MethodEntry;
-  callbacks.MethodExit = &MethodExit;
-  callbacks.VirtualThreadScheduled  = &VirtualThreadScheduled;
-  callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
+  callbacks.MethodExit  = &MethodExit;
+  callbacks.VirtualThreadStart     = &VirtualThreadStart;
+  callbacks.VirtualThreadEnd       = &VirtualThreadEnd;
   callbacks.VirtualThreadMounted   = &VirtualThreadMounted;
   callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
 
@@ -454,12 +454,12 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_END, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }

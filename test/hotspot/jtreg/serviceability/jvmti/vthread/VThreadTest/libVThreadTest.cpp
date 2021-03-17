@@ -94,11 +94,11 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
 
   printf("\n#### %s event: thread: %s, vthread: %p\n", event_name, tname, vthread);
 
-  if (strcmp(event_name, "VirtualThreadScheduled") == 0) {
+  if (strcmp(event_name, "VirtualThreadStart") == 0) {
     inf->just_scheduled = JNI_TRUE;
   }
   else {
-    if (inf->tname == NULL && strcmp(event_name, "VirtualThreadTerminated") != 0) {
+    if (inf->tname == NULL && strcmp(event_name, "VirtualThreadEnd") != 0) {
       fatal(jni, "VThread event: worker thread not found!");
     }
     if (strcmp(event_name, "VirtualThreadUnmounted") == 0) {
@@ -480,8 +480,8 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *e
   jthread cthread = NULL;
   jvmtiError err;
 
-  if (strcmp(event_name, "VirtualThreadTerminated") != 0 &&
-      strcmp(event_name, "VirtualThreadScheduled")  != 0) {
+  if (strcmp(event_name, "VirtualThreadEnd") != 0 &&
+      strcmp(event_name, "VirtualThreadStart")  != 0) {
     if (vthread_events_cnt++ > MAX_EVENTS_TO_PROCESS) {
       return; // No need to test all events
     }
@@ -495,16 +495,16 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *e
 
   deallocate(jvmti, jni, (void*)tname);
 
-  if (strcmp(event_name, "VirtualThreadTerminated") == 0) {
+  if (strcmp(event_name, "VirtualThreadEnd") == 0) {
     return; // skip further testing as GetVirtualThread can return NULL
   }
 
   test_GetVirtualThread(jvmti, jni, cthread, vthread, event_name);
   test_GetCarrierThread(jvmti, jni, cthread, vthread, event_name);
 
-  if (strcmp(event_name, "VirtualThreadScheduled") == 0) {
+  if (strcmp(event_name, "VirtualThreadStart") == 0) {
     test_GetThreadInfo(jvmti, jni, vthread, event_name);
-    return; // skip testing of GetFrame* for VirtualThreadScheduled events
+    return; // skip testing of GetFrame* for VirtualThreadStart events
   }
   jint frame_count = test_GetFrameCount(jvmti, jni, vthread, event_name);
   test_GetFrameLocation(jvmti, jni, vthread, event_name, frame_count);
@@ -513,15 +513,15 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *e
 }
 
 static void JNICALL
-VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
+VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   RawMonitorLocker rml(jvmti, jni, events_monitor);
-  processVThreadEvent(jvmti, jni, vthread, "VirtualThreadScheduled");
+  processVThreadEvent(jvmti, jni, vthread, "VirtualThreadStart");
 }
 
 static void JNICALL
-VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
+VirtualThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   RawMonitorLocker rml(jvmti, jni, events_monitor);
-  processVThreadEvent(jvmti, jni, vthread, "VirtualThreadTerminated");
+  processVThreadEvent(jvmti, jni, vthread, "VirtualThreadEnd");
 }
 
 static void JNICALL
@@ -549,8 +549,8 @@ Agent_OnLoad(JavaVM *jvm, char *options,
   }
 
   memset(&callbacks, 0, sizeof(callbacks));
-  callbacks.VirtualThreadScheduled = &VirtualThreadScheduled;
-  callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
+  callbacks.VirtualThreadStart = &VirtualThreadStart;
+  callbacks.VirtualThreadEnd = &VirtualThreadEnd;
   callbacks.VirtualThreadMounted = &VirtualThreadMounted;
   callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
 
@@ -570,13 +570,13 @@ Agent_OnLoad(JavaVM *jvm, char *options,
     return JNI_ERR;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_END, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;

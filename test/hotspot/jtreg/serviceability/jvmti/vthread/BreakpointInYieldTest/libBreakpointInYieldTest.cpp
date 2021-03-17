@@ -115,13 +115,13 @@ ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 }
 
 static void JNICALL
-VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   char* tname = get_thread_name(jvmti, jni, thread);
   const char* virt = jni->IsVirtualThread(thread) ? "virtual" : "carrier";
 
   {
     RawMonitorLocker rml(jvmti, jni, event_mon);
-    printf("\nVirtualThreadScheduled: %s, thread: %s\n", virt, tname);
+    printf("\nVirtualThreadStart: %s, thread: %s\n", virt, tname);
     fflush(0);
   }
 
@@ -174,7 +174,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   memset(&callbacks, 0, sizeof(callbacks));
   callbacks.Breakpoint  = &Breakpoint;
   callbacks.ThreadStart = &ThreadStart;
-  callbacks.VirtualThreadScheduled = &VirtualThreadScheduled;
+  callbacks.VirtualThreadStart     = &VirtualThreadStart;
   callbacks.VirtualThreadMounted   = &VirtualThreadMounted;
   callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
 
@@ -206,7 +206,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
