@@ -413,7 +413,7 @@ agent_proc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
 }
 
 static void JNICALL
-VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
+VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   RawMonitorLocker agent_start_locker(jvmti, jni, agent_event_lock);
 
   tested_vthreads[vthread_no++] = jni->NewGlobalRef(vthread);
@@ -459,7 +459,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   memset(&callbacks, 0, sizeof(callbacks));
-  callbacks.VirtualThreadScheduled = &VirtualThreadScheduled;
+  callbacks.VirtualThreadStart = &VirtualThreadStart;
 
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
@@ -470,7 +470,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                        JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
+                                        JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("Agent init: error in JVMTI SetEventNotificationMode: %s (%d)\n",
            TranslateError(err), err);

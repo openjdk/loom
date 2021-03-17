@@ -172,8 +172,8 @@ typedef enum {
         EI_MONITOR_WAITED       = 18,
         EI_VM_INIT              = 19,
         EI_VM_DEATH             = 20,
-        EI_VIRTUAL_THREAD_SCHEDULED  = 21,
-        EI_VIRTUAL_THREAD_TERMINATED = 22,
+        EI_VIRTUAL_THREAD_START = 21,
+        EI_VIRTUAL_THREAD_END   = 22,
 
         EI_max                  = 22
 } EventIndex;
