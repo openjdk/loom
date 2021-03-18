@@ -65,11 +65,10 @@ Java_WaitNotifySuspendedVThreadTask_setBreakpoint(JNIEnv *jni, jclass klass) {
 
 JNIEXPORT void JNICALL
 Java_WaitNotifySuspendedVThreadTask_notifyRawMonitors(JNIEnv *jni, jclass klass, jthread thread) {
-  jthread cthread;
-
   printf("Main thread: suspending virtual and carrier threads\n"); fflush(0);
+
   check_jvmti_status(jni, jvmti_env->SuspendThread(thread), "SuspendThread thread");
-  check_jvmti_status(jni, jvmti_env->GetCarrierThread(thread, &cthread), "GetCarrierThread thread");
+  jthread cthread = get_carrier_thread(jvmti_env, jni, thread);
   check_jvmti_status(jni, jvmti_env->SuspendThread(cthread), "SuspendThread thread");
 
   {

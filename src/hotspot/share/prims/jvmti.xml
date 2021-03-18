@@ -2239,6 +2239,7 @@ jvmtiEnv *jvmti;
     <intro>
     </intro>
 
+    <elide>
     <function id="GetVirtualThread" num="113" since="16">
       <synopsis>Get Virtual Thread</synopsis>
       <description>
@@ -2266,7 +2267,9 @@ jvmtiEnv *jvmti;
       <errors>
       </errors>
     </function>
+    </elide>
 
+    <elide>
     <function id="GetCarrierThread" num="117" since="16">
       <synopsis>Get Carrier Thread</synopsis>
       <description>
@@ -2299,6 +2302,7 @@ jvmtiEnv *jvmti;
         </error>
       </errors>
     </function>
+    </elide>
 
     <function id="SuspendAllVirtualThreads" num="118" since="16">
       <synopsis>Suspend All Virtual Threads</synopsis>
@@ -10589,19 +10593,8 @@ myInit() {
         <description>
           Can support virtual threads.
           If this capability is enabled then the following functions can be called:
-          <functionlink id="IsVirtualThread"></functionlink>, 
-          <functionlink id="GetVirtualThread"></functionlink>, 
-          <functionlink id="GetCarrierThread"></functionlink>,
-          the following functions can be called with a virtual thread reference:
-          <functionlink id="GetStackTrace"></functionlink>
-          <functionlink id="GetFrameCount"></functionlink>
-          <functionlink id="GetFrameLocation"></functionlink>
-          <functionlink id="GetLocalObject"></functionlink>
-          <functionlink id="GetLocalInstance"></functionlink>
-          <functionlink id="GetLocalInt"></functionlink>
-          <functionlink id="GetLocalLong"></functionlink>
-          <functionlink id="GetLocalFloat"></functionlink>
-          <functionlink id="GetLocalDouble"></functionlink>
+          <functionlink id="SuspendAllVirtualThreads"></functionlink>, 
+          <functionlink id="ResumeAllVirtualThreads"></functionlink>,
           and the following events can be enabled:
           <eventlink id="VirtualThreadStart"></eventlink>,
           <eventlink id="VirtualThreadEnd"></eventlink>,

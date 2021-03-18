@@ -124,14 +124,14 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
     }
     check_jvmti_status(jni, err, "SuspendThread");
 
-    err = jvmti->GetVirtualThread(thread, &vthread);
+    err = GetVirtualThread(jvmti, jni, thread, &vthread);
     if (err == JVMTI_ERROR_THREAD_NOT_SUSPENDED) {
       // Some system threads might not fully suspended. so just skip them
       err = jvmti->ResumeThread(thread);
       check_jvmti_status(jni, err, "ResumeThread");
       continue;
     }
-    check_jvmti_status(jni, err, "GetVirtualThread");
+    check_jvmti_status(jni, err, "JVMTI extension GetVirtualThread");
     if (vthread != NULL) {
       printf("\n#### Found carrier thread: %s\n", tname);
       fflush(stdout);

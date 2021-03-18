@@ -134,8 +134,8 @@ breakpoint_hit1(jvmtiEnv *jvmti, JNIEnv* jni,
   // Test GetVirtualThread for carrier thread.
   printf("Hit #1: Breakpoint: %s: checking GetVirtualThread on carrier thread: %p, %s\n",
          mname, (void*)cthread, tname); fflush(0);
-  err = jvmti->GetVirtualThread(cthread, &vthread);
-  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetVirtualThread");
+
+  vthread = get_virtual_thread(jvmti, jni, cthread);
 
   if (jni->IsSameObject(thread, vthread) != JNI_TRUE) {
     passed = JNI_FALSE;
@@ -286,7 +286,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   jthread cthread = NULL;
   char* mname = get_method_name(jvmti, jni, method);
   jboolean is_virtual = jni->IsVirtualThread(thread);
-  jvmtiError err;
 
   if (strcmp(mname, "brkpt") != 0) {
     printf("FAILED: got  unexpected breakpoint in method %s()\n", mname);
@@ -301,8 +300,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   print_frame_event_info(jvmti, jni, thread, method,
                          "Breakpoint", ++breakpoint_count);
 
-  err = jvmti->GetCarrierThread(thread, &cthread);
-  check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetCarrierThread");
+  cthread = get_carrier_thread(jvmti, jni, thread);
 
   if (brkptBreakpointHit == 1) { // 1st MethodExitTest.brkpt() breakpoint
     breakpoint_hit1(jvmti, jni, thread, cthread, is_virtual, mname);

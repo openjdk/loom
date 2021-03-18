@@ -118,8 +118,8 @@ test_GetVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthr
 
   printf("\n");
 
-  // #1: Test JVMTI GetVirtualThread function NULL thread (current)
-  err = jvmti->GetVirtualThread(NULL, &thread_vthread);
+  // #1: Test JVMTI GetVirtualThread extension function NULL thread (current)
+  err = GetVirtualThread(jvmti, jni, NULL, &thread_vthread);
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetVirtualThread with NULL thread (current)");
 
   if (thread_vthread == NULL) {
@@ -127,14 +127,14 @@ test_GetVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthr
   }
   printf("JVMTI GetVirtualThread with NULL thread (current) returned non-NULL vthread as expected\n");
 
-  // #2: Test JVMTI GetVirtualThread function with a bad thread
-  err = jvmti->GetVirtualThread(vthread, &thread_vthread);
+  // #2: Test JVMTI GetVirtualThread extension function with a bad thread
+  err = GetVirtualThread(jvmti, jni, vthread, &thread_vthread);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     fatal(jni, "event handler: JVMTI GetVirtualThread with bad thread failed to return JVMTI_ERROR_INVALID_THREAD");
   }
 
-  // #3: Test JVMTI GetVirtualThread function with a good thread
-  err = jvmti->GetVirtualThread(thread, &thread_vthread);
+  // #3: Test JVMTI GetVirtualThread extension function with a good thread
+  err = GetVirtualThread(jvmti, jni,thread, &thread_vthread);
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetVirtualThread");
 
   if (thread_vthread == NULL) {
@@ -150,20 +150,20 @@ test_GetCarrierThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthr
 
   printf("\n");
 
-  // #1: Test JVMTI GetCarrierThread function with NULL vthread
-  err = jvmti->GetCarrierThread(NULL, &vthread_thread);
+  // #1: Test JVMTI GetCarrierThread extension function with NULL vthread
+  err = GetCarrierThread(jvmti, jni, NULL, &vthread_thread);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     fatal(jni, "event handler: JVMTI GetCarrierThread with NULL vthread failed to return JVMTI_ERROR_INVALID_THREAD");
   }
 
-  // #2: Test JVMTI GetCarrierThread function with a bad vthread
-  err = jvmti->GetCarrierThread(thread, &vthread_thread);
+  // #2: Test JVMTI GetCarrierThread extension function with a bad vthread
+  err = GetCarrierThread(jvmti, jni, thread, &vthread_thread);
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     fatal(jni, "event handler: JVMTI GetCarrierThread with bad vthread failed to return JVMTI_ERROR_INVALID_THREAD");
   }
 
-  // #3: Test JVMTI GetCarrierThread function with a good vthread
-  err = jvmti->GetCarrierThread(vthread, &vthread_thread);
+  // #3: Test JVMTI GetCarrierThread extension function with a good vthread
+  err = GetCarrierThread(jvmti, jni, vthread, &vthread_thread);
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetCarrierThread");
 
   if (vthread_thread == NULL) {
@@ -477,8 +477,6 @@ static void
 processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *event_name) {
   static int vthread_events_cnt = 0;
   char* tname = get_thread_name(jvmti, jni, vthread);
-  jthread cthread = NULL;
-  jvmtiError err;
 
   if (strcmp(event_name, "VirtualThreadEnd") != 0 &&
       strcmp(event_name, "VirtualThreadStart")  != 0) {
@@ -488,8 +486,7 @@ processVThreadEvent(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *e
   }
   printf("processVThreadEvent: event: %s, thread: %s\n", event_name, tname); fflush(0);
 
-  err = jvmti->GetCarrierThread(vthread, &cthread);
-  check_jvmti_status(jni, err, "processVThreadEvent: error in JVMTI GetCarrierThread");
+  jthread cthread = get_carrier_thread(jvmti, jni, vthread);
 
   print_vthread_event_info(jvmti, jni, cthread, vthread, event_name);
 

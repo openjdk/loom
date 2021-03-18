@@ -174,7 +174,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
                              "Breakpoint", ++breakpoint_count);
       if (is_virtual) {
           jthread cthread = NULL;
-          err = jvmti->GetCarrierThread(thread, &cthread);
+          cthread = get_carrier_thread(jvmti, jni, thread);
           print_frame_event_info(jvmti, jni, cthread, method,
                                  "Breakpoint", breakpoint_count);
           // Continuation.run() should always be considered to be in the cthread, not the vthread.
@@ -214,8 +214,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     qPutBreakpointHit++;
     print_frame_event_info(jvmti, jni, thread, method,
                            "Breakpoint", ++breakpoint_count);
-    err = jvmti->GetCarrierThread(thread, &cthread);
-    check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetCarrierThread");
+    cthread = get_carrier_thread(jvmti, jni, thread);
     if (qPutBreakpointHit == 1) {
       // We hit our 1st DoContinueSingleStepTest.qPut() breakpoint. Now setup single stepping
       // on the carrier thread. We should not get a single step event before hitting this breakpoint
@@ -330,8 +329,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     }
     jthread cthread = thread;
     if (is_virtual) {
-      err = jvmti->GetCarrierThread(thread, &cthread);
-      check_jvmti_status(jni, err, "Breakpoint: error in JVMTI GetCarrierThread");
+      cthread = get_carrier_thread(jvmti, jni, thread);
     }
     printf("SingleStep: %s: disabling SingleStep events on carrier thread\n", mname);
     err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, cthread);

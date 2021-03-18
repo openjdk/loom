@@ -85,7 +85,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     for (int i = 0; i < count; i++) {
       jthread tested_thread = NULL;
 
-      err = jvmti->GetVirtualThread(threads[i], &tested_thread);
+      err = GetVirtualThread(jvmti, jni, threads[i], &tested_thread);
       if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
         continue;
       }

@@ -1235,7 +1235,6 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
   JavaThread* cur_thread = JavaThread::current();
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
-  ThreadsListHandle tlh(cur_thread);
 
   if (thread == NULL) {
     java_thread = cur_thread;
@@ -1244,7 +1243,7 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
       return JVMTI_ERROR_INVALID_THREAD;
     }
   } else {
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(t_list, thread, &java_thread, &thread_oop);
     if (err != JVMTI_ERROR_NONE) {
       // We got an error code so we don't have a JavaThread*, but only return
       // an error from here if we didn't get a valid thread_oop. In a vthread case

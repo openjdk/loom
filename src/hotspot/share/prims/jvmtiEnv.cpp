@@ -867,6 +867,7 @@ JvmtiEnv::GetJLocationFormat(jvmtiJlocationFormat* format_ptr) {
   // Functions supporting virtual threads
   //
 
+#if 0
 // java_thread - pre-checked
 // vthread_ptr - pre-checked for NULL
 jvmtiError
@@ -874,15 +875,11 @@ JvmtiEnv::GetVirtualThread(JavaThread* java_thread, jthread* vthread_ptr) {
   JavaThread* current_thread = JavaThread::current();
   ResourceMark rm(current_thread);
   oop vthread_oop = NULL;
-  uint32_t debug_bits = 0;
 
   JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
   }
-  // if (!java_thread->is_thread_fully_suspended(true, &debug_bits)) {
-  //   return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
-  // }
   vthread_oop = java_thread->mounted_vthread();
   if (!java_lang_VirtualThread::is_instance(vthread_oop)) { // not a virtual thread
     vthread_oop = NULL;
@@ -905,6 +902,7 @@ JvmtiEnv::GetCarrierThread(jthread vthread, jthread* thread_ptr) {
   Handshake::execute(&op, current_thread);
   return op.result();
 } /* end GetCarrierThread */
+#endif // if 0
 
   //
   // Thread functions
