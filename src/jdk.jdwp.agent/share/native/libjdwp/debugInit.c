@@ -1028,7 +1028,7 @@ parseOptions(char *options)
     /* Set vthread debugging level. */
     gdata->vthreadsSupported = JNI_TRUE;
     gdata->trackAllVThreads = JNI_FALSE;
-    gdata->enumerateVThreads = JNI_TRUE;
+    gdata->enumerateVThreads = JNI_FALSE;
     gdata->fakeVThreadStartEvent = JNI_TRUE;
 
     /* Options being NULL will end up being an error. */

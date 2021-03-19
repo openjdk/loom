@@ -1456,9 +1456,9 @@ cbVThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
     }
 
     /* Ignore VIRTUAL_THREAD_START events unless we are notifying the debugger of all vthreads. */
-    if (!gdata->trackAllVThreads || !gdata->enumerateVThreads) {
-        return;
-    }
+//    if (!gdata->trackAllVThreads || !gdata->enumerateVThreads) {
+//        return;
+//    }
 
     BEGIN_CALLBACK() {
         (void)memset(&info,0,sizeof(info));

@@ -2348,7 +2348,7 @@ jvmtiEnv *jvmti;
     </function>
 
    <function id="ResumeAllVirtualThreads" num="119" since="16">
-      <synopsis>Suspend All Virtual Threads</synopsis>
+      <synopsis>Resume All Virtual Threads</synopsis>
       <description>
         Resume all virtual threads except those already resumed.
         Virtual threads may be suspended with
