@@ -26,6 +26,8 @@
 package java.nio;
 
 import java.io.FileDescriptor;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import jdk.internal.misc.Blocker;
 import jdk.internal.misc.Unsafe;
 
@@ -96,10 +98,14 @@ import jdk.internal.misc.Unsafe;
             long offset = mappingOffset(address, index);
             long mappingAddress = mappingAddress(address, offset, index);
             long mappingLength = mappingLength(offset, length);
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> force0(fd, mappingAddress, mappingLength));
-            } else {
-                force0(fd, mappingAddress, mappingLength);
+            try {
+                if (Thread.currentThread().isVirtual()) {
+                    Blocker.managedBlock(() -> force0(fd, mappingAddress, mappingLength));
+                } else {
+                    force0(fd, mappingAddress, mappingLength);
+                }
+            } catch (IOException cause) {
+                throw new UncheckedIOException(cause);
             }
         }
     }
@@ -109,7 +115,7 @@ import jdk.internal.misc.Unsafe;
     private static native boolean isLoaded0(long address, long length, int pageCount);
     private static native void load0(long address, long length);
     private static native void unload0(long address, long length);
-    private static native void force0(FileDescriptor fd, long address, long length);
+    private static native void force0(FileDescriptor fd, long address, long length) throws IOException;
 
     // utility methods
 

@@ -31,7 +31,7 @@ import jdk.test.lib.process.ProcessTools;
  * @library /test/lib
  * @build AgentWithVThread AgentWithVThreadTest
  * @run driver jdk.test.lib.util.JavaAgentBuilder AgentWithVThread agent.jar
- * @run driver ClassFileInstaller AgentWithVThread
+ * @run driver jdk.test.lib.helpers.ClassFileInstaller AgentWithVThread
  * @run driver AgentWithVThreadTest
  */
 public class AgentWithVThreadTest {

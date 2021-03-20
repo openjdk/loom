@@ -644,7 +644,8 @@ class VirtualThread extends Thread {
         try {
             yieldContinuation();
         } finally {
-            assert Thread.currentThread() == this && state() == RUNNING : "this: " + this + " Thread.currentThread(): " + Thread.currentThread() + " state(): " + state();
+            assert Thread.currentThread() == this && state() == RUNNING :
+                "this: " + this + " currentThread: " + Thread.currentThread() + " state: " + state();
         }
     }
 
