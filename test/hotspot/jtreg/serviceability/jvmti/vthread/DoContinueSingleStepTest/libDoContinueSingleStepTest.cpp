@@ -395,16 +395,36 @@ VirtualThreadEnd(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   //processFiberEvent(jvmti, jni, vthread, "VirtualThreadEnd");
 }
 
+// Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
-VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
+VirtualThreadMount(jvmtiEnv *jvmti, ...) {
+  va_list ap;
+  JNIEnv* jni = NULL;
+  jthread thread = NULL;
+
+  va_start(ap, jvmti);
+  jni = va_arg(ap, JNIEnv*);
+  thread = va_arg(ap, jthread);
+  va_end(ap);
+
   RawMonitorLocker rml(jvmti, jni, event_mon);
-  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadMounted");
+  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadMount");
 }
 
+// Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
-VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
+VirtualThreadUnmount(jvmtiEnv *jvmti, ...) {
+  va_list ap;
+  JNIEnv* jni = NULL;
+  jthread thread = NULL;
+
+  va_start(ap, jvmti);
+  jni = va_arg(ap, JNIEnv*);
+  thread = va_arg(ap, jthread);
+  va_end(ap);
+
   RawMonitorLocker rml(jvmti, jni, event_mon);
-  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadUnmounted");
+  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadUnmount");
 }
 
 JNIEXPORT jint JNICALL
@@ -426,8 +446,19 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.MethodExit  = &MethodExit;
   callbacks.VirtualThreadStart     = &VirtualThreadStart;
   callbacks.VirtualThreadEnd       = &VirtualThreadEnd;
-  callbacks.VirtualThreadMounted   = &VirtualThreadMounted;
-  callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
+
+  err = set_ext_event_callback(jvmti, "VirtualThreadMount", VirtualThreadMount);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
+  err = set_ext_event_callback(jvmti, "VirtualThreadUnmount", VirtualThreadUnmount);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadUnmount: %s(%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
 
   memset(&caps, 0, sizeof(caps));
   caps.can_generate_breakpoint_events = 1;
@@ -440,21 +471,25 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
+    return JNI_ERR;
   }
 
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
     printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
+    return JNI_ERR;
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FRAME_POP, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    return JNI_ERR;
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    return JNI_ERR;
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_END, NULL);
@@ -462,14 +497,16 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_MOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    return JNI_ERR;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    return JNI_ERR;
   }
 
   event_mon = create_raw_monitor(jvmti, "Events Monitor");

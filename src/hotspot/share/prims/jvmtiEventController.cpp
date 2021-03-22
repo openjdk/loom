@@ -90,14 +90,14 @@ static const jlong  VM_OBJECT_ALLOC_BIT = (((jlong)1) << (JVMTI_EVENT_VM_OBJECT_
 static const jlong  SAMPLED_OBJECT_ALLOC_BIT = (((jlong)1) << (JVMTI_EVENT_SAMPLED_OBJECT_ALLOC - TOTAL_MIN_EVENT_TYPE_VAL));
 static const jlong  VTHREAD_START_BIT = (((jlong)1) << (JVMTI_EVENT_VIRTUAL_THREAD_START - TOTAL_MIN_EVENT_TYPE_VAL));
 static const jlong  VTHREAD_END_BIT = (((jlong)1) << (JVMTI_EVENT_VIRTUAL_THREAD_END - TOTAL_MIN_EVENT_TYPE_VAL));
-static const jlong  VTHREAD_MOUNTED_BIT = (((jlong)1) << (JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED - TOTAL_MIN_EVENT_TYPE_VAL));
-static const jlong  VTHREAD_UNMOUNTED_BIT = (((jlong)1) << (JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED - TOTAL_MIN_EVENT_TYPE_VAL));
 
 // bits for extension events
 static const jlong  CLASS_UNLOAD_BIT = (((jlong)1) << (EXT_EVENT_CLASS_UNLOAD - TOTAL_MIN_EVENT_TYPE_VAL));
+static const jlong  VTHREAD_MOUNT_BIT = (((jlong)1) << (EXT_EVENT_VIRTUAL_THREAD_MOUNT - TOTAL_MIN_EVENT_TYPE_VAL));
+static const jlong  VTHREAD_UNMOUNT_BIT = (((jlong)1) << (EXT_EVENT_VIRTUAL_THREAD_UNMOUNT - TOTAL_MIN_EVENT_TYPE_VAL));
 
 
-static const jlong  VTHREAD_BITS = VTHREAD_START_BIT | VTHREAD_END_BIT | VTHREAD_MOUNTED_BIT | VTHREAD_UNMOUNTED_BIT;
+static const jlong  VTHREAD_BITS = VTHREAD_START_BIT | VTHREAD_END_BIT | VTHREAD_MOUNT_BIT | VTHREAD_UNMOUNT_BIT;
 static const jlong  MONITOR_BITS = MONITOR_CONTENDED_ENTER_BIT | MONITOR_CONTENDED_ENTERED_BIT |
                           MONITOR_WAIT_BIT | MONITOR_WAITED_BIT;
 static const jlong  EXCEPTION_BITS = EXCEPTION_THROW_BIT | EXCEPTION_CATCH_BIT;
@@ -675,8 +675,8 @@ JvmtiEventControllerPrivate::recompute_enabled() {
     JvmtiExport::set_should_post_sampled_object_alloc((any_env_thread_enabled & SAMPLED_OBJECT_ALLOC_BIT) != 0);
     JvmtiExport::set_should_post_vthread_start((any_env_thread_enabled & VTHREAD_START_BIT) != 0);
     JvmtiExport::set_should_post_vthread_end((any_env_thread_enabled & VTHREAD_END_BIT) != 0);
-    JvmtiExport::set_should_post_vthread_mounted((any_env_thread_enabled & VTHREAD_MOUNTED_BIT) != 0);
-    JvmtiExport::set_should_post_vthread_unmounted((any_env_thread_enabled & VTHREAD_UNMOUNTED_BIT) != 0);
+    JvmtiExport::set_should_post_vthread_mount((any_env_thread_enabled & VTHREAD_MOUNT_BIT) != 0);
+    JvmtiExport::set_should_post_vthread_unmount((any_env_thread_enabled & VTHREAD_UNMOUNT_BIT) != 0);
 
     // need this if we want thread events or we need them to init data
     JvmtiExport::set_should_post_thread_life((any_env_thread_enabled & NEED_THREAD_LIFE_EVENTS) != 0);
@@ -752,7 +752,8 @@ void JvmtiEventControllerPrivate::set_event_callbacks(JvmtiEnvBase *env,
   flush_object_free_events(env);
 
   env->set_event_callbacks(callbacks, size_of_callbacks);
-  jlong enabled_bits = 0;
+  jlong enabled_bits = env->env_event_enable()->_event_callback_enabled.get_bits();
+
   for (int ei = JVMTI_MIN_EVENT_TYPE_VAL; ei <= JVMTI_MAX_EVENT_TYPE_VAL; ++ei) {
     jvmtiEvent evt_t = (jvmtiEvent)ei;
     if (env->has_callback(evt_t)) {
@@ -786,13 +787,18 @@ JvmtiEventControllerPrivate::set_extension_event_callback(JvmtiEnvBase *env,
   // environment check and before the lock is acquired.
   // We can safely do the is_valid check now, as JvmtiThreadState_lock is held.
   bool enabling = (callback != NULL) && (env->is_valid());
-  env->env_event_enable()->set_user_enabled(event_type, enabling);
 
   // update the callback
   jvmtiExtEventCallbacks* ext_callbacks = env->ext_callbacks();
   switch (extension_event_index) {
     case EXT_EVENT_CLASS_UNLOAD :
       ext_callbacks->ClassUnload = callback;
+      break;
+    case EXT_EVENT_VIRTUAL_THREAD_MOUNT :
+      ext_callbacks->VirtualThreadMount = callback;
+      break;
+    case EXT_EVENT_VIRTUAL_THREAD_UNMOUNT :
+      ext_callbacks->VirtualThreadUnmount = callback;
       break;
     default:
       ShouldNotReachHere();

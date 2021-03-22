@@ -201,18 +201,40 @@ void JvmtiExtensions::register_extensions() {
 
   // register our extension event
 
-  static jvmtiParamInfo event_params[] = {
+  static jvmtiParamInfo class_unload_event_params[] = {
     { (char*)"JNI Environment", JVMTI_KIND_IN_PTR, JVMTI_TYPE_JNIENV, JNI_FALSE },
     { (char*)"Class", JVMTI_KIND_IN_PTR, JVMTI_TYPE_CCHAR, JNI_FALSE }
   };
-  static jvmtiExtensionEventInfo ext_event = {
+  static jvmtiParamInfo virtual_thread_event_params[] = {
+    { (char*)"JNI Environment", JVMTI_KIND_IN_PTR, JVMTI_TYPE_JNIENV, JNI_FALSE },
+    { (char*)"Virtual Thread", JVMTI_KIND_IN, JVMTI_TYPE_JTHREAD, JNI_FALSE }
+  };
+
+  static jvmtiExtensionEventInfo class_unload_ext_event = {
     EXT_EVENT_CLASS_UNLOAD,
     (char*)"com.sun.hotspot.events.ClassUnload",
     (char*)"CLASS_UNLOAD event",
-    sizeof(event_params)/sizeof(event_params[0]),
-    event_params
+    sizeof(class_unload_event_params)/sizeof(class_unload_event_params[0]),
+    class_unload_event_params
   };
-  _ext_events->append(&ext_event);
+  static jvmtiExtensionEventInfo virtual_thread_mount_ext_event = {
+    EXT_EVENT_VIRTUAL_THREAD_MOUNT,
+    (char*)"com.sun.hotspot.events.VirtualThreadMount",
+    (char*)"VIRTUAL_THREAD_MOUNT event",
+    sizeof(virtual_thread_event_params)/sizeof(virtual_thread_event_params[0]),
+    virtual_thread_event_params
+  };
+  static jvmtiExtensionEventInfo virtual_thread_unmount_ext_event = {
+    EXT_EVENT_VIRTUAL_THREAD_UNMOUNT,
+    (char*)"com.sun.hotspot.events.VirtualThreadUnmount",
+    (char*)"VIRTUAL_THREAD_UNMOUNT event",
+    sizeof(virtual_thread_event_params)/sizeof(virtual_thread_event_params[0]),
+    virtual_thread_event_params
+  };
+
+  _ext_events->append(&class_unload_ext_event);
+  _ext_events->append(&virtual_thread_mount_ext_event);
+  _ext_events->append(&virtual_thread_unmount_ext_event);
 }
 
 

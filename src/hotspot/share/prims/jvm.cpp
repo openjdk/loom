@@ -3920,14 +3920,14 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
     jobject cthread = JNIHandles::make_local(thread, ct_oop);
     JFR_ONLY(Jfr::on_thread_start(cthread, vthread));
   }
-  if (JvmtiExport::should_post_vthread_mounted()) {
-    JvmtiExport::post_vthread_mounted(vthread);
+  if (JvmtiExport::should_post_vthread_mount()) {
+    JvmtiExport::post_vthread_mount(vthread);
   }
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread))
-  if (JvmtiExport::should_post_vthread_unmounted()) {
-    JvmtiExport::post_vthread_unmounted(vthread);
+  if (JvmtiExport::should_post_vthread_unmount()) {
+    JvmtiExport::post_vthread_unmount(vthread);
   }
   oop ct_oop = thread->threadObj();
   thread->rebind_to_jvmti_thread_state_of(ct_oop);

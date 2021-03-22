@@ -1285,8 +1285,8 @@ bool              JvmtiExport::_should_post_sampled_object_alloc          = fals
 bool              JvmtiExport::_should_post_on_exceptions                 = false;
 bool              JvmtiExport::_should_post_vthread_start                 = false;
 bool              JvmtiExport::_should_post_vthread_end                   = false;
-bool              JvmtiExport::_should_post_vthread_mounted               = false;
-bool              JvmtiExport::_should_post_vthread_unmounted             = false;
+bool              JvmtiExport::_should_post_vthread_mount                 = false;
+bool              JvmtiExport::_should_post_vthread_unmount               = false;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1589,19 +1589,20 @@ void JvmtiExport::post_vthread_end(jobject vthread) {
   }
 }
 
-void JvmtiExport::post_vthread_mounted(jobject vthread) {
+void JvmtiExport::post_vthread_mount(jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, ("[%p] Trg Virtual Thread Mounted event triggered", vthread));
+  JavaThread *thread = JavaThread::current();
+  HandleMark hm(thread);
+  EVT_TRIG_TRACE(EXT_EVENT_VIRTUAL_THREAD_MOUNT, ("[%p] Trg Virtual Thread Mount event triggered", vthread));
 
-  JavaThread *cur_thread = JavaThread::current();
-  JvmtiThreadState *state = cur_thread->jvmti_thread_state();
+  JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == NULL) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED)) {
+  if (state->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_MOUNT)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1609,12 +1610,12 @@ void JvmtiExport::post_vthread_mounted(jobject vthread) {
       if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
         continue;
       }
-      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED)) {
-        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, ("[%p] Evt Virtual Thread Mounted event sent", vthread));
+      if (ets->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_MOUNT)) {
+        EVT_TRACE(EXT_EVENT_VIRTUAL_THREAD_MOUNT, ("[%p] Evt Virtual Thread Mount event sent", vthread));
 
-        JvmtiVirtualThreadEventMark jem(cur_thread);
-        JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventVirtualThreadMounted callback = env->callbacks()->VirtualThreadMounted;
+        JvmtiVirtualThreadEventMark jem(thread);
+        JvmtiJavaThreadEventTransition jet(thread);
+        jvmtiExtensionEvent callback = env->ext_callbacks()->VirtualThreadMount;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
@@ -1623,19 +1624,20 @@ void JvmtiExport::post_vthread_mounted(jobject vthread) {
   }
 }
 
-void JvmtiExport::post_vthread_unmounted(jobject vthread) {
+void JvmtiExport::post_vthread_unmount(jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, ("[%p] Trg Virtual Thread Unmounted event triggered", vthread));
+  JavaThread *thread = JavaThread::current();
+  HandleMark hm(thread);
+  EVT_TRIG_TRACE(EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, ("[%p] Trg Virtual Thread Unmount event triggered", vthread));
 
-  JavaThread *cur_thread = JavaThread::current();
-  JvmtiThreadState *state = cur_thread->jvmti_thread_state();
+  JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == NULL) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED)) {
+  if (state->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_UNMOUNT)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1643,12 +1645,12 @@ void JvmtiExport::post_vthread_unmounted(jobject vthread) {
       if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
         continue;
       }
-      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED)) {
-        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, ("[%p] Evt Virtual Thread Unmounted event sent", vthread));
+      if (ets->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_UNMOUNT)) {
+        EVT_TRACE(EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, ("[%p] Evt Virtual Thread Unmount event sent", vthread));
 
-        JvmtiVirtualThreadEventMark jem(cur_thread);
-        JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventVirtualThreadUnmounted callback = env->callbacks()->VirtualThreadUnmounted;
+        JvmtiVirtualThreadEventMark jem(thread);
+        JvmtiJavaThreadEventTransition jet(thread);
+        jvmtiExtensionEvent callback = env->ext_callbacks()->VirtualThreadUnmount;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
