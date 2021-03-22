@@ -83,10 +83,10 @@ typedef struct {
     volatile jboolean vmDead; /* Once VM is dead it stays that way - don't put in init */
     jboolean assertOn;
     jboolean assertFatal;
-    jboolean vthreadsSupported;      /* If true, debugging support for vthreads is enabled.*/
-    jboolean notifyDebuggerOfAllVThreads; /* If true, the debugger will be notified of all known vthreads.
-                                           * If false the debugger is only notified of vthreads for which
-                                           * certain events have been received. */
+    jboolean vthreadsSupported; /* If true, debugging support for vthreads is enabled.*/
+    jboolean trackAllVThreads;  /* If true, track all vthreads. Otherwise just ones we get events on. */
+    jboolean enumerateVThreads; /* If true, JDWP APIs return tracked vthreads in thread lists. Otherwise they don't. */
+    jboolean fakeVThreadStartEvent; /* If true, send a fake THREAD_START event the first time we get an event on a vthread. */
     jboolean doerrorexit;
     jboolean modifiedUtf8;
     jboolean quiet;
@@ -172,8 +172,8 @@ typedef enum {
         EI_MONITOR_WAITED       = 18,
         EI_VM_INIT              = 19,
         EI_VM_DEATH             = 20,
-        EI_VIRTUAL_THREAD_SCHEDULED  = 21,
-        EI_VIRTUAL_THREAD_TERMINATED = 22,
+        EI_VIRTUAL_THREAD_START = 21,
+        EI_VIRTUAL_THREAD_END   = 22,
 
         EI_max                  = 22
 } EventIndex;

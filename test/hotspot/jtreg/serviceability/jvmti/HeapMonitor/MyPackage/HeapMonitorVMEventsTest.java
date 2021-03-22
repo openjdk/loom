@@ -37,7 +37,19 @@ import java.util.List;
  * @requires !vm.graal.enabled
  * @run main/othervm/native -XX:+UnlockDiagnosticVMOptions
  *                          -XX:DisableIntrinsic=_clone
- *                          -agentlib:HeapMonitorTest MyPackage.HeapMonitorVMEventsTest
+ *                          -agentlib:HeapMonitorTest MyPackage.HeapMonitorVMEventsTest kernel
+ */
+
+/**
+ * @test
+ * @summary Verifies that when the VM event is sent, sampled events are also collected.
+ * @build Frame HeapMonitor
+ * @compile HeapMonitorVMEventsTest.java
+ * @requires vm.jvmti
+ * @requires !vm.graal.enabled
+ * @run main/othervm/native -XX:+UnlockDiagnosticVMOptions
+ *                          -XX:DisableIntrinsic=_clone
+ *                          -agentlib:HeapMonitorTest MyPackage.HeapMonitorVMEventsTest virtual
  */
 
 public class HeapMonitorVMEventsTest implements Cloneable {
@@ -94,12 +106,20 @@ public class HeapMonitorVMEventsTest implements Cloneable {
     checkDifference(onlySampleCount, vmCount);
   }
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     if (!HeapMonitor.eventStorageIsEmpty()) {
       throw new RuntimeException("Storage is not empty at test start...");
     }
 
     HeapMonitor.sampleEverything();
-    compareSampledAndVM();
+
+    if(args[0].equals("virtual")) {
+        Thread t = Thread.ofVirtual().start(() -> {
+                compareSampledAndVM();
+            });
+        t.join();
+    } else {
+        compareSampledAndVM();
+    }
   }
 }

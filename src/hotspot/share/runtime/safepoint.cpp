@@ -595,7 +595,7 @@ public:
       const char* name = "cleaning keepalive jweak handles";
       EventSafepointCleanupTask event;
       TraceTime timer(name, TRACETIME_LOG(Info, safepoint, cleanup));
-      Continuations::cleanup_keepalives();
+      // Continuations::cleanup_keepalives();
 
       post_safepoint_cleanup_task_event(event, SafepointSynchronize::safepoint_id(), name);
     }
@@ -978,7 +978,7 @@ void ThreadSafepointState::handle_polling_page_exception() {
     // If we have a pending async exception deoptimize the frame
     // as otherwise we may never deliver it.
     if (self->has_async_condition()) {
-      ThreadInVMfromJavaNoAsyncException __tiv(self);
+      ThreadInVMfromJava __tiv(self, false /* check asyncs */);
       Deoptimization::deoptimize_frame(self, caller_fr.id());
     }
 

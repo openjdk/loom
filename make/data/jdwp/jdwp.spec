@@ -2520,9 +2520,9 @@ JDWP "Java(tm) Debug Wire Protocol"
                                 "\"*.Foo\" or \"java.*\". "
                         )
                     )
-                    (Alt VirtualThreadsExclude=13
+                    (Alt PlatformThreadsOnly=13
                         "For thread start and thread end events, restrict the "
-                        "events so they are not sent for virtual threads."
+                        "events so they are only sent for platform threads."
                     )
 
                 )

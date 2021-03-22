@@ -25,19 +25,35 @@
 
 package jdk.internal.misc;
 
-public class StackChunk {
-     private Continuation cont;
-     public StackChunk parent;
-     public int size; // in words
-     public int sp; // in words
-     private int argsize; // bottom stack-passed arguments, in words
-     private long pc;
-     private int gcSP;
-     private long markCycle;
+public final class StackChunk {
+    public static void init() {}
 
-     private int numFrames;
-     private int numOops;
-     private boolean mode;
-     
-     // the stack itself is appended here by the VM
+    public static final byte FLAG_HAS_INTERPRETED_FRAMES = 1 << 2;
+
+    private Continuation cont;
+    private StackChunk parent;
+    private int size; // in words
+    private int sp; // in words
+    private int argsize; // bottom stack-passed arguments, in words
+    private byte flags;
+    private long pc;
+
+    private int gcSP;
+    private long markCycle;
+
+    private int maxSize; // size when fully thawed on stack
+    private int numFrames;
+    private int numOops;
+    private boolean mode;
+   
+   // the stack itself is appended here by the VM
+
+    public Continuation cont() { return cont; }
+    public StackChunk parent() { return parent; }
+    public int size()          { return size; }
+    public int sp()            { return sp; }
+    public int argsize()       { return argsize; }
+    public int maxSize()       { return maxSize; }
+    public boolean isEmpty()   { return sp >= (size - argsize); }
+    public boolean isFlag(byte flag) { return (flags & flag) != 0; }
  }

@@ -541,6 +541,11 @@ final class StackStreamFactory {
             final Class<?> at(int index) {
                 return stackFrames[index].declaringClass();
             }
+
+            @Override
+            final boolean filter(int index) {
+                return stackFrames[index].declaringClass() == Continuation.class && "yield0".equals(stackFrames[index].getMethodName());
+            }
         }
 
         final Function<? super Stream<StackFrame>, ? extends T> function;  // callback
@@ -677,6 +682,9 @@ final class StackStreamFactory {
             @Override
             final Class<?> at(int index) { return classes[index];}
 
+            @Override
+            final boolean filter(int index) { return false; }
+
 
             // ------ subclass may override the following methods -------
             /**
@@ -809,6 +817,11 @@ final class StackStreamFactory {
             final Class<?> at(int index) {
                 return stackFrames[index].declaringClass();
             }
+
+            @Override
+            final boolean filter(int index) {
+                return stackFrames[index].declaringClass() == Continuation.class && "yield0".equals(stackFrames[index].getMethodName());
+            }
         }
 
         LiveStackInfoTraverser(StackWalker walker,
@@ -877,6 +890,13 @@ final class StackStreamFactory {
          * @return the class at the given position in the current batch.
          */
         abstract Class<?> at(int index);
+
+        /**
+         * Filter out frames at the top of a batch
+         * @param index the position of the frame.
+         * @return true if the frame should be skipped
+         */
+        abstract boolean filter(int index);
 
         // ------ subclass may override the following methods -------
 
@@ -981,16 +1001,13 @@ final class StackStreamFactory {
 
             this.origin = startIndex;
             this.fence = endIndex;
-            if (depth == 0 && fence > 0) {
-                // filter the frames due to the stack stream implementation
-                for (int i = START_POS; i < fence; i++) {
-                    Class<?> c = at(i);
-                    if (isDebug) System.err.format("  frame %d: %s%n", i, c);
-                    if (filterStackWalkImpl(c)) {
-                        origin++;
-                    } else {
-                        break;
-                    }
+            for (int i = START_POS; i < fence; i++) {
+                if (isDebug) System.err.format("  frame %d: %s%n", i, at(i));
+                if ((depth == 0 && filterStackWalkImpl(at(i))) // filter the frames due to the stack stream implementation
+                        || filter(i)) {
+                    origin++;
+                } else {
+                    break;
                 }
             }
         }

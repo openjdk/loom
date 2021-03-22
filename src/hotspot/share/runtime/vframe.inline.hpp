@@ -25,14 +25,20 @@
 #ifndef SHARE_RUNTIME_VFRAME_INLINE_HPP
 #define SHARE_RUNTIME_VFRAME_INLINE_HPP
 
-#include "classfile/javaClasses.inline.hpp"
+#include "oops/instanceStackChunkKlass.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/vframe.hpp"
 
-inline vframeStreamCommon::vframeStreamCommon(RegisterMap reg_map) : _reg_map(reg_map) {
+inline vframeStreamCommon::vframeStreamCommon(RegisterMap reg_map) : _reg_map(reg_map), _cont(NULL) {
   _thread = _reg_map.thread();
+}
+
+inline oop vframeStreamCommon::continuation() const { 
+  if (_reg_map.cont() != NULL) return _reg_map.cont();
+  if (_cont != NULL)           return _cont->continuation();
+  return NULL;
 }
 
 inline intptr_t* vframeStreamCommon::frame_id() const        { return _frame.id(); }
@@ -41,6 +47,8 @@ inline bool vframeStreamCommon::is_interpreted_frame() const { return _frame.is_
 
 inline bool vframeStreamCommon::is_entry_frame() const       { return _frame.is_entry_frame(); }
 
+extern "C" void pfl();
+
 inline void vframeStreamCommon::next() {
   // handle frames with inlining
   if (_mode == compiled_mode    && fill_in_compiled_inlined_sender()) return;
@@ -48,23 +56,30 @@ inline void vframeStreamCommon::next() {
   // handle general case
   do {
     bool cont_entry = false;
-    oop cont = _cont();
-    if (cont != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame)) {
+    if (Continuation::is_continuation_enterSpecial(_frame)) {
+      assert (!_reg_map.in_cont(), "");
+      assert (_cont != NULL, "");
+      assert (_cont->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont));
       cont_entry = true;
-      oop scope = java_lang_Continuation::scope(cont);
+      
+      oop scope = java_lang_Continuation::scope(_cont->cont_oop());
       if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
         _mode = at_end_mode;
         break;
       }
+    } else if (_reg_map.in_cont() && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
+      assert (_reg_map.cont() != NULL, "");
+      oop scope = java_lang_Continuation::scope(_reg_map.cont());
+      if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
+        _mode = at_end_mode;
+        break;
+      }      
     }
 
     _frame = _frame.sender(&_reg_map);
     
     if (cont_entry) {
-      *(_cont.raw_value()) = java_lang_Continuation::parent(cont);
-      assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()),
-        "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
-        p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
+      _cont = _cont->parent();
     }
   } while (!fill_from_frame());
 }
@@ -79,17 +94,14 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
   }
 
   _frame = vthread_carrier ? _thread->vthread_carrier_last_frame(&_reg_map) : _thread->last_frame();
-  oop cont = _thread->last_continuation()->cont_oop();
+  _cont = _thread->last_continuation();
   while (!fill_from_frame()) {
-    if (cont != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame)) {
-      cont = java_lang_Continuation::parent(cont);
+    if (_cont != NULL && Continuation::is_continuation_enterSpecial(_frame)) {
+      _cont = _cont->parent();
     }
     _frame = _frame.sender(&_reg_map);
   }
-  _cont = cont != (oop)NULL ? Handle(Thread::current(), cont) : Handle();
-  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()),
-        "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
-        p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
+  // assert (_reg_map.stack_chunk()() == (stackChunkOop)NULL, "map.chunk: " INTPTR_FORMAT, p2i((stackChunkOopDesc*)_reg_map.stack_chunk()()));
 }
 
 inline bool vframeStreamCommon::fill_in_compiled_inlined_sender() {
@@ -249,10 +261,10 @@ inline void vframeStreamCommon::fill_from_interpreter_frame() {
     method = _frame.interpreter_frame_method();
     bcp    = _frame.interpreter_frame_bcp();
   } else {
-    method = Continuation::interpreter_frame_method(_frame, &_reg_map);
-    bcp    = Continuation::interpreter_frame_bcp(_frame, &_reg_map);
+    method = _reg_map.stack_chunk()->interpreter_frame_method(_frame);
+    bcp    = _reg_map.stack_chunk()->interpreter_frame_bcp(_frame);
   }
-  int       bci    = method->validate_bci_from_bcp(bcp);
+  int bci  = method->validate_bci_from_bcp(bcp);
   // 6379830 AsyncGetCallTrace sometimes feeds us wild frames.
   // AsyncGetCallTrace interrupts the VM asynchronously. As a result
   // it is possible to access an interpreter frame for which

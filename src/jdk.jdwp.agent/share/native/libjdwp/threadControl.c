@@ -69,7 +69,7 @@ typedef struct ThreadNode {
     unsigned int pendingInterrupt : 1; /* true if thread is interrupted while handling an event. */
     unsigned int isDebugThread : 1;    /* true if this is one of our debug agent threads. */
     unsigned int suspendOnStart : 1;   /* true for new threads if we are currently in a VM.suspend(). */
-    unsigned int isStarted : 1;        /* THREAD_START or VIRTUAL_THREAD_SCHEDULED event received. */
+    unsigned int isStarted : 1;        /* THREAD_START or VIRTUAL_THREAD_START event received. */
     unsigned int is_vthread : 1;
     unsigned int popFrameEvent : 1;
     unsigned int popFrameProceed : 1;
@@ -1568,8 +1568,9 @@ contains(JNIEnv *env, jthread *list, jint count, jthread item)
 
 
 static jvmtiError
-incrementSupendCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
+incrementSuspendCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
 {
+    node->toBeResumed = JNI_TRUE;
     node->suspendCount++;
     return JVMTI_ERROR_NONE;
 }
@@ -1631,7 +1632,7 @@ threadControl_suspendAll(void)
              * commonResumeList(), so it's a bit orthogonal to how we handle incrementing
              * the suspendCount.
              */
-            error = enumerateOverThreadList(env, &runningVThreads, incrementSupendCountHelper, NULL);
+            error = enumerateOverThreadList(env, &runningVThreads, incrementSuspendCountHelper, NULL);
             JDI_ASSERT(error == JVMTI_ERROR_NONE);
         }
 
@@ -2689,6 +2690,11 @@ threadControl_allVThreads(jint *numVThreads)
     JNIEnv *env;
     ThreadNode *node;
     jthread* vthreads;
+
+    if (!gdata->enumerateVThreads) {
+      *numVThreads = 0;
+      return NULL;
+    }
 
     env = getEnv();
     debugMonitorEnter(threadLock);

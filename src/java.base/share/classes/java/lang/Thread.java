@@ -153,7 +153,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
  * Creating a {@code Thread} will inherit, by default, the initial values of {@code
- * InheritableThreadLocal} variables, {@linkplain Scoped#inheritableForType(Class)
+ * InheritableThreadLocal} variables, {@linkplain ScopeLocal#inheritableForType(Class)
  * inheritable-scoped-variables}, and a number of properties from the parent thread:
  * <ul>
  *     <li> Platform threads inherit the daemon status, priority, and thread-group.
@@ -248,8 +248,8 @@ public class Thread implements Runnable {
     // cache entries from the scoped variable cache.
     int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
-    Scoped.Binding<?> noninheritableScopeLocalBindings;
-    Scoped.Binding<?> inheritableScopeLocalBindings;
+    ScopeLocal.Snapshot noninheritableScopeLocalBindings;
+    ScopeLocal.Snapshot inheritableScopeLocalBindings;
 
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
@@ -364,17 +364,17 @@ public class Thread implements Runnable {
     @IntrinsicCandidate
     private static native Thread currentThread0();
 
-    // Scoped support:
+    // ScopeLocal support:
 
     /**
      * TBD
      * @return TBD
      */
     @IntrinsicCandidate
-    static native Object[] scopedCache();
+    static native Object[] scopeLocalCache();
 
     @IntrinsicCandidate
-    static native void setScopedCache(Object[] cache);
+    static native void setScopeLocalCache(Object[] cache);
 
     /**
      * A hint to the scheduler that the current thread is willing to yield
@@ -1072,7 +1072,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, null, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
@@ -1088,7 +1088,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, task, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
@@ -1118,7 +1118,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (group, task, gname)} ,where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
@@ -1151,7 +1151,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, null, name)}.
      *
@@ -1168,7 +1168,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (group, null, name)}.
      *
@@ -1197,7 +1197,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object. This constructor has the same
+     * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, task, name)}.
      *
@@ -1219,7 +1219,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object so that it has {@code task}
+     * Allocates a new platform {@code Thread} so that it has {@code task}
      * as its run object, has the specified {@code name} as its name,
      * and belongs to the thread group referred to by {@code group}.
      *
@@ -1273,7 +1273,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object so that it has {@code task}
+     * Allocates a new platform {@code Thread} so that it has {@code task}
      * as its run object, has the specified {@code name} as its name,
      * and belongs to the thread group referred to by {@code group}, and has
      * the specified <i>stack size</i>.
@@ -1355,7 +1355,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new {@code Thread} object so that it has {@code task}
+     * Allocates a new platform {@code Thread} so that it has {@code task}
      * as its run object, has the specified {@code name} as its name,
      * belongs to the thread group referred to by {@code group}, has
      * the specified {@code stackSize}, and inherits initial values for

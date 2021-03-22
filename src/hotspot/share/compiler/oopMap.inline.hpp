@@ -50,17 +50,47 @@ template <typename OopFnT, typename DerivedOopFnT, typename ValueFilterT>
 template <typename RegisterMapT>
 void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame *fr, const RegisterMapT *reg_map, const ImmutableOopMap* oopmap) {
   NOT_PRODUCT(if (TraceCodeBlobStacks) OopMapSet::trace_codeblob_maps(fr, reg_map->as_RegisterMap());)
+  assert (fr != NULL, "");
 
   // handle derived pointers first (otherwise base pointer may be
   // changed before derived pointer offset has been collected)
-  if (reg_map->validate_oops())
-    walk_derived_pointers(fr, oopmap, reg_map);
+  {
+    assert (_derived_oop_fn != NULL, "");
+    for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
+      OopMapValue omv = oms.current();
+      if (omv.type() != OopMapValue::derived_oop_value)
+        continue;
+        
+  #ifndef COMPILER2
+      COMPILER1_PRESENT(ShouldNotReachHere();)
+  #if INCLUDE_JVMCI
+      if (UseJVMCICompiler) {
+        ShouldNotReachHere();
+      }
+  #endif
+  #endif // !COMPILER2
 
-  OopMapValue omv;
+      oop* loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
+
+      DEBUG_ONLY(if (reg_map->should_skip_missing()) continue;)
+      guarantee(loc != NULL, "missing saved register");
+      oop *derived_loc = loc;
+      oop *base_loc    = fr->oopmapreg_to_location(omv.content_reg(), reg_map);
+      // Ignore NULL oops and decoded NULL narrow oops which
+      // equal to CompressedOops::base() when a narrow oop
+      // implicit null check is used in compiled code.
+      // The narrow_oop_base could be NULL or be the address
+      // of the page below heap depending on compressed oops mode.
+      if (base_loc != NULL && *base_loc != (oop)NULL && !CompressedOops::is_base(*base_loc)) {
+        _derived_oop_fn->do_derived_oop(base_loc, derived_loc);
+      }
+    }
+  }
+
   // We want coop and oop oop_types
   {
     for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
-      omv = oms.current();
+      OopMapValue omv = oms.current();
       if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
         continue;
       oop* loc = fr->oopmapreg_to_location(omv.reg(),reg_map);
@@ -69,13 +99,13 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
       // this was allowed previously because value_value items might
       // be missing?
 #ifdef ASSERT
-    if (loc == NULL) {
-      if (reg_map->should_skip_missing())
-        continue;
-      VMReg reg = omv.reg();
-      tty->print_cr("missing saved register: reg: " INTPTR_FORMAT " %s loc: %p", reg->value(), reg->name(), loc);
-      fr->print_on(tty);
-    }
+      if (loc == NULL) {
+        if (reg_map->should_skip_missing())
+          continue;
+        VMReg reg = omv.reg();
+        tty->print_cr("missing saved register: reg: " INTPTR_FORMAT " %s loc: %p", reg->value(), reg->name(), loc);
+        fr->print_on(tty);
+      }
 #endif
       guarantee(loc != NULL, "missing saved register");
       if ( omv.type() == OopMapValue::oop_value ) {
@@ -88,27 +118,6 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
           // of the page below heap depending on compressed oops mode.
           continue;
         }
-#ifdef ASSERT
-        // We can not verify the oop here if we are using ZGC, the oop
-        // will be bad in case we had a safepoint between a load and a
-        // load barrier.
-        if (!UseZGC && reg_map->validate_oops() &&
-            ((((uintptr_t)loc & (sizeof(*loc)-1)) != 0) ||
-             !Universe::heap()->is_in_or_null(*loc))) {
-          tty->print_cr("# Found non oop pointer.  Dumping state at failure");
-          // try to dump out some helpful debugging information
-          OopMapSet::trace_codeblob_maps(fr, reg_map->as_RegisterMap());
-          omv.print();
-          tty->print_cr("register r");
-          omv.reg()->print();
-          tty->print_cr("loc = %p *loc = %p\n", loc, cast_from_oop<address>(*loc));
-          // os::print_location(tty, (intptr_t)*loc);
-          tty->print("pc: "); os::print_location(tty, (intptr_t)fr->pc());
-          fr->print_value_on(tty, NULL);
-          // do the real assert.
-          assert(Universe::heap()->is_in_or_null(*loc), "found non oop pointer");
-        }
-#endif // ASSERT
         _oop_fn->do_oop(loc);
       } else if ( omv.type() == OopMapValue::narrowoop_value ) {
         narrowOop *nl = (narrowOop*)loc;
@@ -124,48 +133,6 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
 #endif
         _oop_fn->do_oop(nl);
       }
-    }
-  }
-
-  // When thawing continuation frames, we want to walk derived pointers
-  // after walking oops
-  if (!reg_map->validate_oops())
-    walk_derived_pointers(fr, oopmap, reg_map);
-}
-
-template <typename OopMapFnT, typename DerivedOopFnT, typename ValueFilterT>
-template <typename RegisterMapT>
-void OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers(const frame *fr, const ImmutableOopMap* map, const RegisterMapT *reg_map) {
-  assert (fr != NULL, "");
-  assert (_derived_oop_fn != NULL, "");
-  OopMapValue omv;
-  for (OopMapStream oms(map); !oms.is_done(); oms.next()) {
-    omv = oms.current();
-    if (omv.type() != OopMapValue::derived_oop_value)
-      continue;
-      
-#ifndef COMPILER2
-    COMPILER1_PRESENT(ShouldNotReachHere();)
-#if INCLUDE_JVMCI
-    if (UseJVMCICompiler) {
-      ShouldNotReachHere();
-    }
-#endif
-#endif // !COMPILER2
-
-    oop* loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
-
-    DEBUG_ONLY(if (reg_map->should_skip_missing()) continue;)
-    guarantee(loc != NULL, "missing saved register");
-    oop *derived_loc = loc;
-    oop *base_loc    = fr->oopmapreg_to_location(omv.content_reg(), reg_map);
-    // Ignore NULL oops and decoded NULL narrow oops which
-    // equal to CompressedOops::base() when a narrow oop
-    // implicit null check is used in compiled code.
-    // The narrow_oop_base could be NULL or be the address
-    // of the page below heap depending on compressed oops mode.
-    if (base_loc != NULL && *base_loc != (oop)NULL && !CompressedOops::is_base(*base_loc)) {
-      _derived_oop_fn->do_derived_oop(base_loc, derived_loc);
     }
   }
 }

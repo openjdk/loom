@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -435,8 +435,8 @@ handleEventCommandSingle(JNIEnv *env, PacketOutputStream *out,
         case EI_THREAD_END:
             writeThreadEvent(env, out, evinfo);
             break;
-        case EI_VIRTUAL_THREAD_SCHEDULED:
-        case EI_VIRTUAL_THREAD_TERMINATED:
+        case EI_VIRTUAL_THREAD_START:
+        case EI_VIRTUAL_THREAD_END:
             /* Note that when we wrote the evinfo->ei byte above, it was mapped to an EI_THREAD_XXX event
              * by eventIndex2jdwp(), so we didn't actually write the VIRTUAL_THREAD ei byte.
              */

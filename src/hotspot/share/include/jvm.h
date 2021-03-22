@@ -238,10 +238,10 @@ JVM_CallStackWalk(JNIEnv *env, jobject stackStream, jlong mode,
                   jint frame_count, jint start_index, jobjectArray frames);
 
 JNIEXPORT jobject JNICALL
-JVM_ScopedCache(JNIEnv *env, jclass threadClass);
+JVM_ScopeLocalCache(JNIEnv *env, jclass threadClass);
 
 JNIEXPORT void JNICALL
-JVM_SetScopedCache(JNIEnv *env, jclass threadClass, jobject theCache);
+JVM_SetScopeLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
 
 JNIEXPORT jobject JNICALL
 JVM_Vthread(JNIEnv *env, jclass threadClass);

@@ -145,22 +145,11 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
 
 JNIEXPORT void JNICALL
 MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject monitor) {
-  jvmtiError err;
-  jthread cthread = NULL;
-  jobject contended_monitor = NULL;
-
   if (CheckLockObject(jni, monitor) == JNI_FALSE) {
     return; // Not tested monitor
   }
 
-  err = jvmti->GetCarrierThread(vthread, &cthread);
-  if (err != JVMTI_ERROR_NONE) {
-    ShowErrorMessage(jvmti, err, "MonitorContendedEnter",
-                     "error in JVMTI GetCarrierThread");
-    event_has_posted = JNI_TRUE;
-    status = STATUS_FAILED;
-    return;
-  }
+  jthread cthread = get_carrier_thread(jvmti, jni, vthread);
 
   char* vtname = get_thread_name(jvmti, jni, vthread);
   char* ctname = get_thread_name(jvmti, jni, cthread);
@@ -180,21 +169,11 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject mon
 
 JNIEXPORT void JNICALL
 MonitorContendedEntered(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject monitor) {
-  jthread cthread = NULL;
-  jobject contended_monitor = (jobject)cthread; // init with a wrong monitor
-  jvmtiError err;
-
   if (CheckLockObject(jni, monitor) == JNI_FALSE) {
     return; // Not tested monitor
   }
 
-  err = jvmti->GetCarrierThread(vthread, &cthread);
-  if (err != JVMTI_ERROR_NONE) {
-    ShowErrorMessage(jvmti, err, "MonitorContendedEntered",
-                     "error in JVMTI GetCarrierThread");
-    status = STATUS_FAILED;
-    return;
-  }
+  jthread cthread = get_carrier_thread(jvmti, jni, vthread);
   char* vtname = get_thread_name(jvmti, jni, vthread);
   char* ctname = get_thread_name(jvmti, jni, cthread);
 

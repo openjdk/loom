@@ -99,7 +99,8 @@ children(PacketInputStream *in, PacketOutputStream *out)
          return JNI_TRUE;
      }
 
-     is_vthread_group = isSameObject(env, group, gdata->vthreadThreadGroup);
+     //is_vthread_group = isSameObject(env, group, gdata->vthreadThreadGroup);
+     is_vthread_group = JNI_FALSE;
 
      WITH_LOCAL_REFS(env, 2) {
 

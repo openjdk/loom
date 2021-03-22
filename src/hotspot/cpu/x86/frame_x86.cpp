@@ -323,8 +323,12 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
   return (BasicObjectLock*) addr_at(interpreter_frame_monitor_block_bottom_offset);
 }
 
+template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
+
+template <bool relative>
 BasicObjectLock* frame::interpreter_frame_monitor_end() const {
-  BasicObjectLock* result = (BasicObjectLock*) *addr_at(interpreter_frame_monitor_block_top_offset);
+  BasicObjectLock* result = (BasicObjectLock*) at<relative>(interpreter_frame_monitor_block_top_offset);
   // make sure the pointer points inside the frame
   assert(sp() <= (intptr_t*) result, "monitor end should be above the stack pointer");
   assert((intptr_t*) result < fp(),  "monitor end should be strictly below the frame pointer: result: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(result), p2i(fp()));
@@ -405,10 +409,6 @@ void frame::adjust_unextended_sp() {
 //------------------------------------------------------------------------------
 // frame::sender_for_interpreter_frame
 frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
-  if (map->in_cont()) { // already in an h-stack
-    return Continuation::sender_for_interpreter_frame(*this, map);
-  }
-
   // SP is the raw SP from the sender after adapter or interpreter
   // extension.
   intptr_t* sender_sp = this->sender_sp();
@@ -431,9 +431,6 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
     } else {
       Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &unextended_sp);
     }
-  } else if (map->walk_cont() && Continuation::is_continuation_enterSpecial(*this)) {
-    assert (map->cont() != (oop)NULL, "");
-    map->set_cont(Continuation::continuation_parent(map->cont()));
   }
 
   return frame(sender_sp, unextended_sp, sender_fp, sender_pc);
@@ -574,10 +571,13 @@ BasicType frame::interpreter_frame_result(oop* oop_result, jvalue* value_result)
   return type;
 }
 
+template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
 
+template <bool relative>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
-  return &interpreter_frame_tos_address()[index];
+  return &interpreter_frame_tos_address<relative>()[index];
 }
 
 #ifndef PRODUCT

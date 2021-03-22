@@ -24,6 +24,8 @@ java/lang/Thread/UncaughtExceptionsTest.java                                    
 
 java/lang/Thread/virtual/stress/PinALot.java#id2                                                8255275 generic-all
 
+java/lang/annotation/LoaderLeakTest.java                                                        8263758 generic-all
+
 java/foreign/TestMismatch.java                                                                  8253918 generic-all
 jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
 java/lang/Continuation/Basic.java#id0                                                           8253918 generic-all
@@ -64,7 +66,6 @@ sun/util/resources/cldr/TimeZoneNamesTest.java                                  
 
 # Failed because of known bug but reproduced only in loom-tier3 with wrapper only now
 java/lang/invoke/MethodHandles/CatchExceptionTest.java                                          8146623 generic-all
-
 
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread

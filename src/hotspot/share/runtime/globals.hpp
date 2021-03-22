@@ -2063,18 +2063,14 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, LoomGenCode, true,                                          \
           "Generate oopmap code")                                           \
                                                                             \
+  develop(bool, LoomDeoptAfterThaw, false,                                  \
+          "Deopt stack after thaw")                                         \
                                                                             \
   develop(bool, LoomVerifyAfterThaw, false,                                 \
           "Verify stack after thaw")                                        \
                                                                             \
-  product(bool, UseContinuationLazyCopy, true,                              \
-          "Use lazy-copy in continuations")                                 \
-                                                                            \
   product(bool, UseContinuationStrong, true,                                \
           "The weak keepalive is considered strong on stack")               \
-                                                                            \
-  product(bool, UseContinuationChunks, true,                                \
-         "Fast younggen freeze/thaw")                                       \
                                                                             \
   product(bool, TrimContinuationChunksInGC, false,                          \
          "Trim stack chunks when copying objects in GC")                    \
@@ -2088,7 +2084,7 @@ const intx ObjectAlignmentInBytes = 8;
   develop(bool, VerifyContinuations, true,                                  \
           "Verify continuation consistency")                                \
                                                                             \
-  product(intx, ScopedCacheSize, 16,                                        \
+  product(intx, ScopeLocalCacheSize, 16,                                    \
           "Size of the cache for scoped values")                            \
            range(0, max_intx)                                               \
                                                                             \

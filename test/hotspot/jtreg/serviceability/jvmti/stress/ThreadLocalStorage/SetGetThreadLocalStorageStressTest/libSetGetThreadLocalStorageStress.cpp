@@ -136,7 +136,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
       jthread testedThread = NULL;
       jvmtiError err;
 
-      err = jvmti->GetVirtualThread(threads[i], &testedThread);
+      err = GetVirtualThread(jvmti, jni, threads[i], &testedThread);
       if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
         continue;
       }
@@ -202,18 +202,18 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
 */
 
 static void JNICALL
-VirtualThreadScheduled(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
+VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   RawMonitorLocker rml(jvmti, jni, monitor);
   if (is_vm_running) {
-    check_reset_tls(jvmti, jni, vthread, "VirtualThreadScheduled");
+    check_reset_tls(jvmti, jni, vthread, "VirtualThreadStart");
   }
 }
 
 static void JNICALL
-VirtualThreadTerminated(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
+VirtualThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   RawMonitorLocker rml(jvmti, jni, monitor);
   if (is_vm_running) {
-    check_reset_tls(jvmti, jni, vthread, "VirtualThreadTerminated");
+    check_reset_tls(jvmti, jni, vthread, "VirtualThreadEnd");
   }
 }
 
@@ -261,9 +261,9 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.VMDeath = &VMDeath;
   callbacks.ThreadStart = &ThreadStart;
   callbacks.ThreadEnd = &ThreadEnd;
- // callbacks.MethodEntry = &MethodEntry;
-  callbacks.VirtualThreadScheduled = &VirtualThreadScheduled;
-  callbacks.VirtualThreadTerminated = &VirtualThreadTerminated;
+  // callbacks.MethodEntry = &MethodEntry;
+  callbacks.VirtualThreadStart = &VirtualThreadStart;
+  callbacks.VirtualThreadEnd = &VirtualThreadEnd;
 
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
@@ -273,8 +273,8 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_DEATH, NULL);
   jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_START, NULL);
   jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_END, NULL);
-  jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, NULL);
-  jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, NULL);
+  jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
+  jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_END, NULL);
 
   //jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_METHOD_ENTRY, NULL);
 

@@ -281,7 +281,7 @@ void javaVFrame::print_lock_info_on(outputStream* st, int frame_count) {
 // ------------- interpretedVFrame --------------
 
 u_char* interpretedVFrame::bcp() const {
-    return (!register_map()->in_cont())  ? fr().interpreter_frame_bcp() : Continuation::interpreter_frame_bcp(fr(), register_map());
+  return (!register_map()->in_cont()) ? fr().interpreter_frame_bcp() : register_map()->stack_chunk()->interpreter_frame_bcp(fr());
 }
 
 void interpretedVFrame::set_bcp(u_char* bcp) {
@@ -313,7 +313,7 @@ int interpretedVFrame::bci() const {
 }
 
 Method* interpretedVFrame::method() const {
-  return (!register_map()->in_cont()) ? fr().interpreter_frame_method() : Continuation::interpreter_frame_method(fr(), register_map());
+  return (!register_map()->in_cont()) ? fr().interpreter_frame_method() : register_map()->stack_chunk()->interpreter_frame_method(fr());
 }
 
 static StackValue* create_stack_value_from_oop_map(const RegisterMap* reg_map,
@@ -326,16 +326,8 @@ static StackValue* create_stack_value_from_oop_map(const RegisterMap* reg_map,
 
   // categorize using oop_mask
   if (oop_mask.is_oop(index)) {
-    oop obj = NULL;
-    if (addr != NULL) {
-      // obj = (UseCompressedOops && reg_map->in_cont()) ? HeapAccess<IS_ARRAY>::oop_load((narrowOop*)addr) : *(oop*)addr;
-      if (UseCompressedOops && reg_map->in_cont())
-        obj = HeapAccess<IS_ARRAY>::oop_load((narrowOop*)addr);
-      else
-        obj = *(oop*)addr;
-    }
     // reference (oop) "r"
-    Handle h(Thread::current(), obj);
+    Handle h(Thread::current(), addr != NULL ? (*(oop*)addr) : (oop)NULL);
     return new StackValue(h);
   }
   // value (integer) "v"
@@ -369,7 +361,7 @@ static void stack_locals(StackValueCollection* result,
       addr = fr.interpreter_frame_local_at(i);
       assert(addr >= fr.sp(), "must be inside the frame");
     } else {
-      addr = (intptr_t*)Continuation::interpreter_frame_local_at(fr, reg_map, oop_mask, i);
+      addr = reg_map->stack_chunk()->interpreter_frame_local_at(fr, i);
     }
     assert(addr != NULL, "invariant");
 
@@ -399,7 +391,7 @@ static void stack_expressions(StackValueCollection* result,
         addr = NULL;
       }
     } else {
-      addr = (intptr_t*)Continuation::interpreter_frame_expression_stack_at(fr, reg_map, oop_mask, i);
+      addr = reg_map->stack_chunk()->interpreter_frame_expression_stack_at(fr, i);
     }
 
     StackValue* const sv = create_stack_value_from_oop_map(reg_map,
@@ -545,25 +537,21 @@ vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool s
   }
 
   _frame = _thread->last_frame();
-  oop cont = _thread->last_continuation()->cont_oop();
+  _cont = _thread->last_continuation();
   while (!fill_from_frame()) {
-    if (cont != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame)) {
-      cont = java_lang_Continuation::parent(cont);
+    if (Continuation::is_continuation_enterSpecial(_frame)) {
+      assert (_cont != NULL, "");
+      _cont = _cont->parent();
     }
     _frame = _frame.sender(&_reg_map);
   }
-  _cont = Handle(Thread::current(), cont);
-
-  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()), 
-    "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
-    p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
 }
 
-vframeStream::vframeStream(Handle continuation) 
+vframeStream::vframeStream(oop continuation, Handle continuation_scope) 
  : vframeStreamCommon(RegisterMap(continuation, true)) {
 
   _stop_at_java_call_stub = false;
-  _continuation_scope = Handle();
+  _continuation_scope = continuation_scope;
   
   if (!Continuation::has_last_Java_frame(continuation)) {
     _mode = at_end_mode;
@@ -571,14 +559,10 @@ vframeStream::vframeStream(Handle continuation)
   }
 
   _frame = Continuation::last_frame(continuation, &_reg_map);
-  _cont = continuation;
+  // _chunk = _reg_map.stack_chunk();
   while (!fill_from_frame()) {
     _frame = _frame.sender(&_reg_map);
   }
-
-  assert (_reg_map.cont() == (oop)NULL || (_cont() == _reg_map.cont()), 
-    "map.cont: " INTPTR_FORMAT " vframeStream: " INTPTR_FORMAT, 
-    p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_cont()));
 }
 
 
@@ -766,9 +750,7 @@ void javaVFrame::print_value() const {
   // Check frame size and print warning if it looks suspiciously large
   if (fr().sp() != NULL) {
     RegisterMap map = *register_map();
-    uint size = (map.in_cont() || Continuation::is_cont_barrier_frame(fr()))
-      ? Continuation::frame_size(fr(), &map)
-      : fr().frame_size();
+    uint size = fr().frame_size();
 #ifdef _LP64
     if (size > 8*K) warning("SUSPICIOUSLY LARGE FRAME (%d)", size);
 #else

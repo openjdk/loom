@@ -378,6 +378,7 @@ class Devirtualizer {
   template <typename OopClosureType>             static void do_klass(OopClosureType* closure, Klass* k);
   template <typename OopClosureType>             static void do_cld(OopClosureType* closure, ClassLoaderData* cld);
   template <typename OopClosureType>             static bool do_metadata(OopClosureType* closure);
+  template <typename DerivedOopClosureType>      static void do_derived_oop(DerivedOopClosureType* closure, oop* base, oop* derived);
 };
 
 class OopIteratorClosureDispatch {

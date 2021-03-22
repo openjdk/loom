@@ -26,15 +26,10 @@
  * @summary Functional test for continuations that are preempted and walked with StackWalker's LiveStackFrames
  * @build java.base/java.lang.PreemptLiveFrames
  * 
- * @run main/othervm -XX:+UnlockDiagnosticVMOptions -Xint -XX:-UseContinuationLazyCopy PreemptLiveFramesDriver
- * @run main/othervm -XX:+UnlockDiagnosticVMOptions -Xint -XX:+UseContinuationLazyCopy PreemptLiveFramesDriver
- * @run main/othervm -XX:+UnlockDiagnosticVMOptions -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,java/lang/PreemptLiveFrames -XX:-UseContinuationLazyCopy PreemptLiveFramesDriver
- * @run main/othervm -XX:+UnlockDiagnosticVMOptions -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,java/lang/PreemptLiveFrames -XX:-UseContinuationLazyCopy  PreemptLiveFramesDriver
- * @run main/othervm -XX:+UnlockDiagnosticVMOptions -XX:+TieredCompilation -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,java/lang/PreemptLiveFrames -XX:-UseContinuationLazyCopy PreemptLiveFramesDriver
- * @run main/othervm -XX:+UnlockDiagnosticVMOptions -XX:+TieredCompilation -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,java/lang/PreemptLiveFrames -XX:+UseContinuationLazyCopy PreemptLiveFramesDriver
+ * @run main/othervm -Xint PreemptLiveFramesDriver
+ * @run main/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,java/lang/PreemptLiveFrames PreemptLiveFramesDriver
+ * @run main/othervm -XX:+TieredCompilation -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,java/lang/PreemptLiveFrames PreemptLiveFramesDriver
  */
-
-
 
 public class PreemptLiveFramesDriver {
     public static void main(String[] args) {

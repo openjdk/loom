@@ -94,22 +94,26 @@ serviceability/jvmti/events/ThreadStart/threadstart02/threadstart02.java
 serviceability/jvmti/events/ThreadStart/threadstart03/threadstart03.java
 serviceability/jvmti/events/VMObjectAlloc/vmobjalloc01/vmobjalloc01.java
 
+serviceability/jvmti/negative/thrinfo02/thrinfo02.java
+serviceability/jvmti/negative/getstacktr09/getstacktr09.java
+serviceability/jvmti/negative/GetAllThreadsNullTest/GetAllThreadsNullTest.java
+serviceability/jvmti/negative/thrstat04/thrstat04.java
+serviceability/jvmti/negative/framecnt02/framecnt02.java
+serviceability/jvmti/negative/framecnt03/framecnt03.java
+serviceability/jvmti/negative/getstacktr02/getstacktr02.java
+serviceability/jvmti/negative/frameloc03/frameloc03.java
+
 serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java
 serviceability/jvmti/stress/StackTrace/Suspended/GetStackTraceSuspendedStressTest.java
 serviceability/jvmti/stress/ThreadLocalStorage/SetGetThreadLocalStorageStressTest/SetGetThreadLocalStorageStressTest.java
 
 serviceability/jvmti/thread/GetThreadState/thrstat01/thrstat01.java
 serviceability/jvmti/thread/GetThreadState/thrstat03/thrstat03.java
-serviceability/jvmti/thread/GetThreadState/thrstat04/thrstat04.java
 serviceability/jvmti/thread/GetThreadState/thrstat05/thrstat05.java
 serviceability/jvmti/thread/GetThreadState/thrstat02/thrstat02.java
 serviceability/jvmti/thread/GetFrameCount/framecnt01/framecnt01.java
-serviceability/jvmti/thread/GetFrameCount/framecnt02/framecnt02.java
-serviceability/jvmti/thread/GetFrameCount/framecnt03/framecnt03.java
 serviceability/jvmti/thread/GetFrameLocation/frameloc01/frameloc01.java
 serviceability/jvmti/thread/GetFrameLocation/frameloc02/frameloc02.java
-serviceability/jvmti/thread/GetFrameLocation/frameloc03/frameloc03.java
-serviceability/jvmti/thread/GetThreadInfo/thrinfo02/thrinfo02.java
 serviceability/jvmti/thread/GetThreadInfo/thrinfo01/thrinfo01.java
 serviceability/jvmti/thread/SuspendThread/suspendthrd01/suspendthrd01.java
 serviceability/jvmti/thread/SuspendThread/suspendthrd03/suspendthrd03.java
@@ -119,15 +123,12 @@ serviceability/jvmti/thread/ResumeThreadList/resumethrdlst01/resumethrdlst01.jav
 serviceability/jvmti/thread/SuspendThreadList/suspendthrdlst02/suspendthrdlst02.java
 serviceability/jvmti/thread/SuspendThreadList/suspendthrdlst01/suspendthrdlst01.java
 serviceability/jvmti/thread/GetAllThreads/allthr01/allthr01.java
-serviceability/jvmti/thread/GetAllThreads/allthr02/allthr02.java
 serviceability/jvmti/thread/ResumeThread/resumethrd02/resumethrd02.java
 serviceability/jvmti/thread/ResumeThread/resumethrd01/resumethrd01.java
 serviceability/jvmti/thread/GetStackTrace/getstacktr06/getstacktr06.java
 serviceability/jvmti/thread/GetStackTrace/getstacktr01/getstacktr01.java
 serviceability/jvmti/thread/GetStackTrace/getstacktr08/getstacktr08.java
-serviceability/jvmti/thread/GetStackTrace/getstacktr09/getstacktr09.java
 serviceability/jvmti/thread/GetStackTrace/getstacktr07/getstacktr07.java
-serviceability/jvmti/thread/GetStackTrace/getstacktr02/getstacktr02.java
 serviceability/jvmti/thread/GetStackTrace/getstacktr05/getstacktr05.java
 serviceability/jvmti/thread/GetStackTrace/getstacktr04/getstacktr04.java
 serviceability/jvmti/thread/GetStackTrace/getstacktr03/getstacktr03.java
@@ -143,8 +144,7 @@ serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.jav
 serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java
 serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java
 serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java
-serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id0
-serviceability/jvmti/vthread/VThreadTest/VThreadTest.java#id1
+serviceability/jvmti/vthread/VThreadTest/VThreadTest.java
 serviceability/jvmti/vthread/VThreadUnsupportedTest/VThreadUnsupportedTest.java
 serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java
 
@@ -349,6 +349,7 @@ vmTestbase/nsk/jdwp/ArrayReference/GetValues/getvalues002/TestDescription.java
 
 vmTestbase/nsk/jvmti/GetCurrentContendedMonitor/contmon001/TestDescription.java
 vmTestbase/nsk/jvmti/GetCurrentContendedMonitor/contmon002/TestDescription.java
+vmTestbase/nsk/jvmti/GetCurrentThreadCpuTime/curthrcputime001/TestDescription.java
 vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage003/TestDescription.java
 vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage004/TestDescription.java
 vmTestbase/nsk/jvmti/NotifyFramePop/nframepop002/TestDescription.java

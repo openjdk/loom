@@ -309,7 +309,6 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   nonstatic_field(Method,                      _vtable_index,                                 int)                                   \
   nonstatic_field(Method,                      _intrinsic_id,                                 u2)                                    \
   nonstatic_field(Method,                      _flags,                                        u2)                                    \
-  nonproduct_nonstatic_field(Method,           _compiled_invocation_count,                    int)                                   \
   volatile_nonstatic_field(Method,             _code,                                         CompiledMethod*)                       \
   nonstatic_field(Method,                      _i2i_entry,                                    address)                               \
   volatile_nonstatic_field(Method,             _from_compiled_entry,                          address)                               \
@@ -750,7 +749,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   nonstatic_field(NamedThread,                 _processed_thread,                             Thread*)                               \
   nonstatic_field(JavaThread,                  _threadObj,                                    OopHandle)                             \
   nonstatic_field(JavaThread,                  _vthread,                                      OopHandle)                             \
-  nonstatic_field(JavaThread,                  _scopedCache,                                  OopHandle)                             \
+  nonstatic_field(JavaThread,                  _scopeLocalCache,                              OopHandle)                             \
   nonstatic_field(JavaThread,                  _anchor,                                       JavaFrameAnchor)                       \
   nonstatic_field(JavaThread,                  _vm_result,                                    oop)                                   \
   nonstatic_field(JavaThread,                  _vm_result_2,                                  Metadata*)                             \

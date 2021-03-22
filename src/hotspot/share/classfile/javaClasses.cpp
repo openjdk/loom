@@ -2523,6 +2523,7 @@ int java_lang_Throwable::_backtrace_offset;
 int java_lang_Throwable::_detailMessage_offset;
 int java_lang_Throwable::_stackTrace_offset;
 int java_lang_Throwable::_depth_offset;
+int java_lang_Throwable::_cause_offset;
 int java_lang_Throwable::_static_unassigned_stacktrace_offset;
 
 #define THROWABLE_FIELDS_DO(macro) \
@@ -2530,6 +2531,7 @@ int java_lang_Throwable::_static_unassigned_stacktrace_offset;
   macro(_detailMessage_offset, k, "detailMessage", string_signature,                  false); \
   macro(_stackTrace_offset,    k, "stackTrace",    java_lang_StackTraceElement_array, false); \
   macro(_depth_offset,         k, "depth",         int_signature,                     false); \
+  macro(_cause_offset,         k, "cause",         throwable_signature,               false); \
   macro(_static_unassigned_stacktrace_offset, k, "UNASSIGNED_STACK", java_lang_StackTraceElement_array, true)
 
 void java_lang_Throwable::compute_offsets() {
@@ -2570,6 +2572,9 @@ oop java_lang_Throwable::message(oop throwable) {
   return throwable->obj_field(_detailMessage_offset);
 }
 
+oop java_lang_Throwable::cause(oop throwable) {
+  return throwable->obj_field(_cause_offset);
+}
 
 // Return Symbol for detailed_message or NULL
 Symbol* java_lang_Throwable::detail_message(oop throwable) {
@@ -2721,7 +2726,7 @@ void java_lang_Throwable::print_stack_trace(Handle throwable, outputStream* st) 
     }
     {
       // Call getCause() which doesn't necessarily return the _cause field.
-      EXCEPTION_MARK;
+      ExceptionMark em(THREAD);
       JavaValue cause(T_OBJECT);
       JavaCalls::call_virtual(&cause,
                               throwable,
@@ -2734,7 +2739,7 @@ void java_lang_Throwable::print_stack_trace(Handle throwable, outputStream* st) 
         CLEAR_PENDING_EXCEPTION;
         throwable = Handle();
       } else {
-        throwable = Handle(THREAD, (oop) cause.get_jobject());
+        throwable = Handle(THREAD, cause.get_oop());
         if (throwable.not_null()) {
           st->print("Caused by: ");
           print(throwable(), st);
@@ -2835,8 +2840,8 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
           bcp = fr.interpreter_frame_bcp();
           method = fr.interpreter_frame_method();
         } else {
-          bcp = Continuation::interpreter_frame_bcp(fr, &map);
-          method = Continuation::interpreter_frame_method(fr, &map);
+          bcp = map.stack_chunk()->interpreter_frame_bcp(fr);
+          method = map.stack_chunk()->interpreter_frame_method(fr);
         }
         bci =  method->bci_from(bcp);
         fr = fr.sender(&map);
@@ -4852,7 +4857,7 @@ public:
     } else if (fd->name() == vmSymbols::data_cache_line_flush_size_name()) {
       mirror->int_field_put(fd->offset(), _data_cache_line_flush_size);
     } else if (fd->name() == vmSymbols::scoped_cache_shift_name()) {
-      mirror->int_field_put(fd->offset(), ScopedCacheSize ? exact_log2(ScopedCacheSize) : -1);
+      mirror->int_field_put(fd->offset(), ScopeLocalCacheSize ? exact_log2(ScopeLocalCacheSize) : -1);
     } else {
       assert(false, "unexpected UnsafeConstants field");
     }
@@ -4985,23 +4990,14 @@ void java_lang_AssertionStatusDirectives::set_deflt(oop o, bool val) {
 int java_lang_ContinuationScope::_name_offset;
 int java_lang_Continuation::_scope_offset;
 int java_lang_Continuation::_target_offset;
-int java_lang_Continuation::_stack_offset;
 int java_lang_Continuation::_tail_offset;
-int java_lang_Continuation::_maxSize_offset;
-int java_lang_Continuation::_numFrames_offset;
-int java_lang_Continuation::_numInterpretedFrames_offset;
-int java_lang_Continuation::_refStack_offset;
 int java_lang_Continuation::_parent_offset;
 int java_lang_Continuation::_yieldInfo_offset;
-int java_lang_Continuation::_fp_offset;
-int java_lang_Continuation::_sp_offset;
-int java_lang_Continuation::_pc_offset;
-int java_lang_Continuation::_refSP_offset;
 int java_lang_Continuation::_cs_offset;
-int java_lang_Continuation::_flags_offset;
 int java_lang_Continuation::_reset_offset;
 int java_lang_Continuation::_mounted_offset;
 int java_lang_Continuation::_done_offset;
+int java_lang_Continuation::_preempted_offset;
 
 #define CONTINUATIONSCOPE_FIELDS_DO(macro) \
   macro(_name_offset, k, vmSymbols::name_name(), string_signature, false);
@@ -5025,20 +5021,11 @@ void java_lang_ContinuationScope::serialize_offsets(SerializeClosure* f) {
   macro(_parent_offset,    k, vmSymbols::parent_name(),    continuation_signature,      false); \
   macro(_yieldInfo_offset, k, vmSymbols::yieldInfo_name(), object_signature,            false); \
   macro(_tail_offset,      k, vmSymbols::tail_name(),      stackchunk_signature,        false); \
-  macro(_stack_offset,     k, vmSymbols::stack_name(),     int_array_signature,         false); \
-  macro(_maxSize_offset,   k, vmSymbols::maxSize_name(),   int_signature,               false); \
-  macro(_refStack_offset,  k, vmSymbols::refStack_name(),  object_array_signature,      false); \
-  macro(_fp_offset,        k, vmSymbols::fp_name(),        long_signature,              false); \
-  macro(_sp_offset,        k, vmSymbols::sp_name(),        int_signature,               false); \
-  macro(_pc_offset,        k, vmSymbols::pc_name(),        long_signature,              false); \
-  macro(_refSP_offset,     k, vmSymbols::refSP_name(),     int_signature,               false); \
-  macro(_flags_offset,     k, vmSymbols::flags_name(),     byte_signature,              false); \
   macro(_cs_offset,        k, vmSymbols::cs_name(),        short_signature,             false); \
   macro(_reset_offset,     k, vmSymbols::reset_name(),     bool_signature,              false); \
   macro(_mounted_offset,   k, vmSymbols::mounted_name(),   bool_signature,              false); \
   macro(_done_offset,      k, vmSymbols::done_name(),      bool_signature,              false); \
-  macro(_numFrames_offset, k, vmSymbols::numFrames_name(), short_signature,             false); \
-  macro(_numInterpretedFrames_offset, k, vmSymbols::numInterpretedFrames_name(), short_signature, false);
+  macro(_preempted_offset, k, "preempted",                 bool_signature,              false);
 
 void java_lang_Continuation::compute_offsets() {
   InstanceKlass* k = vmClasses::Continuation_klass();
@@ -5058,9 +5045,11 @@ int jdk_internal_misc_StackChunk::_size_offset;
 int jdk_internal_misc_StackChunk::_sp_offset;
 int jdk_internal_misc_StackChunk::_pc_offset;
 int jdk_internal_misc_StackChunk::_argsize_offset;
+int jdk_internal_misc_StackChunk::_flags_offset;
 int jdk_internal_misc_StackChunk::_mode_offset;
 int jdk_internal_misc_StackChunk::_gcSP_offset;
 int jdk_internal_misc_StackChunk::_markCycle_offset;
+int jdk_internal_misc_StackChunk::_maxSize_offset;
 int jdk_internal_misc_StackChunk::_numFrames_offset;
 int jdk_internal_misc_StackChunk::_numOops_offset;
 int jdk_internal_misc_StackChunk::_cont_offset;
@@ -5071,9 +5060,11 @@ int jdk_internal_misc_StackChunk::_cont_offset;
   macro(_sp_offset,        k, vmSymbols::sp_name(),        int_signature,        false); \
   macro(_pc_offset,        k, vmSymbols::pc_name(),        long_signature,       false); \
   macro(_argsize_offset,   k, vmSymbols::argsize_name(),   int_signature,        false); \
+  macro(_flags_offset,     k, "flags",                     byte_signature,       false); \
   macro(_mode_offset,      k, vmSymbols::mode_name(),      bool_signature,       false); \
   macro(_gcSP_offset,      k, "gcSP",                      int_signature,        false); \
   macro(_markCycle_offset, k, "markCycle",                 long_signature,       false); \
+  macro(_maxSize_offset,   k, vmSymbols::maxSize_name(),   int_signature,        false); \
   macro(_numFrames_offset, k, vmSymbols::numFrames_name(), int_signature,        false); \
   macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false); \
   macro(_cont_offset,      k, "cont",                      continuation_signature, false);
@@ -5088,29 +5079,6 @@ void jdk_internal_misc_StackChunk::serialize_offsets(SerializeClosure* f) {
   STACKCHUNK_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
-
-intptr_t* jdk_internal_misc_StackChunk::end_address(oop chunk) {
-  int argsz = argsize(chunk);
-  if (argsz > 0) argsz += frame::sender_sp_offset;
-  return start_address(chunk) + size(chunk) - argsz;
-}
-
-bool jdk_internal_misc_StackChunk::is_usable_in_chunk(oop chunk, void* p) {
-  assert (is_stack_chunk(chunk), "");
-  HeapWord* start = InstanceStackChunkKlass::start_of_stack(chunk) + jdk_internal_misc_StackChunk::sp(chunk) - frame::sender_sp_offset;
-  HeapWord* end = start + jdk_internal_misc_StackChunk::size(chunk);
-  return (HeapWord*)p >= start && (HeapWord*)p < end;
-}
-
-bool java_lang_Continuation::on_local_stack(oop ref, address adr) {
-  arrayOop s = stack(ref);
-  void* base = s->base(T_INT);
-  return adr >= base && (char*)adr < ((char*)base + (s->length() * 4));
-}
-
-bool java_lang_Continuation::is_mounted(oop ref) {
-  return ref->bool_field(_mounted_offset) != 0;
-}
 
 
 // Support for intrinsification of java.nio.Buffer.checkIndex

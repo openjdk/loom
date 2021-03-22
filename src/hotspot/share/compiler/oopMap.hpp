@@ -476,8 +476,6 @@ public:
 private:
   template <typename RegisterMapT>
   void iterate_oops_do(const frame *fr, const RegisterMapT *reg_map, const ImmutableOopMap* oopmap);
-  template <typename RegisterMapT>
-  void walk_derived_pointers(const frame *fr, const ImmutableOopMap* map, const RegisterMapT *reg_map);
 };
 
 // Derived pointer support. This table keeps track of all derived points on a

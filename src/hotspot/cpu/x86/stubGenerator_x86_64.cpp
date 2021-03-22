@@ -7182,11 +7182,7 @@ RuntimeStub* generate_cont_doYield() {
 
     __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
     if (ContPerfTest > 112) {
-      if (!return_barrier && JvmtiExport::can_support_continuations()) {
-        __ call_VM(noreg, CAST_FROM_FN_PTR(address, Continuation::thaw), c_rarg1);
-      } else {
-        __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw_leaf), r15_thread, c_rarg1);
-      }
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), r15_thread, c_rarg1);
     }
     __ movptr(rbx, rax); // rbx is now the sp of the yielding frame
 
@@ -7229,9 +7225,6 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "StubRoutines", "cont return barrier");
     address start = __ pc();
 
-    if (CONT_FULL_STACK)
-      __ stop("RETURN BARRIER -- UNREACHABLE 0");
-
     generate_cont_thaw(true, false);
 
     return start;
@@ -7240,9 +7233,6 @@ RuntimeStub* generate_cont_doYield() {
   address generate_cont_returnBarrier_exception() {
     StubCodeMark mark(this, "StubRoutines", "cont return barrier exception handler");
     address start = __ pc();
-
-    if (CONT_FULL_STACK)
-      __ stop("RETURN BARRIER -- UNREACHABLE 0");
 
     generate_cont_thaw(true, true);
 
@@ -7255,7 +7245,6 @@ RuntimeStub* generate_cont_doYield() {
 
       // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
       // see InterpreterMacroAssembler::restore_bcp/restore_locals
-      // TODO R: in this situation, have native code push another frame with a return address that points to a stub that does this !!!!!!
       // TODO: use InterpreterMacroAssembler
       static const Register _locals_register = LP64_ONLY(r14) NOT_LP64(rdi);
       static const Register _bcp_register    = LP64_ONLY(r13) NOT_LP64(rsi);

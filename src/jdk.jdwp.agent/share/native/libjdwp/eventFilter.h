@@ -69,8 +69,7 @@ jvmtiError eventFilter_setStepFilter(HandlerNode *node,
 jvmtiError eventFilter_setSourceNameMatchFilter(HandlerNode *node,
                                                 jint index,
                                                 char *sourceNamePattern);
-jvmtiError eventFilter_setVirtualThreadsExcludeFilter(HandlerNode *node,
-                                                      jint index);
+jvmtiError eventFilter_setPlatformThreadsOnlyFilter(HandlerNode *node, jint index);
 
 /***** misc *****/
 

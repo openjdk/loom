@@ -30,6 +30,7 @@
 #include "oops/arrayKlass.hpp"
 #include "oops/arrayOop.hpp"
 #include "oops/compressedOops.inline.hpp"
+#include "oops/instanceKlass.hpp"
 #include "oops/markWord.inline.hpp"
 #include "oops/oop.hpp"
 #include "oops/oopsHierarchy.hpp"
@@ -233,6 +234,7 @@ bool oopDesc::is_instance()  const { return klass()->is_instance_klass();  }
 bool oopDesc::is_array()     const { return klass()->is_array_klass();     }
 bool oopDesc::is_objArray()  const { return klass()->is_objArray_klass();  }
 bool oopDesc::is_typeArray() const { return klass()->is_typeArray_klass(); }
+bool oopDesc::is_stackChunk()const { return klass()->is_instance_klass() && InstanceKlass::cast(klass())->is_stack_chunk_instance_klass(); }
 
 void*    oopDesc::field_addr(int offset)     const { return reinterpret_cast<void*>(cast_from_oop<intptr_t>(as_oop()) + offset); }
 
@@ -472,6 +474,7 @@ size_t oopDesc::copy_conjoint_compact(HeapWord* to) {
 }
 
 size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
+  // if (is_stackChunk()) tty->print_cr(">>> copy_disjoint from: %p - %p to: %p - %p (word_size: %zu)", cast_from_oop<HeapWord*>(this), cast_from_oop<HeapWord*>(this) + word_size, to, to + word_size, word_size);
   assert(word_size == (size_t)size() || size_might_change(), "");
   Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
   return word_size;
@@ -489,6 +492,7 @@ size_t oopDesc::copy_disjoint_compact(HeapWord* to, size_t word_size) {
 }
 
 size_t oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
+  // if (is_stackChunk()) tty->print_cr(">>> copy_conjoint from: %p - %p to: %p - %p (word_size: %zu)", cast_from_oop<HeapWord*>(this), cast_from_oop<HeapWord*>(this) + word_size, to, to + word_size, word_size);
   assert(word_size == (size_t)size() || size_might_change(), "");
   Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
   return word_size;

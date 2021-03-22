@@ -45,6 +45,7 @@ typedef void* OopOrNarrowOopStar;
 
 typedef class oopDesc*                    oop;
 typedef class   instanceOopDesc*            instanceOop;
+// typedef class  stackChunkOopDesc*          stackChunkOop;
 typedef class   arrayOopDesc*               arrayOop;
 typedef class     objArrayOopDesc*            objArrayOop;
 typedef class     typeArrayOopDesc*           typeArrayOop;
@@ -121,7 +122,7 @@ struct PrimitiveConversions::Translate<oop> : public TrueType {
        type##Oop() : oop() {}                                              \
        type##Oop(const type##Oop& o) : oop(o) {}                           \
        type##Oop(const oop& o) : oop(o) {}                                 \
-       type##Oop(const void* p) : oop(p) {}                                \
+       type##Oop(type##OopDesc* o) : oop((oopDesc*)o) {}                   \
        operator type##OopDesc* () const { return (type##OopDesc*)obj(); }  \
        type##OopDesc* operator->() const {                                 \
             return (type##OopDesc*)obj();                                  \
@@ -145,6 +146,7 @@ DEF_OOP(instance);
 DEF_OOP(array);
 DEF_OOP(objArray);
 DEF_OOP(typeArray);
+//DEF_OOP(stackChunk);
 
 #endif // CHECK_UNHANDLED_OOPS
 

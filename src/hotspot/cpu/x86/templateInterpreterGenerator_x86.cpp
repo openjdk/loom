@@ -380,8 +380,16 @@ address TemplateInterpreterGenerator::generate_safept_entry_for(
         TosState state,
         address runtime_entry) {
   address entry = __ pc();
+  
+  const Register rthread = NOT_LP64(rdi) LP64_ONLY(r15_thread);
+
   __ push(state);
+  NOT_LP64(__ get_thread(rthread);)
+  __ push_cont_fastpath(rthread);
   __ call_VM(noreg, runtime_entry);
+  NOT_LP64(__ get_thread(rthread);)
+  __ pop_cont_fastpath(rthread);
+
   __ dispatch_via(vtos, Interpreter::_normal_table.table_for(vtos));
   return entry;
 }

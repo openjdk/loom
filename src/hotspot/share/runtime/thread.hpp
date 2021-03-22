@@ -882,7 +882,7 @@ class JavaThread: public Thread {
   bool           _on_thread_list;                // Is set when this JavaThread is added to the Threads list
   OopHandle      _threadObj;                     // The Java level thread object
   OopHandle      _vthread;
-  OopHandle      _scopedCache;
+  OopHandle      _scopeLocalCache;
 
 #ifdef ASSERT
  private:
@@ -1099,9 +1099,9 @@ private:
 
  public:
   oop _mounted_vthread;
-  jlong _scoped_hash_table_shift;
+  jlong _scopeLocal_hash_table_shift;
     
-  void allocate_scoped_hash_table(int count);
+  void allocate_scopeLocal_hash_table(int count);
     
  public:
   // Constructor
@@ -1155,8 +1155,8 @@ private:
   void set_threadOopHandles(oop p);
   oop vthread() const;
   void set_vthread(oop p);
-  oop scopedCache() const;
-  void set_scopedCache(oop p);
+  oop scopeLocalCache() const;
+  void set_scopeLocalCache(oop p);
   oop mounted_vthread() const                    { return _mounted_vthread; }
   void set_mounted_vthread(oop p)                { _mounted_vthread = p; }
 
@@ -1478,7 +1478,7 @@ private:
   void clr_do_not_unlock(void)                   { _do_not_unlock_if_synchronized = false; }
   bool do_not_unlock(void)                       { return _do_not_unlock_if_synchronized; }
 
-  static ByteSize scopedCache_offset()           { return byte_offset_of(JavaThread, _scopedCache); }
+  static ByteSize scopeLocalCache_offset()       { return byte_offset_of(JavaThread, _scopeLocalCache); }
 
   // For assembly stub generation
   static ByteSize threadObj_offset()             { return byte_offset_of(JavaThread, _threadObj); }
@@ -1667,6 +1667,7 @@ private:
   void make_zombies();
 
   void deoptimize_marked_methods();
+  void deoptimize_marked_methods_only_anchors();
 
  public:
   // Returns the running thread as a JavaThread

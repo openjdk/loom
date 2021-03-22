@@ -27,6 +27,7 @@
 
 #include "code/debugInfo.hpp"
 #include "code/location.hpp"
+#include "oops/instanceStackChunkKlass.inline.hpp"
 #include "runtime/handles.hpp"
 
 class BasicLock;
@@ -111,7 +112,7 @@ class StackValue : public ResourceObj {
 
   template<typename RegisterMapT>
   static StackValue* create_stack_value(const frame* fr, const RegisterMapT* reg_map, ScopeValue* sv) {
-    return create_stack_value(sv, stack_value_address(fr, reg_map, sv), reg_map->in_cont() && !reg_map->in_chunk());
+    return create_stack_value(sv, stack_value_address(fr, reg_map, sv), reg_map->in_cont());
   }
 
   template<typename RegisterMapT>
@@ -126,16 +127,16 @@ class StackValue : public ResourceObj {
     if (!reg_map->in_cont()) {
       value_addr = loc.is_register()
           // Value was in a callee-save register
-          ? reg_map->location(VMRegImpl::as_VMReg(loc.register_number()))
+          ? reg_map->location(VMRegImpl::as_VMReg(loc.register_number()), fr->sp())
           // Else value was directly saved on the stack. The frame's original stack pointer,
           // before any extension by its callee (due to Compiler1 linkage on SPARC), must be used.
           : ((address)fr->unextended_sp()) + loc.stack_offset();
 
-      assert(value_addr == NULL || reg_map->thread()->is_in_usable_stack(value_addr), INTPTR_FORMAT, p2i(value_addr));
+      assert(value_addr == NULL || reg_map->thread() == NULL || reg_map->thread()->is_in_usable_stack(value_addr), INTPTR_FORMAT, p2i(value_addr));
     } else {
       value_addr = loc.is_register()
-          ? Continuation::reg_to_location(*fr, reg_map->as_RegisterMap(), VMRegImpl::as_VMReg(loc.register_number()), loc.type() == Location::oop || loc.type() == Location::narrowoop)
-          : Continuation::usp_offset_to_location(*fr, reg_map->as_RegisterMap(), loc.stack_offset(), loc.type() == Location::oop || loc.type() == Location::narrowoop);
+          ? reg_map->as_RegisterMap()->stack_chunk()->reg_to_location(*fr, reg_map->as_RegisterMap(), VMRegImpl::as_VMReg(loc.register_number()))
+          : reg_map->as_RegisterMap()->stack_chunk()->usp_offset_to_location(*fr, loc.stack_offset());
         
       assert(value_addr == NULL || Continuation::is_in_usable_stack(value_addr, reg_map->as_RegisterMap()) || (reg_map->thread() != NULL && reg_map->thread()->is_in_usable_stack(value_addr)), INTPTR_FORMAT, p2i(value_addr));
     }

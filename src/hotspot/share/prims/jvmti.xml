@@ -2239,6 +2239,7 @@ jvmtiEnv *jvmti;
     <intro>
     </intro>
 
+    <elide>
     <function id="GetVirtualThread" num="113" since="16">
       <synopsis>Get Virtual Thread</synopsis>
       <description>
@@ -2266,7 +2267,9 @@ jvmtiEnv *jvmti;
       <errors>
       </errors>
     </function>
+    </elide>
 
+    <elide>
     <function id="GetCarrierThread" num="117" since="16">
       <synopsis>Get Carrier Thread</synopsis>
       <description>
@@ -2299,6 +2302,7 @@ jvmtiEnv *jvmti;
         </error>
       </errors>
     </function>
+    </elide>
 
     <function id="SuspendAllVirtualThreads" num="118" since="16">
       <synopsis>Suspend All Virtual Threads</synopsis>
@@ -2344,7 +2348,7 @@ jvmtiEnv *jvmti;
     </function>
 
    <function id="ResumeAllVirtualThreads" num="119" since="16">
-      <synopsis>Suspend All Virtual Threads</synopsis>
+      <synopsis>Resume All Virtual Threads</synopsis>
       <description>
         Resume all virtual threads except those already resumed.
         Virtual threads may be suspended with
@@ -10589,32 +10593,11 @@ myInit() {
         <description>
           Can support virtual threads.
           If this capability is enabled then the following functions can be called:
-          <functionlink id="IsVirtualThread"></functionlink>, 
-          <functionlink id="GetVirtualThread"></functionlink>, 
-          <functionlink id="GetCarrierThread"></functionlink>,
-          the following functions can be called with a virtual thread reference:
-          <functionlink id="GetStackTrace"></functionlink>
-          <functionlink id="GetFrameCount"></functionlink>
-          <functionlink id="GetFrameLocation"></functionlink>
-          <functionlink id="GetLocalObject"></functionlink>
-          <functionlink id="GetLocalInstance"></functionlink>
-          <functionlink id="GetLocalInt"></functionlink>
-          <functionlink id="GetLocalLong"></functionlink>
-          <functionlink id="GetLocalFloat"></functionlink>
-          <functionlink id="GetLocalDouble"></functionlink>
+          <functionlink id="SuspendAllVirtualThreads"></functionlink>, 
+          <functionlink id="ResumeAllVirtualThreads"></functionlink>,
           and the following events can be enabled:
-          <eventlink id="VirtualThreadScheduled"></eventlink>,
-          <eventlink id="VirtualThreadTerminated"></eventlink>,
-          <eventlink id="VirtualThreadMounted"></eventlink> and
-          <eventlink id="VirtualThreadUnmounted"></eventlink>.
-        </description>
-      </capabilityfield>
-      <capabilityfield id="can_support_continuations" since="14">
-        <description>
-          Can support continuations. If this capability is enabled then
-          the following events can be enabled:
-          <eventlink id="ContinuationRun"></eventlink> and
-          <eventlink id="ContinuationYield"></eventlink>.
+          <eventlink id="VirtualThreadStart"></eventlink>,
+          <eventlink id="VirtualThreadEnd"></eventlink>,
         </description>
       </capabilityfield>
     </capabilitiestypedef>
@@ -12948,10 +12931,10 @@ myInit() {
     </parameters>
   </event>
 
- <event label="Virtual Thread Scheduled"
-         id="VirtualThreadScheduled" const="JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED" filtered="thread" num="87" phase="start" since="14">
+ <event label="Virtual Thread Start"
+         id="VirtualThreadStart" const="JVMTI_EVENT_VIRTUAL_THREAD_START" filtered="thread" num="87" phase="start" since="14">
     <description>
-      Virtual thread scheduled events are generated before its initial method executes.
+      Virtual thread started events are generated before its initial method executes.
       <p/>
       The event is sent on the <paramlink id="thread"></paramlink>.
     </description>
@@ -12971,16 +12954,16 @@ myInit() {
       <param id="virtual_thread">
         <jthread/>
           <description>
-            Virtual thread scheduled for execution.
+            Virtual thread started for execution.
           </description>
       </param>
     </parameters>
   </event>
 
-  <event label="Virtual Thread Terminated"
-         id="VirtualThreadTerminated" const="JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED" filtered="thread" num="88" phase="start" since="14">
+  <event label="Virtual Thread End"
+         id="VirtualThreadEnd" const="JVMTI_EVENT_VIRTUAL_THREAD_END" filtered="thread" num="88" phase="start" since="14">
     <description>
-      Virtual thread terminated events are generated after its initial method has finished execution.
+      Virtual thread end events are generated after its initial method has finished execution.
       <p/>
       The event is sent on the <paramlink id="thread"></paramlink>.
     </description>
@@ -13000,14 +12983,15 @@ myInit() {
       <param id="virtual_thread">
         <jthread/>
           <description>
-            Virtual thread being terminated.
+            Virtual thread being ended.
           </description>
       </param>
     </parameters>
   </event>
 
-  <event label="Virtual Thread Mounted"
-         id="VirtualThreadMounted" const="JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED" filtered="thread" num="89" phase="start" since="14">
+  <elide>
+  <event label="Virtual Thread Mount"
+         id="VirtualThreadMount" const="JVMTI_EVENT_VIRTUAL_THREAD_MOUNT" filtered="thread" num="89" phase="start" since="14">
     <description>
       Virtual thread mount events are generated before its method continue to execute on the mounted thread.
       <p/>
@@ -13034,9 +13018,11 @@ myInit() {
       </param>
     </parameters>
   </event>
+  </elide>
 
-  <event label="Virtual Thread Unmounted"
-         id="VirtualThreadUnmounted" const="JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED" filtered="thread" num="90" phase="start" since="14">
+  <elide>
+  <event label="Virtual Thread Unmount"
+         id="VirtualThreadUnmount" const="JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNT" filtered="thread" num="90" phase="start" since="14">
     <description>
       Virtual thread unmount events are generated when the virtual thread is about to be unmounted from the carrier thread.
       <p/>
@@ -13063,77 +13049,7 @@ myInit() {
       </param>
     </parameters>
   </event>
-
-  <event label="Continuation Run"
-         id="ContinuationRun" const="JVMTI_EVENT_CONTINUATION_RUN" filtered="thread" num="91" phase="start" since="14">
-    <description>
-      Continuation run events are generated before the continuation is continued execution on current thread.
-      <p/>
-      The event is sent on the <paramlink id="thread"></paramlink> the continuation is about to leave.
-    </description>
-    <origin>new</origin>
-    <capabilities>
-      <required id="can_support_continuations">Can support continuations</required>
-    </capabilities>
-    <parameters>
-      <param id="jni_env">
-        <outptr>
-          <struct>JNIEnv</struct>
-        </outptr>
-          <description>
-            The JNI environment of the event (current) thread.
-          </description>
-      </param>
-      <param id="thread">
-        <jthread/>
-          <description>
-            Thread the continuation is executed on.
-          </description>
-      </param>
-      <param id="continuation_frame_count">
-        <jint min="1"/>
-          <description>
-            Number of frames the continuation is executing.
-          </description>
-      </param>
-    </parameters>
-  </event>
-
-  <event label="Continuation Yield"
-         id="ContinuationYield" const="JVMTI_EVENT_CONTINUATION_YIELD" filtered="thread" num="92" phase="start" since="14">
-    <description>
-      Continuation yield events are generated before the continuation actually yields on current thread.
-      <p/>
-      The event is sent on the <paramlink id="thread"></paramlink> the continuation is about to leave.
-    </description>
-    <origin>new</origin>
-    <capabilities>
-      <required id="can_support_continuations">Can support continuations</required>
-    </capabilities>
-    <parameters>
-      <param id="jni_env">
-        <outptr>
-          <struct>JNIEnv</struct>
-        </outptr>
-          <description>
-            The JNI environment of the event (current) thread.
-          </description>
-      </param>
-      <param id="thread">
-        <jthread/>
-          <description>
-            Thread the continuation is executed on.
-          </description>
-      </param>
-      <param id="continuation_frame_count">
-        <jint min="1"/>
-          <description>
-            Number of frames the continuation is executing.
-          </description>
-      </param>
-    </parameters>
-  </event>
-
+  </elide>
 
   <event label="Class Load"
          id="ClassLoad" const="JVMTI_EVENT_CLASS_LOAD" filtered="thread" phase="start" num="55">

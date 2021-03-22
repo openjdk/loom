@@ -28,6 +28,7 @@
 #include "classfile/vmClasses.hpp"
 #include "oops/oop.hpp"
 #include "oops/instanceKlass.hpp"
+#include "oops/stackChunkOop.hpp"
 #include "oops/symbol.hpp"
 #include "runtime/os.hpp"
 #include "utilities/vmEnums.hpp"
@@ -623,6 +624,7 @@ class java_lang_Throwable: AllStatic {
   static int _detailMessage_offset;
   static int _stackTrace_offset;
   static int _depth_offset;
+  static int _cause_offset;
   static int _static_unassigned_stacktrace_offset;
 
   // StackTrace (programmatic access, new since 1.4)
@@ -640,6 +642,7 @@ class java_lang_Throwable: AllStatic {
   static int get_detailMessage_offset() { CHECK_INIT(_detailMessage_offset); }
   // Message
   static oop message(oop throwable);
+  static oop cause(oop throwable);
   static void set_message(oop throwable, oop value);
   static Symbol* detail_message(oop throwable);
   static void print_stack_element(outputStream *st, Method* method, int bci);
@@ -1068,20 +1071,11 @@ class java_lang_Continuation: AllStatic {
   static int _parent_offset;
   static int _yieldInfo_offset;
   static int _tail_offset;
-  static int _stack_offset;
-  static int _maxSize_offset;
-  static int _numFrames_offset;
-  static int _numInterpretedFrames_offset;
-  static int _refStack_offset;
-  static int _fp_offset;
-  static int _sp_offset;
-  static int _pc_offset;
-  static int _refSP_offset;
   static int _cs_offset;
-  static int _flags_offset;
   static int _reset_offset;
   static int _mounted_offset;
   static int _done_offset;
+  static int _preempted_offset;
 
   static void compute_offsets();
  public:
@@ -1092,37 +1086,15 @@ class java_lang_Continuation: AllStatic {
   static inline oop parent(oop ref);
   static inline oop yieldInfo(oop ref);
   static inline void set_yieldInfo(oop ref, oop value);
-  static inline typeArrayOop stack(oop ref);
-  static inline objArrayOop refStack(oop ref);
-  static inline void set_stack(oop obj, oop value);
-  static inline void set_refStack(oop obj, oop value);
-  static inline oop tail(oop ref);
-  static inline void set_tail(oop ref, oop value);
-  static inline jlong fp(oop ref);
-  static inline void set_fp(oop ref, const jlong i);
-  static inline intptr_t** raw_fp_address(oop ref);
-  static inline jint sp(oop ref);
-  static inline void set_sp(oop ref, const jint i);
-  static inline address pc(oop ref);
-  static inline void  set_pc(oop ref, const address pc);
-  static inline jint refSP(oop ref);
-  static inline void set_refSP(oop ref, jint i);
-  static inline jint maxSize(oop ref);
-  static inline void set_maxSize(oop ref, jint i);
-  static inline jshort numFrames(oop ref);
-  static inline void set_numFrames(oop ref, jshort i);
-  static inline jshort numInterpretedFrames(oop ref);
-  static inline void set_numInterpretedFrames(oop ref, jshort i);
-  static unsigned char flags(oop ref);
-  static void set_flags(oop ref, unsigned char flags);
-  static inline int stack_size(oop ref);
-  static inline void* stack_base(oop ref);
-  static inline HeapWord* refStack_base(oop ref);
+  static inline stackChunkOop tail(oop ref);
+  static inline void set_tail(oop ref, stackChunkOop value);
   static inline jshort critical_section(oop ref);
-  static bool on_local_stack(oop ref, address adr);
-  static bool is_reset(oop ref);
-  static bool is_mounted(oop ref);
-  static bool done(oop ref);
+  static inline bool on_local_stack(oop ref, address adr);
+  static inline bool is_reset(oop ref);
+  static inline bool is_mounted(oop ref);
+  static inline bool done(oop ref);
+  static inline bool is_preempted(oop ref);
+  static inline void set_preempted(oop ref, bool value);
 };
 
 // Interface to jdk.internal.misc.StackChunk objects
@@ -1134,9 +1106,11 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static int _sp_offset;
   static int _pc_offset;
   static int _argsize_offset;
+  static int _flags_offset;
   static int _mode_offset;
   static int _gcSP_offset;
   static int _markCycle_offset;
+  static int _maxSize_offset;
   static int _numFrames_offset;
   static int _numOops_offset;
   static int _cont_offset;
@@ -1145,6 +1119,9 @@ class jdk_internal_misc_StackChunk: AllStatic {
  public:
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
+  static inline int parent_offset() { return _parent_offset; }
+  static inline int cont_offset()   { return _cont_offset; }
+
   // Accessors
   static inline oop parent(oop ref);
   static inline void set_parent(oop ref, oop value);
@@ -1152,40 +1129,32 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline bool is_parent_null(oop ref); // bypasses barriers for a faster test
   template<typename P>
   static inline void set_parent_raw(oop ref, oop value);
-  static inline int size(oop ref);
-  static inline void set_size(HeapWord* ref, int value);
-  static inline int sp(oop ref);
-  static inline void set_sp(oop ref, int value);
-  static inline address pc(oop ref);
-  static inline void set_pc(oop ref, address value);
-  static inline int argsize(oop ref);
-  static inline void set_argsize(oop ref, int value);
-  static inline bool gc_mode(oop ref);
-  static inline void set_gc_mode(oop ref, bool value);
-  static inline int gc_sp(oop ref);
-  static inline void set_gc_sp(oop ref, int value);
-  static inline uint64_t mark_cycle(oop ref);
-  static inline void set_mark_cycle(oop ref, uint64_t value);
-  static inline int end(oop ref);
-  static inline int numFrames(oop ref);
-  static inline void set_numFrames(oop ref, int value);
-  static inline int numOops(oop ref);
-  static inline void set_numOops(oop ref, int value);
+  static inline jint size(oop ref);
+  static inline void set_size(HeapWord* ref, jint value);
+  static inline jint sp(oop ref);
+  static inline void set_sp(oop ref, jint value);
+  static inline jlong pc(oop ref);
+  static inline void set_pc(oop ref, jlong value);
+  static inline jint argsize(oop ref);
+  static inline void set_argsize(oop ref, jint value);
+  static inline jbyte flags(oop ref);
+  static inline void set_flags(oop ref, jbyte value);
+  static inline jboolean gc_mode(oop ref);
+  static inline void set_gc_mode(oop ref, jboolean value);
+  static inline jint gc_sp(oop ref);
+  static inline void set_gc_sp(oop ref, jint value);
+  static inline jlong mark_cycle(oop ref);
+  static inline void set_mark_cycle(oop ref, jlong value);
+  static inline jint maxSize(oop ref);
+  static inline void set_maxSize(oop ref, jint value);
+  static inline jint numFrames(oop ref);
+  static inline void set_numFrames(oop ref, jint value);
+  static inline jint numOops(oop ref);
+  static inline void set_numOops(oop ref, jint value);
   static inline oop cont(oop ref);
   static inline void set_cont(oop ref, oop value);
   template<typename P>
   static inline void set_cont_raw(oop ref, oop value);
-
-  static inline int parent_offset() { return _parent_offset; }
-  static inline int cont_offset()   { return _cont_offset; }
-
-  static inline bool is_stack_chunk(oop ref);
-  static inline bool is_empty(oop ref);
-  static inline intptr_t* start_address(oop ref);
-  static intptr_t* end_address(oop ref);
-  static inline intptr_t* sp_address(oop ref);
-  static bool is_in_chunk(oop chunk, void* p);
-  static bool is_usable_in_chunk(oop ref, void* p);
 };
 
 // Interface to java.lang.invoke.MethodHandle objects

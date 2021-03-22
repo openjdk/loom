@@ -27,31 +27,15 @@
 * @test
 * @summary Basic tests for java.lang.Continuation
 *
-* @run testng/othervm -Xint -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xint -XX:+UseContinuationLazyCopy Basic
-* @run testng/othervm -Xint -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks Basic
-* @run testng/othervm -Xint -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks Basic
+* @run testng/othervm -Xint Basic
 *
-* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy -XX:+UseContinuationChunks Basic
-* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:-UseContinuationChunks Basic
+* @run testng/othervm -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,Basic Basic
 *
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,Basic.manyArgsDriver -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,java/lang/Continuation.enter -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=inline,java/lang/Continuation.run -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
+* @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic Basic
+* @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
+* @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
+* @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=inline,java/lang/Continuation.run Basic
 *
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,Basic.manyArgsDriver -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,java/lang/Continuation.enter -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=inline,java/lang/Continuation.run -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
 */
 
 
@@ -60,21 +44,10 @@
 * @requires vm.graal.enabled
 * @summary Basic tests for java.lang.Continuation with Graal
 *
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,Basic.manyArgsDriver -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,java/lang/Continuation.enter -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=inline,java/lang/Continuation.run -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
-* @run testng/othervm -Xcomp -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
-*
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,Basic.manyArgsDriver -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,java/lang/Continuation.enter -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=inline,java/lang/Continuation.run -XX:-UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
-* @run testng/othervm -Xcomp -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:+UseContinuationLazyCopy -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
+* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic Basic
+* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
+* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
+* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=inline,java/lang/Continuation.run Basic
 */
 
 /**
@@ -147,7 +120,7 @@ public class Basic {
             assertEquals(cont.isPreempted(), false);
 
             List<String> frames = cont.stackWalker().walk(fs -> fs.map(StackWalker.StackFrame::getMethodName).collect(Collectors.toList()));
-            assertEquals(frames, cont.isDone() ? List.of() : Arrays.asList("yield0", "yield", "bar", "foo", "lambda$test1$0", "enter0", "enter"));
+            assertEquals(frames, cont.isDone() ? List.of() : Arrays.asList("yield", "bar", "foo", "lambda$test1$0", "enter0", "enter"));
         }
         assertEquals(res.get(), 247);
         assertEquals(cont.isPreempted(), false);

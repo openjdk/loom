@@ -507,33 +507,4 @@ public interface ExecutorService extends Executor, AutoCloseable {
             }
         }
     }
-
-    /**
-     * Returns an Executor that attempts to stop all tasks executing if a
-     * deadline is reached before it has terminated. The newly created Executor
-     * delegates all operations to this Executor. If the deadline is reached
-     * before the Executor has terminated then it is shutdown, as if by
-     * invoking {@link #shutdownNow()}. The {@code shutdownNow()} method
-     * may be invoked on a thread supporting the deadline mechanism.
-     *
-     * <p> If this method is invoked with a deadline that has already expired
-     * then its {@code shutdownNow()} method is invoked immediately. If the
-     * deadline has already expired or the executor has already terminated
-     * then this Executor is returned (a new Executor is not created).
-     *
-     * @implSpec
-     * The default implementation schedules a task to run when the deadline
-     * expires. The task invokes the {@code shutdownNow()} method to attempt
-     * to stop all executing tasks.
-     *
-     * @param deadline the deadline
-     * @return a new Executor that delegates operations to this Executor
-     * @throws NullPointerException if deadline is null
-     * @throws SecurityException if a security manager exists and it denies
-     *         {@link java.lang.RuntimePermission}{@code ("modifyThread")}.
-     * @since 99
-     */
-//    default ExecutorService withDeadline(Instant deadline) {
-//        return TimedExecutorService.create(this, deadline);
-//    }
 }

@@ -25,16 +25,12 @@
 * @test
 * @summary Tests for java.lang.Continuation preemption
 *
-* @run testng/othervm/timeout=60 -Xint -XX:-UseContinuationLazyCopy Preempt
-* @run testng/othervm -XX:+UnlockDiagnosticVMOptions -Xint -XX:+UseContinuationLazyCopy  Preempt
-* @run testng/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt -XX:-UseContinuationLazyCopy Preempt
-* @run testng/othervm -XX:+UnlockDiagnosticVMOptions -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt -XX:+UseContinuationLazyCopy Preempt
-* @run testng/othervm -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt -XX:-UseContinuationLazyCopy Preempt
-* @run testng/othervm -XX:+UnlockDiagnosticVMOptions -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt -XX:+UseContinuationLazyCopy Preempt
+* @run testng/othervm/timeout=60 -Xint Preempt
+* @run testng/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
+* @run testng/othervm -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
 */
 
-// * @run testng/othervm -XX:+UnlockExperimentalVMOptions -XX:-TieredCompilation -XX:+UseJVMCICompiler -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt -XX:-UseContinuationLazyCopy Preempt
-// * @run testng/othervm -XX:+UnlockExperimentalVMOptions -XX:+UnlockDiagnosticVMOptions -XX:-TieredCompilation -XX:+UseJVMCICompiler -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt -XX:+UseContinuationLazyCopy Preempt
+// * @run testng/othervm -XX:+UnlockExperimentalVMOptions -XX:-TieredCompilation -XX:+UseJVMCICompiler -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
 
 // TODO:
 // - Add tests for failed preemptions
@@ -77,7 +73,7 @@ public class Preempt {
                     do {
                         res = cont.tryPreempt(t0);
                         i++;
-                    } while (i < 20 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
+                    } while (i < 100 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
                     assertEquals(res, Continuation.PreemptStatus.SUCCESS, "res: " + res + " i: " + i);
                 }
                 preemptLatch.await();
@@ -87,7 +83,7 @@ public class Preempt {
                     do {
                         res = cont.tryPreempt(t0);
                         i++;
-                    } while (i < 20 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
+                    } while (i < 100 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
                     assertEquals(res, Continuation.PreemptStatus.SUCCESS, "res: " + res + " i: " + i);
                 }
             } catch (InterruptedException e) {
@@ -115,6 +111,9 @@ public class Preempt {
     private void loop() {
         while (run) {
             x++;
+
+            // Continuation.pin(); try { System.out.println("$$$ " + x + " $$$"); } finally { Continuation.unpin(); }
+
             if (startLatch.getCount() > 0) {
                 startLatch.countDown();
             }

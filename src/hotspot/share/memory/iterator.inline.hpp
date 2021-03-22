@@ -169,6 +169,25 @@ void Devirtualizer::do_cld(OopClosureType* closure, ClassLoaderData* cld) {
   call_do_cld(&OopClosureType::do_cld, &OopIterateClosure::do_cld, closure, cld);
 }
 
+// Implementation of the non-virtual do_derived_oop dispatch.
+
+template <typename Receiver, typename Base, typename DerivedOopClosureType>
+static typename EnableIf<IsSame<Receiver, Base>::value, void>::type
+call_do_derived_oop(void (Receiver::*)(oop*, oop*), void (Base::*)(oop*, oop*), DerivedOopClosureType* closure, oop* base, oop* derived) {
+  closure->do_derived_oop(base, derived);
+}
+
+template <typename Receiver, typename Base, typename DerivedOopClosureType>
+static typename EnableIf<!IsSame<Receiver, Base>::value, void>::type
+call_do_derived_oop(void (Receiver::*)(oop*, oop*), void (Base::*)(oop*, oop*), DerivedOopClosureType* closure, oop* base, oop* derived) {
+  closure->DerivedOopClosureType::do_derived_oop(base, derived);
+}
+
+template <typename DerivedOopClosureType>
+inline void Devirtualizer::do_derived_oop(DerivedOopClosureType* closure, oop* base, oop* derived) {
+  call_do_derived_oop(&DerivedOopClosureType::do_derived_oop, &DerivedOopClosure::do_derived_oop, closure, base, derived);
+}
+
 // Dispatch table implementation for *Klass::oop_oop_iterate
 //
 // It allows for a single call to do a multi-dispatch to an optimized version

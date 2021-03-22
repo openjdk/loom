@@ -972,6 +972,8 @@ void nmethod::maybe_print_nmethod(DirectiveSet* directive) {
 }
 
 void nmethod::print_nmethod(bool printmethod) {
+  run_nmethod_entry_barrier(); // ensure all embedded OOPs are valid before printing
+
   ttyLocker ttyl;  // keep the following output all in one block
   if (xtty != NULL) {
     xtty->begin_head("print_nmethod");
@@ -1118,6 +1120,45 @@ void nmethod::fix_oop_relocations(address begin, address end, bool initialize_im
   }
 }
 
+
+void nmethod::make_deoptimized() {
+  CompiledICLocker ml(this);
+  assert(CompiledICLocker::is_safe(this), "mt unsafe call");
+  ResourceMark rm;
+  RelocIterator iter(this, oops_reloc_begin());
+
+  while(iter.next()) {
+
+    switch(iter.type()) {
+      case relocInfo::virtual_call_type:
+      case relocInfo::opt_virtual_call_type: {
+        CompiledIC *ic = CompiledIC_at(&iter);
+        address pc = ic->end_of_call();
+        NativePostCallNop* nop = nativePostCallNop_at(pc);
+        if (nop != NULL) {
+          nop->make_deopt();
+        }
+        assert(NativeDeoptInstruction::is_deopt_at(pc), "check");
+        break;
+      }
+      case relocInfo::static_call_type: {
+        CompiledStaticCall *csc = compiledStaticCall_at(iter.reloc());
+        address pc = csc->end_of_call();
+        NativePostCallNop* nop = nativePostCallNop_at(pc);
+        //tty->print_cr(" - static pc %p", pc);
+        if (nop != NULL) {
+          nop->make_deopt();
+        }
+        // We can't assert here, there are some calls to stubs / runtime
+        // that have reloc data and doesn't have a post call NOP.
+        //assert(NativeDeoptInstruction::is_deopt_at(pc), "check");
+        break;
+      }
+      default:
+        break;
+    }
+  }
+}
 
 void nmethod::verify_clean_inline_caches() {
   assert(CompiledICLocker::is_safe(this), "mt unsafe call");

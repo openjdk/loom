@@ -47,6 +47,9 @@ public class SunCommandLineLauncher extends AbstractLauncher {
     static private final String ARG_QUOTE = "quote";
     static private final String ARG_VM_EXEC = "vmexec";
 
+    static private final String ARG_VM_ENUMERATE_VTHREADS = "enumeratevthreads";
+    static private final String ARG_VM_TRACK_VTHREADS     = "trackvthreads";
+
     TransportService transportService;
     Transport transport;
     boolean usingSharedMemory = false;
@@ -130,6 +133,18 @@ public class SunCommandLineLauncher extends AbstractLauncher {
                 getString("sun.vm_exec"),
                 "java",
                 true);
+        addStringArgument(
+                ARG_VM_ENUMERATE_VTHREADS,
+                getString("sun.vm_enumerate_vthreads.label"),
+                getString("sun.vm_enumerate_vthreads"),
+                "n",
+                false);
+        addStringArgument(
+                ARG_VM_TRACK_VTHREADS,
+                getString("sun.vm_track_vthreads.label"),
+                getString("sun.vm_track_vthreads"),
+                "some",
+                false);
     }
 
     static boolean hasWhitespace(String string) {
@@ -156,6 +171,8 @@ public class SunCommandLineLauncher extends AbstractLauncher {
                                                   arguments)).booleanValue();
         String quote = argument(ARG_QUOTE, arguments).value();
         String exe = argument(ARG_VM_EXEC, arguments).value();
+        String enumerateVThreads = argument(ARG_VM_ENUMERATE_VTHREADS, arguments).value();
+        String trackVThreads = argument(ARG_VM_TRACK_VTHREADS, arguments).value();
         String exePath = null;
 
         if (quote.length() > 1) {
@@ -213,7 +230,9 @@ public class SunCommandLineLauncher extends AbstractLauncher {
 
             String xrun = "transport=" + transport().name() +
                           ",address=" + address +
-                          ",suspend=" + (wait? 'y' : 'n');
+                          ",suspend=" + (wait? 'y' : 'n') +
+                          ",enumeratevthreads=" + enumerateVThreads +
+                          ",trackvthreads=" + trackVThreads;
             // Quote only if necessary in case the quote arg value is bogus
             if (hasWhitespace(xrun)) {
                 xrun = quote + xrun + quote;

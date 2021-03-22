@@ -24,30 +24,26 @@
 /**
  * @test
  * @requires vm.debug != true
- * @run main/othervm -XX:-UseContinuationChunks PinALot
- * @run main/othervm -XX:+UseContinuationChunks PinALot
+ * @run main/othervm PinALot
  * @summary Stress test timed park when pinned
  */
 
 /**
  * @test
  * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot
- * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot
  */
 
 /**
  * @test
  * @requires vm.debug == true
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks PinALot 200000
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks PinALot 200000
+ * @run main/othervm/timeout=300 PinALot 200000
  */
 
 /**
  * @test
  * @requires vm.debug == true & vm.graal.enabled
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot 200000
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot 200000
+ * @run main/othervm/timeout=300 -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot 200000
  */
 
 import java.time.Duration;

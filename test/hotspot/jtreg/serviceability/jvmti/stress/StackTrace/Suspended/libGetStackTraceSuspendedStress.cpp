@@ -71,12 +71,7 @@ jint get_thread_state(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
 }
 
 void check_link_consistency(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  jthread cthread = NULL;
-  jvmtiError err;
-
-  err = jvmti->GetCarrierThread(vthread, &cthread);
-  check_jvmti_status(jni, err, "Error in GetCarrierThread.");
-
+  jthread cthread = get_carrier_thread(jvmti, jni, vthread);
   jint vstate = get_thread_state(jvmti, jni, vthread);
   jint cstate = get_thread_state(jvmti, jni, cthread);
 
@@ -88,14 +83,7 @@ void check_link_consistency(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   }
 
   if (cthread != NULL) {
-    jthread cthread_to_vthread = NULL;
-    err = jvmti->GetVirtualThread(cthread, &cthread_to_vthread);
-    if (err != JVMTI_ERROR_NONE) {
-      printf("Error %s in GetVirtualThread :\n", TranslateError(err));
-      print_thread_info(jvmti, jni, vthread);
-      print_thread_info(jvmti, jni, cthread);
-      fatal(jni, "");
-    }
+    jthread cthread_to_vthread = get_virtual_thread(jvmti, jni, cthread);
     if (!jni->IsSameObject(vthread, cthread_to_vthread)) {
       printf("GetVirtualThread(GetCarrierThread(vthread)) not equals to vthread.\n");
       printf("Result: ");
@@ -141,7 +129,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     for (int i = 0; i < count; i++) {
       jthread tested_thread = NULL;
 
-      err = jvmti->GetVirtualThread(threads[i], &tested_thread);
+      err = GetVirtualThread(jvmti, jni, threads[i], &tested_thread);
       if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
         continue;
       }

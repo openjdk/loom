@@ -57,6 +57,8 @@ class CompiledPltStaticCall: public CompiledStaticCall {
     return st;
   }
 
+  address end_of_call() const { return _call->return_address(); }
+
   static inline CompiledPltStaticCall* at(Relocation* call_site) {
     return at(call_site->addr());
   }

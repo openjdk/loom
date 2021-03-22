@@ -52,6 +52,9 @@
 const char* TranslateState(jint flags);
 const char* TranslateError(jvmtiError err);
 
+static jvmtiExtensionFunction GetVirtualThread_func = NULL;
+static jvmtiExtensionFunction GetCarrierThread_func = NULL;
+
 char*
 jlong_to_string(jlong value, char *string) {
   char buffer[32];
@@ -330,66 +333,53 @@ print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 /* Commonly used helper functions */
 const char*
 TranslateState(jint flags) {
-    static char str[15 * 20];
+  static char str[15 * 20];
 
-    if (flags == 0)
-        return "<none>";
+  if (flags == 0) {
+    return "<none>";
+  }
+  str[0] = '\0';
 
-    str[0] = '\0';
-
-    if (flags & JVMTI_THREAD_STATE_ALIVE) {
-        strcat(str, " ALIVE");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_TERMINATED) {
-        strcat(str, " TERMINATED");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_RUNNABLE) {
-        strcat(str, " RUNNABLE");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_WAITING) {
-        strcat(str, " WAITING");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_WAITING_INDEFINITELY) {
-        strcat(str, " WAITING_INDEFINITELY");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT) {
-        strcat(str, " WAITING_WITH_TIMEOUT");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_SLEEPING) {
-        strcat(str, " SLEEPING");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_IN_OBJECT_WAIT) {
-        strcat(str, " IN_OBJECT_WAIT");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_PARKED) {
-        strcat(str, " PARKED");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER) {
-        strcat(str, " BLOCKED_ON_MONITOR_ENTER");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_SUSPENDED) {
-        strcat(str, " SUSPENDED");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_INTERRUPTED) {
-        strcat(str, " INTERRUPTED");
-    }
-
-    if (flags & JVMTI_THREAD_STATE_IN_NATIVE) {
-        strcat(str, " IN_NATIVE");
-    }
-
-    return str;
+  if (flags & JVMTI_THREAD_STATE_ALIVE) {
+    strcat(str, " ALIVE");
+  }
+  if (flags & JVMTI_THREAD_STATE_TERMINATED) {
+    strcat(str, " TERMINATED");
+  }
+  if (flags & JVMTI_THREAD_STATE_RUNNABLE) {
+    strcat(str, " RUNNABLE");
+  }
+  if (flags & JVMTI_THREAD_STATE_WAITING) {
+    strcat(str, " WAITING");
+  }
+  if (flags & JVMTI_THREAD_STATE_WAITING_INDEFINITELY) {
+    strcat(str, " WAITING_INDEFINITELY");
+  }
+  if (flags & JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT) {
+    strcat(str, " WAITING_WITH_TIMEOUT");
+  }
+  if (flags & JVMTI_THREAD_STATE_SLEEPING) {
+    strcat(str, " SLEEPING");
+  }
+  if (flags & JVMTI_THREAD_STATE_IN_OBJECT_WAIT) {
+    strcat(str, " IN_OBJECT_WAIT");
+  }
+  if (flags & JVMTI_THREAD_STATE_PARKED) {
+    strcat(str, " PARKED");
+  }
+  if (flags & JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER) {
+    strcat(str, " BLOCKED_ON_MONITOR_ENTER");
+  }
+  if (flags & JVMTI_THREAD_STATE_SUSPENDED) {
+    strcat(str, " SUSPENDED");
+  }
+  if (flags & JVMTI_THREAD_STATE_INTERRUPTED) {
+    strcat(str, " INTERRUPTED");
+  }
+  if (flags & JVMTI_THREAD_STATE_IN_NATIVE) {
+    strcat(str, " IN_NATIVE");
+  }
+  return str;
 }
 
 const char*
@@ -632,33 +622,32 @@ TranslateObjectRefKind(jvmtiObjectReferenceKind ref) {
 
 int
 isThreadExpected(jvmtiEnv *jvmti, jthread thread) {
-    static const char *vm_jfr_buffer_thread_name = "VM JFR Buffer Thread";
-    static const char *jfr_request_timer_thread_name = "JFR request timer";
-    static const char *graal_management_bean_registration_thread_name =
-                                            "HotSpotGraalManagement Bean Registration";
-    static const char *graal_compiler_thread_name_prefix = "JVMCI CompilerThread";
-    static const size_t prefixLength = strlen(graal_compiler_thread_name_prefix);
+  static const char *vm_jfr_buffer_thread_name = "VM JFR Buffer Thread";
+  static const char *jfr_request_timer_thread_name = "JFR request timer";
+  static const char *graal_management_bean_registration_thread_name =
+                        "HotSpotGraalManagement Bean Registration";
+  static const char *graal_compiler_thread_name_prefix = "JVMCI CompilerThread";
+  static const size_t prefixLength = strlen(graal_compiler_thread_name_prefix);
 
-    jvmtiThreadInfo threadinfo;
-    jvmtiError err = jvmti->GetThreadInfo(thread, &threadinfo);
-    if (err != JVMTI_ERROR_NONE) {
-      return 0;
-    }
+  jvmtiThreadInfo threadinfo;
+  jvmtiError err = jvmti->GetThreadInfo(thread, &threadinfo);
+  if (err != JVMTI_ERROR_NONE) {
+    return 0;
+  }
+  if (strcmp(threadinfo.name, vm_jfr_buffer_thread_name) == 0) {
+    return 0;
+  }
+  if (strcmp(threadinfo.name, jfr_request_timer_thread_name) == 0) {
+    return 0;
+  }
+  if (strcmp(threadinfo.name, graal_management_bean_registration_thread_name) == 0)
+    return 0;
 
-    if (strcmp(threadinfo.name, vm_jfr_buffer_thread_name) == 0)
-        return 0;
-
-    if (strcmp(threadinfo.name, jfr_request_timer_thread_name) == 0)
-        return 0;
-
-    if (strcmp(threadinfo.name, graal_management_bean_registration_thread_name) == 0)
-        return 0;
-
-    if ((strlen(threadinfo.name) > prefixLength) &&
-         strncmp(threadinfo.name, graal_compiler_thread_name_prefix, prefixLength) == 0)
-        return 0;
-
-    return 1;
+  if ((strlen(threadinfo.name) > prefixLength) &&
+      strncmp(threadinfo.name, graal_compiler_thread_name_prefix, prefixLength) == 0) {
+    return 0;
+  }
+  return 1;
 }
 
 jthread
@@ -691,7 +680,113 @@ nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
   return foundThread;
 }
 
+/*
+ * JVMTI Extension Mechanism
+ */
+
+static const jvmtiEvent
+  EXT_EVENT_VIRTUAL_THREAD_MOUNT   = (jvmtiEvent)((int)JVMTI_MIN_EVENT_TYPE_VAL - 2),
+  EXT_EVENT_VIRTUAL_THREAD_UNMOUNT = (jvmtiEvent)((int)JVMTI_MIN_EVENT_TYPE_VAL - 3);
+
+static jvmtiExtensionFunction
+find_ext_function(jvmtiEnv* jvmti, JNIEnv* jni, const char* fname) {
+  jint extCount = 0;
+  jvmtiExtensionFunctionInfo* extList = NULL;
+
+  jvmtiError err = jvmti->GetExtensionFunctions(&extCount, &extList);
+  check_jvmti_status(jni, err, "jvmti_common find_ext_function: Error in JVMTI GetExtensionFunctions");
+
+  for (int i = 0; i < extCount; i++) {
+    if (strstr(extList[i].id, (char*)fname) != NULL) {
+      return extList[i].func;
+    }
+  }
+  return NULL;
+}
+
+static jvmtiError
+GetVirtualThread(jvmtiEnv* jvmti, JNIEnv* jni, jthread cthread, jthread* vthread_ptr) {
+  if (GetVirtualThread_func == NULL) { // lazily initialize function pointer
+    GetVirtualThread_func = find_ext_function(jvmti, jni, "GetVirtualThread");
+  }
+  jvmtiError err = (*GetVirtualThread_func)(jvmti, cthread, vthread_ptr);
+
+  return err;
+}
+
+static jvmtiError
+GetCarrierThread(jvmtiEnv* jvmti, JNIEnv* jni, jthread vthread, jthread* cthread_ptr) {
+  if (GetCarrierThread_func == NULL) { // lazily initialize function pointer
+    GetCarrierThread_func = find_ext_function(jvmti, jni, "GetCarrierThread");
+  }
+  jvmtiError err = (*GetCarrierThread_func)(jvmti, vthread, cthread_ptr);
+
+  return err;
+}
+
+static jthread
+get_virtual_thread(jvmtiEnv* jvmti, JNIEnv* jni, jthread cthread) {
+  jthread vthread = NULL;
+  jvmtiError err = GetVirtualThread(jvmti, jni, cthread, &vthread);
+  check_jvmti_status(jni, err, "jvmti_common get_virtual_thread: Error in JVMTI extension GetVirtualThread");
+  return vthread;
+}
+
+static jthread
+get_carrier_thread(jvmtiEnv* jvmti, JNIEnv* jni, jthread vthread) {
+  jthread cthread = NULL;
+  jvmtiError err = GetCarrierThread(jvmti, jni, vthread, &cthread);
+  check_jvmti_status(jni, err, "jvmti_common get_carrier_thread: Error in JVMTI extension GetCarrierThread");
+
+  return cthread;
+}
+
+static jvmtiExtensionEventInfo*
+find_ext_event(jvmtiEnv* jvmti, const char* ename) {
+  jint extCount = 0;
+  jvmtiExtensionEventInfo* extList = NULL;
+
+  jvmtiError err = jvmti->GetExtensionEvents(&extCount, &extList);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("jvmti_common find_ext_event: Error in JVMTI GetExtensionFunctions: %s(%d)\n",
+           TranslateError(err), err);
+    printf(0);
+    return NULL;
+  }
+  for (int i = 0; i < extCount; i++) {
+    if (strstr(extList[i].id, (char*)ename) != NULL) {
+      return &extList[i];
+    }
+  }
+  return NULL;
+}
+
+static jvmtiError
+set_ext_event_callback(jvmtiEnv* jvmti,  const char* ename, jvmtiExtensionEvent callback) {
+  jvmtiExtensionEventInfo* info = find_ext_event(jvmti, ename);
+
+  if (info == NULL) {
+    printf("jvmti_common set_ext_event_callback: Extension event was not found: %s\n", ename);
+    return JVMTI_ERROR_NOT_AVAILABLE;
+  }
+  jvmtiError err = jvmti->SetExtensionEventCallback(info->extension_event_index, callback);
+  return err;
+}
+
 /** Enable or disable given events. */
+
+static jvmtiError
+set_event_notification_mode(jvmtiEnv* jvmti, jvmtiEventMode mode, jvmtiEvent event_type, jthread event_thread) {
+  jvmtiError err = jvmti->SetEventNotificationMode(mode, event_type, event_thread);
+  return err;
+}
+
+static void
+set_event_notification_mode(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode mode, jvmtiEvent event_type, jthread event_thread) {
+  jvmtiError err = jvmti->SetEventNotificationMode(mode, event_type, event_thread);
+  check_jvmti_status(jni, err, "jvmti_common set_event_notification_mode: Error in JVMTI SetEventNotificationMode");
+}
+
 int
 nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int size, jvmtiEvent list[], jthread thread) {
   for (int i = 0; i < size; i++) {

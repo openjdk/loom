@@ -45,7 +45,7 @@ public final class StackWalkerHelper {
     public static StackFrame[] getLiveStackFrames(Continuation cont)       { return getStackFrames(LiveStackFrame.getStackWalker(OPTS, cont.getScope(), cont)); }
 
     public static StackFrame[] getStackFrames(StackWalker walker) {
-        return walker.walk(fs -> fs.collect(Collectors.toList())).toArray(new StackFrame[0]);
+        return walker.walk(fs -> fs.collect(Collectors.toList())).toArray(StackFrame[]::new);
     }
 
     public static StackTraceElement[] toStackTraceElement(StackFrame[] fs) {

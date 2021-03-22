@@ -27,6 +27,7 @@
 
 #include "code/compiledMethod.inline.hpp"
 #include "interpreter/interpreter.hpp"
+#include "oops/instanceStackChunkKlass.inline.hpp"
 #include "oops/method.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/frame.hpp"
@@ -42,11 +43,6 @@
 
 inline bool frame::is_entry_frame() const {
   return StubRoutines::returns_to_call_stub(pc());
-}
-
-inline bool frame::is_deoptimized_frame() const {
-  assert(_deopt_state != unknown, "not answerable");
-  return _deopt_state == is_deoptimized;
 }
 
 inline bool frame::is_stub_frame() const {
@@ -70,11 +66,11 @@ template <typename RegisterMapT>
 inline oop* frame::oopmapreg_to_location(VMReg reg, const RegisterMapT* reg_map) const {
   if (reg->is_reg()) {
     // If it is passed in a register, it got spilled in the stub frame.
-    return (oop *)reg_map->location(reg);
+    return (oop *)reg_map->location(reg, sp());
   } else {
     int sp_offset_in_bytes = reg->reg2stack() * VMRegImpl::stack_slot_size;
     if (reg_map->in_cont()) {
-      return reinterpret_cast<oop*>((uintptr_t)Continuation::usp_offset_to_index(*this, reg_map->as_RegisterMap(), sp_offset_in_bytes));
+      return reinterpret_cast<oop*>((intptr_t)reg_map->as_RegisterMap()->stack_chunk()->relativize_usp_offset(*this, sp_offset_in_bytes));
     }
     address usp = (address)unextended_sp();
     assert(reg_map->thread() == NULL || reg_map->thread()->is_in_usable_stack(usp), INTPTR_FORMAT, p2i(usp)); 

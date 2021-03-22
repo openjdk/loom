@@ -24,34 +24,28 @@
 /**
  * @test
  * @requires vm.debug != true
- * @run main/othervm -XX:-UseContinuationChunks GetStackTraceALot
- * @run main/othervm -XX:+UseContinuationChunks GetStackTraceALot
+ * @run main/othervm GetStackTraceALot
  * @summary Stress test asynchronous Thread.getStackTrace
  */
 
 /**
  * @test
  * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions
- *     -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot
- * @run main/othervm -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions
  *     -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot
  */
 
 /**
  * @test
  * @requires vm.debug == true
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks GetStackTraceALot 1000
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks GetStackTraceALot 1000
+ * @run main/othervm/timeout=300 GetStackTraceALot 1000
  */
 
 /**
  * @test
  * @requires vm.debug == true & vm.graal.enabled
- * @run main/othervm/timeout=300 -XX:-UseContinuationChunks -XX:+UnlockExperimentalVMOptions
+ * @run main/othervm/timeout=300 -XX:+UnlockExperimentalVMOptions
  *     -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal GetStackTraceALot 1000
- * @run main/othervm/timeout=300 -XX:+UseContinuationChunks -XX:+UnlockExperimentalVMOptions
- *     -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internalGetStackTraceALot 1000
  */
 
 import java.time.Duration;

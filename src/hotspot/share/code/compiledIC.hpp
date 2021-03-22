@@ -260,7 +260,7 @@ class CompiledIC: public ResourceObj {
 
   bool is_icholder_call() const;
 
-  address end_of_call() { return  _call->return_address(); }
+  address end_of_call() const { return  _call->return_address(); }
 
   // MT-safe patching of inline caches. Note: Only safe to call is_xxx when holding the CompiledIC_ock
   // so you are guaranteed that no patching takes place. The same goes for verify.
@@ -383,6 +383,7 @@ public:
   virtual bool is_call_to_interpreted() const = 0;
 
   virtual address instruction_address() const = 0;
+  virtual address end_of_call() const = 0;
 protected:
   virtual address resolve_call_stub() const = 0;
   virtual void set_destination_mt_safe(address dest) = 0;
@@ -434,6 +435,7 @@ private:
 
   // Delegation
   address destination() const { return _call->destination(); }
+  address end_of_call() const { return _call->return_address(); }
 
   // State
   virtual bool is_call_to_interpreted() const;

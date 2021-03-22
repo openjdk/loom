@@ -231,8 +231,7 @@ public:
   JvmtiVirtualThreadEventMark(JavaThread *thread) :
     JvmtiEventMark(thread) {
     JvmtiThreadState* state = thread->jvmti_thread_state();
-    if (JvmtiExport::can_support_virtual_threads() &&
-        state != NULL && state->is_virtual()) {
+    if (state != NULL && state->is_virtual()) {
       _jt = (jthread)(to_jobject(thread->vthread()));
     } else {
       _jt = (jthread)(to_jobject(thread->threadObj()));
@@ -1256,7 +1255,6 @@ bool              JvmtiExport::_can_post_frame_pop                        = fals
 bool              JvmtiExport::_can_pop_frame                             = false;
 bool              JvmtiExport::_can_force_early_return                    = false;
 bool              JvmtiExport::_can_support_virtual_threads               = false;
-bool              JvmtiExport::_can_support_continuations                 = false;
 bool              JvmtiExport::_can_get_owned_monitor_info                = false;
 
 bool              JvmtiExport::_early_vmstart_recorded                    = false;
@@ -1285,12 +1283,10 @@ bool              JvmtiExport::_should_post_resource_exhausted            = fals
 bool              JvmtiExport::_should_post_vm_object_alloc               = false;
 bool              JvmtiExport::_should_post_sampled_object_alloc          = false;
 bool              JvmtiExport::_should_post_on_exceptions                 = false;
-bool              JvmtiExport::_should_post_continuation_run              = false;
-bool              JvmtiExport::_should_post_continuation_yield            = false;
-bool              JvmtiExport::_should_post_vthread_scheduled             = false;
-bool              JvmtiExport::_should_post_vthread_terminated            = false;
-bool              JvmtiExport::_should_post_vthread_mounted               = false;
-bool              JvmtiExport::_should_post_vthread_unmounted             = false;
+bool              JvmtiExport::_should_post_vthread_start                 = false;
+bool              JvmtiExport::_should_post_vthread_end                   = false;
+bool              JvmtiExport::_should_post_vthread_mount                 = false;
+bool              JvmtiExport::_should_post_vthread_unmount               = false;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1475,7 +1471,7 @@ void JvmtiExport::post_thread_start(JavaThread *thread) {
         EVT_TRACE(JVMTI_EVENT_THREAD_START, ("[%s] Evt Thread Start event sent",
                      JvmtiTrace::safe_get_thread_name(thread) ));
 
-        JvmtiThreadEventMark jem(thread);
+        JvmtiVirtualThreadEventMark jem(thread);
         JvmtiJavaThreadEventTransition jet(thread);
         jvmtiEventThreadStart callback = env->callbacks()->ThreadStart;
         if (callback != NULL) {
@@ -1513,7 +1509,7 @@ void JvmtiExport::post_thread_end(JavaThread *thread) {
         EVT_TRACE(JVMTI_EVENT_THREAD_END, ("[%s] Evt Thread End event sent",
                      JvmtiTrace::safe_get_thread_name(thread) ));
 
-        JvmtiThreadEventMark jem(thread);
+        JvmtiVirtualThreadEventMark jem(thread);
         JvmtiJavaThreadEventTransition jet(thread);
         jvmtiEventThreadEnd callback = env->callbacks()->ThreadEnd;
         if (callback != NULL) {
@@ -1525,11 +1521,11 @@ void JvmtiExport::post_thread_end(JavaThread *thread) {
 }
 
 
-void JvmtiExport::post_vthread_scheduled(jobject vthread) {
+void JvmtiExport::post_vthread_start(jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, ("[%p] Trg Virtual Thread Scheduled event triggered", vthread));
+  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_START, ("[%p] Trg Virtual Thread Start event triggered", vthread));
 
   JavaThread *cur_thread = JavaThread::current();
   JvmtiThreadState *state = cur_thread->jvmti_thread_state();
@@ -1537,7 +1533,7 @@ void JvmtiExport::post_vthread_scheduled(jobject vthread) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED)) {
+  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_START)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1545,12 +1541,12 @@ void JvmtiExport::post_vthread_scheduled(jobject vthread) {
       if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
         continue;
       }
-      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED)) {
-        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_SCHEDULED, ("[%p] Evt Virtual Thread Scheduled event sent", vthread));
+      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_START)) {
+        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_START, ("[%p] Evt Virtual Thread Start event sent", vthread));
 
         JvmtiVirtualThreadEventMark jem(cur_thread);
         JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventVirtualThreadScheduled callback = env->callbacks()->VirtualThreadScheduled;
+        jvmtiEventVirtualThreadStart callback = env->callbacks()->VirtualThreadStart;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
@@ -1559,11 +1555,11 @@ void JvmtiExport::post_vthread_scheduled(jobject vthread) {
   }
 }
 
-void JvmtiExport::post_vthread_terminated(jobject vthread) {
+void JvmtiExport::post_vthread_end(jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, ("[%p] Trg Virtual Thread Terminated event triggered", vthread));
+  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_END, ("[%p] Trg Virtual Thread End event triggered", vthread));
 
   JavaThread *cur_thread = JavaThread::current();
   JvmtiThreadState *state = cur_thread->jvmti_thread_state();
@@ -1571,7 +1567,7 @@ void JvmtiExport::post_vthread_terminated(jobject vthread) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED)) {
+  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_END)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1579,12 +1575,12 @@ void JvmtiExport::post_vthread_terminated(jobject vthread) {
       if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
         continue;
       }
-      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED)) {
-        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_TERMINATED, ("[%p] Evt Virtual Thread Terminated event sent", vthread));
+      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_END)) {
+        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_END, ("[%p] Evt Virtual Thread End event sent", vthread));
 
         JvmtiVirtualThreadEventMark jem(cur_thread);
         JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventVirtualThreadTerminated callback = env->callbacks()->VirtualThreadTerminated;
+        jvmtiEventVirtualThreadEnd callback = env->callbacks()->VirtualThreadEnd;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), vthread);
         }
@@ -1593,19 +1589,20 @@ void JvmtiExport::post_vthread_terminated(jobject vthread) {
   }
 }
 
-void JvmtiExport::post_vthread_mounted(jobject vthread) {
+void JvmtiExport::post_vthread_mount(jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, ("[%p] Trg Virtual Thread Mounted event triggered", vthread));
+  JavaThread *thread = JavaThread::current();
+  HandleMark hm(thread);
+  EVT_TRIG_TRACE(EXT_EVENT_VIRTUAL_THREAD_MOUNT, ("[%p] Trg Virtual Thread Mount event triggered", vthread));
 
-  JavaThread *cur_thread = JavaThread::current();
-  JvmtiThreadState *state = cur_thread->jvmti_thread_state();
+  JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == NULL) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED)) {
+  if (state->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_MOUNT)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1613,12 +1610,12 @@ void JvmtiExport::post_vthread_mounted(jobject vthread) {
       if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
         continue;
       }
-      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED)) {
-        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, ("[%p] Evt Virtual Thread Mounted event sent", vthread));
+      if (ets->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_MOUNT)) {
+        EVT_TRACE(EXT_EVENT_VIRTUAL_THREAD_MOUNT, ("[%p] Evt Virtual Thread Mount event sent", vthread));
 
-        JvmtiVirtualThreadEventMark jem(cur_thread);
-        JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventVirtualThreadMounted callback = env->callbacks()->VirtualThreadMounted;
+        JvmtiVirtualThreadEventMark jem(thread);
+        JvmtiJavaThreadEventTransition jet(thread);
+        jvmtiExtensionEvent callback = env->ext_callbacks()->VirtualThreadMount;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
@@ -1627,19 +1624,20 @@ void JvmtiExport::post_vthread_mounted(jobject vthread) {
   }
 }
 
-void JvmtiExport::post_vthread_unmounted(jobject vthread) {
+void JvmtiExport::post_vthread_unmount(jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, ("[%p] Trg Virtual Thread Unmounted event triggered", vthread));
+  JavaThread *thread = JavaThread::current();
+  HandleMark hm(thread);
+  EVT_TRIG_TRACE(EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, ("[%p] Trg Virtual Thread Unmount event triggered", vthread));
 
-  JavaThread *cur_thread = JavaThread::current();
-  JvmtiThreadState *state = cur_thread->jvmti_thread_state();
+  JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == NULL) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED)) {
+  if (state->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_UNMOUNT)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1647,12 +1645,12 @@ void JvmtiExport::post_vthread_unmounted(jobject vthread) {
       if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
         continue;
       }
-      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED)) {
-        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, ("[%p] Evt Virtual Thread Unmounted event sent", vthread));
+      if (ets->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_UNMOUNT)) {
+        EVT_TRACE(EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, ("[%p] Evt Virtual Thread Unmount event sent", vthread));
 
-        JvmtiVirtualThreadEventMark jem(cur_thread);
-        JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventVirtualThreadUnmounted callback = env->callbacks()->VirtualThreadUnmounted;
+        JvmtiVirtualThreadEventMark jem(thread);
+        JvmtiJavaThreadEventTransition jet(thread);
+        jvmtiExtensionEvent callback = env->ext_callbacks()->VirtualThreadUnmount;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
@@ -1661,11 +1659,10 @@ void JvmtiExport::post_vthread_unmounted(jobject vthread) {
   }
 }
 
-void JvmtiExport::post_continuation_run(JavaThread* thread, jint continuation_frame_count) {
+void JvmtiExport::continuation_yield_cleanup(JavaThread* thread, jint continuation_frame_count) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_CONTINUATION_RUN, ("Trg Continuation Run event triggered"));
 
   assert (thread == JavaThread::current(), "must be");
   JvmtiThreadState *state = thread->jvmti_thread_state();
@@ -1673,62 +1670,6 @@ void JvmtiExport::post_continuation_run(JavaThread* thread, jint continuation_fr
     return;
   }
   state->invalidate_cur_stack_depth();
-
-  if (state->is_enabled(JVMTI_EVENT_CONTINUATION_RUN)) {
-    JvmtiEnvThreadStateIterator it(state);
-
-    for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
-      JvmtiEnv *env = ets->get_env();
-      if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
-        continue;
-      }
-      if (ets->is_enabled(JVMTI_EVENT_CONTINUATION_RUN)) {
-        EVT_TRACE(JVMTI_EVENT_CONTINUATION_RUN, ("Evt Continuation Run event sent"));
-
-        JvmtiVirtualThreadEventMark jem(thread);
-        JvmtiJavaThreadEventTransition jet(thread);
-        jvmtiEventContinuationRun callback = env->callbacks()->ContinuationRun;
-        if (callback != NULL) {
-          (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread(), continuation_frame_count);
-        }
-      }
-    }
-  }
-}
-
-void JvmtiExport::post_continuation_yield(JavaThread* thread, jint continuation_frame_count) {
-  if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
-    return;
-  }
-  EVT_TRIG_TRACE(JVMTI_EVENT_CONTINUATION_YIELD, ("Trg Continuation Yield event triggered"));
-
-  assert (thread == JavaThread::current(), "must be");
-  JvmtiThreadState *state = thread->jvmti_thread_state();
-  if (state == NULL) {
-    return;
-  }
-  state->invalidate_cur_stack_depth();
-
-  if (state->is_enabled(JVMTI_EVENT_CONTINUATION_YIELD)) {
-    JvmtiEnvThreadStateIterator it(state);
-
-    for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
-      JvmtiEnv *env = ets->get_env();
-      if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
-        continue;
-      }
-      if (ets->is_enabled(JVMTI_EVENT_CONTINUATION_YIELD)) {
-        EVT_TRACE(JVMTI_EVENT_CONTINUATION_YIELD, ("Evt Continuation Yield event sent"));
-
-        JvmtiVirtualThreadEventMark jem(thread);
-        JvmtiJavaThreadEventTransition jet(thread);
-        jvmtiEventContinuationYield callback = env->callbacks()->ContinuationYield;
-        if (callback != NULL) {
-          (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread(), continuation_frame_count);
-        }
-      }
-    }
-  }
 
   // Clear frame_pop requests in frames popped by yield
   if (can_post_frame_pop()) {

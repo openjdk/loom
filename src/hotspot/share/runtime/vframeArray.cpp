@@ -538,7 +538,7 @@ void vframeArray::fill_in(JavaThread* thread,
       // in frame_amd64.cpp and the values of the phantom high half registers
       // in amd64.ad.
       //      if (VMReg::Name(i) < SharedInfo::stack0 && is_even(i)) {
-        intptr_t* src = (intptr_t*) reg_map->location(VMRegImpl::as_VMReg(i));
+        intptr_t* src = (intptr_t*) reg_map->location(VMRegImpl::as_VMReg(i), _caller.sp());
         _callee_registers[i] = src != NULL ? *src : NULL_WORD;
         //      } else {
         //      jint* src = (jint*) reg_map->location(VMReg::Name(i));

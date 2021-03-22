@@ -883,7 +883,7 @@ static jclass jvm_define_class_common(const char *name,
                                                    &st,
                                                    CHECK_NULL);
 
-  if (log_is_enabled(Debug, class, resolve) && k != NULL) {
+  if (log_is_enabled(Debug, class, resolve)) {
     trace_class_resolution(k);
   }
 
@@ -962,19 +962,17 @@ static jclass jvm_lookup_define_class(jclass lookup, const char *name,
   const char* source = is_nestmate ? host_class->external_name() : "__JVM_LookupDefineClass__";
   ClassFileStream st((u1*)buf, len, source, ClassFileStream::verify);
 
-  Klass* defined_k;
   InstanceKlass* ik = NULL;
   if (!is_hidden) {
-    defined_k = SystemDictionary::resolve_from_stream(class_name,
-                                                      class_loader,
-                                                      protection_domain,
-                                                      &st,
-                                                      CHECK_NULL);
+    ik = SystemDictionary::resolve_from_stream(class_name,
+                                               class_loader,
+                                               protection_domain,
+                                               &st,
+                                               CHECK_NULL);
 
-    if (log_is_enabled(Debug, class, resolve) && defined_k != NULL) {
-      trace_class_resolution(defined_k);
+    if (log_is_enabled(Debug, class, resolve)) {
+      trace_class_resolution(ik);
     }
-    ik = InstanceKlass::cast(defined_k);
   } else { // hidden
     Handle classData_h(THREAD, JNIHandles::resolve(classData));
     ClassLoadInfo cl_info(protection_domain,
@@ -985,16 +983,11 @@ static jclass jvm_lookup_define_class(jclass lookup, const char *name,
                           is_hidden,
                           is_strong,
                           vm_annotations);
-    defined_k = SystemDictionary::parse_stream(class_name,
-                                               class_loader,
-                                               &st,
-                                               cl_info,
-                                               CHECK_NULL);
-    if (defined_k == NULL) {
-      THROW_MSG_0(vmSymbols::java_lang_Error(), "Failure to define a hidden class");
-    }
-
-    ik = InstanceKlass::cast(defined_k);
+    ik = SystemDictionary::parse_stream(class_name,
+                                        class_loader,
+                                        &st,
+                                        cl_info,
+                                        CHECK_NULL);
 
     // The hidden class loader data has been artificially been kept alive to
     // this point. The mirror and any instances of this class have to keep
@@ -1011,7 +1004,7 @@ static jclass jvm_lookup_define_class(jclass lookup, const char *name,
                                   ik->is_hidden() ? "is hidden" : "is not hidden");
     }
   }
-  assert(Reflection::is_same_class_package(lookup_k, defined_k),
+  assert(Reflection::is_same_class_package(lookup_k, ik),
          "lookup class and defined class are in different packages");
 
   if (init) {
@@ -1020,7 +1013,7 @@ static jclass jvm_lookup_define_class(jclass lookup, const char *name,
     ik->link_class(CHECK_NULL);
   }
 
-  return (jclass) JNIHandles::make_local(THREAD, defined_k->java_mirror());
+  return (jclass) JNIHandles::make_local(THREAD, ik->java_mirror());
 }
 
 JVM_ENTRY(jclass, JVM_DefineClass(JNIEnv *env, const char *name, jobject loader, const jbyte *buf, jsize len, jobject pd))
@@ -1103,31 +1096,41 @@ JVM_END
 
 JVM_ENTRY(void, JVM_DefineModule(JNIEnv *env, jobject module, jboolean is_open, jstring version,
                                  jstring location, jobjectArray packages))
-  Modules::define_module(module, is_open, version, location, packages, CHECK);
+  Handle h_module (THREAD, JNIHandles::resolve(module));
+  Modules::define_module(h_module, is_open, version, location, packages, CHECK);
 JVM_END
 
 JVM_ENTRY(void, JVM_SetBootLoaderUnnamedModule(JNIEnv *env, jobject module))
-  Modules::set_bootloader_unnamed_module(module, CHECK);
+  Handle h_module (THREAD, JNIHandles::resolve(module));
+  Modules::set_bootloader_unnamed_module(h_module, CHECK);
 JVM_END
 
 JVM_ENTRY(void, JVM_AddModuleExports(JNIEnv *env, jobject from_module, jstring package, jobject to_module))
-  Modules::add_module_exports_qualified(from_module, package, to_module, CHECK);
+  Handle h_from_module (THREAD, JNIHandles::resolve(from_module));
+  Handle h_to_module (THREAD, JNIHandles::resolve(to_module));
+  Modules::add_module_exports_qualified(h_from_module, package, h_to_module, CHECK);
 JVM_END
 
 JVM_ENTRY(void, JVM_AddModuleExportsToAllUnnamed(JNIEnv *env, jobject from_module, jstring package))
-  Modules::add_module_exports_to_all_unnamed(from_module, package, CHECK);
+  Handle h_from_module (THREAD, JNIHandles::resolve(from_module));
+  Modules::add_module_exports_to_all_unnamed(h_from_module, package, CHECK);
 JVM_END
 
 JVM_ENTRY(void, JVM_AddModuleExportsToAll(JNIEnv *env, jobject from_module, jstring package))
-  Modules::add_module_exports(from_module, package, NULL, CHECK);
+  Handle h_from_module (THREAD, JNIHandles::resolve(from_module));
+  Modules::add_module_exports(h_from_module, package, Handle(), CHECK);
 JVM_END
 
 JVM_ENTRY (void, JVM_AddReadsModule(JNIEnv *env, jobject from_module, jobject source_module))
-  Modules::add_reads_module(from_module, source_module, CHECK);
+  Handle h_from_module (THREAD, JNIHandles::resolve(from_module));
+  Handle h_source_module (THREAD, JNIHandles::resolve(source_module));
+  Modules::add_reads_module(h_from_module, h_source_module, CHECK);
 JVM_END
 
 JVM_ENTRY(void, JVM_DefineArchivedModules(JNIEnv *env, jobject platform_loader, jobject system_loader))
-  Modules::define_archived_modules(platform_loader, system_loader, CHECK);
+  Handle h_platform_loader (THREAD, JNIHandles::resolve(platform_loader));
+  Handle h_system_loader (THREAD, JNIHandles::resolve(system_loader));
+  Modules::define_archived_modules(h_platform_loader, h_system_loader, CHECK);
 JVM_END
 
 // Reflection support //////////////////////////////////////////////////////////////////////////////
@@ -3127,22 +3130,22 @@ JVM_ENTRY(void, JVM_Interrupt(JNIEnv* env, jobject jthread))
   }
 JVM_END
 
-JVM_ENTRY(jobject, JVM_ScopedCache(JNIEnv* env, jclass threadClass))
-  oop theCache = thread->scopedCache();
+JVM_ENTRY(jobject, JVM_ScopeLocalCache(JNIEnv* env, jclass threadClass))
+  oop theCache = thread->scopeLocalCache();
   if (theCache) {
     arrayOop objs = arrayOop(theCache);
-    assert(objs->length() == ScopedCacheSize * 2, "wrong length");
+    assert(objs->length() == ScopeLocalCacheSize * 2, "wrong length");
   }
   return JNIHandles::make_local(THREAD, theCache);
 JVM_END
 
-JVM_ENTRY(void, JVM_SetScopedCache(JNIEnv* env, jclass threadClass,
+JVM_ENTRY(void, JVM_SetScopeLocalCache(JNIEnv* env, jclass threadClass,
                                    jobject theCache))
   arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
   if (objs != NULL) {
-    assert(objs->length() == ScopedCacheSize * 2, "wrong length");
+    assert(objs->length() == ScopeLocalCacheSize * 2, "wrong length");
   }
-  thread->set_scopedCache(objs);
+  thread->set_scopeLocalCache(objs);
 JVM_END
 
 JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
@@ -3904,21 +3907,27 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
 
   if (first_mount) {
     // thread start
-    if (JvmtiExport::should_post_vthread_scheduled()) {
-      JvmtiExport::post_vthread_scheduled(vthread);
+    if (JvmtiExport::can_support_virtual_threads()) {
+      if (JvmtiExport::should_post_vthread_start()) {
+        JvmtiExport::post_vthread_start(vthread);
+      }
+    } else { // compatibility for vthread unaware agents: legacy thread_start
+      if (JvmtiExport::should_post_thread_life()) {
+        JvmtiExport::post_thread_start(thread);
+      }
     }
     oop ct_oop = thread->threadObj();
     jobject cthread = JNIHandles::make_local(thread, ct_oop);
     JFR_ONLY(Jfr::on_thread_start(cthread, vthread));
   }
-  if (JvmtiExport::should_post_vthread_mounted()) {
-    JvmtiExport::post_vthread_mounted(vthread);
+  if (JvmtiExport::should_post_vthread_mount()) {
+    JvmtiExport::post_vthread_mount(vthread);
   }
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread))
-  if (JvmtiExport::should_post_vthread_unmounted()) {
-    JvmtiExport::post_vthread_unmounted(vthread);
+  if (JvmtiExport::should_post_vthread_unmount()) {
+    JvmtiExport::post_vthread_unmount(vthread);
   }
   oop ct_oop = thread->threadObj();
   thread->rebind_to_jvmti_thread_state_of(ct_oop);
@@ -3931,8 +3940,14 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread))
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jobject vthread))
-  if (JvmtiExport::should_post_vthread_terminated()) {
-    JvmtiExport::post_vthread_terminated(vthread);
+  if (JvmtiExport::can_support_virtual_threads()) {
+    if (JvmtiExport::should_post_vthread_end()) {
+      JvmtiExport::post_vthread_end(vthread);
+    }
+  } else { // compatibility for vthread unaware agents: legacy thread_end
+    if (JvmtiExport::should_post_thread_life()) {
+      JvmtiExport::post_thread_end(thread);
+    }
   }
   oop ct_oop = thread->threadObj();
   jobject cthread = JNIHandles::make_local(thread, ct_oop);

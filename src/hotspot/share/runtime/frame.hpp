@@ -26,6 +26,7 @@
 #define SHARE_RUNTIME_FRAME_HPP
 
 #include "compiler/oopMap.hpp"
+#include "oops/stackChunkOop.hpp"
 #include "runtime/basicLock.hpp"
 #include "runtime/monitorChunk.hpp"
 #include "runtime/registerMap.hpp"
@@ -64,11 +65,10 @@ class frame {
   // Instance variables:
   union {
     intptr_t* _sp; // stack pointer (from Thread::last_Java_sp)
-    size_t _offset_sp; // used by frames in continuation chunks
     struct {
-      int _sp;
-      int _ref_sp;
-    } _cont_sp; // used by frames in continuation arrays
+      int _offset_sp; // used by frames in continuation chunks
+      int _frame_index;
+    };
   };
   address   _pc; // program counter (the next instruction after the call)
   mutable CodeBlob* _cb; // CodeBlob that "owns" pc
@@ -117,11 +117,11 @@ class frame {
 
   intptr_t* sp() const           { return _sp; }
   void set_sp( intptr_t* newsp ) { _sp = newsp; }
-  void set_offset_sp( size_t newsp ) { _offset_sp = newsp; }
 
-  int cont_sp()      const { return _cont_sp._sp; }
-  int cont_ref_sp()  const { return _cont_sp._ref_sp; }
-  size_t offset_sp() const { return _offset_sp; }
+  int offset_sp() const { return _offset_sp; }
+  void set_offset_sp( int newsp ) { _offset_sp = newsp; }
+  int frame_index() const { return _frame_index; }
+  void set_frame_index( int index ) { _frame_index = index; }
 
   CodeBlob* cb() const           { return _cb; }
   inline CodeBlob* get_cb() const;
@@ -186,7 +186,7 @@ class frame {
   // the number of oops in the frame for non-interpreted frames
   inline int num_oops() const;
 
-  // the size, in bytes, of stack-passed arguments
+  // the size, in words, of stack-passed arguments
   inline int compiled_frame_stack_argsize() const;
 
   inline void interpreted_frame_oop_map(InterpreterOopMap* mask) const;
@@ -227,6 +227,10 @@ class frame {
 
   intptr_t* addr_at(int index) const             { return &fp()[index];    }
   intptr_t  at(int index) const                  { return *addr_at(index); }
+  // in interpreter frames in continuation stacks, internal addresses are relative to fp.
+  intptr_t  at_relative(int index) const         { return (intptr_t)(fp() + fp()[index]); }
+  template <bool relative> 
+  intptr_t at(int index) const                   { return relative ? at_relative(index) : at(index); }
 
   // accessors for locals
   oop obj_at(int offset) const                   { return *obj_at_addr(offset);  }
@@ -255,9 +259,10 @@ class frame {
   // The frame's original SP, before any extension by an interpreted callee;
   // used for packing debug info into vframeArray objects and vframeArray lookup.
   intptr_t* unextended_sp() const;
-  
-  size_t frame_index() const;
-  void set_frame_index(size_t index);
+  void set_unextended_sp(intptr_t* value);
+
+  int offset_unextended_sp() const;
+  void set_offset_unextended_sp(int value);
 
   // returns the stack pointer of the calling frame
   intptr_t* sender_sp() const;
@@ -287,6 +292,7 @@ class frame {
   // Locals
 
   // The _at version returns a pointer because the address is used for GC.
+  template <bool relative = false>
   intptr_t* interpreter_frame_local_at(int index) const;
 
   void interpreter_frame_set_locals(intptr_t* locs);
@@ -322,17 +328,17 @@ class frame {
 
   // expression stack (may go up or down, direction == 1 or -1)
  public:
-  intptr_t* interpreter_frame_expression_stack() const;
+  template <bool relative = false> intptr_t* interpreter_frame_expression_stack() const;
 
   // The _at version returns a pointer because the address is used for GC.
-  intptr_t* interpreter_frame_expression_stack_at(jint offset) const;
+  template <bool relative = false> intptr_t* interpreter_frame_expression_stack_at(jint offset) const;
 
   // top of expression stack
-  intptr_t* interpreter_frame_tos_at(jint offset) const;
-  intptr_t* interpreter_frame_tos_address() const;
+  template <bool relative = false> intptr_t* interpreter_frame_tos_at(jint offset) const;
+  template <bool relative = false> intptr_t* interpreter_frame_tos_address() const;
 
 
-  jint  interpreter_frame_expression_stack_size() const;
+  template <bool relative = false> jint  interpreter_frame_expression_stack_size() const;
 
   intptr_t* interpreter_frame_sender_sp() const;
 
@@ -353,11 +359,14 @@ class frame {
   //                                 this value is >= BasicObjectLock::size(), and may be rounded up
 
   BasicObjectLock* interpreter_frame_monitor_begin() const;
+  template <bool relative = false> 
   BasicObjectLock* interpreter_frame_monitor_end()   const;
+  template <bool relative = false>
   BasicObjectLock* next_monitor_in_interpreter_frame(BasicObjectLock* current) const;
   BasicObjectLock* previous_monitor_in_interpreter_frame(BasicObjectLock* current) const;
   static int interpreter_frame_monitor_size();
 
+  template <bool relative = false>
   void interpreter_frame_verify_monitor(BasicObjectLock* value) const;
 
   // Return/result value from this interpreter frame
@@ -403,12 +412,15 @@ class frame {
  public:
   void print_value() const { print_value_on(tty,NULL); }
   void print_value_on(outputStream* st, JavaThread *thread) const;
+  template <bool relative = false>
   void print_on(outputStream* st) const;
+  template <bool relative = false>
   void interpreter_frame_print_on(outputStream* st) const;
   void print_on_error(outputStream* st, char* buf, int buflen, bool verbose = false) const;
   static void print_C_frame(outputStream* st, char* buf, int buflen, address pc);
 
   // Add annotated descriptions of memory locations belonging to this frame to values
+  template <bool relative = false>
   void describe(FrameValues& values, int frame_no, const RegisterMap* reg_map=NULL);
 
   // Conversion from a VMReg to physical stack location
@@ -417,11 +429,14 @@ class frame {
 
   // Oops-do's
   void oops_compiled_arguments_do(Symbol* signature, bool has_receiver, bool has_appendix, const RegisterMap* reg_map, OopClosure* f) const;
+  template <bool relative = false>
   void oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache = true) const;
+  template <bool relative = false>
   void oops_interpreted_do(OopClosure* f, const RegisterMap* map, const InterpreterOopMap& mask) const;
 
  private:
   void oops_interpreted_arguments_do(Symbol* signature, bool has_receiver, OopClosure* f) const;
+  template <bool relative = false>
   void oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHandle m, jint bci, const InterpreterOopMap& mask) const;
 
   // Iteration of oops
@@ -488,6 +503,8 @@ class FrameValues {
     return a->location - b->location;
   }
 
+  void print_on(outputStream* out, int min_index, int max_index, intptr_t* v0, intptr_t* v1, bool relative = false);
+
  public:
   // Used by frame functions to describe locations.
   void describe(int owner, intptr_t* location, const char* description, int priority = 0);
@@ -497,6 +514,8 @@ class FrameValues {
 #endif
   void print(JavaThread* thread) { print_on(thread, tty); }
   void print_on(JavaThread* thread, outputStream* out);
+  void print(stackChunkOop chunk) { print_on(chunk, tty); }
+  void print_on(stackChunkOop chunk, outputStream* out);
 };
 
 #endif

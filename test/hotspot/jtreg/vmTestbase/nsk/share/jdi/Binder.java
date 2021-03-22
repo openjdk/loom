@@ -740,6 +740,9 @@ public class Binder extends DebugeeBinder {
             arg.setValue(argumentHandler.getLaunchExecName());
         }
 
+        arg = (Connector.StringArgument) arguments.get("enumeratevthreads");
+        arg.setValue("y");
+
         String vmArgs = "";
 
         String vmUserArgs = argumentHandler.getLaunchOptions();
