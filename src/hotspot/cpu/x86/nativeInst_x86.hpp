@@ -85,7 +85,7 @@ class NativeInstruction {
   oop  oop_at (int offset) const       { return *(oop*) addr_at(offset); }
 
 
-  void set_char_at(int offset, char c)        { *addr_at(offset) = (u_char)c; wrote(offset); }
+  void set_char_at(int offset, u_char c)        { *addr_at(offset) = c; wrote(offset); }
   void set_int_at(int offset, jint  i)        { *(jint*)addr_at(offset) = i;  wrote(offset); }
   void set_ptr_at (int offset, intptr_t  ptr) { *(intptr_t*) addr_at(offset) = ptr;  wrote(offset); }
   void set_oop_at (int offset, oop  o)        { *(oop*) addr_at(offset) = o;  wrote(offset); }
