@@ -1195,6 +1195,7 @@ JavaThread::JavaThread() :
   _doing_unsafe_access(false),
   _do_not_unlock_if_synchronized(false),
   _is_in_VTMT(false),
+  _is_VTMT_disabler(false),
   _jni_attach_state(_not_attaching_via_jni),
 #if INCLUDE_JVMCI
   _pending_deoptimization(-1),
@@ -1865,7 +1866,9 @@ void JavaThread::check_and_handle_async_exceptions(bool check_unsafe_error) {
 void JavaThread::handle_special_runtime_exit_condition(bool check_asyncs) {
 
   // Check for pending external suspend.
-  if (is_external_suspend_with_lock()) {
+  // A JavaThread disabling VTMT can't be suspended without deadlock.
+  // It will be self-suspended after VTMT is reenabled.
+  if (!is_VTMT_disabler() && is_external_suspend_with_lock()) {
     frame_anchor()->make_walkable(this);
     java_suspend_self_with_safepoint_check();
   }
@@ -1959,7 +1962,9 @@ void JavaThread::java_suspend() {
   }
 
   { MutexLocker ml(SR_lock(), Mutex::_no_safepoint_check_flag);
-    if (!is_external_suspend()) {
+    // A JavaThread disabling VTMT can't be suspended without deadlock.
+    // It will be self-suspended after VTMT is reenabled.
+    if (is_VTMT_disabler() || !is_external_suspend()) {
       // a racing resume has cancelled us; bail out now
       return;
     }
@@ -2041,6 +2046,7 @@ int JavaThread::java_suspend_self() {
 
     // _ext_suspended flag is cleared by java_resume()
     while (is_ext_suspended()) {
+      assert(!is_VTMT_disabler(), "sanity check");
       ml.wait();
     }
   }

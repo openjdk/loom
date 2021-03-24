@@ -226,6 +226,7 @@ JvmtiVTMTDisabler::disable_VTMT() {
   while (_VTMT_count > 0) {
     ml.wait();
   }
+  thread->set_is_VTMT_disabler(true);
 }
 
 void
@@ -235,6 +236,14 @@ JvmtiVTMTDisabler::enable_VTMT() {
 
   if (--_VTMT_disable_count == 0) {
     ml.notify_all();
+  }
+  JavaThread* thread = JavaThread::current();
+  thread->set_is_VTMT_disabler(false);
+
+  // A JavaThread disabling VTMT can't suspend itself without deadlock.
+  // It is self-suspended here after VTMT has been enabled again.
+  while (thread->is_external_suspend()) {
+    ml.wait();
   }
 }
 
