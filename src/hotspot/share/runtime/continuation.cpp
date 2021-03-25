@@ -136,11 +136,11 @@ template<int x> NOINLINE static bool verify_stack_chunk(oop chunk) { return Inst
 extern "C" void pns2();
 extern "C" void pfl();
 extern "C" void find(intptr_t x);
+#endif
+
 // Returns true iff the address p is readable and *(intptr_t*)p != errvalue
 extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
-
 static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass(); }
-#endif
 
 // Freeze:
 // 5 - no call into C
@@ -2879,7 +2879,9 @@ bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChun
   #endif
       fr.print_on(tty);
       cl.reset();
+  #ifdef ASSERT
       pfl();
+  #endif
       chunk->print_on(true, tty);
       return false;
     }
