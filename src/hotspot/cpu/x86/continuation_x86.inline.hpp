@@ -191,8 +191,11 @@ void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
   anchor->set_last_Java_fp(fp);
 }
 
-void ContMirror::set_top_frame_metadata_pd(const frame& hf) {
-  stackChunkOop chunk = tail();
+/////
+
+template <typename ConfigT>
+inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
+  stackChunkOop chunk = _cont.tail();
   assert (chunk->is_in_chunk(hf.sp() - 1), "");
   assert (chunk->is_in_chunk(hf.sp() - frame::sender_sp_offset), "");
 
@@ -204,8 +207,6 @@ void ContMirror::set_top_frame_metadata_pd(const frame& hf) {
 
   log_develop_trace(jvmcont)("set_top_frame_metadata_pd pc: " INTPTR_FORMAT " fp: %ld", p2i(hf.pc()), *fp_addr);
 }
-
-/////
 
 template <typename ConfigT>
 inline intptr_t* Freeze<ConfigT>::align_bottom(intptr_t* bottom, int argsize) {
@@ -299,9 +300,8 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, intptr_
     caller.set_sp(fp + frame::sender_sp_offset);
     return frame(vsp, vsp, fp, hf.pc());
   } else {
-    intptr_t* fp = (intptr_t*)hf.fp();
     assert (hf.cb() != nullptr && hf.oop_map() != nullptr, "");
-    return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
+    return frame(vsp, vsp, hf.fp(), hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
   }
 }
 

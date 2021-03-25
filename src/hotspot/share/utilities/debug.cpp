@@ -46,6 +46,7 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/java.hpp"
 #include "runtime/os.hpp"
+#include "runtime/safefetch.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubCodeGenerator.hpp"
 #include "runtime/stubRoutines.hpp"
@@ -712,6 +713,11 @@ extern "C" void pns2() { // print native stack
 }
 
 #endif // !PRODUCT
+
+// Returns true iff the address p is readable and *(intptr_t*)p != errvalue
+extern "C" bool dbg_is_safe(void* p, intptr_t errvalue) {
+  return p != NULL && SafeFetchN((intptr_t*)p, errvalue) != errvalue;
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // Test multiple STATIC_ASSERT forms in various scopes.

@@ -136,6 +136,10 @@ template<int x> NOINLINE static bool verify_stack_chunk(oop chunk) { return Inst
 extern "C" void pns2();
 extern "C" void pfl();
 extern "C" void find(intptr_t x);
+// Returns true iff the address p is readable and *(intptr_t*)p != errvalue
+extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
+
+static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass(); }
 #endif
 
 // Freeze:
@@ -590,8 +594,6 @@ public:
   stackChunkOop find_chunk_by_address(void* p) const;
 
   const frame last_frame();
-  void set_last_frame(const frame& hf);
-  inline void set_top_frame_metadata_pd(const frame& hf);
   inline void set_empty() { _tail = nullptr; }
 
   bool is_preempted() { return java_lang_Continuation::is_preempted(_cont); }
@@ -759,21 +761,6 @@ const frame ContMirror::last_frame() {
   return StackChunkFrameStream<true>(chunk).to_frame();
 }
 
-inline void ContMirror::set_last_frame(const frame& hf) {
-  if (log_develop_is_enabled(Trace, jvmcont)) {
-    hf.print_on<true>(tty);
-  }
-
-  set_top_frame_metadata_pd(hf);
-  assert (hf.pc() == Frame::real_pc(hf), "");
-
-  stackChunkOop chunk = tail();
-
-  OrderAccess::storestore();
-  chunk->set_sp(chunk->to_offset(hf.sp()));
-  chunk->set_pc(hf.pc());
-}
-
 stackChunkOop ContMirror::find_chunk_by_address(void* p) const {
   for (stackChunkOop chunk = tail(); chunk != nullptr; chunk = chunk->parent()) {
     if (chunk->is_in_chunk(p)) {
@@ -901,6 +888,7 @@ private:
 
   DEBUG_ONLY(intptr_t* _last_write;)
 
+  inline void set_top_frame_metadata_pd(const frame& hf);
   template <typename FKind, bool bottom> inline void patch_pd(frame& callee, const frame& caller);
   inline void patch_chunk_pd(intptr_t* vsp, intptr_t* hsp);
   template<typename FKind> frame new_hframe(frame& f, frame& caller, int num_oops);
@@ -1608,7 +1596,14 @@ public:
     stackChunkOop chunk = _cont.tail();
     assert (chunk->to_offset(top.sp()) <= chunk->sp(), "top.sp(): %d sp: %d", chunk->to_offset(top.sp()), chunk->sp());
 
-    _cont.set_last_frame(top);
+    if (log_develop_is_enabled(Trace, jvmcont)) top.print_on<true>(tty);
+
+    set_top_frame_metadata_pd(top);
+    assert (top.pc() == Frame::real_pc(top), "");
+
+    OrderAccess::storestore();
+    chunk->set_sp(chunk->to_offset(top.sp()));
+    chunk->set_pc(top.pc());
 
     log_develop_trace(jvmcont)("add max_size _align_size: %d -- %d", _align_size, chunk->max_size() + _align_size);
     chunk->set_max_size(chunk->max_size() + _align_size);
@@ -2106,11 +2101,14 @@ private:
   } // TODO PERF
 
 public:
+  DEBUG_ONLY(int _mode;)
+  DEBUG_ONLY(bool barriers() { return _barriers; })
 
   Thaw(JavaThread* thread, ContMirror& cont) :
     _thread(thread), _cont(cont),
     _fastpath(nullptr) {
       DEBUG_ONLY(_top_unextended_sp = nullptr;)
+      DEBUG_ONLY(_mode = 0;)
   }
 
 inline bool can_thaw_fast() {
@@ -2197,6 +2195,7 @@ inline bool can_thaw_fast() {
       e.commit();
     }
 
+    DEBUG_ONLY(_mode = 3;)
     // _cont.read_rest();
     _align_size = 0;
     int num_frames = (return_barrier ? 1 : 2);
@@ -2268,6 +2267,7 @@ inline bool can_thaw_fast() {
       //   chunk->set_numFrames(0);
       //   chunk->set_numOops(0);
       // }
+      DEBUG_ONLY(_mode = 1;)
     } else { // thaw a single frame
       partial = true;
       empty = thaw_one_frame_from_chunk(chunk, hsp, &size, &argsize);
@@ -2276,6 +2276,7 @@ inline bool can_thaw_fast() {
       //   // java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail());
       // }
       size += argsize;
+      DEBUG_ONLY(_mode = 2;)
     }
 
     const bool is_last = empty && chunk->is_parent_null<typename ConfigT::OopT>();
@@ -2704,8 +2705,6 @@ inline bool can_thaw_fast() {
 
     push_return_frame(f);
 
-    // _cont.set_last_frame(_last_frame);
-
     assert (_cont.is_empty() == _cont.last_frame().is_empty(), "cont.is_empty: %d cont.last_frame().is_empty(): %d", _cont.is_empty(), _cont.last_frame().is_empty());
 
     log_develop_trace(jvmcont)("thawed %d frames", _frames);
@@ -2772,7 +2771,8 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   print_frames(thread);
 #endif
 
-  intptr_t* sp = Thaw<ConfigT>(thread, cont).thaw(kind);
+  Thaw<ConfigT> thw(thread, cont);
+  intptr_t* sp = thw.thaw(kind);
 
   thread->reset_held_monitor_count();
 
@@ -2787,7 +2787,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   ContinuationHelper::set_anchor(thread, sp0);
   print_frames(thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
   if (LoomVerifyAfterThaw) {
-    assert(do_verify_after_thaw(thread), "");
+    assert(do_verify_after_thaw(thread, thw._mode, thw.barriers(), cont.tail()), "");
   }
   assert (ContinuationEntry::assert_entry_frame_laid_out(thread), "");
   ContinuationHelper::clear_anchor(thread);
@@ -2819,13 +2819,13 @@ public:
 
   virtual void do_oop(oop* p) {
     oop o = *p;
-    if (o == (oop)nullptr || (oopDesc::is_oop(o) && o->klass()->is_klass())) return;
+    if (o == (oop)nullptr || is_good_oop(o)) return;
     _p = (intptr_t*)p;
     tty->print_cr("*** non-oop " PTR_FORMAT " found at " PTR_FORMAT, p2i(*p), p2i(p));
   }
   virtual void do_oop(narrowOop* p) {
     oop o = RawAccess<>::oop_load(p);
-    if (o == (oop)nullptr || (oopDesc::is_oop(o) && o->klass()->is_klass())) return;
+    if (o == (oop)nullptr || is_good_oop(o)) return;
     _p = (intptr_t*)p;
     tty->print_cr("*** (narrow) non-oop %x found at " PTR_FORMAT, (int)(*p), p2i(p));
   }
@@ -2847,7 +2847,7 @@ void do_deopt_after_thaw(JavaThread* thread) {
 }
 
 
-bool do_verify_after_thaw(JavaThread* thread) {
+bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk) {
   assert(thread->has_last_Java_frame(), "");
 
   ResourceMark rm;
@@ -2867,8 +2867,9 @@ bool do_verify_after_thaw(JavaThread* thread) {
 
     fst.current()->oops_do(&cl, &cf, fst.register_map());
     if (cl.p() != nullptr) {
+
       frame fr = *fst.current();
-      tty->print_cr("Failed for frame %d, pc: %p, sp: %p, fp: %p", i, fr.pc(), fr.unextended_sp(), fr.fp());
+      tty->print_cr("Failed for frame %d, pc: %p, sp: %p, fp: %p; mode: %d barriers: %d", i, fr.pc(), fr.unextended_sp(), fr.fp(), mode, barriers);
       if (!fr.is_interpreted_frame()) {
         tty->print_cr("size: %d argsize: %d", NonInterpretedUnknown::size(fr), NonInterpretedUnknown::stack_argsize(fr));
       }
@@ -2878,6 +2879,8 @@ bool do_verify_after_thaw(JavaThread* thread) {
   #endif
       fr.print_on(tty);
       cl.reset();
+      pfl();
+      chunk->print_on(true, tty);
       return false;
     }
   }
