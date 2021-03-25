@@ -1306,5 +1306,5 @@ oop GenCollectedHeap::handle_failed_promotion(Generation* old_gen,
   if (result != NULL) {
     obj->copy_disjoint_compact(result, obj_size);
   }
-  return oop(result);
+  return cast_to_oop(result);
 }

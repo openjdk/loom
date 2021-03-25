@@ -167,7 +167,7 @@ oop Generation::promote(oop obj, size_t obj_size) {
   HeapWord* result = allocate(obj_size, false);
   if (result != NULL) {
     obj->copy_disjoint_compact(result, obj_size);
-    return oop(result);
+    return cast_to_oop(result);
   } else {
     GenCollectedHeap* gch = GenCollectedHeap::heap();
     return gch->handle_failed_promotion(this, obj, obj_size);

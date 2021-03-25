@@ -228,7 +228,7 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
            : Copy::aligned_conjoint_words(from_addr, to_addr, header);
 
   // update header
-  stackChunkOop to_chunk = stackChunkOop(to_addr);
+  stackChunkOop to_chunk = (stackChunkOop) cast_to_oop(to_addr);
   jdk_internal_misc_StackChunk::set_size(to_addr, used_stack_in_words);
   to_chunk->set_sp(metadata_words());
 

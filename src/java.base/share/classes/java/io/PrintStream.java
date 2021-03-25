@@ -42,9 +42,9 @@ import jdk.internal.misc.InternalLock;
  * {@code IOException}; instead, exceptional situations merely set an
  * internal flag that can be tested via the {@code checkError} method.
  * Optionally, a {@code PrintStream} can be created so as to flush
- * automatically; this means that the {@code flush} method is
- * automatically invoked after a byte array is written, one of the
- * {@code println} methods is invoked, or a newline character or byte
+ * automatically; this means that the {@code flush} method of the underlying
+ * output stream is automatically invoked after a byte array is written, one
+ * of the {@code println} methods is invoked, or a newline character or byte
  * ({@code '\n'}) is written.
  *
  * <p> All characters printed by a {@code PrintStream} are converted into
@@ -53,8 +53,8 @@ import jdk.internal.misc.InternalLock;
  * The {@link PrintWriter} class should be used in situations that require
  * writing characters rather than bytes.
  *
- * <p> This class always replaces malformed and unmappable character sequences with
- * the charset's default replacement string.
+ * <p> This class always replaces malformed and unmappable character sequences
+ * with the charset's default replacement string.
  * The {@linkplain java.nio.charset.CharsetEncoder} class should be used when more
  * control over the encoding process is required.
  *
@@ -561,7 +561,7 @@ public class PrintStream extends FilterOutputStream
     /**
      * Writes the specified byte to this stream.  If the byte is a newline and
      * automatic flushing is enabled then the {@code flush} method will be
-     * invoked.
+     * invoked on the underlying output stream.
      *
      * <p> Note that the byte is written as given; to write a character that
      * will be translated according to the platform's default character
@@ -606,7 +606,8 @@ public class PrintStream extends FilterOutputStream
     /**
      * Writes {@code len} bytes from the specified byte array starting at
      * offset {@code off} to this stream.  If automatic flushing is
-     * enabled then the {@code flush} method will be invoked.
+     * enabled then the {@code flush} method will be invoked on the underlying
+     * output stream.
      *
      * <p> Note that the bytes will be written as given; to write characters
      * that will be translated according to the platform's default character
@@ -652,7 +653,7 @@ public class PrintStream extends FilterOutputStream
     /**
      * Writes all bytes from the specified byte array to this stream. If
      * automatic flushing is enabled then the {@code flush} method will be
-     * invoked.
+     * invoked on the underlying output stream.
      *
      * <p> Note that the bytes will be written as given; to write characters
      * that will be translated according to the platform's default character

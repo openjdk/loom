@@ -42,7 +42,7 @@ void java_lang_String::set_value_raw(oop string, typeArrayOop buffer) {
 }
 
 void java_lang_String::set_value(oop string, typeArrayOop buffer) {
-  string->obj_field_put(_value_offset, (oop)buffer);
+  string->obj_field_put(_value_offset, buffer);
 }
 
 bool java_lang_String::hash_is_set(oop java_string) {
@@ -258,7 +258,7 @@ inline jint jdk_internal_misc_StackChunk::size(oop ref) {
   return ref->int_field(_size_offset);
 }
 inline void jdk_internal_misc_StackChunk::set_size(HeapWord* ref, jint value) {
-  *(jint*)((oop)ref)->field_addr(_size_offset) = value; // ref->int_field_put(_size_offset, value);
+  *(jint*)(cast_to_oop(ref))->field_addr(_size_offset) = value; // ref->int_field_put(_size_offset, value);
 }
 inline jint jdk_internal_misc_StackChunk::sp(oop ref) {
   return ref->int_field(_sp_offset);

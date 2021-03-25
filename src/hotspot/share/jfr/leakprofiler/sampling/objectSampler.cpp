@@ -253,7 +253,7 @@ void ObjectSampler::add(HeapWord* obj, size_t allocated, traceid thread_id, bool
   }
 
   sample->set_span(allocated);
-  sample->set_object((oop)obj);
+  sample->set_object(cast_to_oop(obj));
   sample->set_allocated(allocated);
   sample->set_allocation_time(JfrTicks::now());
   sample->set_heap_used_at_last_gc(Universe::heap()->used_at_last_gc());
