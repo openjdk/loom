@@ -647,6 +647,17 @@ address NativeGeneralJump::jump_destination() const {
     return addr_at(0) + length + sbyte_at(offset);
 }
 
+void NativePostCallNop::make_deopt() {
+  NativeDeoptInstruction::insert(addr_at(0));
+  // makes the first 2 bytes into UD, the rest is thrash. Make NOPs to help debugging.
+  set_char_at(2, 0x90);
+  set_char_at(3, 0x90);
+  set_char_at(4, 0x90);
+  set_char_at(5, 0x90);
+  set_char_at(6, 0x90);
+  set_char_at(7, 0x90);
+}
+
 void NativePostCallNop::patch(jint diff) {
   assert(diff != 0, "must be");
   int32_t *code_pos = (int32_t *) addr_at(displacement_offset);
@@ -670,3 +681,13 @@ void NativePostCallNop::patch_int2(uint32_t int2) {
   wrote(12);
 }
 #endif
+
+void NativeDeoptInstruction::verify() {
+}
+
+// Inserts an undefined instruction at a given pc
+void NativeDeoptInstruction::insert(address code_pos) {
+  *code_pos = instruction_prefix;
+  *(code_pos+1) = instruction_code;
+  ICache::invalidate_range(code_pos, instruction_size);
+}

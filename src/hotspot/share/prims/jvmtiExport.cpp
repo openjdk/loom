@@ -1285,8 +1285,8 @@ bool              JvmtiExport::_should_post_sampled_object_alloc          = fals
 bool              JvmtiExport::_should_post_on_exceptions                 = false;
 bool              JvmtiExport::_should_post_vthread_start                 = false;
 bool              JvmtiExport::_should_post_vthread_end                   = false;
-bool              JvmtiExport::_should_post_vthread_mounted               = false;
-bool              JvmtiExport::_should_post_vthread_unmounted             = false;
+bool              JvmtiExport::_should_post_vthread_mount                 = false;
+bool              JvmtiExport::_should_post_vthread_unmount               = false;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1349,6 +1349,9 @@ void JvmtiExport::post_class_load(JavaThread *thread, Klass* klass) {
   if (state == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
   JvmtiEnvThreadStateIterator it(state);
   for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
     if (ets->is_enabled(JVMTI_EVENT_CLASS_LOAD)) {
@@ -1381,6 +1384,9 @@ void JvmtiExport::post_class_prepare(JavaThread *thread, Klass* klass) {
   JvmtiThreadState* state = thread->jvmti_thread_state();
   if (state == NULL) {
     return;
+  }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
   }
   JvmtiEnvThreadStateIterator it(state);
   for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1589,19 +1595,20 @@ void JvmtiExport::post_vthread_end(jobject vthread) {
   }
 }
 
-void JvmtiExport::post_vthread_mounted(jobject vthread) {
+void JvmtiExport::post_vthread_mount(jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, ("[%p] Trg Virtual Thread Mounted event triggered", vthread));
+  JavaThread *thread = JavaThread::current();
+  HandleMark hm(thread);
+  EVT_TRIG_TRACE(EXT_EVENT_VIRTUAL_THREAD_MOUNT, ("[%p] Trg Virtual Thread Mount event triggered", vthread));
 
-  JavaThread *cur_thread = JavaThread::current();
-  JvmtiThreadState *state = cur_thread->jvmti_thread_state();
+  JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == NULL) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED)) {
+  if (state->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_MOUNT)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1609,12 +1616,12 @@ void JvmtiExport::post_vthread_mounted(jobject vthread) {
       if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
         continue;
       }
-      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED)) {
-        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, ("[%p] Evt Virtual Thread Mounted event sent", vthread));
+      if (ets->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_MOUNT)) {
+        EVT_TRACE(EXT_EVENT_VIRTUAL_THREAD_MOUNT, ("[%p] Evt Virtual Thread Mount event sent", vthread));
 
-        JvmtiVirtualThreadEventMark jem(cur_thread);
-        JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventVirtualThreadMounted callback = env->callbacks()->VirtualThreadMounted;
+        JvmtiVirtualThreadEventMark jem(thread);
+        JvmtiJavaThreadEventTransition jet(thread);
+        jvmtiExtensionEvent callback = env->ext_callbacks()->VirtualThreadMount;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
@@ -1623,19 +1630,20 @@ void JvmtiExport::post_vthread_mounted(jobject vthread) {
   }
 }
 
-void JvmtiExport::post_vthread_unmounted(jobject vthread) {
+void JvmtiExport::post_vthread_unmount(jobject vthread) {
   if (JvmtiEnv::get_phase() < JVMTI_PHASE_PRIMORDIAL) {
     return;
   }
-  EVT_TRIG_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, ("[%p] Trg Virtual Thread Unmounted event triggered", vthread));
+  JavaThread *thread = JavaThread::current();
+  HandleMark hm(thread);
+  EVT_TRIG_TRACE(EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, ("[%p] Trg Virtual Thread Unmount event triggered", vthread));
 
-  JavaThread *cur_thread = JavaThread::current();
-  JvmtiThreadState *state = cur_thread->jvmti_thread_state();
+  JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == NULL) {
     return;
   }
 
-  if (state->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED)) {
+  if (state->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_UNMOUNT)) {
     JvmtiEnvThreadStateIterator it(state);
 
     for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
@@ -1643,12 +1651,12 @@ void JvmtiExport::post_vthread_unmounted(jobject vthread) {
       if (env->phase() == JVMTI_PHASE_PRIMORDIAL) {
         continue;
       }
-      if (ets->is_enabled(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED)) {
-        EVT_TRACE(JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, ("[%p] Evt Virtual Thread Unmounted event sent", vthread));
+      if (ets->is_enabled((jvmtiEvent)EXT_EVENT_VIRTUAL_THREAD_UNMOUNT)) {
+        EVT_TRACE(EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, ("[%p] Evt Virtual Thread Unmount event sent", vthread));
 
-        JvmtiVirtualThreadEventMark jem(cur_thread);
-        JvmtiJavaThreadEventTransition jet(cur_thread);
-        jvmtiEventVirtualThreadUnmounted callback = env->callbacks()->VirtualThreadUnmounted;
+        JvmtiVirtualThreadEventMark jem(thread);
+        JvmtiJavaThreadEventTransition jet(thread);
+        jvmtiExtensionEvent callback = env->ext_callbacks()->VirtualThreadUnmount;
         if (callback != NULL) {
           (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread());
         }
@@ -1943,6 +1951,9 @@ void JvmtiExport::post_exception_throw(JavaThread *thread, Method* method, addre
   if (state == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
 
   EVT_TRIG_TRACE(JVMTI_EVENT_EXCEPTION, ("[%s] Trg Exception thrown triggered",
                       JvmtiTrace::safe_get_thread_name(thread)));
@@ -2105,6 +2116,10 @@ void JvmtiExport::post_field_access_by_jni(JavaThread *thread, oop obj,
   // function don't make the call unless there is a Java context.
   assert(thread->has_last_Java_frame(), "must be called with a Java context");
 
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
+
   ResourceMark rm;
   fieldDescriptor fd;
   // if get_field_descriptor finds fieldID to be invalid, then we just bail
@@ -2137,6 +2152,10 @@ void JvmtiExport::post_field_access(JavaThread *thread, Method* method,
   if (state == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
+
   EVT_TRIG_TRACE(JVMTI_EVENT_FIELD_ACCESS, ("[%s] Trg Field Access event triggered",
                       JvmtiTrace::safe_get_thread_name(thread)));
   JvmtiEnvThreadStateIterator it(state);
@@ -2183,6 +2202,10 @@ void JvmtiExport::post_field_modification_by_jni(JavaThread *thread, oop obj,
   // function don't make the call unless there is a Java context.
   assert(thread->has_last_Java_frame(), "must be called with Java context");
 
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }                   
+
   ResourceMark rm;
   fieldDescriptor fd;
   // if get_field_descriptor finds fieldID to be invalid, then we just bail
@@ -2209,6 +2232,10 @@ void JvmtiExport::post_field_modification_by_jni(JavaThread *thread, oop obj,
 void JvmtiExport::post_raw_field_modification(JavaThread *thread, Method* method,
   address location, Klass* field_klass, Handle object, jfieldID field,
   char sig_type, jvalue *value) {
+
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
 
   if (sig_type == JVM_SIGNATURE_INT || sig_type == JVM_SIGNATURE_BOOLEAN ||
       sig_type == JVM_SIGNATURE_BYTE || sig_type == JVM_SIGNATURE_CHAR ||
@@ -2281,6 +2308,10 @@ void JvmtiExport::post_field_modification(JavaThread *thread, Method* method,
   if (state == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
+
   EVT_TRIG_TRACE(JVMTI_EVENT_FIELD_MODIFICATION,
                      ("[%s] Trg Field Modification event triggered",
                       JvmtiTrace::safe_get_thread_name(thread)));
@@ -2319,6 +2350,10 @@ void JvmtiExport::post_native_method_bind(Method* method, address* function_ptr)
 
   EVT_TRIG_TRACE(JVMTI_EVENT_NATIVE_METHOD_BIND, ("[%s] Trg Native Method Bind event triggered",
                       JvmtiTrace::safe_get_thread_name(thread)));
+
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
 
   if (JvmtiEventController::is_enabled(JVMTI_EVENT_NATIVE_METHOD_BIND)) {
     JvmtiEnvIterator it;
@@ -2623,6 +2658,9 @@ void JvmtiExport::post_monitor_contended_enter(JavaThread *thread, ObjectMonitor
   if (state == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
 
   HandleMark hm(thread);
   Handle h(thread, object);
@@ -2654,6 +2692,9 @@ void JvmtiExport::post_monitor_contended_entered(JavaThread *thread, ObjectMonit
   if (state == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
 
   HandleMark hm(thread);
   Handle h(thread, object);
@@ -2684,6 +2725,9 @@ void JvmtiExport::post_monitor_wait(JavaThread *thread, oop object,
   JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == NULL) {
     return;
+  }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
   }
 
   HandleMark hm(thread);
@@ -2717,6 +2761,9 @@ void JvmtiExport::post_monitor_waited(JavaThread *thread, ObjectMonitor *obj_mnt
   if (state == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
 
   HandleMark hm(thread);
   Handle h(thread, object);
@@ -2749,6 +2796,9 @@ void JvmtiExport::post_vm_object_alloc(JavaThread *thread, oop object) {
   if (object == NULL) {
     return;
   }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
+  }
   HandleMark hm(thread);
   Handle h(thread, object);
   JvmtiEnvIterator it;
@@ -2780,6 +2830,9 @@ void JvmtiExport::post_sampled_object_alloc(JavaThread *thread, oop object) {
                   JvmtiTrace::safe_get_thread_name(thread)));
   if (object == NULL) {
     return;
+  }
+  if (thread->is_in_VTMT()) {
+    return; // no events should be posted if thread is in a VTMT transition
   }
   HandleMark hm(thread);
   Handle h(thread, object);

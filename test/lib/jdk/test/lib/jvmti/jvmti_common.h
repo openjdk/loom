@@ -680,17 +680,24 @@ nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
   return foundThread;
 }
 
+/*
+ * JVMTI Extension Mechanism
+ */
+
+static const jvmtiEvent
+  EXT_EVENT_VIRTUAL_THREAD_MOUNT   = (jvmtiEvent)((int)JVMTI_MIN_EVENT_TYPE_VAL - 2),
+  EXT_EVENT_VIRTUAL_THREAD_UNMOUNT = (jvmtiEvent)((int)JVMTI_MIN_EVENT_TYPE_VAL - 3);
+
 static jvmtiExtensionFunction
 find_ext_function(jvmtiEnv* jvmti, JNIEnv* jni, const char* fname) {
   jint extCount = 0;
   jvmtiExtensionFunctionInfo* extList = NULL;
-  jvmtiError err;
 
-  err = jvmti->GetExtensionFunctions(&extCount, &extList);
-  check_jvmti_status(jni, err, "get_virtual_thread: Error in JVMTI GetExtensionFunctions");
+  jvmtiError err = jvmti->GetExtensionFunctions(&extCount, &extList);
+  check_jvmti_status(jni, err, "jvmti_common find_ext_function: Error in JVMTI GetExtensionFunctions");
 
   for (int i = 0; i < extCount; i++) {
-    if (strcmp(extList[i].id, (char*)fname) == 0) {
+    if (strstr(extList[i].id, (char*)fname) != NULL) {
       return extList[i].func;
     }
   }
@@ -700,7 +707,7 @@ find_ext_function(jvmtiEnv* jvmti, JNIEnv* jni, const char* fname) {
 static jvmtiError
 GetVirtualThread(jvmtiEnv* jvmti, JNIEnv* jni, jthread cthread, jthread* vthread_ptr) {
   if (GetVirtualThread_func == NULL) { // lazily initialize function pointer
-    GetVirtualThread_func = find_ext_function(jvmti, jni, "com.sun.hotspot.functions.GetVirtualThread");
+    GetVirtualThread_func = find_ext_function(jvmti, jni, "GetVirtualThread");
   }
   jvmtiError err = (*GetVirtualThread_func)(jvmti, cthread, vthread_ptr);
 
@@ -710,7 +717,7 @@ GetVirtualThread(jvmtiEnv* jvmti, JNIEnv* jni, jthread cthread, jthread* vthread
 static jvmtiError
 GetCarrierThread(jvmtiEnv* jvmti, JNIEnv* jni, jthread vthread, jthread* cthread_ptr) {
   if (GetCarrierThread_func == NULL) { // lazily initialize function pointer
-    GetCarrierThread_func = find_ext_function(jvmti, jni, "com.sun.hotspot.functions.GetCarrierThread");
+    GetCarrierThread_func = find_ext_function(jvmti, jni, "GetCarrierThread");
   }
   jvmtiError err = (*GetCarrierThread_func)(jvmti, vthread, cthread_ptr);
 
@@ -734,7 +741,52 @@ get_carrier_thread(jvmtiEnv* jvmti, JNIEnv* jni, jthread vthread) {
   return cthread;
 }
 
+static jvmtiExtensionEventInfo*
+find_ext_event(jvmtiEnv* jvmti, const char* ename) {
+  jint extCount = 0;
+  jvmtiExtensionEventInfo* extList = NULL;
+
+  jvmtiError err = jvmti->GetExtensionEvents(&extCount, &extList);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("jvmti_common find_ext_event: Error in JVMTI GetExtensionFunctions: %s(%d)\n",
+           TranslateError(err), err);
+    printf(0);
+    return NULL;
+  }
+  for (int i = 0; i < extCount; i++) {
+    if (strstr(extList[i].id, (char*)ename) != NULL) {
+      return &extList[i];
+    }
+  }
+  return NULL;
+}
+
+static jvmtiError
+set_ext_event_callback(jvmtiEnv* jvmti,  const char* ename, jvmtiExtensionEvent callback) {
+  jvmtiExtensionEventInfo* info = find_ext_event(jvmti, ename);
+
+  if (info == NULL) {
+    printf("jvmti_common set_ext_event_callback: Extension event was not found: %s\n", ename);
+    return JVMTI_ERROR_NOT_AVAILABLE;
+  }
+  jvmtiError err = jvmti->SetExtensionEventCallback(info->extension_event_index, callback);
+  return err;
+}
+
 /** Enable or disable given events. */
+
+static jvmtiError
+set_event_notification_mode(jvmtiEnv* jvmti, jvmtiEventMode mode, jvmtiEvent event_type, jthread event_thread) {
+  jvmtiError err = jvmti->SetEventNotificationMode(mode, event_type, event_thread);
+  return err;
+}
+
+static void
+set_event_notification_mode(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode mode, jvmtiEvent event_type, jthread event_thread) {
+  jvmtiError err = jvmti->SetEventNotificationMode(mode, event_type, event_thread);
+  check_jvmti_status(jni, err, "jvmti_common set_event_notification_mode: Error in JVMTI SetEventNotificationMode");
+}
+
 int
 nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int size, jvmtiEvent list[], jthread thread) {
   for (int i = 0; i < size; i++) {

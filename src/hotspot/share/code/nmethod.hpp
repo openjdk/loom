@@ -769,6 +769,8 @@ public:
   virtual CompiledStaticCall* compiledStaticCall_at(Relocation* call_site) const;
   virtual CompiledStaticCall* compiledStaticCall_at(address addr) const;
   virtual CompiledStaticCall* compiledStaticCall_before(address addr) const;
+
+  virtual void  make_deoptimized();
 };
 
 // Locks an nmethod so its code will not get removed and it will not

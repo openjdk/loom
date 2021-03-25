@@ -44,13 +44,17 @@ class JvmtiEnvBase;
 
 // Extension events start JVMTI_MIN_EVENT_TYPE_VAL-1 and work towards 0.
 typedef enum {
+  EXT_EVENT_VIRTUAL_THREAD_UNMOUNT = JVMTI_MIN_EVENT_TYPE_VAL-3,
+  EXT_EVENT_VIRTUAL_THREAD_MOUNT = JVMTI_MIN_EVENT_TYPE_VAL-2,
   EXT_EVENT_CLASS_UNLOAD = JVMTI_MIN_EVENT_TYPE_VAL-1,
-  EXT_MIN_EVENT_TYPE_VAL = EXT_EVENT_CLASS_UNLOAD,
+  EXT_MIN_EVENT_TYPE_VAL = EXT_EVENT_VIRTUAL_THREAD_UNMOUNT,
   EXT_MAX_EVENT_TYPE_VAL = EXT_EVENT_CLASS_UNLOAD
 } jvmtiExtEvent;
 
 typedef struct {
   jvmtiExtensionEvent ClassUnload;
+  jvmtiExtensionEvent VirtualThreadMount;
+  jvmtiExtensionEvent VirtualThreadUnmount;
 } jvmtiExtEventCallbacks;
 
 

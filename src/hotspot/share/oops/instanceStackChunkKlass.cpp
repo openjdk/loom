@@ -464,19 +464,20 @@ public:
     _sp = f.sp();
     _cb = f.cb();
 
-    int fsize = f.frame_size();
+    int fsize = f.frame_size() - ((f.is_interpreted() == _callee_interpreted) ? _argsize : 0);
     int num_oops = f.num_oops();
     assert (num_oops >= 0, "");
+    // tty->print_cr(">>> fsize: %d f.frame_size(): %d callee_interpreted: %d callee_argsize: %d", fsize, f.frame_size(), _callee_interpreted, _argsize);
 
+    _argsize   = f.stack_argsize();
     _size     += fsize;
-    _argsize   = f.is_interpreted() ? 0 : f.stack_argsize();
     _num_oops += num_oops;
     if (f.is_interpreted()) {
       _num_interpreted_frames++;
     }
 
     // assert (!chunk->requires_barriers() || num_frames <= chunk->numFrames(), "");
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk frame: %d sp: %ld pc: " INTPTR_FORMAT " interpreted: %d size: %d oops: %d", _num_frames, f.sp() - _chunk->start_address(), p2i(f.pc()), f.is_interpreted(), fsize, num_oops);
+    log_develop_trace(jvmcont)("debug_verify_stack_chunk frame: %d sp: %ld pc: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d oops: %d", _num_frames, f.sp() - _chunk->start_address(), p2i(f.pc()), f.is_interpreted(), fsize, _argsize, num_oops);
     if (log_develop_is_enabled(Trace, jvmcont)) f.print_on(tty);
     assert (f.pc() != nullptr, 
       "young: %d chunk->numFrames(): %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT, 
@@ -582,25 +583,23 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
       closure._sp += closure._cb != nullptr ? ((closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord) : 0;
     }
   }
-  if (!concurrent) {
-    assert (closure._size <= size, "size: %d closure.size: %d end sp: %ld start sp: %d chunk size: %d argsize: %d", size, closure._size, closure._sp - chunk->start_address(), chunk->sp(), chunk->stack_size(), chunk->argsize());
-  }
-
-  assert (chunk->argsize() == closure._argsize, "chunk->argsize(): %d argsize: %d", chunk->argsize(), closure._argsize);
-  size += chunk->argsize();
-  size += closure._num_i2c * align_wiggle();
-  // TODO R: uncomment assertion below
-  // assert (chunk->max_size() == size, "max_size(): %d size: %d argsize: %d num_i2c: %d", chunk->max_size(), size, chunk->argsize(), closure._num_i2c);
 
   if (!concurrent) {
+    assert (closure._size <= size + chunk->argsize() + metadata_words(), "size: %d argsize: %d closure.size: %d end sp: %ld start sp: %d chunk size: %d", size, chunk->argsize(), closure._size, closure._sp - chunk->start_address(), chunk->sp(), chunk->stack_size());
+    assert (chunk->argsize() == (closure._callee_interpreted ? 0 : closure._argsize), "chunk->argsize(): %d closure.argsize: %d closure.callee_interpreted: %d", chunk->argsize(), closure._argsize, closure._callee_interpreted);
+    
+    int max_size = closure._size + closure._num_i2c * align_wiggle();
+    assert (chunk->max_size() == max_size, "max_size(): %d max_size: %d argsize: %d num_i2c: %d", chunk->max_size(), max_size, closure._argsize, closure._num_i2c);
+
     assert (chunk->numFrames() == -1 || closure._num_frames == chunk->numFrames(), "barriers: %d num_frames: %d chunk->numFrames(): %d", chunk->requires_barriers(), closure._num_frames, chunk->numFrames());
     assert (chunk->numOops()   == -1 || closure._num_oops   == chunk->numOops(),   "barriers: %d num_oops: %d chunk->numOops(): %d",     chunk->requires_barriers(), closure._num_oops,   chunk->numOops());
-  }
 
-  if (out_size   != nullptr) *out_size   += size;
-  if (out_oops   != nullptr) *out_oops   += closure._num_oops;
-  if (out_frames != nullptr) *out_frames += closure._num_frames;
-  if (out_interpreted_frames != nullptr) *out_interpreted_frames += closure._num_interpreted_frames;
+    if (out_size   != nullptr) *out_size   += size;
+    if (out_oops   != nullptr) *out_oops   += closure._num_oops;
+    if (out_frames != nullptr) *out_frames += closure._num_frames;
+    if (out_interpreted_frames != nullptr) *out_interpreted_frames += closure._num_interpreted_frames;
+  } else assert (out_size == nullptr && out_oops == nullptr && out_frames == nullptr && out_interpreted_frames == nullptr, "");
+
 
   return true;
 }

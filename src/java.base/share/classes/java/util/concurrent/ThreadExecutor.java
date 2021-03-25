@@ -224,19 +224,10 @@ class ThreadExecutor implements ExecutorService {
         }
     }
 
-    @Override
-    public void close() {
-        checkPermission();
-        checkOwner();
-
-        if (owner != null && !closed) {
-            if (ThreadFields.latestThreadExecutor(owner) != this)
-                throw new IllegalStateException("close is out of order");
-            // eagerly mark as closed and restore ref to previous executor
-            closed = true;
-            ThreadFields.setLatestThreadExecutor(previous);
-        }
-
+    /**
+     * Waits for executor to terminate.
+     */
+    private void awaitTermination() {
         boolean terminated = isTerminated();
         if (!terminated) {
             tryShutdownAndTerminate(false);
@@ -253,6 +244,28 @@ class ThreadExecutor implements ExecutorService {
             }
             if (interrupted) {
                 Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    @Override
+    public void close() {
+        checkPermission();
+
+        if (owner != null) {
+            if (owner != Thread.currentThread())
+                throw new IllegalCallerException("Not owned by this thread");
+            if (!closed && ThreadFields.latestThreadExecutor(owner) != this)
+                throw new IllegalStateException("close is out of order");
+        }
+
+        try {
+            awaitTermination();
+        } finally {
+            if (owner != null && !closed) {
+                // restore ref to previous executor
+                ThreadFields.setLatestThreadExecutor(previous);
+                closed = true;
             }
         }
     }

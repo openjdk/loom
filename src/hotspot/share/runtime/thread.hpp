@@ -988,6 +988,7 @@ class JavaThread: public Thread {
   bool                  _do_not_unlock_if_synchronized;  // Do not unlock the receiver of a synchronized method (since it was
                                                          // never locked) when throwing an exception. Used by interpreter only.
   bool                  _is_in_VTMT;             // thread is in virtual thread mount transition
+  bool                  _is_VTMT_disabler;       // thread currently disabled VTMT
 
   // JNI attach states:
   enum JNIAttachStates {
@@ -1355,6 +1356,8 @@ private:
 
   bool is_in_VTMT() const                        { return _is_in_VTMT; }
   void set_is_in_VTMT(bool val)                  { _is_in_VTMT = val; }
+  bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
+  void set_is_VTMT_disabler(bool val)            { _is_VTMT_disabler = val; }
 
   // Thread.stop support
   void send_thread_stop(oop throwable);
@@ -1667,6 +1670,7 @@ private:
   void make_zombies();
 
   void deoptimize_marked_methods();
+  void deoptimize_marked_methods_only_anchors();
 
  public:
   // Returns the running thread as a JavaThread

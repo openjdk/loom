@@ -173,12 +173,23 @@ static JfrBlobHandle get_thread_blob(JavaThread* thread, traceid tid, bool virtu
   return tl->thread_blob();
 }
 
-static void record_stacktrace(JavaThread* thread) {
-  assert(thread != NULL, "invariant");
-  if (JfrEventSetting::has_stacktrace(EventOldObjectSample::eventId)) {
-    JfrStackTraceRepository::record_and_cache(thread);
+class RecordStackTrace {
+ private:
+  JavaThread* _jt;
+  bool _enabled;
+ public:
+  RecordStackTrace(JavaThread* jt) : _jt(jt),
+    _enabled(JfrEventSetting::has_stacktrace(EventOldObjectSample::eventId)) {
+    if (_enabled) {
+      JfrStackTraceRepository::record_for_leak_profiler(jt);
+    }
   }
-}
+  ~RecordStackTrace() {
+    if (_enabled) {
+      _jt->jfr_thread_local()->clear_cached_stack_trace();
+    }
+  }
+};
 
 void ObjectSampler::sample(HeapWord* obj, size_t allocated, JavaThread* thread) {
   assert(thread != NULL, "invariant");
@@ -190,7 +201,7 @@ void ObjectSampler::sample(HeapWord* obj, size_t allocated, JavaThread* thread) 
   }
   const JfrBlobHandle bh = get_thread_blob(thread, thread_id, virtual_thread);
   assert(bh.valid(), "invariant");
-  record_stacktrace(thread);
+  RecordStackTrace rst(thread);
   // try enter critical section
   JfrTryLock tryLock(&_lock);
   if (!tryLock.acquired()) {

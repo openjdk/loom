@@ -10598,8 +10598,6 @@ myInit() {
           and the following events can be enabled:
           <eventlink id="VirtualThreadStart"></eventlink>,
           <eventlink id="VirtualThreadEnd"></eventlink>,
-          <eventlink id="VirtualThreadMounted"></eventlink> and
-          <eventlink id="VirtualThreadUnmounted"></eventlink>.
         </description>
       </capabilityfield>
     </capabilitiestypedef>
@@ -12991,8 +12989,9 @@ myInit() {
     </parameters>
   </event>
 
-  <event label="Virtual Thread Mounted"
-         id="VirtualThreadMounted" const="JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED" filtered="thread" num="89" phase="start" since="14">
+  <elide>
+  <event label="Virtual Thread Mount"
+         id="VirtualThreadMount" const="JVMTI_EVENT_VIRTUAL_THREAD_MOUNT" filtered="thread" num="89" phase="start" since="14">
     <description>
       Virtual thread mount events are generated before its method continue to execute on the mounted thread.
       <p/>
@@ -13019,9 +13018,11 @@ myInit() {
       </param>
     </parameters>
   </event>
+  </elide>
 
-  <event label="Virtual Thread Unmounted"
-         id="VirtualThreadUnmounted" const="JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED" filtered="thread" num="90" phase="start" since="14">
+  <elide>
+  <event label="Virtual Thread Unmount"
+         id="VirtualThreadUnmount" const="JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNT" filtered="thread" num="90" phase="start" since="14">
     <description>
       Virtual thread unmount events are generated when the virtual thread is about to be unmounted from the carrier thread.
       <p/>
@@ -13048,6 +13049,7 @@ myInit() {
       </param>
     </parameters>
   </event>
+  </elide>
 
   <event label="Class Load"
          id="ClassLoad" const="JVMTI_EVENT_CLASS_LOAD" filtered="thread" phase="start" num="55">

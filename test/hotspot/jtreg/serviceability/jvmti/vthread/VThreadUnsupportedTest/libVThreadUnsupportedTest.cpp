@@ -147,11 +147,21 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
   return JNI_TRUE;
 }
 
+// Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
-VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
-  printf("Got VirtualThreadMounted event\n");
+VirtualThreadMount(jvmtiEnv *jvmti, ...) {
+  va_list ap;
+  JNIEnv* jni = NULL;
+  jthread thread = NULL;
+
+  va_start(ap, jvmti);
+  jni = va_arg(ap, JNIEnv*);
+  thread = va_arg(ap, jthread);
+  va_end(ap);
+
+  printf("Got VirtualThreadMount event\n");
   fflush(stdout);
-  test_unsupported_jvmti_functions(jvmti, jni, vthread);
+  test_unsupported_jvmti_functions(jvmti, jni, thread);
 
   jlong nanos;
   jvmtiError err = jvmti->GetCurrentThreadCpuTime(&nanos);
@@ -162,7 +172,6 @@ VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
 
 extern JNIEXPORT jint JNICALL
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-  jvmtiEventCallbacks callbacks;
   jvmtiCapabilities caps;
   jvmtiError err;
 
@@ -171,9 +180,13 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  memset(&callbacks, 0, sizeof (callbacks));
-  callbacks.VirtualThreadMounted = &VirtualThreadMounted;
-
+  err = set_ext_event_callback(jvmti, "VirtualThreadMount", VirtualThreadMount);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
+ 
   memset(&caps, 0, sizeof (caps));
   caps.can_suspend = 1;
   caps.can_pop_frame = 1;
@@ -187,20 +200,17 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI AddCapabilities: %d\n", err);
+    return JNI_ERR;
   }
 
-  err = jvmti->SetEventCallbacks(&callbacks, sizeof (jvmtiEventCallbacks));
-  if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventCallbacks: %d\n", err);
-  }
-
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_MOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    return JNI_ERR;
   }
 
   printf("Agent_OnLoad finished\n");
-  return 0;
+  return JNI_OK;
 }
 
 } // extern "C"

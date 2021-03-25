@@ -101,9 +101,9 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
     if (inf->tname == NULL && strcmp(event_name, "VirtualThreadEnd") != 0) {
       fatal(jni, "VThread event: worker thread not found!");
     }
-    if (strcmp(event_name, "VirtualThreadUnmounted") == 0) {
+    if (strcmp(event_name, "VirtualThreadUnmount") == 0) {
       if (inf->just_scheduled) {
-        fatal(jni, "VirtualThreadUnmounted: event without VirtualThreadMounted before!");
+        fatal(jni, "VirtualThreadUnmount: event without VirtualThreadMount before!");
       }
     }
     inf->just_scheduled = JNI_FALSE;
@@ -371,8 +371,8 @@ test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread, co
   jint depth = -1;
   jvmtiError err;
 
-  if (strcmp(event_name, "VirtualThreadMounted") != 0 && strcmp(event_name, "VirtualThreadUnmounted") != 0) {
-    return; // Check GetLocal at VirtualThreadMounted/VirtualThreadUnmounted events only
+  if (strcmp(event_name, "VirtualThreadMount") != 0 && strcmp(event_name, "VirtualThreadUnmount") != 0) {
+    return; // Check GetLocal at VirtualThreadMount/VirtualThreadUnmount events only
   }
 
   // #0: Test JVMTI GetLocalInstance function for carrier thread
@@ -521,16 +521,36 @@ VirtualThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   processVThreadEvent(jvmti, jni, vthread, "VirtualThreadEnd");
 }
 
+// Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
-VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
+VirtualThreadMount(jvmtiEnv *jvmti, ...) {
+  va_list ap;
+  JNIEnv* jni = NULL;
+  jthread thread = NULL;
+
+  va_start(ap, jvmti);
+  jni = va_arg(ap, JNIEnv*);
+  thread = va_arg(ap, jthread);
+  va_end(ap);
+
   RawMonitorLocker rml(jvmti, jni, events_monitor);
-  processVThreadEvent(jvmti, jni, vthread, "VirtualThreadMounted");
+  processVThreadEvent(jvmti, jni, thread, "VirtualThreadMount");
 }
 
+// Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
-VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
+VirtualThreadUnmount(jvmtiEnv *jvmti, ...) {
+  va_list ap;
+  JNIEnv* jni = NULL;
+  jthread thread = NULL;
+
+  va_start(ap, jvmti);
+  jni = va_arg(ap, JNIEnv*);
+  thread = va_arg(ap, jthread);
+  va_end(ap);
+
   RawMonitorLocker rml(jvmti, jni, events_monitor);
-  processVThreadEvent(jvmti, jni, vthread, "VirtualThreadUnmounted");
+  processVThreadEvent(jvmti, jni, thread, "VirtualThreadUnmount");
 }
 
 JNIEXPORT jint JNICALL
@@ -548,8 +568,19 @@ Agent_OnLoad(JavaVM *jvm, char *options,
   memset(&callbacks, 0, sizeof(callbacks));
   callbacks.VirtualThreadStart = &VirtualThreadStart;
   callbacks.VirtualThreadEnd = &VirtualThreadEnd;
-  callbacks.VirtualThreadMounted = &VirtualThreadMounted;
-  callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
+
+  err = set_ext_event_callback(jvmti, "VirtualThreadMount", VirtualThreadMount);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
+  err = set_ext_event_callback(jvmti, "VirtualThreadUnmount", VirtualThreadUnmount);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadUnmount: %s(%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
 
   memset(&caps, 0, sizeof(caps));
   caps.can_support_virtual_threads = 1;
@@ -579,13 +610,13 @@ Agent_OnLoad(JavaVM *jvm, char *options,
     return JNI_ERR;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_MOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;

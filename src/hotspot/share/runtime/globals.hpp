@@ -2063,6 +2063,8 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, LoomGenCode, true,                                          \
           "Generate oopmap code")                                           \
                                                                             \
+  develop(bool, LoomDeoptAfterThaw, false,                                  \
+          "Deopt stack after thaw")                                         \
                                                                             \
   develop(bool, LoomVerifyAfterThaw, false,                                 \
           "Verify stack after thaw")                                        \

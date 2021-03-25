@@ -353,6 +353,8 @@ void frame::deoptimize(JavaThread* thread) {
                         cm->deopt_mh_handler_begin() :
                         cm->deopt_handler_begin();
 
+  NativePostCallNop* inst = nativePostCallNop_at(pc());
+
   // Save the original pc before we patch in the new one
   cm->set_original_pc(this, pc());
   patch_pc(thread, deopt);
@@ -1174,6 +1176,22 @@ void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) const {
   entry_frame_call_wrapper()->oops_do(f);
 }
 
+bool frame::is_deoptimized_frame() const {
+  assert(_deopt_state != unknown, "not answerable");
+  if (_deopt_state == is_deoptimized) {
+    return true;
+  }
+
+  /* This method only checks if the frame is deoptimized
+   * as in return address being patched. 
+   * It doesn't care if the OP that we return to is a 
+   * deopt instruction */
+  /*if (_cb != NULL && _cb->is_nmethod()) {
+    return NativeDeoptInstruction::is_deopt_at(_pc);
+  }*/
+  return false;
+}
+
 void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, DerivedPointerIterationMode derived_mode, const RegisterMap* map, bool use_interpreter_oop_map_cache) const {
 #ifndef PRODUCT
   // simulate GC crash here to dump java thread in error report
@@ -1636,7 +1654,7 @@ void FrameValues::print_on(outputStream* st, int min_index, int max_index, intpt
       if (relative
           && *fv.location != 0 && *fv.location > -100 && *fv.location < 100 
           && (strncmp(fv.description, "interpreter_frame_", 18) == 0 || strstr(fv.description, " method "))) {
-        st->print_cr(" " INTPTR_FORMAT ": %18d %s", p2i(fv.location), (int)*fv.location, fv.description);
+        st->print_cr(" " INTPTR_FORMAT ": %18d %s (" INTPTR_FORMAT ")", p2i(fv.location), (int)*fv.location, fv.description, p2i(fv.location + (int)*fv.location));
       } else {
         st->print_cr(" " INTPTR_FORMAT ": " INTPTR_FORMAT " %s", p2i(fv.location), *fv.location, fv.description);
       }

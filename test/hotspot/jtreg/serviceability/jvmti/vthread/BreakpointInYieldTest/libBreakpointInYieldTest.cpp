@@ -128,27 +128,47 @@ VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   deallocate(jvmti, jni, (void*)tname);
 }
 
+// Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
-VirtualThreadMounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+VirtualThreadMount(jvmtiEnv *jvmti, ...) {
   jmethodID method = NULL;
   jlocation loc = 0L;
   jvmtiError err;
 
+  va_list ap;
+  JNIEnv* jni = NULL;
+  jthread thread = NULL;
+
+  va_start(ap, jvmti);
+  jni = va_arg(ap, JNIEnv*);
+  thread = va_arg(ap, jthread);
+  va_end(ap);
+
   err = jvmti->GetFrameLocation(thread, 0, &method, &loc);
-  check_jvmti_status(jni, err, "VirtualThreadMounted: error in JVMTI GetFrameLocation");
+  check_jvmti_status(jni, err, "VirtualThreadMount: error in JVMTI GetFrameLocation");
 
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
   print_frame_event_info(jvmti, jni, thread, method,
-                         "VirtualThreadMounted", ++vt_mounted_count);
+                         "VirtualThreadMount", ++vt_mounted_count);
   fflush(0);
 }
 
+// Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
-VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+VirtualThreadUnmount(jvmtiEnv *jvmti, ...) {
   jmethodID method = NULL;
   jlocation loc = 0L;
   jvmtiError err;
+
+  va_list ap;
+  JNIEnv* jni = NULL;
+  jthread thread = NULL;
+
+  va_start(ap, jvmti);
+  jni = va_arg(ap, JNIEnv*);
+  thread = va_arg(ap, jthread);
+  va_end(ap);
 
   err = jvmti->GetFrameLocation(thread, 0, &method, &loc);
   check_jvmti_status(jni, err, "VirtualThreadMUnmounted: error in JVMTI GetFrameLocation");
@@ -156,7 +176,7 @@ VirtualThreadUnmounted(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   RawMonitorLocker rml(jvmti, jni, event_mon);
 
   print_frame_event_info(jvmti, jni, thread, method,
-                         "VirtualThreadUnmounted", ++vt_unmounted_count);
+                         "VirtualThreadUnmount", ++vt_unmounted_count);
   fflush(0);
 }
 
@@ -164,7 +184,7 @@ JNIEXPORT jint JNICALL
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEventCallbacks callbacks;
   jvmtiCapabilities caps;
-  jvmtiError err;
+  jvmtiError err; 
 
   printf("Agent_OnLoad started\n");
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
@@ -175,8 +195,19 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.Breakpoint  = &Breakpoint;
   callbacks.ThreadStart = &ThreadStart;
   callbacks.VirtualThreadStart     = &VirtualThreadStart;
-  callbacks.VirtualThreadMounted   = &VirtualThreadMounted;
-  callbacks.VirtualThreadUnmounted = &VirtualThreadUnmounted;
+
+  err = set_ext_event_callback(jvmti, "VirtualThreadMount", VirtualThreadMount);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
+  err = set_ext_event_callback(jvmti, "VirtualThreadUnmount", VirtualThreadUnmount);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadUnmount: %s(%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
 
   memset(&caps, 0, sizeof(caps));
   caps.can_support_virtual_threads = 1;
@@ -211,13 +242,13 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_MOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_MOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_UNMOUNTED, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     printf("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;

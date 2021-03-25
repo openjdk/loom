@@ -85,7 +85,7 @@ class NativeInstruction {
   oop  oop_at (int offset) const       { return *(oop*) addr_at(offset); }
 
 
-  void set_char_at(int offset, char c)        { *addr_at(offset) = (u_char)c; wrote(offset); }
+  void set_char_at(int offset, u_char c)        { *addr_at(offset) = c; wrote(offset); }
   void set_int_at(int offset, jint  i)        { *(jint*)addr_at(offset) = i;  wrote(offset); }
   void set_ptr_at (int offset, intptr_t  ptr) { *(intptr_t*) addr_at(offset) = ptr;  wrote(offset); }
   void set_oop_at (int offset, oop  o)        { *(oop*) addr_at(offset) = o;  wrote(offset); }
@@ -753,6 +753,7 @@ public:
   }
   int displacement() const { return (jint) int_at(displacement_offset); }
   void patch(jint diff);
+  void make_deopt();
 
 #ifdef CONT_DOUBLE_NOP
   bool check1() const { return (int_at(0) & 0xffffff) == 0x841f0f && (int_at(8) & 0xffffff) == 0x841f0f; }
@@ -793,5 +794,28 @@ inline NativePostCallNop* nativePostCallNop_unsafe_at(address address) {
 #endif
   return nop;
 }
+
+class NativeDeoptInstruction: public NativeInstruction {
+ public:
+  enum Intel_specific_constants {
+    instruction_prefix          = 0x0F,
+    instruction_code            = 0xFF,
+    instruction_size            =    2,
+    instruction_offset          =    0,
+  };
+
+  address instruction_address() const       { return addr_at(instruction_offset); }
+  address next_instruction_address() const  { return addr_at(instruction_size); }
+
+  void  verify();
+
+  static bool is_deopt_at(address instr) {
+    return ((*instr) & 0xFF) == NativeDeoptInstruction::instruction_prefix && 
+      ((*(instr+1)) & 0xFF) == NativeDeoptInstruction::instruction_code;
+  }
+
+  // MT-safe patching
+  static void insert(address code_pos);
+};
 
 #endif // CPU_X86_NATIVEINST_X86_HPP

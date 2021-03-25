@@ -134,8 +134,8 @@ class JvmtiExport : public AllStatic {
 
   JVMTI_SUPPORT_FLAG(should_post_vthread_start)
   JVMTI_SUPPORT_FLAG(should_post_vthread_end)
-  JVMTI_SUPPORT_FLAG(should_post_vthread_mounted)
-  JVMTI_SUPPORT_FLAG(should_post_vthread_unmounted)
+  JVMTI_SUPPORT_FLAG(should_post_vthread_mount)
+  JVMTI_SUPPORT_FLAG(should_post_vthread_unmount)
 
   // If flag cannot be implemented, give an error if on=true
   static void report_unsupported(bool on);
@@ -344,8 +344,8 @@ class JvmtiExport : public AllStatic {
 
   static void post_vthread_start         (jthread vthread) NOT_JVMTI_RETURN;
   static void post_vthread_end           (jthread vthread) NOT_JVMTI_RETURN;
-  static void post_vthread_mounted       (jthread vthread) NOT_JVMTI_RETURN;
-  static void post_vthread_unmounted     (jthread vthread) NOT_JVMTI_RETURN;
+  static void post_vthread_mount         (jthread vthread) NOT_JVMTI_RETURN;
+  static void post_vthread_unmount       (jthread vthread) NOT_JVMTI_RETURN;
 
   static void continuation_yield_cleanup (JavaThread* thread, jint continuation_frame_count) NOT_JVMTI_RETURN;
 

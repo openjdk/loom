@@ -178,6 +178,7 @@ extern "C" void find(intptr_t x);
 bool do_verify_after_thaw(JavaThread* thread);
 template<int x> NOINLINE static bool do_verify_after_thaw1(JavaThread* thread) { return do_verify_after_thaw(thread); }
 static void print_vframe(frame f, const RegisterMap* map = nullptr, outputStream* st = tty);
+void do_deopt_after_thaw(JavaThread* thread);
 
 #ifdef ASSERT
   template <bool relative>
@@ -1475,13 +1476,14 @@ public:
   }
 
   NOINLINE freeze_result recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
-    // ResourceMark rm(_thread);
+    // ResourceMark rm;
     // InterpreterOopMap mask;
     // f.interpreted_frame_oop_map(&mask);
-    // int oops  = Interpreted::num_oops(f, &mask);
+    // int oops = Interpreted::num_oops(f, &mask);
 
     { // TODO PD
-      intptr_t* real_unextended_sp = (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset);
+      assert ((f.at<false>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
+      intptr_t* real_unextended_sp = (intptr_t*)f.at<false>(frame::interpreter_frame_last_sp_offset);
       if (real_unextended_sp != nullptr) f.set_unextended_sp(real_unextended_sp); // can be null at a safepoint
     }
     
@@ -1491,9 +1493,10 @@ public:
 
 #ifdef ASSERT
   {
+    ResourceMark rm;
     InterpreterOopMap mask;
     f.interpreted_frame_oop_map(&mask);
-    assert (vsp <=  Interpreted::frame_top(f, &mask), "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT, p2i(vsp), p2i(Interpreted::frame_top(f, &mask)));
+    assert (vsp <= Interpreted::frame_top(f, &mask), "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT, p2i(vsp), p2i(Interpreted::frame_top(f, &mask)));
     assert (fsize >= Interpreted::size(f, &mask), "fsize: %d Interpreted::size: %d", fsize, Interpreted::size(f, &mask));
     if (fsize > Interpreted::size(f, &mask) + 1) {
       log_develop_trace(jvmcont)("III fsize: %d Interpreted::size: %d", fsize, Interpreted::size(f, &mask));
@@ -2199,6 +2202,8 @@ inline bool can_thaw_fast() {
     int num_frames = (return_barrier ? 1 : 2);
 
     _stream = StackChunkFrameStream<true>(chunk);
+    _top_unextended_sp = _stream.unextended_sp();
+
     frame hf = _stream.to_frame();
     log_develop_trace(jvmcont)("top_hframe before (thaw):"); if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on<true>(tty);
     
@@ -2317,6 +2322,9 @@ inline bool can_thaw_fast() {
   intptr_t* sp0 = vsp;
   ContinuationHelper::set_anchor(_thread, sp0);
   print_frames(_thread, tty); // must be done after write(), as frame walking reads fields off the Java objects.
+  if (LoomDeoptAfterThaw) {
+    do_deopt_after_thaw(_thread);
+  }
   // if (LoomVerifyAfterThaw) {
   //   assert(do_verify_after_thaw(_thread), "partial: %d empty: %d is_last: %d fix: %d", partial, empty, is_last, fix);
   // }
@@ -2461,14 +2469,12 @@ inline bool can_thaw_fast() {
   template<typename FKind>
   void finalize_thaw(frame& entry, int argsize) {
     stackChunkOop chunk = _cont.tail();
-
-    int orig_sp = chunk->sp();
     
-    _top_unextended_sp = _stream.unextended_sp();
     // assert (is_empty == _cont.is_empty() /* _last_frame.is_empty()*/, "hf.is_empty(cont): %d last_frame.is_empty(): %d ", is_empty, _cont.is_empty()/*_last_frame.is_empty()*/);
 
     OrderAccess::storestore();
     if (!_stream.is_done()) {
+      assert (_stream.sp() >= chunk->sp_address(), "");
       chunk->set_sp(chunk->to_offset(_stream.sp()));
       chunk->set_pc(_stream.pc());
     } else {
@@ -2478,9 +2484,8 @@ inline bool can_thaw_fast() {
     }
     assert(_stream.is_done() == chunk->is_empty(), "_stream.is_done(): %d chunk->is_empty(): %d", _stream.is_done(), chunk->is_empty());
     
-    assert (chunk->sp() >= orig_sp, "");
-    int delta = chunk->sp() - orig_sp;
-    log_develop_trace(jvmcont)("sub max_size: %d -- %d", delta, chunk->max_size() - delta);
+    int delta = _stream.unextended_sp() - _top_unextended_sp;
+    log_develop_trace(jvmcont)("sub max_size: %d -- %d (unextended_sp: " INTPTR_FORMAT " orig unextended_sp: " INTPTR_FORMAT ")", delta, chunk->max_size() - delta, p2i(_stream.unextended_sp()), p2i(_top_unextended_sp));
     chunk->set_max_size(chunk->max_size() - delta);
 
     assert (!_stream.is_done() || chunk->parent() != nullptr || argsize == 0, "");
@@ -2692,13 +2697,8 @@ inline bool can_thaw_fast() {
       chunk->reset_counters();
       assert (chunk->argsize() == 0, "");
     } else {
-      int orig_sp = chunk->sp();
-      assert (chunk->sp() >= orig_sp, "");
-      int delta = chunk->sp() - orig_sp;
-      log_develop_trace(jvmcont)("sub max_size: %d -- %d", delta, chunk->max_size() - delta);
-      log_develop_trace(jvmcont)("sub max_size _align_size: %d -- %d", _align_size, chunk->max_size() + _align_size);
-      delta += _align_size;
-      chunk->set_max_size(chunk->max_size() - delta);
+      log_develop_trace(jvmcont)("sub max_size _align_size: %d -- %d", _align_size, chunk->max_size() - _align_size);
+      chunk->set_max_size(chunk->max_size() - _align_size);
     }
     assert (chunk->is_empty() == (chunk->max_size() == 0), "chunk->is_empty: %d chunk->max_size: %d", chunk->is_empty(), chunk->max_size());
 
@@ -2830,6 +2830,22 @@ public:
     tty->print_cr("*** (narrow) non-oop %x found at " PTR_FORMAT, (int)(*p), p2i(p));
   }
 };
+
+void do_deopt_after_thaw(JavaThread* thread) {
+  int i = 0;
+  StackFrameStream fst(thread, true, false);
+  fst.register_map()->set_include_argument_oops(false);
+  ContinuationHelper::update_register_map_with_callee(fst.register_map(), *fst.current());
+  for (; !fst.is_done(); fst.next()) {
+    if (fst.current()->cb()->is_compiled()) {
+      CompiledMethod* cm = fst.current()->cb()->as_compiled_method();
+      if (!cm->method()->is_continuation_enter_intrinsic()) {
+        cm->make_deoptimized();
+      }
+    }
+  }
+}
+
 
 bool do_verify_after_thaw(JavaThread* thread) {
   assert(thread->has_last_Java_frame(), "");

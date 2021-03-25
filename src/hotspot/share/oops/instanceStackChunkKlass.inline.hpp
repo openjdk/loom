@@ -384,6 +384,7 @@ StackChunkFrameStream<mixed>::StackChunkFrameStream(stackChunkOop chunk, bool gc
     } else {
       _unextended_sp = _sp;
     }
+    assert (_unextended_sp >= _sp - InstanceStackChunkKlass::metadata_words(), "");
     // else if (is_compiled()) {
     //   tty->print_cr(">>>>> XXXX"); os::print_location(tty, (intptr_t)nativeCall_before(pc())->destination());
     //   assert (NativeCall::is_call_before(pc()) && nativeCall_before(pc()) != nullptr && nativeCall_before(pc())->destination() != nullptr, "");
@@ -413,6 +414,7 @@ StackChunkFrameStream<mixed>::StackChunkFrameStream(stackChunkOop chunk, const f
   _sp = f.sp();
   if (mixed) {
     _unextended_sp = f.unextended_sp();
+    assert (_unextended_sp >= _sp - InstanceStackChunkKlass::metadata_words(), "");
   }
   DEBUG_ONLY(else _unextended_sp = nullptr;)
   assert (_sp >= chunk->start_address() && _sp <= chunk->start_address() + chunk->stack_size() + InstanceStackChunkKlass::metadata_words(), "");
@@ -447,7 +449,8 @@ inline bool StackChunkFrameStream<mixed>::is_interpreted() const {
 
 template <bool mixed>
 inline int StackChunkFrameStream<mixed>::frame_size() const {
-  return (mixed && is_interpreted()) ? interpreter_frame_size() : cb()->frame_size();
+  return (mixed && is_interpreted()) ? interpreter_frame_size() 
+                                     : cb()->frame_size() + stack_argsize();
 }
 
 template <bool mixed>
@@ -482,12 +485,14 @@ inline void StackChunkFrameStream<mixed>::next(RegisterMapT* map) {
       if (_sp >= _end - InstanceStackChunkKlass::metadata_words()) {
         _sp = _end;
       }
-      _unextended_sp = _sp;
+      _unextended_sp = is_interpreted() ? unextended_sp_for_interpreter_frame() : _sp;
     }
+    assert (_unextended_sp >= _sp - InstanceStackChunkKlass::metadata_words(), "");
   } else {
     _sp += cb()->frame_size();
   }
-  
+  assert (!is_interpreted() || _unextended_sp == unextended_sp_for_interpreter_frame(), "_unextended_sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(_unextended_sp), p2i(unextended_sp_for_interpreter_frame()));
+
   get_cb();
   update_reg_map_pd(map);
   if (safepoint && cb() != nullptr) _oopmap = cb()->oop_map_for_return_address(pc()); // there's no post-call nop and no fast oopmap lookup
@@ -533,11 +538,15 @@ template <bool mixed>
 inline void StackChunkFrameStream<mixed>::get_oopmap(address pc, int oopmap_slot) const {
   assert (cb() != nullptr, "");
   assert (!is_compiled() || !cb()->as_compiled_method()->is_deopt_pc(pc), "oopmap_slot: %d", oopmap_slot);
-  assert (oopmap_slot >= 0, "");
-  assert (cb()->oop_map_for_slot(oopmap_slot, pc) != nullptr, "");
-  assert (cb()->oop_map_for_slot(oopmap_slot, pc) == cb()->oop_map_for_return_address(pc), "");
+  if (oopmap_slot >= 0) {
+    assert (oopmap_slot >= 0, "");
+    assert (cb()->oop_map_for_slot(oopmap_slot, pc) != nullptr, "");
+    assert (cb()->oop_map_for_slot(oopmap_slot, pc) == cb()->oop_map_for_return_address(pc), "");
 
-  _oopmap = cb()->oop_map_for_slot(oopmap_slot, pc);
+    _oopmap = cb()->oop_map_for_slot(oopmap_slot, pc);
+  } else {
+    _oopmap = cb()->oop_map_for_return_address(pc);
+  }
   assert (_oopmap != nullptr, "");
 }
 
@@ -619,8 +628,12 @@ void StackChunkFrameStream<mixed>::handle_deopted() const {
   address pc1 = pc();
   int oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
   if (UNLIKELY(oopmap_slot < 0)) { // we could have marked frames for deoptimization in thaw_chunk
-    pc1 = orig_pc();
-    oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
+    // tty->print_cr(">>>> handle_deopted: deopted");
+    CompiledMethod* cm = cb()->as_compiled_method();
+    if (cm->is_deopt_pc(pc1)) {
+      pc1 = orig_pc();
+      oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
+    }
   }
   get_oopmap(pc1, oopmap_slot);
 }
@@ -913,6 +926,9 @@ public:
 
     if (f.is_compiled()) f.handle_deopted(); // because of deopt in thaw; TODO: remove when changing deoptimization
 
+    // tty->print_cr(">>>> OopOopIterateStackClosure::do_frame is_compiled: %d return_barrier: %d pc: %p", f.is_compiled(), Continuation::is_return_barrier_entry(f.pc()), f.pc()); f.print_on(tty);
+    // if (f.is_compiled()) tty->print_cr(">>>> OopOopIterateStackClosure::do_frame nmethod: %p method: %p", f.cb()->as_nmethod(), f.cb()->as_compiled_method()->method());
+
     // if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
 
     CodeBlob* cb = f.cb();
@@ -958,6 +974,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
     assert (!SafepointSynchronize::is_at_safepoint() || chunk->gc_mode(), "gc_mode: %d is_at_safepoint: %d", chunk->gc_mode(), SafepointSynchronize::is_at_safepoint());
   }
 
+  // tty->print_cr(">>>> OopOopIterateStackClosure::oop_oop_iterate_stack_bounded");
   OopOopIterateStackClosure<concurrent_gc, OopClosureType> frame_closure(chunk, do_destructive_processing, closure);
   chunk->iterate_stack(&frame_closure, mr);
 
