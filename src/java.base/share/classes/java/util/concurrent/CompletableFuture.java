@@ -486,21 +486,18 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         abstract boolean isLive();
 
         public final void run() {
-            if (snapshot != null) {
-                snapshot.runWithSnapshot(() -> tryFire(ASYNC));
+            if (snapshot != ScopeLocal.snapshot()) {
+                ScopeLocal.runWithSnapshot(() -> tryFire(ASYNC), snapshot);
             } else {
                 tryFire(ASYNC);
             }
         }
         public final boolean exec() {
-            if (snapshot != null) {
-                snapshot.runWithSnapshot(() -> tryFire(ASYNC));
-            } else {
-                tryFire(ASYNC);
-            }
+            run();
             return false;
         }
-        public final Void getRawResult()       { return null; }
+
+    public final Void getRawResult()       { return null; }
         public final void setRawResult(Void v) {}
     }
 
@@ -1833,8 +1830,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
 
         public void run() {
-            if (snapshot != null) {
-                snapshot.runWithSnapshot(this::doRun);
+            if (snapshot != ScopeLocal.snapshot()) {
+                ScopeLocal.runWithSnapshot(this::doRun, snapshot);
             } else {
                 doRun();
             }

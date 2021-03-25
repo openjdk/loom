@@ -147,44 +147,79 @@ public final class ScopeLocal<T> {
             }
             return NIL;
         }
+
         /**
          * Runs an operation with this snapshot of inheritable scoped variables.
          *
-         * @param op the operation to run
-         */
-        public void runWithSnapshot(Runnable op) {
-            var prev = Thread.currentThread().inheritableScopeLocalBindings;
-            var cache = Thread.scopeLocalCache();
-            Cache.invalidate();
-            try {
-                Thread.currentThread().inheritableScopeLocalBindings = this;
-                op.run();
-            } finally {
-                Thread.currentThread().inheritableScopeLocalBindings = prev;
-                Thread.setScopeLocalCache(cache);
-            }
-        }
-
-        /**
-         * Runs a value-returning operation with this snapshot of inheritable
-         * scoped variables.
-         *
-         * @param op the operation to run
+         * @param op  the operation to run
          * @param <R> the type of the result of the function
          * @return the result
          * @throws Exception if the operation completes with an exception
          */
-        public <R> R callWithSnapshot(Callable<R> op) throws Exception {
-            var prev = Thread.currentThread().inheritableScopeLocalBindings;
-            var cache = Thread.scopeLocalCache();
-            Cache.invalidate();
-            try {
-                Thread.currentThread().inheritableScopeLocalBindings = this;
-                return op.call();
-            } finally {
-                Thread.currentThread().inheritableScopeLocalBindings = prev;
-                Thread.setScopeLocalCache(cache);
-            }
+        void runWithSnapshot(Runnable op) {
+            ScopeLocal.runWithSnapshot(op, this);
+        }
+
+        /**
+         * Runs a value-returning operation with this snapshot of inheritable
+         * scoped variables.a
+         *
+         * @param op  the operation to run
+         * @param <R> the type of the result of the function
+         * @return the result
+         * @throws Exception if the operation completes with an exception
+         */
+        <R> R callWithSnapshot(Callable<R> op) throws Exception {
+            return ScopeLocal.callWithSnapshot(op, this);
+        }
+    }
+
+    /**
+     * Runs a value-returning operation with a snapshot of inheritable
+     * scoped variables.
+     *
+     * @param op the operation to run
+     * @param s the Snapshot. May be null.
+     * @param <R> the type of the result of the function
+     * @return the result
+     * @throws Exception if the operation completes with an exception
+     */
+    public static <R> R callWithSnapshot(Callable<R> op, Snapshot s) throws Exception {
+        var prev = Thread.currentThread().inheritableScopeLocalBindings;
+        if (prev == s) {
+            return op.call();
+        }
+        var cache = Thread.scopeLocalCache();
+        Cache.invalidate();
+        try {
+            Thread.currentThread().inheritableScopeLocalBindings = s;
+            return op.call();
+        } finally {
+            Thread.currentThread().inheritableScopeLocalBindings = prev;
+            Thread.setScopeLocalCache(cache);
+        }
+    }
+
+    /**
+     * Runs an operation with this snapshot of inheritable scoped variables.
+     *
+     * @param op the operation to run
+     * @param s the Snapshot. May be null.
+     */
+    public static void runWithSnapshot(Runnable op, Snapshot s) {
+        var prev = Thread.currentThread().inheritableScopeLocalBindings;
+        if (prev == s) {
+            op.run();
+            return;
+        }
+        var cache = Thread.scopeLocalCache();
+        Cache.invalidate();
+        try {
+            Thread.currentThread().inheritableScopeLocalBindings = s;
+            op.run();
+        } finally {
+            Thread.currentThread().inheritableScopeLocalBindings = prev;
+            Thread.setScopeLocalCache(cache);
         }
     }
 

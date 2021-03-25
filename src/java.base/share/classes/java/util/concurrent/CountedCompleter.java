@@ -753,8 +753,8 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      */
     @Override
     protected final boolean exec() {
-        if (snapshot != null) {
-            snapshot.runWithSnapshot(this::compute);
+        if (snapshot != ScopeLocal.snapshot()) {
+            ScopeLocal.runWithSnapshot(this::compute, snapshot);
         } else {
             compute();
         }
