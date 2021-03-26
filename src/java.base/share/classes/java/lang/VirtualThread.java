@@ -49,7 +49,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.event.VirtualThreadSubmitRejectedEvent;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
-import jdk.internal.vm.ThreadDumper;
+import jdk.internal.vm.ThreadTracker;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import jdk.internal.vm.annotation.JvmtiMountTransition;
 import sun.nio.ch.Interruptible;
@@ -438,7 +438,7 @@ class VirtualThread extends Thread {
         }
 
         // notify thread dumper, no-op if not tracking threads
-        ThreadDumper.notifyTerminate(this);
+        ThreadTracker.notifyTerminate(this);
 
         // clear references to thread locals, this method is assumed to be
         // called on its carrier thread on which it terminated.
@@ -502,7 +502,7 @@ class VirtualThread extends Thread {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
-        ThreadDumper.notifyStart(this);  // no-op if threads not tracked
+        ThreadTracker.notifyStart(this);  // no-op if threads not tracked
         try {
             submitRunContinuation();
         } catch (RejectedExecutionException ree) {

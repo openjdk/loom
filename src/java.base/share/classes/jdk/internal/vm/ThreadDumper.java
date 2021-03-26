@@ -46,56 +46,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import sun.nio.ch.Poller;
-import sun.security.action.GetPropertyAction;
 
 /**
  * Thread dump support.
  *
  * This class defines methods to dump threads to an output stream or file in
  * plain text or JSON format. Virtual threads are located if they are created in
- * a structured way with a ThreadExecutor. This class optionally support tracking
- * the start and termination of all virtual threads.
+ * a structured way with a ThreadExecutor.
  */
 public class ThreadDumper {
     private ThreadDumper() { }
-
-    // the set of all virtual threads when tracking is enabled, otherwise null
-    private static final Set<Thread> VIRTUAL_THREADS;
-    static {
-        String s = GetPropertyAction.privilegedGetProperty("jdk.trackAllVirtualThreads");
-        if (s != null && (s.isEmpty() || s.equalsIgnoreCase("true"))) {
-            VIRTUAL_THREADS = ConcurrentHashMap.newKeySet();
-        } else {
-            VIRTUAL_THREADS = null;
-        }
-    }
-
-    /**
-     * Notifies the thread dumper of new virtual thread. A no-op if tracking of
-     * virtual threads is not enabled.
-     */
-    public static void notifyStart(Thread thread) {
-        Set<Thread> threads = VIRTUAL_THREADS;
-        if (threads != null) {
-            assert thread.isVirtual();
-            threads.add(thread);
-        }
-    }
-
-    /**
-     * Notifies the thread dumper that a virtual thread has virtual. A no-op if
-     * tracking of virtual threads is not enabled.
-     */
-    public static void notifyTerminate(Thread thread) {
-        Set<Thread> threads = VIRTUAL_THREADS;
-        if (threads != null) {
-            assert thread.isVirtual();
-            threads.remove(thread);
-        }
-    }
 
     /**
      * A container of threads, backed by a ThreadExecutor.
@@ -250,7 +212,7 @@ public class ThreadDumper {
         }
 
         // virtual threads
-        Set<Thread> threads = VIRTUAL_THREADS;
+        Set<Thread> threads = ThreadTracker.virtualThreads().orElse(null);
         if (threads != null) {
             threads.forEach(t -> dumpThread(t, t.getStackTrace(), ps));
         } else {
@@ -356,7 +318,7 @@ public class ThreadDumper {
         out.println("      \"threads\": [");
 
         // virtual threads
-        Set<Thread> threads = VIRTUAL_THREADS;
+        Set<Thread> threads = ThreadTracker.virtualThreads().orElse(null);;
         if (threads != null) {
             threads.forEach(t -> dumpThreadToJson(t, t.getStackTrace(), out, true));
         } else {
