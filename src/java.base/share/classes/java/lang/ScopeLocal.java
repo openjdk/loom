@@ -106,14 +106,6 @@ public final class ScopeLocal<T> {
 
     public int hashCode() { return hash; }
 
-    static class AbstractSnapX {
-        final AbstractSnapX prev;
-
-        AbstractSnapX(AbstractSnapX prev) {
-            this.prev = prev;
-        }
-    }
-
     /**
      * Represents a snapshot of inheritable scoped variables.
      *
@@ -124,36 +116,24 @@ public final class ScopeLocal<T> {
      * @see ScopeLocal#snapshot()
      */
 
-    public static class Snapshot extends AbstractSnapX {
-        final ScopeLocal<?> key;
-        final Object value;
+    public static class Snapshot {
+        final Snapshot prev;
 
         private static final Object NIL = new Object();
 
-        Snapshot(ScopeLocal<?> key, Object value, AbstractSnapX prev) {
-            super(prev);
-            key.type.cast(value);
-            this.key = key;
-            this.value = value;
-        }
-
-        final Object get() {
-            return value;
-        }
-
-        final ScopeLocal<?> getKey() {
-            return key;
+        Snapshot(Snapshot prev) {
+            this.prev = prev;
         }
 
         Object find(ScopeLocal<?> key) {
-            for (AbstractSnapX b = this; b != null; b = b.prev) {
-                if (b instanceof Snapshot snapshot) {
-                    if (snapshot.getKey() == key) {
-                        Object value = b.get();
+            for (Snapshot b = this; b != null; b = b.prev) {
+                if (b instanceof SingleBinding singlebinding) {
+                    if (singlebinding.getKey() == key) {
+                        Object value = singlebinding.get();
                         return value;
                     }
-                } else if (b instanceof Split split) {
-                    var value = split.snapshot.find(key);
+                } else if (b instanceof MultiBinding split) {
+                    var value = split.bindings.find(key);
                     if (value != NIL) {
                         return value;
                     }
@@ -190,16 +170,37 @@ public final class ScopeLocal<T> {
         }
     }
 
-    static class Split extends AbstractSnapX {
-        final Snapshot snapshot;
+    // An immutable object that represents the binding of a single value
+    // to a single key.
+    static final class SingleBinding extends Snapshot {
+        final ScopeLocal<?> key;
+        final Object value;
 
-        Split(Snapshot snapshot, AbstractSnapX prev) {
+        SingleBinding(ScopeLocal<?> key, Object value, Snapshot prev) {
             super(prev);
-            this.snapshot = snapshot;
+            key.type.cast(value);
+            this.key = key;
+            this.value = value;
         }
 
-        Object find(ScopeLocal<?> key) {
-            return snapshot.find(key);
+        final Object get() {
+            return value;
+        }
+
+        final ScopeLocal<?> getKey() {
+            return key;
+        }
+
+    }
+
+    // An immutable object that represents the binding of a number of
+    // keys and values. The key-value bindings form a linked list.
+    static final class MultiBinding extends Snapshot {
+        final SingleBinding bindings;
+
+        MultiBinding(SingleBinding bindings, Snapshot prev) {
+            super(prev);
+            this.bindings = bindings;
         }
     }
 
@@ -207,23 +208,98 @@ public final class ScopeLocal<T> {
      * TBD
      */
     public static class BoundValues {
-        Snapshot snapshot;
-        BoundValues(Snapshot snapshot) {
-            this.snapshot = snapshot;
-        }
+        SingleBinding inheritables, nonInheritables;
+
+        BoundValues() {
+        }  // Non-public default constructor
 
         /**
-         *
-         * @param key TBD
+         * @param key   TBD
          * @param value TBD
-         * @param <T> TBD
+         * @param <T>   TBD
          * @return TBD
          */
         public <T> BoundValues set(ScopeLocal<T> key, T value) {
-            snapshot = new Snapshot(key, value, snapshot);
+            if (key.isInheritable) {
+                inheritables = new SingleBinding(key, value, inheritables);
+            } else {
+                nonInheritables = new SingleBinding(key, value, nonInheritables);
+            }
             return this;
         }
+
+        private Snapshot setScopeLocalBindings(SingleBinding bindings, boolean isInheritable) {
+            Thread currentThread = Thread.currentThread();
+            Snapshot prev;
+            if (isInheritable) {
+                prev = currentThread.inheritableScopeLocalBindings;
+                if (bindings != null) {
+                    var b = new MultiBinding(bindings, prev);
+                    currentThread.inheritableScopeLocalBindings = b;
+                }
+            } else {
+                prev = currentThread.noninheritableScopeLocalBindings;
+                if (bindings != null) {
+                    var b = new MultiBinding(bindings, prev);
+                    currentThread.noninheritableScopeLocalBindings = b;
+                }
+            }
+            return prev;
+        }
+
+        /**
+         * Runs a value-returning operation with this some ScopeLocals bound to values.
+         * Code executed by the operation can use the {@link #get()} method to
+         * get the value of the variables. The variables revert to their previous values or
+         * becomes {@linkplain #isBound() unbound} when the operation completes.
+         *
+         * @param op    the operation to run
+         * @param <R>   the type of the result of the function
+         * @return the result
+         * @throws Exception if the operation completes with an exception
+         */
+        public <R> R in(Callable<R> op) throws Exception {
+            Objects.requireNonNull(op);
+            Cache.invalidate();  // FIXME: Horribly crude. Do something better.
+            var p1 = setScopeLocalBindings(this.inheritables, true);
+            var p2 = setScopeLocalBindings(this.nonInheritables, false);
+            try {
+                return op.call();
+            } finally {
+                Thread currentThread = Thread.currentThread();
+                currentThread.noninheritableScopeLocalBindings = p2;
+                currentThread.inheritableScopeLocalBindings = p1;
+                Cache.invalidate();
+            }
+        }
+
+
+        /**
+         * Runs an operation with this some ScopeLocals bound to our values.
+         * Code executed by the operation can use the {@link #get()} method to
+         * get the value of the variables. The variables revert to their previous values or
+         * becomes {@linkplain #isBound() unbound} when the operation completes.
+         *
+         * @param value the value for the variable, can be null
+         * @param op    the operation to run
+         * @throws Exception if the operation completes with an exception
+         */
+        public void in(Runnable op) {
+            Objects.requireNonNull(op);
+            ScopeLocal.Cache.invalidate();  // FIXME: Horribly crude. Do something better.
+            var p1 = setScopeLocalBindings(this.inheritables, true);
+            var p2 = setScopeLocalBindings(this.nonInheritables, false);
+            try {
+                op.run();
+            } finally {
+                Thread currentThread = Thread.currentThread();
+                currentThread.noninheritableScopeLocalBindings = p2;
+                currentThread.inheritableScopeLocalBindings = p1;
+                ScopeLocal.Cache.invalidate();
+            }
+        }
     }
+
 
     /**
      *
@@ -233,7 +309,7 @@ public final class ScopeLocal<T> {
      * @return TBD
      */
     public static <T> BoundValues set(ScopeLocal<T> key, T value) {
-        return new BoundValues(new Snapshot(key, value, null));
+        return new BoundValues().set(key, value);
     }
 
     /**
@@ -397,20 +473,11 @@ public final class ScopeLocal<T> {
     @SuppressWarnings("unchecked")
     private T slowGet() {
         var bindings = scopeLocalBindings();
-        /*
-        if (bindings != null) {
-            for (var b = bindings; b != null; b = b.prev) {
-                if (b.getKey() == this) {
-                    return (T) b.get();
-                }
-            }
-        }
-        */
         var value =  bindings.find(this);
         if (value == Snapshot.NIL) {
             throw new NoSuchElementException();
         }
-
+        Cache.put(this, value);
         return (T)value;
     }
 
@@ -453,7 +520,7 @@ public final class ScopeLocal<T> {
         Snapshot top = scopeLocalBindings();
         Cache.update(this, value);
         try {
-            setScopeLocalBindings(new Snapshot(this, value, top));
+            setScopeLocalBindings(new SingleBinding(this, value, top));
             op.run();
         } finally {
             // assert(top == Thread.currentThread().scopeLocalBindings.prev);
@@ -479,7 +546,7 @@ public final class ScopeLocal<T> {
         Snapshot top = scopeLocalBindings();
         Cache.update(this, value);
         try {
-            setScopeLocalBindings(new Snapshot(this, value, top));
+            setScopeLocalBindings(new SingleBinding(this, value, top));
             return op.call();
         } finally {
             setScopeLocalBindings(top);
@@ -496,11 +563,25 @@ public final class ScopeLocal<T> {
         static final int TABLE_MASK = TABLE_SIZE - 1;
 
         static void put(ScopeLocal<?> key, Object value) {
-            if (Thread.scopeLocalCache() == null) {
-                Thread.setScopeLocalCache(new Object[TABLE_SIZE * 2]);
+            Object[] theCache = Thread.scopeLocalCache();
+            if (theCache == null) {
+                theCache = new Object[TABLE_SIZE * 2];
+                Thread.setScopeLocalCache(theCache);
             }
-            int victim = chooseVictim(Thread.currentCarrierThread(), key.hashCode());
+            // Update the cache to replace one entry with the value we just looked up.
+            // Each value can be in one of two possible places in the cache.
+            // Pick a victim at (pseudo-)random.
+            Thread thread = Thread.currentThread();
+            int hash = key.hashCode();
+            int k1 = hash & TABLE_MASK;
+            int k2 = (hash >> INDEX_BITS) & TABLE_MASK;
+            int tmp = chooseVictim(thread);
+            int victim = tmp == 0 ? k1 : k2;
+            int other = tmp == 0 ? k2 : k1;
             setKeyAndObjectAt(victim, key, value);
+            if (getKey(theCache, other) == key) {
+                setKey(theCache, other, null);
+            }
         }
 
         private static final void update(Object key, Object value) {
@@ -538,25 +619,20 @@ public final class ScopeLocal<T> {
             Thread.scopeLocalCache()[n * 2 + 1] = value;
         }
 
-        private static Object getKey(Object[] objs, long hash) {
-            int n = (int) (hash & TABLE_MASK);
+        private static Object getKey(Object[] objs, int n) {
             return objs[n * 2];
         }
 
-        private static void setKey(Object[] objs, long hash, Object key) {
-            int n = (int) (hash & TABLE_MASK);
+        private static void setKey(Object[] objs, int n, Object key) {
             objs[n * 2] = key;
         }
 
-        private static int chooseVictim(Thread thread, int hash) {
-            // Update the cache to replace one entry with the value we just looked up.
-            // Each value can be in one of two possible places in the cache.
-            // Pick a victim at (pseudo-)random.
-            int k1 = hash & TABLE_MASK;
-            int k2 = (hash >> INDEX_BITS) & TABLE_MASK;
+        // Return either 0 or 1, at pseudo-random. This chooses either the
+        // primary or secondary cache slot.
+        private static int chooseVictim(Thread thread) {
             int tmp = thread.victims;
             thread.victims = (tmp << 31) | (tmp >>> 1);
-            return (tmp & 1) == 0 ? k1 : k2;
+            return tmp & 1;
         }
 
         public static void invalidate() {
