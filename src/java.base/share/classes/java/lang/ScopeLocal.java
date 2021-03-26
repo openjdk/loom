@@ -106,6 +106,14 @@ public final class ScopeLocal<T> {
 
     public int hashCode() { return hash; }
 
+    static class AbstractSnapX {
+        final AbstractSnapX prev;
+
+        AbstractSnapX(AbstractSnapX prev) {
+            this.prev = prev;
+        }
+    }
+
     /**
      * Represents a snapshot of inheritable scoped variables.
      *
@@ -116,18 +124,17 @@ public final class ScopeLocal<T> {
      * @see ScopeLocal#snapshot()
      */
 
-    public static class Snapshot {
+    public static class Snapshot extends AbstractSnapX {
         final ScopeLocal<?> key;
         final Object value;
-        final Snapshot prev;
 
         private static final Object NIL = new Object();
 
-        Snapshot(ScopeLocal<?> key, Object value, Snapshot prev) {
+        Snapshot(ScopeLocal<?> key, Object value, AbstractSnapX prev) {
+            super(prev);
             key.type.cast(value);
             this.key = key;
             this.value = value;
-            this.prev = prev;
         }
 
         final Object get() {
@@ -139,10 +146,19 @@ public final class ScopeLocal<T> {
         }
 
         Object find(ScopeLocal<?> key) {
-            for (Snapshot b = this; b != null; b = b.prev) {
-                if (b.getKey() == key) {
-                    Object value = b.get();
-                    return value;
+            for (AbstractSnapX b = this; b != null; b = b.prev) {
+                if (b instanceof Snapshot snapshot) {
+                    if (snapshot.getKey() == key) {
+                        Object value = b.get();
+                        return value;
+                    }
+                } else if (b instanceof Split split) {
+                    var value = split.snapshot.find(key);
+                    if (value != NIL) {
+                        return value;
+                    }
+                } else {
+                    throw new RuntimeException("impossible");
                 }
             }
             return NIL;
@@ -172,6 +188,52 @@ public final class ScopeLocal<T> {
         <R> R callWithSnapshot(Callable<R> op) throws Exception {
             return ScopeLocal.callWithSnapshot(op, this);
         }
+    }
+
+    static class Split extends AbstractSnapX {
+        final Snapshot snapshot;
+
+        Split(Snapshot snapshot, AbstractSnapX prev) {
+            super(prev);
+            this.snapshot = snapshot;
+        }
+
+        Object find(ScopeLocal<?> key) {
+            return snapshot.find(key);
+        }
+    }
+
+    /**
+     * TBD
+     */
+    public static class BoundValues {
+        Snapshot snapshot;
+        BoundValues(Snapshot snapshot) {
+            this.snapshot = snapshot;
+        }
+
+        /**
+         *
+         * @param key TBD
+         * @param value TBD
+         * @param <T> TBD
+         * @return TBD
+         */
+        public <T> BoundValues set(ScopeLocal<T> key, T value) {
+            snapshot = new Snapshot(key, value, snapshot);
+            return this;
+        }
+    }
+
+    /**
+     *
+     * @param key TBD
+     * @param value TBD
+     * @param <T> TBD
+     * @return TBD
+     */
+    public static <T> BoundValues set(ScopeLocal<T> key, T value) {
+        return new BoundValues(new Snapshot(key, value, null));
     }
 
     /**
@@ -335,6 +397,7 @@ public final class ScopeLocal<T> {
     @SuppressWarnings("unchecked")
     private T slowGet() {
         var bindings = scopeLocalBindings();
+        /*
         if (bindings != null) {
             for (var b = bindings; b != null; b = b.prev) {
                 if (b.getKey() == this) {
@@ -342,7 +405,13 @@ public final class ScopeLocal<T> {
                 }
             }
         }
-        throw new NoSuchElementException();
+        */
+        var value =  bindings.find(this);
+        if (value == Snapshot.NIL) {
+            throw new NoSuchElementException();
+        }
+
+        return (T)value;
     }
 
     /**
