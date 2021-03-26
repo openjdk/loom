@@ -355,29 +355,20 @@ vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage004/TestDescription.java
 vmTestbase/nsk/jvmti/NotifyFramePop/nframepop002/TestDescription.java
 vmTestbase/nsk/jvmti/NotifyFramePop/nframepop003/TestDescription.java
 vmTestbase/nsk/jvmti/PopFrame/popframe004/TestDescription.java
-vmTestbase/nsk/jvmti/SetLocalVariable/setlocal001/TestDescription.java
-vmTestbase/nsk/jvmti/SetLocalVariable/setlocal002/TestDescription.java
-vmTestbase/nsk/jvmti/SetLocalVariable/setlocal003/TestDescription.java
-vmTestbase/nsk/jvmti/SetLocalVariable/setlocal004/TestDescription.java
 vmTestbase/nsk/jvmti/StopThread/stopthrd006/TestDescription.java
 vmTestbase/nsk/jvmti/scenarios/events/EM02/em02t012/TestDescription.java
 
 # Events are not handled on vthreads while checking function (GetFrameLocation) does
-vmTestbase/nsk/jvmti/FramePop/framepop001/TestDescription.java
-vmTestbase/nsk/jvmti/GetFrameLocation/frameloc001/TestDescription.java
-vmTestbase/nsk/jvmti/GetLocalVariable/getlocal001/TestDescription.java
-vmTestbase/nsk/jvmti/MethodEntry/mentry001/TestDescription.java
-vmTestbase/nsk/jvmti/MethodExit/mexit001/TestDescription.java
-vmTestbase/nsk/jvmti/MethodExit/mexit002/TestDescription.java
-vmTestbase/nsk/jvmti/NotifyFramePop/nframepop001/TestDescription.java
+
 vmTestbase/nsk/jvmti/unit/GetLocalVariable/getlocal003/TestDescription.java
-vmTestbase/nsk/jvmti/scenarios/hotswap/HS101/hs101t007/TestDescription.java
-vmTestbase/nsk/jvmti/scenarios/hotswap/HS101/hs101t008/TestDescription.java
 
 # returned JVMTI_ERROR_INVALID_THREAD for non-implented
 vmTestbase/nsk/jvmti/Exception/exception001/TestDescription.java
 vmTestbase/nsk/jvmti/RedefineClasses/redefclass005/TestDescription.java
 vmTestbase/nsk/jvmti/RedefineClasses/redefclass018/TestDescription.java
+
+# Test fails because expect to find vthread in GetAllThreads
+vmTestbase/nsk/jvmti/scenarios/allocation/AP11/ap11t001/TestDescription.java
 
 ####
 ## Breakpoint expects name of virtual thread which is set by test.
@@ -386,7 +377,7 @@ vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
 
 
 ####
-## Test don't request capabilites
+## Test doesn't request capabilites
 
 vmTestbase/nsk/jvmti/GetFrameLocation/frameloc002/TestDescription.java
 
