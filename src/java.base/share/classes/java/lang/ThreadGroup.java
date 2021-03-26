@@ -61,7 +61,7 @@ import jdk.internal.misc.VM;
  * a form of <i>job control</i> for threads. Thread groups supported the isolation
  * of applets and defined methods intended for diagnostic purposes. The concept
  * of thread group is obsolete. It should be rare for new applications to create
- * thread groups or interact with its class.
+ * thread groups or interact with this API.
  *
  * @since   1.0
  */
