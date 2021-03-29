@@ -81,6 +81,7 @@ public class TestThreadEndEvent {
         RecordedThread t = event.getThread();
         Asserts.assertEquals(event.getThread("thread").getJavaName(), thread.getName());
         Asserts.assertEquals(t.getThreadGroup().getName(), LatchedThread.THREAD_GROUP.getName());
+        Asserts.assertEquals(t.isVirtual(), false);
     }
 
     private static RecordedEvent findEventByThreadName(List<RecordedEvent> events, String name) {

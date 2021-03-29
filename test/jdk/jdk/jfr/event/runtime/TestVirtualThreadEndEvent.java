@@ -38,28 +38,30 @@ import jdk.test.lib.jfr.Events;
  * @requires vm.hasJFR
  * @library /test/lib
  * @build jdk.jfr.event.runtime.LatchedThread
- * @run main/othervm jdk.jfr.event.runtime.TestThreadStartEvent
+ * @run main/othervm jdk.jfr.event.runtime.TestVirtualThreadEndEvent
  */
-public class TestThreadStartEvent {
-    private final static String EVENT_NAME_THREAD_START = EventNames.ThreadStart;
+public class TestVirtualThreadEndEvent {
+    private final static String EVENT_NAME_THREAD_END = EventNames.ThreadEnd;
 
     public static void main(String[] args) throws Throwable {
         try (Recording recording = new Recording()) {
-            recording.enable(EVENT_NAME_THREAD_START);
+            recording.enable(EVENT_NAME_THREAD_END);
 
-            // Start a thread before recording
-            LatchedThread beforeThread = new LatchedThread("Before Thread");
+            LatchedThread beforeThread = new LatchedThread("Before Thread", true);
             beforeThread.start();
             beforeThread.awaitStarted();
             recording.start();
 
-            // Start and end a thread during recording
-            LatchedThread duringThread = new LatchedThread("During Thread");
+            // End an already running thread
+            beforeThread.stopAndJoin();
+
+            // End a thread that is started during recording
+            LatchedThread duringThread = new LatchedThread("During Thread", true);
             duringThread.start();
             duringThread.stopAndJoin();
 
             // Start a thread and end it after the recording has stopped
-            LatchedThread afterThread = new LatchedThread("After Thread");
+            LatchedThread afterThread = new LatchedThread("After Thread", true);
             afterThread.start();
             afterThread.awaitStarted();
 
@@ -67,9 +69,9 @@ public class TestThreadStartEvent {
             afterThread.stopAndJoin();
 
             List<RecordedEvent> events = Events.fromRecording(recording);
+            assertEvent(events, beforeThread);
             assertEvent(events, duringThread);
-            assertEvent(events, afterThread);
-            Asserts.assertNull(findEventByThreadName(events, beforeThread.getName()));
+            Asserts.assertNull(findEventByThreadName(events, afterThread.getName()));
         }
     }
 
@@ -77,12 +79,8 @@ public class TestThreadStartEvent {
         RecordedEvent event = findEventByThreadName(events, thread.getName());
         System.out.println(event);
         RecordedThread t = event.getThread();
-        Thread current = Thread.currentThread();
-        Events.assertFrame(event, TestThreadStartEvent.class, "main");
         Asserts.assertEquals(event.getThread("thread").getJavaName(), thread.getName());
-        Asserts.assertEquals(event.getThread("parentThread").getJavaName(), current.getName());
-        Asserts.assertEquals(t.getThreadGroup().getName(), LatchedThread.THREAD_GROUP.getName());
-        Asserts.assertEquals(t.isVirtual(), false);
+        Asserts.assertEquals(t.isVirtual(), true);
     }
 
     private static RecordedEvent findEventByThreadName(List<RecordedEvent> events, String name) {
