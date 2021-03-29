@@ -1154,6 +1154,8 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline oop cont(oop ref);
   static inline void set_cont(oop ref, oop value);
   template<typename P>
+  static inline oop cont_raw(oop ref);
+  template<typename P>
   static inline void set_cont_raw(oop ref, oop value);
 };
 

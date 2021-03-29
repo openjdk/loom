@@ -1290,6 +1290,9 @@ void frame::interpreter_frame_verify_monitor(BasicObjectLock* value) const {
 
 #ifndef PRODUCT
 
+// Returns true iff the address p is readable and *(intptr_t*)p != errvalue
+extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
+
 class FrameValuesOopClosure: public OopClosure, public DerivedOopClosure {
 private:
   FrameValues& _values;
@@ -1297,7 +1300,7 @@ private:
 public:
   FrameValuesOopClosure(FrameValues& values, int frame_no) : _values(values), _frame_no(frame_no) {}
   virtual void do_oop(oop* p) {
-    bool good = Universe::heap()->is_in_or_null(*p) && oopDesc::is_oop_or_null(*p);
+    bool good = *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && Universe::heap()->is_in_or_null(*p) && oopDesc::is_oop_or_null(*p));
     _values.describe(_frame_no, (intptr_t*)p, err_msg("oop%s for #%d", good ? "" : " (BAD)", _frame_no)); 
   }
   virtual void do_oop(narrowOop* p) { _values.describe(_frame_no, (intptr_t*)p, err_msg("narrow oop for #%d", _frame_no)); }

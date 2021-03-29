@@ -39,6 +39,7 @@
 #include "oops/oop.inline.hpp"
 #include "oops/stackChunkOop.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/handles.inline.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
@@ -926,6 +927,7 @@ public:
 
     if (f.is_compiled()) f.handle_deopted(); // because of deopt in thaw; TODO: remove when changing deoptimization
 
+    // For unload method debugging
     // tty->print_cr(">>>> OopOopIterateStackClosure::do_frame is_compiled: %d return_barrier: %d pc: %p", f.is_compiled(), Continuation::is_return_barrier_entry(f.pc()), f.pc()); f.print_on(tty);
     // if (f.is_compiled()) tty->print_cr(">>>> OopOopIterateStackClosure::do_frame nmethod: %p method: %p", f.cb()->as_nmethod(), f.cb()->as_compiled_method()->method());
 

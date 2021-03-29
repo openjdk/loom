@@ -24,6 +24,7 @@
 
 #include "oops/instanceStackChunkKlass.hpp"
 #include "memory/resourceArea.hpp"
+#include "oops/oopsHierarchy.hpp"
 #include "precompiled.hpp"
 #include "code/scopeDesc.hpp"
 #include "classfile/javaClasses.inline.hpp"
@@ -39,6 +40,7 @@
 #include "oops/oop.inline.hpp"
 #include "oops/symbol.hpp"
 #include "runtime/continuation.hpp"
+#include "runtime/globals.hpp"
 #include "utilities/macros.hpp"
 
 int InstanceStackChunkKlass::_offset_of_stack = 0;
@@ -407,6 +409,10 @@ static inline oop safe_load(P *addr) {
   return obj;
 }
 
+// Returns true iff the address p is readable and *(intptr_t*)p != errvalue
+extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
+static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass(); }
+
 class StackChunkVerifyOopsClosure : public OopClosure {
   intptr_t* _sp;
   int _count;
@@ -421,7 +427,7 @@ public:
     _count++;
     oop obj = safe_load(p);
     if (!SafepointSynchronize::is_at_safepoint()) {
-      assert (oopDesc::is_oop_or_null(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
+      assert (obj == nullptr || is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     }
   }
 };
@@ -431,6 +437,7 @@ public:
   virtual void do_derived_oop(oop *base_loc, oop *derived_loc) override {
     log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
     oop base = *(oop*)base_loc; // (oop)NativeAccess<>::oop_load((oop*)base_loc); // 
+    assert (base == nullptr || is_good_oop(base), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(base_loc), p2i((oopDesc*)base));
     if (base != (oop)nullptr) {
       assert (!CompressedOops::is_base(base), "");
       assert (oopDesc::is_oop(base), "");
@@ -522,7 +529,6 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
 
-  oop cont = chunk->cont();
   log_develop_trace(jvmcont)("debug_verify_stack_chunk barriers: %d", chunk->requires_barriers());
   // chunk->print_on(true, tty);
 
@@ -574,15 +580,6 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
     assert (chunk->argsize() == 0, "");
   }
   assert (closure._num_interpreted_frames == 0 || chunk->has_mixed_frames(), "");
-
-  if (cont == (oop)nullptr || is_last) {
-    if (cont != (oop)nullptr) {
-      assert (chunk->argsize() == 0, "");
-    } else {
-      // closure._size += chunk->argsize();
-      closure._sp += closure._cb != nullptr ? ((closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord) : 0;
-    }
-  }
 
   if (!concurrent) {
     assert (closure._size <= size + chunk->argsize() + metadata_words(), "size: %d argsize: %d closure.size: %d end sp: %ld start sp: %d chunk size: %d", size, chunk->argsize(), closure._size, closure._sp - chunk->start_address(), chunk->sp(), chunk->stack_size());

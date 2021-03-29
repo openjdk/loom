@@ -249,6 +249,12 @@ inline oop jdk_internal_misc_StackChunk::cont(oop ref) {
 inline void jdk_internal_misc_StackChunk::set_cont(oop ref, oop value) {
   ref->obj_field_put(_cont_offset, value);
 }
+
+template<typename P>
+inline oop jdk_internal_misc_StackChunk::cont_raw(oop ref) {
+  return (oop)RawAccess<>::oop_load((P*)ref->field_addr(_cont_offset));
+}
+
 template<typename P>
 inline void jdk_internal_misc_StackChunk::set_cont_raw(oop ref, oop value) {
   RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr(_cont_offset), value);

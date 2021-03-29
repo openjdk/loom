@@ -1464,11 +1464,6 @@ public:
   }
 
   NOINLINE freeze_result recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
-    // ResourceMark rm;
-    // InterpreterOopMap mask;
-    // f.interpreted_frame_oop_map(&mask);
-    // int oops = Interpreted::num_oops(f, &mask);
-
     { // TODO PD
       assert ((f.at<false>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
       intptr_t* real_unextended_sp = (intptr_t*)f.at<false>(frame::interpreter_frame_last_sp_offset);
@@ -2174,8 +2169,9 @@ inline bool can_thaw_fast() {
     assert (chunk != nullptr && !chunk->is_empty(), ""); // guaranteed by prepare_thaw
 
     if (UNLIKELY(should_fix(chunk))) {
+      log_develop_debug(jvmcont)("prepare_chunk fixing chunk");
       InstanceStackChunkKlass::fix_chunk(chunk);
-    }
+    } else log_develop_debug(jvmcont)("prepare_chunk not fixing chunk");
 
     assert (verify_stack_chunk<1>(chunk), "");
     return chunk;
@@ -2416,7 +2412,7 @@ inline bool can_thaw_fast() {
     OopT* loc = obj->obj_field_addr<OopT>(offset);
     intptr_t before = *(intptr_t*)loc;
     intptr_t after = cast_from_oop<intptr_t>(HeapAccess<>::oop_load(loc));
-    // tty->print_cr("!oop_fixed %d", before != after);
+    // tty->print_cr("!oop_fixed %d: " INTPTR_FORMAT " -> " INTPTR_FORMAT, before != after, before, after);
     return before == after;
   }
 
@@ -2858,7 +2854,7 @@ bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChun
   StackFrameStream fst(thread, true, false);
   fst.register_map()->set_include_argument_oops(false);
   ContinuationHelper::update_register_map_with_callee(fst.register_map(), *fst.current());
-  for (; !fst.is_done(); fst.next()) {
+  for (; !fst.is_done() && !Continuation::is_continuation_enterSpecial(*fst.current()); fst.next()) {
     if (fst.current()->cb()->is_compiled() && fst.current()->cb()->as_compiled_method()->is_marked_for_deoptimization()) {
       tty->print_cr(">>> do_verify_after_thaw deopt");
       fst.current()->deoptimize(nullptr);
@@ -2869,7 +2865,7 @@ bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChun
     if (cl.p() != nullptr) {
 
       frame fr = *fst.current();
-      tty->print_cr("Failed for frame %d, pc: %p, sp: %p, fp: %p; mode: %d barriers: %d", i, fr.pc(), fr.unextended_sp(), fr.fp(), mode, barriers);
+      tty->print_cr("Failed for frame %d, pc: %p, sp: %p, fp: %p; mode: %d barriers: %d %d", i, fr.pc(), fr.unextended_sp(), fr.fp(), mode, barriers, chunk->requires_barriers());
       if (!fr.is_interpreted_frame()) {
         tty->print_cr("size: %d argsize: %d", NonInterpretedUnknown::size(fr), NonInterpretedUnknown::stack_argsize(fr));
       }
