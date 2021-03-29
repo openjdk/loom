@@ -66,9 +66,6 @@ inline stackChunkOopDesc* stackChunkOopDesc::parent() const         { return (st
 inline void stackChunkOopDesc::set_parent(stackChunkOopDesc* value) { jdk_internal_misc_StackChunk::set_parent(this, (oop)value); }
 template<typename P> inline void stackChunkOopDesc::set_parent_raw(oop value) { jdk_internal_misc_StackChunk::set_parent_raw<P>(this, value); }
 template<typename P> inline bool stackChunkOopDesc::is_parent_null() const    { return jdk_internal_misc_StackChunk::is_parent_null<P>(const_cast<stackChunkOopDesc*>(this)); }
-inline oop stackChunkOopDesc::cont() const               { return jdk_internal_misc_StackChunk::cont(const_cast<stackChunkOopDesc*>(this)); }
-inline void stackChunkOopDesc::set_cont(oop value)       { jdk_internal_misc_StackChunk::set_cont(this, value); }
-template<typename P> inline void stackChunkOopDesc::set_cont_raw(oop value)   { jdk_internal_misc_StackChunk::set_cont_raw<P>(this, value); }
 inline int stackChunkOopDesc::stack_size() const         { return jdk_internal_misc_StackChunk::size(const_cast<stackChunkOopDesc*>(this)); }
 inline int stackChunkOopDesc::sp() const                 { return jdk_internal_misc_StackChunk::sp(const_cast<stackChunkOopDesc*>(this)); }
 inline void stackChunkOopDesc::set_sp(int value)         { jdk_internal_misc_StackChunk::set_sp(this, value); }
@@ -76,8 +73,8 @@ inline address stackChunkOopDesc::pc() const             { return (address)jdk_i
 inline void stackChunkOopDesc::set_pc(address value)     { jdk_internal_misc_StackChunk::set_pc(this, (jlong)value); }
 inline int stackChunkOopDesc::argsize() const            { return jdk_internal_misc_StackChunk::argsize(const_cast<stackChunkOopDesc*>(this)); }
 inline void stackChunkOopDesc::set_argsize(int value)    { jdk_internal_misc_StackChunk::set_argsize(const_cast<stackChunkOopDesc*>(this), value); }
-inline uint8_t stackChunkOopDesc::flags() const         { return (uint8_t)jdk_internal_misc_StackChunk::flags(const_cast<stackChunkOopDesc*>(this)); }
-inline void stackChunkOopDesc::set_flags(uint8_t value) { jdk_internal_misc_StackChunk::set_flags(this, (jbyte)value); }
+inline uint8_t stackChunkOopDesc::flags() const          { return (uint8_t)jdk_internal_misc_StackChunk::flags(const_cast<stackChunkOopDesc*>(this)); }
+inline void stackChunkOopDesc::set_flags(uint8_t value)  { jdk_internal_misc_StackChunk::set_flags(this, (jbyte)value); }
 inline int stackChunkOopDesc::max_size() const           { return (int)jdk_internal_misc_StackChunk::maxSize(const_cast<stackChunkOopDesc*>(this)); }
 inline void stackChunkOopDesc::set_max_size(int value)   { jdk_internal_misc_StackChunk::set_maxSize(this, (jint)value); }
 inline int stackChunkOopDesc::numFrames() const          { return jdk_internal_misc_StackChunk::numFrames(const_cast<stackChunkOopDesc*>(this)); }
@@ -90,6 +87,16 @@ inline int stackChunkOopDesc::gc_sp() const              { return jdk_internal_m
 inline void stackChunkOopDesc::set_gc_sp(int value)      { jdk_internal_misc_StackChunk::set_gc_sp(this, value); }
 inline uint64_t stackChunkOopDesc::mark_cycle() const         { return (uint64_t)jdk_internal_misc_StackChunk::mark_cycle(const_cast<stackChunkOopDesc*>(this)); }
 inline void stackChunkOopDesc::set_mark_cycle(uint64_t value) { jdk_internal_misc_StackChunk::set_mark_cycle(this, (jlong)value); }
+
+inline void stackChunkOopDesc::set_cont(oop value) { jdk_internal_misc_StackChunk::set_cont(this, value); }
+template<typename P> inline void stackChunkOopDesc::set_cont_raw(oop value)   { jdk_internal_misc_StackChunk::set_cont_raw<P>(this, value); }
+inline oop stackChunkOopDesc::cont() const  { return UseCompressedOops ? cont<narrowOop>() : cont<oop>(); /* jdk_internal_misc_StackChunk::cont(const_cast<stackChunkOopDesc*>(this)); */ }
+template<typename P> inline oop stackChunkOopDesc::cont() const { 
+  // this is a special field used to detect GC processing status (see should_fix) and so we don't want to invoke a barrier directly on it
+  oop obj = jdk_internal_misc_StackChunk::cont_raw<P>(const_cast<stackChunkOopDesc*>(this)); 
+  obj = (oop)NativeAccess<>::oop_load(&obj);
+  return obj;
+}
 
 inline int stackChunkOopDesc::end() const { return stack_size() - argsize(); }
 

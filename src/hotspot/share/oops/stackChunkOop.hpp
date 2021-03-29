@@ -53,10 +53,6 @@ public:
   template<typename P>
   inline bool is_parent_null() const;
   inline int stack_size() const;
-  inline oop cont() const;
-  inline void set_cont(oop value);
-  template<typename P>
-  inline void set_cont_raw(oop value);
   inline int sp() const;
   inline void set_sp(int value);
   inline address pc() const;
@@ -77,6 +73,12 @@ public:
   inline void set_gc_sp(int value);
   inline uint64_t mark_cycle() const;
   inline void set_mark_cycle(uint64_t value);
+
+  inline oop cont() const;
+  template<typename P> inline oop cont() const;
+  inline void set_cont(oop value);
+  template<typename P>
+  inline void set_cont_raw(oop value);
 
   inline bool is_empty() const;
   inline int end() const;
