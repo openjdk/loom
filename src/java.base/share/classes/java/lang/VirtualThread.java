@@ -299,7 +299,7 @@ class VirtualThread extends Thread {
             // unmount
             if (notifyJvmti) notifyJvmtiUnmountBegin();
             unmount();
-            if (notifyJvmti) notifyJvmtiUnmountEnd();
+            if (notifyJvmti) notifyJvmtiUnmountEnd(false); // no keep_hiding
         }
     }
 
@@ -360,7 +360,7 @@ class VirtualThread extends Thread {
         // unmount
         if (notifyJvmti) notifyJvmtiUnmountBegin();
         unmount();
-        if (notifyJvmti) notifyJvmtiUnmountEnd();
+        if (notifyJvmti) notifyJvmtiUnmountEnd(true); // keep_hiding
 
         boolean yielded = false;
         try {
@@ -944,7 +944,7 @@ class VirtualThread extends Thread {
     private native void notifyJvmtiUnmountBegin();
 
     @JvmtiMountTransition
-    private native void notifyJvmtiUnmountEnd();
+    private native void notifyJvmtiUnmountEnd(boolean keep_hiding);
 
     private native void notifyJvmtiTerminated();
 

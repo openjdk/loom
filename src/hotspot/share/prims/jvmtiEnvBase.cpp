@@ -623,7 +623,12 @@ JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
       jvf = jvf->java_sender(); // skip annotated method
       break;
     }
+    if (jvf->method()->changes_current_thread()) {
+      break;
+    }
+    // skip frame above annotated method
   }
+  assert(jvf != NULL, "VTMT sanity check");
   return jvf;
 }
 

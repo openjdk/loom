@@ -1670,6 +1670,17 @@ int early_return(int res, JavaThread* thread) {
   return res;
 }
 
+static void JVMTI_yield_VTMT_cleanup(JavaThread* thread) {
+  // this is to hide JVMTI events when in VTMT transition
+  oop vt_oop = thread->vthread();
+  JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vt_oop);
+  assert(state == NULL || !state->is_in_VTMT(), "VTMT sanity check");
+  if (state != NULL && state->is_virtual()) {
+    state->set_is_in_VTMT(thread->is_in_VTMT());
+  }
+  thread->set_is_in_VTMT(false);
+}
+
 static void invalidate_JVMTI_stack(JavaThread* thread) {
   if (thread->is_interp_only_mode()) {
     JvmtiThreadState *jvmti_state = thread->jvmti_thread_state();
@@ -1805,6 +1816,8 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
+
+  JVMTI_yield_VTMT_cleanup(thread);
 
   if (java_lang_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
@@ -2726,6 +2739,14 @@ inline bool can_thaw_fast() {
   }
 
   static void JVMTI_continue_cleanup(JavaThread* thread) {
+    // this is to hide JVMTI events when in VTMT transition
+    oop vt_oop = thread->vthread();
+    JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vt_oop);
+    assert(!thread->is_in_VTMT(), "VTMT sanity check");
+    if (state != NULL && state->is_virtual()) {
+      thread->set_is_in_VTMT(state->is_in_VTMT());
+      state->set_is_in_VTMT(false);
+    }
     invalidate_JVMTI_stack(thread);
   }
 };

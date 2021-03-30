@@ -1132,7 +1132,7 @@ JNIEXPORT void JNICALL
 JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread);
+JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean keep_hiding);
 
 JNIEXPORT void JNICALL
 JVM_VirtualThreadTerminated(JNIEnv* env, jobject vthread);

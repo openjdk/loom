@@ -34,9 +34,9 @@
 static JNINativeMethod methods[] = {
     { "notifyJvmtiMountBegin",   "(Z)V", (void *)&JVM_VirtualThreadMountBegin },
     { "notifyJvmtiMountEnd",     "(Z)V", (void *)&JVM_VirtualThreadMountEnd },
-    { "notifyJvmtiUnmountBegin", "()V", (void *)&JVM_VirtualThreadUnmountBegin },
-    { "notifyJvmtiUnmountEnd",   "()V", (void *)&JVM_VirtualThreadUnmountEnd },
-    { "notifyJvmtiTerminated",   "()V", (void *)&JVM_VirtualThreadTerminated },
+    { "notifyJvmtiUnmountBegin", "()V",  (void *)&JVM_VirtualThreadUnmountBegin },
+    { "notifyJvmtiUnmountEnd",   "(Z)V", (void *)&JVM_VirtualThreadUnmountEnd },
+    { "notifyJvmtiTerminated",   "()V",  (void *)&JVM_VirtualThreadTerminated },
 };
 
 JNIEXPORT void JNICALL
