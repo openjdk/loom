@@ -630,15 +630,12 @@ void StackChunkFrameStream<mixed>::handle_deopted() const {
 
   if (_oopmap != nullptr) return;
   if (mixed && is_interpreted()) return;
-  
   assert (is_compiled(), "");
 
   address pc1 = pc();
   int oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
   if (UNLIKELY(oopmap_slot < 0)) { // we could have marked frames for deoptimization in thaw_chunk
-    // tty->print_cr(">>>> handle_deopted: deopted");
-    CompiledMethod* cm = cb()->as_compiled_method();
-    if (cm->is_deopt_pc(pc1)) {
+    if (cb()->as_compiled_method()->is_deopt_pc(pc1)) {
       pc1 = orig_pc();
       oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
     }
