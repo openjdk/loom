@@ -53,8 +53,6 @@
 #include "utilities/macros.hpp"
 #include "crc32c.h"
 
-#include "runtime/continuation.hpp" // TODO LOOM remove after testing CONT_DOUBLE_NOP
-
 #ifdef PRODUCT
 #define BLOCK_COMMENT(str) /* nothing */
 #define STOP(error) stop(error)
@@ -2006,13 +2004,6 @@ void MacroAssembler::post_call_nop() {
   emit_int8((int8_t)0x84);
   emit_int8((int8_t)0x00);
   emit_int32(0x00);
-#ifdef CONT_DOUBLE_NOP
-  emit_int8((int8_t)0x0f);
-  emit_int8((int8_t)0x1f);
-  emit_int8((int8_t)0x84);
-  emit_int8((int8_t)0x00);
-  emit_int32(0x00);
-#endif
 }
 
 // A 5 byte nop that is safe for patching (see patch_verified_entry)

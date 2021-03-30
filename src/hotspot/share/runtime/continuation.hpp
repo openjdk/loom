@@ -32,8 +32,6 @@
 #include "runtime/globals.hpp"
 #include "jni.h"
 
-// #define CONT_DOUBLE_NOP 1
-
 // The order of this struct matters as it's directly manipulated by assembly code (push/pop)
 
 class ContinuationEntry;
