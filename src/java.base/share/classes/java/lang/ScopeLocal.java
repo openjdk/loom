@@ -133,9 +133,11 @@ public final class ScopeLocal<T> {
                         return value;
                     }
                 } else if (b instanceof MultiBinding split) {
-                    var value = split.bindings.find(key);
-                    if (value != NIL) {
-                        return value;
+                    if (((1 << Cache.primaryIndex(key)) & split.primaryBits) != 0) {
+                        var value = split.bindings.find(key);
+                        if (value != NIL) {
+                            return value;
+                        }
                     }
                 } else {
                     throw new RuntimeException("impossible");
@@ -197,10 +199,12 @@ public final class ScopeLocal<T> {
     // keys and values. The key-value bindings form a linked list.
     static final class MultiBinding extends Snapshot {
         final SingleBinding bindings;
+        final short primaryBits;
 
-        MultiBinding(SingleBinding bindings, Snapshot prev) {
+        MultiBinding(SingleBinding bindings, Snapshot prev, short primaryBits) {
             super(prev);
             this.bindings = bindings;
+            this.primaryBits = primaryBits;
         }
     }
 
@@ -208,10 +212,31 @@ public final class ScopeLocal<T> {
      * TBD
      */
     public static class BoundValues {
-        SingleBinding inheritables, nonInheritables;
+        // Bit masks: a 1 in postion n indicates that this set of bound values
+        // hits that slot in the cache
+        final short primaryBits, secondaryBits;
+        final SingleBinding inheritables, nonInheritables;
 
-        BoundValues() {
-        }  // Non-public default constructor
+       BoundValues(SingleBinding inheritables, SingleBinding nonInheritables, short primaryBits, short secondaryBits) {
+            this.inheritables = inheritables;
+            this.nonInheritables = nonInheritables;
+            this.primaryBits = primaryBits;
+            this.secondaryBits = secondaryBits;
+        }
+
+        // Single-element factory method
+        static <T> BoundValues of(ScopeLocal<T> key, T value) {
+            SingleBinding inheritables = null;
+            SingleBinding nonInheritables = null;
+            if (key.isInheritable) {
+                inheritables = new SingleBinding(key, value, null);
+            } else {
+                nonInheritables = new SingleBinding(key, value, null);
+            }
+            short primaryBits = (short)(1 << Cache.primaryIndex(key));
+            short secondaryBits = (short)(1 << Cache.secondaryIndex(key));
+            return new BoundValues(inheritables, nonInheritables, primaryBits, secondaryBits);
+        }
 
         /**
          * @param key   TBD
@@ -220,27 +245,31 @@ public final class ScopeLocal<T> {
          * @return TBD
          */
         public <T> BoundValues set(ScopeLocal<T> key, T value) {
+            var inheritables = this.inheritables;
+            var nonInheritables = this.inheritables;
             if (key.isInheritable) {
-                inheritables = new SingleBinding(key, value, inheritables);
+                inheritables = new SingleBinding(key, value, this.inheritables);
             } else {
-                nonInheritables = new SingleBinding(key, value, nonInheritables);
+                nonInheritables = new SingleBinding(key, value, this.nonInheritables);
             }
-            return this;
+            short primaryBits = (short)(this.primaryBits | (1 << Cache.primaryIndex(key)));
+            short secondaryBits = (short)(this.secondaryBits | (1 << Cache.secondaryIndex(key)));
+            return new BoundValues(inheritables, nonInheritables, primaryBits, secondaryBits);
         }
 
-        private Snapshot setScopeLocalBindings(SingleBinding bindings, boolean isInheritable) {
+        private Snapshot setScopeLocalBindings(SingleBinding bindings, short primaryBits, boolean isInheritable) {
             Thread currentThread = Thread.currentThread();
             Snapshot prev;
             if (isInheritable) {
                 prev = currentThread.inheritableScopeLocalBindings;
                 if (bindings != null) {
-                    var b = new MultiBinding(bindings, prev);
+                    var b = new MultiBinding(bindings, prev, primaryBits);
                     currentThread.inheritableScopeLocalBindings = b;
                 }
             } else {
                 prev = currentThread.noninheritableScopeLocalBindings;
                 if (bindings != null) {
-                    var b = new MultiBinding(bindings, prev);
+                    var b = new MultiBinding(bindings, prev, primaryBits);
                     currentThread.noninheritableScopeLocalBindings = b;
                 }
             }
@@ -260,16 +289,16 @@ public final class ScopeLocal<T> {
          */
         public <R> R in(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
-            Cache.invalidate();  // FIXME: Horribly crude. Do something better.
-            var p1 = setScopeLocalBindings(this.inheritables, true);
-            var p2 = setScopeLocalBindings(this.nonInheritables, false);
+            Cache.invalidate(primaryBits | secondaryBits);
+            var p1 = setScopeLocalBindings(this.inheritables, primaryBits,true);
+            var p2 = setScopeLocalBindings(this.nonInheritables, primaryBits,false);
             try {
                 return op.call();
             } finally {
                 Thread currentThread = Thread.currentThread();
                 currentThread.noninheritableScopeLocalBindings = p2;
                 currentThread.inheritableScopeLocalBindings = p1;
-                Cache.invalidate();
+                Cache.invalidate(primaryBits | secondaryBits);
             }
         }
 
@@ -286,16 +315,16 @@ public final class ScopeLocal<T> {
          */
         public void in(Runnable op) {
             Objects.requireNonNull(op);
-            ScopeLocal.Cache.invalidate();  // FIXME: Horribly crude. Do something better.
-            var p1 = setScopeLocalBindings(this.inheritables, true);
-            var p2 = setScopeLocalBindings(this.nonInheritables, false);
+            Cache.invalidate(primaryBits | secondaryBits);
+            var p1 = setScopeLocalBindings(this.inheritables, primaryBits,true);
+            var p2 = setScopeLocalBindings(this.nonInheritables, primaryBits,false);
             try {
                 op.run();
             } finally {
                 Thread currentThread = Thread.currentThread();
                 currentThread.noninheritableScopeLocalBindings = p2;
                 currentThread.inheritableScopeLocalBindings = p1;
-                ScopeLocal.Cache.invalidate();
+                Cache.invalidate(primaryBits | secondaryBits);
             }
         }
     }
@@ -309,7 +338,7 @@ public final class ScopeLocal<T> {
      * @return TBD
      */
     public static <T> BoundValues set(ScopeLocal<T> key, T value) {
-        return new BoundValues().set(key, value);
+        return BoundValues.of(key, value);
     }
 
     /**
@@ -562,6 +591,14 @@ public final class ScopeLocal<T> {
         static final int TABLE_SIZE = 1 << INDEX_BITS;
         static final int TABLE_MASK = TABLE_SIZE - 1;
 
+        static final int primaryIndex(ScopeLocal<?> key) {
+            return key.hash & TABLE_MASK;
+        }
+
+        static final int secondaryIndex(ScopeLocal<?> key) {
+            return (key.hash >> INDEX_BITS) & TABLE_MASK;
+        }
+
         static void put(ScopeLocal<?> key, Object value) {
             Object[] theCache = Thread.scopeLocalCache();
             if (theCache == null) {
@@ -572,9 +609,8 @@ public final class ScopeLocal<T> {
             // Each value can be in one of two possible places in the cache.
             // Pick a victim at (pseudo-)random.
             Thread thread = Thread.currentThread();
-            int hash = key.hashCode();
-            int k1 = hash & TABLE_MASK;
-            int k2 = (hash >> INDEX_BITS) & TABLE_MASK;
+            int k1 = primaryIndex(key);
+            int k2 = secondaryIndex(key);
             int tmp = chooseVictim(thread);
             int victim = tmp == 0 ? k1 : k2;
             int other = tmp == 0 ? k2 : k1;
@@ -587,7 +623,6 @@ public final class ScopeLocal<T> {
         private static final void update(Object key, Object value) {
             Object[] objects;
             if ((objects = Thread.scopeLocalCache()) != null) {
-
                 int k1 = key.hashCode() & TABLE_MASK;
                 if (getKey(objects, k1) == key) {
                     setKeyAndObjectAt(k1, key, value);
@@ -602,7 +637,6 @@ public final class ScopeLocal<T> {
         private static final void remove(Object key) {
             Object[] objects;
             if ((objects = Thread.scopeLocalCache()) != null) {
-
                 int k1 = key.hashCode() & TABLE_MASK;
                 if (getKey(objects, k1) == key) {
                     setKeyAndObjectAt(k1, null, null);
@@ -637,6 +671,20 @@ public final class ScopeLocal<T> {
 
         public static void invalidate() {
             Thread.setScopeLocalCache(null);
+        }
+
+        // Null a set of cache entries, indicated by the 1-bits given
+        static void invalidate(int toClearBits) {
+            assert(toClearBits == (short)toClearBits);
+            Object[] objects;
+            if ((objects = Thread.scopeLocalCache()) != null) {
+                for (short bits = (short)toClearBits;
+                     bits != 0; ) {
+                    int index = Integer.numberOfTrailingZeros(bits);
+                    setKey(objects, index, null);
+                    bits &= ~1 << index;
+                }
+            }
         }
     }
 
