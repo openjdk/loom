@@ -287,7 +287,7 @@ class VirtualThread extends Thread {
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // mount
-        if (notifyJvmti) notifyJvmtiMountBegin(true);
+        if (notifyJvmti) notifyJvmtiMountBegin();
         mount();
         if (notifyJvmti) notifyJvmtiMountEnd(true);
 
@@ -299,7 +299,7 @@ class VirtualThread extends Thread {
             // unmount
             if (notifyJvmti) notifyJvmtiUnmountBegin();
             unmount();
-            if (notifyJvmti) notifyJvmtiUnmountEnd(false); // no keep_hiding
+            if (notifyJvmti) notifyJvmtiUnmountEnd(true);
         }
     }
 
@@ -360,7 +360,7 @@ class VirtualThread extends Thread {
         // unmount
         if (notifyJvmti) notifyJvmtiUnmountBegin();
         unmount();
-        if (notifyJvmti) notifyJvmtiUnmountEnd(true); // keep_hiding
+        if (notifyJvmti) notifyJvmtiUnmountEnd(false);
 
         boolean yielded = false;
         try {
@@ -368,7 +368,7 @@ class VirtualThread extends Thread {
         } finally {
 
             // mount
-            if (notifyJvmti) notifyJvmtiMountBegin(false);
+            if (notifyJvmti) notifyJvmtiMountBegin();
             mount();
             if (notifyJvmti) notifyJvmtiMountEnd(false);
 
@@ -935,7 +935,7 @@ class VirtualThread extends Thread {
     private static volatile boolean notifyJvmtiEvents;  // set by VM
 
     @JvmtiMountTransition
-    private native void notifyJvmtiMountBegin(boolean firstMount);
+    private native void notifyJvmtiMountBegin();
 
     @JvmtiMountTransition
     private native void notifyJvmtiMountEnd(boolean firstMount);
@@ -944,7 +944,7 @@ class VirtualThread extends Thread {
     private native void notifyJvmtiUnmountBegin();
 
     @JvmtiMountTransition
-    private native void notifyJvmtiUnmountEnd(boolean keep_hiding);
+    private native void notifyJvmtiUnmountEnd(boolean lastMount);
 
     private native void notifyJvmtiTerminated();
 

@@ -1123,7 +1123,7 @@ JVM_GetEnclosingMethodInfo(JNIEnv* env, jclass ofClass);
 /* Virtual thread support.
  */
 JNIEXPORT void JNICALL
-JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount);
+JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread);
 
 JNIEXPORT void JNICALL
 JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount);
@@ -1132,7 +1132,7 @@ JNIEXPORT void JNICALL
 JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean keep_hiding);
+JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean last_mount);
 
 JNIEXPORT void JNICALL
 JVM_VirtualThreadTerminated(JNIEnv* env, jobject vthread);
