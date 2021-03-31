@@ -1423,23 +1423,6 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Creates a platform thread to execute a task and schedules it to execute.
-     *
-     * <p> This method is equivalent to:
-     * <pre>{@code Thread.ofPlatform().start(task); }</pre>
-     *
-     * @param task the object to run when the thread executes
-     * @return a new, and started, platform thread
-     * @see <a href="#inheritance">Inheritance</a>
-     * @since 99
-     */
-    public static Thread startPlatformThread(Runnable task) {
-        var thread = new Thread(Objects.requireNonNull(task));
-        thread.start();
-        return thread;
-    }
-
-    /**
      * Creates a virtual thread to execute a task and schedules it to execute.
      *
      * <p> The thread has no {@link Permission permissions}.
