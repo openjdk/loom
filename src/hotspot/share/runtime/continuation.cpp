@@ -2155,11 +2155,12 @@ public:
     assert (!chunk->is_empty(), "");
     assert (!chunk->has_mixed_frames(), "");
     assert (!chunk->requires_barriers(), "");
- 
-    static const int threshold = 500; // words
+    assert (!_thread->is_interp_only_mode(), "");
 
     log_develop_trace(jvmcont)("thaw_fast");
     if (log_develop_is_enabled(Debug, jvmcont)) chunk->print_on(true, tty);
+
+    static const int threshold = 500; // words
 
     int sp = chunk->sp();
     int size = chunk->stack_size() - sp;
@@ -2314,7 +2315,6 @@ public:
     int num_frames = (return_barrier ? 1 : 2);
 
     log_develop_trace(jvmcont)("thaw slow");
-    assert (!_thread->is_interp_only_mode(), "");
 
     bool last_interpreted = false;
     if (chunk->has_mixed_frames()) {
