@@ -301,7 +301,8 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, intptr_
     return frame(vsp, vsp, fp, hf.pc());
   } else {
     assert (hf.cb() != nullptr && hf.oop_map() != nullptr, "");
-    return frame(vsp, vsp, hf.fp(), hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
+    intptr_t* fp = *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
+    return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
   }
 }
 

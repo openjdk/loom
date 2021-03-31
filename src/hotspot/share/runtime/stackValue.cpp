@@ -103,6 +103,7 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
       oop val = CompressedOops::decode(value.noop);
       // Deoptimization must make sure all oops have passed load barriers
       // TODO: Erik: remove after integration with concurrent stack scanning
+      // TODO: HeapAccess when in_cont?
       val = NativeAccess<>::oop_load(&val);
       Handle h(Thread::current(), val); // Wrap a handle around the oop
       return new StackValue(h);
@@ -121,6 +122,7 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
 #endif
       // Deoptimization must make sure all oops have passed load barriers
       // TODO: Erik: remove after integration with concurrent stack scanning
+      // TODO: HeapAccess when in_cont?
       val = NativeAccess<>::oop_load(&val);
       assert(oopDesc::is_oop_or_null(val), "bad oop found at " INTPTR_FORMAT, p2i(value_addr));
       Handle h(Thread::current(), val); // Wrap a handle around the oop

@@ -94,15 +94,17 @@ public:
   inline void set_flag(uint8_t flag, bool value);
   inline void clear_flags();
   inline bool has_mixed_frames() const;
+  template <typename OopT, bool concurrent_gc> inline bool should_fix() const;
+  bool should_fix() const; // non-templatized version
   inline bool requires_barriers() const;
   inline void reset_counters();
 
   //
   bool verify(size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL) PRODUCT_RETURN_(return true;);
 
-  // template <bool mixed, typename RegisterMapT> bool do_frame(const StackChunkFrameStream<mixed>&, const RegisterMapT*, MemRegion);
+  // template <bool mixed, typename RegisterMapT> bool do_frame(const StackChunkFrameStream<mixed>&, const RegisterMapT*);
   template <class StackChunkFrameClosureType> 
-  inline void iterate_stack(StackChunkFrameClosureType* closure, MemRegion mr = MemRegion(NULL, SIZE_MAX));
+  inline void iterate_stack(StackChunkFrameClosureType* closure);
 
   // Returns a relative frame (with offset_sp, offset_unextended_sp, and offset_fp) that can be held during safepoints.
   // This is orthogonal to the relativizing of the actual content of interpreted frames.
@@ -132,7 +134,7 @@ public:
   inline frame derelativize(frame fr) const;
 
 private:
-  template <bool mixed, class StackChunkFrameClosureType> inline void iterate_stack(StackChunkFrameClosureType* closure, MemRegion mr);
+  template <bool mixed, class StackChunkFrameClosureType> inline void iterate_stack(StackChunkFrameClosureType* closure);
   inline intptr_t* relative_base() const;
 
   inline void relativize_frame(frame& fr) const;

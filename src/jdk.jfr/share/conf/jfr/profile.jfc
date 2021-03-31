@@ -143,19 +143,11 @@
       <setting name="enabled">true</setting>
     </event>
 
-    <event name="jdk.ContinuationSquash">
-      <setting name="enabled">true</setting>
-    </event>
-
     <event name="jdk.ContinuationThawYoung">
       <setting name="enabled">true</setting>
     </event>
 
     <event name="jdk.ContinuationThawOld">
-      <setting name="enabled">true</setting>
-    </event>
-
-    <event name="jdk.ContinuationFix">
       <setting name="enabled">true</setting>
     </event>
     

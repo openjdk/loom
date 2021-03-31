@@ -326,8 +326,9 @@ static StackValue* create_stack_value_from_oop_map(const RegisterMap* reg_map,
 
   // categorize using oop_mask
   if (oop_mask.is_oop(index)) {
+    oop obj = addr != NULL ? (reg_map->in_cont() ? HeapAccess<>::oop_load((oop*)addr) : *(oop*)addr) : (oop)NULL;
     // reference (oop) "r"
-    Handle h(Thread::current(), addr != NULL ? (*(oop*)addr) : (oop)NULL);
+    Handle h(Thread::current(), obj);
     return new StackValue(h);
   }
   // value (integer) "v"

@@ -136,13 +136,8 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 public:
-  template <bool store>
-  static void barriers_for_oops_in_chunk(stackChunkOop chunk);
-
   template <bool mixed, bool store, typename RegisterMapT>
-  static void barriers_for_oops_in_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
-
-  static void fix_chunk(stackChunkOop chunk);
+  static void fix_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
@@ -260,8 +255,8 @@ class StackChunkFrameStream : public StackObj {
   inline void* reg_to_loc(VMReg reg, const RegisterMapT* map) const;
 
 public:
-  template <class OopClosureType, class RegisterMapT> inline void iterate_oops(OopClosureType* closure, const RegisterMapT* map, MemRegion mr = MemRegion(NULL, SIZE_MAX)) const;
-  template <class DerivedOopClosureType, class RegisterMapT> inline void iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map, MemRegion mr = MemRegion(NULL, SIZE_MAX)) const;
+  template <class OopClosureType, class RegisterMapT> inline void iterate_oops(OopClosureType* closure, const RegisterMapT* map) const;
+  template <class DerivedOopClosureType, class RegisterMapT> inline void iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map) const;
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP

@@ -122,12 +122,6 @@
     <Field type="ulong" name="id" label="Continuation ID" />
   </Event>
 
-  <Event name="ContinuationSquash" experimental="true" category="Java Virtual Machine" label="Continuation Squash" thread="true" stackTrace="false" startTime="false">
-    <Field type="ulong" name="id" label="Continuation ID" />
-    <Field type="ushort" name="numChunks" label="Chunks" />
-    <Field type="ushort" name="numFrames" label="Frames" />
-  </Event>
-
   <Event name="ContinuationThawYoung" experimental="true" category="Java Virtual Machine" label="Continuation Thaw Young" thread="true" stackTrace="false" startTime="false">
     <Field type="ulong" name="id" label="Continuation ID" />
     <Field type="boolean" name="full" label="Full" />
@@ -136,12 +130,6 @@
 
   <Event name="ContinuationThawOld" experimental="true" category="Java Virtual Machine" label="Continuation Thaw Old" thread="true" stackTrace="false" startTime="false">
     <Field type="ulong" name="id" label="Continuation ID" />
-  </Event>
-
-  <Event name="ContinuationFix" experimental="true" category="Java Virtual Machine" label="Continuation Fix" thread="true" stackTrace="false" startTime="false">
-    <Field type="ulong" name="id" label="Continuation ID" />
-    <Field type="ushort" name="numFrames" label="Frames" />
-    <Field type="ushort" name="numOops" label="Oops" />
   </Event>
 
   <Event name="ReservedStackActivation" category="Java Virtual Machine, Runtime" label="Reserved Stack Activation"

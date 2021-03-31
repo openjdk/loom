@@ -596,10 +596,6 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
     DESCRIBE_FP_OFFSET(interpreter_frame_locals);
     DESCRIBE_FP_OFFSET(interpreter_frame_bcp);
     DESCRIBE_FP_OFFSET(interpreter_frame_initial_sp);
-  } else if (is_compiled_frame()) {
-    address ret_pc = *(address*)(real_fp() - return_addr_offset);
-    values.describe(frame_no, real_fp() - return_addr_offset, Continuation::is_return_barrier_entry(ret_pc) ? "return address (return barrier)" : "return address");
-    values.describe(-1, real_fp() - sender_sp_offset, "saved fp", 2);
 #ifdef AMD64
   } else if (is_entry_frame()) {
     // This could be more descriptive if we use the enum in
@@ -610,6 +606,18 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
     }
 #endif // AMD64
   }
+
+  if (is_java_frame()) {
+    address ret_pc = *(address*)(real_fp() - return_addr_offset);
+    values.describe(frame_no, real_fp() - return_addr_offset, Continuation::is_return_barrier_entry(ret_pc) ? "return address (return barrier)" : "return address");
+    values.describe(-1, real_fp() - sender_sp_offset, "saved fp", 2);
+  }
+}
+
+void frame::describe_top_pd(FrameValues& values) {
+  address ret_pc_callee = *(address*)(sp() - return_addr_offset);
+  values.describe(-1, sp() - return_addr_offset, Continuation::is_return_barrier_entry(ret_pc_callee) ? "return address (return barrier)" : "return address");
+  values.describe(-1, sp() - sender_sp_offset, "saved fp", 2);
 }
 #endif // !PRODUCT
 

@@ -1538,6 +1538,9 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
   describe_pd(values, frame_no);
 }
 
+void frame::describe_top(FrameValues& values) {
+  describe_top_pd(values);
+}
 #endif
 
 
@@ -1593,6 +1596,7 @@ void FrameValues::validate() {
       prev = fv;
     }
   }
+  // if (error) { tty->cr(); print_on((JavaThread*)nullptr, tty); }
   assert(!error, "invalid layout");
 }
 #endif // ASSERT

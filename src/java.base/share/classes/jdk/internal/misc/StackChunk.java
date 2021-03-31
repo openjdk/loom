@@ -30,7 +30,7 @@ public final class StackChunk {
 
     public static final byte FLAG_HAS_INTERPRETED_FRAMES = 1 << 2;
 
-    private Continuation cont;
+    private Continuation cont; // must not be accessed by Java code, as this oop's processing is essential for the chunk's GC protocol
     private StackChunk parent;
     private int size; // in words
     private int sp; // in words
@@ -48,7 +48,6 @@ public final class StackChunk {
    
    // the stack itself is appended here by the VM
 
-    public Continuation cont() { return cont; }
     public StackChunk parent() { return parent; }
     public int size()          { return size; }
     public int sp()            { return sp; }

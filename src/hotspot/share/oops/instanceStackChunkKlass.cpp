@@ -23,6 +23,7 @@
  */
 
 #include "oops/instanceStackChunkKlass.hpp"
+#include "gc/shared/gc_globals.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "precompiled.hpp"
@@ -51,17 +52,33 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
 }
 #endif
 
+bool stackChunkOopDesc::should_fix() const {
+  const bool concurrent_gc = (UseZGC || UseShenandoahGC);
+  return 
+    UseCompressedOops
+      ? (concurrent_gc ? should_fix<narrowOop, true>()
+                       : should_fix<narrowOop, false>())
+      : (concurrent_gc ? should_fix<oop,       true>()
+                       : should_fix<oop,       false>());
+}
+
+// void stackChunkOopDesc::fix_frame_if_needed(const frame& fr, const RegisterMap* map) const {
+//   if (should_fix()) {
+//     InstanceStackChunkKlass::fix_frame<true, false>(StackChunkFrameStream<true>(const_cast<stackChunkOopDesc*>(this), derelativize(fr)), map);
+//   }
+// }
+
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
   // tty->print_cr(">>> stackChunkOopDesc::top_frame this: %p map: %p map->chunk: %p", this, map, (stackChunkOopDesc*)map->stack_chunk()());
   StackChunkFrameStream<true> fs(this);
-  frame f = fs.to_frame();
 
   map->set_stack_chunk(this);
   fs.initialize_register_map(map);
+  // if (map->update_map() && should_fix()) InstanceStackChunkKlass::fix_frame<true, false>(fs, map);
 
+  frame f = fs.to_frame();
   relativize_frame(f);
-  f.set_frame_index(0);
-  
+  f.set_frame_index(0);  
   return f;
 }
 
@@ -77,6 +94,7 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
   int index = f.frame_index();
   StackChunkFrameStream<true> fs(this, derelativize(f));
   fs.next(map);
+  // if (map->update_map() && should_fix()) InstanceStackChunkKlass::fix_frame<true, false>(fs, map);
   if (!fs.is_done()) {
     frame sender = fs.to_frame();
     assert (is_usable_in_chunk(sender.unextended_sp()), "");
@@ -270,33 +288,6 @@ void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
 }
 #endif
 
-template void InstanceStackChunkKlass::barriers_for_oops_in_chunk<false>(stackChunkOop chunk);
-template void InstanceStackChunkKlass::barriers_for_oops_in_chunk<true> (stackChunkOop chunk);
-template void InstanceStackChunkKlass::barriers_for_oops_in_frame<true,  false>(const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::barriers_for_oops_in_frame<true,  true> (const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::barriers_for_oops_in_frame<false, false>(const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::barriers_for_oops_in_frame<false, true> (const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::barriers_for_oops_in_frame<true,  false>(const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::barriers_for_oops_in_frame<true,  true> (const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::barriers_for_oops_in_frame<false, false>(const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::barriers_for_oops_in_frame<false, true> (const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
-
-template <bool store>
-class BarriersIterateStackClosure {
-public:
-  template <bool mixed, typename RegisterMapT> 
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map, MemRegion mr) {
-    InstanceStackChunkKlass::barriers_for_oops_in_frame<mixed, store>(f, map);
-    return true;
-  }
-};
-
-template <bool store>
-void InstanceStackChunkKlass::barriers_for_oops_in_chunk(stackChunkOop chunk) {
-  BarriersIterateStackClosure<store> frame_closure;
-  chunk->iterate_stack(&frame_closure);
-}
-
 template<bool store>
 class BarrierClosure: public OopClosure {
   DEBUG_ONLY(intptr_t* _sp;)
@@ -311,94 +302,69 @@ public:
     if (store) HeapAccess<>::oop_store(p, value);
     log_develop_trace(jvmcont)("barriers_for_oops_in_frame narrow: %d p: " INTPTR_FORMAT " sp offset: %ld", sizeof(T) < sizeof(intptr_t), p2i(p), (intptr_t*)p - _sp);
   }
+
+// virtual void do_oop(oop* p) override { *(oop*)p = (oop)NativeAccess<>::oop_load((oop*)p); }
+// virtual void do_oop(narrowOop* p) override { *(narrowOop*)p = CompressedOops::encode((oop)NativeAccess<>::oop_load((narrowOop*)p)); }
 };
 
+
 template <bool mixed, bool store, typename RegisterMapT>
-void InstanceStackChunkKlass::barriers_for_oops_in_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+void InstanceStackChunkKlass::fix_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
   // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
+  if (f.is_done()) return;
+  log_develop_trace(jvmcont)("InstanceStackChunkKlass::fix_frame sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(f.sp()), p2i(f.pc()));
+
+  if (log_develop_is_enabled(Trace, jvmcont) && !mixed && f.is_interpreted()) f.cb()->print_value_on(tty);
 
   if (mixed) f.handle_deopted(); // we could freeze deopted frames in slow mode.
 
-
   run_nmethod_entry_barrier_if_needed<mixed>(f);
 
-  BarrierClosure<store> oop_closure(f.sp());
-  f.iterate_oops(&oop_closure, map);
-}
-
-class FixOopsClosure: public OopClosure {
-  DEBUG_ONLY(intptr_t* _sp;)
-public:
-  FixOopsClosure(intptr_t* sp) DEBUG_ONLY(: _sp(sp)) {}
-
-  virtual void do_oop(oop* p) override {
-    log_develop_trace(jvmcont)("fix_oops wide p: " INTPTR_FORMAT " sp offset: %ld", p2i(p), (intptr_t*)p - _sp);
-    *(oop*)p = (oop)NativeAccess<>::oop_load((oop*)p);
-    ZGC_ONLY(assert (!UseZGC || ZAddress::is_good_or_null(cast_from_oop<uintptr_t>(*(oop*)p)), "");)
-  }
-  virtual void do_oop(narrowOop* p) override {
-    log_develop_trace(jvmcont)("fix_oops narrow p: " INTPTR_FORMAT " sp offset: %ld", p2i(p), (intptr_t*)p - _sp);
-    *(narrowOop*)p = CompressedOops::encode((oop)NativeAccess<>::oop_load((narrowOop*)p));
-  }
-};
-
-class FixChunkIterateStackClosure {
-  stackChunkOop _chunk;
-public:
-  int _num_frames, _num_oops;
-  FixChunkIterateStackClosure(stackChunkOop chunk) : _chunk(chunk), _num_frames(0), _num_oops(0) {}
-
-  template <bool mixed, typename RegisterMapT> 
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map, MemRegion mr) {
-    log_develop_trace(jvmcont)("fix_stack_chunk sp: %ld pc: " INTPTR_FORMAT, f.sp() - _chunk->start_address(), p2i(f.pc()));
-
-    if (log_develop_is_enabled(Trace, jvmcont) && !mixed && f.is_interpreted()) f.cb()->print_value_on(tty);
-
-    f.handle_deopted();
-
-    _num_frames++;
-    _num_oops += f.num_oops();
-
-    InstanceStackChunkKlass::run_nmethod_entry_barrier_if_needed<mixed>(f);
-
-    if (UseZGC || UseShenandoahGC) {
-      RelativizeDerivedPointers<true> derived_closure(_chunk);
-      f.iterate_derived_pointers(&derived_closure, map);
-
-      FixOopsClosure oops_closure(f.sp());
-      f.iterate_oops(&oops_closure, map);
-      OrderAccess::loadload();
-    }
-    DerelativizeDerivedPointers derived_closure;
+  if (UseZGC || UseShenandoahGC) {
+    RelativizeDerivedPointers<true> derived_closure;
     f.iterate_derived_pointers(&derived_closure, map);
-
-    return true;
-  }
-};
-
-NOINLINE void InstanceStackChunkKlass::fix_chunk(stackChunkOop chunk) {
-  log_develop_trace(jvmcont)("fix_stack_chunk young: %d", !chunk->requires_barriers());
-
-  FixChunkIterateStackClosure frame_closure(chunk);
-  chunk->iterate_stack(&frame_closure);
-
-  OrderAccess::storestore();
-  chunk->set_gc_mode(false);
-
-  assert (frame_closure._num_frames >= 0, "");
-  assert (frame_closure._num_oops >= 0, "");
-
-  EventContinuationFix e;
-  if (e.should_commit()) {
-    e.set_id(cast_from_oop<u8>(chunk));
-    e.set_numFrames((u2)frame_closure._num_frames);
-    e.set_numOops((u2)frame_closure._num_oops);
-    e.commit();
   }
 
-  log_develop_trace(jvmcont)("fix_stack_chunk ------- end -------");
-  // tty->print_cr("<<< fix_stack_chunk %p %p", (oopDesc*)chunk, Thread::current());
+  BarrierClosure<store> oops_closure(f.sp());
+  f.iterate_oops(&oops_closure, map);
+  OrderAccess::loadload(); // observing the barriers will prevent derived pointers from being derelativized concurrently
+
+  DerelativizeDerivedPointers derived_closure;
+  f.iterate_derived_pointers(&derived_closure, map);
 }
+
+template void InstanceStackChunkKlass::fix_frame<true,  false>(const StackChunkFrameStream<true >& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<true,  true> (const StackChunkFrameStream<true >& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<false, false>(const StackChunkFrameStream<false>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<false, true> (const StackChunkFrameStream<false>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<true,  false>(const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<true,  true> (const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<false, false>(const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<false, true> (const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
+
+
+// template <bool store>
+// class BarriersIterateStackClosure {
+// public:
+//   template <bool mixed, typename RegisterMapT> 
+//   bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+//     InstanceStackChunkKlass::barriers_for_oops_in_frame<mixed, store>(f, map);
+//     return true;
+//   }
+// };
+
+// template <bool store>
+// void InstanceStackChunkKlass::barriers_for_oops_in_chunk(stackChunkOop chunk) {
+//   BarriersIterateStackClosure<store> frame_closure;
+//   chunk->iterate_stack(&frame_closure);
+// }
+
+// NOINLINE void InstanceStackChunkKlass::fix_chunk(stackChunkOop chunk) {
+//   log_develop_trace(jvmcont)("fix_stack_chunk young: %d", !chunk->requires_barriers());
+//   FixChunkIterateStackClosure frame_closure(chunk);
+//   chunk->iterate_stack(&frame_closure);
+//   log_develop_trace(jvmcont)("fix_stack_chunk ------- end -------");
+// }
 
 #ifdef ASSERT
 
@@ -467,7 +433,7 @@ public:
       _size(size), _argsize(0), _num_oops(0), _num_frames(num_frames), _num_interpreted_frames(0), _num_i2c(0) {}
 
   template <bool mixed, typename RegisterMapT> 
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map, MemRegion mr) {
+  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
     _sp = f.sp();
     _cb = f.cb();
 
@@ -616,11 +582,13 @@ public:
   const RegisterMap* get_map(const SmallRegisterMap* map, intptr_t* sp) { return map->copy_to_RegisterMap(&_map, sp); }
 
   template <bool mixed, typename RegisterMapT> 
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map, MemRegion mr) {
+  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
     ResetNoHandleMark rnhm;
     HandleMark hm(Thread::current());
 
-    f.to_frame().template describe<true>(_values, _frame_no++, get_map(map, f.sp()));
+    frame fr = f.to_frame();
+    if (_frame_no == 0) fr.describe_top(_values);
+    fr.template describe<true>(_values, _frame_no++, get_map(map, f.sp()));
     return true;
   }
 
@@ -651,7 +619,7 @@ public:
   PrintStackChunkClosure(stackChunkOop chunk, outputStream* st) : _chunk(chunk), _st(st) {}
 
   template <bool mixed, typename RegisterMapT> 
-  bool do_frame(const StackChunkFrameStream<mixed>& fs, const RegisterMapT* map, MemRegion mr) {
+  bool do_frame(const StackChunkFrameStream<mixed>& fs, const RegisterMapT* map) {
     frame f = fs.to_frame();
     _st->print_cr("-- frame sp: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d", p2i(fs.sp()), fs.is_interpreted(), f.frame_size(), fs.is_interpreted() ? 0 : f.compiled_frame_stack_argsize());
     f.print_on<true>(_st);

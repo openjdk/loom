@@ -2727,6 +2727,7 @@ void JavaThread::print_frame_layout(int depth, bool validate_only) {
   FrameValues values;
   int frame_no = 0;
   for (StackFrameStream fst(this, true, true, true); !fst.is_done(); fst.next()) {
+    if (frame_no == 0) fst.current()->describe_top(values);
     fst.current()->describe(values, ++frame_no, fst.register_map());
     if (depth == frame_no) break;
   }
