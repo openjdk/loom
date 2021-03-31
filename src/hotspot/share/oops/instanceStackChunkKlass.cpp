@@ -62,12 +62,6 @@ bool stackChunkOopDesc::should_fix() const {
                        : should_fix<oop,       false>());
 }
 
-// void stackChunkOopDesc::fix_frame_if_needed(const frame& fr, const RegisterMap* map) const {
-//   if (should_fix()) {
-//     InstanceStackChunkKlass::fix_frame<true, false>(StackChunkFrameStream<true>(const_cast<stackChunkOopDesc*>(this), derelativize(fr)), map);
-//   }
-// }
-
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
   // tty->print_cr(">>> stackChunkOopDesc::top_frame this: %p map: %p map->chunk: %p", this, map, (stackChunkOopDesc*)map->stack_chunk()());
   StackChunkFrameStream<true> fs(this);
