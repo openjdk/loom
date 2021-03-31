@@ -934,12 +934,15 @@ public:
     }
     
     if (_do_destructive_processing) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
-      if (concurrent_gc) {
-        _chunk->set_gc_mode(true);
-        OrderAccess::storestore(); // if you see any following writes, you'll see this
+      assert (!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
+      if (f.is_compiled() && f.oopmap()->has_derived_oops()) {
+        if (concurrent_gc) {
+          _chunk->set_gc_mode(true);
+          OrderAccess::storestore(); // if you see any following writes, you'll see this
+        }
+        RelativizeDerivedPointers<concurrent_gc> derived_closure;
+        f.iterate_derived_pointers(&derived_closure, map);
       }
-      RelativizeDerivedPointers<concurrent_gc> derived_closure;
-      f.iterate_derived_pointers(&derived_closure, map);
     }
 
     CheckMutationWrapper<OopClosureType> cl(_closure, _chunk);

@@ -91,6 +91,7 @@ OopMap::OopMap(int frame_size, int arg_count) {
   set_write_stream(new CompressedWriteStream(32));
   set_omv_count(0);
   _num_oops = 0;
+  _has_derived_oops = false;
   _index = -1;
 
 #ifdef ASSERT
@@ -108,6 +109,7 @@ OopMap::OopMap(OopMap::DeepCopyToken, OopMap* source) {
   set_omv_count(0);
   set_offset(source->offset());
   _num_oops = source->num_oops();
+  _has_derived_oops = source->has_derived_oops();
   _index = -1;
 
 #ifdef ASSERT
@@ -315,8 +317,11 @@ void OopMap::set_xxx(VMReg reg, OopMapValue::oop_types x, VMReg optional) {
   OopMapValue o(reg, x, optional);
   o.write_on(write_stream());
   increment_count();
-  if (x == OopMapValue::oop_value || x == OopMapValue::narrowoop_value)
+  if (x == OopMapValue::oop_value || x == OopMapValue::narrowoop_value) {
     increment_num_oops();
+  } else if (x == OopMapValue::derived_oop_value) {
+    set_has_derived_oops(true);
+  }
 }
 
 
@@ -756,6 +761,7 @@ ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap)
     _thaw_stub(NULL /*Continuations::default_thaw_oops_stub()*/), 
     _count(oopmap->count()), _num_oops(oopmap->num_oops()) {
   _num_oops = oopmap->num_oops();
+  _has_derived_oops = oopmap->has_derived_oops();
   address addr = data_addr();
   //oopmap->copy_data_to(addr);
   oopmap->copy_and_sort_data_to(addr);

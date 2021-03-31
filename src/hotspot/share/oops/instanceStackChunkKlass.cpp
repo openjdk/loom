@@ -320,17 +320,23 @@ void InstanceStackChunkKlass::fix_frame(const StackChunkFrameStream<mixed>& f, c
 
   run_nmethod_entry_barrier_if_needed<mixed>(f);
 
-  if (UseZGC || UseShenandoahGC) {
-    RelativizeDerivedPointers<true> derived_closure;
-    f.iterate_derived_pointers(&derived_closure, map);
+  assert (!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
+  bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
+  if (has_derived) {
+    if (UseZGC || UseShenandoahGC) {
+      RelativizeDerivedPointers<true> derived_closure;
+      f.iterate_derived_pointers(&derived_closure, map);
+    }
   }
 
   BarrierClosure<store> oops_closure(f.sp());
   f.iterate_oops(&oops_closure, map);
   OrderAccess::loadload(); // observing the barriers will prevent derived pointers from being derelativized concurrently
 
-  DerelativizeDerivedPointers derived_closure;
-  f.iterate_derived_pointers(&derived_closure, map);
+  if (has_derived) {
+    DerelativizeDerivedPointers derived_closure;
+    f.iterate_derived_pointers(&derived_closure, map);
+  }
 }
 
 template void InstanceStackChunkKlass::fix_frame<true,  false>(const StackChunkFrameStream<true >& f, const RegisterMap* map);
