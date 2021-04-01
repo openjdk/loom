@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
  */
 
 #include <string.h>
-#include <unistd.h>
 #include "jvmti.h"
+#include "jvmti_common.h"
 
 extern "C" {
 
@@ -38,13 +38,6 @@ static jsize threads_count = 0;
     fflush(stdout); \
   } while (0)
 
-static void
-check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
-  if (err != JVMTI_ERROR_NONE) {
-    LOG("check_jvmti_status: JVMTI function returned error: %d", err);
-    jni->FatalError(msg);
-  }
-}
 
 JNIEXPORT void JNICALL
 Java_SuspendWithCurrentThread_registerTestedThreads(JNIEnv *jni, jclass cls, jobjectArray threadsArr) {
@@ -103,7 +96,7 @@ Java_SuspendWithCurrentThread_checkTestedThreadsSuspended(JNIEnv *jni, jclass cl
       } else {
         break;
       }
-      usleep(10000);
+      millisleep(10);
     }
   }
   LOG("checkTestedThreadsSuspended: finished\n");
