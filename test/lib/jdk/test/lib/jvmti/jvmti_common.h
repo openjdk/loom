@@ -796,11 +796,11 @@ nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int 
 }
 
 void
-millisleep(jlong milliseconds) {
+millisleep(int millis) {
 #ifdef _WIN32
-  Sleep(milliseconds);
+  Sleep(millis);
 #else
-  usleep(1000L * milliseconds);
+  usleep(1000 * millis);
 #endif
 }
 
