@@ -85,7 +85,7 @@ public class BufferedOutputStream extends FilterOutputStream {
         }
 
         if (getClass() == BufferedOutputStream.class) {
-            // use ExplicitLock and resizable buffer when not sub-classed
+            // use InternalLock and resizable buffer when not sub-classed
             this.lock = new InternalLock();
             this.buf = new byte[initialSize];    // resizable
             this.maxBufSize = maxSize;
