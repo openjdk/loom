@@ -400,11 +400,11 @@ public:
 
 class StackChunkVerifyDerivedPointersClosure : public DerivedOopClosure {
 public:
-  virtual void do_derived_oop(oop *base_loc, oop *derived_loc) override {
+  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
-    oop base = *(oop*)base_loc; // (oop)NativeAccess<>::oop_load((oop*)base_loc); // 
+    oop base = *base_loc; // (oop)NativeAccess<>::oop_load((oop*)base_loc); // 
     assert (base == nullptr || is_good_oop(base), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(base_loc), p2i((oopDesc*)base));
-    if (base != (oop)nullptr) {
+    if (base != nullptr) {
       assert (!CompressedOops::is_base(base), "");
       assert (oopDesc::is_oop(base), "");
       ZGC_ONLY(assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
@@ -414,7 +414,7 @@ public:
                   : offset - cast_from_oop<intptr_t>(base);
       assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
     } else {
-      assert (*derived_loc == (oop)nullptr, "");
+      assert (*derived_loc == derived_pointer(0), "");
     }
   }
 };

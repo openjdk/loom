@@ -1066,14 +1066,14 @@ class CompiledArgumentOopFinder: public SignatureIterator {
     // Extract low order register number from register array.
     // In LP64-land, the high-order bits are valid but unhelpful.
     VMReg reg = _regs[_offset].first();
-    oop *loc = _fr.oopmapreg_to_location(reg, _reg_map);
+    oop *loc = _fr.oopmapreg_to_oop_location(reg, _reg_map);
   #ifdef ASSERT
     if (loc == NULL) {
       if (_reg_map->should_skip_missing())
         return;
       tty->print_cr("Error walking frame oops:");
       _fr.print_on(tty);
-      assert(loc != NULL, "reg: " INTPTR_FORMAT " %s loc: " INTPTR_FORMAT, reg->value(), reg->name(), p2i(loc));
+      assert(loc != NULL, "missing register map entry reg: " INTPTR_FORMAT " %s loc: " INTPTR_FORMAT, reg->value(), reg->name(), p2i(loc));
     }
   #endif
     _f->do_oop(loc);
@@ -1128,7 +1128,7 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
 
   // First consult the ADLC on where it puts parameter 0 for this signature.
   VMReg reg = SharedRuntime::name_for_receiver();
-  oop* oop_adr = caller.oopmapreg_to_location(reg, reg_map);
+  oop* oop_adr = caller.oopmapreg_to_oop_location(reg, reg_map);
   if (oop_adr == NULL) {
     guarantee(oop_adr != NULL, "bad register save location");
     return NULL;
@@ -1304,7 +1304,7 @@ public:
     _values.describe(_frame_no, (intptr_t*)p, err_msg("oop%s for #%d", good ? "" : " (BAD)", _frame_no)); 
   }
   virtual void do_oop(narrowOop* p) { _values.describe(_frame_no, (intptr_t*)p, err_msg("narrow oop for #%d", _frame_no)); }
-  virtual void do_derived_oop(oop *base, oop *derived) { 
+  virtual void do_derived_oop(oop* base, derived_pointer* derived) { 
     _values.describe(_frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), _frame_no));
   }
 };

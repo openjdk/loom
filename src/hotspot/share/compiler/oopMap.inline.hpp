@@ -70,12 +70,12 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
   #endif
   #endif // !COMPILER2
 
-      oop* loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
+      address loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
 
       DEBUG_ONLY(if (reg_map->should_skip_missing()) continue;)
       guarantee(loc != NULL, "missing saved register");
-      oop *derived_loc = loc;
-      oop *base_loc    = fr->oopmapreg_to_location(omv.content_reg(), reg_map);
+      derived_pointer* derived_loc = (derived_pointer*)loc;
+      oop* base_loc = fr->oopmapreg_to_oop_location(omv.content_reg(), reg_map);
       // Ignore NULL oops and decoded NULL narrow oops which
       // equal to CompressedOops::base() when a narrow oop
       // implicit null check is used in compiled code.
@@ -93,7 +93,7 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
       OopMapValue omv = oms.current();
       if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
         continue;
-      oop* loc = fr->oopmapreg_to_location(omv.reg(),reg_map);
+      oop* loc = fr->oopmapreg_to_oop_location(omv.reg(),reg_map);
       // It should be an error if no location can be found for a
       // register mentioned as contained an oop of some kind.  Maybe
       // this was allowed previously because value_value items might

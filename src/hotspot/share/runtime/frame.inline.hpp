@@ -63,19 +63,24 @@ inline bool frame::is_compiled_frame() const {
 }
 
 template <typename RegisterMapT>
-inline oop* frame::oopmapreg_to_location(VMReg reg, const RegisterMapT* reg_map) const {
+inline address frame::oopmapreg_to_location(VMReg reg, const RegisterMapT* reg_map) const {
   if (reg->is_reg()) {
     // If it is passed in a register, it got spilled in the stub frame.
-    return (oop *)reg_map->location(reg, sp());
+    return reg_map->location(reg, sp());
   } else {
     int sp_offset_in_bytes = reg->reg2stack() * VMRegImpl::stack_slot_size;
     if (reg_map->in_cont()) {
-      return reinterpret_cast<oop*>((intptr_t)reg_map->as_RegisterMap()->stack_chunk()->relativize_usp_offset(*this, sp_offset_in_bytes));
+      return (address)((intptr_t)reg_map->as_RegisterMap()->stack_chunk()->relativize_usp_offset(*this, sp_offset_in_bytes));
     }
     address usp = (address)unextended_sp();
     assert(reg_map->thread() == NULL || reg_map->thread()->is_in_usable_stack(usp), INTPTR_FORMAT, p2i(usp)); 
-    return (oop*)(usp + sp_offset_in_bytes);
+    return (usp + sp_offset_in_bytes);
   }
+}
+
+template <typename RegisterMapT>
+inline oop* frame::oopmapreg_to_oop_location(VMReg reg, const RegisterMapT* reg_map) const {
+  return (oop*)oopmapreg_to_location(reg, reg_map);
 }
 
 inline CodeBlob* frame::get_cb() const {

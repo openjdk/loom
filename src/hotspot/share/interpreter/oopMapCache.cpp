@@ -244,6 +244,8 @@ class MaskFillerForNative: public NativeSignatureIterator {
   }
 
  public:
+  void pass_byte()                               { /* ignore */ }
+  void pass_short()                              { /* ignore */ }
   void pass_int()                                { /* ignore */ }
   void pass_long()                               { /* ignore */ }
   void pass_float()                              { /* ignore */ }

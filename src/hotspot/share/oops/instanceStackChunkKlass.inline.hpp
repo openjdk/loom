@@ -707,7 +707,7 @@ inline void StackChunkFrameStream<mixed>::iterate_derived_pointers(DerivedOopClo
     assert (is_in_oops(base_loc, map), "not found: " INTPTR_FORMAT, p2i(base_loc));
     assert (!is_in_oops(derived_loc, map), "found: " INTPTR_FORMAT, p2i(derived_loc));
     
-    Devirtualizer::do_derived_oop(closure, (oop*)base_loc, (oop*)derived_loc);
+    Devirtualizer::do_derived_oop(closure, (oop*)base_loc, (derived_pointer*)derived_loc);
   }
   OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
 }
@@ -824,7 +824,7 @@ class RelativizeDerivedPointers : public DerivedOopClosure {
 public:
   RelativizeDerivedPointers() {}
 
-  virtual void do_derived_oop(oop *base_loc, oop *derived_loc) override {
+  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load((oop*)base_loc);
@@ -858,14 +858,14 @@ public:
       // assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize)); -- base might be invalid at this point
       Atomic::store((intptr_t*)derived_loc, -offset); // there could be a benign race here; we write a negative offset to let the sign bit signify it's an offset rather than an address
     } else {
-      assert (*derived_loc == 0, "");
+      assert (*derived_loc == derived_pointer(0), "");
     }
   }
 };
 
 class DerelativizeDerivedPointers : public DerivedOopClosure {
 public:
-  virtual void do_derived_oop(oop *base_loc, oop *derived_loc) override {
+  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load(base_loc);
