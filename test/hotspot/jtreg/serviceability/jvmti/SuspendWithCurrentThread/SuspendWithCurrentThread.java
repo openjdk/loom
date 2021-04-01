@@ -166,7 +166,6 @@ public class SuspendWithCurrentThread {
 class ThreadToSuspend extends Thread {
     private static void log(String msg) { System.out.println(msg); }
 
-    private static native void init();
     private static native void suspendTestedThreads();
     private static volatile boolean allThreadsReady = false;
 
@@ -188,9 +187,6 @@ class ThreadToSuspend extends Thread {
     public void run() {
         boolean needSuspend = true;
 
-        if (isSuspender) {
-            init();
-        }
         threadReady = true;
 
         // run in a loop
