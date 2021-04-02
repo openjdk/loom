@@ -432,11 +432,6 @@ class VirtualThread extends Thread {
             }
         }
 
-        // notify JVMTI agents
-        if (executed && notifyJvmtiEvents) {
-            notifyJvmtiTerminated();
-        }
-
         // notify thread tracker, no-op if not tracking threads
         ThreadTracker.notifyTerminate(this);
 
@@ -945,8 +940,6 @@ class VirtualThread extends Thread {
 
     @JvmtiMountTransition
     private native void notifyJvmtiUnmountEnd(boolean lastUnmount);
-
-    private native void notifyJvmtiTerminated();
 
     private static native void registerNatives();
     static {

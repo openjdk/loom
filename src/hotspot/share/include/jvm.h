@@ -1134,9 +1134,6 @@ JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboolean last_unmoun
 JNIEXPORT void JNICALL
 JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean last_unmount);
 
-JNIEXPORT void JNICALL
-JVM_VirtualThreadTerminated(JNIEnv* env, jobject vthread);
-
 /*
  * This structure is used by the launcher to get the default thread
  * stack size from the VM using JNI_GetDefaultJavaVMInitArgs() with a

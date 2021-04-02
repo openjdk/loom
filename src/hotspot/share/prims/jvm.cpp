@@ -3927,10 +3927,25 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboolean last_unmount))
+  oop ct_oop = thread->threadObj();
+
   if (JvmtiExport::should_post_vthread_unmount()) {
     JvmtiExport::post_vthread_unmount(vthread);
   }
-  oop ct_oop = thread->threadObj();
+  if (last_unmount) {
+    if (JvmtiExport::can_support_virtual_threads()) {
+      if (JvmtiExport::should_post_vthread_end()) {
+        JvmtiExport::post_vthread_end(vthread);
+      }
+    } else { // compatibility for vthread unaware agents: legacy thread_end
+      if (JvmtiExport::should_post_thread_life()) {
+        JvmtiExport::post_thread_end(thread);
+      }
+    }
+    jobject cthread = JNIHandles::make_local(thread, ct_oop);
+    JFR_ONLY(Jfr::on_thread_exit(cthread, vthread));
+    thread->set_mounted_vthread(NULL);
+  }
   thread->rebind_to_jvmti_thread_state_of(ct_oop);
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
@@ -3948,22 +3963,4 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboole
     }
     thread->set_is_in_VTMT(true);
   }
-JVM_END
-
-JVM_ENTRY(void, JVM_VirtualThreadTerminated(JNIEnv* env, jobject vthread))
-  if (JvmtiExport::can_support_virtual_threads()) {
-    if (JvmtiExport::should_post_vthread_end()) {
-      JvmtiExport::post_vthread_end(vthread);
-    }
-  } else { // compatibility for vthread unaware agents: legacy thread_end
-    if (JvmtiExport::should_post_thread_life()) {
-      JvmtiExport::post_thread_end(thread);
-    }
-  }
-  oop ct_oop = thread->threadObj();
-  jobject cthread = JNIHandles::make_local(thread, ct_oop);
-  JFR_ONLY(Jfr::on_thread_exit(cthread, vthread));
-  thread->set_mounted_vthread(NULL);
-  JvmtiVTMTDisabler::start_VTMT(vthread, 0);
-  JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
 JVM_END

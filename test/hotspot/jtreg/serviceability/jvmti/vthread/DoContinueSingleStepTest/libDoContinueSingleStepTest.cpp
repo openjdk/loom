@@ -383,18 +383,6 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
   print_frame_event_info(jvmti, jni, thread, method, "FramePop", frame_pop_count);
 }
 
-static void JNICALL
-VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
-  RawMonitorLocker rml(jvmti, jni, event_mon);
-  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadStart");
-}
-
-static void JNICALL
-VirtualThreadEnd(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
-  RawMonitorLocker rml(jvmti, jni, event_mon);
-  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadEnd");
-}
-
 // Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
 VirtualThreadMount(jvmtiEnv *jvmti, ...) {
@@ -408,7 +396,6 @@ VirtualThreadMount(jvmtiEnv *jvmti, ...) {
   va_end(ap);
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
-  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadMount");
 }
 
 // Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
@@ -424,7 +411,6 @@ VirtualThreadUnmount(jvmtiEnv *jvmti, ...) {
   va_end(ap);
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
-  //processFiberEvent(jvmti, jni, vthread, "VirtualThreadUnmount");
 }
 
 JNIEXPORT jint JNICALL
@@ -444,8 +430,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.FramePop    = &FramePop;
   callbacks.MethodEntry = &MethodEntry;
   callbacks.MethodExit  = &MethodExit;
-  callbacks.VirtualThreadStart     = &VirtualThreadStart;
-  callbacks.VirtualThreadEnd       = &VirtualThreadEnd;
 
   err = set_ext_event_callback(jvmti, "VirtualThreadMount", VirtualThreadMount);
   if (err != JVMTI_ERROR_NONE) {
