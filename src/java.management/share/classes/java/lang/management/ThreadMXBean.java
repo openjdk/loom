@@ -28,13 +28,13 @@ package java.lang.management;
 import java.util.Map;
 
 /**
- * The management interface for the thread system of
- * the Java virtual machine.
+ * The management interface for the thread system of the Java virtual machine.
  *
  * <p> {@code ThreadMXBean} supports monitoring and management of <em>live
- * threads</em> in the Java virtual machine that are scheduled by the operating
- * system. {@code ThreadMXBean} does not support monitoring or management
- * of {@linkplain Thread#isVirtual() virtual threads} in this release.
+ * platform threads</em> in the Java virtual machine. Platform threads are
+ * typically mapped to kernel threads scheduled by the operating system.
+ * {@code ThreadMXBean} does not support monitoring or management of {@linkplain
+ * Thread#isVirtual() virtual threads}.
  *
  * <p> A Java virtual machine has a single instance of the implementation
  * class of this interface.  This instance implementing this interface is
@@ -128,42 +128,42 @@ import java.util.Map;
 
 public interface ThreadMXBean extends PlatformManagedObject {
     /**
-     * Returns the current number of live threads including both
+     * Returns the current number of live platform threads including both
      * daemon and non-daemon threads.
      * The count does not include virtual threads.
      *
-     * @return the current number of live threads.
+     * @return the current number of live platform threads.
      */
     public int getThreadCount();
 
     /**
-     * Returns the peak live thread count since the Java virtual machine
-     * started or peak was reset.
+     * Returns the peak live platform thread count since the Java virtual
+     * machine started or peak was reset.
      * The count does not include virtual threads.
      *
-     * @return the peak live thread count.
+     * @return the peak live platform thread count.
      */
     public int getPeakThreadCount();
 
     /**
-     * Returns the total number of threads created and also started
+     * Returns the total number of platform threads created and also started
      * since the Java virtual machine started.
      * The count does not include virtual threads.
      *
-     * @return the total number of threads started.
+     * @return the total number of platform threads started.
      */
     public long getTotalStartedThreadCount();
 
     /**
-     * Returns the current number of live daemon threads.
+     * Returns the current number of live platform threads that are daemon threads.
      * The count does not include virtual threads.
      *
-     * @return the current number of live daemon threads.
+     * @return the current number of live platform threads that are daemon threads.
      */
     public int getDaemonThreadCount();
 
     /**
-     * Returns all live thread IDs.
+     * Returns the threadIDs of all live platform threads.
      * The thread IDs of virtual threads are not included.
      * Some threads included in the returned array
      * may have been terminated when this method returns.
