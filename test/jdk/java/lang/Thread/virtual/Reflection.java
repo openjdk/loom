@@ -131,7 +131,9 @@ public class Reflection {
             Thread.sleep(100); // give thread time to be scheduled
 
             // unpark with another virtual thread, runs on same carrier thread
-            factory.newThread(() -> LockSupport.unpark(vthread)).start();
+            Thread unparker = factory.newThread(() -> LockSupport.unpark(vthread));
+            unparker.start();
+            unparker.join();
         }
     }
 
