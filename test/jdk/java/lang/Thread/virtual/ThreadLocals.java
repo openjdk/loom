@@ -108,7 +108,7 @@ public class ThreadLocals {
         assertTrue(INHERITED_LOCAL.get() == null);
     }
 
-    // initial value inherited from kernel thread
+    // initial value inherited from platform thread
     public void testInheritedThreadLocal2() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         var obj = new Object();
@@ -137,7 +137,7 @@ public class ThreadLocals {
         assertTrue(INHERITED_LOCAL.get() == null);
     }
 
-    // initial value not inherited from kernel thread
+    // initial value not inherited from platform thread
     public void testInheritedThreadLocal4() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         var obj = new Object();

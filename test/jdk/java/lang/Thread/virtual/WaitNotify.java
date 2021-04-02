@@ -35,7 +35,7 @@ import static org.testng.Assert.*;
 @Test
 public class WaitNotify {
 
-    // virtual thread waits, notified by kernel thread
+    // virtual thread waits, notified by platform thread
     public void testWaitNotify1() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
@@ -55,7 +55,7 @@ public class WaitNotify {
         thread.join();
     }
 
-    // kernel thread waits, notified by virtual thread
+    // platform thread waits, notified by virtual thread
     public void testWaitNotify2() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);

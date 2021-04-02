@@ -25,7 +25,7 @@
  * @test
  * @modules java.base/java.lang:+open
  * @run testng SchedulerCocktail
- * @summary Test kernel and virtual threads creating virtual threads that use
+ * @summary Test platform and virtual threads creating virtual threads that use
  *          the same or different schedulers
  */
 
@@ -60,7 +60,7 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.startVirtualThread.
+     * Test platform thread invoking Thread.startVirtualThread.
      */
     public void testStartVirtualThread1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
@@ -105,7 +105,7 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create virtual thread
+     * Test platform thread invoking Thread.Builder to create virtual thread
      * without specifying the scheduler.
      */
     public void testBuilderNoScheduler1() throws Exception {
@@ -153,7 +153,7 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create virtual thread
+     * Test platform thread invoking Thread.Builder to create virtual thread
      * that uses a custom scheduler.
      */
     public void testBuilderCustomScheduler1() throws Exception {
@@ -201,7 +201,7 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create virtual thread
+     * Test platform thread invoking Thread.Builder to create virtual thread
      * that uses the default scheduler.
      */
     public void testBuilderNullScheduler1() throws Exception {
@@ -249,7 +249,7 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create a ThreadFactory
+     * Test platform thread invoking Thread.Builder to create a ThreadFactory
      * that creates virtual thread without specifying the scheduler.
      */
     public void testThreadFactoryNoScheduler1() throws Exception {
@@ -308,7 +308,7 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create a ThreadFactory
+     * Test platform thread invoking Thread.Builder to create a ThreadFactory
      * that creates virtual thread using a custom scheduler.
      */
     public void testThreadFactoryCustomScheduler1() throws Exception {
@@ -367,7 +367,7 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create a ThreadFactory
+     * Test platform thread invoking Thread.Builder to create a ThreadFactory
      * that creates virtual thread using the default scheduler.
      */
     public void testThreadFactoryNullScheduler1() throws Exception {
