@@ -286,8 +286,8 @@ class VirtualThread extends Thread {
     private void run(Runnable task) {
         boolean notifyJvmti = notifyJvmtiEvents;
 
-        // mount
-        if (notifyJvmti) notifyJvmtiMountBegin();
+        // first mount
+        if (notifyJvmti) notifyJvmtiMountBegin(true);
         mount();
         if (notifyJvmti) notifyJvmtiMountEnd(true);
 
@@ -296,8 +296,8 @@ class VirtualThread extends Thread {
         } catch (Throwable exc) {
             dispatchUncaughtException(exc);
         } finally {
-            // unmount
-            if (notifyJvmti) notifyJvmtiUnmountBegin();
+            // last unmount
+            if (notifyJvmti) notifyJvmtiUnmountBegin(true);
             unmount();
             if (notifyJvmti) notifyJvmtiUnmountEnd(true);
         }
@@ -358,7 +358,7 @@ class VirtualThread extends Thread {
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // unmount
-        if (notifyJvmti) notifyJvmtiUnmountBegin();
+        if (notifyJvmti) notifyJvmtiUnmountBegin(false);
         unmount();
         if (notifyJvmti) notifyJvmtiUnmountEnd(false);
 
@@ -368,7 +368,7 @@ class VirtualThread extends Thread {
         } finally {
 
             // mount
-            if (notifyJvmti) notifyJvmtiMountBegin();
+            if (notifyJvmti) notifyJvmtiMountBegin(false);
             mount();
             if (notifyJvmti) notifyJvmtiMountEnd(false);
 
@@ -437,7 +437,7 @@ class VirtualThread extends Thread {
             notifyJvmtiTerminated();
         }
 
-        // notify thread dumper, no-op if not tracking threads
+        // notify thread tracker, no-op if not tracking threads
         ThreadTracker.notifyTerminate(this);
 
         // clear references to thread locals, this method is assumed to be
@@ -935,16 +935,16 @@ class VirtualThread extends Thread {
     private static volatile boolean notifyJvmtiEvents;  // set by VM
 
     @JvmtiMountTransition
-    private native void notifyJvmtiMountBegin();
+    private native void notifyJvmtiMountBegin(boolean firstMount);
 
     @JvmtiMountTransition
     private native void notifyJvmtiMountEnd(boolean firstMount);
 
     @JvmtiMountTransition
-    private native void notifyJvmtiUnmountBegin();
+    private native void notifyJvmtiUnmountBegin(boolean lastUnmount);
 
     @JvmtiMountTransition
-    private native void notifyJvmtiUnmountEnd(boolean lastMount);
+    private native void notifyJvmtiUnmountEnd(boolean lastUnmount);
 
     private native void notifyJvmtiTerminated();
 
