@@ -31,7 +31,8 @@
 /**
  * @test
  * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -Xmx4g TimedGet
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal
+ *     -XX:CompilationMode=high-only-quick-internal -Xmx4g TimedGet
  * @summary Stress parking with CompletableFuture timed get
  */
 
