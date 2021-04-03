@@ -535,6 +535,7 @@ java/awt/GridLayout/ComponentPreferredSize/ComponentPreferredSize.java 8238720 w
 java/awt/GridLayout/ChangeGridSize/ChangeGridSize.java   8238720 windows-all
 java/awt/event/MouseEvent/FrameMouseEventAbsoluteCoordsTest/FrameMouseEventAbsoluteCoordsTest.java
 
+sun/awt/AppContext/8012933/Test8012933.java 8264674 generic-all
 
 ############################################################################
 
@@ -768,6 +769,8 @@ javax/swing/JPopupMenu/4634626/bug4634626.java 8017175 macosx-all
 
 sanity/client/SwingSet/src/ToolTipDemoTest.java 8225012 windows-all,macosx-all
 sanity/client/SwingSet/src/ScrollPaneDemoTest.java 8225013 linux-all
+
+javax/swing/plaf/metal/MetalUtils/bug6190373.java 8264674 generic-all
 
 ############################################################################
 
