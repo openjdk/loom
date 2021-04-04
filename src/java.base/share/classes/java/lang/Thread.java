@@ -152,9 +152,10 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * extend {@code Thread}. The constructors cannot be used to create virtual threads.
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
- * Creating a {@code Thread} will inherit, by default, the initial values of {@code
- * InheritableThreadLocal} variables, {@linkplain ScopeLocal#inheritableForType(Class)
- * inheritable-scoped-variables}, and a number of properties from the parent thread:
+ * Creating a {@code Thread} will inherit, by default, {@linkplain
+ * ScopeLocal#inheritableForType(Class) inheritable-scope-local} variables, the initial
+ * value of {@linkplain InheritableThreadLocal inheritable-thread-local} variables, and
+ * a number of properties from the parent thread:
  * <ul>
  *     <li> Platform threads inherit the daemon status, priority, and thread-group.
  *     <li> Virtual threads are scheduled by the same scheduler as the parent thread
@@ -323,6 +324,12 @@ public class Thread implements Runnable {
      * the constructing thread.
      */
     static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
+
+    /**
+     * Characteristic value signifying that {@link ScopeLocal#inheritableForType(Class)
+     * inheritable-scope-locals} are not inherited from the constructing thread.
+     */
+    static final int NO_INHERIT_SCOPE_LOCALS = 1 << 3;
 
     // current inner-most continuation
     private Continuation cont;
@@ -661,7 +668,9 @@ public class Thread implements Runnable {
                     this.contextClassLoader = parentLoader;
                 }
             }
-            this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+            if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
+                this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+            }
         }
 
         int priority;
@@ -709,7 +718,9 @@ public class Thread implements Runnable {
         }
 
         // scoped variables
-        this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+        if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
+            this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+        }
 
         // no additional fields
         this.holder = null;
@@ -907,6 +918,15 @@ public class Thread implements Runnable {
          * @return this builder
          */
         Builder inheritInheritableThreadLocals(boolean inherit);
+
+        /**
+         * Sets whether the thread inherits {@linkplain ScopeLocal#inheritableForType(Class)
+         * inheritable-scope-local} variables. The default is to inherit.
+         *
+         * @param inherit {@code true} to inherit, {@code false} to not inherit
+         * @return this builder
+         */
+        Builder inheritInheritableScopeLocals(boolean inherit);
 
         /**
          * Sets the uncaught exception handler.
