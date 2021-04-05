@@ -91,18 +91,6 @@ void TemplateInterpreterGenerator::generate_all() {
                    generate_return_entry_for(vtos, i, sizeof(u2))
                    );
     }
-    Interpreter::_return_entryX[0] = EntryPoint();
-    for (int i = 1; i < Interpreter::number_of_return_entries; i++) {
-      Interpreter::_return_entryX[i] =
-        EntryPoint(
-                   generate_return_entry_for(atos, i, sizeof(u2), true),
-                   generate_return_entry_for(itos, i, sizeof(u2), true),
-                   generate_return_entry_for(ltos, i, sizeof(u2), true),
-                   generate_return_entry_for(ftos, i, sizeof(u2), true),
-                   generate_return_entry_for(dtos, i, sizeof(u2), true),
-                   generate_return_entry_for(vtos, i, sizeof(u2), true)
-                   );
-    }
   }
 
   { CodeletMark cm(_masm, "invoke return entry points");
@@ -125,7 +113,6 @@ void TemplateInterpreterGenerator::generate_all() {
       Interpreter::_invokeinterface_return_entry[i] = Interpreter::_return_entry[invokeinterface_length].entry(state);
 
       Interpreter::_invokedynamic_return_entry[i]   = generate_return_entry_for(state, invokedynamic_length, sizeof(u4));
-      Interpreter::_invoke_return_entryX[i] = generate_return_entry_for(state, invoke_length, sizeof(u2), true);
     }
 
     // set itos entry points for btos/ztos/ctos/stos

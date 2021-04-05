@@ -178,13 +178,8 @@ address TemplateInterpreterGenerator::generate_exception_handler_common(
 }
 
 address TemplateInterpreterGenerator::generate_return_entry_for(TosState state, int step, size_t index_size) {
-  return generate_return_entry_for(state, step, index_size, false);
-}
-
-address TemplateInterpreterGenerator::generate_return_entry_for(TosState state, int step, size_t index_size, bool X) {
   address entry = __ pc();
 
-// if(X) __ stop("XXXXXXXX 000");
 #ifndef _LP64
 #ifdef COMPILER2
   // The FPU stack is clean if UseSSE >= 2 but must be cleaned in other cases
@@ -209,19 +204,13 @@ address TemplateInterpreterGenerator::generate_return_entry_for(TosState state, 
   }
 #endif // _LP64
 
-  // if(X) __ stop("XXXXXXXX 111");
-
   // Restore stack bottom in case i2c adjusted stack
   __ movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
   // and NULL it as marker that esp is now tos until next java call
   __ movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
 
-  // if(X) __ stop("XXXXXXXX 222");
-
   __ restore_bcp();
   __ restore_locals();
-
-  // if(X) __ stop("XXXXXXXX 333"); // rbcp = r13 locals = r14
 
   if (state == atos) {
     Register mdp = rbx;
@@ -247,8 +236,6 @@ address TemplateInterpreterGenerator::generate_return_entry_for(TosState state, 
      NOT_LP64(__ get_thread(java_thread));
      __ check_and_handle_earlyret(java_thread);
    }
-
-  if(X) __ stop("XXXXXXXX 444");
 
   __ dispatch_next(state, step);
 

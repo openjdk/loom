@@ -125,7 +125,6 @@ class TemplateInterpreter: public AbstractInterpreter {
   static EntryPoint _safept_entry;
 
   static address _invoke_return_entry[number_of_return_addrs];           // for invokestatic, invokespecial, invokevirtual return entries
-  static address _invoke_return_entryX[number_of_return_addrs];           // for invokestatic, invokespecial, invokevirtual return entries
   static address _invokeinterface_return_entry[number_of_return_addrs];  // for invokeinterface return entries
   static address _invokedynamic_return_entry[number_of_return_addrs];    // for invokedynamic return entries
 
@@ -178,7 +177,6 @@ class TemplateInterpreter: public AbstractInterpreter {
   static address deopt_entry(TosState state, int length);
   static address deopt_reexecute_return_entry()                 { return _deopt_reexecute_return_entry; }
   static address return_entry(TosState state, int length, Bytecodes::Code code);
-  static address return_entry(TosState state, int length, Bytecodes::Code code, bool X);
 
   // Safepoint support
   static void       notice_safepoints();                        // stops the thread when reaching a safepoint
