@@ -862,6 +862,7 @@ public:
   virtual void do_oop(narrowOop* o) { _nr_oops++; }
 };
 
+// should match Continuation.preemptStatus() in Continuation.java
 enum freeze_result {
   freeze_ok = 0,
   freeze_ok_bottom = 1,
