@@ -51,8 +51,9 @@
 //------------------------------------------------------------------------------------------------------------------------
 // Implementation of InterpreterCodelet
 
-void InterpreterCodelet::initialize(const char* description, Bytecodes::Code bytecode) {
+void InterpreterCodelet::initialize(const char* description, Kind kind, Bytecodes::Code bytecode) {
   _description       = description;
+  _kind              = kind;
   _bytecode          = bytecode;
 }
 
@@ -84,6 +85,7 @@ void InterpreterCodelet::print() const { print_on(tty); }
 
 CodeletMark::CodeletMark(InterpreterMacroAssembler*& masm,
                          const char* description,
+                         InterpreterCodelet::Kind kind,
                          Bytecodes::Code bytecode) :
   _clet((InterpreterCodelet*)AbstractInterpreter::code()->request(codelet_size())),
   _cb(_clet->code_begin(), _clet->code_size()) {
@@ -91,7 +93,7 @@ CodeletMark::CodeletMark(InterpreterMacroAssembler*& masm,
   assert(_clet != NULL, "we checked not enough space already");
 
   // Initialize Codelet attributes.
-  _clet->initialize(description, bytecode);
+  _clet->initialize(description, kind, bytecode);
   // Create assembler for code generation.
   masm = new InterpreterMacroAssembler(&_cb);
   _masm = &masm;

@@ -1932,45 +1932,44 @@ static bool is_safe_to_preempt(JavaThread* thread) {
     return false;
   }
 
-  frame f = thread->last_frame();
   if (log_develop_is_enabled(Trace, jvmcont)) {
+    frame f = thread->last_frame();
     log_develop_trace(jvmcont)("is_safe_to_preempt %sSAFEPOINT", Interpreter::contains(f.pc()) ? "INTERPRETER " : "");
-    f.cb()->print_on(tty);
     f.print_on(tty);
   }
 
-  if (Interpreter::contains(f.pc())) {
-    // TODO R: set slow path
-    InterpreterCodelet* codelet = Interpreter::codelet_containing(f.pc());
+  address pc = thread->last_Java_pc();
+  if (Interpreter::contains(pc)) {
+    // Generally, we don't want to preempt when returning from some useful VM function, and certainly not when inside one.
+    InterpreterCodelet* codelet = Interpreter::codelet_containing(pc);
     if (codelet != nullptr) {
       if (log_develop_is_enabled(Trace, jvmcont)) codelet->print_on(tty);
-      // We allow preemption only when no bytecode (safepoint codelet) or a return byteocde
-      if (codelet->bytecode() >= 0 && !Bytecodes::is_return(codelet->bytecode())) {
-        log_develop_trace(jvmcont)("is_safe_to_preempt: unsafe bytecode: %s", Bytecodes::name(codelet->bytecode()));
-        return false;
-      } else if (codelet->code_begin() == Interpreter::entry_for_kind(Interpreter::native)) {
-        log_develop_trace(jvmcont)("is_safe_to_preempt: native entry: %s (unsafe)", codelet->description());
-        return false;
+      // We allow preemption only when at a safepoint codelet or a return byteocde
+      if (codelet->bytecode() >= 0 && Bytecodes::is_return(codelet->bytecode())) {
+        log_develop_trace(jvmcont)("is_safe_to_preempt: safe bytecode: %s", Bytecodes::name(codelet->bytecode()));
+        assert (codelet->kind() == InterpreterCodelet::codelet_bytecode, "");
+        return true;
+      } else if (codelet->kind() == InterpreterCodelet::codelet_safepoint_entry) {
+        log_develop_trace(jvmcont)("is_safe_to_preempt: safepoint entry: %s", codelet->description());
+        return true;
       } else {
-        log_develop_trace(jvmcont)("is_safe_to_preempt: %s (safe)", codelet->description());
-        // assert (Bytecodes::is_return(desc->bytecode()) || desc->description() != nullptr && strncmp("safepoint", desc->description(), 9) == 0, "desc: %s", desc->description());
+        log_develop_trace(jvmcont)("is_safe_to_preempt: %s (unsafe)", codelet->description());
+        return false;
       }
     } else {
       log_develop_trace(jvmcont)("is_safe_to_preempt: no codelet (safe?)");
+      return true;
     }
   } else {
-    // if (f.is_compiled_frame()) {
-    //   RelocIterator iter(f.cb()->as_compiled_method(), f.pc(), f.pc()+1);
-    //   while (iter.next()) {
-    //     iter.print_current();
-    //   }
-    // }
-    if (!f.cb()->is_safepoint_stub()) {
+    CodeBlob* cb = CodeCache::find_blob(pc);
+    if (cb->is_safepoint_stub()) {
+      log_develop_trace(jvmcont)("is_safe_to_preempt: safepoint stub");
+      return true;
+    } else {
       log_develop_trace(jvmcont)("is_safe_to_preempt: not safepoint stub");
       return false;
     }
   }
-  return true;
 }
 
 // called in a safepoint
@@ -1991,6 +1990,10 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
   if (!is_safe_to_preempt(thread)) {
     return freeze_pinned_native;
   }
+
+  assert (thread->has_last_Java_frame(), "");
+  // if (Interpreter::contains(thread->last_Java_pc())) { thread->push_cont_fastpath(thread->last_Java_sp()); }
+  assert (!Interpreter::contains(thread->last_Java_pc()) || !thread->cont_fastpath(), "fast_path at codelet %s", Interpreter::codelet_containing(thread->last_Java_pc())->description());
 
   const oop scope = java_lang_Continuation::scope(cont);
   if (innermost != cont) { // we have nested continuations
