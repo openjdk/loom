@@ -801,8 +801,7 @@ com/sun/jdi/InvokeHangTest.java                                 8218463 linux-al
 
 com/sun/jdi/AfterThreadDeathTest.java                           8232839 linux-all
 
-# times out, not executed in CI
-com/sun/jdi/EATests.java#id0                                    0000000 generic-all
+com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
 ############################################################################
 
