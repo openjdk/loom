@@ -1635,8 +1635,8 @@ public:
     // chunk->set_pc(nullptr);
     // chunk->set_argsize(0);
     chunk->clear_flags();
-    chunk->set_max_size(0);
     chunk->set_gc_mode(false);
+    chunk->set_max_size(0);
     chunk->set_mark_cycle(0);
     chunk->reset_counters();
     // chunk->set_pc(nullptr); // TODO PERF: necessary?
