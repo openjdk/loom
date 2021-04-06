@@ -25,35 +25,84 @@
 
 package com.sun.management;
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 import jdk.internal.vm.ThreadTracker;
 
 /**
- * This class consists exclusively of static methods that provide access to
- * threads in the Java virtual machine. It is intended for use by debuggers
- * or monitoring tools that run with the system property
- * "{@code jdk.trackAllVirtualThreads}" set to the value of "{@code true}" to
- * track all virtual threads in the runtime.
+ * This class consists exclusively of static methods that provide access to threads
+ * in the Java virtual machine. It is intended for use by debugging and monitoring
+ * tools.
  *
  * @since 99
  */
 public class Threads {
     private Threads() { }
 
-    /**
-     * Returns the stream of the virtual threads that have been started but have
-     * not terminated. Returns an empty stream if tracking of virtual threads
-     * is not enabled.
-     *
-     * @return a stream of virtual threads
-     * @throws SecurityException if denied by the security manager
-     */
-    public static Stream<Thread> virtualThreads() {
+    private static void checkPermission() {
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             sm.checkPermission(new RuntimePermission("modifyThreadGroup"));
         }
+    }
+
+    /**
+     * Returns the stream of the virtual threads that have been started but have
+     * not terminated. Returns an empty stream if tracking of virtual threads is
+     * not enabled.
+     *
+     * <p> This method requires that the Java virtual machine be started with the
+     * system property "{@code jdk.trackAllVirtualThreads}" set to the value of
+     * "{@code true}", otherwise virtual threads are not tracked.
+     *
+     * @return the stream of virtual threads
+     * @throws SecurityException if denied by the security manager
+     */
+    public static Stream<Thread> virtualThreads() {
+        checkPermission();
         return ThreadTracker.virtualThreads().orElse(Set.of()).stream();
     }
+
+    /**
+     * A thread executor.
+     * @since 99
+     * @see java.util.concurrent.Executors#newThreadExecutor(ThreadFactory)
+     */
+    public interface ThreadExecutor {
+        /**
+         * {@return the stream of the threads running in this executor}
+         */
+        Stream<Thread> threads();
+    }
+
+    private static class ThreadExecutorImpl implements ThreadExecutor {
+        private final jdk.internal.vm.ThreadExecutor delegate;
+        ThreadExecutorImpl(jdk.internal.vm.ThreadExecutor delegate) {
+            this.delegate = delegate;
+        }
+        static ThreadExecutor wrap(jdk.internal.vm.ThreadExecutor delegate) {
+            return new ThreadExecutorImpl(delegate);
+        }
+        public Stream<Thread> threads() {
+            return delegate.threads();
+        }
+    }
+
+    /**
+     * Returns the list of active thread executors owned by the given thread.
+     * The list is ordered, enclosing executors before nested executors.
+     *
+     * @param thread the thread
+     * @return the list of active thread executors owned by the thread
+     * @throws SecurityException if denied by the security manager
+     * @see java.util.concurrent.Executors#newThreadExecutor(ThreadFactory)
+     */
+    public static List<ThreadExecutor> executors(Thread thread) {
+        checkPermission();
+        return jdk.internal.vm.ThreadExecutor.executors(thread).stream()
+                .map(c -> ThreadExecutorImpl.wrap(c))
+                .toList();
+    }
+
 }
