@@ -535,7 +535,6 @@ java/awt/GridLayout/ComponentPreferredSize/ComponentPreferredSize.java 8238720 w
 java/awt/GridLayout/ChangeGridSize/ChangeGridSize.java   8238720 windows-all
 java/awt/event/MouseEvent/FrameMouseEventAbsoluteCoordsTest/FrameMouseEventAbsoluteCoordsTest.java
 
-sun/awt/AppContext/8012933/Test8012933.java 8264674 generic-all
 
 ############################################################################
 
@@ -561,12 +560,6 @@ java/lang/ProcessHandle/InfoTest.java                           8211847 aix-ppc6
 java/lang/invoke/LFCaching/LFMultiThreadCachingTest.java        8151492 generic-all
 java/lang/invoke/LFCaching/LFGarbageCollectedTest.java          8078602 generic-all
 java/lang/invoke/lambda/LambdaFileEncodingSerialization.java    8249079 linux-x64
-
-# Loom-specific failures
-java/lang/Continuation/Basic.java#id2                           8253570 generic-all
-java/lang/Thread/virtual/stress/PinALot.java#id1                8253523 generic-all
-java/lang/Thread/virtual/stress/PinALot.java#id3                8253523 generic-all
-java/lang/Thread/virtual/stress/GetStackTraceALot.java#id2      8254188 generic-all
 
 ############################################################################
 
@@ -629,10 +622,6 @@ java/nio/channels/DatagramChannel/Unref.java                    8233519 generic-
 java/nio/channels/AsynchronousSocketChannel/StressLoopback.java 8211851 aix-ppc64
 
 java/nio/channels/Selector/Wakeup.java                          6963118 windows-all
-
-# tests too fragile
-java/nio/Buffer/LimitDirectMemory.java                          0000000 generic-all
-sun/nio/ch/TestMaxCachedBufferSize.java                         0000000 generic-all
 
 ############################################################################
 
@@ -770,8 +759,6 @@ javax/swing/JPopupMenu/4634626/bug4634626.java 8017175 macosx-all
 sanity/client/SwingSet/src/ToolTipDemoTest.java 8225012 windows-all,macosx-all
 sanity/client/SwingSet/src/ScrollPaneDemoTest.java 8225013 linux-all
 
-javax/swing/plaf/metal/MetalUtils/bug6190373.java 8264674 generic-all
-
 ############################################################################
 
 # jdk_text
@@ -800,8 +787,6 @@ com/sun/jdi/NashornPopFrameTest.java                            8225620 generic-
 com/sun/jdi/InvokeHangTest.java                                 8218463 linux-all
 
 com/sun/jdi/AfterThreadDeathTest.java                           8232839 linux-all
-
-com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
 ############################################################################
 
@@ -887,3 +872,18 @@ java/awt/FullScreen/TranslucentWindow/TranslucentWindow.java 8258103 linux-all
 
 
 ############################################################################
+
+# Loom specific
+
+java/lang/Continuation/Basic.java#id2                           8253570 generic-all
+java/lang/Thread/virtual/stress/PinALot.java#id1                8253523 generic-all
+java/lang/Thread/virtual/stress/PinALot.java#id3                8253523 generic-all
+java/lang/Thread/virtual/stress/GetStackTraceALot.java#id2      8254188 generic-all
+
+java/nio/Buffer/LimitDirectMemory.java                          0000000 generic-all
+sun/nio/ch/TestMaxCachedBufferSize.java                         0000000 generic-all
+
+com/sun/jdi/EATests.java#id0                                    8264699 generic-all
+
+sun/awt/AppContext/8012933/Test8012933.java                     8264674 generic-all
+javax/swing/plaf/metal/MetalUtils/bug6190373.java               8264674 generic-all
