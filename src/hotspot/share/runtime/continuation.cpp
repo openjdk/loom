@@ -772,6 +772,7 @@ stackChunkOop ContMirror::find_chunk_by_address(void* p) const {
 }
 
 template<typename Event> void ContMirror::post_jfr_event(Event* e, JavaThread* jt) {
+#if INCLUDE_JFR
   if (e->should_commit()) {
     log_develop_trace(jvmcont)("JFR event: frames: %d iframes: %d size: %d", _e_num_frames, _e_num_interpreted_frames, _e_size);
     e->set_carrierThread(JFR_VM_THREAD_ID(jt));
@@ -781,6 +782,7 @@ template<typename Event> void ContMirror::post_jfr_event(Event* e, JavaThread* j
     e->set_size(_e_size);
     e->commit();
   }
+#endif
 }
 
 template <bool aligned>
@@ -1889,7 +1891,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   frame f = thread->last_frame();
 
   if (!safepoint) {
-    f = f.frame_sender<ContinuationCodeBlobLookup>(&map); // LOOKUP // this is the yield frame
+    f = f.sender(&map); // this is the yield frame
   } else { // safepoint yield
     f.set_fp(f.real_fp()); // Instead of this, maybe in ContMirror::set_last_frame always use the real_fp?
     if (!Interpreter::contains(f.pc())) {
@@ -1904,7 +1906,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
     if (res != freeze_ok)
       return res;
 
-    f = f.frame_sender<ContinuationCodeBlobLookup>(&map);
+    f = f.sender(&map);
     if (!Continuation::is_frame_in_continuation(cont, f)) {
       oop scope = java_lang_Continuation::scope(cont->continuation());
       if (scope == cont_scope)
@@ -3247,8 +3249,8 @@ public:
 
   static void print() {
     tty->print_cr(">>> Config compressed_oops: %d concurrent_gc: %d", _compressed_oops, concurrent_gc);
-    tty->print_cr(">>> Config UseAVX: %ld UseUnalignedLoadStores: %d Enhanced REP MOVSB: %d Fast Short REP MOVSB: %d rdtscp: %d rdpid: %d", UseAVX, UseUnalignedLoadStores, VM_Version::supports_erms(), VM_Version::supports_fsrm(), VM_Version::supports_rdtscp(), VM_Version::supports_rdpid());
-    tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
+    // tty->print_cr(">>> Config UseAVX: %ld UseUnalignedLoadStores: %d Enhanced REP MOVSB: %d Fast Short REP MOVSB: %d rdtscp: %d rdpid: %d", UseAVX, UseUnalignedLoadStores, VM_Version::supports_erms(), VM_Version::supports_fsrm(), VM_Version::supports_rdtscp(), VM_Version::supports_rdpid());
+    // tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
   }
 };
 

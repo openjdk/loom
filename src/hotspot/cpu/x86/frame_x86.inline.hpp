@@ -25,7 +25,6 @@
 #ifndef CPU_X86_FRAME_X86_INLINE_HPP
 #define CPU_X86_FRAME_X86_INLINE_HPP
 
-#include "code/codeCache.hpp"
 #include "code/codeCache.inline.hpp"
 #include "code/vmreg.inline.hpp"
 #include "compiler/oopMap.inline.hpp"
@@ -75,6 +74,24 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   setup(pc);
 
   _oop_map = NULL;
+}
+
+inline void frame::setup(address pc) {
+  adjust_unextended_sp();
+
+  address original_pc = CompiledMethod::get_deopt_original_pc(this);
+  if (original_pc != NULL) {
+    _pc = original_pc;
+    _deopt_state = is_deoptimized;
+    assert(_cb == NULL || _cb->as_compiled_method()->insts_contains_inclusive(_pc),
+           "original PC must be in the main code section of the the compiled method (or must be immediately following it)");
+  } else {
+    if (_cb == SharedRuntime::deopt_blob()) {
+      _deopt_state = is_deoptimized;
+    } else {
+      _deopt_state = not_deoptimized;
+    }
+  }
 }
 
 inline frame::frame(intptr_t* sp, intptr_t* fp, address pc) {
@@ -139,24 +156,6 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
 }
 
 inline frame::frame(intptr_t* sp) : frame(sp, sp, *(intptr_t**)(sp - frame::sender_sp_offset), *(address*)(sp - 1)) {}
-
-inline void frame::setup(address pc) {
-  adjust_unextended_sp();
-
-  address original_pc = CompiledMethod::get_deopt_original_pc(this);
-  if (original_pc != NULL) {
-    _pc = original_pc;
-    _deopt_state = is_deoptimized;
-    assert(_cb == NULL || _cb->as_compiled_method()->insts_contains_inclusive(_pc),
-           "original PC must be in the main code section of the the compiled method (or must be immediately following it)");
-  } else {
-    if (_cb == SharedRuntime::deopt_blob()) {
-      _deopt_state = is_deoptimized;
-    } else {
-      _deopt_state = not_deoptimized;
-    }
-  }
-}
 
 inline frame::frame(intptr_t* sp, intptr_t* fp) {
   _sp = sp;

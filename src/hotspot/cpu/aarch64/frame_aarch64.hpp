@@ -133,6 +133,8 @@
   static void verify_deopt_original_pc(   CompiledMethod* nm, intptr_t* unextended_sp);
 #endif
 
+  const ImmutableOopMap* get_oop_map() const;
+
  public:
   // Constructors
 
@@ -140,21 +142,35 @@
 
   frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc);
 
+  frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb);
+
+  frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map);
+
+  frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool dummy); // used for fast frame construction by continuations
+
   frame(intptr_t* sp, intptr_t* fp);
 
   void init(intptr_t* sp, intptr_t* fp, address pc);
+  void setup(address pc);
 
   // accessors for the instance variables
   // Note: not necessarily the real 'frame pointer' (see real_fp)
   intptr_t*   fp() const { return _fp; }
+  void set_fp(intptr_t* newfp) { _fp = newfp; }
+  int offset_fp() const { return (int)(intptr_t)_fp; }
+  void set_offset_fp(int value) { _fp = (intptr_t*)(intptr_t)value; }
 
   inline address* sender_pc_addr() const;
 
   // expression stack tos if we are nested in a java call
+  template <bool relative = false>
   intptr_t* interpreter_frame_last_sp() const;
 
   // helper to update a map with callee-saved RBP
-  static void update_map_with_saved_link(RegisterMap* map, intptr_t** link_addr);
+  template <typename RegisterMapT>
+  static void update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr);
+  template <typename RegisterMapT>
+  static intptr_t** saved_link_address(const RegisterMapT* map);
 
   // deoptimization support
   void interpreter_frame_set_last_sp(intptr_t* sp);
