@@ -286,15 +286,6 @@ void frame::patch_pc(Thread* thread, address pc) {
   }
 }
 
-bool frame::is_interpreted_frame() const  {
-  return Interpreter::contains(pc());
-}
-
-int frame::frame_size(RegisterMap* map) const {
-  frame sender = this->sender(map);
-  return sender.sp() - sp();
-}
-
 intptr_t* frame::entry_frame_argument_at(int offset) const {
   // convert offset to index to deal with tsi
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
@@ -320,8 +311,12 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
   return (BasicObjectLock*) addr_at(interpreter_frame_monitor_block_bottom_offset);
 }
 
+template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
+
+template <bool relative>
 BasicObjectLock* frame::interpreter_frame_monitor_end() const {
-  BasicObjectLock* result = (BasicObjectLock*) *addr_at(interpreter_frame_monitor_block_top_offset);
+  BasicObjectLock* result = (BasicObjectLock*) at<relative>(interpreter_frame_monitor_block_top_offset);
   // make sure the pointer points inside the frame
   assert(sp() <= (intptr_t*) result, "monitor end should be above the stack pointer");
   assert((intptr_t*) result < fp(),  "monitor end should be strictly below the frame pointer");
@@ -397,27 +392,6 @@ void frame::adjust_unextended_sp() {
   }
 }
 
-//------------------------------------------------------------------------------
-// frame::update_map_with_saved_link
-void frame::update_map_with_saved_link(RegisterMap* map, intptr_t** link_addr) {
-  // The interpreter and compiler(s) always save fp in a known
-  // location on entry. We must record where that location is
-  // so that if fp was live on callout from c2 we can find
-  // the saved copy no matter what it called.
-
-  // Since the interpreter always saves fp if we record where it is then
-  // we don't have to always save fp on entry and exit to c2 compiled
-  // code, on entry will be enough.
-  map->set_location(rfp->as_VMReg(), (address) link_addr);
-  // this is weird "H" ought to be at a higher address however the
-  // oopMaps seems to have the "H" regs at the same address and the
-  // vanilla register.
-  // XXXX make this go away
-  if (true) {
-    map->set_location(rfp->as_VMReg()->next(), (address) link_addr);
-  }
-}
-
 
 //------------------------------------------------------------------------------
 // frame::sender_for_interpreter_frame
@@ -428,6 +402,7 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
 
   // This is the sp before any possible extension (adapter/locals).
   intptr_t* unextended_sp = interpreter_frame_sender_sp();
+  intptr_t* sender_fp = link();
 
 #if COMPILER2_OR_JVMCI
   if (map->update_map()) {
@@ -435,72 +410,21 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   }
 #endif // COMPILER2_OR_JVMCI
 
-  return frame(sender_sp, unextended_sp, link(), sender_pc());
-}
+  address sender_pc = this->sender_pc();
 
-
-//------------------------------------------------------------------------------
-// frame::sender_for_compiled_frame
-frame frame::sender_for_compiled_frame(RegisterMap* map) const {
-  // we cannot rely upon the last fp having been saved to the thread
-  // in C2 code but it will have been pushed onto the stack. so we
-  // have to find it relative to the unextended sp
-
-  assert(_cb->frame_size() >= 0, "must have non-zero frame size");
-  intptr_t* l_sender_sp = unextended_sp() + _cb->frame_size();
-  intptr_t* unextended_sp = l_sender_sp;
-
-  // the return_address is always the word on the stack
-  address sender_pc = (address) *(l_sender_sp-1);
-
-  intptr_t** saved_fp_addr = (intptr_t**) (l_sender_sp - frame::sender_sp_offset);
-
-  // assert (sender_sp() == l_sender_sp, "should be");
-  // assert (*saved_fp_addr == link(), "should be");
-
-  if (map->update_map()) {
-    // Tell GC to use argument oopmaps for some runtime stubs that need it.
-    // For C1, the runtime stub might not have oop maps, so set this flag
-    // outside of update_register_map.
-    map->set_include_argument_oops(_cb->caller_must_gc_arguments(map->thread()));
-    if (_cb->oop_maps() != NULL) {
-      OopMapSet::update_register_map(this, map);
+  if (Continuation::is_return_barrier_entry(sender_pc)) {	
+    if (map->walk_cont()) { // about to walk into an h-stack	
+      return Continuation::top_frame(*this, map);	
+    } else {
+      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &unextended_sp);
     }
-
-    // Since the prolog does the save and restore of FP there is no
-    // oopmap for it so we must fill in its location as if there was
-    // an oopmap entry since if our caller was compiled code there
-    // could be live jvm state in it.
-    update_map_with_saved_link(map, saved_fp_addr);
   }
 
-  return frame(l_sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
+  return frame(sender_sp, unextended_sp, sender_fp, sender_pc);
 }
 
 //------------------------------------------------------------------------------
-// frame::sender_raw
-frame frame::sender_raw(RegisterMap* map) const {
-  // Default is we done have to follow them. The sender_for_xxx will
-  // update it accordingly
-   map->set_include_argument_oops(false);
-
-  if (is_entry_frame())
-    return sender_for_entry_frame(map);
-  if (is_interpreted_frame())
-    return sender_for_interpreter_frame(map);
-  assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
-
-  // This test looks odd: why is it not is_compiled_frame() ?  That's
-  // because stubs also have OOP maps.
-  if (_cb != NULL) {
-    return sender_for_compiled_frame(map);
-  }
-
-  // Must be native-compiled frame, i.e. the marshaling code for native
-  // methods that exists in the core system.
-  return frame(sender_sp(), link(), sender_pc());
-}
-
+// frame::sender
 frame frame::sender(RegisterMap* map) const {
   frame result = sender_raw(map);
 
@@ -617,10 +541,13 @@ BasicType frame::interpreter_frame_result(oop* oop_result, jvalue* value_result)
   return type;
 }
 
+template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
 
+template <bool relative>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
-  return &interpreter_frame_tos_address()[index];
+  return &interpreter_frame_tos_address<relative>()[index];
 }
 
 #ifndef PRODUCT
@@ -640,25 +567,24 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
     DESCRIBE_FP_OFFSET(interpreter_frame_bcp);
     DESCRIBE_FP_OFFSET(interpreter_frame_initial_sp);
   }
+
+  if (is_java_frame()) {
+    address ret_pc = *(address*)(real_fp() - return_addr_offset);
+    values.describe(frame_no, real_fp() - return_addr_offset, Continuation::is_return_barrier_entry(ret_pc) ? "return address (return barrier)" : "return address");
+    values.describe(-1, real_fp() - sender_sp_offset, "saved fp", 2);
+  }
+}
+
+void frame::describe_top_pd(FrameValues& values) {
+  address ret_pc_callee = *(address*)(sp() - return_addr_offset);
+  values.describe(-1, sp() - return_addr_offset, Continuation::is_return_barrier_entry(ret_pc_callee) ? "return address (return barrier)" : "return address");
+  values.describe(-1, sp() - sender_sp_offset, "saved fp", 2);
 }
 #endif
 
 intptr_t *frame::initial_deoptimization_info() {
   // Not used on aarch64, but we must return something.
   return NULL;
-}
-
-intptr_t* frame::real_fp() const {
-  if (_cb != NULL) {
-    // use the frame size if valid
-    int size = _cb->frame_size();
-    if (size > 0) {
-      return unextended_sp() + size;
-    }
-  }
-  // else rely on fp()
-  assert(! is_compiled_frame(), "unknown compiled frame size");
-  return fp();
 }
 
 #undef DESCRIBE_FP_OFFSET

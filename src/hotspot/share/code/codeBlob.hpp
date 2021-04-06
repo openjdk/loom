@@ -258,11 +258,6 @@ public:
 #endif
 };
 
-class CodeBlobLookup {
-public:
-  virtual CodeBlob* find_blob(address addr) const { return NULL; }
-};
-
 class CodeBlobLayout : public StackObj {
 private:
   int _size;

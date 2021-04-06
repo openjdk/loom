@@ -34,23 +34,6 @@
 
 // Inline functions for Intel frames:
 
-class ContinuationCodeBlobLookup {
-public:
-  enum { has_oopmap_lookup = true };
-
-  static CodeBlob* find_blob(address pc) {
-    CodeBlob* cb = CodeCache::find_blob_fast(pc);
-    /*Prefetch::read(cb, PrefetchScanIntervalInBytes);
-    Prefetch::read((void*)cb->is_compiled_addr(), PrefetchScanIntervalInBytes);
-    Prefetch::read((void*) ((CompiledMethod*) cb)->deopt_handler_begin_addr(), PrefetchScanIntervalInBytes);*/
-    return cb;
-  }
-
-  static CodeBlob* find_blob_and_oopmap(address pc, int& slot) {
-    return CodeCache::find_blob_and_oopmap(pc, slot);
-  }
-};
-
 // Constructors:
 
 inline frame::frame() {
@@ -400,8 +383,21 @@ inline bool frame::is_interpreted_frame() const {
   return Interpreter::contains(pc());
 }
 
-template <typename LOOKUP>
-frame frame::frame_sender(RegisterMap* map) const {
+inline const ImmutableOopMap* frame::get_oop_map() const {
+  if (_cb == NULL) return NULL;
+  if (_cb->oop_maps() != NULL) {
+    NativePostCallNop* nop = nativePostCallNop_at(_pc);
+    if (nop != NULL && nop->displacement() != 0) {
+      int slot = ((nop->displacement() >> 24) & 0xff);
+      return _cb->oop_map_for_slot(slot, _pc);
+    }
+    const ImmutableOopMap* oop_map = OopMapSet::find_map(this);
+    return oop_map;
+  }
+  return NULL;
+}
+
+inline frame frame::sender_raw(RegisterMap* map) const {
   // Default is we done have to follow them. The sender_for_xxx will
   // update it accordingly
   map->set_include_argument_oops(false);
@@ -416,24 +412,21 @@ frame frame::frame_sender(RegisterMap* map) const {
   assert(_cb == CodeCache::find_blob(pc()), "Must be the same");
 
   if (_cb != NULL) {
-    return _cb->is_compiled() ? sender_for_compiled_frame<LOOKUP, false>(map) : sender_for_compiled_frame<LOOKUP, true>(map);
+    return _cb->is_compiled() ? sender_for_compiled_frame<false>(map) : sender_for_compiled_frame<true>(map);
   }
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
   return frame(sender_sp(), link(), sender_pc());
 }
 
-//------------------------------------------------------------------------------
-// frame::sender_for_compiled_frame
-template <typename LOOKUP, bool stub>
+template <bool stub>
 frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   assert(map != NULL, "map must be set");
 
   // frame owned by optimizing compiler
   assert(_cb->frame_size() >= 0, "must have non-zero frame size");
   intptr_t* sender_sp = unextended_sp() + _cb->frame_size();
-
-  assert (sender_sp == real_fp(), "sender_sp: " INTPTR_FORMAT " real_fp: " INTPTR_FORMAT, p2i(sender_sp), p2i(real_fp()));
+  assert (sender_sp == real_fp(), "");
 
   // On Intel the return_address is always the word on the stack
   address sender_pc = (address) *(sender_sp-1);
@@ -442,7 +435,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   // It is only an FP if the sender is an interpreter frame (or C1?).
   // saved_fp_addr should be correct even for a bottom thawed frame (with a return barrier)
   intptr_t** saved_fp_addr = (intptr_t**) (sender_sp - frame::sender_sp_offset);
-  intptr_t* sender_fp = *saved_fp_addr;
+
   if (map->update_map()) {
     // Tell GC to use argument oopmaps for some runtime stubs that need it.
     // For C1, the runtime stub might not have oop maps, so set this flag
@@ -475,26 +468,12 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   }
 
   intptr_t* unextended_sp = sender_sp;
-  CodeBlob* sender_cb = LOOKUP::find_blob(sender_pc);
+  CodeBlob* sender_cb = CodeCache::find_blob_fast(sender_pc);
   if (sender_cb != NULL) {
-    return frame(sender_sp, unextended_sp, sender_fp, sender_pc, sender_cb);
+    return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc, sender_cb);
   }
   // tty->print_cr(">>>> NO CB sender_pc: %p", sender_pc); os::print_location(tty, (intptr_t)sender_pc); print_on(tty);
-  return frame(sender_sp, unextended_sp, sender_fp, sender_pc);
-}
-
-inline const ImmutableOopMap* frame::get_oop_map() const {
-  if (_cb == NULL) return NULL;
-  if (_cb->oop_maps() != NULL) {
-    NativePostCallNop* nop = nativePostCallNop_at(_pc);
-    if (nop != NULL && nop->displacement() != 0) {
-      int slot = ((nop->displacement() >> 24) & 0xff);
-      return _cb->oop_map_for_slot(slot, _pc);
-    }
-    const ImmutableOopMap* oop_map = OopMapSet::find_map(this);
-    return oop_map;
-  }
-  return NULL;
+  return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
 }
 
 #endif // CPU_X86_FRAME_X86_INLINE_HPP

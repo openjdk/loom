@@ -39,7 +39,6 @@
 typedef class BytecodeInterpreter* interpreterState;
 
 class CodeBlob;
-class CodeBlobLookup;
 class CompiledMethod;
 class FrameValues;
 class vframeArray;
@@ -197,9 +196,6 @@ class frame {
   // returns the sending frame
   frame sender(RegisterMap* map) const;
 
-  template<typename LOOKUP> // LOOKUP is CodeCache or ContinuationCodeBlobLookup (requires: static CodeBlob* find_blob(address pc))
-  frame frame_sender(RegisterMap* map) const;
-
   bool safe_for_sender(JavaThread *thread);
 
   // returns the sender, but skips conversion frames
@@ -211,7 +207,7 @@ class frame {
 
  private:
   // Helper methods for better factored code in frame::sender
-  template <typename LOOKUP, bool stub>
+  template <bool stub>
   frame sender_for_compiled_frame(RegisterMap* map) const;
   frame sender_for_entry_frame(RegisterMap* map) const;
   frame sender_for_interpreter_frame(RegisterMap* map) const;

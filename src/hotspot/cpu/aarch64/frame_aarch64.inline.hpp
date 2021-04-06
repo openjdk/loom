@@ -28,6 +28,7 @@
 
 #include "code/codeCache.inline.hpp"
 #include "code/vmreg.inline.hpp"
+#include "interpreter/interpreter.hpp"
 #include "interpreter/oopMapCache.hpp"
 #include "runtime/sharedRuntime.hpp"
 
@@ -264,7 +265,6 @@ void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) 
   // we don't have to always save EBP/RBP on entry and exit to c2 compiled
   // code, on entry will be enough.
   map->set_location(rfp->as_VMReg(), (address) link_addr);
-#ifdef AMD64
   // this is weird "H" ought to be at a higher address however the
   // oopMaps seems to have the "H" regs at the same address and the
   // vanilla register.
@@ -272,7 +272,6 @@ void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) 
   if (true) {
     map->set_location(rfp->as_VMReg()->next(), (address) link_addr);
   }
-#endif // AMD64
 }
 
 template <typename RegisterMapT>
@@ -384,6 +383,10 @@ inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
   *result_adr = obj;
 }
 
+inline bool frame::is_interpreted_frame() const {
+  return Interpreter::contains(pc());
+}
+
 inline const ImmutableOopMap* frame::get_oop_map() const {
   if (_cb == NULL) return NULL;
   if (_cb->oop_maps() != NULL) {
@@ -396,6 +399,81 @@ inline const ImmutableOopMap* frame::get_oop_map() const {
     return oop_map;
   }
   return NULL;
+}
+
+inline frame frame::sender_raw(RegisterMap* map) const {
+  // Default is we done have to follow them. The sender_for_xxx will
+  // update it accordingly
+  map->set_include_argument_oops(false);
+
+  if (map->in_cont()) { // already in an h-stack
+    return map->stack_chunk()->sender(*this, map);
+  }
+
+  if (is_entry_frame())       return sender_for_entry_frame(map);
+  if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
+
+  assert(_cb == CodeCache::find_blob(pc()), "Must be the same");
+
+  if (_cb != NULL) {
+    return _cb->is_compiled() ? sender_for_compiled_frame<false>(map) : sender_for_compiled_frame<true>(map);
+  }
+  // Must be native-compiled frame, i.e. the marshaling code for native
+  // methods that exists in the core system.
+  return frame(sender_sp(), link(), sender_pc());
+}
+
+template <bool stub>
+frame frame::sender_for_compiled_frame(RegisterMap* map) const {
+  // we cannot rely upon the last fp having been saved to the thread
+  // in C2 code but it will have been pushed onto the stack. so we
+  // have to find it relative to the unextended sp
+
+  assert(_cb->frame_size() >= 0, "must have non-zero frame size");
+  intptr_t* sender_sp = unextended_sp() + _cb->frame_size();
+  assert (sender_sp == real_fp(), "");
+
+  // the return_address is always the word on the stack
+  address sender_pc = (address) *(sender_sp-1);
+
+  intptr_t** saved_fp_addr = (intptr_t**) (sender_sp - frame::sender_sp_offset);
+
+  if (map->update_map()) {
+    // Tell GC to use argument oopmaps for some runtime stubs that need it.
+    // For C1, the runtime stub might not have oop maps, so set this flag
+    // outside of update_register_map.
+    if (stub) { // compiled frames do not use callee-saved registers
+      map->set_include_argument_oops(_cb->caller_must_gc_arguments(map->thread()));
+      if (oop_map() != NULL) { 
+        _oop_map->update_register_map(this, map);
+      }
+    } else {
+      assert (!_cb->caller_must_gc_arguments(map->thread()), "");
+      assert (!map->include_argument_oops(), "");
+      assert (oop_map() == NULL || !oop_map()->has_any(OopMapValue::callee_saved_value), "callee-saved value in compiled frame");
+    }
+
+    // Since the prolog does the save and restore of EBP there is no oopmap
+    // for it so we must fill in its location as if there was an oopmap entry
+    // since if our caller was compiled code there could be live jvm state in it.
+    update_map_with_saved_link(map, saved_fp_addr);
+  }
+
+  if (Continuation::is_return_barrier_entry(sender_pc)) {	
+    if (map->walk_cont()) { // about to walk into an h-stack 	
+      return Continuation::top_frame(*this, map);	
+    } else {
+      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &sender_sp);	
+    }
+  }
+
+  intptr_t* unextended_sp = sender_sp;
+  CodeBlob* sender_cb = CodeCache::find_blob_fast(sender_pc);
+  if (sender_cb != NULL) {
+    return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc, sender_cb);
+  }
+  // tty->print_cr(">>>> NO CB sender_pc: %p", sender_pc); os::print_location(tty, (intptr_t)sender_pc); print_on(tty);
+  return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
 }
 
 #endif // CPU_AARCH64_FRAME_AARCH64_INLINE_HPP

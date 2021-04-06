@@ -438,10 +438,7 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
 
 
 //------------------------------------------------------------------------------
-// frame::sender_raw
-frame frame::sender_raw(RegisterMap* map) const {
-  return frame_sender<CodeCache>(map);
-}
+// frame::sender
 
 frame frame::sender(RegisterMap* map) const {
   frame result = sender_raw(map);
