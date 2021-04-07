@@ -559,13 +559,22 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   // QQQ I'd rather see this pushed down into last_frame_adjust
   // and have it take the sender (aka caller).
 
+  if (!deopt_sender.is_interpreted_frame() || caller_was_method_handle) {
+    caller_adjustment = last_frame_adjust(0, callee_locals);
+  } else if (callee_locals > callee_parameters) {
+    // The caller frame may need extending to accommodate
+    // non-parameter locals of the first unpacked interpreted frame.
+    // Compute that adjustment.
+    caller_adjustment = last_frame_adjust(callee_parameters, callee_locals);
+  }
+
   // We always push the stack to make room for parameters, even if the caller is interpreted and has the parameters on the stack; this makes Loom continuation code simpler.
   // ... except if we've already done it, which can happen if the deoptimized frame becomes OSR and then deoptimized again.
-  if (deopt_sender.is_interpreted_frame() && deopt_sender.interpreter_frame_last_sp() > deopt_sender.sp() + 1 && callee_locals > callee_parameters) {
-    caller_adjustment = last_frame_adjust(callee_parameters, callee_locals);
-  } else {
-    caller_adjustment = last_frame_adjust(0, callee_locals);
-  }
+  // if (deopt_sender.is_interpreted_frame() && deopt_sender.interpreter_frame_last_sp() > deopt_sender.sp() + 1 && callee_locals > callee_parameters) {
+  //   caller_adjustment = last_frame_adjust(callee_parameters, callee_locals);
+  // } else {
+  //   caller_adjustment = last_frame_adjust(0, callee_locals);
+  // }
   
   // // If the caller is a continuation entry and the callee has a return barrier
   // // then we cannot use the parameters in the caller.

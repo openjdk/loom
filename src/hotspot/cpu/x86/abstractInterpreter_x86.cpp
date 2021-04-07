@@ -109,27 +109,12 @@ void AbstractInterpreter::layout_activation(Method* method,
   // All frames but the initial (oldest) interpreter frame we fill in have
   // a value for sender_sp that allows walking the stack but isn't
   // truly correct. Correct the value here.
-  if (extra_locals != 0 &&
-      interpreter_frame->sender_sp() ==
-      interpreter_frame->interpreter_frame_sender_sp()) {
-    interpreter_frame->set_interpreter_frame_sender_sp(caller->sp() +
-                                                       extra_locals);
-  }
-  if (is_bottom_frame && caller->is_interpreted_frame()) {
-    interpreter_frame->set_interpreter_frame_sender_sp(locals - params + 1);
+  if (extra_locals != 0 && interpreter_frame->sender_sp() == interpreter_frame->interpreter_frame_sender_sp()) {
+    interpreter_frame->set_interpreter_frame_sender_sp(caller->sp() + extra_locals);
   }
 
-  assert (!caller->is_interpreted_frame() || interpreter_frame->interpreter_frame_sender_sp() == locals - params + 1, 
-    "is_bottom_frame: %d sender_sp: " INTPTR_FORMAT " locals: " INTPTR_FORMAT " params: %d locals-params+1: " INTPTR_FORMAT, 
-    is_bottom_frame, p2i(interpreter_frame->interpreter_frame_sender_sp()), p2i(locals), params, p2i(locals - params + 1));
-  assert (!caller->is_interpreted_frame() || interpreter_frame->interpreter_frame_sender_sp() == interpreter_frame->fp() + 1 + extra_locals + 1,
-    "is_bottom_frame: %d sender_sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " extra_locals: %d fp+1+extra_locals+1: " INTPTR_FORMAT, 
-    is_bottom_frame, p2i(interpreter_frame->interpreter_frame_sender_sp()), p2i(interpreter_frame->fp()), extra_locals, p2i(interpreter_frame->fp() + 1 + extra_locals + 1));
-
-  *interpreter_frame->interpreter_frame_cache_addr() =
-    method->constants()->cache();
-  *interpreter_frame->interpreter_frame_mirror_addr() =
-    method->method_holder()->java_mirror();
+  *interpreter_frame->interpreter_frame_cache_addr()  = method->constants()->cache();
+  *interpreter_frame->interpreter_frame_mirror_addr() = method->method_holder()->java_mirror();
 }
 
 #ifndef _LP64
