@@ -5738,6 +5738,147 @@ class StubGenerator: public StubCodeGenerator {
   }
 #endif // LINUX
 
+RuntimeStub* generate_cont_doYield() {
+    const char *name = "cont_doYield";
+
+    enum layout {
+      rfp_off,
+      rfpH_off,
+      return_off,
+      return_off2,
+      framesize // inclusive of return address
+    };
+    // assert(is_even(framesize/2), "sp not 16-byte aligned");
+    int insts_size = 512;
+    int locs_size  = 64;
+    CodeBuffer code(name, insts_size, locs_size);
+    OopMapSet* oop_maps  = new OopMapSet();
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* _masm = masm;
+
+    // MacroAssembler* masm = _masm;
+    // StubCodeMark mark(this, "StubRoutines", name);
+
+    address start = __ pc();
+
+    // __ enter();
+
+    int frame_complete = __ pc() - start;
+    address the_pc = __ pc();
+
+    // TODO LOOM AARCH64
+
+    // return start;
+
+    OopMap* map = new OopMap(framesize, 1);
+    // map->set_callee_saved(VMRegImpl::stack2reg(rfp_off), rfp->as_VMReg());
+    oop_maps->add_gc_map(the_pc - start, map);
+
+    RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)
+    RuntimeStub::new_runtime_stub(name,
+                                  &code,
+                                  frame_complete,
+                                  (framesize >> (LogBytesPerWord - LogBytesPerInt)),
+                                  oop_maps, false);
+    return stub;
+  }
+
+  address generate_cont_jump_from_safepoint() {
+    StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
+
+    address start = __ pc();
+
+    // TODO LOOM AARCH64
+
+    return start;
+  }
+
+  address generate_cont_thaw(bool return_barrier, bool exception) {
+    assert (return_barrier || !exception, "must be");
+
+    address start = __ pc();
+
+    // TODO LOOM AARCH64
+
+    return start;
+  }
+
+  address generate_cont_thaw() {
+    StubCodeMark mark(this, "StubRoutines", "Cont thaw");
+    address start = __ pc();
+    generate_cont_thaw(false, false);
+    return start;
+  }
+
+  address generate_cont_returnBarrier() {
+    // TODO: will probably need multiple return barriers depending on return type
+    StubCodeMark mark(this, "StubRoutines", "cont return barrier");
+    address start = __ pc();
+
+    generate_cont_thaw(true, false);
+
+    return start;
+  }
+
+  address generate_cont_returnBarrier_exception() {
+    StubCodeMark mark(this, "StubRoutines", "cont return barrier exception handler");
+    address start = __ pc();
+
+    generate_cont_thaw(true, true);
+
+    return start;
+  }
+
+  address generate_cont_interpreter_forced_preempt_return() {
+      StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
+      address start = __ pc();
+
+      // TODO LOOM AARCH64
+
+      return start;
+    }
+
+#if INCLUDE_JFR
+
+  static void jfr_set_last_java_frame(MacroAssembler* _masm, Register thread) {
+    // TODO LOOM AARCH64
+  }
+
+  static void jfr_prologue(MacroAssembler* _masm, Register thread) {
+    jfr_set_last_java_frame(_masm, thread);
+    // TODO LOOM AARCH64
+  }
+
+  // Handle is dereference here using correct load constructs.
+  static void jfr_epilogue(MacroAssembler* _masm, Register thread) {
+    // TODO LOOM AARCH64
+  }
+
+  // For c2: c_rarg0 is junk, c_rarg1 is the thread id. Call to runtime to write a checkpoint.
+  // Runtime will return a jobject handle to the event writer. The handle is dereferenced and the return value
+  // is the event writer oop.
+  address generate_jfr_write_checkpoint() {
+    StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
+    address start = __ pc();
+    
+    // TODO LOOM AARCH64
+
+    return start;
+  }
+
+  // For c1: call the corresponding runtime routine, it returns a jobject handle to the event writer.
+  // The handle is dereferenced and the return value is the event writer oop.
+  address generate_jfr_get_event_writer() {
+    StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
+    address start = __ pc();
+
+    // TODO LOOM AARCH64
+
+    return start;
+  }
+
+#endif // INCLUDE_JFR
+
   // Continuation point for throwing of implicit exceptions that are
   // not handled in the current activation. Fabricates an exception
   // oop and initiates normal exception dispatching in this
@@ -6730,6 +6871,20 @@ class StubGenerator: public StubCodeGenerator {
                                                        &StubRoutines::_safefetchN_continuation_pc);
   }
 
+  void generate_phase1() {
+    // Continuation stubs:
+    StubRoutines::_cont_thaw          = generate_cont_thaw();
+    StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
+    StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
+    StubRoutines::_cont_doYield_stub = generate_cont_doYield();
+    StubRoutines::_cont_doYield    = StubRoutines::_cont_doYield_stub->entry_point();
+    StubRoutines::_cont_jump_from_sp = generate_cont_jump_from_safepoint();
+    StubRoutines::_cont_interpreter_forced_preempt_return = generate_cont_interpreter_forced_preempt_return();
+
+    JFR_ONLY(StubRoutines::_jfr_write_checkpoint = generate_jfr_write_checkpoint();)
+    JFR_ONLY(StubRoutines::_jfr_get_event_writer = generate_jfr_get_event_writer();)
+  }
+
   void generate_all() {
     // support for verify_oop (must happen after universe_init)
     StubRoutines::_verify_oop_subroutine_entry     = generate_verify_oop();
@@ -6860,21 +7015,23 @@ class StubGenerator: public StubCodeGenerator {
   }
 
  public:
-  StubGenerator(CodeBuffer* code, bool all) : StubCodeGenerator(code) {
-    if (all) {
-      generate_all();
-    } else {
+  StubGenerator(CodeBuffer* code, int phase) : StubCodeGenerator(code) {
+    if (phase == 0) {
       generate_initial();
+    } else if (phase == 1) {
+      generate_phase1(); // stubs that must be available for the interpreter
+    } else {
+      generate_all();
     }
   }
 }; // end class declaration
 
 #define UCM_TABLE_MAX_ENTRIES 8
-void StubGenerator_generate(CodeBuffer* code, bool all) {
+void StubGenerator_generate(CodeBuffer* code, int phase) {
   if (UnsafeCopyMemory::_table == NULL) {
     UnsafeCopyMemory::create_table(UCM_TABLE_MAX_ENTRIES);
   }
-  StubGenerator g(code, all);
+  StubGenerator g(code, phase);
 }
 
 
@@ -6903,3 +7060,37 @@ DEFAULT_ATOMIC_OP(cmpxchg, 8, _relaxed)
 #undef DEFAULT_ATOMIC_OP
 
 #endif // LINUX
+
+
+#undef __
+#define __ masm->
+
+// on exit, rsp points to the ContinuationEntry
+// kills rax
+OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
+  assert (ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
+  assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
+  assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
+
+  // TODO LOOM AARCH64
+  OopMap* map = new OopMap(((int)ContinuationEntry::size() + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
+  ContinuationEntry::setup_oopmap(map);
+
+  return map;
+}
+
+// on entry c_rarg1 points to the continuation 
+//          rsp points to ContinuationEntry
+// kills rax
+void fill_continuation_entry(MacroAssembler* masm) {
+  // TODO LOOM AARCH64
+}
+
+// on entry, rsp points to the ContinuationEntry
+// on exit, rsp points to the spilled rbp in the entry frame
+// kills rbx, rcx
+void continuation_enter_cleanup(MacroAssembler* masm) {
+  // TODO LOOM AARCH64
+}
+
+#undef __

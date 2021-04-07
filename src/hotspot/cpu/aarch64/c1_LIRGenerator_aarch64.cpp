@@ -361,6 +361,13 @@ void LIRGenerator::do_MonitorExit(MonitorExit* x) {
   monitor_exit(obj_temp, lock, syncTempOpr(), LIR_OprFact::illegalOpr, x->monitor_no());
 }
 
+void LIRGenerator::do_continuation_doYield(Intrinsic* x) {
+  BasicTypeList signature(0);
+  // signature.append(T_INT);
+  CallingConvention* cc = frame_map()->java_calling_convention(&signature, true);
+
+  // TODO LOOM AARCH64
+}
 
 void LIRGenerator::do_NegateOp(NegateOp* x) {
 

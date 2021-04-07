@@ -668,14 +668,6 @@ void LIR_Assembler::emit_op0(LIR_Op0* op) {
       on_spin_wait();
       break;
 
-    case lir_getfp:
-      getfp(op->result_opr());
-      break;
-
-    case lir_getsp:
-      getsp(op->result_opr());
-      break;
-
 
     default:
       ShouldNotReachHere();

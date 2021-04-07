@@ -215,23 +215,6 @@ void LIR_Assembler::pop(LIR_Opr opr) {
   }
 }
 
-void LIR_Assembler::getfp(LIR_Opr opr) {
-  __ lea(opr->as_register_lo(), Address(rsp, initial_frame_size_in_bytes() + wordSize)); // + wordSize seems to be required to handle the push rbp before the sub of rsp
-}
-
-void LIR_Assembler::getsp(LIR_Opr opr) {
-  __ movptr(opr->as_register_lo(), rsp);
-}
-
-#if 0
-void LIR_Assembler::getpc(LIR_Opr opr) {
-  const char *name + "cont_getPC";
-  address entry = StubRoutines::cont_getPC();
-  __ call_VM_leaf(entry, 0);
-  __ movptr(opr->as_register_lo(), rax);
-}
-#endif
-
 bool LIR_Assembler::is_literal_address(LIR_Address* addr) {
   return addr->base()->is_illegal() && addr->index()->is_illegal();
 }

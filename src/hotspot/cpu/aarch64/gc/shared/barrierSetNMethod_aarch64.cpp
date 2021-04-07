@@ -152,6 +152,14 @@ void BarrierSetNMethod::disarm(nmethod* nm) {
   barrier->set_value(disarmed_value());
 }
 
+void BarrierSetNMethod::arm(nmethod* nm, int arm_value) {
+  if (!supports_entry_barrier(nm)) {
+    return;
+  }
+
+  // TODO LOOM AARCH64
+}
+
 bool BarrierSetNMethod::is_armed(nmethod* nm) {
   if (!supports_entry_barrier(nm)) {
     return false;

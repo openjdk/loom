@@ -2798,6 +2798,37 @@ void MacroAssembler::pop_FPU_state() {
   addptr(rsp, FPUStateSizeInWords * wordSize);
 }
 
+void MacroAssembler::pop_IU_state() {
+  popa();
+  LP64_ONLY(addq(rsp, 8));
+  popf();
+}
+
+// Save Integer and Float state
+// Warning: Stack must be 16 byte aligned (64bit)
+void MacroAssembler::push_CPU_state() {
+  push_IU_state();
+  push_FPU_state();
+}
+
+void MacroAssembler::push_FPU_state() {
+  subptr(rsp, FPUStateSizeInWords * wordSize);
+#ifndef _LP64
+  fnsave(Address(rsp, 0));
+  fwait();
+#else
+  fxsave(Address(rsp, 0));
+#endif // LP64
+}
+
+void MacroAssembler::push_IU_state() {
+  // Push flags first because pusha kills them
+  pushf();
+  // Make sure rsp stays 16-byte aligned
+  LP64_ONLY(subq(rsp, 8));
+  pusha();
+}
+
 void MacroAssembler::push_cont_fastpath(Register java_thread) {
   Label done;
   cmpptr(rsp, Address(java_thread, JavaThread::cont_fastpath_offset()));
@@ -2840,37 +2871,6 @@ void MacroAssembler::stop_if_in_cont(Register cont, const char* name) {
 #endif
 }
 #endif
-
-void MacroAssembler::pop_IU_state() {
-  popa();
-  LP64_ONLY(addq(rsp, 8));
-  popf();
-}
-
-// Save Integer and Float state
-// Warning: Stack must be 16 byte aligned (64bit)
-void MacroAssembler::push_CPU_state() {
-  push_IU_state();
-  push_FPU_state();
-}
-
-void MacroAssembler::push_FPU_state() {
-  subptr(rsp, FPUStateSizeInWords * wordSize);
-#ifndef _LP64
-  fnsave(Address(rsp, 0));
-  fwait();
-#else
-  fxsave(Address(rsp, 0));
-#endif // LP64
-}
-
-void MacroAssembler::push_IU_state() {
-  // Push flags first because pusha kills them
-  pushf();
-  // Make sure rsp stays 16-byte aligned
-  LP64_ONLY(subq(rsp, 8));
-  pusha();
-}
 
 void MacroAssembler::reset_last_Java_frame(Register java_thread, bool clear_fp) { // determine java_thread register
   if (!java_thread->is_valid()) {

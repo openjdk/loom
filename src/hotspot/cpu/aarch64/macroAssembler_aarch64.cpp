@@ -308,6 +308,26 @@ void MacroAssembler::safepoint_poll(Label& slow_path, bool at_return, bool acqui
   }
 }
 
+void MacroAssembler::push_cont_fastpath(Register java_thread) {
+  // TODO LOOM AARCH64
+}
+
+void MacroAssembler::pop_cont_fastpath(Register java_thread) {
+  // TODO LOOM AARCH64
+}
+
+void MacroAssembler::inc_held_monitor_count(Register java_thread) {
+  // TODO LOOM AARCH64
+}
+
+void MacroAssembler::dec_held_monitor_count(Register java_thread) {
+  // TODO LOOM AARCH64
+}
+
+void MacroAssembler::reset_held_monitor_count(Register java_thread) {
+  // TODO LOOM AARCH64
+}
+
 void MacroAssembler::reset_last_Java_frame(bool clear_fp) {
   // we must set sp to zero to clear frame
   str(zr, Address(rthread, JavaThread::last_Java_sp_offset()));
