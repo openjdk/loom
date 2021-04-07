@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -542,7 +542,12 @@ getAllThreads(PacketInputStream *in, PacketOutputStream *out)
         jthread *theVThreads;
 
         theThreads = allThreads(&threadCount);
-        theVThreads = threadControl_allVThreads(&vthreadCount);
+        if (gdata->enumerateVThreads) {
+            theVThreads = threadControl_allVThreads(&vthreadCount);
+        } else {
+            theVThreads = NULL;
+            vthreadCount = 0;
+        }
 
         if (theThreads == NULL || (theVThreads == NULL && vthreadCount != 0)) {
             outStream_setError(out, JDWP_ERROR(OUT_OF_MEMORY));

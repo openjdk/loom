@@ -588,6 +588,9 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
         reportEvents(env, eventSessionID, evinfo->thread, evinfo->ei,
                      evinfo->clazz, evinfo->method, evinfo->location, eventBag);
     }
+    // vthread fixme: if we didn't have any events to report, we should allow the vthread
+    // ThreadNode to be released at this point.
+
 }
 
 /*
@@ -596,13 +599,10 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
  * filters, then we will notify the debugger with a THREAD_START and add it to our list of
  * vthreads. Otherwise we ignore it.
  *
- * vthread fixme: We should be able to get rid of this. Eventually we won't be sending the
- * the fake THREAD_START event anymore. This just leaves the need to call threadControl_addVThread()
- * for the vthread so the debug agent can track it. This could probably be deferred until it is
- * really needed, such as when the event gets sent to the debugger (if one actually gets sent)
- * or when the debugger sends a command that references the thread. It may mean adding special
- * checks in more than one place when a vthread lookup fails, and add the vthread at that point.
+ * vthread fixme: We should be able to get rid of this. Vthreads are now tracked lazily
+ * when threadControl_onEventHandlerEntry is called.
  */
+#if 0
 static void
 filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSessionID)
 {
@@ -649,6 +649,7 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
 
         if (gdata->fakeVThreadStartEvent) {
             /* vthread fixme: this shouldn't be needed if ei == EI_THREAD_START. */
+            JDI_ASSERT(evinfo->ei != EI_THREAD_START);
             /*
              * When the VIRTUAL_THREAD_START event arrived for this vthread, we ignored it since we don't
              * want to notify the debugger about vthreads until there is a non-vthread event that
@@ -661,6 +662,9 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
             struct bag *eventBag = eventHelper_createEventBag();
 
             (void)memset(&info,0,sizeof(info));
+            /* vthread fixme: I think this can be changed to EI_THREAD_START. It works now because
+             * eventIndex2jdwp converts it to THREAD_START before sending the event.
+             */
             info.ei         = EI_VIRTUAL_THREAD_START;
             info.thread     = vthread;
 
@@ -672,6 +676,7 @@ filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSe
         }
     }
 }
+#endif
 
 /*
  * The JVMTI generic event callback. Each event is passed to a sequence of
@@ -778,11 +783,14 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
     }
 
     /* We want the vthread start/end events to mimic thread start/end events */
+    /* vthread fixme: We can remove this now because cbVThreadStart/End set to THREAD_START/END. */
     if (ei == EI_VIRTUAL_THREAD_START) {
         ei = EI_THREAD_START;
+        JDI_ASSERT(JNI_FALSE);
     }
     if (ei == EI_VIRTUAL_THREAD_END) {
         ei = EI_THREAD_END;
+        JDI_ASSERT(JNI_FALSE);
     }
 
     if (gdata->vthreadsSupported) {
@@ -797,7 +805,9 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
                  */
             } else {
                 /* Add this vthread if it passes the event filters. */
-                filterAndAddVThread(env, evinfo, ei, eventSessionID);
+                /* vthread fixme: no longer needed since it will be added lazily when
+                 * threadControl_onEventHandlerEntry is called. */
+                //filterAndAddVThread(env, evinfo, ei, eventSessionID);
             }
         }
     }
@@ -1454,11 +1464,6 @@ cbVThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
             debugMonitorExit(callbackBlock);
         }
     }
-
-    /* Ignore VIRTUAL_THREAD_START events unless we are notifying the debugger of all vthreads. */
-//    if (!gdata->trackAllVThreads || !gdata->enumerateVThreads) {
-//        return;
-//    }
 
     BEGIN_CALLBACK() {
         (void)memset(&info,0,sizeof(info));
