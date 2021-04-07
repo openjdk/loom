@@ -3284,7 +3284,6 @@ public:
 
 void Continuations::init() {
   ConfigResolve::resolve();
-  OopMapStubGenerator::init();
   InstanceStackChunkKlass::resolve_memcpy_functions();
   Continuation::init();
 }
