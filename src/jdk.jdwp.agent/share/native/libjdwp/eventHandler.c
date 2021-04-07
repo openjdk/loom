@@ -594,91 +594,6 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
 }
 
 /*
- * Called when we are not notifying the debugging of all vthreads, and we are seeing an event
- * on a vthread that we have not notified the debugger about yet. If the event passes the event
- * filters, then we will notify the debugger with a THREAD_START and add it to our list of
- * vthreads. Otherwise we ignore it.
- *
- * vthread fixme: We should be able to get rid of this. Vthreads are now tracked lazily
- * when threadControl_onEventHandlerEntry is called.
- */
-#if 0
-static void
-filterAndAddVThread(JNIEnv *env, EventInfo *evinfo, EventIndex ei, jbyte eventSessionID)
-{
-    jboolean needToAddVThread = JNI_FALSE; /* Assume we won't need to add the vthread. */;
-    jthread vthread = evinfo->thread;
-    JDI_ASSERT(isVThread(vthread));
-
-    /*
-     * Although we have received a JVMTI event for a vthread that we have not added yet,
-     * we only need to add it if we are going to pass the vthread on to the debugger. This
-     * might not end up happening due to event filtering. Therefore we need to do a dry run
-     * with the filtering to see if we really need to add this vthread.
-     */
-    debugMonitorEnter(handlerLock);
-    {
-        HandlerNode *node = getHandlerChain(ei)->first;
-        char        *classname  = getClassname(evinfo->clazz);
-
-
-        /* Filter the event over each handler node. */
-        while (node != NULL) {
-            /* Save next so handlers can remove themselves */
-            HandlerNode *next = NEXT(node);
-            jboolean shouldDelete;
-
-            if (eventFilterRestricted_passesFilter(env, classname,
-                                                   evinfo, node,
-                                                   &shouldDelete, JNI_TRUE /* filterOnly */)) {
-                /* If we match even one filter, then we need to add the vthread. */
-                needToAddVThread = JNI_TRUE;
-                break;
-            }
-            JDI_ASSERT(!shouldDelete);
-            node = next;
-        }
-
-        jvmtiDeallocate(classname);
-    }
-    debugMonitorExit(handlerLock);
-
-    if (needToAddVThread) {
-        /* Make sure this vthread gets added to the vthreads list. */
-        threadControl_addVThread(vthread);
-
-        if (gdata->fakeVThreadStartEvent) {
-            /* vthread fixme: this shouldn't be needed if ei == EI_THREAD_START. */
-            JDI_ASSERT(evinfo->ei != EI_THREAD_START);
-            /*
-             * When the VIRTUAL_THREAD_START event arrived for this vthread, we ignored it since we don't
-             * want to notify the debugger about vthreads until there is a non-vthread event that
-             * arrives on it (like a breakpoint). Now that this has happened, we need to send
-             * a VIRTUAL_THREAD_START event (which will be converted into a THREAD_START event) so
-             * the debugger will know about the vthread. Otherwise it will be unhappy when it gets
-             * an event for a vthread that it never got a THREAD_START event for.
-             */
-            EventInfo info;
-            struct bag *eventBag = eventHelper_createEventBag();
-
-            (void)memset(&info,0,sizeof(info));
-            /* vthread fixme: I think this can be changed to EI_THREAD_START. It works now because
-             * eventIndex2jdwp converts it to THREAD_START before sending the event.
-             */
-            info.ei         = EI_VIRTUAL_THREAD_START;
-            info.thread     = vthread;
-
-            /* Note: filterAndHandleEvent() expects EI_THREAD_START instead of EI_VIRTUAL_THREAD_START
-             * in order for getHandlerChain(ei) to work properly. */
-            filterAndHandleEvent(env, &info, EI_THREAD_START, eventBag, eventSessionID);
-            JDI_ASSERT(bagSize(eventBag) == 0);
-            bagDestroyBag(eventBag);
-        }
-    }
-}
-#endif
-
-/*
  * The JVMTI generic event callback. Each event is passed to a sequence of
  * handlers in a chain until the chain ends or one handler
  * consumes the event.
@@ -793,22 +708,10 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
         JDI_ASSERT(JNI_FALSE);
     }
 
-    if (gdata->vthreadsSupported) {
+    if (gdata->vthreadsSupported && gdata->trackAllVThreads) {
         /* Add the vthread if we haven't added it before. */
         if (evinfo->is_vthread && !threadControl_isKnownVThread(thread)) {
-            if (gdata->trackAllVThreads) {
-                /* Make sure this vthread gets added to the vthreads list. */
-                threadControl_addVThread(thread);
-                /* vthread fixme: we need to fake a THREAD_START event here just like
-                 * filterAndAddVThread() does. This is needed when the debug
-                 * agent is started after some vthreads have already been started.
-                 */
-            } else {
-                /* Add this vthread if it passes the event filters. */
-                /* vthread fixme: no longer needed since it will be added lazily when
-                 * threadControl_onEventHandlerEntry is called. */
-                //filterAndAddVThread(env, evinfo, ei, eventSessionID);
-            }
+            threadControl_addVThread(thread);
         }
     }
 

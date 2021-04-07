@@ -86,7 +86,6 @@ typedef struct {
     jboolean vthreadsSupported; /* If true, debugging support for vthreads is enabled.*/
     jboolean enumerateVThreads; /* If true, JDWP APIs returns vthreads in thread lists. */
     jboolean notifyVThreads;    /* If true, all vthread START and DEATH events are sent, subject to filtering. */
-    jboolean fakeVThreadStartEvent; /* If true, send a fake THREAD_START event the first time we get an event on a vthread. */
     jboolean trackAllVThreads;  /* If true, track all vthreads. Otherwise just track ones we need to track. */
     jboolean doerrorexit;
     jboolean modifiedUtf8;
