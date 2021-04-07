@@ -59,7 +59,7 @@ class SocketDispatcher extends NativeDispatcher {
     }
 
     void preClose(FileDescriptor fd) throws IOException {
-        // do nothing
+        throw new UnsupportedOperationException();
     }
 
     void close(FileDescriptor fd) throws IOException {
