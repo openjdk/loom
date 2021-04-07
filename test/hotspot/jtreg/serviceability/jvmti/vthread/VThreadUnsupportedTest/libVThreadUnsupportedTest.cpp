@@ -22,13 +22,16 @@
  */
 
 #include <string.h>
+#include <atomic>
+
 #include "jvmti.h"
 #include "jvmti_common.h"
 
 extern "C" {
 
 static jvmtiEnv *jvmti = NULL;
-static volatile jboolean is_completed_test_in_event = JNI_FALSE;
+
+static std::atomic<bool> is_completed_test_in_event;
 
 static void
 check_jvmti_error_invalid_thread(JNIEnv* jni, const char* msg, jvmtiError err) {
@@ -40,7 +43,7 @@ check_jvmti_error_invalid_thread(JNIEnv* jni, const char* msg, jvmtiError err) {
 
 JNIEXPORT jboolean JNICALL
 Java_VThreadUnsupportedTest_isCompletedTestInEvent(JNIEnv *env, jobject obj) {
-  return is_completed_test_in_event;
+  return is_completed_test_in_event.load();
 }
 
 /*
@@ -167,7 +170,7 @@ VirtualThreadMount(jvmtiEnv *jvmti, ...) {
   jvmtiError err = jvmti->GetCurrentThreadCpuTime(&nanos);
   check_jvmti_error_invalid_thread(jni, "GetCurrentThreadCpuTime", err);
 
-  is_completed_test_in_event = JNI_TRUE;
+  is_completed_test_in_event.store(true);
 }
 
 extern JNIEXPORT jint JNICALL
@@ -179,6 +182,8 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   if (jvm->GetEnv((void **)(&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
+
+  is_completed_test_in_event.store(false);
 
   err = set_ext_event_callback(jvmti, "VirtualThreadMount", VirtualThreadMount);
   if (err != JVMTI_ERROR_NONE) {
