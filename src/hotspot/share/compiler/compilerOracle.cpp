@@ -850,7 +850,7 @@ bool CompilerOracle::has_command_file() {
   return cc_file() != NULL;
 }
 
-bool CompilerOracle::_quiet = true;
+bool CompilerOracle::_quiet = false;
 
 void CompilerOracle::parse_from_file() {
   assert(has_command_file(), "command file must be specified");
