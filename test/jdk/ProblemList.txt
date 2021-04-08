@@ -883,9 +883,6 @@ java/lang/Thread/virtual/stress/PinALot.java#id1                8253523 generic-
 java/lang/Thread/virtual/stress/PinALot.java#id3                8253523 generic-all
 java/lang/Thread/virtual/stress/GetStackTraceALot.java#id2      8254188 generic-all
 
-java/nio/Buffer/LimitDirectMemory.java                          0000000 generic-all
-sun/nio/ch/TestMaxCachedBufferSize.java                         0000000 generic-all
-
 com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
 sun/awt/AppContext/8012933/Test8012933.java                     8264674 generic-all
