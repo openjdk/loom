@@ -72,6 +72,8 @@ public class TrackingVirtualThreadsTest {
                 latch.countDown();
             }
         }
-        assertTrue(Threads.virtualThreads().count() == 0L);
+        while (Threads.virtualThreads().count() != 0L) {
+            Thread.sleep(100);
+        }
     }
 }
