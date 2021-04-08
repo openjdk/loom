@@ -38,24 +38,6 @@
 #
 #############################################################################
 
-# loom specific failing tests
-
-compiler/graalunit/HotspotTest.java                                           8242063 generic-all
-compiler/runtime/StackOverflowBug.java                                        8242064 generic-all
-compiler/startup/SmallCodeCacheStartup.java                                   8242064 generic-all
-compiler/exceptions/TestRecursiveReplacedException.java	                      8242065 generic-all
-compiler/vectorization/TestMacroLogicVector.java                              8253919 windows-all
-vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java   8242890 generic-all
-runtime/clinit/ClassInitBarrier.java                                          8254936 generic-all
-runtime/vthread/RedefineClass.java                                            8253378 generic-all
-gtest/GTestWrapper.java                                                       0000000 generic-all
-runtime/vthread/TestObjectAllocationSampleEvent.java                          8261379 generic-all
-serviceability/jvmti/events/FramePop/framepop02/framepop02.java               0000000 generic-all
-
-serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java    0000000 generic-all
-
-#############################################################################
-
 # :hotspot_compiler
 
 compiler/ciReplay/TestSAServer.java 8029528 generic-all
@@ -116,9 +98,6 @@ serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorStatIntervalTest.java 8214
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorStatArrayCorrectnessTest.java 8224150 generic-all
 serviceability/jvmti/ModuleAwareAgents/ThreadStart/MAAThreadStart.java 8225354 windows-all
 
-# Loom SA failures
-serviceability/sa/JhsdbThreadInfoTest.java 8243016 generic-all
-
 #############################################################################
 
 # :hotspot_misc
@@ -131,8 +110,6 @@ serviceability/sa/JhsdbThreadInfoTest.java 8243016 generic-all
 # :vmTestbase_*
 
 #############################################################################
-
-vmTestbase/gc/memory/Nio/Nio.java 8249549 generic-all
 
 vmTestbase/nsk/monitoring/MemoryPoolMBean/isCollectionUsageThresholdExceeded/isexceeded003/TestDescription.java 8153598 generic-all
 vmTestbase/nsk/monitoring/MemoryPoolMBean/isUsageThresholdExceeded/isexceeded001/TestDescription.java 8198668 generic-all
@@ -178,12 +155,25 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 #############################################################################
 
+# Loom specific
 
+compiler/graalunit/HotspotTest.java                                           8242063 generic-all
+compiler/runtime/StackOverflowBug.java                                        8242064 generic-all
+compiler/startup/SmallCodeCacheStartup.java                                   8242064 generic-all
+compiler/exceptions/TestRecursiveReplacedException.java	                      8242065 generic-all
+compiler/vectorization/TestMacroLogicVector.java                              8253919 windows-all
 
+runtime/clinit/ClassInitBarrier.java                                          8254936 generic-all
+runtime/vthread/RedefineClass.java                                            8253378 generic-all
+runtime/vthread/TestObjectAllocationSampleEvent.java                          8261379 generic-all
 
-#############################################################################
+serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java    0000000 generic-all
+serviceability/jvmti/events/FramePop/framepop02/framepop02.java               0000000 generic-all
+serviceability/sa/JhsdbThreadInfoTest.java 8243016 generic-all
 
-# Loom specific section
-
+vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java   8242890 generic-all
 vmTestbase/nsk/stress/stack/stack008.java	8252468 generic-all
 vmTestbase/nsk/stress/stack/stack018.java	8252468 generic-all
+vmTestbase/gc/memory/Nio/Nio.java 8249549 generic-all
+
+gtest/GTestWrapper.java                                                       0000000 generic-all
