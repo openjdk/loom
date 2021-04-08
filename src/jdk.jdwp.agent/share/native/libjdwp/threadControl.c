@@ -243,21 +243,6 @@ findThread(ThreadList *list, jthread thread)
 {
     ThreadNode *node;
     JNIEnv *env = getEnv();
-    jboolean is_vthread = isVThread(thread);
-
-    if (is_vthread) {
-        if (list == NULL || list == &runningVThreads) {
-            /*
-             * Search for a vthread.
-             * vthread fixme: this needs to be done a lot faster. Maybe some sort of TLS for vthreads is needed.
-             * Otherwise we'll need something like a hashlist front end to the runningVThreads list so
-             * we can do quick lookups.
-             */
-            return nonTlsSearch(env, &runningVThreads, thread);
-        } else {
-            return NULL; // return NULL if we aren't looking for vthreads
-        }
-    }
 
     /* Get thread local storage for quick thread -> node access */
     node = getThreadLocalStorage(thread);
@@ -269,7 +254,11 @@ findThread(ThreadList *list, jthread thread)
         if ( list != NULL ) {
             node = nonTlsSearch(env, list, thread);
         } else {
-            node = nonTlsSearch(env, &runningThreads, thread);
+            if ( isVThread(thread) ) {
+                node = nonTlsSearch(env, &runningVThreads, thread);
+            } else {
+                node = nonTlsSearch(env, &runningThreads, thread);
+            }
             if ( node == NULL ) {
                 node = nonTlsSearch(env, &otherThreads, thread);
             }
