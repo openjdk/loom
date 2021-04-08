@@ -787,8 +787,8 @@ public class ThreadAPI {
             assertEquals(thread.getName(), "joe");
         } finally {
             LockSupport.unpark(thread);
-            thread.join();
         }
+        thread.join();
     }
 
 
@@ -798,52 +798,71 @@ public class ThreadAPI {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             assertTrue(me.getPriority() == Thread.NORM_PRIORITY);
-            me.setPriority(Thread.MIN_PRIORITY);
-            assertTrue(me.getPriority() == Thread.NORM_PRIORITY);
+            me.setPriority(Thread.NORM_PRIORITY);
+            assertThrows(IllegalArgumentException.class, () -> me.setPriority(-1));
+            assertThrows(IllegalArgumentException.class, () -> me.setPriority(Thread.MIN_PRIORITY));
         });
     }
 
     public void testSetPriority2() throws Exception {
-        var thread = Thread.startVirtualThread(LockSupport::park);
+        var thread = Thread.ofVirtual().unstarted(LockSupport::park);
+
+        // not started
+        assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
+        thread.setPriority(Thread.NORM_PRIORITY);
+        assertThrows(IllegalArgumentException.class, () -> thread.setPriority(-1));
+        assertThrows(IllegalArgumentException.class, () -> thread.setPriority(Thread.MIN_PRIORITY));
+
+        // running
+        thread.start();
         try {
             assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
-            thread.setPriority(Thread.MIN_PRIORITY);
-            assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
+            thread.setPriority(Thread.NORM_PRIORITY);
+            assertThrows(IllegalArgumentException.class, () -> thread.setPriority(-1));
+            assertThrows(IllegalArgumentException.class, () -> thread.setPriority(Thread.MIN_PRIORITY));
         } finally {
             LockSupport.unpark(thread);
-            thread.join();
         }
+        thread.join();
+
+        // terminated
+        assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
     }
 
 
     // -- setDaemon/isDaemon --
 
-    public void testIsDaemon1() throws Exception {
+    public void testSetDaemon1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             assertTrue(me.isDaemon());
+            assertThrows(IllegalThreadStateException.class, () -> me.setDaemon(true));
+            assertThrows(IllegalArgumentException.class, () -> me.setDaemon(false));
         });
     }
 
-    // unstarted
-    public void testSetDaemon1() {
-        var thread = Thread.ofVirtual().unstarted(() -> { });
+    public void testSetDaemon2() throws Exception {
+        var thread = Thread.ofVirtual().unstarted(LockSupport::park);
+
+        // not started
         assertTrue(thread.isDaemon());
         thread.setDaemon(true);
-        thread.setDaemon(false);
-        assertTrue(thread.isDaemon());
-    }
+        assertThrows(IllegalArgumentException.class, () -> thread.setDaemon(false));
 
-    public void testSetDaemon2() throws Exception {
-        var thread = Thread.startVirtualThread(LockSupport::park);
+        // running
+        thread.start();
         try {
             assertTrue(thread.isDaemon());
+            assertThrows(IllegalThreadStateException.class, () -> thread.setDaemon(true));
+            assertThrows(IllegalArgumentException.class, () -> thread.setDaemon(false));
         } finally {
             LockSupport.unpark(thread);
-            thread.join();
         }
-    }
+        thread.join();
 
+        // terminated
+        assertTrue(thread.isDaemon());
+    }
 
     // -- Thread.yield --
 
