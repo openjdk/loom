@@ -711,6 +711,10 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
     if (gdata->vthreadsSupported && gdata->trackAllVThreads) {
         /* Add the vthread if we haven't added it before. */
         if (evinfo->is_vthread && !threadControl_isKnownVThread(thread)) {
+            // vthread fixme: we can actually get rid of the threadControl_addVThread call now since
+            // the call to threadControl_onEventHandlerEntry above should always end up adding
+            // the vthread. Leave in place with an assert for now just to make sure.
+            JDI_ASSERT(threadControl_isKnownVThread(thread));
             threadControl_addVThread(thread);
         }
     }
