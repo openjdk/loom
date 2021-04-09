@@ -745,6 +745,16 @@ const char* Klass::signature_name() const {
   return name()->as_C_string();
 }
 
+size_t Klass::copy_disjoint(oop obj, HeapWord* to, size_t word_size) { 
+  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), to, word_size);
+  return word_size;
+}
+
+size_t Klass::copy_conjoint(oop obj, HeapWord* to, size_t word_size) { 
+  Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(obj), to, word_size);
+  return word_size;
+}
+
 size_t Klass::copy_disjoint_compact(oop obj, HeapWord* to) { 
   return obj->copy_disjoint(to); 
 }

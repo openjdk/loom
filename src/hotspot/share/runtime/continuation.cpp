@@ -1118,6 +1118,7 @@ public:
     }
     assert (chunk != nullptr, "");
     assert (!chunk->is_flag(stackChunkOopDesc::FLAG_HAS_INTERPRETED_FRAMES), "");
+    assert (!chunk->is_flag(stackChunkOopDesc::FLAG_GC_MODE), "");
 
     if (should_flush_stack_processing())
       flush_stack_processing();
@@ -1392,6 +1393,7 @@ public:
       } DEBUG_ONLY(else empty_chunk = false);
     }
     chunk->set_flag(stackChunkOopDesc::FLAG_HAS_INTERPRETED_FRAMES, true);
+    assert (!chunk->is_flag(stackChunkOopDesc::FLAG_GC_MODE), "");
     
     assert (!chunk->is_empty() || StackChunkFrameStream<true>(chunk).is_done(), "");
     assert (!chunk->is_empty() || StackChunkFrameStream<true>(chunk).to_frame().is_empty(), "");
@@ -2522,6 +2524,11 @@ public:
 
     maybe_set_fastpath(f.sp());
 
+    if (!bottom) {
+      log_develop_trace(jvmcont)("fix thawed caller");
+      InstanceStackChunkKlass::fix_thawed_frame(caller, SmallRegisterMap::instance); // can only fix caller once this frame is thawed (due to callee saved regs)
+    }
+
     DEBUG_ONLY(after_thaw_java_frame(f, bottom);)
     caller = f;
   }
@@ -2597,6 +2604,11 @@ public:
       maybe_set_fastpath(f.sp());
     }
 
+    if (!bottom) {
+      log_develop_trace(jvmcont)("fix thawed caller");
+      InstanceStackChunkKlass::fix_thawed_frame(caller, SmallRegisterMap::instance); // can only fix caller once this frame is thawed (due to callee saved regs)
+    }
+
     DEBUG_ONLY(after_thaw_java_frame(f, bottom);)
     caller = f;
   }
@@ -2606,14 +2618,17 @@ public:
 
     DEBUG_ONLY(_frames++;)
 
-    RegisterMap map(nullptr, true, false, false);
-    map.set_include_argument_oops(false);
-    _stream.next(&map);
-    assert (!_stream.is_done(), "");
-    if (UNLIKELY(_barriers)) { // we're now doing this on the stub's caller
-      InstanceStackChunkKlass::fix_frame<true, true>(_stream, &map);
+    {
+      RegisterMap map(nullptr, true, false, false);
+      map.set_include_argument_oops(false);
+      _stream.next(&map);
+      assert (!_stream.is_done(), "");
+      if (UNLIKELY(_barriers)) { // we're now doing this on the stub's caller
+        InstanceStackChunkKlass::fix_frame<true>(_stream, &map);
+      }
+      assert (!_stream.is_done(), "");
     }
-    assert (!_stream.is_done(), "");
+    
     recurse_thaw_compiled_frame(_stream.to_frame(), caller, num_frames);
 
     DEBUG_ONLY(before_thaw_java_frame(hf, caller, false, num_frames);)
@@ -2633,6 +2648,14 @@ public:
     copy_from_chunk(hsp - ContinuationHelper::frame_metadata, vsp - ContinuationHelper::frame_metadata, fsize + ContinuationHelper::frame_metadata);
 
     frame f = new_frame<StubF>(hf, vsp, caller);
+
+    { // can only fix caller once this frame is thawed (due to callee saved regs)
+      RegisterMap map(nullptr, true, false, false); // map.clear();
+      map.set_include_argument_oops(false);
+      f.oop_map()->update_register_map(&f, &map);
+      ContinuationHelper::update_register_map_with_callee(&map, caller);
+      InstanceStackChunkKlass::fix_thawed_frame(caller, &map);
+    }
 
     DEBUG_ONLY(after_thaw_java_frame(f, false);)
     caller = f;
@@ -2656,6 +2679,7 @@ public:
     assert (chunk->is_empty() == (chunk->max_size() == 0), "chunk->is_empty: %d chunk->max_size: %d", chunk->is_empty(), chunk->max_size());
 
     push_return_frame(f);
+    InstanceStackChunkKlass::fix_thawed_frame(f, SmallRegisterMap::instance); // can only fix caller after push_return_frame (due to callee saved regs)
 
     assert (_cont.is_empty() == _cont.last_frame().is_empty(), "cont.is_empty: %d cont.last_frame().is_empty(): %d", _cont.is_empty(), _cont.last_frame().is_empty());
 

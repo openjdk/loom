@@ -42,8 +42,9 @@ typedef VMRegImpl* VMReg;
 // max_size is the maximum space a thawed chunk would take up on the stack, *not* including top-most frame's metadata
 class stackChunkOopDesc : public instanceOopDesc {
 public:
-  // Chunk flags
-  static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1 << 2;
+  // Chunk flags. These are monotonic. They can change from 0 to 1, but never vice-versa.
+  static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1;
+  static const uint8_t FLAG_GC_MODE = 1 << 2;
   
 public:
   inline stackChunkOopDesc* parent() const;

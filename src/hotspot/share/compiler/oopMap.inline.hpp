@@ -54,8 +54,7 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
 
   // handle derived pointers first (otherwise base pointer may be
   // changed before derived pointer offset has been collected)
-  {
-    assert (_derived_oop_fn != NULL, "");
+  if (_derived_oop_fn != nullptr) {
     for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
       OopMapValue omv = oms.current();
       if (omv.type() != OopMapValue::derived_oop_value)
@@ -88,7 +87,7 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
   }
 
   // We want coop and oop oop_types
-  {
+  if (_oop_fn != nullptr) {
     for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
       OopMapValue omv = oms.current();
       if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)

@@ -85,8 +85,11 @@ public:
   virtual int oop_size(oop obj) const override;
   virtual int compact_oop_size(oop obj) const override;
 
-  virtual size_t copy_disjoint_compact(oop obj, HeapWord* to) { return copy_compact<true> (obj, to); }
-  virtual size_t copy_conjoint_compact(oop obj, HeapWord* to) { return copy_compact<false>(obj, to); }
+  virtual size_t copy_disjoint(oop obj, HeapWord* to, size_t word_size) override { return copy<true> (obj, to, word_size); }
+  virtual size_t copy_conjoint(oop obj, HeapWord* to, size_t word_size) override { return copy<false>(obj, to, word_size); }
+
+  virtual size_t copy_disjoint_compact(oop obj, HeapWord* to) override { return copy_compact<true> (obj, to); }
+  virtual size_t copy_conjoint_compact(oop obj, HeapWord* to) override { return copy_compact<false>(obj, to); }
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
@@ -139,12 +142,16 @@ public:
   template <bool store, bool mixed, typename RegisterMapT>
   static void fix_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
+  template <typename RegisterMapT>
+  static void fix_thawed_frame(const frame& f, const RegisterMapT* map);
+
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
 private:
-  template<bool disjoint>
-  size_t copy_compact(oop obj, HeapWord* to);
+
+  template<bool disjoint> size_t copy(oop obj, HeapWord* to, size_t word_size);
+  template<bool disjoint> size_t copy_compact(oop obj, HeapWord* to);
   
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
@@ -157,6 +164,12 @@ private:
   
   template <bool mixed>
   static void run_nmethod_entry_barrier_if_needed(const StackChunkFrameStream<mixed>& f);
+
+  template <bool concurrent_gc, bool mixed, typename RegisterMapT>
+  static void relativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
+
+  template <bool mixed, typename RegisterMapT>
+  static void derelativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
   static inline void relativize(intptr_t* const fp, intptr_t* const hfp, int offset);
   static inline void derelativize(intptr_t* const fp, int offset);

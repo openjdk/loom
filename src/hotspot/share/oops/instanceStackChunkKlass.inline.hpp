@@ -539,8 +539,8 @@ inline void StackChunkFrameStream<mixed>::get_cb() {
 
   // if (_cb == nullptr) { tty->print_cr("OOPS"); os::print_location(tty, (intptr_t)pc()); }
   assert (_cb != nullptr, 
-    "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d", 
-    _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->end_address()), _chunk->stack_size(), _chunk->sp());
+    "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d gc_flag: %d", 
+    _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->end_address()), _chunk->stack_size(), _chunk->sp(), _chunk->is_flag(stackChunkOopDesc::FLAG_GC_MODE));
   assert ((mixed && is_interpreted()) || ((is_stub() || is_compiled()) && _cb->frame_size() > 0), 
     "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d is_stub: %d is_compiled: %d frame_size: %d mixed: %d", 
     _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->end_address()), _chunk->stack_size(), _chunk->sp(), is_stub(), is_compiled(), _cb->frame_size(), mixed);

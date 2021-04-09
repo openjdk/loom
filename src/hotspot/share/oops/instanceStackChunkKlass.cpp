@@ -190,6 +190,29 @@ int InstanceStackChunkKlass::oop_size(oop obj) const {
   return instance_size(jdk_internal_misc_StackChunk::size(obj));
 }
 
+template <int x> NOINLINE static bool verify_chunk(stackChunkOop c) { return c->verify(); }
+
+template <bool disjoint> 
+size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_size) {
+  assert (obj->is_stackChunk(), "");
+  stackChunkOop chunk = (stackChunkOop)obj;
+
+  // pns2();
+  // tty->print_cr(">>> CPY %s %p-%p (%zu) -> %p-%p (%zu) -- %d %d", disjoint ? "DIS" : "CON", cast_from_oop<HeapWord*>(obj), cast_from_oop<HeapWord*>(obj) + word_size, word_size, to_addr, to_addr + word_size, word_size, chunk->is_flag(stackChunkOopDesc::FLAG_GC_MODE), chunk->gc_mode());
+
+  HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
+  disjoint ? Copy::aligned_disjoint_words(from_addr, to_addr, word_size)
+           : Copy::aligned_conjoint_words(from_addr, to_addr, word_size);
+
+  stackChunkOop to_chunk = (stackChunkOop) cast_to_oop(to_addr);
+  to_chunk->set_flag(stackChunkOopDesc::FLAG_GC_MODE, true);
+
+  return word_size;
+}
+
+template size_t InstanceStackChunkKlass::copy<false>(oop obj, HeapWord* to_addr, size_t word_size);
+template size_t InstanceStackChunkKlass::copy<true>(oop obj, HeapWord* to_addr, size_t word_size);
+
 int InstanceStackChunkKlass::compact_oop_size(oop obj) const {
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
@@ -438,9 +461,17 @@ void InstanceStackChunkKlass::fix_frame(const StackChunkFrameStream<mixed>& f, c
   f.iterate_oops(&oops_closure, map);
   OrderAccess::loadload(); // observing the barriers will prevent derived pointers from being derelativized concurrently
 
-  if (has_derived) {
+  // if (has_derived) { // we do this in fix_thawed_frame
+  //   derelativize_derived_pointers(f, map);
+  // }
+}
+
+template <typename RegisterMapT>
+void InstanceStackChunkKlass::fix_thawed_frame(const frame& f, const RegisterMapT* map) {
+  if (f.is_compiled_frame() && f.oop_map()->has_derived_oops()) {
     DerelativizeDerivedPointers derived_closure;
-    f.iterate_derived_pointers(&derived_closure, map);
+    OopMapDo<OopClosure, DerelativizeDerivedPointers, SkipNullValue> visitor(nullptr, &derived_closure);
+    visitor.oops_do(&f, map, f.oop_map());
   }
 }
 
@@ -453,6 +484,8 @@ template void InstanceStackChunkKlass::fix_frame<true> (const StackChunkFrameStr
 template void InstanceStackChunkKlass::fix_frame<false>(const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
 template void InstanceStackChunkKlass::fix_frame<true> (const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
 
+template void InstanceStackChunkKlass::fix_thawed_frame(const frame& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_thawed_frame(const frame& f, const SmallRegisterMap* map);
 
 // template <bool store>
 // class BarriersIterateStackClosure {
@@ -755,7 +788,7 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
 
   // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
   st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: 0x%lx", p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->start_address() + c->stack_size()), c->identity_hash());
-  st->print_cr("       barriers: %d gc_mode: %d parent: " INTPTR_FORMAT, c->requires_barriers(), c->gc_mode(), p2i((oopDesc*)c->parent()));
+  st->print_cr("       barriers: %d gc_mode: %d %d parent: " INTPTR_FORMAT, c->requires_barriers(), c->gc_mode(), c->is_flag(stackChunkOopDesc::FLAG_GC_MODE), p2i((oopDesc*)c->parent()));
   st->print_cr("       flags mixed: %d", c->has_mixed_frames());
   st->print_cr("       size: %d argsize: %d max_size: %d sp: %d pc: " INTPTR_FORMAT " num_frames: %d num_oops: %d", c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()), c->numFrames(), c->numOops());
 
