@@ -819,84 +819,6 @@ public:
   }
 };
 
-
-// We replace derived pointers with offsets; the converse is done in DerelativizeDerivedPointers
-template <bool concurrent_gc>
-class RelativizeDerivedPointers : public DerivedOopClosure {
-public:
-  RelativizeDerivedPointers() {}
-
-  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    // The ordering in the following is crucial
-    OrderAccess::loadload();
-    oop base = Atomic::load((oop*)base_loc);
-    // assert (Universe::heap()->is_in_or_null(base), "not an oop"); -- base might be invalid at this point
-    if (base != (oop)nullptr) {
-      assert (!CompressedOops::is_base(base), "");
-
-#if INCLUDE_ZGC
-      if (concurrent_gc && UseZGC) {
-        if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) 
-          return;
-      }
-#endif
-#if INCLUDE_SHENANDOAHGC
-      if (concurrent_gc && UseShenandoahGC) {
-        if (!ShenandoahHeap::heap()->in_collection_set(base)) {
-          return;
-        }
-      }
-#endif
-
-      OrderAccess::loadload();
-      intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc); // *derived_loc;
-      if (derived_int_val < 0) {
-        return;
-      }
-
-      // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
-      // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
-      intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-      // assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize)); -- base might be invalid at this point
-      Atomic::store((intptr_t*)derived_loc, -offset); // there could be a benign race here; we write a negative offset to let the sign bit signify it's an offset rather than an address
-    } else {
-      assert (*derived_loc == derived_pointer(0), "");
-    }
-  }
-};
-
-class DerelativizeDerivedPointers : public DerivedOopClosure {
-public:
-  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    // The ordering in the following is crucial
-    OrderAccess::loadload();
-    oop base = Atomic::load(base_loc);
-    if (base != (oop)nullptr) {
-      assert (!CompressedOops::is_base(base), "");
-      ZGC_ONLY(assert (ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
-
-      OrderAccess::loadload();
-      intptr_t offset = Atomic::load((intptr_t*)derived_loc); // *derived_loc;
-      if (offset >= 0)
-        return;
-
-      // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
-      // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
-      if (offset < 0) {
-        offset = -offset;
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
-        Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
-      }
-  #ifdef ASSERT 
-      else { // DEBUG ONLY
-        offset = offset - cast_from_oop<intptr_t>(base);
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
-      }
-  #endif
-    }
-  }
-};
-
 template <bool concurrent_gc, typename OopClosureType>
 class OopOopIterateStackClosure {
   stackChunkOop _chunk;
@@ -942,8 +864,7 @@ public:
           _chunk->set_gc_mode(true);
           OrderAccess::storestore(); // if you see any following writes, you'll see this
         }
-        RelativizeDerivedPointers<concurrent_gc> derived_closure;
-        f.iterate_derived_pointers(&derived_closure, map);
+        InstanceStackChunkKlass::relativize_derived_pointers<concurrent_gc>(f, map);
       }
     }
 
@@ -953,8 +874,7 @@ public:
     _num_oops += cl._num_oops;// f.oopmap()->num_oops();
 
     // if (FIX_DERIVED_POINTERS && concurrent_gc && mutated_oops && _chunk->gc_mode()) { // TODO: this is a ZGC-specific optimization that depends on the one in iterate_derived_pointers
-    //   DerelativizeDerivedPointers derived_closure;
-    //   f.iterate_derived_pointers(&derived_closure, map);
+    //   InstanceStackChunkKlass::derelativize_derived_pointers(f, map);
     // }
     return true;
   }
