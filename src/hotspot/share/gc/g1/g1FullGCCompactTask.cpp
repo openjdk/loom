@@ -61,7 +61,7 @@ size_t G1FullGCCompactTask::G1CompactRegionClosure::apply(oop obj) {
 
   // copy object and reinit its mark
   HeapWord* obj_addr = cast_from_oop<HeapWord*>(obj);
-  assert(obj_addr != destination || size > static_cast<size_t>(obj->compact_size(size)), "everything in this pass should be moving or compressed in place");
+  assert((obj_addr != destination) || (size > static_cast<size_t>(obj->compact_size(size))), "everything in this pass should be moving or compressed in place");
   obj->copy_conjoint_compact(destination); // TODO LOOM: see G1FullGCCompactionPoint::forward; Might want to reconsider compacting here.
   cast_to_oop(destination)->init_mark();
   assert(cast_to_oop(destination)->klass() != NULL, "should have a class");
