@@ -521,6 +521,8 @@ inline intptr_t* StackChunkFrameStream<mixed>::next_sp() const {
   return (mixed && is_interpreted()) ? next_sp_for_interpreter_frame() : unextended_sp() + cb()->frame_size();
 }
 
+extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
+
 template <bool mixed>
 inline void StackChunkFrameStream<mixed>::get_cb() {
   _oopmap = nullptr;
@@ -529,7 +531,7 @@ inline void StackChunkFrameStream<mixed>::get_cb() {
     return;
   }
 
-  assert (pc() != nullptr, 
+  assert (pc() != nullptr && dbg_is_safe(pc(), -1), 
   "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d", 
   _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->end_address()), _chunk->stack_size(), _chunk->sp());
 

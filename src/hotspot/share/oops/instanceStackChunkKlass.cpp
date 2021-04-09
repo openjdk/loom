@@ -26,6 +26,7 @@
 #include "gc/shared/gc_globals.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/oopsHierarchy.hpp"
+#include "oops/stackChunkOop.hpp"
 #include "precompiled.hpp"
 #include "code/scopeDesc.hpp"
 #include "classfile/javaClasses.inline.hpp"
@@ -302,7 +303,7 @@ public:
 };
 
 
-template <bool mixed, bool store, typename RegisterMapT>
+template <bool store, bool mixed, typename RegisterMapT>
 void InstanceStackChunkKlass::fix_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
   // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
   if (f.is_done()) return;
@@ -333,14 +334,14 @@ void InstanceStackChunkKlass::fix_frame(const StackChunkFrameStream<mixed>& f, c
   }
 }
 
-template void InstanceStackChunkKlass::fix_frame<true,  false>(const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::fix_frame<true,  true> (const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::fix_frame<false, false>(const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::fix_frame<false, true> (const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::fix_frame<true,  false>(const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::fix_frame<true,  true> (const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::fix_frame<false, false>(const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::fix_frame<false, true> (const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<false>(const StackChunkFrameStream<true >& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<true> (const StackChunkFrameStream<true >& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<false>(const StackChunkFrameStream<false>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<true> (const StackChunkFrameStream<false>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<false>(const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<true> (const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<false>(const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::fix_frame<true> (const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
 
 
 // template <bool store>
@@ -390,11 +391,11 @@ public:
 
   template <class T> inline void do_oop_work(T* p) {
     log_develop_trace(jvmcont)("debug_verify_stack_chunk narrow: %d p: " INTPTR_FORMAT, sizeof(T) < sizeof(intptr_t), p2i(p));
-    _count++;
+     _count++;
+    if (SafepointSynchronize::is_at_safepoint()) return;
+    
     oop obj = safe_load(p);
-    if (!SafepointSynchronize::is_at_safepoint()) {
-      assert (obj == nullptr || is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
-    }
+    assert (obj == nullptr || is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
   }
 };
 
@@ -402,6 +403,8 @@ class StackChunkVerifyDerivedPointersClosure : public DerivedOopClosure {
 public:
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
+    if (SafepointSynchronize::is_at_safepoint()) return;
+
     oop base = *base_loc; // (oop)NativeAccess<>::oop_load((oop*)base_loc); // 
     assert (base == nullptr || is_good_oop(base), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(base_loc), p2i((oopDesc*)base));
     if (base != nullptr) {

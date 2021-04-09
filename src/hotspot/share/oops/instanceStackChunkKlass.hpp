@@ -82,8 +82,8 @@ public:
   int instance_size(int stack_size_in_words) const;
 
   // Returns the size of the instance including the stack data.
-  virtual int oop_size(oop obj) const;
-  virtual int compact_oop_size(oop obj) const;
+  virtual int oop_size(oop obj) const override;
+  virtual int compact_oop_size(oop obj) const override;
 
   virtual size_t copy_disjoint_compact(oop obj, HeapWord* to) { return copy_compact<true> (obj, to); }
   virtual size_t copy_conjoint_compact(oop obj, HeapWord* to) { return copy_compact<false>(obj, to); }
@@ -94,7 +94,7 @@ public:
 
   static inline void assert_mixed_correct(stackChunkOop chunk, bool mixed) PRODUCT_RETURN;
 #ifndef PRODUCT
-  void oop_print_on(oop obj, outputStream* st);
+  void oop_print_on(oop obj, outputStream* st) override;
   static bool verify(oop obj, size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL);
 #endif
   
@@ -136,7 +136,7 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 public:
-  template <bool mixed, bool store, typename RegisterMapT>
+  template <bool store, bool mixed, typename RegisterMapT>
   static void fix_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);

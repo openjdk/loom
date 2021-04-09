@@ -425,7 +425,7 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
 
   address sender_pc = this->sender_pc();
 
-  if (Continuation::is_return_barrier_entry(sender_pc)) {	
+  if (Continuation::is_return_barrier_entry(sender_pc)) {
     if (map->walk_cont()) { // about to walk into an h-stack	
       return Continuation::top_frame(*this, map);	
     } else {

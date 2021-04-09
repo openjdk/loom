@@ -1306,7 +1306,6 @@ public:
     }
   }
 
-
   inline void before_freeze_java_frame(const frame& f, const frame& caller, int fsize, int argsize, bool bottom) {
     log_develop_trace(jvmcont)("============================= FREEZING FRAME interpreted: %d bottom: %d", f.is_interpreted_frame(), bottom);
     log_develop_trace(jvmcont)("fsize: %d argsize: %d", fsize, argsize);
@@ -2200,7 +2199,7 @@ public:
 
       chunk->set_sp(chunk->stack_size());
       chunk->set_argsize(0);
-      chunk->clear_flags();
+      // chunk->clear_flags();
       chunk->reset_counters();
       chunk->set_max_size(0);
       log_develop_trace(jvmcont)("set max_size: 0");
@@ -2325,6 +2324,7 @@ public:
     // _cont.read_rest();
     _align_size = 0;
     int num_frames = (return_barrier ? 1 : 2);
+    // _frames = 0;
 
     log_develop_trace(jvmcont)("thaw slow");
 
@@ -2394,7 +2394,7 @@ public:
     DEBUG_ONLY(_frames++;)
 
     if (UNLIKELY(_barriers)) {
-      InstanceStackChunkKlass::fix_frame<true, true>(_stream, SmallRegisterMap::instance);
+      InstanceStackChunkKlass::fix_frame<true>(_stream, SmallRegisterMap::instance);
     }
 
     int argsize = _stream.stack_argsize();
@@ -2408,12 +2408,12 @@ public:
       num_frames++;
     }
 
-    if (num_frames == 1 || _stream.is_done()) {
+    if (num_frames == 1 || _stream.is_done()) { // end recursion
       log_develop_trace(jvmcont)("is_empty: %d", _stream.is_done());
       finalize_thaw<FKind>(caller, argsize);
       return true; // bottom
-    } else {
-      thaw(_stream.to_frame(), caller, num_frames - 1, false); // recurse
+    } else { // recurse
+      thaw(_stream.to_frame(), caller, num_frames - 1, false);
       return false;
     }
   }
@@ -2644,9 +2644,10 @@ public:
     if (chunk->is_empty()) {
       if (_barriers) {
         _cont.set_tail(chunk->parent());
+      } else {
+        chunk->set_flag(stackChunkOopDesc::FLAG_HAS_INTERPRETED_FRAMES, false);
       }
       chunk->set_max_size(0);
-      chunk->reset_counters();
       assert (chunk->argsize() == 0, "");
     } else {
       log_develop_trace(jvmcont)("sub max_size _align_size: %d -- %d", _align_size, chunk->max_size() - _align_size);
@@ -3387,6 +3388,7 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   int num_oops = 0;
   // tty->print_cr(">>> debug_verify_continuation traversing chunks");
   for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
+    log_develop_trace(jvmcont)("debug_verify_continuation chunk %d", num_chunks);
     chunk->verify(&max_size, &num_oops, &num_frames, &num_interpreted_frames);
     if (!chunk->is_empty()) nonempty_chunk = true;
     num_chunks++;
