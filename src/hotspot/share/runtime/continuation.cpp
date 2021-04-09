@@ -627,8 +627,8 @@ public:
 
   static void update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map);
   static void update_map_for_chunk_frame(RegisterMap* map);
-  template<typename FKind, typename RegisterMapT> static void update_register_map(RegisterMapT* map, const frame& f);
-  template<typename RegisterMapT> static void update_register_map_with_callee(RegisterMapT* map, const frame& f);
+  template<typename FKind, typename RegisterMapT> static void update_register_map(RegisterMapT* map, const frame& f); // TODO invert parameter order
+  template<typename RegisterMapT> static void update_register_map_with_callee(RegisterMapT* map, const frame& f); // TODO invert parameter order
 
   static inline frame last_frame(JavaThread* thread);
   static inline void push_pd(const frame& f);
