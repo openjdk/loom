@@ -820,16 +820,16 @@ bool ContMirror::has_mixed_frames() {
 }
 #endif
 
+#if INCLUDE_JVMTI
 static int num_java_frames(ContMirror& cont) {
   ResourceMark rm; // used for scope traversal in num_java_frames(CompiledMethod*, address)
   int count = 0;
-
   for (stackChunkOop chunk = cont.tail(); chunk != (oop)nullptr; chunk = chunk->parent()) {
     count += chunk->num_java_frames();
   }
-
   return count;
 }
+#endif // INCLUDE_JVMTI
 
 typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, bool);
 
@@ -1674,6 +1674,7 @@ int early_return(int res, JavaThread* thread) {
 }
 
 static void JVMTI_yield_VTMT_cleanup(JavaThread* thread) {
+#if INCLUDE_JVMTI
   // this is to hide JVMTI events when in VTMT transition
   oop vt_oop = thread->vthread();
   JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vt_oop);
@@ -1682,8 +1683,10 @@ static void JVMTI_yield_VTMT_cleanup(JavaThread* thread) {
     state->set_is_in_VTMT(thread->is_in_VTMT());
   }
   thread->set_is_in_VTMT(false);
+#endif // INCLUDE_JVMTI
 }
 
+#if INCLUDE_JVMTI
 static void invalidate_JVMTI_stack(JavaThread* thread) {
   if (thread->is_interp_only_mode()) {
     JvmtiThreadState *jvmti_state = thread->jvmti_thread_state();
@@ -1691,8 +1694,10 @@ static void invalidate_JVMTI_stack(JavaThread* thread) {
       jvmti_state->invalidate_cur_stack_depth();
   }
 }
+#endif // INCLUDE_JVMTI
 
 static void JVMTI_yield_cleanup(JavaThread* thread, ContMirror& cont) {
+#if INCLUDE_JVMTI
   if (JvmtiExport::can_post_frame_pop()) {
     ContinuationHelper::set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible
 
@@ -1705,6 +1710,7 @@ static void JVMTI_yield_cleanup(JavaThread* thread, ContMirror& cont) {
     cont.post_safepoint(conth);
   }
   invalidate_JVMTI_stack(thread);
+#endif
 }
 
 static freeze_result is_pinned(const frame& f, RegisterMap* map) {
@@ -2675,6 +2681,7 @@ public:
   }
 
   static void JVMTI_continue_cleanup(JavaThread* thread) {
+  #if INCLUDE_JVMTI
     // this is to hide JVMTI events when in VTMT transition
     oop vt_oop = thread->vthread();
     JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vt_oop);
@@ -2684,6 +2691,7 @@ public:
       state->set_is_in_VTMT(false);
     }
     invalidate_JVMTI_stack(thread);
+  #endif // INCLUDE_JVMTI
   }
 };
 
