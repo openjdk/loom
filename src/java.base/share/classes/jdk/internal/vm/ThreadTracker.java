@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.LongAdder;
 import sun.security.action.GetPropertyAction;
 
 /**
@@ -36,38 +37,56 @@ import sun.security.action.GetPropertyAction;
 public class ThreadTracker {
     // the set of all virtual threads when tracking is enabled, otherwise null
     private static final Set<Thread> VIRTUAL_THREADS;
+    private static final LongAdder COUNT;
     static {
         String s = GetPropertyAction.privilegedGetProperty("jdk.trackAllVirtualThreads");
         if (s != null && (s.isEmpty() || s.equalsIgnoreCase("true"))) {
             VIRTUAL_THREADS = ConcurrentHashMap.newKeySet();
+            COUNT = null;
         } else {
             VIRTUAL_THREADS = null;
+            COUNT = new LongAdder();
         }
     }
 
     private ThreadTracker() { }
 
     /**
-     * Notifies the thread dumper of new virtual thread. A no-op if tracking of
-     * virtual threads is not enabled.
+     * Notifies the thread tracker that a virtual thread has been started.
      */
-    public static void notifyStart(Thread thread) {
+    public static void notifyVirtualThreadStart(Thread thread) {
         Set<Thread> threads = VIRTUAL_THREADS;
         if (threads != null) {
             assert thread.isVirtual();
             threads.add(thread);
+        } else {
+            COUNT.increment();
         }
     }
 
     /**
-     * Notifies the thread dumper that a virtual thread has virtual. A no-op if
-     * tracking of virtual threads is not enabled.
+     * Notifies the thread tracker that a virtual thread has terminated.
      */
-    public static void notifyTerminate(Thread thread) {
+    public static void notifyVirtualThreadTerminate(Thread thread) {
         Set<Thread> threads = VIRTUAL_THREADS;
         if (threads != null) {
             assert thread.isVirtual();
             threads.remove(thread);
+        } else {
+            COUNT.decrement();
+        }
+    }
+
+    /**
+     * Returns the current number of virtual threads that have been started but
+     * have not terminated.
+     */
+    public static long virtualThreadCount() {
+        Set<Thread> threads = VIRTUAL_THREADS;
+        if (threads != null) {
+            return threads.size();
+        } else {
+            return COUNT.sum();
         }
     }
 

@@ -432,8 +432,8 @@ class VirtualThread extends Thread {
             }
         }
 
-        // notify thread tracker, no-op if not tracking threads
-        ThreadTracker.notifyTerminate(this);
+        // notify thread tracker
+        ThreadTracker.notifyVirtualThreadTerminate(this);
 
         // clear references to thread locals, this method is assumed to be
         // called on its carrier thread on which it terminated.
@@ -497,7 +497,7 @@ class VirtualThread extends Thread {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
-        ThreadTracker.notifyStart(this);  // no-op if threads not tracked
+        ThreadTracker.notifyVirtualThreadStart(this);
         try {
             submitRunContinuation();
         } catch (RejectedExecutionException ree) {

@@ -230,6 +230,7 @@ module java.base {
         jdk.internal.vm.ci,
         jdk.unsupported;
     exports jdk.internal.vm to
+        java.management,
         jdk.internal.jvmstat,
         jdk.management,
         jdk.management.agent;

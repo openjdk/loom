@@ -163,6 +163,19 @@ public interface ThreadMXBean extends PlatformManagedObject {
     public int getDaemonThreadCount();
 
     /**
+     * {@return the current number of virtual threads that have been started
+     * but have not terminated}
+     *
+     * @implSpec
+     * The default implementation returns {@code 0L}.
+     *
+     * @since 99
+     */
+    public default long getVirtualThreadCount() {
+        return 0L;
+    }
+
+    /**
      * Returns the threadIDs of all live platform threads.
      * The thread IDs of virtual threads are not included.
      * Some threads included in the returned array
