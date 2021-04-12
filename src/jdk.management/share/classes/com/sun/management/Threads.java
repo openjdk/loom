@@ -87,6 +87,18 @@ public class Threads {
         public Stream<Thread> threads() {
             return delegate.threads();
         }
+        @Override
+        public int hashCode() {
+            return delegate.hashCode();
+        }
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof ThreadExecutorImpl other) {
+                return this.delegate.equals(other.delegate);
+            } else {
+                return false;
+            }
+        }
     }
 
     /**

@@ -24,8 +24,9 @@
 /**
  * @test
  * @run testng DumpThreads
- * @summary Basic test of HotSpotDiagnosticMXBean.dumpThreads
+ * @summary Basic test for com.sun.management.HotSpotDiagnosticMXBean.dumpThreads
  */
+
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,7 +39,6 @@ import static org.testng.Assert.*;
 
 @Test
 public class DumpThreads {
-
 
     public void testPlainText() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
@@ -70,9 +70,15 @@ public class DumpThreads {
     }
 
     @Test(expectedExceptions = { IllegalArgumentException.class })
-    public void testRelativePath() throws Exception {
+    public void testRelativePath1() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         mbean.dumpThreads("threads.txt", ThreadDumpFormat.TEXT_PLAIN);
+    }
+
+    @Test(expectedExceptions = { IllegalArgumentException.class })
+    public void testRelativePath2() throws Exception {
+        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
+        mbean.dumpThreads("threads.json", ThreadDumpFormat.JSON);
     }
 
     @Test(expectedExceptions = { NullPointerException.class })
