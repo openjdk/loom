@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng Monitoring
- * @summary Test javax.management.ThreadMXBean with virtual threads
+ * @run testng VirtualThreads
+ * @summary Test java.lang.management.ThreadMXBean with virtual threads
  */
 
 import java.lang.management.ManagementFactory;
@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
-public class Monitoring {
+public class VirtualThreads {
 
     /**
      * Test ThreadMXBean::getVirtualThreadCount.
@@ -62,7 +62,7 @@ public class Monitoring {
      * virtual threads.
      */
     public void testGetAllThreadIds() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        runInVirtualThread(() -> {
             long currentTid = Thread.currentThread().getId();
             long[] tids = ManagementFactory.getThreadMXBean().getAllThreadIds();
             boolean found = Arrays.stream(tids).anyMatch(tid -> tid == currentTid);
@@ -74,7 +74,7 @@ public class Monitoring {
      * Test that ThreadMXBean::getThreadInfo returns null for a virual thread.
      */
     public void testGetThreadInfo1() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        runInVirtualThread(() -> {
             long tid = Thread.currentThread().getId();
             ThreadInfo info = ManagementFactory.getThreadMXBean().getThreadInfo(tid);
             assertTrue(info == null);
@@ -127,7 +127,7 @@ public class Monitoring {
      * Test that getThreadCpuTime returns -1 for a virual thread..
      */
     public void testGetThreadCpuTime() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        runInVirtualThread(() -> {
             long tid = Thread.currentThread().getId();
             long cpuTime = ManagementFactory.getThreadMXBean().getThreadCpuTime(tid);
             assertTrue(cpuTime == -1L);
@@ -138,7 +138,7 @@ public class Monitoring {
      * Test that getThreadUserTime returns -1 for a virual thread.
      */
     public void testGetThreadUserTime() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        runInVirtualThread(() -> {
             long tid = Thread.currentThread().getId();
             long cpuTime = ManagementFactory.getThreadMXBean().getThreadUserTime(tid);
             assertTrue(cpuTime == -1L);
@@ -151,7 +151,7 @@ public class Monitoring {
      */
     @Test(expectedExceptions = { UnsupportedOperationException.class })
     public void testGetCurrentThreadCpuTime() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        runInVirtualThread(() -> {
             ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
         });
     }
@@ -162,7 +162,7 @@ public class Monitoring {
      */
     @Test(expectedExceptions = { UnsupportedOperationException.class })
     public void testGetCurrentThreadUserTime() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        runInVirtualThread(() -> {
             ManagementFactory.getThreadMXBean().getCurrentThreadUserTime();
         });
     }
@@ -172,11 +172,34 @@ public class Monitoring {
      * invoked on a virtual thread.
      */
     public void testGetCurrentThreadAllocatedBytes() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        runInVirtualThread(() -> {
             long allocated = ManagementFactory.getPlatformMXBean(com.sun.management.ThreadMXBean.class)
                     .getCurrentThreadAllocatedBytes();
             assertTrue(allocated == -1L);
         });
+    }
+
+    interface ThrowingRunnable {
+        void run() throws Exception;
+    }
+
+    private static void runInVirtualThread(ThrowingRunnable task) throws Exception {
+        AtomicReference<Exception> exc = new AtomicReference<>();
+        Runnable target =  () -> {
+            try {
+                task.run();
+            } catch (Error e) {
+                exc.set(new RuntimeException(e));
+            } catch (Exception e) {
+                exc.set(e);
+            }
+        };
+        Thread thread = Thread.ofVirtual().start(target);
+        thread.join();
+        Exception e = exc.get();
+        if (e != null) {
+            throw e;
+        }
     }
 
     private static boolean contains(StackTraceElement[] stack, String className) {
