@@ -1847,13 +1847,11 @@ public class Thread implements Runnable {
      * {@linkplain ThreadGroup thread group}.
      *
      * The priority of a virtual thread is always {@link Thread#NORM_PRIORITY}
-     * and cannot be changed by this method to another priority.
+     * and {@code newPriority} is ignored.
      *
      * @param newPriority the new thread priority
      * @throws  IllegalArgumentException if the priority is not in the
-     *          range {@code MIN_PRIORITY} to {@code MAX_PRIORITY}, or
-     *          the thread is a virtual thread and the priority is not
-     *          {@code NORM_PRIORITY}.
+     *          range {@code MIN_PRIORITY} to {@code MAX_PRIORITY}.
      * @throws  SecurityException
      *          if {@link #checkAccess} determines that the current
      *          thread cannot modify this thread
@@ -1865,12 +1863,7 @@ public class Thread implements Runnable {
         if (newPriority > MAX_PRIORITY || newPriority < MIN_PRIORITY) {
             throw new IllegalArgumentException();
         }
-        if (isVirtual()) {
-            if (newPriority != NORM_PRIORITY) {
-                throw new IllegalArgumentException("Priority "
-                    + newPriority + " not legal for virtual threads");
-            }
-        } else {
+        if (!isVirtual()) {
             priority(newPriority);
         }
     }

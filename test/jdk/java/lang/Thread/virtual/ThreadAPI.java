@@ -798,9 +798,18 @@ public class ThreadAPI {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             assertTrue(me.getPriority() == Thread.NORM_PRIORITY);
+
+            me.setPriority(Thread.MAX_PRIORITY);
+            assertTrue(me.getPriority() == Thread.NORM_PRIORITY);
+
             me.setPriority(Thread.NORM_PRIORITY);
+            assertTrue(me.getPriority() == Thread.NORM_PRIORITY);
+
+            me.setPriority(Thread.MIN_PRIORITY);
+            assertTrue(me.getPriority() == Thread.NORM_PRIORITY);
+
             assertThrows(IllegalArgumentException.class, () -> me.setPriority(-1));
-            assertThrows(IllegalArgumentException.class, () -> me.setPriority(Thread.MIN_PRIORITY));
+
         });
     }
 
@@ -809,17 +818,35 @@ public class ThreadAPI {
 
         // not started
         assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
+
+        thread.setPriority(Thread.MAX_PRIORITY);
+        assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
+
         thread.setPriority(Thread.NORM_PRIORITY);
+        assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
+
+        thread.setPriority(Thread.MIN_PRIORITY);
+        assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
+
         assertThrows(IllegalArgumentException.class, () -> thread.setPriority(-1));
-        assertThrows(IllegalArgumentException.class, () -> thread.setPriority(Thread.MIN_PRIORITY));
 
         // running
         thread.start();
         try {
             assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
             thread.setPriority(Thread.NORM_PRIORITY);
+
+            thread.setPriority(Thread.MAX_PRIORITY);
+            assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
+
+            thread.setPriority(Thread.NORM_PRIORITY);
+            assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
+
+            thread.setPriority(Thread.MIN_PRIORITY);
+            assertTrue(thread.getPriority() == Thread.NORM_PRIORITY);
+
             assertThrows(IllegalArgumentException.class, () -> thread.setPriority(-1));
-            assertThrows(IllegalArgumentException.class, () -> thread.setPriority(Thread.MIN_PRIORITY));
+
         } finally {
             LockSupport.unpark(thread);
         }
