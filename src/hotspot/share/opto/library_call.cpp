@@ -3066,8 +3066,8 @@ Node* LibraryCallKit::scopeLocalCache_helper() {
 
   Node* thread = _gvn.transform(new ThreadLocalNode());
   Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::scopeLocalCache_offset()));
-  return _gvn.transform(make_load(NULL, p, p->bottom_type()->is_ptr(),
-                                  T_ADDRESS, MemNode::unordered));
+  return _gvn.transform(LoadNode::make(_gvn, NULL, immutable_memory(), p, p->bottom_type()->is_ptr(),
+        TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered));
 }
 
 //------------------------inline_native_scopeLocalCache------------------
