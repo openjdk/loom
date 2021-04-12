@@ -24,7 +24,7 @@
 
 /**
  * @test
- * @run testng/othervm -Djdk.trackAllVirtualThreads=true TrackingVirtualThreadsTest
+ * @run testng/othervm -Djdk.trackAllVirtualThreads=true TrackAllVirtualThreads
  */
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
@@ -36,7 +36,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
-public class TrackingVirtualThreadsTest {
+public class TrackAllVirtualThreads {
 
     public void testOneThread() throws Exception {
         assertTrue(Threads.virtualThreads().count() == 0L);
@@ -47,7 +47,10 @@ public class TrackingVirtualThreadsTest {
             LockSupport.unpark(thread);
             thread.join();
         }
-        assertTrue(Threads.virtualThreads().count() == 0L);
+        // wait for thread count to go to 0
+        while (Threads.virtualThreads().count() != 0L) {
+            Thread.sleep(10);
+        }
     }
 
     public void testManyThreads() throws Exception {
@@ -72,8 +75,9 @@ public class TrackingVirtualThreadsTest {
                 latch.countDown();
             }
         }
+        // wait for thread count to go to 0
         while (Threads.virtualThreads().count() != 0L) {
-            Thread.sleep(100);
+            Thread.sleep(10);
         }
     }
 }
