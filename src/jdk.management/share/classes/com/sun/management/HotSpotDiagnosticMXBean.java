@@ -39,7 +39,7 @@ import java.lang.management.PlatformManagedObject;
  * <blockquote>
  *    {@code com.sun.management:type=HotSpotDiagnostic}
  * </blockquote>
-.*
+ *
  * It can be obtained by calling the
  * {@link PlatformManagedObject#getObjectName} method.
  *
