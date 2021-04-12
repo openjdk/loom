@@ -29,18 +29,33 @@
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.nio.channels.Selector;
 import java.util.Arrays;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
 public class Monitoring {
+
+    /**
+     * Test ThreadMXBean::getVirtualThreadCount.
+     */
+    public void testGetVirtualThreadCount() {
+        Thread thread = Thread.ofVirtual().start(LockSupport::park);
+        try {
+            ThreadMXBean mbean = ManagementFactory.getThreadMXBean();
+            assertTrue(mbean.getVirtualThreadCount() > 0);
+        } finally {
+            LockSupport.unpark(thread);
+        }
+    }
 
     /**
      * Test that ThreadMXBean::getAllThreadsIds does not include thread ids for
