@@ -177,3 +177,22 @@ vmTestbase/nsk/stress/stack/stack018.java	8252468 generic-all
 vmTestbase/gc/memory/Nio/Nio.java 8249549 generic-all
 
 gtest/GTestWrapper.java                                                       0000000 generic-all
+
+vmTestbase/nsk/stress/strace/strace001.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace002.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace003.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace004.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace005.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace006.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace007.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace008.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace009.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace010.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace011.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace012.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace013.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace014.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace015.java                                   8254188 generic-all
+
+runtime/stack/4217960/b4217960.java                                           8252468 generic-all
+runtime/stack/4502350/b4502350.java                                           8252468 generic-all
