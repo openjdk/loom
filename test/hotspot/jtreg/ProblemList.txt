@@ -193,6 +193,3 @@ vmTestbase/nsk/stress/strace/strace012.java                                   82
 vmTestbase/nsk/stress/strace/strace013.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace014.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace015.java                                   8254188 generic-all
-
-runtime/stack/4217960/b4217960.java                                           8252468 generic-all
-runtime/stack/4502350/b4502350.java                                           8252468 generic-all
