@@ -193,3 +193,12 @@ vmTestbase/nsk/stress/strace/strace012.java                                   82
 vmTestbase/nsk/stress/strace/strace013.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace014.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace015.java                                   8254188 generic-all
+
+#Deadlock when SetEventNotification/PopFrame suspended test
+vmTestbase/nsk/jvmti/scenarios/sampling/SP05/sp05t003/TestDescription.java    0000000 generic-all
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS204/hs204t004/hs204t004.java         0000000 generic-all
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS204/hs204t003/hs204t003.java         0000000 generic-all
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS203/hs203t003/hs203t003.java         0000000 generic-all
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS203/hs203t002/hs203t002.java         0000000 generic-all
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS203/hs203t001/hs203t001.java         0000000 generic-all
+vmTestbase/nsk/jvmti/scenarios/hotswap/HS202/hs202t002/hs202t002.java         0000000 generic-all
