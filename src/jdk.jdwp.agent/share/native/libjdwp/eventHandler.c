@@ -719,7 +719,11 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
         }
     }
 
-    filterAndHandleEvent(env, evinfo, ei, eventBag, eventSessionID);
+    if (ei == EI_THREAD_END && evinfo->is_vthread && !gdata->notifyVThreads) {
+        // Skip this event since we are not notifying the debugger of vthread START/END events
+    } else {
+        filterAndHandleEvent(env, evinfo, ei, eventBag, eventSessionID);
+    }
 
     /* we are continuing after VMDeathEvent - now we are dead */
     if (evinfo->ei == EI_VM_DEATH) {
@@ -1370,6 +1374,12 @@ cbVThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
             }
             debugMonitorExit(callbackBlock);
         }
+    }
+
+    /* Ignore VIRTUAL_THREAD_START events unless we are notifying the debugger of all vthreads
+     * or are tracking all vthreads. */
+    if (!gdata->notifyVThreads && !gdata->trackAllVThreads) {
+        return;
     }
 
     BEGIN_CALLBACK() {
