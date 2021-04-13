@@ -425,9 +425,7 @@ insertThread(JNIEnv *env, ThreadList *list, jthread thread)
          *   Some threads may not be in a state that allows setting of TLS,
          *   which is ok, see findThread, it deals with threads without TLS set.
          */
-        if (!is_vthread) {
-          setThreadLocalStorage(node->thread, (void*)node);
-        }
+        setThreadLocalStorage(node->thread, (void*)node);
     }
 
     return node;
@@ -444,9 +442,7 @@ clearThread(JNIEnv *env, ThreadNode *node)
         (void)threadControl_removeDebugThread(node->thread);
     }
     /* Clear out TLS on this thread (just a cleanup action) */
-    if (!node->is_vthread) {
-        setThreadLocalStorage(node->thread, NULL);
-    }
+    setThreadLocalStorage(node->thread, NULL);
     tossGlobalRef(env, &(node->thread));
     bagDestroyBag(node->eventBag);
     jvmtiDeallocate(node);
@@ -2768,11 +2764,11 @@ threadControl_addVThread(jthread vthread)
 void
 threadControl_dumpAllThreads()
 {
-    tty_message("Dumping runningThreads:\n");
+    tty_message("Dumping runningThreads:");
     dumpThreadList(&runningThreads);
-    tty_message("Dumping runningVThreads:\n");
+    tty_message("\nDumping runningVThreads:");
     dumpThreadList(&runningVThreads);
-    tty_message("Dumping otherThreads:\n");
+    tty_message("\nDumping otherThreads:");
     dumpThreadList(&otherThreads);
 }
 
