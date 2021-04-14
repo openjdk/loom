@@ -162,6 +162,7 @@ compiler/runtime/StackOverflowBug.java                                        82
 compiler/startup/SmallCodeCacheStartup.java                                   8242064 generic-all
 compiler/exceptions/TestRecursiveReplacedException.java	                      8242065 generic-all
 compiler/vectorization/TestMacroLogicVector.java                              8253919 windows-all
+compiler/whitebox/ForceNMethodSweepTest.java                                  8265181 generic-all
 
 runtime/clinit/ClassInitBarrier.java                                          8254936 generic-all
 runtime/vthread/RedefineClass.java                                            8253378 generic-all
