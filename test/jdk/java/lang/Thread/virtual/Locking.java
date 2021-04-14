@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -83,7 +83,7 @@ public class Locking {
         });
     }
 
-    // locked by dinoasur thread, virtual thread tries to lock
+    // locked by platform thread, virtual thread tries to lock
     public void testReentrantLock4() throws Exception {
         ReentrantLock lock = new ReentrantLock();
         var holdsLock = new AtomicBoolean();
@@ -118,7 +118,7 @@ public class Locking {
         thread.join();
     }
 
-    // locked by virtual thread, dinoasur thread tries to lock
+    // locked by virtual thread, platform thread tries to lock
     public void testReentrantLock5() throws Exception {
         ReentrantLock lock = new ReentrantLock();
         var thread = Thread.startVirtualThread(() -> {
