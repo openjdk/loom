@@ -29,264 +29,133 @@
 
 extern "C" {
 
-
-#define PASSED  0
-#define STATUS_FAILED  2
-
 typedef struct {
-    int cnt;
-    const char **thrNames;
+  int cnt;
+  const char **thr_names;
 } info;
 
-static jvmtiEnv *jvmti;
+static jvmtiEnv *jvmti_env;
 static jrawMonitorID lock1;
 static jrawMonitorID lock2;
-static jboolean printdump = JNI_FALSE;
-static jint result = PASSED;
-static jvmtiThreadInfo inf;
-static int sys_cnt;
-static const char *names0[] = { "main" };
-static const char *names1[] = { "main", "thread1" };
-static const char *names2[] = { "main", "Thread-" };
+static int system_threads_count;
+static const char *names0[] = {"main"};
+static const char *names1[] = {"main", "thread1"};
+static const char *names2[] = {"main", "Thread-"};
 static info thrInfo[] = {
-    { 1, names0 }, { 1, names0 }, { 2, names1 }, { 1, names0 }, { 2, names2 }
+    {1, names0}, {1, names0}, {2, names1}, {1, names0}, {2, names2}
 };
 
-jthread jthr(JNIEnv *env) {
-    jclass thrClass;
-    jmethodID cid;
-    jthread res;
-    thrClass = env->FindClass("java/lang/Thread");
-    cid = env->GetMethodID(thrClass, "<init>", "()V");
-    res = env->NewObject(thrClass, cid);
-    return res;
+const int IDX_AGENT_THREAD = 4;
+
+jthread create_jthread(JNIEnv *jni) {
+  jclass thrClass = jni->FindClass("java/lang/Thread");
+  jmethodID cid = jni->GetMethodID(thrClass, "<init>", "()V");
+  return jni->NewObject(thrClass, cid);
 }
 
 static void JNICALL
-sys_thread(jvmtiEnv* jvmti, JNIEnv* jni, void *p) {
-    jvmtiError err;
-
-    err = jvmti->RawMonitorEnter(lock2);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to enter raw monitor 2 (thread): %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-
-    /* allows the main thread to wait until the child thread is running */
-    err = jvmti->RawMonitorEnter(lock1);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to enter raw monitor 1 (thread): %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-    err = jvmti->RawMonitorNotify(lock1);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to notify raw monitor (thread): %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-    err = jvmti->RawMonitorExit(lock1);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to exit raw monitor 1 (thread): %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-
-    /* keeps the child thread from exiting */
-    err = jvmti->RawMonitorWait(lock2, (jlong)0);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to wait raw monitor (thread): %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-    err = jvmti->RawMonitorExit(lock2);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to exit raw monitor 2 (thread): %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
+sys_thread(jvmtiEnv *jvmti, JNIEnv *jni, void *p) {
+  RawMonitorLocker rml2 = RawMonitorLocker(jvmti, jni, lock2);
+  {
+    RawMonitorLocker rml1 = RawMonitorLocker(jvmti, jni, lock1);
+    rml1.notify();
+  }
+  rml2.wait();
 }
 
-jint  Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-    jint res;
-    jvmtiError err;
+jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  jint res;
 
-    if (options != NULL && strcmp(options, "printdump") == 0) {
-        printdump = JNI_TRUE;
-    }
+  res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti_env == NULL) {
+    printf("Wrong result of a valid call to GetEnv !\n");
+    return JNI_ERR;
+  }
+  lock1 = create_raw_monitor(jvmti_env, "_lock1");
+  lock2 = create_raw_monitor(jvmti_env, "_lock2");
 
-    res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
-    if (res != JNI_OK || jvmti == NULL) {
-        printf("Wrong result of a valid call to GetEnv !\n");
-        return JNI_ERR;
-    }
-
-    err = jvmti->CreateRawMonitor("_lock1", &lock1);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to create raw monitor 1, err = %d\n", err);
-        return JNI_ERR;
-    }
-
-    err = jvmti->CreateRawMonitor("_lock2", &lock2);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to create raw monitor 2, err = %d\n", err);
-        return JNI_ERR;
-    }
-
-    return JNI_OK;
+  return JNI_OK;
 }
 
-JNIEXPORT void checkInfo(JNIEnv *env, int ind) {
-    jint threadsCount = -1;
-    jthread *threads;
-    int i, j, found;
-    jvmtiError err;
-    int num_unexpected = 0;
+JNIEXPORT jboolean check_info(JNIEnv *jni, int ind) {
+  jboolean result = JNI_TRUE;
+  jint threadsCount = -1;
+  jthread *threads;
+  int num_unexpected = 0;
 
-    if (printdump == JNI_TRUE) {
-        printf(" >>> Check: %d\n", ind);
+  printf(" >>> Check: %d\n", ind);
+
+  if (ind == IDX_AGENT_THREAD) {
+    RawMonitorLocker rml1 = RawMonitorLocker(jvmti_env, jni, lock1);
+    jvmtiError err = jvmti_env->RunAgentThread(create_jthread(jni), sys_thread, NULL,JVMTI_THREAD_NORM_PRIORITY);
+    check_jvmti_status(jni, err, "Failed to run AgentThread");
+    rml1.wait();
+  }
+
+  check_jvmti_status(jni, jvmti_env->GetAllThreads(&threadsCount, &threads), "Failed in GetAllThreads");
+
+  for (int i = 0; i < threadsCount; i++) {
+    if (!isThreadExpected(jvmti_env, threads[i])) {
+      num_unexpected++;
+    }
+  }
+
+  if (threadsCount - num_unexpected != thrInfo[ind].cnt + system_threads_count) {
+    printf("Point %d: number of threads expected: %d, got: %d\n",
+           ind, thrInfo[ind].cnt + system_threads_count, threadsCount - num_unexpected);
+    return JNI_FALSE;
+  }
+
+  for (int i = 0; i < thrInfo[ind].cnt; i++) {
+    bool found = false;
+    for (int j = 0; j < threadsCount && !found; j++) {
+      char *name = get_thread_name(jvmti_env, jni, threads[j]);
+      printf(" >>> %s\n", name);
+
+      found = (name != NULL &&
+          strstr(name, thrInfo[ind].thr_names[i]) == name &&
+          (ind == IDX_AGENT_THREAD || strlen(name) ==
+              strlen(thrInfo[ind].thr_names[i])));
     }
 
-    if (ind == 4) {
-        err = jvmti->RawMonitorEnter(lock1);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Failed to enter raw monitor (check): %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-        err = jvmti->RunAgentThread(jthr(env), sys_thread, NULL,
-                                       JVMTI_THREAD_NORM_PRIORITY);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Failed to start agent thread: %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-        err = jvmti->RawMonitorWait(lock1, (jlong)0);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Failed to wait raw monitor (check): %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-        err = jvmti->RawMonitorExit(lock1);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Failed to exit raw monitor (check): %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
+    printf("\n");
+    if (!found) {
+      printf("Point %d: thread %s not detected\n",
+             ind, thrInfo[ind].thr_names[i]);
+      result = JNI_FALSE;
     }
+  }
 
-    err = jvmti->GetAllThreads(&threadsCount, &threads);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to get all threads (check): %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-        return;
-    }
+  deallocate(jvmti_env, jni, threads);
 
-    for (i = 0; i < threadsCount; i++) {
-        if (!isThreadExpected(jvmti, threads[i])) {
-            num_unexpected++;
-        }
-    }
-
-    if (threadsCount - num_unexpected != thrInfo[ind].cnt + sys_cnt) {
-        printf("Point %d: number of threads expected: %d, got: %d\n",
-            ind, thrInfo[ind].cnt + sys_cnt, threadsCount - num_unexpected);
-        result = STATUS_FAILED;
-        return;
-    }
-
-    for (i = 0; i < thrInfo[ind].cnt; i++) {
-        for (j = 0, found = 0; j < threadsCount && !found; j++) {
-            err = jvmti->GetThreadInfo(threads[j], &inf);
-            if (err != JVMTI_ERROR_NONE) {
-                printf("Failed to get thread info: %s (%d)\n",
-                       TranslateError(err), err);
-                result = STATUS_FAILED;
-                return;
-            }
-            if (printdump == JNI_TRUE) {
-                printf(" >>> %s", inf.name);
-            }
-            found = (inf.name != NULL &&
-                     strstr(inf.name, thrInfo[ind].thrNames[i]) == inf.name &&
-                     (ind == 4 || strlen(inf.name) ==
-                      strlen(thrInfo[ind].thrNames[i])));
-        }
-        if (printdump == JNI_TRUE) {
-            printf("\n");
-        }
-        if (!found) {
-            printf("Point %d: thread %s not detected\n",
-                   ind, thrInfo[ind].thrNames[i]);
-            result = STATUS_FAILED;
-        }
-    }
-
-    err = jvmti->Deallocate((unsigned char *)threads);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to deallocate array: %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-
-    if (ind == 4) {
-        err = jvmti->RawMonitorEnter(lock2);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Failed to enter raw monitor (check): %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-        err = jvmti->RawMonitorNotify(lock2);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Failed to notify raw monitor (check): %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-        err = jvmti->RawMonitorExit(lock2);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("Failed to exit raw monitor (check): %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-    }
+  if (ind == IDX_AGENT_THREAD) {
+    RawMonitorLocker rml2 = RawMonitorLocker(jvmti_env, jni, lock2);
+    rml2.notify();
+  }
+  return result;
 }
 
 JNIEXPORT void JNICALL Java_allthr01_setSysCnt(JNIEnv *env, jclass cls) {
-    jint threadsCount = -1;
-    jthread *threads;
-    jvmtiError err;
-    int i;
+  jint threadsCount = -1;
+  jthread *threads;
 
-    err = jvmti->GetAllThreads(&threadsCount, &threads);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to get all threads (count): %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-        return;
+  check_jvmti_status(env, jvmti_env->GetAllThreads(&threadsCount, &threads), "Failed in GetAllThreads");
+
+  system_threads_count = threadsCount - 1;
+
+  for (int i = 0; i < threadsCount; i++) {
+    if (!isThreadExpected(jvmti_env, threads[i])) {
+      system_threads_count--;
     }
+  }
 
-    sys_cnt = threadsCount - 1;
+  printf(" >>> number of system threads: %d\n", system_threads_count);
 
-    for (i = 0; i < threadsCount; i++) {
-        if (!isThreadExpected(jvmti, threads[i])) {
-            sys_cnt--;
-        }
-    }
-
-    if (printdump == JNI_TRUE) {
-        printf(" >>> number of system threads: %d\n", sys_cnt);
-    }
 }
 
-JNIEXPORT void JNICALL
-Java_allthr01_checkInfo(JNIEnv *env, jclass cls, jint ind) {
-    checkInfo(env, ind);
-}
-
-JNIEXPORT jint JNICALL Java_allthr01_getRes(JNIEnv *env, jclass cls) {
-    return result;
+JNIEXPORT jboolean JNICALL
+Java_allthr01_checkInfo0(JNIEnv *env, jclass cls, jint ind) {
+  return check_info(env, ind);
 }
 
 }

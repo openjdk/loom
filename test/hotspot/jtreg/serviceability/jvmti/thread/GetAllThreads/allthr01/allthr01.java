@@ -37,7 +37,7 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:allthr01 allthr01 5
+ * @run main/othervm/native -agentlib:allthr01 allthr01
  */
 
 import java.io.PrintStream;
@@ -56,29 +56,20 @@ public class allthr01 {
     }
 
     native static void setSysCnt();
-    native static void checkInfo(int thr_ind);
-    native static int getRes();
+    native static boolean checkInfo0(int thr_ind);
+    static void checkInfo(int thr_ind) {
+        if (!checkInfo0(thr_ind)) {
+            throw new RuntimeException("checkInfo faled for idx: " + thr_ind);
+        }
+    }
+
 
     public static Object lock1 = new Object();
     public static Object lock2 = new Object();
     public static int waitTime = 2;
 
     public static void main(String[] args) {
-        System.exit(run(args, System.out) + 95/*STATUS_TEMP*/);
-    }
-
-    public static int run(String args[], PrintStream out) {
-        if (args.length > 0) {
-            try {
-                int i  = Integer.parseInt(args[0]);
-                waitTime = i;
-            } catch (NumberFormatException ex) {
-                out.println("# Wrong argument \"" + args[0]
-                    + "\", the default value is used");
-            }
-        }
-        out.println("# Waiting time = " + waitTime + " mins");
-
+        boolean result;
         setSysCnt();
         checkInfo(0);
 
@@ -102,14 +93,13 @@ public class allthr01 {
         }
 
         try {
-            t_a.join(waitTime * 60000);
+            t_a.join();
         } catch (InterruptedException e) {
             throw new Error("Unexpected " + e);
         }
         checkInfo(3);
 
         checkInfo(4);
-        return getRes();
     }
 }
 
