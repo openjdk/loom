@@ -58,6 +58,7 @@ class InstanceStackChunkKlass: public InstanceKlass {
   friend class Continuations;
   template <bool mixed> friend class StackChunkFrameStream; 
   friend class FixChunkIterateStackClosure;
+  friend class MarkMethodsStackClosure;
   template <bool concurrent_gc, typename OopClosureType> friend class OopOopIterateStackClosure;
 
 public:
@@ -79,7 +80,10 @@ public:
     return static_cast<InstanceStackChunkKlass*>(k);
   }
 
-  int instance_size(int stack_size_in_words) const;
+  inline int instance_size(int stack_size_in_words) const;
+  static inline int bitmap_size(int stack_size_in_words); // in words
+  // the *last* bit in the bitmap corresponds to the last word in the stack; this returns the bit index corresponding to the first word
+  static inline BitMap::idx_t bit_offset(int stack_size_in_words);
 
   // Returns the size of the instance including the stack data.
   virtual int oop_size(oop obj) const override;
@@ -102,19 +106,16 @@ public:
 #endif
   
   // Stack offset is an offset into the Heap
-  static HeapWord* start_of_stack(oop obj) {
-    return (HeapWord*)(cast_from_oop<intptr_t>(obj) + offset_of_stack());
-  }
+  static HeapWord* start_of_stack(oop obj) { return (HeapWord*)(cast_from_oop<intptr_t>(obj) + offset_of_stack()); }
+  static inline HeapWord* start_of_bitmap(oop obj);
 
+  static int offset_of_stack() { return _offset_of_stack; }
   static void init_offset_of_stack() {
     // Cache the offset of the static fields in the Class instance
     assert(_offset_of_stack == 0, "once");
     _offset_of_stack = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass())->size_helper() << LogHeapWordSize;
   }
 
-  static int offset_of_stack() {
-    return _offset_of_stack;
-  }
 
   template<bool mixed = true>
   static int count_frames(stackChunkOop chunk);
@@ -140,15 +141,17 @@ public:
 
 public:
   template <bool store, bool mixed, typename RegisterMapT>
-  static void fix_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
+  static void do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
   template <typename RegisterMapT>
-  static void fix_thawed_frame(const frame& f, const RegisterMapT* map);
+  static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
 
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
 private:
+  static int bitmap_size_in_bits(int stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
+  void build_bitmap(stackChunkOop chunk);
 
   template<bool disjoint> size_t copy(oop obj, HeapWord* to, size_t word_size);
   template<bool disjoint> size_t copy_compact(oop obj, HeapWord* to);
@@ -162,6 +165,14 @@ private:
   template <bool concurrent_gc, class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
   
+  template <bool concurrent_gc, class OopClosureType>
+  inline void oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
+
+  void mark_methods(stackChunkOop chunk);
+
+  template <bool concurrent_gc>
+  void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure);
+
   template <bool mixed>
   static void run_nmethod_entry_barrier_if_needed(const StackChunkFrameStream<mixed>& f);
 

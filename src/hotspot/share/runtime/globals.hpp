@@ -2075,6 +2075,9 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, TrimContinuationChunksInGC, false,                          \
          "Trim stack chunks when copying objects in GC")                    \
                                                                             \
+  product(bool, UseChunkBitmaps, false,                                    \
+         "Generate oop bitmaps for continuation chunks")                    \
+                                                                            \
   product(bool, UseContinuationFastPath, true,                              \
           "Use fast-path frame walking in continuations")                   \
                                                                             \

@@ -1107,7 +1107,6 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static int _pc_offset;
   static int _argsize_offset;
   static int _flags_offset;
-  static int _mode_offset;
   static int _gcSP_offset;
   static int _markCycle_offset;
   static int _maxSize_offset;
@@ -1139,8 +1138,6 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline void set_argsize(oop ref, jint value);
   static inline jbyte flags(oop ref);
   static inline void set_flags(oop ref, jbyte value);
-  static inline jboolean gc_mode(oop ref);
-  static inline void set_gc_mode(oop ref, jboolean value);
   static inline jint gc_sp(oop ref);
   static inline void set_gc_sp(oop ref, jint value);
   static inline jlong mark_cycle(oop ref);

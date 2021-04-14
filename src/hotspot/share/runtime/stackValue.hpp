@@ -112,7 +112,7 @@ class StackValue : public ResourceObj {
 
   template<typename RegisterMapT>
   static StackValue* create_stack_value(const frame* fr, const RegisterMapT* reg_map, ScopeValue* sv) {
-    return create_stack_value(sv, stack_value_address(fr, reg_map, sv), reg_map->in_cont());
+    return create_stack_value(sv, stack_value_address(fr, reg_map, sv), reg_map);
   }
 
   template<typename RegisterMapT>
@@ -150,7 +150,8 @@ class StackValue : public ResourceObj {
 #endif
 
 private:
-  static StackValue* create_stack_value(ScopeValue* sv, address value_addr, bool in_cont);
+  template<typename RegisterMapT>
+  static StackValue* create_stack_value(ScopeValue* sv, address value_addr, const RegisterMapT* reg_map);
 };
 
 #endif // SHARE_RUNTIME_STACKVALUE_HPP

@@ -28,6 +28,7 @@
 #include "memory/allocation.hpp"
 #include "memory/memRegion.hpp"
 #include "oops/oopsHierarchy.hpp"
+#include "utilities/bitMap.hpp"
 
 class CodeBlob;
 class nmethod;
@@ -380,6 +381,7 @@ class Devirtualizer {
   template <typename OopClosureType>             static void do_cld(OopClosureType* closure, ClassLoaderData* cld);
   template <typename OopClosureType>             static bool do_metadata(OopClosureType* closure);
   template <typename DerivedOopClosureType>      static void do_derived_oop(DerivedOopClosureType* closure, oop* base, derived_pointer* derived);
+  template <typename BitMapClosureType>          static bool do_bit(BitMapClosureType* closure, BitMap::idx_t index);
 };
 
 class OopIteratorClosureDispatch {

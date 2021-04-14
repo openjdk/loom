@@ -290,12 +290,6 @@ inline jbyte jdk_internal_misc_StackChunk::flags(oop ref) {
 inline void jdk_internal_misc_StackChunk::set_flags(oop ref, jbyte value) {
   ref->byte_field_put(_flags_offset, value);
 }
-inline jboolean jdk_internal_misc_StackChunk::gc_mode(oop ref) {
-  return ref->bool_field(_mode_offset);
-}
-inline void jdk_internal_misc_StackChunk::set_gc_mode(oop ref, jboolean value) {
-  ref->bool_field_put(_mode_offset, value);
-}
 inline jint jdk_internal_misc_StackChunk::gc_sp(oop ref) {
   return ref->int_field(_gcSP_offset);
 }

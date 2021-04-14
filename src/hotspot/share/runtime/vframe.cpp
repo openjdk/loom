@@ -39,6 +39,7 @@
 #include "oops/oop.inline.hpp"
 #include "prims/jvmtiExport.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/objectMonitor.hpp"
 #include "runtime/objectMonitor.inline.hpp"
@@ -326,7 +327,14 @@ static StackValue* create_stack_value_from_oop_map(const RegisterMap* reg_map,
 
   // categorize using oop_mask
   if (oop_mask.is_oop(index)) {
-    oop obj = addr != NULL ? (reg_map->in_cont() ? HeapAccess<>::oop_load((oop*)addr) : *(oop*)addr) : (oop)NULL;
+    oop obj = NULL;
+    if (addr != NULL) {
+      if (reg_map->in_cont()) {
+        obj = (reg_map->stack_chunk()->has_bitmap() && UseCompressedOops) ? (oop)HeapAccess<>::oop_load((narrowOop*)addr) : HeapAccess<>::oop_load((oop*)addr);
+      } else {
+        obj = *(oop*)addr;
+      }
+    }
     // reference (oop) "r"
     Handle h(Thread::current(), obj);
     return new StackValue(h);

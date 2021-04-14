@@ -5082,7 +5082,6 @@ int jdk_internal_misc_StackChunk::_sp_offset;
 int jdk_internal_misc_StackChunk::_pc_offset;
 int jdk_internal_misc_StackChunk::_argsize_offset;
 int jdk_internal_misc_StackChunk::_flags_offset;
-int jdk_internal_misc_StackChunk::_mode_offset;
 int jdk_internal_misc_StackChunk::_gcSP_offset;
 int jdk_internal_misc_StackChunk::_markCycle_offset;
 int jdk_internal_misc_StackChunk::_maxSize_offset;
@@ -5097,7 +5096,6 @@ int jdk_internal_misc_StackChunk::_cont_offset;
   macro(_pc_offset,        k, vmSymbols::pc_name(),        long_signature,       false); \
   macro(_argsize_offset,   k, vmSymbols::argsize_name(),   int_signature,        false); \
   macro(_flags_offset,     k, "flags",                     byte_signature,       false); \
-  macro(_mode_offset,      k, vmSymbols::mode_name(),      bool_signature,       false); \
   macro(_gcSP_offset,      k, "gcSP",                      int_signature,        false); \
   macro(_markCycle_offset, k, "markCycle",                 long_signature,       false); \
   macro(_maxSize_offset,   k, vmSymbols::maxSize_name(),   int_signature,        false); \

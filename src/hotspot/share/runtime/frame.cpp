@@ -1631,7 +1631,7 @@ void FrameValues::print_on(stackChunkOop chunk, outputStream* st) {
   _values.sort(compare);
 
   intptr_t* start = chunk->start_address();
-  intptr_t* end = chunk->start_address() + chunk->stack_size() + 1;
+  intptr_t* end = chunk->end_address() + 1;
 
   int min_index = 0;
   int max_index = _values.length() - 1;

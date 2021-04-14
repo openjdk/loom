@@ -22,11 +22,13 @@
  *
  */
 
+#include "oops/access.hpp"
 #include "precompiled.hpp"
 #include "code/debugInfo.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/oop.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/stackValue.hpp"
 #if INCLUDE_ZGC
@@ -36,7 +38,12 @@
 #include "gc/shenandoah/shenandoahBarrierSet.inline.hpp"
 #endif
 
-StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, bool in_cont) {
+
+template StackValue* StackValue::create_stack_value(ScopeValue*, address, const RegisterMap*);
+template StackValue* StackValue::create_stack_value(ScopeValue*, address, const SmallRegisterMap*);
+
+template<typename RegisterMapT>
+StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, const RegisterMapT* reg_map) {
   if (sv->is_location()) {
     // Stack or register value
     Location loc = ((LocationValue *)sv)->location();
@@ -110,7 +117,12 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
     }
 #endif
     case Location::oop: {
-      oop val = *(oop *)value_addr;
+      oop val;
+      if (reg_map->in_cont() && reg_map->stack_chunk()->has_bitmap() && UseCompressedOops) {
+        val = CompressedOops::decode(*(narrowOop*)value_addr);
+      } else {
+        val = *(oop *)value_addr;
+      }
 #ifdef _LP64
       if (CompressedOops::is_base(val)) {
          // Compiled code may produce decoded oop = narrow_oop_base
@@ -122,7 +134,6 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, b
 #endif
       // Deoptimization must make sure all oops have passed load barriers
       // TODO: Erik: remove after integration with concurrent stack scanning
-      // TODO: HeapAccess when in_cont?
       val = NativeAccess<>::oop_load(&val);
       assert(oopDesc::is_oop_or_null(val), "bad oop found at " INTPTR_FORMAT, p2i(value_addr));
       Handle h(Thread::current(), val); // Wrap a handle around the oop

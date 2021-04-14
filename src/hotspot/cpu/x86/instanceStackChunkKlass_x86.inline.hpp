@@ -254,6 +254,7 @@ public:
   bool include_argument_oops() const { return false; }
   void set_include_argument_oops(bool f)  {}
   bool in_cont()       const { return false; }
+  stackChunkHandle stack_chunk() const { return stackChunkHandle(); }
 
 #ifdef ASSERT
   bool should_skip_missing() const  { return false; }
