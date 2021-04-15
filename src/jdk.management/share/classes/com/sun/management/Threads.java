@@ -65,8 +65,9 @@ public class Threads {
     }
 
     /**
-     * A thread executor.
+     * A handle to a thread executor.
      * @since 99
+     * @see #executors(Thread)
      * @see java.util.concurrent.Executors#newThreadExecutor(ThreadFactory)
      */
     public interface ThreadExecutor {
