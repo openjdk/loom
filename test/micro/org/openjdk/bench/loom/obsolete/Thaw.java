@@ -21,7 +21,7 @@
  * questions.
  */
 
-package org.openjdk.bench.loom;
+package org.openjdk.bench.loom.obsolete;
 
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
@@ -32,7 +32,7 @@ import org.openjdk.jmh.annotations.*;
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
-public class Freeze {
+public class Thaw {
     static final ContinuationScope SCOPE = new ContinuationScope() { };
 
     static class Arg {
@@ -114,17 +114,28 @@ public class Freeze {
 
     @Setup(Level.Iteration)
     public void setup() {
+        // we must warmup manually because the in justContinue, the Java methods only return and are never called, and so never compiled
+        for (int i=0; i<20000; i++) {
+            Continuation c = Yielder.continuation(paramCount, stackDepth, true);
+            c.run(); c.run();
+            assert c.isDone();
+        }
+        
         // System.out.println("pc = " + paramCount + " sd = " + stackDepth);
         cont = Yielder.continuation(paramCount, stackDepth, true);
+        cont.run();
+        assert !cont.isDone();
+        cont.something_something_2();
     }
 
     /**
      * Creates and runs a continuation that yields at a given stack depth.
      */
     @Benchmark
-    public void justYield() {
+    public void justContinue() {
         cont.run();
-        
-        cont.something_something_1();
+
+        assert cont.isDone();
+        cont.something_something_3();
     }
 }
