@@ -885,5 +885,7 @@ java/lang/Thread/virtual/stress/GetStackTraceALot.java#id2      8254188 generic-
 
 com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
+javax/management/remote/mandatory/notif/NotificationEmissionTest.java 8265342 generic-all
+
 sun/awt/AppContext/8012933/Test8012933.java                     8264674 generic-all
 javax/swing/plaf/metal/MetalUtils/bug6190373.java               8264674 generic-all
