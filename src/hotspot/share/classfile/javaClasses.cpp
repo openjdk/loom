@@ -1210,7 +1210,7 @@ void java_lang_Class::initialize_mirror_fields(Klass* k,
 }
 
 // Set the java.lang.Module module field in the java_lang_Class mirror
-void java_lang_Class::set_mirror_module_field(Klass* k, Handle mirror, Handle module, TRAPS) {
+void java_lang_Class::set_mirror_module_field(JavaThread* current, Klass* k, Handle mirror, Handle module) {
   if (module.is_null()) {
     // During startup, the module may be NULL only if java.base has not been defined yet.
     // Put the class on the fixup_module_list to patch later when the java.lang.Module
@@ -1219,7 +1219,7 @@ void java_lang_Class::set_mirror_module_field(Klass* k, Handle mirror, Handle mo
 
     bool javabase_was_defined = false;
     {
-      MutexLocker m1(THREAD, Module_lock);
+      MutexLocker m1(current, Module_lock);
       // Keep list of classes needing java.base module fixup
       if (!ModuleEntryTable::javabase_defined()) {
         assert(k->java_mirror() != NULL, "Class's mirror is null");
@@ -1236,7 +1236,7 @@ void java_lang_Class::set_mirror_module_field(Klass* k, Handle mirror, Handle mo
       ModuleEntry *javabase_entry = ModuleEntryTable::javabase_moduleEntry();
       assert(javabase_entry != NULL && javabase_entry->module() != NULL,
              "Setting class module field, " JAVA_BASE_NAME " should be defined");
-      Handle javabase_handle(THREAD, javabase_entry->module());
+      Handle javabase_handle(current, javabase_entry->module());
       set_module(mirror(), javabase_handle());
     }
   } else {
@@ -1329,7 +1329,7 @@ void java_lang_Class::create_mirror(Klass* k, Handle class_loader,
 
     // Set the module field in the java_lang_Class instance.  This must be done
     // after the mirror is set.
-    set_mirror_module_field(k, mirror, module, THREAD);
+    set_mirror_module_field(THREAD->as_Java_thread(), k, mirror, module);
 
     if (comp_mirror() != NULL) {
       // Set after k->java_mirror() is published, because compiled code running
@@ -1636,7 +1636,7 @@ bool java_lang_Class::restore_archived_mirror(Klass *k,
 
   k->set_java_mirror(mirror);
 
-  set_mirror_module_field(k, mirror, module, THREAD);
+  set_mirror_module_field(THREAD->as_Java_thread(), k, mirror, module);
 
   if (log_is_enabled(Trace, cds, heap, mirror)) {
     ResourceMark rm(THREAD);
@@ -3254,7 +3254,7 @@ void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const metho
   Handle cont_h (THREAD, cont);
   InstanceKlass* ik = method->method_holder();
   CallInfo info(method(), ik, CHECK);
-  MethodHandles::init_method_MemberName(mname, info, THREAD);
+  MethodHandles::init_method_MemberName(mname, info);
   // set bci
   java_lang_StackFrameInfo::set_bci(stackFrame(), bci);
   // method may be redefined; store the version
