@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng BasicTests
  * @summary Unit tests for java.lang.ThreadGroup
+ * @run testng BasicTests
  */
 
 import java.lang.ref.WeakReference;
