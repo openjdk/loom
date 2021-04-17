@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng ThreadLocals
  * @summary Test Virtual threads using thread locals
+ * @run testng ThreadLocals
  */
 
 import org.testng.annotations.Test;

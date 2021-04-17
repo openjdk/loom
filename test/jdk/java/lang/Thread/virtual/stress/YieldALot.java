@@ -23,9 +23,9 @@
 
 /**
  * @test
+ * @summary Stress test Thread.yield
  * @requires vm.debug != true
  * @run main/othervm YieldALot
- * @summary Stress test Thread.yield
  */
 
 /**

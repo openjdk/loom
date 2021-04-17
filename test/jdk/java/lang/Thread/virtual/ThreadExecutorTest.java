@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng/othervm/timeout=300 ThreadExecutorTest
  * @summary Basic tests for ThreadExecutor
+ * @run testng/othervm/timeout=300 ThreadExecutorTest
  */
 
 import java.time.Duration;

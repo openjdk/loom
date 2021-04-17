@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng DumpThreads
  * @summary Basic test for com.sun.management.HotSpotDiagnosticMXBean.dumpThreads
+ * @run testng DumpThreads
  */
 
 import java.lang.management.ManagementFactory;

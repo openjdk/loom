@@ -23,10 +23,10 @@
 
 /**
  * @test
+ * @summary Stress test virtual threads with SynchronousQueue and LinkedTransferQueue
  * @requires vm.debug != true
  * @run main/othervm PingPong SQ 1000000
  * @run main/othervm PingPong LTQ 1000000
- * @summary Stress test virtual threads with SynchronousQueue and LinkedTransferQueue
  */
 
 /**

@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng WaitNotify
  * @summary Test virtual threads using Object.wait/notify
+ * @run testng WaitNotify
  */
 
 import java.util.concurrent.Semaphore;

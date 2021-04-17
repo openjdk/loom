@@ -23,9 +23,9 @@
 
 /**
  * @test
+ * @summary Stress test asynchronous Thread.getStackTrace
  * @requires vm.debug != true
  * @run main/othervm GetStackTraceALot
- * @summary Stress test asynchronous Thread.getStackTrace
  */
 
 /**

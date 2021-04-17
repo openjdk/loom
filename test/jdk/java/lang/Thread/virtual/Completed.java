@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng Completed
  * @summary Basic tests for CompletableFuture.completed with a virtual thread executor
+ * @run testng Completed
  */
 
 import java.time.Duration;

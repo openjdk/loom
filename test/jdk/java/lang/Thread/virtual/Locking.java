@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng Locking
  * @summary Test virtual threads using java.util.concurrent locks
+ * @run testng Locking
  */
 
 import java.util.concurrent.atomic.AtomicBoolean;

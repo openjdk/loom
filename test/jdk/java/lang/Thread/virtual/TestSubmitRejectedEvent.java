@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng/othervm TestSubmitRejectedEvent
  * @summary Basic test for JFR VirtualThreadSubmitRejectedEvent
+ * @run testng/othervm TestSubmitRejectedEvent
  */
 
 import java.io.IOException;

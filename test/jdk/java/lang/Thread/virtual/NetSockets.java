@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng/othervm/timeout=300 NetSockets
  * @summary Basic tests for virtual threads using java.net sockets.
+ * @run testng/othervm/timeout=300 NetSockets
  */
 
 /**

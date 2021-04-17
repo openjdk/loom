@@ -23,11 +23,11 @@
 
 /**
  * @test
+ * @summary Test that the stack traces for carrier threads are hidden by
+ *     exceptions and the StackWalker API
  * @modules java.management
  * @run testng StackTraces
  * @run testng/othervm -XX:+UnlockDiagnosticVMOptions -XX:+ShowCarrierFrames StackTraces
- * @summary Test that the stack traces for carrier threads are hidden by
- *     exceptions and the StackWalker API
  */
 
 import java.lang.management.ManagementFactory;

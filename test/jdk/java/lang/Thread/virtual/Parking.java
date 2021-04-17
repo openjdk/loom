@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng Parking
  * @summary Test virtual threads using park/unpark
+ * @run testng Parking
  */
 
 import java.time.Duration;

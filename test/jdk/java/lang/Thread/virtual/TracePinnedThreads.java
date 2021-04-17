@@ -23,9 +23,9 @@
 
 /**
  * @test
+ * @summary Basic test of debugging option to trace pinned threads
  * @run main/othervm -Djdk.tracePinnedThreads=full TracePinnedThreads
  * @run main/othervm -Djdk.tracePinnedThreads=short TracePinnedThreads
- * @summary Basic test of debugging option to trace pinned threads
  */
 
 import java.io.ByteArrayOutputStream;

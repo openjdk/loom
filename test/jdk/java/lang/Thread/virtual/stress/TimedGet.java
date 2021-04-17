@@ -23,9 +23,9 @@
 
 /**
  * @test
+ * @summary Stress parking with CompletableFuture timed get
  * @requires vm.debug != true
  * @run main/othervm -Xmx1g TimedGet
- * @summary Stress parking with CompletableFuture timed get
  */
 
 /**

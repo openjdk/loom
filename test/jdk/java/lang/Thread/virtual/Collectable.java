@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng Collectable
  * @summary Test that virtual threads are GC'ed
+ * @run testng Collectable
  */
 
 import java.lang.ref.WeakReference;

@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng Reflection
  * @summary Test virtual threads using core reflection
+ * @run testng Reflection
  */
 
 import java.lang.reflect.Constructor;

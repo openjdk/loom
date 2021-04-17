@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng Submit
  * @summary Basic tests for ExecutorService.submit with a virtual thread executor
+ * @run testng Submit
  */
 
 import java.time.Duration;

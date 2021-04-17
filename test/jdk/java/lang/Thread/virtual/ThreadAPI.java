@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng ThreadAPI
  * @summary Test Thread API with virtual threads
+ * @run testng ThreadAPI
  */
 
 import java.time.Duration;

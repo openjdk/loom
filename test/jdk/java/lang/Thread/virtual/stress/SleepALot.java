@@ -23,9 +23,9 @@
 
 /**
  * @test
+ * @summary Stress test Thread.sleep
  * @requires vm.debug != true
  * @run main/othervm SleepALot
- * @summary Stress test Thread.sleep
  */
 
 /**

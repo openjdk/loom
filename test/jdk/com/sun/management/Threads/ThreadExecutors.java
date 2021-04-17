@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng ThreadExecutors
  * @summary @summary Basic test for com.sun.management.Threads.executors
+ * @run testng ThreadExecutors
  */
 
 import java.util.List;

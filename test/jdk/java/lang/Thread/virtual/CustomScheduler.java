@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng CustomScheduler
  * @summary Test virtual threads using a custom scheduler
+ * @run testng CustomScheduler
  */
 
 import java.time.Duration;

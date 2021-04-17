@@ -23,10 +23,10 @@
 
 /**
  * @test
- * @modules java.base/java.lang:+open
- * @run testng SchedulerCocktail
  * @summary Test platform and virtual threads creating virtual threads that use
  *          the same or different schedulers
+ * @modules java.base/java.lang:+open
+ * @run testng SchedulerCocktail
  */
 
 import java.lang.reflect.Field;

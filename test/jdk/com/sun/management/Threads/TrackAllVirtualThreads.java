@@ -23,6 +23,7 @@
 
 /**
  * @test
+ * @summary Basic test for com.sun.management.Threads.virtualThreads
  * @run testng/othervm -Djdk.trackAllVirtualThreads=true TrackAllVirtualThreads
  */
 import java.time.Duration;
