@@ -229,9 +229,9 @@ public class BuilderTest {
 
     // priority
     public void testPriority1() {
-        int priority = Thread.currentThread().getThreadGroup().getMaxPriority();
-        Thread.Builder builder = Thread.ofPlatform().priority(priority);
+        int priority = Thread.currentThread().getPriority();
 
+        Thread.Builder builder = Thread.ofPlatform();
         Thread thread1 = builder.unstarted(() -> { });
         Thread thread2 = builder.start(() -> { });
         Thread thread3 = builder.factory().newThread(() -> { });
@@ -242,15 +242,39 @@ public class BuilderTest {
     }
 
     public void testPriority2() {
-        Thread.Builder builder = Thread.ofPlatform();
+        int priority = Thread.MIN_PRIORITY;
 
+        Thread.Builder builder = Thread.ofPlatform().priority(priority);
         Thread thread1 = builder.unstarted(() -> { });
         Thread thread2 = builder.start(() -> { });
         Thread thread3 = builder.factory().newThread(() -> { });
 
-        assertTrue(thread1.getPriority() == Thread.NORM_PRIORITY);
-        assertTrue(thread2.getPriority() == Thread.NORM_PRIORITY);
-        assertTrue(thread3.getPriority() == Thread.NORM_PRIORITY);
+        assertTrue(thread1.getPriority() == priority);
+        assertTrue(thread2.getPriority() == priority);
+        assertTrue(thread3.getPriority() == priority);
+    }
+
+    public void testPriority3() {
+        int maxPriority = Thread.currentThread().getThreadGroup().getMaxPriority();
+        int priority = Math.min(maxPriority + 1, Thread.MAX_PRIORITY);
+
+        Thread.Builder builder = Thread.ofPlatform().priority(priority);
+        Thread thread1 = builder.unstarted(() -> { });
+        Thread thread2 = builder.start(() -> { });
+        Thread thread3 = builder.factory().newThread(() -> { });
+
+        assertTrue(thread1.getPriority() == priority);
+        assertTrue(thread2.getPriority() == priority);
+        assertTrue(thread3.getPriority() == priority);
+    }
+
+    @Test(expectedExceptions = { IllegalArgumentException.class })
+    public void testPriority4() {
+        Thread.ofPlatform().priority(Thread.MIN_PRIORITY - 1);
+    }
+    @Test(expectedExceptions = { IllegalArgumentException.class })
+    public void testPriority5() {
+        Thread.ofPlatform().priority(Thread.MAX_PRIORITY + 1);
     }
 
     // daemon status
