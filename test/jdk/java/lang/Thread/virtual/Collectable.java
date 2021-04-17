@@ -46,7 +46,7 @@ public class Collectable {
 
     // ensure that a parked virtual thread can be GC'ed
     public void testGC2() {
-        var thread = Thread.startVirtualThread(LockSupport::park);
+        var thread = Thread.ofVirtual().start(LockSupport::park);
         var ref = new WeakReference<>(thread);
         thread = null;
         waitUntilCleared(ref);
@@ -54,7 +54,7 @@ public class Collectable {
 
     // ensure that a terminated virtual thread can be GC'ed
     public void testGC3() throws Exception {
-        var thread = Thread.startVirtualThread(() -> { });
+        var thread = Thread.ofVirtual().start(() -> { });
         thread.join();
         var ref = new WeakReference<>(thread);
         thread = null;
