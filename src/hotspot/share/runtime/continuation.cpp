@@ -66,6 +66,7 @@
 #include "runtime/orderAccess.hpp"
 #include "runtime/prefetch.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/stackWatermarkSet.inline.hpp"
 #include "runtime/stackOverflow.hpp"
 #include "runtime/vframe_hp.hpp"

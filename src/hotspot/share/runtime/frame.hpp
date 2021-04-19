@@ -25,11 +25,11 @@
 #ifndef SHARE_RUNTIME_FRAME_HPP
 #define SHARE_RUNTIME_FRAME_HPP
 
+#include "code/vmregTypes.hpp"
 #include "compiler/oopMap.hpp"
 #include "oops/stackChunkOop.hpp"
 #include "runtime/basicLock.hpp"
 #include "runtime/monitorChunk.hpp"
-#include "runtime/registerMap.hpp"
 #include "utilities/growableArray.hpp"
 #include "utilities/macros.hpp"
 #ifdef ZERO
@@ -45,6 +45,7 @@ class vframeArray;
 class JavaCallWrapper;
 class Method;
 class methodHandle;
+class RegisterMap;
 class InterpreterOopMap;
 
 enum class DerivedPointerIterationMode {
@@ -520,40 +521,5 @@ class FrameValues {
 
 #endif
 
-//
-// StackFrameStream iterates through the frames of a thread starting from
-// top most frame. It automatically takes care of updating the location of
-// all (callee-saved) registers iff the update flag is set. It also
-// automatically takes care of lazily applying deferred GC processing
-// onto exposed frames, such that all oops are valid iff the process_frames
-// flag is set.
-//
-// Notice: If a thread is stopped at a safepoint, all registers are saved,
-// not only the callee-saved ones.
-//
-// Use:
-//
-//   for(StackFrameStream fst(thread, true /* update */, true /* process_frames */);
-//       !fst.is_done();
-//       fst.next()) {
-//     ...
-//   }
-//
-class StackFrameStream : public StackObj {
- private:
-  frame       _fr;
-  RegisterMap _reg_map;
-  bool        _is_done;
- public:
-  StackFrameStream(JavaThread *thread, bool update, bool process_frames, bool allow_missing_reg = false);
-
-  // Iteration
-  inline bool is_done();
-  void next()                     { if (!_is_done) _fr = _fr.sender(&_reg_map); }
-
-  // Query
-  frame *current()                { return &_fr; }
-  RegisterMap* register_map()     { return &_reg_map; }
-};
 
 #endif // SHARE_RUNTIME_FRAME_HPP

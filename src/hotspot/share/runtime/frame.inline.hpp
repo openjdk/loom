@@ -31,6 +31,7 @@
 #include "oops/method.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/frame.hpp"
+#include "runtime/registerMap.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "utilities/macros.hpp"
 #ifdef ZERO
@@ -101,8 +102,5 @@ inline CodeBlob* frame::get_cb() const {
 //   assert (_cb->contains(_pc), "");
 // }
 
-inline bool StackFrameStream::is_done() {
-  return (_is_done) ? true : (_is_done = _fr.is_first_frame(), false);
-}
 
 #endif // SHARE_RUNTIME_FRAME_INLINE_HPP

@@ -122,6 +122,9 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      * Generate a thread dump to the given file and format. The {@code outputFile}
      * parameter must be an absolute path.
      *
+     * <p> The thread dump will include output for all platform threads. It may
+     * include output for some or all virtual threads.
+     *
      * @implSpec
      * The default implementation throws {@code UnsupportedOperationException}.
      *
@@ -136,6 +139,7 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      *         access to the file or {@link java.lang.management.ManagementPermission
      *         ManagementPermission("control")} is denied.
      * @since 99
+     * @see Threads#virtualThreads()
      */
     default void dumpThreads(String outputFile, ThreadDumpFormat format) throws IOException {
         throw new UnsupportedOperationException();

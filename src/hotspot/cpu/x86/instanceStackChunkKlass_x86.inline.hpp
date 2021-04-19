@@ -27,6 +27,7 @@
 
 #include "interpreter/oopMapCache.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/registerMap.hpp"
 
 int InstanceStackChunkKlass::metadata_words() { return frame::sender_sp_offset; }
 int InstanceStackChunkKlass::align_wiggle()   { return 1; }
