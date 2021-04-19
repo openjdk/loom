@@ -23,8 +23,8 @@
 
 /*
  * @test
- * @summary Tests for default methods defined by j.u.c.Future
- * @run testng DefaultMethods
+ * @summary Test default implementation of Future.join
+ * @run testng JoinTest
  */
 
 import java.time.Duration;
@@ -45,142 +45,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
-public class DefaultMethods {
-
-    /**
-     * Test isCompletedNormally when the task has already completed.
-     */
-    public void testIsCompletedNormally1() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<String> future = submit(executor, () -> "foo");
-            await(future);
-            assertTrue(future.isCompletedNormally());
-        }
-    }
-
-    /**
-     * Test isCompletedNormally when the task has not completed.
-     */
-    public void testIsCompletedNormally2() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> {
-                Thread.sleep(Duration.ofSeconds(60));
-                return null;
-            });
-            try {
-                assertFalse(future.isCompletedNormally());
-            } finally {
-                future.cancel(true); // interrupt sleep
-            }
-        }
-    }
-
-    /**
-     * Test isCompletedNormally when the task has completed with an exception.
-     */
-    public void testIsCompletedNormally3() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> { throw new RuntimeException(); });
-            await(future);
-            assertFalse(future.isCompletedNormally());
-        }
-    }
-
-    /**
-     * Test isCompletedNormally when the task is cancelled.
-     */
-    public void testIsCompletedNormally4() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> {
-                Thread.sleep(Duration.ofSeconds(60));
-                return null;
-            });
-            future.cancel(true);
-            assertFalse(future.isCompletedNormally());
-        }
-    }
-
-    /**
-     * Test isCompletedNormally with the interrupt status and the task has
-     * already completed.
-     */
-    public void testIsCompletedNormally5() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<String> future = submit(executor, () -> "foo");
-            await(future);
-
-            Thread.currentThread().interrupt();
-            try {
-                assertTrue(future.isCompletedNormally());
-                assertTrue(Thread.currentThread().isInterrupted());
-            } finally {
-                Thread.interrupted();
-            }
-        }
-    }
-
-    /**
-     * Test isCompletedNormally with the interrupt status set and when
-     * the task has not completed.
-     */
-    public void testIsCompletedNormally6() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> {
-                Thread.sleep(Duration.ofSeconds(60));
-                return null;
-            });
-
-            Thread.currentThread().interrupt();
-            try {
-                assertFalse(future.isCompletedNormally());
-                assertTrue(Thread.currentThread().isInterrupted());
-            } finally {
-                Thread.interrupted();
-                future.cancel(true);  // interrupt sleep
-            }
-        }
-    }
-
-    /**
-     * Test isCompletedNormally with the interrupt status and the task has
-     * already completed with an exception.
-     */
-    public void testIsCompletedNormally7() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> { throw new RuntimeException(); });
-            await(future);
-
-            Thread.currentThread().interrupt();
-            try {
-                assertFalse(future.isCompletedNormally());
-                assertTrue(Thread.currentThread().isInterrupted());
-            } finally {
-                Thread.interrupted();
-            }
-        }
-    }
-
-    /**
-     * Test isCompletedNormally with the interrupt status and the task is
-     * cancelled.
-     */
-    public void testIsCompletedNormally8() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> {
-                Thread.sleep(Duration.ofSeconds(60));
-                return null;
-            });
-            future.cancel(true);
-
-            Thread.currentThread().interrupt();
-            try {
-                assertFalse(future.isCompletedNormally());
-                assertTrue(Thread.currentThread().isInterrupted());
-            } finally {
-                Thread.interrupted();
-            }
-        }
-    }
+public class JoinTest {
 
     /**
      * Test join when the task has already completed.
@@ -238,7 +103,7 @@ public class DefaultMethods {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
                 Thread.sleep(Duration.ofSeconds(1));
-                throw new RuntimeException(); 
+                throw new RuntimeException();
             });
             expectThrows(CompletionException.class, future::join);
         }
