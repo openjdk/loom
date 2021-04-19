@@ -179,10 +179,11 @@ public class IsCompletedNormallyTest {
     }
 
     /**
-     * Wraps a Future with another Future object that delegates. The wrapper
-     * does not override the default methods to allow them to be tested.
+     * Submits the task to the executor and wraps the Future so that its
+     * default methods can be tested.
      */
-    private static <V> Future<V> wrap(Future<V> future) {
+    private static <V> Future<V> submit(ExecutorService executor, Callable<V> task) {
+        Future<V> future = executor.submit(task);
         return new Future<V>() {
             @Override
             public boolean cancel(boolean mayInterruptIfRunning) {
@@ -206,14 +207,6 @@ public class IsCompletedNormallyTest {
                 return future.get(timeout, unit);
             }
         };
-    }
-
-    /**
-     * Submits the task to the executor and wraps the Future so that its
-     * default methods can be tested.
-     */
-    private static <V> Future<V> submit(ExecutorService executor, Callable<V> task) {
-        return wrap(executor.submit(task));
     }
 
     /**

@@ -49,11 +49,49 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
 public class SubmitTest {
+    private ScheduledExecutorService scheduler;
+
+    @BeforeClass
+    public void setUp() throws Exception {
+        ThreadFactory factory = (task) -> {
+            Thread thread = new Thread(task);
+            thread.setDaemon(true);
+            return thread;
+        };
+        scheduler = Executors.newSingleThreadScheduledExecutor(factory);
+    }
+
+    @AfterClass
+    public void tearDown() {
+        scheduler.shutdown();
+    }
+
+    /**
+     * Schedules a resource to be closed after the given delay.
+     */
+    private void scheduleClose(AutoCloseable closeable, Duration delay) {
+        long millis = delay.toMillis();
+        Callable<Void> action = () -> {
+            closeable.close();
+            return null;
+        };
+        scheduler.schedule(action, millis, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Schedules a thread to be interrupted after the given delay.
+     */
+    private void scheduleInterrupt(Thread thread, Duration delay) {
+        long millis = delay.toMillis();
+        scheduler.schedule(thread::interrupt, millis, TimeUnit.MILLISECONDS);
+    }
 
     /**
      * Test submit where the tasks completed immediately.
@@ -436,32 +474,5 @@ public class SubmitTest {
                 executor.execute(task);
             }
         };
-    }
-
-    /**
-     * Schedules a thread to be interrupted after the given delay.
-     */
-    private static void scheduleInterrupt(Thread thread, Duration delay) {
-        long millis = delay.toMillis();
-        SES.schedule(thread::interrupt, millis, TimeUnit.MILLISECONDS);
-    }
-
-    private static void scheduleClose(AutoCloseable closeable, Duration delay) {
-        long millis = delay.toMillis();
-        Callable<Void> action = () -> {
-            closeable.close();
-            return null;
-        };
-        SES.schedule(action, millis, TimeUnit.MILLISECONDS);
-    }
-
-    private static final ScheduledExecutorService SES;
-    static {
-        ThreadFactory factory = (task) -> {
-            Thread thread = new Thread(task);
-            thread.setDaemon(true);
-            return thread;
-        };
-        SES = Executors.newSingleThreadScheduledExecutor(factory);
     }
 }

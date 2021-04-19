@@ -21,7 +21,7 @@
  * questions.
  */
 
-/**
+/*
  * @test
  * @summary Basic tests for ThreadExecutor
  * @run testng/othervm/timeout=300 ThreadExecutorTest

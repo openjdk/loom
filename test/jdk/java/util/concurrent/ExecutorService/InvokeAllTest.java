@@ -45,11 +45,37 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
 public class InvokeAllTest {
+    private ScheduledExecutorService scheduler;
+
+    @BeforeClass
+    public void setUp() throws Exception {
+        ThreadFactory factory = (task) -> {
+            Thread thread = new Thread(task);
+            thread.setDaemon(true);
+            return thread;
+        };
+        scheduler = Executors.newSingleThreadScheduledExecutor(factory);
+    }
+
+    @AfterClass
+    public void tearDown() {
+        scheduler.shutdown();
+    }
+
+    /**
+     * Schedules a thread to be interrupted after the given delay.
+     */
+    private void scheduleInterrupt(Thread thread, Duration delay) {
+        long millis = delay.toMillis();
+        scheduler.schedule(thread::interrupt, millis, TimeUnit.MILLISECONDS);
+    }
 
     /**
      * Test invokeAll where all tasks complete normally.
@@ -385,23 +411,5 @@ public class InvokeAllTest {
                 executor.execute(task);
             }
         };
-    }
-
-    /**
-     * Schedules a thread to be interrupted after the given delay.
-     */
-    private static void scheduleInterrupt(Thread thread, Duration delay) {
-        long millis = delay.toMillis();
-        SES.schedule(thread::interrupt, millis, TimeUnit.MILLISECONDS);
-    }
-
-    private static final ScheduledExecutorService SES;
-    static {
-        ThreadFactory factory = (task) -> {
-            Thread thread = new Thread(task);
-            thread.setDaemon(true);
-            return thread;
-        };
-        SES = Executors.newSingleThreadScheduledExecutor(factory);
     }
 }

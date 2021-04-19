@@ -41,11 +41,45 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
 public class JoinTest {
+    private ScheduledExecutorService scheduler;
+
+    @BeforeClass
+    public void setUp() throws Exception {
+        ThreadFactory factory = (task) -> {
+            Thread thread = new Thread(task);
+            thread.setDaemon(true);
+            return thread;
+        };
+        scheduler = Executors.newSingleThreadScheduledExecutor(factory);
+    }
+
+    @AfterClass
+    public void tearDown() {
+        scheduler.shutdown();
+    }
+
+    /**
+     * Schedules a future to be cancelled after the given delay.
+     */
+    private void scheduleCancel(Future<?> future, Duration delay) {
+        long millis = delay.toMillis();
+        scheduler.schedule(() -> future.cancel(true), millis, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Schedules a thread to be interrupted after the given delay.
+     */
+    private void scheduleInterrupt(Thread thread, Duration delay) {
+        long millis = delay.toMillis();
+        scheduler.schedule(thread::interrupt, millis, TimeUnit.MILLISECONDS);
+    }
 
     /**
      * Test join when the task has already completed.
@@ -210,10 +244,11 @@ public class JoinTest {
     }
 
     /**
-     * Wraps a Future with another Future object that delegates. The wrapper
-     * does not override the default methods to allow them to be tested.
+     * Submits the task to the executor and wraps the Future so that its
+     * default methods can be tested.
      */
-    private static <V> Future<V> wrap(Future<V> future) {
+    private static <V> Future<V> submit(ExecutorService executor, Callable<V> task) {
+        Future<V> future = executor.submit(task);
         return new Future<V>() {
             @Override
             public boolean cancel(boolean mayInterruptIfRunning) {
@@ -240,14 +275,6 @@ public class JoinTest {
     }
 
     /**
-     * Submits the task to the executor and wraps the Future so that its
-     * default methods can be tested.
-     */
-    private static <V> Future<V> submit(ExecutorService executor, Callable<V> task) {
-        return wrap(executor.submit(task));
-    }
-
-    /**
      * Waits for the future to be done.
      */
     private static void await(Future<?> future) {
@@ -262,31 +289,5 @@ public class JoinTest {
         if (interrupted) {
             Thread.currentThread().interrupt();
         }
-    }
-
-    /**
-     * Schedules a future to be cancelled after the given delay.
-     */
-    private static void scheduleCancel(Future<?> future, Duration delay) {
-        long millis = delay.toMillis();
-        SES.schedule(() -> future.cancel(true), millis, TimeUnit.MILLISECONDS);
-    }
-
-    /**
-     * Schedules a thread to be interrupted after the given delay.
-     */
-    private static void scheduleInterrupt(Thread thread, Duration delay) {
-        long millis = delay.toMillis();
-        SES.schedule(thread::interrupt, millis, TimeUnit.MILLISECONDS);
-    }
-
-    private static final ScheduledExecutorService SES;
-    static {
-        ThreadFactory factory = (task) -> {
-            Thread thread = new Thread(task);
-            thread.setDaemon(true);
-            return thread;
-        };
-        SES = Executors.newSingleThreadScheduledExecutor(factory);
     }
 }
