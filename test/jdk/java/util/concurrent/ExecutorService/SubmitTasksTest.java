@@ -29,9 +29,7 @@
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -43,7 +41,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -80,7 +77,7 @@ public class SubmitTasksTest {
         var defaultThreadFactory = Executors.defaultThreadFactory();
         var virtualThreadFactory = Thread.ofVirtual().factory();
         return new Object[][] {
-            // ensures that default submit(Collection) method is tested.
+            // ensures that default submit(Collection) method is tested
             { new DelegatingExecutorService(Executors.newCachedThreadPool()), },
 
             // implementations that may override submit(Collection)
@@ -243,7 +240,6 @@ public class SubmitTasksTest {
 
                 // schedule close, give enough time for tasks to start
                 scheduleClose(stream, Duration.ofSeconds(1));
-
                 List<Future<String>> futures = stream
                         .peek(f -> assertTrue(f.isDone()))
                         .collect(Collectors.toList());
@@ -435,75 +431,6 @@ public class SubmitTasksTest {
                 }
                 assertTrue(exc instanceof InterruptedException);
             }
-        }
-    }
-
-    /**
-     * Wraps the given ExecutorService The wrapper does not override the
-     * default methods so they can be tested.
-     */
-    private static class DelegatingExecutorService implements ExecutorService {
-        private final ExecutorService delegate;
-        DelegatingExecutorService(ExecutorService delegate) {
-            this.delegate = delegate;
-        }
-        @Override
-        public void shutdown() {
-            delegate.shutdown();
-        }
-        @Override
-        public List<Runnable> shutdownNow() {
-            return delegate.shutdownNow();
-        }
-        @Override
-        public boolean isShutdown() {
-            return delegate.isShutdown();
-        }
-        @Override
-        public boolean isTerminated() {
-            return delegate.isTerminated();
-        }
-        @Override
-        public boolean awaitTermination(long timeout, TimeUnit unit)
-                throws InterruptedException {
-            return delegate.awaitTermination(timeout, unit);
-        }
-        @Override
-        public <T> Future<T> submit(Callable<T> task) {
-            return delegate.submit(task);
-        }
-        @Override
-        public <T> Future<T> submit(Runnable task, T result) {
-            return delegate.submit(task, result);
-        }
-        @Override
-        public Future<?> submit(Runnable task) {
-            return delegate.submit(task);
-        }
-        @Override
-        public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
-                throws InterruptedException {
-            return delegate.invokeAll(tasks);
-        }
-        @Override
-        public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                throws InterruptedException {
-            return delegate.invokeAll(tasks, timeout, unit);
-        }
-        @Override
-        public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-                throws InterruptedException, ExecutionException {
-            return delegate.invokeAny(tasks);
-        }
-
-        @Override
-        public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                throws InterruptedException, ExecutionException, TimeoutException {
-            return delegate.invokeAny(tasks, timeout, unit);
-        }
-        @Override
-        public void execute(Runnable task) {
-            delegate.execute(task);
         }
     }
 }

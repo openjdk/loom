@@ -28,29 +28,44 @@
  */
 
 import java.time.Duration;
-import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
 public class CloseTest {
 
+    @DataProvider(name = "executors")
+    public Object[][] executors() {
+        var defaultThreadFactory = Executors.defaultThreadFactory();
+        var virtualThreadFactory = Thread.ofVirtual().factory();
+        return new Object[][] {
+            // ensures that default close method is tested
+            { new DelegatingExecutorService(Executors.newCachedThreadPool()), },
+
+            // implementations that may override close
+            { new ForkJoinPool(), },
+            { Executors.newUnownedThreadExecutor(defaultThreadFactory), },
+            { Executors.newUnownedThreadExecutor(virtualThreadFactory), },
+        };
+    }
+
     /**
      * Test close with no tasks running.
      */
-    public void testCloseWithNoTasks() throws Exception {
-        ExecutorService executor = newExecutorService();
+    @Test(dataProvider = "executors")
+    public void testCloseWithNoTasks(ExecutorService executor) throws Exception {
         executor.close();
         assertTrue(executor.isShutdown());
         assertTrue(executor.isTerminated());
@@ -60,13 +75,13 @@ public class CloseTest {
     /**
      * Test close with tasks running.
      */
-    public void testCloseWithRunningTasks() throws Exception {
-        ExecutorService executor = newExecutorService();
+    @Test(dataProvider = "executors")
+    public void testCloseWithRunningTasks(ExecutorService executor) throws Exception {
         Future<?> future = executor.submit(() -> {
             Thread.sleep(Duration.ofSeconds(1));
             return "foo";
         });
-        executor.close();
+        executor.close();  // waits for task to complete
         assertTrue(executor.isShutdown());
         assertTrue(executor.isTerminated());
         assertTrue(executor.awaitTermination(10,  TimeUnit.MILLISECONDS));
@@ -76,16 +91,16 @@ public class CloseTest {
     /**
      * Test close when executor is shutdown but not terminated.
      */
-    public void testShutdownBeforeClose() throws Exception {
-        ExecutorService executor = newExecutorService();
-
+    @Test(dataProvider = "executors")
+    public void testShutdownBeforeClose(ExecutorService executor) throws Exception {
         Phaser phaser = new Phaser(2);
         Future<?> future = executor.submit(() -> {
             phaser.arriveAndAwaitAdvance();
             Thread.sleep(Duration.ofSeconds(1));
             return "foo";
         });
-        phaser.arriveAndAwaitAdvance();
+        phaser.arriveAndAwaitAdvance();   // wait for task to start
+
         executor.shutdown();  // shutdown, will not immediately terminate
 
         executor.close();
@@ -98,8 +113,8 @@ public class CloseTest {
     /**
      * Test close when terminated.
      */
-    public void testTerminateBeforeClose() throws Exception {
-        ExecutorService executor = newExecutorService();
+    @Test(dataProvider = "executors")
+    public void testTerminateBeforeClose(ExecutorService executor) throws Exception {
         executor.shutdown();
         assertTrue(executor.isTerminated());
 
@@ -112,12 +127,16 @@ public class CloseTest {
     /**
      * Test close with interrupt status set.
      */
-    public void testInterruptBeforeClose() throws Exception {
-        ExecutorService executor = newExecutorService();
+    @Test(dataProvider = "executors")
+    public void testInterruptBeforeClose(ExecutorService executor) throws Exception {
+        Phaser phaser = new Phaser(2);
         Future<?> future = executor.submit(() -> {
+            phaser.arriveAndAwaitAdvance();
             Thread.sleep(Duration.ofDays(1));
             return null;
         });
+        phaser.arriveAndAwaitAdvance();  // wait for task to star
+
         Thread.currentThread().interrupt();
         try {
             executor.close();
@@ -134,8 +153,8 @@ public class CloseTest {
     /**
      * Test interrupt when blocked in close.
      */
-    public void testInterruptDuringClose() throws Exception {
-        ExecutorService executor = newExecutorService();
+    @Test(dataProvider = "executors")
+    public void testInterruptDuringClose(ExecutorService executor) throws Exception {
         Future<?> future = executor.submit(() -> {
             Thread.sleep(Duration.ofDays(1));
             return null;
@@ -155,73 +174,5 @@ public class CloseTest {
         assertTrue(executor.isTerminated());
         assertTrue(executor.awaitTermination(10, TimeUnit.MILLISECONDS));
         expectThrows(ExecutionException.class, future::get);
-    }
-
-    /**
-     * Wraps a ExecutorService with another ExecutorService that delegates. The
-     * wrapper does not override the default methods to allow them to be tested.
-     */
-    private static ExecutorService newExecutorService() {
-        ExecutorService executor = Executors.newCachedThreadPool();
-        return new ExecutorService() {
-            @Override
-            public void shutdown() {
-                executor.shutdown();
-            }
-            @Override
-            public List<Runnable> shutdownNow() {
-                return executor.shutdownNow();
-            }
-            @Override
-            public boolean isShutdown() {
-                return executor.isShutdown();
-            }
-            @Override
-            public boolean isTerminated() {
-                return executor.isTerminated();
-            }
-            @Override
-            public boolean awaitTermination(long timeout, TimeUnit unit)
-                    throws InterruptedException {
-                return executor.awaitTermination(timeout, unit);
-            }
-            @Override
-            public <T> Future<T> submit(Callable<T> task) {
-                return executor.submit(task);
-            }
-            @Override
-            public <T> Future<T> submit(Runnable task, T result) {
-                return executor.submit(task, result);
-            }
-            @Override
-            public Future<?> submit(Runnable task) {
-                return executor.submit(task);
-            }
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException {
-                return executor.invokeAll(tasks);
-            }
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                    throws InterruptedException {
-                return executor.invokeAll(tasks, timeout, unit);
-            }
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException, ExecutionException {
-                return executor.invokeAny(tasks);
-            }
-
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                    throws InterruptedException, ExecutionException, TimeoutException {
-                return executor.invokeAny(tasks, timeout, unit);
-            }
-            @Override
-            public void execute(Runnable task) {
-                executor.execute(task);
-            }
-        };
     }
 }

@@ -29,24 +29,24 @@
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
@@ -69,6 +69,21 @@ public class InvokeAllTest {
         scheduler.shutdown();
     }
 
+    @DataProvider(name = "executors")
+    public Object[][] executors() {
+        var defaultThreadFactory = Executors.defaultThreadFactory();
+        var virtualThreadFactory = Thread.ofVirtual().factory();
+        return new Object[][] {
+            // ensures that default invokeAll(Collectiom, boolean) method is tested
+            { new DelegatingExecutorService(Executors.newCachedThreadPool()), },
+
+            // implementations that may override invokeAll(Collection, boolean)
+            { new ForkJoinPool(), },
+            { Executors.newUnownedThreadExecutor(defaultThreadFactory), },
+            { Executors.newUnownedThreadExecutor(virtualThreadFactory), },
+        };
+    }
+
     /**
      * Schedules a thread to be interrupted after the given delay.
      */
@@ -80,21 +95,25 @@ public class InvokeAllTest {
     /**
      * Test invokeAll where all tasks complete normally.
      */
-    public void testAllTasksComplete1() throws Exception {
-        testAllTasksComplete(false);
+    @Test(dataProvider = "executors")
+    public void testAllTasksComplete1(ExecutorService executor) throws Exception {
+        testAllTasksComplete(executor, false);
     }
-    public void testAllTasksComplete2() throws Exception {
-        testAllTasksComplete(true);
+    @Test(dataProvider = "executors")
+    public void testAllTasksComplete2(ExecutorService executor) throws Exception {
+        testAllTasksComplete(executor, true);
     }
-    private void testAllTasksComplete(boolean cancelOnException) throws Exception {
-        try (var executor = newExecutorService()) {
+    private void testAllTasksComplete(ExecutorService executor,
+                                      boolean cancelOnException) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
                 Thread.sleep(Duration.ofMillis(500));
                 return "bar";
             };
 
-            List<Future<String>> list = executor.invokeAll(List.of(task1, task2), cancelOnException);
+            List<Callable<String>> tasks = List.of(task1, task2);
+            List<Future<String>> list = executor.invokeAll(tasks, cancelOnException);
 
             // list should have two elements, both should be done
             assertTrue(list.size() == 2);
@@ -112,8 +131,9 @@ public class InvokeAllTest {
     /**
      * Test invokeAll where all tasks complete with exception.
      */
-    public void testAllTasksFail() throws Exception {
-        try (var executor = newExecutorService()) {
+    @Test(dataProvider = "executors")
+    public void testAllTasksFail(ExecutorService executor) throws Exception {
+        try (executor) {
             class FooException extends Exception { }
             class BarException extends Exception { }
             Callable<String> task1 = () -> {
@@ -133,21 +153,24 @@ public class InvokeAllTest {
 
             // check results
             Throwable e1 = expectThrows(ExecutionException.class, () -> list.get(0).get());
-            assertTrue(e1.getCause() instanceof FooException);
             Throwable e2 = expectThrows(ExecutionException.class, () -> list.get(1).get());
-            assertTrue(e2.getCause() instanceof BarException);
+            if (!(executor instanceof ForkJoinPool)) {   // FJP wraps cause
+                assertTrue(e1.getCause() instanceof FooException);
+                assertTrue(e2.getCause() instanceof BarException);
+            }
         }
     }
 
     /**
      * Test invokeAll with cancelOnException=true, last task should be cancelled
      */
-    public void testCancelOnException1() throws Exception {
-        try (var executor = newExecutorService()) {
+    @Test(dataProvider = "executors")
+    public void testCancelOnException1(ExecutorService executor) throws Exception {
+        try (executor) {
             class BarException extends Exception { }
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofSeconds(3));
+                Thread.sleep(Duration.ofMillis(500));
                 throw new BarException();
             };
             Callable<String> task3 = () -> {
@@ -162,9 +185,13 @@ public class InvokeAllTest {
             boolean notDone = list.stream().anyMatch(r -> !r.isDone());
             assertFalse(notDone);
 
-            // task1 should have a result
-            String s = list.get(0).get();
-            assertTrue("foo".equals(s));
+            // task1 should have a result or be cancelled
+            Future<String> future = list.get(0);
+            if (future.isCompletedNormally()) {
+                assertEquals(future.get(), "foo");
+            } else {
+                expectThrows(CancellationException.class, future::get);
+            }
 
             // task2 should have failed with an exception
             Throwable e2 = expectThrows(ExecutionException.class, () -> list.get(1).get());
@@ -178,15 +205,16 @@ public class InvokeAllTest {
     /**
      * Test invokeAll with cancelOnException=true, first task should be cancelled
      */
-    public void testCancelOnException2() throws Exception {
-        try (var executor = newExecutorService()) {
+    @Test(dataProvider = "executors")
+    public void testCancelOnException2(ExecutorService executor) throws Exception {
+        try (executor) {
             class BarException extends Exception { }
             Callable<String> task1 = () -> {
                 Thread.sleep(Duration.ofDays(1));
                 return "foo";
             };
             Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofSeconds(3));
+                Thread.sleep(Duration.ofMillis(500));
                 throw new BarException();
             };
             Callable<String> task3 = () -> "baz";
@@ -201,27 +229,33 @@ public class InvokeAllTest {
             // task1 should be cancelled
             expectThrows(CancellationException.class, () -> list.get(0).get());
 
-            // tasl2 should have failed with an exception
+            // task2 should have failed with an exception
             Throwable e2 = expectThrows(ExecutionException.class, () -> list.get(1).get());
             assertTrue(e2.getCause() instanceof BarException);
 
-            // task3 should have a result
-            String s = list.get(2).get();
-            assertTrue("baz".equals(s));
+            // task3 should have a result or be cancelled
+            Future<String> future = list.get(2);
+            if (future.isCompletedNormally()) {
+                assertEquals(future.get(), "baz");
+            } else {
+                expectThrows(CancellationException.class, future::get);
+            }
         }
     }
 
     /**
      * Call invokeAll with interrupt status set.
      */
-    public void testWithInterruptStatusSet1() {
-        testWithInterruptStatusSet(false);
+    @Test(dataProvider = "executors")
+    public void testWithInterruptStatusSet1(ExecutorService executor) {
+        testWithInterruptStatusSet(executor, false);
     }
-    public void testWithInterruptStatusSet2() {
-        testWithInterruptStatusSet(true);
+    @Test(dataProvider = "executors")
+    public void testWithInterruptStatusSet2(ExecutorService executor) {
+        testWithInterruptStatusSet(executor, true);
     }
-    void testWithInterruptStatusSet(boolean cancelOnException) {
-        try (var executor = newExecutorService()) {
+    void testWithInterruptStatusSet(ExecutorService executor, boolean cancelOnException) {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
                 Thread.sleep(Duration.ofDays(1));
@@ -242,18 +276,27 @@ public class InvokeAllTest {
     /**
      * Interrupt thread blocked in invokeAll.
      */
-    public void testInterruptInvokeAll1() throws Exception {
-        testInterruptInvokeAll(false);
+    @Test(dataProvider = "executors")
+    public void testInterruptInvokeAll1(ExecutorService executor) throws Exception {
+        testInterruptInvokeAll(executor, false);
     }
-    public void testInterruptInvokeAll2() throws Exception {
-        testInterruptInvokeAll(true);
+    @Test(dataProvider = "executors")
+    public void testInterruptInvokeAll2(ExecutorService executor) throws Exception {
+        testInterruptInvokeAll(executor, true);
     }
-    void testInterruptInvokeAll(boolean cancelOnException) throws Exception {
-        try (var executor = newExecutorService()) {
-            Callable<String> task1 = () -> "foo";
-            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
+    void testInterruptInvokeAll(ExecutorService executor,
+                                boolean cancelOnException) throws Exception {
+        try (executor) {
 
-            scheduleInterrupt(Thread.currentThread(), Duration.ofSeconds(2));
+            // skip test on ForkJoinPool for now
+            if (executor instanceof ForkJoinPool) {
+                throw new SkipException("FJP: Futre.cancel(true) does not interrupt tasks");
+            }
+
+            Callable<String> task1 = () -> "foo";
+            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofDays(1));
+
+            scheduleInterrupt(Thread.currentThread(), Duration.ofSeconds(1));
             try {
                 executor.invokeAll(Set.of(task1, task2), cancelOnException);
                 assertTrue(false);
@@ -268,7 +311,9 @@ public class InvokeAllTest {
                 while (!task2.isDone()) {
                     Thread.sleep(Duration.ofMillis(10));
                 }
-                assertTrue(task2.exception() instanceof InterruptedException);
+                if (!(executor instanceof ForkJoinPool)) {
+                    assertTrue(task2.exception() instanceof InterruptedException);
+                }
             }
         }
     }
@@ -312,11 +357,10 @@ public class InvokeAllTest {
     /**
      * Test invokeAll after ExecutorService has been shutdown.
      */
-    @Test(expectedExceptions = { RejectedExecutionException.class })
-    public void testInvokeAllAfterShutdown() throws Exception {
-        var executor = newExecutorService();
+    @Test(dataProvider = "executors",
+          expectedExceptions = { RejectedExecutionException.class })
+    public void testInvokeAllAfterShutdown(ExecutorService executor) throws Exception {
         executor.shutdown();
-
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> "bar";
         executor.invokeAll(Set.of(task1, task2), false);
@@ -325,91 +369,36 @@ public class InvokeAllTest {
     /**
      * Test invokeAll with an empty collection.
      */
-    public void testInvokeAllWithNoTasks() throws Exception {
-        try (var executor = newExecutorService()) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllWithNoTasks(ExecutorService executor) throws Exception {
+        try (executor) {
             List<Future<Object>> list = executor.invokeAll(Set.of(), false);
             assertTrue(list.size() == 0);
         }
     }
 
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testInvokeAllNull1() throws Exception {
-        try (var executor = newExecutorService()) {
+    /**
+     * Test invokeAll with null collection.
+     */
+    @Test(dataProvider = "executors",
+          expectedExceptions = { NullPointerException.class })
+    public void testInvokeAllNull1(ExecutorService executor) throws Exception {
+        try (executor) {
             executor.invokeAll(null, false);
         }
     }
 
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testInvokeAllNull2() throws Exception {
-        try (var executor = newExecutorService()) {
+    /**
+     * Test invokeAll with collection containing null element.
+     */
+    @Test(dataProvider = "executors",
+          expectedExceptions = { NullPointerException.class })
+    public void testInvokeAllNull2(ExecutorService executor) throws Exception {
+        try (executor) {
             List<Callable<String>> tasks = new ArrayList<>();
             tasks.add(() -> "foo");
             tasks.add(null);
             executor.invokeAll(tasks, false);
         }
-    }
-
-    private static ExecutorService newExecutorService() {
-        ExecutorService executor = Executors.newCachedThreadPool();
-        return new ExecutorService() {
-            @Override
-            public void shutdown() {
-                executor.shutdown();
-            }
-            @Override
-            public List<Runnable> shutdownNow() {
-                return executor.shutdownNow();
-            }
-            @Override
-            public boolean isShutdown() {
-                return executor.isShutdown();
-            }
-            @Override
-            public boolean isTerminated() {
-                return executor.isTerminated();
-            }
-            @Override
-            public boolean awaitTermination(long timeout, TimeUnit unit)
-                    throws InterruptedException {
-                return executor.awaitTermination(timeout, unit);
-            }
-            @Override
-            public <T> Future<T> submit(Callable<T> task) {
-                return executor.submit(task);
-            }
-            @Override
-            public <T> Future<T> submit(Runnable task, T result) {
-                return executor.submit(task, result);
-            }
-            @Override
-            public Future<?> submit(Runnable task) {
-                return executor.submit(task);
-            }
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException {
-                return executor.invokeAll(tasks);
-            }
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                    throws InterruptedException {
-                return executor.invokeAll(tasks, timeout, unit);
-            }
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException, ExecutionException {
-                return executor.invokeAny(tasks);
-            }
-
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                    throws InterruptedException, ExecutionException, TimeoutException {
-                return executor.invokeAny(tasks, timeout, unit);
-            }
-            @Override
-            public void execute(Runnable task) {
-                executor.execute(task);
-            }
-        };
     }
 }
