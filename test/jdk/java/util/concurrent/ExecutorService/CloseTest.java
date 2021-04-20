@@ -125,7 +125,7 @@ public class CloseTest {
     }
 
     /**
-     * Test close with interrupt status set.
+     * Test invoking close with interrupt status set.
      */
     @Test(dataProvider = "executors")
     public void testInterruptBeforeClose(ExecutorService executor) throws Exception {
@@ -135,7 +135,7 @@ public class CloseTest {
             Thread.sleep(Duration.ofDays(1));
             return null;
         });
-        phaser.arriveAndAwaitAdvance();  // wait for task to star
+        phaser.arriveAndAwaitAdvance();  // wait for task to start
 
         Thread.currentThread().interrupt();
         try {
@@ -151,7 +151,7 @@ public class CloseTest {
     }
 
     /**
-     * Test interrupt when blocked in close.
+     * Test Thread.interrupt when thread blocked in close.
      */
     @Test(dataProvider = "executors")
     public void testInterruptDuringClose(ExecutorService executor) throws Exception {

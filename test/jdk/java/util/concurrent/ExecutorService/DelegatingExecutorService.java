@@ -30,7 +30,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Wraps a ExecutorService to allow ExecutorService's default methods to be tested.
+ * Wraps an ExecutorService to allow ExecutorService's default methods to be tested.
  */
 class DelegatingExecutorService implements ExecutorService {
     private final ExecutorService delegate;

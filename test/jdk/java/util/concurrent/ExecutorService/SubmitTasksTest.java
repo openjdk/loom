@@ -286,7 +286,7 @@ public class SubmitTasksTest {
     }
 
     /**
-     * Test invoking an operation on the stream with the interrupt status set.
+     * Test consuming the stream with the interrupt status set.
      */
     @Test(dataProvider = "executors")
     public void testInterruptStream1(ExecutorService executor) throws Exception {
