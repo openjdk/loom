@@ -23,8 +23,8 @@
 
 /*
  * @test
- * @summary Test default implementation of ExecutorService.submit
- * @run testng SubmitTest
+ * @summary Test default implementation of ExecutorService.submit(Collection)
+ * @run testng SubmitTasksTest
  */
 
 import java.time.Duration;
@@ -38,6 +38,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -51,11 +52,12 @@ import java.util.stream.Stream;
 
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
-public class SubmitTest {
+public class SubmitTasksTest {
     private ScheduledExecutorService scheduler;
 
     @BeforeClass
@@ -71,6 +73,21 @@ public class SubmitTest {
     @AfterClass
     public void tearDown() {
         scheduler.shutdown();
+    }
+
+    @DataProvider(name = "executors")
+    public Object[][] executors() {
+        var defaultThreadFactory = Executors.defaultThreadFactory();
+        var virtualThreadFactory = Thread.ofVirtual().factory();
+        return new Object[][] {
+            // ensures that default submit(Collection) method is tested.
+            { new DelegatingExecutorService(Executors.newCachedThreadPool()), },
+
+            // implementations that may override submit(Collection)
+            { new ForkJoinPool(), },
+            { Executors.newUnownedThreadExecutor(defaultThreadFactory), },
+            { Executors.newUnownedThreadExecutor(virtualThreadFactory), },
+        };
     }
 
     /**
@@ -96,10 +113,11 @@ public class SubmitTest {
     /**
      * Test submit where the tasks completed immediately.
      */
-    public void testSubmit1() {
+    @Test(dataProvider = "executors")
+    public void testSubmit1(ExecutorService executor) {
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> "bar";
-        try (var executor = newExecutorService()) {
+        try (executor) {
             Set<String> results = executor.submit(List.of(task1, task2))
                     .peek(f -> assertTrue(f.isDone()))
                     .map(Future::join)
@@ -111,7 +129,8 @@ public class SubmitTest {
     /**
      * Test submit where the tasks do not complete immediately.
      */
-    public void testSubmit2() {
+    @Test(dataProvider = "executors")
+    public void testSubmit2(ExecutorService executor) {
         Callable<String> task1 = () -> {
             Thread.sleep(Duration.ofMillis(500));
             return "foo";
@@ -120,7 +139,7 @@ public class SubmitTest {
             Thread.sleep(Duration.ofSeconds(1));
             return "bar";
         };
-        try (var executor = newExecutorService()) {
+        try (executor) {
             Set<String> results = executor.submit(List.of(task1, task2))
                     .peek(f -> assertTrue(f.isDone()))
                     .map(Future::join)
@@ -132,8 +151,9 @@ public class SubmitTest {
     /**
      * Test submit with an empty collection of tasks.
      */
-    public void testSubmit3() {
-        try (var executor = newExecutorService()) {
+    @Test(dataProvider = "executors")
+    public void testSubmit3(ExecutorService executor) {
+        try (executor) {
             long count = executor.submit(List.of()).mapToLong(e -> 1L).sum();
             assertTrue(count == 0);
         }
@@ -142,10 +162,11 @@ public class SubmitTest {
     /**
      * Test closing a stream after it has been consumed.
      */
-    public void testCloseStream1() {
+    @Test(dataProvider = "executors")
+    public void testCloseStream1(ExecutorService executor) {
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> "bar";
-        try (var executor = newExecutorService()) {
+        try (executor) {
             try (Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
                 Set<String> results = stream
                         .peek(f -> assertTrue(f.isDone()))
@@ -160,7 +181,8 @@ public class SubmitTest {
      * Test closing a stream before all tasks have completed. The remaining tasks
      * should be cancelled.
      */
-    public void testCloseStream2() throws Exception {
+    @Test(dataProvider = "executors")
+    public void testCloseStream2(ExecutorService executor) throws Exception {
         AtomicBoolean task2Started = new AtomicBoolean();
         AtomicReference<Throwable> task2Exception = new AtomicReference<>();
         Callable<String> task1 = () -> "foo";
@@ -174,7 +196,7 @@ public class SubmitTest {
             return "bar";
         };
 
-        try (var executor = newExecutorService()) {
+        try (executor) {
             try (Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
                 String first = stream
                         .peek(f -> assertTrue(f.isDone()))
@@ -198,7 +220,8 @@ public class SubmitTest {
     /**
      * Test closing a stream while blocked waiting for an element.
      */
-    public void testCloseStream3() throws Exception {
+    @Test(dataProvider = "executors")
+    public void testCloseStream3(ExecutorService executor) throws Exception {
         AtomicInteger tasksStarted = new AtomicInteger();
         AtomicReference<Throwable> task2Exception = new AtomicReference<>();
         Callable<String> task1 = () -> {
@@ -215,7 +238,7 @@ public class SubmitTest {
             return "bar";
         };
 
-        try (var executor = newExecutorService()) {
+        try (executor) {
             try (Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
 
                 // schedule close, give enough time for tasks to start
@@ -269,7 +292,8 @@ public class SubmitTest {
     /**
      * Test invoking an operation on the stream with the interrupt status set.
      */
-    public void testInterruptStream1() throws Exception {
+    @Test(dataProvider = "executors")
+    public void testInterruptStream1(ExecutorService executor) throws Exception {
         AtomicBoolean task2Started = new AtomicBoolean();
         AtomicReference<Throwable> task2Exception = new AtomicReference<>();
         Callable<String> task1 = () -> "foo";
@@ -283,8 +307,8 @@ public class SubmitTest {
             return "bar";
         };
 
-        try (var executor = newExecutorService();
-             Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
+        try (executor) {
+            Stream<Future<String>> stream = executor.submit(List.of(task1, task2));
 
             Thread.currentThread().interrupt();
             try {
@@ -312,7 +336,8 @@ public class SubmitTest {
      * Test interrupting a thread that is blocked on the stream waiting for
      * an element.
      */
-    public void testInterruptStream2() throws Exception {
+    @Test(dataProvider = "executors")
+    public void testInterruptStream2(ExecutorService executor) throws Exception {
         AtomicBoolean task2Started = new AtomicBoolean();
         AtomicReference<Throwable> task2Exception = new AtomicReference<>();
         Callable<String> task1 = () -> "foo";
@@ -326,8 +351,8 @@ public class SubmitTest {
             return "bar";
         };
 
-        try (var executor = newExecutorService();
-             Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
+        try (executor) {
+            Stream<Future<String>> stream = executor.submit(List.of(task1, task2));
 
             // schedule main thread to be interrupted
             scheduleInterrupt(Thread.currentThread(), Duration.ofSeconds(1));
@@ -355,9 +380,9 @@ public class SubmitTest {
     /**
      * Test submit with a null value.
      */
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNull1() {
-        try (var executor = newExecutorService()) {
+    @Test(dataProvider = "executors", expectedExceptions = { NullPointerException.class })
+    public void testNull1(ExecutorService executor) {
+        try (executor) {
             List<Callable<String>> tasks = null;
             executor.submit(tasks);
         }
@@ -366,9 +391,9 @@ public class SubmitTest {
     /**
      * Test submit with a collection containing a null task.
      */
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNull2() {
-        try (var executor = newExecutorService()) {
+    @Test(dataProvider = "executors", expectedExceptions = { NullPointerException.class })
+    public void testNull2(ExecutorService executor) {
+        try (executor) {
             List<Callable<String>> tasks = new ArrayList<>();
             tasks.add(null);
             executor.submit(tasks);
@@ -379,7 +404,8 @@ public class SubmitTest {
      * Test submit with a collection containing a null task. Tasks submitted before
      * throwing NPE should be cancelled.
      */
-    public void testNull3() throws Exception {
+    @Test(dataProvider = "executors")
+    public void testNull3(ExecutorService executor) throws Exception {
         AtomicBoolean taskStarted = new AtomicBoolean();
         AtomicReference<Throwable> taskException = new AtomicReference<>();
         Callable<String> task = () -> {
@@ -392,7 +418,7 @@ public class SubmitTest {
             return "bar";
         };
 
-        try (var executor = newExecutorService()) {
+        try (executor) {
             List<Callable<String>> tasks = new ArrayList<>();
             tasks.add(task);
             tasks.add(null);
@@ -412,67 +438,72 @@ public class SubmitTest {
         }
     }
 
-    private static ExecutorService newExecutorService() {
-        ExecutorService executor = Executors.newCachedThreadPool();
-        return new ExecutorService() {
-            @Override
-            public void shutdown() {
-                executor.shutdown();
-            }
-            @Override
-            public List<Runnable> shutdownNow() {
-                return executor.shutdownNow();
-            }
-            @Override
-            public boolean isShutdown() {
-                return executor.isShutdown();
-            }
-            @Override
-            public boolean isTerminated() {
-                return executor.isTerminated();
-            }
-            @Override
-            public boolean awaitTermination(long timeout, TimeUnit unit)
-                    throws InterruptedException {
-                return executor.awaitTermination(timeout, unit);
-            }
-            @Override
-            public <T> Future<T> submit(Callable<T> task) {
-                return executor.submit(task);
-            }
-            @Override
-            public <T> Future<T> submit(Runnable task, T result) {
-                return executor.submit(task, result);
-            }
-            @Override
-            public Future<?> submit(Runnable task) {
-                return executor.submit(task);
-            }
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException {
-                return executor.invokeAll(tasks);
-            }
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                    throws InterruptedException {
-                return executor.invokeAll(tasks, timeout, unit);
-            }
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException, ExecutionException {
-                return executor.invokeAny(tasks);
-            }
+    /**
+     * Wraps the given ExecutorService The wrapper does not override the
+     * default methods so they can be tested.
+     */
+    private static class DelegatingExecutorService implements ExecutorService {
+        private final ExecutorService delegate;
+        DelegatingExecutorService(ExecutorService delegate) {
+            this.delegate = delegate;
+        }
+        @Override
+        public void shutdown() {
+            delegate.shutdown();
+        }
+        @Override
+        public List<Runnable> shutdownNow() {
+            return delegate.shutdownNow();
+        }
+        @Override
+        public boolean isShutdown() {
+            return delegate.isShutdown();
+        }
+        @Override
+        public boolean isTerminated() {
+            return delegate.isTerminated();
+        }
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit)
+                throws InterruptedException {
+            return delegate.awaitTermination(timeout, unit);
+        }
+        @Override
+        public <T> Future<T> submit(Callable<T> task) {
+            return delegate.submit(task);
+        }
+        @Override
+        public <T> Future<T> submit(Runnable task, T result) {
+            return delegate.submit(task, result);
+        }
+        @Override
+        public Future<?> submit(Runnable task) {
+            return delegate.submit(task);
+        }
+        @Override
+        public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
+                throws InterruptedException {
+            return delegate.invokeAll(tasks);
+        }
+        @Override
+        public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
+                throws InterruptedException {
+            return delegate.invokeAll(tasks, timeout, unit);
+        }
+        @Override
+        public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+                throws InterruptedException, ExecutionException {
+            return delegate.invokeAny(tasks);
+        }
 
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                    throws InterruptedException, ExecutionException, TimeoutException {
-                return executor.invokeAny(tasks, timeout, unit);
-            }
-            @Override
-            public void execute(Runnable task) {
-                executor.execute(task);
-            }
-        };
+        @Override
+        public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
+                throws InterruptedException, ExecutionException, TimeoutException {
+            return delegate.invokeAny(tasks, timeout, unit);
+        }
+        @Override
+        public void execute(Runnable task) {
+            delegate.execute(task);
+        }
     }
 }
