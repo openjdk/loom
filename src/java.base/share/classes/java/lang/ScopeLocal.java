@@ -41,8 +41,8 @@ import jdk.internal.vm.annotation.Stable;
  * scoped and intended for cases where context needs to be passed from a caller
  * to a transitive callee without using an explicit parameter. A scoped variable
  * does not have a default/initial value, it is bound, meaning it gets a value,
- * when executing an operation specified to {@link #runWithBinding(Object, Runnable)}
- * or {@link #callWithBinding(Object, Callable)}. Code executed by the operation
+ * when executing an operation specified to {@link #where(ScopeLocal, Object)}.
+ * Code executed by the operation
  * uses the {@link #get()} method to get the value of the variable. The variable reverts
  * to being unbound (or its previous value) when the operation completes.
  *
@@ -81,7 +81,7 @@ import jdk.internal.vm.annotation.Stable;
  *   private static final ScopeLocal<Credentials> CREDENTIALS = ScopeLocal.forType(Credentials.class);
  *
  *   Credentials creds = ...
- *   CREDENTIALS.runWithBinding(creds, () -> {
+ *   ScopeLocal.where(CREDENTIALS, creds).run(creds, () -> {
  *       :
  *       Connection connection = connectDatabase();
  *       :
@@ -228,13 +228,17 @@ public final class ScopeLocal<T> {
         }
 
         /**
+         * Runs a value-returning operation with this some ScopeLocals bound to values.
+         * If the operation terminates with an exception {@code e}, apply {@code handler}
+         * to {@code e} and return the result.
          *
          * @param op the operation to run
          * @param handler a function to be applied if the operation completes with an exception
          * @param <R> the type of the result of the function
          * @return the result
          */
-        public final <R> R callOrElse(Callable<R> op, Function<Exception, R> handler) {
+        public final <R> R callOrElse(Callable<R> op,
+                                      Function<? super Exception, ? extends R> handler) {
             try {
                 return call(op);
             } catch (Exception e) {
@@ -243,14 +247,12 @@ public final class ScopeLocal<T> {
         }
 
         /**
-         * Runs an operation with this some ScopeLocals bound to our values.
+         * Runs an operation with some ScopeLocals bound to our values.
          * Code executed by the operation can use the {@link #get()} method to
          * get the value of the variables. The variables revert to their previous values or
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
-         * @param value the value for the variable, can be null
          * @param op    the operation to run
-         * @throws Exception if the operation completes with an exception
          */
         public final void run(Runnable op) {
             Objects.requireNonNull(op);
@@ -281,6 +283,10 @@ public final class ScopeLocal<T> {
     }
 
     /**
+     * Creates a binding for a ScopeLocal instance.
+     * That {@link BoundValues} may be used later to invoke a {@link Callable} or
+     * {@link Runnable} instance. More bindings may be added to the {@link BoundValues}
+     * by the {@link BoundValues#where(ScopeLocal, Object)} method.
      *
      * @param key the ScopeLocal to bind
      * @param value The value to bind it to
@@ -544,7 +550,7 @@ public final class ScopeLocal<T> {
     }
 
     // A small fixed-size key-value cache. When a scope variable's get() method
-    // is called, we record the result of the lookup in this per-thread cache
+    // is invoked, we record the result of the lookup in this per-thread cache
     // for fast access in future.
     private static class Cache {
         static final int INDEX_BITS = 4;  // Must be a power of 2

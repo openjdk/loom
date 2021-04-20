@@ -2060,6 +2060,8 @@ int java_lang_Thread::_interrupted_offset;
 int java_lang_Thread::_tid_offset;
 int java_lang_Thread::_continuation_offset;
 int java_lang_Thread::_park_blocker_offset;
+int java_lang_Thread::_noninheritableScopeLocalBindings_offset;
+int java_lang_Thread::_inheritableScopeLocalBindings_offset;
 
 #define THREAD_FIELDS_DO(macro) \
   macro(_holder_offset,        k, "holder", thread_fieldholder_signature, false); \
@@ -2072,6 +2074,8 @@ int java_lang_Thread::_park_blocker_offset;
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
+  macro(_noninheritableScopeLocalBindings_offset, k, "noninheritableScopeLocalBindings", scopeLocalSnapshot_name, false); \
+  macro(_inheritableScopeLocalBindings_offset,    k, "inheritableScopeLocalBindings", scopeLocalSnapshot_name, false); \
 
 void java_lang_Thread::compute_offsets() {
   assert(_holder_offset == 0, "offsets should be initialized only once");
@@ -2100,6 +2104,11 @@ JvmtiThreadState* java_lang_Thread::jvmti_thread_state(oop java_thread) {
 
 void java_lang_Thread::set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state) {
   java_thread->address_field_put(_jvmti_thread_state_offset, (address)state);
+}
+
+void java_lang_Thread::clear_scopeLocalBindings(oop java_thread) {
+  java_thread->address_field_put(_noninheritableScopeLocalBindings_offset, NULL);
+  java_thread->address_field_put(_inheritableScopeLocalBindings_offset, NULL);
 }
 
 oop java_lang_Thread::holder(oop java_thread) {

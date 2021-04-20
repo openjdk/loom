@@ -415,6 +415,9 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   vframeArray* array = create_vframeArray(thread, deoptee, &map, chunk, realloc_failures);
 #if COMPILER2_OR_JVMCI
   if (realloc_failures) {
+    oop java_thread = thread->threadObj();
+    thread->set_scopeLocalCache(NULL);
+    java_lang_Thread::clear_scopeLocalBindings(java_thread);
     pop_frames_failed_reallocs(thread, array);
   }
 #endif
