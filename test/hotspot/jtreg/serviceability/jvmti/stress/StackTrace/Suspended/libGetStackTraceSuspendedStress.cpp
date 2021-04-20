@@ -64,12 +64,6 @@ static void test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   }
 }
 
-jint get_thread_state(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
-  jint thread_state_ptr;
-  check_jvmti_status(jni, jvmti->GetThreadState(thread, &thread_state_ptr), "Error in GetThreadState");
-  return thread_state_ptr;
-}
-
 void check_link_consistency(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   jthread cthread = get_carrier_thread(jvmti, jni, vthread);
   jint vstate = get_thread_state(jvmti, jni, vthread);

@@ -76,8 +76,8 @@ public class SuspendWithCurrentThread {
         test.run();
     }
 
-    private ThreadToSuspend[] startTestedThreads(int threadsCount) throws RuntimeException  {
-        ThreadToSuspend[]threads = new ThreadToSuspend[threadsCount];
+    private ThreadToSuspend[] startTestedThreads(int threads_count) throws RuntimeException  {
+        ThreadToSuspend[]threads = new ThreadToSuspend[threads_count];
 
         // create tested threads
         for (int i = 0; i < threads.length; i++) {

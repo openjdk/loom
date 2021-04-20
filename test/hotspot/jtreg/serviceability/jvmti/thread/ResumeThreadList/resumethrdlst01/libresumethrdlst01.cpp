@@ -45,7 +45,7 @@ static int threadsCount = 0;
 
 /* ============================================================================= */
 
-static int fillThreadsByName(jvmtiEnv* jvmti, JNIEnv* jni,
+static int find_threads_by_name(jvmtiEnv* jvmti, JNIEnv* jni,
                                 const char name[], int foundCount, jthread foundThreads[]);
 
 /** Agent algorithm. */
@@ -75,7 +75,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
         NSK_DISPLAY1("  ... allocated array: %p\n", (void*)threads);
 
         NSK_DISPLAY1("Find threads: %d threads\n", threadsCount);
-        if (fillThreadsByName(jvmti, jni, THREAD_NAME, threadsCount, threads) == 0) {
+        if (find_threads_by_name(jvmti, jni, THREAD_NAME, threadsCount, threads) == 0) {
           return;
         }
 
@@ -157,7 +157,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
 /* ============================================================================= */
 
 /** Find threads whose name starts with specified name prefix. */
-static int fillThreadsByName(jvmtiEnv* jvmti, JNIEnv* jni,
+static int find_threads_by_name(jvmtiEnv* jvmti, JNIEnv* jni,
                             const char name[], int foundCount, jthread foundThreads[]) {
     jint count = 0;
     jthread* threads = NULL;

@@ -27,59 +27,44 @@
 #include "jvmti_common.h"
 #include "../get_stack_trace.h"
 
+
 extern "C" {
 
 static jvmtiEnv *jvmti = NULL;
+static frame_info expected_virtual_frames[] = {
+    {"LGetStackTraceCurrentThreadTest;", "check", "(Ljava/lang/Thread;)V"},
+    {"LGetStackTraceCurrentThreadTest;", "dummy", "()V"},
+    {"LGetStackTraceCurrentThreadTest;", "chain", "()V"},
+    {"LTask;", "run", "()V"},
+    {"Ljava/lang/VirtualThread;", "run", "(Ljava/lang/Runnable;)V"}
+};
+
 static frame_info expected_platform_frames[] = {
-    {"Ljava/lang/Object;", "wait", "()V"},
-    {"Lgetstacktr03;", "dummy", "()V"},
-    {"Lgetstacktr03;", "chain", "()V"},
-    {"Lgetstacktr03$Task;", "run", "()V"},
+    {"LGetStackTraceCurrentThreadTest;", "check", "(Ljava/lang/Thread;)V"},
+    {"LGetStackTraceCurrentThreadTest;", "dummy", "()V"},
+    {"LGetStackTraceCurrentThreadTest;", "chain", "()V"},
+    {"LTask;", "run", "()V"},
     {"Ljava/lang/Thread;", "run", "()V"}
 };
 
-static frame_info expected_virtual_frames[] = {
-    {"Ljava/lang/Object;", "wait", "()V"},
-    {"Lgetstacktr03;", "dummy", "()V"},
-    {"Lgetstacktr03;", "chain", "()V"},
-    {"Lgetstacktr03$Task;", "run", "()V"},
-    {"Ljava/lang/VirtualThread;", "run", "(Ljava/lang/Runnable;)V"},
-    {"Ljava/lang/VirtualThread$VThreadContinuation;", "lambda$new$0", "(Ljava/lang/VirtualThread;Ljava/lang/Runnable;)V"},
-    {"Ljava/lang/VirtualThread$VThreadContinuation$$Lambda$31.0x0000000800098810;", "run", "()V"},
-    {"Ljava/lang/Continuation;", "enter0", "()V"},
-    {"Ljava/lang/Continuation;", "enter", "(Ljava/lang/Continuation;Z)V"}
-};
-
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-  jvmtiError err;
   jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
     printf("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
-
-  jvmtiCapabilities caps;
-  memset(&caps, 0, sizeof(caps));
-  caps.can_suspend = 1;
-
-  err = jvmti->AddCapabilities(&caps);
-  if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
-    return JNI_ERR;
-  }
-
   return JNI_OK;
 }
 
 JNIEXPORT void JNICALL
-Java_getstacktr03_chain(JNIEnv *env, jclass cls) {
+Java_GetStackTraceCurrentThreadTest_chain(JNIEnv *env, jclass cls) {
   jmethodID mid = env->GetStaticMethodID(cls, "dummy", "()V");
   env->CallStaticVoidMethod(cls, mid);
 }
 
-JNIEXPORT int JNICALL
-Java_getstacktr03_check(JNIEnv *jni, jclass cls, jthread thread) {
-  suspend_thread(jvmti, jni, thread);
+JNIEXPORT void JNICALL
+Java_GetStackTraceCurrentThreadTest_check(JNIEnv *jni, jclass cls, jthread thread) {
+
   frame_info *expected_frames = jni->IsVirtualThread(thread)
       ? expected_virtual_frames
       : expected_platform_frames;
@@ -90,8 +75,5 @@ Java_getstacktr03_check(JNIEnv *jni, jclass cls, jthread thread) {
   if (!compare_stack_trace(jvmti, jni, thread, expected_frames, expected_number_of_stack_frames)) {
     jni->ThrowNew(jni->FindClass("java/lang/RuntimeException"), "Stacktrace differs from expected.");
   }
-  resume_thread(jvmti, jni, thread);
-  return 0;
 }
-
 }

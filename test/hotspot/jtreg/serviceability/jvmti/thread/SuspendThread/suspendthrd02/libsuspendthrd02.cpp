@@ -26,8 +26,6 @@
 #include "jvmti_common.h"
 #include "jvmti_thread.h"
 
-
-
 extern "C" {
 
 /* ============================================================================= */
@@ -56,133 +54,133 @@ static jthread testedThread = NULL;
 
 /** Agent algorithm. */
 static void JNICALL
-agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
-    jvmtiError err;
+agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
+  jvmtiError err;
 
-    NSK_DISPLAY0("Wait for thread to start\n");
-    if (!nsk_jvmti_waitForSync(timeout))
-        return;
+  NSK_DISPLAY0("Wait for thread to start\n");
+  if (!nsk_jvmti_waitForSync(timeout))
+    return;
 
-    /* perform testing */
-    {
-        NSK_DISPLAY1("Find thread: %s\n", THREAD_NAME);
-        testedThread = nsk_jvmti_threadByName(jvmti, jni,THREAD_NAME);
-        if (testedThread == NULL) {
-          return;
-        }
-        NSK_DISPLAY1("  ... found thread: %p\n", (void*)testedThread);
+  /* perform testing */
+  {
+    NSK_DISPLAY1("Find thread: %s\n", THREAD_NAME);
+    testedThread = nsk_jvmti_threadByName(jvmti, jni, THREAD_NAME);
+    if (testedThread == NULL) {
+      return;
+    }
+    NSK_DISPLAY1("  ... found thread: %p\n", (void *) testedThread);
 
-        eventsReceived = 0;
-        NSK_DISPLAY1("Enable event: %s\n", "THREAD_END");
-        nsk_jvmti_enableEvents(jvmti, jni,JVMTI_ENABLE, EVENTS_COUNT, eventsList, NULL);
+    eventsReceived = 0;
+    NSK_DISPLAY1("Enable event: %s\n", "THREAD_END");
+    nsk_jvmti_enableEvents(jvmti, jni, JVMTI_ENABLE, EVENTS_COUNT, eventsList, NULL);
 
-        NSK_DISPLAY1("Suspend thread: %p\n", (void*)testedThread);
-        err = jvmti->SuspendThread(testedThread);
-        if (err != JVMTI_ERROR_NONE) {
-          nsk_jvmti_setFailStatus();
-          return;
-        }
-
-        NSK_DISPLAY0("Let thread to run and finish\n");
-        if (!nsk_jvmti_resumeSync())
-            return;
-
-        NSK_DISPLAY1("Check that THREAD_END event NOT received for timeout: %ld ms\n", (long)verificationTime);
-        {
-            jlong delta = 1000;
-            jlong time;
-            for (time = 0; time < verificationTime; time += delta) {
-                if (eventsReceived > 0) {
-                    NSK_COMPLAIN0("Thread ran and finished after suspension\n");
-                    nsk_jvmti_setFailStatus();
-                    break;
-                }
-                nsk_jvmti_sleep(delta);
-            }
-        }
-
-        NSK_DISPLAY1("Disable event: %s\n", "THREAD_END");
-        nsk_jvmti_enableEvents(jvmti, jni,JVMTI_DISABLE, EVENTS_COUNT, eventsList, NULL);
-
-        NSK_DISPLAY1("Resume thread: %p\n", (void*)testedThread);
-        err = jvmti->ResumeThread(testedThread);
-        if (err != JVMTI_ERROR_NONE) {
-          nsk_jvmti_setFailStatus();
-          return;
-        }
-
-        NSK_DISPLAY0("Wait for thread to finish\n");
-        if (!nsk_jvmti_waitForSync(timeout))
-            return;
-
-        NSK_DISPLAY0("Delete thread reference\n");
-        jni->DeleteGlobalRef(testedThread);
+    NSK_DISPLAY1("Suspend thread: %p\n", (void *) testedThread);
+    err = jvmti->SuspendThread(testedThread);
+    if (err != JVMTI_ERROR_NONE) {
+      nsk_jvmti_setFailStatus();
+      return;
     }
 
-    NSK_DISPLAY0("Let debugee to finish\n");
+    NSK_DISPLAY0("Let thread to run and finish\n");
     if (!nsk_jvmti_resumeSync())
-        return;
+      return;
+
+    NSK_DISPLAY1("Check that THREAD_END event NOT received for timeout: %ld ms\n", (long) verificationTime);
+    {
+      jlong delta = 1000;
+      jlong time;
+      for (time = 0; time < verificationTime; time += delta) {
+        if (eventsReceived > 0) {
+          NSK_COMPLAIN0("Thread ran and finished after suspension\n");
+          nsk_jvmti_setFailStatus();
+          break;
+        }
+        nsk_jvmti_sleep(delta);
+      }
+    }
+
+    NSK_DISPLAY1("Disable event: %s\n", "THREAD_END");
+    nsk_jvmti_enableEvents(jvmti, jni, JVMTI_DISABLE, EVENTS_COUNT, eventsList, NULL);
+
+    NSK_DISPLAY1("Resume thread: %p\n", (void *) testedThread);
+    err = jvmti->ResumeThread(testedThread);
+    if (err != JVMTI_ERROR_NONE) {
+      nsk_jvmti_setFailStatus();
+      return;
+    }
+
+    NSK_DISPLAY0("Wait for thread to finish\n");
+    if (!nsk_jvmti_waitForSync(timeout))
+      return;
+
+    NSK_DISPLAY0("Delete thread reference\n");
+    jni->DeleteGlobalRef(testedThread);
+  }
+
+  NSK_DISPLAY0("Let debugee to finish\n");
+  if (!nsk_jvmti_resumeSync())
+    return;
 }
 
 /* ============================================================================= */
 
 /** THREAD_END callback. */
 JNIEXPORT void JNICALL
-callbackThreadEnd(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
-    /* check if event is for tested thread */
-    if (thread != NULL &&
-                jni->IsSameObject(testedThread, thread)) {
-        NSK_DISPLAY1("  ... received THREAD_END event for tested thread: %p\n", (void*)thread);
-        eventsReceived++;
-    } else {
-        NSK_DISPLAY1("  ... received THREAD_END event for unknown thread: %p\n", (void*)thread);
-    }
+callbackThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
+  /* check if event is for tested thread */
+  if (thread != NULL &&
+      jni->IsSameObject(testedThread, thread)) {
+    NSK_DISPLAY1("  ... received THREAD_END event for tested thread: %p\n", (void *) thread);
+    eventsReceived++;
+  } else {
+    NSK_DISPLAY1("  ... received THREAD_END event for unknown thread: %p\n", (void *) thread);
+  }
 }
 
 /* ============================================================================= */
 
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-    jvmtiEnv* jvmti = NULL;
+  jvmtiEnv *jvmti = NULL;
 
-    timeout =  60 * 1000;
+  timeout = 60 * 1000;
 
-    jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
-    if (res != JNI_OK || jvmti == NULL) {
-      printf("Wrong result of a valid call to GetEnv!\n");
+  jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
+  if (res != JNI_OK || jvmti == NULL) {
+    printf("Wrong result of a valid call to GetEnv!\n");
+    return JNI_ERR;
+  }
+
+  /* add specific capabilities for suspending thread */
+  {
+    jvmtiCapabilities suspendCaps;
+    memset(&suspendCaps, 0, sizeof(suspendCaps));
+    suspendCaps.can_suspend = 1;
+    if (jvmti->AddCapabilities(&suspendCaps) != JVMTI_ERROR_NONE) {
       return JNI_ERR;
     }
+  }
 
-    /* add specific capabilities for suspending thread */
-    {
-      jvmtiCapabilities suspendCaps;
-      memset(&suspendCaps, 0, sizeof(suspendCaps));
-      suspendCaps.can_suspend = 1;
-      if (jvmti->AddCapabilities(&suspendCaps) != JVMTI_ERROR_NONE) {
-        return JNI_ERR;
-      }
-    }
-
-    /* set callbacks for THREAD_END event */
-    {
-        jvmtiEventCallbacks callbacks;
-        memset(&callbacks, 0, sizeof(callbacks));
-        callbacks.ThreadEnd = callbackThreadEnd;
-        jvmtiError err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
-        if (err != JVMTI_ERROR_NONE) {
-          printf("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
-          return JNI_ERR;
-        }
-    }
-
-    if (init_agent_data(jvmti, &agent_data) != JVMTI_ERROR_NONE) {
+  /* set callbacks for THREAD_END event */
+  {
+    jvmtiEventCallbacks callbacks;
+    memset(&callbacks, 0, sizeof(callbacks));
+    callbacks.ThreadEnd = callbackThreadEnd;
+    jvmtiError err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
+    if (err != JVMTI_ERROR_NONE) {
+      printf("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
       return JNI_ERR;
     }
-    /* register agent proc and arg */
-    if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
-      return JNI_ERR;
-    }
+  }
 
-    return JNI_OK;
+  if (init_agent_data(jvmti, &agent_data) != JVMTI_ERROR_NONE) {
+    return JNI_ERR;
+  }
+  /* register agent proc and arg */
+  if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
+    return JNI_ERR;
+  }
+
+  return JNI_OK;
 }
 
 /* ============================================================================= */

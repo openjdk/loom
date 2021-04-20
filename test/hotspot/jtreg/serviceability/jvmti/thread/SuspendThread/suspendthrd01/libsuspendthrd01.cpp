@@ -26,8 +26,6 @@
 #include "jvmti_common.h"
 #include "jvmti_thread.h"
 
-
-
 extern "C" {
 
 /* ============================================================================= */
@@ -42,105 +40,90 @@ static jlong timeout = 0;
 
 /** Agent algorithm. */
 static void JNICALL
-agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
+agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
 
-    NSK_DISPLAY0("Wait for thread to start\n");
-    if (!nsk_jvmti_waitForSync(timeout))
-        return;
+  printf("Wait for thread to start\n");
+  if (!nsk_jvmti_waitForSync(timeout))
+    return;
 
-    /* perform testing */
-    {
-        jthread testedThread = NULL;
+  /* perform testing */
+  {
+    printf("Find thread: %s\n", THREAD_NAME);
+    jthread tested_thread = find_thread_by_name(jvmti, jni, THREAD_NAME);
+    if (tested_thread == NULL) {
+      return;
+    }
+    printf("  ... found thread: %p\n", (void *) tested_thread);
 
-        NSK_DISPLAY1("Find thread: %s\n", THREAD_NAME);
-        testedThread = nsk_jvmti_threadByName(jvmti, jni,THREAD_NAME);
-        if (testedThread == NULL) {
-          return;
-        }
-        NSK_DISPLAY1("  ... found thread: %p\n", (void*)testedThread);
+    printf("Suspend thread: %p\n", (void *) tested_thread);
+    suspend_thread(jvmti, jni, tested_thread);
 
-        NSK_DISPLAY1("Suspend thread: %p\n", (void*)testedThread);
-        jvmtiError err = jvmti->SuspendThread(testedThread);
-        if (err != JVMTI_ERROR_NONE) {
-          nsk_jvmti_setFailStatus();
-          return;
-        }
-
-        NSK_DISPLAY0("Let thread to run and finish\n");
-        if (!nsk_jvmti_resumeSync())
-            return;
-
-        NSK_DISPLAY1("Get state vector for thread: %p\n", (void*)testedThread);
-        {
-            jint state = 0;
-
-            err = jvmti->GetThreadState(testedThread, &state);
-            if (err != JVMTI_ERROR_NONE) {
-              nsk_jvmti_setFailStatus();
-            }
-            NSK_DISPLAY2("  ... got state vector: %s (%d)\n",
-                            TranslateState(state), (int)state);
-
-            if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
-                printf("SuspendThread() does not turn on flag SUSPENDED:\n"
-                              "#   state: %s (%d)\n",
-                              TranslateState(state), (int)state);
-                nsk_jvmti_setFailStatus();
-            }
-        }
-
-        NSK_DISPLAY1("Resume thread: %p\n", (void*)testedThread);
-        err = jvmti->ResumeThread(testedThread);
-        if (err != JVMTI_ERROR_NONE) {
-          nsk_jvmti_setFailStatus();
-          return;
-        }
-
-        NSK_DISPLAY0("Wait for thread to finish\n");
-        if (!nsk_jvmti_waitForSync(timeout))
-            return;
-
-        NSK_DISPLAY0("Delete thread reference\n");
-        jni->DeleteGlobalRef(testedThread);
+    printf("Let thread to run and finish\n");
+    if (!nsk_jvmti_resumeSync()) {
+      return;
     }
 
-    NSK_DISPLAY0("Let debugee to finish\n");
-    if (!nsk_jvmti_resumeSync())
-        return;
+    printf("Get state vector for thread: %p\n", (void *) tested_thread);
+    {
+      jint state = get_thread_state(jvmti, jni, tested_thread);
+      printf("  ... got state vector: %s (%d)\n", TranslateState(state), (int) state);
+
+      if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
+        printf("SuspendThread() does not turn on flag SUSPENDED:\n"
+               "#   state: %s (%d)\n", TranslateState(state), (int) state);
+        nsk_jvmti_setFailStatus();
+      }
+    }
+
+    printf("Resume thread: %p\n", (void *) tested_thread);
+    resume_thread(jvmti, jni, tested_thread);
+
+    printf("Wait for thread to finish\n");
+    if (!nsk_jvmti_waitForSync(timeout)) {
+      return;
+    }
+
+    printf("Delete thread reference\n");
+    jni->DeleteGlobalRef(tested_thread);
+  }
+
+  printf("Let debugee to finish\n");
+  if (!nsk_jvmti_resumeSync()) {
+    return;
+  }
 }
 
 /* ============================================================================= */
 
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-    jvmtiEnv* jvmti = NULL;
+  jvmtiEnv *jvmti = NULL;
 
-    timeout =  60 * 1000;
+  timeout = 60 * 1000;
 
-    jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
-    if (res != JNI_OK || jvmti == NULL) {
-      printf("Wrong result of a valid call to GetEnv!\n");
-      return JNI_ERR;
-    }
+  jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
+  if (res != JNI_OK || jvmti == NULL) {
+    printf("Wrong result of a valid call to GetEnv!\n");
+    return JNI_ERR;
+  }
 
-    /* add specific capabilities for suspending thread */
-    {
-      jvmtiCapabilities suspendCaps;
-      memset(&suspendCaps, 0, sizeof(suspendCaps));
-      suspendCaps.can_suspend = 1;
-      if (jvmti->AddCapabilities(&suspendCaps) != JVMTI_ERROR_NONE) {
-        return JNI_ERR;
-      }
-    }
+  /* add specific capabilities for suspending thread */
 
-    if (init_agent_data(jvmti, &agent_data) != JVMTI_ERROR_NONE) {
-      return JNI_ERR;
-    }
+  jvmtiCapabilities caps;
+  memset(&caps, 0, sizeof(caps));
+  caps.can_suspend = 1;
+  if (jvmti->AddCapabilities(&caps) != JVMTI_ERROR_NONE) {
+    return JNI_ERR;
+  }
 
-    /* register agent proc and arg */
-    if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
-      return JNI_ERR;
-    }
 
+  if (init_agent_data(jvmti, &agent_data) != JVMTI_ERROR_NONE) {
+    return JNI_ERR;
+  }
+
+  /* register agent proc and arg */
+  if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
+    return JNI_ERR;
+  }
 
   return JNI_OK;
 }

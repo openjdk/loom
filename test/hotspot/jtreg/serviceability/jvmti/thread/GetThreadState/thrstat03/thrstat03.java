@@ -51,30 +51,12 @@ public class thrstat03 {
     static final int ZOMBIE = 2;
 
     native static void init(int waitTime);
-    native static int check(Thread thread, int status);
+    native static boolean check(Thread thread, int status);
 
-    public static void main(String args[]) {
-
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    static int contendCount = 0;
     public static Object lock = new Object();
     public static int waitTime = 2;
 
-    public static int run(String args[], PrintStream out) {
-        if (args.length > 0) {
-            try {
-                int i  = Integer.parseInt(args[0]);
-                waitTime = i;
-            } catch (NumberFormatException ex) {
-                out.println("# Wrong argument \"" + args[0]
-                    + "\", the default value is used");
-            }
-        }
-        out.println("# Waiting time = " + waitTime + " mins");
+    public static void main(String args[]) {
 
         init(waitTime);
 
@@ -101,7 +83,9 @@ public class thrstat03 {
             throw new Error("Unexpected: " + e);
         }
 
-        return check(t, ZOMBIE);
+        if (!check(t, ZOMBIE)) {
+            throw new RuntimeException();
+        }
     }
 
 

@@ -73,8 +73,8 @@ public class framecnt02 {
 
     public static int run(String argv[], PrintStream ref) {
         Thread currThread = Thread.currentThread();
-        framecnt02a thr1 = new framecnt02a();
-        checkFrames(thr1, 1);
+        framecnt02a tested_thread_thr1 = new framecnt02a();
+        checkFrames(tested_thread_thr1, 1);
         checkFrames(currThread, 0);
         return getRes();
     }

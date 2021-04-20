@@ -22,99 +22,59 @@
  */
 
 #include <stdio.h>
-#include <string.h>
 #include "jvmti.h"
 #include "jvmti_common.h"
 
 extern "C" {
 
-
-#define PASSED 0
-#define STATUS_FAILED 2
-
-static jvmtiEnv *jvmti = NULL;
-static jvmtiCapabilities caps;
-static jint result = PASSED;
-
+static jvmtiEnv *jvmti_env = NULL;
 
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-    jvmtiError err;
-    jint res;
+  jvmtiCapabilities caps;
+  jint res;
 
-    res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
-    if (res != JNI_OK || jvmti == NULL) {
-        printf("Wrong result of a valid call to GetEnv !\n");
-        return JNI_ERR;
-    }
+  res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti_env == NULL) {
+    printf("Wrong result of a valid call to GetEnv !\n");
+    return JNI_ERR;
+  }
 
-    err = jvmti->GetPotentialCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
+  memset(&caps, 0, sizeof(caps));
+  caps.can_support_virtual_threads = true;
+  caps.can_suspend = true;
 
-    err = jvmti->AddCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(AddCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
+  jvmtiError err = jvmti_env->AddCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
 
-    err = jvmti->GetCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
-
-    if (!caps.can_suspend) {
-        printf("Warning: suspend/resume is not implemented\n");
-    }
-
-    return JNI_OK;
+  return JNI_OK;
 }
 
-JNIEXPORT void JNICALL Java_framecnt01_checkFrames(JNIEnv *env, jclass cls,
-        jthread thr, jint thr_num, jint fnum) {
-    jvmtiError err;
-    jint frameCount;
+JNIEXPORT jboolean JNICALL Java_framecnt01_checkFrames0(JNIEnv *jni, jclass cls, jthread thread,
+                                                        jboolean suspend, jint expected_count) {
+  jboolean result = JNI_TRUE;
 
-    if (!caps.can_suspend) {
-        return;
-    }
+  if (suspend) {
+    suspend_thread(jvmti_env, jni, thread);
+  }
 
-    if (thr_num != 0) {
-        err = jvmti->SuspendThread(thr);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("(SuspendThread#%d) unexpected error: %s (%d)\n",
-                   thr_num, TranslateError(err), err);
-            result = STATUS_FAILED;
-            return;
-        }
-    }
-    err = jvmti->GetFrameCount(thr, &frameCount);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetFrameCount#%d) unexpected error: %s (%d)\n",
-               thr_num, TranslateError(err), err);
-        result = STATUS_FAILED;
-    } else if (frameCount != fnum) {
-        printf("Thread #%d: number of frames expected: %d, got: %d\n", thr_num, fnum, frameCount);
-        print_stack_trace(jvmti, env, thr);
-        result = STATUS_FAILED;
-    }
-    if (thr_num != 0) {
-        err = jvmti->ResumeThread(thr);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("(ResumeThread#%d) unexpected error: %s (%d)\n",
-                   thr_num, TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-    }
-}
+  printf("Testing: \n");
+  print_stack_trace(jvmti_env, jni, thread);
+  jint frame_count = get_frame_count(jvmti_env, jni, thread);
+  if (frame_count != expected_count) {
+    printf("Thread #%s: number of frames expected: %d, got: %d\n",
+           get_thread_name(jvmti_env, jni, thread), expected_count, frame_count);
+    result = JNI_FALSE;
+  }
 
-JNIEXPORT jint JNICALL Java_framecnt01_getRes(JNIEnv *env, jclass cls) {
-    return result;
+  if (suspend) {
+    resume_thread(jvmti_env, jni, thread);
+  }
+
+  return result;
 }
 
 }

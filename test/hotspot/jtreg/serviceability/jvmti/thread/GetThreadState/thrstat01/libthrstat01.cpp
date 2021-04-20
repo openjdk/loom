@@ -28,19 +28,14 @@
 
 extern "C" {
 
-
-#define PASSED  0
-#define STATUS_FAILED  2
 #define WAIT_START 100
 #define WAIT_TIME (2*60*1000)
 
 static jvmtiEnv *jvmti = NULL;
-static jvmtiCapabilities caps;
-static jvmtiEventCallbacks callbacks;
+
 static jrawMonitorID access_lock;
 static jrawMonitorID wait_lock;
-static jint result = PASSED;
-static jthread thr_ptr = NULL;
+static jthread tested_thread_thr1 = NULL;
 
 static jint state[] = {
     JVMTI_THREAD_STATE_RUNNABLE,
@@ -48,196 +43,93 @@ static jint state[] = {
     JVMTI_THREAD_STATE_IN_OBJECT_WAIT
 };
 
-static void
-lock(const char* func_name, jrawMonitorID lock) {
-    jvmtiError err = jvmti->RawMonitorEnter(lock);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("%s: unexpected error in RawMonitorEnter: %s (%d)\n",
-               func_name, TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-}
-
-static void
-unlock(const char* func_name, jrawMonitorID lock) {
-    jvmtiError err = jvmti->RawMonitorExit(lock);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("%s: unexpected error in RawMonitorExit: %s (%d)\n",
-               func_name, TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-}
-
-static void
-wait(const char* func_name, jrawMonitorID lock, jint millis) {
-    jvmtiError err = jvmti->RawMonitorWait(lock, (jlong)millis);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("%s: unexpected error in RawMonitorWait: %s (%d)\n",
-               func_name, TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-}
-
-static void
-set_notification_mode(const char* event_name,
-                      jvmtiEventMode mode,
-                      jvmtiEvent event_type,
-                      jthread event_thread) {
-    const char* action = (mode == JVMTI_ENABLE) ? "enable" : "disable";
-    jvmtiError err = jvmti->SetEventNotificationMode(mode, event_type, event_thread);
-
-    if (err != JVMTI_ERROR_NONE) {
-        printf("Failed to %s %s event: %s (%d)\n",
-               action, event_name, TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-}
-
-void JNICALL VMInit(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thr) {
-    set_notification_mode("JVMTI_EVENT_THREAD_START", JVMTI_ENABLE,
-                          JVMTI_EVENT_THREAD_START, NULL);
+void JNICALL VMInit(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thr) {
+  jvmtiError err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_START, NULL);
+  check_jvmti_status(jni, err, "Error in SetEventNotificationMode");
 }
 
 void JNICALL
-ThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread) {
-    jvmtiError err;
-    jvmtiThreadInfo thrInfo;
+ThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread) {
 
-    lock("ThreadStart", access_lock);
+  RawMonitorLocker rml = RawMonitorLocker(jvmti_env, jni, access_lock);
+  jvmtiThreadInfo thread_info = get_thread_info(jvmti, jni, thread);
 
-    err = jvmti_env->GetThreadInfo(thread, &thrInfo);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetThreadInfo#TS) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-    if (thrInfo.name != NULL && strcmp(thrInfo.name, "thr1") == 0) {
-        thr_ptr = env->NewGlobalRef(thread);
-        printf(">>> ThreadStart: \"%s\", 0x%p\n", thrInfo.name, thr_ptr);
-        set_notification_mode("JVMTI_EVENT_THREAD_START", JVMTI_DISABLE,
-                              JVMTI_EVENT_THREAD_START, NULL);
-    }
-
-    unlock("ThreadStart", access_lock);
+  if (thread_info.name != NULL && strcmp(thread_info.name, "tested_thread_thr1") == 0) {
+    tested_thread_thr1 = jni->NewGlobalRef(thread);
+    printf(">>> ThreadStart: \"%s\", 0x%p\n", thread_info.name, tested_thread_thr1);
+    jvmtiError err = jvmti_env->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_THREAD_START, NULL);
+    check_jvmti_status(jni, err, "Error in SetEventNotificationMode");
+  }
 }
 
-jint  Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-    jint res;
-    jvmtiError err;
+jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  jint res;
+  jvmtiError err;
 
-    printf("Agent_OnLoad started\n");
+  printf("Agent_OnLoad started\n");
 
-    res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
-    if (res != JNI_OK || jvmti == NULL) {
-        printf("Wrong result of a valid call to GetEnv!\n");
-        return JNI_ERR;
-    }
+  res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti == NULL) {
+    printf("Wrong result of a valid call to GetEnv!\n");
+    return JNI_ERR;
+  }
 
-    err = jvmti->GetPotentialCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
+  access_lock = create_raw_monitor(jvmti, "_access_lock");
+  wait_lock = create_raw_monitor(jvmti, "_wait_lock");
 
-    err = jvmti->AddCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(AddCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
+  jvmtiEventCallbacks callbacks;
+  callbacks.VMInit = &VMInit;
+  callbacks.ThreadStart = &ThreadStart;
+  err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
 
-    err = jvmti->GetCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
-
-    err = jvmti->CreateRawMonitor("_access_lock", &access_lock);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(CreateRawMonitor)#access_lock unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
-
-    err = jvmti->CreateRawMonitor("_wait_lock", &wait_lock);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(CreateRawMonitor#wait_lock) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
-
-    callbacks.VMInit = &VMInit;
-    callbacks.ThreadStart = &ThreadStart;
-    err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
-
-    set_notification_mode("JVMTI_EVENT_VM_INIT", JVMTI_ENABLE,
-                          JVMTI_EVENT_VM_INIT, NULL);
-
-    printf("Agent_OnLoad finished\n\n");
-    return JNI_OK;
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_INIT, NULL);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(SetEventNotificationMode) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
+  printf("Agent_OnLoad finished\n\n");
+  return JNI_OK;
 }
 
-JNIEXPORT void JNICALL
-Java_thrstat01_checkStatus(JNIEnv *env,
-        jclass cls, jint statInd) {
-    jvmtiError err;
-    jint thrState;
-    jint millis;
+JNIEXPORT jboolean JNICALL
+Java_thrstat01_checkStatus0(JNIEnv *jni, jclass cls, jint stat_ind) {
+  jboolean result = JNI_TRUE;
+  jint thread_state;
+  jint millis;
 
-    printf("native method checkStatus started\n");
-    if (jvmti == NULL) {
-        printf("JVMTI client was not properly loaded!\n");
-        result = STATUS_FAILED;
-        return;
+  printf("native method checkStatus started\n");
+
+  if (tested_thread_thr1 == NULL) {
+    printf("Missing thread \"tested_thread_thr1\" start event\n");
+    return JNI_FALSE;
+  }
+
+  /* wait until thread gets an expected state */
+  for (millis = WAIT_START; millis < WAIT_TIME; millis <<= 1) {
+    thread_state = get_thread_state(jvmti, jni, tested_thread_thr1);
+    if ((thread_state & state[stat_ind]) != 0) {
+      break;
     }
+    RawMonitorLocker rml = RawMonitorLocker(jvmti, jni, wait_lock);
+    rml.wait(millis);
+  }
 
-    if (thr_ptr == NULL) {
-        printf("Missing thread \"thr1\" start event\n");
-        result = STATUS_FAILED;
-        return;
-    }
+  printf(">>> thread \"tested_thread_thr1\" (0x%p) state: %s (%d)\n", tested_thread_thr1, TranslateState(thread_state), thread_state);
 
-    /* wait until thread gets an expected state */
-    for (millis = WAIT_START; millis < WAIT_TIME; millis <<= 1) {
-        err = jvmti->GetThreadState(thr_ptr, &thrState);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("(GetThreadState#%d) unexpected error: %s (%d)\n",
-                statInd, TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-        if ((thrState & state[statInd]) != 0) {
-            break;
-        }
-        lock("checkStatus", wait_lock);
-        wait("checkStatus", wait_lock, millis);
-        unlock("checkStatus", wait_lock);
-    }
-
-    printf(">>> thread \"thr1\" (0x%p) state: %s (%d)\n",
-            thr_ptr, TranslateState(thrState), thrState);
-
-    if ((thrState & state[statInd]) == 0) {
-        printf("Wrong thread \"thr1\" (0x%p) state:\n", thr_ptr);
-        printf("    expected: %s (%d)\n",
-            TranslateState(state[statInd]), state[statInd]);
-        printf("      actual: %s (%d)\n",
-            TranslateState(thrState), thrState);
-        result = STATUS_FAILED;
-    }
-    printf("native method checkStatus finished\n\n");
-}
-
-JNIEXPORT jint JNICALL
-Java_thrstat01_getRes(JNIEnv *env, jclass cls) {
-    printf("native method getRes: result: %d\n\n", result);
-    return result;
+  if ((thread_state & state[stat_ind]) == 0) {
+    printf("Wrong thread \"tested_thread_thr1\" (0x%p) state:\n", tested_thread_thr1);
+    printf("    expected: %s (%d)\n", TranslateState(state[stat_ind]), state[stat_ind]);
+    printf("      actual: %s (%d)\n", TranslateState(thread_state), thread_state);
+    result = JNI_FALSE;
+  }
+  printf("native method checkStatus finished\n\n");
+  return result;
 }
 
 }

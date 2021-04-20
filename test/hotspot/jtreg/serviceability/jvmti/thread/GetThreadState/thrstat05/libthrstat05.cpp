@@ -25,15 +25,10 @@
  */
 
 #include <stdio.h>
-#include <string.h>
 #include "jvmti.h"
 #include "jvmti_common.h"
 
-#ifndef STANDALONE
-#endif
-
 extern "C" {
-
 
 #define THREAD_STATE_MASK ~(JVMTI_THREAD_STATE_SUSPENDED \
                             | JVMTI_THREAD_STATE_INTERRUPTED \
@@ -71,88 +66,49 @@ static int g_ThreadState[] = {
         | JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT,     /* TS_RUN_WAIT_SLEEPING */
 };
 
-static jvmtiEnv * g_ppJvmtiEnv = NULL;
-static int g_waitTime = 1000;
-jrawMonitorID g_waitMon; /* Monitor is used just for sleeping */
+static jvmtiEnv *jvmti_env = NULL;
+static int g_wait_time = 1000;
+jrawMonitorID wait_lock; /* Monitor is used just for sleeping */
 
-void reportError(const char * szErr, jvmtiError res) {
-#ifndef STANDALONE
-    printf("%s (%d: %s)\n", szErr, res, TranslateError(res));
-#else
-    printf("%s (%d)\n", szErr, res);
-#endif
-    fflush(stdout);
-}
 
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-    jvmtiError error;
-    jint res;
-
-    res = jvm->GetEnv((void **) &g_ppJvmtiEnv, JVMTI_VERSION_1_1);
-    if (res != JNI_OK || !g_ppJvmtiEnv) {
-        printf("Agent_OnLoad: Error: GetEnv returned error or NULL\n");
-        return JNI_ERR;
-    }
-
-    error = g_ppJvmtiEnv->CreateRawMonitor("beast", &g_waitMon);
-    if (error != JVMTI_ERROR_NONE) {
-        reportError("Agent_OnLoad: error creating raw monitor", error);
-        return JNI_ERR;
-    }
-
-    return JNI_OK;
+  jint res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || !jvmti_env) {
+    printf("Agent_OnLoad: Error: GetEnv returned error or NULL\n");
+    return JNI_ERR;
+  }
+  wait_lock = create_raw_monitor(jvmti_env, "beast");
+  return JNI_OK;
 }
 
 JNIEXPORT void JNICALL
-Java_thrstat05_setWaitTime(JNIEnv * pEnv, jclass klass, jint waitTime) {
-    g_waitTime = waitTime;
+Java_thrstat05_setWaitTime(JNIEnv *jni, jclass klass, jint wait_time) {
+  g_wait_time = wait_time;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_thrstat05_checkThreadState(JNIEnv * pEnv, jclass klass, jthread thread, jint stateIdx) {
+Java_thrstat05_checkThreadState(JNIEnv *jni, jclass klass, jthread thread, jint stateIdx) {
+  int wait_time = 10;
 
-    jint thrState;
-    jint maskedThrState;
-    int waitTime = 10;
+  /* Repeat querying status until wait_time < g_wait_time */
+  do {
+    jint thrState = get_thread_state(jvmti_env, jni, thread);
+    jint maskedThrState = thrState & THREAD_STATE_MASK;
+    printf("GetThreadState = %x. Masked: %x. Must be: %x\n", thrState, maskedThrState, g_ThreadState[stateIdx]);
+    fflush(stdout);
 
-    /* Repeat querying status until waitTime < g_waitTime */
-    do {
-        jvmtiError res = g_ppJvmtiEnv->GetThreadState(thread, &thrState);
-        if (res != JVMTI_ERROR_NONE) {
-            reportError("GetThreadState: unexpected error", res);
-            return JNI_FALSE;
-        }
+    if (maskedThrState == g_ThreadState[stateIdx])
+      return JNI_TRUE;
 
-        maskedThrState = thrState & THREAD_STATE_MASK;
-        printf("GetThreadState = %x. Masked: %x. Must be: %x\n", thrState, maskedThrState, g_ThreadState[stateIdx]);
-        fflush(stdout);
+    printf("checkThreadState: wait %d ms\n", wait_time);
+    fflush(stdout);
+    RawMonitorLocker wait_locker = RawMonitorLocker(jvmti_env, jni,wait_lock);
+    wait_locker.wait(wait_time);
+    wait_time <<= 1;
 
-        if (maskedThrState == g_ThreadState[stateIdx])
-            return JNI_TRUE;
+  } while (wait_time < g_wait_time);
 
-        printf("checkThreadState: wait %d ms\n", waitTime);
-        fflush(stdout);
-        res = g_ppJvmtiEnv->RawMonitorEnter(g_waitMon);
-        if (res != JVMTI_ERROR_NONE) {
-            reportError("GetThreadState: unexpected error from RawMontiorEnter", res);
-            return JNI_FALSE;
-        }
-        res = g_ppJvmtiEnv->RawMonitorWait(g_waitMon, waitTime);
-        if (res != JVMTI_ERROR_NONE) {
-            reportError("GetThreadState: unexpected error from RawMontiorWait", res);
-            return JNI_FALSE;
-        }
-        res = g_ppJvmtiEnv->RawMonitorExit(g_waitMon);
-        if (res != JVMTI_ERROR_NONE) {
-            reportError("GetThreadState: unexpected error from RawMonitorExit", res);
-            return JNI_FALSE;
-        }
-
-        waitTime <<= 1;
-
-    } while (waitTime < g_waitTime);
-
-    return JNI_FALSE;
+  return JNI_FALSE;
 }
 
 }

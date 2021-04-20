@@ -35,17 +35,24 @@ typedef struct {
 } info;
 
 static jvmtiEnv *jvmti_env;
-static jrawMonitorID lock1;
-static jrawMonitorID lock2;
+static jrawMonitorID starting_agent_thread_lock;
+static jrawMonitorID stopping_agent_thread_lock;
 static int system_threads_count;
 static const char *names0[] = {"main"};
 static const char *names1[] = {"main", "thread1"};
 static const char *names2[] = {"main", "Thread-"};
-static info thrInfo[] = {
-    {1, names0}, {1, names0}, {2, names1}, {1, names0}, {2, names2}
+static const char *names3[] = {"main", "ForkJoinPool-"};
+
+/*
+ * Expected number and names of threads started by test for each test point
+ */
+static info expected_thread_info[] = {
+    {1, names0}, {1, names0}, {2, names1},
+    {1, names0}, {2, names2},  {2, names3}
 };
 
-const int IDX_AGENT_THREAD = 4;
+const char VTHREAD_PREFIX[] = "ForkJoinPool";
+
 
 jthread create_jthread(JNIEnv *jni) {
   jclass thrClass = jni->FindClass("java/lang/Thread");
@@ -55,15 +62,17 @@ jthread create_jthread(JNIEnv *jni) {
 
 static void JNICALL
 sys_thread(jvmtiEnv *jvmti, JNIEnv *jni, void *p) {
-  RawMonitorLocker rml2 = RawMonitorLocker(jvmti, jni, lock2);
+  RawMonitorLocker rml2 = RawMonitorLocker(jvmti, jni, stopping_agent_thread_lock);
   {
-    RawMonitorLocker rml1 = RawMonitorLocker(jvmti, jni, lock1);
+    RawMonitorLocker rml1 = RawMonitorLocker(jvmti, jni, starting_agent_thread_lock);
     rml1.notify();
   }
   rml2.wait();
 }
 
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiCapabilities caps;
+  jvmtiError err;
   jint res;
 
   res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
@@ -71,69 +80,88 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     printf("Wrong result of a valid call to GetEnv !\n");
     return JNI_ERR;
   }
-  lock1 = create_raw_monitor(jvmti_env, "_lock1");
-  lock2 = create_raw_monitor(jvmti_env, "_lock2");
+  memset(&caps, 0, sizeof(caps));
+  caps.can_support_virtual_threads = true;
+
+  err = jvmti_env->AddCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
+
+  starting_agent_thread_lock = create_raw_monitor(jvmti_env, "_started_agent_thread_lock");
+  stopping_agent_thread_lock = create_raw_monitor(jvmti_env, "_stopping_agent_thread_lock");
 
   return JNI_OK;
 }
 
-JNIEXPORT jboolean check_info(JNIEnv *jni, int ind) {
+JNIEXPORT jboolean check_info(JNIEnv *jni, int idx) {
   jboolean result = JNI_TRUE;
-  jint threadsCount = -1;
+  jint threads_count = -1;
   jthread *threads;
   int num_unexpected = 0;
 
-  printf(" >>> Check: %d\n", ind);
+  printf(" >>> Check point: %d\n", idx);
 
-  if (ind == IDX_AGENT_THREAD) {
-    RawMonitorLocker rml1 = RawMonitorLocker(jvmti_env, jni, lock1);
-    jvmtiError err = jvmti_env->RunAgentThread(create_jthread(jni), sys_thread, NULL,JVMTI_THREAD_NORM_PRIORITY);
-    check_jvmti_status(jni, err, "Failed to run AgentThread");
-    rml1.wait();
-  }
+  check_jvmti_status(jni, jvmti_env->GetAllThreads(&threads_count, &threads), "Failed in GetAllThreads");
 
-  check_jvmti_status(jni, jvmti_env->GetAllThreads(&threadsCount, &threads), "Failed in GetAllThreads");
-
-  for (int i = 0; i < threadsCount; i++) {
+  for (int i = 0; i < threads_count; i++) {
     if (!isThreadExpected(jvmti_env, threads[i])) {
       num_unexpected++;
+      printf(">>> unexpected:  ");
+    } else {
+      printf(">>> expected: ");
     }
+    print_thread_info(jvmti_env, jni, threads[i]);
   }
 
-  if (threadsCount - num_unexpected != thrInfo[ind].cnt + system_threads_count) {
+  if (threads_count - num_unexpected != expected_thread_info[idx].cnt + system_threads_count) {
     printf("Point %d: number of threads expected: %d, got: %d\n",
-           ind, thrInfo[ind].cnt + system_threads_count, threadsCount - num_unexpected);
+           idx, expected_thread_info[idx].cnt + system_threads_count, threads_count - num_unexpected);
     return JNI_FALSE;
   }
 
-  for (int i = 0; i < thrInfo[ind].cnt; i++) {
+  for (int i = 0; i < expected_thread_info[idx].cnt; i++) {
     bool found = false;
-    for (int j = 0; j < threadsCount && !found; j++) {
+    for (int j = 0; j < threads_count && !found; j++) {
       char *name = get_thread_name(jvmti_env, jni, threads[j]);
-      printf(" >>> %s\n", name);
-
-      found = (name != NULL &&
-          strstr(name, thrInfo[ind].thr_names[i]) == name &&
-          (ind == IDX_AGENT_THREAD || strlen(name) ==
-              strlen(thrInfo[ind].thr_names[i])));
+      found = strstr(name, expected_thread_info[idx].thr_names[i]);
+      if (found) {
+        printf(" >>> found: %s\n", name);
+      }
+      //== name &&
+        //  (idx == POINT_AGENT_THREAD || strlen(name) ==
+          //    strlen(expected_thread_info[idx].thr_names[i]));
     }
 
-    printf("\n");
     if (!found) {
       printf("Point %d: thread %s not detected\n",
-             ind, thrInfo[ind].thr_names[i]);
+             idx, expected_thread_info[idx].thr_names[i]);
       result = JNI_FALSE;
     }
   }
 
   deallocate(jvmti_env, jni, threads);
 
-  if (ind == IDX_AGENT_THREAD) {
-    RawMonitorLocker rml2 = RawMonitorLocker(jvmti_env, jni, lock2);
-    rml2.notify();
-  }
   return result;
 }
+
+JNIEXPORT void Java_allthr01_startAgentThread(JNIEnv *jni) {
+  RawMonitorLocker rml1 = RawMonitorLocker(jvmti_env, jni, starting_agent_thread_lock);
+  jvmtiError err = jvmti_env->RunAgentThread(create_jthread(jni), sys_thread, NULL,JVMTI_THREAD_NORM_PRIORITY);
+  check_jvmti_status(jni, err, "Failed to run AgentThread");
+  rml1.wait();
+  printf("Started Agent Thread\n");
+}
+
+JNIEXPORT void Java_allthr01_stopAgentThread(JNIEnv *jni) {
+  RawMonitorLocker rml2 = RawMonitorLocker(jvmti_env, jni, stopping_agent_thread_lock);
+  rml2.notify();
+  printf("Stopped Agent Thread\n");
+}
+
+
 
 JNIEXPORT void JNICALL Java_allthr01_setSysCnt(JNIEnv *env, jclass cls) {
   jint threadsCount = -1;
@@ -154,8 +182,8 @@ JNIEXPORT void JNICALL Java_allthr01_setSysCnt(JNIEnv *env, jclass cls) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_allthr01_checkInfo0(JNIEnv *env, jclass cls, jint ind) {
-  return check_info(env, ind);
+Java_allthr01_checkInfo0(JNIEnv *env, jclass cls, jint expected_idx) {
+  return check_info(env, expected_idx);
 }
 
 }

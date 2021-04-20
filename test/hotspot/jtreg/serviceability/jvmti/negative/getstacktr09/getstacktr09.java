@@ -69,7 +69,7 @@ public class getstacktr09 {
     }
 
     public static int run(String args[], PrintStream out) {
-        TestThread thr1 = new TestThread();
+        TestThread tested_thread_thr1 = new TestThread();
         TestThread thr2 = new TestThread();
 
         thr2.start();
@@ -80,7 +80,7 @@ public class getstacktr09 {
             return FAILED;
         }
 
-        return check(thr1, thr2);
+        return check(tested_thread_thr1, thr2);
     }
 
     static class TestThread extends Thread {

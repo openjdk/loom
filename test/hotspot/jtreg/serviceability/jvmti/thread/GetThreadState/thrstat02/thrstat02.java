@@ -71,27 +71,25 @@ public class thrstat02 {
     public static final int STATUS_WAIT    = 2;
 
     native static void init(int waitTime);
-    native static void checkStatus(int statInd, boolean susp);
-    native static int getRes();
-
-    public static void main(String[] args) {
-
-
-        System.exit(run(args, System.out) + 95/*STATUS_TEMP*/);
+    native static boolean checkStatus0(int statInd, boolean suspended);
+    static void checkStatus(int statInd, boolean suspended) {
+        if (!checkStatus0(statInd, suspended)) {
+            throw new RuntimeException("checkStatus failed");
+        }
     }
 
-    public static int run(String args[], PrintStream out) {
+    public static void main(String[] args) {
         int waitTime = 2;
         if (args.length > 0) {
             try {
                 int i  = Integer.parseInt(args[0]);
                 waitTime = i;
             } catch (NumberFormatException ex) {
-                out.println("# Wrong argument \"" + args[0]
+                System.out.println("# Wrong argument \"" + args[0]
                     + "\", the default value is used");
             }
         }
-        out.println("# Waiting time = " + waitTime + " mins");
+        System.out.println("# Waiting time = " + waitTime + " mins");
         init(waitTime);
         try {
             new thrstat02().meth();
@@ -99,7 +97,6 @@ public class thrstat02 {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
-        return getRes();
     }
 
     public static CountDownLatch startingBarrier;
@@ -110,7 +107,7 @@ public class thrstat02 {
     static volatile boolean targetAboutToLock = false;
 
     void meth() throws InterruptedException {
-        thrstat02a thr = new thrstat02a("thr1");
+        thrstat02a thr = new thrstat02a("tested_thread_thr1");
         startingBarrier = new CountDownLatch(1);
         runningBarrier = new CountDownLatch(1);
 

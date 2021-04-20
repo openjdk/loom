@@ -28,189 +28,148 @@
 
 extern "C" {
 
-
 #define PASSED 0
 #define STATUS_FAILED 2
 
-static jvmtiEnv *jvmti = NULL;
-static jvmtiCapabilities caps;
-static jvmtiEventCallbacks callbacks;
+static jvmtiEnv *jvmti_env = NULL;
 static jint result = PASSED;
 static jmethodID mid1;
 
 // If mustPass is false we just check if we have reached the correct instruction location.
 // This is used to wait for the child thread to reach the expected position.
-jboolean checkFrame(jvmtiEnv *jvmti_env, JNIEnv *env,
-        jthread thr, jmethodID exp_mid, jlocation exp_loc, jlocation exp_loc_alternative, jboolean mustPass) {
-    jvmtiError err;
-    jmethodID mid = NULL;
-    jlocation loc = -1;
-    char *meth, *sig, *generic;
-    jboolean isOk = JNI_FALSE;
+jboolean checkFrame(jvmtiEnv *jvmti_env,
+                    JNIEnv *jni,
+                    jthread thr,
+                    jmethodID exp_mid,
+                    jlocation exp_loc,
+                    jlocation exp_loc_alternative,
+                    jboolean mustPass) {
+  jvmtiError err;
+  jmethodID mid = NULL;
+  jlocation loc = -1;
+  char *meth, *sig, *generic;
+  jboolean isOk = JNI_FALSE;
 
-    err = jvmti_env->GetMethodName(exp_mid, &meth, &sig, &generic);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetMethodName) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
+  err = jvmti_env->GetMethodName(exp_mid, &meth, &sig, &generic);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(GetMethodName) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
+    result = STATUS_FAILED;
+  }
 
-    err = jvmti_env->GetFrameLocation(thr, 0, &mid, &loc);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetFrameLocation#%s) unexpected error: %s (%d)\n",
-               meth, TranslateError(err), err);
-        result = STATUS_FAILED;
-    } else {
-        if (exp_mid != mid) {
-            printf("Method \"%s\" current frame's method ID", meth);
-            printf(" expected: 0x%p, got: 0x%p\n", exp_mid, mid);
-            result = STATUS_FAILED;
-        }
-        isOk = exp_loc == loc || exp_loc_alternative == loc;
-        if (!isOk && mustPass) {
-            printf("Method \"%s\" current frame's location", meth);
-            printf(" expected: 0x%x or 0x%x, got: 0x%x%08x\n",
-                   (jint)exp_loc, (jint)exp_loc_alternative, (jint)(loc >> 32), (jint)loc);
-            result = STATUS_FAILED;
-        }
+  err = jvmti_env->GetFrameLocation(thr, 0, &mid, &loc);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(GetFrameLocation#%s) unexpected error: %s (%d)\n",
+           meth, TranslateError(err), err);
+    result = STATUS_FAILED;
+  } else {
+    if (exp_mid != mid) {
+      printf("Method \"%s\" current frame's method ID", meth);
+      printf(" expected: 0x%p, got: 0x%p\n", exp_mid, mid);
+      result = STATUS_FAILED;
     }
-    return isOk && result == PASSED;
+    isOk = exp_loc == loc || exp_loc_alternative == loc;
+    if (!isOk && mustPass) {
+      printf("Method \"%s\" current frame's location", meth);
+      printf(" expected: 0x%x or 0x%x, got: 0x%x%08x\n",
+             (jint) exp_loc, (jint) exp_loc_alternative, (jint) (loc >> 32), (jint) loc);
+      result = STATUS_FAILED;
+    }
+  }
+  return isOk && result == PASSED;
 }
 
 void JNICALL
 ExceptionCatch(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thr,
-        jmethodID method, jlocation location, jobject exception) {
-    if (method == mid1) {
-      checkFrame(jvmti_env, (JNIEnv *)env, thr, method, location, location, JNI_TRUE);
-    }
+               jmethodID method, jlocation location, jobject exception) {
+  if (method == mid1) {
+    checkFrame(jvmti_env, (JNIEnv *) env, thr, method, location, location, JNI_TRUE);
+  }
 }
 
-jint  Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-    jint res;
-    jvmtiError err;
+jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+  jvmtiCapabilities caps;
+  jvmtiEventCallbacks callbacks;
+  jvmtiError err;
 
-    res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
-    if (res != JNI_OK || jvmti == NULL) {
-        printf("Wrong result of a valid call to GetEnv !\n");
-        return JNI_ERR;
-    }
+  jint res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti_env == NULL) {
+    printf("Wrong result of a valid call to GetEnv !\n");
+    return JNI_ERR;
+  }
 
-    err = jvmti->GetPotentialCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
+  memset(&caps, 0, sizeof(caps));
+  caps.can_suspend = true;
+  caps.can_generate_exception_events = true;
+  err = jvmti_env->AddCapabilities(&caps);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
 
-    err = jvmti->AddCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(AddCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
 
-    err = jvmti->GetCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(GetCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-    }
 
-    if (!caps.can_suspend) {
-        printf("Warning: suspend/resume is not implemented\n");
-    }
+  callbacks.ExceptionCatch = &ExceptionCatch;
+  err = jvmti_env->SetEventCallbacks(&callbacks, sizeof(callbacks));
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
+    return JNI_ERR;
+  }
 
-    if (caps.can_generate_exception_events) {
-        callbacks.ExceptionCatch = &ExceptionCatch;
-        err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
-        if (err != JVMTI_ERROR_NONE) {
-            printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
-                   TranslateError(err), err);
-            return JNI_ERR;
-        }
-    } else {
-        printf("Warning: ExceptionCatch event is not implemented\n");
-    }
 
-    return JNI_OK;
+  return JNI_OK;
 }
 
 JNIEXPORT void JNICALL
-Java_frameloc01_getReady(JNIEnv *env, jclass cls,
-        jclass klass) {
-    jvmtiError err;
+Java_frameloc01_getReady(JNIEnv *env, jclass cls, jclass klass) {
+  jvmtiError err;
+  mid1 = env->GetMethodID(klass, "meth01", "(I)V");
+  if (mid1 == NULL) {
+    printf("Cannot get jmethodID for method \"meth01\"\n");
+    result = STATUS_FAILED;
+    return;
+  }
 
-    if (jvmti == NULL) {
-        printf("JVMTI client was not properly loaded!\n");
-        result = STATUS_FAILED;
-        return;
-    }
-
-    if (!caps.can_generate_exception_events) {
-        return;
-    }
-
-    mid1 = env->GetMethodID(klass, "meth01", "(I)V");
-    if (mid1 == NULL) {
-        printf("Cannot get jmethodID for method \"meth01\"\n");
-        result = STATUS_FAILED;
-        return;
-    }
-
-    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-        JVMTI_EVENT_EXCEPTION_CATCH, NULL);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(SetEventNotificationMode) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
+  err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE,
+                                        JVMTI_EVENT_EXCEPTION_CATCH, NULL);
+  if (err != JVMTI_ERROR_NONE) {
+    printf("(SetEventNotificationMode) unexpected error: %s (%d)\n",
+           TranslateError(err), err);
+    result = STATUS_FAILED;
+  }
 }
 
 JNIEXPORT jboolean JNICALL
-Java_frameloc01_checkFrame01(JNIEnv *env,
-        jclass cls, jthread thr, jclass klass, jboolean mustPass) {
-    jvmtiError err;
-    jmethodID mid;
-    jboolean isOk = JNI_FALSE;
+Java_frameloc01_checkFrame01(JNIEnv *jni, jclass cls, jthread thr, jclass klass, jboolean mustPass) {
+  jmethodID mid;
+  jboolean isOk = JNI_FALSE;
 
-    if (jvmti == NULL || !caps.can_suspend) {
-        return JNI_TRUE;
-    }
+  mid = jni->GetMethodID(klass, "run", "()V");
+  if (mid == NULL) {
+    printf("Cannot get jmethodID for method \"run\"\n");
+    result = STATUS_FAILED;
+    return JNI_TRUE;
+  }
 
-    mid = env->GetMethodID(klass, "run", "()V");
-    if (mid == NULL) {
-        printf("Cannot get jmethodID for method \"run\"\n");
-        result = STATUS_FAILED;
-        return JNI_TRUE;
-    }
+  suspend_thread(jvmti_env, jni, thr);
 
-    err = jvmti->SuspendThread(thr);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(SuspendThread) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
+  // This tests the location of a throw/catch statement.
+  // The returned location may be either the throw or the catch statement.
+  // It seems like the throw statement is returned in compiled code (-Xcomp),
+  // but the catch statement is returned in interpreted code.
+  // Both locations are valid.
+  // See bug JDK-4527281.
+  isOk = checkFrame(jvmti_env, jni, thr, mid, 31, 32, mustPass);
 
-    // This tests the location of a throw/catch statement.
-    // The returned location may be either the throw or the catch statement.
-    // It seems like the throw statement is returned in compiled code (-Xcomp),
-    // but the catch statement is returned in interpreted code.
-    // Both locations are valid.
-    // See bug JDK-4527281.
-    isOk = checkFrame(jvmti, env, thr, mid, 31, 32, mustPass);
-
-    err = jvmti->ResumeThread(thr);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(ResumeThread) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-    return isOk && result == PASSED;
+  resume_thread(jvmti_env, jni, thr);
+  return isOk && result == PASSED;
 }
 
 JNIEXPORT jint JNICALL
 Java_frameloc01_getRes(JNIEnv *env, jclass cls) {
-    return result;
+  return result;
 }
 
 }
