@@ -79,7 +79,7 @@ int compare_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
       const char *lambda = strstr(expected_frames[exp_idx].cls, "$$Lambda");
       if (lambda != nullptr) {
         lambda_idx = lambda - expected_frames[exp_idx].cls;
-        printf("Comparing only first %d chars in classname.\n", lambda_idx);
+        printf("Comparing only first %zu chars in classname.\n", lambda_idx);
       }
       if (class_signature == NULL || strncmp(class_signature, expected_frames[exp_idx].cls, lambda_idx) != 0) {
         printf("(frame#%d) wrong class sig: \"%s\", expected: \"%s\"\n",

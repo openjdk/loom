@@ -57,7 +57,6 @@ static frame_info expected_virtual_frames[] = {
 
 
 void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread, jmethodID method, jlocation location) {
-  jvmtiError err;
   jint frame_count = 0;
 
   if (mid != method) {
