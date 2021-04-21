@@ -161,7 +161,7 @@ public class HotSpotDiagnostic implements HotSpotDiagnosticMXBean {
     public void dumpThreads(String outputFile, ThreadDumpFormat format) throws IOException {
         Path file = Path.of(outputFile);
         if (!file.isAbsolute())
-            throw new IllegalArgumentException("'outptuFile' not absolute path");
+            throw new IllegalArgumentException("'outputFile' not absolute path");
 
         // need ManagementPermission("control")
         SecurityManager sm = System.getSecurityManager();
