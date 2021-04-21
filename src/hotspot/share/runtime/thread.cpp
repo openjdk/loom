@@ -1813,6 +1813,12 @@ void JavaThread::check_and_handle_async_exceptions(bool check_unsafe_error) {
       // We cannot call Exceptions::_throw(...) here because we cannot block
       set_pending_exception(_pending_async_exception, __FILE__, __LINE__);
 
+      // Clear any scope-local bindings on ThreadDeath
+      set_scopeLocalCache(NULL);
+      oop threadOop = threadObj();
+      assert(threadOop != NULL, "must be");
+      java_lang_Thread::clear_scopeLocalBindings(threadOop);
+
       LogTarget(Info, exceptions) lt;
       if (lt.is_enabled()) {
         ResourceMark rm;
