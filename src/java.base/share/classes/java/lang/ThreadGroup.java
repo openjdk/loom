@@ -57,7 +57,7 @@ import jdk.internal.misc.VM;
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @apiNote
- * Thread groups provided a way in early JDK release to group threads and provide
+ * Thread groups provided a way in early JDK releases to group threads and provide
  * a form of <i>job control</i> for threads. Thread groups supported the isolation
  * of applets and defined methods intended for diagnostic purposes. The concept
  * of thread group is obsolete. It should be rare for new applications to create
