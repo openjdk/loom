@@ -309,8 +309,9 @@ public class ThreadExecutorTest {
             future = executor.submit(SLEEP_FOR_A_DAY);
             Thread.currentThread().interrupt();
         } finally {
-            assertTrue(Thread.currentThread().isInterrupted());
+            assertTrue(Thread.interrupted());  // clear interrupt
         }
+
         assertTrue(executor.isShutdown());
         assertTrue(executor.isTerminated());
         assertTrue(executor.awaitTermination(10,  TimeUnit.MILLISECONDS));
@@ -860,7 +861,7 @@ public class ThreadExecutorTest {
             class BarException extends Exception { }
             Callable<String> task1 = () -> { throw new FooException(); };
             Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofSeconds(1));
+                Thread.sleep(Duration.ofMillis(500));
                 throw new BarException();
             };
 
