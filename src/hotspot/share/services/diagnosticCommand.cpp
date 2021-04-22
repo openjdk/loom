@@ -1022,7 +1022,7 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
 
 JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
                                        DCmdWithParser(output, heap),
-  _clobber("-clobber", "Clobber file", "BOOLEAN", false, "false"),
+  _clobber("-clobber", "Clobber existing file", "BOOLEAN", false, "false"),
   _format("-format", "Output format (\"plain\" or \"json\")", "STRING", false, "plain"),
   _filepath("filepath", "The file path to the output file", "STRING", true) {
   _dcmdparser.add_dcmd_option(&_clobber);
