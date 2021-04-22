@@ -27,6 +27,7 @@
 
 #include "asm/codeBuffer.hpp"
 #include "compiler/compilerDefinitions.hpp"
+#include "compiler/oopMap.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/handles.hpp"
 #include "utilities/align.hpp"

@@ -230,10 +230,12 @@ void frame::patch_pc(Thread* thread, address pc) {
     tty->print_cr("patch_pc at address" INTPTR_FORMAT " [" INTPTR_FORMAT " -> " INTPTR_FORMAT "] ",
                   p2i(pc_addr), p2i(*pc_addr), p2i(pc));
   }
+  DEBUG_ONLY(address old_pc = _pc;)
   *pc_addr = pc;
+  _pc = pc; // must be set before call to get_deopt_original_pc
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
   if (original_pc != NULL) {
-    assert(original_pc == _pc, "expected original PC to be stored before patching");
+    assert(original_pc == old_pc, "expected original PC to be stored before patching");
     _deopt_state = is_deoptimized;
     // leave _pc as is
   } else {

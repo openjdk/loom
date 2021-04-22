@@ -3891,6 +3891,7 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit    = StubRoutines::_oop_disjoint_arraycopy_uninit;
     StubRoutines::_arrayof_oop_arraycopy_uninit             = StubRoutines::_oop_arraycopy_uninit;
 
+    StubRoutines::_has_word_memcpy     = true;
     StubRoutines::_word_memcpy_up      = generate_disjoint_word_copy_up  (false, "word_memcpy_up");
     StubRoutines::_word_memcpy_up_nt   = generate_disjoint_word_copy_up  (true,  "word_memcpy_up_nt");
     StubRoutines::_word_memcpy_down    = generate_disjoint_word_copy_down(0,     "word_memcpy_down");

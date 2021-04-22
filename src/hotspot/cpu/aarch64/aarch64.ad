@@ -3648,6 +3648,8 @@ encode %{
       }
     }
 
+    __ post_call_nop();
+
     // Only non uncommon_trap calls need to reinitialize ptrue.
     if (Compile::current()->max_vector_size() >= 16 && uncommon_trap_request() == 0) {
       __ reinitialize_ptrue();
@@ -3658,6 +3660,7 @@ encode %{
     C2_MacroAssembler _masm(&cbuf);
     int method_index = resolved_method_index(cbuf);
     address call = __ ic_call((address)$meth$$method, method_index);
+    __ post_call_nop();
     if (call == NULL) {
       ciEnv::current()->record_failure("CodeCache is full");
       return;
@@ -3685,6 +3688,7 @@ encode %{
     CodeBlob *cb = CodeCache::find_blob(entry);
     if (cb) {
       address call = __ trampoline_call(Address(entry, relocInfo::runtime_call_type));
+      __ post_call_nop();
       if (call == NULL) {
         ciEnv::current()->record_failure("CodeCache is full");
         return;
@@ -3697,6 +3701,7 @@ encode %{
       __ stp(zr, rscratch2, Address(__ pre(sp, -2 * wordSize)));
       __ blr(rscratch1);
       __ bind(retaddr);
+      // __ post_call_nop(); -- can we have one here? do we need one?
       __ add(sp, sp, 2 * wordSize);
     }
     if (Compile::current()->max_vector_size() >= 16) {

@@ -22,6 +22,7 @@
  *
  */
 
+#include "compiler/oopMap.inline.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "memory/resourceArea.hpp"
@@ -157,7 +158,7 @@ MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_stack_to_chunk = nullptr;
 MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_chunk_to_stack = nullptr;
 
 void InstanceStackChunkKlass::resolve_memcpy_functions() {
-  if (UseNewCode) {
+  if (!StubRoutines::has_word_memcpy() || UseNewCode) {
     // tty->print_cr(">> Config memcpy: default");
     memcpy_fn_from_stack_to_chunk = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
     memcpy_fn_from_chunk_to_stack = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;

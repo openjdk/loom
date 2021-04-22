@@ -71,7 +71,7 @@ public:
     return (encoding() & 0xff000000) == 0x10000000;
   }
 
-  inline bool is_nop();
+  inline bool is_nop() const;
   bool is_jump();
   bool is_general_jump();
   inline bool is_jump_or_nop();
@@ -543,7 +543,7 @@ class NativeTstRegMem: public NativeInstruction {
 public:
 };
 
-inline bool NativeInstruction::is_nop() {
+inline bool NativeInstruction::is_nop() const{
   uint32_t insn = *(uint32_t*)addr_at(0);
   return insn == 0xd503201f;
 }
@@ -668,15 +668,8 @@ inline NativeLdSt* NativeLdSt_at(address addr) {
 
 class NativePostCallNop: public NativeInstruction {
 public:
-  enum Intel_specific_constants { // TODO LOOM AARCH64
-    instruction_code = 0x0f,
-    instruction_size = 8,
-    instruction_offset = 0,
-    displacement_offset = 4
-  };
-
-  bool check() const { return int_at(0) == 0x841f0f; }
-  int displacement() const { return (jint) int_at(displacement_offset); }
+  bool check() const { return is_nop(); }
+  int displacement() const { return 0; }
   void patch(jint diff);
   void make_deopt();
 };
@@ -698,9 +691,7 @@ inline NativePostCallNop* nativePostCallNop_unsafe_at(address address) {
 class NativeDeoptInstruction: public NativeInstruction {
  public:
   enum Intel_specific_constants { // TODO LOOM AARCH64
-    instruction_prefix          = 0x0F,
-    instruction_code            = 0xFF,
-    instruction_size            =    2,
+    instruction_size            =    4,
     instruction_offset          =    0,
   };
 
@@ -710,8 +701,10 @@ class NativeDeoptInstruction: public NativeInstruction {
   void  verify();
 
   static bool is_deopt_at(address instr) {
-    return ((*instr) & 0xFF) == NativeDeoptInstruction::instruction_prefix && 
-      ((*(instr+1)) & 0xFF) == NativeDeoptInstruction::instruction_code;
+    return ((*instr) & 0xFF) == 0xd4 && 
+      ((*(instr+1)) & 0xFF) == 0x20 &&
+      ((*(instr+2)) & 0xFF) == 0x00 &&
+      ((*(instr+3)) & 0xFF) == 0x00;
   }
 
   // MT-safe patching

@@ -696,6 +696,9 @@ public:
   // Alignment
   void align(int modulus);
 
+  // nop
+  void post_call_nop() { nop(); }
+
   // Stack frame creation/removal
   void enter()
   {
