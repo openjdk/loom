@@ -594,6 +594,7 @@ class java_lang_VirtualThread : AllStatic {
   static oop continuation(oop vthread);
   static jshort state(oop vthread);
   static JavaThreadStatus map_state_to_thread_status(jint state);
+  static bool notify_jvmti_events();
   static void set_notify_jvmti_events(jboolean enable);
   static void init_static_notify_jvmti_events();
   static jlong set_jfrTraceId(oop vthread, jlong id);

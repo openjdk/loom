@@ -2548,6 +2548,10 @@ void java_lang_VirtualThread::serialize_offsets(SerializeClosure* f) {
 }
 #endif
 
+bool java_lang_VirtualThread::notify_jvmti_events() {
+  return vthread_notify_jvmti_events == JNI_TRUE;
+}
+
 void java_lang_VirtualThread::set_notify_jvmti_events(jboolean enable) {
   vthread_notify_jvmti_events = enable;
 }

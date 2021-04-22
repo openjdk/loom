@@ -49,20 +49,40 @@ public class GetStackTraceSuspendedStressTest extends DebugeeClass {
         QUEUE.put(msg);
     }
 
-    static final Runnable PRODUCER = () -> {
+    static void producer() {
         try {
             for (int i = 0; i < MSG_COUNT; i++) {
                 producer("msg: ");
             }
         } catch (InterruptedException e) { }
-    };
+    }
 
-    static final Runnable CONSUMER = () -> {
+    static void consumer() {
         try {
             for (int i = 0; i < MSG_COUNT; i++) {
                 String s = QUEUE.take();
             }
         } catch (InterruptedException e) { }
+    }
+
+    static String threadName() {
+        return Thread.currentThread().getName();
+    }
+
+    static final Runnable PRODUCER = () -> {
+        String name = threadName();
+
+        System.out.println(name + ": started");
+        producer();
+        System.out.println(name + ": finished");
+    };
+
+    static final Runnable CONSUMER = () -> {
+        String name = threadName();
+
+        System.out.println(name + ": started");
+        consumer();
+        System.out.println(name + ": finished");
     };
 
     public static void test1() throws Exception {

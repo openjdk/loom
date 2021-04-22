@@ -611,12 +611,12 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 }
 
 javaVFrame*
-JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
-  // The second condition is needed to hide notification methods
-  // as jt->is_in_VTMT() can be not set yet. 
-  if (!jt->is_in_VTMT() && !jvf->method()->jvmti_mount_transition()) {
+JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
+  // The second condition is needed to hide notification methods. 
+  if (!is_in_VTMT && !jvf->method()->jvmti_mount_transition()) {
     return jvf; // no frames to skip
   }
+  javaVFrame* jvf_saved = jvf;
   // find jvf with a method annotated with @JvmtiMountTransition
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
     if (jvf->method()->jvmti_mount_transition()) {
@@ -628,7 +628,22 @@ JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
     }
     // skip frame above annotated method
   }
-  assert(jvf != NULL, "VTMT sanity check");
+  if (jvf == NULL) { // TMP workaround for stability until the root cause is fixed
+    return jvf_saved;
+  }
+  return jvf;
+}
+
+javaVFrame*
+JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
+  jvf = check_and_skip_hidden_frames(jt->is_in_VTMT(), jvf);
+  return jvf;
+}
+
+javaVFrame*
+JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
+  JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vthread);
+  jvf = check_and_skip_hidden_frames(state->is_in_VTMT(), jvf);
   return jvf;
 }
 
@@ -658,6 +673,7 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   } else {
     vframeStream vfs(cont);
     jvf = vfs.at_end() ? NULL : vfs.asJavaVFrame();
+    jvf = check_and_skip_hidden_frames(vthread, jvf);
   }
   return jvf;
 }
@@ -689,7 +705,10 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
     if (jt->is_being_ext_suspended()) {
-      state |= JVMTI_THREAD_STATE_SUSPENDED;
+      JvmtiThreadState* st = java_lang_Thread::jvmti_thread_state(jt->vthread());
+      if (st == NULL || !st->is_virtual()) {
+        state |= JVMTI_THREAD_STATE_SUSPENDED;
+      }
     }
     if (jts == _thread_in_native) {
       state |= JVMTI_THREAD_STATE_IN_NATIVE;

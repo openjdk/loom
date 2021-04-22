@@ -588,7 +588,10 @@ JvmtiEventControllerPrivate::recompute_thread_enabled(JvmtiThreadState *state) {
     }
   }
 
-  Continuation::set_cont_fastpath_thread_state(state->get_thread());
+  // TBD: there is a race here, so get_thread() can return NULL below.
+  if (state->get_thread() != NULL) {
+    Continuation::set_cont_fastpath_thread_state(state->get_thread());
+  }
 
   return any_env_enabled;
 }
@@ -874,7 +877,7 @@ JvmtiEventControllerPrivate::set_user_enabled(JvmtiEnvBase *env, JavaThread *thr
     flush_object_free_events(env);
   }
 
-  if (thread == NULL) {
+  if (thread == NULL && thread_oop == NULL) { // thread can be NULL for unmounted virtual trheads
     env->env_event_enable()->set_user_enabled(event_type, enabled);
   } else {
     // create the thread state (if it didn't exist before)

@@ -1119,7 +1119,6 @@ JRT_ENTRY(MethodCounters*, InterpreterRuntime::build_method_counters(JavaThread*
   return Method::build_method_counters(thread, m);
 JRT_END
 
-
 JRT_ENTRY(void, InterpreterRuntime::at_safepoint(JavaThread* thread))
   // We used to need an explict preserve_arguments here for invoke bytecodes. However,
   // stack traversal automatically takes care of preserving arguments for invoke, so
@@ -1127,6 +1126,10 @@ JRT_ENTRY(void, InterpreterRuntime::at_safepoint(JavaThread* thread))
 
   // JRT_END does an implicit safepoint check, hence we are guaranteed to block
   // if this is called during a safepoint
+
+  if (java_lang_VirtualThread::notify_jvmti_events()) {
+    JvmtiExport::check_suspend_at_safepoint(thread);
+  }
 
   if (JvmtiExport::should_post_single_step()) {
     // This function is called by the interpreter when single stepping. Such single

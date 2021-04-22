@@ -1291,6 +1291,36 @@ bool              JvmtiExport::_should_post_vthread_unmount               = fals
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+void JvmtiExport::check_suspend_at_safepoint(JavaThread *thread) {
+  oop vt = thread->mounted_vthread();
+
+  if (vt != NULL && java_lang_VirtualThread::is_instance(vt)) {
+    HandleMark hm(thread);
+    Handle vth = Handle(thread, vt);
+
+    ThreadBlockInVM tbivm(thread);
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+
+#if 0
+    JvmtiThreadState* state = thread->jvmti_thread_state();
+
+    if (state != NULL) {
+      printf("SERG: at_safepoint: state: %p virt: %d jt: %p susp: %d ct pend susp: %d\n",
+             (void*)state, state->is_virtual(), (void*)thread,
+             thread->is_external_suspend() || JvmtiVTSuspender::vthread_is_ext_suspended(vt),
+             thread->is_cthread_pending_suspend()
+            );
+      fflush(0);
+    }
+#endif
+    // block while suspended bit is set
+    while (thread->is_external_suspend() ||
+           JvmtiVTSuspender::vthread_is_ext_suspended(vth())) {
+      ml.wait();
+    }
+  }
+}
+
 //
 // JVMTI single step management
 //
@@ -1914,7 +1944,7 @@ void JvmtiExport::post_single_step(JavaThread *thread, Method* method, address l
   if (state == NULL) {
     return;
   }
-  if (thread->is_in_VTMT()) {
+  if (mh->jvmti_mount_transition() || thread->is_in_VTMT()) {
     return; // no events should be posted if thread is in a VTMT transition
   }
 
@@ -1933,6 +1963,15 @@ void JvmtiExport::post_single_step(JavaThread *thread, Method* method, address l
       JvmtiJavaThreadEventTransition jet(thread);
       jvmtiEventSingleStep callback = env->callbacks()->SingleStep;
       if (callback != NULL) {
+#if 0
+       ResourceMark rm(thread);
+       oop name_oop = java_lang_Thread::name(thread->mounted_vthread());
+       const char* name_str = java_lang_String::as_utf8_string(name_oop);
+       name_str = name_str == NULL ? "<NULL>" : name_str;
+
+        printf("SERG: post_single_step: st: %p virt: %d jt: %p %s\n",
+               (void*)state, state->is_virtual(), (void*)thread, name_str); fflush(0);
+#endif
         (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread(),
                     jem.jni_methodID(), jem.location());
       }
