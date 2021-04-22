@@ -1127,6 +1127,8 @@ void nmethod::make_deoptimized() {
   ResourceMark rm;
   RelocIterator iter(this, oops_reloc_begin());
 
+  assert (can_be_deoptimized(), "");
+
   while(iter.next()) {
 
     switch(iter.type()) {

@@ -1161,7 +1161,9 @@ void CodeCache::mark_all_nmethods_for_evol_deoptimization() {
   while(iter.next()) {
     CompiledMethod* nm = iter.method();
     if (!nm->method()->is_method_handle_intrinsic()) {
-      nm->mark_for_deoptimization();
+      if (nm->can_be_deoptimized()) {
+        nm->mark_for_deoptimization();
+      }
       if (nm->has_evol_metadata()) {
         add_to_old_table(nm);
       }
@@ -1228,7 +1230,7 @@ void CodeCache::make_marked_nmethods_not_entrant(GrowableArray<CompiledMethod*>*
 void CodeCache::make_marked_nmethods_deoptimized(GrowableArray<CompiledMethod*>* marked) {
   for (int i = 0; i < marked->length(); i++) {
     CompiledMethod* nm = marked->at(i);
-    if (nm->is_marked_for_deoptimization()) {
+    if (nm->is_marked_for_deoptimization() && nm->can_be_deoptimized()) {
       nm->make_deoptimized();
     }
   }
