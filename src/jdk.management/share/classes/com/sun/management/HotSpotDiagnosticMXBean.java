@@ -128,6 +128,11 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      * @implSpec
      * The default implementation throws {@code UnsupportedOperationException}.
      *
+     * @apiNote
+     * The output file is required to be an absolute path as the MXBean may be
+     * accessed remotely from a tool or program with a different current user
+     * directory.
+     *
      * @param  outputFile the path to the file to create
      * @param  format the format to use (TEXT_PLAIN or JSON)
      * @throws IllegalArgumentException if the file path is not absolute
