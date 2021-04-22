@@ -28,9 +28,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
@@ -105,15 +103,41 @@ public class ThreadDumper {
     }
 
     /**
+     * Generate a thread dump in plain text or JSON format to the given file, UTF-8 encoded.
+     */
+    private static byte[] dumpThreads(String file, boolean clobber, boolean json) {
+        Path path = Path.of(file).toAbsolutePath();
+        OpenOption[] options = (clobber) ?
+                new OpenOption[0] : new OpenOption[] { StandardOpenOption.CREATE_NEW };
+        String reply;
+        try (OutputStream out = Files.newOutputStream(path, options);
+             PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
+            if (json) {
+                dumpThreadsToJson(ps);
+            } else {
+                dumpThreads(ps);
+            }
+            reply = String.format("Created %s%n", path);
+        } catch (FileAlreadyExistsException e) {
+            reply = String.format("%s exists, use -clobber to override%n", path);
+        } catch (IOException ioe) {
+            reply = String.format("Failed: %s%n", ioe);
+        }
+        return reply.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
      * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
      */
-    public static byte[] dumpThreads(String file) throws IOException {
-        Path path = Path.of(file).toAbsolutePath();
-        try (OutputStream out = Files.newOutputStream(path, StandardOpenOption.CREATE_NEW);
-             PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
-            dumpThreads(ps);
-        }
-        return String.format("Created %s%n", path).getBytes("UTF-8");
+    public static byte[] dumpThreads(String file, boolean clobber) {
+        return dumpThreads(file, clobber, false);
+    }
+
+    /**
+     * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
+     */
+    public static byte[] dumpThreadsToJson(String file, boolean clobber) {
+        return dumpThreads(file, clobber, true);
     }
 
     /**
@@ -157,18 +181,6 @@ public class ThreadDumper {
             ps.format("      %s%n", ste);
         }
         ps.println();
-    }
-
-    /**
-     * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
-     */
-    public static byte[] dumpThreadsToJson(String file) throws IOException {
-        Path path = Path.of(file).toAbsolutePath();
-        try (OutputStream out = Files.newOutputStream(path, StandardOpenOption.CREATE_NEW);
-             PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
-            dumpThreadsToJson(ps);
-        }
-        return String.format("Created %s%n", path).getBytes("UTF-8");
     }
 
     /**

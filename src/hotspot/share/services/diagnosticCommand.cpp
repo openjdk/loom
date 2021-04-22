@@ -1022,8 +1022,10 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
 
 JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
                                        DCmdWithParser(output, heap),
+  _clobber("-clobber", "Clobber file", "BOOLEAN", false, "false"),
   _format("-format", "Output format (\"plain\" or \"json\")", "STRING", false, "plain"),
   _filepath("filepath", "The file path to the output file", "STRING", true) {
+  _dcmdparser.add_dcmd_option(&_clobber);
   _dcmdparser.add_dcmd_option(&_format);
   _dcmdparser.add_dcmd_argument(&_filepath);
 }
@@ -1042,14 +1044,12 @@ int JavaThreadDumpDCmd::num_arguments() {
 void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
   bool json = (_format.value() != NULL) && (strcmp(_format.value(), "json") == 0);
   char* path = _filepath.value();
-  if (json) {
-    dumpToFile(vmSymbols::dumpThreadsToJson_name(), vmSymbols::string_byte_array_signature(), path, CHECK);
-  } else {
-    dumpToFile(vmSymbols::dumpThreads_name(), vmSymbols::string_byte_array_signature(), path, CHECK);
-  }
+  bool clobber = _clobber.value();
+  Symbol* name = (json) ? vmSymbols::dumpThreadsToJson_name() : vmSymbols::dumpThreads_name();
+  dumpToFile(name, vmSymbols::string_bool_byte_array_signature(), path, clobber, CHECK);
 }
 
-void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, TRAPS) {
+void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, bool clobber, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 
@@ -1069,6 +1069,7 @@ void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char*
   JavaValue result(T_OBJECT);
   JavaCallArguments args;
   args.push_oop(h_path);
+  args.push_int(clobber ? JNI_TRUE : JNI_FALSE);
   JavaCalls::call_static(&result,
                          k,
                          name,
