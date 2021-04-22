@@ -320,17 +320,8 @@ bool frame::can_be_deoptimized() const {
   if (!is_compiled_frame()) return false;
   CompiledMethod* nm = (CompiledMethod*)_cb;
 
-  if( !nm->can_be_deoptimized() )
+  if(!nm->can_be_deoptimized())
     return false;
-
-  // address* pc_addr = &(((address*) sp())[-1]); // TODO: PLATFORM
-  // if (Continuation::is_return_barrier_entry(*pc_addr)) {
-  //   log_trace(jvmcont)("Can't deopt entry:");
-  //   if (log_is_enabled(Trace, jvmcont)) {
-  //     print_value_on(tty, NULL);
-  //   }
-  //   return false;
-  // }
 
   return !nm->is_at_poll_return(pc());
 }
