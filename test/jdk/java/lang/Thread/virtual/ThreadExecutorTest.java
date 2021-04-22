@@ -129,7 +129,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test that the given thread factory specified to newThreadExecutor is used.
+     * Test that the thread factory specified to newThreadExecutor is used.
      */
     public void testThreadFactory() throws Exception {
         var ref1 = new AtomicReference<Thread>();
