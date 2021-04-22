@@ -224,7 +224,20 @@ public class BuilderTest {
     }
 
     public void testThreadGroup2() {
-        // test ThreadGroup of virtual thread???
+        ThreadGroup vgroup = Thread.ofVirtual().unstarted(() -> { }).getThreadGroup();
+        assertEquals(vgroup.getName(), "VirtualThreads");
+
+        Thread thread1 = Thread.ofVirtual().unstarted(() -> { });
+        Thread thread2 = Thread.ofVirtual().start(LockSupport::park);
+        Thread thread3 = Thread.ofVirtual().factory().newThread(() -> { });
+
+        try {
+            assertTrue(thread1.getThreadGroup() == vgroup);
+            assertTrue(thread2.getThreadGroup() == vgroup);
+            assertTrue(thread3.getThreadGroup() == vgroup);
+        } finally {
+            LockSupport.unpark(thread2);
+        }
     }
 
     // priority
