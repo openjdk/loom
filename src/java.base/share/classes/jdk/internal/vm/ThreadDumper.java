@@ -109,9 +109,9 @@ public class ThreadDumper {
     /**
      * Generate a thread dump in plain text or JSON format to the given file, UTF-8 encoded.
      */
-    private static byte[] dumpThreads(String file, boolean clobber, boolean json) {
+    private static byte[] dumpThreads(String file, boolean okayToOverwrite, boolean json) {
         Path path = Path.of(file).toAbsolutePath();
-        OpenOption[] options = (clobber) ?
+        OpenOption[] options = (okayToOverwrite) ?
                 new OpenOption[0] : new OpenOption[] { StandardOpenOption.CREATE_NEW };
         String reply;
         try (OutputStream out = Files.newOutputStream(path, options);
@@ -123,7 +123,7 @@ public class ThreadDumper {
             }
             reply = String.format("Created %s%n", path);
         } catch (FileAlreadyExistsException e) {
-            reply = String.format("%s exists, use -clobber to override%n", path);
+            reply = String.format("%s exists, use -overwrite to overwrite%n", path);
         } catch (IOException ioe) {
             reply = String.format("Failed: %s%n", ioe);
         }
@@ -133,15 +133,15 @@ public class ThreadDumper {
     /**
      * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
      */
-    public static byte[] dumpThreads(String file, boolean clobber) {
-        return dumpThreads(file, clobber, false);
+    public static byte[] dumpThreads(String file, boolean okayToOverwrite) {
+        return dumpThreads(file, okayToOverwrite, false);
     }
 
     /**
      * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
      */
-    public static byte[] dumpThreadsToJson(String file, boolean clobber) {
-        return dumpThreads(file, clobber, true);
+    public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite) {
+        return dumpThreads(file, okayToOverwrite, true);
     }
 
     /**

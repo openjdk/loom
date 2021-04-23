@@ -902,9 +902,9 @@ public:
 
 class JavaThreadDumpDCmd : public DCmdWithParser {
 private:
-  void dumpToFile(Symbol* name, Symbol* signature, const char* path, bool clobber, TRAPS);
+  void dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, TRAPS);
 protected:
-  DCmdArgument<bool> _clobber;
+  DCmdArgument<bool> _overwrite;
   DCmdArgument<char*> _format;
   DCmdArgument<char*> _filepath;
 public:
