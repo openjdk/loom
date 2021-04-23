@@ -71,7 +71,7 @@ Java_ThreadToSuspend_suspendTestedThreads(JNIEnv *jni, jclass cls) {
   LOG("suspendTestedThreads: finished\n");
 
   err = jvmti->Deallocate((unsigned char*)results);
-  check_jvmti_status(jni, err, "suspendTestedThreads: error in JVMTI Deallocate results\n");
+  check_jvmti_status(jni, err, "suspendTestedThreads: error in JVMTI Deallocate results");
 }
 
 JNIEXPORT jboolean JNICALL

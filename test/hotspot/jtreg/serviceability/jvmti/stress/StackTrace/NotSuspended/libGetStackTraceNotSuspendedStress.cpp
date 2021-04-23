@@ -81,7 +81,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     if (err == JVMTI_ERROR_WRONG_PHASE) {
       return;
     }
-    check_jvmti_status(jni, err,  "Error in GetAllThreads\n");
+    check_jvmti_status(jni, err,  "Error in GetAllThreads");
     for (int i = 0; i < count; i++) {
       jthread tested_thread = NULL;
 
@@ -92,7 +92,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
       if (err == JVMTI_ERROR_WRONG_PHASE) {
         return;
       }
-      check_jvmti_status(jni, err,  "Error in GetVirtualThread\n");
+      check_jvmti_status(jni, err,  "Error in GetVirtualThread");
       if (tested_thread != NULL) {
         test_stack_trace(jvmti, jni, tested_thread);
         //test_stack_trace(jvmti, jni, threads[i]);

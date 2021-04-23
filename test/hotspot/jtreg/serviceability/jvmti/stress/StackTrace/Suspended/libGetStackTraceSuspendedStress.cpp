@@ -31,7 +31,7 @@
 static const char CONTINUATION_CLASS_NAME[] = "java/lang/Continuation";
 static const char CONTINUATION_METHOD_NAME[] = "enter";
 
-static jrawMonitorID event_mon = NULL; 
+static jrawMonitorID event_mon = NULL;
 
 static void
 test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
@@ -135,7 +135,7 @@ check_vthread_consistency_suspended(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthrea
 
   // LOG("Agent: disabled SingleStep for vt: %s ct: %s\n", name, cname);
 }
-  
+
 #if 1
 static int i = 0;
 #endif
@@ -144,12 +144,12 @@ static void JNICALL
 SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
   RawMonitorLocker rml(jvmti, jni, event_mon);
- 
+
   LOG("Agent: Got SingleStep event:\n");
   print_stack_trace(jvmti, jni, thread);
 
   jthread cthread = get_carrier_thread(jvmti, jni, thread);
-  if (cthread != NULL) { 
+  if (cthread != NULL) {
     print_stack_trace(jvmti, jni, cthread);
   }
 
@@ -182,7 +182,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     if (err == JVMTI_ERROR_WRONG_PHASE) {
       return;
     }
-    check_jvmti_status(jni, err,  "Error in GetAllThreads\n");
+    check_jvmti_status(jni, err,  "Error in GetAllThreads");
 
     for (int i = 0; i < count; i++) {
       jthread cthread = threads[i];
@@ -195,7 +195,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
       if (err == JVMTI_ERROR_WRONG_PHASE) {
         return;
       }
-      check_jvmti_status(jni, err,  "Error in GetVirtualThread\n");
+      check_jvmti_status(jni, err,  "Error in GetVirtualThread");
       if (iter > 50 && vthread != NULL) {
         char* cname = get_thread_name(jvmti, jni, cthread);
         char* vname = get_thread_name(jvmti, jni, vthread);
