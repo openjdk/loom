@@ -42,52 +42,52 @@ static jlong timeout = 0;
 static void JNICALL
 agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
 
-  printf("Wait for thread to start\n");
+  LOG("Wait for thread to start\n");
   if (!nsk_jvmti_waitForSync(timeout))
     return;
 
   /* perform testing */
   {
-    printf("Find thread: %s\n", THREAD_NAME);
+    LOG("Find thread: %s\n", THREAD_NAME);
     jthread tested_thread = find_thread_by_name(jvmti, jni, THREAD_NAME);
     if (tested_thread == NULL) {
       return;
     }
-    printf("  ... found thread: %p\n", (void *) tested_thread);
+    LOG("  ... found thread: %p\n", (void *) tested_thread);
 
-    printf("Suspend thread: %p\n", (void *) tested_thread);
+    LOG("Suspend thread: %p\n", (void *) tested_thread);
     suspend_thread(jvmti, jni, tested_thread);
 
-    printf("Let thread to run and finish\n");
+    LOG("Let thread to run and finish\n");
     if (!nsk_jvmti_resumeSync()) {
       return;
     }
 
-    printf("Get state vector for thread: %p\n", (void *) tested_thread);
+    LOG("Get state vector for thread: %p\n", (void *) tested_thread);
     {
       jint state = get_thread_state(jvmti, jni, tested_thread);
-      printf("  ... got state vector: %s (%d)\n", TranslateState(state), (int) state);
+      LOG("  ... got state vector: %s (%d)\n", TranslateState(state), (int) state);
 
       if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
-        printf("SuspendThread() does not turn on flag SUSPENDED:\n"
+        LOG("SuspendThread() does not turn on flag SUSPENDED:\n"
                "#   state: %s (%d)\n", TranslateState(state), (int) state);
         nsk_jvmti_setFailStatus();
       }
     }
 
-    printf("Resume thread: %p\n", (void *) tested_thread);
+    LOG("Resume thread: %p\n", (void *) tested_thread);
     resume_thread(jvmti, jni, tested_thread);
 
-    printf("Wait for thread to finish\n");
+    LOG("Wait for thread to finish\n");
     if (!nsk_jvmti_waitForSync(timeout)) {
       return;
     }
 
-    printf("Delete thread reference\n");
+    LOG("Delete thread reference\n");
     jni->DeleteGlobalRef(tested_thread);
   }
 
-  printf("Let debugee to finish\n");
+  LOG("Let debugee to finish\n");
   if (!nsk_jvmti_resumeSync()) {
     return;
   }
@@ -102,7 +102,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 

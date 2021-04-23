@@ -72,11 +72,10 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
         nsk_jvmti_setFailStatus();
         return;
       }
-      NSK_DISPLAY2("  ... got state vector: %s (%d)\n",
-                   TranslateState(state), (int) state);
+      LOG("  ... got state vector: %s (%d)", TranslateState(state), (int) state);
 
       if ((state & JVMTI_THREAD_STATE_SUSPENDED) != 0) {
-        printf("SuspendThread() does not turn off flag SUSPENDED:\n"
+        LOG("SuspendThread() does not turn off flag SUSPENDED:\n"
                "#   state:  %s (%d)\n",
                TranslateState(state), (int) state);
         nsk_jvmti_setFailStatus();
@@ -107,11 +106,11 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEnv *jvmti = NULL;
 
   timeout = 60 * 1000;
-  printf("Agent_OnLoad started\n");
+  LOG("Agent_OnLoad started\n");
 
   jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 

@@ -63,21 +63,21 @@ void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread, jmetho
     jni->FatalError("ERROR: didn't know where we got called from");
   }
 
-  printf(">>> (bp) checking frame count ...\n");
+  LOG(">>> (bp) checking frame count ...\n");
 
   check_jvmti_status(jni, jvmti_env->GetFrameCount(thread, &frame_count), "GetFrameCount failed.");
   int expected_number_of_stack_frames = jni->IsVirtualThread(thread)
       ? ((int) (sizeof(expected_virtual_frames) / sizeof(frame_info)))
       : ((int) (sizeof(expected_platform_frames) / sizeof(frame_info)));
   if (frame_count != expected_number_of_stack_frames + 1) {
-    printf("(bp) wrong frame count, expected: %d, actual: %d\n", expected_number_of_stack_frames + 1, frame_count);
+    LOG("(bp) wrong frame count, expected: %d, actual: %d\n", expected_number_of_stack_frames + 1, frame_count);
     jni->FatalError("Wrong number of frames.");
   }
 
-  printf(">>> (bp)   frame_count: %d\n", frame_count);
+  LOG(">>> (bp)   frame_count: %d\n", frame_count);
 
   set_event_notification_mode(jvmti_env, JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thread);
-  printf(">>> stepping ...\n");
+  LOG(">>> stepping ...\n");
 }
 
 
@@ -100,7 +100,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
   jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -111,7 +111,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
+   LOG("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -119,7 +119,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.SingleStep = &SingleStep;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 

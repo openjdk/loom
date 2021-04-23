@@ -50,7 +50,7 @@ static int find_threads_by_name(jvmtiEnv *jvmti, JNIEnv *jni,
 static void JNICALL
 agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
 
-  printf("Wait for threads to start\n");
+  LOG("Wait for threads to start\n");
   if (!nsk_jvmti_waitForSync(timeout))
     return;
 
@@ -60,30 +60,30 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
     jvmtiError *results = NULL;
     int i;
 
-    printf("Allocate threads array: %d threads\n", threads_count);
+    LOG("Allocate threads array: %d threads\n", threads_count);
     check_jvmti_status(jni, jvmti->Allocate((threads_count * sizeof(jthread)),
                                             (unsigned char **) &threads), "");
 
-    printf("  ... allocated array: %p\n", (void *) threads);
+    LOG("  ... allocated array: %p\n", (void *) threads);
 
-    printf("Allocate results array: %d threads\n", threads_count);
+    LOG("Allocate results array: %d threads\n", threads_count);
     check_jvmti_status(jni, jvmti->Allocate((threads_count * sizeof(jvmtiError)),
                                             (unsigned char **) &results), "");
-    printf("  ... allocated array: %p\n", (void *) threads);
+    LOG("  ... allocated array: %p\n", (void *) threads);
 
-    printf("Find threads: %d threads\n", threads_count);
+    LOG("Find threads: %d threads\n", threads_count);
     if (find_threads_by_name(jvmti, jni, THREAD_NAME, threads_count, threads) == 0) {
       return;
     }
 
-    printf("Suspend threads list\n");
+    LOG("Suspend threads list\n");
     jvmtiError err = jvmti->SuspendThreadList(threads_count, threads, results);
     if (err != JVMTI_ERROR_NONE) {
       nsk_jvmti_setFailStatus();
       return;
     }
 
-    printf("Check threads results:\n");
+    LOG("Check threads results:\n");
     for (i = 0; i < threads_count; i++) {
       NSK_DISPLAY3("  ... thread #%d: %s (%d)\n",
                    i, TranslateError(results[i]), (int) results[i]);
@@ -92,52 +92,51 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
       }
     }
 
-    printf("Let threads to run and finish\n");
+    LOG("Let threads to run and finish\n");
     if (!nsk_jvmti_resumeSync())
       return;
 
-    printf("Get state vector for each thread\n");
+    LOG("Get state vector for each thread\n");
     for (i = 0; i < threads_count; i++) {
       jint state = 0;
 
-      printf("  thread #%d (%p):\n", i, (void *) threads[i]);
+      LOG("  thread #%d (%p):\n", i, (void *) threads[i]);
       check_jvmti_status(jni, jvmti->GetThreadState(threads[i], &state), "");
-      printf("  ... got state vector: %s (%d)\n",
+      LOG("  ... got state vector: %s (%d)\n",
                    TranslateState(state), (int) state);
 
       if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
-        printf("SuspendThreadList() does not turn on flag SUSPENDED for thread #%i:\n"
-                      "#   state: %s (%d)\n",
-                      i, TranslateState(state), (int) state);
+        LOG("SuspendThreadList() does not turn on flag SUSPENDED for thread #%i:\n"
+                      "#   state: %s (%d)", i, TranslateState(state), (int) state);
         nsk_jvmti_setFailStatus();
       }
     }
 
-    printf("Resume threads list\n");
+    LOG("Resume threads list\n");
     err = jvmti->ResumeThreadList(threads_count, threads, results);
     if (err != JVMTI_ERROR_NONE) {
       nsk_jvmti_setFailStatus();
       return;
     }
 
-    printf("Wait for thread to finish\n");
+    LOG("Wait for thread to finish\n");
     if (!nsk_jvmti_waitForSync(timeout))
       return;
 
-    printf("Delete threads references\n");
+    LOG("Delete threads references\n");
     for (i = 0; i < threads_count; i++) {
       if (threads[i] != NULL)
         jni->DeleteGlobalRef(threads[i]);
     }
 
-    printf("Deallocate threads array: %p\n", (void *) threads);
+    LOG("Deallocate threads array: %p\n", (void *) threads);
     check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) threads), "");
 
-    printf("Deallocate results array: %p\n", (void *) results);
+    LOG("Deallocate results array: %p\n", (void *) results);
     check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) results), "");
   }
 
-  printf("Let debugee to finish\n");
+  LOG("Let debugee to finish\n");
   if (!nsk_jvmti_resumeSync())
     return;
 }
@@ -177,23 +176,23 @@ static int find_threads_by_name(jvmtiEnv *jvmti, JNIEnv *jni, const char *name, 
   check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) threads), "");
 
   if (found != found_count) {
-    printf("Unexpected number of tested threads found:\n"
-                  "#   name:     %s\n"
-                  "#   found:    %d\n"
-                  "#   expected: %d\n",
+    LOG("Unexpected number of tested threads found:\n"
+                  "#   name:     %s"
+                  "#   found:    %d"
+                  "#   expected: %d",
            name, found, found_count);
     nsk_jvmti_setFailStatus();
     return NSK_FALSE;
   }
 
-  printf("Make global references for threads: %d threads\n", found_count);
+  LOG("Make global references for threads: %d threads\n", found_count);
   for (int i = 0; i < found_count; i++) {
     found_threads[i] = (jthread) jni->NewGlobalRef(found_threads[i]);
     if (found_threads[i] == NULL) {
       nsk_jvmti_setFailStatus();
       return NSK_FALSE;
     }
-    printf("  ... thread #%d: %p\n", i, found_threads[i]);
+    LOG("  ... thread #%d: %p\n", i, found_threads[i]);
   }
 
   return NSK_TRUE;
@@ -206,7 +205,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 

@@ -49,7 +49,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti_env == NULL) {
-    printf("Wrong result of a valid call to GetEnv !\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -57,7 +57,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   caps.can_support_virtual_threads = 1;
   res = jvmti_env->AddCapabilities(&caps);
   if (res != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI AddCapabilities: %d\n", res);
+    LOG("error in JVMTI AddCapabilities: %d\n", res);
     return JNI_ERR;
   }
   return JNI_OK;
@@ -68,38 +68,38 @@ JNIEXPORT jboolean JNICALL Java_thrinfo01_checkInfo0(JNIEnv *jni, jclass cls,
   jboolean result = JNI_TRUE;
   jvmtiThreadInfo inf;
 
-  printf("Checking thread info for\n");
+  LOG("Checking thread info for\n");
   print_thread_info(jvmti_env, jni, thread);
 
   info expected_info = expected_info_array[expected_idx];
 
   check_jvmti_status(jni, jvmti_env->GetThreadInfo(thread, &inf), "Error in GetThreadInfo.");
   if (inf.name == NULL) {
-    printf("Thread %s: incorrect name in NULL\n", expected_info.name);
+    LOG("Thread %s: incorrect name in NULL\n", expected_info.name);
     result = JNI_FALSE;
   }
 
 
   if (strstr(inf.name, expected_info.name) != inf.name ||
       (expected_info.is_name_exact && strlen(inf.name) != strlen(expected_info.name))) {
-    printf("Thread %s: incorrect name: %s\n", expected_info.name, inf.name);
+    LOG("Thread %s: incorrect name: %s\n", expected_info.name, inf.name);
     result = JNI_FALSE;
   }
 
   if (inf.priority != expected_info.priority) {
-    printf("Thread %s: priority expected: %d, got: %d\n", expected_info.name, expected_info.priority, inf.priority);
+    LOG("Thread %s: priority expected: %d, got: %d\n", expected_info.name, expected_info.priority, inf.priority);
     result = JNI_FALSE;
   }
   if (inf.is_daemon != expected_info.is_daemon) {
-    printf("Thread %s: is_daemon expected: %d, got: %d\n", expected_info.name, expected_info.is_daemon, inf.is_daemon);
+    LOG("Thread %s: is_daemon expected: %d, got: %d\n", expected_info.name, expected_info.is_daemon, inf.is_daemon);
     result = JNI_FALSE;
   }
   if (!jni->IsSameObject(thread_group, inf.thread_group)) {
-    printf("Thread %s: invalid thread thread_group\n", expected_info.name);
+    LOG("Thread %s: invalid thread thread_group\n", expected_info.name);
     result = JNI_FALSE;
   }
 
-  printf("Check completed.\n\n");
+  LOG("Check completed.\n");
   return result;
 }
 

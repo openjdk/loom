@@ -74,25 +74,25 @@ static class_info virtual_classes[] = {
 void printStatus(jint status) {
   int flags = 0;
   if ((status & JVMTI_CLASS_STATUS_VERIFIED) != 0) {
-    printf("JVMTI_CLASS_STATUS_VERIFIED");
+    LOG("JVMTI_CLASS_STATUS_VERIFIED");
     flags++;
   }
   if ((status & JVMTI_CLASS_STATUS_PREPARED) != 0) {
-    if (flags > 0) printf(" | ");
-    printf("JVMTI_CLASS_STATUS_PREPARED");
+    if (flags > 0) LOG(" | ");
+    LOG("JVMTI_CLASS_STATUS_PREPARED");
     flags++;
   }
   if ((status & JVMTI_CLASS_STATUS_INITIALIZED) != 0) {
-    if (flags > 0) printf(" | ");
-    printf("JVMTI_CLASS_STATUS_INITIALIZED");
+    if (flags > 0) LOG(" | ");
+    LOG("JVMTI_CLASS_STATUS_INITIALIZED");
     flags++;
   }
   if ((status & JVMTI_CLASS_STATUS_ERROR) != 0) {
-    if (flags > 0) printf(" | ");
-    printf("JVMTI_CLASS_STATUS_ERROR");
+    if (flags > 0) LOG(" | ");
+    LOG("JVMTI_CLASS_STATUS_ERROR");
     flags++;
   }
-  printf(" (0x%x)\n", status);
+  LOG(" (0x%x)\n", status);
 }
 
 void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls) {
@@ -106,7 +106,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
 
   err = jvmti->GetClassSignature(cls, &inf.sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassSignature#%" PRIuPTR ") unexpected error: %s (%d)\n",
+    LOG("(GetClassSignature#%" PRIuPTR ") unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
@@ -119,127 +119,127 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
   }
   err = jvmti->GetClassStatus(cls, &inf.status);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassStatus#%" PRIuPTR ") unexpected error: %s (%d)\n",
+    LOG("(GetClassStatus#%" PRIuPTR ") unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
   }
   err = jvmti->GetClassMethods(cls, &inf.mcount, &methods);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n",
+    LOG("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetClassFields(cls, &inf.fcount, &fields);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n",
+    LOG("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetImplementedInterfaces(cls, &inf.icount, &interfaces);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetImplementedInterfaces#%" PRIuPTR ") unexpected error: %s (%d)\n",
+    LOG("(GetImplementedInterfaces#%" PRIuPTR ") unexpected error: %s (%d)\n",
            eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
 
-  printf(">>> [class prepare event #%" PRIuPTR "]", eventsCount);
-  printf(" \"%s\"\n", inf.sig);
-  printf(">>> Got ClassPrep event in thread.\n");
+  LOG(">>> [class prepare event #%" PRIuPTR "]", eventsCount);
+  LOG(" \"%s\"\n", inf.sig);
+  LOG(">>> Got ClassPrep event in thread.\n");
   print_thread_info(jvmti, jni, thr);
-  printf(">>>   status: ");
+  LOG(">>>   status: ");
   printStatus(inf.status);
-  printf(">>>   %d methods:", inf.mcount);
+  LOG(">>>   %d methods:", inf.mcount);
   for (i = 0; i < inf.mcount; i++) {
-    if (i > 0) printf(",");
+    if (i > 0) LOG(",");
     if (methods[i] == NULL) {
-      printf(" null");
+      LOG(" null");
     } else {
       err = jvmti->GetMethodName(methods[i], &name, &sig, &generic);
       if (err == JVMTI_ERROR_NONE) {
-        printf(" \"%s%s\"", name, sig);
+        LOG(" \"%s%s\"", name, sig);
       } else {
-        printf(" ???");
+        LOG(" ???");
       }
     }
   }
-  printf("\n");
-  printf(">>>   %d fields:", inf.fcount);
+  LOG("\n");
+  LOG(">>>   %d fields:", inf.fcount);
   for (i = 0; i < inf.fcount; i++) {
-    if (i > 0) printf(",");
+    if (i > 0) LOG(",");
     if (fields[i] == NULL) {
-      printf(" null");
+      LOG(" null");
     } else {
       err = jvmti->GetFieldName(cls, fields[i],
                                     &name, &sig, &generic);
       if (err == JVMTI_ERROR_NONE) {
-        printf(" \"%s, %s\"", name, sig);
+        LOG(" \"%s, %s\"", name, sig);
       } else {
-        printf(" ???");
+        LOG(" ???");
       }
     }
   }
-  printf("\n");
-  printf(">>>   %d interfaces:", inf.icount);
+  LOG("\n");
+  LOG(">>>   %d interfaces:", inf.icount);
   for (i = 0; i < inf.icount; i++) {
-    if (i > 0) printf(",");
+    if (i > 0) LOG(",");
     if (interfaces[i] == NULL) {
-      printf(" null");
+      LOG(" null");
     } else {
       err = jvmti->GetClassSignature(interfaces[i], &sig, &generic);
       if (err == JVMTI_ERROR_NONE) {
-        printf(" \"%s\"", sig);
+        LOG(" \"%s\"", sig);
       } else {
-        printf(" ???");
+        LOG(" ???");
       }
     }
   }
-  printf("\n");
+  LOG("\n");
 
 
   if (eventsCount >= eventsExpected) {
-    printf("(#%" PRIuPTR ") too many events: %" PRIuPTR ", expected: %" PRIuPTR "\n",
+    LOG("(#%" PRIuPTR ") too many events: %" PRIuPTR ", expected: %" PRIuPTR "\n",
            eventsCount, eventsCount + 1, eventsExpected);
     result = STATUS_FAILED;
     return;
   }
 
   if (jni->IsVirtualThread(thr) != (classes == virtual_classes)) {
-    printf("Thread IsVirtual differs from expected. Check log.\n");
+    LOG("Thread IsVirtual differs from expected. Check log.\n");
     result = STATUS_FAILED;
     return;
   }
 
   if (inf.sig == NULL || strcmp(inf.sig, classes[eventsCount].sig) != 0) {
-    printf("(#%" PRIuPTR ") wrong class: \"%s\"", eventsCount, inf.sig);
-    printf(", expected: \"%s\"\n", classes[eventsCount].sig);
+    LOG("(#%" PRIuPTR ") wrong class: \"%s\"", eventsCount, inf.sig);
+    LOG(", expected: \"%s\"\n", classes[eventsCount].sig);
     result = STATUS_FAILED;
   }
   if (inf.status != classes[eventsCount].status) {
-    printf("(#%" PRIuPTR ") wrong status: ", eventsCount);
+    LOG("(#%" PRIuPTR ") wrong status: ", eventsCount);
     printStatus(inf.status);
-    printf("     expected: ");
+    LOG("     expected: ");
     printStatus(classes[eventsCount].status);
     result = STATUS_FAILED;
   }
   if (inf.mcount != classes[eventsCount].mcount) {
-    printf("(#%" PRIuPTR ") wrong number of methods: 0x%x",
+    LOG("(#%" PRIuPTR ") wrong number of methods: 0x%x",
            eventsCount, inf.mcount);
-    printf(", expected: 0x%x\n", classes[eventsCount].mcount);
+    LOG(", expected: 0x%x\n", classes[eventsCount].mcount);
     result = STATUS_FAILED;
   }
   if (inf.fcount != classes[eventsCount].fcount) {
-    printf("(#%" PRIuPTR ") wrong number of fields: 0x%x",
+    LOG("(#%" PRIuPTR ") wrong number of fields: 0x%x",
            eventsCount, inf.fcount);
-    printf(", expected: 0x%x\n", classes[eventsCount].fcount);
+    LOG(", expected: 0x%x\n", classes[eventsCount].fcount);
     result = STATUS_FAILED;
   }
   if (inf.icount != classes[eventsCount].icount) {
-    printf("(#%" PRIuPTR ") wrong number of interfaces: 0x%x",
+    LOG("(#%" PRIuPTR ") wrong number of interfaces: 0x%x",
            eventsCount, inf.icount);
-    printf(", expected: 0x%x\n", classes[eventsCount].icount);
+    LOG(", expected: 0x%x\n", classes[eventsCount].icount);
     result = STATUS_FAILED;
   }
   eventsCount++;
@@ -263,7 +263,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -281,14 +281,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   if (!caps.can_support_virtual_threads) {
-    printf("ERROR: virtual thread support is not implemented.\n");
+    LOG("ERROR: virtual thread support is not implemented.\n");
     return JNI_ERR;
   }
 
   callbacks.ClassPrepare = &ClassPrepare;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -302,13 +302,13 @@ Java_classprep01_getReady(JNIEnv *jni, jclass cls) {
   jthread prep_thread;
 
   if (jvmti == NULL) {
-    printf("JVMTI client was not properly loaded!\n");
+    LOG("JVMTI client was not properly loaded!\n");
     return;
   }
 
   err = jvmti->GetCurrentThread(&prep_thread);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
+    LOG("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
@@ -321,13 +321,13 @@ Java_classprep01_getReady(JNIEnv *jni, jclass cls) {
     classes = kernel_classes;
     eventsExpected = sizeof(kernel_classes)/sizeof(class_info);
   }
-  printf("Requesting enabling JVMTI_EVENT_CLASS_PREPARE in thread.\n");
+  LOG("Requesting enabling JVMTI_EVENT_CLASS_PREPARE in thread.\n");
   print_thread_info(jvmti, jni, prep_thread);
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_CLASS_PREPARE, prep_thread);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to enable JVMTI_EVENT_CLASS_PREPARE: %s (%d)\n",
+    LOG("Failed to enable JVMTI_EVENT_CLASS_PREPARE: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
@@ -339,29 +339,29 @@ Java_classprep01_check(JNIEnv *jni, jclass cls) {
   jthread prep_thread;
 
   if (jvmti == NULL) {
-    printf("JVMTI client was not properly loaded!\n");
+    LOG("JVMTI client was not properly loaded!\n");
     return STATUS_FAILED;
   }
 
   err = jvmti->GetCurrentThread(&prep_thread);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
+    LOG("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
     return STATUS_FAILED;
   }
 
-  printf("Requesting disabling JVMTI_EVENT_CLASS_PREPARE in thread.\n");
+  LOG("Requesting disabling JVMTI_EVENT_CLASS_PREPARE in thread.\n");
   print_thread_info(jvmti, jni, prep_thread);
 
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_CLASS_PREPARE, prep_thread);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to disable JVMTI_EVENT_CLASS_PREPARE: %s (%d)\n",
+    LOG("Failed to disable JVMTI_EVENT_CLASS_PREPARE: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
   if (eventsCount != eventsExpected) {
-    printf("Wrong number of class prepare events: %" PRIuPTR ", expected: %" PRIuPTR "\n",
+    LOG("Wrong number of class prepare events: %" PRIuPTR ", expected: %" PRIuPTR "\n",
            eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }

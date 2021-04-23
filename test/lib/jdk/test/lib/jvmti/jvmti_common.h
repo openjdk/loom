@@ -39,15 +39,21 @@
 #define NSK_TRUE 1
 #define NSK_FALSE 0
 
-#define NSK_DISPLAY0 printf
-#define NSK_DISPLAY1 printf
-#define NSK_DISPLAY2 printf
-#define NSK_DISPLAY3 printf
+#define LOG(...) \
+  { \
+    printf(__VA_ARGS__); \
+    fflush(stdout); \
+  }
+
+#define NSK_DISPLAY0 LOG
+#define NSK_DISPLAY1 LOG
+#define NSK_DISPLAY2 LOG
+#define NSK_DISPLAY3 LOG
 
 
-#define NSK_COMPLAIN0 printf
-#define NSK_COMPLAIN1 printf
-#define NSK_COMPLAIN3 printf
+#define NSK_COMPLAIN0 LOG
+#define NSK_COMPLAIN1 LOG
+#define NSK_COMPLAIN3 LOG
 
 const char* TranslateState(jint flags);
 const char* TranslateError(jvmtiError err);
@@ -92,7 +98,7 @@ fatal(JNIEnv* jni, const char* msg) {
 static void
 check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
   if (err != JVMTI_ERROR_NONE) {
-    printf("check_jvmti_status: JVMTI function returned error: %s (%d)\n", TranslateError(err), err);
+    LOG("check_jvmti_status: JVMTI function returned error: %s (%d)\n", TranslateError(err), err);
     jni->FatalError(msg);
   }
 }
@@ -193,7 +199,7 @@ print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
   err = jvmti->GetMethodName(method, &mname, &msign, NULL);
   check_jvmti_status(jni, err, "print_method: error in JVMTI GetMethodName");
 
-  printf("%2d: %s: %s%s\n", depth, cname, mname, msign);
+  LOG("%2d: %s: %s%s\n", depth, cname, mname, msign);
   fflush(0);
 }
 
@@ -204,17 +210,17 @@ print_thread_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread_obj) {
   check_jvmti_status(jni, jvmti->GetThreadInfo(thread_obj, &thread_info), "Error in GetThreadInfo");
   check_jvmti_status(jni, jvmti->GetThreadState(thread_obj, &thread_state), "Error in GetThreadInfo");
   const char* state = TranslateState(thread_state);
-  printf("Thread: %p, name: %s, state: %s, attrs: %s %s\n", thread_obj, thread_info.name, TranslateState(thread_state),
+  LOG("Thread: %p, name: %s, state: %s, attrs: %s %s\n", thread_obj, thread_info.name, TranslateState(thread_state),
          (jni->IsVirtualThread(thread_obj)? "virtual": "kernel"), (thread_info.is_daemon ? "daemon": ""));
 }
 
 static void
 print_stack_trace_frames(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInfo *frames) {
-  printf("JVMTI Stack Trace: frame count: %d\n", count);
+  LOG("JVMTI Stack Trace: frame count: %d\n", count);
   for (int depth = 0; depth < count; depth++) {
     print_method(jvmti, jni, frames[depth].method, depth);
   }
-  printf("\n");
+  LOG("\n");
 }
 
 static jint
@@ -332,11 +338,11 @@ print_current_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni) {
   err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
   check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
 
-  printf("JVMTI Stack Trace for current thread: frame count: %d\n", count);
+  LOG("JVMTI Stack Trace for current thread: frame count: %d\n", count);
   for (int depth = 0; depth < count; depth++) {
     print_method(jvmti, jni, frames[depth].method, depth);
   }
-  printf("\n");
+  LOG("\n");
 }
 
 static void
@@ -349,12 +355,12 @@ print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
   check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
 
-  printf("JVMTI Stack Trace for thread %s: frame count: %d\n", tname, count);
+  LOG("JVMTI Stack Trace for thread %s: frame count: %d\n", tname, count);
   for (int depth = 0; depth < count; depth++) {
     print_method(jvmti, jni, frames[depth].method, depth);
   }
   deallocate(jvmti, jni, (void*)tname);
-  printf("\n");
+  LOG("\n");
 }
 
 
@@ -791,9 +797,7 @@ find_ext_event(jvmtiEnv* jvmti, const char* ename) {
 
   jvmtiError err = jvmti->GetExtensionEvents(&extCount, &extList);
   if (err != JVMTI_ERROR_NONE) {
-    printf("jvmti_common find_ext_event: Error in JVMTI GetExtensionFunctions: %s(%d)\n",
-           TranslateError(err), err);
-    printf(0);
+    LOG("jvmti_common find_ext_event: Error in JVMTI GetExtensionFunctions: %s(%d)\n",TranslateError(err), err);
     return NULL;
   }
   for (int i = 0; i < extCount; i++) {
@@ -809,7 +813,7 @@ set_ext_event_callback(jvmtiEnv* jvmti,  const char* ename, jvmtiExtensionEvent 
   jvmtiExtensionEventInfo* info = find_ext_event(jvmti, ename);
 
   if (info == NULL) {
-    printf("jvmti_common set_ext_event_callback: Extension event was not found: %s\n", ename);
+    LOG("jvmti_common set_ext_event_callback: Extension event was not found: %s\n", ename);
     return JVMTI_ERROR_NOT_AVAILABLE;
   }
   jvmtiError err = jvmti->SetExtensionEventCallback(info->extension_event_index, callback);

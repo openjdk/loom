@@ -52,7 +52,7 @@ static void
 test_get_thread_list_stack_traces(JNIEnv *jni, bool is_virt, jint thread_cnt, jthread* thread_list) {
   jvmtiStackInfo* stack_info_arr = NULL;
 
-  printf("## Agent: test_get_thread_list_stack_traces started: is virtual: %d, count: %d\n\n",
+  LOG("## Agent: test_get_thread_list_stack_traces started: is virtual: %d, count: %d\n\n",
          is_virt, thread_cnt);
 
   jvmtiError err = jvmti->GetThreadListStackTraces(thread_cnt, thread_list,
@@ -64,7 +64,7 @@ test_get_thread_list_stack_traces(JNIEnv *jni, bool is_virt, jint thread_cnt, jt
 
     print_stack_trace(jvmti, jni, thread);
   }
-  printf("## Agent: test_get_thread_list_stack_traces finished: virtual: %d, count: %d\n\n",
+  LOG("## Agent: test_get_thread_list_stack_traces finished: virtual: %d, count: %d\n\n",
          is_virt, thread_cnt);
 }
 
@@ -82,14 +82,14 @@ test_get_frame_location(JNIEnv* jni, jthread thread, char* tname) {
     if (!is_virtual || err != JVMTI_ERROR_NO_MORE_FRAMES) { // TMP work around
       check_jvmti_status(jni, err, "test_get_frame_location: error in JVMTI GetFrameLocation");
     } else {
-      printf("## Agent: test_get_frame_location: ignoring JVMTI_ERROR_NO_MORE_FRAMES for vt\n\n");
+      LOG("## Agent: test_get_frame_location: ignoring JVMTI_ERROR_NO_MORE_FRAMES for vt\n\n");
     }
     return;
   }
   err = jvmti->GetMethodName(method, &name, &sign, NULL);
   check_jvmti_status(jni, err, "test_get_frame_location: error in JVMTI GetMethodName");
 
-  printf("Agent: GetFrameLocation: frame for current thread %s: method: %s%s, loc: %lld\n",
+  LOG("Agent: GetFrameLocation: frame for current thread %s: method: %s%s, loc: %lld\n",
          tname, name, sign, (long long)loc);
 }
 
@@ -101,11 +101,11 @@ check_suspended_state(JNIEnv* jni, jthread thread, int thr_idx, char* tname, con
   jvmtiError err = jvmti->GetThreadState(thread, &state);
   check_jvmti_status(jni, err, "check_suspended_state: error in JVMTI GetThreadState");
 
-  printf("## Agent: thread[%d] %p %s: state after suspend: %s (%d)\n",
-         thr_idx, thread_p,  tname, TranslateState(state), (int)state); fflush(0);
+  LOG("## Agent: thread[%d] %p %s: state after suspend: %s (%d)\n",
+         thr_idx, thread_p,  tname, TranslateState(state), (int)state);
 
   if ((state & (JVMTI_THREAD_STATE_SUSPENDED | JVMTI_THREAD_STATE_TERMINATED)) == 0) {
-    printf("## Agent: FAILED: %s did not turn on SUSPENDED flag:\n"
+    LOG("## Agent: FAILED: %s did not turn on SUSPENDED flag:\n"
            "#  state: %s (%d)\n", func_name, TranslateState(state), (int)state);
     nsk_jvmti_setFailStatus();
   }
@@ -119,11 +119,11 @@ check_resumed_state(JNIEnv* jni, jthread thread, int thr_idx, char* tname, const
   jvmtiError err = jvmti->GetThreadState(thread, &state);
   check_jvmti_status(jni, err, "check_resumed_state: error in JVMTI GetThreadState");
 
-  printf("## Agent: thread[%d] %p %s: state after resume: %s (%d)\n",
-         thr_idx, thread_p, tname, TranslateState(state), (int)state); fflush(0);
+  LOG("## Agent: thread[%d] %p %s: state after resume: %s (%d)\n",
+         thr_idx, thread_p, tname, TranslateState(state), (int)state);
 
   if (!((state & (JVMTI_THREAD_STATE_SUSPENDED | JVMTI_THREAD_STATE_TERMINATED)) == 0)) {
-    printf("## Agent: FAILED: %s did not turn off SUSPENDED flag:\n"
+    LOG("## Agent: FAILED: %s did not turn off SUSPENDED flag:\n"
            "#   state: %s (%d)\n", func_name, TranslateState(state), (int)state);
     nsk_jvmti_setFailStatus();
   }
@@ -149,7 +149,7 @@ static void
 test_thread_suspend_list(JNIEnv* jni, const jthread* thread_list) {
   jvmtiError results[VTHREAD_CNT] = {JVMTI_ERROR_NONE}; // VTHREAD_CNT is max
 
-  printf("\n## Agent: test_thread_suspend_list started\n"); fflush(0);
+  LOG("\n## Agent: test_thread_suspend_list started\n");
 
   jvmtiError err = jvmti->SuspendThreadList(VTHREAD_CNT, thread_list, results);
   check_jvmti_status(jni, err, "test_thread_suspend_list: error in JVMTI SuspendThreadList");
@@ -161,14 +161,14 @@ test_thread_suspend_list(JNIEnv* jni, const jthread* thread_list) {
     check_suspended_state(jni, thread, idx, tname,"SuspendThreadList");
     deallocate(jvmti, jni, (void*)tname);
   }
-  printf("\n## Agent: test_thread_suspend_list finished\n"); fflush(0);
+  LOG("\n## Agent: test_thread_suspend_list finished\n");
 }
 
 static void
 test_thread_resume_list(JNIEnv* jni, const jthread* thread_list) {
   jvmtiError results[VTHREAD_CNT] = {JVMTI_ERROR_NONE}; // VTHREAD_CNT is max
 
-  printf("\n## Agent: test_thread_resume_list: started\n"); fflush(0);
+  LOG("\n## Agent: test_thread_resume_list: started\n");
 
   jvmtiError err = jvmti->ResumeThreadList(VTHREAD_CNT, thread_list, results);
   check_jvmti_status(jni, err, "test_thread_resume_list: error in JVMTI ResumeThreadList");
@@ -180,13 +180,13 @@ test_thread_resume_list(JNIEnv* jni, const jthread* thread_list) {
     check_resumed_state(jni, thread, idx, tname, "ResumeThreadList");
     deallocate(jvmti, jni, (void*)tname);
   }
-  printf("\n## Agent: test_thread_resume_list: finished\n"); fflush(0);
+  LOG("\n## Agent: test_thread_resume_list: finished\n");
 }
 
 static void
 test_vthread_suspend_all(JNIEnv* jni, const jthread* thread_list, int suspend_mask) {
 
-  printf("\n## Agent: test_vthread_suspend_all started\n"); fflush(0);
+  LOG("\n## Agent: test_vthread_suspend_all started\n");
 
   const jint EXCLUDE_CNT = 2;
   jthread exclude_list[EXCLUDE_CNT] = { NULL, NULL };
@@ -213,13 +213,13 @@ test_vthread_suspend_all(JNIEnv* jni, const jthread* thread_list, int suspend_ma
     } 
     deallocate(jvmti, jni, (void*)tname);
   }
-  printf("\n## Agent: test_vthread_suspend_all finished\n"); fflush(0);
+  LOG("\n## Agent: test_vthread_suspend_all finished\n");
 }
 
 static void
 test_vthread_resume_all(JNIEnv* jni, const jthread* thread_list, int suspend_mask) {
 
-  printf("\n## Agent: test_vthread_resume_all started\n"); fflush(0);
+  LOG("\n## Agent: test_vthread_resume_all started\n");
 
   const jint EXCLUDE_CNT = 2;
   jthread exclude_list[EXCLUDE_CNT] = { NULL, NULL };
@@ -246,14 +246,14 @@ test_vthread_resume_all(JNIEnv* jni, const jthread* thread_list, int suspend_mas
     }
     deallocate(jvmti, jni, (void*)tname);
   }
-  printf("\n## Agent: test_vthread_resume_all: finished\n"); fflush(0);
+  LOG("\n## Agent: test_vthread_resume_all: finished\n");
 }
 
 static void
 test_vthread_suspend_half(JNIEnv* jni, const jthread* thread_list) {
   jvmtiError err;
 
-  printf("\n## Agent: test_vthread_suspend_half started\n"); fflush(0);
+  LOG("\n## Agent: test_vthread_suspend_half started\n");
   for (int idx = 0; idx < VTHREAD_CNT; idx++) {
     if (idx % 2 == 1) {
       continue; // skip odd indeces
@@ -267,14 +267,14 @@ test_vthread_suspend_half(JNIEnv* jni, const jthread* thread_list) {
     check_suspended_state(jni, thread, idx, tname, "SuspendThread");
     deallocate(jvmti, jni, (void*)tname);
   }
-  printf("\n## Agent: test_vthread_suspend_half finished\n"); fflush(0);
+  LOG("\n## Agent: test_vthread_suspend_half finished\n");
 }
 
 static void
 test_vthread_resume_half(JNIEnv* jni, const jthread* thread_list) {
   jvmtiError err;
 
-  printf("\n## Agent: test_vthread_resume_half started\n"); fflush(0);
+  LOG("\n## Agent: test_vthread_resume_half started\n");
   for (int idx = 0; idx < VTHREAD_CNT; idx++) {
     if (idx % 2 == 1) {
       continue; // skip odd indeces
@@ -288,7 +288,7 @@ test_vthread_resume_half(JNIEnv* jni, const jthread* thread_list) {
     check_resumed_state(jni, thread, idx, tname, "ResumeThread");
     deallocate(jvmti, jni, (void*)tname);
   }
-  printf("\n## Agent: test_vthread_resume_half: finished\n"); fflush(0);
+  LOG("\n## Agent: test_vthread_resume_half: finished\n");
 }
 
 static void
@@ -298,7 +298,7 @@ test_threads_suspend_resume(JNIEnv* jni, jint thread_cnt, jthread* tested_thread
     jthread thread = tested_threads[idx];
     char* tname = get_thread_name(jvmti, jni, thread);
 
-    printf("\n");
+    LOG("\n");
     test_thread_suspend(jni, thread, idx, tname);
     test_thread_resume(jni, thread, idx, tname);
 
@@ -315,7 +315,7 @@ test_jvmti_functions_for_one_thread(JNIEnv* jni, jthread thread) {
   jvmtiError err = jvmti->GetFrameCount(thread, &frame_count);
   check_jvmti_status(jni, err, "test_jvmti_functions_for_one_thread: error in JVMTI GetStackTrace");
 
-  printf("## Agent: thread %s frame count: %d\n", tname, frame_count); fflush(0);
+  LOG("## Agent: thread %s frame count: %d\n", tname, frame_count);
 
   // test JVMTI GetFrameLocation
   test_get_frame_location(jni, thread, tname);
@@ -330,8 +330,8 @@ static void
 test_jvmti_functions_for_threads(JNIEnv* jni, bool is_virt, jint thread_cnt, jthread* thread_list) {
   jvmtiError results[VTHREAD_CNT] = {JVMTI_ERROR_NONE}; // VTHREAD_CNT is max
 
-  printf("\n## Agent: test_jvmti_functions_for_threads started: virtual: %d\n\n", is_virt);
-  fflush(0);
+  LOG("\n## Agent: test_jvmti_functions_for_threads started: virtual: %d\n\n", is_virt);
+
 
   // iterate over all vthreads
   for (int idx = 0; idx < thread_cnt; idx++) {
@@ -343,8 +343,8 @@ test_jvmti_functions_for_threads(JNIEnv* jni, bool is_virt, jint thread_cnt, jth
   test_get_thread_list_stack_traces(jni, is_virt, 1, thread_list);          // test with one thread
   test_get_thread_list_stack_traces(jni, is_virt, thread_cnt, thread_list); // test with multiple threads
 
-  printf("\n## Agent: test_jvmti_functions_for_threads finished: virtual: %d\n", is_virt);
-  fflush(0);
+  LOG("\n## Agent: test_jvmti_functions_for_threads finished: virtual: %d\n", is_virt);
+
 }
 
 static jint
@@ -376,19 +376,19 @@ agent_proc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
   jthread* tested_cthreads = NULL;
   jint cthread_cnt = 0;
 
-  printf("\n## Agent: Wait for vthreads to start\n"); fflush(0);
+  LOG("\n## Agent: Wait for vthreads to start\n");
   if (!nsk_jvmti_waitForSync(timeout)) {
     return;
   }
   if (!nsk_jvmti_resumeSync()) {
     return;
   }
-  printf("\n## Agent: Test carrier threads\n"); fflush(0);
+  LOG("\n## Agent: Test carrier threads\n");
   cthread_cnt = get_cthreads(jni, &tested_cthreads);
   test_threads_suspend_resume(jni, cthread_cnt, tested_cthreads);
   test_jvmti_functions_for_threads(jni, false /*virtual */, cthread_cnt, tested_cthreads);
 
-  printf("\n## Agent: Test virtual threads\n"); fflush(0);
+  LOG("\n## Agent: Test virtual threads\n");
   test_threads_suspend_resume(jni, VTHREAD_CNT, tested_vthreads);
   test_jvmti_functions_for_threads(jni, true /* virtual */, VTHREAD_CNT, tested_vthreads);
 
@@ -404,12 +404,12 @@ agent_proc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
   test_vthread_resume_half(jni, tested_vthreads);
   test_vthread_resume_all(jni, tested_vthreads, 0xAAAAAAAA);
 
-  printf("\n## Agent: Wait for vthreads to finish\n"); fflush(0);
+  LOG("\n## Agent: Wait for vthreads to finish\n");
 
   for (int i = 0; i < VTHREAD_CNT; i++) {
     jni->DeleteGlobalRef(tested_vthreads[i]);
   }
-  printf("\n## Agent: Let debugee to finish\n"); fflush(0);
+  LOG("\n## Agent: Let debugee to finish\n");
 }
 
 static void JNICALL
@@ -427,17 +427,17 @@ Java_SuspendResumeAll_GetStatus(JNIEnv* jni, jclass cls) {
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
 
-  printf("Agent init started\n");
+  LOG("Agent init started\n");
 
   /* create JVMTI environment */
   if (jvm->GetEnv((void **)(&jvmti), JVMTI_VERSION) != JNI_OK) {
-    printf("Agent init: error in getting JvmtiEnv with GetEnv\n");
+    LOG("Agent init: error in getting JvmtiEnv with GetEnv\n");
     return JNI_ERR;
   }
 
   err = init_agent_data(jvmti, &agent_data);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent init: error in init_agent_data: %s (%d)\n",
+    LOG("Agent init: error in init_agent_data: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -452,7 +452,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&suspendCaps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent init: error in JVMTI AddCapabilities: %s (%d)\n",
+    LOG("Agent init: error in JVMTI AddCapabilities: %s (%d)\n",
            TranslateError(err), err);
     nsk_jvmti_setFailStatus();
     return JNI_ERR;
@@ -463,7 +463,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent init: error in JVMTI SetEventCallbacks: %s (%d)\n",
+    LOG("Agent init: error in JVMTI SetEventCallbacks: %s (%d)\n",
            TranslateError(err), err);
     nsk_jvmti_setFailStatus();
     return JNI_ERR;
@@ -472,7 +472,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent init: error in JVMTI SetEventNotificationMode: %s (%d)\n",
+    LOG("Agent init: error in JVMTI SetEventNotificationMode: %s (%d)\n",
            TranslateError(err), err);
     nsk_jvmti_setFailStatus();
    return JNI_ERR;
@@ -482,13 +482,13 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   /* register agent proc and arg */
   if (!nsk_jvmti_setAgentProc(agent_proc, NULL)) {
-    printf("Agent init: error in nsk_jvmti_setAgentProc\n");
+    LOG("Agent init: error in nsk_jvmti_setAgentProc\n");
     nsk_jvmti_setFailStatus();
     return JNI_ERR;
   }
 
-  printf("Agent init finished\n");
-  fflush(0);
+  LOG("Agent init finished\n");
+
   return JNI_OK;
 }
 

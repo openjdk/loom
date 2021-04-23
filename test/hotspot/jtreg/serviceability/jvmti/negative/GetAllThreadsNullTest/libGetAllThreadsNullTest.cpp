@@ -33,7 +33,7 @@ static jvmtiEnv *jvmti_env = NULL;
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     jint res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
     if (res != JNI_OK || jvmti_env == NULL) {
-        printf("Wrong test_passed of a valid call to GetEnv!\n");
+        LOG("Wrong test_passed of a valid call to GetEnv!\n");
         return JNI_ERR;
     }
 
@@ -48,36 +48,36 @@ Java_GetAllThreadsNullTest_check(JNIEnv *env, jclass cls) {
     jboolean test_passed = JNI_TRUE;
 
     if (jvmti_env == NULL) {
-        printf("JVMTI client was not properly loaded!\n");
+        LOG("JVMTI client was not properly loaded!\n");
         return JNI_FALSE;
     }
 
-    printf(">>> (threadsCountPtr) null pointer check ...\n");
+    LOG(">>> (threadsCountPtr) null pointer check ...\n");
 
     err = jvmti_env->GetAllThreads(NULL, &threadsPtr);
     if (err != JVMTI_ERROR_NULL_POINTER) {
-        printf("(threadsCountPtr) error expected: JVMTI_ERROR_NULL_POINTER,\n");
-        printf("           got: %s (%d)\n", TranslateError(err), err);
+        LOG("(threadsCountPtr) error expected: JVMTI_ERROR_NULL_POINTER,\n");
+        LOG("           got: %s (%d)\n", TranslateError(err), err);
         test_passed = JNI_FALSE;
     }
 
-    printf(">>> (threadsPtr) null pointer check ...\n");
+    LOG(">>> (threadsPtr) null pointer check ...\n");
 
     err = jvmti_env->GetAllThreads(&threadsCountPtr, NULL);
     if (err != JVMTI_ERROR_NULL_POINTER) {
-        printf("(threadsPtr) error expected: JVMTI_ERROR_NULL_POINTER,\n");
-        printf("           got: %s (%d)\n", TranslateError(err), err);
+        LOG("(threadsPtr) error expected: JVMTI_ERROR_NULL_POINTER,\n");
+        LOG("           got: %s (%d)\n", TranslateError(err), err);
         test_passed = JNI_FALSE;
     }
 
     err = jvmti_env->GetAllThreads(NULL, NULL);
     if (err != JVMTI_ERROR_NULL_POINTER) {
-      printf("(threadsPtr) error expected: JVMTI_ERROR_NULL_POINTER,\n");
-      printf("           got: %s (%d)\n", TranslateError(err), err);
+      LOG("(threadsPtr) error expected: JVMTI_ERROR_NULL_POINTER,\n");
+      LOG("           got: %s (%d)\n", TranslateError(err), err);
       test_passed = JNI_FALSE;
     }
 
-    printf(">>> done\n");
+    LOG(">>> done\n");
 
     return test_passed;
 }

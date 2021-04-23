@@ -52,26 +52,24 @@ jboolean checkFrame(jvmtiEnv *jvmti_env,
 
   err = jvmti_env->GetMethodName(exp_mid, &meth, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodName) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(GetMethodName) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
   err = jvmti_env->GetFrameLocation(thr, 0, &mid, &loc);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetFrameLocation#%s) unexpected error: %s (%d)\n",
-           meth, TranslateError(err), err);
+    LOG("(GetFrameLocation#%s) unexpected error: %s (%d)\n", meth, TranslateError(err), err);
     result = STATUS_FAILED;
   } else {
     if (exp_mid != mid) {
-      printf("Method \"%s\" current frame's method ID", meth);
-      printf(" expected: 0x%p, got: 0x%p\n", exp_mid, mid);
+      LOG("Method \"%s\" current frame's method ID", meth);
+      LOG(" expected: 0x%p, got: 0x%p\n", exp_mid, mid);
       result = STATUS_FAILED;
     }
     isOk = exp_loc == loc || exp_loc_alternative == loc;
     if (!isOk && mustPass) {
-      printf("Method \"%s\" current frame's location", meth);
-      printf(" expected: 0x%x or 0x%x, got: 0x%x%08x\n",
+      LOG("Method \"%s\" current frame's location", meth);
+      LOG(" expected: 0x%x or 0x%x, got: 0x%x%08x\n",
              (jint) exp_loc, (jint) exp_loc_alternative, (jint) (loc >> 32), (jint) loc);
       result = STATUS_FAILED;
     }
@@ -94,7 +92,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   jint res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti_env == NULL) {
-    printf("Wrong result of a valid call to GetEnv !\n");
+    LOG("Wrong result of a valid call to GetEnv !\n");
     return JNI_ERR;
   }
 
@@ -103,8 +101,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   caps.can_generate_exception_events = true;
   err = jvmti_env->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+   LOG("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -113,8 +110,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.ExceptionCatch = &ExceptionCatch;
   err = jvmti_env->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -127,7 +123,7 @@ Java_frameloc01_getReady(JNIEnv *env, jclass cls, jclass klass) {
   jvmtiError err;
   mid1 = env->GetMethodID(klass, "meth01", "(I)V");
   if (mid1 == NULL) {
-    printf("Cannot get jmethodID for method \"meth01\"\n");
+    LOG("Cannot get jmethodID for method \"meth01\"\n");
     result = STATUS_FAILED;
     return;
   }
@@ -135,8 +131,7 @@ Java_frameloc01_getReady(JNIEnv *env, jclass cls, jclass klass) {
   err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_EXCEPTION_CATCH, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventNotificationMode) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(SetEventNotificationMode) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 }
@@ -148,7 +143,7 @@ Java_frameloc01_checkFrame01(JNIEnv *jni, jclass cls, jthread thr, jclass klass,
 
   mid = jni->GetMethodID(klass, "run", "()V");
   if (mid == NULL) {
-    printf("Cannot get jmethodID for method \"run\"\n");
+    LOG("Cannot get jmethodID for method \"run\"\n");
     result = STATUS_FAILED;
     return JNI_TRUE;
   }

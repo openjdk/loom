@@ -43,7 +43,7 @@ set_breakpoint(JNIEnv *jni, jclass klass, const char *mname) {
   err = jvmti_env->SetBreakpoint(method, location);
   check_jvmti_status(jni, err, "set_or_clear_breakpoint: error in JVMTI SetBreakpoint");
 
-  fflush(0);
+
 }
 
 extern "C" {
@@ -52,20 +52,20 @@ JNIEXPORT void JNICALL
 Java_WaitNotifySuspendedVThreadTask_setBreakpoint(JNIEnv *jni, jclass klass) {
   jvmtiError err;
 
-  printf("setBreakpoint: started\n");
+  LOG("setBreakpoint: started\n");
   set_breakpoint(jni, klass, "methBreakpoint");
 
   // Enable Breakpoint events globally
   err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_BREAKPOINT, NULL);
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI SetEventNotificationMode: enable BREAKPOINT");
 
-  printf("setBreakpoint: finished\n");
-  fflush(0);
+  LOG("setBreakpoint: finished\n");
+
 }
 
 JNIEXPORT void JNICALL
 Java_WaitNotifySuspendedVThreadTask_notifyRawMonitors(JNIEnv *jni, jclass klass, jthread thread) {
-  printf("Main thread: suspending virtual and carrier threads\n"); fflush(0);
+  LOG("Main thread: suspending virtual and carrier threads\n");
 
   check_jvmti_status(jni, jvmti_env->SuspendThread(thread), "SuspendThread thread");
   jthread cthread = get_carrier_thread(jvmti_env, jni, thread);
@@ -74,20 +74,20 @@ Java_WaitNotifySuspendedVThreadTask_notifyRawMonitors(JNIEnv *jni, jclass klass,
   {
     RawMonitorLocker rml(jvmti_env, jni, monitor);
 
-    printf("Main thread: calling monitor.notifyAll()\n"); fflush(0);
+    LOG("Main thread: calling monitor.notifyAll()\n");
     rml.notify_all();
   }
 
   RawMonitorLocker completed(jvmti_env, jni, monitor_completed);
 
-  printf("Main thread: resuming virtual thread\n"); fflush(0);
+  LOG("Main thread: resuming virtual thread\n");
   check_jvmti_status(jni, jvmti_env->ResumeThread(thread), "ResumeThread thread");
 
-  printf("Main thread: before monitor_completed.wait()\n"); fflush(0);
+  LOG("Main thread: before monitor_completed.wait()\n");
   completed.wait();
-  printf("Main thread: after monitor_completed.wait()\n"); fflush(0);
+  LOG("Main thread: after monitor_completed.wait()\n");
 
-  printf("Main thread: resuming carrier thread\n"); fflush(0);
+  LOG("Main thread: resuming carrier thread\n");
   check_jvmti_status(jni, jvmti_env->ResumeThread(cthread), "ResumeThread cthread");
 }
 
@@ -99,7 +99,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   char* mname = get_method_name(jvmti, jni, method);
 
   if (strcmp(mname, "methBreakpoint") != 0) {
-    printf("FAILED: got  unexpected breakpoint in method %s()\n", mname);
+    LOG("FAILED: got  unexpected breakpoint in method %s()\n", mname);
     deallocate(jvmti, jni, (void*)mname);
     fatal(jni, "Error in breakpoint");
     return;
@@ -110,14 +110,14 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   {
     RawMonitorLocker rml(jvmti, jni, monitor);
 
-    printf("Breakpoint: before monitor.wait(): %s in %s thread\n", mname, virt); fflush(0);
+    LOG("Breakpoint: before monitor.wait(): %s in %s thread\n", mname, virt);
     rml.wait();
-    printf("Breakpoint: after monitor.wait(): %s in %s thread\n", mname, virt); fflush(0);
+    LOG("Breakpoint: after monitor.wait(): %s in %s thread\n", mname, virt);
   }
 
   RawMonitorLocker completed(jvmti, jni, monitor_completed);
 
-  printf("Breakpoint: calling monitor_completed.notifyAll()\n"); fflush(0);
+  LOG("Breakpoint: calling monitor_completed.notifyAll()\n");
   completed.notify_all();
 
   deallocate(jvmti, jni, (void*)tname);
@@ -137,7 +137,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -153,26 +153,26 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
+    LOG("(GetCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   /* set event callback */
-  printf("setting event callbacks ...\n");
+  LOG("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.Breakpoint = &Breakpoint;
 
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }

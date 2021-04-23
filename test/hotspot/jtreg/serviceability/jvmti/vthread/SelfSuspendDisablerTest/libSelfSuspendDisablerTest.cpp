@@ -54,10 +54,10 @@ Java_SelfSuspendDisablerTest_isSuspended(JNIEnv* jni, jclass cls, jthread thread
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
 
-  printf("Agent init started\n");
+  LOG("Agent init started\n");
 
   if (jvm->GetEnv((void **)(&jvmti), JVMTI_VERSION) != JNI_OK) {
-    printf("Agent init: error in getting JvmtiEnv with GetEnv\n");
+    LOG("Agent init: error in getting JvmtiEnv with GetEnv\n");
     return JNI_ERR;
   }
 
@@ -70,6 +70,6 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  printf("Agent init finished\n");
+  LOG("Agent init finished\n");
   return JNI_OK;
 }

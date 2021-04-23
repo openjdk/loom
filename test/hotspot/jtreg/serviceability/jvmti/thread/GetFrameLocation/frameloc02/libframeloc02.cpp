@@ -47,7 +47,7 @@ static frame_info fi =
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jint res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti_env == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -63,68 +63,62 @@ Java_frameloc02_check(JNIEnv *env, jclass cls, jthread thr) {
   char *cls_sig, *name, *sig, *generic;
   char buffer[32];
 
-  printf(">>> acquiring frame location ...\n");
+  LOG(">>> acquiring frame location ...\n");
 
   err = jvmti_env->GetFrameLocation(thr, 0, &mid, &loc);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetFrameLocation) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(GetFrameLocation) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return result;
   }
 
-  printf(">>> retrieving class/method info ...\n");
+  LOG(">>> retrieving class/method info ...\n");
 
   err = jvmti_env->GetMethodDeclaringClass(mid, &klass);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(GetMethodDeclaringClass) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return result;
   }
   err = jvmti_env->GetClassSignature(klass, &cls_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassSignature) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(GetClassSignature) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return result;
   }
   err = jvmti_env->GetMethodName(mid, &name, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodName) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(GetMethodName) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return result;
   }
 
-  printf(">>>      class: \"%s\"\n", cls_sig);
-  printf(">>>     method: \"%s%s\"\n", name, sig);
-  printf(">>>   location: %s\n", jlong_to_string(loc, buffer));
+  LOG(">>>      class: \"%s\"\n", cls_sig);
+  LOG(">>>     method: \"%s%s\"\n", name, sig);
+  LOG(">>>   location: %s\n", jlong_to_string(loc, buffer));
 
   if (cls_sig == NULL || strcmp(cls_sig, fi.cls_sig) != 0) {
-    printf("(GetFrameLocation) wrong class: \"%s\"", cls_sig);
-    printf(", expected: \"%s\"\n", fi.cls_sig);
+    LOG("(GetFrameLocation) wrong class: \"%s\"\n", cls_sig);
+    LOG(", expected: \"%s\"\n", fi.cls_sig);
     result = STATUS_FAILED;
   }
   if (name == NULL || strcmp(name, fi.name) != 0) {
-    printf("(GetFrameLocation) wrong method name: \"%s\"", name);
-    printf(", expected: \"%s\"\n", fi.name);
+    LOG("(GetFrameLocation) wrong method name: \"%s\"", name);
+    LOG(", expected: \"%s\"\n", fi.name);
     result = STATUS_FAILED;
   }
   if (sig == NULL || strcmp(sig, fi.sig) != 0) {
-    printf("(GetFrameLocation) wrong method signature: \"%s\"", sig);
-    printf(", expected: \"%s\"\n", fi.sig);
+    LOG("(GetFrameLocation) wrong method signature: \"%s\"", sig);
+    LOG(", expected: \"%s\"\n", fi.sig);
     result = STATUS_FAILED;
   }
   if (loc != fi.loc) {
-    printf("(GetFrameLocation) wrong location: %s",
-           jlong_to_string(loc, buffer));
-    printf(", expected: %s\n",
-           jlong_to_string(fi.loc, buffer));
+    LOG("(GetFrameLocation) wrong location: %s", jlong_to_string(loc, buffer));
+    LOG(", expected: %s\n", jlong_to_string(fi.loc, buffer));
     result = STATUS_FAILED;
   }
 
-  printf(">>> ... done\n");
+  LOG(">>> ... done\n");
 
   return result;
 }

@@ -46,7 +46,7 @@ Java_thrstat03_init(JNIEnv *env, jclass cls, jint waitTime) {
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
   return JNI_OK;
@@ -59,14 +59,14 @@ Java_thrstat03_check(JNIEnv *jni, jclass cls, jthread thread, jint statInd) {
   jint thr_state = 0;
 
   if (jvmti == NULL) {
-    printf("JVMTI client was not properly loaded!\n");
+    LOG("JVMTI client was not properly loaded!\n");
     return JNI_FALSE;
   }
 
   wait_lock = create_raw_monitor(jvmti, "_wait_lock");
   for (int i = WAIT_START; i < wait_time; i <<= 1) {
     thr_state = get_thread_state(jvmti, jni, thread);
-    printf(">>> thread state: %s (%d)\n", TranslateState(thr_state), thr_state);
+    LOG(">>> thread state: %s (%d)\n", TranslateState(thr_state), thr_state);
 
     if ((thr_state & JVMTI_THREAD_STATE_RUNNABLE) == 0) {
       break;
@@ -85,8 +85,8 @@ Java_thrstat03_check(JNIEnv *jni, jclass cls, jthread thread, jint statInd) {
     result = JNI_FALSE;
   }
   if (result == JNI_FALSE) {
-    printf("Wrong state: %s (%d)\n", TranslateState(thr_state), thr_state);
-    printf("   expected: %s (%d)\n", TranslateState(state[statInd]), state[statInd]);
+    LOG("Wrong state: %s (%d)\n", TranslateState(thr_state), thr_state);
+    LOG("   expected: %s (%d)\n", TranslateState(state[statInd]), state[statInd]);
   }
 
   return result;

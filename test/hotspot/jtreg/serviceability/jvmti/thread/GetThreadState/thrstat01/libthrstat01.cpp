@@ -56,7 +56,7 @@ ThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread) {
 
   if (thread_info.name != NULL && strcmp(thread_info.name, "tested_thread_thr1") == 0) {
     tested_thread_thr1 = jni->NewGlobalRef(thread);
-    printf(">>> ThreadStart: \"%s\", 0x%p\n", thread_info.name, tested_thread_thr1);
+    LOG(">>> ThreadStart: \"%s\", 0x%p\n", thread_info.name, tested_thread_thr1);
     jvmtiError err = jvmti_env->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_THREAD_START, NULL);
     check_jvmti_status(jni, err, "Error in SetEventNotificationMode");
   }
@@ -66,11 +66,11 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jint res;
   jvmtiError err;
 
-  printf("Agent_OnLoad started\n");
+  LOG("Agent_OnLoad started\n");
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -82,18 +82,16 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.ThreadStart = &ThreadStart;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_INIT, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventNotificationMode) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(SetEventNotificationMode) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
-  printf("Agent_OnLoad finished\n\n");
+  LOG("Agent_OnLoad finished\n");
   return JNI_OK;
 }
 
@@ -103,10 +101,10 @@ Java_thrstat01_checkStatus0(JNIEnv *jni, jclass cls, jint stat_ind) {
   jint thread_state;
   jint millis;
 
-  printf("native method checkStatus started\n");
+  LOG("native method checkStatus started\n");
 
   if (tested_thread_thr1 == NULL) {
-    printf("Missing thread \"tested_thread_thr1\" start event\n");
+    LOG("Missing thread \"tested_thread_thr1\" start event\n");
     return JNI_FALSE;
   }
 
@@ -120,15 +118,15 @@ Java_thrstat01_checkStatus0(JNIEnv *jni, jclass cls, jint stat_ind) {
     rml.wait(millis);
   }
 
-  printf(">>> thread \"tested_thread_thr1\" (0x%p) state: %s (%d)\n", tested_thread_thr1, TranslateState(thread_state), thread_state);
+  LOG(">>> thread \"tested_thread_thr1\" (0x%p) state: %s (%d)\n", tested_thread_thr1, TranslateState(thread_state), thread_state);
 
   if ((thread_state & state[stat_ind]) == 0) {
-    printf("Wrong thread \"tested_thread_thr1\" (0x%p) state:\n", tested_thread_thr1);
-    printf("    expected: %s (%d)\n", TranslateState(state[stat_ind]), state[stat_ind]);
-    printf("      actual: %s (%d)\n", TranslateState(thread_state), thread_state);
+    LOG("Wrong thread \"tested_thread_thr1\" (0x%p) state:\n", tested_thread_thr1);
+    LOG("    expected: %s (%d)\n", TranslateState(state[stat_ind]), state[stat_ind]);
+    LOG("      actual: %s (%d)\n", TranslateState(thread_state), thread_state);
     result = JNI_FALSE;
   }
-  printf("native method checkStatus finished\n\n");
+  LOG("native method checkStatus finished\n");
   return result;
 }
 

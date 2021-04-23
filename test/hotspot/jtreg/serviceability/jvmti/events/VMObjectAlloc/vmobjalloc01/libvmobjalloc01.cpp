@@ -125,7 +125,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   /* create JVMTI environment */
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 

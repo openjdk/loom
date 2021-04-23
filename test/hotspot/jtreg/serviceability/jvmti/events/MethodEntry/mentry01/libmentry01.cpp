@@ -69,73 +69,73 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
 
   err = jvmti->GetMethodDeclaringClass(method, &cls);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
+    LOG("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetClassSignature(cls, &cls_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassSignature) unexpected error: %s (%d)\n",
+    LOG("(GetClassSignature) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   if (cls_sig != NULL && strcmp(cls_sig, "Lmentry01;") == 0) {
-    printf(">>> retrieving method entry info ...\n");
+    LOG(">>> retrieving method entry info ...\n");
 
     err = jvmti->GetMethodName(method, &entry.name, &entry.sig, &generic);
     if (err != JVMTI_ERROR_NONE) {
-      printf("(GetMethodName) unexpected error: %s (%d)\n",
+      LOG("(GetMethodName) unexpected error: %s (%d)\n",
              TranslateError(err), err);
       result = STATUS_FAILED;
       return;
     }
     err = jvmti->GetFrameLocation(thread_obj, 0, &mid, &entry.loc);
     if (err != JVMTI_ERROR_NONE) {
-      printf("(GetFrameLocation) unexpected error: %s (%d)\n",
+      LOG("(GetFrameLocation) unexpected error: %s (%d)\n",
              TranslateError(err), err);
       result = STATUS_FAILED;
       return;
     }
 
-    printf(">>>      class: \"%s\"\n", cls_sig);
-    printf(">>>     method: \"%s%s\"\n", entry.name, entry.sig);
-    printf(">>>   location: %s\n", jlong_to_string(entry.loc, buffer));
-    printf(">>> ... done\n");
+    LOG(">>>      class: \"%s\"\n", cls_sig);
+    LOG(">>>     method: \"%s%s\"\n", entry.name, entry.sig);
+    LOG(">>>   location: %s\n", jlong_to_string(entry.loc, buffer));
+    LOG(">>> ... done\n");
 
     if (eventsCount < sizeof(entries)/sizeof(entry_info)) {
       if (entry.name == NULL ||
           strcmp(entry.name, entries[eventsCount].name) != 0) {
-        printf("(entry#%" PRIuPTR ") wrong method name: \"%s\"",
+        LOG("(entry#%" PRIuPTR ") wrong method name: \"%s\"",
                eventsCount, entry.name);
-        printf(", expected: \"%s\"\n", entries[eventsCount].name);
+        LOG(", expected: \"%s\"\n", entries[eventsCount].name);
         result = STATUS_FAILED;
       }
       if (entry.sig == NULL ||
           strcmp(entry.sig, entries[eventsCount].sig) != 0) {
-        printf("(entry#%" PRIuPTR ") wrong method sig: \"%s\"",
+        LOG("(entry#%" PRIuPTR ") wrong method sig: \"%s\"",
                eventsCount, entry.sig);
-        printf(", expected: \"%s\"\n", entries[eventsCount].sig);
+        LOG(", expected: \"%s\"\n", entries[eventsCount].sig);
         result = STATUS_FAILED;
       }
       if (entry.loc != entries[eventsCount].loc) {
-        printf("(entry#%" PRIuPTR ") wrong location: %s",
+        LOG("(entry#%" PRIuPTR ") wrong location: %s",
                eventsCount, jlong_to_string(entry.loc, buffer));
-        printf(", expected: %s\n",
+        LOG(", expected: %s\n",
                jlong_to_string(entries[eventsCount].loc, buffer));
         result = STATUS_FAILED;
       }
       jboolean isVirtual = jni->IsVirtualThread(thread_obj);
       if (isVirtualExpected != isVirtual) {
-        printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
+        LOG("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
         result = STATUS_FAILED;
       }
     } else {
-      printf("Unexpected method entry catched:");
-      printf("     class: \"%s\"\n", cls_sig);
-      printf("    method: \"%s%s\"\n", entry.name, entry.sig);
-      printf("  location: %s\n", jlong_to_string(entry.loc, buffer));
+      LOG("Unexpected method entry catched:");
+      LOG("     class: \"%s\"\n", cls_sig);
+      LOG("    method: \"%s%s\"\n", entry.name, entry.sig);
+      LOG("  location: %s\n", jlong_to_string(entry.loc, buffer));
       result = STATUS_FAILED;
     }
     eventsCount++;
@@ -161,7 +161,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -171,14 +171,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
+    LOG("(GetCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -187,12 +187,12 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     callbacks.MethodEntry = &MethodEntry;
     err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
     if (err != JVMTI_ERROR_NONE) {
-      printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
+      LOG("(SetEventCallbacks) unexpected error: %s (%d)\n",
              TranslateError(err), err);
       return JNI_ERR;
     }
   } else {
-    printf("Warning: MethodEntry event is not implemented\n");
+    LOG("Warning: MethodEntry event is not implemented\n");
   }
 
   return JNI_OK;
@@ -209,7 +209,7 @@ Java_mentry01_enable(JNIEnv *jni, jclass cls) {
   jthread thread;
   err = jvmti->GetCurrentThread(&thread);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
+    LOG("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
   isVirtualExpected = jni->IsVirtualThread(thread);
@@ -220,7 +220,7 @@ Java_mentry01_enable(JNIEnv *jni, jclass cls) {
     eventsExpected = sizeof(entries)/sizeof(entry_info);
     eventsCount = 0;
   } else {
-    printf("Failed to enable JVMTI_EVENT_METHOD_ENTRY event: %s (%d)\n", TranslateError(err), err);
+    LOG("Failed to enable JVMTI_EVENT_METHOD_ENTRY event: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 }
@@ -231,13 +231,13 @@ Java_mentry01_check(JNIEnv *jni, jclass cls) {
 
   mid = jni->GetStaticMethodID(cls, "dummy", "()V");
   if (mid == NULL) {
-    printf("Cannot find metod \"dummy()\"!\n");
+    LOG("Cannot find metod \"dummy()\"!\n");
     return STATUS_FAILED;
   }
 
   jni->CallStaticVoidMethod(cls, mid);
   if (eventsCount != eventsExpected) {
-    printf("Wrong number of MethodEntry events: %" PRIuPTR ", expected: %" PRIuPTR "\n", eventsCount, eventsExpected);
+    LOG("Wrong number of MethodEntry events: %" PRIuPTR ", expected: %" PRIuPTR "\n", eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }
   return result;
@@ -248,7 +248,7 @@ Java_mentry01_chain(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
   if (jvmti == NULL) {
-    printf("JVMTI client was not properly loaded!\n");
+    LOG("JVMTI client was not properly loaded!\n");
     result = STATUS_FAILED;
     return;
   }
@@ -256,7 +256,7 @@ Java_mentry01_chain(JNIEnv *jni, jclass cls) {
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_METHOD_ENTRY, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to disable JVMTI_EVENT_METHOD_ENTRY event: %s (%d)\n",
+    LOG("Failed to disable JVMTI_EVENT_METHOD_ENTRY event: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }

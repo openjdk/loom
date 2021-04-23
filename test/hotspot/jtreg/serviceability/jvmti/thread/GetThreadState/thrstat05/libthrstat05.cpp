@@ -74,7 +74,7 @@ jrawMonitorID wait_lock; /* Monitor is used just for sleeping */
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jint res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
   if (res != JNI_OK || !jvmti_env) {
-    printf("Agent_OnLoad: Error: GetEnv returned error or NULL\n");
+    LOG("Agent_OnLoad: Error: GetEnv returned error or NULL\n");
     return JNI_ERR;
   }
   wait_lock = create_raw_monitor(jvmti_env, "beast");
@@ -94,13 +94,13 @@ Java_thrstat05_checkThreadState(JNIEnv *jni, jclass klass, jthread thread, jint 
   do {
     jint thrState = get_thread_state(jvmti_env, jni, thread);
     jint maskedThrState = thrState & THREAD_STATE_MASK;
-    printf("GetThreadState = %x. Masked: %x. Must be: %x\n", thrState, maskedThrState, g_ThreadState[stateIdx]);
+    LOG("GetThreadState = %x. Masked: %x. Must be: %x\n", thrState, maskedThrState, g_ThreadState[stateIdx]);
     fflush(stdout);
 
     if (maskedThrState == g_ThreadState[stateIdx])
       return JNI_TRUE;
 
-    printf("checkThreadState: wait %d ms\n", wait_time);
+    LOG("checkThreadState: wait %d ms\n", wait_time);
     fflush(stdout);
     RawMonitorLocker wait_locker = RawMonitorLocker(jvmti_env, jni,wait_lock);
     wait_locker.wait(wait_time);

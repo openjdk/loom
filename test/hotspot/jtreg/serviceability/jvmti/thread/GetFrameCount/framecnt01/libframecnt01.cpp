@@ -35,7 +35,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti_env == NULL) {
-    printf("Wrong result of a valid call to GetEnv !\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -45,7 +45,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   jvmtiError err = jvmti_env->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+   LOG("(AddCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -61,11 +61,11 @@ JNIEXPORT jboolean JNICALL Java_framecnt01_checkFrames0(JNIEnv *jni, jclass cls,
     suspend_thread(jvmti_env, jni, thread);
   }
 
-  printf("Testing: \n");
+  LOG("Testing:\n");
   print_stack_trace(jvmti_env, jni, thread);
   jint frame_count = get_frame_count(jvmti_env, jni, thread);
   if (frame_count != expected_count) {
-    printf("Thread #%s: number of frames expected: %d, got: %d\n",
+    LOG("Thread #%s: number of frames expected: %d, got: %d\n",
            get_thread_name(jvmti_env, jni, thread), expected_count, frame_count);
     result = JNI_FALSE;
   }

@@ -44,10 +44,10 @@ test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   check_jvmti_status(jni, err, "Error in GetStackTrace");
 
   if (count <= 0) {
-    printf("Stacktrace in virtual thread is incorrect.\n");
+    LOG("Stacktrace in virtual thread is incorrect.\n");
     print_thread_info(jvmti, jni, vthread);
     print_stack_trace_frames(jvmti, jni, count, frames);
-    printf("Incorrect frame count %d\n", count); fflush(0);
+    LOG("Incorrect frame count %d\n", count);
     fatal(jni, "Incorrect frame count: count <= 0");
   }
   method = frames[count -1].method;
@@ -55,7 +55,7 @@ test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   const char* method_name = get_method_name(jvmti, jni, method);
 
   if (strcmp(CONTINUATION_CLASS_NAME, class_name) !=0 || strcmp(CONTINUATION_METHOD_NAME, method_name) != 0) {
-    printf("Stacktrace in virtual thread is incorrect (doesn't start from enter(...):\n");
+    LOG("Stacktrace in virtual thread is incorrect (doesn't start from enter(...):\n");
     print_stack_trace_frames(jvmti, jni, count, frames);
 
     fatal(jni, "incorrect stacktrace.");
@@ -64,12 +64,12 @@ test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   jint frame_count = -1;
   check_jvmti_status(jni, jvmti->GetFrameCount(vthread, &frame_count), "Error in GetFrameCount");
   if (frame_count != count) {
-    printf("Incorrect frame count %d while %d expected\n", frame_count, count); fflush(0);
+    LOG("Incorrect frame count %d while %d expected\n", frame_count, count);
 
-    printf("Suspended vthread 1st stack trace:\n"); fflush(0);
+    LOG("Suspended vthread 1st stack trace:\n");
     print_stack_trace_frames(jvmti, jni, count, frames);
 
-    printf("Suspended vthread 2nd stack trace:\n"); fflush(0);
+    LOG("Suspended vthread 2nd stack trace:\n");
     print_stack_trace(jvmti, jni, vthread);
 
     fatal(jni, "Incorrect frame count: frame_count != count");
@@ -96,11 +96,11 @@ check_link_consistency(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   if (cthread != NULL) {
     jthread cthread_to_vthread = get_virtual_thread(jvmti, jni, cthread);
     if (!jni->IsSameObject(vthread, cthread_to_vthread)) {
-      printf("\nCarrier: ");
+      LOG("\nCarrier: ");
       print_thread_info(jvmti, jni, cthread);
-      printf("Expected: ");
+      LOG("Expected: ");
       print_thread_info(jvmti, jni, vthread);
-      printf("Resulted: ");
+      LOG("Resulted: ");
       print_thread_info(jvmti, jni, cthread_to_vthread);
       fatal(jni, "GetVirtualThread(GetCarrierThread(vthread)) != vthread");
     }
@@ -122,7 +122,7 @@ check_vthread_consistency_suspended(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthrea
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, vthread);
   check_jvmti_status(jni, err, "Error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
 
-  // printf("Agent: enabled SingleStep for vt: %s ct: %s\n", name, cname); fflush(0);
+  // LOG("Agent: enabled SingleStep for vt: %s ct: %s\n", name, cname);
 
   if (cthread != NULL) { // pre-condition for reliable testing
     test_stack_trace(jvmti, jni, vthread);
@@ -133,7 +133,7 @@ check_vthread_consistency_suspended(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthrea
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, vthread);
   check_jvmti_status(jni, err, "Error in JVMTI SetEventNotificationMode: disable SINGLE_STEP");
 
-  // printf("Agent: disabled SingleStep for vt: %s ct: %s\n", name, cname); fflush(0);
+  // LOG("Agent: disabled SingleStep for vt: %s ct: %s\n", name, cname);
 }
   
 #if 1
@@ -145,7 +145,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
   RawMonitorLocker rml(jvmti, jni, event_mon);
  
-  printf("Agent: Got SingleStep event:\n");
+  LOG("Agent: Got SingleStep event:\n");
   print_stack_trace(jvmti, jni, thread);
 
   jthread cthread = get_carrier_thread(jvmti, jni, thread);
@@ -164,13 +164,13 @@ static void JNICALL
 agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
 
   static jlong timeout = 0;
-  printf("Agent: waiting to start\n");
+  LOG("Agent: waiting to start\n");
   if (!nsk_jvmti_waitForSync(timeout))
     return;
   if (!nsk_jvmti_resumeSync())
     return;
 
-  printf("Agent: started\n");
+  LOG("Agent: started\n");
 
   int iter = 0;
   while (true) {
@@ -201,12 +201,12 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
         char* vname = get_thread_name(jvmti, jni, vthread);
 
         check_jvmti_status(jni, jvmti->SuspendThread(vthread), "Error in SuspendThread");
-        // printf("Agent: suspended vt: %s ct: %s\n", vname, cname); fflush(0);
+        // LOG("Agent: suspended vt: %s ct: %s\n", vname, cname);
 
         check_vthread_consistency_suspended(jvmti, jni, vthread);
 
         check_jvmti_status(jni, jvmti->ResumeThread(vthread), "Error in ResumeThread");
-        // printf("Agent: resumed vt: %s ct: %s\n", vname, cname); fflush(0);
+        // LOG("Agent: resumed vt: %s ct: %s\n", vname, cname);
       }
     }
     check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) threads), "Error in Deallocate");
@@ -214,7 +214,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     iter++;
     millisleep(20);
   }
-  printf("Agent: finished\n");
+  LOG("Agent: finished\n");
 }
 
 
@@ -225,7 +225,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
   jvmtiEnv* jvmti;
 
-  printf("Agent_OnLoad started\n");
+  LOG("Agent_OnLoad started\n");
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
@@ -237,14 +237,14 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI AddCapabilities: %d\n", err);
+    LOG("error in JVMTI AddCapabilities: %d\n", err);
   }
 
   memset(&callbacks, 0, sizeof(callbacks));
   callbacks.SingleStep  = &SingleStep;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
+    LOG("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
   event_mon = create_raw_monitor(jvmti, "Events Monitor");
@@ -258,6 +258,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  printf("Agent_OnLoad finished\n");
+  LOG("Agent_OnLoad finished\n");
   return 0;
 }

@@ -42,12 +42,12 @@ static jint state[] = {
 
 void printStateFlags(jint flags) {
   if (flags & JVMTI_THREAD_STATE_SUSPENDED)
-    printf(" JVMTI_THREAD_STATE_SUSPENDED");
+   LOG(" JVMTI_THREAD_STATE_SUSPENDED");
   if (flags & JVMTI_THREAD_STATE_INTERRUPTED)
-    printf(" JVMTI_THREAD_STATE_INTERRUPTED");
+   LOG(" JVMTI_THREAD_STATE_INTERRUPTED");
   if (flags & JVMTI_THREAD_STATE_IN_NATIVE)
-    printf(" JVMTI_THREAD_STATE_IN_NATIVE");
-  printf(" (0x%0x)\n", flags);
+   LOG(" JVMTI_THREAD_STATE_IN_NATIVE");
+  LOG(" (0x%0x)\n", flags);
 }
 
 void JNICALL VMInit(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thr) {
@@ -62,7 +62,7 @@ ThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread) {
   jvmtiThreadInfo thread_info = get_thread_info(jvmti_env, jni, thread);
   if (thread_info.name != NULL && strcmp(thread_info.name, "tested_thread_thr1") == 0) {
     thr_ptr = jni->NewGlobalRef(thread);
-    printf(">>> ThreadStart: \"%s\", 0x%p\n", thread_info.name, thr_ptr);
+    LOG(">>> ThreadStart: \"%s\", 0x%p\n", thread_info.name, thr_ptr);
   }
 }
 
@@ -74,7 +74,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv !\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -84,8 +84,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+   LOG("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -96,16 +95,14 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.ThreadStart = &ThreadStart;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_VM_INIT, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to enable VM_INIT event: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("Failed to enable VM_INIT event: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -137,24 +134,23 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
   unsigned int waited_millis;
 
   if (jvmti == NULL) {
-    printf("JVMTI client was not properly loaded!\n");
+    LOG("JVMTI client was not properly loaded!\n");
     return JNI_FALSE;
   }
 
   if (thr_ptr == NULL) {
-    printf("Missing thread \"tested_thread_thr1\" start event\n");
+    LOG("Missing thread \"tested_thread_thr1\" start event\n");
     return JNI_FALSE;
   }
 
-  printf("START checkStatus for \"tested_thread_thr1\" (0x%p%s), check state: %s\n",
+  LOG("START checkStatus for \"tested_thread_thr1\" (0x%p%s), check state: %s\n",
          thr_ptr, suspStr, TranslateState(state[statInd]));
 
   timeout_is_reached = JNI_TRUE;
   for (millis = WAIT_START, waited_millis = 0; millis < wait_time; millis <<= 1) {
     err = jvmti->GetThreadState(thr_ptr, &thrState);
     if (err != JVMTI_ERROR_NONE) {
-      printf("(GetThreadState#%d) unexpected error: %s (%d)\n",
-             statInd, TranslateError(err), err);
+      LOG("(GetThreadState#%d) unexpected error: %s (%d)\n", statInd, TranslateError(err), err);
       result = JNI_FALSE;
       timeout_is_reached = JNI_FALSE;
       break;
@@ -170,37 +166,37 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
     wait_for(jni, millis);
   }
 
-  printf(">>> thread \"tested_thread_thr1\" (0x%p) state: %s (%d)\n",
+  LOG(">>> thread \"tested_thread_thr1\" (0x%p) state: %s (%d)\n",
          thr_ptr, TranslateState(thrState), thrState);
-  printf(">>>\tflags:");
+  LOG(">>>\tflags:");
   printStateFlags(suspState);
 
   if (timeout_is_reached == JNI_TRUE) {
-    printf("Error: timeout (%d secs) has been reached\n", waited_millis / 1000);
+    LOG("Error: timeout (%d secs) has been reached\n", waited_millis / 1000);
   }
   if ((thrState & state[statInd]) == 0) {
-    printf("Wrong thread \"tested_thread_thr1\" (0x%p%s) state:\n", thr_ptr, suspStr);
-    printf("    expected: %s (%d)\n",
+    LOG("Wrong thread \"tested_thread_thr1\" (0x%p%s) state:\n", thr_ptr, suspStr);
+    LOG("    expected: %s (%d)\n",
            TranslateState(state[statInd]), state[statInd]);
-    printf("      actual: %s (%d)\n",
+    LOG("      actual: %s (%d)\n",
            TranslateState(thrState), thrState);
     result = JNI_FALSE;
   }
   if (suspState != right_stat) {
-    printf("Wrong thread \"tested_thread_thr1\" (0x%p%s) state flags:\n",
+    LOG("Wrong thread \"tested_thread_thr1\" (0x%p%s) state flags:\n",
            thr_ptr, suspStr);
-    printf("    expected:");
+    LOG("    expected:");
     printStateFlags(right_stat);
-    printf("    actual:");
+    LOG("    actual:");
     printStateFlags(suspState);
     result = JNI_FALSE;
   }
 
   err = jvmti->SuspendThread(thr_ptr);
   if (err != right_ans) {
-    printf("Wrong result of SuspendThread() for \"tested_thread_thr1\" (0x%p%s):\n",
+    LOG("Wrong result of SuspendThread() for \"tested_thread_thr1\" (0x%p%s):\n",
            thr_ptr, suspStr);
-    printf("    expected: %s (%d), actual: %s (%d)\n",
+    LOG("    expected: %s (%d), actual: %s (%d)\n",
            TranslateError(right_ans), right_ans, TranslateError(err), err);
     result = JNI_FALSE;
   }
@@ -213,8 +209,7 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
       wait_for(jni, millis);
       err = jvmti->GetThreadState(thr_ptr, &thrState);
       if (err != JVMTI_ERROR_NONE) {
-        printf("(GetThreadState#%d,after) unexpected error: %s (%d)\n",
-               statInd, TranslateError(err), err);
+        LOG("(GetThreadState#%d,after) unexpected error: %s (%d)\n", statInd, TranslateError(err), err);
         timeout_is_reached = JNI_FALSE;
         result = JNI_FALSE;
         break;
@@ -227,20 +222,20 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
     }
 
     if (timeout_is_reached == JNI_TRUE) {
-      printf("Error: timeout (%d secs) has been reached\n", waited_millis / 1000);
+      LOG("Error: timeout (%d secs) has been reached\n", waited_millis / 1000);
     }
     if ((thrState & state[statInd]) == 0) {
-      printf("Wrong thread \"tested_thread_thr1\" (0x%p) state after SuspendThread:\n", thr_ptr);
-      printf("    expected: %s (%d)\n", TranslateState(state[statInd]), state[statInd]);
-      printf("      actual: %s (%d)\n", TranslateState(thrState), thrState);
+      LOG("Wrong thread \"tested_thread_thr1\" (0x%p) state after SuspendThread:\n", thr_ptr);
+      LOG("    expected: %s (%d)\n", TranslateState(state[statInd]), state[statInd]);
+      LOG("      actual: %s (%d)\n", TranslateState(thrState), thrState);
       result = JNI_FALSE;
     }
     if (suspState != JVMTI_THREAD_STATE_SUSPENDED) {
-      printf("Wrong thread \"tested_thread_thr1\" (0x%p) state flags", thr_ptr);
-      printf(" after SuspendThread:\n");
-      printf("    expected:");
+      LOG("Wrong thread \"tested_thread_thr1\" (0x%p) state flags", thr_ptr);
+      LOG(" after SuspendThread:\n");
+      LOG("    expected:");
       printStateFlags(JVMTI_THREAD_STATE_SUSPENDED);
-      printf("    actual:");
+      LOG("    actual:");
       printStateFlags(suspState);
       result = JNI_FALSE;
     }

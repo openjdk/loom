@@ -36,7 +36,7 @@ static std::atomic<bool> is_completed_test_in_event;
 static void
 check_jvmti_error_invalid_thread(JNIEnv* jni, const char* msg, jvmtiError err) {
   if (err != JVMTI_ERROR_INVALID_THREAD) {
-    printf("%s failed: expected JVMTI_ERROR_INVALID_THREAD instead of: %d\n", msg, err);
+    LOG("%s failed: expected JVMTI_ERROR_INVALID_THREAD instead of: %d\n", msg, err);
     fatal(jni, msg);
   }
 }
@@ -58,8 +58,8 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
   void* local_storage_data = NULL;
   jlong nanos;
 
-  printf("test_unsupported_jvmti_functions: started\n");
-  fflush(0);
+  LOG("test_unsupported_jvmti_functions: started\n");
+
 
   is_vthread = jni->IsVirtualThread(vthread);
   if (is_vthread != JNI_TRUE) {
@@ -73,8 +73,8 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
     fatal(jni, "Virtual threads are not supported");
   }
 
-  printf("Testing JVMTI functions which should not accept a virtual thread argument\n");
-  fflush(0);
+  LOG("Testing JVMTI functions which should not accept a virtual thread argument\n");
+
 
   err = jvmti->StopThread(vthread, vthread);
   check_jvmti_error_invalid_thread(jni, "StopThread", err);
@@ -91,8 +91,8 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
   err = jvmti->GetThreadCpuTime(vthread, &nanos);
   check_jvmti_error_invalid_thread(jni, "GetThreadCpuTime", err);
 
-  printf("test_unsupported_jvmti_functions: finished\n");
-  fflush(0);
+  LOG("test_unsupported_jvmti_functions: finished\n");
+
 }
 
 JNIEXPORT jboolean JNICALL
@@ -102,13 +102,13 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
   jthread *threads = NULL;
   jthread cthread = NULL;
 
-  printf("testJvmtiFunctionsInJNICall: started\n");
-  fflush(0);
+  LOG("testJvmtiFunctionsInJNICall: started\n");
+
 
   err = jvmti->GetCurrentThread(&cthread);
   check_jvmti_status(jni, err, "GetCurrentThread");
-  printf("\n#### GetCurrentThread returned thread: %p\n", (void*)cthread);
-  fflush(0);
+  LOG("\n#### GetCurrentThread returned thread: %p\n", (void*)cthread);
+
 
   err = jvmti->GetAllThreads(&threads_count, &threads);
   check_jvmti_status(jni, err, "GetAllThreads");
@@ -136,7 +136,7 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
     }
     check_jvmti_status(jni, err, "JVMTI extension GetVirtualThread");
     if (vthread != NULL) {
-      printf("\n#### Found carrier thread: %s\n", tname);
+      LOG("\n#### Found carrier thread: %s\n", tname);
       fflush(stdout);
       test_unsupported_jvmti_functions(jvmti, jni, vthread);
     }
@@ -145,8 +145,8 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
 
     deallocate(jvmti, jni, (void*)tname);
   }
-  printf("testJvmtiFunctionsInJNICall: finished\n");
-  fflush(0);
+  LOG("testJvmtiFunctionsInJNICall: finished\n");
+
   return JNI_TRUE;
 }
 
@@ -162,7 +162,7 @@ VirtualThreadMount(jvmtiEnv *jvmti, ...) {
   thread = va_arg(ap, jthread);
   va_end(ap);
 
-  printf("Got VirtualThreadMount event\n");
+  LOG("Got VirtualThreadMount event\n");
   fflush(stdout);
   test_unsupported_jvmti_functions(jvmti, jni, thread);
 
@@ -178,7 +178,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiError err;
 
-  printf("Agent_OnLoad started\n");
+  LOG("Agent_OnLoad started\n");
   if (jvm->GetEnv((void **)(&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
@@ -187,7 +187,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = set_ext_event_callback(jvmti, "VirtualThreadMount", VirtualThreadMount);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
+    LOG("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -204,17 +204,17 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI AddCapabilities: %d\n", err);
+    LOG("error in JVMTI AddCapabilities: %d\n", err);
     return JNI_ERR;
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_MOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    LOG("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;
   }
 
-  printf("Agent_OnLoad finished\n");
+  LOG("Agent_OnLoad finished\n");
   return JNI_OK;
 }
 

@@ -51,8 +51,8 @@ StorageStructure* check_tls(jvmtiEnv * jvmti, JNIEnv * jni, jthread thread, cons
     return NULL;
   }
   check_jvmti_status(jni, err, "Error in GetThreadLocalStorage");
-  printf("Check %s with %p in %s\n", thread_info.name, storage, source);
-  fflush(0);
+  LOG("Check %s with %p in %s\n", thread_info.name, storage, source);
+
 
   if (storage == NULL) {
     // Might be not set
@@ -60,7 +60,7 @@ StorageStructure* check_tls(jvmtiEnv * jvmti, JNIEnv * jni, jthread thread, cons
   }
 
   if (storage->self_pointer != storage || (strcmp(thread_info.name, storage->data) != 0)) {
-    printf("Unexpected value in storage storage=%p, the self_pointer=%p, data (owner thread name): %s\n",
+    LOG("Unexpected value in storage storage=%p, the self_pointer=%p, data (owner thread name): %s\n",
            storage, storage->self_pointer, storage->data);
     print_thread_info(jvmti, jni, thread);
     jni->FatalError("Incorrect value in storage.");
@@ -94,8 +94,8 @@ void check_reset_tls(jvmtiEnv * jvmti, JNIEnv * jni, jthread thread, const char*
 
   StorageStructure* storage = (StorageStructure *)tmp;
 
-  printf("Init %s with %p in %s\n", thread_info.name, storage, source);
-  fflush(0);
+  LOG("Init %s with %p in %s\n", thread_info.name, storage, source);
+
 
   // Fill data
   storage->self_pointer = storage;
@@ -117,12 +117,12 @@ static void JNICALL
 agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
   /* scaffold objects */
   static jlong timeout = 0;
-  printf("Wait for thread to start\n");
+  LOG("Wait for thread to start\n");
   if (!nsk_jvmti_waitForSync(timeout))
     return;
   if (!nsk_jvmti_resumeSync())
     return;
-  printf("Started.....\n");
+  LOG("Started.....\n");
 
   while(true) {
     jthread *threads = NULL;
@@ -158,13 +158,13 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
 /** callback functions **/
 void JNICALL VMInit(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   RawMonitorLocker rml(jvmti, jni, monitor);
-  printf("Starting ...\n");
+  LOG("Starting ...\n");
   is_vm_running = true;
 }
 
 void JNICALL VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
   RawMonitorLocker rml(jvmti, jni, monitor);
-  printf("Exiting ...\n");
+  LOG("Exiting ...\n");
   is_vm_running = false;
 }
 
@@ -184,7 +184,7 @@ void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
 /*
 void JNICALL
 MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
-  fflush(0);
+
   int p = ((long) method / 128 % 100);
   if (p < 1) {
     RawMonitorLocker rml(jvmti, jni, monitor);
@@ -229,7 +229,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -242,20 +242,20 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   caps.can_generate_method_entry_events = 1;
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
+    LOG("(GetCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   /* set event callback */
-  printf("setting event callbacks ...\n");
+  LOG("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.VMInit = &VMInit;
   callbacks.VMDeath = &VMDeath;

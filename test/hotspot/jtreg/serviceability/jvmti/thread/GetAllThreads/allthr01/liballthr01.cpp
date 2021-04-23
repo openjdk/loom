@@ -77,7 +77,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti_env == NULL) {
-    printf("Wrong result of a valid call to GetEnv !\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
   memset(&caps, 0, sizeof(caps));
@@ -85,8 +85,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti_env->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -102,22 +101,22 @@ JNIEXPORT jboolean check_info(JNIEnv *jni, int idx) {
   jthread *threads;
   int num_unexpected = 0;
 
-  printf(" >>> Check point: %d\n", idx);
+  LOG(" >>> Check point: %d\n", idx);
 
   check_jvmti_status(jni, jvmti_env->GetAllThreads(&threads_count, &threads), "Failed in GetAllThreads");
 
   for (int i = 0; i < threads_count; i++) {
     if (!isThreadExpected(jvmti_env, threads[i])) {
       num_unexpected++;
-      printf(">>> unexpected:  ");
+      LOG(">>> unexpected:  ");
     } else {
-      printf(">>> expected: ");
+      LOG(">>> expected: ");
     }
     print_thread_info(jvmti_env, jni, threads[i]);
   }
 
   if (threads_count - num_unexpected != expected_thread_info[idx].cnt + system_threads_count) {
-    printf("Point %d: number of threads expected: %d, got: %d\n",
+    LOG("Point %d: number of threads expected: %d, got: %d\n",
            idx, expected_thread_info[idx].cnt + system_threads_count, threads_count - num_unexpected);
     return JNI_FALSE;
   }
@@ -128,7 +127,7 @@ JNIEXPORT jboolean check_info(JNIEnv *jni, int idx) {
       char *name = get_thread_name(jvmti_env, jni, threads[j]);
       found = strstr(name, expected_thread_info[idx].thr_names[i]);
       if (found) {
-        printf(" >>> found: %s\n", name);
+        LOG(" >>> found: %s\n", name);
       }
       //== name &&
         //  (idx == POINT_AGENT_THREAD || strlen(name) ==
@@ -136,7 +135,7 @@ JNIEXPORT jboolean check_info(JNIEnv *jni, int idx) {
     }
 
     if (!found) {
-      printf("Point %d: thread %s not detected\n",
+      LOG("Point %d: thread %s not detected\n",
              idx, expected_thread_info[idx].thr_names[i]);
       result = JNI_FALSE;
     }
@@ -152,13 +151,13 @@ JNIEXPORT void Java_allthr01_startAgentThread(JNIEnv *jni) {
   jvmtiError err = jvmti_env->RunAgentThread(create_jthread(jni), sys_thread, NULL,JVMTI_THREAD_NORM_PRIORITY);
   check_jvmti_status(jni, err, "Failed to run AgentThread");
   rml1.wait();
-  printf("Started Agent Thread\n");
+  LOG("Started Agent Thread\n");
 }
 
 JNIEXPORT void Java_allthr01_stopAgentThread(JNIEnv *jni) {
   RawMonitorLocker rml2 = RawMonitorLocker(jvmti_env, jni, stopping_agent_thread_lock);
   rml2.notify();
-  printf("Stopped Agent Thread\n");
+  LOG("Stopped Agent Thread\n");
 }
 
 
@@ -177,7 +176,7 @@ JNIEXPORT void JNICALL Java_allthr01_setSysCnt(JNIEnv *env, jclass cls) {
     }
   }
 
-  printf(" >>> number of system threads: %d\n", system_threads_count);
+  LOG(" >>> number of system threads: %d\n", system_threads_count);
 
 }
 

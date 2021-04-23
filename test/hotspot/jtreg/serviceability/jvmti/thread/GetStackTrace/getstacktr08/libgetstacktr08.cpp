@@ -85,14 +85,14 @@ void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread, jmetho
   }
 
   set_event_notification_mode(jvmti_env, jni, JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thread);
-  printf(">>> stepping ...\n");
+  LOG(">>> stepping ...\n");
 }
 
 void JNICALL SingleStep(jvmtiEnv *jvmti_env, JNIEnv *jni,
                         jthread thread, jmethodID method, jlocation location) {
   jclass klass;
   jvmtiClassDefinition classDef;
-  printf(">>> In SingleStep ...\n");
+  LOG(">>> In SingleStep ...\n");
   print_stack_trace(jvmti_env, jni, thread);
 
   if (wasFramePop == JNI_FALSE) {
@@ -103,7 +103,7 @@ void JNICALL SingleStep(jvmtiEnv *jvmti_env, JNIEnv *jni,
       jni->ThrowNew(jni->FindClass("java/lang/RuntimeException"), "Stacktrace differs from expected.");
     }
 
-    printf(">>> popping frame ...\n");
+    LOG(">>> popping frame ...\n");
 
     check_jvmti_status(jni, jvmti_env->PopFrame(thread), "PopFrame failed.");
     wasFramePop = JNI_TRUE;
@@ -119,7 +119,7 @@ void JNICALL SingleStep(jvmtiEnv *jvmti_env, JNIEnv *jni,
     }
 
     check_jvmti_status(jni, jvmti_env->GetMethodDeclaringClass(method, &klass), "GetMethodDeclaringClass failed.");
-    printf(">>> redefining class ...\n");
+    LOG(">>> redefining class ...\n");
 
     classDef.klass = klass;
     classDef.class_byte_count = jni->GetArrayLength(classBytes);
@@ -138,7 +138,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
   jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -151,8 +151,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+   LOG("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -160,8 +159,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.SingleStep = &SingleStep;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
   return JNI_OK;

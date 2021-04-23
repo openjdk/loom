@@ -83,11 +83,10 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
         nsk_jvmti_setFailStatus();
         return;
       }
-      NSK_DISPLAY2("  ... got state vector: %s (%d)\n",
-                   TranslateState(state), (int) state);
+      LOG("  ... got state vector: %s (%d)\n", TranslateState(state), (int) state);
 
       if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
-        printf("SuspendThread() does not turn on flag SUSPENDED:\n"
+        LOG("SuspendThread() does not turn on flag SUSPENDED:\n"
                "#   state: %s (%d)\n",
                TranslateState(state), (int) state);
         nsk_jvmti_setFailStatus();
@@ -103,15 +102,15 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
     /* Original agentProc test block ends here. */
 
     /*
-     * Using printf() instead of NSK_DISPLAY1() in this loop
+     * Using LOG() instead of NSK_DISPLAY1() in this loop
      * in order to slow down the rate of SuspendThread() calls.
      */
     for (late_count = 0; late_count < N_LATE_CALLS; late_count++) {
       jvmtiError l_err;
-      printf("INFO: Late suspend thread: %p\n", (void *) testedThread);
+      LOG("INFO: Late suspend thread: %p\n", (void *) testedThread);
       l_err = jvmti->SuspendThread(testedThread);
       if (l_err != JVMTI_ERROR_NONE) {
-        printf("INFO: Late suspend thread err: %d\n", l_err);
+        LOG("INFO: Late suspend thread err: %d\n", l_err);
         // testedThread has exited so we're done with late calls
         break;
       }
@@ -126,8 +125,8 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
       }
     }
 
-    printf("INFO: made %d late calls to JVM/TI SuspendThread()\n", late_count);
-    printf("INFO: N_LATE_CALLS == %d value is %slarge enough to cause a "
+    LOG("INFO: made %d late calls to JVM/TI SuspendThread()\n", late_count);
+    LOG("INFO: N_LATE_CALLS == %d value is %slarge enough to cause a "
            "SuspendThread() call after thread exit.\n", N_LATE_CALLS,
            (late_count == N_LATE_CALLS) ? "NOT " : "");
 
@@ -158,7 +157,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
