@@ -91,13 +91,16 @@ public class JavaThreadDumpTest {
     }
 
     /**
-     * Test thread in JSON format.
+     * Test thread dump in JSON format.
      */
     public void testJsonThreadDump() throws IOException {
         Path file = genThreadDumpPath(".json");
         threadDump(file, "-format=json").shouldMatch("Created");
 
-        // test that thread dump contains id of the current thread
+        // test that the threadDump object is present
+        assertTrue(find(file, "threadDump"), "`threadDump` not found in " + file);
+
+        // test that thread dump contains the id of the current thread
         long tid = Thread.currentThread().getId();
         String expected = "\"tid\": " + tid;
         assertTrue(find(file, expected), expected + " not found in " + file);
