@@ -1804,52 +1804,52 @@ static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res
 // it must set Continuation.stackSize
 // sets Continuation.fp/sp to relative indices
 template<typename ConfigT>
-int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
+int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   //callgrind();
-  assert (!thread->cont_yield(), "");
-  assert (!thread->has_pending_exception(), ""); // if (thread->has_pending_exception()) return early_return(freeze_exception, thread, fi);
-  assert (thread->deferred_updates() == nullptr || thread->deferred_updates()->count() == 0, "");
-  assert (!preempt || thread->thread_state() == _thread_in_vm || thread->thread_state() == _thread_blocked /*|| thread->thread_state() == _thread_in_native*/, "thread_state: %d %s", thread->thread_state(), thread->thread_state_name());
+  assert (!current->cont_yield(), "");
+  assert (!current->has_pending_exception(), ""); // if (current->has_pending_exception()) return early_return(freeze_exception, current, fi);
+  assert (current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
+  assert (!preempt || current->thread_state() == _thread_in_vm || current->thread_state() == _thread_blocked /*|| current->thread_state() == _thread_in_native*/, "thread_state: %d %s", current->thread_state(), current->thread_state_name());
 
 #ifdef ASSERT
   log_develop_trace(jvmcont)("~~~~~~~~~ freeze sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT,
-    p2i(thread->last_continuation()->entry_sp()), p2i(thread->last_continuation()->entry_fp()), p2i(thread->last_continuation()->entry_pc()));
+    p2i(current->last_continuation()->entry_sp()), p2i(current->last_continuation()->entry_fp()), p2i(current->last_continuation()->entry_pc()));
 
-  /* ContinuationHelper::set_anchor(thread, fi); */ print_frames(thread);
+  /* ContinuationHelper::set_anchor(current, fi); */ print_frames(current);
 #endif
 
 #if CONT_JFR
   EventContinuationFreeze event;
 #endif
 
-  thread->set_cont_yield(true);
+  current->set_cont_yield(true);
 
-  oop oopCont = ContinuationHelper::get_continuation(thread);
-  assert (oopCont == thread->last_continuation()->cont_oop(), "");
-  assert (ContinuationEntry::assert_entry_frame_laid_out(thread), "");
+  oop oopCont = ContinuationHelper::get_continuation(current);
+  assert (oopCont == current->last_continuation()->cont_oop(), "");
+  assert (ContinuationEntry::assert_entry_frame_laid_out(current), "");
 
   assert (verify_continuation<1>(oopCont), "");
-  ContMirror cont(thread, oopCont);
+  ContMirror cont(current, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
-  JVMTI_yield_VTMT_cleanup(thread);
+  JVMTI_yield_VTMT_cleanup(current);
 
   if (java_lang_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
     assert (verify_continuation<10>(cont.mirror()), "");
-    return early_return(freeze_pinned_cs, thread);
+    return early_return(freeze_pinned_cs, current);
   }
 
-  bool fast = can_freeze_fast(thread);
-  assert (!fast || thread->held_monitor_count() == 0, "");
+  bool fast = can_freeze_fast(current);
+  assert (!fast || current->held_monitor_count() == 0, "");
 
-  Freeze<ConfigT> fr(thread, cont, preempt);
+  Freeze<ConfigT> fr(current, cont, preempt);
   
   if (UNLIKELY(preempt)) {
-    assert (thread->thread_state() == _thread_in_vm, "");
+    assert (current->thread_state() == _thread_in_vm, "");
     freeze_result res = fr.freeze_slow();
     cont.set_preempted(true);
-    return freeze_epilog(thread, cont, res);
+    return freeze_epilog(current, cont, res);
   }
 
   if (fast && fr.is_chunk_available(sp)) {
@@ -1857,14 +1857,14 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
     freeze_result res = fr.try_freeze_fast(sp, true);
     assert (res == freeze_ok, "");
   #if CONT_JFR
-    cont.post_jfr_event(&event, thread);
+    cont.post_jfr_event(&event, current);
   #endif
   
     // if (UNLIKELY(preempt)) cont.set_preempted(true);
-    return freeze_epilog(thread, cont);
+    return freeze_epilog(current, cont);
   }
 
-  // if (thread->held_monitor_count() > 0) {
+  // if (current->held_monitor_count() > 0) {
   //    // tty->print_cr(">>> FAIL FAST");
   //    return freeze_pinned_monitor;
   // }
@@ -1872,22 +1872,22 @@ int freeze0(JavaThread* thread, intptr_t* const sp, bool preempt) {
   log_develop_trace(jvmcont)("chunk unavailable; transitioning to VM");
   JRT_BLOCK
     freeze_result res = fast ? fr.try_freeze_fast(sp, false) : fr.freeze_slow();
-    return freeze_epilog(thread, cont, res);
+    return freeze_epilog(current, cont, res);
   JRT_BLOCK_END
 }
 
 // Entry point to freeze. Transitions are handled manually
-JRT_BLOCK_ENTRY(int, Continuation::freeze(JavaThread* thread, intptr_t* sp))
-  // thread->frame_anchor()->set_last_Java_sp(sp);
-  // thread->frame_anchor()->make_walkable(thread);
+JRT_BLOCK_ENTRY(int, Continuation::freeze(JavaThread* current, intptr_t* sp))
+  // current->frame_anchor()->set_last_Java_sp(sp);
+  // current->frame_anchor()->make_walkable(current);
 
-  assert (sp == thread->frame_anchor()->last_Java_sp(), "");
+  assert (sp == current->frame_anchor()->last_Java_sp(), "");
 
-  if (thread->raw_cont_fastpath() > thread->last_continuation()->entry_sp() || thread->raw_cont_fastpath() < sp) {
-    thread->set_cont_fastpath(nullptr);
+  if (current->raw_cont_fastpath() > current->last_continuation()->entry_sp() || current->raw_cont_fastpath() < sp) {
+    current->set_cont_fastpath(nullptr);
   }
 
-  return cont_freeze(thread, sp, false);
+  return cont_freeze(current, sp, false);
 JRT_END
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint) {

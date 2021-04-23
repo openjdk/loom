@@ -3770,7 +3770,7 @@ void JavaThread::invoke_shutdown_hooks() {
 //   + Delete this thread
 //   + Return to caller
 
-bool Threads::destroy_vm() {
+void Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
 
 #ifdef ASSERT
@@ -3863,8 +3863,6 @@ bool Threads::destroy_vm() {
 #endif
 
   LogConfiguration::finalize();
-
-  return true;
 }
 
 
