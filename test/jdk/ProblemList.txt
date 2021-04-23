@@ -903,3 +903,4 @@ javax/management/remote/mandatory/notif/NotificationEmissionTest.java 8265342 ge
 java/awt/AppContext/ApplicationThreadsStop/ApplicationThreadsStop.java 8264674 generic-all
 sun/awt/AppContext/8012933/Test8012933.java                            8264674 generic-all
 javax/swing/plaf/metal/MetalUtils/bug6190373.java                      8264674 generic-all
+javax/swing/system/6799345/TestShutdown.java                           264674 generic-all
