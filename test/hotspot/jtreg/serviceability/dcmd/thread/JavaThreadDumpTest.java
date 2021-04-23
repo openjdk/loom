@@ -109,7 +109,7 @@ public class JavaThreadDumpTest {
     /**
      * Test that an existing file is not overwritten.
      */
-    public void testNotClobbered() throws IOException {
+    public void testDoNotOverwriteFile() throws IOException {
         Path file = genThreadDumpPath(".txt");
         Files.writeString(file, "xxx");
 
@@ -122,9 +122,9 @@ public class JavaThreadDumpTest {
     /**
      * Test overwriting an existing file.
      */
-    public void testOverrideFile() throws IOException {
+    public void testOverwriteFile() throws IOException {
         Path file = genThreadDumpPath(".txt");
         Files.writeString(file, "xxx");
-        testPlainThreadDump(file,"-overwrite");
+        testPlainThreadDump(file, "-overwrite");
     }
 }
