@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -37,9 +38,9 @@ import com.sun.management.HotSpotDiagnosticMXBean.ThreadDumpFormat;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class DumpThreads {
 
+    @Test
     public void testPlainText() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         Path file = genOutputPath("txt");
@@ -53,6 +54,7 @@ public class DumpThreads {
         }
     }
 
+    @Test
     public void testJson() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         Path file = genOutputPath("json");

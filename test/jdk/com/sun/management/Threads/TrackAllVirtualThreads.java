@@ -35,9 +35,9 @@ import com.sun.management.Threads;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class TrackAllVirtualThreads {
 
+    @Test
     public void testOneThread() throws Exception {
         assertTrue(Threads.virtualThreads().count() == 0L);
         Thread thread = Thread.ofVirtual().start(LockSupport::park);
@@ -53,6 +53,7 @@ public class TrackAllVirtualThreads {
         }
     }
 
+    @Test
     public void testManyThreads() throws Exception {
         assertTrue(Threads.virtualThreads().count() == 0L);
 

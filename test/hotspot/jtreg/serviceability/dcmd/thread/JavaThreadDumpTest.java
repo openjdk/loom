@@ -37,7 +37,6 @@ import jdk.test.lib.process.OutputAnalyzer;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class JavaThreadDumpTest {
 
     private Path genThreadDumpPath(String suffix) throws IOException {
@@ -77,6 +76,7 @@ public class JavaThreadDumpTest {
     /**
      * Test thread dump, should be in plain text format.
      */
+    @Test
     public void testThreadDump() throws IOException {
         Path file = genThreadDumpPath(".txt");
         testPlainThreadDump(file);
@@ -85,6 +85,7 @@ public class JavaThreadDumpTest {
     /**
      * Test thread dump in plain text format.
      */
+    @Test
     public void testPlainThreadDump() throws IOException {
         Path file = genThreadDumpPath(".txt");
         testPlainThreadDump(file, "-format=plain");
@@ -93,6 +94,7 @@ public class JavaThreadDumpTest {
     /**
      * Test thread dump in JSON format.
      */
+    @Test
     public void testJsonThreadDump() throws IOException {
         Path file = genThreadDumpPath(".json");
         threadDump(file, "-format=json").shouldMatch("Created");
@@ -109,6 +111,7 @@ public class JavaThreadDumpTest {
     /**
      * Test that an existing file is not overwritten.
      */
+    @Test
     public void testDoNotOverwriteFile() throws IOException {
         Path file = genThreadDumpPath(".txt");
         Files.writeString(file, "xxx");
@@ -122,6 +125,7 @@ public class JavaThreadDumpTest {
     /**
      * Test overwriting an existing file.
      */
+    @Test
     public void testOverwriteFile() throws IOException {
         Path file = genThreadDumpPath(".txt");
         Files.writeString(file, "xxx");

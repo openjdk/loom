@@ -23,7 +23,7 @@
 
 /**
  * @test
- * @summary @summary Basic test for com.sun.management.Threads.executors
+ * @summary Basic test for com.sun.management.Threads.executors
  * @run testng ThreadExecutors
  */
 
@@ -40,12 +40,12 @@ import com.sun.management.Threads.ThreadExecutor;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class ThreadExecutors {
 
     /**
      * One virtual thread executor, two threads.
      */
+    @Test
     public void testOneExecutor() throws Exception {
         try (var executor = Executors.newVirtualThreadExecutor()) {
             Thread vthread1 = execute(executor, LockSupport::park);
@@ -70,6 +70,8 @@ public class ThreadExecutors {
     /**
      * Two nest virtual thread executors, each with one thread.
      */
+
+    @Test
     public void testNestedExecutors() throws Exception {
         try (var executor1 = Executors.newVirtualThreadExecutor()) {
             Thread vthread1 = execute(executor1, LockSupport::park);
