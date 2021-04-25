@@ -46,7 +46,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class JoinTest {
     private ScheduledExecutorService scheduler;
 
@@ -84,6 +83,7 @@ public class JoinTest {
     /**
      * Test join when the task has already completed.
      */
+    @Test
     public void testJoin1() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<String> future = submit(executor, () -> "foo");
@@ -95,6 +95,7 @@ public class JoinTest {
     /**
      * Test join when the task has already completed with an exception.
      */
+    @Test
     public void testJoin2() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> { throw new RuntimeException(); });
@@ -106,6 +107,7 @@ public class JoinTest {
     /**
      * Test join when the task is cancelled.
      */
+    @Test
     public void testJoin3() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
@@ -120,6 +122,7 @@ public class JoinTest {
     /**
      * Test join waiting for a task to complete, task completes normally.
      */
+    @Test
     public void testJoin4() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<String> future = submit(executor, () -> {
@@ -133,6 +136,7 @@ public class JoinTest {
     /**
      * Test join waiting for a task to complete, task completes with exception.
      */
+    @Test
     public void testJoin5() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
@@ -146,6 +150,7 @@ public class JoinTest {
     /**
      * Test join waiting for a task to complete, task is cancelled while waiting.
      */
+    @Test
     public void testJoin6() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
@@ -161,6 +166,7 @@ public class JoinTest {
      * Test join waiting for a task to complete with the interrupt status set,
      * task completes normally.
      */
+    @Test
     public void testJoin7() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
@@ -182,6 +188,7 @@ public class JoinTest {
      * Test join waiting for a task to complete with the interrupt status set,
      * task completes with an exception.
      */
+    @Test
     public void testJoin8() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
@@ -203,6 +210,7 @@ public class JoinTest {
      * Test join waiting for a task to complete with the interrupt status set,
      * task is cancelled while waiting.
      */
+    @Test
     public void testJoin9() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
@@ -225,6 +233,7 @@ public class JoinTest {
      * Test join waiting for a task to complete. The thread is interrupted while
      * waiting., the task completes normally.
      */
+    @Test
     public void testJoin10() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {

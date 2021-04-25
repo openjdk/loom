@@ -49,12 +49,12 @@ import java.nio.channels.Selector;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class ThreadAPI {
 
     // -- Thread.currentThread --
 
     // Thread.currentThread before/after park
+    @Test
     public void testCurrentThread1() throws Exception {
         var before = new AtomicReference<Thread>();
         var after = new AtomicReference<Thread>();
@@ -71,6 +71,7 @@ public class ThreadAPI {
     }
 
     // Thread.currentThread before/after synchronized block
+    @Test
     public void testCurrentThread2() throws Exception {
         var ref1 = new AtomicReference<Thread>();
         var ref2 = new AtomicReference<Thread>();
@@ -94,6 +95,7 @@ public class ThreadAPI {
     }
 
     // Thread.currentThread before/after lock
+    @Test
     public void testCurrentThread3() throws Exception {
         var ref1 = new AtomicReference<Thread>();
         var ref2 = new AtomicReference<Thread>();
@@ -125,6 +127,7 @@ public class ThreadAPI {
 
     // -- run --
 
+    @Test
     public void testRun1() throws Exception {
         var ref = new AtomicBoolean();
         var thread = Thread.ofVirtual().unstarted(() -> ref.set(true));
@@ -136,6 +139,7 @@ public class ThreadAPI {
     // -- start --
 
     // already started
+    @Test
     public void testStart1() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         try {
@@ -147,6 +151,7 @@ public class ThreadAPI {
     }
 
     // already terminated
+    @Test
     public void testStart2() throws Exception {
         var thread = Thread.startVirtualThread(() -> { });
         thread.join();
@@ -156,6 +161,7 @@ public class ThreadAPI {
 
     // -- stop/suspend/resume --
 
+    @Test
     public void testStop1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -168,6 +174,7 @@ public class ThreadAPI {
         });
     }
 
+    @Test
     public void testStop2() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             try {
@@ -183,6 +190,7 @@ public class ThreadAPI {
     }
 
     @SuppressWarnings({"deprecation", "removal"})
+    @Test
     public void testSuspend1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -196,6 +204,7 @@ public class ThreadAPI {
     }
 
     @SuppressWarnings({"deprecation", "removal"})
+    @Test
     public void testSuspend2() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             try {
@@ -211,6 +220,7 @@ public class ThreadAPI {
     }
 
     @SuppressWarnings({"deprecation", "removal"})
+    @Test
     public void testResume1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -224,6 +234,7 @@ public class ThreadAPI {
     }
 
     @SuppressWarnings({"deprecation", "removal"})
+    @Test
     public void testResume2() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             try {
@@ -242,6 +253,7 @@ public class ThreadAPI {
     // -- join --
 
     // join before start
+    @Test
     public void testJoin1() throws Exception {
         var thread = Thread.ofVirtual().unstarted(() -> { });
 
@@ -258,11 +270,13 @@ public class ThreadAPI {
     }
 
     // join before start
+    @Test
     public void testJoin2() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin1);
     }
 
     // join where thread does not terminate
+    @Test
     public void testJoin3() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         try {
@@ -278,11 +292,13 @@ public class ThreadAPI {
     }
 
     // join where thread does not terminate
+    @Test
     public void testJoin4() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin3);
     }
 
     // join where thread terminates
+    @Test
     public void testJoin5() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             try {
@@ -294,11 +310,13 @@ public class ThreadAPI {
     }
 
     // join where thread terminates
+    @Test
     public void testJoin6() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin5);
     }
 
     // join where thread terminates
+    @Test
     public void testJoin7() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             try {
@@ -310,11 +328,13 @@ public class ThreadAPI {
     }
 
     // join where thread terminates
+    @Test
     public void testJoin8() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin7);
     }
 
     // join where thread terminates
+    @Test
     public void testJoin9() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             try {
@@ -326,11 +346,13 @@ public class ThreadAPI {
     }
 
     // join where thread terminates
+    @Test
     public void testJoin10() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin9);
     }
 
     // join where thread terminates
+    @Test
     public void testJoin11() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             try {
@@ -342,11 +364,13 @@ public class ThreadAPI {
     }
 
     // join where thread terminates
+    @Test
     public void testJoin12() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin11);
     }
 
     // join thread that has terminated
+    @Test
     public void testJoin13() throws Exception {
         var thread = Thread.startVirtualThread(() -> { });
         while (thread.isAlive()) {
@@ -360,11 +384,13 @@ public class ThreadAPI {
     }
 
     // join where thread terminates
+    @Test
     public void testJoin14() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin13);
     }
 
     // join with interrupt status set
+    @Test
     public void testJoin15() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         Thread.currentThread().interrupt();
@@ -381,11 +407,13 @@ public class ThreadAPI {
     }
 
     // join with interrupt status set
+    @Test
     public void testJoin16() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin15);
     }
 
     // join with interrupt status set
+    @Test
     public void testJoin17() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         Thread.currentThread().interrupt();
@@ -402,11 +430,13 @@ public class ThreadAPI {
     }
 
     // join with interrupt status set
+    @Test
     public void testJoin18() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin17);
     }
 
     // join with interrupt status set
+    @Test
     public void testJoin19() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         Thread.currentThread().interrupt();
@@ -423,11 +453,13 @@ public class ThreadAPI {
     }
 
     // join with interrupt status set
+    @Test
     public void testJoin20() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin19);
     }
 
     // interrupted when in join
+    @Test
     public void testJoin21() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         TestHelper.scheduleInterrupt(Thread.currentThread(), 100);
@@ -444,11 +476,13 @@ public class ThreadAPI {
     }
 
     // interrupted when in join
+    @Test
     public void testJoin22() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin17);
     }
 
     // interrupted when in join
+    @Test
     public void testJoin23() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         TestHelper.scheduleInterrupt(Thread.currentThread(), 100);
@@ -465,11 +499,13 @@ public class ThreadAPI {
     }
 
     // interrupted when in join
+    @Test
     public void testJoin24() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin23);
     }
 
     // interrupted when in join
+    @Test
     public void testJoin25() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         TestHelper.scheduleInterrupt(Thread.currentThread(), 100);
@@ -486,11 +522,13 @@ public class ThreadAPI {
     }
 
     // interrupted when in join
+    @Test
     public void testJoin26() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin25);
     }
 
     // join dinosaur thread from virtual thread
+    @Test
     public void testJoin27() throws Exception {
         AtomicBoolean done = new AtomicBoolean();
         TestHelper.runInVirtualThread(() -> {
@@ -513,6 +551,7 @@ public class ThreadAPI {
     }
 
     // join dinosaur thread from virtual thread
+    @Test
     public void testJoin28() throws Exception {
         long nanos = TimeUnit.NANOSECONDS.convert(2, TimeUnit.SECONDS);
         TestHelper.runInVirtualThread(() -> {
@@ -529,6 +568,7 @@ public class ThreadAPI {
     }
 
     // join dinosaur thread from virtual thread with interrupt status set
+    @Test
     public void testJoin29() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             var thread = new Thread(LockSupport::park);
@@ -547,6 +587,7 @@ public class ThreadAPI {
     }
 
     // interrupt virtual thread when in join of dinosaur thread
+    @Test
     public void testJoin30() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             AtomicBoolean done = new AtomicBoolean();
@@ -571,6 +612,7 @@ public class ThreadAPI {
     }
 
     // join thread that is being signalled
+    @Test
     public void testJoin31() throws Exception {
         Thread thread = Thread.startVirtualThread(() -> {
             Object lock = new Object();
@@ -585,11 +627,13 @@ public class ThreadAPI {
     }
 
     // join thread that is being signalled
+    @Test
     public void testJoin32() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin31);
     }
 
     // join thread that is being signalled
+    @Test
     public void testJoin33() throws Exception {
         AtomicBoolean done = new AtomicBoolean();
         Thread thread = Thread.startVirtualThread(() -> {
@@ -608,6 +652,7 @@ public class ThreadAPI {
     }
 
     // join thread that is being signalled
+    @Test
     public void testJoin34() throws Exception {
         TestHelper.runInVirtualThread(this::testJoin33);
     }
@@ -615,6 +660,7 @@ public class ThreadAPI {
 
     // -- interrupt --
 
+    @Test
     public void testInterrupt1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
@@ -628,6 +674,7 @@ public class ThreadAPI {
     }
 
     // interrupt before started
+    @Test
     public void testInterrupt2() throws Exception {
         var thread = Thread.ofVirtual().unstarted(() -> { });
         thread.interrupt();
@@ -635,6 +682,7 @@ public class ThreadAPI {
     }
 
     // interrupt after terminated
+    @Test
     public void testInterrupt3() throws Exception {
         var thread = Thread.startVirtualThread(() -> { });
         thread.join();
@@ -643,6 +691,7 @@ public class ThreadAPI {
     }
 
     // terminate with interrupt status set
+    @Test
     public void testInterrupt4() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             Thread.currentThread().interrupt();
@@ -652,6 +701,7 @@ public class ThreadAPI {
     }
 
     // interrupt when mounted
+    @Test
     public void testInterrupt5() throws Exception {
         var exception = new AtomicReference<Exception>();
         var thread = Thread.startVirtualThread(() -> {
@@ -671,6 +721,7 @@ public class ThreadAPI {
     }
 
     // interrupt when mounted
+    @Test
     public void testInterrupt6() throws Exception {
         var exception = new AtomicReference<Exception>();
         var thread = Thread.startVirtualThread(() -> {
@@ -693,6 +744,7 @@ public class ThreadAPI {
     }
 
     // interrupt when unmounted
+    @Test
     public void testInterrupt7() throws Exception {
         var exception = new AtomicReference<Exception>();
         var thread = Thread.startVirtualThread(() -> {
@@ -710,6 +762,7 @@ public class ThreadAPI {
     }
 
     // try to block with interrupt status set
+    @Test
     public void testInterrupt8() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
@@ -746,6 +799,7 @@ public class ThreadAPI {
     // -- setName/getName --
 
     // start thread without a name, the thread sets its own name
+    @Test
     public void testSetName1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
@@ -756,6 +810,7 @@ public class ThreadAPI {
     }
 
     // start thread without a name, main thread changes the name
+    @Test
     public void testSetName2() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         try {
@@ -769,6 +824,7 @@ public class ThreadAPI {
     }
 
     // create with a name
+    @Test
     public void testSetName3() throws Exception {
         TestHelper.runInVirtualThread("fred", () -> {
             Thread me = Thread.currentThread();
@@ -779,6 +835,7 @@ public class ThreadAPI {
     }
 
     // create with a name
+    @Test
     public void testSetName4() throws Exception {
         var thread = Thread.ofVirtual().name("fred").start(LockSupport::park);
         try {
@@ -794,6 +851,7 @@ public class ThreadAPI {
 
     // -- setPriority/getPriority --
 
+    @Test
     public void testSetPriority1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
@@ -813,6 +871,7 @@ public class ThreadAPI {
         });
     }
 
+    @Test
     public void testSetPriority2() throws Exception {
         var thread = Thread.ofVirtual().unstarted(LockSupport::park);
 
@@ -859,6 +918,7 @@ public class ThreadAPI {
 
     // -- setDaemon/isDaemon --
 
+    @Test
     public void testSetDaemon1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
@@ -868,6 +928,7 @@ public class ThreadAPI {
         });
     }
 
+    @Test
     public void testSetDaemon2() throws Exception {
         var thread = Thread.ofVirtual().unstarted(LockSupport::park);
 
@@ -893,6 +954,7 @@ public class ThreadAPI {
 
     // -- Thread.yield --
 
+    @Test
     public void testYield1() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -915,6 +977,7 @@ public class ThreadAPI {
         assertEquals(list, List.of("A", "B", "A", "B"));
     }
 
+    @Test
     public void testYield2() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -940,6 +1003,7 @@ public class ThreadAPI {
 
     // -- Thread.onSpinWait --
 
+    @Test
     public void testOnSpinWait() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
@@ -952,6 +1016,7 @@ public class ThreadAPI {
     // -- Thread.sleep --
 
     // Thread.sleep(-1)
+    @Test
     public void testSleep1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try {
@@ -965,12 +1030,14 @@ public class ThreadAPI {
     }
 
     // Thread.sleep(0)
+    @Test
     public void testSleep2() throws Exception {
         TestHelper.runInVirtualThread(() -> Thread.sleep(0));
         TestHelper.runInVirtualThread(() -> Thread.sleep(Duration.ofMillis(0)));
     }
 
     // Thread.sleep(2000)
+    @Test
     public void testSleep3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             long start = millisTime();
@@ -985,6 +1052,7 @@ public class ThreadAPI {
     }
 
     // Thread.sleep with interrupt status set
+    @Test
     public void testSleep4() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
@@ -1043,6 +1111,7 @@ public class ThreadAPI {
     }
 
     // Thread.sleep interrupted while sleeping
+    @Test
     public void testSleep5() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -1070,6 +1139,7 @@ public class ThreadAPI {
     }
 
     // Thread.sleep should not be disrupted by parking permit
+    @Test
     public void testSleep6() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             LockSupport.unpark(Thread.currentThread());
@@ -1084,6 +1154,7 @@ public class ThreadAPI {
     }
 
     // Thread.sleep should not be disrupted by unparking virtual thread
+    @Test
     public void testSleep7() throws Exception {
         AtomicReference<Exception> exc = new AtomicReference<>();
         var thread = Thread.startVirtualThread(() -> {
@@ -1137,6 +1208,7 @@ public class ThreadAPI {
 
     // -- Thread.set/getContextClassLoader --
 
+    @Test
     public void testContextClassLoader1() throws Exception {
         ClassLoader loader = new ClassLoader() { };
         TestHelper.runInVirtualThread(() -> {
@@ -1147,6 +1219,7 @@ public class ThreadAPI {
     }
 
     // inherit context class loader from creating thread
+    @Test
     public void testContextClassLoader2() throws Exception {
         ClassLoader loader = new ClassLoader() { };
         Thread t = Thread.currentThread();
@@ -1162,6 +1235,7 @@ public class ThreadAPI {
     }
 
     // inherit context class loader from creating virtual thread
+    @Test
     public void testContextClassLoader3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ClassLoader loader = new ClassLoader() { };
@@ -1173,6 +1247,7 @@ public class ThreadAPI {
     }
 
     // inherit context class loader from creating virtual thread
+    @Test
     public void testContextClassLoader4() throws Exception {
         ClassLoader loader = new ClassLoader() { };
         Thread t = Thread.currentThread();
@@ -1190,6 +1265,7 @@ public class ThreadAPI {
     }
 
     // no support for thread locals
+    @Test
     public void testContextClassLoader5() throws Exception {
         ClassLoader loader = new ClassLoader() { };
         TestHelper.runInVirtualThread(TestHelper.NO_THREAD_LOCALS, () -> {
@@ -1202,6 +1278,7 @@ public class ThreadAPI {
     }
 
     // do no inherit the initial value of threads locals
+    @Test
     public void testContextClassLoader6() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ClassLoader loader = new ClassLoader() { };
@@ -1220,6 +1297,7 @@ public class ThreadAPI {
     // -- Thread.UncaughtExceptionHandler --
 
     // per thread UncaughtExceptionHandler
+    @Test
     public void testUncaughtExceptionHandler1() throws Exception {
         class FooException extends RuntimeException { }
         var exception = new AtomicReference<Throwable>();
@@ -1237,6 +1315,7 @@ public class ThreadAPI {
     }
 
     // default UncaughtExceptionHandler
+    @Test
     public void testUncaughtExceptionHandler2() throws Exception {
         class FooException extends RuntimeException { }
         var exception = new AtomicReference<Throwable>();
@@ -1258,6 +1337,7 @@ public class ThreadAPI {
     }
 
     // no UncaughtExceptionHandler set
+    @Test
     public void testUncaughtExceptionHandler3() throws Exception {
         class FooException extends RuntimeException { }
         Thread thread = Thread.startVirtualThread(() -> {
@@ -1269,6 +1349,7 @@ public class ThreadAPI {
 
     // -- Thread.getId --
 
+    @Test
     public void testGetId() throws Exception {
         var ref1 = new AtomicReference<Long>();
         var ref2 = new AtomicReference<Long>();
@@ -1286,12 +1367,14 @@ public class ThreadAPI {
     // -- Thread.getState --
 
     // NEW
+    @Test
     public void testGetState1() {
         var thread = Thread.ofVirtual().unstarted(() -> { });
         assertTrue(thread.getState() == Thread.State.NEW);
     }
 
     // RUNNABLE (mounted)
+    @Test
     public void testGetState2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread.State state = Thread.currentThread().getState();
@@ -1300,6 +1383,7 @@ public class ThreadAPI {
     }
 
     // RUNNABLE (not mounted)
+    @Test
     public void testGetState3() throws Exception {
         AtomicBoolean completed = new AtomicBoolean();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -1328,6 +1412,7 @@ public class ThreadAPI {
     }
 
     // WAITING when parked
+    @Test
     public void testGetState4() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
         while (thread.getState() != Thread.State.WAITING) {
@@ -1338,6 +1423,7 @@ public class ThreadAPI {
     }
 
     // WAITING when parked and pinned
+    @Test
     public void testGetState5() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             var lock = new Object();
@@ -1353,6 +1439,7 @@ public class ThreadAPI {
     }
 
     // WAITING when blocked in Object.wait
+    @Test
     public void testGetState6() throws Exception {
         var thread = Thread.startVirtualThread(() -> {
             var lock = new Object();
@@ -1368,6 +1455,7 @@ public class ThreadAPI {
     }
 
     // TERMINATED
+    @Test
     public void testGetState7() throws Exception {
         var thread = Thread.startVirtualThread(() -> { });
         thread.join();
@@ -1377,6 +1465,7 @@ public class ThreadAPI {
 
     // -- isAlive --
 
+    @Test
     public void testIsAlive1() throws Exception {
         var thread = Thread.ofVirtual().unstarted(LockSupport::park);
         assertFalse(thread.isAlive());
@@ -1393,6 +1482,7 @@ public class ThreadAPI {
 
     // -- Thread.holdsLock --
 
+    @Test
     public void testHoldsLock1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             var lock = new Object();
@@ -1400,6 +1490,7 @@ public class ThreadAPI {
         });
     }
 
+    @Test
     public void testHoldsLock2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             var lock = new Object();
@@ -1413,6 +1504,7 @@ public class ThreadAPI {
     // -- Thread.getStackTrace/getStackTraces --
 
     // runnable (mounted)
+    @Test
     public void testGetStackTrace1() throws Exception {
         var sel = Selector.open();
         var thread = Thread.startVirtualThread(() -> {
@@ -1430,6 +1522,7 @@ public class ThreadAPI {
     }
 
     // waiting (mounted)
+    @Test
     public void testGetStackTrace2() throws Exception {
         try (ForkJoinPool pool = new ForkJoinPool(1)) {
             AtomicReference<Thread> ref = new AtomicReference<>();
@@ -1480,6 +1573,7 @@ public class ThreadAPI {
     }
 
     // parked (unmounted)
+    @Test
     public void testGetStackTrace3() throws Exception {
         var thread = Thread.startVirtualThread(LockSupport::park);
 
@@ -1498,6 +1592,7 @@ public class ThreadAPI {
     }
 
     // not started
+    @Test
     public void testGetStackTrace4() {
         var thread = Thread.ofVirtual().unstarted(() -> { });
         StackTraceElement[] stack = thread.getStackTrace();
@@ -1505,6 +1600,7 @@ public class ThreadAPI {
     }
 
     // terminated
+    @Test
     public void testGetStackTrace5() throws Exception {
         var thread = Thread.startVirtualThread(() -> { });
         thread.join();
@@ -1513,6 +1609,7 @@ public class ThreadAPI {
     }
 
     // getAllStackTraces should not include virtual threads
+    @Test
     public void testGetAllStackTraces1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Set<Thread> threads = Thread.getAllStackTraces().keySet();
@@ -1521,6 +1618,7 @@ public class ThreadAPI {
     }
 
     // getAllStackTraces should include carrier thread
+    @Test
     public void testGetAllStackTraces2() throws Exception {
         try (ForkJoinPool pool = new ForkJoinPool(1)) {
             AtomicReference<Thread> ref = new AtomicReference<>();
@@ -1579,6 +1677,7 @@ public class ThreadAPI {
 
     // -- ThreadGroup --
 
+    @Test
     public void testThreadGroup1() throws Exception {
         var thread = Thread.ofVirtual().unstarted(LockSupport::park);
         var vgroup = thread.getThreadGroup();
@@ -1593,6 +1692,7 @@ public class ThreadAPI {
     }
 
     // platform thread created by virtual thread
+    @Test
     public void testThreadGroup2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
@@ -1603,6 +1703,7 @@ public class ThreadAPI {
     }
 
     // enumerate recurse=false
+    @Test
     public void testEnumerate1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
@@ -1613,6 +1714,7 @@ public class ThreadAPI {
     }
 
     // enumerate recurse=true
+    @Test
     public void testEnumerate2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
@@ -1625,6 +1727,7 @@ public class ThreadAPI {
     // -- toString --
 
     // not started
+    @Test
     public void testToString1() {
         Thread thread = Thread.ofVirtual().unstarted(() -> { });
         thread.setName("fred");
@@ -1632,6 +1735,7 @@ public class ThreadAPI {
     }
 
     // mounted
+    @Test
     public void testToString2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
@@ -1641,6 +1745,7 @@ public class ThreadAPI {
     }
 
     // unmounted
+    @Test
     public void testToString3() throws Exception {
         Thread thread = Thread.startVirtualThread(() -> {
             Thread me = Thread.currentThread();
@@ -1659,6 +1764,7 @@ public class ThreadAPI {
     }
 
     // terminated
+    @Test
     public void testToString4() throws Exception {
         Thread thread = Thread.startVirtualThread(() -> {
             Thread me = Thread.currentThread();

@@ -30,11 +30,11 @@
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class ThreadLocals {
     static final ThreadLocal<Object> LOCAL = new ThreadLocal<>();
     static final ThreadLocal<Object> INHERITED_LOCAL = new InheritableThreadLocal<>();
 
+    @Test
     public void testThreadLocal1() throws Exception {
         for (int i = 0; i < 10; i++) {
             TestHelper.runInVirtualThread(() -> {
@@ -46,6 +46,7 @@ public class ThreadLocals {
         }
     }
 
+    @Test
     public void testThreadLocal2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             assertTrue(LOCAL.get() == null);
@@ -57,6 +58,7 @@ public class ThreadLocals {
     }
 
     // Thread cannot set values for its copy of thread-locals.
+    @Test
     public void testThreadLocal3() throws Exception {
         Object INITIAL_VALUE = new Object();
         ThreadLocal<Object> LOCAL2 = new ThreadLocal<>() {
@@ -95,6 +97,7 @@ public class ThreadLocals {
         });
     }
 
+    @Test
     public void testInheritedThreadLocal1() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         for (int i = 0; i < 10; i++) {
@@ -109,6 +112,7 @@ public class ThreadLocals {
     }
 
     // initial value inherited from platform thread
+    @Test
     public void testInheritedThreadLocal2() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         var obj = new Object();
@@ -123,6 +127,7 @@ public class ThreadLocals {
     }
 
     // initial value inherited from virtual thread
+    @Test
     public void testInheritedThreadLocal3() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         TestHelper.runInVirtualThread(() -> {
@@ -138,6 +143,7 @@ public class ThreadLocals {
     }
 
     // initial value not inherited from platform thread
+    @Test
     public void testInheritedThreadLocal4() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         var obj = new Object();
@@ -153,6 +159,7 @@ public class ThreadLocals {
     }
 
     // initial value not inherited from virtual thread
+    @Test
     public void testInheritedThreadLocal5() throws Exception {
         assertTrue(INHERITED_LOCAL.get() == null);
         TestHelper.runInVirtualThread(() -> {

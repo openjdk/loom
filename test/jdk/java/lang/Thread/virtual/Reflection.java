@@ -38,11 +38,11 @@ import java.util.concurrent.locks.LockSupport;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class Reflection {
     
     // -- invoke static method --
 
+    @Test
     public void testInvokeStatic1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             int result = (int) divideMethod().invoke(null, 20, 2);
@@ -51,6 +51,7 @@ public class Reflection {
     }
 
     // InvocationTargetException with cause
+    @Test
     public void testInvokeStatic2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try {
@@ -63,6 +64,7 @@ public class Reflection {
     }
 
     // IllegalArgumentException
+    @Test
     public void testInvokeStatic3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             assertThrows(IllegalArgumentException.class,
@@ -81,6 +83,7 @@ public class Reflection {
     }
 
     // ExceptionInInitializerError
+    @Test
     public void testInvokeStatic4() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Method foo = BadClass1.class.getDeclaredMethod("foo");
@@ -101,6 +104,7 @@ public class Reflection {
     }
 
     // <clinit> throws Error, specified behavior?
+    @Test
     public void testInvokeStatic5() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Method foo = BadClass2.class.getDeclaredMethod("foo");
@@ -116,6 +120,7 @@ public class Reflection {
     }
 
     // test that invoke does not pin the carrier thread
+    @Test
     public void testInvokeStatic6() throws Exception {
         Method parkMethod = Parker.class.getDeclaredMethod("park");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -140,6 +145,7 @@ public class Reflection {
 
     // -- invoke instance method --
 
+    @Test
     public void testInvokeInstance1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             var adder = new Adder();
@@ -149,6 +155,7 @@ public class Reflection {
     }
 
     // test exception throw by method
+    @Test
     public void testInvokeInstance2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             var adder = new Adder();
@@ -162,6 +169,7 @@ public class Reflection {
     }
 
     // NullPointerException/IllegalArgumentException
+    @Test
     public void testInvokeInstance3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             var adder = new Adder();
@@ -182,6 +190,7 @@ public class Reflection {
 
     // -- newInstance to construct objects --
 
+    @Test
     public void testNewInstance1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Constructor<?> ctor = Adder.class.getDeclaredConstructor(long.class);
@@ -191,6 +200,7 @@ public class Reflection {
     }
 
     // InvocationTargetException with cause
+    @Test
     public void testNewInstance2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Constructor<?> ctor = Adder.class.getDeclaredConstructor(long.class);
@@ -204,6 +214,7 @@ public class Reflection {
     }
 
     // IllegalArgumentException
+    @Test
     public void testNewInstance3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             var adder = new Adder();
@@ -222,6 +233,7 @@ public class Reflection {
     }
 
     // ExceptionInInitializerError
+    @Test
     public void testNewInstance4() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Constructor<?> ctor = BadClass3.class.getDeclaredConstructor();
@@ -242,6 +254,7 @@ public class Reflection {
     }
 
     // <clinit> throws Error, specified behavior?
+    @Test
     public void testNewInstance5() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Constructor<?> ctor = BadClass4.class.getDeclaredConstructor();
@@ -257,6 +270,7 @@ public class Reflection {
     }
 
     // test that newInstance does not pin the carrier thread
+    @Test
     public void testNewInstance6() throws Exception {
         Constructor<?> ctor = Parker.class.getDeclaredConstructor();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {

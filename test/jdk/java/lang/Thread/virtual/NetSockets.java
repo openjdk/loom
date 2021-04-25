@@ -50,7 +50,6 @@ import java.net.SocketTimeoutException;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class NetSockets {
 
     private static final long DELAY = 2000;
@@ -58,6 +57,7 @@ public class NetSockets {
     /**
      * Socket read/write, no blocking.
      */
+    @Test
     public void testSocketReadWrite1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -80,6 +80,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in read.
      */
+    @Test
     public void testSocketRead1() throws Exception {
         testSocketRead(0);
     }
@@ -87,6 +88,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in timed read.
      */
+    @Test
     public void testSocketRead2() throws Exception {
         testSocketRead(60_000);
     }
@@ -117,6 +119,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in write.
      */
+    @Test
     public void testSocketWrite1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -139,6 +142,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in read, peer closes connection.
      */
+    @Test
     public void testSocketReadPeerClose1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -156,6 +160,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in read, peer closes connection abruptly.
      */
+    @Test
     public void testSocketReadPeerClose2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -178,6 +183,7 @@ public class NetSockets {
     /**
      * Socket close while virtual thread blocked in read.
      */
+    @Test
     public void testSocketReadAsyncClose1() throws Exception {
         testSocketReadAsyncClose(0);
     }
@@ -185,6 +191,7 @@ public class NetSockets {
     /**
      * Socket close while virtual thread blocked in timed read.
      */
+    @Test
     public void testSocketReadAsyncClose2() throws Exception {
         testSocketReadAsyncClose(0);
     }
@@ -209,6 +216,7 @@ public class NetSockets {
     /**
      * Virtual thread interrupted while blocked in Socket read.
      */
+    @Test
     public void testSocketReadInterrupt1() throws Exception {
         testSocketReadInterrupt(0);
     }
@@ -216,6 +224,7 @@ public class NetSockets {
     /**
      * Virtual thread interrupted while blocked in Socket read with timeout
      */
+    @Test
     public void testSocketReadInterrupt2() throws Exception {
         testSocketReadInterrupt(60_000);
     }
@@ -243,6 +252,7 @@ public class NetSockets {
     /**
      * Socket close while virtual thread blocked in write.
      */
+    @Test
     public void testSocketWriteAsyncClose() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -262,6 +272,7 @@ public class NetSockets {
     /**
      * Virtual thread interrupted while blocked in Socket write
      */
+    @Test
     public void testSocketWriteInterrupt() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -284,6 +295,7 @@ public class NetSockets {
     /**
      * Virtual thread reading urgent data when SO_OOBINLINE is enabled.
      */
+    @Test
     public void testSocketReadUrgentData() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var connection = new Connection()) {
@@ -313,6 +325,7 @@ public class NetSockets {
     /**
      * ServerSocket accept, no blocking.
      */
+    @Test
     public void testServerSocketAccept1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (var listener = new ServerSocket(0)) {
@@ -328,6 +341,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in accept.
      */
+    @Test
     public void testServerSocketAccept2() throws Exception {
         testServerSocketAccept(0);
     }
@@ -335,6 +349,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in timed accept.
      */
+    @Test
     public void testServerSocketAccept3() throws Exception {
         testServerSocketAccept(60_000);
     }
@@ -359,6 +374,7 @@ public class NetSockets {
     /**
      * ServerSocket close while virtual thread blocked in accept.
      */
+    @Test
     public void testServerSocketAcceptAsyncClose1() throws Exception {
         testServerSocketAcceptAsyncClose(0);
     }
@@ -366,6 +382,7 @@ public class NetSockets {
     /**
      * ServerSocket close while virtual thread blocked in timed accept.
      */
+    @Test
     public void testServerSocketAcceptAsyncClose2() throws Exception {
         testServerSocketAcceptAsyncClose(60_000);
     }
@@ -389,6 +406,7 @@ public class NetSockets {
     /**
      * Virtual thread interrupted while blocked in ServerSocket accept
      */
+    @Test
     public void testServerSocketAcceptInterrupt1() throws Exception {
         testServerSocketAcceptInterrupt(0);
     }
@@ -396,6 +414,7 @@ public class NetSockets {
     /**
      * Virtual thread interrupted while blocked in ServerSocket accept with timeout
      */
+    @Test
     public void testServerSocketAcceptInterrupt2() throws Exception {
         testServerSocketAcceptInterrupt(60_000);
     }
@@ -422,6 +441,7 @@ public class NetSockets {
     /**
      * DatagramSocket receive/send, no blocking.
      */
+    @Test
     public void testDatagramSocketSendReceive1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (DatagramSocket s1 = new DatagramSocket(null);
@@ -450,6 +470,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in DatagramSocket receive
      */
+    @Test
     public void testDatagramSocketSendReceive2() throws Exception {
         testDatagramSocketSendReceive(0);
     }
@@ -457,6 +478,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in DatagramSocket receive with timeout
      */
+    @Test
     public void testDatagramSocketSendReceive3() throws Exception {
         testDatagramSocketSendReceive(60_000);
     }
@@ -493,6 +515,7 @@ public class NetSockets {
     /**
      * Virtual thread blocks in DatagramSocket receive that times out
      */
+    @Test
     public void testDatagramSocketReceiveTimeout() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try (DatagramSocket s = new DatagramSocket(null)) {
@@ -512,6 +535,7 @@ public class NetSockets {
     /**
      * DatagramSocket close while virtual thread blocked in receive.
      */
+    @Test
     public void testDatagramSocketReceiveAsyncClose1() throws Exception {
         testDatagramSocketReceiveAsyncClose(0);
     }
@@ -519,6 +543,7 @@ public class NetSockets {
     /**
      * DatagramSocket close while virtual thread blocked with timeout.
      */
+    @Test
     public void testDatagramSocketReceiveAsyncClose2() throws Exception {
         testDatagramSocketReceiveAsyncClose(60_000);
     }
@@ -550,6 +575,7 @@ public class NetSockets {
     /**
      * Virtual thread interrupted while blocked in DatagramSocket receive.
      */
+    @Test
     public void testDatagramSocketReceiveInterrupt1() throws Exception {
         testDatagramSocketReceiveInterrupt(0);
     }
@@ -557,6 +583,7 @@ public class NetSockets {
     /**
      * Virtual thread interrupted while blocked in DatagramSocket receive with timeout
      */
+    @Test
     public void testDatagramSocketReceiveInterrupt2() throws Exception {
         testDatagramSocketReceiveInterrupt(60_000);
     }

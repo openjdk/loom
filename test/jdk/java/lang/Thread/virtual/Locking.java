@@ -34,10 +34,12 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class Locking {
 
-    // lock/unlock
+    /**
+     * Test lock/unlock.
+     */
+    @Test
     public void testReentrantLock1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ReentrantLock lock = new ReentrantLock();
@@ -49,7 +51,10 @@ public class Locking {
         });
     }
 
-    // tryLock/unlock
+    /**
+     * Test tryLock/unlock.
+     */
+    @Test
     public void testReentrantLock2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ReentrantLock lock = new ReentrantLock();
@@ -62,7 +67,10 @@ public class Locking {
         });
     }
 
-    // lock/lock/unlock/unlock
+    /**
+     * Test lock/lock/unlock/unlock.
+     */
+    @Test
     public void testReentrantLock3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ReentrantLock lock = new ReentrantLock();
@@ -83,7 +91,10 @@ public class Locking {
         });
     }
 
-    // locked by platform thread, virtual thread tries to lock
+    /**
+     * Test locked by platform thread, virtual thread tries to lock.
+     */
+    @Test
     public void testReentrantLock4() throws Exception {
         ReentrantLock lock = new ReentrantLock();
         var holdsLock = new AtomicBoolean();
@@ -118,7 +129,10 @@ public class Locking {
         thread.join();
     }
 
-    // locked by virtual thread, platform thread tries to lock
+    /**
+     * Test locked by virtual thread, platform thread tries to lock.
+     */
+    @Test
     public void testReentrantLock5() throws Exception {
         ReentrantLock lock = new ReentrantLock();
         var thread = Thread.startVirtualThread(() -> {
@@ -149,7 +163,10 @@ public class Locking {
         }
     }
 
-    // lock by virtual thread, another virtual thread tries to lock
+    /**
+     * Test locked by virtual thread, another virtual thread tries to lock.
+     */
+    @Test
     public void testReentrantLock6() throws Exception {
         ReentrantLock lock = new ReentrantLock();
         var thread1 = Thread.startVirtualThread(() -> {

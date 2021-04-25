@@ -70,7 +70,6 @@ public class ThreadExecutors {
     /**
      * Two nest virtual thread executors, each with one thread.
      */
-
     @Test
     public void testNestedExecutors() throws Exception {
         try (var executor1 = Executors.newVirtualThreadExecutor()) {

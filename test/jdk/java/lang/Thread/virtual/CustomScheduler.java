@@ -41,12 +41,12 @@ import java.util.concurrent.locks.LockSupport;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class CustomScheduler {
     /**
      * Test task is a VirtualThreadTask and that its thread() method returns
      * the Thread object for the virtual thread.
      */
+    @Test
     public void testThread() throws Exception {
         try (ExecutorService pool = Executors.newFixedThreadPool(1)) {
             var ref = new AtomicReference<Thread>();
@@ -65,6 +65,7 @@ public class CustomScheduler {
      * Test task is a VirtualThreadTask and that an object can be attached to
      * the task.
      */
+    @Test
     public void testAttach() throws Exception {
         try (ExecutorService pool = Executors.newFixedThreadPool(1)) {
             Object context = new Object();
@@ -102,6 +103,7 @@ public class CustomScheduler {
     /**
      * Test running task on a virtual thread, should thrown IllegalCallerException.
      */
+    @Test
     public void testBadCarrier() {
         Executor scheduler = (task) -> {
             var exc = new AtomicReference<Throwable>();
@@ -125,6 +127,7 @@ public class CustomScheduler {
     /**
      * Test running task on a virtual thread, should thrown IllegalStateException.
      */
+    @Test
     public void testBadState() {
         Executor scheduler = (task) -> {
             // run on current thread
@@ -147,6 +150,7 @@ public class CustomScheduler {
      * Test parking with the virtual thread interrupt set, should not leak to the
      * carrier thread when the task completes.
      */
+    @Test
     public void testParkWithInterruptSet() {
         Thread carrier = Thread.currentThread();
         try {
@@ -165,6 +169,7 @@ public class CustomScheduler {
      * Test terminating with the virtual thread interrupt set, should not leak to
      * the carrier thread when the task completes.
      */
+    @Test
     public void testTerminateWithInterruptSet() {
         Thread carrier = Thread.currentThread();
         try {
@@ -181,6 +186,7 @@ public class CustomScheduler {
     /**
      * Test running task with the carrier interrupt status set.
      */
+    @Test
     public void testInterruptBeforeRun() throws Exception {
         Executor scheduler = (task) -> {
             Thread.currentThread().interrupt();
@@ -200,6 +206,7 @@ public class CustomScheduler {
     /**
      * Test carrier interrupt after running task.
      */
+    @Test
     public void testInterruptAfterRun() {
         Executor scheduler = (task) -> {
             task.run();

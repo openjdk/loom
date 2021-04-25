@@ -44,12 +44,12 @@ import jdk.jfr.consumer.RecordingFile;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class TestSubmitRejectedEvent {
 
     /**
      * Basic test of jdk.VirtualThreadSubmitRejectedEvent
      */
+    @Test
     public void testEvent() throws Exception {
         try (Recording recording = new Recording()) {
             recording.enable("jdk.VirtualThreadSubmitRejectedEvent");

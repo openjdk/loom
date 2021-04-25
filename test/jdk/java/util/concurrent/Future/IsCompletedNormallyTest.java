@@ -40,12 +40,12 @@ import java.util.concurrent.TimeoutException;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class IsCompletedNormallyTest {
 
     /**
      * Test isCompletedNormally when the task has already completed.
      */
+    @Test
     public void testIsCompletedNormally1() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<String> future = submit(executor, () -> "foo");
@@ -57,6 +57,7 @@ public class IsCompletedNormallyTest {
     /**
      * Test isCompletedNormally when the task has not completed.
      */
+    @Test
     public void testIsCompletedNormally2() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
@@ -74,6 +75,7 @@ public class IsCompletedNormallyTest {
     /**
      * Test isCompletedNormally when the task has completed with an exception.
      */
+    @Test
     public void testIsCompletedNormally3() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> { throw new RuntimeException(); });
@@ -85,6 +87,7 @@ public class IsCompletedNormallyTest {
     /**
      * Test isCompletedNormally when the task is cancelled.
      */
+    @Test
     public void testIsCompletedNormally4() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
@@ -100,6 +103,7 @@ public class IsCompletedNormallyTest {
      * Test isCompletedNormally with the interrupt status and the task has
      * already completed.
      */
+    @Test
     public void testIsCompletedNormally5() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<String> future = submit(executor, () -> "foo");
@@ -119,6 +123,7 @@ public class IsCompletedNormallyTest {
      * Test isCompletedNormally with the interrupt status set and when
      * the task has not completed.
      */
+    @Test
     public void testIsCompletedNormally6() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {
@@ -141,6 +146,7 @@ public class IsCompletedNormallyTest {
      * Test isCompletedNormally with the interrupt status and the task has
      * already completed with an exception.
      */
+    @Test
     public void testIsCompletedNormally7() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> { throw new RuntimeException(); });
@@ -160,6 +166,7 @@ public class IsCompletedNormallyTest {
      * Test isCompletedNormally with the interrupt status and the task is
      * cancelled.
      */
+    @Test
     public void testIsCompletedNormally8() {
         try (var executor = Executors.newCachedThreadPool()) {
             Future<?> future = submit(executor, () -> {

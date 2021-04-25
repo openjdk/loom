@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Basic tests for ThreadExecutor
+ * @summary Basic tests for executors created by Executors.newThreadExecutor
  * @run testng/othervm/timeout=300 ThreadExecutorTest
  */
 
@@ -56,7 +56,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class ThreadExecutorTest {
     // long running interruptible task
     private static final Callable<Void> SLEEP_FOR_A_DAY = () -> {
@@ -129,21 +128,37 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test that the thread factory specified to newThreadExecutor is used.
+     * Test that newVirtualThreadExecutor creates virtual threads
      */
+    @Test
+    public void testVirtualThreadExecutor() {
+        var ref = new AtomicReference<Thread>();
+        try (ExecutorService executor = Executors.newVirtualThreadExecutor()) {
+            executor.submit(() -> ref.set(Thread.currentThread()));
+        }
+        Thread thread = ref.get();
+        assertTrue(thread.isVirtual());
+    }
+
+    /**
+     * Test that newThreadExecutor uses the specified thread factory.
+     */
+    @Test
     public void testThreadFactory() throws Exception {
         var ref1 = new AtomicReference<Thread>();
         var ref2 = new AtomicReference<Thread>();
         ThreadFactory factory = task -> {
             assertTrue(ref1.get() == null);
-            Thread vthread = Thread.ofVirtual().unstarted(task);
-            ref1.set(vthread);
-            return vthread;
+            Thread thread = new Thread(task);
+            ref1.set(thread);
+            return thread;
         };
-        try (ExecutorService executor = Executors.newThreadExecutor(factory)) {
-            executor.submit(() -> ref2.set(Thread.currentThread())).join();
-            assertTrue(ref1.get() != null && ref1.get() == ref2.get());
+        try (var executor = Executors.newThreadExecutor(factory)) {
+            executor.submit(() -> ref2.set(Thread.currentThread()));
         }
+        Thread thread1 = ref1.get();   // Thread created by thread factory
+        Thread thread2 = ref2.get();   // Thread that executed task
+        assertTrue(thread1 == thread2);
     }
 
     /**
@@ -187,7 +202,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test shutdown a shared executor from a different thread.
+     * Test shutdown an unowned executor from a different thread.
      */
     @Test(dataProvider = "factories")
     public void testShutdown3(ThreadFactory factory) throws Exception {
@@ -250,7 +265,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test shutdownNow a shared executor from a different thread.
+     * Test shutdownNow an unowned executor from a random thread.
      */
     @Test(dataProvider = "factories")
     public void testShutdownNow3(ThreadFactory factory) throws Exception {
@@ -405,7 +420,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test closing a shared executor from a different thread.
+     * Test closing an unowned executor from a different thread.
      */
     @Test(dataProvider = "factories")
     public void testClose10(ThreadFactory factory) throws Exception {
