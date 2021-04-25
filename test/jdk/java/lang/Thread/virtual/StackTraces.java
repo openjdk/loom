@@ -41,7 +41,10 @@ import static org.testng.Assert.*;
 
 public class StackTraces {
 
-    // The stack frames for the carrier thread may be hidden
+    /**
+     * Test that the stack trace in exceptions does not include the carrier thread
+     * frames, except when running with -XX:+ShowCarrierFrames.
+     */
     @Test
     public void testStackTrace() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -53,7 +56,9 @@ public class StackTraces {
         });
     }
 
-    // carrier frames should be hidden
+    /**
+     * Test that StackWalker does not include carrier thread frames.
+     */
     @Test
     public void testStackWalker() throws Exception {
         TestHelper.runInVirtualThread(() -> {
