@@ -233,10 +233,10 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @param daemon  ignored
      *
      * @deprecated This method originally changed the <i>daemon status</i> of
-     *             the thread group that determined if the thread group was
-     *             automatically destroyed when its last thread terminates.
-     *             The concept of daemon thread group and the concept of a
-     *             destroyed thread group no longer exists.
+     *             the thread group. A daemon thread group was automatically
+     *             destroyed when its last thread terminated. The concept of
+     *             daemon thread group and the concept of a destroyed thread
+     *             group no longer exists.
      */
     @Deprecated(since="16", forRemoval=true)
     public final void setDaemon(boolean daemon) {
