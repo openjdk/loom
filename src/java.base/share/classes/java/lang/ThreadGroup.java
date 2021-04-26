@@ -131,8 +131,17 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @param   name   the name of the new thread group, can be {@code null}
      * @throws  SecurityException  if the current thread cannot create a
      *               thread in the specified thread group.
+     *
+     * @deprecated
+     * Thread groups provided a way in early JDK releases to group threads and
+     * provide a form of <i>job control</i> for threads. Thread groups supported
+     * the isolation of applets and defined methods intended for diagnostic
+     * purposes. The concept of thread group is obsolete. It should be rare for
+     * new applications to create thread groups.
+     *
      * @see     java.lang.ThreadGroup#checkAccess()
      */
+    @Deprecated(since = "99")
     public ThreadGroup(String name) {
         this(Thread.currentThread().getThreadGroup(), name);
     }
@@ -148,9 +157,17 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @param     name     the name of the new thread group, can be {@code null}
      * @throws    SecurityException  if the current thread cannot create a
      *               thread in the specified thread group.
-     * @see     java.lang.SecurityException
+     *
+     * @deprecated
+     * Thread groups provided a way in early JDK releases to group threads and
+     * provide a form of <i>job control</i> for threads. Thread groups supported
+     * the isolation of applets and defined methods intended for diagnostic
+     * purposes. The concept of thread group is obsolete. It should be rare for
+     * new applications to create thread groups.
+     *
      * @see     java.lang.ThreadGroup#checkAccess()
      */
+    @Deprecated(since = "99")
     public ThreadGroup(ThreadGroup parent, String name) {
         this(checkParentAccess(parent), parent, name);
     }

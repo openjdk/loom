@@ -1044,7 +1044,9 @@ class VirtualThread extends Thread {
                     ThreadGroup group = Thread.currentCarrierThread().getThreadGroup();
                     for (ThreadGroup p; (p = group.getParent()) != null; )
                         group = p;
-                    return new ThreadGroup(group, "CarrierThreads");
+                    @SuppressWarnings("deprecation")
+                    var carrierThreadsGroup = new ThreadGroup(group, "CarrierThreads");
+                    return carrierThreadsGroup;
                 }
             });
         }

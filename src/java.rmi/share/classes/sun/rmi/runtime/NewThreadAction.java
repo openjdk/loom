@@ -68,6 +68,7 @@ public final class NewThreadAction implements PrivilegedAction<Thread> {
      * may execute user code, so that the security policy for threads in
      * the system thread group will not apply
      */
+    @SuppressWarnings("deprecation")
     static final ThreadGroup userThreadGroup =
         AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
             public ThreadGroup run() {

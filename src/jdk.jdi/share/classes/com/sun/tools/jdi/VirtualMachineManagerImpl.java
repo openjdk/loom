@@ -83,7 +83,9 @@ public class VirtualMachineManagerImpl implements VirtualMachineManagerService {
         while ((parent = top.getParent()) != null) {
             top = parent;
         }
-        mainGroupForJDI = new ThreadGroup(top, "JDI main");
+        @SuppressWarnings("deprecation")
+        ThreadGroup group = new ThreadGroup(top, "JDI main");
+        mainGroupForJDI = group;
 
         /*
          * Load the connectors
