@@ -63,7 +63,7 @@ public class YieldALot {
 
         AtomicInteger count = new AtomicInteger();
 
-        Thread thread = Thread.startVirtualThread(() -> {
+        Thread thread = Thread.ofVirtual().start(() -> {
             while (count.incrementAndGet() < ITERATIONS) {
                 Thread.yield();
             }

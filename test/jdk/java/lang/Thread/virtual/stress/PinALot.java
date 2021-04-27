@@ -65,7 +65,7 @@ public class PinALot {
 
         AtomicInteger count = new AtomicInteger();
 
-        Thread thread = Thread.startVirtualThread(() -> {
+        Thread thread = Thread.ofVirtual().start(() -> {
             synchronized (lock) {
                 while (count.incrementAndGet() < ITERATIONS) {
                     LockSupport.parkNanos(1);

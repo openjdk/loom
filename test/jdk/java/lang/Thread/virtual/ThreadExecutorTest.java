@@ -190,7 +190,7 @@ public class ThreadExecutorTest {
     public void testShutdown2(ThreadFactory factory) throws Exception {
         var exception = new AtomicReference<Exception>();
         try (var executor = Executors.newThreadExecutor(factory)) {
-            Thread.startVirtualThread(() -> {
+            Thread.ofVirtual().start(() -> {
                 try {
                     executor.shutdown();
                 } catch (Exception e) {
@@ -208,7 +208,7 @@ public class ThreadExecutorTest {
     public void testShutdown3(ThreadFactory factory) throws Exception {
         var exception = new AtomicReference<Exception>();
         try (var executor = Executors.newUnownedThreadExecutor(factory)) {
-            Thread.startVirtualThread(() -> {
+            Thread.ofVirtual().start(() -> {
                 try {
                     executor.shutdown();
                 } catch (Exception e) {
@@ -253,7 +253,7 @@ public class ThreadExecutorTest {
     public void testShutdownNow2(ThreadFactory factory) throws Exception {
         var exception = new AtomicReference<Exception>();
         try (var executor = Executors.newThreadExecutor(factory)) {
-            Thread.startVirtualThread(() -> {
+            Thread.ofVirtual().start(() -> {
                 try {
                     executor.shutdownNow();
                 } catch (Exception e) {
@@ -271,7 +271,7 @@ public class ThreadExecutorTest {
     public void testShutdownNow3(ThreadFactory factory) throws Exception {
         var exception = new AtomicReference<Exception>();
         try (var executor = Executors.newUnownedThreadExecutor(factory)) {
-            Thread.startVirtualThread(() -> {
+            Thread.ofVirtual().start(() -> {
                 try {
                     executor.shutdownNow();
                 } catch (Exception e) {
@@ -373,7 +373,7 @@ public class ThreadExecutorTest {
     public void testClose6(ThreadFactory factory) throws Exception {
         var exception = new AtomicReference<Exception>();
         try (var executor = Executors.newThreadExecutor(factory)) {
-            Thread.startVirtualThread(() -> {
+            Thread.ofVirtual().start(() -> {
                 try {
                     executor.close();
                 } catch (Exception e) {
@@ -394,7 +394,7 @@ public class ThreadExecutorTest {
         executor.close();
         assertTrue(executor.isTerminated());
         var exception = new AtomicReference<Exception>();
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 executor.close();
             } catch (Exception e) {
@@ -426,7 +426,7 @@ public class ThreadExecutorTest {
     public void testClose10(ThreadFactory factory) throws Exception {
         var exception = new AtomicReference<Exception>();
         try (var executor = Executors.newUnownedThreadExecutor(factory)) {
-            Thread.startVirtualThread(() -> {
+            Thread.ofVirtual().start(() -> {
                 try {
                     executor.close();
                 } catch (Exception e) {

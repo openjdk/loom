@@ -67,7 +67,7 @@ public class TimedGet {
             futures.add(future);
 
             // start a thread that uses a timed-get to wait for the result
-            Thread thread = Thread.startVirtualThread(() -> {
+            Thread thread = Thread.ofVirtual().start(() -> {
                 try {
                     String result = future.get(1, TimeUnit.DAYS);
                     if (!RESULT.equals(result)) {
