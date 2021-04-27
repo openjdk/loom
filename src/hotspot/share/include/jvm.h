@@ -249,9 +249,6 @@ JVM_ScopeLocalCache(JNIEnv *env, jclass threadClass);
 JNIEXPORT void JNICALL
 JVM_SetScopeLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
 
-JNIEXPORT jobject JNICALL
-JVM_Vthread(JNIEnv *env, jclass threadClass);
-
 JNIEXPORT void JNICALL
 JVM_SetCurrentThread(JNIEnv *env, jclass threadClass, jobject theThread);
 
