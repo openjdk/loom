@@ -3934,9 +3934,6 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
         JvmtiExport::post_thread_start(thread);
       }
     }
-    oop ct_oop = thread->threadObj();
-    jobject cthread = JNIHandles::make_local(thread, ct_oop);
-    JFR_ONLY(Jfr::on_thread_start(cthread, vthread));
   }
   if (JvmtiExport::should_post_vthread_mount()) {
     JvmtiExport::post_vthread_mount(vthread);
@@ -3959,8 +3956,6 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
         JvmtiExport::post_thread_end(thread);
       }
     }
-    jobject cthread = JNIHandles::make_local(thread, ct_oop);
-    JFR_ONLY(Jfr::on_thread_exit(cthread, vthread));
     thread->set_mounted_vthread(NULL);
   }
   thread->rebind_to_jvmti_thread_state_of(ct_oop);
