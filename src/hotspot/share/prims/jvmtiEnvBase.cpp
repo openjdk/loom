@@ -705,8 +705,7 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
     if (jt->is_being_ext_suspended()) {
-      JvmtiThreadState* st = java_lang_Thread::jvmti_thread_state(jt->vthread());
-      if (st == NULL || !st->is_virtual()) {
+      if (jt->vthread() == NULL || jt->vthread() == thread_oop) {
         state |= JVMTI_THREAD_STATE_SUSPENDED;
       }
     }

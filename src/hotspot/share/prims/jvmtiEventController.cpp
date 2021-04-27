@@ -622,7 +622,7 @@ JvmtiEventControllerPrivate::recompute_enabled() {
 
   EC_TRACE(("[-] # recompute enabled - before " JULONG_FORMAT_X, was_any_env_thread_enabled));
 
-  // compute non-thread-filters events.
+  // Compute non-thread-filtered events.
   // This must be done separately from thread-filtered events, since some
   // events can occur before any threads exist.
   JvmtiEnvIterator it;

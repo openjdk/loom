@@ -828,6 +828,7 @@ javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
 
     if (!vfs.at_end()) {
       jvf = vfs.asJavaVFrame();
+      jvf = JvmtiEnvBase::check_and_skip_hidden_frames(_vthread_h(), jvf);
     }
   }
   int d = 0;
