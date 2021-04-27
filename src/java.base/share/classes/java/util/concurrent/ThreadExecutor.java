@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -44,7 +44,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.misc.InnocuousThread;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
-
 /**
  * An ExecutorService that executes each task in its own thread.
  */
@@ -85,9 +84,9 @@ class ThreadExecutor implements ExecutorService {
      *
      * @param factory the thread factory
      * @param deadline the deadline, null for no deadline
-     * @param shared true if not owned by the caller thread
+     * @param owned true if owned by the caller thread
      */
-    ThreadExecutor(ThreadFactory factory, Instant deadline, boolean shared) {
+    ThreadExecutor(ThreadFactory factory, Instant deadline, boolean owned) {
         Objects.requireNonNull(factory);
         Future<?> timer = null;
         if (deadline != null) {
@@ -103,14 +102,14 @@ class ThreadExecutor implements ExecutorService {
 
         this.factory = factory;
         this.timerTask = timer;
-        if (shared) {
-            this.owner = null;
-            this.previous = null;
-        } else {
+        if (owned) {
             Thread owner = Thread.currentThread();
             this.owner = owner;
             this.previous = ThreadFields.latestThreadExecutor(owner);
             ThreadFields.setLatestThreadExecutor(this);
+        } else {
+            this.owner = null;
+            this.previous = null;
         }
     }
 
