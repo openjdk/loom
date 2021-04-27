@@ -148,13 +148,13 @@ class ThreadExecutor implements ExecutorService {
      */
     private void tryTerminate() {
         assert state >= SHUTDOWN;
-        if (threads.isEmpty()) {
-            // set state
-            STATE.set(this, TERMINATED);
+        if (threads.isEmpty()
+            && STATE.compareAndSet(this, SHUTDOWN, TERMINATED)) {
 
             // cancel timer
-            if (timerTask != null && !timerTask.isDone()) {
-                timerTask.cancel(false);
+            Future<?> timer = this.timerTask;
+            if (timer != null && !timer.isDone()) {
+                timer.cancel(false);
             }
 
             // signal any waiters
@@ -390,9 +390,9 @@ class ThreadExecutor implements ExecutorService {
     }
 
     /**
-     * A Future for a task that runs in its own thread. The thread
-     * is created (but not started) when the Future is created. The
-     * thread is interrupted when the future is cancelled. Its ThreadExecutor
+     * A Future for a task that runs in its own thread. The thread is
+     * created (but not started) when the Future is created. The thread
+     * is interrupted when the future is cancelled. Its ThreadExecutor
      * is notified when the task completes.
      */
     private static class ThreadBoundFuture<T>
@@ -525,7 +525,7 @@ class ThreadExecutor implements ExecutorService {
 
         int size = tasks.size();
         if (size == 0) {
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("'tasks' is empty");
         }
 
         var holder = new AnyResultHolder<T>(Thread.currentThread());
@@ -551,7 +551,7 @@ class ThreadExecutor implements ExecutorService {
                 count++;
             }
             if (count == 0) {
-                throw new IllegalArgumentException();
+                throw new IllegalArgumentException("'tasks' is empty");
             }
 
             if (Thread.interrupted())
