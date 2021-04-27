@@ -643,6 +643,9 @@ JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
 javaVFrame*
 JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
   JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vthread);
+  if (state == NULL) {
+    return jvf; // nothing to skip
+  }
   jvf = check_and_skip_hidden_frames(state->is_in_VTMT(), jvf);
   return jvf;
 }
