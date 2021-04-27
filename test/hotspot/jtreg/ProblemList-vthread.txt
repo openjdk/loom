@@ -391,14 +391,8 @@ runtime/modules/PatchModule/PatchModuleClassList.java
 ####
 # GC tests failing because test expected results differ with vthread
 
-gc/g1/TestStringDeduplicationYoungGC.java
-gc/g1/TestStringDeduplicationTableRehash.java
-gc/g1/TestStringDeduplicationTableResize.java
-gc/g1/TestStringDeduplicationPrintOptions.java
-gc/g1/TestStringDeduplicationFullGC.java
-gc/g1/TestStringDeduplicationAgeThreshold.java
-gc/g1/TestRemsetLoggingPerRegion.java
-gc/g1/TestRemsetLogging.java
+gc/TestAgeOutput.java#id1
+gc/TestAgeOutput.java#id0
 gc/arguments/TestUseCompressedOopsErgo.java#id0
 gc/arguments/TestUseCompressedOopsErgo.java#id1
 gc/arguments/TestUseCompressedOopsErgo.java#id2
@@ -408,8 +402,16 @@ gc/arguments/TestMinInitialErgonomics.java
 gc/arguments/TestMaxRAMFlags.java
 gc/arguments/TestG1HeapSizeFlags.java
 gc/arguments/TestNewSizeThreadIncrease.java
-gc/TestAgeOutput.java#id1
-gc/TestAgeOutput.java#id0
+gc/g1/TestMixedGCLiveThreshold.java
+gc/g1/TestSkipRebuildRemsetPhase.java
+gc/g1/TestStringDeduplicationYoungGC.java
+gc/g1/TestStringDeduplicationTableRehash.java
+gc/g1/TestStringDeduplicationTableResize.java
+gc/g1/TestStringDeduplicationPrintOptions.java
+gc/g1/TestStringDeduplicationFullGC.java
+gc/g1/TestStringDeduplicationAgeThreshold.java
+gc/g1/TestRemsetLoggingPerRegion.java
+gc/g1/TestRemsetLogging.java
 
 ####
 ## Expected exception is ignored
