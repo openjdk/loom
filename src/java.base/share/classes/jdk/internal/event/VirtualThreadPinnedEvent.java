@@ -25,11 +25,7 @@
 package jdk.internal.event;
 
 /**
- * Event recording when an attempt to submit the task for a virtual thread to
- * its scheduler is rejected (RejectedExecutionException).
+ * Event recording that a virtual thread has parked on its carrier thread.
  */
-public class VirtualThreadSubmitRejectedEvent extends Event {
-    public String vthread;
-    public String scheduler;
-    public String exceptionMessage;
+public class VirtualThreadPinnedEvent extends Event {
 }

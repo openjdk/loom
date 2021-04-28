@@ -46,7 +46,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import jdk.internal.event.VirtualThreadSubmitRejectedEvent;
+import jdk.internal.event.VirtualThreadPinnedEvent;
+import jdk.internal.event.VirtualThreadSubmitFailedEvent;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.ThreadTracker;
@@ -259,11 +260,10 @@ class VirtualThread extends Thread {
                 scheduler.execute(runContinuation);
             }
         } catch (RejectedExecutionException ree) {
-            // record JFR event
-            var event = new VirtualThreadSubmitRejectedEvent();
-            if (event.shouldCommit()) {
-                event.vthread = this.toString();
-                event.scheduler = scheduler.toString();
+            // record event
+            var event = new VirtualThreadSubmitFailedEvent();
+            if (event.isEnabled()) {
+                event.javaThreadId = getId();
                 event.exceptionMessage = ree.getMessage();
                 event.commit();
             }
@@ -450,6 +450,12 @@ class VirtualThread extends Thread {
     @ChangesCurrentThread
     private void parkOnCarrierThread() {
         assert state() == PARKING;
+
+        // record event when mounted
+        VirtualThreadPinnedEvent event = new VirtualThreadPinnedEvent();
+        if (event.isEnabled()) {
+            event.commit();
+        }
 
         // switch to carrier thread
         Thread carrier = this.carrierThread;

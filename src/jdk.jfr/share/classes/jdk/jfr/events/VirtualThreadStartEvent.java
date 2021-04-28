@@ -32,19 +32,13 @@ import jdk.jfr.Name;
 import jdk.jfr.internal.MirrorEvent;
 
 @Category({"Java Runtime"})
-@Label("Virtual thread submit task rejected")
-@Name("jdk.VirtualThreadSubmitRejected")
-@Description("Submit of virtual thread task rejected")
-@MirrorEvent(className = "jdk.internal.event.VirtualThreadSubmitRejectedEvent")
-public final class VirtualThreadSubmitRejectedEvent extends AbstractJDKEvent {
+@Label("Virtual thread start")
+@Name("jdk.VirtualThreadStart")
+@Description("Virtual thread start")
+@MirrorEvent(className = "jdk.internal.event.VirtualThreadStartEvent")
+public final class VirtualThreadStartEvent extends AbstractJDKEvent {
 
-    @Label("Virtual Thread")
-    public String vthread;
-
-    @Label("Scheduler")
-    public String scheduler;
-
-    @Label("Exception message")
-    public String exceptionMessage;
+    @Label("Thread Id")
+    public long javaThreadId;
 
 }

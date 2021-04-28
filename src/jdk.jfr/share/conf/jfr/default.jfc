@@ -73,7 +73,21 @@
       <setting name="threshold" control="locking-threshold">20 ms</setting>
     </event>
 
-    <event name="jdk.VirtualThreadSubmitRejectedEvent">
+    <event name="jdk.VirtualThreadStart">
+      <setting name="enabled">true</setting>
+      <setting name="stackTrace">true</setting>
+    </event>
+
+    <event name="jdk.VirtualThreadEnd">
+      <setting name="enabled">true</setting>
+    </event>
+
+    <event name="jdk.VirtualThreadPinned">
+      <setting name="enabled">true</setting>
+      <setting name="stackTrace">true</setting>
+    </event>
+
+    <event name="jdk.VirtualThreadSubmitFailed">
       <setting name="enabled">true</setting>
       <setting name="stackTrace">true</setting>
     </event>
