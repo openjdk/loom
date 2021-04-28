@@ -88,7 +88,6 @@ serviceability/jvmti/negative/getstacktr02/getstacktr02.java
 serviceability/jvmti/negative/frameloc03/frameloc03.java
 
 serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java
-serviceability/jvmti/stress/StackTrace/Suspended/GetStackTraceSuspendedStressTest.java
 serviceability/jvmti/stress/ThreadLocalStorage/SetGetThreadLocalStorageStressTest/SetGetThreadLocalStorageStressTest.java
 
 serviceability/jvmti/thread/GetThreadState/thrstat01/thrstat01.java

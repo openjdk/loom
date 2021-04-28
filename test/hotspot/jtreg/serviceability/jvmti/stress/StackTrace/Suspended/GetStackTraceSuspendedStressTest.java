@@ -38,6 +38,7 @@ public class GetStackTraceSuspendedStressTest extends DebugeeClass {
     private static final String agentLib = "GetStackTraceSuspendedStress";
 
     static final int MSG_COUNT = 1000;
+    static final int VTHREAD_COUNT = 60;
     static final SynchronousQueue<String> QUEUE = new SynchronousQueue<>();
 
     static void producer(String msg) throws InterruptedException {
@@ -87,7 +88,7 @@ public class GetStackTraceSuspendedStressTest extends DebugeeClass {
 
     public static void test1() throws Exception {
         List<Thread> threads = new ArrayList<>();
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < VTHREAD_COUNT; i++) {
             threads.add(Thread.ofVirtual().name("VThread-Producer-" + i).unstarted(PRODUCER));
             threads.add(Thread.ofVirtual().name("VThread-Consumer-" + i).unstarted(CONSUMER));
         }

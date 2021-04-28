@@ -619,6 +619,15 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
   javaVFrame* jvf_saved = jvf;
   // find jvf with a method annotated with @JvmtiMountTransition
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
+    // TBD: Below is a TMP work around bad/unaligned method addresses in jvf.
+    // There were observed unaligned method addresses like 0x7 or 0xffffffffffffffee.
+    // This is a safety guard but there has to be a better solution.
+    if (jvf->is_interpreted_frame()) {
+      Method** method_addr = jvf->fr().interpreter_frame_method_addr();
+      if (!is_object_aligned((const void*)method_addr)) {
+        return jvf_saved; // safety gard - return the original top jvf
+      }
+    }
     if (jvf->method()->jvmti_mount_transition()) {
       jvf = jvf->java_sender(); // skip annotated method
       break;
@@ -652,6 +661,10 @@ JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
 
 javaVFrame*
 JvmtiEnvBase::get_vthread_jvf(oop vthread) {
+  assert(java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::NEW, "sanity check");
+  if (java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::TERMINATED) {
+    return NULL;
+  }
   Thread* cur_thread = Thread::current();
   oop cont = java_lang_VirtualThread::continuation(vthread);
   javaVFrame* jvf = NULL;
