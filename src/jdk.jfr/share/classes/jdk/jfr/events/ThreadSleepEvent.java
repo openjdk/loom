@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,11 +34,11 @@ import jdk.jfr.internal.MirrorEvent;
 import jdk.jfr.internal.Type;
 
 @Category("Java Application")
-@Label("Hava Thread Sleep")
+@Label("Java Thread Sleep")
 @Name("jdk.ThreadSleep")
 @MirrorEvent(className = "jdk.internal.event.ThreadSleepEvent")
 public final class ThreadSleepEvent extends AbstractJDKEvent {
-    @Label("SLeep Time")
+    @Label("Sleep Time")
     @Timespan(Timespan.NANOSECONDS)
     public long time;
 }

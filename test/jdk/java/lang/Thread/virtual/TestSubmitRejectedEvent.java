@@ -23,7 +23,7 @@
 
 /**
  * @test
- * @summary Basic test for JFR VirtualThreadSubmitRejectedEvent
+ * @summary Basic test for JFR VirtualThreadSubmitRejected event
  * @run testng/othervm TestSubmitRejectedEvent
  */
 
@@ -47,12 +47,12 @@ import static org.testng.Assert.*;
 public class TestSubmitRejectedEvent {
 
     /**
-     * Basic test of jdk.VirtualThreadSubmitRejectedEvent
+     * Basic test of jdk.VirtualThreadSubmitRejected
      */
     @Test
     public void testEvent() throws Exception {
         try (Recording recording = new Recording()) {
-            recording.enable("jdk.VirtualThreadSubmitRejectedEvent");
+            recording.enable("jdk.VirtualThreadSubmitRejected");
 
             int nEventsExpected;
             recording.start();
