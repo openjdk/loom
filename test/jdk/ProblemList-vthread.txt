@@ -12,7 +12,7 @@ jdk/jfr/event/runtime/TestJavaBlockedEvent.java                                 
 jdk/jfr/jcmd/TestJcmdStartStopDefault.java                                                      8253378 generic-all
 
 jdk/jfr/event/allocation/TestObjectAllocationSampleEvent.java                                   8261379 generic-all
-java/lang/Thread/virtual/TestSubmitFailedEvent.java                                             8261379 generic-all
+java/lang/Thread/virtual/JfrEvents.java                                                         8261379 generic-all
 
 java/lang/invoke/condy/CondyNestedTest.java                                                     8253670 generic-all
 
