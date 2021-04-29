@@ -108,7 +108,7 @@ public final class ScopeLocal<T> {
     public final int hashCode() { return hash; }
 
     /**
-     * Represents a snapshot of inheritable scoped variables.
+     * An immutable map from {@code ScopeLocal} to values.
      *
      * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
      * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -148,18 +148,18 @@ public final class ScopeLocal<T> {
     }
 
     /**
-     * A map from a set of ScopeLocals to their bound values.
+     * An immutable map from a set of ScopeLocals to their bound values.
      * When map() or call() is invoked, the ScopeLocals bound in this set
      * are bound, such that calling the get() method returns the associated
      * value.
      */
-    public static final class BoundValues {
+    public static final class Carrier {
         // Bit masks: a 1 in postion n indicates that this set of bound values
         // hits that slot in the cache
         final short primaryBits, secondaryBits;
         final SingleBinding inheritables, nonInheritables;
 
-       BoundValues(SingleBinding inheritables, SingleBinding nonInheritables, short primaryBits, short secondaryBits) {
+       Carrier(SingleBinding inheritables, SingleBinding nonInheritables, short primaryBits, short secondaryBits) {
             this.inheritables = inheritables;
             this.nonInheritables = nonInheritables;
             this.primaryBits = primaryBits;
@@ -167,9 +167,9 @@ public final class ScopeLocal<T> {
         }
 
         /**
-         * Add a binding to this map, returning a new BoundValues instance.
+         * Add a binding to this map, returning a new Carrier instance.
          */
-        private static final <T> BoundValues where(ScopeLocal<T> key, T value,
+        private static final <T> Carrier where(ScopeLocal<T> key, T value,
                                            SingleBinding inheritables, SingleBinding nonInheritables,
                                            short primaryBits, short secondaryBits) {
             if (key.isInheritable) {
@@ -179,7 +179,7 @@ public final class ScopeLocal<T> {
             }
             primaryBits |= (short)(1 << Cache.primaryIndex(key));
             secondaryBits |= (short)(1 << Cache.secondaryIndex(key));
-            return new BoundValues(inheritables, nonInheritables, primaryBits, secondaryBits);
+            return new Carrier(inheritables, nonInheritables, primaryBits, secondaryBits);
         }
 
         /**
@@ -190,15 +190,33 @@ public final class ScopeLocal<T> {
          * @param <T>   The type of the ScopeLocal
          * @return TBD
          */
-        public final <T> BoundValues where(ScopeLocal<T> key, T value) {
+        public final <T> Carrier where(ScopeLocal<T> key, T value) {
             return where(key, value, inheritables, nonInheritables, primaryBits, secondaryBits);
         }
 
         /*
-         * Return a new set of BoundValues, consisting of a single binding.
+         * Return a new set consisting of a single binding.
          */
-        static final <T> BoundValues of(ScopeLocal<T> key, T value) {
+        static final <T> Carrier of(ScopeLocal<T> key, T value) {
             return where(key, value, null, null, (short)0, (short)0);
+        }
+
+        /**
+         * Search for the value of a binding in this set
+         * @param key the ScopeLocal to find
+         * @param <T> the type of the ScopeLocal
+         * @return the value
+         */
+        @SuppressWarnings("unchecked")
+        public final <T> T get(ScopeLocal<T> key) {
+            for (SingleBinding b = key.isInheritable ? inheritables : nonInheritables;
+                 b != null; b = b.prev) {
+                if (b.getKey() == key) {
+                    Object value = b.get();
+                    return (T)value;
+                }
+            }
+            throw new NoSuchElementException();
         }
 
         /**
@@ -215,14 +233,14 @@ public final class ScopeLocal<T> {
         public final <R> R call(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
-            var p1 = addScopeLocalBindings(this.inheritables, primaryBits,true);
-            var p2 = addScopeLocalBindings(this.nonInheritables, primaryBits,false);
+            var inheritables = addScopeLocalBindings(this.inheritables, primaryBits,true);
+            var nonInheritables = addScopeLocalBindings(this.nonInheritables, primaryBits,false);
             try {
                 return op.call();
             } finally {
                 Thread currentThread = Thread.currentThread();
-                currentThread.noninheritableScopeLocalBindings = p2;
-                currentThread.inheritableScopeLocalBindings = p1;
+                currentThread.noninheritableScopeLocalBindings = nonInheritables;
+                currentThread.inheritableScopeLocalBindings = inheritables;
                 Cache.invalidate(primaryBits | secondaryBits);
             }
         }
@@ -257,14 +275,14 @@ public final class ScopeLocal<T> {
         public final void run(Runnable op) {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
-            var p1 = addScopeLocalBindings(this.inheritables, primaryBits,true);
-            var p2 = addScopeLocalBindings(this.nonInheritables, primaryBits,false);
+            var inheritables = addScopeLocalBindings(this.inheritables, primaryBits,true);
+            var nonInheritables = addScopeLocalBindings(this.nonInheritables, primaryBits,false);
             try {
                 op.run();
             } finally {
                 Thread currentThread = Thread.currentThread();
-                currentThread.noninheritableScopeLocalBindings = p2;
-                currentThread.inheritableScopeLocalBindings = p1;
+                currentThread.noninheritableScopeLocalBindings = nonInheritables;
+                currentThread.inheritableScopeLocalBindings = inheritables;
                 Cache.invalidate(primaryBits | secondaryBits);
             }
         }
@@ -284,17 +302,46 @@ public final class ScopeLocal<T> {
 
     /**
      * Creates a binding for a ScopeLocal instance.
-     * That {@link BoundValues} may be used later to invoke a {@link Callable} or
-     * {@link Runnable} instance. More bindings may be added to the {@link BoundValues}
-     * by the {@link BoundValues#where(ScopeLocal, Object)} method.
+     * That {@link Carrier} may be used later to invoke a {@link Callable} or
+     * {@link Runnable} instance. More bindings may be added to the {@link Carrier}
+     * by the {@link Carrier#where(ScopeLocal, Object)} method.
      *
      * @param key the ScopeLocal to bind
      * @param value The value to bind it to
      * @param <T> the type of the ScopeLocal
-     * @return A BoundValues instance that contains one binding, that of key and value
+     * @return A Carrier instance that contains one binding, that of key and value
      */
-    public static <T> BoundValues where(ScopeLocal<T> key, T value) {
-        return BoundValues.of(key, value);
+    public static <T> Carrier where(ScopeLocal<T> key, T value) {
+        // This could be made more efficient by not creating the Carrier instance.
+        return Carrier.of(key, value);
+    }
+
+    /**
+     * Creates a binding for a ScopeLocal instance and runs a value-returning
+     * operation with that bound ScopeLocal.
+     * @param key the ScopeLocal to bind
+     * @param value The value to bind it to
+     * @param <T> the type of the ScopeLocal
+     * @param <U> the type of the Result
+     * @param op the operation to call
+     * @return the result
+     * @throws Exception if the operation completes with an exception
+     */
+    public static <T, U> U where(ScopeLocal<T> key, T value, Callable<U> op) throws Exception {
+        // This could be made more efficient by not creating the Carrier instance.
+        return where(key, value).call(op);
+    }
+
+    /**
+     * Creates a binding for a ScopeLocal instance and runs an
+     * operation with that bound ScopeLocal.
+     * @param key the ScopeLocal to bind
+     * @param value The value to bind it to
+     * @param <T> the type of the ScopeLocal
+     * @param op the operation to run
+     */
+    public static <T> void where(ScopeLocal<T> key, T value, Runnable op) {
+        where(key, value).run(op);
     }
 
     /**
