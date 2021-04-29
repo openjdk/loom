@@ -181,8 +181,8 @@ setThreadLocalStorage(jthread thread, ThreadNode *node)
 
     error = JVMTI_FUNC_PTR(gdata->jvmti,SetThreadLocalStorage)
             (gdata->jvmti, thread, (void*)node);
-    if ( error == JVMTI_ERROR_THREAD_NOT_ALIVE ) {
-        /* Just return, thread hasn't started yet */
+    if ( error == JVMTI_ERROR_THREAD_NOT_ALIVE && node == NULL) {
+        /* Just return. This can happen when clearing the TLS. */
         return;
     } else if ( error != JVMTI_ERROR_NONE ) {
         /* The jthread object must be valid, so this must be a fatal error */
@@ -243,41 +243,21 @@ findThread(ThreadList *list, jthread thread)
 {
     ThreadNode *node;
     JNIEnv *env = getEnv();
-    jboolean is_vthread = isVThread(thread);
-
-    if (is_vthread) {
-        if (list == NULL || list == &runningVThreads) {
-            /*
-             * Search for a vthread.
-             * vthread fixme: this needs to be done a lot faster. Maybe some sort of TLS for vthreads is needed.
-             * Otherwise we'll need something like a hashlist front end to the runningVThreads list so
-             * we can do quick lookups.
-             */
-            return nonTlsSearch(env, &runningVThreads, thread);
-        } else {
-            return NULL; // return NULL if we aren't looking for vthreads
-        }
-    }
 
     /* Get thread local storage for quick thread -> node access */
     node = getThreadLocalStorage(thread);
 
-    /* In some rare cases we might get NULL, so we check the list manually for
-     *   any threads that we could match.
-     */
     if ( node == NULL ) {
-        if ( list != NULL ) {
-            node = nonTlsSearch(env, list, thread);
-        } else {
-            node = nonTlsSearch(env, &runningThreads, thread);
-            if ( node == NULL ) {
-                node = nonTlsSearch(env, &otherThreads, thread);
-            }
+        /*
+         * If the thread was not yet started when the ThreadNode was created, then it
+         * got added to the otherThreads list and its thread local storage was not set.
+         * Search for it in the otherThreads list.
+         */
+        if ( list == NULL || list == &otherThreads ) {
+            node = nonTlsSearch(getEnv(), &otherThreads, thread);
         }
-        if ( node != NULL ) {
-            /* Here we make another attempt to set TLS, it's ok if this fails */
-            setThreadLocalStorage(thread, (void*)node);
-        }
+        /* A thread with no TLS should never be in the runningThreads list. */
+        JDI_ASSERT(!nonTlsSearch(getEnv(), &runningThreads, thread));
     }
 
     /* If a list is supplied, only return ones in this list */
@@ -373,20 +353,43 @@ insertThread(JNIEnv *env, ThreadList *list, jthread thread)
             EXIT_ERROR(AGENT_ERROR_OUT_OF_MEMORY,"thread table entry");
             return NULL;
         }
-        /*
-         * Remember if it is a debug thread
-         */
-        if (!is_vthread && threadControl_isDebugThread(node->thread)) {
-            node->isDebugThread = JNI_TRUE;
-        } else if (suspendAllCount > 0){
-            /*
-             * If there is a pending suspendAll, all new threads should
-             * be initialized as if they were suspended by the suspendAll,
-             * and the thread will need to be suspended when it starts.
-             */
-            node->suspendCount = suspendAllCount;
-            node->suspendOnStart = JNI_TRUE;
+        if (!is_vthread) {
+            if (threadControl_isDebugThread(node->thread)) {
+                /* Remember if it is a debug thread */
+                node->isDebugThread = JNI_TRUE;
+            } else {
+                if (suspendAllCount > 0) {
+                    /*
+                     * If there is a pending suspendAll, all new threads should
+                     * be initialized as if they were suspended by the suspendAll,
+                     * and the thread will need to be suspended when it starts.
+                     */
+                    node->suspendCount = suspendAllCount;
+                    node->suspendOnStart = JNI_TRUE;
+                }
+            }
+        } else { /* vthread */
+            jint vthread_state = 0;
+            jvmtiError error = threadState(node->thread, &vthread_state);
+            if (error != JVMTI_ERROR_NONE) {
+                EXIT_ERROR(error, "getting thread state");
+            }
+            if (suspendAllCount > 0) {
+                // Assume the suspendAllCount, just like the regular thread case above.
+                node->suspendCount = suspendAllCount;
+                if (vthread_state == 0) {
+                    // If state == 0, then this is a new vthread that has not been started yet.
+                    // Need to suspendOnStart in that case, just like the regular thread case above.
+                    node->suspendOnStart = JNI_TRUE;
+                    list = &otherThreads; // Put on otherThreads list instead of runningVThreads
+                }
+            }
+            if (vthread_state != 0) {
+                // This is an already started vthread that we were not already tracking.
+                node->isStarted = JNI_TRUE;
+            }
         }
+
         node->current_ei = 0;
         node->is_vthread = is_vthread;
         node->instructionStepMode = JVMTI_DISABLE;
@@ -410,15 +413,13 @@ insertThread(JNIEnv *env, ThreadList *list, jthread thread)
 #endif
 
         /* Set thread local storage for quick thread -> node access.
-         *   Some threads may not be in a state that allows setting of TLS,
-         *   which is ok, see findThread, it deals with threads without TLS set.
+         *   Threads that are not yet started do not allow setting of TLS. These
+         *   threads go on the otherThreads list and have their TLS set
+         *   when moved to the runningThreads list. findThread() knows to look
+         *   on otherThreads when the TLS lookup fails.
          */
-        if (!is_vthread) {
-          setThreadLocalStorage(node->thread, (void*)node);
-        }
-
-        if (is_vthread) {
-            node->isStarted = JNI_TRUE; /* VThreads are considered started by default. */
+        if (list != &otherThreads) {
+            setThreadLocalStorage(node->thread, (void*)node);
         }
     }
 
@@ -436,9 +437,7 @@ clearThread(JNIEnv *env, ThreadNode *node)
         (void)threadControl_removeDebugThread(node->thread);
     }
     /* Clear out TLS on this thread (just a cleanup action) */
-    if (!node->is_vthread) {
-        setThreadLocalStorage(node->thread, NULL);
-    }
+    setThreadLocalStorage(node->thread, NULL);
     tossGlobalRef(env, &(node->thread));
     bagDestroyBag(node->eventBag);
     jvmtiDeallocate(node);
@@ -475,6 +474,10 @@ static void
 moveNode(ThreadList *source, ThreadList *dest, ThreadNode *node)
 {
     removeNode(source, node);
+    // vthread fixme: we should really fix the caller to pass the right list
+    if (node->is_vthread && dest == &runningThreads) {
+        dest = &runningVThreads;
+    }
     JDI_ASSERT(findThread(dest, node->thread) == NULL);
     addNode(dest, node);
 }
@@ -1063,6 +1066,7 @@ resumeThreadByNode(ThreadNode *node)
                 error = JVMTI_ERROR_NONE;
             }
         }
+        // vthread fixme: If this is a vthread and suspendCount == 0, we should delete the node.
     }
 
     return error;
@@ -1127,19 +1131,28 @@ commonSuspend(JNIEnv *env, jthread thread, jboolean deferred)
 {
     ThreadNode *node;
 
-    /*
-     * If the thread is not between its start and end events, we should
-     * still suspend it. To keep track of things, add the thread
-     * to a separate list of threads so that we'll resume it later.
-     */
     node = findRunningThread(thread);
+
+    if (node == NULL) {
+        if (isVThread(thread)) {
+            /*
+             * Since we don't track all vthreads, it might not be in the list already. Start
+             * tracking it now.
+             */
+            node = insertThread(env, &runningVThreads, thread);
+        } else {
+            /*
+             * If the thread is not between its start and end events, we should
+             * still suspend it. To keep track of things, add the thread
+             * to a separate list of threads so that we'll resume it later.
+             */
+            node = insertThread(env, &otherThreads, thread);
+        }
+    }
+
 #if 0
     tty_message("commonSuspend: node(%p) suspendCount(%d) %s", node, node->suspendCount, node->name);
 #endif
-    if (node == NULL) {
-        JDI_ASSERT(!isVThread(thread));
-        node = insertThread(env, &otherThreads, thread);
-    }
 
     if ( deferred ) {
         return deferredSuspendThreadByNode(node);
@@ -1180,6 +1193,7 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
      */
     if (node->suspendCount == 1 && (!node->toBeResumed || node->suspendOnStart)) {
         node->suspendCount--;
+        // vthread fixme: If this is a vthread, we should delete the node.
         return JVMTI_ERROR_NONE;
     }
 
@@ -1329,6 +1343,8 @@ commonResumeList(JNIEnv *env)
         node->suspendCount--;
         node->toBeResumed = JNI_FALSE;
         node->frameGeneration++; /* Increment on each resume */
+
+        // vthread fixme: If this is a vthread, we should delete the node.
     }
     deleteArray(results);
     deleteArray(reqList);
@@ -1545,6 +1561,7 @@ threadControl_suspendCount(jthread thread, jint *count)
          * If the node is in neither list, the debugger never suspended
          * this thread, so the suspend count is 0.
          */
+        // vthread fixme: use suspendAllCount if vthread has started
         *count = 0;
     }
 
@@ -2154,6 +2171,10 @@ checkForPopFrameEvents(JNIEnv *env, EventIndex ei, jthread thread)
                 setPopFrameThread(thread, JNI_FALSE);
                 popFrameCompleteEvent(thread);
                 break;
+            case EI_VIRTUAL_THREAD_START:
+            case EI_VIRTUAL_THREAD_END:
+                JDI_ASSERT(JNI_FALSE);
+                break;
             case EI_SINGLE_STEP:
                 /* This is an event we requested to mark the */
                 /*        completion of the pop frame */
@@ -2214,8 +2235,9 @@ threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject cu
      */
     node = findThread(&otherThreads, thread);
     if (node != NULL) {
-        JDI_ASSERT(!evinfo->is_vthread);
         moveNode(&otherThreads, &runningThreads, node);
+        /* Now that we know the thread has started, we can set its TLS.*/
+        setThreadLocalStorage(thread, (void*)node);
     } else {
         /*
          * Get a thread node for the reporting thread. For thread start
@@ -2232,7 +2254,7 @@ threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject cu
         }
     }
 
-    if (ei == EI_THREAD_START) {
+    if (ei == EI_THREAD_START || ei == EI_VIRTUAL_THREAD_START) {
         node->isStarted = JNI_TRUE;
         processDeferredEventModes(env, thread, node);
     }
@@ -2691,11 +2713,6 @@ threadControl_allVThreads(jint *numVThreads)
     ThreadNode *node;
     jthread* vthreads;
 
-    if (!gdata->enumerateVThreads) {
-      *numVThreads = 0;
-      return NULL;
-    }
-
     env = getEnv();
     debugMonitorEnter(threadLock);
 
@@ -2744,11 +2761,11 @@ threadControl_addVThread(jthread vthread)
 void
 threadControl_dumpAllThreads()
 {
-    tty_message("Dumping runningThreads:\n");
+    tty_message("Dumping runningThreads:");
     dumpThreadList(&runningThreads);
-    tty_message("Dumping runningVThreads:\n");
+    tty_message("\nDumping runningVThreads:");
     dumpThreadList(&runningVThreads);
-    tty_message("Dumping otherThreads:\n");
+    tty_message("\nDumping otherThreads:");
     dumpThreadList(&otherThreads);
 }
 

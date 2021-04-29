@@ -351,7 +351,7 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
 #ifndef PRODUCT
         if (PrintDeoptimizationDetails) {
           tty->print("Reconstructed expression %d (OBJECT): ", i);
-          oop o = (oop)(address)(*addr);
+          oop o = cast_to_oop((address)(*addr));
           if (o == NULL) {
             tty->print_cr("NULL");
           } else {
@@ -389,7 +389,7 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
 #ifndef PRODUCT
         if (PrintDeoptimizationDetails) {
           tty->print("Reconstructed local %d (OBJECT): ", i);
-          oop o = (oop)(address)(*addr);
+          oop o = cast_to_oop((address)(*addr));
           if (o == NULL) {
             tty->print_cr("NULL");
           } else {
@@ -545,7 +545,7 @@ void vframeArray::fill_in(JavaThread* thread,
         //      _callee_registers[i] = src != NULL ? *src : NULL_WORD;
         //      }
 #else
-      jint* src = (jint*) reg_map->location(VMRegImpl::as_VMReg(i));
+      jint* src = (jint*) reg_map->location(VMRegImpl::as_VMReg(i), _caller.sp());
       _callee_registers[i] = src != NULL ? *src : NULL_WORD;
 #endif
       if (src == NULL) {

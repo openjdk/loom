@@ -60,30 +60,26 @@
  */
 
 
-import java.io.PrintStream;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.*;
 
 public class thrstat05 {
-    final static int JCK_STATUS_BASE = 95;
 
-    public static final int TS_NEW        = 0;
+    public static final int TS_NEW = 0;
     public static final int TS_TERMINATED = 1;
 
-    public static final int TS_RUN_RUNNING           = 2;
-    public static final int TS_RUN_BLOCKED           = 3;
-    public static final int TS_RUN_WAIT_TIMED        = 4;
-    public static final int TS_RUN_WAIT_INDEF        = 5;
+    public static final int TS_RUN_RUNNING = 2;
+    public static final int TS_RUN_BLOCKED = 3;
+    public static final int TS_RUN_WAIT_TIMED = 4;
+    public static final int TS_RUN_WAIT_INDEF = 5;
     public static final int TS_RUN_WAIT_PARKED_TIMED = 6;
     public static final int TS_RUN_WAIT_PARKED_INDEF = 7;
-    public static final int TS_RUN_WAIT_SLEEP        = 8; /* assumes _TIMED */
+    public static final int TS_RUN_WAIT_SLEEP = 8; /* assumes _TIMED */
 
     public static final int WAIT_TIME = 250;
 
-    public PrintStream _out;
-    public Thread      _thrMain;
-    public TestThread  _thrDummy;
-    public int         _passCnt, _failCnt;
+    public TestThread testThread;
+    public int passedCnt, failedCnt;
 
     /**
      * Set waiting time for checkThreadState
@@ -97,24 +93,16 @@ public class thrstat05 {
     native static boolean checkThreadState(Thread t, int stateIdx);
 
     public static void main(String args[]) {
-
-
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
+        new thrstat05().run();
     }
 
-    public static int run(String args[], PrintStream out) {
-        return new thrstat05(out).run();
-    }
-
-    thrstat05(PrintStream out) {
-        _out = out;
-        _thrMain = Thread.currentThread();
+    thrstat05() {
         setWaitTime(WAIT_TIME * 23 / 11);
     }
 
-    public int run() {
-        _failCnt = 0;
-        _passCnt = 0;
+    public void run() {
+        failedCnt = 0;
+        passedCnt = 0;
 
         testAndPrint("New", TS_NEW);
         testAndPrint("Running", TS_RUN_RUNNING);
@@ -126,246 +114,244 @@ public class thrstat05 {
         testAndPrint("Sleeping", TS_RUN_WAIT_SLEEP);
         testAndPrint("Terminating", TS_TERMINATED);
 
-        log(">>> PASS/FAIL: " + _passCnt + "/" + _failCnt);
+        System.out.println(">>> PASS/FAIL: " + passedCnt + "/" + failedCnt);
 
-        return _failCnt > 0 ? 2 : 0;
+        if (failedCnt > 0) {
+            throw new RuntimeException("Failed cnt: " + failedCnt);
+        }
     }
 
     public void testAndPrint(String name, int state) {
         boolean fPassed;
-
         try {
-            log(">>> Testing state: " + name);
+            System.out.println(">>> Testing state: " + name);
             fPassed = test(state);
-        } catch ( BrokenBarrierException e ) {
-            log("Main: broken barrier exception");
+        } catch (BrokenBarrierException e) {
+            System.out.println("Main: broken barrier exception");
             fPassed = false;
-        } catch ( InterruptedException e ) {
-            log("Main: interrupted exception");
+        } catch (InterruptedException e) {
+            System.out.println("Main: interrupted exception");
             fPassed = false;
         }
 
-        log(">>> " + (fPassed ? "PASSED" : "FAILED") + " testing state: " + name);
-        if ( fPassed )
-            _passCnt++;
-        else
-            _failCnt++;
+        System.out.println(">>> " + (fPassed ? "PASSED" : "FAILED") + " testing state: " + name);
+        if (fPassed) {
+            passedCnt++;
+        } else {
+            failedCnt++;
+        }
     }
 
     public boolean test(int state) throws BrokenBarrierException, InterruptedException {
         boolean fRes;
 
-        switch ( state ) {
+        switch (state) {
             case TS_NEW:
-                log("Main: Creating new thread");
-                _thrDummy = new TestThread();
-                fRes = checkThreadState(_thrDummy, state);
-                _thrDummy.start();
+                System.out.println("Main: Creating new thread");
+                testThread = new TestThread();
+                fRes = checkThreadState(testThread, state);
+                testThread.start();
                 return fRes;
 
             case TS_RUN_RUNNING:
-                log("Main: Running thread");
-                _thrDummy._fRun = true;
+                System.out.println("Main: Running thread");
+                testThread.fRun = true;
                 fRes = sendStateAndCheckIt(state);
-                _thrDummy._fRun = false;
+                testThread.fRun = false;
                 return fRes;
 
             case TS_RUN_BLOCKED:
-                log("Main: Blocking thread");
-                synchronized ( _thrDummy._mon ) {
+                System.out.println("Main: Blocking thread");
+                synchronized (testThread.monitor) {
                     return sendStateAndCheckIt(state);
                 }
 
             case TS_RUN_WAIT_TIMED:
             case TS_RUN_WAIT_INDEF:
-                log("Main: Thread will wait");
-                _thrDummy._fRun = true;
+                System.out.println("Main: Thread will wait");
+                testThread.fRun = true;
                 fRes = sendStateAndCheckIt(state);
 
-                _thrDummy._fRun = false;
+                testThread.fRun = false;
                 do {
-                    log("Main: Notifying the thread");
-                    synchronized ( _thrDummy._mon ) {
-                        _thrDummy._mon.notify();
+                    System.out.println("Main: Notifying the thread");
+                    synchronized (testThread.monitor) {
+                        testThread.monitor.notify();
                     }
 
-                    if ( ! _thrDummy._fInTest ) {
+                    if (!testThread.fInTest) {
                         break;
                     }
 
                     Thread.sleep(WAIT_TIME / 4);
-                } while ( true );
+                } while (true);
 
                 return fRes;
 
             case TS_RUN_WAIT_PARKED_TIMED:
             case TS_RUN_WAIT_PARKED_INDEF:
-                log("Main: Thread will park");
-                _thrDummy._fRun = true;
+                System.out.println("Main: Thread will park");
+                testThread.fRun = true;
                 fRes = sendStateAndCheckIt(state);
 
-                _thrDummy._fRun = false;
+                testThread.fRun = false;
                 do {
-                    log("Main: Unparking the thread");
-                    LockSupport.unpark(_thrDummy);
+                    System.out.println("Main: Unparking the thread");
+                    LockSupport.unpark(testThread);
 
-                    if ( ! _thrDummy._fInTest ) {
+                    if (!testThread.fInTest) {
                         break;
                     }
 
                     Thread.sleep(WAIT_TIME);
-                } while ( true );
+                } while (true);
 
                 return fRes;
 
             case TS_RUN_WAIT_SLEEP:
-                log("Main: Thread will sleep");
-                _thrDummy._fRun = true;
+                System.out.println("Main: Thread will sleep");
+                testThread.fRun = true;
                 fRes = sendStateAndCheckIt(state);
-                _thrDummy._fRun = false;
+                testThread.fRun = false;
                 return fRes;
 
             case TS_TERMINATED:
-                log("Main: Terminating thread");
-                _thrDummy.sendTestState(state);
+                System.out.println("Main: Terminating thread");
+                testThread.sendTestState(state);
 
-                log("Main: Waiting for join");
-                _thrDummy.join();
-                return checkThreadState(_thrDummy, state);
+                System.out.println("Main: Waiting for join");
+                testThread.join();
+                return checkThreadState(testThread, state);
         }
 
         return false;
     }
 
     public boolean sendStateAndCheckIt(int state) throws BrokenBarrierException, InterruptedException {
-        _thrDummy.sendTestState(state);
-        while ( ! _thrDummy._fInTest ) {
-            log("Main: Waiting for the thread to start the test");
+        testThread.sendTestState(state);
+        while (!testThread.fInTest) {
+            System.out.println("Main: Waiting for the thread to start the test");
             Thread.sleep(WAIT_TIME * 29 / 7); // Wait time should not be a multiple of WAIT_TIME
         }
-        return checkThreadState(_thrDummy, state);
-    }
-
-    synchronized void log(String s) {
-        _out.println(s);
-        _out.flush();
+        return checkThreadState(testThread, state);
     }
 
     class TestThread extends Thread {
 
-        SynchronousQueue<Integer> _taskQueue = new SynchronousQueue<Integer>();
+        SynchronousQueue<Integer> taskQueue = new SynchronousQueue<>();
 
-        public volatile boolean _fRun = true;
-        public volatile boolean _fInTest = false;
-        public Object _mon = new Object();
+        public volatile boolean fRun = true;
+        public volatile boolean fInTest = false;
+        public Object monitor = new Object();
 
-        public void sendTestState(int state) throws BrokenBarrierException, InterruptedException {
-            _taskQueue.put(state);
+        public void sendTestState(int state) throws InterruptedException {
+            taskQueue.put(state);
         }
 
         public int recvTestState() {
             int state = TS_NEW;
             try {
-                state = _taskQueue.take();
-            } catch ( InterruptedException e ) {
-                log("Thread: interrupted exception " + e);
+                state = taskQueue.take();
+            } catch (InterruptedException e) {
+                System.out.println("Thread: interrupted exception " + e);
             }
             return state;
         }
 
         public void run() {
-            log("Thread: started");
+            System.out.println("Thread: started");
 
-            while ( true ) {
+            while (true) {
                 int state = recvTestState();
-                switch ( state ) {
+                switch (state) {
                     case TS_NEW:
-                        log("Thread: ERROR IN TEST: TS_NEW");
+                        System.out.println("Thread: ERROR IN TEST: TS_NEW");
                         break;
 
                     case TS_RUN_RUNNING:
                         int i = 0;
-                        log("Thread: Running...");
-                        _fInTest = true;
-                        while ( _fRun ) i++;
-                        log("Thread: Running: done");
-                        _fInTest = false;
+                        System.out.println("Thread: Running...");
+                        fInTest = true;
+                        while (fRun) { i++; }
+                        System.out.println("Thread: Running: done");
+                        fInTest = false;
                         break;
 
                     case TS_RUN_BLOCKED:
-                        log("Thread: Blocking...");
-                        _fInTest = true;
-                        synchronized ( _mon ) {}
-                        log("Thread: Blocking: done");
-                        _fInTest = false;
+                        System.out.println("Thread: Blocking...");
+                        fInTest = true;
+                        synchronized (monitor) {
+                        }
+                        System.out.println("Thread: Blocking: done");
+                        fInTest = false;
                         break;
 
                     case TS_RUN_WAIT_TIMED:
-                        log("Thread: Waiting with timeout...");
-                        while ( _fRun ) {
-                            synchronized ( _mon ) {
-                                _fInTest = true;
+                        System.out.println("Thread: Waiting with timeout...");
+                        while (fRun) {
+                            synchronized (monitor) {
+                                fInTest = true;
                                 try {
-                                    _mon.wait(WAIT_TIME);
-                                } catch ( InterruptedException e ) {
-                                    log("Thread: Interrupted exception");
+                                    monitor.wait(WAIT_TIME);
+                                } catch (InterruptedException e) {
+                                    System.out.println("Thread: Interrupted exception");
                                 }
                             }
                         }
-                        log("Thread: Waiting: done");
-                        _fInTest = false;
+                        System.out.println("Thread: Waiting: done");
+                        fInTest = false;
                         break;
 
                     case TS_RUN_WAIT_INDEF:
-                        log("Thread: Waiting indefinitely...");
-                        _fInTest = true;
-                        synchronized ( _mon ) {
+                        System.out.println("Thread: Waiting indefinitely...");
+                        fInTest = true;
+                        synchronized (monitor) {
                             try {
-                                _mon.wait();
-                            } catch ( InterruptedException e ) {
-                                log("Thread: Interrupted exception");
+                                monitor.wait();
+                            } catch (InterruptedException e) {
+                                System.out.println("Thread: Interrupted exception");
                             }
-                            log("Thread: Waiting: done");
-                            _fInTest = false;
+                            System.out.println("Thread: Waiting: done");
+                            fInTest = false;
                         }
                         break;
 
                     case TS_RUN_WAIT_SLEEP:
-                        log("Thread: Sleeping...");
-                        while ( _fRun ) {
+                        System.out.println("Thread: Sleeping...");
+                        while (fRun) {
                             try {
-                                _fInTest = true;
+                                fInTest = true;
                                 Thread.sleep(WAIT_TIME);
-                            } catch ( InterruptedException e ) {
-                                log("Thread: Interrupted exception");
+                            } catch (InterruptedException e) {
+                                System.out.println("Thread: Interrupted exception");
                             }
                         }
-                        log("Thread: Sleeping: done");
-                        _fInTest = false;
+                        System.out.println("Thread: Sleeping: done");
+                        fInTest = false;
                         break;
 
                     case TS_RUN_WAIT_PARKED_TIMED:
-                        log("Thread: Parking indefinitely...");
-                        _fInTest = true;
-                        while ( _fRun ) {
+                        System.out.println("Thread: Parking indefinitely...");
+                        fInTest = true;
+                        while (fRun) {
                             LockSupport.park();
                         }
-                        log("Thread: Parking: done");
-                        _fInTest = false;
+                        System.out.println("Thread: Parking: done");
+                        fInTest = false;
                         break;
 
                     case TS_RUN_WAIT_PARKED_INDEF:
-                        log("Thread: Parking with timeout...");
-                        _fInTest = true;
-                        while ( _fRun ) {
+                        System.out.println("Thread: Parking with timeout...");
+                        fInTest = true;
+                        while (fRun) {
                             LockSupport.parkUntil(System.currentTimeMillis() + WAIT_TIME);
                         }
-                        log("Thread: Parking: done");
-                        _fInTest = false;
+                        System.out.println("Thread: Parking: done");
+                        fInTest = false;
                         break;
 
                     case TS_TERMINATED:
-                        log("Thread: terminating");
+                        System.out.println("Thread: terminating");
                         return;
                 }
             }

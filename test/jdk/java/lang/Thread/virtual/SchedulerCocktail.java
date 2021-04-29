@@ -23,10 +23,10 @@
 
 /**
  * @test
+ * @summary Test platform and virtual threads creating virtual threads that use
+ *          the same or different schedulers
  * @modules java.base/java.lang:+open
  * @run testng SchedulerCocktail
- * @summary Test kernel and virtual threads creating virtual threads that use
- *          the same or different schedulers
  */
 
 import java.lang.reflect.Field;
@@ -41,7 +41,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class SchedulerCocktail {
     private static final Executor DEFAULT_SCHEDULER = defaultScheduler();
     private static ExecutorService SCHEDULER_1;
@@ -60,24 +59,26 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.startVirtualThread.
+     * Test platform thread creating virtual thread.
      */
+    @Test
     public void testStartVirtualThread1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().start(() -> {
             ref.set(scheduler(Thread.currentThread()));
         }).join();
         assertTrue(ref.get() == DEFAULT_SCHEDULER);
     }
 
     /**
-     * Test virtual thread using default scheduler invoking Thread.startVirtualThread.
+     * Test virtual thread using default scheduler creating virtual thread.
      */
+    @Test
     public void testStartVirtualThread2() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
-                Thread.startVirtualThread(() -> {
+                Thread.ofVirtual().start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
                 }).join();
             } catch (Exception e) {
@@ -88,13 +89,14 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test virtual thread using custom scheduler invoking Thread.startVirtualThread.
+     * Test virtual thread using custom scheduler creating virtual thread.
      */
+    @Test
     public void testStartVirtualThread3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
             try {
-                Thread.startVirtualThread(() -> {
+                Thread.ofVirtual().start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
                 }).join();
             } catch (Exception e) {
@@ -105,9 +107,10 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create virtual thread
+     * Test platform thread invoking Thread.Builder to create virtual thread
      * without specifying the scheduler.
      */
+    @Test
     public void testBuilderNoScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().start(() -> {
@@ -120,9 +123,10 @@ public class SchedulerCocktail {
      * Test virtual thread using default scheduler invoking Thread.Builder
      * to create virtual thread without specifying the scheduler.
      */
+    @Test
     public void testBuilderNoScheduler2() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 Thread.ofVirtual().start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
@@ -138,6 +142,7 @@ public class SchedulerCocktail {
      * Test virtual thread using custom scheduler invoking Thread.Builder
      * to create virtual thread without specifying the scheduler.
      */
+    @Test
     public void testBuilderNoScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
@@ -153,9 +158,10 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create virtual thread
+     * Test platform thread invoking Thread.Builder to create virtual thread
      * that uses a custom scheduler.
      */
+    @Test
     public void testBuilderCustomScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
@@ -168,9 +174,10 @@ public class SchedulerCocktail {
      * Test virtual thread using default scheduler invoking Thread.Builder
      * to create virtual thread that uses a custom scheduler.
      */
+    @Test
     public void testBuilderCustomScheduler2() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
@@ -186,6 +193,7 @@ public class SchedulerCocktail {
      * Test virtual thread using custom scheduler invoking Thread.Builder
      * to create virtual thread that uses a different custom scheduler.
      */
+    @Test
     public void testBuilderCustomScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
@@ -201,9 +209,10 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create virtual thread
+     * Test platform thread invoking Thread.Builder to create virtual thread
      * that uses the default scheduler.
      */
+    @Test
     public void testBuilderNullScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().scheduler(null).start(() -> {
@@ -216,9 +225,10 @@ public class SchedulerCocktail {
      * Test virtual thread using default scheduler invoking Thread.Builder
      * to create virtual thread that uses the default scheduler.
      */
+    @Test
     public void testBuilderNullScheduler2() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 Thread.ofVirtual().scheduler(null).start(() -> {
                     ref.set(scheduler(Thread.currentThread()));
@@ -234,6 +244,7 @@ public class SchedulerCocktail {
      * Test virtual thread using custom scheduler invoking Thread.Builder
      * to create virtual thread that uses the default scheduler.
      */
+    @Test
     public void testBuilderNullScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
@@ -249,9 +260,10 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create a ThreadFactory
+     * Test platform thread invoking Thread.Builder to create a ThreadFactory
      * that creates virtual thread without specifying the scheduler.
      */
+    @Test
     public void testThreadFactoryNoScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         ThreadFactory factory = Thread.ofVirtual().factory();
@@ -268,9 +280,10 @@ public class SchedulerCocktail {
      * to create a ThreadFactory that creates virtual thread without specifying
      * the scheduler.
      */
+    @Test
     public void testThreadFactoryNoScheduler2() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 ThreadFactory factory = Thread.ofVirtual().factory();
                 Thread thread = factory.newThread(() -> {
@@ -290,6 +303,7 @@ public class SchedulerCocktail {
      * to create a ThreadFactory that creates virtual thread without specifying
      * the scheduler.
      */
+    @Test
     public void testThreadFactoryNoScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
@@ -308,9 +322,10 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create a ThreadFactory
+     * Test platform thread invoking Thread.Builder to create a ThreadFactory
      * that creates virtual thread using a custom scheduler.
      */
+    @Test
     public void testThreadFactoryCustomScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         ThreadFactory factory = Thread.ofVirtual().scheduler(SCHEDULER_1).factory();
@@ -327,9 +342,10 @@ public class SchedulerCocktail {
      * to create a ThreadFactory that creates virtual thread using a custom
      * scheduler.
      */
+    @Test
     public void testThreadFactoryCustomScheduler2() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 ThreadFactory factory = Thread.ofVirtual().scheduler(SCHEDULER_1).factory();
                 Thread thread = factory.newThread(() -> {
@@ -349,6 +365,7 @@ public class SchedulerCocktail {
      * to create a ThreadFactory that creates virtual thread using a custom
      * scheduler.
      */
+    @Test
     public void testThreadFactoryCustomScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {
@@ -367,9 +384,10 @@ public class SchedulerCocktail {
     }
 
     /**
-     * Test kernel thread invoking Thread.Builder to create a ThreadFactory
+     * Test platform thread invoking Thread.Builder to create a ThreadFactory
      * that creates virtual thread using the default scheduler.
      */
+    @Test
     public void testThreadFactoryNullScheduler1() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         ThreadFactory factory = Thread.ofVirtual().scheduler(null).factory();
@@ -386,9 +404,10 @@ public class SchedulerCocktail {
      * to create a ThreadFactory that creates virtual thread using the
      * default scheduler.
      */
+    @Test
     public void testThreadFactoryNullScheduler2() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 ThreadFactory factory = Thread.ofVirtual().scheduler(null).factory();
                 Thread thread = factory.newThread(() -> {
@@ -408,6 +427,7 @@ public class SchedulerCocktail {
      * to create a ThreadFactory that creates virtual thread using the
      * default scheduler.
      */
+    @Test
     public void testThreadFactoryNullScheduler3() throws Exception {
         AtomicReference<Executor> ref = new AtomicReference<>();
         Thread.ofVirtual().scheduler(SCHEDULER_1).start(() -> {

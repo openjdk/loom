@@ -611,24 +611,60 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 }
 
 javaVFrame*
-JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
-  // The second condition is needed to hide notification methods
-  // as jt->is_in_VTMT() can be not set yet. 
-  if (!jt->is_in_VTMT() && !jvf->method()->jvmti_mount_transition()) {
+JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
+  // The second condition is needed to hide notification methods. 
+  if (!is_in_VTMT && !jvf->method()->jvmti_mount_transition()) {
     return jvf; // no frames to skip
   }
+  javaVFrame* jvf_saved = jvf;
   // find jvf with a method annotated with @JvmtiMountTransition
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
+    // TBD: Below is a TMP work around bad/unaligned method addresses in jvf.
+    // There were observed unaligned method addresses like 0x7 or 0xffffffffffffffee.
+    // This is a safety guard but there has to be a better solution.
+    if (jvf->is_interpreted_frame()) {
+      Method** method_addr = jvf->fr().interpreter_frame_method_addr();
+      if (!is_object_aligned((const void*)method_addr)) {
+        return jvf_saved; // safety gard - return the original top jvf
+      }
+    }
     if (jvf->method()->jvmti_mount_transition()) {
       jvf = jvf->java_sender(); // skip annotated method
       break;
     }
+    if (jvf->method()->changes_current_thread()) {
+      break;
+    }
+    // skip frame above annotated method
+  }
+  if (jvf == NULL) { // TMP workaround for stability until the root cause is fixed
+    return jvf_saved;
   }
   return jvf;
 }
 
 javaVFrame*
+JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
+  jvf = check_and_skip_hidden_frames(jt->is_in_VTMT(), jvf);
+  return jvf;
+}
+
+javaVFrame*
+JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
+  JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vthread);
+  if (state == NULL) {
+    return jvf; // nothing to skip
+  }
+  jvf = check_and_skip_hidden_frames(state->is_in_VTMT(), jvf);
+  return jvf;
+}
+
+javaVFrame*
 JvmtiEnvBase::get_vthread_jvf(oop vthread) {
+  assert(java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::NEW, "sanity check");
+  if (java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::TERMINATED) {
+    return NULL;
+  }
   Thread* cur_thread = Thread::current();
   oop cont = java_lang_VirtualThread::continuation(vthread);
   javaVFrame* jvf = NULL;
@@ -653,6 +689,7 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   } else {
     vframeStream vfs(cont);
     jvf = vfs.at_end() ? NULL : vfs.asJavaVFrame();
+    jvf = check_and_skip_hidden_frames(vthread, jvf);
   }
   return jvf;
 }
@@ -684,7 +721,9 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
     if (jt->is_being_ext_suspended()) {
-      state |= JVMTI_THREAD_STATE_SUSPENDED;
+      if (jt->vthread() == NULL || jt->vthread() == thread_oop) {
+        state |= JVMTI_THREAD_STATE_SUSPENDED;
+      }
     }
     if (jts == _thread_in_native) {
       state |= JVMTI_THREAD_STATE_IN_NATIVE;

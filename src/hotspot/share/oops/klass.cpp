@@ -26,7 +26,6 @@
 #include "jvm_io.h"
 #include "classfile/classLoaderData.inline.hpp"
 #include "classfile/classLoaderDataGraph.inline.hpp"
-#include "classfile/dictionary.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/moduleEntry.hpp"
 #include "classfile/systemDictionary.hpp"
@@ -746,6 +745,16 @@ const char* Klass::signature_name() const {
   return name()->as_C_string();
 }
 
+size_t Klass::copy_disjoint(oop obj, HeapWord* to, size_t word_size) { 
+  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), to, word_size);
+  return word_size;
+}
+
+size_t Klass::copy_conjoint(oop obj, HeapWord* to, size_t word_size) { 
+  Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(obj), to, word_size);
+  return word_size;
+}
+
 size_t Klass::copy_disjoint_compact(oop obj, HeapWord* to) { 
   return obj->copy_disjoint(to); 
 }
@@ -758,11 +767,6 @@ const char* Klass::external_kind() const {
   if (is_interface()) return "interface";
   if (is_abstract()) return "abstract class";
   return "class";
-}
-
-// Unless overridden, modifier_flags is 0.
-jint Klass::compute_modifier_flags(TRAPS) const {
-  return 0;
 }
 
 int Klass::atomic_incr_biased_lock_revocation_count() {

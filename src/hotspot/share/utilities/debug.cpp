@@ -32,20 +32,19 @@
 #include "compiler/compileBroker.hpp"
 #include "compiler/disassembler.hpp"
 #include "gc/shared/collectedHeap.hpp"
-#include "interpreter/bytecodeHistogram.hpp"
 #include "interpreter/interpreter.hpp"
 #include "memory/allocation.hpp"
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
 #include "oops/klass.inline.hpp"
 #include "oops/oop.inline.hpp"
-#include "runtime/arguments.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/flags/flagSetting.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/java.hpp"
 #include "runtime/os.hpp"
+#include "runtime/safefetch.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubCodeGenerator.hpp"
 #include "runtime/stubRoutines.hpp"
@@ -482,7 +481,7 @@ extern "C" void pp(void* p) {
   Command c("pp");
   FlagSetting fl(DisplayVMOutput, true);
   if (Universe::heap()->is_in(p)) {
-    oop obj = oop(p);
+    oop obj = cast_to_oop(p);
     obj->print();
   } else {
     tty->print(PTR_FORMAT, p2i(p));
@@ -712,6 +711,11 @@ extern "C" void pns2() { // print native stack
 }
 
 #endif // !PRODUCT
+
+// Returns true iff the address p is readable and *(intptr_t*)p != errvalue
+extern "C" bool dbg_is_safe(void* p, intptr_t errvalue) {
+  return p != NULL && SafeFetchN((intptr_t*)p, errvalue) != errvalue;
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // Test multiple STATIC_ASSERT forms in various scopes.

@@ -148,6 +148,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   OopHandle         _thread_oop_h;
   // Jvmti Events that cannot be posted in their current context.
   JvmtiDeferredEventQueue* _jvmti_event_queue;
+  bool              _is_in_VTMT; // saved at unmound to restore at mount
   bool              _is_virtual; // state belongs to a virtual thread
   bool              _hide_single_stepping;
   bool              _pending_step_for_popframe;
@@ -256,7 +257,11 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   // Needed for virtual threads as they can migrate to different JavaThread's.
   // Also used for carrier threads to clear/restore _thread.
   void set_thread(JavaThread* thread);
-  oop get_thread_oop(); 
+  oop get_thread_oop();
+
+  // The java_thread.is_in_VTMT() value is saved at unmount to restore at mount.
+  inline void set_is_in_VTMT(bool val) { _is_in_VTMT = val; }
+  inline bool is_in_VTMT() { return _is_in_VTMT; }
   inline bool is_virtual() { return _is_virtual; } // the _thread is virtual
 
   inline bool is_exception_detected()  { return _exception_state == ES_DETECTED;  }

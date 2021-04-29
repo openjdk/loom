@@ -84,33 +84,31 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
   char *generic;
   size_t i;
 
-  printf(">>> retrieving Exception info ...\n");
+  LOG(">>> retrieving Exception info ...\n");
 
   cls = jni->GetObjectClass(exception);
   err = jvmti->GetClassSignature(cls, &ex.name, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassSignature) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(GetClassSignature) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetMethodDeclaringClass(method, &cls);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodDeclaringClass#t) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(GetMethodDeclaringClass#t) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetClassSignature(cls, &ex.t_cls, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassSignature#t) unexpected error: %s (%d)\n",
+    LOG("(GetClassSignature#t) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetMethodName(method, &ex.t_name, &ex.t_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodName#t) unexpected error: %s (%d)\n",
+    LOG("(GetMethodName#t) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
@@ -118,14 +116,14 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
   ex.t_loc = location;
   err = jvmti->GetMethodDeclaringClass(catch_method, &cls);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodDeclaringClass#c) unexpected error: %s (%d)\n",
+    LOG("(GetMethodDeclaringClass#c) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetClassSignature(cls, &ex.c_cls, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassSignature#c) unexpected error: %s (%d)\n",
+    LOG("(GetClassSignature#c) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
@@ -133,20 +131,20 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
   err = jvmti->GetMethodName(catch_method,
                                  &ex.c_name, &ex.c_sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodName#c) unexpected error: %s (%d)\n",
+    LOG("(GetMethodName#c) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   ex.c_loc = catch_location;
-  printf(">>> %s\n", ex.name);
-  printf(">>>   thrown at %s.%s%s:0x%x%08x\n",
+  LOG(">>> %s\n", ex.name);
+  LOG(">>>   thrown at %s.%s%s:0x%x%08x\n",
          ex.t_cls, ex.t_name, ex.t_sig,
          (jint)(ex.t_loc >> 32), (jint)ex.t_loc);
-  printf(">>>    catch at %s.%s%s:0x%x%08x\n",
+  LOG(">>>    catch at %s.%s%s:0x%x%08x\n",
          ex.c_cls, ex.c_name, ex.c_sig,
          (jint)(ex.c_loc >> 32), (jint)ex.c_loc);
-  printf(">>> ... done\n");
+  LOG(">>> ... done\n");
 
 
   for (i = 0; i < sizeof(exs)/sizeof(exceptionInfo); i++) {
@@ -160,7 +158,7 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
         && ex.t_loc == exs[i].t_loc && ex.c_loc == exs[i].c_loc) {
       jboolean isVirtual = jni->IsVirtualThread(thr);
       if (isVirtualExpected != isVirtual) {
-        printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
+        LOG("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
         result = STATUS_FAILED;
       } else {
         eventsCount++;
@@ -169,12 +167,12 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
     }
   }
   if (i == sizeof(exs)/sizeof(exceptionInfo)) {
-    printf("Unexpected exception event:\n");
-    printf("  %s\n", ex.name);
-    printf("    thrown at %s.%s%s:0x%x%08x\n",
+    LOG("Unexpected exception event:\n");
+    LOG("  %s\n", ex.name);
+    LOG("    thrown at %s.%s%s:0x%x%08x\n",
            ex.t_cls, ex.t_name, ex.t_sig,
            (jint)(ex.t_loc >> 32), (jint)ex.t_loc);
-    printf("     catch at %s.%s%s:0x%x%08x\n",
+    LOG("     catch at %s.%s%s:0x%x%08x\n",
            ex.c_cls, ex.c_name, ex.c_sig,
            (jint)(ex.c_loc >> 32), (jint)ex.c_loc);
     result = STATUS_FAILED;
@@ -199,7 +197,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti_env, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti_env == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -209,14 +207,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti_env->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti_env->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
+    LOG("(GetCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -225,12 +223,12 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     callbacks.Exception = &Exception;
     err = jvmti_env->SetEventCallbacks(&callbacks, sizeof(callbacks));
     if (err != JVMTI_ERROR_NONE) {
-      printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
+      LOG("(SetEventCallbacks) unexpected error: %s (%d)\n",
              TranslateError(err), err);
       return JNI_ERR;
     }
   } else {
-    printf("Warning: Exception event is not implemented\n");
+    LOG("Warning: Exception event is not implemented\n");
   }
 
   return JNI_OK;
@@ -244,34 +242,34 @@ Java_exception01_check(JNIEnv *jni, jclass cls) {
   jmethodID mid;
 
   if (jvmti_env == NULL) {
-    printf("JVMTI client was not properly loaded!\n");
+    LOG("JVMTI client was not properly loaded!\n");
     return STATUS_FAILED;
   }
 
   clz = jni->FindClass("exception01c");
   if (clz == NULL) {
-    printf("Cannot find exception01c class!\n");
+    LOG("Cannot find exception01c class!\n");
     return STATUS_FAILED;
   }
   clz = jni->FindClass("exception01b");
   if (clz == NULL) {
-    printf("Cannot find exception01b class!\n");
+    LOG("Cannot find exception01b class!\n");
     return STATUS_FAILED;
   }
   clz = jni->FindClass("exception01a");
   if (clz == NULL) {
-    printf("Cannot find exception01a class!\n");
+    LOG("Cannot find exception01a class!\n");
     return STATUS_FAILED;
   }
   mid = jni->GetStaticMethodID(clz, "run", "()V");
   if (mid == NULL) {
-    printf("Cannot find method run!\n");
+    LOG("Cannot find method run!\n");
     return STATUS_FAILED;
   }
 
   err = jvmti_env->GetCurrentThread(&thread);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
+    LOG("Failed to get current thread: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return STATUS_FAILED;
   }
@@ -281,7 +279,7 @@ Java_exception01_check(JNIEnv *jni, jclass cls) {
   if (err == JVMTI_ERROR_NONE) {
     eventsExpected = sizeof(exs)/sizeof(exceptionInfo);
   } else {
-    printf("Failed to enable JVMTI_EVENT_EXCEPTION: %s (%d)\n",
+    LOG("Failed to enable JVMTI_EVENT_EXCEPTION: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
@@ -294,13 +292,13 @@ Java_exception01_check(JNIEnv *jni, jclass cls) {
   err = jvmti_env->SetEventNotificationMode(JVMTI_DISABLE,
                                             JVMTI_EVENT_EXCEPTION, thread);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to disable JVMTI_EVENT_EXCEPTION: %s (%d)\n",
+    LOG("Failed to disable JVMTI_EVENT_EXCEPTION: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
   if (eventsCount != eventsExpected) {
-    printf("Wrong number of exception events: %d, expected: %d\n",
+    LOG("Wrong number of exception events: %d, expected: %d\n",
            eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }

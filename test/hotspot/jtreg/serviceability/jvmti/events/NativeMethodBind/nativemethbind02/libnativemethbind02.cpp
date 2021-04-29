@@ -51,7 +51,7 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
   RawMonitorLocker rml(jvmti, jni, counter_lock);
   err = jvmti->GetPhase(&phase);
   if (err != JVMTI_ERROR_NONE) {
-    printf(">>>> Error getting phase\n");
+    LOG(">>>> Error getting phase\n");
     result = STATUS_FAILED;
     return;
   }
@@ -64,10 +64,10 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
 
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    printf("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
+    LOG("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
     return;
   } else {
-    printf("NativeMethodBind received for \"%s %s\"\n",
+    LOG("NativeMethodBind received for \"%s %s\"\n",
                  methNam, methSig);
   }
 
@@ -75,7 +75,7 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
     err = jvmti->Deallocate((unsigned char *) methNam);
     if (err != JVMTI_ERROR_NONE) {
       result = STATUS_FAILED;
-      printf("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
+      LOG("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
     }
   }
 
@@ -83,7 +83,7 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
     err = jvmti->Deallocate((unsigned char *) methSig);
     if (err != JVMTI_ERROR_NONE) {
       result = STATUS_FAILED;
-      printf("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
+      LOG("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
     }
   }
 
@@ -91,7 +91,7 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
 
 void JNICALL
 VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
-  printf("VMDeath event received\n");
+  LOG("VMDeath event received\n");
 
   if (wrongBindEv != 0) {
     NSK_COMPLAIN1(
@@ -109,7 +109,7 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
 /* dummy method used only to provoke NativeMethodBind events */
 JNIEXPORT jint JNICALL
 Java_nativemethbind02_nativeMethod(JNIEnv *jni, jobject obj) {
-  printf("inside the nativeMethod()\n\n");
+  LOG("inside the nativeMethod()\n\n");
 
   return PASSED;
 }
@@ -132,7 +132,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -155,10 +155,10 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
   if (!caps.can_generate_native_method_bind_events)
-    printf("Warning: generation of native method bind events is not implemented\n");
+    LOG("Warning: generation of native method bind events is not implemented\n");
 
   /* set event callback */
-  printf("setting event callbacks ...\n");
+  LOG("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.NativeMethodBind = &NativeMethodBind;
   callbacks.VMDeath = &VMDeath;
@@ -166,7 +166,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE)
     return JNI_ERR;
 
-  printf("setting event callbacks done\nenabling JVMTI events ...\n");
+  LOG("setting event callbacks done\nenabling JVMTI events ...\n");
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_NATIVE_METHOD_BIND,
                                         NULL);
@@ -179,7 +179,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
-  printf("enabling the events done\n\n");
+  LOG("enabling the events done\n\n");
 
   return JNI_OK;
 }

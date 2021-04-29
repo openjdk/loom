@@ -45,7 +45,7 @@ void oopDesc::print_on(outputStream* st) const {
   } else if (*((juint*)this) == badMetaWordVal) {
     st->print("BAD META WORD");
   } else {
-    klass()->oop_print_on(oop(this), st);
+    klass()->oop_print_on(cast_to_oop(this), st);
   }
 }
 
@@ -79,7 +79,7 @@ void oopDesc::print_value_on(outputStream* st) const {
   if (this == NULL) {
     st->print("NULL");
   } else {
-    oop obj = oop(this);
+    oop obj = cast_to_oop(this);
     if (java_lang_String::is_instance(obj)) {
       java_lang_String::print(obj, st);
       print_address_on(st);

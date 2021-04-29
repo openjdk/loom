@@ -39,15 +39,21 @@
 #define NSK_TRUE 1
 #define NSK_FALSE 0
 
-#define NSK_DISPLAY0 printf
-#define NSK_DISPLAY1 printf
-#define NSK_DISPLAY2 printf
-#define NSK_DISPLAY3 printf
+#define LOG(...) \
+  { \
+    printf(__VA_ARGS__); \
+    fflush(stdout); \
+  }
+
+#define NSK_DISPLAY0 LOG
+#define NSK_DISPLAY1 LOG
+#define NSK_DISPLAY2 LOG
+#define NSK_DISPLAY3 LOG
 
 
-#define NSK_COMPLAIN0 printf
-#define NSK_COMPLAIN1 printf
-#define NSK_COMPLAIN3 printf
+#define NSK_COMPLAIN0 LOG
+#define NSK_COMPLAIN1 LOG
+#define NSK_COMPLAIN3 LOG
 
 const char* TranslateState(jint flags);
 const char* TranslateError(jvmtiError err);
@@ -92,7 +98,7 @@ fatal(JNIEnv* jni, const char* msg) {
 static void
 check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
   if (err != JVMTI_ERROR_NONE) {
-    printf("check_jvmti_status: JVMTI function returned error: %s (%d)\n", TranslateError(err), err);
+    LOG("check_jvmti_status: JVMTI function returned error: %s (%d)\n", TranslateError(err), err);
     jni->FatalError(msg);
   }
 }
@@ -109,6 +115,10 @@ create_raw_monitor(jvmtiEnv *jvmti, const char* name) {
     return nullptr;
   }
   return lock;
+}
+
+void destroy_raw_monitor(jvmtiEnv *jvmti, JNIEnv *jni, jrawMonitorID lock) {
+  check_jvmti_status(jni, jvmti->DestroyRawMonitor(lock), "DestroyRawMonitor failed.");
 }
 
 class RawMonitorLocker {
@@ -189,7 +199,7 @@ print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
   err = jvmti->GetMethodName(method, &mname, &msign, NULL);
   check_jvmti_status(jni, err, "print_method: error in JVMTI GetMethodName");
 
-  printf("%2d: %s: %s%s\n", depth, cname, mname, msign);
+  LOG("%2d: %s: %s%s\n", depth, cname, mname, msign);
   fflush(0);
 }
 
@@ -200,17 +210,41 @@ print_thread_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread_obj) {
   check_jvmti_status(jni, jvmti->GetThreadInfo(thread_obj, &thread_info), "Error in GetThreadInfo");
   check_jvmti_status(jni, jvmti->GetThreadState(thread_obj, &thread_state), "Error in GetThreadInfo");
   const char* state = TranslateState(thread_state);
-  printf("Thread: %p, name: %s, state: %s, attrs: %s %s\n", thread_obj, thread_info.name, TranslateState(thread_state),
+  LOG("Thread: %p, name: %s, state: %s, attrs: %s %s\n", thread_obj, thread_info.name, TranslateState(thread_state),
          (jni->IsVirtualThread(thread_obj)? "virtual": "kernel"), (thread_info.is_daemon ? "daemon": ""));
 }
 
 static void
 print_stack_trace_frames(jvmtiEnv *jvmti, JNIEnv *jni, jint count, jvmtiFrameInfo *frames) {
-  printf("JVMTI Stack Trace: frame count: %d\n", count);
+  LOG("JVMTI Stack Trace: frame count: %d\n", count);
   for (int depth = 0; depth < count; depth++) {
     print_method(jvmti, jni, frames[depth].method, depth);
   }
-  printf("\n");
+  LOG("\n");
+}
+
+static jint
+get_frame_count(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  jint frame_count;
+  jvmtiError err = jvmti->GetFrameCount(thread, &frame_count);
+  check_jvmti_status(jni, err, "get_frame_count: error in JVMTI GetFrameCount call");
+  return frame_count;
+}
+
+static jvmtiThreadInfo
+get_thread_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  jvmtiThreadInfo thr_info;
+  jvmtiError err = jvmti->GetThreadInfo(thread, &thr_info);
+  check_jvmti_status(jni, err, "get_thread_info: error in JVMTI GetThreadInfo call");
+  return thr_info;
+}
+
+static jint
+get_thread_state(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  jint thread_state;
+  jvmtiError err = jvmti->GetThreadState(thread, &thread_state);
+  check_jvmti_status(jni, err, "get_thread_state: error in JVMTI GetThreadState call");
+  return thread_state;
 }
 
 static char*
@@ -304,11 +338,11 @@ print_current_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni) {
   err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
   check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
 
-  printf("JVMTI Stack Trace for current thread: frame count: %d\n", count);
+  LOG("JVMTI Stack Trace for current thread: frame count: %d\n", count);
   for (int depth = 0; depth < count; depth++) {
     print_method(jvmti, jni, frames[depth].method, depth);
   }
-  printf("\n");
+  LOG("\n");
 }
 
 static void
@@ -321,13 +355,30 @@ print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
   check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
 
-  printf("JVMTI Stack Trace for thread %s: frame count: %d\n", tname, count);
+  LOG("JVMTI Stack Trace for thread %s: frame count: %d\n", tname, count);
   for (int depth = 0; depth < count; depth++) {
     print_method(jvmti, jni, frames[depth].method, depth);
   }
   deallocate(jvmti, jni, (void*)tname);
-  printf("\n");
+  LOG("\n");
 }
+
+
+static void suspend_thread(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  check_jvmti_status(jni, jvmti->SuspendThread(thread), "error in JVMTI SuspendThread");
+}
+
+static void resume_thread(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
+  check_jvmti_status(jni, jvmti->ResumeThread(thread), "error in JVMTI ResumeThread");
+}
+
+static jthread get_current_thread(jvmtiEnv *jvmti, JNIEnv* jni) {
+  jthread thread;
+  check_jvmti_status(jni, jvmti->GetCurrentThread(&thread), "error in JVMTI ResumeThread");
+  return thread;
+}
+
+
 
 
 /* Commonly used helper functions */
@@ -650,12 +701,10 @@ isThreadExpected(jvmtiEnv *jvmti, jthread thread) {
   return 1;
 }
 
-jthread
-nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
+jthread find_thread_by_name(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
   jthread* threads = NULL;
   jint count = 0;
-  jthread foundThread = NULL;
-  int i;
+  jthread found_thread = NULL;
 
   if (name == NULL) {
     return NULL;
@@ -663,23 +712,23 @@ nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
 
   check_jvmti_status(jni, jvmti->GetAllThreads(&count, &threads), "");
 
-  for (i = 0; i < count; i++) {
-    jvmtiThreadInfo info;
-
-    check_jvmti_status(jni, jvmti->GetThreadInfo(threads[i], &info), "");
-
+  for (int i = 0; i < count; i++) {
+    jvmtiThreadInfo info = get_thread_info(jvmti, jni, threads[i]);
     if (info.name != NULL && strcmp(name, info.name) == 0) {
-      foundThread = threads[i];
+      found_thread = threads[i];
       break;
     }
   }
 
   check_jvmti_status(jni, jvmti->Deallocate((unsigned char*)threads), "");
 
-  foundThread = (jthread) jni->NewGlobalRef(foundThread);
-  return foundThread;
+  found_thread = (jthread) jni->NewGlobalRef(found_thread);
+  return found_thread;
 }
 
+jthread nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
+  return find_thread_by_name(jvmti, jni, name);
+}
 /*
  * JVMTI Extension Mechanism
  */
@@ -748,9 +797,7 @@ find_ext_event(jvmtiEnv* jvmti, const char* ename) {
 
   jvmtiError err = jvmti->GetExtensionEvents(&extCount, &extList);
   if (err != JVMTI_ERROR_NONE) {
-    printf("jvmti_common find_ext_event: Error in JVMTI GetExtensionFunctions: %s(%d)\n",
-           TranslateError(err), err);
-    printf(0);
+    LOG("jvmti_common find_ext_event: Error in JVMTI GetExtensionFunctions: %s(%d)\n",TranslateError(err), err);
     return NULL;
   }
   for (int i = 0; i < extCount; i++) {
@@ -766,7 +813,7 @@ set_ext_event_callback(jvmtiEnv* jvmti,  const char* ename, jvmtiExtensionEvent 
   jvmtiExtensionEventInfo* info = find_ext_event(jvmti, ename);
 
   if (info == NULL) {
-    printf("jvmti_common set_ext_event_callback: Extension event was not found: %s\n", ename);
+    LOG("jvmti_common set_ext_event_callback: Extension event was not found: %s\n", ename);
     return JVMTI_ERROR_NOT_AVAILABLE;
   }
   jvmtiError err = jvmti->SetExtensionEventCallback(info->extension_event_index, callback);
@@ -793,6 +840,15 @@ nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int 
     check_jvmti_status(jni, jvmti->SetEventNotificationMode(enable, list[i], thread), "");
   }
   return NSK_TRUE;
+}
+
+void
+millisleep(int millis) {
+#ifdef _WIN32
+  Sleep(millis);
+#else
+  usleep(1000 * millis);
+#endif
 }
 
 void

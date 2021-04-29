@@ -57,7 +57,7 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
   err = jvmti->GetMethodName(method, &mname, &msign, NULL);
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetMethodName call");
 
-  printf("%s #%d: thread: %s, method: %s.%s%s\n",
+ LOG("%s #%d: thread: %s, method: %s.%s%s\n",
          event_name, event_count, tname, cname, mname, msign);
 
   if (strcmp(event_name, "SingleStep") != 0) {
@@ -73,7 +73,7 @@ static void
 print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_cnt, const char* event_name) {
   char* tname = get_thread_name(jvmti, jni, thread);
 
-  printf("%s: thread: %s, frames: %d\n\n", event_name, tname, frames_cnt);
+ LOG("%s: thread: %s, frames: %d\n\n", event_name, tname, frames_cnt);
 
   print_stack_trace(jvmti, jni, thread);
 
@@ -93,13 +93,13 @@ set_or_clear_breakpoint(JNIEnv *jni, jboolean set, const char *methodName,
     char* mname = get_method_name(jvmti, jni, meth);
 
     if (strcmp(mname, methodName) == 0) {
-      // printf("setupBreakpoint: found method %s() to %s a breakpoint\n", mname, set ? "set" : "clear");
+      //LOG("setupBreakpoint: found method %s() to %s a breakpoint\n", mname, set ? "set" : "clear");
       method = meth;
     }
     deallocate(jvmti, jni, (void*)mname);
   }
   if (method == NULL) {
-      printf("setupBreakpoint: not found method %s() to %s a breakpoint\n",
+     LOG("setupBreakpoint: not found method %s() to %s a breakpoint\n",
              methodName, set ? "set" : "clear");
       jni->FatalError("Error in setupBreakpoint: not found method");
   }
@@ -111,7 +111,7 @@ set_or_clear_breakpoint(JNIEnv *jni, jboolean set, const char *methodName,
   }
   check_jvmti_status(jni, err, "setupBreakpoint: error in JVMTI SetBreakpoint");
 
-  fflush(0);
+
 }
 
 static void
@@ -131,7 +131,7 @@ breakpoint_hit1(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, char* mname) {
   jvmtiError err;
 
   if (strcmp(mname, "openStream") != 0) {
-    printf("FAILED: got  unexpected breakpoint in method %s()\n", mname);
+   LOG("FAILED: got  unexpected breakpoint in method %s()\n", mname);
     passed = JNI_FALSE;
     return;
   }
@@ -149,7 +149,7 @@ breakpoint_hit2(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, char* mname) {
   jvmtiError err;
 
   if (strcmp(mname, "brkpoint") != 0) {
-    printf("FAILED: got unexpected breakpoint in method %s()\n", mname);
+   LOG("FAILED: got unexpected breakpoint in method %s()\n", mname);
     passed = JNI_FALSE;
     return;
   }
@@ -157,7 +157,7 @@ breakpoint_hit2(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, char* mname) {
   // Verify that we got the FRAME_POP event before we hit this breakpoint.
   if (!received_frame_pop_event) {
     passed = JNI_FALSE;
-    printf("FAILED: did not get FRAME_POP event before second breakpoint event\n");
+   LOG("FAILED: did not get FRAME_POP event before second breakpoint event\n");
   }
 
   // Disable breakpoing events and let the test complete.
@@ -180,10 +180,10 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   } else if (brkptBreakpointHit == 2) { // This should be for NotifyFramePop.brkpoint()
     breakpoint_hit2(jvmti, jni, thread, mname);
   } else {
-    printf("FAILED: Breakpoint: too many breakpoints hit.\n");
+   LOG("FAILED: Breakpoint: too many breakpoints hit.\n");
     passed = JNI_FALSE;
   }
-  fflush(0);
+
   deallocate(jvmti, jni, (void*)mname);
 }
 
@@ -197,12 +197,12 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
   received_frame_pop_event = JNI_TRUE;
   frame_pop_count++;
 
-  printf("\nFramePop #%d: Hit #%d:  method: %s, thread: %p\n",
+ LOG("\nFramePop #%d: Hit #%d:  method: %s, thread: %p\n",
          frame_pop_count, brkptBreakpointHit, mname, (void*)thread);
 
   print_frame_event_info(jvmti, jni, thread, method, "FramePop", frame_pop_count);
 
-  fflush(0);
+
   deallocate(jvmti, jni, (void*)mname);
 }
 
@@ -213,7 +213,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiError err;
 
-  printf("Agent_OnLoad started\n");
+ LOG("Agent_OnLoad started\n");
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
@@ -229,23 +229,23 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
+   LOG("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
   }
 
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
+   LOG("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FRAME_POP, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+   LOG("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
   event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
-  printf("Agent_OnLoad finished\n");
-  fflush(0);
+ LOG("Agent_OnLoad finished\n");
+
 
   return JNI_OK;
 }
@@ -255,7 +255,7 @@ Java_VThreadNotifyFramePopTest_enableEvents(JNIEnv *jni, jclass klass, jthread t
                                  jclass testKlass, jclass urlKlass) {
   jvmtiError err;
 
-  printf("enableEvents: started\n");
+ LOG("enableEvents: started\n");
 
   test_class = (jclass)jni->NewGlobalRef(urlKlass);
   err = jvmti->GetClassMethods(urlKlass, &url_method_count, &url_methods);
@@ -271,30 +271,30 @@ Java_VThreadNotifyFramePopTest_enableEvents(JNIEnv *jni, jclass klass, jthread t
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_BREAKPOINT, NULL);
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI SetEventNotificationMode: enable BREAKPOINT");
 
-  printf("enableEvents: finished\n");
-  fflush(0);
+ LOG("enableEvents: finished\n");
+
 }
 
 JNIEXPORT jboolean JNICALL
 Java_VThreadNotifyFramePopTest_check(JNIEnv *jni, jclass cls) {
-  printf("\n");
-  printf("check: started\n");
+ LOG("\n");
+ LOG("check: started\n");
 
-  printf("check: breakpoint_count:  %d\n", breakpoint_count);
-  printf("check: frame_pop_count:   %d\n", frame_pop_count);
+ LOG("check: breakpoint_count:  %d\n", breakpoint_count);
+ LOG("check: frame_pop_count:   %d\n", frame_pop_count);
 
   if (breakpoint_count != 2) {
     passed = JNI_FALSE;
-    printf("FAILED: method_exit_count == 0\n");
+   LOG("FAILED: method_exit_count == 0\n");
   }
   if (frame_pop_count == 0) {
     passed = JNI_FALSE;
-    printf("FAILED: frame_pop_count == 0\n");
+   LOG("FAILED: frame_pop_count == 0\n");
   }
 
-  printf("check: finished\n");
-  printf("\n");
-  fflush(0);
+ LOG("check: finished\n");
+  LOG("\n");
+
 
   return passed;
 }

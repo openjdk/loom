@@ -98,7 +98,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
     }
 
     if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
-      printf("ClassLoad event received for the class %s setting breakpoints ...\n", sig);
+      LOG("ClassLoad event received for the class %s setting breakpoints ...\n", sig);
       setBP(jvmti, jni, klass);
     }
   }
@@ -113,27 +113,27 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jmethodID method, jloca
   int checkStatus = PASSED;
   int i;
 
-  printf(">>>> Breakpoint event received\n");
+  LOG(">>>> Breakpoint event received\n");
 
 /* checking thread info */
   err = jvmti->GetThreadInfo(thread, &thr_info);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    printf("TEST FAILED: unable to get thread info during Breakpoint callback\n\n");
+    LOG("TEST FAILED: unable to get thread info during Breakpoint callback\n\n");
     return;
   }
 
   if (thr_info.name == NULL ||
       strcmp(thr_info.name, THREAD_NAME) != 0) {
     result = checkStatus = STATUS_FAILED;
-    printf(
+    LOG(
         "TEST FAILED: Breakpoint event with unexpected thread info:\n"
         "\tname: \"%s\"\ttype: %s %s thread\n\n",
         (thr_info.name == NULL) ? "NULL" : thr_info.name,
         (jni->IsVirtualThread(thread) == JNI_TRUE) ? "virtual" : "kernel",
         (thr_info.is_daemon == JNI_TRUE) ? "deamon" : "user");
   } else {
-    printf("CHECK PASSED: thread name: \"%s\"\ttype: %s %s thread\n",
+    LOG("CHECK PASSED: thread name: \"%s\"\ttype: %s %s thread\n",
            thr_info.name,        (jni->IsVirtualThread(thread) == JNI_TRUE) ? "virtual" : "kernel",
         (thr_info.is_daemon == JNI_TRUE) ? "deamon" : "user");
   }
@@ -142,49 +142,49 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jmethodID method, jloca
 /* checking location */
   if (location != 0) {
     result = checkStatus = STATUS_FAILED;
-    printf("TEST FAILED: Breakpoint event with unexpected location %ld:\n\n", (long) location);
+    LOG("TEST FAILED: Breakpoint event with unexpected location %ld:\n\n", (long) location);
   } else {
-    printf("CHECK PASSED: location: %ld as expected\n", (long) location);
+    LOG("CHECK PASSED: location: %ld as expected\n", (long) location);
   }
 
 /* checking method info */
   err = jvmti->GetMethodDeclaringClass(method, &klass);
   if (err != JVMTI_ERROR_NONE) {
     result = checkStatus = STATUS_FAILED;
-    printf("TEST FAILED: unable to get method declaring class during Breakpoint callback\n\n");
+    LOG("TEST FAILED: unable to get method declaring class during Breakpoint callback\n\n");
     return;
   }
   err = jvmti->GetClassSignature(klass, &clsSig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     result = checkStatus = STATUS_FAILED;
-    printf("TEST FAILED: unable to obtain a class signature during Breakpoint callback\n\n");
+    LOG("TEST FAILED: unable to obtain a class signature during Breakpoint callback\n\n");
     return;
   }
   if (clsSig == NULL ||
       strcmp(clsSig, CLASS_SIG) != 0) {
     result = checkStatus = STATUS_FAILED;
-    printf(
+    LOG(
         "TEST FAILED: Breakpoint event with unexpected class signature:\n"
         "\t\"%s\"\n\n",
         (clsSig == NULL) ? "NULL" : clsSig);
   } else {
-    printf("CHECK PASSED: class signature: \"%s\"\n", clsSig);
+    LOG("CHECK PASSED: class signature: \"%s\"\n", clsSig);
   }
 
   err = jvmti->GetMethodName(method, &methNam, &methSig, NULL);
   if (err != JVMTI_ERROR_NONE) {
     result = checkStatus = STATUS_FAILED;
-    printf("TEST FAILED: unable to get method name during Breakpoint callback\n\n");
+    LOG("TEST FAILED: unable to get method name during Breakpoint callback\n\n");
     return;
   }
 
   for (i = 0; i < METH_NUM; i++) {
     if (strcmp(methNam, METHODS[i][0]) == 0 &&
         strcmp(methSig, METHODS[i][1]) == 0) {
-      printf("CHECK PASSED: method name: \"%s\"\tsignature: \"%s\" %d\n", methNam, methSig, i);
+      LOG("CHECK PASSED: method name: \"%s\"\tsignature: \"%s\" %d\n", methNam, methSig, i);
       jboolean isVirtual = jni->IsVirtualThread(thread);
       if (isVirtual != METHODS_ATTRS[i]) {
-        printf("TEST FAILED: IsVirtualThread check failed with unexpected result %d  when expected is %d\n", isVirtual, METHODS_ATTRS[i]);
+        LOG("TEST FAILED: IsVirtualThread check failed with unexpected result %d  when expected is %d\n", isVirtual, METHODS_ATTRS[i]);
         result = checkStatus = STATUS_FAILED;
       }
       if (checkStatus == PASSED) {
@@ -196,16 +196,16 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jmethodID method, jloca
   err = jvmti->Deallocate((unsigned char *) methNam);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    printf("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
+    LOG("TEST FAILED: unable to deallocate memory pointed to method name\n\n");
   }
 
   err = jvmti->Deallocate((unsigned char *) methSig);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    printf("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
+    LOG("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
   }
 
-  printf("<<<<\n\n");
+  LOG("<<<<\n\n");
 }
 
 void JNICALL
@@ -227,13 +227,13 @@ JNIEXPORT jint JNICALL Java_breakpoint01_check(JNIEnv *jni, jobject obj) {
   for (i = 0; i < METH_NUM; i++) {
     if (bpEvents[i] != 1) {
       result = STATUS_FAILED;
-      printf(
+      LOG(
           "TEST FAILED: wrong number of Breakpoint events\n"
           "\tfor the method \"%s %s\":\n"
           "\t\tgot: %d\texpected: 1\n",
           METHODS[i][0], METHODS[i][1], bpEvents[i]);
     } else {
-      printf("CHECK PASSED: %d Breakpoint event(s) for the method \"%s %s\" as expected\n",
+      LOG("CHECK PASSED: %d Breakpoint event(s) for the method \"%s %s\" as expected\n",
              bpEvents[i], METHODS[i][0], METHODS[i][1]);
     }
   }
@@ -248,7 +248,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -269,10 +269,10 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   if (!caps.can_generate_single_step_events)
-    printf("Warning: generation of single step events is not implemented\n");
+    LOG("Warning: generation of single step events is not implemented\n");
 
   /* set event callback */
-  printf("setting event callbacks ...\n");
+  LOG("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.ClassLoad = &ClassLoad;
   callbacks.Breakpoint = &Breakpoint;
@@ -283,7 +283,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE)
     return JNI_ERR;
 
-  printf("setting event callbacks done\nenabling JVMTI events ...\n");
+  LOG("setting event callbacks done\nenabling JVMTI events ...\n");
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
@@ -298,7 +298,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_BREAKPOINT, NULL);
   if (err != JVMTI_ERROR_NONE)
     return JNI_ERR;
-  printf("enabling the events done\n\n");
+  LOG("enabling the events done\n\n");
 
   agent_lock = create_raw_monitor(jvmti, "agent_lock");
 

@@ -28,6 +28,7 @@
 
 #include "asm/assembler.inline.hpp"
 #include "oops/compressedOops.hpp"
+#include "runtime/vm_version.hpp"
 #include "utilities/powerOfTwo.hpp"
 
 // MacroAssembler extends Assembler by frequently used macros.
@@ -887,6 +888,12 @@ public:
                       int sve_vector_size_in_bytes = 0);
   void pop_CPU_state(bool restore_vectors = false, bool use_sve = false,
                       int sve_vector_size_in_bytes = 0);
+
+  void push_cont_fastpath(Register java_thread);
+  void pop_cont_fastpath(Register java_thread);
+  void inc_held_monitor_count(Register java_thread);
+  void dec_held_monitor_count(Register java_thread);
+  void reset_held_monitor_count(Register java_thread);
 
   // Round up to a power of two
   void round_to(Register reg, int modulus);

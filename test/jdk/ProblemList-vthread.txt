@@ -12,7 +12,7 @@ jdk/jfr/event/runtime/TestJavaBlockedEvent.java                                 
 jdk/jfr/jcmd/TestJcmdStartStopDefault.java                                                      8253378 generic-all
 
 jdk/jfr/event/allocation/TestObjectAllocationSampleEvent.java                                   8261379 generic-all
-java/lang/Thread/virtual/TestSubmitRejectedEvent.java                                           8261379 generic-all
+java/lang/Thread/virtual/JfrEvents.java                                                         8261379 generic-all
 
 java/lang/invoke/condy/CondyNestedTest.java                                                     8253670 generic-all
 
@@ -232,7 +232,28 @@ java/lang/ClassLoader/getResource/automaticmodules/Driver.java
 java/lang/Class/getResource/ResourcesTest.java
 java/lang/Class/forName/modules/TestDriver.java
 java/lang/ClassLoader/getResource/modules/ResourcesTest.java
-
+java/security/AccessController/DoPrivAccompliceTest.java
+java/security/Policy/SignedJar/SignedJarTest.java
+java/security/Provider/SecurityProviderModularTest.java
+javax/security/auth/login/modules/JaasModularClientTest.java
+javax/security/auth/login/modules/JaasModularDefaultHandlerTest.java
+sun/security/tools/jarsigner/multiRelease/MVJarSigningTest.java
+java/io/FilePermission/ReadFileOnPath.java
+java/nio/file/spi/SetDefaultProvider.java
+tools/launcher/modules/addexports/AddExportsTest.java
+tools/launcher/modules/addexports/manifest/AddExportsAndOpensInManifest.java
+tools/launcher/modules/addmods/AddModsTest.java
+tools/launcher/modules/addreads/AddReadsTest.java
+tools/launcher/modules/addreads/AddReadsTestWarningError.java
+tools/launcher/modules/basic/BasicTest.java
+tools/launcher/modules/basic/LauncherErrors.java
+tools/launcher/modules/describe/DescribeModuleTest.java
+tools/launcher/modules/dryrun/DryRunTest.java
+tools/launcher/modules/illegalaccess/IllegalAccessTest.java
+tools/launcher/modules/limitmods/LimitModsTest.java
+tools/launcher/modules/listmods/ListModsTest.java
+tools/launcher/modules/showmoduleresolution/ShowModuleResolutionTest.java
+tools/launcher/modules/validate/ValidateModulesTest.java
 
 ####
 # No expected StackOverflow

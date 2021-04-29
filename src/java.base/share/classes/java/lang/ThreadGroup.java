@@ -57,11 +57,11 @@ import jdk.internal.misc.VM;
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @apiNote
- * Thread groups provided a way in early JDK release to group threads and provide
+ * Thread groups provided a way in early JDK releases to group threads and provide
  * a form of <i>job control</i> for threads. Thread groups supported the isolation
  * of applets and defined methods intended for diagnostic purposes. The concept
  * of thread group is obsolete. It should be rare for new applications to create
- * thread groups or interact with its class.
+ * thread groups or interact with this API.
  *
  * @since   1.0
  */
@@ -131,8 +131,17 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @param   name   the name of the new thread group, can be {@code null}
      * @throws  SecurityException  if the current thread cannot create a
      *               thread in the specified thread group.
+     *
+     * @deprecated
+     * Thread groups provided a way in early JDK releases to group threads and
+     * provide a form of <i>job control</i> for threads. Thread groups supported
+     * the isolation of applets and defined methods intended for diagnostic
+     * purposes. The concept of thread group is obsolete. It should be rare for
+     * new applications to create thread groups.
+     *
      * @see     java.lang.ThreadGroup#checkAccess()
      */
+    @Deprecated(since = "99")
     public ThreadGroup(String name) {
         this(Thread.currentThread().getThreadGroup(), name);
     }
@@ -148,9 +157,17 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @param     name     the name of the new thread group, can be {@code null}
      * @throws    SecurityException  if the current thread cannot create a
      *               thread in the specified thread group.
-     * @see     java.lang.SecurityException
+     *
+     * @deprecated
+     * Thread groups provided a way in early JDK releases to group threads and
+     * provide a form of <i>job control</i> for threads. Thread groups supported
+     * the isolation of applets and defined methods intended for diagnostic
+     * purposes. The concept of thread group is obsolete. It should be rare for
+     * new applications to create thread groups.
+     *
      * @see     java.lang.ThreadGroup#checkAccess()
      */
+    @Deprecated(since = "99")
     public ThreadGroup(ThreadGroup parent, String name) {
         this(checkParentAccess(parent), parent, name);
     }
@@ -233,10 +250,10 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @param daemon  ignored
      *
      * @deprecated This method originally changed the <i>daemon status</i> of
-     *             the thread group that determined if the thread group was
-     *             automatically destroyed when its last thread terminates.
-     *             The concept of daemon thread group and the concept of a
-     *             destroyed thread group no longer exists.
+     *             the thread group. A daemon thread group was automatically
+     *             destroyed when its last thread terminated. The concept of
+     *             daemon thread group and the concept of a destroyed thread
+     *             group no longer exists.
      */
     @Deprecated(since="16", forRemoval=true)
     public final void setDaemon(boolean daemon) {

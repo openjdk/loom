@@ -58,9 +58,10 @@ public class LocalExecutionControl extends DirectExecutionControl {
     }
 
     @Override
-    @SuppressWarnings("deprecation")
     protected String invoke(Method doitMethod) throws Exception {
-        execThreadGroup = new ThreadGroup("JShell process local execution");
+        @SuppressWarnings("deprecation")
+        ThreadGroup group = new ThreadGroup("JShell process local execution");
+        execThreadGroup = group;
 
         AtomicReference<InvocationTargetException> iteEx = new AtomicReference<>();
         AtomicReference<IllegalAccessException> iaeEx = new AtomicReference<>();

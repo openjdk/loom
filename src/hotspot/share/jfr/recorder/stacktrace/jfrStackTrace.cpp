@@ -297,11 +297,20 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool as
     } else {
       bci = vfs.bci();
     }
+
+    intptr_t* frame_id = vfs.frame_id();
+    vfs.next_vframe();
+    if (type == JfrStackFrame::FRAME_JIT && !vfs.at_end() && frame_id == vfs.frame_id()) {
+      // This frame and the caller frame are both the same physical
+      // frame, so this frame is inlined into the caller.
+      type = JfrStackFrame::FRAME_INLINE;
+    }
+
+    const int lineno = async_mode ? method->line_number_from_bci(bci) : 0;
     _hash = (_hash * 31) + mid;
     _hash = (_hash * 31) + bci;
     _hash = (_hash * 31) + type;
-    _frames[count] = JfrStackFrame(mid, bci, type, async_mode ? method->line_number_from_bci(bci) : 0, method->method_holder());
-    vfs.next_vframe();
+    _frames[count] = JfrStackFrame(mid, bci, type, lineno, method->method_holder());
     count++;
   }
 

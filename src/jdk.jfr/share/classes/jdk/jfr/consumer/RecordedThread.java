@@ -105,10 +105,9 @@ public final class RecordedThread extends RecordedObject {
     }
 
     /**
-     * Returns {@code true} if this is a Virtual Thread, {@code false} otherwise.
-     * <p>
+     * Returns {@code true} if this is a virtual Thread, {@code false} otherwise.
      *
-     * @return {@code true} if this is a Virtual Thread, {@code false} otherwise.
+     * @return {@code true} if this is a virtual Thread, {@code false} otherwise.
      */
     public boolean isVirtual() {
         return getTyped("isVirtual", Boolean.class, Boolean.FALSE);

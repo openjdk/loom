@@ -49,7 +49,7 @@ static volatile int eventsCount = 0;
 void JNICALL
 MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj) {
 
-  printf("MonitorContendedEnter event:\n\tthread: %p, object: %p, expected object: %p\n",thr, obj, expected_object);
+  LOG("MonitorContendedEnter event:\n\tthread: %p, object: %p, expected object: %p\n",thr, obj, expected_object);
 
   print_thread_info(jvmti, jni, thr);
 
@@ -65,7 +65,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj) {
   if (jni->IsSameObject(expected_thread, thr) &&
       jni->IsSameObject(expected_object, obj)) {
     eventsCount++;
-    printf("Increasing eventCount to %d\n", eventsCount);
+    LOG("Increasing eventCount to %d\n", eventsCount);
   }
 }
 
@@ -81,7 +81,7 @@ static int prepare() {
 
 static int clean() {
   jvmtiError err;
-  printf("Disabling events\n");
+  LOG("Disabling events\n");
   /* disable MonitorContendedEnter event */
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_MONITOR_CONTENDED_ENTER,
@@ -163,7 +163,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -178,13 +178,13 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
+    LOG("(GetCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -210,7 +210,7 @@ JNIEXPORT jint JNICALL Java_mcontenter01_getEventCount(JNIEnv *jni, jobject obj)
 }
 
 JNIEXPORT void JNICALL Java_mcontenter01_setExpected(JNIEnv *jni, jobject clz, jobject obj, jobject thread) {
-  printf("Remembering global reference for monitor object is %p\n", obj);
+  LOG("Remembering global reference for monitor object is %p\n", obj);
   /* make object accessible for a long time */
   expected_object = jni->NewGlobalRef(obj);
   if (expected_object == NULL) {

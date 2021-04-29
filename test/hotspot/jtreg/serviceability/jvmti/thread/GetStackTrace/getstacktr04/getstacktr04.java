@@ -39,50 +39,26 @@
  * @run main/othervm/native -agentlib:getstacktr04 getstacktr04
  */
 
-import java.io.PrintStream;
-
 public class getstacktr04 {
 
-    final static int FAILED = 2;
-    final static int JCK_STATUS_BASE = 95;
-
     static {
-        try {
-            System.loadLibrary("getstacktr04");
-        } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load getstacktr04 library");
-            System.err.println("java.library.path:"
-                + System.getProperty("java.library.path"));
-            throw ule;
-        }
+        System.loadLibrary("getstacktr04");
     }
 
     native static void getReady(Class clazz);
-    native static int getRes();
 
-    public static void main(String args[]) {
-
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    public static int run(String args[], PrintStream out) {
-        TestThread thr = new TestThread();
+    public static void main(String args[]) throws Exception {
+        Thread thread = Thread.ofPlatform().unstarted(new TestThread());
         getReady(TestThread.class);
+        thread.start();
+        thread.join();
 
-        thr.start();
-        try {
-            thr.join();
-        } catch (InterruptedException ex) {
-            out.println("# Unexpected " + ex);
-            return FAILED;
-        }
-
-        return getRes();
+        Thread vThread = Thread.ofVirtual().unstarted(new TestThread());
+        vThread.start();
+        vThread.join();
     }
 
-    static class TestThread extends Thread {
+    static class TestThread implements Runnable {
         public void run() {
             chain1();
         }

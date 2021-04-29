@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021 Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,6 +27,7 @@
 
 #include "interpreter/oopMapCache.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/registerMap.hpp"
 
 int InstanceStackChunkKlass::metadata_words() { return frame::sender_sp_offset; }
 int InstanceStackChunkKlass::align_wiggle()   { return 1; }
@@ -87,7 +88,6 @@ inline intptr_t* StackChunkFrameStream<mixed>::unextended_sp_for_interpreter_fra
 template <bool mixed>
 intptr_t* StackChunkFrameStream<mixed>::next_sp_for_interpreter_frame() const {
   assert (mixed && is_interpreted(), "");
-  // tty->print_cr(">>>> StackChunkFrameStream<mixed>::next_for_interpreter_frame derelativize(frame::interpreter_frame_locals_offset): %p _end: %p", derelativize(frame::interpreter_frame_locals_offset), _end);
   return (derelativize(frame::interpreter_frame_locals_offset) + 1 >= _end) ? _end : fp() + frame::sender_sp_offset;
 }
 
@@ -101,20 +101,18 @@ inline void StackChunkFrameStream<mixed>::next_for_interpreter_frame() {
     intptr_t* fp = this->fp();
     _unextended_sp = fp + fp[frame::interpreter_frame_sender_sp_offset];
     _sp = fp + frame::sender_sp_offset;
-    // assert (_unextended_sp >= _sp, "fp[frame::interpreter_frame_sender_sp_offset]: %ld", fp[frame::interpreter_frame_sender_sp_offset]);
-    assert (!is_interpreted() || _unextended_sp == unextended_sp_for_interpreter_frame(), "_unextended_sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(_unextended_sp), p2i(unextended_sp_for_interpreter_frame()));
   }
 }
 
 template <bool mixed>
 inline int StackChunkFrameStream<mixed>::interpreter_frame_size() const {
   assert (mixed && is_interpreted(), "");
-  InterpreterOopMap mask;
-  to_frame().interpreted_frame_oop_map(&mask);
-
-  // unextended sp to unextended sp
+  // InterpreterOopMap mask;
+  // to_frame().interpreted_frame_oop_map(&mask);
+  // intptr_t* top = derelativize(frame::interpreter_frame_initial_sp_offset) - mask.expression_stack_size();
+  
+  intptr_t* top = unextended_sp(); // later subtract argsize if callee is interpreted
   intptr_t* bottom = derelativize(frame::interpreter_frame_locals_offset) + 1; // the sender's unextended sp: derelativize(frame::interpreter_frame_sender_sp_offset); 
-  intptr_t* top = derelativize(frame::interpreter_frame_initial_sp_offset) - mask.expression_stack_size(); // unextended_sp(); // 
 
   // tty->print_cr(">>>> StackChunkFrameStream<mixed>::interpreter_frame_size bottom: %d top: %d size: %d", _chunk->to_offset(bottom - 1) + 1, _chunk->to_offset(top), (int)(bottom - top));
   return (int)(bottom - top);
@@ -147,10 +145,11 @@ inline void stackChunkOopDesc::derelativize_frame_pd(frame& fr) const {
   if (fr.is_interpreted_frame()) fr.set_fp(derelativize_address(fr.offset_fp()));
 }
 
-inline void InstanceStackChunkKlass::relativize(intptr_t* const fp, intptr_t* const hfp, int offset) {
+inline void InstanceStackChunkKlass::relativize(intptr_t* const vfp, intptr_t* const hfp, int offset) {
+  assert (*(hfp + offset) == *(vfp + offset), "vaddr: " INTPTR_FORMAT " *vaddr: " INTPTR_FORMAT " haddr: " INTPTR_FORMAT " *haddr: " INTPTR_FORMAT, p2i(vfp + offset) , *(vfp + offset), p2i(hfp + offset) , *(hfp + offset));
   intptr_t* addr = hfp + offset;
-  intptr_t value = *(intptr_t**)addr - fp;
-  // tty->print_cr(">>>> relativize offset: %d fp: %p delta: %ld derel: %p", offset, fp, value, *(intptr_t**)addr);
+  intptr_t value = *(intptr_t**)addr - vfp;
+  // tty->print_cr(">>>> relativize offset: %d fp: %p delta: %ld derel: %p", offset, vfp, value, *(intptr_t**)addr);
   *addr = value;
 }
 
@@ -164,15 +163,19 @@ inline void InstanceStackChunkKlass::relativize_interpreted_frame_metadata(const
   intptr_t* vfp = f.fp();
   intptr_t* hfp = hf.fp();
   assert (hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
-  assert ((*(vfp + frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
-  
+  assert ((f.at<false>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
+  assert (f.fp() > (intptr_t*)f.at<false>(frame::interpreter_frame_initial_sp_offset), "");
+
   // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
   *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
   relativize(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
   relativize(vfp, hfp, frame::interpreter_frame_locals_offset);
 
-  assert (hf.unextended_sp() <= (intptr_t*)hf.at<true>(frame::interpreter_frame_initial_sp_offset), "");
+  assert ((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
   assert (hf.unextended_sp() == (intptr_t*)hf.at<true>(frame::interpreter_frame_last_sp_offset), "");
+  assert (hf.unextended_sp() <= (intptr_t*)hf.at<true>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            >  (intptr_t*)hf.at<true>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            <= (intptr_t*)hf.at<true>(frame::interpreter_frame_locals_offset), "");
 }
 
 inline void InstanceStackChunkKlass::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
@@ -252,6 +255,7 @@ public:
   bool include_argument_oops() const { return false; }
   void set_include_argument_oops(bool f)  {}
   bool in_cont()       const { return false; }
+  stackChunkHandle stack_chunk() const { return stackChunkHandle(); }
 
 #ifdef ASSERT
   bool should_skip_missing() const  { return false; }

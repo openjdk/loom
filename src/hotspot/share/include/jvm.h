@@ -200,6 +200,12 @@ JVM_GetRandomSeedForDumping();
 JNIEXPORT void JNICALL
 JVM_LogLambdaFormInvoker(JNIEnv* env, jstring line);
 
+JNIEXPORT void JNICALL
+JVM_DumpClassListToFile(JNIEnv* env, jstring fileName);
+
+JNIEXPORT void JNICALL
+JVM_DumpDynamicArchive(JNIEnv* env, jstring archiveName);
+
 /*
  * java.lang.Throwable
  */
@@ -242,9 +248,6 @@ JVM_ScopeLocalCache(JNIEnv *env, jclass threadClass);
 
 JNIEXPORT void JNICALL
 JVM_SetScopeLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
-
-JNIEXPORT jobject JNICALL
-JVM_Vthread(JNIEnv *env, jclass threadClass);
 
 JNIEXPORT void JNICALL
 JVM_SetCurrentThread(JNIEnv *env, jclass threadClass, jobject theThread);
@@ -1129,13 +1132,10 @@ JNIEXPORT void JNICALL
 JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread);
+JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboolean last_unmount);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread);
-
-JNIEXPORT void JNICALL
-JVM_VirtualThreadTerminated(JNIEnv* env, jobject vthread);
+JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean last_unmount);
 
 /*
  * This structure is used by the launcher to get the default thread

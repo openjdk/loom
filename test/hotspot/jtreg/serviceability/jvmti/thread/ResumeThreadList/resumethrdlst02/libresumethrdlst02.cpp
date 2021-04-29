@@ -55,7 +55,7 @@ static jrawMonitorID eventsReceivedMtx = 0;
 
 /* ============================================================================= */
 
-static int fillThreadsByName(jvmtiEnv* jvmti, JNIEnv* jni,
+static int find_threads_by_name(jvmtiEnv* jvmti, JNIEnv* jni,
                                 const char name[], int foundCount, jthread foundThreads[]);
 
 /** Agent algorithm. */
@@ -82,7 +82,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
         NSK_DISPLAY1("  ... allocated array: %p\n", (void*)threads);
 
         NSK_DISPLAY1("Find threads: %d threads\n", threadsCount);
-        if (fillThreadsByName(jvmti, jni, THREAD_NAME, threadsCount, threads) == 0) {
+        if (find_threads_by_name(jvmti, jni, THREAD_NAME, threadsCount, threads) == 0) {
           return;
         }
 
@@ -171,7 +171,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
 /* ============================================================================= */
 
 /** Find threads whose name starts with specified name prefix. */
-static int fillThreadsByName(jvmtiEnv* jvmti, JNIEnv* jni,
+static int find_threads_by_name(jvmtiEnv* jvmti, JNIEnv* jni,
                             const char name[], int foundCount, jthread foundThreads[]) {
     jint count = 0;
     jthread* threads = NULL;
@@ -262,7 +262,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -283,7 +283,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     callbacks.ThreadEnd = callbackThreadEnd;
     jvmtiError err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
     if (err != JVMTI_ERROR_NONE) {
-      printf("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
+      LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
       return JNI_ERR;
     }
   }

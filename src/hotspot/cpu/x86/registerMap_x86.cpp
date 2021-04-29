@@ -66,6 +66,6 @@ address RegisterMap::pd_location(VMReg base_reg, int slot_idx) const {
   return location(base_reg->next(slot_idx), (intptr_t*)NULL);
 }
 
-int RegisterMap::link_offset() {
-  return in_bytes(byte_offset_of(RegisterMap, _location)) + (int)(sizeof(intptr_t*) * rbp->as_VMReg()->value());
-}
+// int RegisterMap::link_offset() {
+//   return in_bytes(byte_offset_of(RegisterMap, _location)) + (int)(sizeof(intptr_t*) * rbp->as_VMReg()->value());
+// }

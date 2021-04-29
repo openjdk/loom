@@ -275,6 +275,41 @@ bool JvmtiEnvThreadState::is_frame_pop(int cur_frame_number) {
   return get_frame_pops()->contains(fp);
 }
 
+class VM_VThreadGetCurrentLocation : public VM_Operation {
+ private:
+   Handle _vthread_h;
+   jmethodID _method_id;
+   int _bci;
+   bool _completed;
+
+ public:
+  VM_VThreadGetCurrentLocation(Handle vthread_h)
+    : _vthread_h(vthread_h),
+      _method_id(NULL),
+      _bci(0),
+      _completed(false)
+  {}
+
+  VMOp_Type type() const { return VMOp_VThreadGetCurrentLocation; }
+  void doit() {
+    ResourceMark rm;
+    javaVFrame* jvf = JvmtiEnvBase::get_vthread_jvf(_vthread_h());
+
+    if (jvf != NULL) { // TBD: jvf can be NULL, most likely, when vthread is exiting
+      Method* method = jvf->method();
+      _method_id = method->jmethod_id();
+      _bci = jvf->bci();
+    }
+    _completed = true;
+  }
+  void get_current_location(jmethodID *method_id, int *bci) {
+    *method_id = _method_id;
+    *bci = _bci;
+  }
+  bool completed() {
+    return _completed;
+  }
+};
 
 class GetCurrentLocationClosure : public HandshakeClosure {
  private:
@@ -344,6 +379,30 @@ void JvmtiEnvThreadState::reset_current_location(jvmtiEvent event_type, bool ena
 
     JavaThread* thread = get_thread_or_saved();
 
+    oop thread_oop = jvmti_thread_state()->get_thread_oop();
+
+    // Check for an unmounted virual thread case.
+    if (thread == NULL && event_type == JVMTI_EVENT_SINGLE_STEP && is_virtual()) {
+      jmethodID method_id;
+      int bci;
+#if 0
+      ResourceMark rm(JavaThread::current());
+      oop thread_oop = jvmti_thread_state()->get_thread_oop();
+      oop name_oop = java_lang_Thread::name(thread_oop);
+      const char* name_str = java_lang_String::as_utf8_string(name_oop);
+      name_str = name_str == NULL ? "<NULL>" : name_str;
+
+      printf("DBG: reset_current_location (SINGLE_STEP) for vthread: JvmtiThreadState: %p jt: %p %s\n",
+             (void*)jvmti_thread_state(), (void*)thread, name_str); fflush(0);
+#endif
+      JavaThread* cur_thread = JavaThread::current();
+      HandleMark hm(cur_thread);
+      VM_VThreadGetCurrentLocation op(Handle(cur_thread, thread_oop));
+      VMThread::execute(&op);
+      op.get_current_location(&method_id, &bci);
+      set_current_location(method_id, bci);
+      return;
+    }
     if (event_type == JVMTI_EVENT_SINGLE_STEP && thread->has_last_Java_frame()) {
       jmethodID method_id;
       int bci;

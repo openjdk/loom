@@ -475,8 +475,8 @@ class StubRoutines: AllStatic {
   static address cont_interpreter_forced_preempt_return() { return _cont_interpreter_forced_preempt_return; }
   static cont_jump_from_sp_t  cont_jump_from_sp_C() { return CAST_TO_FN_PTR(cont_jump_from_sp_t, _cont_jump_from_sp); }
 
-  static address jfr_write_checkpoint() { return _jfr_write_checkpoint; }
-  static address jfr_get_event_writer() { return _jfr_get_event_writer; }
+  JFR_ONLY(static address jfr_write_checkpoint() { return _jfr_write_checkpoint; })
+  JFR_ONLY(static address jfr_get_event_writer() { return _jfr_get_event_writer; })
 
 
   static address select_fill_function(BasicType t, bool aligned, const char* &name);

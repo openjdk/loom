@@ -115,7 +115,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
   err = jvmti->GetClassSignature(klass, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    printf("TEST FAILURE: unable to obtain a class signature. Error %d\n", err);
+    LOG("TEST FAILURE: unable to obtain a class signature. Error %d\n", err);
     return;
   }
 
@@ -124,18 +124,18 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
     jboolean is_virtual_thread = jni->IsVirtualThread(thread);
     print_thread_info(jvmti, jni, thread);
     if (is_virtual_thread != expThreadIsVirtual[i]) {
-      printf("TEST FAILED: IsVirtualThread(thread) is not expected: %d\n", is_virtual_thread);
+      LOG("TEST FAILED: IsVirtualThread(thread) is not expected: %d\n", is_virtual_thread);
       result = STATUS_FAILED;
     } else {
       clsEvents[i]++;
-      printf("CHECK PASSED: ClassLoad event received for the class \"%s\" as expected\n", sig);
+      LOG("CHECK PASSED: ClassLoad event received for the class \"%s\" as expected\n", sig);
     }
   } else {
     i = findSig(sig, 0);
     if (i != -1) {
       result = STATUS_FAILED;
       primClsEvents[i]++;
-      printf(
+      LOG(
           "TEST FAILED: JVMTI_EVENT_CLASS_LOAD event received for\n"
           "\t a primitive class/array of primitive types with the signature \"%s\"\n",
           sig);
@@ -151,14 +151,14 @@ Java_classload01_check(JNIEnv *jni, jobject obj) {
   for (i = 0; i < EXP_SIG_NUM; i++) {
     if (clsEvents[i] != 1) {
       result = STATUS_FAILED;
-      printf("TEST FAILED: wrong number of JVMTI_EVENT_CLASS_LOAD events for \"%s\":\n\tgot: %d\texpected: 1\n",
+      LOG("TEST FAILED: wrong number of JVMTI_EVENT_CLASS_LOAD events for \"%s\":\n\tgot: %d\texpected: 1\n",
              expSigs[i], clsEvents[i]);
     }
   }
 
   for (i = 0; i < UNEXP_SIG_NUM; i++) {
     if (primClsEvents[i] != 0) {
-      printf("TEST FAILED: there are JVMTI_EVENT_CLASS_LOAD events for the primitive classes\n");
+      LOG("TEST FAILED: there are JVMTI_EVENT_CLASS_LOAD events for the primitive classes\n");
     }
   }
   return result;
@@ -182,7 +182,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -200,7 +200,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   if (!caps.can_support_virtual_threads) {
-    printf("ERROR: virtual thread support is not implemented.\n");
+    LOG("ERROR: virtual thread support is not implemented.\n");
     return JNI_ERR;
   }
 
@@ -209,22 +209,22 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   counter_lock = create_raw_monitor(jvmti, "_counter_lock");
 
-  printf("setting event callbacks ...\n");
+  LOG("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.ClassLoad = &ClassLoad;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("Error in SetEventCallbacks %d/n", err);
+    LOG("Error in SetEventCallbacks %d/n", err);
     return JNI_ERR;
   }
 
-  printf("setting event callbacks done\nenabling ClassLoad event ...\n");
+  LOG("setting event callbacks done\nenabling ClassLoad event ...\n");
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_LOAD, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Error in SetEventNotificationMode: %d\n", err);
+    LOG("Error in SetEventNotificationMode: %d\n", err);
     return JNI_ERR;
   }
-  printf("the event enabled\n");
+  LOG("the event enabled\n");
 
   return JNI_OK;
 }

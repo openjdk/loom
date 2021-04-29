@@ -40,21 +40,10 @@
  * @run main/othervm/native -agentlib:getstacktr03 getstacktr03
  */
 
-import java.io.PrintStream;
-
 public class getstacktr03 {
 
-    final static int JCK_STATUS_BASE = 95;
-
     static {
-        try {
-            System.loadLibrary("getstacktr03");
-        } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load getstacktr03 library");
-            System.err.println("java.library.path:"
-                    + System.getProperty("java.library.path"));
-            throw ule;
-        }
+        System.loadLibrary("getstacktr03");
     }
 
     native static void chain();
@@ -64,16 +53,14 @@ public class getstacktr03 {
     public static Object lockOut = new Object();
 
     public static void main(String args[]) {
+        Thread thread = Thread.ofPlatform().unstarted(new Task());
+        test(thread);
 
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
+        Thread vthread = Thread.ofVirtual().unstarted(new Task());
+        test(vthread);
     }
 
-    public static int run(String args[], PrintStream out) {
-        int res;
-        TestThread thr = new TestThread();
-
+    public static void test(Thread thr) {
         synchronized (lockIn) {
             thr.start();
             try {
@@ -83,9 +70,8 @@ public class getstacktr03 {
             }
         }
 
-
         synchronized (lockOut) {
-            res = check(thr);
+            check(thr);
             lockOut.notify();
         }
 
@@ -94,8 +80,6 @@ public class getstacktr03 {
         } catch (InterruptedException e) {
             throw new Error("Unexpected " + e);
         }
-
-        return res;
     }
 
     static void dummy() {
@@ -110,10 +94,10 @@ public class getstacktr03 {
             }
         }
     }
-
-    static class TestThread extends Thread {
+    static class Task implements Runnable {
+        @Override
         public void run() {
-            chain();
+            getstacktr03.chain();
         }
     }
 }

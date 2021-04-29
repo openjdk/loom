@@ -45,7 +45,7 @@ public class InterruptHttp {
             AtomicReference<Exception> exception = new AtomicReference<>();
 
             // start thread to connect to server
-            Thread thread = Thread.startVirtualThread(() -> {
+            Thread thread = Thread.ofVirtual().start(() -> {
                 try {
                     URL url = new URL(server.address() + "/hello");
                     try (InputStream in = url.openStream()) { }
@@ -82,7 +82,7 @@ public class InterruptHttp {
             InetAddress lb = InetAddress.getLoopbackAddress();
             listener = new ServerSocket(0, -1, lb);
             address = "http://" + lb.getHostAddress() + ":" + listener.getLocalPort();
-            Thread.startVirtualThread(this::run);
+            Thread.ofVirtual().start(this::run);
         }
 
         private void run() {

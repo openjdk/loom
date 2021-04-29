@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,147 +27,32 @@ package jdk.internal.vm;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.security.AccessController;
-import java.security.PrivilegedExceptionAction;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import sun.nio.ch.Poller;
-import sun.security.action.GetPropertyAction;
 
 /**
  * Thread dump support.
  *
  * This class defines methods to dump threads to an output stream or file in
  * plain text or JSON format. Virtual threads are located if they are created in
- * a structured way with a ThreadExecutor. This class optionally support tracking
- * the start and termination of all virtual threads.
+ * a structured way with a ThreadExecutor.
  */
 public class ThreadDumper {
     private ThreadDumper() { }
-
-    // the set of all virtual threads when tracking is enabled, otherwise null
-    private static final Set<Thread> VIRTUAL_THREADS;
-    static {
-        String s = GetPropertyAction.privilegedGetProperty("jdk.trackAllVirtualThreads");
-        if (s != null && (s.isEmpty() || s.equalsIgnoreCase("true"))) {
-            VIRTUAL_THREADS = ConcurrentHashMap.newKeySet();
-        } else {
-            VIRTUAL_THREADS = null;
-        }
-    }
-
-    /**
-     * Notifies the thread dumper of new virtual thread. A no-op if tracking of
-     * virtual threads is not enabled.
-     */
-    public static void notifyStart(Thread thread) {
-        Set<Thread> threads = VIRTUAL_THREADS;
-        if (threads != null) {
-            assert thread.isVirtual();
-            threads.add(thread);
-        }
-    }
-
-    /**
-     * Notifies the thread dumper that a virtual thread has virtual. A no-op if
-     * tracking of virtual threads is not enabled.
-     */
-    public static void notifyTerminate(Thread thread) {
-        Set<Thread> threads = VIRTUAL_THREADS;
-        if (threads != null) {
-            assert thread.isVirtual();
-            threads.remove(thread);
-        }
-    }
-
-    /**
-     * A container of threads, backed by a ThreadExecutor.
-     */
-    private static class ThreadContainer {
-        private final Object threadExecutor;
-
-        ThreadContainer(Object threadExecutor) {
-            this.threadExecutor = Objects.requireNonNull(threadExecutor);
-        }
-
-        Stream<Thread> threads() {
-            return ThreadExecutors.threads(threadExecutor).stream();
-        }
-
-        private static ThreadContainer latestThreadContainer(Thread thread) {
-            Object threadExecutor = Threads.latestThreadExecutor(thread);
-            if (threadExecutor != null) {
-                return new ThreadContainer(threadExecutor);
-            } else {
-                return null;
-            }
-        }
-
-        private ThreadContainer previous() {
-            Object previous = ThreadExecutors.previous(threadExecutor);
-            if (previous != null) {
-                return new ThreadContainer(previous);
-            } else {
-                return null;
-            }
-        }
-        
-        /**
-         * Returns the list of "active" containers created by the given thread. The
-         * list is ordered, enclosing containers before nested containers.
-         */
-        static List<ThreadContainer> containers(Thread thread) {
-            ThreadContainer container = latestThreadContainer(thread);
-            if (container == null) {
-                return List.of();
-            } else {
-                List<ThreadContainer> list = new ArrayList<>();
-                while (container != null) {
-                    list.add(container);
-                    container = container.previous();
-                }
-                Collections.reverse(list);
-                return list;
-            }
-        }
-
-        @Override
-        public int hashCode() {
-            return threadExecutor.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj instanceof ThreadContainer other) {
-                return this.threadExecutor == other.threadExecutor;
-            } else {
-                return false;
-            }
-        }
-
-        @Override
-        public String toString() {
-            return threadExecutor.getClass().getName()
-                    + "@" + System.identityHashCode(threadExecutor);
-        }
-    }
 
     /**
      * Returns a stream of the virtual threads that are found by walking the
@@ -175,46 +60,46 @@ public class ThreadDumper {
      */
     private static Stream<Thread> virtualThreads(Set<Thread> roots) {
         Set<Thread> threads = new HashSet<>();
-        Deque<ThreadContainer> stack = new ArrayDeque<>();
+        Deque<ThreadExecutor> stack = new ArrayDeque<>();
         roots.stream()
-                .flatMap(t -> ThreadContainer.containers(t).stream())
+                .flatMap(t -> ThreadExecutor.executors(t).stream())
                 .forEach(stack::push);
         while (!stack.isEmpty()) {
-            ThreadContainer container = stack.pop();
-            container.threads().forEach(t -> {
+            ThreadExecutor executor = stack.pop();
+            executor.threads().forEach(t -> {
                 if (t.isVirtual()) {
                     threads.add(t);
                 }
-                ThreadContainer.containers(t).forEach(stack::push);
+                ThreadExecutor.executors(t).forEach(stack::push);
             });
         }
         return threads.stream();
     }
 
     /**
-     * Returns a map of "active" containers found by walking the graph from the given
+     * Returns a map of "active" executors found by walking the graph from the given
      * set of root threads. The map is keyed on the identifier of the thread that
-     * created the containers. Each map value is a list of containers created by that
-     * thread, in creation order, so that enclosing containers are best nested
-     * containers.
+     * created the executors. Each map value is a list of executors created by that
+     * thread, in creation order, so that enclosing executors are best nested
+     * executors.
      */
-    private static Map<Long, List<ThreadContainer>> findContainers(Set<Thread> roots) {
-        Map<Long, List<ThreadContainer>> map = new HashMap<>();
-        Deque<ThreadContainer> stack = new ArrayDeque<>();
+    private static Map<Long, List<ThreadExecutor>> findExecutors(Set<Thread> roots) {
+        Map<Long, List<ThreadExecutor>> map = new HashMap<>();
+        Deque<ThreadExecutor> stack = new ArrayDeque<>();
         roots.stream().forEach(t -> {
-            List<ThreadContainer> containers = ThreadContainer.containers(t);
-            if (!containers.isEmpty()) {
-                map.put(t.getId(), containers);
-                containers.forEach(stack::push);
+            List<ThreadExecutor> executors = ThreadExecutor.executors(t);
+            if (!executors.isEmpty()) {
+                map.put(t.getId(), executors);
+                executors.forEach(stack::push);
             }
         });
         while (!stack.isEmpty()) {
-            ThreadContainer container = stack.pop();
-            container.threads().forEach(t -> {
-                List<ThreadContainer> containers = ThreadContainer.containers(t);
-                if (!containers.isEmpty()) {
-                    map.put(t.getId(), containers);
-                    containers.forEach(stack::push);
+            ThreadExecutor executor = stack.pop();
+            executor.threads().forEach(t -> {
+                List<ThreadExecutor> executors = ThreadExecutor.executors(t);
+                if (!executors.isEmpty()) {
+                    map.put(t.getId(), executors);
+                    executors.forEach(stack::push);
                 }
             });
         }
@@ -222,15 +107,41 @@ public class ThreadDumper {
     }
 
     /**
+     * Generate a thread dump in plain text or JSON format to the given file, UTF-8 encoded.
+     */
+    private static byte[] dumpThreads(String file, boolean okayToOverwrite, boolean json) {
+        Path path = Path.of(file).toAbsolutePath();
+        OpenOption[] options = (okayToOverwrite) ?
+                new OpenOption[0] : new OpenOption[] { StandardOpenOption.CREATE_NEW };
+        String reply;
+        try (OutputStream out = Files.newOutputStream(path, options);
+             PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
+            if (json) {
+                dumpThreadsToJson(ps);
+            } else {
+                dumpThreads(ps);
+            }
+            reply = String.format("Created %s%n", path);
+        } catch (FileAlreadyExistsException e) {
+            reply = String.format("%s exists, use -overwrite to overwrite%n", path);
+        } catch (IOException ioe) {
+            reply = String.format("Failed: %s%n", ioe);
+        }
+        return reply.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
      * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
      */
-    public static byte[] dumpThreads(String file) throws IOException {
-        Path path = Path.of(file).toAbsolutePath();
-        try (OutputStream out = Files.newOutputStream(path, StandardOpenOption.CREATE_NEW);
-             PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
-            dumpThreads(ps);
-        }
-        return String.format("Created %s%n", path).getBytes("UTF-8");
+    public static byte[] dumpThreads(String file, boolean okayToOverwrite) {
+        return dumpThreads(file, okayToOverwrite, false);
+    }
+
+    /**
+     * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
+     */
+    public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite) {
+        return dumpThreads(file, okayToOverwrite, true);
     }
 
     /**
@@ -250,7 +161,7 @@ public class ThreadDumper {
         }
 
         // virtual threads
-        Set<Thread> threads = VIRTUAL_THREADS;
+        Set<Thread> threads = ThreadTracker.virtualThreads().orElse(null);
         if (threads != null) {
             threads.forEach(t -> dumpThread(t, t.getStackTrace(), ps));
         } else {
@@ -277,18 +188,6 @@ public class ThreadDumper {
     }
 
     /**
-     * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
-     */
-    public static byte[] dumpThreadsToJson(String file) throws IOException {
-        Path path = Path.of(file).toAbsolutePath();
-        try (OutputStream out = Files.newOutputStream(path, StandardOpenOption.CREATE_NEW);
-             PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
-            dumpThreadsToJson(ps);
-        }
-        return String.format("Created %s%n", path).getBytes("UTF-8");
-    }
-
-    /**
      * Generate a thread dump in JSON format to the given output stream, UTF-8 encoded.
      */
     public static void dumpThreadsToJson(OutputStream out) {
@@ -307,28 +206,28 @@ public class ThreadDumper {
         Map<Thread, StackTraceElement[]> allTraceTraces = Thread.getAllStackTraces();
 
         Set<Thread> roots = allTraceTraces.keySet();
-        Map<Long, List<ThreadContainer>> map = findContainers(roots);
+        Map<Long, List<ThreadExecutor>> map = findExecutors(roots);
 
-        // threadContainers
-        out.println("      \"threadContainers\": [");
-        Iterator<Map.Entry<Long, List<ThreadContainer>>> iterator = map.entrySet().iterator();
+        // threadExecutors
+        out.println("      \"threadExecutors\": [");
+        Iterator<Map.Entry<Long, List<ThreadExecutor>>> iterator = map.entrySet().iterator();
         while (iterator.hasNext()) {
-            Map.Entry<Long, List<ThreadContainer>> e = iterator.next();
+            Map.Entry<Long, List<ThreadExecutor>> e = iterator.next();
             long creatorTid = e.getKey();
-            List<ThreadContainer> containers = e.getValue();
+            List<ThreadExecutor> executors = e.getValue();
 
             out.println("        {");
             out.format("          \"creatorTid\": %d,%n", creatorTid);
-            out.println("          \"containerIds\": [");
+            out.println("          \"executorIds\": [");
 
             int i = 0;
-            while (i < containers.size()) {
-                ThreadContainer container = containers.get(i++);
+            while (i < executors.size()) {
+                ThreadExecutor executor = executors.get(i++);
                 out.println("            {");
-                out.format("              \"containerId\": \"%s\",%n", escape(container.toString()));
+                out.format("              \"executorId\": \"%s\",%n", escape(executor.toString()));
 
                 out.println("              \"memberTids\": [");
-                long[] members = container.threads().mapToLong(Thread::getId).toArray();
+                long[] members = executor.threads().mapToLong(Thread::getId).toArray();
                 int j = 0 ;
                 while (j < members.length) {
                     long tid = members[j++];
@@ -339,24 +238,24 @@ public class ThreadDumper {
                 out.println("              ]");   // end of memberTids
 
                 out.print("            }");
-                if (i < containers.size()) out.print(",");
+                if (i < executors.size()) out.print(",");
                 out.println();
             }
 
-            out.println("          ]");   // end of containerIds
+            out.println("          ]");   // end of executorIds
 
             out.print("        }");
             if (iterator.hasNext()) out.print(",");
             out.println();
         }
 
-        out.println("      ],");   // end of threadContainers
+        out.println("      ],");   // end of threadExecutors
 
         // threads
         out.println("      \"threads\": [");
 
         // virtual threads
-        Set<Thread> threads = VIRTUAL_THREADS;
+        Set<Thread> threads = ThreadTracker.virtualThreads().orElse(null);;
         if (threads != null) {
             threads.forEach(t -> dumpThreadToJson(t, t.getStackTrace(), out, true));
         } else {
@@ -440,53 +339,5 @@ public class ThreadDumper {
             }
         }
         return sb.toString();
-    }
-
-    /**
-     * Provides read access to Thread.latestThreadExecutor
-     */
-    private static class Threads {
-        private static final VarHandle LATEST_THREAD_EXECUTOR;
-        static {
-            try {
-                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
-                    MethodHandles.privateLookupIn(Thread.class, MethodHandles.lookup());
-                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                LATEST_THREAD_EXECUTOR = l.findVarHandle(Thread.class, "latestThreadExecutor", Object.class);
-            } catch (Exception e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-
-        static Object latestThreadExecutor(Thread thread) {
-            return LATEST_THREAD_EXECUTOR.getVolatile(thread);
-        }
-    }
-
-    /**
-     * Provides access to ThreadExecutor
-     */
-    private static class ThreadExecutors{
-        private static final VarHandle THREADS;
-        private static final VarHandle PREVIOUS;
-        static {
-            try {
-                Class<?> clazz = Class.forName("java.util.concurrent.ThreadExecutor");
-                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
-                    MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
-                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                THREADS = l.findVarHandle(clazz, "threads", Set.class);
-                PREVIOUS = l.findVarHandle(clazz, "previous", clazz);
-            } catch (Exception e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-        @SuppressWarnings("unchecked")
-        static Set<Thread> threads(Object threadExecutor) {
-            return (Set<Thread>) THREADS.get(threadExecutor);
-        }
-        static Object previous(Object threadExecutor) {
-            return PREVIOUS.get(threadExecutor);
-        }
     }
 }

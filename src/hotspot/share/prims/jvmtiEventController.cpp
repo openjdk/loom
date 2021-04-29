@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -36,6 +36,7 @@
 #include "prims/jvmtiThreadState.inline.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadSMR.hpp"
 #include "runtime/vframe.hpp"
@@ -587,7 +588,10 @@ JvmtiEventControllerPrivate::recompute_thread_enabled(JvmtiThreadState *state) {
     }
   }
 
-  Continuation::set_cont_fastpath_thread_state(state->get_thread());
+  // TBD: there is a race here, so get_thread() can return NULL below.
+  if (state->get_thread() != NULL) {
+    Continuation::set_cont_fastpath_thread_state(state->get_thread());
+  }
 
   return any_env_enabled;
 }
@@ -618,7 +622,7 @@ JvmtiEventControllerPrivate::recompute_enabled() {
 
   EC_TRACE(("[-] # recompute enabled - before " JULONG_FORMAT_X, was_any_env_thread_enabled));
 
-  // compute non-thread-filters events.
+  // Compute non-thread-filtered events.
   // This must be done separately from thread-filtered events, since some
   // events can occur before any threads exist.
   JvmtiEnvIterator it;
@@ -873,7 +877,7 @@ JvmtiEventControllerPrivate::set_user_enabled(JvmtiEnvBase *env, JavaThread *thr
     flush_object_free_events(env);
   }
 
-  if (thread == NULL) {
+  if (thread == NULL && thread_oop == NULL) { // thread can be NULL for unmounted virtual trheads
     env->env_event_enable()->set_user_enabled(event_type, enabled);
   } else {
     // create the thread state (if it didn't exist before)

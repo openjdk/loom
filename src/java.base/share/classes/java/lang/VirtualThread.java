@@ -46,10 +46,11 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import jdk.internal.event.VirtualThreadSubmitRejectedEvent;
+import jdk.internal.event.VirtualThreadPinnedEvent;
+import jdk.internal.event.VirtualThreadSubmitFailedEvent;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
-import jdk.internal.vm.ThreadDumper;
+import jdk.internal.vm.ThreadTracker;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import jdk.internal.vm.annotation.JvmtiMountTransition;
 import sun.nio.ch.Interruptible;
@@ -259,11 +260,10 @@ class VirtualThread extends Thread {
                 scheduler.execute(runContinuation);
             }
         } catch (RejectedExecutionException ree) {
-            // record JFR event
-            var event = new VirtualThreadSubmitRejectedEvent();
-            if (event.shouldCommit()) {
-                event.vthread = this.toString();
-                event.scheduler = scheduler.toString();
+            // record event
+            var event = new VirtualThreadSubmitFailedEvent();
+            if (event.isEnabled()) {
+                event.javaThreadId = getId();
                 event.exceptionMessage = ree.getMessage();
                 event.commit();
             }
@@ -286,7 +286,7 @@ class VirtualThread extends Thread {
     private void run(Runnable task) {
         boolean notifyJvmti = notifyJvmtiEvents;
 
-        // mount
+        // first mount
         if (notifyJvmti) notifyJvmtiMountBegin(true);
         mount();
         if (notifyJvmti) notifyJvmtiMountEnd(true);
@@ -296,10 +296,10 @@ class VirtualThread extends Thread {
         } catch (Throwable exc) {
             dispatchUncaughtException(exc);
         } finally {
-            // unmount
-            if (notifyJvmti) notifyJvmtiUnmountBegin();
+            // last unmount
+            if (notifyJvmti) notifyJvmtiUnmountBegin(true);
             unmount();
-            if (notifyJvmti) notifyJvmtiUnmountEnd();
+            if (notifyJvmti) notifyJvmtiUnmountEnd(true);
         }
     }
 
@@ -358,9 +358,9 @@ class VirtualThread extends Thread {
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // unmount
-        if (notifyJvmti) notifyJvmtiUnmountBegin();
+        if (notifyJvmti) notifyJvmtiUnmountBegin(false);
         unmount();
-        if (notifyJvmti) notifyJvmtiUnmountEnd();
+        if (notifyJvmti) notifyJvmtiUnmountEnd(false);
 
         boolean yielded = false;
         try {
@@ -432,13 +432,8 @@ class VirtualThread extends Thread {
             }
         }
 
-        // notify JVMTI agents
-        if (executed && notifyJvmtiEvents) {
-            notifyJvmtiTerminated();
-        }
-
-        // notify thread dumper, no-op if not tracking threads
-        ThreadDumper.notifyTerminate(this);
+        // notify thread tracker
+        ThreadTracker.notifyVirtualThreadTerminate(this);
 
         // clear references to thread locals, this method is assumed to be
         // called on its carrier thread on which it terminated.
@@ -455,6 +450,9 @@ class VirtualThread extends Thread {
     @ChangesCurrentThread
     private void parkOnCarrierThread() {
         assert state() == PARKING;
+
+        var pinnedEvent = new VirtualThreadPinnedEvent();
+        pinnedEvent.begin();
 
         // switch to carrier thread
         Thread carrier = this.carrierThread;
@@ -489,6 +487,11 @@ class VirtualThread extends Thread {
             if (awaitInterrupted)
                 Thread.currentThread().interrupt();
         }
+
+        // commit event if enabled
+        if (pinnedEvent.isEnabled()) {
+            pinnedEvent.commit();
+        }
     }
 
     /**
@@ -502,7 +505,7 @@ class VirtualThread extends Thread {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
-        ThreadDumper.notifyStart(this);  // no-op if threads not tracked
+        ThreadTracker.notifyVirtualThreadStart(this);
         try {
             submitRunContinuation();
         } catch (RejectedExecutionException ree) {
@@ -941,12 +944,10 @@ class VirtualThread extends Thread {
     private native void notifyJvmtiMountEnd(boolean firstMount);
 
     @JvmtiMountTransition
-    private native void notifyJvmtiUnmountBegin();
+    private native void notifyJvmtiUnmountBegin(boolean lastUnmount);
 
     @JvmtiMountTransition
-    private native void notifyJvmtiUnmountEnd();
-
-    private native void notifyJvmtiTerminated();
+    private native void notifyJvmtiUnmountEnd(boolean lastUnmount);
 
     private static native void registerNatives();
     static {
@@ -1051,7 +1052,9 @@ class VirtualThread extends Thread {
                     ThreadGroup group = Thread.currentCarrierThread().getThreadGroup();
                     for (ThreadGroup p; (p = group.getParent()) != null; )
                         group = p;
-                    return new ThreadGroup(group, "CarrierThreads");
+                    @SuppressWarnings("deprecation")
+                    var carrierThreadsGroup = new ThreadGroup(group, "CarrierThreads");
+                    return carrierThreadsGroup;
                 }
             });
         }

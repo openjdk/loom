@@ -23,15 +23,16 @@
 
 /**
  * @test
+ * @summary Stress test Thread.sleep
  * @requires vm.debug != true
  * @run main/othervm SleepALot
- * @summary Stress test Thread.sleep
  */
 
 /**
  * @test
  * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal SleepALot
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal
+ *     -XX:CompilationMode=high-only-quick-internal SleepALot
  */
 
 /**
@@ -43,7 +44,8 @@
 /**
  * @test
  * @requires vm.debug == true & vm.graal.enabled
- * @run main/othervm/timeout=300 -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal SleepALot 200000
+ * @run main/othervm/timeout=300 -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler
+ *     -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal SleepALot 200000
  */
 
 import java.time.Duration;
@@ -60,7 +62,7 @@ public class SleepALot {
 
         AtomicInteger count = new AtomicInteger();
 
-        Thread thread = Thread.startVirtualThread(() -> {
+        Thread thread = Thread.ofVirtual().start(() -> {
             while (count.incrementAndGet() < ITERATIONS) {
                 try {
                     Thread.sleep(Duration.ofNanos(100));

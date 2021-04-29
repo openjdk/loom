@@ -551,3 +551,33 @@ address NativeCall::trampoline_jump(CodeBuffer &cbuf, address dest) {
 
   return stub;
 }
+
+void NativePostCallNop::make_deopt() {
+  // TODO LOOM AARCH64
+  NativeDeoptInstruction::insert(addr_at(0));
+  // makes the first 2 bytes into UD, the rest is thrash. Make NOPs to help debugging.
+  set_char_at(2, 0x90);
+  set_char_at(3, 0x90);
+  set_char_at(4, 0x90);
+  set_char_at(5, 0x90);
+  set_char_at(6, 0x90);
+  set_char_at(7, 0x90);
+}
+
+void NativePostCallNop::patch(jint diff) {
+  // TODO LOOM AARCH64
+  assert(diff != 0, "must be");
+  int32_t *code_pos = (int32_t *) addr_at(displacement_offset);
+  *((int32_t *)(code_pos)) = (int32_t) diff;
+}
+
+void NativeDeoptInstruction::verify() {
+}
+
+// Inserts an undefined instruction at a given pc
+void NativeDeoptInstruction::insert(address code_pos) {
+  // TODO LOOM AARCH64
+  *code_pos = instruction_prefix;
+  *(code_pos+1) = instruction_code;
+  ICache::invalidate_range(code_pos, instruction_size);
+}

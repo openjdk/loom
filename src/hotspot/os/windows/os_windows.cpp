@@ -519,16 +519,6 @@ LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo);
 static unsigned __stdcall thread_native_entry(Thread* thread) {
 
   thread->record_stack_base_and_size();
-
-  // Try to randomize the cache line index of hot stack frames.
-  // This helps when threads of the same stack traces evict each other's
-  // cache lines. The threads can be either from the same JVM instance, or
-  // from different JVM instances. The benefit is especially true for
-  // processors with hyperthreading technology.
-  static int counter = 0;
-  int pid = os::current_process_id();
-  _alloca(((pid ^ counter++) & 7) * 128);
-
   thread->initialize_thread_current();
 
   OSThread* osthr = thread->osthread();
@@ -2694,7 +2684,28 @@ LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
       if (result==EXCEPTION_CONTINUE_EXECUTION) return result;
     }
 #endif
+
+    if (in_java && (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION || exception_code == EXCEPTION_ILLEGAL_INSTRUCTION_2)) {
+      // Check for UD trap caused by NOP patching.
+      // If it is, patch return address to be deopt handler.
+      if (NativeDeoptInstruction::is_deopt_at(pc)) {
+        CodeBlob* cb = CodeCache::find_blob_unsafe(pc);
+        if (cb != NULL && cb->is_compiled()) {
+          CompiledMethod* cm = cb->as_compiled_method();
+          frame fr = os::fetch_frame_from_context((void*)exceptionInfo->ContextRecord);
+          address deopt = cm->is_method_handle_return(pc) ?
+            cm->deopt_mh_handler_begin() :
+            cm->deopt_handler_begin();
+          assert(cm->insts_contains_inclusive(pc), "");
+          cm->set_original_pc(&fr, pc);
+          // Set pc to handler
+          exceptionInfo->ContextRecord->PC_NAME = (DWORD64)deopt;
+          return EXCEPTION_CONTINUE_EXECUTION;
+        }
+      }
+    }
   }
+
 
 #if !defined(USE_VECTORED_EXCEPTION_HANDLING)
   if (exception_code != EXCEPTION_BREAKPOINT) {

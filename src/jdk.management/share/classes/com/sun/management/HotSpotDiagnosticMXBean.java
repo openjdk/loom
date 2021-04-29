@@ -39,7 +39,7 @@ import java.lang.management.PlatformManagedObject;
  * <blockquote>
  *    {@code com.sun.management:type=HotSpotDiagnostic}
  * </blockquote>
-.*
+ *
  * It can be obtained by calling the
  * {@link PlatformManagedObject#getObjectName} method.
  *
@@ -117,4 +117,51 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      *     ManagementPermission("control").
      */
     public void setVMOption(String name, String value);
+
+    /**
+     * Generate a thread dump to the given file and format. The {@code outputFile}
+     * parameter must be an absolute path.
+     *
+     * <p> The thread dump will include output for all platform threads. It may
+     * include output for some or all virtual threads.
+     *
+     * @implSpec
+     * The default implementation throws {@code UnsupportedOperationException}.
+     *
+     * @apiNote
+     * The output file is required to be an absolute path as the MXBean may be
+     * accessed remotely from a tool or program with a different current user
+     * directory.
+     *
+     * @param  outputFile the path to the file to create
+     * @param  format the format to use (TEXT_PLAIN or JSON)
+     * @throws IllegalArgumentException if the file path is not absolute
+     * @throws IOException if an I/O exception is thrown writing to the file
+     * @throws NullPointerException if either parameter is {@code null}.
+     * @throws SecurityException
+     *         If a security manager is set and its {@link
+     *         SecurityManager#checkWrite(java.lang.String)} method denies write
+     *         access to the file or {@link java.lang.management.ManagementPermission
+     *         ManagementPermission("control")} is denied.
+     * @since 99
+     * @see Threads#virtualThreads()
+     */
+    default void dumpThreads(String outputFile, ThreadDumpFormat format) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Thread dump format.
+     * @since 99
+     */
+    public static enum ThreadDumpFormat {
+        /**
+         * Plain text format.
+         */
+        TEXT_PLAIN,
+        /**
+         * JSON (JavaScript Object Notation) format.
+         */
+        JSON,
+    }
 }

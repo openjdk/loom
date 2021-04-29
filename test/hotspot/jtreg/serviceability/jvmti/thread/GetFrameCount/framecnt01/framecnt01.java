@@ -29,9 +29,7 @@
  * VM Testbase readme:
  * DESCRIPTION
  *     The test exercise JVMTI function GetFrameCount.
- *     The function is called by a native method for the current thread
- *     and for two more threads. The test suspends these two threads
- *     before GetFrameCount invocation.
+ *     The function is tested for current thread, other thread. For platform and virtual threads.
  * COMMENTS
  *     Ported from JVMDI.
  *
@@ -39,14 +37,17 @@
  * @run main/othervm/native -agentlib:framecnt01 framecnt01
  */
 
-import java.io.PrintStream;
+import java.util.concurrent.locks.LockSupport;
 
 public class framecnt01 {
 
-    final static int JCK_STATUS_BASE = 95;
+    native static boolean checkFrames0(Thread thread, boolean shouldSuspend, int expected);
 
-    native static void checkFrames(Thread thr, int thr_num, int ans);
-    native static int getRes();
+    static void checkFrames(Thread thread, boolean shouldSuspend, int expected) {
+        if(!checkFrames0(thread, shouldSuspend, expected)) {
+            throw new RuntimeException("Check failed for " + thread + " " + shouldSuspend + " " + expected);
+        }
+    }
 
     static {
         try {
@@ -59,70 +60,93 @@ public class framecnt01 {
         }
     }
 
-    static Object flag1 = new Object();
-    static Object flag2 = new Object();
-    static Object check_flag = new Object();
+    public static void main(String args[]) throws Exception {
 
-    public static void main(String args[]) {
+        // Test GetFrameCount on virtual live thread
+        Thread vThread = Thread.ofVirtual().name("VirtualThread-Live").start(() -> {
+           checkFrames(Thread.currentThread(), false, 9);
+        });
+        vThread.join();
+
+        // Test GetFrameCount on virtual frozen thread
+        Thread vThread1 = Thread.ofVirtual().name("VirtualThread-Frozen").start(() -> {
+            LockSupport.park();
+        });
+        Thread.sleep(10);
+        checkFrames(vThread1, false, 14);
+        LockSupport.unpark(vThread1);
+        vThread1.join();
+
+        // Test GetFrameCount on live platform thread
+        Thread pThread = Thread.ofPlatform().name("PlatformThread-Live").start(() -> {
+            checkFrames(Thread.currentThread(), false, 5);
+        });
+        pThread.join();
+
+        // Test GetFrameCount on parked platform thread
+        Thread pThread1 = Thread.ofPlatform().name("PlatformThread-Parked").start(() -> {
+            LockSupport.park();
+        });
+        Thread.sleep(10);
+        checkFrames(pThread1, false, 5);
+        LockSupport.unpark(pThread1);
+        pThread1.join();
 
 
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    public static int run(String argv[], PrintStream ref) {
-        Thread currThread = Thread.currentThread();
-        framecnt01a thr1 = new framecnt01a("thr1", 0, flag1);
-        framecnt01a thr2 = new framecnt01a("thr2", 500, flag2);
-        synchronized(check_flag) {
-            synchronized(flag1) {
-                synchronized(flag2) {
-                    thr1.start();
-                    thr2.start();
-                    checkFrames(currThread, 0, 9);
-                    // Stack should looks like this in jtreg
-                    // TODO fix test to check new thread instead of main
-//                      0: framecnt01: checkFrames(Ljava/lang/Thread;II)V
-//                      1: framecnt01: run([Ljava/lang/String;Ljava/io/PrintStream;)I
-//                      2: framecnt01: main([Ljava/lang/String;)V
-//                      3: jdk/internal/reflect/NativeMethodAccessorImpl: invoke0(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
-//                      4: jdk/internal/reflect/NativeMethodAccessorImpl: invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
-//                      5: jdk/internal/reflect/DelegatingMethodAccessorImpl: invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
-//                      6: java/lang/reflect/Method: invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
-//                      7: com/sun/javatest/regtest/agent/MainWrapper$MainThread: run()V
-//                      8: java/lang/Thread: run()V
-                    try {
-                        flag1.wait();
-                        flag2.wait();
-                    } catch(InterruptedException e) {}
-                }
-            }
-            checkFrames(thr1, 1, 1);
-            checkFrames(thr2, 2, 501);
-        }
-        return getRes();
+        // Test GetFrameCount on some depth stack fixed by sync
+        FixedDepthThread.checkFrameCount(0);
+        FixedDepthThread.checkFrameCount(500);
     }
 }
 
-class framecnt01a extends Thread {
-    int steps;
-    Object flag;
+class FixedDepthThread implements Runnable {
+    int depth;
+    Object startedFlag;
+    Object checkFlag;
+    Thread thread;
 
-    framecnt01a(String name, int steps, Object flag) {
-        super(name);
-        this.steps = steps;
-        this.flag = flag;
+    // Each stack has 2 frames additional to expected depth
+    // 0: FixedDepthThread: run()V
+    // 1: java/lang/Thread: run()V
+    static final int ADDITIONAL_STACK_COUNT = 2;
+
+    private FixedDepthThread(String name, int depth, Object checkFlag) {
+        this.thread = Thread.ofPlatform().name(name).unstarted(this);
+        this.depth = depth;
+        this.startedFlag = new Object();
+        this.checkFlag = checkFlag;
+    }
+
+    private void startAndWait() {
+        synchronized(startedFlag) {
+            thread.start();
+            try {
+                startedFlag.wait();
+
+            } catch(InterruptedException e) {}
+
+        }
     }
 
     public void run() {
-        if (steps > 0) {
-            steps--;
+        if (depth > 0) {
+            depth--;
             run();
         }
-        synchronized(flag) {
-            flag.notify();  // let main thread know that all frames are in place
+        synchronized(startedFlag) {
+            startedFlag.notify();  // let main thread know that all frames are in place
         }
-        synchronized(framecnt01.check_flag) {  // wait for the check done
+        synchronized(checkFlag) {  // wait for the check done
+        }
+    }
+
+    static void checkFrameCount(int depth) {
+        final Object checkFlag = new Object();
+        FixedDepthThread fixedDepthThread = new FixedDepthThread("FixedDepthThread-" + depth, depth, checkFlag);
+        synchronized(checkFlag) {
+            fixedDepthThread.startAndWait();
+            framecnt01.checkFrames(fixedDepthThread.thread, false, depth + ADDITIONAL_STACK_COUNT);
+            framecnt01.checkFrames(fixedDepthThread.thread, true, depth + ADDITIONAL_STACK_COUNT);
         }
     }
 }

@@ -270,7 +270,7 @@ class java_lang_Class : AllStatic {
   static void set_component_mirror(oop java_class, oop comp_mirror);
   static void initialize_mirror_fields(Klass* k, Handle mirror, Handle protection_domain,
                                        Handle classData, TRAPS);
-  static void set_mirror_module_field(Klass* K, Handle mirror, Handle module, TRAPS);
+  static void set_mirror_module_field(JavaThread* current, Klass* K, Handle mirror, Handle module);
  public:
   static void allocate_fixup_lists();
   static void compute_offsets();
@@ -594,6 +594,7 @@ class java_lang_VirtualThread : AllStatic {
   static oop continuation(oop vthread);
   static jshort state(oop vthread);
   static JavaThreadStatus map_state_to_thread_status(jint state);
+  static bool notify_jvmti_events();
   static void set_notify_jvmti_events(jboolean enable);
   static void init_static_notify_jvmti_events();
   static jlong set_jfrTraceId(oop vthread, jlong id);
@@ -1107,7 +1108,6 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static int _pc_offset;
   static int _argsize_offset;
   static int _flags_offset;
-  static int _mode_offset;
   static int _gcSP_offset;
   static int _markCycle_offset;
   static int _maxSize_offset;
@@ -1139,8 +1139,6 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline void set_argsize(oop ref, jint value);
   static inline jbyte flags(oop ref);
   static inline void set_flags(oop ref, jbyte value);
-  static inline jboolean gc_mode(oop ref);
-  static inline void set_gc_mode(oop ref, jboolean value);
   static inline jint gc_sp(oop ref);
   static inline void set_gc_sp(oop ref, jint value);
   static inline jlong mark_cycle(oop ref);
@@ -1153,6 +1151,8 @@ class jdk_internal_misc_StackChunk: AllStatic {
   static inline void set_numOops(oop ref, jint value);
   static inline oop cont(oop ref);
   static inline void set_cont(oop ref, oop value);
+  template<typename P>
+  static inline oop cont_raw(oop ref);
   template<typename P>
   static inline void set_cont_raw(oop ref, oop value);
 };

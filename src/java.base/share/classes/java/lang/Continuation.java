@@ -86,9 +86,9 @@ public class Continuation {
             case  0: return PreemptStatus.SUCCESS;
             case -1: return PreemptStatus.PERM_FAIL_NOT_MOUNTED;
             case -2: return PreemptStatus.PERM_FAIL_YIELDING;
-            case  1: return PreemptStatus.TRANSIENT_FAIL_PINNED_CRITICAL_SECTION;
-            case  2: return PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE;
-            case  3: return PreemptStatus.TRANSIENT_FAIL_PINNED_MONITOR;
+            case  2: return PreemptStatus.TRANSIENT_FAIL_PINNED_CRITICAL_SECTION;
+            case  3: return PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE;
+            case  4: return PreemptStatus.TRANSIENT_FAIL_PINNED_MONITOR;
             default: throw new AssertionError("Unknown status: " + status);
         }
     }

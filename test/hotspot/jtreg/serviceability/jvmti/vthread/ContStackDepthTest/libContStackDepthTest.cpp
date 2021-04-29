@@ -49,13 +49,13 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
   err = jvmti->GetMethodName(method, &mname, &msign, NULL);
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetMethodName call");
 
-  printf("\n%s event #%d: thread: %s, method: %s: %s%s\n",
+  LOG("\n%s event #%d: thread: %s, method: %s: %s%s\n",
          event_name, event_count, tname, cname, mname, msign);
 
   if (strcmp(event_name, "SingleStep") != 0) {
     print_current_stack_trace(jvmti, jni);
   }
-  fflush(0);
+
   deallocate(jvmti, jni, (void*)tname);
   deallocate(jvmti, jni, (void*)cname);
   deallocate(jvmti, jni, (void*)mname);
@@ -66,11 +66,11 @@ static void
 print_cont_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jint frames_cnt, const char* event_name) {
   char* tname = get_thread_name(jvmti, jni, thread);
 
-  printf("\n%s event: thread: %s, frames: %d\n\n", event_name, tname, frames_cnt);
+  LOG("\n%s event: thread: %s, frames: %d\n\n", event_name, tname, frames_cnt);
 
   print_current_stack_trace(jvmti, jni);
 
-  fflush(0);
+
   deallocate(jvmti, jni, (void*)tname);
 }
 
@@ -86,7 +86,7 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
     return; // ignore unrelated events
   }
 
-  printf("\nMethodEntry: Requesting FramePop notifications for top frame\n");
+  LOG("\nMethodEntry: Requesting FramePop notifications for top frame\n");
 
   err = jvmti->NotifyFramePop(thread, 0);
   check_jvmti_status(jni, err, "MethodEntry: error in JVMTI NotifyFramePop");
@@ -196,7 +196,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiError err;
 
-  printf("Agent_OnLoad started\n");
+  LOG("Agent_OnLoad started\n");
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
@@ -217,18 +217,18 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
+    LOG("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
   }
 
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
+    LOG("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
   event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
-  printf("Agent_OnLoad finished\n");
-  fflush(0);
+  LOG("Agent_OnLoad finished\n");
+
 
   return JNI_OK;
 }
@@ -241,7 +241,7 @@ Java_ContStackDepthTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread) 
   jlocation location = (jlocation)0L;
   jvmtiError err;
 
-  printf("enableEvents: started\n");
+  LOG("enableEvents: started\n");
   exp_thread = (jthread)jni->NewGlobalRef(thread);
 
   err = jvmti->GetClassMethods(klass, &method_count, &methods);
@@ -253,8 +253,8 @@ Java_ContStackDepthTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread) 
     char* mname = get_method_name(jvmti, jni, meth);
 
     if (strcmp(mname, "fibTest") == 0) {
-      printf("enableEvents: found method fibTest() to set a breakpoint\n");
-      fflush(0);
+      LOG("enableEvents: found method fibTest() to set a breakpoint\n");
+
       method = meth;
     } 
     deallocate(jvmti, jni, (void*)mname);
@@ -270,22 +270,22 @@ Java_ContStackDepthTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread) 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_BREAKPOINT, NULL);
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI SetEventNotificationMode: enable BREAKPOINT");
 
-  printf("enableEvents: finished\n");
-  fflush(0);
+  LOG("enableEvents: finished\n");
+
 }
 
 JNIEXPORT jboolean JNICALL
 Java_ContStackDepthTest_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
-  printf("\n");
-  printf("check: started\n");
+  LOG("\n");
+  LOG("check: started\n");
 
-  printf("check: breakpoint_count:   %d\n", breakpoint_count);
-  printf("check: frame_pop_count:    %d\n", frame_pop_count);
-  printf("check: method_entry_count: %d\n", method_entry_count);
-  printf("check: method_exit_count:  %d\n", method_exit_count);
-  printf("check: single_step_count:  %d\n", single_step_count);
+  LOG("check: breakpoint_count:   %d\n", breakpoint_count);
+  LOG("check: frame_pop_count:    %d\n", frame_pop_count);
+  LOG("check: method_entry_count: %d\n", method_entry_count);
+  LOG("check: method_exit_count:  %d\n", method_exit_count);
+  LOG("check: single_step_count:  %d\n", single_step_count);
 
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_ENTRY, exp_thread);
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI SetEventNotificationMode: disable METHOD_ENTRY");
@@ -296,9 +296,9 @@ Java_ContStackDepthTest_check(JNIEnv *jni, jclass cls) {
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_FRAME_POP, exp_thread);
   check_jvmti_status(jni, err, "error in JVMTI SetEventNotificationMode: disable FRAME_POP");
 
-  printf("check: finished\n");
-  printf("\n");
-  fflush(0);
+  LOG("check: finished\n");
+  LOG("\n");
+
 
   return (frame_pop_count == method_entry_count &&
           frame_pop_count == method_exit_count);

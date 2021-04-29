@@ -177,7 +177,7 @@ LIR_Address* LIRGenerator::generate_address(LIR_Opr base, LIR_Opr index,
         __ add(index, LIR_OprFact::intptrConst(large_disp), tmp);
         index = tmp;
       } else {
-        __ move(tmp, LIR_OprFact::intptrConst(large_disp));
+        __ move(LIR_OprFact::intptrConst(large_disp), tmp);
         __ add(tmp, index, tmp);
         index = tmp;
       }
@@ -361,6 +361,13 @@ void LIRGenerator::do_MonitorExit(MonitorExit* x) {
   monitor_exit(obj_temp, lock, syncTempOpr(), LIR_OprFact::illegalOpr, x->monitor_no());
 }
 
+void LIRGenerator::do_continuation_doYield(Intrinsic* x) {
+  BasicTypeList signature(0);
+  // signature.append(T_INT);
+  CallingConvention* cc = frame_map()->java_calling_convention(&signature, true);
+
+  // TODO LOOM AARCH64
+}
 
 void LIRGenerator::do_NegateOp(NegateOp* x) {
 

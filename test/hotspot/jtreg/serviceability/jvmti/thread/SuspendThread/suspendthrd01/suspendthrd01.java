@@ -52,12 +52,7 @@ public class suspendthrd01 extends DebugeeClass {
 
     // run test from command line
     public static void main(String argv[]) {
-        System.exit(run(argv, System.out) + 95);
-    }
-
-    // run test from JCK-compatible environment
-    public static int run(String argv[], PrintStream out) {
-        return new suspendthrd01().runIt(argv, out);
+        new suspendthrd01().runIt(argv);
     }
 
     /* =================================================================== */
@@ -65,15 +60,12 @@ public class suspendthrd01 extends DebugeeClass {
     long timeout = 0;
     int status = DebugeeClass.TEST_PASSED;
 
-    // tested thread
-    suspendthrd01Thread thread = null;
-
     // run debuggee
-    public int runIt(String argv[], PrintStream out) {
+    public void runIt(String argv[]) {
         timeout =  60 * 1000; // milliseconds
 
         // create tested thread
-        thread = new suspendthrd01Thread("TestedThread");
+        suspendthrd01Thread thread = new suspendthrd01Thread("TestedThread");
 
         // run tested thread
         System.out.println("Staring tested thread");
@@ -102,8 +94,9 @@ public class suspendthrd01 extends DebugeeClass {
         // testing sync
         System.out.println("Sync: thread finished");
         status = checkStatus(status);
-
-        return status;
+        if (checkStatus(status) != 0) {
+            new RuntimeException();
+        }
     }
 }
 

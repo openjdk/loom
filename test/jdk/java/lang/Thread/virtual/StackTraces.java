@@ -23,11 +23,11 @@
 
 /**
  * @test
+ * @summary Test that the stack traces for carrier threads are hidden by
+ *     exceptions and the StackWalker API
  * @modules java.management
  * @run testng StackTraces
  * @run testng/othervm -XX:+UnlockDiagnosticVMOptions -XX:+ShowCarrierFrames StackTraces
- * @summary Test that the stack traces for carrier threads are hidden by
- *     exceptions and the StackWalker API
  */
 
 import java.lang.management.ManagementFactory;
@@ -39,10 +39,13 @@ import static java.lang.StackWalker.Option.*;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class StackTraces {
 
-    // The stack frames for the carrier thread may be hidden
+    /**
+     * Test that the stack trace in exceptions does not include the carrier thread
+     * frames, except when running with -XX:+ShowCarrierFrames.
+     */
+    @Test
     public void testStackTrace() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Exception e = new Exception();
@@ -53,7 +56,10 @@ public class StackTraces {
         });
     }
 
-    // carrier frames should be hidden
+    /**
+     * Test that StackWalker does not include carrier thread frames.
+     */
+    @Test
     public void testStackWalker() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             StackWalker walker = StackWalker.getInstance(Set.of(RETAIN_CLASS_REFERENCE));

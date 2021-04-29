@@ -318,6 +318,23 @@ void LIRGenerator::do_MonitorExit(MonitorExit* x) {
   monitor_exit(obj_temp, lock, syncTempOpr(), LIR_OprFact::illegalOpr, x->monitor_no());
 }
 
+void LIRGenerator::do_continuation_doYield(Intrinsic* x) {
+  BasicTypeList signature(0);
+  // signature.append(T_INT);
+  CallingConvention* cc = frame_map()->java_calling_convention(&signature, true);
+
+  // LIRItem value(x->argument_at(0), this);
+  // value.load_item();
+  // __ move(value.result(), cc->at(0)); // scopes
+  // __ move(LIR_OprFact::intConst(0), cc->at(0)); // from interpreter TODO unused
+
+  const LIR_Opr result_reg = result_register_for(x->type());
+  address entry = StubRoutines::cont_doYield();
+  LIR_Opr result = rlock_result(x);
+  CodeEmitInfo* info = state_for(x, x->state());
+  __ call_runtime(entry, LIR_OprFact::illegalOpr, result_reg, cc->args(), info);
+  __ move(result_reg, result);
+}
 
 // _ineg, _lneg, _fneg, _dneg
 void LIRGenerator::do_NegateOp(NegateOp* x) {
@@ -342,24 +359,6 @@ void LIRGenerator::do_NegateOp(NegateOp* x) {
   __ negate(value.result(), reg, tmp);
 
   set_result(x, round_item(reg));
-}
-
-void LIRGenerator::do_continuation_doYield(Intrinsic* x) {
-  BasicTypeList signature(0);
-  // signature.append(T_INT);
-  CallingConvention* cc = frame_map()->java_calling_convention(&signature, true);
-
-  // LIRItem value(x->argument_at(0), this);
-  // value.load_item();
-  // __ move(value.result(), cc->at(0)); // scopes
-  // __ move(LIR_OprFact::intConst(0), cc->at(0)); // from interpreter TODO unused
-
-  const LIR_Opr result_reg = result_register_for(x->type());
-  address entry = StubRoutines::cont_doYield();
-  LIR_Opr result = rlock_result(x);
-  CodeEmitInfo* info = state_for(x, x->state());
-  __ call_runtime(entry, LIR_OprFact::illegalOpr, result_reg, cc->args(), info);
-  __ move(result_reg, result);
 }
 
 // for  _fadd, _fmul, _fsub, _fdiv, _frem

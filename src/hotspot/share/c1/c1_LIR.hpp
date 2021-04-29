@@ -903,8 +903,6 @@ enum LIR_Code {
       , lir_membar_storeload
       , lir_get_thread
       , lir_on_spin_wait
-      , lir_getfp
-      , lir_getsp
   , end_op0
   , begin_op1
       , lir_fxch
@@ -2125,8 +2123,6 @@ class LIR_List: public CompilationResourceObj {
 
   void push(LIR_Opr opr)                                   { append(new LIR_Op1(lir_push, opr)); }
   void pop(LIR_Opr reg)                                    { append(new LIR_Op1(lir_pop,  reg)); }
-  void getfp(LIR_Opr reg)                                  { append(new LIR_Op0(lir_getfp, reg)); }
-  void getsp(LIR_Opr reg)                                  { append(new LIR_Op0(lir_getsp, reg)); }
 
   void cmp(LIR_Condition condition, LIR_Opr left, LIR_Opr right, CodeEmitInfo* info = NULL) {
     append(new LIR_Op2(lir_cmp, condition, left, right, info));

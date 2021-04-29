@@ -173,19 +173,36 @@ void Devirtualizer::do_cld(OopClosureType* closure, ClassLoaderData* cld) {
 
 template <typename Receiver, typename Base, typename DerivedOopClosureType>
 static typename EnableIf<IsSame<Receiver, Base>::value, void>::type
-call_do_derived_oop(void (Receiver::*)(oop*, oop*), void (Base::*)(oop*, oop*), DerivedOopClosureType* closure, oop* base, oop* derived) {
+call_do_derived_oop(void (Receiver::*)(oop*, derived_pointer*), void (Base::*)(oop*, derived_pointer*), DerivedOopClosureType* closure, oop* base, derived_pointer* derived) {
   closure->do_derived_oop(base, derived);
 }
 
 template <typename Receiver, typename Base, typename DerivedOopClosureType>
 static typename EnableIf<!IsSame<Receiver, Base>::value, void>::type
-call_do_derived_oop(void (Receiver::*)(oop*, oop*), void (Base::*)(oop*, oop*), DerivedOopClosureType* closure, oop* base, oop* derived) {
+call_do_derived_oop(void (Receiver::*)(oop*, derived_pointer*), void (Base::*)(oop*, derived_pointer*), DerivedOopClosureType* closure, oop* base, derived_pointer* derived) {
   closure->DerivedOopClosureType::do_derived_oop(base, derived);
 }
 
 template <typename DerivedOopClosureType>
-inline void Devirtualizer::do_derived_oop(DerivedOopClosureType* closure, oop* base, oop* derived) {
+inline void Devirtualizer::do_derived_oop(DerivedOopClosureType* closure, oop* base, derived_pointer* derived) {
   call_do_derived_oop(&DerivedOopClosureType::do_derived_oop, &DerivedOopClosure::do_derived_oop, closure, base, derived);
+}
+
+template <typename Receiver, typename Base, typename BitMapClosureType>
+static typename EnableIf<IsSame<Receiver, Base>::value, bool>::type
+call_do_bit(bool (Receiver::*)(BitMap::idx_t), bool (Base::*)(BitMap::idx_t), BitMapClosureType* closure, BitMap::idx_t index) {
+  return closure->do_bit(index);
+}
+
+template <typename Receiver, typename Base, typename BitMapClosureType>
+static typename EnableIf<!IsSame<Receiver, Base>::value, bool>::type
+call_do_bit(bool (Receiver::*)(BitMap::idx_t), bool (Base::*)(BitMap::idx_t), BitMapClosureType* closure, BitMap::idx_t index) {
+  return closure->BitMapClosureType::do_bit(index);
+}
+
+template <typename BitMapClosureType>
+inline bool Devirtualizer::do_bit(BitMapClosureType* closure, BitMap::idx_t index) {
+  return call_do_bit(&BitMapClosureType::do_bit, &BitMapClosure::do_bit, closure, index);
 }
 
 // Dispatch table implementation for *Klass::oop_oop_iterate
