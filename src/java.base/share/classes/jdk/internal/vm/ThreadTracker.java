@@ -29,6 +29,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
+import jdk.internal.event.VirtualThreadEndEvent;
+import jdk.internal.event.VirtualThreadStartEvent;
 import sun.security.action.GetPropertyAction;
 
 /**
@@ -55,12 +57,19 @@ public class ThreadTracker {
      * Notifies the thread tracker that a virtual thread has been started.
      */
     public static void notifyVirtualThreadStart(Thread thread) {
+        assert thread.isVirtual();
+
         Set<Thread> threads = VIRTUAL_THREADS;
         if (threads != null) {
-            assert thread.isVirtual();
             threads.add(thread);
         } else {
             COUNT.increment();
+        }
+
+        if (VirtualThreadStartEvent.isTurnedOn()) {
+            var event = new VirtualThreadStartEvent();
+            event.javaThreadId = thread.getId();
+            event.commit();
         }
     }
 
@@ -68,9 +77,16 @@ public class ThreadTracker {
      * Notifies the thread tracker that a virtual thread has terminated.
      */
     public static void notifyVirtualThreadTerminate(Thread thread) {
+        assert thread.isVirtual();
+
+        if (VirtualThreadEndEvent.isTurnedOn()) {
+            var event = new VirtualThreadEndEvent();
+            event.javaThreadId = thread.getId();
+            event.commit();
+        }
+
         Set<Thread> threads = VIRTUAL_THREADS;
         if (threads != null) {
-            assert thread.isVirtual();
             threads.remove(thread);
         } else {
             COUNT.decrement();

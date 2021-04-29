@@ -80,6 +80,7 @@
   template(ChangeBreakpoints)                     \
   template(GetOrSetLocal)                         \
   template(VirtualThreadGetOrSetLocal)            \
+  template(VThreadGetCurrentLocation)             \
   template(ChangeSingleStep)                      \
   template(HeapWalkOperation)                     \
   template(HeapIterateOperation)                  \

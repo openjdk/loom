@@ -104,7 +104,7 @@ public class Locking {
         // thread acquires lock
         lock.lock();
         try {
-            thread = Thread.startVirtualThread(() -> {
+            thread = Thread.ofVirtual().start(() -> {
                 lock.lock();  // should block
                 holdsLock.set(true);
                 LockSupport.park();
@@ -135,7 +135,7 @@ public class Locking {
     @Test
     public void testReentrantLock5() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -169,7 +169,7 @@ public class Locking {
     @Test
     public void testReentrantLock6() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread1 = Thread.startVirtualThread(() -> {
+        var thread1 = Thread.ofVirtual().start(() -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -184,7 +184,7 @@ public class Locking {
         }
 
         var holdsLock  = new AtomicBoolean();
-        var thread2 = Thread.startVirtualThread(() -> {
+        var thread2 = Thread.ofVirtual().start(() -> {
             lock.lock();
             holdsLock.set(true);
             LockSupport.park();

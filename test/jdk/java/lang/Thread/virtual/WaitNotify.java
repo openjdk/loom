@@ -41,7 +41,7 @@ public class WaitNotify {
     public void testWaitNotify1() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             synchronized (lock) {
                 ready.release();
                 try {
@@ -64,7 +64,7 @@ public class WaitNotify {
     public void testWaitNotify2() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             ready.acquireUninterruptibly();
             synchronized (lock) {
                 lock.notifyAll();
@@ -84,7 +84,7 @@ public class WaitNotify {
     public void testWaitNotify3() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread1 = Thread.startVirtualThread(() -> {
+        var thread1 = Thread.ofVirtual().start(() -> {
             synchronized (lock) {
                 ready.release();
                 try {
@@ -92,7 +92,7 @@ public class WaitNotify {
                 } catch (InterruptedException e) { }
             }
         });
-        var thread2 = Thread.startVirtualThread(() -> {
+        var thread2 = Thread.ofVirtual().start(() -> {
             ready.acquireUninterruptibly();
             synchronized (lock) {
                 lock.notifyAll();

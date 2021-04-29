@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,34 +31,41 @@ import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
+import org.testng.SkipException;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 public class Parking {
 
-    // virtual thread parks, unparked by dinosaur thread
+    /**
+     * Park, unparked by platform thread.
+     */
     @Test
     public void testPark1() throws Exception {
-        var thread = Thread.startVirtualThread(LockSupport::park);
+        var thread = Thread.ofVirtual().start(LockSupport::park);
         Thread.sleep(1000); // give time for virtual thread to park
         LockSupport.unpark(thread);
         thread.join();
     }
 
-    // virtual thread parks, unparked by another virtual thread
+    /**
+     * Park, unparked by virtual thread.
+     */
     @Test
     public void testPark2() throws Exception {
-        var thread1 = Thread.startVirtualThread(LockSupport::park);
+        var thread1 = Thread.ofVirtual().start(LockSupport::park);
         Thread.sleep(1000); // give time for virtual thread to park
-        var thread2 = Thread.startVirtualThread(() -> LockSupport.unpark(thread1));
+        var thread2 = Thread.ofVirtual().start(() -> LockSupport.unpark(thread1));
         thread1.join();
         thread2.join();
     }
 
-    // park while holding monitor
+    /**
+     * Park while holding monitor, unparked by platform thread.
+     */
     @Test
     public void testPark3() throws Exception {
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             var lock = new Object();
             synchronized (lock) {
                 LockSupport.park();
@@ -69,63 +76,54 @@ public class Parking {
         thread.join();
     }
 
-    /*
-
-    // park with native frame on the stack
+    /**
+     * Park with native frame on stack.
+     */
     @Test
     public void testPark4() throws Exception {
-        var virtual thread = virtual threadScope.background().schedule(() -> {
-            try {
-                Method m = Basic.class.getDeclaredMethod("doPark");
-                m.invoke(null);
-            } catch (Exception e) {
-                assertTrue(false);
-            }
-        });
-        Thread.sleep(1000); // give time for virtual thread to park
-        LockSupport.unpark(virtual thread);
-        virtual thread.join();
-    }
-    static void doPark() {
-        LockSupport.park();
+        throw new SkipException("Not implemented");
     }
 
-    */
-
-    // unpark before park
+    /**
+     * Unpark before park.
+     */
     @Test
     public void testPark5() throws Exception {
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             LockSupport.unpark(Thread.currentThread());
             LockSupport.park();
         });
         thread.join();
     }
 
-    // 2 x unpark before park
+    /**
+     * 2 x unpark before park.
+     */
     @Test
     public void testPark6() throws Exception {
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             Thread me = Thread.currentThread();
             LockSupport.unpark(me);
             LockSupport.unpark(me);
             LockSupport.park();
             LockSupport.park();  // should park
         });
-        Thread.sleep(1000); // give time for virtual thread to park
+        Thread.sleep(1000); // give time for thread to park
         LockSupport.unpark(thread);
         thread.join();
     }
 
-    // 2 x park
+    /**
+     * 2 x park and unpark by platform thread.
+     */
     @Test
     public void testPark7() throws Exception {
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             LockSupport.park();
             LockSupport.park();
         });
 
-        Thread.sleep(1000); // give time for virtual thread to park
+        Thread.sleep(1000); // give time for thread to park
 
         // unpark, virtual thread should park again
         LockSupport.unpark(thread);
@@ -137,7 +135,9 @@ public class Parking {
         thread.join();
     }
 
-    // park with interrupt status set
+    /**
+     * Park with interrupt status set.
+     */
     @Test
     public void testPark8() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -148,7 +148,9 @@ public class Parking {
         });
     }
 
-    // interrupt when parked
+    /**
+     * Thread interrupt when parked.
+     */
     @Test
     public void testPark9() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -159,7 +161,9 @@ public class Parking {
         });
     }
 
-    // park (pinned park) with interrupt status set
+    /**
+     * Park while holding monitor and with interrupt status set.
+     */
     @Test
     public void testPark10() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -173,7 +177,9 @@ public class Parking {
         });
     }
 
-    // interrupt when parked (pinned park)
+    /**
+     * Thread interrupt when parked while holding monitor
+     */
     @Test
     public void testPark11() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -187,19 +193,25 @@ public class Parking {
         });
     }
 
-    // parkNanos(-1) completes immediately
+    /**
+     * parkNanos(-1) completes immediately
+     */
     @Test
     public void testParkNanos1() throws Exception {
         TestHelper.runInVirtualThread(() -> LockSupport.parkNanos(-1));
     }
 
-    // parkNanos(0) completes immediately
+    /**
+     * parkNanos(0) completes immediately
+     */
     @Test
     public void testParkNanos2() throws Exception {
         TestHelper.runInVirtualThread(() -> LockSupport.parkNanos(0));
     }
 
-    // parkNanos(1000ms) completes quickly
+    /**
+     * parkNanos(1000ms) parks thread.
+     */
     @Test
     public void testParkNanos3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -208,55 +220,63 @@ public class Parking {
             long start = System.nanoTime();
             LockSupport.parkNanos(nanos);
 
-            // check that virtual thread parks for >= 900ms
+            // check that virtual thread parked for >= 900ms
             long elapsed = TimeUnit.MILLISECONDS.convert(System.nanoTime() - start,
                     TimeUnit.NANOSECONDS);
             assertTrue(elapsed >= 900);
         });
     }
 
-    // virtual thread parks, unparked by dinosaur thread
+    /**
+     * Park with parkNanos, unparked by platform thread.
+     */
     @Test
     public void testParkNanos4() throws Exception {
-        var thread = Thread.startVirtualThread(() -> {
-            long nanos = TimeUnit.NANOSECONDS.convert(30, TimeUnit.SECONDS);
+        var thread = Thread.ofVirtual().start(() -> {
+            long nanos = TimeUnit.NANOSECONDS.convert(1, TimeUnit.DAYS);
             LockSupport.parkNanos(nanos);
         });
-        Thread.sleep(1000); // give time for virtual thread to park
+        Thread.sleep(100); // give time for virtual thread to park
         LockSupport.unpark(thread);
         thread.join();
     }
 
-    // virtual thread parks, unparked by another virtual thread
+    /**
+     * Park with parkNanos, unparked by virtual thread.
+     */
     @Test
     public void testParkNanos5() throws Exception {
-        var thread1 = Thread.startVirtualThread(() -> {
-            long nanos = TimeUnit.NANOSECONDS.convert(30, TimeUnit.SECONDS);
+        var thread1 = Thread.ofVirtual().start(() -> {
+            long nanos = TimeUnit.NANOSECONDS.convert(1, TimeUnit.DAYS);
             LockSupport.parkNanos(nanos);
         });
-        Thread.sleep(1000);  // give time for virtual thread to park
-        var thread2 = Thread.startVirtualThread(() -> LockSupport.unpark(thread1));
+        Thread.sleep(100);  // give time for virtual thread to park
+        var thread2 = Thread.ofVirtual().start(() -> LockSupport.unpark(thread1));
         thread1.join();
         thread2.join();
     }
 
-    // unpark before parkNanos
+    /**
+     * Unpark before parkNanos.
+     */
     @Test
     public void testParkNanos6() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             LockSupport.unpark(Thread.currentThread());
-            long nanos = TimeUnit.NANOSECONDS.convert(30, TimeUnit.SECONDS);
+            long nanos = TimeUnit.NANOSECONDS.convert(1, TimeUnit.DAYS);
             LockSupport.parkNanos(nanos);
         });
     }
 
-    // unpark before parkNanos(0), should consume permit
+    /**
+     * Unpark before parkNanos(0), should consume parking permit.
+     */
     @Test
     public void testParkNanos7() throws Exception {
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             LockSupport.unpark(Thread.currentThread());
-            LockSupport.parkNanos(0);
-            LockSupport.park(); // should block
+            LockSupport.parkNanos(0);  // should consume parking permit
+            LockSupport.park();  // should block
         });
         boolean isAlive = thread.join(Duration.ofSeconds(2));
         assertTrue(isAlive);
@@ -264,7 +284,9 @@ public class Parking {
         thread.join();
     }
 
-    // parkNanos with interrupt status set
+    /**
+     * Park with parkNanos and interrupt status set.
+     */
     @Test
     public void testParkNanos8() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -275,7 +297,9 @@ public class Parking {
         });
     }
 
-    // interrupt when parked in parkNanos
+    /**
+     * Thread interrupt when parked in parkNanos.
+     */
     @Test
     public void testParkNanos9() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -286,7 +310,9 @@ public class Parking {
         });
     }
 
-    // parkNanos (pinned park) with interrupt status set
+    /**
+     * Park with parkNanos while holding monitor and with interrupt status set.
+     */
     @Test
     public void testParkNanos10() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -300,7 +326,9 @@ public class Parking {
         });
     }
 
-    // interrupt when parked in parkNanos (pinned park)
+    /**
+     * Thread interrupt when parked in parkNanos and while holding monitor.
+     */
     @Test
     public void testParkNanos11() throws Exception {
         TestHelper.runInVirtualThread(() -> {

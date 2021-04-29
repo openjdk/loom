@@ -63,7 +63,7 @@ public class PingPong {
         AtomicInteger count1 = new AtomicInteger();
         AtomicInteger count2 = new AtomicInteger();
 
-        Thread t1 = Thread.startVirtualThread(() -> {
+        Thread t1 = Thread.ofVirtual().start(() -> {
             try {
                 while (count1.incrementAndGet() < iterations) {
                     queue.transfer("hello");
@@ -77,7 +77,7 @@ public class PingPong {
             }
         });
 
-        Thread t2 = Thread.startVirtualThread(() -> {
+        Thread t2 = Thread.ofVirtual().start(() -> {
             try {
                 while (count2.incrementAndGet() < iterations) {
                     String message = queue.take();

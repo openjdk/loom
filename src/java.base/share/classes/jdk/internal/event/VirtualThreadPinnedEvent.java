@@ -22,29 +22,10 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+package jdk.internal.event;
 
-package jdk.jfr.events;
-
-import jdk.jfr.Category;
-import jdk.jfr.Description;
-import jdk.jfr.Label;
-import jdk.jfr.Name;
-import jdk.jfr.internal.MirrorEvent;
-
-@Category({"Java Runtime"})
-@Label("Virtual thread submit task rejected")
-@Name("jdk.VirtualThreadSubmitRejectedEvent")
-@Description("Submit of virtual thread task rejected")
-@MirrorEvent(className = "jdk.internal.event.VirtualThreadSubmitRejectedEvent")
-public final class VirtualThreadSubmitRejectedEvent extends AbstractJDKEvent {
-
-    @Label("Virtual Thread")
-    public String vthread;
-
-    @Label("Scheduler")
-    public String scheduler;
-
-    @Label("Exception message")
-    public String exceptionMessage;
-
+/**
+ * Event recording that a virtual thread has parked on its carrier thread.
+ */
+public class VirtualThreadPinnedEvent extends Event {
 }

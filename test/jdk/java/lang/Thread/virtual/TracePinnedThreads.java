@@ -42,7 +42,7 @@ public class TracePinnedThreads {
         PrintStream original = System.out;
         System.setOut(new PrintStream(baos));
         try {
-            Thread.startVirtualThread(() -> {
+            Thread.ofVirtual().start(() -> {
                 synchronized (lock) {
                     long nanos = Duration.ofSeconds(1).toNanos();
                     LockSupport.parkNanos(nanos);

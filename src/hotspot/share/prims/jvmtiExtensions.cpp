@@ -77,9 +77,12 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
   va_end(ap);
 
   ThreadInVMfromNative tiv(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh(current_thread);
 
   jvmtiError err;
+
+  *vthread_ptr = NULL;
   if (thread == NULL) {
     java_thread = current_thread;
   } else {
@@ -89,14 +92,14 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
     }
   }
   if (vthread_ptr == NULL) {
-      return JVMTI_ERROR_NULL_POINTER;
+    return JVMTI_ERROR_NULL_POINTER;
   }
 
   JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
   }
-  oop vthread_oop = java_thread->mounted_vthread();
+  oop vthread_oop = java_thread->vthread();
   if (!java_lang_VirtualThread::is_instance(vthread_oop)) { // not a virtual thread
     vthread_oop = NULL;
   }
@@ -123,6 +126,7 @@ static jvmtiError JNICALL GetCarrierThread(const jvmtiEnv* env, ...) {
   va_end(ap);
 
   ThreadInVMfromNative tiv(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
 
   oop vthread_obj = JNIHandles::resolve_external_guard(vthread);
 

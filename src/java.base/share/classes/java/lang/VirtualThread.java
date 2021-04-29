@@ -46,7 +46,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import jdk.internal.event.VirtualThreadSubmitRejectedEvent;
+import jdk.internal.event.VirtualThreadPinnedEvent;
+import jdk.internal.event.VirtualThreadSubmitFailedEvent;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.ThreadTracker;
@@ -259,11 +260,10 @@ class VirtualThread extends Thread {
                 scheduler.execute(runContinuation);
             }
         } catch (RejectedExecutionException ree) {
-            // record JFR event
-            var event = new VirtualThreadSubmitRejectedEvent();
-            if (event.shouldCommit()) {
-                event.vthread = this.toString();
-                event.scheduler = scheduler.toString();
+            // record event
+            var event = new VirtualThreadSubmitFailedEvent();
+            if (event.isEnabled()) {
+                event.javaThreadId = getId();
                 event.exceptionMessage = ree.getMessage();
                 event.commit();
             }
@@ -451,6 +451,9 @@ class VirtualThread extends Thread {
     private void parkOnCarrierThread() {
         assert state() == PARKING;
 
+        var pinnedEvent = new VirtualThreadPinnedEvent();
+        pinnedEvent.begin();
+
         // switch to carrier thread
         Thread carrier = this.carrierThread;
         carrier.setCurrentThread(carrier);
@@ -483,6 +486,11 @@ class VirtualThread extends Thread {
             // restore interrupt status
             if (awaitInterrupted)
                 Thread.currentThread().interrupt();
+        }
+
+        // commit event if enabled
+        if (pinnedEvent.isEnabled()) {
+            pinnedEvent.commit();
         }
     }
 
@@ -1044,7 +1052,9 @@ class VirtualThread extends Thread {
                     ThreadGroup group = Thread.currentCarrierThread().getThreadGroup();
                     for (ThreadGroup p; (p = group.getParent()) != null; )
                         group = p;
-                    return new ThreadGroup(group, "CarrierThreads");
+                    @SuppressWarnings("deprecation")
+                    var carrierThreadsGroup = new ThreadGroup(group, "CarrierThreads");
+                    return carrierThreadsGroup;
                 }
             });
         }

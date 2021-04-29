@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,16 +29,19 @@ import jdk.jfr.Category;
 import jdk.jfr.Description;
 import jdk.jfr.Label;
 import jdk.jfr.Name;
-import jdk.jfr.Timespan;
 import jdk.jfr.internal.MirrorEvent;
-import jdk.jfr.internal.Type;
 
-@Category("Java Application")
-@Label("Java Thread Sleep")
-@Name("jdk.ThreadSleep")
-@MirrorEvent(className = "jdk.internal.event.ThreadSleepEvent")
-public final class ThreadSleepEvent extends AbstractJDKEvent {
-    @Label("Sleep Time")
-    @Timespan(Timespan.NANOSECONDS)
-    public long time;
+@Category({"Java Runtime"})
+@Label("Virtual thread submit task failed")
+@Name("jdk.VirtualThreadSubmitFailed")
+@Description("Submit of task for virtual thread failed")
+@MirrorEvent(className = "jdk.internal.event.VirtualThreadSubmitFailedEvent")
+public final class VirtualThreadSubmitFailedEvent extends AbstractJDKEvent {
+
+    @Label("Thread Id")
+    public long javaThreadId;
+
+    @Label("Exception message")
+    public String exceptionMessage;
+
 }

@@ -122,18 +122,13 @@ check_vthread_consistency_suspended(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthrea
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, vthread);
   check_jvmti_status(jni, err, "Error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
 
-  // LOG("Agent: enabled SingleStep for vt: %s ct: %s\n", name, cname);
-
   if (cthread != NULL) { // pre-condition for reliable testing
     test_stack_trace(jvmti, jni, vthread);
-    // TMP commented the line below to debug stack inconsistency issue
-    // check_link_consistency(jvmti, jni, vthread);
+    check_link_consistency(jvmti, jni, vthread);
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, vthread);
   check_jvmti_status(jni, err, "Error in JVMTI SetEventNotificationMode: disable SINGLE_STEP");
-
-  // LOG("Agent: disabled SingleStep for vt: %s ct: %s\n", name, cname);
 }
 
 #if 1

@@ -208,9 +208,11 @@ class VirtualMachineImpl extends MirrorImpl
         /* Create ThreadGroup to be used by all threads servicing
          * this VM.
          */
-        threadGroupForJDI = new ThreadGroup(vmManager.mainGroupForJDI(),
+        @SuppressWarnings("deprecation")
+        ThreadGroup group = new ThreadGroup(vmManager.mainGroupForJDI(),
                                             "JDI [" +
                                             this.hashCode() + "]");
+        threadGroupForJDI = group;
 
         /*
          * Set up a thread to communicate with the target VM over

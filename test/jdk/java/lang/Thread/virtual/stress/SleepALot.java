@@ -62,7 +62,7 @@ public class SleepALot {
 
         AtomicInteger count = new AtomicInteger();
 
-        Thread thread = Thread.startVirtualThread(() -> {
+        Thread thread = Thread.ofVirtual().start(() -> {
             while (count.incrementAndGet() < ITERATIONS) {
                 try {
                     Thread.sleep(Duration.ofNanos(100));

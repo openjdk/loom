@@ -22,14 +22,23 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.internal.event;
 
-/**
- * Event recording when an attempt to submit the task for a virtual thread to
- * its scheduler is rejected (RejectedExecutionException).
- */
-public class VirtualThreadSubmitRejectedEvent extends Event {
-    public String vthread;
-    public String scheduler;
-    public String exceptionMessage;
+package jdk.jfr.events;
+
+import jdk.jfr.Category;
+import jdk.jfr.Description;
+import jdk.jfr.Label;
+import jdk.jfr.Name;
+import jdk.jfr.internal.MirrorEvent;
+
+@Category({"Java Runtime"})
+@Label("Virtual thread start")
+@Name("jdk.VirtualThreadStart")
+@Description("Virtual thread start")
+@MirrorEvent(className = "jdk.internal.event.VirtualThreadStartEvent")
+public final class VirtualThreadStartEvent extends AbstractJDKEvent {
+
+    @Label("Thread Id")
+    public long javaThreadId;
+
 }

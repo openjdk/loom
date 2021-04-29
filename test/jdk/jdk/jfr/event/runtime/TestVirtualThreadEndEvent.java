@@ -41,7 +41,7 @@ import jdk.test.lib.jfr.Events;
  * @run main/othervm jdk.jfr.event.runtime.TestVirtualThreadEndEvent
  */
 public class TestVirtualThreadEndEvent {
-    private final static String EVENT_NAME_THREAD_END = EventNames.ThreadEnd;
+    private final static String EVENT_NAME_THREAD_END = EventNames.VirtualThreadEnd;
 
     public static void main(String[] args) throws Throwable {
         try (Recording recording = new Recording()) {

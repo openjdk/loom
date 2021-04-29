@@ -108,7 +108,7 @@ public class CustomScheduler {
         Executor scheduler = (task) -> {
             var exc = new AtomicReference<Throwable>();
             try {
-                Thread.startVirtualThread(() -> {
+                Thread.ofVirtual().start(() -> {
                     try {
                         task.run();
                         assertTrue(false);
