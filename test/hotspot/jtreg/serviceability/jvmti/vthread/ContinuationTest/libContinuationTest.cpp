@@ -50,13 +50,13 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
   check_jvmti_status(jni, err, "event handler: error in JVMTI GetMethodName call");
 
   if (strcmp(event_name, "MethodEntry") == 0) {
-    printf("%s event #%d: %s thread: %s, method: %s: %s%s\n",
+    LOG("%s event #%d: %s thread: %s, method: %s: %s%s\n",
            event_name, method_entry_count, virt, tname, cname, mname, msign);
   } else {
-    printf("%s event #%d: %s thread: %s, method: %s: %s%s\n",
+    LOG("%s event #%d: %s thread: %s, method: %s: %s%s\n",
            event_name, frame_pop_count, virt, tname, cname, mname, msign);
   }
-  fflush(0);
+
   deallocate(jvmti, jni, (void*)tname);
   deallocate(jvmti, jni, (void*)cname);
   deallocate(jvmti, jni, (void*)mname);
@@ -73,7 +73,7 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
   if (strcmp(mname, "yield0") == 0) {
     print_frame_event_info(jvmti, jni, thread, method, "MethodEntry");
 
-    printf("\nMethodEntry: Requesting FramePop notifications for %d frames:\n", FRAMES_TO_NOTIFY_POP);
+    LOG("\nMethodEntry: Requesting FramePop notifications for %d frames:\n", FRAMES_TO_NOTIFY_POP);
 
     // Request FramePop notifications for all continuation frames.
     // They all are expected to be cleared as a part of yield protocol.
@@ -89,9 +89,9 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
 
       print_method(jvmti, jni, frame_method, depth);
     }
-    printf("\n");
+    LOG("\n");
   }
-  fflush(0);
+
   deallocate(jvmti, jni, (void*)mname);
 }
 
@@ -109,7 +109,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiError err;
 
-  printf("Agent_OnLoad started\n");
+  LOG("Agent_OnLoad started\n");
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
@@ -124,18 +124,18 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
+    LOG("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
   }
 
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
+    LOG("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
   }
 
   event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
-  printf("Agent_OnLoad finished\n");
-  fflush(0);
+  LOG("Agent_OnLoad finished\n");
+
 
   return JNI_OK;
 }
@@ -144,7 +144,7 @@ JNIEXPORT void JNICALL
 Java_ContinuationTest_enableEvents(JNIEnv *jni, jclass cls, jthread thread) {
   jvmtiError err;
 
-  printf("enableEvents: started\n");
+  LOG("enableEvents: started\n");
   exp_thread = (jthread)jni->NewGlobalRef(thread);
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_METHOD_ENTRY, thread);
@@ -153,16 +153,16 @@ Java_ContinuationTest_enableEvents(JNIEnv *jni, jclass cls, jthread thread) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FRAME_POP, thread);
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI SetEventNotificationMode: enable FRAME_POP");
 
-  printf("enableEvents: finished\n");
-  fflush(0);
+  LOG("enableEvents: finished\n");
+
 }
 
 JNIEXPORT jboolean JNICALL
 Java_ContinuationTest_check(JNIEnv *jni, jclass cls) {
   jvmtiError err;
 
-  printf("\n");
-  printf("check: started\n");
+  LOG("\n");
+  LOG("check: started\n");
 
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_METHOD_ENTRY, exp_thread);
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI SetEventNotificationMode: disable METHOD_ENTRY");
@@ -170,9 +170,9 @@ Java_ContinuationTest_check(JNIEnv *jni, jclass cls) {
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_FRAME_POP, exp_thread);
   check_jvmti_status(jni, err, "error in JVMTI SetEventNotificationMode: disable FRAME_POP");
 
-  printf("check: finished\n");
-  printf("\n");
-  fflush(0);
+  LOG("check: finished\n");
+  LOG("\n");
+
 
   return frame_pop_count == 0;
 }

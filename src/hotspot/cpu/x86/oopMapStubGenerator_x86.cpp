@@ -1413,25 +1413,3 @@ void OopMapStubGenerator::free() {
 address OopMapStubGenerator::thaw_stub(address freeze_stub_address) {
   return *((address*)freeze_stub_address - 1);
 }
-
-intptr_t OopMapStubGenerator::stub_to_offset(address stub) {
-  assert (code_cache_base == (intptr_t)CodeCache::low_bound(CodeBlobType::NonNMethod), "");
-  intptr_t offset = (intptr_t)stub - (intptr_t)code_cache_base;
-  assert ((offset & 0xffffffff) == offset, "");
-  return offset;
-}
-
-address OopMapStubGenerator::offset_to_stub(intptr_t offset) {
-  assert (code_cache_base == (intptr_t)CodeCache::low_bound(CodeBlobType::NonNMethod), "");
-  return (address)(code_cache_base + offset);
-}
-
-CodeBlob* OopMapStubGenerator::code_blob(address thaw_stub_address) {
-  return (CodeBlob*)*((address*)thaw_stub_address - 1);
-}
-
-intptr_t OopMapStubGenerator::code_cache_base;
-
-void OopMapStubGenerator::init() {
-  code_cache_base = (intptr_t)CodeCache::low_bound(CodeBlobType::NonNMethod);
-}

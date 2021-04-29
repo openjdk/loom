@@ -23,9 +23,9 @@
 
 /**
  * @test
+ * @summary Basic test of debugging option to trace pinned threads
  * @run main/othervm -Djdk.tracePinnedThreads=full TracePinnedThreads
  * @run main/othervm -Djdk.tracePinnedThreads=short TracePinnedThreads
- * @summary Basic test of debugging option to trace pinned threads
  */
 
 import java.io.ByteArrayOutputStream;
@@ -42,7 +42,7 @@ public class TracePinnedThreads {
         PrintStream original = System.out;
         System.setOut(new PrintStream(baos));
         try {
-            Thread.startVirtualThread(() -> {
+            Thread.ofVirtual().start(() -> {
                 synchronized (lock) {
                     long nanos = Duration.ofSeconds(1).toNanos();
                     LockSupport.parkNanos(nanos);

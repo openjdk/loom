@@ -4,9 +4,7 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -83,6 +81,7 @@ public class TestThreadEndEvent {
         RecordedThread t = event.getThread();
         Asserts.assertEquals(event.getThread("thread").getJavaName(), thread.getName());
         Asserts.assertEquals(t.getThreadGroup().getName(), LatchedThread.THREAD_GROUP.getName());
+        Asserts.assertEquals(t.isVirtual(), false);
     }
 
     private static RecordedEvent findEventByThreadName(List<RecordedEvent> events, String name) {

@@ -192,12 +192,16 @@ public final class InnocuousThread extends Thread {
                 group = parent;
             }
             final ThreadGroup root = group;
+
             if (System.getSecurityManager() == null) {
-                INNOCUOUSTHREADGROUP = new ThreadGroup(root, "InnocuousThreadGroup");
+                @SuppressWarnings("deprecation")
+                ThreadGroup g = new ThreadGroup(root, "InnocuousThreadGroup");
+                INNOCUOUSTHREADGROUP = g;
             } else {
                 INNOCUOUSTHREADGROUP = AccessController.doPrivileged(
                     new PrivilegedAction<ThreadGroup>() {
                         @Override
+                        @SuppressWarnings("deprecation")
                         public ThreadGroup run() {
                             return new ThreadGroup(root, "InnocuousThreadGroup");
                         }

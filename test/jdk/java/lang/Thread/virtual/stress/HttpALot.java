@@ -23,13 +23,13 @@
 
 /**
  * @test
+ * @summary Stress test the HTTP protocol handler and HTTP server
  * @requires vm.debug != true
  * @modules java.base/java.util.concurrent:open
  * @run main/othervm/timeout=600
  *     -Dsun.net.client.defaultConnectTimeout=5000
  *     -Dsun.net.client.defaultReadTimeout=5000
  *     HttpALot
- * @summary Stress test the HTTP protocol handler and HTTP server
  */
 
 import java.io.IOException;

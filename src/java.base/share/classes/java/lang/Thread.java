@@ -91,7 +91,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * thread (the thread that typically calls the application's {@code main} method).
  * The Java virtual machine terminates when all started non-daemon threads have
  * terminated. Unstarted daemon threads do not prevent the Java virtual machine from
- * termination. The Java virtual machine can also be terminated by invoking the
+ * terminating. The Java virtual machine can also be terminated by invoking the
  * {@linkplain Runtime#exit(int)} method, in which case it will terminate even
  * if there are non-daemon threads still running.
  *
@@ -152,9 +152,10 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * extend {@code Thread}. The constructors cannot be used to create virtual threads.
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
- * Creating a {@code Thread} will inherit, by default, the initial values of {@code
- * InheritableThreadLocal} variables, {@linkplain ScopeLocal#inheritableForType(Class)
- * inheritable-scoped-variables}, and a number of properties from the parent thread:
+ * Creating a {@code Thread} will inherit, by default, {@linkplain
+ * ScopeLocal#inheritableForType(Class) inheritable-scope-local} variables, the initial
+ * value of {@linkplain InheritableThreadLocal inheritable-thread-local} variables, and
+ * a number of properties from the parent thread:
  * <ul>
  *     <li> Platform threads inherit the daemon status, priority, and thread-group.
  *     <li> Virtual threads are scheduled by the same scheduler as the parent thread
@@ -323,6 +324,12 @@ public class Thread implements Runnable {
      * the constructing thread.
      */
     static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
+
+    /**
+     * Characteristic value signifying that {@link ScopeLocal#inheritableForType(Class)
+     * inheritable-scope-locals} are not inherited from the constructing thread.
+     */
+    static final int NO_INHERIT_SCOPE_LOCALS = 1 << 3;
 
     // current inner-most continuation
     private Continuation cont;
@@ -661,7 +668,9 @@ public class Thread implements Runnable {
                     this.contextClassLoader = parentLoader;
                 }
             }
-            this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+            if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
+                this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+            }
         }
 
         int priority;
@@ -709,7 +718,9 @@ public class Thread implements Runnable {
         }
 
         // scoped variables
-        this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+        if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
+            this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+        }
 
         // no additional fields
         this.holder = null;
@@ -907,6 +918,15 @@ public class Thread implements Runnable {
          * @return this builder
          */
         Builder inheritInheritableThreadLocals(boolean inherit);
+
+        /**
+         * Sets whether the thread inherits {@linkplain ScopeLocal#inheritableForType(Class)
+         * inheritable-scope-local} variables. The default is to inherit.
+         *
+         * @param inherit {@code true} to inherit, {@code false} to not inherit
+         * @return this builder
+         */
+        Builder inheritInheritableScopeLocals(boolean inherit);
 
         /**
          * Sets the uncaught exception handler.
@@ -1423,23 +1443,6 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Creates a platform thread to execute a task and schedules it to execute.
-     *
-     * <p> This method is equivalent to:
-     * <pre>{@code Thread.ofPlatform().start(task); }</pre>
-     *
-     * @param task the object to run when the thread executes
-     * @return a new, and started, platform thread
-     * @see <a href="#inheritance">Inheritance</a>
-     * @since 99
-     */
-    public static Thread startPlatformThread(Runnable task) {
-        var thread = new Thread(Objects.requireNonNull(task));
-        thread.start();
-        return thread;
-    }
-
-    /**
      * Creates a virtual thread to execute a task and schedules it to execute.
      *
      * <p> The thread has no {@link Permission permissions}.
@@ -1838,28 +1841,22 @@ public class Thread implements Runnable {
 
     /**
      * Changes the priority of this thread.
-     * <p>
-     * First the {@code checkAccess} method of this thread is called
-     * with no arguments. This may result in throwing a {@code SecurityException}.
-     * <p>
-     * The priority of virtual-threads is always {@linkplain Thread#NORM_PRIORITY}
-     * and is not changed by this method.
-     * Otherwise, the priority of this thread is set to the smaller of
-     * the specified {@code newPriority} and the maximum permitted
-     * priority of the thread's thread group.
      *
-     * @param newPriority priority to set this thread to
-     * @throws     IllegalArgumentException  If the priority is not in the
-     *               range {@code MIN_PRIORITY} to
-     *               {@code MAX_PRIORITY}.
-     * @throws     SecurityException  if the current thread cannot modify
-     *               this thread.
-     * @see        #getPriority
-     * @see        #checkAccess()
-     * @see        #getThreadGroup()
-     * @see        #MAX_PRIORITY
-     * @see        #MIN_PRIORITY
-     * @see        ThreadGroup#getMaxPriority()
+     * For platform threads, the priority is set to the smaller of the specified
+     * {@code newPriority} and the maximum permitted priority of the thread's
+     * {@linkplain ThreadGroup thread group}.
+     *
+     * The priority of a virtual thread is always {@link Thread#NORM_PRIORITY}
+     * and {@code newPriority} is ignored.
+     *
+     * @param newPriority the new thread priority
+     * @throws  IllegalArgumentException if the priority is not in the
+     *          range {@code MIN_PRIORITY} to {@code MAX_PRIORITY}.
+     * @throws  SecurityException
+     *          if {@link #checkAccess} determines that the current
+     *          thread cannot modify this thread
+     * @see #setPriority(int)
+     * @see ThreadGroup#getMaxPriority()
      */
     public final void setPriority(int newPriority) {
         checkAccess();
@@ -1884,7 +1881,7 @@ public class Thread implements Runnable {
 
     /**
      * Returns this thread's priority.
-     * The priority of a virtual thread is always {@linkplain Thread#NORM_PRIORITY}.
+     * The priority of a virtual thread is always {@link Thread#NORM_PRIORITY}.
      *
      * @return  this thread's priority.
      * @see     #setPriority
@@ -2217,33 +2214,35 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Marks this thread as either a {@linkplain #isDaemon daemon} thread
-     * or a user thread.
-     * The daemon status of a virtual thread is meaningless and is not
-     * changed by this method (the {@linkplain #isDaemon() isDaemon} method
-     * always returns {@code true}).
-     * The Java Virtual Machine exits when the only threads running are all
-     * daemon threads.
+     * Marks this thread as either a <i>daemon</i> or <i>non-daemon</i> thread.
+     * The Java virtual machine terminates when all started non-daemon threads have
+     * terminated.
      *
-     * <p> This method must be invoked before the thread is started.
+     * The daemon status of a virtual thread is always {@code true} and cannot be
+     * changed by this method to {@code false}.
+     *
+     * <p> This method must be invoked before the thread is started. The behavior
+     * of this method when the thread has terminated is not specified.
      *
      * @param  on
      *         if {@code true}, marks this thread as a daemon thread
      *
+     * @throws  IllegalArgumentException
+     *          if this is a virtual thread and {@code on} is false
      * @throws  IllegalThreadStateException
      *          if this thread is {@linkplain #isAlive alive}
-     *
      * @throws  SecurityException
      *          if {@link #checkAccess} determines that the current
      *          thread cannot modify this thread
      */
     public final void setDaemon(boolean on) {
         checkAccess();
+        if (isVirtual() && !on)
+            throw new IllegalArgumentException("'false' not legal for virtual threads");
         if (isAlive())
             throw new IllegalThreadStateException();
-        if (!isVirtual()) {
+        if (!isVirtual())
             daemon(on);
-        }
     }
 
     void daemon(boolean on) {
@@ -2252,8 +2251,7 @@ public class Thread implements Runnable {
 
     /**
      * Tests if this thread is a daemon thread.
-     * The daemon status of a virtual thread is meaningless, this method
-     * returns {@code true} if this is a virtual thread.
+     * The daemon status of a virtual thread is always {@code true}.
      *
      * @return  {@code true} if this thread is a daemon thread;
      *          {@code false} otherwise.

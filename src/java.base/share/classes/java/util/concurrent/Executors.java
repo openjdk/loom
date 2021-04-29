@@ -240,13 +240,12 @@ public class Executors {
     }
 
     /**
-     * Creates an Executor that starts a new Thread for each task. The Executor
-     * is <i>owned</i> by the Thread that creates it.
+     * Creates an Executor that starts a new Thread for each task.
      *
      * <p> An Executor created by this method is intended to be used in a
      * <em>structured manner</em>. It is <em>owned</em> by the Thread that creates
-     * it and must be {@linkplain ExecutorService#close() closed} by the thread
-     * when it is finished with the executor. Failure to invoke the {@code
+     * it and must be {@linkplain ExecutorService#close() closed} by the same
+     * thread when it is finished with the executor. Failure to invoke the {@code
      * close} method may result in a memory leak. The {@code close}, {@link
      * ExecutorService#shutdown() shutdown}, and {@link ExecutorService#shutdownNow()
      * shutdownNow} methods throw {@code IllegalCallerException} if invoked by
@@ -260,7 +259,8 @@ public class Executors {
      *
      * <p> Invoking {@link Future#cancel(boolean) cancel(true)} on a {@link
      * Future Future} representing the pending result of a task submitted to
-     * the Executor will {@link Thread#interrupt() interrupt} the thread.
+     * the Executor will {@link Thread#interrupt() interrupt} the thread
+     * executing the task.
      *
      * @apiNote
      * The {@link #newUnownedThreadExecutor(ThreadFactory)} method should be
@@ -272,20 +272,36 @@ public class Executors {
      * @since 99
      */
     public static ExecutorService newThreadExecutor(ThreadFactory threadFactory) {
-        return new ThreadExecutor(threadFactory, null, false);
+        return new ThreadExecutor(threadFactory, null, true);
     }
 
     /**
-     * Creates an Executor that starts a new Thread for each task. The Executor
-     * is <i>owned</i> by the Thread that creates it.
-     *
-     * The Executor is created with a deadline. If the deadline is reached before
-     * the Executor has terminated then it is {@link ExecutorService#shutdown()
-     * shutdown} and its threads are {@linkplain Thread#interrupt() interrupted}
-     * to cancel the remaining tasks.
-     * If this method is invoked with a deadline that has already expired then
-     * it returns an Executor that is already shutdown (any attempt to submit
+     * Creates an Executor that starts a new Thread for each task and with a
+     * deadline. If the deadline is reached before the Executor has terminated
+     * then it is {@link ExecutorService#shutdown() shutdown} and its threads
+     * are {@linkplain Thread#interrupt() interrupted} to cancel the remaining
+     * tasks. If this method is invoked with a deadline that has already expired
+     * then it returns an Executor that is already shutdown (any attempt to submit
      * a task will fail with {@code RejectedExecutionException}).
+     *
+     * <p> An Executor created by this method is intended to be used in a
+     * <em>structured manner</em>. It is <em>owned</em> by the Thread that creates
+     * it and must be {@linkplain ExecutorService#close() closed} by the same
+     * thread when it is finished with the executor. Failure to invoke the {@code
+     * close} method may result in a memory leak. The {@code close}, {@code
+     * shutdown} and {@link ExecutorService#shutdownNow() shutdownNow} methods
+     * throw {@code IllegalCallerException} if invoked by other threads.
+     * Executors created by this method enforce strict nesting and must be
+     * closed in the reverse order that they are created in. The {@code close}
+     * method throws {@code IllegalStateException} if invoked to close
+     * executors created by this method in a different order. Once closed by
+     * its owner, further attempts to close the executor by its owner has no
+     * effect.
+     *
+     * <p> Invoking {@link Future#cancel(boolean) cancel(true)} on a {@link
+     * Future Future} representing the pending result of a task submitted to
+     * the Executor will {@link Thread#interrupt() interrupt} the thread
+     * executing the task.
      *
      * @param threadFactory the factory to use when creating new threads
      * @param deadline the deadline
@@ -295,14 +311,12 @@ public class Executors {
      */
     public static ExecutorService newThreadExecutor(ThreadFactory threadFactory,
                                                     Instant deadline) {
-        Objects.requireNonNull(threadFactory);
         Objects.requireNonNull(deadline);
-        return new ThreadExecutor(threadFactory, deadline, false);
+        return new ThreadExecutor(threadFactory, deadline, true);
     }
 
     /**
-     * Creates an Executor that starts a new virtual Thread for each task. The
-     * Executor is <i>owned</i> by the Thread that creates it.
+     * Creates an Executor that starts a new virtual Thread for each task.
      *
      * <p> This method is equivalent to creating an Executor with the {@link
      * #newThreadExecutor(ThreadFactory)} method and specifying a ThreadFactory
@@ -313,12 +327,12 @@ public class Executors {
      */
     public static ExecutorService newVirtualThreadExecutor() {
         ThreadFactory factory = Thread.ofVirtual().factory();
-        return new ThreadExecutor(factory, null, false);
+        return new ThreadExecutor(factory, null, true);
     }
 
     /**
-     * Creates an Executor that starts a new virtual Thread for each task. The
-     * Executor is <i>owned</i> by the Thread that creates it.
+     * Creates an Executor that starts a new virtual Thread for each task and
+     * with a deadline.
      *
      * <p> This method is equivalent to creating an Executor with the {@link
      * #newThreadExecutor(ThreadFactory, Instant)} method and specifying a
@@ -332,15 +346,21 @@ public class Executors {
     public static ExecutorService newVirtualThreadExecutor(Instant deadline) {
         Objects.requireNonNull(deadline);
         ThreadFactory factory = Thread.ofVirtual().factory();
-        return new ThreadExecutor(factory, deadline, false);
+        return new ThreadExecutor(factory, deadline, true);
     }
 
     /**
      * Creates an Executor that starts a new thread for each task.
      *
-     * The resulting Executor is not owned to any thread, meaning any thread can
-     * {@link ExecutorService#shutdown() shutdown} the Executor or invoke {@link
-     * ExecutorService#close() close} if they have the appropriate permission.
+     * <p> Unlike {@link #newThreadExecutor(ThreadFactory)}, the Executor is not
+     * owned by any thread so any thread can {@link ExecutorService#shutdown()
+     * shutdown} the Executor or invoke {@link ExecutorService#close() close}
+     * if they have the appropriate permission.
+     *
+     * <p> Invoking {@link Future#cancel(boolean) cancel(true)} on a {@link
+     * Future Future} representing the pending result of a task submitted to
+     * the Executor will {@link Thread#interrupt() interrupt} the thread
+     * executing the task.
      *
      * @apiNote
      * This method is intended for unstructured usage such as cases where an
@@ -353,7 +373,7 @@ public class Executors {
      * @since 99
      */
     public static ExecutorService newUnownedThreadExecutor(ThreadFactory threadFactory) {
-        return new ThreadExecutor(threadFactory, null, true);
+        return new ThreadExecutor(threadFactory, null, false);
     }
 
     /**

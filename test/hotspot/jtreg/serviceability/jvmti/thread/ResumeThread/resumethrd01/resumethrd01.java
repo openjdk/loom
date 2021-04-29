@@ -41,8 +41,6 @@
 
 import jdk.test.lib.jvmti.DebugeeClass;
 
-import java.io.PrintStream;
-
 
 public class resumethrd01 extends DebugeeClass {
 
@@ -52,7 +50,7 @@ public class resumethrd01 extends DebugeeClass {
     }
 
     // run test from command line
-    public static void main(String argv[]) {
+    public static void main(String argv[]) throws Exception {
         new resumethrd01().runIt();
     }
 
@@ -61,23 +59,18 @@ public class resumethrd01 extends DebugeeClass {
     long timeout = 0;
     int status = DebugeeClass.TEST_PASSED;
 
-    // tested thread
-    resumethrd01Thread thread = null;
-
     // run debuggee
-    public void runIt() {
+    public void runIt() throws Exception {
         timeout = 60 * 1000; // milliseconds
 
         // create tested thread
-        thread = new resumethrd01Thread("TestedThread");
+        TestedThread thread = new TestedThread("TestedThread");
 
         // run tested thread
         System.out.println("Staring tested thread");
         try {
             thread.start();
-            if (!thread.checkReady()) {
-                throw new RuntimeException("Unable to prepare tested thread: " + thread);
-            }
+            thread.checkReady();
 
             // testing sync
             System.out.println("Sync: thread started");
@@ -85,21 +78,16 @@ public class resumethrd01 extends DebugeeClass {
         } finally {
             // let thread to finish
             thread.letFinish();
-        }
-
-        // wait for thread to finish
-        System.out.println("Finishing tested thread");
-        try {
+            // wait for thread to finish
+            System.out.println("Finishing tested thread");
             thread.join();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
         }
 
         // testing sync
         System.out.println("Sync: thread finished");
         status = checkStatus(status);
 
-        if (status !=0 ) {
+        if (status !=0) {
             throw new RuntimeException("status = " + status);
         }
     }
@@ -108,12 +96,12 @@ public class resumethrd01 extends DebugeeClass {
 /* =================================================================== */
 
 // basic class for tested threads
-class resumethrd01Thread extends Thread {
+class TestedThread extends Thread {
     private volatile boolean threadReady = false;
     private volatile boolean shouldFinish = false;
 
     // make thread with specific name
-    public resumethrd01Thread(String name) {
+    public TestedThread(String name) {
         super(name);
     }
 
@@ -136,15 +124,14 @@ class resumethrd01Thread extends Thread {
     }
 
     // check if thread is ready
-    public boolean checkReady() {
+    public void checkReady() {
         try {
             while (!threadReady) {
-                sleep(1000);
+                sleep(100);
             }
         } catch (InterruptedException e) {
             throw new RuntimeException("Interruption while preparing tested thread: \n\t" + e);
         }
-        return threadReady;
     }
 
     // let thread to finish

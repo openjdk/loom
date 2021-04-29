@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng Locking
  * @summary Test virtual threads using java.util.concurrent locks
+ * @run testng Locking
  */
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,10 +34,12 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class Locking {
 
-    // lock/unlock
+    /**
+     * Test lock/unlock.
+     */
+    @Test
     public void testReentrantLock1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ReentrantLock lock = new ReentrantLock();
@@ -49,7 +51,10 @@ public class Locking {
         });
     }
 
-    // tryLock/unlock
+    /**
+     * Test tryLock/unlock.
+     */
+    @Test
     public void testReentrantLock2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ReentrantLock lock = new ReentrantLock();
@@ -62,7 +67,10 @@ public class Locking {
         });
     }
 
-    // lock/lock/unlock/unlock
+    /**
+     * Test lock/lock/unlock/unlock.
+     */
+    @Test
     public void testReentrantLock3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             ReentrantLock lock = new ReentrantLock();
@@ -83,7 +91,10 @@ public class Locking {
         });
     }
 
-    // locked by dinoasur thread, virtual thread tries to lock
+    /**
+     * Test locked by platform thread, virtual thread tries to lock.
+     */
+    @Test
     public void testReentrantLock4() throws Exception {
         ReentrantLock lock = new ReentrantLock();
         var holdsLock = new AtomicBoolean();
@@ -93,7 +104,7 @@ public class Locking {
         // thread acquires lock
         lock.lock();
         try {
-            thread = Thread.startVirtualThread(() -> {
+            thread = Thread.ofVirtual().start(() -> {
                 lock.lock();  // should block
                 holdsLock.set(true);
                 LockSupport.park();
@@ -118,10 +129,13 @@ public class Locking {
         thread.join();
     }
 
-    // locked by virtual thread, dinoasur thread tries to lock
+    /**
+     * Test locked by virtual thread, platform thread tries to lock.
+     */
+    @Test
     public void testReentrantLock5() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -149,10 +163,13 @@ public class Locking {
         }
     }
 
-    // lock by virtual thread, another virtual thread tries to lock
+    /**
+     * Test locked by virtual thread, another virtual thread tries to lock.
+     */
+    @Test
     public void testReentrantLock6() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        var thread1 = Thread.startVirtualThread(() -> {
+        var thread1 = Thread.ofVirtual().start(() -> {
             lock.lock();
             try {
                 LockSupport.park();
@@ -167,7 +184,7 @@ public class Locking {
         }
 
         var holdsLock  = new AtomicBoolean();
-        var thread2 = Thread.startVirtualThread(() -> {
+        var thread2 = Thread.ofVirtual().start(() -> {
             lock.lock();
             holdsLock.set(true);
             LockSupport.park();

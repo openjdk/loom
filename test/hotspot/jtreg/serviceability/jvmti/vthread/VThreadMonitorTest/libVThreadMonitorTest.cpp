@@ -48,10 +48,10 @@ static void ShowErrorMessage(jvmtiEnv *jvmti, jvmtiError errCode,
 
   result = jvmti->GetErrorName(errCode, &errMsg);
   if (result == JVMTI_ERROR_NONE) {
-    fprintf(stderr, "%s: %s %s (%d)\n", func, msg, errMsg, errCode);
+    LOG("%s: %s %s (%d)\n", func, msg, errMsg, errCode);
     jvmti->Deallocate((unsigned char *)errMsg);
   } else {
-    fprintf(stderr, "%s: %s (%d)\n", func, msg, errCode);
+    LOG("%s: %s (%d)\n", func, msg, errCode);
   }
 }
 
@@ -79,16 +79,16 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
     return;
   }
 
-  printf("\n%s: %s: contended monitor: %p\n", func, tname, contended_monitor);
+  LOG("\n%s: %s: contended monitor: %p\n", func, tname, contended_monitor);
 
   // Check if it is expected monitor.
   if (jni->IsSameObject(monitor1, contended_monitor) == JNI_FALSE &&
       jni->IsSameObject(monitor2, contended_monitor) == JNI_FALSE) {
-    printf("FAIL: is_vt: %d: unexpected monitor from GetCurrentContendedMonitor\n", is_vt);
+    LOG("FAIL: is_vt: %d: unexpected monitor from GetCurrentContendedMonitor\n", is_vt);
     status = STATUS_FAILED;
     return;
   }
-  printf("%s: GetCurrentContendedMonitor returned expected monitor for %s\n", func, tname);
+  LOG("%s: GetCurrentContendedMonitor returned expected monitor for %s\n", func, tname);
 
   // Check GetThreadState for a vthread.
   err = jvmti->GetThreadState(thread, &state);
@@ -97,8 +97,8 @@ check_contended_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
     status = STATUS_FAILED;
     return;
   }
-  printf("%s: GetThreadState returned state for %s: %0x\n\n", func, tname, state);
-  fflush(0);
+  LOG("%s: GetThreadState returned state for %s: %0x\n\n", func, tname, state);
+
 }
 
 static void
@@ -116,21 +116,21 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
     status = STATUS_FAILED;
     return;
   }
-  printf("\n%s: GetOwnedMonitorInfo: %s owns %d monitor(s)\n", func, tname, mcount);
+  LOG("\n%s: GetOwnedMonitorInfo: %s owns %d monitor(s)\n", func, tname, mcount);
   jvmti->Deallocate((unsigned char *)owned_monitors);
 
   if (is_vt == JNI_TRUE && mcount < 2) {
-    fprintf(stderr, "%s: FAIL: monitorCount for %s expected to be >= 2\n", func, tname);
+    LOG("%s: FAIL: monitorCount for %s expected to be >= 2\n", func, tname);
     status = STATUS_FAILED;
     return;
   }
   if (is_vt == JNI_FALSE && mcount != 0) {
-    fprintf(stderr, "%s: FAIL: monitorCount for %s expected to be 0\n", func, tname);
+    LOG("%s: FAIL: monitorCount for %s expected to be 0\n", func, tname);
     status = STATUS_FAILED;
     return;
   }
 
-  printf("%s: GetOwnedMonitorInfo: returned expected number of monitors for %s\n", func, tname);
+  LOG("%s: GetOwnedMonitorInfo: returned expected number of monitors for %s\n", func, tname);
 
   // Check GetThreadState for a vthread.
   err = jvmti->GetThreadState(thread, &state);
@@ -139,8 +139,8 @@ check_owned_monitor(jvmtiEnv *jvmti, JNIEnv *jni, const char* func,
     status = STATUS_FAILED;
     return;
   }
-  printf("%s: GetThreadState returned state for %s: %0x\n\n", func, tname, state);
-  fflush(0);
+  LOG("%s: GetThreadState returned state for %s: %0x\n\n", func, tname, state);
+
 }
 
 JNIEXPORT void JNICALL
@@ -203,7 +203,7 @@ JNI_OnLoad(JavaVM *jvm, void *reserved) {
 
   res = jvm->GetEnv((void **)&jni, JNI_VERSION_9);
   if (res != JNI_OK || jni == NULL) {
-    fprintf(stderr, "Error: GetEnv call failed(%d)!\n", res);
+    LOG("Error: GetEnv call failed(%d)!\n", res);
     return JNI_ERR;
   }
 
@@ -212,7 +212,7 @@ JNI_OnLoad(JavaVM *jvm, void *reserved) {
     test_class = (jclass)jni->NewGlobalRef(test_class);
   }
   if (test_class == NULL) {
-    fprintf(stderr, "Error: Could not load class %s!\n", TEST_CLASS);
+    LOG("Error: Could not load class %s!\n", TEST_CLASS);
     return JNI_ERR;
   }
   return JNI_VERSION_9;
@@ -225,11 +225,11 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiEventCallbacks callbacks;
 
-  printf("Agent_OnLoad started\n");
+  LOG("Agent_OnLoad started\n");
 
   res = jvm->GetEnv((void **)&jvmti, JVMTI_VERSION);
   if (res != JNI_OK || jvmti == NULL) {
-    fprintf(stderr, "Error: wrong result of a valid call to GetEnv!\n");
+    LOG("Error: wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -255,15 +255,15 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   if (!caps.can_generate_monitor_events) {
-    fprintf(stderr, "Warning: Monitor events are not implemented\n");
+    LOG("Warning: Monitor events are not implemented\n");
     return JNI_ERR;
   }
   if (!caps.can_get_owned_monitor_info) {
-    fprintf(stderr, "Warning: GetOwnedMonitorInfo is not implemented\n");
+    LOG("Warning: GetOwnedMonitorInfo is not implemented\n");
     return JNI_ERR;
   }
   if (!caps.can_support_virtual_threads) {
-    fprintf(stderr, "Warning: virtual threads are not supported\n");
+    LOG("Warning: virtual threads are not supported\n");
     return JNI_ERR;
   }
 
@@ -292,7 +292,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
                      "error in JVMTI SetEventNotificationMode #2");
     return JNI_ERR;
   }
-  printf("Agent_OnLoad finished\n");
+  LOG("Agent_OnLoad finished\n");
   return JNI_OK;
 }
 

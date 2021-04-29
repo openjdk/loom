@@ -76,27 +76,23 @@
  * @run main/othervm/native -agentlib:thrstat01 thrstat01
  */
 
-import java.io.PrintStream;
-
 public class thrstat01 {
 
     public static final int STATUS_RUNNING = 0;
     public static final int STATUS_MONITOR = 1;
     public static final int STATUS_WAIT    = 2;
 
-    native static void checkStatus(int statInd);
-    native static int getRes();
+    native static boolean checkStatus0(int statInd);
 
-    public static void main(String[] args) {
-
-
-        System.exit(run(args, System.out) + 95/*STATUS_TEMP*/);
+    static void checkStatus(int statInd) {
+        if (!checkStatus0(statInd)) {
+            throw new RuntimeException("Failed");
+        }
     }
 
-    public static int run(String argv[], PrintStream ref) {
+    public static void main(String[] args) {
         thrstat01 t = new thrstat01();
         t.meth();
-        return getRes();
     }
 
     // barriers for testing thread status values
@@ -105,7 +101,7 @@ public class thrstat01 {
     public static Lock endingMonitor = new Lock();
 
     void meth() {
-        thrstat01a thr = new thrstat01a("thr1");
+        TestedThreadThr1 thr = new TestedThreadThr1("tested_thread_thr1");
 
         synchronized (blockingMonitor) {
             synchronized (startingMonitor) {
@@ -141,9 +137,9 @@ public class thrstat01 {
     }
 }
 
-class thrstat01a extends Thread {
+class TestedThreadThr1 extends Thread {
 
-    public thrstat01a(String name) {
+    public TestedThreadThr1(String name) {
         super(name);
     }
 

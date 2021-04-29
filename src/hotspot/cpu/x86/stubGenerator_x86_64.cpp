@@ -26,6 +26,7 @@
 #include "asm/macroAssembler.hpp"
 #include "asm/macroAssembler.inline.hpp"
 #include "ci/ciUtilities.hpp"
+#include "compiler/oopMap.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetAssembler.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
@@ -7747,12 +7748,20 @@ RuntimeStub* generate_cont_doYield() {
     if (phase == 0) {
       generate_initial();
     } else if (phase == 1) {
-      generate_phase1();
+      generate_phase1(); // stubs that must be available for the interpreter
     } else {
       generate_all();
     }
   }
 }; // end class declaration
+
+#define UCM_TABLE_MAX_ENTRIES 16
+void StubGenerator_generate(CodeBuffer* code, int phase) {
+  if (UnsafeCopyMemory::_table == NULL) {
+    UnsafeCopyMemory::create_table(UCM_TABLE_MAX_ENTRIES);
+  }
+  StubGenerator g(code, phase);
+}
 
 #undef __
 #define __ masm->
@@ -7819,11 +7828,3 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
 }
 
 #undef __
-
-#define UCM_TABLE_MAX_ENTRIES 16
-void StubGenerator_generate(CodeBuffer* code, int phase) {
-  if (UnsafeCopyMemory::_table == NULL) {
-    UnsafeCopyMemory::create_table(UCM_TABLE_MAX_ENTRIES);
-  }
-  StubGenerator g(code, phase);
-}

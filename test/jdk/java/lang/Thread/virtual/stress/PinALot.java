@@ -31,7 +31,8 @@
 /**
  * @test
  * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -XX:+UseJVMCICompiler
+ *     -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot
  */
 
 /**
@@ -43,7 +44,8 @@
 /**
  * @test
  * @requires vm.debug == true & vm.graal.enabled
- * @run main/othervm/timeout=300 -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot 200000
+ * @run main/othervm/timeout=300 -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler
+ *     -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PinALot 200000
  */
 
 import java.time.Duration;
@@ -63,7 +65,7 @@ public class PinALot {
 
         AtomicInteger count = new AtomicInteger();
 
-        Thread thread = Thread.startVirtualThread(() -> {
+        Thread thread = Thread.ofVirtual().start(() -> {
             synchronized (lock) {
                 while (count.incrementAndGet() < ITERATIONS) {
                     LockSupport.parkNanos(1);

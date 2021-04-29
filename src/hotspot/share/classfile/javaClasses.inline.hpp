@@ -42,7 +42,7 @@ void java_lang_String::set_value_raw(oop string, typeArrayOop buffer) {
 }
 
 void java_lang_String::set_value(oop string, typeArrayOop buffer) {
-  string->obj_field_put(_value_offset, (oop)buffer);
+  string->obj_field_put(_value_offset, buffer);
 }
 
 bool java_lang_String::hash_is_set(oop java_string) {
@@ -249,6 +249,12 @@ inline oop jdk_internal_misc_StackChunk::cont(oop ref) {
 inline void jdk_internal_misc_StackChunk::set_cont(oop ref, oop value) {
   ref->obj_field_put(_cont_offset, value);
 }
+
+template<typename P>
+inline oop jdk_internal_misc_StackChunk::cont_raw(oop ref) {
+  return (oop)RawAccess<>::oop_load((P*)ref->field_addr(_cont_offset));
+}
+
 template<typename P>
 inline void jdk_internal_misc_StackChunk::set_cont_raw(oop ref, oop value) {
   RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr(_cont_offset), value);
@@ -258,7 +264,7 @@ inline jint jdk_internal_misc_StackChunk::size(oop ref) {
   return ref->int_field(_size_offset);
 }
 inline void jdk_internal_misc_StackChunk::set_size(HeapWord* ref, jint value) {
-  *(jint*)((oop)ref)->field_addr(_size_offset) = value; // ref->int_field_put(_size_offset, value);
+  *(jint*)(cast_to_oop(ref))->field_addr(_size_offset) = value; // ref->int_field_put(_size_offset, value);
 }
 inline jint jdk_internal_misc_StackChunk::sp(oop ref) {
   return ref->int_field(_sp_offset);
@@ -283,12 +289,6 @@ inline jbyte jdk_internal_misc_StackChunk::flags(oop ref) {
 }
 inline void jdk_internal_misc_StackChunk::set_flags(oop ref, jbyte value) {
   ref->byte_field_put(_flags_offset, value);
-}
-inline jboolean jdk_internal_misc_StackChunk::gc_mode(oop ref) {
-  return ref->bool_field(_mode_offset);
-}
-inline void jdk_internal_misc_StackChunk::set_gc_mode(oop ref, jboolean value) {
-  ref->bool_field_put(_mode_offset, value);
 }
 inline jint jdk_internal_misc_StackChunk::gc_sp(oop ref) {
   return ref->int_field(_gcSP_offset);

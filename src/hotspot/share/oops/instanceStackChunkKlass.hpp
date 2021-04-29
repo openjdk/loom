@@ -58,6 +58,7 @@ class InstanceStackChunkKlass: public InstanceKlass {
   friend class Continuations;
   template <bool mixed> friend class StackChunkFrameStream; 
   friend class FixChunkIterateStackClosure;
+  friend class MarkMethodsStackClosure;
   template <bool concurrent_gc, typename OopClosureType> friend class OopOopIterateStackClosure;
 
 public:
@@ -79,14 +80,20 @@ public:
     return static_cast<InstanceStackChunkKlass*>(k);
   }
 
-  int instance_size(int stack_size_in_words) const;
+  inline int instance_size(int stack_size_in_words) const;
+  static inline int bitmap_size(int stack_size_in_words); // in words
+  // the *last* bit in the bitmap corresponds to the last word in the stack; this returns the bit index corresponding to the first word
+  static inline BitMap::idx_t bit_offset(int stack_size_in_words);
 
   // Returns the size of the instance including the stack data.
-  virtual int oop_size(oop obj) const;
-  virtual int compact_oop_size(oop obj) const;
+  virtual int oop_size(oop obj) const override;
+  virtual int compact_oop_size(oop obj) const override;
 
-  virtual size_t copy_disjoint_compact(oop obj, HeapWord* to) { return copy_compact<true> (obj, to); }
-  virtual size_t copy_conjoint_compact(oop obj, HeapWord* to) { return copy_compact<false>(obj, to); }
+  virtual size_t copy_disjoint(oop obj, HeapWord* to, size_t word_size) override { return copy<true> (obj, to, word_size); }
+  virtual size_t copy_conjoint(oop obj, HeapWord* to, size_t word_size) override { return copy<false>(obj, to, word_size); }
+
+  virtual size_t copy_disjoint_compact(oop obj, HeapWord* to) override { return copy_compact<true> (obj, to); }
+  virtual size_t copy_conjoint_compact(oop obj, HeapWord* to) override { return copy_compact<false>(obj, to); }
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
@@ -94,24 +101,21 @@ public:
 
   static inline void assert_mixed_correct(stackChunkOop chunk, bool mixed) PRODUCT_RETURN;
 #ifndef PRODUCT
-  void oop_print_on(oop obj, outputStream* st);
+  void oop_print_on(oop obj, outputStream* st) override;
   static bool verify(oop obj, size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL);
 #endif
   
   // Stack offset is an offset into the Heap
-  static HeapWord* start_of_stack(oop obj) {
-    return (HeapWord*)(cast_from_oop<intptr_t>(obj) + offset_of_stack());
-  }
+  static HeapWord* start_of_stack(oop obj) { return (HeapWord*)(cast_from_oop<intptr_t>(obj) + offset_of_stack()); }
+  static inline HeapWord* start_of_bitmap(oop obj);
 
+  static int offset_of_stack() { return _offset_of_stack; }
   static void init_offset_of_stack() {
     // Cache the offset of the static fields in the Class instance
     assert(_offset_of_stack == 0, "once");
     _offset_of_stack = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass())->size_helper() << LogHeapWordSize;
   }
 
-  static int offset_of_stack() {
-    return _offset_of_stack;
-  }
 
   template<bool mixed = true>
   static int count_frames(stackChunkOop chunk);
@@ -136,20 +140,21 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 public:
-  template <bool store>
-  static void barriers_for_oops_in_chunk(stackChunkOop chunk);
+  template <bool store, bool mixed, typename RegisterMapT>
+  static void do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
-  template <bool mixed, bool store, typename RegisterMapT>
-  static void barriers_for_oops_in_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
-
-  static void fix_chunk(stackChunkOop chunk);
+  template <typename RegisterMapT>
+  static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
 
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
 private:
-  template<bool disjoint>
-  size_t copy_compact(oop obj, HeapWord* to);
+  static int bitmap_size_in_bits(int stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
+  void build_bitmap(stackChunkOop chunk);
+
+  template<bool disjoint> size_t copy(oop obj, HeapWord* to, size_t word_size);
+  template<bool disjoint> size_t copy_compact(oop obj, HeapWord* to);
   
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
@@ -160,8 +165,22 @@ private:
   template <bool concurrent_gc, class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
   
+  template <class OopClosureType>
+  inline void oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
+
+  void mark_methods(stackChunkOop chunk);
+
+  template <bool concurrent_gc>
+  void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure);
+
   template <bool mixed>
   static void run_nmethod_entry_barrier_if_needed(const StackChunkFrameStream<mixed>& f);
+
+  template <bool concurrent_gc, bool mixed, typename RegisterMapT>
+  static void relativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
+
+  template <bool mixed, typename RegisterMapT>
+  static void derelativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
   static inline void relativize(intptr_t* const fp, intptr_t* const hfp, int offset);
   static inline void derelativize(intptr_t* const fp, int offset);
@@ -260,8 +279,8 @@ class StackChunkFrameStream : public StackObj {
   inline void* reg_to_loc(VMReg reg, const RegisterMapT* map) const;
 
 public:
-  template <class OopClosureType, class RegisterMapT> inline void iterate_oops(OopClosureType* closure, const RegisterMapT* map, MemRegion mr = MemRegion(NULL, SIZE_MAX)) const;
-  template <class DerivedOopClosureType, class RegisterMapT> inline void iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map, MemRegion mr = MemRegion(NULL, SIZE_MAX)) const;
+  template <class OopClosureType, class RegisterMapT> inline void iterate_oops(OopClosureType* closure, const RegisterMapT* map) const;
+  template <class DerivedOopClosureType, class RegisterMapT> inline void iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map) const;
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP

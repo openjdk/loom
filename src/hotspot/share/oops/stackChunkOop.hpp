@@ -28,6 +28,7 @@
 
 #include "oops/instanceOop.hpp"
 #include "runtime/handles.hpp"
+#include "utilities/bitMap.hpp"
 #include "utilities/macros.hpp"
 
 class frame;
@@ -41,9 +42,11 @@ typedef VMRegImpl* VMReg;
 // size and sp are in machine words
 // max_size is the maximum space a thawed chunk would take up on the stack, *not* including top-most frame's metadata
 class stackChunkOopDesc : public instanceOopDesc {
-public:
-  // Chunk flags
-  static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1 << 2;
+private:
+  // Chunk flags.
+  static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1;
+  static const uint8_t FLAG_GC_MODE = 1 << 2; // once this is true, it can never be false; also, once true, FLAG_HAS_INTERPRETED_FRAMES can't change
+  static const uint8_t FLAG_HAS_BITMAP = 1 << 3; // can only be true if FLAG_GC_MODE is true
   
 public:
   inline stackChunkOopDesc* parent() const;
@@ -53,10 +56,6 @@ public:
   template<typename P>
   inline bool is_parent_null() const;
   inline int stack_size() const;
-  inline oop cont() const;
-  inline void set_cont(oop value);
-  template<typename P>
-  inline void set_cont_raw(oop value);
   inline int sp() const;
   inline void set_sp(int value);
   inline address pc() const;
@@ -71,17 +70,22 @@ public:
   inline void set_numFrames(int value);
   inline int numOops() const;
   inline void set_numOops(int value);
-  inline bool gc_mode() const;
-  inline void set_gc_mode(bool value);
   inline int gc_sp() const;
   inline void set_gc_sp(int value);
   inline uint64_t mark_cycle() const;
   inline void set_mark_cycle(uint64_t value);
 
+  inline oop cont() const;
+  template<typename P> inline oop cont() const;
+  inline void set_cont(oop value);
+  template<typename P>
+  inline void set_cont_raw(oop value);
+
   inline bool is_empty() const;
-  inline int end() const;
+  inline int bottom() const;
   inline intptr_t* start_address() const;
   inline intptr_t* end_address() const;
+  inline intptr_t* bottom_address() const; // = end_address - argsize
   inline intptr_t* sp_address() const;
   inline int to_offset(intptr_t* p) const;
   inline intptr_t* from_offset(int offset) const;
@@ -92,15 +96,29 @@ public:
   inline void set_flag(uint8_t flag, bool value);
   inline void clear_flags();
   inline bool has_mixed_frames() const;
+  inline void set_has_mixed_frames(bool value);
+  inline bool is_gc_mode() const;
+  inline void set_gc_mode(bool value);
+  inline bool has_bitmap() const;
+  inline void set_has_bitmap(bool value);
+  template <typename OopT, bool concurrent_gc> inline bool should_fix() const;
+  bool should_fix() const; // non-templatized version
   inline bool requires_barriers() const;
   inline void reset_counters();
+
+  inline BitMapView bitmap() const;
+  inline BitMap::idx_t bit_offset() const;
+  inline BitMap::idx_t bit_index_for(intptr_t* p) const;
+  inline intptr_t* address_for_bit(BitMap::idx_t index) const;
+  template <typename OopT> inline BitMap::idx_t bit_index_for(OopT* p) const;
+  template <typename OopT> inline OopT* address_for_bit(BitMap::idx_t index) const;
 
   //
   bool verify(size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL) PRODUCT_RETURN_(return true;);
 
-  // template <bool mixed, typename RegisterMapT> bool do_frame(const StackChunkFrameStream<mixed>&, const RegisterMapT*, MemRegion);
+  // template <bool mixed, typename RegisterMapT> bool do_frame(const StackChunkFrameStream<mixed>&, const RegisterMapT*);
   template <class StackChunkFrameClosureType> 
-  inline void iterate_stack(StackChunkFrameClosureType* closure, MemRegion mr = MemRegion(NULL, SIZE_MAX));
+  inline void iterate_stack(StackChunkFrameClosureType* closure);
 
   // Returns a relative frame (with offset_sp, offset_unextended_sp, and offset_fp) that can be held during safepoints.
   // This is orthogonal to the relativizing of the actual content of interpreted frames.
@@ -130,7 +148,7 @@ public:
   inline frame derelativize(frame fr) const;
 
 private:
-  template <bool mixed, class StackChunkFrameClosureType> inline void iterate_stack(StackChunkFrameClosureType* closure, MemRegion mr);
+  template <bool mixed, class StackChunkFrameClosureType> inline void iterate_stack(StackChunkFrameClosureType* closure);
   inline intptr_t* relative_base() const;
 
   inline void relativize_frame(frame& fr) const;

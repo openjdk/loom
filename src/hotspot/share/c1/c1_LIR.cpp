@@ -435,17 +435,6 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
       break;
     }
 
-    case lir_getfp:          // result always valid
-    case lir_getsp:          // result always valid
-    {
-      assert(op->as_Op0() != NULL, "must be");
-      if (op->_info)                  do_info(op->_info);
-      if (op->_result->is_valid())    do_output(op->_result);
-      break;
-    }
-
-
-
 // LIR_OpLabel
     case lir_label:                    // result and info always invalid
     {
@@ -1677,8 +1666,6 @@ const char * LIR_Op::name() const {
      case lir_convert:               s = "convert";       break;
      case lir_alloc_object:          s = "alloc_obj";     break;
      case lir_monaddr:               s = "mon_addr";      break;
-     case lir_getsp:                 s = "getsp";         break;
-     case lir_getfp:                 s = "getfp";         break;
      // LIR_Op2
      case lir_cmp:                   s = "cmp";           break;
      case lir_cmp_l2i:               s = "cmp_l2i";       break;

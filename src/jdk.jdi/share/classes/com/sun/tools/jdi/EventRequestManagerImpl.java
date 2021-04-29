@@ -310,6 +310,7 @@ class EventRequestManagerImpl extends MirrorImpl
         }
 
         public synchronized void addPlatformThreadsOnlyFilter() {
+            validateMirror(thread);
             if (isEnabled() || deleted) {
                 throw invalidState();
             }

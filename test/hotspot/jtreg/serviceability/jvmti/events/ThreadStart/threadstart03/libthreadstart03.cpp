@@ -51,12 +51,12 @@ void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
 
   err = jvmti->GetThreadInfo(thread, &inf);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetThreadInfo, start) unexpected error: %s (%d)\n",
+    LOG("(GetThreadInfo, start) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
-  printf(">>> start: %s\n", inf.name);
+  LOG(">>> start: %s\n", inf.name);
 
   if (inf.name != NULL && strcmp(inf.name, threadName) == 0) {
     startsCount++;
@@ -69,12 +69,12 @@ void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
 
   err = jvmti->GetThreadInfo(thread, &inf);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetThreadInfo, end) unexpected error: %s (%d)\n",
+    LOG("(GetThreadInfo, end) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
-  printf(">>> end: %s\n", inf.name);
+  LOG(">>> end: %s\n", inf.name);
 
   if (inf.name != NULL && strcmp(inf.name, threadName) == 0) {
     endsCount++;
@@ -98,7 +98,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -106,7 +106,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   callbacks.ThreadEnd = &ThreadEnd;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -125,13 +125,13 @@ Java_threadstart03_check(JNIEnv *jni, jclass cls, jthread thr, jstring name) {
   jvmtiError err;
 
   if (jvmti == NULL) {
-    printf("JVMTI client was not properly loaded!\n");
+    LOG("JVMTI client was not properly loaded!\n");
     return STATUS_FAILED;
   }
 
   threadName = jni->GetStringUTFChars(name, NULL);
   if (threadName == NULL) {
-    printf("Failed to copy UTF-8 string!\n");
+    LOG("Failed to copy UTF-8 string!\n");
     return STATUS_FAILED;
   }
 
@@ -142,7 +142,7 @@ Java_threadstart03_check(JNIEnv *jni, jclass cls, jthread thr, jstring name) {
   if (err == JVMTI_ERROR_NONE) {
     startsExpected = 1;
   } else {
-    printf("Failed to enable JVMTI_EVENT_THREAD_START: %s (%d)\n",
+    LOG("Failed to enable JVMTI_EVENT_THREAD_START: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
@@ -152,19 +152,19 @@ Java_threadstart03_check(JNIEnv *jni, jclass cls, jthread thr, jstring name) {
   if (err == JVMTI_ERROR_NONE) {
     endsExpected = 1;
   } else {
-    printf("Failed to enable JVMTI_EVENT_THREAD_END: %s (%d)\n",
+    LOG("Failed to enable JVMTI_EVENT_THREAD_END: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
-  printf(">>> starting agent thread ...\n");
+  LOG(">>> starting agent thread ...\n");
 
   {
     RawMonitorLocker wait_locker(jvmti, jni, wait_lock);
     err = jvmti->RunAgentThread(thr, threadProc,
                                 NULL, JVMTI_THREAD_MAX_PRIORITY);
     if (err != JVMTI_ERROR_NONE) {
-      printf("(RunAgentThread) unexpected error: %s (%d)\n",
+      LOG("(RunAgentThread) unexpected error: %s (%d)\n",
              TranslateError(err), err);
       result = STATUS_FAILED;
     }
@@ -187,7 +187,7 @@ Java_threadstart03_check(JNIEnv *jni, jclass cls, jthread thr, jstring name) {
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to disable JVMTI_EVENT_THREAD_START: %s (%d)\n",
+    LOG("Failed to disable JVMTI_EVENT_THREAD_START: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
@@ -195,19 +195,19 @@ Java_threadstart03_check(JNIEnv *jni, jclass cls, jthread thr, jstring name) {
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_THREAD_END, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to disable JVMTI_EVENT_THREAD_END: %s (%d)\n",
+    LOG("Failed to disable JVMTI_EVENT_THREAD_END: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
   if (startsCount != startsExpected) {
-    printf("Wrong number of thread start events: %d, expected: %d\n",
+    LOG("Wrong number of thread start events: %d, expected: %d\n",
            startsCount, startsExpected);
     result = STATUS_FAILED;
   }
 
   if (endsCount != endsExpected) {
-    printf("Wrong number of thread end events: %d, expected: %d\n",
+    LOG("Wrong number of thread end events: %d, expected: %d\n",
            endsCount, endsExpected);
     result = STATUS_FAILED;
   }

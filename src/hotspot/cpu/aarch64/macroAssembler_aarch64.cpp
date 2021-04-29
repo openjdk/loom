@@ -35,6 +35,7 @@
 #include "gc/shared/cardTable.hpp"
 #include "gc/shared/collectedHeap.hpp"
 #include "gc/shared/tlab_globals.hpp"
+#include "interpreter/bytecodeHistogram.hpp"
 #include "interpreter/interpreter.hpp"
 #include "compiler/disassembler.hpp"
 #include "memory/resourceArea.hpp"
@@ -178,7 +179,7 @@ int MacroAssembler::patch_oop(address insn_addr, address o) {
   // instruction.
   if (Instruction_aarch64::extract(insn, 31, 21) == 0b11010010101) {
     // Move narrow OOP
-    uint32_t n = CompressedOops::narrow_oop_value((oop)o);
+    uint32_t n = CompressedOops::narrow_oop_value(cast_to_oop(o));
     Instruction_aarch64::patch(insn_addr, 20, 5, n >> 16);
     Instruction_aarch64::patch(insn_addr+4, 20, 5, n & 0xffff);
     instructions = 2;
@@ -306,6 +307,26 @@ void MacroAssembler::safepoint_poll(Label& slow_path, bool at_return, bool acqui
   } else {
     tbnz(rscratch1, log2i_exact(SafepointMechanism::poll_bit()), slow_path);
   }
+}
+
+void MacroAssembler::push_cont_fastpath(Register java_thread) {
+  // TODO LOOM AARCH64
+}
+
+void MacroAssembler::pop_cont_fastpath(Register java_thread) {
+  // TODO LOOM AARCH64
+}
+
+void MacroAssembler::inc_held_monitor_count(Register java_thread) {
+  // TODO LOOM AARCH64
+}
+
+void MacroAssembler::dec_held_monitor_count(Register java_thread) {
+  // TODO LOOM AARCH64
+}
+
+void MacroAssembler::reset_held_monitor_count(Register java_thread) {
+  // TODO LOOM AARCH64
 }
 
 void MacroAssembler::reset_last_Java_frame(bool clear_fp) {
@@ -5153,7 +5174,7 @@ address MacroAssembler::byte_array_inflate(Register src, Register dst, Register 
 
   assert_different_registers(src, dst, len, tmp4, rscratch1);
 
-  fmovd(vtmp1, zr);
+  fmovd(vtmp1, 0.0);
   lsrw(tmp4, len, 3);
   bind(after_init);
   cbnzw(tmp4, big);

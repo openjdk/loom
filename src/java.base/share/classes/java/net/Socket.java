@@ -1070,13 +1070,13 @@ public class Socket implements java.io.Closeable {
         public void write(byte b[], int off, int len) throws IOException {
             try {
                 out.write(b, off, len);
-            } catch (InterruptedIOException iioe) {
+            } catch (InterruptedIOException e) {
                 Thread thread = Thread.currentThread();
                 if (thread.isVirtual() && thread.isInterrupted()) {
                     close();
                     throw new SocketException("Closed by interrupt");
                 }
-                throw iioe;
+                throw e;
             }
         }
         @Override

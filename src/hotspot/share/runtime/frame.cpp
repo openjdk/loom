@@ -29,6 +29,7 @@
 #include "code/vmreg.inline.hpp"
 #include "compiler/abstractCompiler.hpp"
 #include "compiler/disassembler.hpp"
+#include "compiler/oopMap.hpp"
 #include "gc/shared/collectedHeap.inline.hpp"
 #include "interpreter/interpreter.hpp"
 #include "interpreter/oopMapCache.hpp"
@@ -319,17 +320,8 @@ bool frame::can_be_deoptimized() const {
   if (!is_compiled_frame()) return false;
   CompiledMethod* nm = (CompiledMethod*)_cb;
 
-  if( !nm->can_be_deoptimized() )
+  if(!nm->can_be_deoptimized())
     return false;
-
-  // address* pc_addr = &(((address*) sp())[-1]); // TODO: PLATFORM
-  // if (Continuation::is_return_barrier_entry(*pc_addr)) {
-  //   log_trace(jvmcont)("Can't deopt entry:");
-  //   if (log_is_enabled(Trace, jvmcont)) {
-  //     print_value_on(tty, NULL);
-  //   }
-  //   return false;
-  // }
 
   return !nm->is_at_poll_return(pc());
 }
@@ -1066,14 +1058,14 @@ class CompiledArgumentOopFinder: public SignatureIterator {
     // Extract low order register number from register array.
     // In LP64-land, the high-order bits are valid but unhelpful.
     VMReg reg = _regs[_offset].first();
-    oop *loc = _fr.oopmapreg_to_location(reg, _reg_map);
+    oop *loc = _fr.oopmapreg_to_oop_location(reg, _reg_map);
   #ifdef ASSERT
     if (loc == NULL) {
       if (_reg_map->should_skip_missing())
         return;
       tty->print_cr("Error walking frame oops:");
       _fr.print_on(tty);
-      assert(loc != NULL, "reg: " INTPTR_FORMAT " %s loc: " INTPTR_FORMAT, reg->value(), reg->name(), p2i(loc));
+      assert(loc != NULL, "missing register map entry reg: " INTPTR_FORMAT " %s loc: " INTPTR_FORMAT, reg->value(), reg->name(), p2i(loc));
     }
   #endif
     _f->do_oop(loc);
@@ -1128,7 +1120,7 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
 
   // First consult the ADLC on where it puts parameter 0 for this signature.
   VMReg reg = SharedRuntime::name_for_receiver();
-  oop* oop_adr = caller.oopmapreg_to_location(reg, reg_map);
+  oop* oop_adr = caller.oopmapreg_to_oop_location(reg, reg_map);
   if (oop_adr == NULL) {
     guarantee(oop_adr != NULL, "bad register save location");
     return NULL;
@@ -1290,6 +1282,9 @@ void frame::interpreter_frame_verify_monitor(BasicObjectLock* value) const {
 
 #ifndef PRODUCT
 
+// Returns true iff the address p is readable and *(intptr_t*)p != errvalue
+extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
+
 class FrameValuesOopClosure: public OopClosure, public DerivedOopClosure {
 private:
   FrameValues& _values;
@@ -1297,11 +1292,11 @@ private:
 public:
   FrameValuesOopClosure(FrameValues& values, int frame_no) : _values(values), _frame_no(frame_no) {}
   virtual void do_oop(oop* p) {
-    bool good = Universe::heap()->is_in_or_null(*p) && oopDesc::is_oop_or_null(*p);
+    bool good = *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && Universe::heap()->is_in_or_null(*p) && oopDesc::is_oop_or_null(*p));
     _values.describe(_frame_no, (intptr_t*)p, err_msg("oop%s for #%d", good ? "" : " (BAD)", _frame_no)); 
   }
   virtual void do_oop(narrowOop* p) { _values.describe(_frame_no, (intptr_t*)p, err_msg("narrow oop for #%d", _frame_no)); }
-  virtual void do_derived_oop(oop *base, oop *derived) { 
+  virtual void do_derived_oop(oop* base, derived_pointer* derived) { 
     _values.describe(_frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), _frame_no));
   }
 };
@@ -1535,23 +1530,10 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
   describe_pd(values, frame_no);
 }
 
-#endif
-
-
-//-----------------------------------------------------------------------------------
-// StackFrameStream implementation
-
-StackFrameStream::StackFrameStream(JavaThread *thread, bool update, bool process_frames, bool allow_missing_reg) : _reg_map(thread, update, process_frames) {
-  assert(thread->has_last_Java_frame(), "sanity check");
-  _fr = thread->last_frame();
-  _is_done = false;
-#ifndef PRODUCT
-  if (allow_missing_reg) {
-    _reg_map.set_skip_missing(true);
-  }
-#endif
+void frame::describe_top(FrameValues& values) {
+  describe_top_pd(values);
 }
-
+#endif
 
 #ifndef PRODUCT
 
@@ -1590,6 +1572,7 @@ void FrameValues::validate() {
       prev = fv;
     }
   }
+  // if (error) { tty->cr(); print_on((JavaThread*)nullptr, tty); }
   assert(!error, "invalid layout");
 }
 #endif // ASSERT
@@ -1624,7 +1607,7 @@ void FrameValues::print_on(stackChunkOop chunk, outputStream* st) {
   _values.sort(compare);
 
   intptr_t* start = chunk->start_address();
-  intptr_t* end = chunk->start_address() + chunk->stack_size() + 1;
+  intptr_t* end = chunk->end_address() + 1;
 
   int min_index = 0;
   int max_index = _values.length() - 1;
@@ -1654,7 +1637,7 @@ void FrameValues::print_on(outputStream* st, int min_index, int max_index, intpt
       if (relative
           && *fv.location != 0 && *fv.location > -100 && *fv.location < 100 
           && (strncmp(fv.description, "interpreter_frame_", 18) == 0 || strstr(fv.description, " method "))) {
-        st->print_cr(" " INTPTR_FORMAT ": %18d %s", p2i(fv.location), (int)*fv.location, fv.description);
+        st->print_cr(" " INTPTR_FORMAT ": %18d %s (" INTPTR_FORMAT ")", p2i(fv.location), (int)*fv.location, fv.description, p2i(fv.location + (int)*fv.location));
       } else {
         st->print_cr(" " INTPTR_FORMAT ": " INTPTR_FORMAT " %s", p2i(fv.location), *fv.location, fv.description);
       }

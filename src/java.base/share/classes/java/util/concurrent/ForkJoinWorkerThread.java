@@ -188,6 +188,7 @@ public class ForkJoinWorkerThread extends Thread {
         /** The ThreadGroup for all InnocuousForkJoinWorkerThreads */
         private static final ThreadGroup innocuousThreadGroup =
             AccessController.doPrivileged(new PrivilegedAction<>() {
+                @SuppressWarnings("deprecation")
                 public ThreadGroup run() {
                     ThreadGroup group = Thread.currentThread().getThreadGroup();
                     for (ThreadGroup p; (p = group.getParent()) != null; )

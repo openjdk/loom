@@ -1713,6 +1713,49 @@ jvmtiEnv *jvmti;
       </errors>
     </function>
 
+    <function id="SuspendAllVirtualThreads" num="118" since="16">
+      <synopsis>Suspend All Virtual Threads</synopsis>
+      <description>
+        Suspend all virtual threads except those already suspended.
+        Virtual threads may be resumed with
+        <functionlink id="ResumeAllVirtualThreads"></functionlink> or
+        <functionlink id="ResumeThreadList"></functionlink> or
+        <functionlink id="ResumeThread"></functionlink>.
+        Virtual threads that are currently suspended do not change state.
+      </description>
+      <origin>new</origin>
+      <capabilities>
+        <required id="can_suspend"></required>
+        <required id="can_support_virtual_threads"></required>
+      </capabilities>
+      <parameters>
+        <param id="except_count">
+          <jint min="0"/>
+          <description>
+            The number of threads in the list of threads not to be suspended.
+          </description>
+        </param>
+        <param id="except_list">
+            <inbuf incount="except_count">
+              <jthread/>
+              <nullok>not an error if <code>except_count == 0</code></nullok>
+            </inbuf>
+            <description>
+              The list of threads not to be suspended.
+            </description>
+        </param>
+      </parameters>
+      <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          A thread in <paramlink id="except_list"></paramlink> was invalid.
+        </error>
+        <error id="JVMTI_ERROR_NULL_POINTER">
+          Both <paramlink id="except_list"></paramlink> was <code>NULL</code>
+          and <paramlink id="except_count"></paramlink> was non-zero.
+        </error>
+      </errors>
+    </function>
+
     <function id="ResumeThread" num="6">
       <synopsis>Resume Thread</synopsis>
       <description>
@@ -1791,6 +1834,49 @@ jvmtiEnv *jvmti;
         </param>
       </parameters>
       <errors>
+      </errors>
+    </function>
+
+   <function id="ResumeAllVirtualThreads" num="119" since="16">
+      <synopsis>Resume All Virtual Threads</synopsis>
+      <description>
+        Resume all virtual threads except those already resumed.
+        Virtual threads may be suspended with
+        <functionlink id="SuspendAllVirtualThreads"></functionlink> or
+        <functionlink id="SuspendThreadList"></functionlink> or
+        <functionlink id="SuspendThread"></functionlink>.
+        Virtual threads that are currently resumed do not change state.
+      </description>
+      <origin>new</origin>
+      <capabilities>
+        <required id="can_suspend"></required>
+        <required id="can_support_virtual_threads"></required>
+      </capabilities>
+      <parameters>
+        <param id="except_count">
+          <jint min="0"/>
+          <description>
+            The number of threads in the list of threads not to be resumed.
+          </description>
+        </param>
+        <param id="except_list">
+            <inbuf incount="except_count">
+              <jthread/>
+              <nullok>not an error if <code>except_count == 0</code></nullok>
+            </inbuf>
+            <description>
+              The list of threads not to be resumed.
+            </description>
+        </param>
+      </parameters>
+      <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          A thread in <paramlink id="except_list"></paramlink> was invalid.
+        </error>
+        <error id="JVMTI_ERROR_NULL_POINTER">
+          Both <paramlink id="except_list"></paramlink> was <code>NULL</code>
+          and <paramlink id="except_count"></paramlink> was non-zero.
+        </error>
       </errors>
     </function>
 
@@ -2230,163 +2316,6 @@ jvmtiEnv *jvmti;
         </param>
       </parameters>
       <errors>
-      </errors>
-    </function>
-
-  </category>
-
-  <category id="virtualTheadCategory" label="VirtualThread">
-    <intro>
-    </intro>
-
-    <elide>
-    <function id="GetVirtualThread" num="113" since="16">
-      <synopsis>Get Virtual Thread</synopsis>
-      <description>
-        Get the virtual thread mounted to the specified thread.
-        If no virtual thread is mounted, <code>NULL</code> is returned.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_support_virtual_threads">Can support virtual threads</required>
-      </capabilities>
-      <parameters>
-        <param id="thread">
-          <jthread null="current"/>
-            <description>
-              The thread to query.
-            </description>
-        </param>
-        <param id="virtual_thread_ptr">
-          <outptr><jobject/></outptr>
-          <description>
-            On return, points to the virtual thread mounted to the specified thread, or <code>NULL</code>.
-          </description>
-        </param>
-      </parameters>
-      <errors>
-      </errors>
-    </function>
-    </elide>
-
-    <elide>
-    <function id="GetCarrierThread" num="117" since="16">
-      <synopsis>Get Carrier Thread</synopsis>
-      <description>
-        Get the thread the specified virtual thread is mounted to.
-        If the virtual thread is unmounted, <code>NULL</code> is returned.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_support_virtual_threads">Can support virtual threads</required>
-      </capabilities>
-      <parameters>
-        <param id="virtual_thread">
-          <jthread impl="noconvert"/>
-            <description>
-              The virtual thread to query.
-            </description>
-        </param>
-        <param id="thread_ptr">
-          <outptr><jthread/></outptr>
-          <description>
-            On return, points to the thread the virtual thread is mounted to, or <code>NULL</code>.
-            The result is transient if current thread is not the virtual thread carrier thread
-            and not all carrier threads are suspended.
-          </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="virtual_thread"></paramlink> is not a virtual thread.
-        </error>
-      </errors>
-    </function>
-    </elide>
-
-    <function id="SuspendAllVirtualThreads" num="118" since="16">
-      <synopsis>Suspend All Virtual Threads</synopsis>
-      <description>
-        Suspend all virtual threads except those already suspended.
-        Virtual threads may be resumed with
-        <functionlink id="ResumeAllVirtualThreads"></functionlink> or
-        <functionlink id="ResumeThreadList"></functionlink> or
-        <functionlink id="ResumeThread"></functionlink>.
-        Virtual threads that are currently suspended do not change state.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_suspend"></required>
-        <required id="can_support_virtual_threads"></required>
-      </capabilities>
-      <parameters>
-        <param id="except_count">
-          <jint min="0"/>
-          <description>
-            The number of threads in the list of threads not to be suspended.
-          </description>
-        </param>
-        <param id="except_list">
-            <inbuf incount="except_count">
-              <jthread/>
-              <nullok>not an error if <code>except_count == 0</code></nullok>
-            </inbuf>
-            <description>
-              The list of threads not to be suspended.
-            </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          A thread in <paramlink id="except_list"></paramlink> was invalid.
-        </error>
-        <error id="JVMTI_ERROR_NULL_POINTER">
-          Both <paramlink id="except_list"></paramlink> was <code>NULL</code>
-          and <paramlink id="except_count"></paramlink> was non-zero.
-        </error>
-      </errors>
-    </function>
-
-   <function id="ResumeAllVirtualThreads" num="119" since="16">
-      <synopsis>Resume All Virtual Threads</synopsis>
-      <description>
-        Resume all virtual threads except those already resumed.
-        Virtual threads may be suspended with
-        <functionlink id="SuspendAllVirtualThreads"></functionlink> or
-        <functionlink id="SuspendThreadList"></functionlink> or
-        <functionlink id="SuspendThread"></functionlink>.
-        Virtual threads that are currently resumed do not change state.
-      </description>
-      <origin>new</origin>
-      <capabilities>
-        <required id="can_suspend"></required>
-        <required id="can_support_virtual_threads"></required>
-      </capabilities>
-      <parameters>
-        <param id="except_count">
-          <jint min="0"/>
-          <description>
-            The number of threads in the list of threads not to be resumed.
-          </description>
-        </param>
-        <param id="except_list">
-            <inbuf incount="except_count">
-              <jthread/>
-              <nullok>not an error if <code>except_count == 0</code></nullok>
-            </inbuf>
-            <description>
-              The list of threads not to be resumed.
-            </description>
-        </param>
-      </parameters>
-      <errors>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          A thread in <paramlink id="except_list"></paramlink> was invalid.
-        </error>
-        <error id="JVMTI_ERROR_NULL_POINTER">
-          Both <paramlink id="except_list"></paramlink> was <code>NULL</code>
-          and <paramlink id="except_count"></paramlink> was non-zero.
-        </error>
       </errors>
     </function>
 

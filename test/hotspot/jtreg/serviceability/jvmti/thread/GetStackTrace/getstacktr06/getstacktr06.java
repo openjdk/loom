@@ -45,46 +45,28 @@ import java.io.PrintStream;
 
 public class getstacktr06 {
 
-    final static int FAILED = 2;
-    final static int JCK_STATUS_BASE = 95;
-
     static {
-        try {
-            System.loadLibrary("getstacktr06");
-        } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load getstacktr06 library");
-            System.err.println("java.library.path:"
-                + System.getProperty("java.library.path"));
-            throw ule;
-        }
+        System.loadLibrary("getstacktr06");
     }
 
     native static void getReady(Class clazz);
-    native static int getRes();
 
-    public static void main(String args[]) {
-
-
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    public static int run(String args[], PrintStream out) {
-        TestThread thr = new TestThread();
+    public static void main(String args[]) throws Exception{
+        Thread thread = Thread.ofPlatform().unstarted(new TestThread());
         getReady(TestThread.class);
+        thread.start();
+        thread.join();
 
-        thr.start();
-        try {
-            thr.join();
-        } catch (InterruptedException ex) {
-            out.println("# Unexpected " + ex);
-            return FAILED;
-        }
-
-        return getRes();
+        /*
+         PopFrame not implemented for virtual threads yet.
+        Thread vThread = Thread.ofVirtual().unstarted(new TestThread());
+        getReady(TestThread.class);
+        vThread.start();
+        vThread.join();
+        */
     }
 
-    static class TestThread extends Thread {
+    static class TestThread implements Runnable {
         public void run() {
             chain1();
         }

@@ -45,7 +45,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
     res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
     if (res != JNI_OK || jvmti == NULL) {
-        printf("Wrong result of a valid call to GetEnv!\n");
+        LOG("Wrong result of a valid call to GetEnv!\n");
         return JNI_ERR;
     }
 
@@ -58,27 +58,27 @@ Java_thrstat04_check(JNIEnv *env, jclass cls, jthread thr) {
     jint thrState;
 
     if (jvmti == NULL) {
-        printf("JVMTI client was not properly loaded!\n");
+        LOG("JVMTI client was not properly loaded!\n");
         return STATUS_FAILED;
     }
 
     if (printdump == JNI_TRUE) {
-        printf(">>> (threadStatePtr) null pointer check ...\n");
+        LOG(">>> (threadStatePtr) null pointer check ...\n");
     }
     err = jvmti->GetThreadState(thr, NULL);
     if (err != JVMTI_ERROR_NULL_POINTER) {
-        printf("(threadStatePtr) error expected: JVMTI_ERROR_NULL_POINTER,\n");
-        printf("           got: %s (%d)\n", TranslateError(err), err);
+        LOG("(threadStatePtr) error expected: JVMTI_ERROR_NULL_POINTER,\n");
+        LOG("           got: %s (%d)\n", TranslateError(err), err);
         result = STATUS_FAILED;
     }
 
     if (printdump == JNI_TRUE) {
-        printf(">>> invalid thread check ...\n");
+        LOG(">>> invalid thread check ...\n");
     }
     err = jvmti->GetThreadState(cls, &thrState);
     if (err != JVMTI_ERROR_INVALID_THREAD) {
-        printf("Error expected: JVMTI_ERROR_INVALID_THREAD,\n");
-        printf("           got: %s (%d)\n", TranslateError(err), err);
+        LOG("Error expected: JVMTI_ERROR_INVALID_THREAD,\n");
+        LOG("           got: %s (%d)\n", TranslateError(err), err);
         result = STATUS_FAILED;
     }
 

@@ -4,9 +4,7 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -179,7 +177,10 @@ public class TestDefaultConfigurations {
         insertSetting(doc, EventNames.X509Validation, "threshold", "0 ns");
         insertSetting(doc, EventNames.ProcessStart, "threshold", "0 ns");
         insertSetting(doc, EventNames.Deserialization, "threshold", "0 ns");
-        insertSetting(doc, EventNames.VirtualThreadSubmitRejectedEvent, "threshold", "0 ns");
+        insertSetting(doc, EventNames.VirtualThreadStart, "threshold", "0 ns");
+        insertSetting(doc, EventNames.VirtualThreadEnd, "threshold", "0 ns");
+        insertSetting(doc, EventNames.VirtualThreadEnd, "stackTrace", "false");
+        insertSetting(doc, EventNames.VirtualThreadSubmitFailed, "threshold", "0 ns");
 
         return doc;
     }

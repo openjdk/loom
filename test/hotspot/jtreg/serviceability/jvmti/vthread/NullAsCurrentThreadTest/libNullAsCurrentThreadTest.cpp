@@ -35,7 +35,7 @@ static jboolean failed_status = JNI_FALSE;
 static void
 check(JNIEnv* jni, const char* msg, int err) {
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent: %s failed with error code %d\n", msg, err);
+    LOG("Agent: %s failed with error code %d\n", msg, err);
     fatal(jni, msg);
   }
 }
@@ -44,7 +44,7 @@ static void
 checkStackTraces(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiFrameInfo* frames0, jvmtiFrameInfo* frames1, jint cnt) {
   jvmtiError err;
 
-  printf("Agent: GetStackTrace: current thread frame count: %d\n", cnt);
+  LOG("Agent: GetStackTrace: current thread frame count: %d\n", cnt);
 
   for (int idx = 0; idx < cnt; idx++) {
     jmethodID method0 = frames0[idx].method;
@@ -62,16 +62,16 @@ checkStackTraces(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiFrameInfo* frames0, jvmtiFra
       check_jvmti_status(jni, err, "GetMethodName");
 
       failed_status = JNI_TRUE;
-      printf("\t methods at frame depth #%d do not match: %s%s != %s%s\n",
+      LOG("\t methods at frame depth #%d do not match: %s%s != %s%s\n",
              idx, name0, sign0, name1, sign1);
     }
-    printf("\t%s%s\n", name0, sign0);
+    LOG("\t%s%s\n", name0, sign0);
     deallocate(jvmti, jni, (void*)name0);
     deallocate(jvmti, jni, (void*)name1);
     deallocate(jvmti, jni, (void*)sign0);
     deallocate(jvmti, jni, (void*)sign1);
   }
-  printf("\n");
+  LOG("\n");
 }
 
 static void
@@ -87,11 +87,11 @@ testGetThreadInfo(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
   check(jni, "GetThreadInfo", err);
 
   const char* name = (inf0.name == NULL) ? "<Unnamed thread>" : inf0.name;
-  printf("Agent: GetThreadInfo: current thread: %s\n", name);
+  LOG("Agent: GetThreadInfo: current thread: %s\n", name);
 
   if (strcmp(inf0.name, inf1.name) != 0) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetThreadInfo: current thread names do not match: %s != %s\n",
+    LOG("Agent: GetThreadInfo: current thread names do not match: %s != %s\n",
            inf0.name, inf1.name);
   }
   jobject loader0 = inf0.context_class_loader;
@@ -99,11 +99,11 @@ testGetThreadInfo(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
 
   if (jni->IsSameObject(loader0, loader1) == JNI_FALSE) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetThreadInfo: current thread context class loaders do not match\n");
+    LOG("Agent: GetThreadInfo: current thread context class loaders do not match\n");
   }
   if (inf0.priority != inf1.priority) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetThreadInfo: current thread priorities do not match: %d != %d\n",
+    LOG("Agent: GetThreadInfo: current thread priorities do not match: %d != %d\n",
            inf0.priority, inf1.priority);
   }
   jobject tgrp0 = inf0.thread_group;
@@ -111,7 +111,7 @@ testGetThreadInfo(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
 
   if (jni->IsSameObject(tgrp0, tgrp1) == JNI_FALSE) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetThreadInfo: current thread groups do not match\n");
+    LOG("Agent: GetThreadInfo: current thread groups do not match\n");
   }
 }
 
@@ -129,10 +129,10 @@ testGetThreadState(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
 
   if (state0 != state1) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetThreadState: current thread states do not match: %xd != %xd\n",
+    LOG("Agent: GetThreadState: current thread states do not match: %xd != %xd\n",
            state0, state1);
   } else {
-    printf("Agent: GetThreadState: current thread state: %0x\n", state0);
+    LOG("Agent: GetThreadState: current thread state: %0x\n", state0);
   }
 }
 
@@ -150,10 +150,10 @@ testGetFrameCount(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
 
   if (count0 != count1) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetFrameCount: current thread frame counts do not match: %d != %d\n",
+    LOG("Agent: GetFrameCount: current thread frame counts do not match: %d != %d\n",
            count0, count1);
   } else {
-    printf("Agent: GetFrameCount: current thread frame count: %d\n", count0);
+    LOG("Agent: GetFrameCount: current thread frame count: %d\n", count0);
   }
 }
 
@@ -184,15 +184,15 @@ testGetFrameLocation(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
     check_jvmti_status(jni, err, "GetMethodName");
 
     failed_status = JNI_TRUE;
-    printf("Agent: GetFrameLocation: current thread frame #1 methods do not match:\n"
+    LOG("Agent: GetFrameLocation: current thread frame #1 methods do not match:\n"
            " %s%s != %s%s\n", name0, sign0, name1, sign1);
   }
   if (loc0 != loc1) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetFrameLocation: current thread frame #1 locations do not match: %lld != %lld\n",
+    LOG("Agent: GetFrameLocation: current thread frame #1 locations do not match: %lld != %lld\n",
            (long long)loc0, (long long)loc1);
   }
-  printf("Agent: GetFrameLocation: current thread frame: method: %s%s, loc: %lld\n",
+  LOG("Agent: GetFrameLocation: current thread frame: method: %s%s, loc: %lld\n",
          name0, sign0, (long long)loc0);
 }
 
@@ -215,7 +215,7 @@ testGetStackTrace(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
 
   if (count0 != count1) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetStackTrace: current thread frame counts do not match: %d != %d\n",
+    LOG("Agent: GetStackTrace: current thread frame counts do not match: %d != %d\n",
            count0, count1);
   }
   checkStackTraces(jvmti, jni, frames0, frames1, count0);
@@ -237,19 +237,19 @@ testGetOwnedMonitorInfo(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
 
   if (count0 != count1) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetOwnedMonitorInfo: current thread monitors counts do not match: %d != %d\n",
+    LOG("Agent: GetOwnedMonitorInfo: current thread monitors counts do not match: %d != %d\n",
            count0, count1);
   }
-  printf("Agent: GetOwnedMonitorInfo: current thread owns monitors: %d\n", count0);
+  LOG("Agent: GetOwnedMonitorInfo: current thread owns monitors: %d\n", count0);
   for (int idx = 0; idx < count0; idx++) {
     jobject mon0 = monitors0[idx];
     jobject mon1 = monitors1[idx];
 
     if (jni->IsSameObject(mon0, mon1) == JNI_FALSE) {
       failed_status = JNI_TRUE;
-      printf("Agent: GetOwnedMonitorInfo: current thread monitors #%d do not match\n", idx);
+      LOG("Agent: GetOwnedMonitorInfo: current thread monitors #%d do not match\n", idx);
     }
-    printf("\t monitor #%d: %p\n", idx, (void*)mon0);
+    LOG("\t monitor #%d: %p\n", idx, (void*)mon0);
   }
   err = jvmti->Deallocate((unsigned char*)monitors0);
   check_jvmti_status(jni, err, "Deallocate");
@@ -274,23 +274,23 @@ testGetOwnedMonitorStackDepthInfo(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) 
 
   if (count0 != count1) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetOwnedMonitorStackDepthInfo: current thread monitors counts do not match: %d != %d\n",
+    LOG("Agent: GetOwnedMonitorStackDepthInfo: current thread monitors counts do not match: %d != %d\n",
            count0, count1);
   }
-  printf("Agent: GetOwnedMonitorStackDepthInfo: current thread owns monitors: %d\n", count0);
+  LOG("Agent: GetOwnedMonitorStackDepthInfo: current thread owns monitors: %d\n", count0);
   for (int idx = 0; idx < count0; idx++) {
     jvmtiMonitorStackDepthInfo slot0 = inf0[idx];
     jvmtiMonitorStackDepthInfo slot1 = inf1[idx];
 
     if (jni->IsSameObject(slot0.monitor, slot1.monitor) == JNI_FALSE) {
       failed_status = JNI_TRUE;
-      printf("Agent: GetOwnedMonitorStackDepthInfo: current thread monitors #%d do not match\n", idx);
+      LOG("Agent: GetOwnedMonitorStackDepthInfo: current thread monitors #%d do not match\n", idx);
     }
     if (slot0.stack_depth != slot1.stack_depth) {
       failed_status = JNI_TRUE;
-      printf("Agent: GetOwnedMonitorStackDepthInfo: current thread monitor #%d depths do not match\n", idx);
+      LOG("Agent: GetOwnedMonitorStackDepthInfo: current thread monitor #%d depths do not match\n", idx);
     }
-    printf("\t monitor #%d at depth %d: %p\n", idx, slot0.stack_depth, (void*)slot0.monitor);
+    LOG("\t monitor #%d at depth %d: %p\n", idx, slot0.stack_depth, (void*)slot0.monitor);
   }
   err = jvmti->Deallocate((unsigned char*)inf0);
   check_jvmti_status(jni, err, "Deallocate");
@@ -313,9 +313,9 @@ testGetCurrentContendedMonitor(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
 
   if (jni->IsSameObject(monitor0, monitor1) == JNI_FALSE) {
     failed_status = JNI_TRUE;
-    printf("Agent: GetCurrentContendedMonitor: current thread contended monitors do not match\n");
+    LOG("Agent: GetCurrentContendedMonitor: current thread contended monitors do not match\n");
   } else {
-    printf("Agent: GetCurrentContendedMonitor: current thread has contended monitor: %p\n",
+    LOG("Agent: GetCurrentContendedMonitor: current thread has contended monitor: %p\n",
            (void*)monitor0);
   }
 }
@@ -331,7 +331,7 @@ Java_NullAsCurrentThreadTest_testJvmtiFunctions(JNIEnv *jni, jclass cls) {
   err = jvmti->GetCurrentThread(&cur_thr);
   check(jni, "GetCurrentThread", err);
 
-  printf("Testing JMTI functions accepting NULL jthread as current thread\n");
+  LOG("Testing JMTI functions accepting NULL jthread as current thread\n");
 
   testGetThreadInfo(jvmti, jni, cur_thr);
   testGetThreadState(jvmti, jni, cur_thr);
@@ -353,7 +353,7 @@ Java_NullAsCurrentThreadTest_failedStatus(JNIEnv *env, jclass clas) {
 // Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
 VirtualThreadMount(jvmtiEnv *jvmti, ...) {
-  printf("Got VirtualThreadMount event\n");
+  LOG("Got VirtualThreadMount event\n");
   fflush(stdout);
 }
 
@@ -363,7 +363,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiError err; 
 
-  printf("Agent_OnLoad: started: can_support_virtual_threads: %d\n", vt_support_enabled);
+  LOG("Agent_OnLoad: started: can_support_virtual_threads: %d\n", vt_support_enabled);
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
@@ -381,7 +381,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = set_ext_event_callback(jvmti, "VirtualThreadMount", VirtualThreadMount);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
+    LOG("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -389,18 +389,18 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   if (vt_support_enabled) {
     err = jvmti->AddCapabilities(&caps);
     if (err != JVMTI_ERROR_NONE) {
-      printf("Agent_Onload: error in JVMTI AddCapabilities: %d\n", err);
+      LOG("Agent_Onload: error in JVMTI AddCapabilities: %d\n", err);
     }
     err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
     if (err != JVMTI_ERROR_NONE) {
-      printf("Agent_OnLoad: error in JVMTI SetEventCallbacks: %d\n", err);
+      LOG("Agent_OnLoad: error in JVMTI SetEventCallbacks: %d\n", err);
     }
     err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_MOUNT, NULL);
     if (err != JVMTI_ERROR_NONE) {
-      printf("Agent_OnLoad: error in JVMTI SetEventNotificationMode: %d\n", err);
+      LOG("Agent_OnLoad: error in JVMTI SetEventNotificationMode: %d\n", err);
     }
   }
-  printf("Agent_OnLoad: finished\n");
+  LOG("Agent_OnLoad: finished\n");
   return 0;
 }
 

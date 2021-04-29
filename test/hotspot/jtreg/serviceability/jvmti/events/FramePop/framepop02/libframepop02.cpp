@@ -71,7 +71,7 @@ int isTestThread(jvmtiEnv *jvmti, jthread thr) {
 
   err = jvmti->GetThreadInfo(thr, &inf);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetThreadInfo) unexpected error: %s (%d)\n", TranslateError(err), err);
+    LOG("(GetThreadInfo) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
     return 0;
   }
@@ -87,14 +87,14 @@ void printInfo(jvmtiEnv *jvmti, jthread thr, jmethodID method, int depth) {
 
   err = jvmti->GetThreadInfo(thr, &inf);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetThreadInfo) unexpected error: %s (%d)\n",
+    LOG("(GetThreadInfo) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
   err = jvmti->GetMethodDeclaringClass(method, &cls);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
+    LOG("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
@@ -102,7 +102,7 @@ void printInfo(jvmtiEnv *jvmti, jthread thr, jmethodID method, int depth) {
 
   err = jvmti->GetClassSignature(cls, &clsig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetClassSignature) unexpected error: %s (%d)\n",
+    LOG("(GetClassSignature) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
@@ -110,13 +110,13 @@ void printInfo(jvmtiEnv *jvmti, jthread thr, jmethodID method, int depth) {
 
   err = jvmti->GetMethodName(method, &name, &sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetMethodName) unexpected error: %s (%d)\n",
+    LOG("(GetMethodName) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
 
-  printf("  %s: %s.%s%s, depth = %d\n", inf.name, clsig, name, sig, depth);
+  LOG("  %s: %s.%s%s, depth = %d\n", inf.name, clsig, name, sig, depth);
 
   jvmti->Deallocate((unsigned char *)sig);
   jvmti->Deallocate((unsigned char *)name);
@@ -137,7 +137,7 @@ void pop(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method, int depth)
 
   if (i == thr_count) {
     watch_events = JNI_FALSE;
-    printf("Unknown thread:\n");
+    LOG("Unknown thread:\n");
     printInfo(jvmti, thr, method, depth);
     result = STATUS_FAILED;
     return;
@@ -145,7 +145,7 @@ void pop(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method, int depth)
 
   if (threads[i].tos == NULL) {
     watch_events = JNI_FALSE;
-    printf("Stack underflow:\n");
+    LOG("Stack underflow:\n");
     printInfo(jvmti, thr, method, depth);
     result = STATUS_FAILED;
     return;
@@ -163,7 +163,7 @@ void pop(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method, int depth)
   } while (threads[i].tos != NULL);
 
   watch_events = JNI_FALSE;
-  printf("Frame pop does not match any entry:\n");
+  LOG("Frame pop does not match any entry:\n");
   printInfo(jvmti, thr, method, depth);
   result = STATUS_FAILED;
 }
@@ -183,7 +183,7 @@ void push(JNIEnv *jni, jthread thr, jmethodID method, int depth) {
     thr_count++;
     if (thr_count == MAX_THREADS) {
       watch_events = JNI_FALSE;
-      printf("Out of threads\n");
+      LOG("Out of threads\n");
       result = STATUS_FAILED;
       return;
     }
@@ -194,7 +194,7 @@ void push(JNIEnv *jni, jthread thr, jmethodID method, int depth) {
   new_item = (item_t)malloc(sizeof(item));
   if (new_item == NULL) {
     watch_events = JNI_FALSE;
-    printf("Out of memory\n");
+    LOG("Out of memory\n");
     result = STATUS_FAILED;
     return;
   }
@@ -223,7 +223,7 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
 
   err = jvmti->GetFrameCount(thr, &frameCount);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetFrameCount#entry) unexpected error: %s (%d)\n",
+    LOG("(GetFrameCount#entry) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     printInfo(jvmti, thr, method, frameCount);
     result = STATUS_FAILED;
@@ -232,7 +232,7 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
 
   err = jvmti->IsMethodNative(method, &isNative);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(IsMethodNative) unexpected error: %s (%d)\n",
+    LOG("(IsMethodNative) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     printInfo(jvmti, thr, method, frameCount);
     result = STATUS_FAILED;
@@ -240,7 +240,7 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
 
   if (isTestThread(jvmti, thr)) {
     if (printdump == JNI_TRUE) {
-      printf(">>> %sMethod entry\n>>>",
+      LOG(">>> %sMethod entry\n>>>",
              (isNative == JNI_TRUE) ? "Native " : "");
       printInfo(jvmti, thr, method, frameCount);
     }
@@ -249,7 +249,7 @@ void JNICALL MethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
       push((JNIEnv *)jni, thr, method, frameCount);
       err = jvmti->NotifyFramePop(thr, 0);
       if (err != JVMTI_ERROR_NONE) {
-        printf("(NotifyFramePop) unexpected error: %s (%d)\n",
+        LOG("(NotifyFramePop) unexpected error: %s (%d)\n",
                TranslateError(err), err);
         printInfo(jvmti, thr, method, frameCount);
         result = STATUS_FAILED;
@@ -281,7 +281,7 @@ void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *jni,
   }
   err = jvmti->GetFrameCount(thr, &frameCount);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetFrameCount#entry) unexpected error: %s (%d)\n",
+    LOG("(GetFrameCount#entry) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     printInfo(jvmti, thr, method, frameCount);
     result = STATUS_FAILED;
@@ -290,7 +290,7 @@ void JNICALL FramePop(jvmtiEnv *jvmti, JNIEnv *jni,
 
   if (isTestThread(jvmti, thr)) {
     if (printdump == JNI_TRUE) {
-      printf(">>> Frame Pop\n>>>");
+      LOG(">>> Frame Pop\n>>>");
       printInfo(jvmti, thr, method, frameCount);
     }
     RawMonitorLocker rml(jvmti, jni, event_lock);
@@ -320,7 +320,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -334,14 +334,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
+    LOG("(GetCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -355,7 +355,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
     err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
     if (err != JVMTI_ERROR_NONE) {
-      printf("(SetEventCallbacks) unexpected error: %s (%d)\n",
+      LOG("(SetEventCallbacks) unexpected error: %s (%d)\n",
              TranslateError(err), err);
       return JNI_ERR;
     }
@@ -371,7 +371,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     agent_lock = create_raw_monitor(jvmti, "agent_lock");
 
   } else {
-    printf("Warning: FramePop or MethodEntry event is not implemented\n");
+    LOG("Warning: FramePop or MethodEntry event is not implemented\n");
   }
 
   return JNI_OK;
@@ -383,14 +383,14 @@ JNIEXPORT void JNICALL Java_framepop02_getReady(JNIEnv *jni, jclass cls) {
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_METHOD_ENTRY, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to enable JVMTI_EVENT_METHOD_ENTRY event: %s (%d)\n",
+    LOG("Failed to enable JVMTI_EVENT_METHOD_ENTRY event: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
                                         JVMTI_EVENT_FRAME_POP, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to enable JVMTI_EVENT_FRAME_POP event: %s (%d)\n",
+    LOG("Failed to enable JVMTI_EVENT_FRAME_POP event: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
@@ -404,20 +404,20 @@ JNIEXPORT jint JNICALL Java_framepop02_check(JNIEnv *jni, jclass cls) {
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_FRAME_POP, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to disable JVMTI_EVENT_FRAME_POP event: %s (%d)\n",
+    LOG("Failed to disable JVMTI_EVENT_FRAME_POP event: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
   err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
                                         JVMTI_EVENT_METHOD_ENTRY, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Failed to disable JVMTI_EVENT_METHOD_ENTRY event: %s (%d)\n",
+    LOG("Failed to disable JVMTI_EVENT_METHOD_ENTRY event: %s (%d)\n",
            TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
   if (printdump == JNI_TRUE) {
-    printf("%d threads, %d method entrys, %d frame pops, max depth = %d\n",
+    LOG("%d threads, %d method entrys, %d frame pops, max depth = %d\n",
            thr_count, push_count, pop_count, max_depth);
   }
 

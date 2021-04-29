@@ -200,7 +200,10 @@ public class EventNames {
     public final static String SecurityProperty = PREFIX + "SecurityPropertyModification";
     public final static String DirectBufferStatistics = PREFIX + "DirectBufferStatistics";
     public final static String Deserialization = PREFIX + "Deserialization";
-    public static final String VirtualThreadSubmitRejectedEvent = PREFIX + "VirtualThreadSubmitRejectedEvent";
+    public static final String VirtualThreadStart = PREFIX + "VirtualThreadStart";
+    public static final String VirtualThreadEnd = PREFIX + "VirtualThreadEnd";
+    public static final String VirtualThreadPinned = PREFIX + "VirtualThreadPinned";
+    public static final String VirtualThreadSubmitFailed = PREFIX + "VirtualThreadSubmitFailed";
 
     // Flight Recorder
     public final static String DumpReason = PREFIX + "DumpReason";

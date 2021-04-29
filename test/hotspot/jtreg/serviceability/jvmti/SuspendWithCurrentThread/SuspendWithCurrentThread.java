@@ -76,8 +76,8 @@ public class SuspendWithCurrentThread {
         test.run();
     }
 
-    private ThreadToSuspend[] startTestedThreads(int threadsCount) throws RuntimeException  {
-        ThreadToSuspend[]threads = new ThreadToSuspend[threadsCount];
+    private ThreadToSuspend[] startTestedThreads(int threads_count) throws RuntimeException  {
+        ThreadToSuspend[]threads = new ThreadToSuspend[threads_count];
 
         // create tested threads
         for (int i = 0; i < threads.length; i++) {
@@ -166,7 +166,6 @@ public class SuspendWithCurrentThread {
 class ThreadToSuspend extends Thread {
     private static void log(String msg) { System.out.println(msg); }
 
-    private static native void init();
     private static native void suspendTestedThreads();
     private static volatile boolean allThreadsReady = false;
 
@@ -188,9 +187,6 @@ class ThreadToSuspend extends Thread {
     public void run() {
         boolean needSuspend = true;
 
-        if (isSuspender) {
-            init();
-        }
         threadReady = true;
 
         // run in a loop

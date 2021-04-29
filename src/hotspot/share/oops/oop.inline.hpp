@@ -324,7 +324,7 @@ oop oopDesc::forward_to_atomic(oop p, markWord compare, atomic_memory_order orde
   if (old_mark == compare) {
     return NULL;
   } else {
-    return (oop)old_mark.decode_pointer();
+    return cast_to_oop(old_mark.decode_pointer());
   }
 }
 
@@ -332,14 +332,14 @@ oop oopDesc::forward_to_atomic(oop p, markWord compare, atomic_memory_order orde
 // The forwardee is used when copying during scavenge and mark-sweep.
 // It does need to clear the low two locking- and GC-related bits.
 oop oopDesc::forwardee() const {
-  return (oop) mark().decode_pointer();
+  return cast_to_oop(mark().decode_pointer());
 }
 
 // Note that the forwardee is not the same thing as the displaced_mark.
 // The forwardee is used when copying during scavenge and mark-sweep.
 // It does need to clear the low two locking- and GC-related bits.
 oop oopDesc::forwardee_acquire() const {
-  return (oop) Atomic::load_acquire(&_mark).decode_pointer();
+  return cast_to_oop(Atomic::load_acquire(&_mark).decode_pointer());
 }
 
 // The following method needs to be MT safe.
@@ -476,6 +476,12 @@ size_t oopDesc::copy_conjoint_compact(HeapWord* to) {
 size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
   // if (is_stackChunk()) tty->print_cr(">>> copy_disjoint from: %p - %p to: %p - %p (word_size: %zu)", cast_from_oop<HeapWord*>(this), cast_from_oop<HeapWord*>(this) + word_size, to, to + word_size, word_size);
   assert(word_size == (size_t)size() || size_might_change(), "");
+  int lh = klass()->layout_helper();
+  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh))) {
+    size_t res = klass()->copy_disjoint(this, to, word_size);
+    assert (word_size == res, "");
+    return res;
+  }
   Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
   return word_size;
 }
@@ -483,7 +489,7 @@ size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
 size_t oopDesc::copy_disjoint_compact(HeapWord* to, size_t word_size) {
   assert(word_size == (size_t)compact_size() || size_might_change(), "");
   int lh = klass()->layout_helper();
-  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
+  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC)) {
     size_t res = klass()->copy_disjoint_compact(this, to);
     assert (word_size == res, "");
     return res;
@@ -494,6 +500,12 @@ size_t oopDesc::copy_disjoint_compact(HeapWord* to, size_t word_size) {
 size_t oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
   // if (is_stackChunk()) tty->print_cr(">>> copy_conjoint from: %p - %p to: %p - %p (word_size: %zu)", cast_from_oop<HeapWord*>(this), cast_from_oop<HeapWord*>(this) + word_size, to, to + word_size, word_size);
   assert(word_size == (size_t)size() || size_might_change(), "");
+  int lh = klass()->layout_helper();
+  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh))) {
+    size_t res = klass()->copy_conjoint(this, to, word_size);
+    assert (word_size == res, "");
+    return res;
+  }
   Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
   return word_size;
 }
@@ -501,7 +513,7 @@ size_t oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
 size_t oopDesc::copy_conjoint_compact(HeapWord* to, size_t word_size) {
   assert(word_size == (size_t)compact_size() || size_might_change(), "");
   int lh = klass()->layout_helper();
-  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
+  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC)) {
     size_t res = klass()->copy_conjoint_compact(this, to);
     assert (word_size == res, "");
     return res;

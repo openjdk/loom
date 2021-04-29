@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @run testng Collectable
  * @summary Test that virtual threads are GC'ed
+ * @run testng Collectable
  */
 
 import java.lang.ref.WeakReference;
@@ -33,28 +33,36 @@ import java.util.concurrent.locks.LockSupport;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class Collectable {
 
-    // ensure that an unstarted virtual thread can be GC"ed
-    public void testGC1() {
+    /**
+     * Test that an unstarted virtual thread can be GC"ed.
+     */
+    @Test
+    public void testUnstartedThread() {
         var thread = Thread.ofVirtual().unstarted(() -> { });
         var ref = new WeakReference<>(thread);
         thread = null;
         waitUntilCleared(ref);
     }
 
-    // ensure that a parked virtual thread can be GC'ed
-    public void testGC2() {
-        var thread = Thread.startVirtualThread(LockSupport::park);
+    /**
+     * Test that a parked virtual thread can be GC'ed.
+     */
+    @Test
+    public void testParkedThread() {
+        var thread = Thread.ofVirtual().start(LockSupport::park);
         var ref = new WeakReference<>(thread);
         thread = null;
         waitUntilCleared(ref);
     }
 
-    // ensure that a terminated virtual thread can be GC'ed
-    public void testGC3() throws Exception {
-        var thread = Thread.startVirtualThread(() -> { });
+    /**
+     * Ensure that a terminated virtual thread can be GC'ed.
+     */
+    @Test
+    public void testTerminatedThread() throws Exception {
+        var thread = Thread.ofVirtual().start(() -> { });
         thread.join();
         var ref = new WeakReference<>(thread);
         thread = null;

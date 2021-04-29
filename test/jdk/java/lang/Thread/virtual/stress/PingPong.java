@@ -23,17 +23,19 @@
 
 /**
  * @test
+ * @summary Stress test virtual threads with SynchronousQueue and LinkedTransferQueue
  * @requires vm.debug != true
  * @run main/othervm PingPong SQ 1000000
  * @run main/othervm PingPong LTQ 1000000
- * @summary Stress test virtual threads with SynchronousQueue and LinkedTransferQueue
  */
 
 /**
  * @test
  * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PingPong SQ 1000000
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal PingPong LTQ 1000000
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal
+ *     -XX:CompilationMode=high-only-quick-internal PingPong SQ 1000000
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal
+ *     -XX:CompilationMode=high-only-quick-internal PingPong LTQ 1000000
  */
 
 import java.time.Duration;
@@ -61,7 +63,7 @@ public class PingPong {
         AtomicInteger count1 = new AtomicInteger();
         AtomicInteger count2 = new AtomicInteger();
 
-        Thread t1 = Thread.startVirtualThread(() -> {
+        Thread t1 = Thread.ofVirtual().start(() -> {
             try {
                 while (count1.incrementAndGet() < iterations) {
                     queue.transfer("hello");
@@ -75,7 +77,7 @@ public class PingPong {
             }
         });
 
-        Thread t2 = Thread.startVirtualThread(() -> {
+        Thread t2 = Thread.ofVirtual().start(() -> {
             try {
                 while (count2.incrementAndGet() < iterations) {
                     String message = queue.take();

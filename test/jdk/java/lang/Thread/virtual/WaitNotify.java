@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,8 +23,8 @@
 
 /**
  * @test
+ * @summary Test virtual threads using Object.wait/notifyAll
  * @run testng WaitNotify
- * @summary Test virtual threads using Object.wait/notify
  */
 
 import java.util.concurrent.Semaphore;
@@ -32,14 +32,16 @@ import java.util.concurrent.Semaphore;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class WaitNotify {
 
-    // virtual thread waits, notified by kernel thread
+    /**
+     * Test virtual thread waits, notified by platform thread.
+     */
+    @Test
     public void testWaitNotify1() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             synchronized (lock) {
                 ready.release();
                 try {
@@ -55,11 +57,14 @@ public class WaitNotify {
         thread.join();
     }
 
-    // kernel thread waits, notified by virtual thread
+    /**
+     * Test platform thread waits, notified by virtual thread.
+     */
+    @Test
     public void testWaitNotify2() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread = Thread.startVirtualThread(() -> {
+        var thread = Thread.ofVirtual().start(() -> {
             ready.acquireUninterruptibly();
             synchronized (lock) {
                 lock.notifyAll();
@@ -72,11 +77,14 @@ public class WaitNotify {
         thread.join();
     }
 
-    // virtual thread waits, notified by other virtual thread
+    /**
+     * Test virtual thread waits, notified by another virtual thread.
+     */
+    @Test
     public void testWaitNotify3() throws Exception {
         var lock = new Object();
         var ready = new Semaphore(0);
-        var thread1 = Thread.startVirtualThread(() -> {
+        var thread1 = Thread.ofVirtual().start(() -> {
             synchronized (lock) {
                 ready.release();
                 try {
@@ -84,7 +92,7 @@ public class WaitNotify {
                 } catch (InterruptedException e) { }
             }
         });
-        var thread2 = Thread.startVirtualThread(() -> {
+        var thread2 = Thread.ofVirtual().start(() -> {
             ready.acquireUninterruptibly();
             synchronized (lock) {
                 lock.notifyAll();
@@ -94,7 +102,10 @@ public class WaitNotify {
         thread2.join();
     }
 
-    // interrupt before Object.wait
+    /**
+     * Test interrupt status set when calling Object.wait.
+     */
+    @Test
     public void testWaitNotify4() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
@@ -112,7 +123,10 @@ public class WaitNotify {
         });
     }
 
-    // interrupt while waiting in Object.wait
+    /**
+     * Test interrupt when blocked in Object.wait.
+     */
+    @Test
     public void testWaitNotify5() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Azul Systems, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -87,7 +88,6 @@
 #include "runtime/javaCalls.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/jniPeriodicChecker.hpp"
-#include "runtime/memprofiler.hpp"
 #include "runtime/monitorDeflationThread.hpp"
 #include "runtime/mutexLocker.hpp"
 #include "runtime/nonJavaThread.hpp"
@@ -100,6 +100,7 @@
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/serviceThread.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/stackWatermarkSet.hpp"
 #include "runtime/statSampler.hpp"
 #include "runtime/task.hpp"
@@ -107,6 +108,7 @@
 #include "runtime/threadCritical.hpp"
 #include "runtime/threadSMR.inline.hpp"
 #include "runtime/threadStatisticalInfo.hpp"
+#include "runtime/threadWXSetters.inline.hpp"
 #include "runtime/timer.hpp"
 #include "runtime/timerTrace.hpp"
 #include "runtime/vframe.inline.hpp"
@@ -326,6 +328,8 @@ Thread::Thread() {
     // If the main thread creates other threads before the barrier set that is an error.
     assert(Thread::current_or_null() == NULL, "creating thread before barrier set");
   }
+
+  MACOS_AARCH64_ONLY(DEBUG_ONLY(_wx_init = false));
 }
 
 void Thread::initialize_tlab() {
@@ -388,6 +392,8 @@ void Thread::call_run() {
   // Perform common initialization actions
 
   register_thread_stack_with_NMT();
+
+  MACOS_AARCH64_ONLY(this->init_wx());
 
   JFR_ONLY(Jfr::on_thread_start(this);)
 
@@ -1195,6 +1201,7 @@ JavaThread::JavaThread() :
   _doing_unsafe_access(false),
   _do_not_unlock_if_synchronized(false),
   _is_in_VTMT(false),
+  _is_VTMT_disabler(false),
   _jni_attach_state(_not_attaching_via_jni),
 #if INCLUDE_JVMCI
   _pending_deoptimization(-1),
@@ -1204,6 +1211,9 @@ JavaThread::JavaThread() :
   _pending_failed_speculation(0),
   _jvmci{nullptr},
   _jvmci_counters(nullptr),
+  _jvmci_reserved0(nullptr),
+  _jvmci_reserved1(nullptr),
+  _jvmci_reserved_oop0(nullptr),
 #endif // INCLUDE_JVMCI
 
   _exception_oop(oop()),
@@ -1871,7 +1881,9 @@ void JavaThread::check_and_handle_async_exceptions(bool check_unsafe_error) {
 void JavaThread::handle_special_runtime_exit_condition(bool check_asyncs) {
 
   // Check for pending external suspend.
-  if (is_external_suspend_with_lock()) {
+  // A JavaThread disabling VTMT can't be suspended without deadlock.
+  // It will be self-suspended after VTMT is reenabled.
+  if (!is_VTMT_disabler() && is_external_suspend_with_lock()) {
     frame_anchor()->make_walkable(this);
     java_suspend_self_with_safepoint_check();
   }
@@ -1965,7 +1977,9 @@ void JavaThread::java_suspend() {
   }
 
   { MutexLocker ml(SR_lock(), Mutex::_no_safepoint_check_flag);
-    if (!is_external_suspend()) {
+    // A JavaThread disabling VTMT can't be suspended without deadlock.
+    // It will be self-suspended after VTMT is reenabled.
+    if (is_VTMT_disabler() || !is_external_suspend()) {
       // a racing resume has cancelled us; bail out now
       return;
     }
@@ -2047,6 +2061,7 @@ int JavaThread::java_suspend_self() {
 
     // _ext_suspended flag is cleared by java_resume()
     while (is_ext_suspended()) {
+      assert(!is_VTMT_disabler(), "sanity check");
       ml.wait();
     }
   }
@@ -2182,6 +2197,9 @@ void JavaThread::check_safepoint_and_suspend_for_native_trans(JavaThread *thread
 // Note only the native==>VM/Java barriers can call this function and when
 // thread state is _thread_in_native_trans.
 void JavaThread::check_special_condition_for_native_trans(JavaThread *thread) {
+  // Enable WXWrite: called directly from interpreter native wrapper.
+  MACOS_AARCH64_ONLY(ThreadWXEnable wx(WXWrite, thread));
+
   check_safepoint_and_suspend_for_native_trans(thread);
 
   // After returning from native, it could be that the stack frames are not
@@ -2344,6 +2362,9 @@ void JavaThread::oops_do_no_frames(OopClosure* f, CodeBlobClosure* cf) {
   f->do_oop((oop*) &_vm_result);
   f->do_oop((oop*) &_exception_oop);
   f->do_oop((oop*) &_pending_async_exception);
+#if INCLUDE_JVMCI
+  f->do_oop((oop*) &_jvmci_reserved_oop0);
+#endif
 
   if (jvmti_thread_state() != NULL) {
     jvmti_thread_state()->oops_do(f, cf);
@@ -2727,6 +2748,7 @@ void JavaThread::print_frame_layout(int depth, bool validate_only) {
   FrameValues values;
   int frame_no = 0;
   for (StackFrameStream fst(this, true, true, true); !fst.is_done(); fst.next()) {
+    if (frame_no == 0) fst.current()->describe_top(values);
     fst.current()->describe(values, ++frame_no, fst.register_map());
     if (depth == frame_no) break;
   }
@@ -3109,6 +3131,8 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Initialize the os module
   os::init();
 
+  MACOS_AARCH64_ONLY(os::current_thread_enable_wx(WXWrite));
+
   // Record VM creation timing statistics
   TraceVmCreationTime create_vm_timer;
   create_vm_timer.start();
@@ -3202,7 +3226,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 #endif // INCLUDE_JVMCI
 
   // Initialize OopStorage for threadObj
-  _thread_oop_storage = OopStorageSet::create_strong("Thread OopStorage");
+  _thread_oop_storage = OopStorageSet::create_strong("Thread OopStorage", mtThread);
 
   // Attach the main thread to this os thread
   JavaThread* main_thread = new JavaThread();
@@ -3212,6 +3236,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   main_thread->record_stack_base_and_size();
   main_thread->register_thread_stack_with_NMT();
   main_thread->set_active_handles(JNIHandleBlock::allocate_block());
+  MACOS_AARCH64_ONLY(main_thread->init_wx());
 
   if (!main_thread->set_as_starting_thread()) {
     vm_shutdown_during_initialization(
@@ -3434,7 +3459,6 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   }
 #endif // INCLUDE_MANAGEMENT
 
-  if (MemProfiling)                   MemProfiler::engage();
   StatSampler::engage();
   if (CheckJNICalls)                  JniPeriodicChecker::engage();
 
@@ -3471,7 +3495,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 #endif
 
   if (DumpSharedSpaces) {
-    MetaspaceShared::preload_and_dump(CHECK_JNI_ERR);
+    MetaspaceShared::preload_and_dump();
     ShouldNotReachHere();
   }
 
@@ -3752,7 +3776,7 @@ void JavaThread::invoke_shutdown_hooks() {
 //   + Delete this thread
 //   + Return to caller
 
-bool Threads::destroy_vm() {
+void Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
 
 #ifdef ASSERT
@@ -3845,8 +3869,6 @@ bool Threads::destroy_vm() {
 #endif
 
   LogConfiguration::finalize();
-
-  return true;
 }
 
 
@@ -4011,17 +4033,6 @@ public:
 void Threads::possibly_parallel_oops_do(bool is_par, OopClosure* f, CodeBlobClosure* cf) {
   ParallelOopsDoThreadClosure tc(f, cf);
   possibly_parallel_threads_do(is_par, &tc);
-}
-
-void Threads::nmethods_do(CodeBlobClosure* cf) {
-  ALL_JAVA_THREADS(p) {
-    // This is used by the code cache sweeper to mark nmethods that are active
-    // on the stack of a Java thread. Ignore the sweeper thread itself to avoid
-    // marking CodeCacheSweeperThread::_scanned_compiled_method as active.
-    if(!p->is_Code_cache_sweeper_thread()) {
-      p->nmethods_do(cf);
-    }
-  }
 }
 
 void Threads::metadata_do(MetadataClosure* f) {

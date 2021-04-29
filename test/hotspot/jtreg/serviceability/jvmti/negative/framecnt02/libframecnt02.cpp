@@ -40,7 +40,7 @@ jint  Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
     res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
     if (res != JNI_OK || jvmti == NULL) {
-        printf("Wrong result of a valid call to GetEnv !\n");
+        LOG("Wrong result of a valid call to GetEnv !\n");
         return JNI_ERR;
     }
 
@@ -55,14 +55,14 @@ JNIEXPORT void JNICALL Java_framecnt02_checkFrames(JNIEnv *env, jclass cls,
     if (thr_num == 0) {
         err = jvmti->GetFrameCount(thr, NULL);
         if (err != JVMTI_ERROR_NULL_POINTER) {
-            printf("Error expected: JVMTI_ERROR_NULL_POINTER, got: %s (%d)\n",
+            LOG("Error expected: JVMTI_ERROR_NULL_POINTER, got: %s (%d)\n",
                    TranslateError(err), err);
             result = STATUS_FAILED;
         }
     } else {
         err = jvmti->GetFrameCount(thr, &frameCount);
         if (err != JVMTI_ERROR_THREAD_NOT_ALIVE) {
-            printf("Error expected: JVMTI_ERROR_THREAD_NOT_ALIVE, got: %s (%d)\n",
+            LOG("Error expected: JVMTI_ERROR_THREAD_NOT_ALIVE, got: %s (%d)\n",
                    TranslateError(err), err);
             result = STATUS_FAILED;
         }

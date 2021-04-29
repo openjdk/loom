@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -44,7 +44,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.misc.InnocuousThread;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
-
 /**
  * An ExecutorService that executes each task in its own thread.
  */
@@ -85,9 +84,9 @@ class ThreadExecutor implements ExecutorService {
      *
      * @param factory the thread factory
      * @param deadline the deadline, null for no deadline
-     * @param shared true if not owned by the caller thread
+     * @param owned true if owned by the caller thread
      */
-    ThreadExecutor(ThreadFactory factory, Instant deadline, boolean shared) {
+    ThreadExecutor(ThreadFactory factory, Instant deadline, boolean owned) {
         Objects.requireNonNull(factory);
         Future<?> timer = null;
         if (deadline != null) {
@@ -103,14 +102,14 @@ class ThreadExecutor implements ExecutorService {
 
         this.factory = factory;
         this.timerTask = timer;
-        if (shared) {
-            this.owner = null;
-            this.previous = null;
-        } else {
+        if (owned) {
             Thread owner = Thread.currentThread();
             this.owner = owner;
             this.previous = ThreadFields.latestThreadExecutor(owner);
             ThreadFields.setLatestThreadExecutor(this);
+        } else {
+            this.owner = null;
+            this.previous = null;
         }
     }
 
@@ -149,13 +148,13 @@ class ThreadExecutor implements ExecutorService {
      */
     private void tryTerminate() {
         assert state >= SHUTDOWN;
-        if (threads.isEmpty()) {
-            // set state
-            STATE.set(this, TERMINATED);
+        if (threads.isEmpty()
+            && STATE.compareAndSet(this, SHUTDOWN, TERMINATED)) {
 
             // cancel timer
-            if (timerTask != null && !timerTask.isDone()) {
-                timerTask.cancel(false);
+            Future<?> timer = this.timerTask;
+            if (timer != null && !timer.isDone()) {
+                timer.cancel(false);
             }
 
             // signal any waiters
@@ -224,19 +223,10 @@ class ThreadExecutor implements ExecutorService {
         }
     }
 
-    @Override
-    public void close() {
-        checkPermission();
-        checkOwner();
-
-        if (owner != null && !closed) {
-            if (ThreadFields.latestThreadExecutor(owner) != this)
-                throw new IllegalStateException("close is out of order");
-            // eagerly mark as closed and restore ref to previous executor
-            closed = true;
-            ThreadFields.setLatestThreadExecutor(previous);
-        }
-
+    /**
+     * Waits for executor to terminate.
+     */
+    private void awaitTermination() {
         boolean terminated = isTerminated();
         if (!terminated) {
             tryShutdownAndTerminate(false);
@@ -253,6 +243,28 @@ class ThreadExecutor implements ExecutorService {
             }
             if (interrupted) {
                 Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    @Override
+    public void close() {
+        checkPermission();
+
+        if (owner != null) {
+            if (owner != Thread.currentThread())
+                throw new IllegalCallerException("Not owned by this thread");
+            if (!closed && ThreadFields.latestThreadExecutor(owner) != this)
+                throw new IllegalStateException("close is out of order");
+        }
+
+        try {
+            awaitTermination();
+        } finally {
+            if (owner != null && !closed) {
+                // restore ref to previous executor
+                ThreadFields.setLatestThreadExecutor(previous);
+                closed = true;
             }
         }
     }
@@ -378,9 +390,9 @@ class ThreadExecutor implements ExecutorService {
     }
 
     /**
-     * A Future for a task that runs in its own thread. The thread
-     * is created (but not started) when the Future is created. The
-     * thread is interrupted when the future is cancelled. Its ThreadExecutor
+     * A Future for a task that runs in its own thread. The thread is
+     * created (but not started) when the Future is created. The thread
+     * is interrupted when the future is cancelled. Its ThreadExecutor
      * is notified when the task completes.
      */
     private static class ThreadBoundFuture<T>
@@ -513,7 +525,7 @@ class ThreadExecutor implements ExecutorService {
 
         int size = tasks.size();
         if (size == 0) {
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("'tasks' is empty");
         }
 
         var holder = new AnyResultHolder<T>(Thread.currentThread());
@@ -539,7 +551,7 @@ class ThreadExecutor implements ExecutorService {
                 count++;
             }
             if (count == 0) {
-                throw new IllegalArgumentException();
+                throw new IllegalArgumentException("'tasks' is empty");
             }
 
             if (Thread.interrupted())

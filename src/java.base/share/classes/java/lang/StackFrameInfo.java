@@ -32,7 +32,7 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 
 class StackFrameInfo implements StackFrame {
-    private final static JavaLangInvokeAccess JLIA =
+    private static final JavaLangInvokeAccess JLIA =
         SharedSecrets.getJavaLangInvokeAccess();
 
     private final boolean retainClassRef;

@@ -66,7 +66,7 @@ static void setBP(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass) {
     jni->FatalError("failed to get ID for the java method\n");
   }
 
-  printf("Setting breakpoint....");
+  LOG("Setting breakpoint....");
   err = jvmti->SetBreakpoint(mid, 0);
   if (err != JVMTI_ERROR_NONE) {
     jni->FatalError("failed to set breakpoint\n");
@@ -87,7 +87,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
       jni->FatalError("failed to obtain a class signature\n");
     }
     if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
-      printf(
+      LOG(
           "ClassLoad event received for the class \"%s\"\n"
           "\tsetting breakpoint ...\n",
           sig);
@@ -120,7 +120,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jmethodID method, jlocatio
   }
 
   if (sig != NULL && (strcmp(sig, CLASS_SIG) == 0)) {
-    printf("method declaring class \"%s\"\n\tenabling SingleStep events ...\n", sig);
+    LOG("method declaring class \"%s\"\n\tenabling SingleStep events ...\n", sig);
     err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thr);
     if (err != JVMTI_ERROR_NONE) {
       result = STATUS_FAILED;
@@ -184,18 +184,18 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
         (strcmp(methSig, METHOD_SIGS[0]) == 0) &&
         (strcmp(sig, CLASS_SIG) == 0)) {
       stepEv[0]++;
-      printf("CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n",
+      LOG("CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n",
                    methNam);
     } else if ((strcmp(methNam, METHODS[1]) == 0) &&
         (strcmp(methSig, METHOD_SIGS[1]) == 0) &&
         (strcmp(sig, CLASS_SIG) == 0)) {
       jboolean isVirtual = jni->IsVirtualThread(thread);
       if (isVirtualExpected != isVirtual) {
-        printf("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
+        LOG("The thread IsVirtualThread %d differs from expected %d.\n", isVirtual, isVirtualExpected);
         result = STATUS_FAILED;
       } else {
         stepEv[1]++;
-        printf(
+        LOG(
             "CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n"
             "\tdisabling the event generation\n",
             methNam);
@@ -219,7 +219,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
     NSK_COMPLAIN0("TEST FAILED: unable to deallocate memory pointed to method signature\n\n");
   }
 
-  printf("<<<<\n\n");
+  LOG("<<<<\n\n");
 }
 
 void JNICALL
@@ -268,7 +268,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
   /* add capability to generate compiled method events */
@@ -279,24 +279,24 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
+    LOG("(GetCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   if (!caps.can_generate_single_step_events) {
-    printf("Warning: generation of single step events is not implemented\n");
+    LOG("Warning: generation of single step events is not implemented\n");
   }
 
   /* set event callback */
-  printf("setting event callbacks ...\n");
+  LOG("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.ClassLoad = &ClassLoad;
   callbacks.Breakpoint = &Breakpoint;
@@ -308,7 +308,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  printf("setting event callbacks done\nenabling JVMTI events ...\n");
+  LOG("setting event callbacks done\nenabling JVMTI events ...\n");
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
@@ -326,7 +326,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  printf("enabling the events done\n\n");
+  LOG("enabling the events done\n\n");
 
   agent_lock = create_raw_monitor(jvmti, "agent lock");
 

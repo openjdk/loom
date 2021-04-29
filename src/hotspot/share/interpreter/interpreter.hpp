@@ -45,8 +45,13 @@ class InterpreterMacroAssembler;
 class InterpreterCodelet: public Stub {
   friend class VMStructs;
   friend class CodeCacheDumper; // possible extension [do not remove]
+ public:
+  enum Kind {
+    codelet_other, codelet_bytecode, codelet_method_entry, codelet_safepoint_entry
+  };
  private:
   int         _size;                             // the size in bytes
+  Kind        _kind;
   const char* _description;                      // a description of the codelet, for debugging & printing
   Bytecodes::Code _bytecode;                     // associated bytecode if any
   NOT_PRODUCT(CodeStrings _strings;)              // Comments for annotating assembler output.
@@ -73,10 +78,11 @@ class InterpreterCodelet: public Stub {
   void    print() const;
 
   // Interpreter-specific initialization
-  void    initialize(const char* description, Bytecodes::Code bytecode);
+  void    initialize(const char* description, Kind kind, Bytecodes::Code bytecode);
 
   // Interpreter-specific attributes
   int         code_size() const                  { return code_end() - code_begin(); }
+  Kind kind() const                              { return _kind; }
   const char* description() const                { return _description; }
   Bytecodes::Code bytecode() const               { return _bytecode; }
 };
@@ -111,6 +117,7 @@ class CodeletMark: ResourceMark {
  public:
   CodeletMark(InterpreterMacroAssembler*& masm,
               const char* description,
+              InterpreterCodelet::Kind kind = InterpreterCodelet::codelet_other,
               Bytecodes::Code bytecode = Bytecodes::_illegal);
   ~CodeletMark();
 };

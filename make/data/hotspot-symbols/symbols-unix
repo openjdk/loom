@@ -54,6 +54,8 @@ JVM_DefineClass
 JVM_DefineClassWithSource
 JVM_DesiredAssertionStatus
 JVM_DumpAllStacks
+JVM_DumpClassListToFile
+JVM_DumpDynamicArchive
 JVM_DumpThreads
 JVM_FillInStackTrace
 JVM_FindClassFromCaller
@@ -218,5 +220,4 @@ JVM_VirtualThreadMountBegin
 JVM_VirtualThreadMountEnd
 JVM_VirtualThreadUnmountBegin
 JVM_VirtualThreadUnmountEnd
-JVM_VirtualThreadTerminated
 #

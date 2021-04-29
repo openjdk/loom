@@ -80,7 +80,7 @@ static int prepare() {
   /* enable MonitorWait event */
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_WAITED, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Prepare: 11\n");
+    LOG("Prepare: 11\n");
     return NSK_FALSE;
   }
   return NSK_TRUE;
@@ -170,7 +170,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
@@ -185,14 +185,14 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(AddCapabilities) unexpected error: %s (%d)\n",
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
 
   err = jvmti->GetCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
+    LOG("(GetCapabilities) unexpected error: %s (%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -215,7 +215,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL Java_monitorwaited01_setExpected(JNIEnv *jni, jobject clz, jobject obj, jobject thread) {
-  printf("Remembering global reference for monitor object is %p\n", obj);
+  LOG("Remembering global reference for monitor object is %p\n", obj);
   /* make object accessible for a long time */
   expected_object = jni->NewGlobalRef(obj);
   if (expected_object == NULL) {

@@ -28,14 +28,9 @@
 
 extern "C" {
 
-
-#define PASSED 0
-#define STATUS_FAILED 2
 #define WAIT_START 100
 
 static jvmtiEnv *jvmti = NULL;
-static jint result = PASSED;
-static jboolean printdump = JNI_FALSE;
 static jint wait_time = 0;
 static jint state[] = {
     0,                               /*  JVMTI_THREAD_STATUS_NOT_STARTED, */
@@ -44,104 +39,57 @@ static jint state[] = {
 };
 
 JNIEXPORT void JNICALL
-Java_thrstat03_init(JNIEnv *env, jclass cls,
-        jint waitTime) {
-    wait_time = waitTime * 60000;
+Java_thrstat03_init(JNIEnv *env, jclass cls, jint waitTime) {
+  wait_time = waitTime * 60000;
 }
 
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-    jint res;
-
-    if (options != NULL && strcmp(options, "printdump") == 0) {
-        printdump = JNI_TRUE;
-    }
-
-    res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
-    if (res != JNI_OK || jvmti == NULL) {
-        printf("Wrong result of a valid call to GetEnv!\n");
-        return JNI_ERR;
-    }
-
-    return JNI_OK;
+  jint res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti == NULL) {
+    LOG("Wrong result of a valid call to GetEnv!\n");
+    return JNI_ERR;
+  }
+  return JNI_OK;
 }
 
-JNIEXPORT jint JNICALL
-Java_thrstat03_check(JNIEnv *env, jclass cls,
-        jthread thr, jint statInd) {
-    jvmtiError err;
-    jrawMonitorID wait_lock;
-    jint thrState;
-    jint i;
+JNIEXPORT jboolean JNICALL
+Java_thrstat03_check(JNIEnv *jni, jclass cls, jthread thread, jint statInd) {
+  jboolean result = JNI_TRUE;
+  jrawMonitorID wait_lock;
+  jint thr_state = 0;
 
-    if (jvmti == NULL) {
-        printf("JVMTI client was not properly loaded!\n");
-        return STATUS_FAILED;
+  if (jvmti == NULL) {
+    LOG("JVMTI client was not properly loaded!\n");
+    return JNI_FALSE;
+  }
+
+  wait_lock = create_raw_monitor(jvmti, "_wait_lock");
+  for (int i = WAIT_START; i < wait_time; i <<= 1) {
+    thr_state = get_thread_state(jvmti, jni, thread);
+    LOG(">>> thread state: %s (%d)\n", TranslateState(thr_state), thr_state);
+
+    if ((thr_state & JVMTI_THREAD_STATE_RUNNABLE) == 0) {
+      break;
     }
 
-    err = jvmti->CreateRawMonitor("_wait_lock", &wait_lock);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(CreateRawMonitor#%d) unexpected error: %s (%d)\n",
-               statInd, TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
+    RawMonitorLocker rml = RawMonitorLocker(jvmti, jni, wait_lock);
+    rml.wait(i);
+  }
 
-    for (i = WAIT_START; i < wait_time; i <<= 1) {
-        err = jvmti->GetThreadState(thr, &thrState);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("(GetThreadState#%d) unexpected error: %s (%d)\n",
-                statInd, TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
+  destroy_raw_monitor(jvmti, jni,  wait_lock);
 
-        if (printdump == JNI_TRUE) {
-            printf(">>> thread state: %s (%d)\n",
-                TranslateState(thrState), thrState);
-        }
+  /* We expect that thread is NOT_STARTED if statInd == 0 */
+  if (statInd == 0 && thr_state != state[statInd]) {
+    result = JNI_FALSE;
+  } else if (statInd != 0 && (thr_state & state[statInd]) == 0) {
+    result = JNI_FALSE;
+  }
+  if (result == JNI_FALSE) {
+    LOG("Wrong state: %s (%d)\n", TranslateState(thr_state), thr_state);
+    LOG("   expected: %s (%d)\n", TranslateState(state[statInd]), state[statInd]);
+  }
 
-        if ((thrState & JVMTI_THREAD_STATE_RUNNABLE) == 0) {
-            break;
-        }
-
-        err = jvmti->RawMonitorEnter(wait_lock);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("(RawMonitorEnter) unexpected error: %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-        err = jvmti->RawMonitorWait(wait_lock, (jlong)i);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("(RawMonitorWait) unexpected error: %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-        err = jvmti->RawMonitorExit(wait_lock);
-        if (err != JVMTI_ERROR_NONE) {
-            printf("(RawMonitorExit) unexpected error: %s (%d)\n",
-                   TranslateError(err), err);
-            result = STATUS_FAILED;
-        }
-    }
-
-    err = jvmti->DestroyRawMonitor(wait_lock);
-    if (err != JVMTI_ERROR_NONE) {
-        printf("(DestroyRawMonitor#%d) unexpected error: %s (%d)\n",
-               statInd, TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-
-    /* We expect that thread is NOT_STARTED if statInd == 0 */
-    if (statInd == 0 && thrState != state[statInd]) {
-        result = STATUS_FAILED;
-    } else if (statInd != 0 && (thrState & state[statInd]) == 0) {
-        result = STATUS_FAILED;
-    }
-    if (result == STATUS_FAILED) {
-        printf("Wrong state: %s (%d)\n", TranslateState(thrState), thrState);
-        printf("   expected: %s (%d)\n",
-            TranslateState(state[statInd]), state[statInd]);
-    }
-
-    return result;
+  return result;
 }
 
 }

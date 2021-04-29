@@ -47,7 +47,9 @@ class RegisterMap;
 class OopClosure;
 class CodeBlob;
 
-class OopMapValue {
+enum class derived_pointer : intptr_t {};
+
+class OopMapValue: public StackObj {
   friend class VMStructs;
 private:
   short _value;
@@ -157,6 +159,7 @@ class OopMap: public ResourceObj {
   int  _omv_count; // number of OopMapValues in the stream
   int  _num_oops;  // number of oops
   int  _index;     // index in OopMapSet
+  bool _has_derived_oops;
   CompressedWriteStream* _write_stream;
 
   debug_only( OopMapValue::oop_types* _locs_used; int _locs_length;)
@@ -166,6 +169,7 @@ class OopMap: public ResourceObj {
   void set_omv_count(int value)               { _omv_count = value; }
   void increment_count()                      { _omv_count++; }
   void increment_num_oops()                   { _num_oops++; }
+  void set_has_derived_oops(bool value)       { _has_derived_oops = value; }
   CompressedWriteStream* write_stream() const { return _write_stream; }
   void set_write_stream(CompressedWriteStream* value) { _write_stream = value; }
 
@@ -185,6 +189,7 @@ class OopMap: public ResourceObj {
   int data_size() const  { return write_stream()->position(); }
   address data() const { return write_stream()->buffer(); }
   int num_oops() const { return _num_oops; }
+  bool has_derived_oops() const { return _has_derived_oops; }
   int index() const { return _index; }
 
   // Construction
@@ -283,6 +288,7 @@ private:
   mutable address _thaw_stub;
   int _count; // contains the number of entries in this OopMap
   int _num_oops;
+  bool _has_derived_oops;
 
   address data_addr() const { return (address) this + sizeof(ImmutableOopMap); }
 public:
@@ -290,6 +296,7 @@ public:
 
   int count() const { return _count; }
   int num_oops() const { return _num_oops; }
+  bool has_derived_oops() const { return _has_derived_oops; }
   bool has_any(OopMapValue::oop_types type) const;
 
 #ifdef ASSERT
@@ -488,12 +495,12 @@ class DerivedPointerTable : public AllStatic {
   friend class VMStructs;
  private:
   class Entry;
-  static bool _active;                      // do not record pointers for verify pass etc.
+  static bool _active;                                  // do not record pointers for verify pass etc.
 
  public:
-  static void clear();                       // Called before scavenge/GC
-  static void add(oop *derived, oop *base);  // Called during scavenge/GC
-  static void update_pointers();             // Called after  scavenge/GC
+  static void clear();                                  // Called before scavenge/GC
+  static void add(derived_pointer* derived, oop *base); // Called during scavenge/GC
+  static void update_pointers();                        // Called after  scavenge/GC
   static bool is_empty();
   static bool is_active()                    { return _active; }
   static void set_active(bool value)         { _active = value; }

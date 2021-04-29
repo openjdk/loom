@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -99,8 +99,7 @@ children(PacketInputStream *in, PacketOutputStream *out)
          return JNI_TRUE;
      }
 
-     //is_vthread_group = isSameObject(env, group, gdata->vthreadThreadGroup);
-     is_vthread_group = JNI_FALSE;
+     is_vthread_group = isSameObject(env, group, gdata->vthreadThreadGroup);
 
      WITH_LOCAL_REFS(env, 2) {
 
@@ -113,12 +112,14 @@ children(PacketInputStream *in, PacketOutputStream *out)
          jthread *theGroups;
 
          if (is_vthread_group) {
-             /* Get all the VThreads so we can return them. */
-             theVThreads = threadControl_allVThreads(&vthreadCount);
-             if (theVThreads == NULL && vthreadCount != 0) {
-                 error = JVMTI_ERROR_OUT_OF_MEMORY;
+             if (gdata->enumerateVThreads) {
+                 /* Get all the VThreads so we can return them. */
+                 theVThreads = threadControl_allVThreads(&vthreadCount);
+                 if (theVThreads == NULL && vthreadCount != 0) {
+                     error = JVMTI_ERROR_OUT_OF_MEMORY;
+                 }
              }
-         } 
+         }
 
          if (error == JVMTI_ERROR_NONE) {
              /* Get all the threads in this group so we can return them. */

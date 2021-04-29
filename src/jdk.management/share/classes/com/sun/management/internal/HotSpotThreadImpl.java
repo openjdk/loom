@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,19 +24,9 @@
  */
 package com.sun.management.internal;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.AccessController;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
 import com.sun.management.ThreadMXBean;
-import com.sun.management.ThreadMXBean.OutputFormat;
-import jdk.internal.vm.ThreadDumper;
 import sun.management.ManagementFactoryHelper;
 import sun.management.ThreadImpl;
-import sun.management.Util;
 import sun.management.VMManagement;
 
 /**
@@ -85,41 +75,5 @@ public class HotSpotThreadImpl extends ThreadImpl implements ThreadMXBean {
     @Override
     public void setThreadAllocatedMemoryEnabled(boolean enable) {
         super.setThreadAllocatedMemoryEnabled(enable);
-    }
-
-    @Override
-    public void dumpThreads(String outputFile, OutputFormat format) throws IOException {
-        Path file = Path.of(outputFile);
-        if (!file.isAbsolute())
-            throw new IllegalArgumentException("'outptuFile' not absolute path");
-
-        // need ManagementPermission("control")
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null)
-            Util.checkControlAccess();
-
-        try (OutputStream out = Files.newOutputStream(file)) {
-            PrivilegedExceptionAction<Void> pa = () -> {
-                dumpThreads(out, format);
-                return null;
-            };
-            try {
-                AccessController.doPrivileged(pa);
-            } catch (PrivilegedActionException pae) {
-                Throwable cause = pae.getCause();
-                if (cause instanceof IOException ioe)
-                    throw ioe;
-                if (cause instanceof RuntimeException e)
-                    throw e;
-                throw new RuntimeException(cause);
-            }
-        }
-    }
-
-    private void dumpThreads(OutputStream out, OutputFormat format) throws IOException {
-        switch (format) {
-            case TEXT_PLAIN -> ThreadDumper.dumpThreads(out);
-            case JSON       -> ThreadDumper.dumpThreadsToJson(out);
-        }
     }
 }

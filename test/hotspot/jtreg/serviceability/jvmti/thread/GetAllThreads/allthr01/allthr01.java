@@ -30,17 +30,17 @@
  * DESCRIPTION
  *     The test exercises JVMTI function GetAllThreads.
  *     The test cases include:
- *     - user-defined java and debug threads
+ *     - platform, virtual and native debug threads
  *     - running and dead threads
  * COMMENTS
  *     Fixed according to the 4480280 bug.
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:allthr01 allthr01 5
+ * @run main/othervm/native -agentlib:allthr01 allthr01
  */
 
-import java.io.PrintStream;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class allthr01 {
 
@@ -55,79 +55,91 @@ public class allthr01 {
         }
     }
 
+    // Sync with native code
+    final static String THREAD_NAME = "thread1";
+
     native static void setSysCnt();
-    native static void checkInfo(int thr_ind);
-    native static int getRes();
-
-    public static Object lock1 = new Object();
-    public static Object lock2 = new Object();
-    public static int waitTime = 2;
-
-    public static void main(String[] args) {
-        System.exit(run(args, System.out) + 95/*STATUS_TEMP*/);
+    native static void startAgentThread();
+    native static void stopAgentThread();
+    native static boolean checkInfo0(int expectedInfoIdx);
+    static void checkInfo(int expectedInfoIdx) {
+        if (!checkInfo0(expectedInfoIdx)) {
+            throw new RuntimeException("checkInfo failed for idx: " + expectedInfoIdx);
+        }
     }
 
-    public static int run(String args[], PrintStream out) {
-        if (args.length > 0) {
-            try {
-                int i  = Integer.parseInt(args[0]);
-                waitTime = i;
-            } catch (NumberFormatException ex) {
-                out.println("# Wrong argument \"" + args[0]
-                    + "\", the default value is used");
-            }
-        }
-        out.println("# Waiting time = " + waitTime + " mins");
-
+    public static void main(String[] args) {
         setSysCnt();
         checkInfo(0);
 
-        ThreadGroup tg = new ThreadGroup("tg1");
-        allthr001a t_a = new allthr001a(tg, "thread1");
-        t_a.setDaemon(true);
+        MyThread platformThread = new MyThread(THREAD_NAME, false);
         checkInfo(1);
 
-        synchronized (lock1) {
-            try {
-                t_a.start();
-                lock1.wait();
-            } catch (InterruptedException e) {
-                throw new Error("Unexpected " + e);
-            }
-        }
+        platformThread.start();
+
         checkInfo(2);
 
-        synchronized (lock2) {
-            lock2.notify();
-        }
-
-        try {
-            t_a.join(waitTime * 60000);
-        } catch (InterruptedException e) {
-            throw new Error("Unexpected " + e);
-        }
+        platformThread.finish();
         checkInfo(3);
 
+        startAgentThread();
         checkInfo(4);
-        return getRes();
+        stopAgentThread();
+
+        MyThread virtualThread = new MyThread(THREAD_NAME, true);
+        virtualThread.start();
+        checkInfo(5);
+        virtualThread.finish();
     }
 }
 
-class allthr001a extends Thread {
-    allthr001a(ThreadGroup tg, String name) {
-        super(tg, name);
+class MyThread implements Runnable {
+    private final Thread thread;
+    private final AtomicBoolean isStarted = new AtomicBoolean(false);
+    private final AtomicBoolean shouldStop = new AtomicBoolean(false);
+
+    MyThread(String name, boolean isVirtual) {
+        if (isVirtual) {
+            thread = Thread.ofVirtual().name(name).unstarted(this);
+        } else {
+            ThreadGroup tg = new ThreadGroup("tg1");
+            thread = Thread.ofPlatform().name(name).group(tg).daemon(true).unstarted(this);
+        }
     }
 
+    void start() {
+        thread.start();
+        waitUntilThreadIsStarted();
+    }
+
+    @Override
     public void run() {
-        synchronized (allthr01.lock2) {
-            synchronized (allthr01.lock1) {
-                allthr01.lock1.notify();
-            }
+        isStarted.set(true);
+        while(!shouldStop.get()) {
             try {
-                allthr01.lock2.wait();
+                Thread.sleep(10);
             } catch (InterruptedException e) {
-                throw new Error("Unexpected " + e);
+                e.printStackTrace();
             }
+        }
+    }
+
+    private void waitUntilThreadIsStarted() {
+        while (isStarted.get()) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    void finish() {
+        try {
+            shouldStop.set(true);
+            thread.join();
+        } catch (InterruptedException e) {
+            throw new Error("Unexpected " + e);
         }
     }
 }

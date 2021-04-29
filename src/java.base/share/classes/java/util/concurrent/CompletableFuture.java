@@ -3052,21 +3052,21 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * @throws NullPointerException if the collection or any of its elements are null
      * @since 99
      */
-    public static <T> Stream<CompletableFuture<T>> completed(Collection<? extends CompletableFuture<T>> cfs) {
-        if (cfs.size() == 0)
-            return Stream.empty();
-        var queue = new LinkedTransferQueue<CompletableFuture<T>>();
-        int count = 0;
-        for (CompletableFuture<T> cf : cfs) {
-            cf.handle((result, exc) -> {
-                queue.add(cf);
-                return null;
-            });
-            count++;
-        }
-        Spliterator<CompletableFuture<T>> s = new BlockingQueueSpliterator<>(queue, count);
-        return StreamSupport.stream(s, false);
-    }
+//    public static <T> Stream<CompletableFuture<T>> completed(Collection<? extends CompletableFuture<T>> cfs) {
+//        if (cfs.size() == 0)
+//            return Stream.empty();
+//        var queue = new LinkedTransferQueue<CompletableFuture<T>>();
+//        int count = 0;
+//        for (CompletableFuture<T> cf : cfs) {
+//            cf.handle((result, exc) -> {
+//                queue.add(cf);
+//                return null;
+//            });
+//            count++;
+//        }
+//        Spliterator<CompletableFuture<T>> s = new BlockingQueueSpliterator<>(queue, count);
+//        return StreamSupport.stream(s, false);
+//    }
 
     /**
      * Returns a stream that is lazily populated with the given CompletableFutures
@@ -3082,71 +3082,71 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
      * @throws NullPointerException if the array or any of its elements are null
      * @since 99
      */
-    @SafeVarargs
-    @SuppressWarnings("varargs")
-    public static <T> Stream<CompletableFuture<T>> completed(CompletableFuture<T>... cfs) {
-        int size = cfs.length;
-        if (size == 0)
-            return Stream.empty();
-        var queue = new LinkedTransferQueue<CompletableFuture<T>>();
-        for (CompletableFuture<T> cf : cfs) {
-            cf.handle((result, exc) -> {
-                queue.add(cf);
-                return null;
-            });
-        }
-        Spliterator<CompletableFuture<T>> s = new BlockingQueueSpliterator<>(queue, size);
-        return StreamSupport.stream(s, false);
-    }
+//    @SafeVarargs
+//    @SuppressWarnings("varargs")
+//    public static <T> Stream<CompletableFuture<T>> completed(CompletableFuture<T>... cfs) {
+//        int size = cfs.length;
+//        if (size == 0)
+//            return Stream.empty();
+//        var queue = new LinkedTransferQueue<CompletableFuture<T>>();
+//        for (CompletableFuture<T> cf : cfs) {
+//            cf.handle((result, exc) -> {
+//                queue.add(cf);
+//                return null;
+//            });
+//        }
+//        Spliterator<CompletableFuture<T>> s = new BlockingQueueSpliterator<>(queue, size);
+//        return StreamSupport.stream(s, false);
+//    }
 
     /**
      * Simple Spliterator with a BlockingQueue as its source. This implementation
      * will be replaced if the APIs go forward beyond prototype.
      */
-    private static class BlockingQueueSpliterator<T>
-            implements Spliterator<CompletableFuture<T>> {
-
-        final BlockingQueue<CompletableFuture<T>> queue;
-        final int size;
-        int taken;   // running count of the number of elements taken
-
-        BlockingQueueSpliterator(BlockingQueue<CompletableFuture<T>> queue, int size) {
-            this.queue = queue;
-            this.size = size;
-        }
-
-        @Override
-        public boolean tryAdvance(Consumer<? super CompletableFuture<T>> action) {
-            Objects.requireNonNull(action);
-            if (taken >= size) {
-                return false;
-            } else {
-                CompletableFuture<T> cf;
-                try {
-                    cf = queue.take();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new CancellationException("Thread interrupted");
-                }
-                taken++;
-                action.accept(cf);
-                return true;
-            }
-        }
-
-        @Override
-        public Spliterator<CompletableFuture<T>> trySplit() {
-            return null;
-        }
-
-        @Override
-        public int characteristics() {
-            return Spliterator.SIZED + Spliterator.NONNULL;
-        }
-
-        @Override
-        public long estimateSize() {
-            return size;
-        }
-    }
+//    private static class BlockingQueueSpliterator<T>
+//            implements Spliterator<CompletableFuture<T>> {
+//
+//        final BlockingQueue<CompletableFuture<T>> queue;
+//        final int size;
+//        int taken;   // running count of the number of elements taken
+//
+//        BlockingQueueSpliterator(BlockingQueue<CompletableFuture<T>> queue, int size) {
+//            this.queue = queue;
+//            this.size = size;
+//        }
+//
+//        @Override
+//        public boolean tryAdvance(Consumer<? super CompletableFuture<T>> action) {
+//            Objects.requireNonNull(action);
+//            if (taken >= size) {
+//                return false;
+//            } else {
+//                CompletableFuture<T> cf;
+//                try {
+//                    cf = queue.take();
+//                } catch (InterruptedException e) {
+//                    Thread.currentThread().interrupt();
+//                    throw new CancellationException("Thread interrupted");
+//                }
+//                taken++;
+//                action.accept(cf);
+//                return true;
+//            }
+//        }
+//
+//        @Override
+//        public Spliterator<CompletableFuture<T>> trySplit() {
+//            return null;
+//        }
+//
+//        @Override
+//        public int characteristics() {
+//            return Spliterator.SIZED + Spliterator.NONNULL;
+//        }
+//
+//        @Override
+//        public long estimateSize() {
+//            return size;
+//        }
+//    }
 }

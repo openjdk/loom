@@ -568,6 +568,10 @@ handleReportEventCompositeCommand(JNIEnv *env,
 
     outStream_sendCommand(&out);
     outStream_destroy(&out);
+
+    // vthread fixme: if we didn't do any suspending, we should allow the vthread ThreadNode
+    // to be released at this point. The thread in question can be extracted the way it is
+    // done in the first loop above.
 }
 
 static void

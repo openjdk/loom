@@ -36,6 +36,7 @@
 #include "code/pcDesc.hpp"
 #include "compiler/compilationPolicy.hpp"
 #include "compiler/compileBroker.hpp"
+#include "compiler/oopMap.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "gc/shared/collectedHeap.hpp"
 #include "jfr/jfrEvents.hpp"
@@ -668,9 +669,6 @@ CodeBlob* CodeCache::patch_nop(NativePostCallNop* nop, void* pc, int& slot) {
     slot = -1;
     log_debug(codecache)("failed to encode %d %d", oopmap_slot, (int) offset);
   }
-#ifdef CONT_DOUBLE_NOP
-  assert (!nop->is_mode2(), "");
-#endif
   return cb;
 }
 
@@ -997,6 +995,9 @@ void CodeCache::initialize() {
 
 void codeCache_init() {
   CodeCache::initialize();
+}
+
+void AOTLoader_init() {
   // Load AOT libraries and add AOT code heaps.
   AOTLoader::initialize();
 }
@@ -1160,7 +1161,9 @@ void CodeCache::mark_all_nmethods_for_evol_deoptimization() {
   while(iter.next()) {
     CompiledMethod* nm = iter.method();
     if (!nm->method()->is_method_handle_intrinsic()) {
-      nm->mark_for_deoptimization();
+      if (nm->can_be_deoptimized()) {
+        nm->mark_for_deoptimization();
+      }
       if (nm->has_evol_metadata()) {
         add_to_old_table(nm);
       }
@@ -1227,7 +1230,7 @@ void CodeCache::make_marked_nmethods_not_entrant(GrowableArray<CompiledMethod*>*
 void CodeCache::make_marked_nmethods_deoptimized(GrowableArray<CompiledMethod*>* marked) {
   for (int i = 0; i < marked->length(); i++) {
     CompiledMethod* nm = marked->at(i);
-    if (nm->is_marked_for_deoptimization()) {
+    if (nm->is_marked_for_deoptimization() && nm->can_be_deoptimized()) {
       nm->make_deoptimized();
     }
   }

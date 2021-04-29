@@ -852,6 +852,15 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
 
 // End of helpers
 
+address TemplateInterpreterGenerator::generate_Continuation_doYield_entry(void) {
+  address entry = __ pc();
+  assert(StubRoutines::cont_doYield() != NULL, "stub not yet generated");
+
+  // TODO LOOM AARCH64
+
+  return entry;
+}
+
 // Various method entries
 //------------------------------------------------------------------------------------------------------------------------
 //

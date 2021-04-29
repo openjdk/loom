@@ -46,11 +46,7 @@
  */
 
 
-import java.io.PrintStream;
-
 public class thrinfo01 {
-
-    final static int JCK_STATUS_BASE = 95;
 
     static {
         try {
@@ -63,73 +59,70 @@ public class thrinfo01 {
         }
     }
 
-    native static void checkInfo(Thread thr, ThreadGroup thr_group, int ind);
-    native static int getRes();
+    native static boolean checkInfo0(Thread thread, ThreadGroup threadGroup, int ind);
+    static void checkInfo(Thread thread, ThreadGroup threadGroup, int ind) {
+        if(!checkInfo0(thread, threadGroup, ind)) {
+            throw new RuntimeException(("Error in checkInfo. See log."));
+        }
+    }
 
     public static void main(String args[]) {
         Thread.currentThread().setName("main");
-        // produce JCK-like exit status.
-        System.exit(run(args, System.out) + JCK_STATUS_BASE);
-    }
-
-    public static int run(String argv[], PrintStream ref) {
-        Thread currThr = Thread.currentThread();
-        checkInfo(currThr, currThr.getThreadGroup(), 0);
+        Thread currentThread = Thread.currentThread();
+        checkInfo(currentThread, currentThread.getThreadGroup(), 0);
 
         ThreadGroup tg = new ThreadGroup("tg1");
-        thrinfo01a t_a = new thrinfo01a(tg, "thread1");
-        t_a.setPriority(Thread.MIN_PRIORITY + 2);
-        t_a.setDaemon(true);
-        checkInfo(t_a, tg, 1);
-        t_a.start();
+        ThreadInfo01a threadInfo01a = new ThreadInfo01a(tg, "thread1");
+        threadInfo01a.setPriority(Thread.MIN_PRIORITY + 2);
+        threadInfo01a.setDaemon(true);
+        checkInfo(threadInfo01a, tg, 1);
+        threadInfo01a.start();
         try {
-            t_a.join();
+            threadInfo01a.join();
         } catch (InterruptedException e) {}
-        checkInfo(t_a, t_a.getThreadGroup(), 1);
+        checkInfo(threadInfo01a, threadInfo01a.getThreadGroup(), 1);
 
-        thrinfo01b t_b = new thrinfo01b();
-        t_b.setPriority(Thread.MIN_PRIORITY);
-        t_b.setDaemon(true);
-        checkInfo(t_b, t_b.getThreadGroup(), 2);
-        t_b.start();
+        ThreadInfo01b threadInfo01b = new ThreadInfo01b();
+        threadInfo01b.setPriority(Thread.MIN_PRIORITY);
+        threadInfo01b.setDaemon(true);
+        checkInfo(threadInfo01b, threadInfo01b.getThreadGroup(), 2);
+        threadInfo01b.start();
         try {
-            t_b.join();
+            threadInfo01b.join();
         } catch (InterruptedException e) {}
-        checkInfo(t_b, t_b.getThreadGroup(), 2);
+        checkInfo(threadInfo01b, threadInfo01b.getThreadGroup(), 2);
 
-        Thread t_c = Thread.ofVirtual().name("vthread").unstarted(new thrinfo01c());
-        checkInfo(t_c, t_c.getThreadGroup(), 3);
-        t_c.start();
+        Thread threadInfo01c = Thread.ofVirtual().name("vthread").unstarted(new ThreadInfo01c());
+        checkInfo(threadInfo01c, threadInfo01c.getThreadGroup(), 3);
+        threadInfo01c.start();
         try {
-            t_c.join();
+            threadInfo01c.join();
         } catch (InterruptedException e) {}
-        checkInfo(t_c, t_c.getThreadGroup(), 3);
-
-        return getRes();
+        checkInfo(threadInfo01c, threadInfo01c.getThreadGroup(), 3);
     }
 }
 
-class thrinfo01a extends Thread {
-    thrinfo01a(ThreadGroup tg, String name) {
+class ThreadInfo01a extends Thread {
+    ThreadInfo01a(ThreadGroup tg, String name) {
         super(tg, name);
     }
 
     public void run() {
-        Thread currThr = Thread.currentThread();
-        thrinfo01.checkInfo(currThr, currThr.getThreadGroup(), 1);
+        Thread currentThread = Thread.currentThread();
+        thrinfo01.checkInfo(currentThread, currentThread.getThreadGroup(), 1);
     }
 }
 
-class thrinfo01b extends Thread {
+class ThreadInfo01b extends Thread {
     public void run() {
-        Thread currThr = Thread.currentThread();
-        thrinfo01.checkInfo(currThr, currThr.getThreadGroup(), 2);
+        Thread currentThread = Thread.currentThread();
+        thrinfo01.checkInfo(currentThread, currentThread.getThreadGroup(), 2);
     }
 }
 
-class thrinfo01c implements Runnable {
+class ThreadInfo01c implements Runnable {
     public void run() {
-        Thread currThr = Thread.currentThread();
-        thrinfo01.checkInfo(currThr, currThr.getThreadGroup(), 3);
+        Thread currentThread = Thread.currentThread();
+        thrinfo01.checkInfo(currentThread, currentThread.getThreadGroup(), 3);
     }
 }

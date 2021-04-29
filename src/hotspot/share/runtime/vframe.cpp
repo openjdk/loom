@@ -39,11 +39,13 @@
 #include "oops/oop.inline.hpp"
 #include "prims/jvmtiExport.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/objectMonitor.hpp"
 #include "runtime/objectMonitor.inline.hpp"
 #include "runtime/osThread.hpp"
 #include "runtime/signature.hpp"
+#include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/synchronizer.hpp"
 #include "runtime/thread.inline.hpp"
@@ -151,8 +153,8 @@ GrowableArray<MonitorInfo*>* javaVFrame::locked_monitors() {
   if (waiting_monitor == NULL) {
     pending_monitor = thread()->current_pending_monitor();
   }
-  oop pending_obj = (pending_monitor != NULL ? (oop) pending_monitor->object() : (oop) NULL);
-  oop waiting_obj = (waiting_monitor != NULL ? (oop) waiting_monitor->object() : (oop) NULL);
+  oop pending_obj = (pending_monitor != NULL ? pending_monitor->object() : (oop) NULL);
+  oop waiting_obj = (waiting_monitor != NULL ? waiting_monitor->object() : (oop) NULL);
 
   for (int index = (mons->length()-1); index >= 0; index--) {
     MonitorInfo* monitor = mons->at(index);
@@ -326,8 +328,16 @@ static StackValue* create_stack_value_from_oop_map(const RegisterMap* reg_map,
 
   // categorize using oop_mask
   if (oop_mask.is_oop(index)) {
+    oop obj = NULL;
+    if (addr != NULL) {
+      if (reg_map->in_cont()) {
+        obj = (reg_map->stack_chunk()->has_bitmap() && UseCompressedOops) ? (oop)HeapAccess<>::oop_load((narrowOop*)addr) : HeapAccess<>::oop_load((oop*)addr);
+      } else {
+        obj = *(oop*)addr;
+      }
+    }
     // reference (oop) "r"
-    Handle h(Thread::current(), addr != NULL ? (*(oop*)addr) : (oop)NULL);
+    Handle h(Thread::current(), obj);
     return new StackValue(h);
   }
   // value (integer) "v"

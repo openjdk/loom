@@ -46,7 +46,7 @@ print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID m
   char* cname = get_method_class_name(jvmti, jni, method);
   const char* virt = jni->IsVirtualThread(thread) ? "virtual" : "carrier";
 
-  printf("\n%s #%d: method: %s::%s, %s thread: %s\n",
+  LOG("\n%s #%d: method: %s::%s, %s thread: %s\n",
          event_name, event_count, cname, mname, virt, tname);
 
   print_stack_trace(jvmti, jni, thread);
@@ -70,7 +70,7 @@ set_breakpoint(JNIEnv *jni, jclass klass, const char *mname)
   err = jvmti->SetBreakpoint(method, location);
   check_jvmti_status(jni, err, "set_or_clear_breakpoint: error in JVMTI SetBreakpoint");
 
-  fflush(0);
+
 }
 
 static void JNICALL
@@ -79,7 +79,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   char* mname = get_method_name(jvmti, jni, method);
 
   if (strcmp(mname, "run") != 0 && strcmp(mname, "yield") != 0) {
-    printf("FAILED: got  unexpected breakpoint in method %s()\n", mname);
+    LOG("FAILED: got  unexpected breakpoint in method %s()\n", mname);
     pass_status = JNI_FALSE;
     deallocate(jvmti, jni, (void*)mname);
     return;
@@ -90,11 +90,11 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
   {
     RawMonitorLocker rml(jvmti, jni, event_mon);
 
-    printf("Breakpoint: %s: Stack Trace of %s thread: %s\n", mname, virt, tname);
+    LOG("Breakpoint: %s: Stack Trace of %s thread: %s\n", mname, virt, tname);
 
     print_frame_event_info(jvmti, jni, thread, method,
                            "Breakpoint", ++breakpoint_count);
-    fflush(0);
+
   }
 
   deallocate(jvmti, jni, (void*)tname);
@@ -107,8 +107,8 @@ ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 
   {
     RawMonitorLocker rml(jvmti, jni, event_mon);
-    printf("\nThreadStart: thread: %p, name: %s\n", (void *) thread, tname);
-    fflush(0);
+    LOG("\nThreadStart: thread: %p, name: %s\n", (void *) thread, tname);
+
   }
 
   deallocate(jvmti, jni, (void*)tname);
@@ -121,8 +121,8 @@ VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 
   {
     RawMonitorLocker rml(jvmti, jni, event_mon);
-    printf("\nVirtualThreadStart: %s, thread: %s\n", virt, tname);
-    fflush(0);
+    LOG("\nVirtualThreadStart: %s, thread: %s\n", virt, tname);
+
   }
 
   deallocate(jvmti, jni, (void*)tname);
@@ -151,7 +151,7 @@ VirtualThreadMount(jvmtiEnv *jvmti, ...) {
   RawMonitorLocker rml(jvmti, jni, event_mon);
   print_frame_event_info(jvmti, jni, thread, method,
                          "VirtualThreadMount", ++vt_mounted_count);
-  fflush(0);
+
 }
 
 // Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
@@ -177,7 +177,7 @@ VirtualThreadUnmount(jvmtiEnv *jvmti, ...) {
 
   print_frame_event_info(jvmti, jni, thread, method,
                          "VirtualThreadUnmount", ++vt_unmounted_count);
-  fflush(0);
+
 }
 
 JNIEXPORT jint JNICALL
@@ -186,7 +186,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiError err; 
 
-  printf("Agent_OnLoad started\n");
+  LOG("Agent_OnLoad started\n");
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
@@ -198,13 +198,13 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = set_ext_event_callback(jvmti, "VirtualThreadMount", VirtualThreadMount);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
+    LOG("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadMount: %s(%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
   err = set_ext_event_callback(jvmti, "VirtualThreadUnmount", VirtualThreadUnmount);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadUnmount: %s(%d)\n",
+    LOG("Agent_OnLoad: Error in JVMTI SetExtEventCallback for VirtualThreadUnmount: %s(%d)\n",
            TranslateError(err), err);
     return JNI_ERR;
   }
@@ -215,47 +215,47 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   err = jvmti->CreateRawMonitor("Events Monitor", &event_mon);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI CreateRawMonitor: %d\n", err);
+    LOG("Agent_OnLoad: Error in JVMTI CreateRawMonitor: %d\n", err);
     return JNI_ERR;
   }
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
+    LOG("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
     return JNI_ERR;
   }
 
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
-    printf("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
+    LOG("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
     return JNI_ERR;
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    LOG("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    LOG("error in JVMTI SetEventNotificationMode: %d\n", err);
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_MOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    LOG("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;
   }
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    printf("error in JVMTI SetEventNotificationMode: %d\n", err);
+    LOG("error in JVMTI SetEventNotificationMode: %d\n", err);
     return JNI_ERR;
   }
 
-  printf("Agent_OnLoad finished\n");
-  fflush(0);
+  LOG("Agent_OnLoad finished\n");
+
 
   return JNI_OK;
 }
@@ -266,7 +266,7 @@ Java_BreakpointInYieldTest_enableEvents(JNIEnv *jni, jclass klass, jthread threa
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
 
-  printf("enableEvents: started\n");
+  LOG("enableEvents: started\n");
 
   jclass k1 = find_class(jvmti, jni, NULL, "Ljava/lang/VirtualThread;");
   jclass k2 = find_class(jvmti, jni, NULL, "Ljava/lang/Continuation;");
@@ -280,18 +280,18 @@ Java_BreakpointInYieldTest_enableEvents(JNIEnv *jni, jclass klass, jthread threa
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_BREAKPOINT, NULL);
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI SetEventNotificationMode: enable BREAKPOINT");
 
-  printf("enableEvents: finished\n");
-  fflush(0);
+  LOG("enableEvents: finished\n");
+
 }
 
 JNIEXPORT jboolean JNICALL
 Java_BreakpointInYieldTest_check(JNIEnv *jni, jclass cls) {
-  printf("\n");
-  printf("check: breakpoint_count:     %d\n", breakpoint_count);
-  printf("check: vt_mounted_count:     %d\n", vt_mounted_count);
-  printf("check: vt_unmounted_count:   %d\n", vt_unmounted_count);
-  printf("\n");
-  fflush(0);
+  LOG("\n");
+  LOG("check: breakpoint_count:     %d\n", breakpoint_count);
+  LOG("check: vt_mounted_count:     %d\n", vt_mounted_count);
+  LOG("check: vt_unmounted_count:   %d\n", vt_unmounted_count);
+  LOG("\n");
+
 
   return pass_status;
 }

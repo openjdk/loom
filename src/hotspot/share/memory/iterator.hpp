@@ -28,6 +28,7 @@
 #include "memory/allocation.hpp"
 #include "memory/memRegion.hpp"
 #include "oops/oopsHierarchy.hpp"
+#include "utilities/bitMap.hpp"
 
 class CodeBlob;
 class nmethod;
@@ -114,10 +115,11 @@ public:
   virtual void do_cld(ClassLoaderData* cld) { ShouldNotReachHere(); }
 };
 
+enum class derived_pointer : intptr_t;
 class DerivedOopClosure : public Closure {
  public:
   enum { SkipNull = true };
-  virtual void do_derived_oop(oop* base, oop* derived) = 0;
+  virtual void do_derived_oop(oop* base, derived_pointer* derived) = 0;
 };
 
 class KlassClosure : public Closure {
@@ -378,7 +380,8 @@ class Devirtualizer {
   template <typename OopClosureType>             static void do_klass(OopClosureType* closure, Klass* k);
   template <typename OopClosureType>             static void do_cld(OopClosureType* closure, ClassLoaderData* cld);
   template <typename OopClosureType>             static bool do_metadata(OopClosureType* closure);
-  template <typename DerivedOopClosureType>      static void do_derived_oop(DerivedOopClosureType* closure, oop* base, oop* derived);
+  template <typename DerivedOopClosureType>      static void do_derived_oop(DerivedOopClosureType* closure, oop* base, derived_pointer* derived);
+  template <typename BitMapClosureType>          static bool do_bit(BitMapClosureType* closure, BitMap::idx_t index);
 };
 
 class OopIteratorClosureDispatch {

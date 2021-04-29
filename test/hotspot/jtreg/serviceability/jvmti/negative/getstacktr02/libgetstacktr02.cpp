@@ -45,7 +45,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
     res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
     if (res != JNI_OK || jvmti == NULL) {
-        printf("Wrong result of a valid call to GetEnv!\n");
+        LOG("Wrong result of a valid call to GetEnv!\n");
         return JNI_ERR;
     }
 
@@ -59,52 +59,52 @@ Java_getstacktr02_check(JNIEnv *env, jclass cls, jthread thread) {
     jint count;
 
     if (jvmti == NULL) {
-        printf("JVMTI client was not properly loaded!\n");
+        LOG("JVMTI client was not properly loaded!\n");
         return STATUS_FAILED;
     }
 
     if (printdump == JNI_TRUE) {
-        printf(">>> Invalid thread check ...\n");
+        LOG(">>> Invalid thread check ...\n");
     }
     err = jvmti->GetStackTrace(cls, 0, 1, &frame, &count);
     if (err != JVMTI_ERROR_INVALID_THREAD) {
-        printf("Error expected: JVMTI_ERROR_INVALID_THREAD, got: %s (%d)\n",
+        LOG("Error expected: JVMTI_ERROR_INVALID_THREAD, got: %s (%d)\n",
                TranslateError(err), err);
         result = STATUS_FAILED;
     }
 
     if (printdump == JNI_TRUE) {
-        printf(">>> Illegal max_count argument check ...\n");
+        LOG(">>> Illegal max_count argument check ...\n");
     }
     err = jvmti->GetStackTrace(thread, 0, -1, &frame, &count);
     if (err != JVMTI_ERROR_ILLEGAL_ARGUMENT) {
-        printf("Error expected: JVMTI_ERROR_ILLEGAL_ARGUMENT, got: %s (%d)\n",
+        LOG("Error expected: JVMTI_ERROR_ILLEGAL_ARGUMENT, got: %s (%d)\n",
                TranslateError(err), err);
         result = STATUS_FAILED;
     }
 
     if (printdump == JNI_TRUE) {
-        printf(">>> (stack_buffer) null pointer check ...\n");
+        LOG(">>> (stack_buffer) null pointer check ...\n");
     }
     err = jvmti->GetStackTrace(thread, 0, 1, NULL, &count);
     if (err != JVMTI_ERROR_NULL_POINTER) {
-        printf("(stack_buffer) error expected: JVMTI_ERROR_NULL_POINTER,");
-        printf(" got: %s (%d)\n", TranslateError(err), err);
+        LOG("(stack_buffer) error expected: JVMTI_ERROR_NULL_POINTER,");
+        LOG(" got: %s (%d)\n", TranslateError(err), err);
         result = STATUS_FAILED;
     }
 
     if (printdump == JNI_TRUE) {
-        printf(">>> (count_ptr) null pointer check ...\n");
+        LOG(">>> (count_ptr) null pointer check ...\n");
     }
     err = jvmti->GetStackTrace(thread, 0, 1, &frame, NULL);
     if (err != JVMTI_ERROR_NULL_POINTER) {
-        printf("(count_ptr) error expected: JVMTI_ERROR_NULL_POINTER,");
-        printf(" got: %s (%d)\n", TranslateError(err), err);
+        LOG("(count_ptr) error expected: JVMTI_ERROR_NULL_POINTER,");
+        LOG(" got: %s (%d)\n", TranslateError(err), err);
         result = STATUS_FAILED;
     }
 
     if (printdump == JNI_TRUE) {
-        printf(">>> ... done\n");
+        LOG(">>> ... done\n");
     }
 
     return result;

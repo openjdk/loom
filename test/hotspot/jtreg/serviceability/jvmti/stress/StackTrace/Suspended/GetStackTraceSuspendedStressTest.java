@@ -38,6 +38,7 @@ public class GetStackTraceSuspendedStressTest extends DebugeeClass {
     private static final String agentLib = "GetStackTraceSuspendedStress";
 
     static final int MSG_COUNT = 1000;
+    static final int VTHREAD_COUNT = 60;
     static final SynchronousQueue<String> QUEUE = new SynchronousQueue<>();
 
     static void producer(String msg) throws InterruptedException {
@@ -49,25 +50,45 @@ public class GetStackTraceSuspendedStressTest extends DebugeeClass {
         QUEUE.put(msg);
     }
 
-    static final Runnable PRODUCER = () -> {
+    static void producer() {
         try {
             for (int i = 0; i < MSG_COUNT; i++) {
                 producer("msg: ");
             }
         } catch (InterruptedException e) { }
-    };
+    }
 
-    static final Runnable CONSUMER = () -> {
+    static void consumer() {
         try {
             for (int i = 0; i < MSG_COUNT; i++) {
                 String s = QUEUE.take();
             }
         } catch (InterruptedException e) { }
+    }
+
+    static String threadName() {
+        return Thread.currentThread().getName();
+    }
+
+    static final Runnable PRODUCER = () -> {
+        String name = threadName();
+
+        System.out.println(name + ": started");
+        producer();
+        System.out.println(name + ": finished");
+    };
+
+    static final Runnable CONSUMER = () -> {
+        String name = threadName();
+
+        System.out.println(name + ": started");
+        consumer();
+        System.out.println(name + ": finished");
     };
 
     public static void test1() throws Exception {
         List<Thread> threads = new ArrayList<>();
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < VTHREAD_COUNT; i++) {
             threads.add(Thread.ofVirtual().name("VThread-Producer-" + i).unstarted(PRODUCER));
             threads.add(Thread.ofVirtual().name("VThread-Consumer-" + i).unstarted(CONSUMER));
         }

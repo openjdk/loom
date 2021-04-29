@@ -23,15 +23,16 @@
 
 /**
  * @test
+ * @summary Stress parking with CompletableFuture timed get
  * @requires vm.debug != true
  * @run main/othervm -Xmx1g TimedGet
- * @summary Stress parking with CompletableFuture timed get
  */
 
 /**
  * @test
  * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -Xmx4g TimedGet
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal
+ *     -XX:CompilationMode=high-only-quick-internal -Xmx4g TimedGet
  * @summary Stress parking with CompletableFuture timed get
  */
 
@@ -66,7 +67,7 @@ public class TimedGet {
             futures.add(future);
 
             // start a thread that uses a timed-get to wait for the result
-            Thread thread = Thread.startVirtualThread(() -> {
+            Thread thread = Thread.ofVirtual().start(() -> {
                 try {
                     String result = future.get(1, TimeUnit.DAYS);
                     if (!RESULT.equals(result)) {
