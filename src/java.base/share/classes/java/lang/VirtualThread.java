@@ -451,11 +451,8 @@ class VirtualThread extends Thread {
     private void parkOnCarrierThread() {
         assert state() == PARKING;
 
-        // record event when mounted
-        VirtualThreadPinnedEvent event = new VirtualThreadPinnedEvent();
-        if (event.isEnabled()) {
-            event.commit();
-        }
+        var pinnedEvent = new VirtualThreadPinnedEvent();
+        pinnedEvent.begin();
 
         // switch to carrier thread
         Thread carrier = this.carrierThread;
@@ -489,6 +486,11 @@ class VirtualThread extends Thread {
             // restore interrupt status
             if (awaitInterrupted)
                 Thread.currentThread().interrupt();
+        }
+
+        // commit event if enabled
+        if (pinnedEvent.isEnabled()) {
+            pinnedEvent.commit();
         }
     }
 
