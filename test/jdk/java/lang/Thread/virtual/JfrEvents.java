@@ -65,6 +65,7 @@ public class JfrEvents {
                 for (int i = 0; i < 100; i++) {
                     executor.submit(() -> { });
                 }
+                Thread.sleep(1000); // give time for thread end events to be recorded
             } finally {
                 recording.stop();
             }
