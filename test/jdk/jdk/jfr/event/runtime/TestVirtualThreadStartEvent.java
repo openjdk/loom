@@ -41,7 +41,7 @@ import jdk.test.lib.jfr.Events;
  * @run main/othervm jdk.jfr.event.runtime.TestVirtualThreadStartEvent
  */
 public class TestVirtualThreadStartEvent {
-    private final static String EVENT_NAME_THREAD_START = EventNames.ThreadStart;
+    private final static String EVENT_NAME_THREAD_START = EventNames.VirtualThreadStart;
 
     public static void main(String[] args) throws Throwable {
         try (Recording recording = new Recording()) {
