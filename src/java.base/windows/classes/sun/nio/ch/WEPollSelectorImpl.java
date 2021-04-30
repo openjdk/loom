@@ -179,7 +179,7 @@ class WEPollSelectorImpl extends SelectorImpl {
                 if (ski != null) {
                     int events = WEPoll.getEvents(event);
                     if ((events & WEPoll.EPOLLPRI) != 0) {
-                        Net.discardUrgentData(ski.getFD());
+                        Net.discardOOB(ski.getFD());
                     }
                     int rOps = toReadyOps(events);
                     numKeysUpdated += processReadyEvents(rOps, ski, action);

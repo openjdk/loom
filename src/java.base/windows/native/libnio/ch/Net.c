@@ -793,7 +793,7 @@ Java_sun_nio_ch_Net_sendOOB(JNIEnv* env, jclass this, jobject fdo, jbyte b)
 }
 
 JNIEXPORT jboolean JNICALL
-Java_sun_nio_ch_Net_discardUrgentData(JNIEnv* env, jclass clazz, jobject fdo)
+Java_sun_nio_ch_Net_discardOOB(JNIEnv* env, jclass clazz, jobject fdo)
 {
     char data[8];
     jboolean discarded = JNI_FALSE;

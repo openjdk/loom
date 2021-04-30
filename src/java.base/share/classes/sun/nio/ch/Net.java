@@ -682,8 +682,7 @@ public class Net {
     /**
      * Read and discard urgent data (MSG_OOB) on the socket.
      */
-    static native boolean discardUrgentData(FileDescriptor fd);
-
+    static native boolean discardOOB(FileDescriptor fd);
 
     // -- Multicast support --
 
