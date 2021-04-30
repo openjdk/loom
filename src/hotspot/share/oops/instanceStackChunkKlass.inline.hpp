@@ -791,10 +791,19 @@ inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(int stack_size_in_words
 template <bool mixed>
 void InstanceStackChunkKlass::run_nmethod_entry_barrier_if_needed(const StackChunkFrameStream<mixed>& f) {
   CodeBlob* cb = f.cb();
-  if ((mixed && cb == nullptr) || !cb->is_nmethod()) return;
-  nmethod* nm = cb->as_nmethod();
-  if (BarrierSet::barrier_set()->barrier_set_nmethod()->is_armed(nm)) {
-    nm->run_nmethod_entry_barrier();
+  if ((mixed && cb == nullptr) || !cb->is_nmethod()) {
+    // Mark interpreted frames for marking_cycle
+    // if jvmtiExport::has_redefined_a_class() ???
+    assert(f.is_interpreted(), "what else?");
+    Method* im = f.to_frame().interpreter_frame_method();
+    ResourceMark rm;
+    tty->print_cr("marking method %s",im->name_and_sig_as_C_string());
+    im->record_marking_cycle();
+  } else {
+    nmethod* nm = cb->as_nmethod();
+    if (BarrierSet::barrier_set()->barrier_set_nmethod()->is_armed(nm)) {
+      nm->run_nmethod_entry_barrier();
+    }
   }
 }
 

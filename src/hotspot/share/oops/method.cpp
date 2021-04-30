@@ -2255,8 +2255,13 @@ void Method::set_on_stack(const bool value) {
   if (value && !already_set) {
     MetadataOnStackMark::record(this);
   }
-  assert(!value || !is_old() || is_obsolete() || is_running_emcp(),
-         "emcp methods cannot run after emcp bit is cleared");
+}
+
+void Method::record_marking_cycle() {
+  // If any method is on the stack in continuations, none of them can be reclaimed,
+  // so save the marking cycle to check for the whole class in the cpCache.
+  // The cpCache is writeable.
+  constants()->cache()->record_marking_cycle();
 }
 
 // Called when the class loader is unloaded to make all methods weak.
