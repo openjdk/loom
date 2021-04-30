@@ -244,7 +244,7 @@ JvmtiVTMTDisabler::enable_VTMT() {
 
   // A JavaThread disabling VTMT can't suspend itself without deadlock.
   // It is self-suspended here after VTMT has been enabled again.
-  while (thread->is_external_suspend()) {
+  while (thread->is_suspended()) { // TODO SERGUEI
     ml.wait();
   }
 }
@@ -260,7 +260,7 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 
   // block while transitions are disabled
   while (_VTMT_disable_count > 0 ||
-         thread->is_external_suspend() ||
+         thread->is_suspended() || // TODO SERGUEI
          JvmtiVTSuspender::vthread_is_ext_suspended(vth())) {
     ml.wait();
   }
@@ -283,7 +283,7 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
     if (thread->is_cthread_pending_suspend()) {
       thread->clear_cthread_pending_suspend();
       // The JavaThread* will be suspended upon return to Java.
-      thread->set_external_suspend();
+      // thread->set_external_suspend(); // TODO SERGUEI
     }
   }
   thread->set_is_in_VTMT(false);
@@ -567,11 +567,6 @@ int JvmtiThreadState::cur_stack_depth() {
   }
   return _cur_stack_depth;
 }
-
-bool JvmtiThreadState::may_be_walked() {
-  return (get_thread()->is_being_ext_suspended() || (JavaThread::current() == get_thread()));
-}
-
 
 void JvmtiThreadState::process_pending_step_for_popframe() {
   // We are single stepping as the last part of the PopFrame() dance

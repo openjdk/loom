@@ -61,7 +61,7 @@
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/objectMonitor.hpp"
 #include "runtime/objectMonitor.inline.hpp"
-#include "runtime/os.inline.hpp"
+#include "runtime/os.hpp"
 #include "runtime/osThread.hpp"
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/serviceThread.hpp"
@@ -1307,14 +1307,14 @@ void JvmtiExport::check_suspend_at_safepoint(JavaThread *thread) {
     if (state != NULL) {
       printf("SERG: at_safepoint: state: %p virt: %d jt: %p susp: %d ct pend susp: %d\n",
              (void*)state, state->is_virtual(), (void*)thread,
-             thread->is_external_suspend() || JvmtiVTSuspender::vthread_is_ext_suspended(vt),
+             thread->is_suspended() || JvmtiVTSuspender::vthread_is_ext_suspended(vt),  // TODO_SERGUEI
              thread->is_cthread_pending_suspend()
             );
       fflush(0);
     }
 #endif
     // block while suspended bit is set
-    while (thread->is_external_suspend() ||
+    while (thread->is_suspended() || // TODO_SERGUEI
            JvmtiVTSuspender::vthread_is_ext_suspended(vth())) {
       ml.wait();
     }

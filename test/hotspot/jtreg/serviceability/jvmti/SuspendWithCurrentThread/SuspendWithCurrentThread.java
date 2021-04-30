@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -129,8 +129,8 @@ public class SuspendWithCurrentThread {
                 " to suspend all tested threads including itself");
             ThreadToSuspend.setAllThreadsReady();
 
-            if (!checkSuspendedStatus()) {
-                throw new RuntimeException("Main: FAILED status returned from checkTestedThreadsSuspended");
+            while (!checkSuspendedStatus()) {
+                Thread.sleep(10);
             }
 
             log("Main: resuming all tested threads");
@@ -186,7 +186,6 @@ class ThreadToSuspend extends Thread {
     // run thread continuously
     public void run() {
         boolean needSuspend = true;
-
         threadReady = true;
 
         // run in a loop

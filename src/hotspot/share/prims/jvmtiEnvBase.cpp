@@ -720,7 +720,7 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
       // Suspended carrier thread with a mounted virtual thread.
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
-    if (jt->is_being_ext_suspended()) {
+    if (jt->is_suspended()) { // TODO SERGUEI
       if (jt->vthread() == NULL || jt->vthread() == thread_oop) {
         state |= JVMTI_THREAD_STATE_SUSPENDED;
       }
@@ -1504,7 +1504,7 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
                              int* need_safepoint_p) {
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     if (single_suspend) {
-      bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
+      bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop); // TODO SERGUEI
       if (vthread_ext_suspended) {
         return JVMTI_ERROR_THREAD_SUSPENDED;
       }
@@ -1517,7 +1517,7 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
     // The java_thread can be still blocked in VTMT transition after a previous JVMTI resume call.
     // There is no need to suspend the java_thread in this case. After vthread unblocking,
     // it will check for ext_suspend request and suspend itself if necessary.
-    if (java_thread == NULL || java_thread->is_being_ext_suspended()) {
+    if (java_thread == NULL) { // TODO SERGUEI
       // We are done if the virtual thread is unmounted or
       // the java_thread is externally suspended.
       return JVMTI_ERROR_NONE;
@@ -1529,7 +1529,6 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
     return JVMTI_ERROR_NONE;
   }
   {
-    MutexLocker ml(java_thread->SR_lock(), Mutex::_no_safepoint_check_flag);
     oop mounted_vt = java_thread->mounted_vthread();
 
     if (single_suspend && !java_lang_VirtualThread::is_instance(thread_oop) &&
@@ -1542,14 +1541,12 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
       java_thread->set_cthread_pending_suspend();
       return JVMTI_ERROR_NONE;
     }
-    if (java_thread->is_external_suspend()) {
-      // Don't allow nested external suspend requests.
+    if (java_thread->is_suspended()) {
       return JVMTI_ERROR_THREAD_SUSPENDED;
     }
     if (java_thread->is_exiting()) { // thread is in the process of exiting
       return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
-    java_thread->set_external_suspend();
   }
   if (need_safepoint_p == NULL) { // single thread suspend
     if (!JvmtiSuspendControl::suspend(java_thread)) {
@@ -1590,7 +1587,7 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
     // The java_thread can be still blocked in VTMT transition after a previous JVMTI suspend call.
     // There is no need to resume the java_thread in this case. After vthread unblocking,
     // it will check for ext_suspend request and remain resumed if necessary.
-    if (java_thread == NULL || !java_thread->is_being_ext_suspended()) {
+    if (java_thread == NULL || !java_thread->is_suspended()) { // TODO SERGUEI
       // We are done if the virtual thread is unmounted or
       // the java_thread is not externally suspended.
       return JVMTI_ERROR_NONE;
@@ -1607,7 +1604,7 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
     java_thread->clear_cthread_pending_suspend();
     return JVMTI_ERROR_NONE;
   }
-  if (!java_thread->is_being_ext_suspended()) {
+  if (!java_thread->is_suspended()) { // TODO SERGUEI
     return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
   }
   if (!JvmtiSuspendControl::resume(java_thread)) {
@@ -1906,7 +1903,7 @@ SetForceEarlyReturn::doit(Thread *target, bool self) {
   HandleMark   hm(current_thread);
 
   if (!self) {
-    if (!java_thread->is_external_suspend()) {
+    if (!java_thread->is_suspended()) {
       _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
       return;
     }
@@ -2039,7 +2036,7 @@ UpdateForPopTopFrameClosure::doit(Thread *target, bool self) {
   JavaThread* java_thread = target->as_Java_thread();
   assert(java_thread == _state->get_thread(), "Must be");
 
-  if (!self && !java_thread->is_external_suspend()) {
+  if (!self && !java_thread->is_suspended()) {
     _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     return;
   }
@@ -2131,7 +2128,7 @@ SetFramePopClosure::doit(Thread *target, bool self) {
   // TBD: This might need to be corrected for detached carrier and virtual threads.
   assert(_state->get_thread_or_saved() == java_thread, "Must be");
 
-  if (!self && !java_thread->is_external_suspend()) {
+  if (!self && !java_thread->is_suspended()) {
     _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     return;
   }
@@ -2272,7 +2269,7 @@ VThreadGetThreadStateClosure::do_thread(Thread *target) {
   if (vthread_state == java_lang_VirtualThread::RUNNING && carrier_thread_oop != NULL) {
     state = (jint) java_lang_Thread::get_thread_status(carrier_thread_oop);
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread_oop);
-    if (java_thread->is_being_ext_suspended()) {
+    if (java_thread->is_suspended()) { // TODO SERGUEI
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
   } else {

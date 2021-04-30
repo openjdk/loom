@@ -429,7 +429,7 @@ void ZHeap::relocate() {
   _relocate.relocate(&_relocation_set);
 
   // Update statistics
-  ZStatHeap::set_at_relocate_end(_page_allocator.stats());
+  ZStatHeap::set_at_relocate_end(_page_allocator.stats(), _object_allocator.relocated());
 }
 
 bool ZHeap::is_allocating(uintptr_t addr) const {
