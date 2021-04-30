@@ -34,13 +34,15 @@ import java.util.function.Supplier;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
 
+import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
+
 /**
  * Represents a scoped variable.
  *
- * <p> A scoped variable differs from a normal variable in that it is dynamically
+ * <p> A scope-local variable differs from a normal variable in that it is dynamically
  * scoped and intended for cases where context needs to be passed from a caller
- * to a transitive callee without using an explicit parameter. A scoped variable
- * does not have a default/initial value, it is bound, meaning it gets a value,
+ * to a transitive callee without using an explicit parameter. A scope-local variable
+ * does not have a default/initial value: it is bound, meaning it gets a value,
  * when executing an operation specified to {@link #where(ScopeLocal, Object)}.
  * Code executed by the operation
  * uses the {@link #get()} method to get the value of the variable. The variable reverts
@@ -96,6 +98,7 @@ import jdk.internal.vm.annotation.Stable;
  * @param <T> the variable type
  * @since 99
  */
+@jdk.internal.javac.PreviewFeature(feature=SCOPE_LOCALS)
 public final class ScopeLocal<T> {
     private final @Stable Class<? super T> type;
     private final @Stable int hash;
