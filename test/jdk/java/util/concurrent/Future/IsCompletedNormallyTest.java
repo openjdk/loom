@@ -23,33 +23,43 @@
 
 /*
  * @test
- * @summary Test default implementation of Future.isCompletedNormally
+ * @summary Test Future::isCompletedNormally, including default implementation
+ * @library ../ExecutorService
  * @run testng IsCompletedNormallyTest
  */
 
-import java.time.Duration;
-import java.util.Objects;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 public class IsCompletedNormallyTest {
 
+    @DataProvider(name = "executors")
+    public Object[][] executors() {
+        return new Object[][] {
+            // ensures that default implementation is tested
+            { new DelegatingExecutorService(Executors.newCachedThreadPool()), },
+
+            // executors that may return a Future that overrides isCompletedNormally
+            { new ForkJoinPool(), },
+            { Executors.newCachedThreadPool(), },
+        };
+    }
+    
     /**
      * Test isCompletedNormally when the task has already completed.
      */
-    @Test
-    public void testIsCompletedNormally1() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<String> future = submit(executor, () -> "foo");
-            await(future);
+    @Test(dataProvider = "executors")
+    public void testIsCompletedNormally1(ExecutorService executor) {
+        try (executor) {
+            Future<String> future = executor.submit(() -> "foo");
+            awaitDone(future);
             assertTrue(future.isCompletedNormally());
         }
     }
@@ -57,17 +67,15 @@ public class IsCompletedNormallyTest {
     /**
      * Test isCompletedNormally when the task has not completed.
      */
-    @Test
-    public void testIsCompletedNormally2() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> {
-                Thread.sleep(Duration.ofSeconds(60));
-                return null;
-            });
+    @Test(dataProvider = "executors")
+    public void testIsCompletedNormally2(ExecutorService executor) throws Exception {
+        try (executor) {
+            var latch = new CountDownLatch(1);
+            Future<?> future = executor.submit(() -> { latch.await(); return null; });
             try {
                 assertFalse(future.isCompletedNormally());
             } finally {
-                future.cancel(true); // interrupt sleep
+                latch.countDown();
             }
         }
     }
@@ -75,11 +83,11 @@ public class IsCompletedNormallyTest {
     /**
      * Test isCompletedNormally when the task has completed with an exception.
      */
-    @Test
-    public void testIsCompletedNormally3() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> { throw new RuntimeException(); });
-            await(future);
+    @Test(dataProvider = "executors")
+    public void testIsCompletedNormally3(ExecutorService executor) {
+        try (executor) {
+            Future<?> future = executor.submit(() -> { throw new RuntimeException(); });
+            awaitDone(future);
             assertFalse(future.isCompletedNormally());
         }
     }
@@ -87,15 +95,17 @@ public class IsCompletedNormallyTest {
     /**
      * Test isCompletedNormally when the task is cancelled.
      */
-    @Test
-    public void testIsCompletedNormally4() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> {
-                Thread.sleep(Duration.ofSeconds(60));
-                return null;
-            });
+    @Test(dataProvider = "executors")
+    public void testIsCompletedNormally4(ExecutorService executor) {
+        try (executor) {
+            var latch = new CountDownLatch(1);
+            Future<?> future = executor.submit(() -> { latch.await(); return null; });
             future.cancel(true);
-            assertFalse(future.isCompletedNormally());
+            try {
+                assertFalse(future.isCompletedNormally());
+            } finally {
+                latch.countDown();
+            }
         }
     }
 
@@ -103,12 +113,11 @@ public class IsCompletedNormallyTest {
      * Test isCompletedNormally with the interrupt status and the task has
      * already completed.
      */
-    @Test
-    public void testIsCompletedNormally5() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<String> future = submit(executor, () -> "foo");
-            await(future);
-
+    @Test(dataProvider = "executors")
+    public void testIsCompletedNormally5(ExecutorService executor) {
+        try (executor) {
+            Future<String> future = executor.submit(() -> "foo");
+            awaitDone(future);
             Thread.currentThread().interrupt();
             try {
                 assertTrue(future.isCompletedNormally());
@@ -123,21 +132,18 @@ public class IsCompletedNormallyTest {
      * Test isCompletedNormally with the interrupt status set and when
      * the task has not completed.
      */
-    @Test
-    public void testIsCompletedNormally6() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> {
-                Thread.sleep(Duration.ofSeconds(60));
-                return null;
-            });
-
+    @Test(dataProvider = "executors")
+    public void testIsCompletedNormally6(ExecutorService executor) {
+        try (executor) {
+            var latch = new CountDownLatch(1);
+            Future<?> future = executor.submit(() -> { latch.await(); return null; });
             Thread.currentThread().interrupt();
             try {
                 assertFalse(future.isCompletedNormally());
                 assertTrue(Thread.currentThread().isInterrupted());
             } finally {
                 Thread.interrupted();
-                future.cancel(true);  // interrupt sleep
+                latch.countDown();
             }
         }
     }
@@ -146,12 +152,11 @@ public class IsCompletedNormallyTest {
      * Test isCompletedNormally with the interrupt status and the task has
      * already completed with an exception.
      */
-    @Test
-    public void testIsCompletedNormally7() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> { throw new RuntimeException(); });
-            await(future);
-
+    @Test(dataProvider = "executors")
+    public void testIsCompletedNormally7(ExecutorService executor) {
+        try (executor) {
+            Future<?> future = executor.submit(() -> { throw new RuntimeException(); });
+            awaitDone(future);
             Thread.currentThread().interrupt();
             try {
                 assertFalse(future.isCompletedNormally());
@@ -166,64 +171,31 @@ public class IsCompletedNormallyTest {
      * Test isCompletedNormally with the interrupt status and the task is
      * cancelled.
      */
-    @Test
-    public void testIsCompletedNormally8() {
-        try (var executor = Executors.newCachedThreadPool()) {
-            Future<?> future = submit(executor, () -> {
-                Thread.sleep(Duration.ofSeconds(60));
-                return null;
-            });
+    @Test(dataProvider = "executors")
+    public void testIsCompletedNormally8(ExecutorService executor) {
+        try (executor) {
+            var latch = new CountDownLatch(1);
+            Future<?> future = executor.submit(() -> { latch.await(); return null; });
             future.cancel(true);
-
             Thread.currentThread().interrupt();
             try {
                 assertFalse(future.isCompletedNormally());
                 assertTrue(Thread.currentThread().isInterrupted());
             } finally {
                 Thread.interrupted();
+                latch.countDown();
             }
         }
     }
 
     /**
-     * Submits the task to the executor and wraps the Future so that its
-     * default methods can be tested.
-     */
-    private static <V> Future<V> submit(ExecutorService executor, Callable<V> task) {
-        Future<V> future = executor.submit(task);
-        return new Future<V>() {
-            @Override
-            public boolean cancel(boolean mayInterruptIfRunning) {
-                return future.cancel(mayInterruptIfRunning);
-            }
-            @Override
-            public boolean isCancelled() {
-                return future.isCancelled();
-            }
-            @Override
-            public boolean isDone() {
-                return future.isDone();
-            }
-            @Override
-            public V get() throws InterruptedException, ExecutionException {
-                return future.get();
-            }
-            @Override
-            public V get(long timeout, TimeUnit unit)
-                    throws InterruptedException, ExecutionException, TimeoutException {
-                return future.get(timeout, unit);
-            }
-        };
-    }
-
-    /**
      * Waits for the future to be done.
      */
-    private static void await(Future<?> future) {
+    private static void awaitDone(Future<?> future) {
         boolean interrupted = false;
         while (!future.isDone()) {
             try {
-                Thread.sleep(50);
+                Thread.sleep(10);
             } catch (InterruptedException e) {
                 interrupted = true;
             }

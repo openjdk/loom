@@ -30,13 +30,42 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Wraps an ExecutorService to allow ExecutorService's default methods to be tested.
+ * Wraps an ExecutorService to allow ExecutorService and Future's default
+ * methods to be tested.
  */
 class DelegatingExecutorService implements ExecutorService {
     private final ExecutorService delegate;
+
     DelegatingExecutorService(ExecutorService delegate) {
         this.delegate = delegate;
     }
+
+    private <V> Future<V> wrap(Future<V> future) {
+        return new Future<V>() {
+            @Override
+            public boolean cancel(boolean mayInterruptIfRunning) {
+                return future.cancel(mayInterruptIfRunning);
+            }
+            @Override
+            public boolean isCancelled() {
+                return future.isCancelled();
+            }
+            @Override
+            public boolean isDone() {
+                return future.isDone();
+            }
+            @Override
+            public V get() throws InterruptedException, ExecutionException {
+                return future.get();
+            }
+            @Override
+            public V get(long timeout, TimeUnit unit)
+                    throws InterruptedException, ExecutionException, TimeoutException {
+                return future.get(timeout, unit);
+            }
+        };
+    };
+
     @Override
     public void shutdown() {
         delegate.shutdown();
@@ -60,32 +89,31 @@ class DelegatingExecutorService implements ExecutorService {
     }
     @Override
     public <T> Future<T> submit(Callable<T> task) {
-        return delegate.submit(task);
+        return wrap(delegate.submit(task));
     }
     @Override
     public <T> Future<T> submit(Runnable task, T result) {
-        return delegate.submit(task, result);
+        return wrap(delegate.submit(task, result));
     }
     @Override
     public Future<?> submit(Runnable task) {
-        return delegate.submit(task);
+        return wrap(delegate.submit(task));
     }
     @Override
     public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
             throws InterruptedException {
-        return delegate.invokeAll(tasks);
+        return delegate.invokeAll(tasks).stream().map(f -> wrap(f)).toList();
     }
     @Override
     public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
             throws InterruptedException {
-        return delegate.invokeAll(tasks, timeout, unit);
+        return delegate.invokeAll(tasks, timeout, unit).stream().map(f -> wrap(f)).toList();
     }
     @Override
     public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
             throws InterruptedException, ExecutionException {
         return delegate.invokeAny(tasks);
     }
-
     @Override
     public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
