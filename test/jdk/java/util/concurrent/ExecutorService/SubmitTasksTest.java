@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Test default implementation of ExecutorService.submit(Collection)
+ * @summary Test ExecutorService.submit(Collection), including default implementation
  * @run testng SubmitTasksTest
  */
 

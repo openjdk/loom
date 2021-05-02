@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Test default implementation of 2-arg ExecutorService.invokeAll
+ * @summary Test 2-arg ExecutorService.invokeAll, including default implementation
  * @run testng InvokeAllTest
  */
 
