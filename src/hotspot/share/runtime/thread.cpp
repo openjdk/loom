@@ -1805,10 +1805,8 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
 //   - Target thread will not enter any new monitors.
 //
 bool JavaThread::java_suspend() {
-
   // A JavaThread disabling VTMT can't be suspended without deadlock.
-  // It will be self-suspended after VTMT is reenabled.
-  // if (is_VTMT_disabler()) TODO SERGUEI ???
+  assert(!is_VTMT_disabler(), "sanity check");
 
   ThreadsListHandle tlh;
   if (!tlh.includes(this)) {

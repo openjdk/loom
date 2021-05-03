@@ -106,7 +106,6 @@
   template(PrintCompileQueue)                     \
   template(PrintClassHierarchy)                   \
   template(ThreadSuspend)                         \
-  template(ThreadsSuspendJVMTI)                   \
   template(ICBufferFull)                          \
   template(ScavengeMonitors)                      \
   template(PrintMetadata)                         \

@@ -1005,10 +1005,16 @@ JvmtiEnv::SuspendThread(jthread thread) {
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
-  err = suspend_thread(thread_oop,
-                       java_thread,
-                       true,  // single suspend
-                       NULL); // no need for extra safepoint
+  if (java_thread != NULL && java_thread == JavaThread::current()) {
+    // current thread will be suspended in the ~VTMTDisabler
+    vtmt_disabler.set_self_suspend();
+    err = JVMTI_ERROR_NONE;
+  } else {
+    err = suspend_thread(thread_oop,
+                         java_thread,
+                         true,  // single suspend
+                         NULL); // no need for extra safepoint
+  }
   return err;
 } /* end SuspendThread */
 
@@ -1019,13 +1025,13 @@ JvmtiEnv::SuspendThread(jthread thread) {
 jvmtiError
 JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvmtiError* results) {
   int self_index = -1;
-  int needSafepoint = 0;  // > 0 if we need a safepoint
   oop thread_oop = NULL;
   JavaThread *java_thread = NULL;
+  JavaThread* current = JavaThread::current();
 
   {
     JvmtiVTMTDisabler vtmt_disabler;
-    ThreadsListHandle tlh;
+    ThreadsListHandle tlh(current);
 
     for (int i = 0; i < request_count; i++) {
       jthread thread = request_list[i];
@@ -1036,24 +1042,16 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
           continue;
         }
       }
+      if (java_thread == current) {
+        self_index = i;
+        // current thread will be suspended in the ~VTMTDisabler
+        vtmt_disabler.set_self_suspend();
+        continue;
+      }
       results[i] = suspend_thread(thread_oop,
                                   java_thread,
                                   true, // single suspend
-                                  &needSafepoint);
-    }
-  }
-  if (self_index >= 0) {
-    JavaThread* current = JavaThread::current();
-    if (!JvmtiSuspendControl::suspend(current)) {
-      // Either the thread is already suspended or
-      // it was in the process of exiting.
-      if (current->is_exiting()) {
-        results[self_index] = JVMTI_ERROR_THREAD_NOT_ALIVE;
-      } else {
-        results[self_index] = JVMTI_ERROR_THREAD_SUSPENDED;
-      }
-    } else {
-      results[self_index] = JVMTI_ERROR_NONE;  // indicate successful suspend
+                                  NULL);
     }
   }
   // per-thread suspend results returned via results parameter
@@ -1063,7 +1061,6 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
 
 jvmtiError
 JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list) {
-  int needSafepoint = 0;  // > 0 if a safepoint is needed
   jvmtiError err = JvmtiEnvBase::check_thread_list(except_count, except_list);
   if (err != JVMTI_ERROR_NONE) {
     return err;
@@ -1102,7 +1099,7 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
         suspend_thread(thread_oop,
                        java_thread,
                        false, // suspend all
-                       &needSafepoint);
+                       NULL);
       }
     }
     JvmtiVTSuspender::register_all_vthreads_suspend();
@@ -1115,10 +1112,6 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
         JvmtiVTSuspender::register_vthread_resume(thread_oop);
       }
     }
-  }
-  if (needSafepoint > 0) {
-    VM_ThreadsSuspendJVMTI tsj;
-    VMThread::execute(&tsj);
   }
   return JVMTI_ERROR_NONE;
 }

@@ -215,6 +215,13 @@ unsigned short JvmtiVTMTDisabler::_VTMT_count = 0;
 // VTMT is disabled while this counter is positive
 unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
 
+JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
+  enable_VTMT();
+  if (_self_suspend) {
+    JvmtiSuspendControl::suspend(JavaThread::current());
+  }
+}
+
 void
 JvmtiVTMTDisabler::disable_VTMT() {
   JavaThread* thread = JavaThread::current();
@@ -241,12 +248,6 @@ JvmtiVTMTDisabler::enable_VTMT() {
   }
   JavaThread* thread = JavaThread::current();
   thread->set_is_VTMT_disabler(false);
-
-  // A JavaThread disabling VTMT can't suspend itself without deadlock.
-  // It is self-suspended here after VTMT has been enabled again.
-  while (thread->is_suspended()) { // TODO SERGUEI
-    ml.wait();
-  }
 }
 
 void
@@ -260,7 +261,6 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 
   // block while transitions are disabled
   while (_VTMT_disable_count > 0 ||
-         thread->is_suspended() || // TODO SERGUEI
          JvmtiVTSuspender::vthread_is_ext_suspended(vth())) {
     ml.wait();
   }
@@ -271,22 +271,24 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 void
 JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   JavaThread* thread = JavaThread::current();
-  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  {
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  _VTMT_count--;
+    _VTMT_count--;
 
-  // unblock waiting VTMT disablers
-  if (_VTMT_disable_count > 0) {
-    ml.notify_all();
+    // unblock waiting VTMT disablers
+    if (_VTMT_disable_count > 0) {
+      ml.notify_all();
+    }
+    thread->set_is_in_VTMT(false);
   }
   if (callsite_tag == 1) { // finish_VTMT for a vthread unmount
     if (thread->is_cthread_pending_suspend()) {
       thread->clear_cthread_pending_suspend();
-      // The JavaThread* will be suspended upon return to Java.
-      // thread->set_external_suspend(); // TODO SERGUEI
+      // TBD: Need sync here.
+      JvmtiSuspendControl::suspend(thread);
     }
   }
-  thread->set_is_in_VTMT(false);
 }
 
 /* VThreadList implementation */

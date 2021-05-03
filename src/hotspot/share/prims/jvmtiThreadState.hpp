@@ -84,9 +84,16 @@ class JvmtiVTMTDisabler {
   static void disable_VTMT();
   static void enable_VTMT();
 
+  bool _self_suspend;
+
  public:
-  JvmtiVTMTDisabler() { disable_VTMT(); }
-  ~JvmtiVTMTDisabler() { enable_VTMT(); }
+  JvmtiVTMTDisabler() {
+    _self_suspend = false;
+    disable_VTMT();
+  }
+  ~JvmtiVTMTDisabler();
+
+  void set_self_suspend() { _self_suspend = true; }
   static void start_VTMT(jthread vthread, int callsite_tag);
   static void finish_VTMT(jthread vthread, int callsite_tag);
 };
