@@ -135,7 +135,7 @@ public interface Future<V> {
     /**
      * Returns {@code true} if this task completed normally. Returns
      * {@code false} if the task has not completed, completed with an
-     * exception or error, or was cancelled before it completed normally.
+     * exception or error, or was cancelled before it completed.
      *
      * @implSpec
      * The default implementation invokes {@code isDone} to test if the task
@@ -206,7 +206,7 @@ public interface Future<V> {
                 } catch (InterruptedException e) {
                     interrupted = true;
                 } catch (ExecutionException e) {
-                    throw new CompletionException(e);
+                    throw new CompletionException(e.getCause());
                 }
             }
         } finally {
