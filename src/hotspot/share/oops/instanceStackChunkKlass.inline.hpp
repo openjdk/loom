@@ -32,6 +32,7 @@
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "gc/shared/collectedHeap.hpp"
 #include "gc/shared/gc_globals.hpp"
+#include "logging/log.hpp"
 #include "memory/iterator.inline.hpp"
 #include "oops/instanceKlass.inline.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
