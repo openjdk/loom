@@ -302,16 +302,25 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * method makes a best effort attempt to cancel the tasks that it
      * submitted when RejectedExecutionException is thrown.
      *
-     * <p> The following example invokes {@code submit} with a collection of
-     * tasks and performs an action on the result of each task that completes
-     * normally.
+     * <p> The following are examples that submit a collection of tasks. The
+     * first collects the results of the tasks that complete normally into a
+     * list. The second finds the result of any task that completes normally
+     * and cancels the remaining by closing the stream.
      * <pre> {@code
      *     ExecutorService executor = ...
-     *     Collection<Callable<...>> tasks = ...
-     *     executor.submit(tasks)
-     *                 .filter(Future::isCompletedNormally)
+     *     Collection<Callable<String>> tasks = ...
+     *
+     *     List<String> results = executor.submit(tasks)
+     *             .filter(Future::isCompletedNormally)
+     *             .map(Future::join)
+     *             .toList();
+     *
+     *     try (Stream<Future<String>> stream = executor.submit(tasks)) {
+     *         String first = stream.filter(Future::isCompletedNormally)
      *                 .map(Future::join)
-     *                 .forEach(result -> { });
+     *                 .findFirst()
+     *                 .orElseThrow();
+     *    }
      * }</pre>
      *
      * @param tasks the collection of tasks
