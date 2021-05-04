@@ -1529,10 +1529,10 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
     return JVMTI_ERROR_NONE;
   }
   {
-    oop mounted_vt = java_thread->mounted_vthread();
+    oop mounted_vt = java_thread->vthread();
 
     if (single_suspend && !java_lang_VirtualThread::is_instance(thread_oop) &&
-        mounted_vt != NULL && thread_oop != mounted_vt) {
+        mounted_vt != thread_oop) {
       // A case of a carrier thread executing a mounted virtual thread.
       assert(java_lang_VirtualThread::is_instance(mounted_vt), "sanity check");
       if (java_thread->is_cthread_pending_suspend()) {
@@ -2161,6 +2161,16 @@ GetCurrentContendedMonitorClosure::do_thread(Thread *target) {
 }
 
 void
+VM_VThreadGetStackTrace::doit() {
+  ResourceMark rm;
+  javaVFrame* jvf = JvmtiEnvBase::get_vthread_jvf(_vthread_h());
+
+  _result = ((JvmtiEnvBase *)_env)->get_stack_trace(jvf,
+                                                    _start_depth, _max_count,
+                                                    _frame_buffer, _count_ptr);
+}
+
+void
 GetStackTraceClosure::do_thread(Thread *target) {
   JavaThread *jt = target->as_Java_thread();
   if (!jt->is_exiting() && jt->threadObj() != NULL) {
@@ -2168,6 +2178,11 @@ GetStackTraceClosure::do_thread(Thread *target) {
                                                       _start_depth, _max_count,
                                                       _frame_buffer, _count_ptr);
   }
+}
+
+void
+VM_VThreadGetFrameCount::doit() {
+  _result = ((JvmtiEnvBase*)_env)->get_frame_count(_vthread_h(), _count_ptr);
 }
 
 void

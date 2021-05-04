@@ -77,6 +77,8 @@
   template(GetObjectMonitorUsage)                 \
   template(GetAllStackTraces)                     \
   template(GetThreadListStackTraces)              \
+  template(VThreadGetStackTrace)                  \
+  template(VThreadGetFrameCount)                  \
   template(ChangeBreakpoints)                     \
   template(GetOrSetLocal)                         \
   template(VirtualThreadGetOrSetLocal)            \
