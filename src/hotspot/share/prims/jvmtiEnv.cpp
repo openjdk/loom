@@ -173,14 +173,6 @@ JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
     if (state == NULL) {
       return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
-#ifdef DBG // TMP
-    ResourceMark rm(current_thread);
-    oop name_oop = java_lang_Thread::name(thread_oop);
-    const char* name_str = java_lang_String::as_utf8_string(name_oop);
-    name_str = name_str == NULL ? "<NULL>" : name_str;
-    printf("DBG: state_for_while_locked: %s cthread JvmtiThreadState: %p, %s\n",
-           action, (void*)state, name_str); fflush(0);
-#endif
   }
   state->env_thread_state(this)->set_agent_thread_local_storage_data((void*)data);
   return JVMTI_ERROR_NONE;
@@ -219,14 +211,6 @@ JvmtiEnv::GetThreadLocalStorage(jthread thread, void** data_ptr) {
     }
 
     JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread, thread_obj);
-#ifdef DBG // TMP
-    ResourceMark rm(current_thread);
-    oop name_oop = java_lang_Thread::name(thread_obj);
-    const char* name_str = java_lang_String::as_utf8_string(name_oop);
-    name_str = name_str == NULL ? "<NULL>" : name_str;
-    printf("DBG: GetThreadLocalStorage: cthread JvmtiThreadState: %p, %s\n",
-           (void*)state, name_str); fflush(0);
-#endif
     *data_ptr = (state == NULL) ? NULL :
       state->env_thread_state(this)->get_agent_thread_local_storage_data();
   }
@@ -1739,9 +1723,12 @@ JvmtiEnv::GetStackTrace(jthread thread, jint start_depth, jint max_frame_count, 
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (java_thread == NULL) { // target virtual thread is unmounted
       ResourceMark rm(current_thread);
-      javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(thread_obj);
-      err = get_stack_trace(jvf, start_depth, max_frame_count, frame_buffer, count_ptr);
-      return err;
+
+      VM_VThreadGetStackTrace op(this, Handle(current_thread, thread_obj),
+                                 start_depth, max_frame_count,
+                                 frame_buffer, count_ptr);
+      VMThread::execute(&op);
+      return op.result();
     }
     VThreadGetStackTraceClosure op(this, Handle(current_thread, thread_obj),
                                    start_depth, max_frame_count, frame_buffer, count_ptr);
@@ -1857,8 +1844,9 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
   // Support for virtual threads
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (java_thread == NULL) { // target virtual thread is unmounted
-      err = get_frame_count(thread_obj, count_ptr);
-      return err;
+      VM_VThreadGetFrameCount op(this, Handle(current_thread, thread_obj),  count_ptr);
+      VMThread::execute(&op);
+      return op.result();
     }
     VThreadGetFrameCountClosure op(this, Handle(current_thread, thread_obj), count_ptr);
     Handshake::execute(&op, java_thread);

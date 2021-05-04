@@ -616,6 +616,52 @@ public:
   jvmtiError result()             { return _collector.result(); }
 };
 
+class VM_VThreadGetStackTrace : public VM_Operation {
+private:
+  JvmtiEnv *_env;
+  Handle _vthread_h;
+  jint _start_depth;
+  jint _max_count;
+  jvmtiFrameInfo* _frame_buffer;
+  jint* _count_ptr;
+  jvmtiError _result;
+
+public:
+  VM_VThreadGetStackTrace(JvmtiEnv *env, Handle vthread_h,
+                          jint start_depth, jint max_count,
+                          jvmtiFrameInfo* frame_buffer, jint* count_ptr)
+    : _vthread_h(vthread_h),
+      _start_depth(start_depth),
+      _max_count(max_count),
+      _frame_buffer(frame_buffer),
+      _count_ptr(count_ptr),
+      _result(JVMTI_ERROR_NONE)
+  {}
+
+  VMOp_Type type() const { return VMOp_VThreadGetStackTrace; }
+  void doit();
+  jvmtiError result() { return _result; }
+};
+
+class VM_VThreadGetFrameCount : public VM_Operation {
+private: 
+  JvmtiEnv *_env;
+  Handle _vthread_h;
+  jint* _count_ptr;
+  jvmtiError _result;
+
+public:
+  VM_VThreadGetFrameCount(JvmtiEnv *env, Handle vthread_h, jint* count_ptr)
+    : _vthread_h(vthread_h),
+      _count_ptr(count_ptr),
+      _result(JVMTI_ERROR_NONE)
+  {}
+  
+  VMOp_Type type() const { return VMOp_VThreadGetFrameCount; }
+  void doit();
+  jvmtiError result() { return _result; }
+};
+
 // HandshakeClosure to get single stack trace.
 class GetSingleStackTraceClosure : public HandshakeClosure {
 private:
