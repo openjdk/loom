@@ -210,6 +210,33 @@ public class FutureTask<V> implements RunnableFuture<V> {
     }
 
     /**
+     * @throws CancellationException {@inheritDoc}
+     * @throws CompletionException {@inheritDoc}
+     */
+    public V join() {
+        boolean interrupted = false;
+        int s = state;
+        while (s <= COMPLETING) {
+            try {
+                s = awaitDone(false, 0L);
+            } catch (InterruptedException e) {
+                interrupted = true;
+            }
+        }
+        if (interrupted)
+            Thread.currentThread().interrupt();
+        Object x = outcome;
+        if (s == NORMAL) {
+            @SuppressWarnings("unchecked")
+            V result = (V)x;
+            return result;
+        }
+        if (s >= CANCELLED)
+            throw new CancellationException();
+        throw new CompletionException((Throwable)x);
+    }
+
+    /**
      * Protected method invoked when this task transitions to state
      * {@code isDone} (whether normally or via cancellation). The
      * default implementation does nothing.  Subclasses may override
