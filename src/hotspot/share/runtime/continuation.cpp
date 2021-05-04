@@ -1337,6 +1337,9 @@ public:
     }
   #endif
 
+    // const int argsize = _cont.argsize();
+    // assert (FKind::interpreted || argsize == Compiled::stack_argsize(callee), "argsize: %d argsize(callee): %d", argsize, Compiled::stack_argsize(callee));
+    assert (FKind::interpreted || argsize == _cont.argsize(), "argsize: %d _cont.argsize(): %d", argsize, _cont.argsize());
     log_develop_trace(jvmcont)("bottom: " INTPTR_FORMAT " count %d size: %d argsize: %d", p2i(_bottom_address), nr_frames(), nr_bytes(), argsize);
 
   #ifdef ASSERT
@@ -1351,16 +1354,31 @@ public:
     _size += ContinuationHelper::frame_metadata; // for top frame's metadata
 
     int overlap = 0; // the args overlap the caller -- if there is one in this chunk and is of the same kind
-    if (argsize > 0 && chunk != nullptr && !chunk->is_empty() && FKind::interpreted == Interpreter::contains(chunk->pc())) {
-      overlap = argsize;
+    int unextended_sp = -1;
+    if (chunk != nullptr && !chunk->is_empty()) {
+      bool top_interpreted = Interpreter::contains(chunk->pc());
+      unextended_sp = chunk->sp();
+      if (top_interpreted) {
+        StackChunkFrameStream<true> last(chunk);
+        unextended_sp += last.unextended_sp() - last.sp(); // can be negative (-1), often with lambda forms
+      }
+      if (argsize > 0 && FKind::interpreted == top_interpreted) {
+        overlap = argsize;
+      }
     }
-    _size -= overlap;
-    log_develop_trace(jvmcont)("finalize _size: %d overlap: %d", _size, argsize);
 
-    // ALLOCATION
+    log_develop_trace(jvmcont)("finalize _size: %d overlap: %d unextended_sp: %d", _size, overlap, unextended_sp);
+
+    _size -= overlap;
+    assert (_size >= 0, "");
     
+    assert (chunk == nullptr || chunk->is_empty() || unextended_sp == chunk->to_offset(StackChunkFrameStream<true>(chunk).unextended_sp()), "");
+    assert (chunk != nullptr || unextended_sp < _size, "");
+
     DEBUG_ONLY(bool empty_chunk = true);
-    if (chunk == (oop)nullptr || chunk->sp() < _size || chunk->is_gc_mode() || chunk->requires_barriers()) {
+    if (unextended_sp < _size || chunk->is_gc_mode() || chunk->requires_barriers()) {
+      // ALLOCATION
+
       if (log_develop_is_enabled(Trace, jvmcont)) {
         if (chunk == nullptr) log_develop_trace(jvmcont)("is chunk available: no chunk");
         else {
@@ -1386,7 +1404,7 @@ public:
       _cont.set_tail(chunk);
       // java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail()); -- doesn't seem to help
     } else {
-      log_develop_trace(jvmcont)("Reusing chunk mixed: %d", chunk->has_mixed_frames());
+      log_develop_trace(jvmcont)("Reusing chunk mixed: %d empty: %d interpreted callee: %d caller: %d", chunk->has_mixed_frames(), chunk->is_empty(), callee.is_interpreted_frame(), Interpreter::contains(chunk->pc()));
       if (chunk->is_empty()) {
         int sp = chunk->stack_size() - argsize;
         chunk->set_sp(sp);
@@ -1394,7 +1412,7 @@ public:
         chunk->set_argsize(argsize);
         _size += overlap;
         assert (chunk->max_size() == 0, "");
-      } DEBUG_ONLY(else empty_chunk = false);
+      } DEBUG_ONLY(else empty_chunk = false;)
     }
     chunk->set_has_mixed_frames(true);
 
@@ -1415,8 +1433,8 @@ public:
     caller = StackChunkFrameStream<true>(chunk).to_frame();
     
     DEBUG_ONLY(_last_write = caller.unextended_sp() + (empty_chunk ? argsize : overlap);)
-    // tty->print_cr(">>> finalize_freeze chunk->sp_address(): %p argisze: %d _last_write: %p", chunk->sp_address(), argsize, _last_write); caller.print_on<true>(tty);
-
+    // tty->print_cr(">>> finalize_freeze chunk->sp_address(): %p empty_chunk: %d argsize: %d overlap: %d _last_write: %p _last_write - _size: %p", chunk->sp_address(), empty_chunk, argsize, overlap, _last_write, _last_write - _size); // caller.print_on<true>(tty);
+    assert(chunk->is_in_chunk(_last_write - _size), "_last_write - _size: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(_last_write - _size), p2i(chunk->start_address()));
   #ifdef ASSERT
     log_develop_trace(jvmcont)("top_hframe before (freeze):");
     if (log_develop_is_enabled(Trace, jvmcont)) caller.print_on<true>(tty);
@@ -1512,6 +1530,7 @@ public:
 
     intptr_t* hsp = Interpreted::frame_top(hf, callee_argsize, callee_interpreted);
     copy_to_chunk<false>(vsp, hsp, fsize);
+    assert (!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
     InstanceStackChunkKlass::relativize_interpreted_frame_metadata(f, hf);
 
@@ -1543,6 +1562,7 @@ public:
 
     // tty->print_cr(">>> COMPILED bottom: %d argsize: %d callee_argsize: %d callee_interpreted: %d caller_interpreted: %d", bottom, argsize, callee_argsize, callee_interpreted, caller.is_interpreted_frame());
     copy_to_chunk<false>(vsp, hsp, fsize);
+    assert (!bottom || !caller.is_compiled_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
     if (caller.is_interpreted_frame()) {
       log_develop_trace(jvmcont)("add max_size align %d", ContinuationHelper::align_wiggle);
@@ -3527,15 +3547,22 @@ bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
     sp = cont->bottom_sender_sp();
   } else {
     sp = unextended_sp;
+    bool interpreted_bottom = false;
     RegisterMap map(thread, false, false, false);
-    for (frame f = thread->last_frame(); !f.is_first_frame() && f.sp() <= unextended_sp; f = f.sender(&map)) {
-      sp = f.sp();
-      if (!(sp != nullptr && sp <= cont->bottom_sender_sp())) {
+    frame f;
+    for (f = thread->last_frame(); !f.is_first_frame() && f.sp() <= unextended_sp && !Continuation::is_continuation_enterSpecial(f); f = f.sender(&map)) {
+      if (Continuation::is_continuation_enterSpecial(f))
+        break;
+      interpreted_bottom = f.is_interpreted_frame();
+      if (!(f.sp() != nullptr && f.sp() <= cont->bottom_sender_sp())) {
         tty->print_cr("oops");
         f.print_on(tty);
       }
     }
+    assert (Continuation::is_continuation_enterSpecial(f), "");
+    sp = interpreted_bottom ? f.sp() : cont->bottom_sender_sp();
   }
+  
   assert (sp != nullptr && sp <= cont->entry_sp(), "sp: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT " bottom_sender_sp: " INTPTR_FORMAT, p2i(sp), p2i(cont->entry_sp()), p2i(cont->bottom_sender_sp()));
   address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
 
