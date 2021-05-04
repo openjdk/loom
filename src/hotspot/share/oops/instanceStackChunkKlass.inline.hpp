@@ -793,11 +793,8 @@ void InstanceStackChunkKlass::run_nmethod_entry_barrier_if_needed(const StackChu
   CodeBlob* cb = f.cb();
   if ((mixed && cb == nullptr) || !cb->is_nmethod()) {
     // Mark interpreted frames for marking_cycle
-    // if jvmtiExport::has_redefined_a_class() ???
     assert(f.is_interpreted(), "what else?");
     Method* im = f.to_frame().interpreter_frame_method();
-    ResourceMark rm;
-    tty->print_cr("marking method %s",im->name_and_sig_as_C_string());
     im->record_marking_cycle();
   } else {
     nmethod* nm = cb->as_nmethod();
