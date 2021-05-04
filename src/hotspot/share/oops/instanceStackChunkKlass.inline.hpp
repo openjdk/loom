@@ -500,13 +500,13 @@ inline bool StackChunkFrameStream<mixed>::is_interpreted() const {
 
 template <bool mixed>
 inline int StackChunkFrameStream<mixed>::frame_size() const {
-  return (mixed && is_interpreted()) ? interpreter_frame_size() 
-                                     : cb()->frame_size() + stack_argsize();
+  return is_interpreted() ? interpreter_frame_size() 
+                          : cb()->frame_size() + stack_argsize();
 }
 
 template <bool mixed>
 inline int StackChunkFrameStream<mixed>::stack_argsize() const {
-  if (mixed && is_interpreted()) return interpreter_frame_stack_argsize();
+  if (is_interpreted()) return interpreter_frame_stack_argsize();
   if (is_stub()) return 0;
   guarantee (cb() != nullptr, "");
   guarantee (cb()->is_compiled(), "");
@@ -516,7 +516,7 @@ inline int StackChunkFrameStream<mixed>::stack_argsize() const {
 
 template <bool mixed>
 inline int StackChunkFrameStream<mixed>::num_oops() const {
-  return (mixed && is_interpreted()) ? interpreter_frame_num_oops() : oopmap()->num_oops();
+  return is_interpreted() ? interpreter_frame_num_oops() : oopmap()->num_oops();
 }
 
 template <bool mixed>
@@ -552,7 +552,7 @@ inline void StackChunkFrameStream<mixed>::next(RegisterMapT* map) {
 
 template <bool mixed>
 inline intptr_t* StackChunkFrameStream<mixed>::next_sp() const {
-  return (mixed && is_interpreted()) ? next_sp_for_interpreter_frame() : unextended_sp() + cb()->frame_size();
+  return is_interpreted() ? next_sp_for_interpreter_frame() : unextended_sp() + cb()->frame_size();
 }
 
 extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
@@ -560,7 +560,7 @@ extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
 template <bool mixed>
 inline void StackChunkFrameStream<mixed>::get_cb() {
   _oopmap = nullptr;
-  if (is_done() || (mixed && is_interpreted())) {
+  if (is_done() || is_interpreted()) {
     _cb = nullptr;
     return;
   }
@@ -575,14 +575,14 @@ inline void StackChunkFrameStream<mixed>::get_cb() {
   assert (_cb != nullptr, 
     "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d gc_flag: %d", 
     _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp(), _chunk->is_gc_mode());
-  assert ((mixed && is_interpreted()) || ((is_stub() || is_compiled()) && _cb->frame_size() > 0), 
+  assert (is_interpreted() || ((is_stub() || is_compiled()) && _cb->frame_size() > 0), 
     "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d is_stub: %d is_compiled: %d frame_size: %d mixed: %d", 
     _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp(), is_stub(), is_compiled(), _cb->frame_size(), mixed);
 }
 
 template <bool mixed>
 inline void StackChunkFrameStream<mixed>::get_oopmap() const {
-  if (mixed && is_interpreted()) return;
+  if (is_interpreted()) return;
   assert (is_compiled(), "");
   get_oopmap(pc(), CodeCache::find_oopmap_slot_fast(pc())); 
 }
@@ -657,7 +657,7 @@ inline void StackChunkFrameStream<mixed>::update_reg_map(RegisterMapT* map) {}
 template <bool mixed>
 inline address  StackChunkFrameStream<mixed>::orig_pc() const {
   address pc1 = pc();
-  if ((mixed && is_interpreted()) || is_stub()) return pc1;
+  if (is_interpreted() || is_stub()) return pc1;
   CompiledMethod* cm = cb()->as_compiled_method();
   if (cm->is_deopt_pc(pc1)) {
     pc1 = *(address*)((address)unextended_sp() + cm->orig_pc_offset());
@@ -674,7 +674,7 @@ void StackChunkFrameStream<mixed>::handle_deopted() const {
   assert (!is_done(), "");
 
   if (_oopmap != nullptr) return;
-  if (mixed && is_interpreted()) return;
+  if (is_interpreted()) return;
   assert (is_compiled(), "");
 
   address pc1 = pc();
@@ -691,7 +691,7 @@ void StackChunkFrameStream<mixed>::handle_deopted() const {
 template <bool mixed>
 template <class OopClosureType, class RegisterMapT>
 inline void StackChunkFrameStream<mixed>::iterate_oops(OopClosureType* closure, const RegisterMapT* map) const {
-  if (mixed && is_interpreted()) {
+  if (is_interpreted()) {
     frame f = to_frame();
     // InterpreterOopMap mask;
     // f.interpreted_frame_oop_map(&mask);
@@ -723,7 +723,7 @@ inline void StackChunkFrameStream<mixed>::iterate_oops(OopClosureType* closure, 
 template<bool mixed>
 template <class DerivedOopClosureType, class RegisterMapT>
 inline void StackChunkFrameStream<mixed>::iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map) const {
-  if (mixed && is_interpreted()) return;
+  if (is_interpreted()) return;
   
   for (OopMapStream oms(oopmap()); !oms.is_done(); oms.next()) {
     OopMapValue omv = oms.current();

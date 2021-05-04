@@ -1158,8 +1158,6 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
     describe.print_on(st);
     st->print_cr("======");
   #endif
-  } else {
-    st->print_cr(" frames: %d", count_frames(c));
   }
 }
 
