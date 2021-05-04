@@ -509,8 +509,12 @@ extern "C" void ps() { // print stack
   if (p->has_last_Java_frame()) {
     // If the last_Java_fp is set we are in C land and
     // can call the standard stack_trace function.
+#ifdef PRODUCT
     p->print_stack();
-    if (Verbose) p->trace_stack();
+  } else {
+    tty->print_cr("Cannot find the last Java frame, printing stack disabled.");
+#else // !PRODUCT
+    p->trace_stack();
   } else {
     frame f = os::current_frame();
     RegisterMap reg_map(p);
@@ -518,7 +522,9 @@ extern "C" void ps() { // print stack
     tty->print("(guessing starting frame id=" PTR_FORMAT " based on current fp)\n", p2i(f.id()));
     p->trace_stack_from(vframe::new_vframe(&f, &reg_map, p));
     f.pd_ps();
+#endif // PRODUCT
   }
+
 }
 
 extern "C" void pfl() {
