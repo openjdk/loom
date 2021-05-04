@@ -1633,7 +1633,7 @@ void FrameValues::print_on(outputStream* st, int min_index, int max_index, intpt
       if (relative
           && *fv.location != 0 && *fv.location > -100 && *fv.location < 100 
           && (strncmp(fv.description, "interpreter_frame_", 18) == 0 || strstr(fv.description, " method "))) {
-        st->print_cr(" " INTPTR_FORMAT ": %18d %s (" INTPTR_FORMAT ")", p2i(fv.location), (int)*fv.location, fv.description, p2i(fv.location + (int)*fv.location));
+        st->print_cr(" " INTPTR_FORMAT ": %18d %s", p2i(fv.location), (int)*fv.location, fv.description);
       } else {
         st->print_cr(" " INTPTR_FORMAT ": " INTPTR_FORMAT " %s", p2i(fv.location), *fv.location, fv.description);
       }
