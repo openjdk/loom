@@ -305,7 +305,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * <p> The following are examples that submit a collection of tasks. The
      * first collects the results of the tasks that complete normally into a
      * list. The second finds the result of any task that completes normally
-     * and cancels the remaining by closing the stream.
+     * and cancels outstanding tasks by closing the stream.
      * <pre> {@code
      *     ExecutorService executor = ...
      *     Collection<Callable<String>> tasks = ...
