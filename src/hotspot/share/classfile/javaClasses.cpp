@@ -2283,7 +2283,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     int _depth;
     GrowableArray<Method*>* _methods;
     GrowableArray<int>*     _bcis;
-    GrowableArray<oop>*  _continuations;
+    GrowableArray<oop>*     _continuations;
 
     GetStackTraceClosure(Handle java_thread) :
       HandshakeClosure("GetStackTraceClosure"), _java_thread(java_thread), _depth(0) {
@@ -2314,8 +2314,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
           return; // not mounted
         }
       } else {
-        if (thread->last_continuation(vthread_scope) != NULL)
-          carrier = true;
+        carrier = (thread->last_continuation(vthread_scope) != NULL);
       }
 
       const int max_depth = MaxJavaStackTraceDepth;
@@ -2348,14 +2347,13 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   GetStackTraceClosure gstc(Handle(THREAD, java_thread));
   Handshake::execute(&gstc, thread);
 
-  // Convert the continuations into handles before allocation.
-  assert(gstc._depth == gstc._continuations->length(), "should be the same");
-
   // Stop if no stack trace is found.
   if (gstc._depth == 0) {
     return NULL;
   }
 
+  // Convert the continuations into handles before allocation.
+  assert(gstc._depth == gstc._continuations->length(), "should be the same");
   GrowableArray<Handle>* cont_handles = new GrowableArray<Handle>(gstc._depth);
   for (int i = 0; i < gstc._depth; i++) {
     cont_handles->push(Handle(THREAD, gstc._continuations->at(i)));
@@ -2366,8 +2364,8 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   assert(k != NULL, "must be loaded in 1.4+");
   if (k->should_be_initialized()) k->initialize(CHECK_NULL);
   objArrayHandle trace = oopFactory::new_objArray_handle(k, gstc._depth, CHECK_NULL);
-  for (int i = 0; i < gstc._depth; i++) {
 
+  for (int i = 0; i < gstc._depth; i++) {
     methodHandle method(THREAD, gstc._methods->at(i));
     oop element = java_lang_StackTraceElement::create(method,
                                                       gstc._bcis->at(i),
