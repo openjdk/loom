@@ -2285,7 +2285,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     GrowableArray<int>*     _bcis;
     GrowableArray<oop>*  _continuations;
 
-    GetStackTraceClosure(Handle java_thread) : 
+    GetStackTraceClosure(Handle java_thread) :
       HandshakeClosure("GetStackTraceClosure"), _java_thread(java_thread), _depth(0) {
       // Pick some initial length
       int init_length = MaxJavaStackTraceDepth/2;
@@ -2309,7 +2309,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       oop vthread_scope = java_lang_VirtualThread::vthread_scope();
       if (java_lang_VirtualThread::is_instance(_java_thread())) {
         // if (thread->vthread() != _java_thread()) // We might be inside a System.executeOnCarrierThread
-        if (thread->last_continuation(vthread_scope)->cont_oop() != 
+        if (thread->last_continuation(vthread_scope)->cont_oop() !=
               java_lang_VirtualThread::continuation(_java_thread())) {
           return; // not mounted
         }
@@ -2317,13 +2317,13 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
         if (thread->last_continuation(vthread_scope) != NULL)
           carrier = true;
       }
-      
+
       const int max_depth = MaxJavaStackTraceDepth;
       const bool skip_hidden = !ShowHiddenFrames;
 
       int total_count = 0;
       for (vframeStream vfst(thread, false, false, carrier);
-           !vfst.at_end() && (max_depth == 0 || max_depth != total_count); 
+           !vfst.at_end() && (max_depth == 0 || max_depth != total_count);
            vfst.next()) {
 
         if (skip_hidden && (vfst.method()->is_hidden() ||
@@ -2370,8 +2370,8 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
 
     methodHandle method(THREAD, gstc._methods->at(i));
     oop element = java_lang_StackTraceElement::create(method,
-                                                      gstc._bcis->at(i), 
-                                                      cont_handles->at(i), 
+                                                      gstc._bcis->at(i),
+                                                      cont_handles->at(i),
                                                       CHECK_NULL);
     trace->obj_at_put(i, element);
   }
