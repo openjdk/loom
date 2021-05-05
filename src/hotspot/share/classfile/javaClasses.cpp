@@ -2143,8 +2143,8 @@ void java_lang_Thread::set_jvmti_thread_state(oop java_thread, JvmtiThreadState*
 }
 
 void java_lang_Thread::clear_scopeLocalBindings(oop java_thread) {
-  java_thread->address_field_put(_noninheritableScopeLocalBindings_offset, NULL);
-  java_thread->address_field_put(_inheritableScopeLocalBindings_offset, NULL);
+  java_thread->obj_field_put(_noninheritableScopeLocalBindings_offset, NULL);
+  java_thread->obj_field_put(_inheritableScopeLocalBindings_offset, NULL);
 }
 
 oop java_lang_Thread::holder(oop java_thread) {
