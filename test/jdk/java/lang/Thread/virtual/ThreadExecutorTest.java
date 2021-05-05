@@ -959,7 +959,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test invokeAll with cancelOnException=true, last task should be cancelled
+     * Test invokeAll with waitAll=false, last task should be cancelled
      */
     @Test(dataProvider = "factories")
     public void testInvokeAll5(ThreadFactory factory) throws Exception {
@@ -975,7 +975,7 @@ public class ThreadExecutorTest {
                 return "baz";
             };
 
-            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), true);
+            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), false);
 
             // list should have three elements, all should be done
             assertTrue(list.size() == 3);
@@ -1000,7 +1000,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test invokeAll with cancelOnException=true, first task should be cancelled
+     * Test invokeAll with waitAll=false, first task should be cancelled
      */
     @Test(dataProvider = "factories")
     public void testInvokeAll6(ThreadFactory factory) throws Exception {
@@ -1016,7 +1016,7 @@ public class ThreadExecutorTest {
             };
             Callable<String> task3 = () -> "baz";
 
-            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), true);
+            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), false);
 
             // list should have three elements, all should be done
             assertTrue(list.size() == 3);
@@ -1065,7 +1065,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test invokeAll cancelOnException=true and with interrupt status set.
+     * Test invokeAll waitAll=false and with interrupt status set.
      */
     @Test(dataProvider = "factories")
     public void testInvokeAllInterrupt2(ThreadFactory factory) throws Exception {
@@ -1078,7 +1078,7 @@ public class ThreadExecutorTest {
 
             Thread.currentThread().interrupt();
             try {
-                executor.invokeAll(List.of(task1, task2), true);
+                executor.invokeAll(List.of(task1, task2), false);
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.currentThread().isInterrupted());
@@ -1139,7 +1139,7 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test interrupt with thread blocked in invokeAll cancelOnException=true
+     * Test interrupt with thread blocked in invokeAll waitAll=false
      */
     @Test(dataProvider = "factories")
     public void testInvokeAllInterrupt5(ThreadFactory factory) throws Exception {
@@ -1148,7 +1148,7 @@ public class ThreadExecutorTest {
             DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
             scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
             try {
-                executor.invokeAll(Set.of(task1, task2), true);
+                executor.invokeAll(Set.of(task1, task2), false);
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.currentThread().isInterrupted());
@@ -1210,7 +1210,7 @@ public class ThreadExecutorTest {
 
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> "bar";
-        executor.invokeAll(Set.of(task1, task2), true);
+        executor.invokeAll(Set.of(task1, task2), false);
     }
 
     @Test(dataProvider = "factories", expectedExceptions = { RejectedExecutionException.class })
@@ -1237,7 +1237,7 @@ public class ThreadExecutorTest {
     @Test(dataProvider = "factories")
     public void testInvokeAllEmpty2(ThreadFactory factory) throws Exception {
         try (var executor = Executors.newThreadExecutor(factory)) {
-            List<Future<Object>> list = executor.invokeAll(Set.of(), true);
+            List<Future<Object>> list = executor.invokeAll(Set.of(), false);
             assertTrue(list.size() == 0);
         }
     }

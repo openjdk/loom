@@ -58,33 +58,16 @@ class ExecutorServiceHelper {
 
     /**
      * Executes the given tasks, returning a list of Futures holding their
-     * status and results when all complete. The parameter {@code cancelOnException}
-     * determines if this method should wait for unfinished tasks to complete when
-     * a task completes with an exception.
+     * status and results when all complete. The parameter {@code waitAll}
+     * determines if this method should wait for unfinished tasks to complete
+     * when a task completes with an exception or error.
      */
     static <T> List<Future<T>> invokeAll(ExecutorService executor,
                                          Collection<? extends Callable<T>> tasks,
-                                         boolean cancelOnException)
+                                         boolean waitAll)
             throws InterruptedException {
 
-        if (cancelOnException) {
-            var queue = new LinkedTransferQueue<Future<T>>();
-            List<Future<T>> futures = submit(executor, tasks, queue);
-            var spliterator = new BlockingQueueSpliterator<>(queue, futures.size());
-            try {
-                // wait for a task to complete with exception or all tasks to complete
-                StreamSupport.stream(spliterator, false)
-                        .filter(f -> isCompletedExceptionally(f))
-                        .findAny();
-            } catch (CancellationException e) {
-                if (Thread.interrupted())
-                    throw new InterruptedException();
-                throw e;
-            } finally {
-                cancelAll(futures);
-            }
-            return futures;
-        } else {
+        if (waitAll) {
             List<Future<T>> futures = new ArrayList<>();
             int j = 0;
             try {
@@ -102,6 +85,23 @@ class ExecutorServiceHelper {
                 }
             } finally {
                 cancelAll(futures, j);
+            }
+            return futures;
+        } else {
+            var queue = new LinkedTransferQueue<Future<T>>();
+            List<Future<T>> futures = submit(executor, tasks, queue);
+            var spliterator = new BlockingQueueSpliterator<>(queue, futures.size());
+            try {
+                // wait for a task to complete with exception or all tasks to complete
+                StreamSupport.stream(spliterator, false)
+                        .filter(f -> isCompletedExceptionally(f))
+                        .findAny();
+            } catch (CancellationException e) {
+                if (Thread.interrupted())
+                    throw new InterruptedException();
+                throw e;
+            } finally {
+                cancelAll(futures);
             }
             return futures;
         }

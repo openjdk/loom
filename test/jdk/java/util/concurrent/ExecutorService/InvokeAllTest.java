@@ -96,14 +96,13 @@ public class InvokeAllTest {
      */
     @Test(dataProvider = "executors")
     public void testAllTasksComplete1(ExecutorService executor) throws Exception {
-        testAllTasksComplete(executor, false);
+        testAllTasksComplete(executor, true);
     }
     @Test(dataProvider = "executors")
     public void testAllTasksComplete2(ExecutorService executor) throws Exception {
-        testAllTasksComplete(executor, true);
+        testAllTasksComplete(executor, false);
     }
-    private void testAllTasksComplete(ExecutorService executor,
-                                      boolean cancelOnException) throws Exception {
+    private void testAllTasksComplete(ExecutorService executor, boolean waitAll) throws Exception {
         try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
@@ -112,7 +111,7 @@ public class InvokeAllTest {
             };
 
             List<Callable<String>> tasks = List.of(task1, task2);
-            List<Future<String>> list = executor.invokeAll(tasks, cancelOnException);
+            List<Future<String>> list = executor.invokeAll(tasks, waitAll);
 
             // list should have two elements, both should be done
             assertTrue(list.size() == 2);
@@ -143,7 +142,7 @@ public class InvokeAllTest {
                 throw new BarException();
             };
 
-            List<Future<String>> list = executor.invokeAll(List.of(task1, task2), false);
+            List<Future<String>> list = executor.invokeAll(List.of(task1, task2), true);
 
             // list should have two elements, both should be done
             assertTrue(list.size() == 2);
@@ -161,10 +160,10 @@ public class InvokeAllTest {
     }
 
     /**
-     * Test invokeAll with cancelOnException=true, last task should be cancelled
+     * Test invokeAll with waitAll=false, last task should be cancelled
      */
     @Test(dataProvider = "executors")
-    public void testCancelOnException1(ExecutorService executor) throws Exception {
+    public void testWaitAll1(ExecutorService executor) throws Exception {
         try (executor) {
             class BarException extends Exception { }
             Callable<String> task1 = () -> "foo";
@@ -177,7 +176,7 @@ public class InvokeAllTest {
                 return "baz";
             };
 
-            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), true);
+            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), false);
 
             // list should have three elements, all should be done
             assertTrue(list.size() == 3);
@@ -202,10 +201,10 @@ public class InvokeAllTest {
     }
 
     /**
-     * Test invokeAll with cancelOnException=true, first task should be cancelled
+     * Test invokeAll with waitAll=true, first task should be cancelled
      */
     @Test(dataProvider = "executors")
-    public void testCancelOnException2(ExecutorService executor) throws Exception {
+    public void testWaitAll2(ExecutorService executor) throws Exception {
         try (executor) {
             class BarException extends Exception { }
             Callable<String> task1 = () -> {
@@ -218,7 +217,7 @@ public class InvokeAllTest {
             };
             Callable<String> task3 = () -> "baz";
 
-            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), true);
+            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), false);
 
             // list should have three elements, all should be done
             assertTrue(list.size() == 3);
@@ -247,13 +246,13 @@ public class InvokeAllTest {
      */
     @Test(dataProvider = "executors")
     public void testWithInterruptStatusSet1(ExecutorService executor) {
-        testWithInterruptStatusSet(executor, false);
+        testWithInterruptStatusSet(executor, true);
     }
     @Test(dataProvider = "executors")
     public void testWithInterruptStatusSet2(ExecutorService executor) {
-        testWithInterruptStatusSet(executor, true);
+        testWithInterruptStatusSet(executor, false);
     }
-    void testWithInterruptStatusSet(ExecutorService executor, boolean cancelOnException) {
+    void testWithInterruptStatusSet(ExecutorService executor, boolean waitAll) {
         try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
@@ -262,7 +261,7 @@ public class InvokeAllTest {
             };
             Thread.currentThread().interrupt();
             try {
-                executor.invokeAll(List.of(task1, task2), cancelOnException);
+                executor.invokeAll(List.of(task1, task2), waitAll);
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.currentThread().isInterrupted());
@@ -277,14 +276,13 @@ public class InvokeAllTest {
      */
     @Test(dataProvider = "executors")
     public void testInterruptInvokeAll1(ExecutorService executor) throws Exception {
-        testInterruptInvokeAll(executor, false);
+        testInterruptInvokeAll(executor, true);
     }
     @Test(dataProvider = "executors")
     public void testInterruptInvokeAll2(ExecutorService executor) throws Exception {
-        testInterruptInvokeAll(executor, true);
+        testInterruptInvokeAll(executor, false);
     }
-    void testInterruptInvokeAll(ExecutorService executor,
-                                boolean cancelOnException) throws Exception {
+    void testInterruptInvokeAll(ExecutorService executor, boolean waitAll) throws Exception {
         try (executor) {
 
             // skip test on ForkJoinPool for now
@@ -297,7 +295,7 @@ public class InvokeAllTest {
 
             scheduleInterrupt(Thread.currentThread(), Duration.ofSeconds(1));
             try {
-                executor.invokeAll(Set.of(task1, task2), cancelOnException);
+                executor.invokeAll(Set.of(task1, task2), waitAll);
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.currentThread().isInterrupted());
@@ -362,7 +360,7 @@ public class InvokeAllTest {
         executor.shutdown();
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> "bar";
-        executor.invokeAll(Set.of(task1, task2), false);
+        executor.invokeAll(Set.of(task1, task2), true);
     }
 
     /**
@@ -371,7 +369,7 @@ public class InvokeAllTest {
     @Test(dataProvider = "executors")
     public void testInvokeAllWithNoTasks(ExecutorService executor) throws Exception {
         try (executor) {
-            List<Future<Object>> list = executor.invokeAll(Set.of(), false);
+            List<Future<Object>> list = executor.invokeAll(Set.of(), true);
             assertTrue(list.size() == 0);
         }
     }
@@ -383,7 +381,7 @@ public class InvokeAllTest {
           expectedExceptions = { NullPointerException.class })
     public void testInvokeAllNull1(ExecutorService executor) throws Exception {
         try (executor) {
-            executor.invokeAll(null, false);
+            executor.invokeAll(null, true);
         }
     }
 
@@ -397,7 +395,7 @@ public class InvokeAllTest {
             List<Callable<String>> tasks = new ArrayList<>();
             tasks.add(() -> "foo");
             tasks.add(null);
-            executor.invokeAll(tasks, false);
+            executor.invokeAll(tasks, true);
         }
     }
 }
