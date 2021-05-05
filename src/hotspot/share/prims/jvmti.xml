@@ -1953,13 +1953,15 @@ jvmtiEnv *jvmti;
           <jint/>
           <description>
             The thread priority.  See the thread priority constants:
-            <datalink id="jvmtiThreadPriority"></datalink>.
+            <datalink id="jvmtiThreadPriority"></datalink>. The priority of a
+            virtual thread is always <code>JVMTI_THREAD_NORM_PRIORITY</code>.
           </description>
         </field>
         <field id="is_daemon">
           <jboolean/>
           <description>
-            Is this a daemon thread/?
+            Is this a daemon thread? The daemon status of a virtual thread is
+            always <code>JNI_TRUE</code>.
           </description>
         </field>
         <field id="thread_group">
