@@ -1130,6 +1130,13 @@ jvmtiEnv *jvmti;
 
   <category id="threadCategory" label="Thread">
     <intro>
+        These functions provide information about threads and allow an agent to
+        suspend and resume threads.
+        <p/>
+        The <code>jthread</code> specified to these functions can be a JNI reference
+        to a platform or virtual Thread object. Some functions are not supported on
+        virtual threads and return <code>JVMTI_ERROR_INVALID_THREAD</code> when
+        called with a reference to a virtual thread.
     </intro>
 
     <function id="GetThreadState" num="17">
@@ -1952,7 +1959,7 @@ jvmtiEnv *jvmti;
         <field id="is_daemon">
           <jboolean/>
           <description>
-            Is this a daemon thread?
+            Is this a daemon thread/?
           </description>
         </field>
         <field id="thread_group">
