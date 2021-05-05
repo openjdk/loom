@@ -1515,8 +1515,10 @@ public:
   }
 #endif
 
+    Method* frame_method = Frame::frame_method(f);
+
     log_develop_trace(jvmcont)("recurse_freeze_interpreted_frame %s _size: %d fsize: %d argsize: %d callee_interpreted: %d callee_argsize: %d :: " INTPTR_FORMAT " - " INTPTR_FORMAT,
-      Frame::frame_method(f)->name_and_sig_as_C_string(), _size, fsize, argsize, callee_interpreted, callee_argsize, p2i(vsp), p2i(vsp+fsize));
+      frame_method->name_and_sig_as_C_string(), _size, fsize, argsize, callee_interpreted, callee_argsize, p2i(vsp), p2i(vsp+fsize));
     
     freeze_result result = recurse_freeze_java_frame<Interpreted>(f, caller, fsize, argsize);
     if (UNLIKELY(result > freeze_ok_bottom)) return result;
@@ -1539,6 +1541,10 @@ public:
     _cont.inc_num_interpreted_frames();
     DEBUG_ONLY(after_freeze_java_frame(hf, bottom);)
     caller = hf;
+
+    // Mark frame_method's marking cycle for GC and redefinition on_stack calculation.
+    frame_method->record_marking_cycle();
+
     return freeze_ok;
   }
 

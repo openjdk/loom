@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -414,6 +414,10 @@ class ConstantPoolCache: public MetaspaceObj {
   // object index to original constant pool index
   OopHandle            _resolved_references;
   Array<u2>*           _reference_map;
+
+  // RedefineClasses support
+  uint64_t             _marking_cycle;
+
   // The narrowOop pointer to the archived resolved_references. Set at CDS dump
   // time when caching java heap object is supported.
   CDS_JAVA_HEAP_ONLY(int _archived_references_index;)
@@ -507,6 +511,8 @@ class ConstantPoolCache: public MetaspaceObj {
   DEBUG_ONLY(bool on_stack() { return false; })
   void deallocate_contents(ClassLoaderData* data);
   bool is_klass() const { return false; }
+  void record_marking_cycle();
+  uint64_t marking_cycle() { return _marking_cycle; }
 
   // Printing
   void print_on(outputStream* st) const;
