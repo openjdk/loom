@@ -12810,7 +12810,7 @@ myInit() {
       The capability
       <internallink id="jvmtiCapabilities.can_support_virtual_threads">
       <code>can_support_virtual_threads</code></internallink> determines
-      if a new virtual threads generates a <code>ThreadStart</code> event or
+      if a new virtual thread generates a <code>ThreadStart</code> event or
       a <eventlink id="VirtualThreadStart"/> event. If disabled, a virtual
       thread generates a <code>ThreadStart</code> event. If enabled, a virtual
       thread generates a <code>VirtualThreadStart</code> event.
@@ -12853,10 +12853,10 @@ myInit() {
       The capability
       <internallink id="jvmtiCapabilities.can_support_virtual_threads">
       <code>can_support_virtual_threads</code></internallink> determines
-      if a virtual threads generates a <code>ThreadEnd</code> event or
-      a <eventlink id="VirtualThreadEnd"/> event. If disabled, a virtual
-      thread generates a <code>ThreadEnd</code> event. If enabled, a virtual
-      thread generates a <code>VirtualThreadEnd</code> event.
+      if a terminating virtual thread generates a <code>ThreadEnd</code>
+      event or a <eventlink id="VirtualThreadEnd"/> event. If disabled, a
+      virtual thread generates a <code>ThreadEnd</code> event. If enabled,
+      a virtual thread generates a <code>VirtualThreadEnd</code> event.
       <p/>
       A thread may be listed in the array returned by
       <functionlink id="GetAllThreads"></functionlink>
