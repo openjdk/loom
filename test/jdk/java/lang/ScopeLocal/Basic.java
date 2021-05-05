@@ -23,7 +23,8 @@
 
 /**
  * @test
- * @run testng Basic
+ * @compile --enable-preview -source ${jdk.version} Basic.java
+ * @run testng/othervm --enable-preview Basic
  * @summary Basic test for java.lang.ScopeLocal
  */
 
@@ -58,7 +59,7 @@ public class Basic {
         assertFalse(name.isBound());
         assertTrue(name.orElse(null) == null);
         assertEquals(name.orElse("default"), "default");
-        name.runWithBinding("fred", () -> {
+        ScopeLocal.where(name, "fred", () -> {
             assertEquals(name.orElse(null), "fred");
             assertEquals(name.orElse("default"), "fred");
         });
@@ -69,7 +70,7 @@ public class Basic {
         assertFalse(name.isBound());
         assertThrows(IllegalStateException.class, () -> name.orElseThrow(IllegalStateException::new));
         assertThrows(NullPointerException.class, () -> name.orElseThrow(null));
-        name.runWithBinding("fred", () -> {
+        ScopeLocal.where(name, "fred", () -> {
             assertEquals(name.orElseThrow(IllegalStateException::new), "fred");
             assertThrows(NullPointerException.class, () -> name.orElseThrow(null));
         });
@@ -80,7 +81,7 @@ public class Basic {
      */
     public void testRunWithBinding1() {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        name.runWithBinding("fred", () -> {
+        ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
             ensureNotInherited(name);
@@ -89,11 +90,11 @@ public class Basic {
 
     public void testRunWithBinding2() {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        name.runWithBinding("fred", () -> {
+        ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
 
-            name.runWithBinding("joe", () -> {
+            ScopeLocal.where(name, "joe", () -> {
                 assertTrue(name.isBound());
                 assertTrue("joe".equals(name.get()));
                 ensureNotInherited(name);
@@ -110,7 +111,7 @@ public class Basic {
      */
     public void testRunWithBinding3() {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        name.runWithBinding(null, () -> {
+        ScopeLocal.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
             ensureNotInherited(name);
@@ -119,11 +120,11 @@ public class Basic {
 
     public void testRunWithBinding4() {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        name.runWithBinding("fred", () -> {
+        ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
 
-            name.runWithBinding(null, () -> {
+            ScopeLocal.where(name, null, () -> {
                 assertTrue(name.isBound());
                 assertTrue(name.get() == null);
                 ensureNotInherited(name);
@@ -140,7 +141,7 @@ public class Basic {
      */
     public void testRunWithBinding5() {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        name.runWithBinding("fred", () -> {
+        ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
             ensureInherited(name);
@@ -149,11 +150,11 @@ public class Basic {
 
     public void testRunWithBinding6() {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        name.runWithBinding("fred", () -> {
+        ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
 
-            name.runWithBinding("joe", () -> {
+            ScopeLocal.where(name, "joe", () -> {
                 assertTrue(name.isBound());
                 assertTrue("joe".equals(name.get()));
                 ensureInherited(name);
@@ -170,7 +171,7 @@ public class Basic {
      */
     public void testRunWithBinding7() {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        name.runWithBinding(null, () -> {
+        ScopeLocal.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
             ensureInherited(name);
@@ -179,11 +180,11 @@ public class Basic {
 
     public void testRunWithBinding8() {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        name.runWithBinding("fred", () -> {
+        ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
 
-            name.runWithBinding(null, () -> {
+            ScopeLocal.where(name, null, () -> {
                 assertTrue(name.isBound());
                 assertTrue(name.get() == null);
                 ensureInherited(name);
@@ -201,7 +202,7 @@ public class Basic {
     @Test(expectedExceptions = { NullPointerException.class })
     public void testRunWithBinding9() {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        name.runWithBinding("fred", null);
+        ScopeLocal.where(name, "fred", (Runnable)null);
     }
 
     /**
@@ -209,7 +210,7 @@ public class Basic {
      */
     public void testCallWithBinding1() throws Exception {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        int result = name.callWithBinding("fred", () -> {
+        int result = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value = name.get();
             assertTrue("fred".equals(value));
@@ -221,13 +222,13 @@ public class Basic {
 
     public void testCallWithBinding2() throws Exception {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        int result1 = name.callWithBinding("fred", () -> {
+        int result1 = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
             assertTrue("fred".equals(value1));
             ensureNotInherited(name);
 
-            int result2 = name.callWithBinding("joe", () -> {
+            int result2 = ScopeLocal.where(name, "joe", () -> {
                 assertTrue(name.isBound());
                 String value2 = name.get();
                 assertTrue("joe".equals(value2));
@@ -245,7 +246,7 @@ public class Basic {
      */
     public void testCallWithBinding3() throws Exception {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        int result = name.callWithBinding(null, () -> {
+        int result = ScopeLocal.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
             ensureNotInherited(name);
@@ -256,13 +257,13 @@ public class Basic {
 
     public void testCallWithBinding4() throws Exception {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        int result1 = name.callWithBinding("fred", () -> {
+        int result1 = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
             assertTrue("fred".equals(value1));
             ensureNotInherited(name);
 
-            int result2 = name.callWithBinding(null, () -> {
+            int result2 = ScopeLocal.where(name, null, () -> {
                 assertTrue(name.isBound());
                 assertTrue(name.get() == null);
                 return 2;
@@ -279,7 +280,7 @@ public class Basic {
      */
     public void testCallWithBinding5() throws Exception {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        int result = name.callWithBinding("fred", () -> {
+        int result = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value = name.get();
             assertTrue("fred".equals(value));
@@ -291,13 +292,13 @@ public class Basic {
 
     public void testCallWithBinding6() throws Exception {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        int result1 = name.callWithBinding("fred", () -> {
+        int result1 = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
             assertTrue("fred".equals(value1));
             ensureInherited(name);
 
-            int result2 = name.callWithBinding("joe", () -> {
+            int result2 = ScopeLocal.where(name, "joe", () -> {
                 assertTrue(name.isBound());
                 String value2 = name.get();
                 assertTrue("joe".equals(value2));
@@ -315,7 +316,7 @@ public class Basic {
      */
     public void testCallWithBinding7() throws Exception {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        int result = name.callWithBinding(null, () -> {
+        int result = ScopeLocal.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
             ensureInherited(name);
@@ -326,13 +327,13 @@ public class Basic {
 
     public void testCallWithBinding8() throws Exception {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        int result1 = name.callWithBinding("fred", () -> {
+        int result1 = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
             assertTrue("fred".equals(value1));
             ensureInherited(name);
 
-            int result2 = name.callWithBinding(null, () -> {
+            int result2 = ScopeLocal.where(name, null, () -> {
                 assertTrue(name.isBound());
                 assertTrue(name.get() == null);
                 return 2;
@@ -350,7 +351,7 @@ public class Basic {
     @Test(expectedExceptions = { NullPointerException.class })
     public void testCallWithBinding9() throws Exception {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        name.callWithBinding("fred", null);
+        ScopeLocal.where(name, "fred", (Callable)null);
     }
 
     /**
@@ -358,11 +359,11 @@ public class Basic {
      */
     public void testInheritAtCreateTime() throws Exception {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        name.callWithBinding("fred", () -> {
+        ScopeLocal.where(name, "fred", () -> {
             AtomicReference<String> ref = new AtomicReference<>();
             Thread thread = new Thread(() -> ref.set(name.get()));
             // start thread with name set to joe
-            name.runWithBinding("joe", thread::start);
+            ScopeLocal.where(name, "joe", thread::start);
             thread.join();
             assertEquals(ref.get(), "fred");
             return null;
@@ -375,10 +376,10 @@ public class Basic {
     public void testSnapshotInheritance() throws Exception {
         ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
         ScopeLocal<String> occupation = ScopeLocal.inheritableForType(String.class);
-        var snapshot = name.callWithBinding("aristotle", () -> ScopeLocal.snapshot());
+        var snapshot = ScopeLocal.where(name, "aristotle", () -> ScopeLocal.snapshot());
         assertFalse(name.isBound());
         assertBoundInSnapshot(snapshot, name, true);
-        occupation.callWithBinding("undertaker", () -> {
+        ScopeLocal.where(occupation, "undertaker", () -> {
             assertBoundInSnapshot(snapshot, occupation, false);
             assertEquals(occupation.get(), "undertaker");
             assertTrue(occupation.isBound());
@@ -393,17 +394,17 @@ public class Basic {
     public void testSnapshotNonInheritance() throws Exception {
         ScopeLocal<String> name = ScopeLocal.forType(String.class);
         ScopeLocal<String> occupation = ScopeLocal.forType(String.class);
-        var snapshot = name.callWithBinding("aristotle", () -> ScopeLocal.snapshot());
+        var snapshot = ScopeLocal.where(name, "aristotle", () -> ScopeLocal.snapshot());
         assertFalse(name.isBound());
         assertBoundInSnapshot(snapshot, name, false);
-        occupation.callWithBinding("undertaker", () -> {
+        ScopeLocal.where(occupation, "undertaker", () -> {
             assertBoundInSnapshot(snapshot, occupation, true);
             assertEquals(occupation.get(), "undertaker");
             assertEqualsInSnapshot(snapshot, occupation, "undertaker");
             assertTrue(occupation.isBound());
             return null;
         });
-        name.callWithBinding("joe", () -> {
+        ScopeLocal.where(name, "joe", () -> {
             assertEqualsInSnapshot(snapshot, name, "joe");
             return null;
         });
@@ -411,7 +412,7 @@ public class Basic {
 
     private <R> R callWithSnapshot(ScopeLocal.Snapshot snapshot, Callable<R> c) {
         try {
-            return snapshot == null ? c.call() : snapshot.callWithSnapshot(c);
+            return ScopeLocal.callWithSnapshot(c, snapshot);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

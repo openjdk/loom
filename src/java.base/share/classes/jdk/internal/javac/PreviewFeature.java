@@ -55,6 +55,7 @@ public @interface PreviewFeature {
 
     public enum Feature {
         SEALED_CLASSES,
+        SCOPE_LOCALS,
         /**
          * A key for testing.
          */
