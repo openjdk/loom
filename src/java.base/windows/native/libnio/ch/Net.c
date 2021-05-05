@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -770,12 +770,6 @@ Java_sun_nio_ch_Net_pollconnValue(JNIEnv *env, jclass this)
     return (jshort)POLLOUT;
 }
 
-JNIEXPORT jshort JNICALL
-Java_sun_nio_ch_Net_pollrdbandValue(JNIEnv *env, jclass this)
-{
-    return (jshort)POLLRDBAND;
-}
-
 JNIEXPORT jint JNICALL
 Java_sun_nio_ch_Net_sendOOB(JNIEnv* env, jclass this, jobject fdo, jbyte b)
 {
@@ -795,14 +789,20 @@ Java_sun_nio_ch_Net_sendOOB(JNIEnv* env, jclass this, jobject fdo, jbyte b)
 JNIEXPORT jboolean JNICALL
 Java_sun_nio_ch_Net_discardOOB(JNIEnv* env, jclass clazz, jobject fdo)
 {
-    char data[8];
+    char buf[8];
     jboolean discarded = JNI_FALSE;
-    int n;
-    do {
-        n = recv(fdval(env, fdo), (char*)&data, sizeof(data), MSG_OOB);
-        if (n > 0) {
-            discarded = JNI_TRUE;
+    for (;;) {
+        int n = recv(fdval(env, fdo), (char*)&buf, sizeof(buf), MSG_OOB);
+        if (n == SOCKET_ERROR) {
+            if (WSAGetLastError() != WSAEWOULDBLOCK) {
+                JNU_ThrowIOExceptionWithLastError(env, "recv failed");
+            }
+            return discarded;
         }
-    } while (n > 0);
-    return discarded;
+        if (n <= 0)
+            return discarded;
+        if (n < (int)sizeof(buf))
+            return JNI_TRUE;
+        discarded = JNI_TRUE;
+    }
 }
