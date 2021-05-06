@@ -886,7 +886,6 @@ javax/swing/JInternalFrame/8146321/JInternalFrameIconTest.java 8260331 linux-x64
 java/lang/Continuation/Basic.java#id2                           8253570 generic-all
 java/lang/Thread/virtual/stress/PinALot.java#id1                8253523 generic-all
 java/lang/Thread/virtual/stress/PinALot.java#id3                8253523 generic-all
-java/lang/Thread/virtual/stress/GetStackTraceALot.java#id2      8254188 generic-all
 
 com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
