@@ -38,18 +38,6 @@
 *
 */
 
-
-/**
-* @test
-* @requires vm.graal.enabled
-* @summary Basic tests for java.lang.Continuation with Graal
-*
-* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic Basic
-* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,Basic.manyArgsDriver Basic
-* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=exclude,java/lang/Continuation.enter Basic
-* @run testng/othervm -Xcomp -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,Basic -XX:CompileCommand=inline,java/lang/Continuation.run Basic
-*/
-
 /**
  * @test
  * @summary Test which verifies that continuation repspects Xint mode
