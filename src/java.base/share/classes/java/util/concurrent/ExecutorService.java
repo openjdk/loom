@@ -267,17 +267,30 @@ public interface ExecutorService extends Executor, AutoCloseable {
 
     /**
      * Submits the given value-returning tasks for execution and returns a
-     * lazily populated stream of completed Future objects with the result
-     * of each task.
+     * lazily populated stream of completed Future objects with the result of
+     * each task.
      *
-     * <p> Invoking the stream's {@linkplain Stream#close() close()} method
+     * <p> Invoking the stream's {@linkplain Stream#close() close} method
      * cancels any remaining tasks as if by invoking {@linkplain
-     * Future#cancel(boolean) cancel(true)} on each remaining task.
+     * Future#cancel(boolean) cancel(true)} on each remaining task. In other
+     * words, for each remaining task that has already started, the thread
+     * executing the task (when known to the implementation) is interrupted
+     * in an attempt to stop the task. This may have no effect on
+     * implementations that do not use thread interruption to control
+     * cancellation, in which case {@code close()} will just close the stream.
+     * The {@code try-with-resources} construct may be useful to ensure that
+     * remaining tasks are cancelled when using <em>short-circuiting</em>
+     * stream operations.
      *
      * <p> If a thread is interrupted while waiting on the stream for a task to
      * complete then the remaining tasks are cancelled, as if by invoking
      * {@linkplain Future#cancel(boolean) cancel(true)}, and {@link
-     * CancellationException} is thrown with the interrupt status set.
+     * CancellationException} is thrown with the interrupt status set. As with
+     * closing the stream, for each remaining task that has already started,
+     * the thread executing the task (when known to the implementation) is
+     * interrupted in an attempt to stop the task. This may have no effect on
+     * implementations that do not use thread interruption to control
+     * cancellation.
      *
      * @implSpec
      * The default implementation {@link #submit(Callable) submits} the tasks
@@ -289,16 +302,25 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * method makes a best effort attempt to cancel the tasks that it
      * submitted when RejectedExecutionException is thrown.
      *
-     * <p> The following example invokes {@code submit} with a collection of
-     * tasks and performs an action on the result of each task that completes
-     * normally.
+     * <p> The following are examples that submit a collection of tasks. The
+     * first collects the results of the tasks that complete normally into a
+     * list. The second finds the result of any task that completes normally
+     * and cancels outstanding tasks by closing the stream.
      * <pre> {@code
      *     ExecutorService executor = ...
-     *     Collection<Callable<...>> tasks = ...
-     *     executor.submit(tasks)
-     *                 .filter(Future::isCompletedNormally)
+     *     Collection<Callable<String>> tasks = ...
+     *
+     *     List<String> results = executor.submit(tasks)
+     *             .filter(Future::isCompletedNormally)
+     *             .map(Future::join)
+     *             .toList();
+     *
+     *     try (Stream<Future<String>> stream = executor.submit(tasks)) {
+     *         String first = stream.filter(Future::isCompletedNormally)
      *                 .map(Future::join)
-     *                 .forEach(result -> { });
+     *                 .findFirst()
+     *                 .orElseThrow();
+     *    }
      * }</pre>
      *
      * @param tasks the collection of tasks
@@ -325,8 +347,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * collection is modified while this operation is in progress.
      *
      * @apiNote This method is equivalent to invoking {@linkplain
-     * #invokeAll(Collection, boolean)} with {@code cancelOnException} set
-     * to {@code false}.
+     * #invokeAll(Collection, boolean) invokeAll(tasks, true)}.
      *
      * @param tasks the collection of tasks
      * @param <T> the type of the values returned from the tasks
@@ -343,25 +364,30 @@ public interface ExecutorService extends Executor, AutoCloseable {
         throws InterruptedException;
 
     /**
-     * Executes the given tasks, returning a list of Futures holding
-     * their status and results when all complete. {@link Future#isDone} is
-     * {@code true} for each element of the returned list.
+     * Executes the given tasks, returning a list of Futures holding their
+     * status and results when all complete or are cancelled.
+     * {@link Future#isDone} is {@code true} for each element of the
+     * returned list. The results of this method are undefined if the given
+     * collection is modified while this operation is in progress.
      *
-     * <p> The parameter {@code cancelOnException} determines if this
-     * method should wait for unfinished tasks to complete when a task
-     * completes with an exception. If {@code true}, unfinished tasks are
-     * cancelled, as if by invoking {@code cancel(true)}, when any task
-     * completes with an exception.
+     * <p> The parameter {@code waitAll} determines if this method should wait
+     * for unfinished tasks to complete when any task completes with an
+     * exception or error. If {@code true}, this method waits until all
+     * tasks have completed or the current thread is interrupted. If
+     * {@code false}, this method stops waiting when a task completes with an
+     * exception or error, in which case it cancels any unfinished tasks as
+     * if by invoking {@code cancel(true)}.
      *
      * @implSpec
      * The default implementation {@link #submit(Callable) submits} the tasks
-     * for execution. It then waits until all tasks have completed, or in the
-     * case that {@code cancelOnException} is true, that a task completes with
-     * an exception.
+     * for execution. If {@code waitAll} is true then it waits until all tasks
+     * complete or the current thread is interrupted. If false, it waits until
+     * all tasks complete normally, a task completes with an exception or
+     * error, or the current thread is interrupted.
      *
      * @param tasks the collection of tasks
-     * @param cancelOnException true to cancel unfinished tasks when
-     *         any task fails
+     * @param waitAll true to wait for all tasks to complete, false to
+     *        cancel unfinished tasks when any task fails
      * @param <T> the type of the values returned from the tasks
      * @return a list of Futures representing the tasks, in the same
      *         sequential order as produced by the iterator for the
@@ -374,9 +400,9 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * @since 99
      */
     default <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
-                                          boolean cancelOnException)
+                                          boolean waitAll)
             throws InterruptedException {
-        return ExecutorServiceHelper.invokeAll(this, tasks, cancelOnException);
+        return ExecutorServiceHelper.invokeAll(this, tasks, waitAll);
     }
 
     /**

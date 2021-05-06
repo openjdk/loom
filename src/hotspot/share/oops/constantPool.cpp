@@ -24,6 +24,7 @@
 
 #include "precompiled.hpp"
 #include "jvm.h"
+#include "cds/heapShared.hpp"
 #include "classfile/classLoaderData.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/metadataOnStackMark.hpp"
@@ -31,12 +32,12 @@
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmClasses.hpp"
 #include "classfile/vmSymbols.hpp"
+#include "code/codeCache.hpp"
 #include "interpreter/bootstrapInfo.hpp"
 #include "interpreter/linkResolver.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
 #include "memory/allocation.inline.hpp"
-#include "memory/heapShared.hpp"
 #include "memory/metadataFactory.hpp"
 #include "memory/metaspaceClosure.hpp"
 #include "memory/oopFactory.hpp"
@@ -353,6 +354,9 @@ void ConstantPool::add_dumped_interned_strings() {
 
 // CDS support. Create a new resolved_references array.
 void ConstantPool::restore_unshareable_info(TRAPS) {
+  if (!_pool_holder->is_linked() && !_pool_holder->is_rewritten()) {
+    return;
+  }
   assert(is_constantPool(), "ensure C++ vtable is restored");
   assert(on_stack(), "should always be set for shared constant pools");
   assert(is_shared(), "should always be set for shared constant pools");
@@ -390,6 +394,9 @@ void ConstantPool::restore_unshareable_info(TRAPS) {
 }
 
 void ConstantPool::remove_unshareable_info() {
+  if (!_pool_holder->is_linked() && _pool_holder->is_shared_old_klass()) {
+    return;
+  }
   // Resolved references are not in the shared archive.
   // Save the length for restoration.  It is not necessarily the same length
   // as reference_map.length() if invokedynamic is saved. It is needed when
@@ -2235,6 +2242,16 @@ int ConstantPool::copy_cpool_bytes(int cpool_size,
 
 #undef DBG
 
+// For redefinition, if any methods found in InstanceStackChunks, the marking_cycle is
+// recorded in their constant pool cache. The on_stack-ness of the constant pool controls whether
+// memory for the method is reclaimed.
+bool ConstantPool::on_stack() const {
+  if (_cache == NULL || _pool_holder == NULL) return false; // removed in loading
+
+  // See nmethod::is_not_on_continuation_stack for explanation of what this means.
+  bool not_on_vthread_stack = CodeCache::marking_cycle() >= align_up(cache()->marking_cycle(), 2) + 2;
+  return (_flags &_on_stack) != 0 || !not_on_vthread_stack;
+}
 
 void ConstantPool::set_on_stack(const bool value) {
   if (value) {

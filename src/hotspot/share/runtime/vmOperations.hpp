@@ -69,12 +69,6 @@ class VM_ThreadSuspend: public VM_ForceSafepoint {
   VMOp_Type type() const { return VMOp_ThreadSuspend; }
 };
 
-// empty vm op, when forcing a safepoint to suspend threads from jvmti
-class VM_ThreadsSuspendJVMTI: public VM_ForceSafepoint {
- public:
-  VMOp_Type type() const { return VMOp_ThreadsSuspendJVMTI; }
-};
-
 // empty vm op, when forcing a safepoint due to inline cache buffers being full
 class VM_ICBufferFull: public VM_ForceSafepoint {
  public:

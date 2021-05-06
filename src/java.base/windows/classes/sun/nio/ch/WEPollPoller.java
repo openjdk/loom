@@ -65,8 +65,8 @@ class WEPollPoller extends Poller {
         int i = 0;
         while (i < n) {
             long event = WEPoll.getEvent(address, i);
-            long s = (int) WEPoll.getSocket(event);
-            polled((int) s);
+            int fdVal = WEPoll.getDescriptor(event);
+            polled(fdVal);
             i++;
         }
         return n;

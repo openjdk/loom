@@ -26,7 +26,6 @@ package nsk.jvmti.RedefineClasses;
 
 
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.HashMap;
@@ -56,6 +55,7 @@ public class StressRedefine extends GCTestBase {
     private static int nonstaticMethodCallersNumber = 10;
     private static int redefiningThreadsNumber = 40;
     private static double corruptingBytecodeProbability = .75;
+    private static boolean virtualThreads = false;
 
     private static volatile Class<?> myClass;
     private static ExecutionController stresser;
@@ -100,6 +100,8 @@ public class StressRedefine extends GCTestBase {
                 redefiningThreadsNumber = Integer.parseInt(args[i + 1]);
             } else if ("-corruptingBytecodeProbability".equals(args[i])) {
                 corruptingBytecodeProbability = Double.parseDouble(args[i + 1]);
+            } else if ("-virtualThreads".equals(args[i])) {
+                virtualThreads = true;
             }
         }
 
@@ -168,14 +170,15 @@ public class StressRedefine extends GCTestBase {
         bytecode = generateAndCompile();
 
         List<Thread> threads = new LinkedList<Thread>();
+        var threadFactory = virtualThreads ? Thread.ofVirtual().factory() : Thread.ofPlatform().factory();
         for (int i = 0; i < staticMethodCallersNumber; i++) {
-            threads.add(new Thread(new StaticMethodCaller()));
+            threads.add(threadFactory.newThread(new StaticMethodCaller()));
         }
         for (int i = 0; i < nonstaticMethodCallersNumber; i++) {
-            threads.add(new Thread(new NonstaticMethodCaller()));
+            threads.add(threadFactory.newThread(new NonstaticMethodCaller()));
         }
         for (int i = 0; i < redefiningThreadsNumber; i++) {
-            threads.add(new Thread(new Worker()));
+            threads.add(threadFactory.newThread(new Worker()));
         }
 
         for (Thread thread : threads) {

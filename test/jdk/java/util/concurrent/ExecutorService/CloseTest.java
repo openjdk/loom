@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Test default implementation of ExecutorService.close
+ * @summary Test ExecutorService.close, including default implementation
  * @run testng CloseTest
  */
 

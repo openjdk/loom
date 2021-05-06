@@ -133,7 +133,9 @@ public interface Future<V> {
     boolean isDone();
 
     /**
-     * Returns {@code true} if this task completed normally.
+     * Returns {@code true} if this task completed normally. Returns
+     * {@code false} if the task has not completed, completed with an
+     * exception or error, or was cancelled before it completed.
      *
      * @implSpec
      * The default implementation invokes {@code isDone} to test if the task
@@ -160,7 +162,8 @@ public interface Future<V> {
                 }
             }
         } finally {
-            if (interrupted) Thread.currentThread().interrupt();
+            if (interrupted)
+                Thread.currentThread().interrupt();
         }
     }
 
@@ -181,7 +184,8 @@ public interface Future<V> {
      * Waits if necessary for the computation to complete, and then
      * retrieves its result. This method differs to {@linkplain #get()} in
      * that it throws an unchecked exception if the computation completed
-     * with an exception. It also does not react to thread interrupt.
+     * with an exception or error. Waiting is not interrupted if the
+     * current thread is interrupted.
      *
      * @implSpec
      * The default implementation invokes {@code get()} to wait for the
@@ -189,7 +193,8 @@ public interface Future<V> {
      *
      * @return the computed result
      * @throws CancellationException if the computation was cancelled
-     * @throws CompletionException if the computation threw an exception
+     * @throws CompletionException if the computation completed with an
+     * exception or error
      * @since 99
      */
     default V join() {
@@ -201,11 +206,12 @@ public interface Future<V> {
                 } catch (InterruptedException e) {
                     interrupted = true;
                 } catch (ExecutionException e) {
-                    throw new CompletionException(e);
+                    throw new CompletionException(e.getCause());
                 }
             }
         } finally {
-            if (interrupted) Thread.currentThread().interrupt();
+            if (interrupted)
+                Thread.currentThread().interrupt();
         }
     }
 

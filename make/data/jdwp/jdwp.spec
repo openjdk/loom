@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -3242,11 +3242,15 @@ JDWP "Java(tm) Debug Wire Protocol"
 )
 
 (ConstantSet ThreadStatus
-    (Constant ZOMBIE                 =0  )
-    (Constant RUNNING                =1  )
-    (Constant SLEEPING               =2  )
-    (Constant MONITOR                =3  )
-    (Constant WAIT                   =4  )
+    (Constant ZOMBIE                 =0  "Thread has terminated.")
+    (Constant RUNNING                =1  "Thread is runnable.")
+    (Constant SLEEPING               =2  "Thread is sleeping, in Thread.sleep.")
+    (Constant MONITOR                =3  "Thread is waiting to enter a synchronized block/method"
+                                         " or, after an Object.wait, waiting to re-enter a"
+                                         " synchronized block/method.")
+    (Constant WAIT                   =4  "Thread is waiting, in Object.wait or LockSupport.park."
+                                         " A virtual thread that is sleeping in Thread.sleep may"
+                                         " have this thread status instead of SLEEPING.")
 )
 
 (ConstantSet SuspendStatus

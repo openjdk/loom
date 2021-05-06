@@ -77,6 +77,8 @@
   template(GetObjectMonitorUsage)                 \
   template(GetAllStackTraces)                     \
   template(GetThreadListStackTraces)              \
+  template(VThreadGetStackTrace)                  \
+  template(VThreadGetFrameCount)                  \
   template(ChangeBreakpoints)                     \
   template(GetOrSetLocal)                         \
   template(VirtualThreadGetOrSetLocal)            \
@@ -106,7 +108,6 @@
   template(PrintCompileQueue)                     \
   template(PrintClassHierarchy)                   \
   template(ThreadSuspend)                         \
-  template(ThreadsSuspendJVMTI)                   \
   template(ICBufferFull)                          \
   template(ScavengeMonitors)                      \
   template(PrintMetadata)                         \

@@ -98,17 +98,10 @@ public class RedefineRunningMethods {
 
     public static void main(String[] args) throws Exception {
 
-        new Thread() {
-            public void run() {
-                RedefineRunningMethods_B.infinite();
-            }
-        }.start();
-
-        new Thread() {
-            public void run() {
-                RedefineRunningMethods_B.infinite_emcp();
-            }
-        }.start();
+        var t1 = Thread.ofPlatform().start(RedefineRunningMethods_B::infinite);
+        var t1v = Thread.ofVirtual().start(RedefineRunningMethods_B::infinite);
+        var t2 = Thread.ofPlatform().start(RedefineRunningMethods_B::infinite_emcp);
+        var t2v = Thread.ofVirtual().start(RedefineRunningMethods_B::infinite);
 
         RedefineClassHelper.redefineClass(RedefineRunningMethods_B.class, newB);
 
@@ -117,11 +110,9 @@ public class RedefineRunningMethods {
         RedefineRunningMethods_B.infinite();
 
         // Start a thread with the second version of infinite_emcp running
-        new Thread() {
-            public void run() {
-                RedefineRunningMethods_B.infinite_emcp();
-            }
-        }.start();
+        var t3 = Thread.ofPlatform().start(RedefineRunningMethods_B::infinite_emcp);
+        var t3v = Thread.ofVirtual().start(RedefineRunningMethods_B::infinite_emcp);
+
 
         for (int i = 0; i < 20 ; i++) {
             String s = new String("some garbage");
@@ -147,5 +138,13 @@ public class RedefineRunningMethods {
             String s = new String("some garbage");
             System.gc();
         }
+/*
+        TODO uncomment, should be join added to orginal test?
+        t1.join();
+        t2.join();
+        t3.join();
+        t1v.join();
+        t2v.join();
+ */
     }
 }

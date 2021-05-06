@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -682,8 +682,7 @@ public class Net {
     /**
      * Read and discard urgent data (MSG_OOB) on the socket.
      */
-    static native boolean discardUrgentData(FileDescriptor fd);
-
+    static native boolean discardOOB(FileDescriptor fd) throws IOException;
 
     // -- Multicast support --
 
@@ -792,7 +791,6 @@ public class Net {
     public static final short POLLHUP;
     public static final short POLLNVAL;
     public static final short POLLCONN;
-    public static final short POLLRDBAND;
 
     static native short pollinValue();
     static native short polloutValue();
@@ -800,7 +798,6 @@ public class Net {
     static native short pollhupValue();
     static native short pollnvalValue();
     static native short pollconnValue();
-    static native short pollrdbandValue();
 
     static {
         IOUtil.load();
@@ -812,7 +809,6 @@ public class Net {
         POLLHUP    = pollhupValue();
         POLLNVAL   = pollnvalValue();
         POLLCONN   = pollconnValue();
-        POLLRDBAND = pollrdbandValue();
     }
 
     static {

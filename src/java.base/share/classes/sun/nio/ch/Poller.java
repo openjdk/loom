@@ -35,8 +35,9 @@ import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.VirtualThreads;
 
 /**
- * A Poller of file descriptors. A virtual thread registers a file descriptors with
- * a Poller. The thread is unparked when the file descriptor is ready for I/O.
+ * A Poller of file descriptors. A virtual thread registers the file descriptor
+ * for a socket with a Poller before parking. The poller unparks the thread when
+ * the socket is ready for I/O.
  */
 public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -129,7 +130,7 @@ public abstract class Poller {
     }
 
     /**
-     * Stops polling the file descriptor and unpark any strands that are registered
+     * Stops polling the file descriptor and unpark any threads that are registered
      * to be unparked when the file descriptor is ready for I/O.
      */
     static void stopPoll(int fdVal) {

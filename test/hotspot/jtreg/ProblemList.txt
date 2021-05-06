@@ -68,6 +68,8 @@ compiler/whitebox/ClearMethodStateTest.java 8265360 macosx-aarch64
 compiler/whitebox/EnqueueMethodForCompilationTest.java 8265360 macosx-aarch64
 compiler/whitebox/MakeMethodNotCompilableTest.java 8265360 macosx-aarch64
 
+compiler/codecache/jmx/PoolsIndependenceTest.java 8264632 macosx-x64
+
 #############################################################################
 
 # :hotspot_gc
@@ -102,6 +104,7 @@ resourcehogs/serviceability/sa/TestHeapDumpForLargeArray.java 8262386 generic-al
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorStatIntervalTest.java 8214032 generic-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorStatArrayCorrectnessTest.java 8224150 generic-all
 serviceability/jvmti/ModuleAwareAgents/ThreadStart/MAAThreadStart.java 8225354 windows-all
+serviceability/dcmd/gc/RunFinalizationTest.java 8227120 linux-x64
 
 #############################################################################
 
@@ -164,7 +167,6 @@ compiler/vectorization/TestMacroLogicVector.java                              82
 compiler/whitebox/ForceNMethodSweepTest.java                                  8265181 generic-all
 
 runtime/clinit/ClassInitBarrier.java                                          8254936 generic-all
-runtime/vthread/RedefineClass.java                                            8253378 generic-all
 runtime/vthread/TestObjectAllocationSampleEvent.java                          8261379 generic-all
 
 serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java    0000000 generic-all

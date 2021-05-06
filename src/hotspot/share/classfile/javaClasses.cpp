@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,6 +24,9 @@
 
 #include "precompiled.hpp"
 #include "jvm.h"
+#include "cds/archiveBuilder.hpp"
+#include "cds/heapShared.inline.hpp"
+#include "cds/metaspaceShared.hpp"
 #include "classfile/altHashing.hpp"
 #include "classfile/classLoaderData.inline.hpp"
 #include "classfile/javaClasses.inline.hpp"
@@ -41,9 +44,6 @@
 #include "interpreter/linkResolver.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
-#include "memory/archiveBuilder.hpp"
-#include "memory/heapShared.inline.hpp"
-#include "memory/metaspaceShared.hpp"
 #include "memory/oopFactory.hpp"
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
@@ -2096,6 +2096,8 @@ int java_lang_Thread::_interrupted_offset;
 int java_lang_Thread::_tid_offset;
 int java_lang_Thread::_continuation_offset;
 int java_lang_Thread::_park_blocker_offset;
+int java_lang_Thread::_noninheritableScopeLocalBindings_offset;
+int java_lang_Thread::_inheritableScopeLocalBindings_offset;
 
 #define THREAD_FIELDS_DO(macro) \
   macro(_holder_offset,        k, "holder", thread_fieldholder_signature, false); \
@@ -2108,6 +2110,8 @@ int java_lang_Thread::_park_blocker_offset;
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
+  macro(_noninheritableScopeLocalBindings_offset, k, "noninheritableScopeLocalBindings", scopeLocalSnapshot_name, false); \
+  macro(_inheritableScopeLocalBindings_offset,    k, "inheritableScopeLocalBindings", scopeLocalSnapshot_name, false); \
 
 void java_lang_Thread::compute_offsets() {
   assert(_holder_offset == 0, "offsets should be initialized only once");
@@ -2136,6 +2140,11 @@ JvmtiThreadState* java_lang_Thread::jvmti_thread_state(oop java_thread) {
 
 void java_lang_Thread::set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state) {
   java_thread->address_field_put(_jvmti_thread_state_offset, (address)state);
+}
+
+void java_lang_Thread::clear_scopeLocalBindings(oop java_thread) {
+  java_thread->obj_field_put(_noninheritableScopeLocalBindings_offset, NULL);
+  java_thread->obj_field_put(_inheritableScopeLocalBindings_offset, NULL);
 }
 
 oop java_lang_Thread::holder(oop java_thread) {
@@ -2269,8 +2278,8 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   bool is_virtual = java_lang_VirtualThread::is_instance(java_thread);
   if (is_virtual) {
     oop carrier_thread = java_lang_VirtualThread::carrier_thread(java_thread);
-    if (carrier_thread == (oop)NULL) {
-      return (oop)NULL;
+    if (carrier_thread == NULL) {
+      return NULL;
     }
     thread = java_lang_Thread::thread(carrier_thread);
   } else {
@@ -2280,99 +2289,99 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   class GetStackTraceClosure : public HandshakeClosure {
   public:
     const Handle _java_thread;
-    Handle _result;
-    Handle _exception;
     int _depth;
+    GrowableArray<Method*>* _methods;
+    GrowableArray<int>*     _bcis;
+    GrowableArray<oop>*     _continuations;
 
-    GetStackTraceClosure(Handle java_thread, Handle result, Handle exception) : 
-      HandshakeClosure("GetStackTraceClosure"), 
-      _java_thread(java_thread), _result(result), _exception(exception), _depth(0) {}
+    GetStackTraceClosure(Handle java_thread) :
+      HandshakeClosure("GetStackTraceClosure"), _java_thread(java_thread), _depth(0) {
+      // Pick some initial length
+      int init_length = MaxJavaStackTraceDepth/2;
+      _methods = new GrowableArray<Method*>(init_length);
+      _bcis = new GrowableArray<int>(init_length);
+      _continuations = new GrowableArray<oop>(init_length);
+    }
 
     bool can_be_processed_by(Thread* thread) {
       return thread->is_Java_thread();
     }
 
-    void do_thread(Thread* thread) {
-      Thread* THREAD = Thread::current();
-
-      do_thread0(thread);
-
-      if (THREAD == thread) { // we're running in the target thread
-        if (THREAD->has_pending_exception()) {
-          *_exception.raw_value() = THREAD->pending_exception();
-          THREAD->clear_pending_exception();
-        }
-      }
-    }
-
-    void do_thread0(Thread* th) {
-      assert (th->is_Java_thread(), "");
-      JavaThread* thread = (JavaThread*)th;
-      JavaThread* THREAD = (JavaThread*)Thread::current();
+    void do_thread(Thread* th) {
+      JavaThread* thread = th->as_Java_thread();
 
       if (!thread->has_last_Java_frame()) {
         return;
       }
-      ResourceMark rm(THREAD);
 
       bool carrier = false;
+      oop vthread_scope = java_lang_VirtualThread::vthread_scope();
       if (java_lang_VirtualThread::is_instance(_java_thread())) {
         // if (thread->vthread() != _java_thread()) // We might be inside a System.executeOnCarrierThread
-        if (thread->last_continuation(java_lang_VirtualThread::vthread_scope())->cont_oop() != java_lang_VirtualThread::continuation(_java_thread())) {
+        if (thread->last_continuation(vthread_scope)->cont_oop() !=
+              java_lang_VirtualThread::continuation(_java_thread())) {
           return; // not mounted
         }
       } else {
-        if (thread->last_continuation(java_lang_VirtualThread::vthread_scope()) != NULL)
-          carrier = true;
+        carrier = (thread->last_continuation(vthread_scope) != NULL);
       }
-      
+
       const int max_depth = MaxJavaStackTraceDepth;
       const bool skip_hidden = !ShowHiddenFrames;
 
-      HandleMark hm(THREAD);
-      BacktraceBuilder bt(CHECK);
-
       int total_count = 0;
-      for (vframeStream vfst(thread, false, false, carrier); !vfst.at_end() && (max_depth == 0 || max_depth != total_count); vfst.next()) {
-        if (skip_hidden && (vfst.method()->is_hidden() || vfst.method()->is_continuation_enter_intrinsic())) continue;
-        bt.push(vfst.method(), vfst.bci(), contScopeName(vfst.continuation()), CHECK);
+      for (vframeStream vfst(thread, false, false, carrier);
+           !vfst.at_end() && (max_depth == 0 || max_depth != total_count);
+           vfst.next()) {
+
+        if (skip_hidden && (vfst.method()->is_hidden() ||
+                            vfst.method()->is_continuation_enter_intrinsic())) continue;
+        _methods->push(vfst.method());
+        _bcis->push(vfst.bci());
+        _continuations->push(contScopeName(vfst.continuation()));
         total_count++;
       }
 
       _depth = total_count;
-      *_result.raw_value() = bt.backtrace();
     }
 
     oop contScopeName(oop cont) {
-      return cont != (oop)NULL ? java_lang_ContinuationScope::name(Continuation::continuation_scope(cont)) : (oop)NULL;
+      return cont == NULL ? NULL : java_lang_ContinuationScope::name(Continuation::continuation_scope(cont));
     }
   };
 
-  // handhsake with target
-  Handle backtrace(THREAD, java_thread); // we need to allocate a handle with an arbitrary non-null oop
-  *backtrace.raw_value() = (oop)NULL;
-  Handle exception(THREAD, java_thread); // we need to allocate a handle with an arbitrary non-null oop
-  *exception.raw_value() = (oop)NULL;
-  GetStackTraceClosure gstc(Handle(THREAD, java_thread), backtrace, exception);
+  // Handshake with target
+  ResourceMark rm(THREAD);
+  HandleMark   hm(THREAD);
+  GetStackTraceClosure gstc(Handle(THREAD, java_thread));
   Handshake::execute(&gstc, thread);
 
-  if (exception() != (oop)NULL) {
-    THROW_OOP_(exception(), (oop)NULL);
-  }
-  if (backtrace() == (oop)NULL) {
-    return (oop)NULL;
+  // Stop if no stack trace is found.
+  if (gstc._depth == 0) {
+    return NULL;
   }
 
-  // convert to StackTraceElement array
+  // Convert the continuations into handles before allocation.
+  assert(gstc._depth == gstc._continuations->length(), "should be the same");
+  GrowableArray<Handle>* cont_handles = new GrowableArray<Handle>(gstc._depth);
+  for (int i = 0; i < gstc._depth; i++) {
+    cont_handles->push(Handle(THREAD, gstc._continuations->at(i)));
+  }
+
+  // Convert to StackTraceElement array
   InstanceKlass* k = vmClasses::StackTraceElement_klass();
   assert(k != NULL, "must be loaded in 1.4+");
   if (k->should_be_initialized()) k->initialize(CHECK_NULL);
   objArrayHandle trace = oopFactory::new_objArray_handle(k, gstc._depth, CHECK_NULL);
-  for (int i=0; i < gstc._depth; i++) {
-    oop element = k->allocate_instance(CHECK_NULL);
+
+  for (int i = 0; i < gstc._depth; i++) {
+    methodHandle method(THREAD, gstc._methods->at(i));
+    oop element = java_lang_StackTraceElement::create(method,
+                                                      gstc._bcis->at(i),
+                                                      cont_handles->at(i),
+                                                      CHECK_NULL);
     trace->obj_at_put(i, element);
   }
-  java_lang_Throwable::get_stack_trace_elements(gstc._depth, backtrace, trace, CHECK_NULL);
 
   return trace();
 }

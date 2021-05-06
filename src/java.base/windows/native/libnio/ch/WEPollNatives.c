@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -53,7 +53,7 @@ Java_sun_nio_ch_WEPoll_dataOffset(JNIEnv* env, jclass clazz)
 JNIEXPORT jlong JNICALL
 Java_sun_nio_ch_WEPoll_create(JNIEnv *env, jclass clazz) {
     HANDLE h = epoll_create1(0);
-    if (h < 0) {
+    if (h == NULL) {
         JNU_ThrowIOExceptionWithLastError(env, "epoll_create1 failed");
     }
     return ptr_to_jlong(h);

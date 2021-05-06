@@ -32,8 +32,11 @@
  *          java.instrument
  *          jdk.jartool/sun.tools.jar
  * @run main RedefineClassHelper
- * @run main/othervm -javaagent:redefineagent.jar RedefineRunningMethodsWithBacktrace
+ * @run main/othervm -javaagent:redefineagent.jar RedefineRunningMethodsWithBacktrace platform
+ * @run main/othervm -javaagent:redefineagent.jar RedefineRunningMethodsWithBacktrace virtual
  */
+
+import java.util.concurrent.ThreadFactory;
 
 import static jdk.test.lib.Asserts.*;
 
@@ -149,11 +152,11 @@ public class RedefineRunningMethodsWithBacktrace {
 
     public static void main(String[] args) throws Exception {
 
-        new Thread() {
-            public void run() {
-                RedefineRunningMethodsWithBacktrace_B.infinite();
-            }
-        }.start();
+        ThreadFactory factory = args[0].equals("platform")
+                ? Thread.ofPlatform().factory()
+                : Thread.ofVirtual().factory();
+
+        factory.newThread(RedefineRunningMethodsWithBacktrace_B::infinite).start();
 
         Throwable t1 = getThrowableInB();
 

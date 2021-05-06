@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,6 +22,7 @@
  */
 
 #include <string.h>
+#include <atomic>
 #include "jvmti.h"
 #include "jvmti_common.h"
 
@@ -30,7 +31,6 @@ extern "C" {
 static jvmtiEnv* jvmti = NULL;
 static jthread* threads = NULL;
 static jsize threads_count = 0;
-
 
 JNIEXPORT void JNICALL
 Java_SuspendWithCurrentThread_registerTestedThreads(JNIEnv *jni, jclass cls, jobjectArray threadsArr) {
@@ -61,6 +61,7 @@ Java_ThreadToSuspend_suspendTestedThreads(JNIEnv *jni, jclass cls) {
 
   LOG("suspendTestedThreads: before JVMTI SuspendThreadList\n");
   err = jvmti->SuspendThreadList(threads_count, threads, results);
+  // is_exited_from_suspend.store(true); // TODO SERGUEI
   check_jvmti_status(jni, err, "suspendTestedThreads: error in JVMTI SuspendThreadList");
 
   LOG("suspendTestedThreads: check and print SuspendThreadList results:\n");
@@ -92,6 +93,10 @@ Java_SuspendWithCurrentThread_checkTestedThreadsSuspended(JNIEnv *jni, jclass cl
       millisleep(10);
     }
   }
+  // if (is_exited_from_suspend.load()) { // TODO SERGUEI
+  //   LOG("Thread didn't stop in self suspend.");
+  //   return JNI_FALSE;
+  // }
   LOG("checkTestedThreadsSuspended: finished\n");
   return JNI_TRUE;
 }

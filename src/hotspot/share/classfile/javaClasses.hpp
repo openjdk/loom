@@ -384,14 +384,14 @@ class java_lang_Thread : AllStatic {
   static int _tid_offset;
   static int _continuation_offset;
   static int _park_blocker_offset;
+  static int _noninheritableScopeLocalBindings_offset;
+  static int _inheritableScopeLocalBindings_offset;
 
   static void compute_offsets();
 
  public:
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
-  // Instance creation
-  static oop create();
   // Returns the JavaThread associated with the thread obj
   static JavaThread* thread(oop java_thread);
   // Set JavaThread for instance
@@ -432,6 +432,9 @@ class java_lang_Thread : AllStatic {
 
   static JvmtiThreadState* jvmti_thread_state(oop java_thread);
   static void set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state);
+
+  // Clear all scope local bindings on error
+  static void clear_scopeLocalBindings(oop java_thread);
 
   // Blocker object responsible for thread parking
   static oop park_blocker(oop java_thread);
@@ -647,7 +650,6 @@ class java_lang_Throwable: AllStatic {
   static void set_message(oop throwable, oop value);
   static Symbol* detail_message(oop throwable);
   static void print_stack_element(outputStream *st, Method* method, int bci);
-  static void print_stack_usage(Handle stream);
 
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
@@ -833,8 +835,6 @@ class java_lang_reflect_Field : public java_lang_reflect_AccessibleObject {
 
   static void set_signature(oop constructor, oop value);
   static void set_annotations(oop constructor, oop value);
-  static void set_parameter_annotations(oop method, oop value);
-  static void set_annotation_default(oop method, oop value);
 
   // Debugging
   friend class JavaClasses;
@@ -1016,8 +1016,6 @@ class java_lang_ref_Reference: AllStatic {
   static inline void set_discovered(oop ref, oop value);
   static inline void set_discovered_raw(oop ref, oop value);
   static inline HeapWord* discovered_addr_raw(oop ref);
-  static inline oop queue(oop ref);
-  static inline void set_queue(oop ref, oop value);
   static bool is_referent_field(oop obj, ptrdiff_t offset);
   static inline bool is_final(oop ref);
   static inline bool is_phantom(oop ref);
@@ -1159,8 +1157,6 @@ class jdk_internal_misc_StackChunk: AllStatic {
 
 // Interface to java.lang.invoke.MethodHandle objects
 
-class MethodHandleEntry;
-
 class java_lang_invoke_MethodHandle: AllStatic {
   friend class JavaClasses;
 
@@ -1233,7 +1229,6 @@ class java_lang_invoke_LambdaForm: AllStatic {
 
   // Accessors
   static oop            vmentry(oop lform);
-  static void       set_vmentry(oop lform, oop invoker);
 
   // Testers
   static bool is_subclass(Klass* klass) {

@@ -173,14 +173,6 @@ JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
     if (state == NULL) {
       return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
-#ifdef DBG // TMP
-    ResourceMark rm(current_thread);
-    oop name_oop = java_lang_Thread::name(thread_oop);
-    const char* name_str = java_lang_String::as_utf8_string(name_oop);
-    name_str = name_str == NULL ? "<NULL>" : name_str;
-    printf("DBG: state_for_while_locked: %s cthread JvmtiThreadState: %p, %s\n",
-           action, (void*)state, name_str); fflush(0);
-#endif
   }
   state->env_thread_state(this)->set_agent_thread_local_storage_data((void*)data);
   return JVMTI_ERROR_NONE;
@@ -219,14 +211,6 @@ JvmtiEnv::GetThreadLocalStorage(jthread thread, void** data_ptr) {
     }
 
     JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread, thread_obj);
-#ifdef DBG // TMP
-    ResourceMark rm(current_thread);
-    oop name_oop = java_lang_Thread::name(thread_obj);
-    const char* name_str = java_lang_String::as_utf8_string(name_oop);
-    name_str = name_str == NULL ? "<NULL>" : name_str;
-    printf("DBG: GetThreadLocalStorage: cthread JvmtiThreadState: %p, %s\n",
-           (void*)state, name_str); fflush(0);
-#endif
     *data_ptr = (state == NULL) ? NULL :
       state->env_thread_state(this)->get_agent_thread_local_storage_data();
   }
@@ -1005,11 +989,17 @@ JvmtiEnv::SuspendThread(jthread thread) {
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
-  err = suspend_thread(thread_oop,
-                       java_thread,
-                       true,  // single suspend
-                       NULL); // no need for extra safepoint
-  return err;;
+  if (java_thread != NULL && java_thread == JavaThread::current()) {
+    // current thread will be suspended in the ~VTMTDisabler
+    vtmt_disabler.set_self_suspend();
+    err = JVMTI_ERROR_NONE;
+  } else {
+    err = suspend_thread(thread_oop,
+                         java_thread,
+                         true,  // single suspend
+                         NULL); // no need for extra safepoint
+  }
+  return err;
 } /* end SuspendThread */
 
 
@@ -1018,13 +1008,14 @@ JvmtiEnv::SuspendThread(jthread thread) {
 // results - pre-checked for NULL
 jvmtiError
 JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvmtiError* results) {
-  int needSafepoint = 0;  // > 0 if we need a safepoint
+  int self_index = -1;
   oop thread_oop = NULL;
   JavaThread *java_thread = NULL;
+  JavaThread* current = JavaThread::current();
 
   {
     JvmtiVTMTDisabler vtmt_disabler;
-    ThreadsListHandle tlh;
+    ThreadsListHandle tlh(current);
 
     for (int i = 0; i < request_count; i++) {
       jthread thread = request_list[i];
@@ -1035,15 +1026,17 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
           continue;
         }
       }
+      if (java_thread == current) {
+        self_index = i;
+        // current thread will be suspended in the ~VTMTDisabler
+        vtmt_disabler.set_self_suspend();
+        continue;
+      }
       results[i] = suspend_thread(thread_oop,
                                   java_thread,
                                   true, // single suspend
-                                  &needSafepoint);
+                                  NULL);
     }
-  }
-  if (needSafepoint > 0) {
-    VM_ThreadsSuspendJVMTI tsj;
-    VMThread::execute(&tsj);
   }
   // per-thread suspend results returned via results parameter
   return JVMTI_ERROR_NONE;
@@ -1052,7 +1045,6 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
 
 jvmtiError
 JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list) {
-  int needSafepoint = 0;  // > 0 if a safepoint is needed
   jvmtiError err = JvmtiEnvBase::check_thread_list(except_count, except_list);
   if (err != JVMTI_ERROR_NONE) {
     return err;
@@ -1091,7 +1083,7 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
         suspend_thread(thread_oop,
                        java_thread,
                        false, // suspend all
-                       &needSafepoint);
+                       NULL);
       }
     }
     JvmtiVTSuspender::register_all_vthreads_suspend();
@@ -1104,10 +1096,6 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
         JvmtiVTSuspender::register_vthread_resume(thread_oop);
       }
     }
-  }
-  if (needSafepoint > 0) {
-    VM_ThreadsSuspendJVMTI tsj;
-    VMThread::execute(&tsj);
   }
   return JVMTI_ERROR_NONE;
 }
@@ -1572,6 +1560,9 @@ JvmtiEnv::RunAgentThread(jthread thread, jvmtiStartFunction proc, const void* ar
     // 'thread' refers to an existing JavaThread.
     return JVMTI_ERROR_INVALID_THREAD;
   }
+  if (java_lang_VirtualThread::is_instance(thread_oop)) {
+    return JVMTI_ERROR_INVALID_THREAD;
+  }
 
   if (priority < JVMTI_THREAD_MIN_PRIORITY || priority > JVMTI_THREAD_MAX_PRIORITY) {
     return JVMTI_ERROR_INVALID_PRIORITY;
@@ -1735,9 +1726,12 @@ JvmtiEnv::GetStackTrace(jthread thread, jint start_depth, jint max_frame_count, 
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (java_thread == NULL) { // target virtual thread is unmounted
       ResourceMark rm(current_thread);
-      javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(thread_obj);
-      err = get_stack_trace(jvf, start_depth, max_frame_count, frame_buffer, count_ptr);
-      return err;
+
+      VM_VThreadGetStackTrace op(this, Handle(current_thread, thread_obj),
+                                 start_depth, max_frame_count,
+                                 frame_buffer, count_ptr);
+      VMThread::execute(&op);
+      return op.result();
     }
     VThreadGetStackTraceClosure op(this, Handle(current_thread, thread_obj),
                                    start_depth, max_frame_count, frame_buffer, count_ptr);
@@ -1853,8 +1847,9 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
   // Support for virtual threads
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (java_thread == NULL) { // target virtual thread is unmounted
-      err = get_frame_count(thread_obj, count_ptr);
-      return err;
+      VM_VThreadGetFrameCount op(this, Handle(current_thread, thread_obj),  count_ptr);
+      VMThread::execute(&op);
+      return op.result();
     }
     VThreadGetFrameCountClosure op(this, Handle(current_thread, thread_obj), count_ptr);
     Handshake::execute(&op, java_thread);

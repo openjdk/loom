@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -53,7 +53,7 @@ class WEPoll {
      */
     private static final int SIZEOF_EPOLLEVENT   = eventSize();
     private static final int OFFSETOF_EVENTS     = eventsOffset();
-    private static final int OFFSETOF_FD         = dataOffset();
+    private static final int OFFSETOF_SOCK       = dataOffset();
 
     // opcodes
     static final int EPOLL_CTL_ADD  = 1;
@@ -68,13 +68,16 @@ class WEPoll {
     static final int EPOLLHUP  = (1 << 4);
 
     // flags
-    static final int EPOLLONESHOT   = (1 << 31);
+    static final int EPOLLONESHOT = (1 << 31);
 
     /**
      * Allocates a poll array to handle up to {@code count} events.
      */
     static long allocatePollArray(int count) {
-        return UNSAFE.allocateMemory(count * SIZEOF_EPOLLEVENT);
+        long size = (long) count * SIZEOF_EPOLLEVENT;
+        long base = UNSAFE.allocateMemory(size);
+        UNSAFE.setMemory(base, size, (byte) 0);
+        return base;
     }
 
     /**
@@ -92,17 +95,20 @@ class WEPoll {
     }
 
     /**
-     * Returns event->data.fd
-     */
-    static int getDescriptor(long eventAddress) {
-        return UNSAFE.getInt(eventAddress + OFFSETOF_FD);
-    }
-
-    /**
      * Returns event->data.socket
      */
     static long getSocket(long eventAddress) {
-        return UNSAFE.getLong(eventAddress + OFFSETOF_FD);
+        return UNSAFE.getLong(eventAddress + OFFSETOF_SOCK);
+    }
+
+    /**
+     * Return event->data.socket as an int file descriptor
+     */
+    static int getDescriptor(long eventAddress) {
+        long s = getSocket(eventAddress);
+        int fd = (int) s;
+        assert ((long) fd) == s;
+        return fd;
     }
 
     /**
