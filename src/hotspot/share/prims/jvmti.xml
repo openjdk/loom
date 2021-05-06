@@ -2248,6 +2248,9 @@ jvmtiEnv *jvmti;
         </param>
       </parameters>
       <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is not a thread object or is a virtual thread.
+        </error>
         <error id="JVMTI_ERROR_INVALID_PRIORITY">
             <paramlink id="priority"/> is less than
             <datalink id="JVMTI_THREAD_MIN_PRIORITY"/>

@@ -41,6 +41,11 @@ check_jvmti_error_invalid_thread(JNIEnv* jni, const char* msg, jvmtiError err) {
   }
 }
 
+static void JNICALL
+agent_proc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
+  fatal(jni, "agent function was not expected to be called");
+}
+
 JNIEXPORT jboolean JNICALL
 Java_VThreadUnsupportedTest_isCompletedTestInEvent(JNIEnv *env, jobject obj) {
   return is_completed_test_in_event.load();
@@ -90,6 +95,9 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
 
   err = jvmti->GetThreadCpuTime(vthread, &nanos);
   check_jvmti_error_invalid_thread(jni, "GetThreadCpuTime", err);
+
+  err = jvmti->RunAgentThread(vthread, agent_proc, (const void*)NULL, JVMTI_THREAD_NORM_PRIORITY);
+  check_jvmti_error_invalid_thread(jni, "RunAgentThread", err);
 
   LOG("test_unsupported_jvmti_functions: finished\n");
 

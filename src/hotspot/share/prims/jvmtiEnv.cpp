@@ -1560,6 +1560,9 @@ JvmtiEnv::RunAgentThread(jthread thread, jvmtiStartFunction proc, const void* ar
     // 'thread' refers to an existing JavaThread.
     return JVMTI_ERROR_INVALID_THREAD;
   }
+  if (java_lang_VirtualThread::is_instance(thread_oop)) {
+    return JVMTI_ERROR_INVALID_THREAD;
+  }
 
   if (priority < JVMTI_THREAD_MIN_PRIORITY || priority > JVMTI_THREAD_MAX_PRIORITY) {
     return JVMTI_ERROR_INVALID_PRIORITY;
