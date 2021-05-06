@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021 Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -47,11 +47,14 @@ public interface ThreadReference extends ObjectReference {
     public final int THREAD_STATUS_ZOMBIE = 0;
     /** Thread is runnable */
     public final int THREAD_STATUS_RUNNING = 1;
-    /** Thread is sleeping - Thread.sleep() or JVM_Sleep() was called */
+    /** Thread is sleeping - {@link Thread#sleep(long)}. */
     public final int THREAD_STATUS_SLEEPING = 2;
     /** Thread is waiting on a java monitor */
     public final int THREAD_STATUS_MONITOR = 3;
-    /** Thread is waiting - Object.wait() or JVM_MonitorWait() was called */
+    /** Thread is waiting - {@link Object#wait()} or
+     * {@link java.util.concurrent.locks.LockSupport#park()}.
+     * A virtual thread that is sleeping in {@link Thread#sleep(long)} may
+     * have this thread status instead of {@link #THREAD_STATUS_SLEEPING}. */
     public final int THREAD_STATUS_WAIT = 4;
     /** Thread has not yet been started */
     public final int THREAD_STATUS_NOT_STARTED = 5;
