@@ -1231,9 +1231,9 @@ jvmtiEnv *jvmti;
             Thread is runnable.
           </constant>
           <constant id="JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER" num="0x0400">
-            Thread is waiting to enter a synchronization block/method or,
+            Thread is waiting to enter a synchronized block/method or,
             after an <code>Object.wait()</code>, waiting to re-enter a
-            synchronization block/method.
+            synchronized block/method.
           </constant>
           <constant id="JVMTI_THREAD_STATE_WAITING" num="0x0080">
             Thread is waiting.
@@ -1247,7 +1247,7 @@ jvmtiEnv *jvmti;
             For example, <code>Object.wait(long)</code>.
           </constant>
           <constant id="JVMTI_THREAD_STATE_SLEEPING" num="0x0040">
-            Thread is sleeping -- <code>Thread.sleep(long)</code>.
+            Thread is sleeping -- <code>Thread.sleep</code>.
           </constant>
           <constant id="JVMTI_THREAD_STATE_IN_OBJECT_WAIT" num="0x0100">
             Thread is waiting on an object monitor -- <code>Object.wait</code>.
@@ -1255,6 +1255,8 @@ jvmtiEnv *jvmti;
           <constant id="JVMTI_THREAD_STATE_PARKED" num="0x0200">
             Thread is parked, for example: <code>LockSupport.park</code>,
             <code>LockSupport.parkUtil</code> and <code>LockSupport.parkNanos</code>.
+            A virtual thread that is sleeping, in <code>Thread.sleep</code>, may
+            have this state flag set instead of <code>JVMTI_THREAD_STATE_SLEEPING</code>.
           </constant>
           <constant id="JVMTI_THREAD_STATE_SUSPENDED" num="0x100000">
             Thread suspended.
