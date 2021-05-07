@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -250,21 +250,20 @@ public interface VirtualMachine extends Mirror {
     void redefineClasses(Map<? extends ReferenceType,byte[]> classToBytes);
 
     /**
-     * Returns a list of the live threads in the target VM. The returned list
-     * contains a {@link ThreadReference} mirror for each live thread that
-     * is attached to the VM. It does not contain elements for virtual threads.
+     * Returns a list of the live platform threads in the target VM. The returned
+     * list contains a {@link ThreadReference} mirror for each live platform thread
+     * that is attached to the VM. The list does not contain elements for virtual
+     * threads.
      * <p>
-     * The returned list contains threads created through
-     * java.lang.Thread, all native threads attached to
-     * the target VM through JNI, and system threads created
-     * by the target VM. Thread objects that have
-     * not yet been started
+     * The returned list contains the platform threads created with the {@link Thread}
+     * API, and all native threads attached to the target VM through JNI.
+     * Thread objects that have not yet been started
      * (see {@link java.lang.Thread#start Thread.start()})
      * and thread objects that have
      * completed their execution are not included in the returned list.
      *
      * @return a list of {@link ThreadReference} objects, one for each
-     * live thread in the mirrored VM.
+     * live platform thread in the mirrored VM.
      */
     List<ThreadReference> allThreads();
 

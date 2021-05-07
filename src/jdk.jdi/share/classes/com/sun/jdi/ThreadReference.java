@@ -477,9 +477,9 @@ public interface ThreadReference extends ObjectReference {
                                               IncompatibleThreadStateException;
 
     /**
-     * Returns {@code true} if the thread is a virtual thread. A virtual
-     * thread is scheduled by the Java virtual machine rather than the
-     * operating system.
+     * Returns {@code true} if the thread is a virtual thread. Virtual threads are
+     * typically <i>user-mode threads</i> scheduled by the Java virtual machine
+     * rather than the operating system.
      *
      * @return true if the thread is a virtual thread
      *
