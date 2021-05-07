@@ -174,7 +174,6 @@ protected:
 
   virtual void flush() = 0;
 
-  oop* _keepalive; // allocated and maintained by Continuation::weak_storage().
 protected:
   CompiledMethod(Method* method, const char* name, CompilerType type, const CodeBlobLayout& layout, int frame_complete_offset, int frame_size, ImmutableOopMapSet* oop_maps, bool caller_must_gc_arguments, bool compiled);
   CompiledMethod(Method* method, const char* name, CompilerType type, int size, int header_size, CodeBuffer* cb, int frame_complete_offset, int frame_size, OopMapSet* oop_maps, bool caller_must_gc_arguments, bool compiled);
@@ -412,10 +411,6 @@ public:
 
   bool unload_nmethod_caches(bool class_unloading_occurred);
   virtual void do_unloading(bool unloading_occurred) = 0;
-
-  oop* get_keepalive();
-  oop* set_keepalive(oop* keepalive);
-  bool clear_keepalive(oop* old);
 
 private:
   PcDesc* find_pc_desc(address pc, bool approximate) {

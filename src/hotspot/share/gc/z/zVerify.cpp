@@ -249,7 +249,7 @@ public:
   virtual void do_nmethod(nmethod* nm) {
     assert(!trust_nmethod_state() || !_bs_nm->is_armed(nm), "Should not encounter any armed nmethods");
 
-    ZNMethod::nmethod_oops_do(nm, _cl, true /* keepalive_is_strong */);
+    ZNMethod::nmethod_oops_do(nm, _cl);
   }
 };
 

@@ -56,8 +56,8 @@ bool ZBarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
   }
 
   // Heal oops
-    ZNMethod::nmethod_oops_barrier(nm, true /* keepalive_is_strong */);
-    nm->mark_as_maybe_on_continuation();
+  ZNMethod::nmethod_oops_barrier(nm);
+  nm->mark_as_maybe_on_continuation();
 
   // Disarm
   disarm(nm);
