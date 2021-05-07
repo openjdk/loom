@@ -92,15 +92,13 @@ JDWP "Java(tm) Debug Wire Protocol"
         )
     )
     (Command AllThreads=4
-        "Returns the live threads in the target VM. "
-        "The returned list contains all live threads that are attached to the VM. "
-        "It does not contain virtual threads. "
-        "The returned list contains threads created through "
-        "java.lang.Thread, all native threads attached to "
-        "the target VM through JNI, and system threads created "
-        "by the target VM. Threads that have not yet been started "
-        "and threads that have completed their execution are not "
-        "included in the returned list. "
+        "Returns the live platform threads in the target VM. "
+        "The returned list contains all live platform threads that are attached "
+        "to the VM. It does not contain virtual threads. "
+        "The returned list contains platform threads created with the java.lang.Thread "
+        "API and all native threads attached to the target VM through JNI. "
+        "Threads that have not yet been started and threads that have completed "
+        "their execution are not included in the returned list."
         (Out
         )
         (Reply
@@ -2194,7 +2192,7 @@ JDWP "Java(tm) Debug Wire Protocol"
         "in a thread group and are not included. Threads and thread groups in child "
         "thread groups are not included. "
         "A thread is alive if it has been started and has not yet been stopped. "
-        "See <a href=../../api/java.base/java/lang/ThreadGroup.html>java.lang.ThreadGroup </a> "
+        "See <a href=../../api/java.base/java/lang/ThreadGroup.html>java.lang.ThreadGroup</a> "
         "for information about active ThreadGroups.
         (Out
             (threadGroupObject group "The thread group object ID. ")
@@ -3245,12 +3243,12 @@ JDWP "Java(tm) Debug Wire Protocol"
     (Constant ZOMBIE                 =0  "Thread has terminated.")
     (Constant RUNNING                =1  "Thread is runnable.")
     (Constant SLEEPING               =2  "Thread is sleeping, in Thread.sleep.")
-    (Constant MONITOR                =3  "Thread is waiting to enter a synchronized block/method"
-                                         " or, after an Object.wait, waiting to re-enter a"
-                                         " synchronized block/method.")
-    (Constant WAIT                   =4  "Thread is waiting, in Object.wait or LockSupport.park."
-                                         " A virtual thread that is sleeping in Thread.sleep may"
-                                         " have this thread status instead of SLEEPING.")
+    (Constant MONITOR                =3  "Thread is waiting to enter a synchronized block/method "
+                                         "or, after an Object.wait, waiting to re-enter a "
+                                         "synchronized block/method.")
+    (Constant WAIT                   =4  "Thread is waiting, in Object.wait or LockSupport.park. "
+                                         "A virtual thread that is sleeping in Thread.sleep may "
+                                         "have this thread status instead of SLEEPING.")
 )
 
 (ConstantSet SuspendStatus
