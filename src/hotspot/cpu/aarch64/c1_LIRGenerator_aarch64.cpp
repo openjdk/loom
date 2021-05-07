@@ -975,10 +975,6 @@ void LIRGenerator::do_update_CRC32(Intrinsic* x) {
         index = tmp;
       }
 
-      if (is_updateBytes) {
-        base_op = access_resolve(ACCESS_READ, base_op);
-      }
-
       if (offset) {
         LIR_Opr tmp = new_pointer_register();
         __ add(base_op, LIR_OprFact::intConst(offset), tmp);
@@ -1055,10 +1051,6 @@ void LIRGenerator::do_update_CRC32C(Intrinsic* x) {
         LIR_Opr tmp = new_register(T_LONG);
         __ convert(Bytecodes::_i2l, index, tmp);
         index = tmp;
-      }
-
-      if (is_updateBytes) {
-        base_op = access_resolve(ACCESS_READ, base_op);
       }
 
       if (offset) {

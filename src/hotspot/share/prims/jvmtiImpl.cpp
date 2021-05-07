@@ -244,7 +244,7 @@ void JvmtiBreakpoint::each_method_version_do(method_action meth_act) {
 
     for (int i = methods->length() - 1; i >= 0; i--) {
       Method* method = methods->at(i);
-      // Only set breakpoints in running EMCP methods.
+      // Only set breakpoints in EMCP methods.
       // EMCP methods are old but not obsolete. Equivalent
       // Modulo Constant Pool means the method is equivalent except
       // the constant pool and instructions that access the constant
