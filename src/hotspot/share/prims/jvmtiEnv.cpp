@@ -1008,7 +1008,6 @@ JvmtiEnv::SuspendThread(jthread thread) {
 // results - pre-checked for NULL
 jvmtiError
 JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvmtiError* results) {
-  int self_index = -1;
   oop thread_oop = NULL;
   JavaThread *java_thread = NULL;
   JavaThread* current = JavaThread::current();
@@ -1027,9 +1026,9 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
         }
       }
       if (java_thread == current) {
-        self_index = i;
         // current thread will be suspended in the ~VTMTDisabler
         vtmt_disabler.set_self_suspend();
+        results[i] = JVMTI_ERROR_NONE;
         continue;
       }
       results[i] = suspend_thread(thread_oop,
