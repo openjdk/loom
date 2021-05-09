@@ -31,7 +31,7 @@ import static sun.nio.ch.WEPoll.*;
  * Poller implementation based on wepoll.
  */
 class WEPollPoller extends Poller {
-    private static final int MAX_EVENTS_TO_POLL = 512;
+    private static final int MAX_EVENTS_TO_POLL = 256;
     private static final int ENOENT = 2;
 
     private final long handle;
