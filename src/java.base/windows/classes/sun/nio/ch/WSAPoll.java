@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, racle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,6 +32,7 @@ import jdk.internal.misc.Unsafe;
  */
 class WSAPoll {
     private static final Unsafe UNSAFE = Unsafe.getUnsafe();
+    private static final int ADDRESS_SIZE = UNSAFE.addressSize();
     
     private WSAPoll() { }
 
@@ -42,10 +43,10 @@ class WSAPoll {
      *   SHORT revents;
      * } WSAPOLLFD;
      */
-    private static final short SIZE_POLLFD    = 16;
-    private static final short FD_OFFSET      = 0;
-    private static final short EVENTS_OFFSET  = 8;
-    private static final short REVENTS_OFFSET = 10;
+    private static final int SIZE_POLLFD    = pollfdSize();
+    private static final int FD_OFFSET      = fdOffset();
+    private static final int EVENTS_OFFSET  = eventsOffset();
+    private static final int REVENTS_OFFSET = reventsOffset();
 
     /**
      * Allocates a poll array of {@code size} WSAPOLLFD structures.
@@ -78,12 +79,24 @@ class WSAPoll {
 
     static void putDescriptor(long address, int i, int fd) {
         int offset = SIZE_POLLFD * i + FD_OFFSET;
-        UNSAFE.putLong(address + offset, fd);
+        if (ADDRESS_SIZE == 8) {
+            UNSAFE.putLong(address + offset, fd);
+        } else {
+            UNSAFE.putInt(address + offset, fd);
+        }
     }
 
     static int getDescriptor(long address, int i) {
         int offset = SIZE_POLLFD * i + FD_OFFSET;
-        return (int) UNSAFE.getLong(address + offset);
+        long s;
+        if (ADDRESS_SIZE == 8) {
+            s = UNSAFE.getLong(address + offset);
+        } else {
+            s = UNSAFE.getInt(address + offset);
+        }
+        int fd = (int) s;
+        assert ((long) fd) == s;
+        return fd;
     }
 
     static void putEvents(long address, int i, short events) {
@@ -105,6 +118,16 @@ class WSAPoll {
         int offset = SIZE_POLLFD * i + REVENTS_OFFSET;
         return UNSAFE.getShort(address + offset);
     }
+
+    // -- Native methods --
+
+    private static native int pollfdSize();
+
+    private static native int fdOffset();
+
+    private static native int eventsOffset();
+
+    private static native int reventsOffset();
 
     static native int poll(long pollAddress, int numfds, int timeout)
         throws IOException;
