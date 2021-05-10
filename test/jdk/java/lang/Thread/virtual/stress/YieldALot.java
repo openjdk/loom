@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -30,23 +30,8 @@
 
 /**
  * @test
- * @requires vm.debug != true & vm.graal.enabled
- * @run main/othervm -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler -Djvmci.Compiler=graal
- *     -XX:CompilationMode=high-only-quick-internal YieldALot
- */
-
-
-/**
- * @test
  * @requires vm.debug == true
  * @run main/othervm/timeout=360 YieldALot 200000
- */
-
-/**
- * @test
- * @requires vm.debug == true & vm.graal.enabled
- * @run main/othervm/timeout=360 -XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler
- *     -Djvmci.Compiler=graal -XX:CompilationMode=high-only-quick-internal YieldALot 200000
  */
 
 import java.time.Duration;

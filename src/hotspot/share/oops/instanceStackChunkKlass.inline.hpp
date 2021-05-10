@@ -60,7 +60,7 @@
 
 #ifdef ASSERT
 extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
-extern "C" void pns2();
+extern "C" JNIEXPORT void pns2();
 #endif
 
 DEF_HANDLE_CONSTR(stackChunk, is_stackChunk_noinline)

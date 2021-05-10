@@ -600,7 +600,6 @@ void TemplateInterpreterGenerator::lock_method() {
 #endif // ASSERT
 
     __ bind(done);
-    __ resolve(IS_NOT_NULL, rax);
   }
 
   // add space for monitor & lock
