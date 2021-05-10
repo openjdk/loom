@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -58,15 +58,10 @@ void continuations_init();
 
 class javaVFrame;
 class JavaThread;
-class OopStorage;
 
 class Continuation : AllStatic {
-private:
-  static OopStorage* _weak_handles;
 public:
   static void init();
-
-  static OopStorage* weak_storage() { return _weak_handles; }
 
   static int freeze(JavaThread* thread, intptr_t* sp);
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
@@ -140,7 +135,7 @@ public:
   void verify_cookie() { assert(this->cookie == 0x1234, ""); }
 #endif
 
-public: 
+public:
   static int return_pc_offset; // friend gen_continuation_enter
   static void set_enter_nmethod(nmethod* nm); // friend SharedRuntime::generate_native_wrapper
 
@@ -169,7 +164,7 @@ public:
 
   static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
   static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
-  
+
 public:
   static size_t size() { return align_up((int)sizeof(ContinuationEntry), 2*wordSize); }
 
