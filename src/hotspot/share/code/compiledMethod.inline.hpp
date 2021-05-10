@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -64,16 +64,6 @@ inline address CompiledMethod::get_deopt_original_pc(const frame* fr) {
     return cm->get_original_pc(fr);
 
   return NULL;
-}
-
-inline oop* CompiledMethod::get_keepalive() { return _keepalive; }
-
-inline oop* CompiledMethod::set_keepalive(oop* obj) {
-  return Atomic::cmpxchg(&_keepalive, (oop*) NULL, obj);
-}
-
-inline bool CompiledMethod::clear_keepalive(oop* old) {
-  return Atomic::cmpxchg(&_keepalive, old, (oop*) NULL) == old;
 }
 
 // class ExceptionCache methods

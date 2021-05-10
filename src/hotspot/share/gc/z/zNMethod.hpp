@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -49,10 +49,10 @@ public:
   static void disarm(nmethod* nm);
   static void arm(nmethod* nm, int arm_value);
 
-  static void nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_strong);
-  static void nmethod_oops_do_inner(nmethod* nm, OopClosure* cl, bool keepalive_is_strong);
+  static void nmethod_oops_do(nmethod* nm, OopClosure* cl);
+  static void nmethod_oops_do_inner(nmethod* nm, OopClosure* cl);
 
-  static void nmethod_oops_barrier(nmethod* nm, bool keepalive_is_strong);
+  static void nmethod_oops_barrier(nmethod* nm);
 
   static void nmethods_do_begin();
   static void nmethods_do_end();

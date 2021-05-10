@@ -256,7 +256,7 @@ public:
     // all nmethods have been processed before visiting the oops.
     _bs_nm->nmethod_entry_barrier(nm);
 
-    ZNMethod::nmethod_oops_do(nm, _cl, false /* keepalive_is_strong */);
+    ZNMethod::nmethod_oops_do(nm, _cl);
   }
 };
 

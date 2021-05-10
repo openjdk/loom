@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -63,7 +63,7 @@ void MarkingCodeBlobClosure::do_code_blob(CodeBlob* cb) {
   nmethod* nm = cb->as_nmethod_or_null();
   if (nm != NULL && nm->oops_do_try_claim()) {
     nm->mark_as_maybe_on_continuation();
-    nm->oops_do_keepalive(_cl, _keepalive_nmethods /* keepalive_is_strong */);
+    nm->oops_do(_cl);
     if (_fix_relocations) {
       nm->fix_oop_relocations();
     }

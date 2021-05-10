@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -212,16 +212,16 @@ void ZNMethod::arm(nmethod* nm, int arm_value) {
   }
 }
 
-void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl, bool keepalive_is_strong) {
+void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl) {
   ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
   if (!nm->is_alive()) {
     return;
   }
 
-  ZNMethod::nmethod_oops_do_inner(nm, cl, keepalive_is_strong);
+  ZNMethod::nmethod_oops_do_inner(nm, cl);
 }
 
-void ZNMethod::nmethod_oops_do_inner(nmethod* nm, OopClosure* cl, bool keepalive_is_strong) {
+void ZNMethod::nmethod_oops_do_inner(nmethod* nm, OopClosure* cl) {
   // Process oops table
   {
     oop* const begin = nm->oops_begin();
@@ -250,13 +250,6 @@ void ZNMethod::nmethod_oops_do_inner(nmethod* nm, OopClosure* cl, bool keepalive
   if (oops->has_non_immediates()) {
     nm->fix_oop_relocations();
   }
-
-  if (keepalive_is_strong) {
-    oop* obj_ptr = nm->get_keepalive();
-    if (obj_ptr != NULL) {
-      cl->do_oop(obj_ptr);
-    }
-  }
 }
 
 class ZNMethodOopClosure : public OopClosure {
@@ -274,9 +267,9 @@ public:
   }
 };
 
-void ZNMethod::nmethod_oops_barrier(nmethod* nm, bool keepalive_is_strong) {
+void ZNMethod::nmethod_oops_barrier(nmethod* nm) {
   ZNMethodOopClosure cl;
-  nmethod_oops_do_inner(nm, &cl, keepalive_is_strong);
+  nmethod_oops_do_inner(nm, &cl);
 }
 
 void ZNMethod::nmethods_do_begin() {
@@ -343,7 +336,7 @@ public:
 
     if (ZNMethod::is_armed(nm)) {
       // Heal oops and disarm
-      ZNMethod::nmethod_oops_barrier(nm, false /* keepalive_is_strong */);
+      ZNMethod::nmethod_oops_barrier(nm);
       ZNMethod::arm(nm, 0);
     }
 

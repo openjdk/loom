@@ -56,8 +56,7 @@ CompiledMethod::CompiledMethod(Method* method, const char* name, CompilerType ty
   : CodeBlob(name, type, layout, frame_complete_offset, frame_size, oop_maps, caller_must_gc_arguments, compiled),
     _mark_for_deoptimization_status(not_marked),
     _method(method),
-    _gc_data(NULL),
-    _keepalive(NULL)
+    _gc_data(NULL)
 {
   init_defaults();
 }
@@ -69,8 +68,7 @@ CompiledMethod::CompiledMethod(Method* method, const char* name, CompilerType ty
              frame_complete_offset, frame_size, oop_maps, caller_must_gc_arguments, compiled),
     _mark_for_deoptimization_status(not_marked),
     _method(method),
-    _gc_data(NULL),
-    _keepalive(NULL)
+    _gc_data(NULL)
 {
   init_defaults();
 }
@@ -372,7 +370,7 @@ void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *
       // assert (method()->is_native(), "");
       return;
     }
-    
+
     if (!method()->is_native()) {
       address pc = fr.pc();
       bool has_receiver, has_appendix;
@@ -628,8 +626,8 @@ void CompiledMethod::cleanup_inline_caches(bool clean_all) {
   }
 }
 
-address* CompiledMethod::orig_pc_addr(const frame* fr) { 
-  return (address*) ((address)fr->unextended_sp() + orig_pc_offset()); 
+address* CompiledMethod::orig_pc_addr(const frame* fr) {
+  return (address*) ((address)fr->unextended_sp() + orig_pc_offset());
 }
 
 // Called to clean up after class unloading for live nmethods and from the sweeper
