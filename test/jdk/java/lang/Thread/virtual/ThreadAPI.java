@@ -29,10 +29,12 @@
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -1638,10 +1640,59 @@ public class ThreadAPI {
     }
 
     /**
-     * Test Thread::getStackTrace of running thread.
+     * Test Thread::getStackTrace on unstarted thread.
      */
     @Test
-    public void testGetStackTrace1() throws Exception {
+    public void testGetStackTrace1() {
+        var thread = Thread.ofVirtual().unstarted(() -> { });
+        StackTraceElement[] stack = thread.getStackTrace();
+        assertTrue(stack.length == 0);
+    }
+
+    /**
+     * Test Thread::getStackTrace on thread that has been started but
+     * has not run.
+     */
+    @Test
+    public void testGetStackTrace2() throws Exception {
+        List<Thread> threads = new ArrayList<>();
+        AtomicBoolean done = new AtomicBoolean();
+        try {
+            Thread target = null;
+
+            // start virtual threads that are CPU bound until we find
+            // a thread that does not run
+            while (target == null) {
+                CountDownLatch latch = new CountDownLatch(1);
+                Thread vthread = Thread.ofVirtual().start(() -> {
+                    latch.countDown();
+                    while (!done.get()) { }
+                });
+                threads.add(vthread);
+                if (!latch.await(3, TimeUnit.SECONDS)) {
+                    // thread did not run
+                    target = vthread;
+                }
+            }
+
+            // stack trace should be empty
+            StackTraceElement[] stack = target.getStackTrace();
+            assertTrue(stack.length == 0);
+        } finally {
+            done.set(true);
+
+            // wait for threads to terminate
+            for (Thread thread : threads) {
+                thread.join();
+            }
+        }
+    }
+
+    /**
+     * Test Thread::getStackTrace on running thread.
+     */
+    @Test
+    public void testGetStackTrace3() throws Exception {
         var sel = Selector.open();
         var thread = Thread.ofVirtual().start(() -> {
             try { sel.select(); } catch (Exception e) { }
@@ -1658,10 +1709,10 @@ public class ThreadAPI {
     }
 
     /**
-     * Test Thread::getStackTrace of thread waiting in Object.wait.
+     * Test Thread::getStackTrace on running thread waiting in Object.wait.
      */
     @Test
-    public void testGetStackTrace2() throws Exception {
+    public void testGetStackTrace4() throws Exception {
         try (ForkJoinPool pool = new ForkJoinPool(1)) {
             AtomicReference<Thread> ref = new AtomicReference<>();
             Executor scheduler = task -> {
@@ -1711,10 +1762,10 @@ public class ThreadAPI {
     }
 
     /**
-     * Test Thread::getStackTrace of parked thread.
+     * Test Thread::getStackTrace on parked thread.
      */
     @Test
-    public void testGetStackTrace3() throws Exception {
+    public void testGetStackTrace5() throws Exception {
         var thread = Thread.ofVirtual().start(LockSupport::park);
 
         // wait for thread to park
@@ -1732,20 +1783,10 @@ public class ThreadAPI {
     }
 
     /**
-     * Test Thread::getStackTrace of unstarted thread.
+     * Test Thread::getStackTrace on terminated thread.
      */
     @Test
-    public void testGetStackTrace4() {
-        var thread = Thread.ofVirtual().unstarted(() -> { });
-        StackTraceElement[] stack = thread.getStackTrace();
-        assertTrue(stack.length == 0);
-    }
-
-    /**
-     * Test Thread::getStackTrace of terminated thread.
-     */
-    @Test
-    public void testGetStackTrace5() throws Exception {
+    public void testGetStackTrace6() throws Exception {
         var thread = Thread.ofVirtual().start(() -> { });
         thread.join();
         StackTraceElement[] stack = thread.getStackTrace();

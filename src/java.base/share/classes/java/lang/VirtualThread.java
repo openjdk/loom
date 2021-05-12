@@ -808,7 +808,8 @@ class VirtualThread extends Thread {
 
     /**
      * Returns the stack trace for this virtual thread if it newly created,
-     * parked, or terminated. Returns null if the thread is in another state.
+     * started, parked, or terminated. Returns null if the thread is in
+     * another state.
      */
     private StackTraceElement[] tryGetStackTrace() {
         if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
@@ -827,7 +828,7 @@ class VirtualThread extends Thread {
             }
         } else {
             int s = state();
-            if (s == NEW || s == TERMINATED) {
+            if (s == NEW || s == STARTED || s == TERMINATED) {
                 return new StackTraceElement[0];   // empty stack
             } else {
                 return null;
