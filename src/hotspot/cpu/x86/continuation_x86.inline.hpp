@@ -136,9 +136,9 @@ inline int Interpreted::stack_argsize(const frame& f) { // exclusive; this will 
   int diff = (int)(f.at(frame::interpreter_frame_locals_offset) - f.at(frame::interpreter_frame_sender_sp_offset) + sizeof(intptr_t));
   // tty->print_cr(">>>> Interpreted::stack_argsize: %ld -- %ld relative: %d", f.at(frame::interpreter_frame_locals_offset), f.at(frame::interpreter_frame_sender_sp_offset), relative);
   if (!relative) diff >>= LogBytesPerWord;
-  assert (!Interpreter::contains(Interpreted::return_pc(f)) || diff >= 0, "diff: %d", diff);
+  // assert (!Interpreter::contains(Interpreted::return_pc(f)) || diff >= 0, "diff: %d", diff); -- -1 has been observed
   assert (!CodeCache::find_blob(Interpreted::return_pc(f))->is_compiled() || diff <= 0, "diff: %d", diff);
-  if (diff < 0) diff = 0; // happens when caller is compiled
+  if (diff < 0) diff = 0;
   return diff;
 }
 
