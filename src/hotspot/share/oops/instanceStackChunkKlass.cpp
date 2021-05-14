@@ -91,7 +91,7 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
   int index = f.frame_index();
   StackChunkFrameStream<true> fs(this, derelativize(f));
   fs.next(map);
-  // if (map->update_map() && should_fix()) InstanceStackChunkKlass::fix_frame<true, false>(fs, map);
+
   if (!fs.is_done()) {
     frame sender = fs.to_frame();
     assert (is_usable_in_chunk(sender.unextended_sp()), "");
