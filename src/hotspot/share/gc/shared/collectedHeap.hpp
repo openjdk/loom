@@ -138,6 +138,7 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   // called to allocate TLABs, only individual objects.
   virtual HeapWord* mem_allocate(size_t size,
                                  bool* gc_overhead_limit_was_exceeded) = 0;
+  virtual HeapWord* try_mem_allocate(size_t size) = 0;
 
   // Filler object utilities.
   static inline size_t filler_array_hdr_size();

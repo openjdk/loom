@@ -904,6 +904,12 @@ HeapWord* ShenandoahHeap::mem_allocate(size_t size,
   return allocate_memory(req);
 }
 
+HeapWord* ShenandoahHeap::try_mem_allocate(size_t size) {
+  // No idea
+  ShouldNotReachHere();
+  return NULL;
+}
+
 MetaWord* ShenandoahHeap::satisfy_failed_metadata_allocation(ClassLoaderData* loader_data,
                                                              size_t size,
                                                              Metaspace::MetadataType mdtype) {

@@ -434,6 +434,28 @@ HeapWord* GenCollectedHeap::mem_allocate(size_t size,
                            gc_overhead_limit_was_exceeded);
 }
 
+HeapWord* GenCollectedHeap::try_mem_allocate(size_t size) {
+  assert_locked_or_safepoint_weak(Heap_lock);
+  // First allocation attempt is lock-free.
+  bool is_tlab = false;
+  HeapWord* result = NULL;
+  Generation *young = _young_gen;
+  assert(young->supports_inline_contig_alloc(),
+    "Otherwise, must do alloc within heap lock");
+  if (young->should_allocate(size, is_tlab)) {
+    result = young->par_allocate(size, is_tlab);
+    if (result != NULL) {
+      assert(is_in_reserved(result), "result not in heap");
+      return result;
+    }
+  }
+  result = attempt_allocation(size, is_tlab, false /*first_only*/);
+  if (result != NULL) {
+    assert(is_in_reserved(result), "result not in heap");
+  }
+  return result;
+}
+
 bool GenCollectedHeap::must_clear_all_soft_refs() {
   return _gc_cause == GCCause::_metadata_GC_clear_soft_refs ||
          _gc_cause == GCCause::_wb_full_gc;

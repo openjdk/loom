@@ -39,7 +39,7 @@ typedef VMRegImpl* VMReg;
 template <bool mixed = true> class StackChunkFrameStream;
 
 
-// An InstanceStackChunkKlass is a specialization of the InstanceKlass. 
+// An InstanceStackChunkKlass is a specialization of the InstanceKlass.
 // It has a header containing metadata, and a blob containing a stack segment
 // (some integral number of stack frames)
 //
@@ -56,7 +56,7 @@ class InstanceStackChunkKlass: public InstanceKlass {
   friend class InstanceKlass;
   friend class stackChunkOopDesc;
   friend class Continuations;
-  template <bool mixed> friend class StackChunkFrameStream; 
+  template <bool mixed> friend class StackChunkFrameStream;
   friend class FixChunkIterateStackClosure;
   friend class MarkMethodsStackClosure;
   template <bool concurrent_gc, typename OopClosureType> friend class OopOopIterateStackClosure;
@@ -104,7 +104,7 @@ public:
   void oop_print_on(oop obj, outputStream* st) override;
   static bool verify(oop obj, size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL);
 #endif
-  
+
   // Stack offset is an offset into the Heap
   static HeapWord* start_of_stack(oop obj) { return (HeapWord*)(cast_from_oop<intptr_t>(obj) + offset_of_stack()); }
   static inline HeapWord* start_of_bitmap(oop obj);
@@ -117,9 +117,11 @@ public:
   }
 
 
+#if 0
   template<bool mixed = true>
   static int count_frames(stackChunkOop chunk);
-  
+#endif
+
   // Oop fields (and metadata) iterators
   //
   // The InstanceClassLoaderKlass iterators also visit the CLD pointer (or mirror of anonymous klasses.)
@@ -155,7 +157,7 @@ private:
 
   template<bool disjoint> size_t copy(oop obj, HeapWord* to, size_t word_size);
   template<bool disjoint> size_t copy_compact(oop obj, HeapWord* to);
-  
+
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
 
@@ -164,7 +166,7 @@ private:
 
   template <bool concurrent_gc, class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
-  
+
   template <class OopClosureType>
   inline void oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
 
@@ -184,7 +186,7 @@ private:
 
   static inline void relativize(intptr_t* const fp, intptr_t* const hfp, int offset);
   static inline void derelativize(intptr_t* const fp, int offset);
-  
+
   typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
   static void resolve_memcpy_functions();
   static MemcpyFnT memcpy_fn_from_stack_to_chunk;
@@ -243,7 +245,7 @@ class StackChunkFrameStream : public StackObj {
   template <typename RegisterMapT> inline void next(RegisterMapT* map);
 
   template <typename RegisterMapT> inline void update_reg_map(RegisterMapT* map);
-  
+
   void handle_deopted() const;
 
   inline int to_offset(stackChunkOop chunk) const { assert (!is_done(), ""); return _sp - chunk->start_address(); }

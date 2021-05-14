@@ -1069,6 +1069,7 @@ JavaThread::JavaThread() :
   _is_in_VTMT(false),
   _is_VTMT_disabler(false),
   _jni_attach_state(_not_attaching_via_jni),
+  _no_gc_during_handshake(false),
 #if INCLUDE_JVMCI
   _pending_deoptimization(-1),
   _pending_monitorenter(false),
@@ -2336,13 +2337,13 @@ void JavaThread::print_stack_on(outputStream* st) {
   }
 }
 
-// Rebind JVMTI thread state from carrier to virtual or from virtual to carrier. 
+// Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
 JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
   set_mounted_vthread(thread_oop);
 
   // unbind current JvmtiThreadState from JavaThread
   jvmti_thread_state()->unbind_from(this);
-    
+
   // bind new JvmtiThreadState to JavaThread
   java_lang_Thread::jvmti_thread_state(thread_oop)->bind_to(this);
 
@@ -2485,7 +2486,7 @@ javaVFrame* JavaThread::last_java_vframe(const frame f, RegisterMap *reg_map) {
 Klass* JavaThread::security_get_caller_class(int depth) {
   ResetNoHandleMark rnhm;
   HandleMark hm(Thread::current());
-  
+
   vframeStream vfst(this);
   vfst.security_get_caller_frame(depth);
   if (!vfst.at_end()) {

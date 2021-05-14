@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -57,23 +57,24 @@ public class Continuation {
     private static final VarHandle MOUNTED;
 
     /** Reason for pinning */
-    public enum Pinned { 
+    public enum Pinned {
         /** Native frame on stack */ NATIVE,
         /** Monitor held */          MONITOR,
         /** In critical section */   CRITICAL_SECTION }
     /** Preemption attempt result */
-    public enum PreemptStatus { 
-        /** Success */                                                      SUCCESS(null), 
-        /** Permanent failure */                                            PERM_FAIL_UNSUPPORTED(null), 
-        /** Permanent failure: continuation alreay yielding */              PERM_FAIL_YIELDING(null), 
-        /** Permanent failure: continuation not mounted on the thread */    PERM_FAIL_NOT_MOUNTED(null), 
+    public enum PreemptStatus {
+        /** Success */                                                      SUCCESS(null),
+        /** Permanent failure */                                            PERM_FAIL_UNSUPPORTED(null),
+        /** Permanent failure: continuation already yielding */             PERM_FAIL_YIELDING(null),
+        /** Permanent failure: continuation not mounted on the thread */    PERM_FAIL_NOT_MOUNTED(null),
         /** Transient failure: continuation pinned due to a held CS */      TRANSIENT_FAIL_PINNED_CRITICAL_SECTION(Pinned.CRITICAL_SECTION),
-        /** Transient failure: continuation pinned due to native frame */   TRANSIENT_FAIL_PINNED_NATIVE(Pinned.NATIVE), 
-        /** Transient failure: continuation pinned due to a held monitor */ TRANSIENT_FAIL_PINNED_MONITOR(Pinned.MONITOR);
+        /** Transient failure: continuation pinned due to native frame */   TRANSIENT_FAIL_PINNED_NATIVE(Pinned.NATIVE),
+        /** Transient failure: continuation pinned due to a held monitor */ TRANSIENT_FAIL_PINNED_MONITOR(Pinned.MONITOR),
+        /** Transient failure: out of memory error */                       TRANSIENT_FAIL_OUT_OF_MEMORY(null);
 
         final Pinned pinned;
         private PreemptStatus(Pinned reason) { this.pinned = reason; }
-        /** 
+        /**
          * TBD
          * @return TBD
          **/
@@ -89,6 +90,7 @@ public class Continuation {
             case  2: return PreemptStatus.TRANSIENT_FAIL_PINNED_CRITICAL_SECTION;
             case  3: return PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE;
             case  4: return PreemptStatus.TRANSIENT_FAIL_PINNED_MONITOR;
+            case  5: return PreemptStatus.TRANSIENT_FAIL_OUT_OF_MEMORY;
             default: throw new AssertionError("Unknown status: " + status);
         }
     }
@@ -246,7 +248,7 @@ public class Continuation {
 
             // if (!inner.isStarted())
             //     throw new IllegalStateException("Continuation not started");
-                
+
             return walk.get();
         } finally {
             for (Continuation c = inner; c != null && c.scope != scope; c = c.parent)
@@ -272,7 +274,7 @@ public class Continuation {
         Thread.setScopeLocalCache(null);
         setMounted(false);
     }
-    
+
     /**
      * TBD
      */
@@ -386,7 +388,7 @@ public class Continuation {
 
     /**
      * TBD
-     * 
+     *
      * @param scope The {@link ContinuationScope} to yield
      * @return {@code true} for success; {@code false} for failure
      * @throws IllegalStateException if not currently in the given {@code scope},
@@ -411,7 +413,7 @@ public class Continuation {
             this.yieldInfo = scope;
         int res = doYield(0);
         unsafe.storeFence(); // needed to prevent certain transformations by the compiler
-        
+
         if (TRACE) System.out.println(this + " awake on scope " + scope + " child: " + child + " res: " + res + " yieldInfo: " + yieldInfo);
 
         try {
@@ -521,9 +523,9 @@ public class Continuation {
     }
 
     /**
-     * Tests whether the given scope is pinned. 
+     * Tests whether the given scope is pinned.
      * This method is slow.
-     * 
+     *
      * @param scope the continuation scope
      * @return {@code} true if we're in the give scope and are pinned; {@code false otherwise}
      */
@@ -621,7 +623,7 @@ public class Continuation {
      * TBD
      * Subclasses may throw an {@link UnsupportedOperationException}, but this does not prevent
      * the continuation from being preempted on a parent scope.
-     * 
+     *
      * @param thread TBD
      * @return TBD
      * @throws UnsupportedOperationException if this continuation does not support preemption

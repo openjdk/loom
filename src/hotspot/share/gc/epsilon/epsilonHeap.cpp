@@ -36,6 +36,7 @@
 #include "memory/universe.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/globals.hpp"
+#include "runtime/safepointVerifiers.hpp"
 
 jint EpsilonHeap::initialize() {
   size_t align = HeapAlignment;
@@ -261,6 +262,12 @@ HeapWord* EpsilonHeap::allocate_new_tlab(size_t min_size,
 HeapWord* EpsilonHeap::mem_allocate(size_t size, bool *gc_overhead_limit_was_exceeded) {
   *gc_overhead_limit_was_exceeded = false;
   return allocate_work(size);
+}
+
+HeapWord* EpsilonHeap::try_mem_allocate(size_t size) {
+  NoSafepointVerifier nsv;
+  assert_locked_or_safepoint_weak(Heap_lock);
+  return _space->par_allocate(size);
 }
 
 void EpsilonHeap::collect(GCCause::Cause cause) {

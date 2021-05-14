@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -182,6 +182,7 @@ public:
   size_t max_capacity() const;
 
   HeapWord* mem_allocate(size_t size, bool*  gc_overhead_limit_was_exceeded);
+  HeapWord* try_mem_allocate(size_t size);
 
   // We may support a shared contiguous allocation area, if the youngest
   // generation does.

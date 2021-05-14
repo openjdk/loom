@@ -39,6 +39,7 @@
 #include "memory/classLoaderMetaspace.hpp"
 #include "memory/iterator.hpp"
 #include "memory/universe.hpp"
+#include "runtime/safepointVerifiers.hpp"
 #include "utilities/align.hpp"
 
 ZCollectedHeap* ZCollectedHeap::heap() {
@@ -153,6 +154,13 @@ oop ZCollectedHeap::array_allocate(Klass* klass, int size, int length, bool do_z
 HeapWord* ZCollectedHeap::mem_allocate(size_t size, bool* gc_overhead_limit_was_exceeded) {
   const size_t size_in_bytes = ZUtils::words_to_bytes(align_object_size(size));
   return (HeapWord*)_heap.alloc_object(size_in_bytes);
+}
+
+HeapWord* ZCollectedHeap::try_mem_allocate(size_t size) {
+  NoSafepointVerifier nsv;
+  assert_locked_or_safepoint_weak(Heap_lock);
+  bool gc_overhead_limit_was_exceeded;
+  return mem_allocate(size, &gc_overhead_limit_was_exceeded);
 }
 
 MetaWord* ZCollectedHeap::satisfy_failed_metadata_allocation(ClassLoaderData* loader_data,

@@ -329,12 +329,14 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
 // template class StackChunkFrameStream<true>;
 // template class StackChunkFrameStream<false>;
 
+#if 0
 template <bool mixed>
 int InstanceStackChunkKlass::count_frames(stackChunkOop chunk) {
   int frames = 0;
   for (StackChunkFrameStream<mixed> f(chunk); !f.is_done(); f.next(SmallRegisterMap::instance)) frames++;
   return frames;
 }
+#endif
 
 #ifndef PRODUCT
 void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {

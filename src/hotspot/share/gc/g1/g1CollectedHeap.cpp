@@ -404,6 +404,15 @@ G1CollectedHeap::mem_allocate(size_t word_size,
   return attempt_allocation(word_size, word_size, &dummy);
 }
 
+// This function is called with the Heap_lock held.  It attempts to allocate memory
+// but if it fails, just returns NULL.  It doesn't safepoint.
+HeapWord* G1CollectedHeap::try_mem_allocate(size_t word_size) {
+  NoSafepointVerifier nsv;
+  assert_locked_or_safepoint_weak(Heap_lock);
+  assert (!is_humongous(word_size), "Humongous is not supported");
+  return _allocator->attempt_allocation_locked(word_size);
+}
+
 HeapWord* G1CollectedHeap::attempt_allocation_slow(size_t word_size) {
   ResourceMark rm; // For retrieving the thread names in log messages.
 

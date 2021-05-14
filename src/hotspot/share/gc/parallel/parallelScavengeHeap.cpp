@@ -49,6 +49,7 @@
 #include "oops/oop.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/java.hpp"
+#include "runtime/safepointVerifiers.hpp"
 #include "runtime/vmThread.hpp"
 #include "services/memoryManager.hpp"
 #include "services/memTracker.hpp"
@@ -384,6 +385,12 @@ HeapWord* ParallelScavengeHeap::mem_allocate(
   }
 
   return result;
+}
+
+HeapWord* ParallelScavengeHeap::try_mem_allocate(size_t size) {
+  NoSafepointVerifier nsv;
+  assert_locked_or_safepoint_weak(Heap_lock);
+  return young_gen()->allocate(size);
 }
 
 // A "death march" is a series of ultra-slow allocations in which a full gc is

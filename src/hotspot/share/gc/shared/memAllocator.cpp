@@ -70,7 +70,7 @@ class MemAllocator::Allocation: StackObj {
 public:
   Allocation(const MemAllocator& allocator, oop* obj_ptr)
     : _allocator(allocator),
-      _thread(Thread::current()),
+      _thread(allocator._thread),
       _obj_ptr(obj_ptr),
       _overhead_limit_exceeded(false),
       _allocated_outside_tlab(false),
@@ -372,6 +372,18 @@ oop MemAllocator::allocate() const {
     }
   }
   return obj;
+}
+
+oop MemAllocator::try_allocate() const {
+
+  HeapWord* mem = Universe::heap()->try_mem_allocate(_word_size);
+  if (mem != NULL) {
+    NOT_PRODUCT(Universe::heap()->check_for_non_bad_heap_word_value(mem, _word_size));
+    size_t size_in_bytes = _word_size * HeapWordSize;
+    _thread->incr_allocated_bytes(size_in_bytes);
+    return initialize(mem);
+  }
+  return NULL;
 }
 
 void MemAllocator::mem_clear(HeapWord* mem) const {

@@ -70,8 +70,11 @@ protected:
     return MemRegion(cast_from_oop<HeapWord*>(obj), _word_size);
   }
 
+
 public:
   oop allocate() const;
+  // allocate without attempting to GC if tlab allocation fails.
+  oop try_allocate() const;
   virtual oop initialize(HeapWord* mem) const = 0;
 };
 
