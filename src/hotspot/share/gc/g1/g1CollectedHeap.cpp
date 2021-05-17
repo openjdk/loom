@@ -410,7 +410,12 @@ HeapWord* G1CollectedHeap::try_mem_allocate(size_t word_size) {
   NoSafepointVerifier nsv;
   assert_locked_or_safepoint_weak(Heap_lock);
   assert (!is_humongous(word_size), "Humongous is not supported");
-  return _allocator->attempt_allocation_locked(word_size);
+  size_t actual_word_size = word_size;
+  HeapWord* result =  _allocator->attempt_allocation_locked(word_size);
+  if (result != NULL) {
+    dirty_young_block(result, actual_word_size);
+  }
+  return result;
 }
 
 HeapWord* G1CollectedHeap::attempt_allocation_slow(size_t word_size) {

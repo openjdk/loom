@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -28,6 +28,8 @@
 * @run testng/othervm/timeout=60 -Xint Preempt
 * @run testng/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
 * @run testng/othervm -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
+* @run testng/othervm -XX:-UseTLAB -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
+* @run testng/othervm -XX:-UseTLAB -Xmx4m -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
 */
 
 // * @run testng/othervm -XX:+UnlockExperimentalVMOptions -XX:-TieredCompilation -XX:+UseJVMCICompiler -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
@@ -108,11 +110,27 @@ public class Preempt {
         t.join();
     }
 
+    private static volatile Object dummy = null;
+    private static void allocateMemory(int kilobytes) {
+        ArrayList<byte[]> l = new ArrayList<>();
+        dummy = l;
+        for (int i = kilobytes; i > 0; i -= 1) {
+            l.add(new byte[1024]);
+        }
+        l = null;
+        dummy = null;
+    }
+
     private void loop() {
         while (run) {
             x++;
 
-            // Continuation.pin(); try { System.out.println("$$$ " + x + " $$$"); } finally { Continuation.unpin(); }
+            try {
+               // Continuation.pin(); try { System.out.println("$$$ " + x + " $$$"); } finally { Continuation.unpin(); }
+               allocateMemory(16 * 1024); // force young collection
+            } catch (OutOfMemoryError e) {
+               System.gc();
+            }
 
             if (startLatch.getCount() > 0) {
                 startLatch.countDown();
