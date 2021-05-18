@@ -170,15 +170,26 @@ class HandshakeState {
   bool _async_suspend_handshake;
 
   // Called from the suspend handshake.
-  bool suspend_with_handshake();
+  bool suspend_with_handshake(JavaThread* caller);
   // Called from the async handshake (the trap)
   // to stop a thread from continuing execution when suspended.
   void do_self_suspend();
 
-  bool is_suspended()                       { return Atomic::load(&_suspended); }
+  bool is_suspended() const                 { return Atomic::load(&_suspended); }
   void set_suspended(bool to)               { return Atomic::store(&_suspended, to); }
   bool has_async_suspend_handshake()        { return _async_suspend_handshake; }
   void set_async_suspend_handshake(bool to) { _async_suspend_handshake = to; }
+
+  void set_caller_thread(JavaThread* caller){ return Atomic::store(&_caller, caller); }
+  JavaThread* caller_thread() const         { return Atomic::load(&_caller); }
+  bool is_frozen() const                    { return caller_thread() != nullptr; }
+  bool is_suspended_or_frozen() const       { return is_suspended() || is_frozen(); }
+
+  void set_suspended_or_frozen(JavaThread* caller) {
+    set_suspended(true);
+    // if the caller is non-null, this sets frozen as well.
+    set_caller_thread(caller);
+  }
 
   bool suspend(JavaThread* caller);
   bool resume(JavaThread* caller);
