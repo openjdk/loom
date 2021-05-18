@@ -406,6 +406,7 @@ HandshakeState::HandshakeState(JavaThread* target) :
   _queue(),
   _lock(Monitor::leaf, "HandshakeState", Mutex::_allow_vm_block_flag, Monitor::_safepoint_check_never),
   _active_handshaker(),
+  _caller(nullptr),
   _suspended(false),
   _async_suspend_handshake(false)
 {
@@ -681,13 +682,18 @@ public:
   bool did_suspend() { return _did_suspend; }
 };
 
-bool HandshakeState::suspend() {
+bool HandshakeState::suspend(JavaThread* caller) {
   SuspendThreadHandshake st;
+  _caller = caller; // race?
   Handshake::execute(&st, _handshakee);
-  return st.did_suspend();
+  bool suspended = st.did_suspend();
+  if (!suspended) {
+    _caller = nullptr;
+  }
+  return suspended;
 }
 
-bool HandshakeState::resume() {
+bool HandshakeState::resume(JavaThread* caller) {
   if (!is_suspended()) {
     return false;
   }
@@ -696,6 +702,12 @@ bool HandshakeState::resume() {
     assert(!_handshakee->is_suspended(), "cannot be suspended without a suspend request");
     return false;
   }
+
+  // If caller is non-null only resume if it's the caller
+  if (_caller != caller) {
+    return false;
+  }
+
   // Resume the thread.
   set_suspended(false);
   _lock.notify();

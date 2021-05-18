@@ -89,6 +89,9 @@ class HandshakeState {
   // Set to the thread executing the handshake operation.
   Thread* _active_handshaker;
 
+  // Caller of suspension.  Only the caller can resume the thread.
+  JavaThread* _caller;
+
   bool claim_handshake();
   bool possibly_can_process_handshake();
   bool can_process_handshake();
@@ -177,8 +180,8 @@ class HandshakeState {
   bool has_async_suspend_handshake()        { return _async_suspend_handshake; }
   void set_async_suspend_handshake(bool to) { _async_suspend_handshake = to; }
 
-  bool suspend();
-  bool resume();
+  bool suspend(JavaThread* caller);
+  bool resume(JavaThread* caller);
 };
 
 #endif // SHARE_RUNTIME_HANDSHAKE_HPP

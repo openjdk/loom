@@ -3209,10 +3209,10 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
   if (thread_oop != nullptr) {
     JavaThread* target = java_lang_Thread::thread(thread_oop);
     // Suspend the target thread and freeze it.
-    if (target->java_suspend()) {
+    if (target->java_suspend(thread)) {
       oop oopCont = JNIHandles::resolve_non_null(jcont);
       result = Continuation::try_force_yield(target, oopCont);
-      target->java_resume();
+      target->java_resume(thread);
     }
   }
   return result;
