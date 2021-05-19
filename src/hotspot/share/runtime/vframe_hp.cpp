@@ -39,6 +39,7 @@
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/monitorChunk.hpp"
+#include "runtime/registerMap.hpp"
 #include "runtime/signature.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/vframeArray.hpp"
@@ -66,7 +67,7 @@ StackValueCollection* compiledVFrame::locals() const {
 
   // Replace the original values with any stores that have been
   // performed through compiledVFrame::update_locals.
-  if (register_map()->cont() == NULL) { // LOOM TODO
+  if (!register_map()->in_cont()) { // LOOM TODO
     GrowableArray<jvmtiDeferredLocalVariableSet*>* list = JvmtiDeferredUpdates::deferred_locals(thread());
     if (list != NULL ) {
       // In real life this never happens or is typically a single element search
@@ -197,7 +198,7 @@ StackValueCollection* compiledVFrame::expressions() const {
     result->add(create_stack_value(scv_list->at(i)));
   }
 
-  if (register_map()->cont() == NULL) { // LOOM TODO
+  if (!register_map()->in_cont()) { // LOOM TODO
     // Replace the original values with any stores that have been
     // performed through compiledVFrame::update_stack.
     GrowableArray<jvmtiDeferredLocalVariableSet*>* list = JvmtiDeferredUpdates::deferred_locals(thread());
@@ -221,7 +222,13 @@ StackValueCollection* compiledVFrame::expressions() const {
 // rematerialization and relocking of non-escaping objects.
 
 StackValue *compiledVFrame::create_stack_value(ScopeValue *sv) const {
-  return StackValue::create_stack_value(&_fr, register_map(), sv);
+  stackChunkOop c = _reg_map.stack_chunk()();
+  const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk(_chunk());
+
+  StackValue* res = StackValue::create_stack_value(&_fr, register_map(), sv);
+  
+  const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk(c);
+  return res;
 }
 
 BasicLock* compiledVFrame::resolve_monitor_lock(Location location) const {

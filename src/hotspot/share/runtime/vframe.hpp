@@ -59,9 +59,11 @@ class vframe: public ResourceObj {
   frame        _fr;      // Raw frame behind the virtual frame.
   RegisterMap  _reg_map; // Register map for the raw frame (used to handle callee-saved registers).
   JavaThread*  _thread;  // The thread owning the raw frame.
+  stackChunkHandle _chunk;
 
   vframe(const frame* fr, const RegisterMap* reg_map, JavaThread* thread);
   vframe(const frame* fr, JavaThread* thread);
+
  public:
   // Factory methods for creating vframes
   static vframe* new_vframe(const frame* f, const RegisterMap *reg_map, JavaThread* thread);
@@ -79,13 +81,17 @@ class vframe: public ResourceObj {
   frame*             frame_pointer() { return &_fr;       }
   const RegisterMap* register_map() const { return &_reg_map; }
   JavaThread*        thread()       const { return _thread;   }
-  oop                continuation() const { return _reg_map.cont(); }
+  stackChunkOop      stack_chunk()  const { return _chunk(); /*_reg_map.stack_chunk();*/ }
+  oop                continuation() const { return stack_chunk() != NULL ? stack_chunk()->cont() : (oop)NULL; }
 
   // Returns the sender vframe
   virtual vframe* sender() const;
 
   // Returns the next javaVFrame on the stack (skipping all other kinds of frame)
   javaVFrame *java_sender() const;
+
+  // Call when resuming a walk (calling [java_]sender) on a frame we'e already walked past
+  void restore_register_map() const;
 
   // Answers if the this is the top vframe in the frame, i.e., if the sender vframe
   // is in the caller frame

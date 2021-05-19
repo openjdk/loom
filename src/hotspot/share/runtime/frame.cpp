@@ -105,7 +105,7 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
   DEBUG_ONLY(_skip_missing = map->_skip_missing;)
 
   // only the original RegisterMap's handle lives long enough for StackWalker; this is bound to cause trouble with nested continuations.
-  _chunk = map->_chunk; // !map->_cont.is_null() && map->_cont() != NULL ? Handle(Thread::current(), map->_cont()) : Handle();
+  _chunk = map->_chunk; // stackChunkHandle(Thread::current(), map->_chunk(), map->_chunk.not_null()); // 
 
   pd_initialize_from(map);
   if (update_map()) {
@@ -131,9 +131,10 @@ oop RegisterMap::cont() const {
 }
 
 void RegisterMap::set_stack_chunk(stackChunkOop chunk) {
-  assert (_walk_cont, "");
+  assert (chunk == NULL || _walk_cont, "");
   assert (chunk == NULL || chunk->is_stackChunk(), "");
-  assert (_chunk.not_null(), "");
+  assert (chunk == NULL || _chunk.not_null(), "");
+  if (_chunk.is_null()) return;
   log_trace(jvmcont)("set_stack_chunk: " INTPTR_FORMAT " this: " INTPTR_FORMAT, p2i((oopDesc*)chunk), p2i(this));
   *(_chunk.raw_value()) = chunk; // reuse handle. see comment above in the constructor
 }
