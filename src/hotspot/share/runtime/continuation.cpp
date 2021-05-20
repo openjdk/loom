@@ -526,7 +526,8 @@ bool Compiled::is_owning_locks(JavaThread* thread, RegisterMapT* map, const fram
 // Contents are read from the Java object at the entry points of this module, and written at exists or intermediate calls into Java
 class ContMirror {
 private:
-  JavaThread* const _thread;
+  JavaThread* const _current;  // Current thread
+  JavaThread* const _thread;   // Thread being frozen/thawed
   ContinuationEntry* _entry;
   oop _cont;
 
@@ -545,7 +546,8 @@ private:
   ContMirror(const ContMirror& cont); // no copy constructor
 
 public:
-  ContMirror(JavaThread* thread, oop cont); // does not automatically read the continuation object
+  // does not automatically read the continuation object
+  ContMirror(JavaThread* current, JavaThread* thread, oop cont);
   ContMirror(oop cont);
   ContMirror(const RegisterMap* map);
 
@@ -688,18 +690,21 @@ oop ContinuationHelper::get_continuation(JavaThread* thread) {
   return java_lang_Thread::continuation(thread->threadObj());
 }
 
-ContMirror::ContMirror(JavaThread* thread, oop cont)
- : _thread(thread), _entry(thread->last_continuation()), _cont(cont),
+ContMirror::ContMirror(JavaThread* current, JavaThread* thread, oop cont)
+ : _current(current), _thread(thread), _entry(thread->last_continuation()), _cont(cont),
 #ifndef PRODUCT
   _tail(nullptr),
 #endif
   _e_size(0) {
+
+  assert(current == JavaThread::current(), "should be");
   assert(_cont != nullptr && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
-  assert (_cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
+  assert (_cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: "
+          INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
 }
 
 ContMirror::ContMirror(oop cont)
- : _thread(nullptr), _entry(nullptr), _cont(cont),
+ : _current(nullptr), _thread(nullptr), _entry(nullptr), _cont(cont),
 #ifndef PRODUCT
   _tail(nullptr),
 #endif
@@ -710,11 +715,15 @@ ContMirror::ContMirror(oop cont)
 }
 
 ContMirror::ContMirror(const RegisterMap* map)
- : _thread(map->thread()), _entry(Continuation::get_continuation_entry_for_continuation(_thread, map->stack_chunk()->cont())), _cont(map->stack_chunk()->cont()),
+ : _current(nullptr),
+   _thread(map->thread()),
+   _entry(Continuation::get_continuation_entry_for_continuation(_thread, map->stack_chunk()->cont())),
+   _cont(map->stack_chunk()->cont()),
 #ifndef PRODUCT
   _tail(nullptr),
 #endif
   _e_size(0) {
+
   assert(_cont != nullptr && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
 
   assert (_entry == nullptr || _cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
@@ -1834,13 +1843,15 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   assert (!current->cont_yield(), "");
   assert (!current->has_pending_exception(), ""); // if (current->has_pending_exception()) return early_return(freeze_exception, current, fi);
   assert (current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
-  assert (!preempt || current->thread_state() == _thread_in_vm || current->thread_state() == _thread_blocked
+  assert (!preempt || current->thread_state() == _thread_blocked
           /*|| current->thread_state() == _thread_in_native*/,
           "thread_state: %d %s", current->thread_state(), current->thread_state_name());
 
 #ifdef ASSERT
   log_develop_trace(jvmcont)("~~~~~~~~~ freeze sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT,
-    p2i(current->last_continuation()->entry_sp()), p2i(current->last_continuation()->entry_fp()), p2i(current->last_continuation()->entry_pc()));
+                             p2i(current->last_continuation()->entry_sp()),
+                             p2i(current->last_continuation()->entry_fp()),
+                             p2i(current->last_continuation()->entry_pc()));
 
   /* ContinuationHelper::set_anchor(current, fi); */ print_frames(current);
 #endif
@@ -1856,7 +1867,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   assert (ContinuationEntry::assert_entry_frame_laid_out(current), "");
 
   assert (verify_continuation<1>(oopCont), "");
-  ContMirror cont(current, oopCont);
+  ContMirror cont(preempt ? JavaThread::current() : current, current, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
   JVMTI_yield_VTMT_cleanup(current);
@@ -1896,6 +1907,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   // }
 
   log_develop_trace(jvmcont)("chunk unavailable; transitioning to VM");
+  assert(current == JavaThread::current(), "must be current thread except for preempt");
   JRT_BLOCK
     freeze_result res = fast ? fr.try_freeze_fast(sp, false) : fr.freeze_slow();
     return freeze_epilog(current, cont, res);
@@ -2764,7 +2776,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   assert (oopCont == ContinuationHelper::get_continuation(thread), "");
 
   assert (verify_continuation<1>(oopCont), "");
-  ContMirror cont(thread, oopCont);
+  ContMirror cont(thread, thread, oopCont);
   log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
   cont.read(); // read_minimal
@@ -3167,18 +3179,16 @@ stackChunkOop ContMirror::allocate_stack_chunk(int stack_size) {
   int size_in_words = klass->instance_size(stack_size);
 
   assert (!UseG1GC || !G1CollectedHeap::is_humongous(size_in_words), "size_in_words: %d", size_in_words);
+  assert(_current == JavaThread::current(), "should be current");
 
   StackChunkAllocator allocator(klass, size_in_words, stack_size, _thread);
-  if (UseTLAB) {
-    HeapWord* start = _thread->tlab().allocate(size_in_words);
-    if (start != nullptr) {
-      return (stackChunkOop)allocator.initialize(start);
-    }
+  HeapWord* start = _current->tlab().allocate(size_in_words);
+  if (start != nullptr) {
+    return (stackChunkOop)allocator.initialize(start);
   }
 
-  Thread* current = Thread::current();
-  //HandleMark hm(current);
-  Handle conth(current, _cont);
+  //HandleMark hm(_current);
+  Handle conth(_current, _cont);
   stackChunkOop result = (stackChunkOop)allocator.allocate();
   post_safepoint(conth);
   return result;
