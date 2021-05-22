@@ -362,7 +362,7 @@ void JfrCheckpointManager::end_epoch_shift() {
 }
 
 size_t JfrCheckpointManager::write() {
-  DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_native(Thread::current()));
+  DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_native(JavaThread::current()));
   WriteOperation wo(_chunkwriter);
   MutexedWriteOperation mwo(wo);
   _java_thread_local_mspace->iterate(mwo, true); // previous epoch list
@@ -395,10 +395,10 @@ size_t JfrCheckpointManager::write_static_type_set(Thread* thread) {
   return writer.used_size();
 }
 
-size_t JfrCheckpointManager::write_threads(Thread* thread) {
+size_t JfrCheckpointManager::write_threads(JavaThread* thread) {
   assert(thread != NULL, "invariant");
   // can safepoint here
-  ThreadInVMfromNative transition(thread->as_Java_thread());
+  ThreadInVMfromNative transition(thread);
   ResourceMark rm(thread);
   HandleMark hm(thread);
   JfrCheckpointWriter writer(true, thread, THREADS);
@@ -407,7 +407,7 @@ size_t JfrCheckpointManager::write_threads(Thread* thread) {
 }
 
 size_t JfrCheckpointManager::write_static_type_set_and_threads() {
-  Thread* const thread = Thread::current();
+  JavaThread* const thread = JavaThread::current();
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_native(thread));
   write_static_type_set(thread);
   write_threads(thread);

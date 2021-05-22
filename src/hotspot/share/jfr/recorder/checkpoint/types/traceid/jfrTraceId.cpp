@@ -70,7 +70,7 @@ static bool setup_thread_identifiers(TRAPS) {
 bool JfrTraceId::initialize() {
   static bool initialized = false;
   if (!initialized) {
-    initialized = setup_thread_identifiers(Thread::current());
+    initialized = setup_thread_identifiers(JavaThread::current());
   }
   return initialized;
 }

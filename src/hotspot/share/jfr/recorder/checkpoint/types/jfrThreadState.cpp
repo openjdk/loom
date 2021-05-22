@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -108,9 +108,8 @@ traceid JfrThreadId::jfr_id(const Thread* t, traceid tid) {
 }
 
 // caller needs ResourceMark
-const char* get_java_thread_name(const Thread* t, oop vthread) {
-  assert(t != NULL, "invariant");
-  const JavaThread* const jt = t->as_Java_thread();
+const char* get_java_thread_name(const JavaThread* jt, oop vthread) {
+  assert(jt != NULL, "invariant");
   const char* name_str = "<no-name - thread name unresolved>";
   oop thread_obj = vthread != NULL ? vthread : jt->threadObj();
   if (thread_obj == NULL) {
@@ -129,5 +128,5 @@ const char* get_java_thread_name(const Thread* t, oop vthread) {
 
 const char* JfrThreadName::name(const Thread* t, oop vthread) {
   assert(t != NULL, "invariant");
-  return t->is_Java_thread() ? get_java_thread_name(t, vthread) : t->name();
+  return t->is_Java_thread() ? get_java_thread_name(t->as_Java_thread(), vthread) : t->name();
 }

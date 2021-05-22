@@ -53,13 +53,15 @@ class NativeConstructorAccessorImpl extends ConstructorAccessorImpl {
                InvocationTargetException
     {
         boolean generate = false;
-        if (Thread.currentThread().isVirtual()) {
-            generate = true;
-        } else {
-            if (++numInvocations > ReflectionFactory.inflationThreshold()
-                    && generated == 0
-                    && U.compareAndSetInt(this, GENERATED_OFFSET, 0, 1)) {
+        if (!c.getDeclaringClass().isHidden()) {
+            if (Thread.currentThread().isVirtual()) {
                 generate = true;
+            } else {
+                if (++numInvocations > ReflectionFactory.inflationThreshold()
+                        && generated == 0
+                        && U.compareAndSetInt(this, GENERATED_OFFSET, 0, 1)) {
+                    generate = true;
+                }
             }
         }
 

@@ -41,8 +41,7 @@ static void set_jvmti_notifications(bool notify_vthread_events) {
 bool JfrJavaThread::initialize(bool notify_vthread_events) {
   static bool initialized = false;
   if (!initialized) {
-    Thread* const t = Thread::current();
-    assert(t->is_Java_thread(), "invariant");
+    JavaThread* t = JavaThread::current();
     Symbol* const sym = vmSymbols::java_lang_Thread_VirtualThreads();
     assert(sym != NULL, "invariant");
     Klass* const k = SystemDictionary::resolve_or_fail(sym, false, t);

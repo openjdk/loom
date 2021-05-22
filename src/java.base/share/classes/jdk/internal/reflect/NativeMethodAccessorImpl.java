@@ -51,13 +51,15 @@ class NativeMethodAccessorImpl extends MethodAccessorImpl {
         throws IllegalArgumentException, InvocationTargetException
     {
         boolean generate = false;
-        if (Thread.currentThread().isVirtual()) {
-            generate = true;
-        } else {
-            if (++numInvocations > ReflectionFactory.inflationThreshold()
-                    && generated == 0
-                    && U.compareAndSetInt(this, GENERATED_OFFSET, 0, 1)) {
+        if (!method.getDeclaringClass().isHidden()) {
+            if (Thread.currentThread().isVirtual()) {
                 generate = true;
+            } else {
+                if (++numInvocations > ReflectionFactory.inflationThreshold()
+                        && generated == 0
+                        && U.compareAndSetInt(this, GENERATED_OFFSET, 0, 1)) {
+                    generate = true;
+                }
             }
         }
 
@@ -71,9 +73,6 @@ class NativeMethodAccessorImpl extends MethodAccessorImpl {
             try {
                 // use bytecode generated implementation for @CS methods for now
                 if (Reflection.isCallerSensitive(method)) {
-                    assert !declaringClass.isHidden()
-                        && !ReflectUtil.isVMAnonymousClass(declaringClass);
-
                     acc = (MethodAccessorImpl) new MethodAccessorGenerator()
                                 .generateMethod(declaringClass,
                                                 method.getName(),
