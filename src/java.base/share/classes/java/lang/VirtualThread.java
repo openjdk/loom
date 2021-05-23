@@ -33,6 +33,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.security.ProtectionDomain;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -838,31 +839,32 @@ class VirtualThread extends Thread {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("VirtualThread[");
+        StringBuilder sb = new StringBuilder("VirtualThread[#");
+        sb.append(getId());
         String name = getName();
-        if (name.isEmpty() || name.equals("<unnamed>")) {
-            sb.append("#");
-            sb.append(getId());
-        } else {
+        if (!name.isEmpty() && !name.equals("<unnamed>")) {
+            sb.append(",");
             sb.append(name);
         }
-        sb.append(",");
+        sb.append("]/");
         Thread carrier = carrierThread;
         if (carrier != null) {
-            sb.append(carrier.getName());
-            ThreadGroup g = carrier.getThreadGroup();
-            if (g != null) {
-                sb.append(",");
-                sb.append(g.getName());
-            }
-        } else {
-            if (state() == TERMINATED) {
-                sb.append("<terminated>");
-            } else {
-                sb.append("<no carrier thread>");
+            // include the carrier thread state and name when mounted
+            synchronized (interruptLock) {
+                carrier = carrierThread;
+                if (carrier != null) {
+                    String stateAsString = carrier.threadState().toString();
+                    sb.append(stateAsString.toLowerCase(Locale.ROOT));
+                    sb.append('@');
+                    sb.append(carrier.getName());
+                }
             }
         }
-        sb.append("]");
+        // include virtual thread state when not mounted
+        if (carrier == null) {
+            String stateAsString = getState().toString();
+            sb.append(stateAsString.toLowerCase(Locale.ROOT));
+        }
         return sb.toString();
     }
 
