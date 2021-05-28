@@ -1215,16 +1215,40 @@ jvmtiError
 JvmtiEnv::InterruptThread(jthread thread) {
   JavaThread* current_thread  = JavaThread::current();
   JavaThread* java_thread = NULL;
+  oop thread_obj = NULL;
+  HandleMark hm(current_thread);
+
+  JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh(current_thread);
-  jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, NULL);
+
+  jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
+
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+#if 0
+    return JVMTI_ERROR_INVALID_THREAD;
+#else
+    Handle obj(current_thread, thread_obj);
+    JavaValue result(T_VOID);
+    JavaCalls::call_virtual(&result,
+                            obj,
+                            vmClasses::Thread_klass(),
+                            vmSymbols::interrupt_method_name(),
+                            vmSymbols::void_method_signature(),
+                            current_thread);
+
+    return JVMTI_ERROR_NONE;
+#endif
+  }
+
   // Really this should be a Java call to Thread.interrupt to ensure the same
   // semantics, however historically this has not been done for some reason.
   // So we continue with that (which means we don't interact with any Java-level
   // Interruptible object) but we must set the Java-level interrupted state.
-  java_lang_Thread::set_interrupted(JNIHandles::resolve(thread), true);
+  java_lang_Thread::set_interrupted(thread_obj, true);
   java_thread->interrupt();
 
   return JVMTI_ERROR_NONE;

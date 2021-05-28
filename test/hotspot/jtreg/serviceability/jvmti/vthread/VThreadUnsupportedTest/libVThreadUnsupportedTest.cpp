@@ -65,7 +65,6 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
 
   LOG("test_unsupported_jvmti_functions: started\n");
 
-
   is_vthread = jni->IsVirtualThread(vthread);
   if (is_vthread != JNI_TRUE) {
     fatal(jni, "IsVirtualThread failed to return JNI_TRUE");
@@ -80,55 +79,53 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
 
   LOG("Testing JVMTI functions which should not accept a virtual thread argument\n");
 
-
+  LOG("Testing StopThread\n");
   err = jvmti->StopThread(vthread, vthread);
   check_jvmti_error_invalid_thread(jni, "StopThread", err);
 
-  err = jvmti->InterruptThread(vthread);
-  check_jvmti_error_invalid_thread(jni, "InterruptThread", err);
-
+  LOG("Testing PopFrame\n");
   err = jvmti->PopFrame(vthread);
   check_jvmti_error_invalid_thread(jni, "PopFrame", err);
 
+  LOG("Testing ForceEarlyReturnVoid\n");
   err = jvmti->ForceEarlyReturnVoid(vthread);
   check_jvmti_error_invalid_thread(jni, "ForceEarlyReturnVoid", err);
 
+  LOG("Testing GetThreadCpuTime\n");
   err = jvmti->GetThreadCpuTime(vthread, &nanos);
   check_jvmti_error_invalid_thread(jni, "GetThreadCpuTime", err);
+
+  jthread cur_thread = get_current_thread(jvmti, jni);
+  if (jni->IsVirtualThread(cur_thread)) {
+    LOG("Testing GetCurrentThreadCpuTime\n");
+    err = jvmti->GetCurrentThreadCpuTime(&nanos);
+    check_jvmti_error_invalid_thread(jni, "GetCurrentThreadCpuTime", err);
+  }
 
   err = jvmti->RunAgentThread(vthread, agent_proc, (const void*)NULL, JVMTI_THREAD_NORM_PRIORITY);
   check_jvmti_error_invalid_thread(jni, "RunAgentThread", err);
 
   LOG("test_unsupported_jvmti_functions: finished\n");
-
 }
 
-JNIEXPORT jboolean JNICALL
-Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj) {
+static jthread find_vthread(JNIEnv *jni) {
   jvmtiError err = JVMTI_ERROR_NONE;
   jint threads_count = 0;
   jthread *threads = NULL;
-  jthread cthread = NULL;
+  jthread vthread = NULL;
 
-  LOG("testJvmtiFunctionsInJNICall: started\n");
-
-
-  err = jvmti->GetCurrentThread(&cthread);
-  check_jvmti_status(jni, err, "GetCurrentThread");
-  LOG("\n#### GetCurrentThread returned thread: %p\n", (void*)cthread);
-
+  jthread cur_thread = get_current_thread(jvmti, jni);
 
   err = jvmti->GetAllThreads(&threads_count, &threads);
   check_jvmti_status(jni, err, "GetAllThreads");
 
   for (int thread_idx = 0; thread_idx < (int) threads_count; thread_idx++) {
     jthread thread = threads[thread_idx];
-    jthread vthread;
-    char* tname = get_thread_name(jvmti, jni, thread);
 
-    if (jni->IsSameObject(cthread, thread) == JNI_TRUE) {
+    if (jni->IsSameObject(cur_thread, thread) == JNI_TRUE) {
       continue;
     }
+
     err = jvmti->SuspendThread(thread);
     if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
       continue;
@@ -143,16 +140,34 @@ Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj
       continue;
     }
     check_jvmti_status(jni, err, "JVMTI extension GetVirtualThread");
+
     if (vthread != NULL) {
+      char* tname = get_thread_name(jvmti, jni, thread);
       LOG("\n#### Found carrier thread: %s\n", tname);
-      fflush(stdout);
-      test_unsupported_jvmti_functions(jvmti, jni, vthread);
+      deallocate(jvmti, jni, (void*)tname);
     }
     err = jvmti->ResumeThread(thread);
     check_jvmti_status(jni, err, "ResumeThread");
-
-    deallocate(jvmti, jni, (void*)tname);
   }
+  return vthread;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  jthread vthread = NULL;
+
+  LOG("testJvmtiFunctionsInJNICall: started\n");
+
+  while (vthread == NULL) {
+    vthread = find_vthread(jni);
+  }
+  test_unsupported_jvmti_functions(jvmti, jni, vthread);
+
+  // test JVMTI InterruptThread
+  err = jvmti->InterruptThread(vthread);
+  check_jvmti_status(jni, err, "InterruptThread");
+
   LOG("testJvmtiFunctionsInJNICall: finished\n");
 
   return JNI_TRUE;

@@ -37,12 +37,17 @@ public class VThreadUnsupportedTest {
     native boolean isCompletedTestInEvent(); 
     native boolean testJvmtiFunctionsInJNICall();
 
+    private boolean iterrupted = false;
+
     final Runnable pinnedTask = () -> {
         synchronized (lock) {
             do {
                 try { 
                     lock.wait(10);
-                } catch (InterruptedException ie) {}
+                } catch (InterruptedException ie) {
+                    System.err.println("Virtual thread was interrupted as expected");
+                    iterrupted = true;
+                }
             } while (!isCompletedTestInEvent() || !isJNITestingCompleted.get());
         }
     };
@@ -52,6 +57,9 @@ public class VThreadUnsupportedTest {
         testJvmtiFunctionsInJNICall();
         isJNITestingCompleted.set(true);
         vthread.join();
+        if (!iterrupted) {
+            throw new RuntimeException("Failed: Virtual thread was not interrupted!");
+        }
     }
 
     public static void main(String[] args) throws Exception {

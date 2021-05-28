@@ -374,10 +374,9 @@ static void resume_thread(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 
 static jthread get_current_thread(jvmtiEnv *jvmti, JNIEnv* jni) {
   jthread thread;
-  check_jvmti_status(jni, jvmti->GetCurrentThread(&thread), "error in JVMTI ResumeThread");
+  check_jvmti_status(jni, jvmti->GetCurrentThread(&thread), "error in JVMTI GetCurrentThread");
   return thread;
 }
-
 
 
 

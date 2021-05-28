@@ -387,6 +387,7 @@
   template(group_name,                                "group")                                    \
   template(daemon_name,                               "daemon")                                   \
   template(run_method_name,                           "run")                                      \
+  template(interrupt_method_name,                     "interrupt")                                \
   template(exit_method_name,                          "exit")                                     \
   template(remove_method_name,                        "remove")                                   \
   template(parent_name,                               "parent")                                   \
