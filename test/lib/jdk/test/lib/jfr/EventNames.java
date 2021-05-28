@@ -204,6 +204,13 @@ public class EventNames {
     public static final String VirtualThreadEnd = PREFIX + "VirtualThreadEnd";
     public static final String VirtualThreadPinned = PREFIX + "VirtualThreadPinned";
     public static final String VirtualThreadSubmitFailed = PREFIX + "VirtualThreadSubmitFailed";
+    
+    // Containers
+    public static final String ContainerConfiguration = PREFIX + "ContainerConfiguration";
+    public static final String ContainerCPUUsage = PREFIX + "ContainerCPUUsage";
+    public static final String ContainerCPUThrottling = PREFIX + "ContainerCPUThrottling";
+    public static final String ContainerMemoryUsage = PREFIX + "ContainerMemoryUsage";
+    public static final String ContainerIOUsage = PREFIX + "ContainerIOUsage";
 
     // Flight Recorder
     public final static String DumpReason = PREFIX + "DumpReason";

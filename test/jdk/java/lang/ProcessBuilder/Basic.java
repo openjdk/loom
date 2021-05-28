@@ -34,8 +34,8 @@
  *          java.base/java.io:open
  *          java.base/jdk.internal.misc
  * @library /test/lib
- * @run main/othervm/timeout=300 Basic
- * @run main/othervm/timeout=300 -Djdk.lang.Process.launchMechanism=fork Basic
+ * @run main/othervm/timeout=300 -Djava.security.manager=allow Basic
+ * @run main/othervm/timeout=300 -Djava.security.manager=allow -Djdk.lang.Process.launchMechanism=fork Basic
  * @author Martin Buchholz
  */
 
@@ -46,7 +46,7 @@
  *          java.base/jdk.internal.misc
  * @requires (os.family == "linux")
  * @library /test/lib
- * @run main/othervm/timeout=300 -Djdk.lang.Process.launchMechanism=posix_spawn Basic
+ * @run main/othervm/timeout=300 -Djava.security.manager=allow -Djdk.lang.Process.launchMechanism=posix_spawn Basic
  */
 
 import java.lang.ProcessBuilder.Redirect;

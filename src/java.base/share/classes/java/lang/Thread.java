@@ -852,7 +852,12 @@ public class Thread implements Runnable {
      * @see Thread#ofVirtual()
      * @since 99
      */
-    public interface Builder {    // sealed, permits ...
+    public sealed interface Builder
+            permits Builder.OfPlatform,
+                    Builder.OfVirtual,
+                    ThreadBuilders.BaseThreadBuilder {
+
+
         /**
          * Sets the thread name.
          * @param name thread name
@@ -982,7 +987,9 @@ public class Thread implements Runnable {
          * @see Thread#ofPlatform()
          * @since 99
          */
-        interface OfPlatform extends Builder {
+        sealed interface OfPlatform extends Builder
+                permits ThreadBuilders.PlatformThreadBuilder {
+
             @Override OfPlatform name(String name);
             /** @throws IllegalArgumentException {@inheritDoc} */
             @Override OfPlatform name(String prefix, long start);
@@ -1051,7 +1058,9 @@ public class Thread implements Runnable {
          * @see Thread#ofVirtual()
          * @since 99
          */
-        interface OfVirtual extends Builder {
+        sealed interface OfVirtual extends Builder
+                permits ThreadBuilders.VirtualThreadBuilder {
+
             @Override OfVirtual name(String name);
             /** @throws IllegalArgumentException {@inheritDoc} */
             @Override OfVirtual name(String prefix, long start);

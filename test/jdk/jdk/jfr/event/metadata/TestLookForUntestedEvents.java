@@ -71,6 +71,13 @@ public class TestLookForUntestedEvents {
             "GCPhasePauseLevel4")
     );
 
+    // Container events are tested in hotspot/jtreg/containers/docker/TestJFREvents.java
+    private static final Set<String> coveredContainerEvents = new HashSet<>(
+        Arrays.asList(
+            "ContainerConfiguration", "ContainerCPUUsage", "ContainerCPUThrottling",
+            "ContainerMemoryUsage", "ContainerIOUsage")
+    );
+
     // Virtual thread events, covered by a different test
     private static final Set<String> virtualThreadEvents = Set.of(
             "jdk.VirtualThreadStart",
@@ -123,6 +130,7 @@ public class TestLookForUntestedEvents {
         // Account for hard-to-test, experimental and GC tested events
         eventsNotCoveredByTest.removeAll(hardToTestEvents);
         eventsNotCoveredByTest.removeAll(coveredGcEvents);
+        eventsNotCoveredByTest.removeAll(coveredContainerEvents);
         eventsNotCoveredByTest.removeAll(knownNotCoveredEvents);
         eventsNotCoveredByTest.removeAll(virtualThreadEvents);
 
