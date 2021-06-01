@@ -1527,7 +1527,7 @@ jvmtiEnv *jvmti;
     <function id="GetAllThreads" num="4">
       <synopsis>Get All Threads</synopsis>
       <description>
-        Get all live threads that are attached to the VM.
+        Get all live platform threads that are attached to the VM.
         The list of threads includes
         <internallink id="RunAgentThread">agent threads</internallink>.
         It does not include virtual threads.
@@ -1895,7 +1895,7 @@ jvmtiEnv *jvmti;
     <function id="StopThread" num="7">
       <synopsis>Stop Thread</synopsis>
       <description>
-        Send the specified asynchronous exception to the specified thread.
+        Send the specified asynchronous exception to the specified platform thread.
         Normally, this function is used to kill the specified thread with an
         instance of the exception <code>ThreadDeath</code>, similar to
         <code>java.lang.Thread.stop</code>.
@@ -2435,9 +2435,9 @@ jvmtiEnv *jvmti;
     <function id="GetThreadGroupChildren" num="15">
       <synopsis>Get Thread Group Children</synopsis>
       <description>
-        Get the live threads and the child thread groups in this thread group.
-        Virtual threads are not considered live threads in a thread group
-        and not returned by this function.
+        Get the live platform threads and the child thread groups in this
+        thread group.  Virtual threads are not considered live threads in
+        a thread group and not returned by this function.
       </description>
       <origin>jvmdi</origin>
       <capabilities>
@@ -2657,7 +2657,7 @@ if (err == JVMTI_ERROR_NONE &amp;&amp; count &gt;= 1) {
     <function id="GetAllStackTraces" num="100">
       <synopsis>Get All Stack Traces</synopsis>
       <description>
-        Get the stack traces of all live threads attached to the VM.
+        Get the stack traces of all live platform threads attached to the VM.
         The list includes the stack traces of
         <internallink id="RunAgentThread">agent threads</internallink>.
         It does not include the stack traces of virtual threads.
