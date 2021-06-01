@@ -81,8 +81,8 @@ public class SubmitTasksTest {
 
             // implementations that may override submit(Collection)
             { new ForkJoinPool(), },
-            { Executors.newUnownedThreadExecutor(defaultThreadFactory), },
-            { Executors.newUnownedThreadExecutor(virtualThreadFactory), },
+            { Executors.newThreadExecutor(defaultThreadFactory), },
+            { Executors.newThreadExecutor(virtualThreadFactory), },
         };
     }
 

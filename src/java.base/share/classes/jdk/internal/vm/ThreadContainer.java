@@ -23,13 +23,42 @@
  * questions.
  */
 
-package com.sun.management;
+package jdk.internal.vm;
+
+import java.util.stream.Stream;
 
 /**
- * TBD
- *
- * @since 99
+ * A container of threads. Thread containers can be arranged in linked list.
  */
-public class Threads {
-    private Threads() { }
+public interface ThreadContainer {
+    /**
+     * Return the owner, null if not owned.
+     */
+    default Thread owner() {
+        return null;
+    }
+
+    /**
+     * Return a count of the number of threads in this container.
+     */
+    long threadCount();
+
+    /**
+     * Returns a stream of the threads in this container.
+     */
+    Stream<Thread> threads();
+
+    /**
+     * Returns the previous thread container in the list.
+     */
+    default ThreadContainer previous() {
+        return null;
+    }
+
+    /**
+     * Sets the previous thread container in the list.
+     */
+    default void setPrevious(ThreadContainer container) {
+        throw new UnsupportedOperationException();
+    }
 }

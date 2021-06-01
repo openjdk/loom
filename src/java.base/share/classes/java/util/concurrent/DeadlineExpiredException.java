@@ -22,14 +22,29 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-
-package com.sun.management;
+package java.util.concurrent;
 
 /**
- * TBD
- *
+ * Exception thrown when a deadline expires before an operation completes.
  * @since 99
  */
-public class Threads {
-    private Threads() { }
+public class DeadlineExpiredException extends RuntimeException {
+    @java.io.Serial
+    private static final long serialVersionUID = 5850190531656065932L;
+
+    /**
+     * Constructs a {@code DeadlineExpiredException} with no specified detail
+     * message.
+     */
+    public DeadlineExpiredException() {}
+
+    /**
+     * Constructs a {@code DeadlineExpiredException} with the specified detail
+     * message.
+     *
+     * @param message the detail message
+     */
+    public DeadlineExpiredException(String message) {
+        super(message);
+    }
 }

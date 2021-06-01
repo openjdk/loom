@@ -23,28 +23,16 @@
 
 /*
  * @test
- * @summary Basic tests for executors created by Executors.newThreadExecutor
+ * @summary Basic tests for new thread-per-task executors
  * @run testng/othervm/timeout=300 ThreadExecutorTest
  */
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.Phaser;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -85,6 +73,18 @@ public class ThreadExecutorTest {
         return new Object[][] {
             { Executors.defaultThreadFactory(), },
             { Thread.ofVirtual().factory(), },
+        };
+    }
+
+    @DataProvider(name = "executors")
+    public Object[][] executors() {
+        var defaultThreadFactory = Executors.defaultThreadFactory();
+        var virtualThreadFactory = Thread.ofVirtual().factory();
+        return new Object[][] {
+            { Executors.newThreadExecutor(defaultThreadFactory), },
+            { Executors.newThreadExecutor(virtualThreadFactory), },
+            { Executors.newStructuredThreadExecutor(defaultThreadFactory), },
+            { Executors.newStructuredThreadExecutor(virtualThreadFactory), },
         };
     }
     
@@ -164,9 +164,9 @@ public class ThreadExecutorTest {
     /**
      * Test shutdown.
      */
-    @Test(dataProvider = "factories")
-    public void testShutdown1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testShutdown(ExecutorService executor) throws Exception {
+        try (executor) {
             assertFalse(executor.isShutdown());
             assertFalse(executor.isTerminated());
             assertFalse(executor.awaitTermination(10, TimeUnit.MILLISECONDS));
@@ -184,47 +184,11 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test shutdown from a thread that is not the owner.
-     */
-    @Test(dataProvider = "factories")
-    public void testShutdown2(ThreadFactory factory) throws Exception {
-        var exception = new AtomicReference<Exception>();
-        try (var executor = Executors.newThreadExecutor(factory)) {
-            Thread.ofVirtual().start(() -> {
-                try {
-                    executor.shutdown();
-                } catch (Exception e) {
-                    exception.set(e);
-                }
-            }).join();
-        }
-        assertTrue(exception.get() instanceof IllegalCallerException);
-    }
-
-    /**
-     * Test shutdown an unowned executor from a different thread.
-     */
-    @Test(dataProvider = "factories")
-    public void testShutdown3(ThreadFactory factory) throws Exception {
-        var exception = new AtomicReference<Exception>();
-        try (var executor = Executors.newUnownedThreadExecutor(factory)) {
-            Thread.ofVirtual().start(() -> {
-                try {
-                    executor.shutdown();
-                } catch (Exception e) {
-                    exception.set(e);
-                }
-            }).join();
-        }
-        assertTrue(exception.get() == null);
-    }
-
-    /**
      * Test shutdownNow.
      */
-    @Test(dataProvider = "factories")
-    public void testShutdownNow1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testShutdownNow(ExecutorService executor) throws Exception {
+        try (executor) {
             assertFalse(executor.isShutdown());
             assertFalse(executor.isTerminated());
             assertFalse(executor.awaitTermination(10, TimeUnit.MILLISECONDS));
@@ -247,47 +211,10 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Test shutdowNow from a thread that is not the owner.
-     */
-    @Test(dataProvider = "factories")
-    public void testShutdownNow2(ThreadFactory factory) throws Exception {
-        var exception = new AtomicReference<Exception>();
-        try (var executor = Executors.newThreadExecutor(factory)) {
-            Thread.ofVirtual().start(() -> {
-                try {
-                    executor.shutdownNow();
-                } catch (Exception e) {
-                    exception.set(e);
-                }
-            }).join();
-        }
-        assertTrue(exception.get() instanceof IllegalCallerException);
-    }
-
-    /**
-     * Test shutdownNow an unowned executor from a random thread.
-     */
-    @Test(dataProvider = "factories")
-    public void testShutdownNow3(ThreadFactory factory) throws Exception {
-        var exception = new AtomicReference<Exception>();
-        try (var executor = Executors.newUnownedThreadExecutor(factory)) {
-            Thread.ofVirtual().start(() -> {
-                try {
-                    executor.shutdownNow();
-                } catch (Exception e) {
-                    exception.set(e);
-                }
-            }).join();
-        }
-        assertTrue(exception.get() == null);
-    }
-
-    /**
      * Test close with no threads running.
      */
-    @Test(dataProvider = "factories")
-    public void testClose1(ThreadFactory factory) throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors")
+    public void testClose1(ExecutorService executor) throws Exception {
         executor.close();
         assertTrue(executor.isShutdown());
         assertTrue(executor.isTerminated());
@@ -297,9 +224,8 @@ public class ThreadExecutorTest {
     /**
      * Test close with threads running.
      */
-    @Test(dataProvider = "factories")
-    public void testClose2(ThreadFactory factory) throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors")
+    public void testClose2(ExecutorService executor) throws Exception {
         Future<String> future;
         try (executor) {
             future = executor.submit(() -> {
@@ -316,9 +242,8 @@ public class ThreadExecutorTest {
     /**
      * Invoke close with interrupt status set, should cancel task.
      */
-    @Test(dataProvider = "factories")
-    public void testClose3(ThreadFactory factory) throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors")
+    public void testClose3(ExecutorService executor) throws Exception {
         Future<?> future;
         try (executor) {
             future = executor.submit(SLEEP_FOR_A_DAY);
@@ -336,9 +261,8 @@ public class ThreadExecutorTest {
     /**
      * Interrupt thread blocked in close.
      */
-    @Test(dataProvider = "factories")
-    public void testClose4(ThreadFactory factory) throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors")
+    public void testClose4(ExecutorService executor) throws Exception {
         Future<?> future;
         try (executor) {
             future = executor.submit(SLEEP_FOR_A_DAY);
@@ -355,105 +279,27 @@ public class ThreadExecutorTest {
     /**
      * Close executor that is already closed.
      */
-    @Test(dataProvider = "factories")
-    public void testClose5(ThreadFactory factory) throws Exception {
-        var executor1 = Executors.newThreadExecutor(factory);
-        var executor2 = Executors.newThreadExecutor(factory);
-        executor2.close();
-        executor2.close(); // already closed
-        executor1.close();
-        executor1.close(); // already closed
-        executor2.close(); // out of order, already closed
-    }
-
-    /**
-     * Attempt to close from a different thread.
-     */
-    @Test(dataProvider = "factories")
-    public void testClose6(ThreadFactory factory) throws Exception {
-        var exception = new AtomicReference<Exception>();
-        try (var executor = Executors.newThreadExecutor(factory)) {
-            Thread.ofVirtual().start(() -> {
-                try {
-                    executor.close();
-                } catch (Exception e) {
-                    exception.set(e);
-                }
-            }).join();
-        }
-        assertTrue(exception.get() instanceof IllegalCallerException);
-    }
-
-    /**
-     * Attempt to close a closed executor from a different thread.
-     * @throws Exception
-     */
-    @Test(dataProvider = "factories")
-    public void testClose7(ThreadFactory factory) throws Exception {
-        var executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors")
+    public void testClose5(ExecutorService executor) throws Exception {
         executor.close();
-        assertTrue(executor.isTerminated());
-        var exception = new AtomicReference<Exception>();
-        Thread.ofVirtual().start(() -> {
-            try {
-                executor.close();
-            } catch (Exception e) {
-                exception.set(e);
-            }
-        }).join();
-        assertTrue(exception.get() instanceof IllegalCallerException);
-    }
-
-    /**
-     * Test that close enforces nesting
-     */
-    @Test(dataProvider = "factories")
-    public void testClose8(ThreadFactory factory) throws Exception {
-        try (var executor1 = Executors.newThreadExecutor(factory)) {
-            try (var executor2 = Executors.newThreadExecutor(factory)) {
-                try {
-                    executor1.close();
-                    assertTrue(false);
-                } catch (IllegalStateException expected) { }
-            }
-        }
-    }
-
-    /**
-     * Test closing an unowned executor from a different thread.
-     */
-    @Test(dataProvider = "factories")
-    public void testClose10(ThreadFactory factory) throws Exception {
-        var exception = new AtomicReference<Exception>();
-        try (var executor = Executors.newUnownedThreadExecutor(factory)) {
-            Thread.ofVirtual().start(() -> {
-                try {
-                    executor.close();
-                } catch (Exception e) {
-                    exception.set(e);
-                }
-            }).join();
-        }
-        assertTrue(exception.get() == null);
+        executor.close(); // already closed
     }
 
     /**
      * Test awaitTermination when not shutdown.
      */
-    @Test(dataProvider = "factories")
-    public void testAwaitTermination1(ThreadFactory factory) throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors")
+    public void testAwaitTermination1(ExecutorService executor) throws Exception {
         assertFalse(executor.awaitTermination(100, TimeUnit.MILLISECONDS));
         executor.close();
-        assertTrue(executor.awaitTermination(10, TimeUnit.MILLISECONDS));
+        assertTrue(executor.awaitTermination(100, TimeUnit.MILLISECONDS));
     }
 
     /**
      * Test awaitTermination with task running.
      */
-    @Test(dataProvider = "factories")
-    public void testAwaitTermination2(ThreadFactory factory) throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors")
+    public void testAwaitTermination2(ExecutorService executor) throws Exception {
         Phaser barrier = new Phaser(2);
         Future<?> result = executor.submit(barrier::arriveAndAwaitAdvance);
         try {
@@ -469,10 +315,10 @@ public class ThreadExecutorTest {
     /**
      * Test submit when the Executor is shutdown but not terminated.
      */
-    @Test(dataProvider = "factories")
-    public void testSubmitAfterShutdown(ThreadFactory factory) {
+    @Test(dataProvider = "executors")
+    public void testSubmitAfterShutdown(ExecutorService executor) throws Exception {
         Phaser barrier = new Phaser(2);
-        try (ExecutorService executor = Executors.newThreadExecutor(factory)) {
+        try (executor) {
             // submit task to prevent executor from terminating
             executor.submit(barrier::arriveAndAwaitAdvance);
             try {
@@ -489,9 +335,8 @@ public class ThreadExecutorTest {
     /**
      * Test submit when the Executor is terminated.
      */
-    @Test(dataProvider = "factories")
-    public void testSubmitAfterTermination(ThreadFactory factory) {
-        var executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors")
+    public void testSubmitAfterTermination(ExecutorService executor) throws Exception {
         executor.shutdown();
         assertTrue(executor.isShutdown() && executor.isTerminated());
         expectThrows(RejectedExecutionException.class, () -> executor.submit(() -> {}));
@@ -521,9 +366,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAny where all tasks complete normally.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAny1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAny1(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> "bar";
             String result = executor.invokeAny(Set.of(task1, task2));
@@ -535,9 +380,9 @@ public class ThreadExecutorTest {
      * Test invokeAny where all tasks complete normally. The completion of the
      * first task should cancel remaining tasks.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAny2(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAny2(ExecutorService executor) throws Exception {
+        try (executor) {
             AtomicBoolean task2Started = new AtomicBoolean();
             AtomicReference<Throwable> task2Exception = new AtomicReference<>();
             Callable<String> task1 = () -> "foo";
@@ -567,9 +412,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAny where all tasks complete with exception.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAny3(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAny3(ExecutorService executor) throws Exception {
+        try (executor) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> { throw new FooException(); };
             Callable<String> task2 = () -> { throw new FooException(); };
@@ -587,9 +432,9 @@ public class ThreadExecutorTest {
      * Test invokeAny where all tasks complete with exception. The completion
      * of the last task is delayed.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAny4(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAny4(ExecutorService executor) throws Exception {
+        try (executor) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> { throw new FooException(); };
             Callable<String> task2 = () -> {
@@ -609,9 +454,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAny where some, not all, tasks complete normally.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAny5(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAny5(ExecutorService executor) throws Exception {
+        try (executor) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> { throw new FooException(); };
@@ -624,9 +469,9 @@ public class ThreadExecutorTest {
      * Test invokeAny where some, not all, tasks complete normally. The
      * completion of the last task is delayed.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAny6(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAny6(ExecutorService executor) throws Exception {
+        try (executor) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> {
                 Thread.sleep(Duration.ofMillis(500));
@@ -641,9 +486,9 @@ public class ThreadExecutorTest {
     /**
      * Test timed-invokeAny where all tasks complete normally before the timeout.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAnyWithTimeout1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAnyWithTimeout1(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> "bar";
             String result = executor.invokeAny(Set.of(task1, task2), 1, TimeUnit.MINUTES);
@@ -655,9 +500,9 @@ public class ThreadExecutorTest {
      * Test timed-invokeAny where one task completes normally before the timeout.
      * The remaining tests should be cancelled.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAnyWithTimeout2(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAnyWithTimeout2(ExecutorService executor) throws Exception {
+        try (executor) {
             AtomicBoolean task2Started = new AtomicBoolean();
             AtomicReference<Throwable> task2Exception = new AtomicReference<>();
             Callable<String> task1 = () -> "foo";
@@ -687,9 +532,9 @@ public class ThreadExecutorTest {
     /**
      * Test timed-invokeAny where timeout expires before any task completes.
      */
-    @Test(dataProvider = "factories", expectedExceptions = { TimeoutException.class })
-    public void testInvokeAnyWithTimeout3(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors", expectedExceptions = { TimeoutException.class })
+    public void testInvokeAnyWithTimeout3(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> {
                 Thread.sleep(Duration.ofMinutes(1));
                 return "foo";
@@ -706,9 +551,9 @@ public class ThreadExecutorTest {
      * Test invokeAny where timeout expires after some tasks have completed
      * with exception.
      */
-    @Test(dataProvider = "factories", expectedExceptions = { TimeoutException.class })
-    public void testInvokeAnyWithTimeout4(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors", expectedExceptions = { TimeoutException.class })
+    public void testInvokeAnyWithTimeout4(ExecutorService executor) throws Exception {
+        try (executor) {
             class FooException extends Exception { }
             Callable<String> task1 = () -> { throw new FooException(); };
             Callable<String> task2 = () -> {
@@ -722,9 +567,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAny with interrupt status set.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAnyWithInterruptSet(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAnyWithInterruptSet(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> "bar";
             Thread.currentThread().interrupt();
@@ -742,9 +587,9 @@ public class ThreadExecutorTest {
     /**
      * Test interrupting a thread blocked in invokeAny.
      */
-    @Test(dataProvider = "factories")
-    public void testInterruptInvokeAny(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInterruptInvokeAny(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> {
                 Thread.sleep(Duration.ofMinutes(1));
                 return "foo";
@@ -768,9 +613,8 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAny after ExecutorService has been shutdown.
      */
-    @Test(dataProvider = "factories", expectedExceptions = { RejectedExecutionException.class })
-    public void testInvokeAnyAfterShutdown(ThreadFactory factory) throws Exception {
-        var executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors", expectedExceptions = { RejectedExecutionException.class })
+    public void testInvokeAnyAfterShutdown(ExecutorService executor) throws Exception {
         executor.shutdown();
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> "bar";
@@ -794,27 +638,6 @@ public class ThreadExecutorTest {
     public void testInvokeAnyEmpty2(ThreadFactory factory) throws Exception {
         try (var executor = Executors.newThreadExecutor(factory)) {
             executor.invokeAny(Set.of(), 1, TimeUnit.MINUTES);
-        }
-    }
-
-    /**
-     * Test invokeAll with deadline, deadline expires with running tasks.
-     */
-    @Test(dataProvider = "factories")
-    public void testInvokeAnyWithDeadline(ThreadFactory factory) throws Exception {
-        var deadline = Instant.now().plusSeconds(3);
-        try (ExecutorService executor = Executors.newThreadExecutor(factory, deadline)) {
-            try {
-                // execute long running tasks
-                executor.invokeAny(List.of(SLEEP_FOR_A_DAY, SLEEP_FOR_A_DAY));
-                assertTrue(false);
-            } catch (ExecutionException e) {
-                // expected
-            }
-
-            // executor should be shutdown and should terminate
-            assertTrue(executor.isShutdown());
-            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
         }
     }
 
@@ -844,9 +667,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll where all tasks complete normally.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAll1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAll1(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
                 Thread.sleep(Duration.ofMillis(500));
@@ -869,9 +692,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll where all tasks complete with exception.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAll2(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAll2(ExecutorService executor) throws Exception {
+        try (executor) {
             class FooException extends Exception { }
             class BarException extends Exception { }
             Callable<String> task1 = () -> { throw new FooException(); };
@@ -898,9 +721,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll where all tasks complete normally before the timeout expires.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAll3(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAll3(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
                 Thread.sleep(Duration.ofMillis(500));
@@ -923,9 +746,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll where some tasks do not complete before the timeout expires.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAll4(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAll4(ExecutorService executor) throws Exception {
+        try (executor) {
             AtomicReference<Exception> exc = new AtomicReference<>();
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
@@ -961,9 +784,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll with waitAll=false, last task should be cancelled
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAll5(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAll5(ExecutorService executor) throws Exception {
+        try (executor) {
             class BarException extends Exception { }
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
@@ -1002,9 +825,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll with waitAll=false, first task should be cancelled
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAll6(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAll6(ExecutorService executor) throws Exception {
+        try (executor) {
             class BarException extends Exception { }
             Callable<String> task1 = () -> {
                 Thread.sleep(Duration.ofDays(1));
@@ -1043,9 +866,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll with interrupt status set.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAllInterrupt1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllInterrupt1(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
                 Thread.sleep(Duration.ofMinutes(1));
@@ -1067,9 +890,9 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll waitAll=false and with interrupt status set.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAllInterrupt2(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllInterrupt2(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
                 Thread.sleep(Duration.ofMinutes(1));
@@ -1091,9 +914,9 @@ public class ThreadExecutorTest {
     /**
      * Test timed-invokeAll with interrupt status set.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAllInterrupt3(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllInterrupt3(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             Callable<String> task2 = () -> {
                 Thread.sleep(Duration.ofMinutes(1));
@@ -1115,9 +938,9 @@ public class ThreadExecutorTest {
     /**
      * Test interrupt with thread blocked in invokeAll
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAllInterrupt4(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllInterrupt4(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
             scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
@@ -1141,9 +964,9 @@ public class ThreadExecutorTest {
     /**
      * Test interrupt with thread blocked in invokeAll waitAll=false
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAllInterrupt5(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllInterrupt5(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
             scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
@@ -1167,9 +990,9 @@ public class ThreadExecutorTest {
     /**
      * Test interrupt with thread blocked in timed-invokeAll
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAllInterrupt6(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllInterrupt6(ExecutorService executor) throws Exception {
+        try (executor) {
             Callable<String> task1 = () -> "foo";
             DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
             scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
@@ -1193,9 +1016,8 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll after ExecutorService has been shutdown.
      */
-    @Test(dataProvider = "factories", expectedExceptions = { RejectedExecutionException.class })
-    public void testInvokeAllAfterShutdown1(ThreadFactory factory) throws Exception {
-        var executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors", expectedExceptions = { RejectedExecutionException.class })
+    public void testInvokeAllAfterShutdown1(ExecutorService executor) throws Exception {
         executor.shutdown();
 
         Callable<String> task1 = () -> "foo";
@@ -1203,9 +1025,8 @@ public class ThreadExecutorTest {
         executor.invokeAll(Set.of(task1, task2));
     }
 
-    @Test(dataProvider = "factories", expectedExceptions = { RejectedExecutionException.class })
-    public void testInvokeAllAfterShutdown2(ThreadFactory factory) throws Exception {
-        var executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors", expectedExceptions = { RejectedExecutionException.class })
+    public void testInvokeAllAfterShutdown2(ExecutorService executor) throws Exception {
         executor.shutdown();
 
         Callable<String> task1 = () -> "foo";
@@ -1213,9 +1034,8 @@ public class ThreadExecutorTest {
         executor.invokeAll(Set.of(task1, task2), false);
     }
 
-    @Test(dataProvider = "factories", expectedExceptions = { RejectedExecutionException.class })
-    public void testInvokeAllAfterShutdown3(ThreadFactory factory) throws Exception {
-        var executor = Executors.newThreadExecutor(factory);
+    @Test(dataProvider = "executors", expectedExceptions = { RejectedExecutionException.class })
+    public void testInvokeAllAfterShutdown3(ExecutorService executor) throws Exception {
         executor.shutdown();
 
         Callable<String> task1 = () -> "foo";
@@ -1226,52 +1046,27 @@ public class ThreadExecutorTest {
     /**
      * Test invokeAll with empty collection.
      */
-    @Test(dataProvider = "factories")
-    public void testInvokeAllEmpty1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newVirtualThreadExecutor()) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllEmpty1(ExecutorService executor) throws Exception {
+        try (executor) {
             List<Future<Object>> list = executor.invokeAll(Set.of());
             assertTrue(list.size() == 0);
         }
     }
 
-    @Test(dataProvider = "factories")
-    public void testInvokeAllEmpty2(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllEmpty2(ExecutorService executor) throws Exception {
+        try (executor) {
             List<Future<Object>> list = executor.invokeAll(Set.of(), false);
             assertTrue(list.size() == 0);
         }
     }
 
-    @Test(dataProvider = "factories")
-    public void testInvokeAllEmpty3(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+    @Test(dataProvider = "executors")
+    public void testInvokeAllEmpty3(ExecutorService executor) throws Exception {
+        try (executor) {
             List<Future<Object>> list = executor.invokeAll(Set.of(), 1, TimeUnit.SECONDS);
             assertTrue(list.size() == 0);
-        }
-    }
-
-    /**
-     * Test invokeAll with deadline, deadline expires with running tasks.
-     */
-    @Test(dataProvider = "factories")
-    public void testInvokeAllWithDeadline(ThreadFactory factory) throws Exception {
-        var deadline = Instant.now().plusSeconds(5);
-        try (var executor = Executors.newThreadExecutor(factory, deadline)) {
-            // execute long running tasks
-            var futures = executor.invokeAll(List.of(SLEEP_FOR_A_DAY, SLEEP_FOR_A_DAY));
-            for (Future<Void> f : futures) {
-                assertTrue(f.isDone());
-                try {
-                    Object result = f.get();
-                    assertTrue(false);
-                } catch (ExecutionException | CancellationException e) {
-                    // expected
-                }
-            }
-
-            // executor should be shutdown and should terminate
-            assertTrue(executor.isShutdown());
-            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
         }
     }
 
@@ -1318,126 +1113,6 @@ public class ThreadExecutorTest {
     }
 
     /**
-     * Deadline expires with running tasks, thread blocked in Future::get.
-     */
-    @Test(dataProvider = "factories")
-    public void testDeadlineDuringFutureGet(ThreadFactory factory) throws Exception {
-        var deadline = Instant.now().plusSeconds(3);
-        try (var executor = Executors.newThreadExecutor(factory, deadline)) {
-            // submit long running task
-            Future<?> future = executor.submit(SLEEP_FOR_A_DAY);
-
-            // task should be interrupted
-            Throwable e = expectThrows(ExecutionException.class, future::get);
-            assertTrue(e.getCause() instanceof InterruptedException);
-
-            // executor should be shutdown and should terminate
-            assertTrue(executor.isShutdown());
-            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
-        }
-    }
-
-    /**
-     * Deadline expires with running tasks, thread blocked waiting on a stream.
-     */
-    @Test(dataProvider = "factories")
-    public void testDeadlineDuringSubmit(ThreadFactory factory) throws Exception {
-        var deadline = Instant.now().plusSeconds(3);
-        try (var executor = Executors.newThreadExecutor(factory, deadline)) {
-            var futures = executor.submit(List.of(SLEEP_FOR_A_DAY, SLEEP_FOR_A_DAY)).toList();
-            for (Future<Void> f : futures) {
-                assertTrue(f.isDone());
-                try {
-                    Object result = f.get();
-                    assertTrue(false);
-                } catch (ExecutionException e) {
-                    assertTrue(e.getCause() instanceof InterruptedException);
-                } catch (CancellationException e) {
-                    // didn't run
-                }
-            }
-
-            // executor should be shutdown and should terminate
-            assertTrue(executor.isShutdown());
-            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
-        }
-    }
-
-    /**
-     * Deadline expires with running tasks, thread blocked in close.
-     */
-    @Test(dataProvider = "factories")
-    public void testDeadlineDuringClose(ThreadFactory factory) throws Exception {
-        var deadline = Instant.now().plusSeconds(3);
-        Future<?> future;
-        try (ExecutorService executor = Executors.newThreadExecutor(factory, deadline)) {
-            // submit long running task
-            future = executor.submit(SLEEP_FOR_A_DAY);
-        }
-
-        // task should be interrupted
-        assertTrue(future.isDone());
-        Throwable e = expectThrows(ExecutionException.class, future::get);
-        assertTrue(e.getCause() instanceof InterruptedException);
-    }
-
-    /**
-     * Deadline expires after the executor is shutdown.
-     */
-    @Test(dataProvider = "factories")
-    public void testDeadlineAfterShutdown(ThreadFactory factory) throws Exception {
-        var deadline = Instant.now().plusSeconds(5);
-        try (ExecutorService executor = Executors.newThreadExecutor(factory, deadline)) {
-            // submit long running task
-            Future<?> future = executor.submit(SLEEP_FOR_A_DAY);
-
-            // shutdown with running task
-            executor.shutdown();
-
-            // task should be interrupted
-            Throwable e = expectThrows(ExecutionException.class, future::get);
-            assertTrue(e.getCause() instanceof InterruptedException);
-
-            // executor should terminate
-            assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
-        }
-    }
-
-    /**
-     * Deadline expires after executor has terminated.
-     */
-    @Test(dataProvider = "factories")
-    public void testDeadlineAfterTerminate(ThreadFactory factory) throws Exception {
-        var deadline = Instant.now().plusSeconds(10);
-        Future<?> future;
-        try (ExecutorService executor = Executors.newThreadExecutor(factory, deadline)) {
-            future = executor.submit(() -> { });
-        }
-        assertTrue(future.get() == null);
-    }
-
-    /**
-     * Deadline has already expired
-     */
-    @Test(dataProvider = "factories")
-    public void testDeadlineAlreadyExpired1(ThreadFactory factory) throws Exception {
-        // now
-        Instant now = Instant.now();
-        try (ExecutorService executor = Executors.newThreadExecutor(factory, now)) {
-            assertTrue(executor.isTerminated());
-        }
-    }
-
-    @Test(dataProvider = "factories")
-    public void testDeadlineAlreadyExpired2(ThreadFactory factory) throws Exception {
-        // in the past
-        var yesterday = Instant.now().minus(Duration.ofDays(1));
-        try (ExecutorService executor = Executors.newThreadExecutor(factory, yesterday)) {
-            assertTrue(executor.isTerminated());
-        }
-    }
-
-    /**
      * Test ThreadFactory that does not produce any threads
      */
     @Test(expectedExceptions = { RejectedExecutionException.class })
@@ -1465,30 +1140,8 @@ public class ThreadExecutorTest {
     }
 
     @Test(expectedExceptions = { NullPointerException.class })
-    public void testNulls1() {
+    public void testNull() {
         Executors.newThreadExecutor(null);
-    }
-
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNulls2() {
-        ThreadFactory factory = Thread.ofPlatform().factory();
-        Executors.newThreadExecutor(factory, null);
-    }
-
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNulls3() {
-        Instant deadline = Instant.now().plusSeconds(10);
-        Executors.newThreadExecutor(null, deadline);
-    }
-
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNulls4() {
-        Executors.newVirtualThreadExecutor(null);
-    }
-
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNulls5() {
-        Executors.newUnownedThreadExecutor(null);
     }
 
     // -- supporting classes --
@@ -1520,5 +1173,4 @@ public class ThreadExecutorTest {
             return exception;
         }
     }
-
 }

@@ -22,14 +22,19 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-
-package com.sun.management;
+package java.util.concurrent;
 
 /**
- * TBD
- *
- * @since 99
+ * An ExecutorService intended to be used in a <em>structured manner</em>. It is
+ * <em>owned</em> by the Thread that creates it and must be {@linkplain
+ * ExecutorService#close() closed} by the same thread when it is finished with the
+ * executor. The {@code close}, {@link ExecutorService#shutdown() shutdown},
+ * {@link ExecutorService#shutdownNow()  shutdownNow} methods, and all methods that
+ * submit tasks throw {@code IllegalCallerException} if invoked by other threads.
  */
-public class Threads {
-    private Threads() { }
+interface StructuredExecutorService extends ExecutorService {
+    /**
+     * {@return the owner thread}.
+     */
+    Thread owner();
 }

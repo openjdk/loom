@@ -78,6 +78,7 @@ import jdk.internal.logger.LoggerFinderLoader;
 import jdk.internal.logger.LazyLoggers;
 import jdk.internal.logger.LocalizedLoggerWrapper;
 import jdk.internal.util.SystemProps;
+import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
@@ -2339,6 +2340,30 @@ public final class System {
 
             public Object classData(Class<?> c) {
                 return c.getClassData();
+            }
+
+            public Thread[] getAllThreads() {
+                return Thread.getAllThreads();
+            }
+
+            public ThreadContainer threadContainer(Thread thread) {
+                return thread.threadContainer();
+            }
+
+            public void start(Thread thread, ThreadContainer container) {
+                thread.start(container);
+            }
+
+            public ThreadContainer headThreadContainer(Thread thread) {
+                return thread.headThreadContainer();
+            }
+
+            public void pushThreadContainer(ThreadContainer container) {
+                Thread.currentThread().pushThreadContainer(container);
+            }
+
+            public void popThreadContainer(ThreadContainer container) {
+                Thread.currentThread().popThreadContainer(container);
             }
 
             public Thread currentCarrierThread() {

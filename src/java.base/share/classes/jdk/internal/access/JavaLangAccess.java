@@ -47,6 +47,7 @@ import java.util.stream.Stream;
 
 import jdk.internal.module.ServicesCatalog;
 import jdk.internal.reflect.ConstantPool;
+import jdk.internal.vm.ThreadContainer;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
 
@@ -380,6 +381,36 @@ public interface JavaLangAccess {
      * @see java.lang.invoke.MethodHandles.Lookup#defineHiddenClass(byte[], boolean, MethodHandles.Lookup.ClassOption...)
      */
     Object classData(Class<?> c);
+
+    /**
+     * Returns an array of all platform threads.
+     */
+    Thread[] getAllThreads();
+
+    /**
+     * Returns the ThreadContainer for a thread, may be null.
+     */
+    ThreadContainer threadContainer(Thread thread);
+
+    /**
+     * Starts a thread in the given ThreadContainer.
+     */
+    void start(Thread thread, ThreadContainer container);
+
+    /**
+     * Returns the thread container at the head/top of the stack.
+     */
+    ThreadContainer headThreadContainer(Thread thread);
+
+    /**
+     * Pushes a thread container to the top of the current thread's stack.
+     */
+    void pushThreadContainer(ThreadContainer container);
+
+    /**
+     * Pops a thread container from the current thread's stack.
+     */
+    void popThreadContainer(ThreadContainer container);
 
     /**
      * Returns a reference to the Thread object for the currently executing
