@@ -1133,10 +1133,13 @@ jvmtiEnv *jvmti;
         These functions provide information about threads and allow an agent to
         suspend and resume threads.
         <p/>
-        The <code>jthread</code> specified to these functions can be a JNI reference
-        to a platform or virtual Thread object. Some functions are not supported on
-        virtual threads and return <code>JVMTI_ERROR_INVALID_THREAD</code> when
-        called with a reference to a virtual thread.
+        The <code>jthread</code> specified to these functions can be a JNI
+        reference to a
+        <externallink id="../api/java.base/java/lang/Thread.html#platform-threads">platform thread</externallink>
+        or <externallink id="../api/java.base/java/lang/Thread.html#virtual-threads">virtual thread</externallink>.
+        Some functions are not supported on virtual threads and return
+        <code>JVMTI_ERROR_INVALID_THREAD</code> when called with a reference
+        to a virtual thread.
     </intro>
 
     <function id="GetThreadState" num="17">
