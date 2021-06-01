@@ -2349,15 +2349,17 @@ public class Thread implements Runnable {
      */
     @CallerSensitive
     public ClassLoader getContextClassLoader() {
-        if (contextClassLoader == null
-                || contextClassLoader == ClassLoaders.NOT_SUPPORTED)
+        ClassLoader cl = this.contextClassLoader;
+        if (cl == null)
             return null;
+        if (cl == ClassLoaders.NOT_SUPPORTED)
+            cl = ClassLoader.getSystemClassLoader();
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
-            ClassLoader.checkClassLoaderPermission(contextClassLoader,
-                                                   Reflection.getCallerClass());
+            Class<?> caller = Reflection.getCallerClass();
+            ClassLoader.checkClassLoaderPermission(cl, caller);
         }
-        return contextClassLoader;
+        return cl;
     }
 
     /**

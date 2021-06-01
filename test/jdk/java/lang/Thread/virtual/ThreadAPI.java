@@ -1376,17 +1376,18 @@ public class ThreadAPI {
     }
 
     /**
-     * Test Thread.xxContextClassLoader when thread locals not supported.
+     * Test Thread.xxxContextClassLoader when thread locals not supported.
      */
     @Test
     public void testContextClassLoader5() throws Exception {
+        ClassLoader scl = ClassLoader.getSystemClassLoader();
         ClassLoader loader = new ClassLoader() { };
         TestHelper.runInVirtualThread(TestHelper.NO_THREAD_LOCALS, () -> {
             Thread t = Thread.currentThread();
-            assertTrue(t.getContextClassLoader() == null);
+            assertTrue(t.getContextClassLoader() == scl);
             assertThrows(UnsupportedOperationException.class,
                          () -> t.setContextClassLoader(loader));
-            assertTrue(t.getContextClassLoader() == null);
+            assertTrue(t.getContextClassLoader() == scl);
         });
     }
 
