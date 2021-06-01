@@ -25,7 +25,7 @@
  * @test
  * @summary Basic test for jcmd JavaThread.dump
  * @library /test/lib
- * @run testng/othervm -Djdk.trackAllVirtualThreads=true JavaThreadDumpTest
+ * @run testng/othervm JavaThreadDumpTest
  */
 
 import java.io.IOException;
