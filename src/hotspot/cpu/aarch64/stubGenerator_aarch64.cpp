@@ -7385,6 +7385,7 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
 //          rsp points to ContinuationEntry
 // kills rax
 void fill_continuation_entry(MacroAssembler* masm) {
+  __ stop("LOOM AARCH64 fill_continuation_entry");
   // TODO LOOM AARCH64
 }
 
@@ -7392,6 +7393,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
 // on exit, rsp points to the spilled rbp in the entry frame
 // kills rbx, rcx
 void continuation_enter_cleanup(MacroAssembler* masm) {
+  __ stop("LOOM AARCH64 continuation_enter_cleanup");
   // TODO LOOM AARCH64
 }
 
