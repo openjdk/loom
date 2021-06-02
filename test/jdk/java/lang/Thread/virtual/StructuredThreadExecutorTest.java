@@ -349,9 +349,4 @@ public class StructuredThreadExecutorTest {
         Instant deadline = Instant.now().plusSeconds(10);
         Executors.newStructuredThreadExecutor(null, deadline);
     }
-
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNulls4() {
-        Executors.newStructuredVirtualThreadExecutor(null);
-    }
 }

@@ -292,7 +292,7 @@ public class Executors {
      * executing the task.
      *
      * @apiNote
-     * TBD naming, return type, and location of this method.
+     * TBD naming, shape, location, ... Executors is not the right place for this.
      *
      * @param threadFactory the factory to use when creating new threads
      * @return a newly created executor
@@ -334,7 +334,7 @@ public class Executors {
      * executing the task.
      *
      * @apiNote
-     * TBD naming, return type, and location of this method.
+     * TBD naming, shape, location, ... Executors is not the right place for this.
      *
      * <p> The {@link ExecutorService#invokeAll(Collection) invokeAll} method
      * throws {@code InterruptedException} if interrupted while waiting for all
@@ -353,44 +353,6 @@ public class Executors {
                                                               Instant deadline) {
         Objects.requireNonNull(deadline);
         return new StructuredThreadExecutor(threadFactory, deadline);
-    }
-
-    /**
-     * Creates an Executor that starts a new virtual Thread for each task.
-     * The number of threads created by the Executor is unbounded.
-     *
-     * <p> This method is equivalent to creating an Executor with the {@link
-     * #newStructuredThreadExecutor(ThreadFactory)} method and specifying a
-     * ThreadFactory created with {@code Thread.ofVirtual().factory()}.
-     *
-     * @apiNote
-     * TBD naming, return type, and location of this method.
-     *
-     * @return a newly created executor
-     * @since 99
-     */
-    public static ExecutorService newStructuredVirtualThreadExecutor() {
-        return newStructuredThreadExecutor(Thread.ofVirtual().factory());
-    }
-
-    /**
-     * Creates an Executor that starts a new Thread for each task and with a
-     * deadline. The number of threads created by the Executor is unbounded.
-     *
-     * <p> This method is equivalent to creating an Executor with the {@link
-     * #newStructuredThreadExecutor(ThreadFactory, Instant)} method and specifying
-     * a ThreadFactory created with {@code Thread.ofVirtual().factory()}.
-     *
-     * @apiNote
-     * TBD naming, return type, and location of this method.
-     *
-     * @param deadline the deadline
-     * @return a newly created executor
-     * @throws NullPointerException if deadline is null
-     * @since 99
-     */
-    public static ExecutorService newStructuredVirtualThreadExecutor(Instant deadline) {
-        return newStructuredThreadExecutor(Thread.ofVirtual().factory(), deadline);
     }
 
     /**
