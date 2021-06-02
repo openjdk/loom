@@ -80,6 +80,7 @@ class StructuredThreadExecutor
         if (stillborn) {
             tryShutdownAndTerminate(false);
             deadlineExpired = true;
+            Thread.currentThread().interrupt();
         }
     }
 

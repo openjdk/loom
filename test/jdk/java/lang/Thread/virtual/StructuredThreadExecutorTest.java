@@ -319,6 +319,7 @@ public class StructuredThreadExecutorTest {
     public void testDeadlineAlreadyExpired1(ThreadFactory factory) throws Exception {
         Instant now = Instant.now();
         var executor = Executors.newStructuredThreadExecutor(factory, now);
+        assertTrue(Thread.interrupted());  // clears interrupt status
         assertTrue(executor.isTerminated());
         expectThrows(DeadlineExpiredException.class, executor::close);
     }
@@ -327,6 +328,7 @@ public class StructuredThreadExecutorTest {
     public void testDeadlineAlreadyExpired2(ThreadFactory factory) throws Exception {
         var yesterday = Instant.now().minus(Duration.ofDays(1));
         var executor = Executors.newStructuredThreadExecutor(factory, yesterday);
+        assertTrue(Thread.interrupted());   // clears interrupt status
         assertTrue(executor.isTerminated());
         expectThrows(DeadlineExpiredException.class, executor::close);
     }
