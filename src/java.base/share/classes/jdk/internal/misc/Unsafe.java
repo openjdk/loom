@@ -418,7 +418,8 @@ public final class Unsafe {
         putAddress(null, address, x);
     }
 
-
+    @IntrinsicCandidate
+    public native void setInheritableScopeLocalBindings(Object cache);
 
     /// helper methods for validating various types of objects/values
 

@@ -471,6 +471,10 @@ class java_lang_Thread : AllStatic {
   // Clear all scope local bindings on error
   static void clear_scopeLocalBindings(oop java_thread);
 
+  static int inheritableScopeLocalBindings_offset() {
+    CHECK_INIT(_inheritableScopeLocalBindings_offset);
+  }
+
   // Blocker object responsible for thread parking
   static oop park_blocker(oop java_thread);
 

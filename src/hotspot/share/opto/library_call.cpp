@@ -477,6 +477,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 
   case vmIntrinsics::_scopeLocalCache:          return inline_native_scopeLocalCache();
   case vmIntrinsics::_setScopeLocalCache:       return inline_native_setScopeLocalCache();
+  case vmIntrinsics::_unsafeSetInheritableScopeLocalBindings: return inline_native_unsafeSetInheritableScopeLocalBindings();
 
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), "counterTime");
@@ -3226,6 +3227,28 @@ bool LibraryCallKit::inline_native_setScopeLocalCache() {
   const TypePtr *adr_type = _gvn.type(cache_obj_handle)->isa_ptr();
   store_to_memory(control(), cache_obj_handle, arr, T_OBJECT, adr_type,
                   MemNode::unordered);
+
+  return true;
+}
+
+//------------------------inline_native_unsafeSetInheritableScopeLocalBindings------------------
+bool LibraryCallKit::inline_native_unsafeSetInheritableScopeLocalBindings() {
+  Node* bindings = argument(1);
+  Node* cache_obj_handle = scopeLocalCache_helper();
+
+  null_check_receiver();  // null-check, then ignore
+  const TypePtr *cache_adr_type = _gvn.type(cache_obj_handle)->isa_ptr();
+  store_to_memory(control(), cache_obj_handle, null(), T_OBJECT, cache_adr_type,
+                  MemNode::unordered);
+  Node* junk = NULL;
+  Node* thread_obj = generate_virtual_thread(junk);
+  Node* adr = make_unsafe_address(thread_obj,
+                                  MakeConX(java_lang_Thread::inheritableScopeLocalBindings_offset()),
+                                  T_OBJECT, /*kind == Relaxed*/true);
+  const TypePtr* adr_type = _gvn.type(adr)->isa_ptr();
+  const Type *bindings_type = Type::get_const_basic_type(T_OBJECT);
+
+  access_store_at(thread_obj, adr, adr_type, bindings, bindings_type, T_OBJECT, IN_HEAP);
 
   return true;
 }
