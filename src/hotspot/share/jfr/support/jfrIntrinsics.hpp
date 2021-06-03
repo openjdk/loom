@@ -34,8 +34,8 @@
 
 class JfrIntrinsicSupport {
  public:
-  static void* get_event_writer(Thread* t);
-  static void* write_checkpoint(Thread* t, traceid tid);
+  static void* get_event_writer(JavaThread* t);
+  static void* write_checkpoint(JavaThread* t, traceid tid);
 };
 
 #define JFR_HAVE_INTRINSICS

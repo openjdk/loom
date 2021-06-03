@@ -275,10 +275,12 @@ void frame::patch_pc(Thread* thread, address pc) {
   // Either the return address is the original one or we are going to
   // patch in the same address that's already there.
   assert(_pc == *pc_addr || pc == *pc_addr, "must be");
+  DEBUG_ONLY(address old_pc = _pc;)
   *pc_addr = pc;
+  _pc = pc; // must be set before call to get_deopt_original_pc
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
   if (original_pc != NULL) {
-    assert(original_pc == _pc, "expected original PC to be stored before patching");
+    assert(original_pc == old_pc, "expected original PC to be stored before patching");
     _deopt_state = is_deoptimized;
     // leave _pc as is
   } else {

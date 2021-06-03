@@ -31,25 +31,23 @@
 #include "runtime/interfaceSupport.inline.hpp"
 #include "utilities/macros.hpp"
 
-static jobject get_event_writer_impl(Thread* t, traceid tid, bool write_checkpoint) {
+static jobject get_event_writer_impl(JavaThread* t, traceid tid, bool write_checkpoint) {
   assert(t != NULL, "invariant");
-  assert(t->is_Java_thread(), "invariant");
-  JavaThread* const jt = (JavaThread*)t;
-  DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_java(jt);)
-  assert(jt->has_last_Java_frame(), "invariant");
+  DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_java(t);)
+  assert(t->has_last_Java_frame(), "invariant");
   // can safepoint here
-  ThreadInVMfromJava transition(jt);
+  ThreadInVMfromJava transition(t);
   if (write_checkpoint) {
     assert(tid != 0, "only for virtual threads");
-    JfrTypeManager::write_checkpoint(t, tid, JfrJavaThread::virtual_thread(jt));
+    JfrTypeManager::write_checkpoint(t, tid, JfrJavaThread::virtual_thread(t));
   }
   return JfrJavaEventWriter::event_writer(t, tid);
 }
 
-void* JfrIntrinsicSupport::get_event_writer(Thread* t) {
+void* JfrIntrinsicSupport::get_event_writer(JavaThread* t) {
   return get_event_writer_impl(t, 0, false);
 }
 
-void* JfrIntrinsicSupport::write_checkpoint(Thread* t, traceid tid) {
+void* JfrIntrinsicSupport::write_checkpoint(JavaThread* t, traceid tid) {
   return get_event_writer_impl(t, tid, true);
 }

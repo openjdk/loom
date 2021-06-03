@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,6 +31,30 @@
 #include "sun_nio_ch_WSAPoll.h"
 
 JNIEXPORT jint JNICALL
+Java_sun_nio_ch_WSAPoll_pollfdSize(JNIEnv* env, jclass clazz)
+{
+    return sizeof(struct pollfd);
+}
+
+JNIEXPORT jint JNICALL
+Java_sun_nio_ch_WSAPoll_fdOffset(JNIEnv* env, jclass clazz)
+{
+    return offsetof(struct pollfd, fd);
+}
+
+JNIEXPORT jint JNICALL
+Java_sun_nio_ch_WSAPoll_eventsOffset(JNIEnv* env, jclass clazz)
+{
+    return offsetof(struct pollfd, events);
+}
+
+JNIEXPORT jint JNICALL
+Java_sun_nio_ch_WSAPoll_reventsOffset(JNIEnv* env, jclass clazz)
+{
+    return offsetof(struct pollfd, revents);
+}
+
+JNIEXPORT jint JNICALL
 Java_sun_nio_ch_WSAPoll_poll(JNIEnv *env, jclass clazz,
                              jlong address, jint numfds, jint timeout)
 {
@@ -42,4 +66,3 @@ Java_sun_nio_ch_WSAPoll_poll(JNIEnv *env, jclass clazz,
     }
     return (jint) res;
 }
-

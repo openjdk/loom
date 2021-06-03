@@ -62,7 +62,7 @@ public class DumpThreads {
             mbean.dumpThreads(file.toString(), ThreadDumpFormat.JSON);
             cat(file);
             assertTrue(count(file, "threadDump") >= 1L);
-            assertTrue(count(file, "threadExecutors") >= 1L);
+            assertTrue(count(file, "threadContainers") >= 1L);
             assertTrue(count(file, "threads") >= 1L);
             String expect = "\"tid\": " + Thread.currentThread().getId();
             assertTrue(count(file, expect) >= 1L);

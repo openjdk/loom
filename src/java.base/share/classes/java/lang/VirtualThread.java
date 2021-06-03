@@ -33,6 +33,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.security.ProtectionDomain;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -46,11 +47,14 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadPinnedEvent;
+import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
-import jdk.internal.vm.ThreadTracker;
+import jdk.internal.vm.ThreadContainer;
+import jdk.internal.vm.ThreadContainers;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import jdk.internal.vm.annotation.JvmtiMountTransition;
 import sun.nio.ch.Interruptible;
@@ -432,8 +436,15 @@ class VirtualThread extends Thread {
             }
         }
 
-        // notify thread tracker
-        ThreadTracker.notifyVirtualThreadTerminate(this);
+        if (VirtualThreadEndEvent.isTurnedOn()) {
+            var event = new VirtualThreadEndEvent();
+            event.javaThreadId = getId();
+            event.commit();
+        }
+
+        if (threadContainer() == null) {
+            ThreadContainers.decrementUnmanagedVirtualThreadCount();
+        }
 
         // clear references to thread locals, this method is assumed to be
         // called on its carrier thread on which it terminated.
@@ -501,18 +512,34 @@ class VirtualThread extends Thread {
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     @Override
-    public void start() {
+    void start(ThreadContainer container) {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
-        ThreadTracker.notifyVirtualThreadStart(this);
-        try {
-            submitRunContinuation();
-        } catch (RejectedExecutionException ree) {
-            // assume executor has been shutdown
-            afterTerminate(/*executed*/ false);
-            throw ree;
+        if (container != null) {
+            setThreadContainer(container);
+        } else {
+            ThreadContainers.incrementUnmanagedVirtualThreadCount();
         }
+        boolean submitted = false;
+        try {
+            if (VirtualThreadStartEvent.isTurnedOn()) {
+                var event = new VirtualThreadStartEvent();
+                event.javaThreadId = getId();
+                event.commit();
+            }
+            submitRunContinuation();
+            submitted = true;
+        } finally {
+            if (!submitted) {
+                afterTerminate(/*executed*/ false);
+            }
+        }
+    }
+
+    @Override
+    public void start() {
+        start(null);
     }
 
     /**
@@ -808,7 +835,8 @@ class VirtualThread extends Thread {
 
     /**
      * Returns the stack trace for this virtual thread if it newly created,
-     * parked, or terminated. Returns null if the thread is in another state.
+     * started, parked, or terminated. Returns null if the thread is in
+     * another state.
      */
     private StackTraceElement[] tryGetStackTrace() {
         if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
@@ -827,7 +855,7 @@ class VirtualThread extends Thread {
             }
         } else {
             int s = state();
-            if (s == NEW || s == TERMINATED) {
+            if (s == NEW || s == STARTED || s == TERMINATED) {
                 return new StackTraceElement[0];   // empty stack
             } else {
                 return null;
@@ -837,31 +865,32 @@ class VirtualThread extends Thread {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("VirtualThread[");
+        StringBuilder sb = new StringBuilder("VirtualThread[#");
+        sb.append(getId());
         String name = getName();
-        if (name.isEmpty() || name.equals("<unnamed>")) {
-            sb.append("#");
-            sb.append(getId());
-        } else {
+        if (!name.isEmpty() && !name.equals("<unnamed>")) {
+            sb.append(",");
             sb.append(name);
         }
-        sb.append(",");
+        sb.append("]/");
         Thread carrier = carrierThread;
         if (carrier != null) {
-            sb.append(carrier.getName());
-            ThreadGroup g = carrier.getThreadGroup();
-            if (g != null) {
-                sb.append(",");
-                sb.append(g.getName());
-            }
-        } else {
-            if (state() == TERMINATED) {
-                sb.append("<terminated>");
-            } else {
-                sb.append("<no carrier thread>");
+            // include the carrier thread state and name when mounted
+            synchronized (interruptLock) {
+                carrier = carrierThread;
+                if (carrier != null) {
+                    String stateAsString = carrier.threadState().toString();
+                    sb.append(stateAsString.toLowerCase(Locale.ROOT));
+                    sb.append('@');
+                    sb.append(carrier.getName());
+                }
             }
         }
-        sb.append("]");
+        // include virtual thread state when not mounted
+        if (carrier == null) {
+            String stateAsString = getState().toString();
+            sb.append(stateAsString.toLowerCase(Locale.ROOT));
+        }
         return sb.toString();
     }
 

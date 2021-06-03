@@ -3258,6 +3258,7 @@ void Continuation::init() {
 }
 
 void Continuation::set_cont_fastpath_thread_state(JavaThread* thread) {
+  assert (thread != nullptr, "");
   bool fast = !thread->is_interp_only_mode();
   thread->set_cont_fastpath_thread_state(fast);
 }

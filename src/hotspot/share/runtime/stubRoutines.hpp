@@ -177,6 +177,7 @@ class StubRoutines: AllStatic {
   static address _jlong_disjoint_arraycopy;
   static address _oop_disjoint_arraycopy, _oop_disjoint_arraycopy_uninit;
 
+  static bool _has_word_memcpy;
   static address _word_memcpy_up;
   static address _word_memcpy_down;
   static address _word_memcpy_up_nt;
@@ -359,6 +360,7 @@ class StubRoutines: AllStatic {
   static address jint_arraycopy()   { return _jint_arraycopy; }
   static address jlong_arraycopy()  { return _jlong_arraycopy; }
 
+  static bool has_word_memcpy()        { return _has_word_memcpy; }
   static address word_memcpy_up()      { return _word_memcpy_up; }
   static address word_memcpy_up_nt()   { return _word_memcpy_up_nt; }
   static address word_memcpy_down()    { return _word_memcpy_down; }

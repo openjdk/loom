@@ -22,6 +22,7 @@
  *
  */
 
+#include "compiler/oopMap.inline.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "memory/resourceArea.hpp"
@@ -91,7 +92,7 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
   int index = f.frame_index();
   StackChunkFrameStream<true> fs(this, derelativize(f));
   fs.next(map);
-  // if (map->update_map() && should_fix()) InstanceStackChunkKlass::fix_frame<true, false>(fs, map);
+
   if (!fs.is_done()) {
     frame sender = fs.to_frame();
     assert (is_usable_in_chunk(sender.unextended_sp()), "");
@@ -157,7 +158,7 @@ MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_stack_to_chunk = nullptr;
 MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_chunk_to_stack = nullptr;
 
 void InstanceStackChunkKlass::resolve_memcpy_functions() {
-  if (UseNewCode) {
+  if (!StubRoutines::has_word_memcpy() || UseNewCode) {
     // tty->print_cr(">> Config memcpy: default");
     memcpy_fn_from_stack_to_chunk = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
     memcpy_fn_from_chunk_to_stack = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;

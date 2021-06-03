@@ -30,7 +30,7 @@ package jdk.internal.event;
  */
 
 public final class ThreadSleepEvent extends Event {
-    private final static ThreadSleepEvent EVENT = new ThreadSleepEvent();
+    private static final ThreadSleepEvent EVENT = new ThreadSleepEvent();
 
 	/**
 	 * Returns {@code true} if event is enabled, {@code false} otherwise.

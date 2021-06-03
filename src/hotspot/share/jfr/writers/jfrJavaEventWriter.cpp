@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -109,7 +109,7 @@ static bool setup_event_writer_offsets(TRAPS) {
 bool JfrJavaEventWriter::initialize() {
   static bool initialized = false;
   if (!initialized) {
-    initialized = setup_event_writer_offsets(Thread::current());
+    initialized = setup_event_writer_offsets(JavaThread::current());
   }
   return initialized;
 }
@@ -192,7 +192,7 @@ static jobject create_new_event_writer(JfrBuffer* buffer, TRAPS) {
   return result.get_jobject();
 }
 
-jobject JfrJavaEventWriter::event_writer(Thread* t, traceid tid /* 0 */) {
+jobject JfrJavaEventWriter::event_writer(JavaThread* t, traceid tid /* 0 */) {
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(t));
   JfrThreadLocal* const tl = t->jfr_thread_local();
   assert(tl->shelved_buffer() == NULL, "invariant");

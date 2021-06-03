@@ -99,6 +99,7 @@ address StubRoutines::_jlong_disjoint_arraycopy          = CAST_FROM_FN_PTR(addr
 address StubRoutines::_oop_disjoint_arraycopy            = CAST_FROM_FN_PTR(address, StubRoutines::oop_copy);
 address StubRoutines::_oop_disjoint_arraycopy_uninit     = CAST_FROM_FN_PTR(address, StubRoutines::oop_copy_uninit);
 
+bool    StubRoutines::_has_word_memcpy             = false;
 address StubRoutines::_word_memcpy_up              = NULL; // CAST_FROM_FN_PTR(address, StubRoutines::jint_copy);
 address StubRoutines::_word_memcpy_down            = NULL; // CAST_FROM_FN_PTR(address, StubRoutines::jint_copy);
 address StubRoutines::_word_memcpy_up_nt           = NULL; // CAST_FROM_FN_PTR(address, StubRoutines::jint_copy);

@@ -1121,12 +1121,12 @@ void nmethod::fix_oop_relocations(address begin, address end, bool initialize_im
 
 
 void nmethod::make_deoptimized() {
+  assert (method() == NULL || can_be_deoptimized(), "");
+
   CompiledICLocker ml(this);
   assert(CompiledICLocker::is_safe(this), "mt unsafe call");
   ResourceMark rm;
   RelocIterator iter(this, oops_reloc_begin());
-
-  assert (can_be_deoptimized(), "");
 
   while(iter.next()) {
 
@@ -1223,15 +1223,7 @@ bool nmethod::is_not_on_continuation_stack() {
   // after that concurrent GC. Each GC increments the marking cycle twice - once when
   // it starts and once when it ends. So we can only be sure there are no new continuations
   // when they have not been encountered from before a GC to after a GC.
-  bool not_on_new_vthread_stack = CodeCache::marking_cycle() >= align_up(_marking_cycle, 2) + 2;
-
-  // As for old vthread stacks, they are kept alive by a WeakHandle.
-  bool not_on_old_vthread_stack = false;
-  if (_keepalive != NULL) {
-    WeakHandle wh = WeakHandle::from_raw(_keepalive);
-    not_on_old_vthread_stack = wh.resolve() == NULL;
-  }
-  return not_on_new_vthread_stack && not_on_old_vthread_stack;
+  return CodeCache::marking_cycle() >= align_up(_marking_cycle, 2) + 2;
 }
 
 // Tell if a non-entrant method can be converted to a zombie (i.e.,
@@ -1857,10 +1849,10 @@ public:
 bool nmethod::is_unloading() {
   uint8_t state = RawAccess<MO_RELAXED>::load(&_is_unloading_state);
   bool state_is_unloading = IsUnloadingState::is_unloading(state);
-  uint8_t state_unloading_cycle = IsUnloadingState::unloading_cycle(state);
   if (state_is_unloading) {
     return true;
   }
+  uint8_t state_unloading_cycle = IsUnloadingState::unloading_cycle(state);
   uint8_t current_cycle = CodeCache::unloading_cycle();
   if (state_unloading_cycle == current_cycle) {
     return false;
@@ -1934,18 +1926,9 @@ void nmethod::do_unloading(bool unloading_occurred) {
   }
 }
 
-void nmethod::oops_do(OopClosure* f, bool allow_dead, bool allow_null, bool keepalive_is_strong) {
+void nmethod::oops_do(OopClosure* f, bool allow_dead, bool allow_null) {
   // make sure the oops ready to receive visitors
   assert(allow_dead || is_alive(), "should not call follow on dead nmethod");
-
-  if (keepalive_is_strong) {
-    if (_keepalive != NULL) {
-      WeakHandle wh = WeakHandle::from_raw(_keepalive);
-      if (wh.resolve() != NULL) {
-        f->do_oop(_keepalive);
-      }
-    }
-  }
 
   // Prevent extra code cache walk for platforms that don't have immediate oops.
   if (relocInfo::mustIterateImmediateOopsInCode()) {

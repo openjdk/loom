@@ -39,8 +39,8 @@ static void test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
 
   err = jvmti->GetStackTrace(vthread, 0, MAX_FRAME_COUNT, frames, &count);
   check_jvmti_status(jni, err, "GetStackTrace returns error.");
-  if (count < 0) {
-    LOG("Stacktrace in virtual thread is incorrect.\n");
+  if (count <= 0) {
+    LOG("Stacktrace in virtual thread is incorrect. count: %d\n", count);
     print_thread_info(jvmti, jni, vthread);
     print_stack_trace_frames(jvmti, jni, count, frames);
     fatal(jni, "Incorrect frame count.");

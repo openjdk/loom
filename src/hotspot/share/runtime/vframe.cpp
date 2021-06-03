@@ -22,6 +22,7 @@
  *
  */
 
+#include "oops/stackChunkOop.hpp"
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/javaThreadStatus.hpp"
@@ -54,15 +55,17 @@
 #include "runtime/vframe_hp.hpp"
 
 vframe::vframe(const frame* fr, const RegisterMap* reg_map, JavaThread* thread)
-: _reg_map(reg_map), _thread(thread) {
+: _reg_map(reg_map), _thread(thread), 
+  _chunk(Thread::current(), reg_map->stack_chunk()(), reg_map->stack_chunk().not_null()) {
   assert(fr != NULL, "must have frame");
   _fr = *fr;
 }
 
 vframe::vframe(const frame* fr, JavaThread* thread)
-: _reg_map(thread), _thread(thread) {
+: _reg_map(thread), _thread(thread), _chunk() {
   assert(fr != NULL, "must have frame");
   _fr = *fr;
+  assert (!_reg_map.in_cont(), "");
 }
 
 vframe* vframe::new_vframe(StackFrameStream& fst, JavaThread* thread) {
@@ -134,6 +137,12 @@ javaVFrame* vframe::java_sender() const {
   return NULL;
 }
 
+void vframe::restore_register_map() const {
+  if (_reg_map.stack_chunk()() != stack_chunk()) {
+    const_cast<vframe*>(this)->_reg_map.set_stack_chunk(stack_chunk());
+  }
+}
+
 // ------------- javaVFrame --------------
 
 GrowableArray<MonitorInfo*>* javaVFrame::locked_monitors() {
@@ -186,9 +195,9 @@ void javaVFrame::print_locked_object_class_name(outputStream* st, Handle obj, co
 }
 
 void javaVFrame::print_lock_info_on(outputStream* st, int frame_count) {
-  Thread* THREAD = Thread::current();
-  ResourceMark rm(THREAD);
-  HandleMark hm(THREAD);
+  Thread* current = Thread::current();
+  ResourceMark rm(current);
+  HandleMark hm(current);
 
   // If this is the first frame and it is java.lang.Object.wait(...)
   // then print out the receiver. Locals are not always available,
@@ -243,7 +252,7 @@ void javaVFrame::print_lock_info_on(outputStream* st, int frame_count) {
           Klass* k = java_lang_Class::as_Klass(monitor->owner_klass());
           st->print("\t- eliminated <owner is scalar replaced> (a %s)", k->external_name());
         } else {
-          Handle obj(THREAD, monitor->owner());
+          Handle obj(current, monitor->owner());
           if (obj() != NULL) {
             print_locked_object_class_name(st, obj, "eliminated");
           }
@@ -272,7 +281,7 @@ void javaVFrame::print_lock_info_on(outputStream* st, int frame_count) {
             lock_state = "waiting to lock";
           }
         }
-        print_locked_object_class_name(st, Handle(THREAD, monitor->owner()), lock_state);
+        print_locked_object_class_name(st, Handle(current, monitor->owner()), lock_state);
 
         found_first_monitor = true;
       }
@@ -283,16 +292,16 @@ void javaVFrame::print_lock_info_on(outputStream* st, int frame_count) {
 // ------------- interpretedVFrame --------------
 
 u_char* interpretedVFrame::bcp() const {
-  return (!register_map()->in_cont()) ? fr().interpreter_frame_bcp() : register_map()->stack_chunk()->interpreter_frame_bcp(fr());
+  return stack_chunk() == NULL ? fr().interpreter_frame_bcp() : stack_chunk()->interpreter_frame_bcp(fr());
 }
 
 void interpretedVFrame::set_bcp(u_char* bcp) {
-  assert (!register_map()->in_cont(), ""); // unsupported for now because seems to be unused
+  assert (stack_chunk() == NULL, ""); // unsupported for now because seems to be unused
   fr().interpreter_frame_set_bcp(bcp);
 }
 
 intptr_t* interpretedVFrame::locals_addr_at(int offset) const {
-  assert (!register_map()->in_cont(), ""); // unsupported for now because seems to be unused
+  assert (stack_chunk() == NULL, ""); // unsupported for now because seems to be unused
   assert(fr().is_interpreted_frame(), "frame should be an interpreted frame");
   return fr().interpreter_frame_local_at(offset);
 }
@@ -300,7 +309,7 @@ intptr_t* interpretedVFrame::locals_addr_at(int offset) const {
 
 GrowableArray<MonitorInfo*>* interpretedVFrame::monitors() const {
   GrowableArray<MonitorInfo*>* result = new GrowableArray<MonitorInfo*>(5);
-  if (!register_map()->in_cont()) { // no monitors in continuations
+  if (stack_chunk() == NULL) { // no monitors in continuations
     for (BasicObjectLock* current = (fr().previous_monitor_in_interpreter_frame(fr().interpreter_frame_monitor_begin()));
         current >= fr().interpreter_frame_monitor_end();
         current = fr().previous_monitor_in_interpreter_frame(current)) {
@@ -315,13 +324,14 @@ int interpretedVFrame::bci() const {
 }
 
 Method* interpretedVFrame::method() const {
-  return (!register_map()->in_cont()) ? fr().interpreter_frame_method() : register_map()->stack_chunk()->interpreter_frame_method(fr());
+  // assert ((stack_chunk() != NULL) == register_map()->in_cont(), "_in_cont: %d register_map()->in_cont(): %d", stack_chunk() != NULL, register_map()->in_cont());
+  return stack_chunk() == NULL ? fr().interpreter_frame_method() : stack_chunk()->interpreter_frame_method(fr());
 }
 
-static StackValue* create_stack_value_from_oop_map(const RegisterMap* reg_map,
-                                                   const InterpreterOopMap& oop_mask,
+static StackValue* create_stack_value_from_oop_map(const InterpreterOopMap& oop_mask,
                                                    int index,
-                                                   const intptr_t* const addr) {
+                                                   const intptr_t* const addr,
+                                                   stackChunkOop chunk) {
 
   assert(index >= 0 &&
          index < oop_mask.number_of_entries(), "invariant");
@@ -330,8 +340,8 @@ static StackValue* create_stack_value_from_oop_map(const RegisterMap* reg_map,
   if (oop_mask.is_oop(index)) {
     oop obj = NULL;
     if (addr != NULL) {
-      if (reg_map->in_cont()) {
-        obj = (reg_map->stack_chunk()->has_bitmap() && UseCompressedOops) ? (oop)HeapAccess<>::oop_load((narrowOop*)addr) : HeapAccess<>::oop_load((oop*)addr);
+      if (chunk != NULL) {
+        obj = (chunk->has_bitmap() && UseCompressedOops) ? (oop)HeapAccess<>::oop_load((narrowOop*)addr) : HeapAccess<>::oop_load((oop*)addr);
       } else {
         obj = *(oop*)addr;
       }
@@ -361,21 +371,21 @@ static void stack_locals(StackValueCollection* result,
                          int length,
                          const InterpreterOopMap& oop_mask,
                          const frame& fr,
-                         const RegisterMap* reg_map) {
+                         const stackChunkOop chunk) {
 
   assert(result != NULL, "invariant");
 
   for (int i = 0; i < length; ++i) {
     const intptr_t* addr;
-    if (!reg_map->in_cont()) {
+    if (chunk == NULL) {
       addr = fr.interpreter_frame_local_at(i);
       assert(addr >= fr.sp(), "must be inside the frame");
     } else {
-      addr = reg_map->stack_chunk()->interpreter_frame_local_at(fr, i);
+      addr = chunk->interpreter_frame_local_at(fr, i);
     }
     assert(addr != NULL, "invariant");
 
-    StackValue* const sv = create_stack_value_from_oop_map(reg_map, oop_mask, i, addr);
+    StackValue* const sv = create_stack_value_from_oop_map(oop_mask, i, addr, chunk);
     assert(sv != NULL, "sanity check");
 
     result->add(sv);
@@ -387,13 +397,13 @@ static void stack_expressions(StackValueCollection* result,
                               int max_locals,
                               const InterpreterOopMap& oop_mask,
                               const frame& fr,
-                              const RegisterMap* reg_map) {
+                              const stackChunkOop chunk) {
 
   assert(result != NULL, "invariant");
 
   for (int i = 0; i < length; ++i) {
     const intptr_t* addr;
-    if (!reg_map->in_cont()) {
+    if (chunk == NULL) {
       addr = fr.interpreter_frame_expression_stack_at(i);
       assert(addr != NULL, "invariant");
       if (!is_in_expression_stack(fr, addr)) {
@@ -401,13 +411,13 @@ static void stack_expressions(StackValueCollection* result,
         addr = NULL;
       }
     } else {
-      addr = reg_map->stack_chunk()->interpreter_frame_expression_stack_at(fr, i);
+      addr = chunk->interpreter_frame_expression_stack_at(fr, i);
     }
 
-    StackValue* const sv = create_stack_value_from_oop_map(reg_map,
-                                                           oop_mask,
+    StackValue* const sv = create_stack_value_from_oop_map(oop_mask,
                                                            i + max_locals,
-                                                           addr);
+                                                           addr,
+                                                           chunk);
     assert(sv != NULL, "sanity check");
 
     result->add(sv);
@@ -456,9 +466,9 @@ StackValueCollection* interpretedVFrame::stack_data(bool expressions) const {
   }
 
   if (expressions) {
-    stack_expressions(result, length, max_locals, oop_mask, fr(), register_map());
+    stack_expressions(result, length, max_locals, oop_mask, fr(), stack_chunk());
   } else {
-    stack_locals(result, length, oop_mask, fr(), register_map());
+    stack_locals(result, length, oop_mask, fr(), stack_chunk());
   }
 
   assert(length == result->size(), "invariant");

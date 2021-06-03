@@ -630,7 +630,7 @@ JVM_GetNestHost(JNIEnv *env, jclass current);
 JNIEXPORT jobjectArray JNICALL
 JVM_GetNestMembers(JNIEnv *env, jclass current);
 
-/* Records - since JDK 14 */
+/* Records - since JDK 16 */
 
 JNIEXPORT jboolean JNICALL
 JVM_IsRecord(JNIEnv *env, jclass cls);
@@ -638,7 +638,7 @@ JVM_IsRecord(JNIEnv *env, jclass cls);
 JNIEXPORT jobjectArray JNICALL
 JVM_GetRecordComponents(JNIEnv *env, jclass ofClass);
 
-/* Sealed types - since JDK 15 */
+/* Sealed classes - since JDK 17 */
 
 JNIEXPORT jobjectArray JNICALL
 JVM_GetPermittedSubclasses(JNIEnv *env, jclass current);

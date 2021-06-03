@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <?xml-stylesheet type="text/xsl" href="jvmti.xsl"?>
 <!--
- Copyright (c) 2002, 2020, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2002, 2021, Oracle and/or its affiliates. All rights reserved.
  DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 
  This code is free software; you can redistribute it and/or modify it
@@ -1133,10 +1133,13 @@ jvmtiEnv *jvmti;
         These functions provide information about threads and allow an agent to
         suspend and resume threads.
         <p/>
-        The <code>jthread</code> specified to these functions can be a JNI reference
-        to a platform or virtual Thread object. Some functions are not supported on
-        virtual threads and return <code>JVMTI_ERROR_INVALID_THREAD</code> when
-        called with a reference to a virtual thread.
+        The <code>jthread</code> specified to these functions can be a JNI
+        reference to a
+        <externallink id="../api/java.base/java/lang/Thread.html#platform-threads">platform thread</externallink>
+        or <externallink id="../api/java.base/java/lang/Thread.html#virtual-threads">virtual thread</externallink>.
+        Some functions are not supported on virtual threads and return
+        <code>JVMTI_ERROR_INVALID_THREAD</code> when called with a reference
+        to a virtual thread.
     </intro>
 
     <function id="GetThreadState" num="17">
@@ -1524,7 +1527,7 @@ jvmtiEnv *jvmti;
     <function id="GetAllThreads" num="4">
       <synopsis>Get All Threads</synopsis>
       <description>
-        Get all live threads that are attached to the VM.
+        Get all live platform threads that are attached to the VM.
         The list of threads includes
         <internallink id="RunAgentThread">agent threads</internallink>.
         It does not include virtual threads.
@@ -1892,7 +1895,7 @@ jvmtiEnv *jvmti;
     <function id="StopThread" num="7">
       <synopsis>Stop Thread</synopsis>
       <description>
-        Send the specified asynchronous exception to the specified thread.
+        Send the specified asynchronous exception to the specified platform thread.
         Normally, this function is used to kill the specified thread with an
         instance of the exception <code>ThreadDeath</code>, similar to
         <code>java.lang.Thread.stop</code>.
@@ -1906,7 +1909,9 @@ jvmtiEnv *jvmti;
           <jthread/>
             <description>
               The thread to stop.
-            </description>
+              The <code>thread</code> may not be a virtual thread. Otherwise, the error code
+              <errorlink id="JVMTI_ERROR_INVALID_THREAD"></errorlink> will be returned.
+             </description>
         </param>
         <param id="exception">
           <jobject/>
@@ -1916,6 +1921,9 @@ jvmtiEnv *jvmti;
         </param>
       </parameters>
       <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
+        </error>
       </errors>
     </function>
 
@@ -2221,7 +2229,9 @@ jvmtiEnv *jvmti;
           <jthread impl="noconvert" started="no"/>
             <description>
               The thread to run.
-            </description>
+              The <code>thread</code> may not be a virtual thread. Otherwise, the error code
+              <errorlink id="JVMTI_ERROR_INVALID_THREAD"></errorlink> will be returned.
+             </description>
         </param>
         <param id="proc">
           <ptrtype>
@@ -2250,14 +2260,14 @@ jvmtiEnv *jvmti;
         </param>
       </parameters>
       <errors>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="thread"/> is not a thread object or is a virtual thread.
-        </error>
         <error id="JVMTI_ERROR_INVALID_PRIORITY">
             <paramlink id="priority"/> is less than
             <datalink id="JVMTI_THREAD_MIN_PRIORITY"/>
               or greater than
             <datalink id="JVMTI_THREAD_MAX_PRIORITY"/>
+        </error>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
         </error>
       </errors>
     </function>
@@ -2425,9 +2435,9 @@ jvmtiEnv *jvmti;
     <function id="GetThreadGroupChildren" num="15">
       <synopsis>Get Thread Group Children</synopsis>
       <description>
-        Get the live threads and the child thread groups in this thread group.
-        Virtual threads are not considered live threads in a thread group
-        and not returned by this function.
+        Get the live platform threads and the child thread groups in this
+        thread group.  Virtual threads are not considered live threads in
+        a thread group and not returned by this function.
       </description>
       <origin>jvmdi</origin>
       <capabilities>
@@ -2647,7 +2657,7 @@ if (err == JVMTI_ERROR_NONE &amp;&amp; count &gt;= 1) {
     <function id="GetAllStackTraces" num="100">
       <synopsis>Get All Stack Traces</synopsis>
       <description>
-        Get the stack traces of all live threads attached to the VM.
+        Get the stack traces of all live platform threads attached to the VM.
         The list includes the stack traces of
         <internallink id="RunAgentThread">agent threads</internallink>.
         It does not include the stack traces of virtual threads.
@@ -2950,6 +2960,8 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
           <jthread/>
             <description>
               The thread whose current frame is to be popped.
+              The <code>thread</code> may not be a virtual thread. Otherwise, the error code
+              <errorlink id="JVMTI_ERROR_INVALID_THREAD"></errorlink> will be returned.
             </description>
         </param>
       </parameters>
@@ -2963,6 +2975,9 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         </error>
         <error id="JVMTI_ERROR_NO_MORE_FRAMES">
           There are less than two stack frames on the call stack.
+        </error>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
         </error>
       </errors>
     </function>
@@ -3064,6 +3079,8 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       for the specified thread at
       the time the function is called.
       <p/>
+      The <code>thread</code> may not be a virtual thread. Otherwise, the error code
+      <errorlink id="JVMTI_ERROR_INVALID_THREAD"></errorlink> will be returned.
       The specified thread must be suspended or must be the current thread.
       The return occurs when execution of Java programming
       language code is resumed on this thread.
@@ -3131,6 +3148,9 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
           The supplied <paramlink id="value"/> is not compatible with the
           result type of the called method.
         </error>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
+        </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
         </error>
@@ -3179,6 +3199,9 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
           <code>char</code>, <code>byte</code>, or
           <code>boolean</code>.
         </error>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
+        </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
         </error>
@@ -3221,6 +3244,9 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         </error>
         <error id="JVMTI_ERROR_TYPE_MISMATCH">
           The result type of the called method is not <code>long</code>.
+        </error>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
         </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
@@ -3265,6 +3291,9 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         <error id="JVMTI_ERROR_TYPE_MISMATCH">
           The result type of the called method is not <code>float</code>.
         </error>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
+        </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
         </error>
@@ -3306,6 +3335,9 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         <error id="JVMTI_ERROR_TYPE_MISMATCH">
           The result type of the called method is not <code>double</code>.
         </error>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
+        </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
         </error>
@@ -3342,6 +3374,9 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         </error>
         <error id="JVMTI_ERROR_TYPE_MISMATCH">
           The called method has a result type.
+        </error>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
         </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
@@ -10900,6 +10935,8 @@ myInit() {
             the current thread (see
             <functionlink id="GetCurrentThreadCpuTimerInfo"/> vs
             <functionlink id="GetThreadCpuTimerInfo"/>).
+            The current thread may not be a virtual thread. Otherwise, the error code
+            <errorlink id="JVMTI_ERROR_INVALID_THREAD"></errorlink> will be returned.
             On many platforms this call will be equivalent to:
 <example>
   GetThreadCpuTime(env, NULL, nanos_ptr)
@@ -10933,6 +10970,9 @@ myInit() {
         </param>
       </parameters>
       <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          Current thread is a virtual thread.
+        </error>
       </errors>
     </function>
 
@@ -10997,7 +11037,9 @@ myInit() {
           <jthread null="current"/>
             <description>
               The thread to query.
-            </description>
+              The <code>thread</code> may not be a virtual thread. Otherwise, the error code
+               <errorlink id="JVMTI_ERROR_INVALID_THREAD"></errorlink> will be returned.
+             </description>
         </param>
         <param id="nanos_ptr">
           <outptr><jlong/></outptr>
@@ -11010,6 +11052,9 @@ myInit() {
         </param>
       </parameters>
       <errors>
+        <error id="JVMTI_ERROR_INVALID_THREAD">
+          <paramlink id="thread"/> is a virtual thread.
+        </error>
       </errors>
     </function>
 

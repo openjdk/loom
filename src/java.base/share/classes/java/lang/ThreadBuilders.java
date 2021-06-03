@@ -42,7 +42,7 @@ class ThreadBuilders {
     /**
      * Base implementation of ThreadBuilder.
      */
-    private static abstract
+    static abstract non-sealed
     class BaseThreadBuilder<T extends Builder> implements Builder {
         private String name;
         private long counter;
@@ -136,7 +136,7 @@ class ThreadBuilders {
     /**
      * ThreadBuilder.OfPlatform implementation.
      */
-    static class PlatformThreadBuilder
+    static final class PlatformThreadBuilder
             extends BaseThreadBuilder<OfPlatform> implements OfPlatform {
         private ThreadGroup group;
         private boolean daemon;
@@ -205,7 +205,7 @@ class ThreadBuilders {
     /**
      * ThreadBuilder.OfVirtual implementation.
      */
-    static class VirtualThreadBuilder
+    static final class VirtualThreadBuilder
             extends BaseThreadBuilder<OfVirtual> implements OfVirtual {
         private Executor scheduler;
 

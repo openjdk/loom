@@ -92,13 +92,14 @@ JDWP "Java(tm) Debug Wire Protocol"
         )
     )
     (Command AllThreads=4
-        "Returns the live platform threads in the target VM. "
-        "The returned list contains all live platform threads that are attached "
-        "to the VM. It does not contain virtual threads. "
-        "The returned list contains platform threads created with the java.lang.Thread "
-        "API and all native threads attached to the target VM through JNI. "
+        "Returns the live "
+        "<a href=../../api/java.base/java/lang/Thread.html#platform-threads>platform threads</a> "
+        "in the target VM. The returned list contains platform threads created with "
+        "the java.lang.Thread API and all native threads attached to the target VM "
+        " through JNI. It does not contain "
+        "<a href=../../api/java.base/java/lang/Thread.html#virtual-threads>virtual threads</a>. "
         "Threads that have not yet been started and threads that have completed "
-        "their execution are not included in the returned list."
+        "their execution are also not included in the returned list."
         (Out
         )
         (Reply
@@ -2141,7 +2142,8 @@ JDWP "Java(tm) Debug Wire Protocol"
         )
     )
     (Command IsVirtual=15
-        "Determine if a thread is a virtual thread."
+        "Determine if a thread is a "
+        "<a href=../../api/java.base/java/lang/Thread.html#virtual-threads>virtual thread</a>."
         (Out
             (threadObject thread "The thread object ID.")
         )

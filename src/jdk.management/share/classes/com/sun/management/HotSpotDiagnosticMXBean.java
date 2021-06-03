@@ -144,7 +144,6 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      *         access to the file or {@link java.lang.management.ManagementPermission
      *         ManagementPermission("control")} is denied.
      * @since 99
-     * @see Threads#virtualThreads()
      */
     default void dumpThreads(String outputFile, ThreadDumpFormat format) throws IOException {
         throw new UnsupportedOperationException();

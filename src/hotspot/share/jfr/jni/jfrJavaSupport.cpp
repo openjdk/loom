@@ -50,21 +50,21 @@
 #include "classfile/vmSymbols.hpp"
 
 #ifdef ASSERT
-static void check_java_thread_state(Thread* t, JavaThreadState state) {
+static void check_java_thread_state(JavaThread* t, JavaThreadState state) {
   assert(t != NULL, "invariant");
   assert(t->is_Java_thread(), "invariant");
-  assert(((JavaThread*)t)->thread_state() == state, "invariant");
+  assert(t->thread_state() == state, "invariant");
 }
 
-void JfrJavaSupport::check_java_thread_in_vm(Thread* t) {
+void JfrJavaSupport::check_java_thread_in_vm(JavaThread* t) {
   check_java_thread_state(t, _thread_in_vm);
 }
 
-void JfrJavaSupport::check_java_thread_in_native(Thread* t) {
+void JfrJavaSupport::check_java_thread_in_native(JavaThread* t) {
   check_java_thread_state(t, _thread_in_native);
 }
 
-void JfrJavaSupport::check_java_thread_in_java(Thread* t) {
+void JfrJavaSupport::check_java_thread_in_java(JavaThread* t) {
   check_java_thread_state(t, _thread_in_Java);
 }
 
@@ -77,12 +77,12 @@ static void check_new_unstarted_java_thread(JavaThread* jt, jobject vthread = NU
 /*
  *  Handles and references
  */
-jobject JfrJavaSupport::local_jni_handle(const oop obj, Thread* t) {
+jobject JfrJavaSupport::local_jni_handle(const oop obj, JavaThread* t) {
   DEBUG_ONLY(check_java_thread_in_vm(t));
   return t->active_handles()->allocate_handle(obj);
 }
 
-jobject JfrJavaSupport::local_jni_handle(const jobject handle, Thread* t) {
+jobject JfrJavaSupport::local_jni_handle(const jobject handle, JavaThread* t) {
   DEBUG_ONLY(check_java_thread_in_vm(t));
   const oop obj = JNIHandles::resolve(handle);
   return obj == NULL ? NULL : local_jni_handle(obj, t);
@@ -92,13 +92,13 @@ void JfrJavaSupport::destroy_local_jni_handle(jobject handle) {
   JNIHandles::destroy_local(handle);
 }
 
-jobject JfrJavaSupport::global_jni_handle(const oop obj, Thread* t) {
+jobject JfrJavaSupport::global_jni_handle(const oop obj, JavaThread* t) {
   DEBUG_ONLY(check_java_thread_in_vm(t));
   HandleMark hm(t);
   return JNIHandles::make_global(Handle(t, obj));
 }
 
-jobject JfrJavaSupport::global_jni_handle(const jobject handle, Thread* t) {
+jobject JfrJavaSupport::global_jni_handle(const jobject handle, JavaThread* t) {
   const oop obj = JNIHandles::resolve(handle);
   return obj == NULL ? NULL : global_jni_handle(obj, t);
 }
@@ -107,13 +107,13 @@ void JfrJavaSupport::destroy_global_jni_handle(jobject handle) {
   JNIHandles::destroy_global(handle);
 }
 
-jweak JfrJavaSupport::global_weak_jni_handle(const oop obj, Thread* t) {
+jweak JfrJavaSupport::global_weak_jni_handle(const oop obj, JavaThread* t) {
   DEBUG_ONLY(check_java_thread_in_vm(t));
   HandleMark hm(t);
   return JNIHandles::make_weak_global(Handle(t, obj));
 }
 
-jweak JfrJavaSupport::global_weak_jni_handle(const jobject handle, Thread* t) {
+jweak JfrJavaSupport::global_weak_jni_handle(const jobject handle, JavaThread* t) {
   const oop obj = JNIHandles::resolve(handle);
   return obj == NULL ? NULL : global_weak_jni_handle(obj, t);
 }
@@ -147,7 +147,7 @@ void JfrJavaSupport::notify_all(jobject object, TRAPS) {
   HandleMark hm(THREAD);
   Handle h_obj(THREAD, resolve_non_null(object));
   assert(h_obj.not_null(), "invariant");
-  ObjectSynchronizer::jni_enter(h_obj, THREAD->as_Java_thread());
+  ObjectSynchronizer::jni_enter(h_obj, THREAD);
   ObjectSynchronizer::notifyall(h_obj, THREAD);
   ObjectSynchronizer::jni_exit(h_obj(), THREAD);
   DEBUG_ONLY(check_java_thread_in_vm(THREAD));
@@ -204,7 +204,7 @@ static void create_object(JfrJavaArguments* args, JavaValue* result, TRAPS) {
   }
 }
 
-static void handle_result(JavaValue* result, bool global_ref, Thread* t) {
+static void handle_result(JavaValue* result, bool global_ref, JavaThread* t) {
   assert(result != NULL, "invariant");
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(t));
   const oop result_oop = result->get_oop();
@@ -283,7 +283,7 @@ jobject JfrJavaSupport::new_java_lang_Long(jlong value, TRAPS) {
   return args.result()->get_jobject();
 }
 
-void JfrJavaSupport::set_array_element(jobjectArray arr, jobject element, int index, Thread* t) {
+void JfrJavaSupport::set_array_element(jobjectArray arr, jobject element, int index, JavaThread* t) {
   assert(arr != NULL, "invariant");
   DEBUG_ONLY(check_java_thread_in_vm(t));
   HandleMark hm(t);
@@ -496,7 +496,7 @@ Klass* JfrJavaSupport::klass(const jobject handle) {
 }
 
 // caller needs ResourceMark
-const char* JfrJavaSupport::c_str(oop string, Thread* t) {
+const char* JfrJavaSupport::c_str(oop string, JavaThread* t) {
   DEBUG_ONLY(check_java_thread_in_vm(t));
   char* resource_copy = NULL;
   const typeArrayOop value = java_lang_String::value(string);
@@ -514,7 +514,7 @@ const char* JfrJavaSupport::c_str(oop string, Thread* t) {
 }
 
 // caller needs ResourceMark
-const char* JfrJavaSupport::c_str(jstring string, Thread* t) {
+const char* JfrJavaSupport::c_str(jstring string, JavaThread* t) {
   DEBUG_ONLY(check_java_thread_in_vm(t));
   return string != NULL ? c_str(resolve_non_null(string), t) : NULL;
 }
@@ -553,7 +553,7 @@ void JfrJavaSupport::throw_runtime_exception(const char* message, TRAPS) {
   create_and_throw(vmSymbols::java_lang_RuntimeException(), message, THREAD);
 }
 
-void JfrJavaSupport::abort(jstring errorMsg, Thread* t) {
+void JfrJavaSupport::abort(jstring errorMsg, JavaThread* t) {
   DEBUG_ONLY(check_java_thread_in_vm(t));
 
   ResourceMark rm(t);
@@ -566,7 +566,7 @@ void JfrJavaSupport::abort(jstring errorMsg, Thread* t) {
 }
 
 JfrJavaSupport::CAUSE JfrJavaSupport::_cause = JfrJavaSupport::VM_ERROR;
-void JfrJavaSupport::set_cause(jthrowable throwable, Thread* t) {
+void JfrJavaSupport::set_cause(jthrowable throwable, JavaThread* t) {
   DEBUG_ONLY(check_java_thread_in_vm(t));
 
   HandleMark hm(t);
@@ -598,7 +598,7 @@ void JfrJavaSupport::set_cause(jthrowable throwable, Thread* t) {
   }
 }
 
-void JfrJavaSupport::uncaught_exception(jthrowable throwable, Thread* t) {
+void JfrJavaSupport::uncaught_exception(jthrowable throwable, JavaThread* t) {
   DEBUG_ONLY(check_java_thread_in_vm(t));
   assert(throwable != NULL, "invariant");
   set_cause(throwable, t);
@@ -692,7 +692,7 @@ static int add_thread_to_exclusion_list(jobject thread) {
   }
   assert(exclusion_list != NULL, "invariant");
   assert(thread_is_not_excluded(thread), "invariant");
-  jweak ref = JfrJavaSupport::global_weak_jni_handle(thread, Thread::current());
+  jweak ref = JfrJavaSupport::global_weak_jni_handle(thread, JavaThread::current());
   const int idx = exclusion_list->append(ref);
   assert(is_thread_excluded(thread), "invariant");
   return idx;

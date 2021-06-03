@@ -236,7 +236,7 @@ JvmtiEnv::GetAllModules(jint* module_count_ptr, jobject** modules_ptr) {
 // module_ptr - pre-checked for NULL
 jvmtiError
 JvmtiEnv::GetNamedModule(jobject class_loader, const char* package_name, jobject* module_ptr) {
-  JavaThread* THREAD = JavaThread::current(); // pass to macros
+  JavaThread* THREAD = JavaThread::current(); // For exception macros.
   ResourceMark rm(THREAD);
 
   Handle h_loader (THREAD, JNIHandles::resolve(class_loader));
@@ -254,7 +254,7 @@ JvmtiEnv::GetNamedModule(jobject class_loader, const char* package_name, jobject
 // to_module - pre-checked for NULL
 jvmtiError
 JvmtiEnv::AddModuleReads(jobject module, jobject to_module) {
-  JavaThread* THREAD = JavaThread::current();
+  JavaThread* THREAD = JavaThread::current(); // For exception macros.
 
   // check module
   Handle h_module(THREAD, JNIHandles::resolve(module));
@@ -275,7 +275,7 @@ JvmtiEnv::AddModuleReads(jobject module, jobject to_module) {
 // to_module - pre-checked for NULL
 jvmtiError
 JvmtiEnv::AddModuleExports(jobject module, const char* pkg_name, jobject to_module) {
-  JavaThread* THREAD = JavaThread::current();
+  JavaThread* THREAD = JavaThread::current(); // For exception macros.
   Handle h_pkg = java_lang_String::create_from_str(pkg_name, THREAD);
 
   // check module
@@ -297,7 +297,7 @@ JvmtiEnv::AddModuleExports(jobject module, const char* pkg_name, jobject to_modu
 // to_module - pre-checked for NULL
 jvmtiError
 JvmtiEnv::AddModuleOpens(jobject module, const char* pkg_name, jobject to_module) {
-  JavaThread* THREAD = JavaThread::current();
+  JavaThread* THREAD = JavaThread::current(); // For exception macros.
   Handle h_pkg = java_lang_String::create_from_str(pkg_name, THREAD);
 
   // check module
@@ -318,7 +318,7 @@ JvmtiEnv::AddModuleOpens(jobject module, const char* pkg_name, jobject to_module
 // service - pre-checked for NULL
 jvmtiError
 JvmtiEnv::AddModuleUses(jobject module, jclass service) {
-  JavaThread* THREAD = JavaThread::current();
+  JavaThread* THREAD = JavaThread::current(); // For exception macros.
 
   // check module
   Handle h_module(THREAD, JNIHandles::resolve(module));
@@ -340,7 +340,7 @@ JvmtiEnv::AddModuleUses(jobject module, jclass service) {
 // impl_class - pre-checked for NULL
 jvmtiError
 JvmtiEnv::AddModuleProvides(jobject module, jclass service, jclass impl_class) {
-  JavaThread* THREAD = JavaThread::current();
+  JavaThread* THREAD = JavaThread::current(); // For exception macros.
 
   // check module
   Handle h_module(THREAD, JNIHandles::resolve(module));
@@ -366,10 +366,10 @@ JvmtiEnv::AddModuleProvides(jobject module, jclass service, jclass impl_class) {
 // is_modifiable_class_ptr - pre-checked for NULL
 jvmtiError
 JvmtiEnv::IsModifiableModule(jobject module, jboolean* is_modifiable_module_ptr) {
-  JavaThread* THREAD = JavaThread::current();
+  JavaThread* current = JavaThread::current();
 
   // check module
-  Handle h_module(THREAD, JNIHandles::resolve(module));
+  Handle h_module(current, JNIHandles::resolve(module));
   if (!java_lang_Module::is_instance(h_module())) {
     return JVMTI_ERROR_INVALID_MODULE;
   }
@@ -699,7 +699,7 @@ JvmtiEnv::AddToSystemClassLoaderSearch(const char* segment) {
     // The phase is checked by the wrapper that called this function,
     // but this thread could be racing with the thread that is
     // terminating the VM so we check one more time.
-    JavaThread* THREAD = JavaThread::current();
+    JavaThread* THREAD = JavaThread::current(); // For exception macros.
     HandleMark hm(THREAD);
 
     // create the zip entry (which will open the zip file and hence
@@ -1215,16 +1215,40 @@ jvmtiError
 JvmtiEnv::InterruptThread(jthread thread) {
   JavaThread* current_thread  = JavaThread::current();
   JavaThread* java_thread = NULL;
+  oop thread_obj = NULL;
+  HandleMark hm(current_thread);
+
+  JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh(current_thread);
-  jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, NULL);
+
+  jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
+
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+#if 0
+    return JVMTI_ERROR_INVALID_THREAD;
+#else
+    Handle obj(current_thread, thread_obj);
+    JavaValue result(T_VOID);
+    JavaCalls::call_virtual(&result,
+                            obj,
+                            vmClasses::Thread_klass(),
+                            vmSymbols::interrupt_method_name(),
+                            vmSymbols::void_method_signature(),
+                            current_thread);
+
+    return JVMTI_ERROR_NONE;
+#endif
+  }
+
   // Really this should be a Java call to Thread.interrupt to ensure the same
   // semantics, however historically this has not been done for some reason.
   // So we continue with that (which means we don't interact with any Java-level
   // Interruptible object) but we must set the Java-level interrupted state.
-  java_lang_Thread::set_interrupted(JNIHandles::resolve(thread), true);
+  java_lang_Thread::set_interrupted(thread_obj, true);
   java_thread->interrupt();
 
   return JVMTI_ERROR_NONE;

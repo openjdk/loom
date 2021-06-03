@@ -26,12 +26,7 @@ package java.util.concurrent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.security.AccessController;
 import java.security.Permission;
-import java.security.PrivilegedAction;
-import java.security.PrivilegedExceptionAction;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -41,13 +36,19 @@ import java.util.Set;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
-import jdk.internal.misc.InnocuousThread;
+import java.util.stream.Stream;
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
+import jdk.internal.vm.ThreadContainer;
+import jdk.internal.vm.ThreadContainers;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
- * An ExecutorService that executes each task in its own thread.
+ * An ExecutorService that starts a new thread for each task. The number of
+ * threads is unbounded.
  */
-class ThreadExecutor implements ExecutorService {
+class ThreadExecutor implements ExecutorService, ThreadContainer {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final Permission MODIFY_THREAD = new RuntimePermission("modifyThread");
     private static final VarHandle STATE;
     static {
@@ -64,10 +65,7 @@ class ThreadExecutor implements ExecutorService {
     private final Condition terminationCondition = terminationLock.newCondition();
 
     private final ThreadFactory factory;
-    private final Future<?> timerTask;
-    private final Thread owner;
-    private final ThreadExecutor previous;
-    private boolean closed;  // true if closed by owner
+    private final Object registrationKey;
 
     // states: RUNNING -> SHUTDOWN -> TERMINATED
     private static final int RUNNING    = 0;
@@ -77,39 +75,32 @@ class ThreadExecutor implements ExecutorService {
 
     /**
      * Constructs a ThreadExecutor that creates threads using the given factory.
-     * If a deadline is specified then the executor will attempt to stop all tasks
-     * if the deadline is reached before the executor has terminated.
-     * The executor is optionally "owned" by the Thread that constructs it. The
-     * owner is the only Thread that can shutdown or close the executor.
-     *
-     * @param factory the thread factory
-     * @param deadline the deadline, null for no deadline
-     * @param owned true if owned by the caller thread
+     * The ThreadExecutor is optionally tracked.
      */
-    ThreadExecutor(ThreadFactory factory, Instant deadline, boolean owned) {
-        Objects.requireNonNull(factory);
-        Future<?> timer = null;
-        if (deadline != null) {
-            Duration timeout = Duration.between(Instant.now(), deadline);
-            if (timeout.isZero() || timeout.isNegative()) {
-                // deadline already reached
-                this.state = TERMINATED;
-            } else {
-                long nanos = NANOSECONDS.convert(timeout);
-                timer = TimerSupport.schedule(this::timeout, nanos, NANOSECONDS);
-            }
-        }
-
-        this.factory = factory;
-        this.timerTask = timer;
-        if (owned) {
-            Thread owner = Thread.currentThread();
-            this.owner = owner;
-            this.previous = ThreadFields.latestThreadExecutor(owner);
-            ThreadFields.setLatestThreadExecutor(this);
+    ThreadExecutor(ThreadFactory factory, boolean tracked) {
+        this.factory = Objects.requireNonNull(factory);
+        if (tracked) {
+            this.registrationKey = ThreadContainers.registerSharedContainer(this);
         } else {
-            this.owner = null;
-            this.previous = null;
+            this.registrationKey = null;
+        }
+    }
+
+    /**
+     * Constructs a ThreadExecutor that creates threads using the given factory.
+     */
+    ThreadExecutor(ThreadFactory factory) {
+        this(factory, true);
+    }
+
+    /**
+     * Throws SecurityException if there is a security manager set and it denies
+     * RuntimePermission("modifyThread").
+     */
+    void checkPermission() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(MODIFY_THREAD);
         }
     }
 
@@ -124,38 +115,13 @@ class ThreadExecutor implements ExecutorService {
     }
 
     /**
-     * Throws SecurityException if there is a security manager set and it denies
-     * RuntimePermission("modifyThread").
-     */
-    private void checkPermission() {
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(new RuntimePermission("modifyThread"));
-        }
-    }
-
-    /**
-     * Throws IllegalCallerException is owned but not owned by this thread.
-     */
-    private void checkOwner() {
-        if (owner != null && owner != Thread.currentThread())
-            throw new IllegalCallerException("Not owned by this thread");
-    }
-
-    /**
-     * Sets the state to TERMINATED if there are no remaining threads
-     * and signals any threads waiting for termination.
+     * Attempts to terminate if already shutdown. If this method terminates the
+     * executor then it signals any threads that are waiting for termination.
      */
     private void tryTerminate() {
         assert state >= SHUTDOWN;
         if (threads.isEmpty()
             && STATE.compareAndSet(this, SHUTDOWN, TERMINATED)) {
-
-            // cancel timer
-            Future<?> timer = this.timerTask;
-            if (timer != null && !timer.isDone()) {
-                timer.cancel(false);
-            }
 
             // signal any waiters
             terminationLock.lock();
@@ -164,24 +130,39 @@ class ThreadExecutor implements ExecutorService {
             } finally {
                 terminationLock.unlock();
             }
+
+            // remove from registry if tracked
+            if (registrationKey != null) {
+                ThreadContainers.deregisterSharedContainer(registrationKey);
+            }
         }
     }
 
     /**
-     * Attempt to shutdown and terminate the executor.
+     * Attempts to shutdown and terminate the executor.
      * If interruptThreads is true then all running threads are interrupted.
      */
-    private void tryShutdownAndTerminate(boolean interruptThreads) {
+    void tryShutdownAndTerminate(boolean interruptThreads) {
         if (STATE.compareAndSet(this, RUNNING, SHUTDOWN))
             tryTerminate();
-        if (interruptThreads)
+        if (interruptThreads) {
             threads.forEach(Thread::interrupt);
+        }
+    }
+
+    @Override
+    public long threadCount() {
+        return threads.size();
+    }
+
+    @Override
+    public Stream<Thread> threads() {
+        return threads.stream();
     }
 
     @Override
     public void shutdown() {
         checkPermission();
-        checkOwner();
         if (!isShutdown())
             tryShutdownAndTerminate(false);
     }
@@ -189,7 +170,6 @@ class ThreadExecutor implements ExecutorService {
     @Override
     public List<Runnable> shutdownNow() {
         checkPermission();
-        checkOwner();
         if (!isTerminated())
             tryShutdownAndTerminate(true);
         return List.of();
@@ -226,7 +206,7 @@ class ThreadExecutor implements ExecutorService {
     /**
      * Waits for executor to terminate.
      */
-    private void awaitTermination() {
+    void awaitTermination() {
         boolean terminated = isTerminated();
         if (!terminated) {
             tryShutdownAndTerminate(false);
@@ -250,43 +230,13 @@ class ThreadExecutor implements ExecutorService {
     @Override
     public void close() {
         checkPermission();
-
-        if (owner != null) {
-            if (owner != Thread.currentThread())
-                throw new IllegalCallerException("Not owned by this thread");
-            if (!closed && ThreadFields.latestThreadExecutor(owner) != this)
-                throw new IllegalStateException("close is out of order");
-        }
-
-        try {
-            awaitTermination();
-        } finally {
-            if (owner != null && !closed) {
-                // restore ref to previous executor
-                ThreadFields.setLatestThreadExecutor(previous);
-                closed = true;
-            }
-        }
-    }
-
-    /**
-     * Invoked when the timeout expires.
-     */
-    private void timeout() {
-        if (!isTerminated()) {
-            // timer task may need permission to interrupt threads
-            PrivilegedAction<Void> pa = () -> {
-                tryShutdownAndTerminate(true);
-                return null;
-            };
-            AccessController.doPrivileged(pa, null, MODIFY_THREAD);
-        }
+        awaitTermination();
     }
 
     /**
      * Creates a thread to run the given task.
      */
-    private Thread newThread(Runnable task) {
+    Thread newThread(Runnable task) {
         Thread thread = factory.newThread(task);
         if (thread == null)
             throw new RejectedExecutionException();
@@ -317,7 +267,7 @@ class ThreadExecutor implements ExecutorService {
         boolean started = false;
         try {
             if (state == RUNNING) {
-                thread.start();
+                JLA.start(thread, this);
                 started = true;
             }
         } finally {
@@ -667,53 +617,6 @@ class ThreadExecutor implements ExecutorService {
          */
         int exceptionCount() {
             return exceptionCount;
-        }
-    }
-
-    /**
-     * Encapsulates a ScheduledThreadPoolExecutor for scheduling tasks.
-     */
-    private static class TimerSupport {
-        private static final ScheduledThreadPoolExecutor STPE;
-        static {
-            STPE = new ScheduledThreadPoolExecutor(0, task -> {
-                Thread thread = InnocuousThread.newThread(task);
-                thread.setDaemon(true);
-                return thread;
-            });
-            STPE.setRemoveOnCancelPolicy(true);
-        }
-        static ScheduledFuture<?> schedule(Runnable task, long delay, TimeUnit unit) {
-            return STPE.schedule(task, delay, unit);
-        }
-    }
-
-    /**
-     * Provides access to Thread.latestThreadExecutor
-     */
-    private static class ThreadFields {
-        private static final VarHandle LATEST_THREAD_EXECUTOR;
-        static {
-            try {
-                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
-                    MethodHandles.privateLookupIn(Thread.class, MethodHandles.lookup());
-                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                LATEST_THREAD_EXECUTOR = l.findVarHandle(Thread.class, "latestThreadExecutor", Object.class);
-            } catch (Exception e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-        /**
-         * Sets the current thread's head node.
-         */
-        static void setLatestThreadExecutor(ThreadExecutor executor) {
-            LATEST_THREAD_EXECUTOR.setVolatile(Thread.currentThread(), executor);
-        }
-        /**
-         * Returns the given thread's head node.
-         */
-        static ThreadExecutor latestThreadExecutor(Thread thread) {
-            return (ThreadExecutor) LATEST_THREAD_EXECUTOR.getVolatile(thread);
         }
     }
 }

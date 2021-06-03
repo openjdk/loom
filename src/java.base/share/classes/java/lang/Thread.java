@@ -48,7 +48,9 @@ import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
+import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
+import jdk.internal.vm.annotation.Stable;
 import sun.nio.ch.Interruptible;
 import sun.security.util.SecurityConstants;
 
@@ -852,7 +854,12 @@ public class Thread implements Runnable {
      * @see Thread#ofVirtual()
      * @since 99
      */
-    public interface Builder {    // sealed, permits ...
+    public sealed interface Builder
+            permits Builder.OfPlatform,
+                    Builder.OfVirtual,
+                    ThreadBuilders.BaseThreadBuilder {
+
+
         /**
          * Sets the thread name.
          * @param name thread name
@@ -982,7 +989,9 @@ public class Thread implements Runnable {
          * @see Thread#ofPlatform()
          * @since 99
          */
-        interface OfPlatform extends Builder {
+        sealed interface OfPlatform extends Builder
+                permits ThreadBuilders.PlatformThreadBuilder {
+
             @Override OfPlatform name(String name);
             /** @throws IllegalArgumentException {@inheritDoc} */
             @Override OfPlatform name(String prefix, long start);
@@ -1051,7 +1060,9 @@ public class Thread implements Runnable {
          * @see Thread#ofVirtual()
          * @since 99
          */
-        interface OfVirtual extends Builder {
+        sealed interface OfVirtual extends Builder
+                permits ThreadBuilders.VirtualThreadBuilder {
+
             @Override OfVirtual name(String name);
             /** @throws IllegalArgumentException {@inheritDoc} */
             @Override OfVirtual name(String prefix, long start);
@@ -1484,18 +1495,26 @@ public class Thread implements Runnable {
      * @throws     java.util.concurrent.RejectedExecutionException if the thread
      *             is virtual and the scheduler cannot accept a task
      */
-    public synchronized void start() {
-        /**
-         * This method is not invoked for the main method thread or "system"
-         * group threads created/set up by the VM. Any new functionality added
-         * to this method in the future may have to also be added to the VM.
-         *
-         * A zero status value corresponds to state "NEW".
-         */
-        if (holder.threadStatus != 0)
-            throw new IllegalThreadStateException();
+    public void start() {
+        start(null);
+    }
 
-        start0();
+    /**
+     * Schedules this thread to begin execution in the given thread container.
+     *
+     * This method is not invoked for the main thread or other system threads
+     * created by the VM during startup.
+     */
+    void start(ThreadContainer container) {
+        synchronized (this) {
+            // zero status  corresponds to state "NEW".
+            if (holder.threadStatus != 0)
+                throw new IllegalThreadStateException();
+            // bind thread to container
+            if (container != null)
+                this.container = container;
+            start0();
+        }
     }
 
     private native void start0();
@@ -2286,20 +2305,24 @@ public class Thread implements Runnable {
     /**
      * Returns a string representation of this thread. The string representation
      * will usually include the thread's name. The default implementation for
-     * platform threads includes the thread's name, priority, and the name of
-     * the thread group.
+     * platform threads includes the thread's identifier, name, priority, and
+     * the name of the thread group.
      *
      * @return  a string representation of this thread.
      */
     public String toString() {
+        StringBuilder sb = new StringBuilder("Thread[#");
+        sb.append(getId());
+        sb.append(",");
+        sb.append(getName());
+        sb.append(",");
+        sb.append(getPriority());
+        sb.append(",");
         ThreadGroup group = getThreadGroup();
-        if (group != null) {
-            return "Thread[" + getName() + "," + getPriority() + "," +
-                           group.getName() + "]";
-        } else {
-            return "Thread[" + getName() + "," + getPriority() + "," +
-                            "" + "]";
-        }
+        if (group != null)
+            sb.append(group.getName());
+        sb.append("]");
+        return sb.toString();
     }
 
     /**
@@ -2326,15 +2349,17 @@ public class Thread implements Runnable {
      */
     @CallerSensitive
     public ClassLoader getContextClassLoader() {
-        if (contextClassLoader == null
-                || contextClassLoader == ClassLoaders.NOT_SUPPORTED)
+        ClassLoader cl = this.contextClassLoader;
+        if (cl == null)
             return null;
+        if (cl == ClassLoaders.NOT_SUPPORTED)
+            cl = ClassLoader.getSystemClassLoader();
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
-            ClassLoader.checkClassLoaderPermission(contextClassLoader,
-                                                   Reflection.getCallerClass());
+            Class<?> caller = Reflection.getCallerClass();
+            ClassLoader.checkClassLoaderPermission(cl, caller);
         }
-        return contextClassLoader;
+        return cl;
     }
 
     /**
@@ -3003,9 +3028,45 @@ public class Thread implements Runnable {
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
     int threadLocalRandomSecondarySeed;
 
-    // Used by java.util.concurrent.ThreadExecutor for thread confined executors
-    // (not a ThreadLocal as it may be accessed from other threads)
-    private volatile Object latestThreadExecutor;
+    /** The thread container that this thread is in */
+    @Stable private volatile ThreadContainer container;
+    ThreadContainer threadContainer() {
+        return container;
+    }
+    void setThreadContainer(ThreadContainer container) {
+        // assert this.container == null;
+        this.container = container;
+    }
+
+    /** The top of this stack of thread containers owned by this thread */
+    private volatile ThreadContainer headThreadContainer;
+    ThreadContainer headThreadContainer() {
+        return headThreadContainer;
+    }
+    void pushThreadContainer(ThreadContainer container) {
+        container.setPrevious(headThreadContainer);
+        headThreadContainer = container;
+    }
+    void popThreadContainer(ThreadContainer container) {
+        ThreadContainer head = headThreadContainer;
+        if (head == container) {
+            // restore ref to previous executor
+            headThreadContainer = head.previous();
+        } else {
+            // pop out of order, uncommon path
+            if (head == null)
+                throw new InternalError();
+            ThreadContainer next = head;
+            ThreadContainer current = head.previous();
+            while (current != container) {
+                if (current == null)
+                    throw new InternalError();
+                next = current;
+                current = current.previous();
+            }
+            next.setPrevious(current.previous());
+        }
+    }
 
     /* Some private helper methods */
     private native void setPriority0(int newPriority);

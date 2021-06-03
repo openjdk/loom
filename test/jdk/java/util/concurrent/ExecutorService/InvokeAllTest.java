@@ -78,8 +78,8 @@ public class InvokeAllTest {
 
             // implementations that may override invokeAll(Collection, boolean)
             { new ForkJoinPool(), },
-            { Executors.newUnownedThreadExecutor(defaultThreadFactory), },
-            { Executors.newUnownedThreadExecutor(virtualThreadFactory), },
+            { Executors.newThreadExecutor(defaultThreadFactory), },
+            { Executors.newThreadExecutor(virtualThreadFactory), },
         };
     }
 

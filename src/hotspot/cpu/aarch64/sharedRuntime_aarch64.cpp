@@ -28,6 +28,7 @@
 #include "asm/macroAssembler.hpp"
 #include "asm/macroAssembler.inline.hpp"
 #include "code/codeCache.hpp"
+#include "code/compiledIC.hpp"
 #include "code/debugInfoRec.hpp"
 #include "code/icBuffer.hpp"
 #include "code/vtableStubs.hpp"
@@ -1200,6 +1201,64 @@ static void verify_oop_args(MacroAssembler* masm,
   }
 }
 
+// defined in stubGenerator_aarch64.cpp
+OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots);
+void fill_continuation_entry(MacroAssembler* masm);
+void continuation_enter_cleanup(MacroAssembler* masm);
+
+// enterSpecial(Continuation c, boolean isContinue)
+// On entry: c_rarg1 -- the continuation object
+//           c_rarg2 -- isContinue
+static void gen_continuation_enter(MacroAssembler* masm,
+                                 const methodHandle& method,
+                                 const BasicType* sig_bt,
+                                 const VMRegPair* regs,
+                                 int& exception_offset,
+                                 OopMapSet*oop_maps,
+                                 int& frame_complete,
+                                 int& stack_slots) {
+  //verify_oop_args(masm, method, sig_bt, regs);
+  Address resolve(SharedRuntime::get_resolve_static_call_stub(), 
+                  relocInfo::static_call_type);
+
+  stack_slots = 2; // will be overwritten
+  address start = __ pc();
+
+  Label call_thaw, exit;
+
+  __ enter(); // push(rbp);
+
+  //BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
+  //bs->nmethod_entry_barrier(masm);
+  OopMap* map = continuation_enter_setup(masm, stack_slots);  // kills rax
+
+  // Frame is now completed as far as size and linkage.
+  frame_complete =__ pc() - start;
+
+  fill_continuation_entry(masm); // kills rax
+
+  address mark = __ pc();
+  
+  __ stop("LOOM AARCH64 gen_continuation_enter");
+
+  //__ call(resolve);
+  // __ mov(r13, sp);
+  // __ blr(c_rarg4);
+  
+  oop_maps->add_gc_map(__ pc() - start, map);
+  __ post_call_nop();
+
+  oop_maps->add_gc_map(__ pc() - start, map->deep_copy());
+  ContinuationEntry::return_pc_offset = __ pc() - start;
+  __ post_call_nop();
+
+  __ bind(exit);
+  continuation_enter_cleanup(masm);
+ 
+  CodeBuffer* cbuf = masm->code_section()->outer();
+  address stub = CompiledStaticCall::emit_to_interp_stub(*cbuf, mark);
+}
+
 static void gen_special_dispatch(MacroAssembler* masm,
                                  const methodHandle& method,
                                  const BasicType* sig_bt,
@@ -1282,6 +1341,37 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                                                 VMRegPair* in_regs,
                                                 BasicType ret_type,
                                                 address critical_entry) {
+  if (method->is_continuation_enter_intrinsic()) {
+    vmIntrinsics::ID iid = method->intrinsic_id();
+    intptr_t start = (intptr_t)__ pc();
+    int vep_offset = ((intptr_t)__ pc()) - start;
+    int exception_offset = 0;
+    int frame_complete = 0;
+    int stack_slots = 0;
+    OopMapSet* oop_maps =  new OopMapSet();
+    gen_continuation_enter(masm,
+                         method,
+                         in_sig_bt,
+                         in_regs,
+                         exception_offset,
+                         oop_maps,
+                         frame_complete,
+                         stack_slots);
+    __ flush();
+    nmethod* nm = nmethod::new_native_nmethod(method,
+                                              compile_id,
+                                              masm->code(),
+                                              vep_offset,
+                                              frame_complete,
+                                              stack_slots,
+                                              in_ByteSize(-1),
+                                              in_ByteSize(-1),
+                                              oop_maps,
+                                              exception_offset);
+    ContinuationEntry::set_enter_nmethod(nm);
+    return nm;
+  }
+
   if (method->is_method_handle_intrinsic()) {
     vmIntrinsics::ID iid = method->intrinsic_id();
     intptr_t start = (intptr_t)__ pc();
