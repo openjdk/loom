@@ -6068,7 +6068,8 @@ RuntimeStub* generate_cont_doYield() {
     address the_pc = __ pc();
 
     // TODO LOOM AARCH64
-
+    __ stop("LOOM AARCH64 generate_cont_doYield");
+    
     // return start;
 
     OopMap* map = new OopMap(framesize, 1);
@@ -6090,6 +6091,7 @@ RuntimeStub* generate_cont_doYield() {
     address start = __ pc();
 
     // TODO LOOM AARCH64
+    __ stop("LOOM AARCH64 generate_cont_jump_from_safepoint");
 
     return start;
   }
@@ -6100,6 +6102,7 @@ RuntimeStub* generate_cont_doYield() {
     address start = __ pc();
 
     // TODO LOOM AARCH64
+    __ stop("LOOM AARCH64 generate_cont_thaw");
 
     return start;
   }
@@ -6135,6 +6138,7 @@ RuntimeStub* generate_cont_doYield() {
       address start = __ pc();
 
       // TODO LOOM AARCH64
+      __ stop("LOOM AARCH64 generate_cont_interpreter_forced_preempt_return");
 
       return start;
     }
@@ -6142,17 +6146,31 @@ RuntimeStub* generate_cont_doYield() {
 #if INCLUDE_JFR
 
   static void jfr_set_last_java_frame(MacroAssembler* _masm, Register thread) {
-    // TODO LOOM AARCH64
+    Register last_java_pc = c_rarg0;
+    Register last_java_sp = c_rarg2;
+    __ ldr(last_java_pc, Address(sp, 0));
+    __ lea(last_java_sp, Address(sp, wordSize));
+    // __ vzeroupper();
+    Address anchor_java_pc(thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::last_Java_pc_offset());
+    __ str(last_java_pc, anchor_java_pc);
+    __ str(last_java_sp, Address(thread, JavaThread::last_Java_sp_offset()));
   }
 
   static void jfr_prologue(MacroAssembler* _masm, Register thread) {
     jfr_set_last_java_frame(_masm, thread);
-    // TODO LOOM AARCH64
+    __ mov(c_rarg0, rthread);
   }
 
   // Handle is dereference here using correct load constructs.
   static void jfr_epilogue(MacroAssembler* _masm, Register thread) {
-    // TODO LOOM AARCH64
+    __ reset_last_Java_frame(false);
+    Label null_jobject;
+    __ cmp(r0, zr);
+    __ br(Assembler::EQ, null_jobject);
+    DecoratorSet decorators = ACCESS_READ | IN_NATIVE;
+    BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
+    bs->load_at(_masm, decorators, T_OBJECT, r0, Address(r0, 0), rscratch1, rthread);
+    __ bind(null_jobject);
   }
 
   // For c2: c_rarg0 is junk, c_rarg1 is the thread id. Call to runtime to write a checkpoint.
@@ -6161,8 +6179,13 @@ RuntimeStub* generate_cont_doYield() {
   address generate_jfr_write_checkpoint() {
     StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
     address start = __ pc();
-    
-    // TODO LOOM AARCH64
+
+    __ enter();
+    jfr_prologue(_masm, rthread);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
+    jfr_epilogue(_masm, rthread);
+    __ leave();
+    __ ret(lr);
 
     return start;
   }
@@ -6173,7 +6196,12 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
     address start = __ pc();
 
-    // TODO LOOM AARCH64
+    __ enter();
+    jfr_prologue(_masm, rthread);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
+    jfr_epilogue(_masm, rthread);
+    __ leave();
+    __ ret(lr);
 
     return start;
   }
@@ -7367,34 +7395,69 @@ DEFAULT_ATOMIC_OP(cmpxchg, 8, _relaxed)
 #undef __
 #define __ masm->
 
-// on exit, rsp points to the ContinuationEntry
-// kills rax
+// on exit, sp points to the ContinuationEntry
 OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   assert (ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
   assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
   assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
 
-  // TODO LOOM AARCH64
+  stack_slots += (int)ContinuationEntry::size()/wordSize;
+  __ sub(sp, sp, (intptr_t)ContinuationEntry::size()); // place Continuation metadata
+
   OopMap* map = new OopMap(((int)ContinuationEntry::size() + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
   ContinuationEntry::setup_oopmap(map);
+
+  __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+  __ str(rscratch1, Address(sp, ContinuationEntry::parent_offset()));
+  __ mov(rscratch1, sp); // we can't use sp as the source in str
+  __ str(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
 
   return map;
 }
 
 // on entry c_rarg1 points to the continuation 
-//          rsp points to ContinuationEntry
+//          sp points to ContinuationEntry
 // kills rax
 void fill_continuation_entry(MacroAssembler* masm) {
-  __ stop("LOOM AARCH64 fill_continuation_entry");
-  // TODO LOOM AARCH64
+#ifdef ASSERT
+  __ movw(rscratch1, 0x1234);
+  __ strw(rscratch1, Address(sp, ContinuationEntry::cookie_offset()));
+#endif
+
+  __ str(c_rarg1, Address(sp, ContinuationEntry::cont_offset()));
+  __ str(zr, Address(sp, ContinuationEntry::chunk_offset()));
+  __ strw(zr, Address(sp, ContinuationEntry::argsize_offset()));
+
+  __ ldr(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
+  __ str(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
+  __ ldr(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
+  __ str(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
+  
+  __ str(zr, Address(rthread, JavaThread::cont_fastpath_offset()));
+  __ reset_held_monitor_count(rthread);
 }
 
-// on entry, rsp points to the ContinuationEntry
-// on exit, rsp points to the spilled rbp in the entry frame
-// kills rbx, rcx
+// on entry, sp points to the ContinuationEntry
+// on exit, sp points to the spilled rbp in the entry frame
 void continuation_enter_cleanup(MacroAssembler* masm) {
-  __ stop("LOOM AARCH64 continuation_enter_cleanup");
-  // TODO LOOM AARCH64
+#ifndef PRODUCT
+  Label OK;
+  __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+  __ cmp(sp, rscratch1);
+  __ br(Assembler::EQ, OK);
+  __ stop("incorrect sp1");
+  __ bind(OK);
+#endif
+  
+  __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
+  __ str(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
+  __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
+  __ str(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
+
+  __ ldr(rscratch2, Address(sp, ContinuationEntry::parent_offset()));
+  __ str(rscratch2, Address(rthread, JavaThread::cont_entry_offset()));
+  __ add(sp, sp, 2 * wordSize);
+  __ add(sp, sp, (intptr_t)ContinuationEntry::size());
 }
 
 #undef __

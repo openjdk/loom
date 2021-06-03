@@ -7340,12 +7340,14 @@ RuntimeStub* generate_cont_doYield() {
   // is the event writer oop.
   address generate_jfr_write_checkpoint() {
     StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
+
     address start = __ pc();
     Register thread = get_thread();
     jfr_prologue(_masm, thread);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
     jfr_epilogue(_masm, thread);
     __ ret(0);
+
     return start;
   }
 
@@ -7354,11 +7356,13 @@ RuntimeStub* generate_cont_doYield() {
   address generate_jfr_get_event_writer() {
     StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
     address start = __ pc();
+    
     Register thread = get_thread();
     jfr_prologue(_masm, thread);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
     jfr_epilogue(_masm, thread);
     __ ret(0);
+
     return start;
   }
 

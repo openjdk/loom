@@ -310,23 +310,34 @@ void MacroAssembler::safepoint_poll(Label& slow_path, bool at_return, bool acqui
 }
 
 void MacroAssembler::push_cont_fastpath(Register java_thread) {
-  // TODO LOOM AARCH64
+  Label done;
+  ldr(rscratch1, Address(java_thread, JavaThread::cont_fastpath_offset()));
+  cmp(sp, rscratch1);
+  br(Assembler::LS, done);
+  mov(rscratch1, sp); // we can't use sp as the source in str
+  str(rscratch1, Address(java_thread, JavaThread::cont_fastpath_offset()));
+  bind(done);
 }
 
 void MacroAssembler::pop_cont_fastpath(Register java_thread) {
-  // TODO LOOM AARCH64
+  Label done;
+  ldr(rscratch1, Address(java_thread, JavaThread::cont_fastpath_offset()));
+  cmp(sp, rscratch1);
+  br(Assembler::LO, done);
+  str(zr, Address(java_thread, JavaThread::cont_fastpath_offset()));
+  bind(done);
 }
 
 void MacroAssembler::inc_held_monitor_count(Register java_thread) {
-  // TODO LOOM AARCH64
+  incrementw(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::dec_held_monitor_count(Register java_thread) {
-  // TODO LOOM AARCH64
+  decrementw(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::reset_held_monitor_count(Register java_thread) {
-  // TODO LOOM AARCH64
+  strw(zr, Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::reset_last_Java_frame(bool clear_fp) {

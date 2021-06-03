@@ -855,7 +855,8 @@ address TemplateInterpreterGenerator::generate_Continuation_doYield_entry(void) 
   address entry = __ pc();
   assert(StubRoutines::cont_doYield() != NULL, "stub not yet generated");
 
-  // TODO LOOM AARCH64
+  __ push_cont_fastpath(rthread);
+  __ far_jump(RuntimeAddress(CAST_FROM_FN_PTR(address, StubRoutines::cont_doYield())));
 
   return entry;
 }
