@@ -48,6 +48,7 @@
 #include "runtime/stubRoutines.hpp"
 #include "runtime/thread.inline.hpp"
 #include "utilities/align.hpp"
+#include "utilities/globalDefinitions.hpp"
 #include "utilities/powerOfTwo.hpp"
 #ifdef COMPILER2
 #include "opto/runtime.hpp"
@@ -71,6 +72,10 @@
 #endif
 
 #define BIND(label) bind(label); BLOCK_COMMENT(#label ":")
+
+OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots);
+void fill_continuation_entry(MacroAssembler* masm);
+void continuation_enter_cleanup(MacroAssembler* masm);
 
 // Stub Code definitions
 
@@ -6043,13 +6048,14 @@ RuntimeStub* generate_cont_doYield() {
     const char *name = "cont_doYield";
 
     enum layout {
-      rfp_off,
-      rfpH_off,
-      return_off,
-      return_off2,
+      rfp_off1,
+      rfp_off2,
+      lr_off,
+      lr_off2,
       framesize // inclusive of return address
     };
     // assert(is_even(framesize/2), "sp not 16-byte aligned");
+    
     int insts_size = 512;
     int locs_size  = 64;
     CodeBuffer code(name, insts_size, locs_size);
@@ -6057,20 +6063,37 @@ RuntimeStub* generate_cont_doYield() {
     MacroAssembler* masm = new MacroAssembler(&code);
     MacroAssembler* _masm = masm;
 
-    // MacroAssembler* masm = _masm;
-    // StubCodeMark mark(this, "StubRoutines", name);
-
     address start = __ pc();
 
-    // __ enter();
+    __ enter();
+
+    __ mov(c_rarg1, sp);
 
     int frame_complete = __ pc() - start;
     address the_pc = __ pc();
 
-    // TODO LOOM AARCH64
-    __ stop("LOOM AARCH64 generate_cont_doYield");
+    __ post_call_nop(); // this must be exactly after the pc value that is pushed into the frame info, we use this nop for fast CodeBlob lookup
+
+    __ mov(c_rarg0, rthread);
+    __ set_last_Java_frame(sp, rfp, the_pc, rscratch1);
+
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
+      
+    __ reset_last_Java_frame(true);
+
+    Label pinned;
+
+    __ cmp(r0, zr);
+    __ br(Assembler::NE, pinned);
+
+    __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+    __ mov(sp, rscratch1);
+    continuation_enter_cleanup(masm);
+
+    __ bind(pinned); // pinned -- return to caller
     
-    // return start;
+    __ leave();
+    __ ret(lr);
 
     OopMap* map = new OopMap(framesize, 1);
     // map->set_callee_saved(VMRegImpl::stack2reg(rfp_off), rfp->as_VMReg());
@@ -6090,8 +6113,25 @@ RuntimeStub* generate_cont_doYield() {
 
     address start = __ pc();
 
-    // TODO LOOM AARCH64
-    __ stop("LOOM AARCH64 generate_cont_jump_from_safepoint");
+#ifdef ASSERT
+    { // verify that threads correspond
+      Label L;
+      __ get_thread(rscratch1);
+      __ cmp(rthread, rscratch1);
+      __ br(Assembler::EQ, L);
+      __ stop("StubRoutines::cont_jump_from_safepoint: threads must correspond");
+      __ BIND(L);
+    }
+#endif
+
+    __ reset_last_Java_frame(true); // false would be fine, too, I guess
+    __ reinit_heapbase();
+    
+    __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+    __ mov(sp, rscratch1);
+    continuation_enter_cleanup(_masm);
+    __ leave();
+    __ ret(lr);
 
     return start;
   }
@@ -6137,8 +6177,16 @@ RuntimeStub* generate_cont_doYield() {
       StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
       address start = __ pc();
 
-      // TODO LOOM AARCH64
-      __ stop("LOOM AARCH64 generate_cont_interpreter_forced_preempt_return");
+      // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
+      // see InterpreterMacroAssembler::restore_bcp/restore_locals
+
+      __ mov(rfp, sp);
+      __ leave();
+
+      __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize));
+      __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize));
+
+      __ ret(lr);
 
       return start;
     }
@@ -7417,7 +7465,6 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
 
 // on entry c_rarg1 points to the continuation 
 //          sp points to ContinuationEntry
-// kills rax
 void fill_continuation_entry(MacroAssembler* masm) {
 #ifdef ASSERT
   __ movw(rscratch1, 0x1234);
@@ -7438,7 +7485,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
 }
 
 // on entry, sp points to the ContinuationEntry
-// on exit, sp points to the spilled rbp in the entry frame
+// on exit, rfp points to the spilled rfp in the entry frame
 void continuation_enter_cleanup(MacroAssembler* masm) {
 #ifndef PRODUCT
   Label OK;
@@ -7456,8 +7503,7 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
 
   __ ldr(rscratch2, Address(sp, ContinuationEntry::parent_offset()));
   __ str(rscratch2, Address(rthread, JavaThread::cont_entry_offset()));
-  __ add(sp, sp, 2 * wordSize);
-  __ add(sp, sp, (intptr_t)ContinuationEntry::size());
+  __ add(rfp, sp, (intptr_t)ContinuationEntry::size());
 }
 
 #undef __

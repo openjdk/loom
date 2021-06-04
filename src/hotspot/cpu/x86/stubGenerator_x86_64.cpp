@@ -7077,6 +7077,7 @@ RuntimeStub* generate_cont_doYield() {
       framesize // inclusive of return address
     };
     // assert(is_even(framesize/2), "sp not 16-byte aligned");
+    
     int insts_size = 512;
     int locs_size  = 64;
     CodeBuffer code(name, insts_size, locs_size);
@@ -7084,15 +7085,10 @@ RuntimeStub* generate_cont_doYield() {
     MacroAssembler* masm = new MacroAssembler(&code);
     MacroAssembler* _masm = masm;
 
-    // MacroAssembler* masm = _masm;
-    // StubCodeMark mark(this, "StubRoutines", name);
-
     address start = __ pc();
 
     __ enter();
 
-    // // return address and rbp are already in place
-    // __ subptr(rsp, (framesize-4) << LogBytesPerInt); // prolog
     __ movptr(c_rarg1, rsp);
 
     int frame_complete = __ pc() - start;
@@ -7110,13 +7106,6 @@ RuntimeStub* generate_cont_doYield() {
       
       __ reset_last_Java_frame(true);
       NOT_LP64(__ pop(rdi));
-
-      // if (from_java) {
-      //__ set_last_Java_frame(rsp, rbp, the_pc); // may be unnecessary. also, consider MacroAssembler::call_VM_leaf_base
-      //__ call_VM(noreg, CAST_FROM_FN_PTR(address, Continuation::freeze), fi, false); // do NOT check exceptions; they'll get forwarded to the caller
-      // } else {
-      //   __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze_C), fi);
-      // }
     }
 
     Label pinned;
@@ -7134,8 +7123,6 @@ RuntimeStub* generate_cont_doYield() {
 
     __ leave();
     __ ret(0);
-
-    // return start;
 
     OopMap* map = new OopMap(framesize, 1);
     // map->set_callee_saved(VMRegImpl::stack2reg(rbp_off), rbp->as_VMReg());
