@@ -44,8 +44,18 @@ class ThreadBuilders {
      */
     static abstract non-sealed
     class BaseThreadBuilder<T extends Builder> implements Builder {
+        private static final VarHandle COUNTER;
+        static {
+            try {
+                MethodHandles.Lookup l = MethodHandles.lookup();
+                COUNTER = l.findVarHandle(BaseThreadBuilder.class, "counter", long.class);
+            } catch (Exception e) {
+                throw new InternalError(e);
+            }
+        }
+
         private String name;
-        private long counter;
+        private volatile long counter;
         private int characteristics;
         private UncaughtExceptionHandler uhe;
 
@@ -67,7 +77,7 @@ class ThreadBuilders {
 
         String nextThreadName() {
             if (name != null && counter >= 0) {
-                return name + (counter++);
+                return name + (long) COUNTER.getAndAdd(this, 1);
             } else {
                 return name;
             }
