@@ -220,6 +220,7 @@ public class Thread implements Runnable {
     private volatile ClassLoader contextClassLoader;
 
     // inherited AccessControlContext, TBD: move this to FieldHolder
+    @SuppressWarnings("removal")
     private AccessControlContext inheritedAccessControlContext;
 
     /* For auto-numbering anonymous threads. */
@@ -585,6 +586,7 @@ public class Thread implements Runnable {
      * Returns the context class loader to inherit from the given parent thread
      */
     private static ClassLoader contextClassLoader(Thread parent) {
+        @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
         if (sm == null || isCCLOverridden(parent.getClass())) {
             return parent.getContextClassLoader();
@@ -606,6 +608,7 @@ public class Thread implements Runnable {
      * @param acc the AccessControlContext to inherit, or
      *            AccessController.getContext() if null
      */
+    @SuppressWarnings("removal")
     Thread(ThreadGroup g, String name, int characteristics, Runnable task,
            long stackSize, AccessControlContext acc) {
         if (name == null) {
@@ -1143,7 +1146,7 @@ public class Thread implements Runnable {
      * but thread-local variables are not inherited.
      * This is not a public constructor.
      */
-    Thread(Runnable task, AccessControlContext acc) {
+    Thread(Runnable task, @SuppressWarnings("removal") AccessControlContext acc) {
         this(null, nextThreadName(), 0, task, 0, acc);
     }
 
@@ -1638,6 +1641,7 @@ public class Thread implements Runnable {
      */
     @Deprecated(since="1.2", forRemoval=true)
     public final void stop() {
+        @SuppressWarnings("removal")
         SecurityManager security = System.getSecurityManager();
         if (security != null) {
             checkAccess();
@@ -2294,8 +2298,16 @@ public class Thread implements Runnable {
      * @throws  SecurityException  if the current thread is not allowed to
      *          access this thread.
      * @see        SecurityManager#checkAccess(Thread)
+     * @deprecated This method is only useful in conjunction with
+     *       {@linkplain SecurityManager the Security Manager}, which is
+     *       deprecated and subject to removal in a future release.
+     *       Consequently, this method is also deprecated and subject to
+     *       removal. There is no replacement for the Security Manager or this
+     *       method.
      */
+    @Deprecated(since="17", forRemoval=true)
     public final void checkAccess() {
+        @SuppressWarnings("removal")
         SecurityManager security = System.getSecurityManager();
         if (security != null) {
             security.checkAccess(this);
@@ -2354,6 +2366,7 @@ public class Thread implements Runnable {
             return null;
         if (cl == ClassLoaders.NOT_SUPPORTED)
             cl = ClassLoader.getSystemClassLoader();
+        @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             Class<?> caller = Reflection.getCallerClass();
@@ -2386,6 +2399,7 @@ public class Thread implements Runnable {
      * @since 1.2
      */
     public void setContextClassLoader(ClassLoader cl) {
+        @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             sm.checkPermission(new RuntimePermission("setContextClassLoader"));
@@ -2397,6 +2411,7 @@ public class Thread implements Runnable {
         contextClassLoader = cl;
     }
 
+    @SuppressWarnings("removal")
     private static class ClassLoaders {
         static final ClassLoader NOT_SUPPORTED;
         static {
@@ -2471,6 +2486,7 @@ public class Thread implements Runnable {
     public StackTraceElement[] getStackTrace() {
         if (this != Thread.currentThread()) {
             // check for getStackTrace permission
+            @SuppressWarnings("removal")
             SecurityManager security = System.getSecurityManager();
             if (security != null) {
                 security.checkPermission(SecurityConstants.GET_STACK_TRACE_PERMISSION);
@@ -2547,6 +2563,7 @@ public class Thread implements Runnable {
      */
     public static Map<Thread, StackTraceElement[]> getAllStackTraces() {
         // check for getStackTrace permission
+        @SuppressWarnings("removal")
         SecurityManager security = System.getSecurityManager();
         if (security != null) {
             security.checkPermission(SecurityConstants.GET_STACK_TRACE_PERMISSION);
@@ -2607,6 +2624,7 @@ public class Thread implements Runnable {
      * subclass overrides any of the methods, false otherwise.
      */
     private static boolean auditSubclass(final Class<?> subcl) {
+        @SuppressWarnings("removal")
         Boolean result = AccessController.doPrivileged(
             new PrivilegedAction<>() {
                 public Boolean run() {
@@ -2856,6 +2874,7 @@ public class Thread implements Runnable {
      * @since 1.5
      */
     public static void setDefaultUncaughtExceptionHandler(UncaughtExceptionHandler eh) {
+        @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             sm.checkPermission(
@@ -2988,11 +3007,13 @@ public class Thread implements Runnable {
         }
     }
 
+    @SuppressWarnings("removal")
     private static class VirtualThreads {
         // Thread group for virtual threads.
         static final ThreadGroup THREAD_GROUP;
 
         // AccessControlContext that doesn't support any permissions.
+        @SuppressWarnings("removal")
         static final AccessControlContext ACCESS_CONTROL_CONTEXT;
 
         static {
@@ -3005,6 +3026,7 @@ public class Thread implements Runnable {
                     return parent;
                 }
             };
+            @SuppressWarnings("removal")
             ThreadGroup root = AccessController.doPrivileged(pa);
             THREAD_GROUP = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY);
 

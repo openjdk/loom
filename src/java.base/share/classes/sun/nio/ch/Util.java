@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -409,6 +409,7 @@ public class Util {
 
     private static volatile Constructor<?> directByteBufferConstructor;
 
+    @SuppressWarnings("removal")
     private static void initDBBConstructor() {
         AccessController.doPrivileged(new PrivilegedAction<Void>() {
                 public Void run() {
@@ -457,6 +458,7 @@ public class Util {
 
     private static volatile Constructor<?> directByteBufferRConstructor;
 
+    @SuppressWarnings("removal")
     private static void initDBBRConstructor() {
         AccessController.doPrivileged(new PrivilegedAction<Void>() {
                 public Void run() {

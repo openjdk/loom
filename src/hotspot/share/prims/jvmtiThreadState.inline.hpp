@@ -27,6 +27,7 @@
 
 #include "classfile/javaClasses.hpp"
 #include "prims/jvmtiEnvThreadState.hpp"
+
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/thread.inline.hpp"

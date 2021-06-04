@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -199,6 +199,7 @@ interface LiveStackFrame extends StackFrame {
      * and it denies access to {@code RuntimePermission("getStackWalkerWithClassReference")}.
      */
     public static StackWalker getStackWalker(Set<StackWalker.Option> options, ContinuationScope contScope) {
+        @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             sm.checkPermission(new RuntimePermission("liveStackFrames"));
@@ -237,6 +238,7 @@ interface LiveStackFrame extends StackFrame {
      * and it denies access to {@code RuntimePermission("getStackWalkerWithClassReference")}.
      */
     public static StackWalker getStackWalker(Set<StackWalker.Option> options, ContinuationScope contScope, Continuation continuation) {
+        @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             sm.checkPermission(new RuntimePermission("liveStackFrames"));

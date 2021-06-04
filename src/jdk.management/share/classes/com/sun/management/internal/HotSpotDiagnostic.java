@@ -53,11 +53,13 @@ public class HotSpotDiagnostic implements HotSpotDiagnosticMXBean {
 
         String propertyName = "jdk.management.heapdump.allowAnyFileSuffix";
         PrivilegedAction<Boolean> pa = () -> Boolean.parseBoolean(System.getProperty(propertyName, "false"));
+        @SuppressWarnings("removal")
         boolean allowAnyFileSuffix = AccessController.doPrivileged(pa);
         if (!allowAnyFileSuffix && !outputFile.endsWith(".hprof")) {
             throw new IllegalArgumentException("heapdump file must have .hprof extention");
         }
 
+        @SuppressWarnings("removal")
         SecurityManager security = System.getSecurityManager();
         if (security != null) {
             security.checkWrite(outputFile);
@@ -158,12 +160,14 @@ public class HotSpotDiagnostic implements HotSpotDiagnosticMXBean {
     }
 
     @Override
+    @SuppressWarnings("removal")
     public void dumpThreads(String outputFile, ThreadDumpFormat format) throws IOException {
         Path file = Path.of(outputFile);
         if (!file.isAbsolute())
             throw new IllegalArgumentException("'outputFile' not absolute path");
 
         // need ManagementPermission("control")
+        @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
         if (sm != null)
             Util.checkControlAccess();

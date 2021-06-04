@@ -97,6 +97,7 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
      * Throws SecurityException if there is a security manager set and it denies
      * RuntimePermission("modifyThread").
      */
+    @SuppressWarnings("removal")
     void checkPermission() {
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {

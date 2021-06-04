@@ -2206,9 +2206,7 @@ void LIR_Assembler::arith_op(LIR_Code code, LIR_Opr left, LIR_Opr right, LIR_Opr
       switch (code) {
         case lir_add: __ addss(lreg, rreg);  break;
         case lir_sub: __ subss(lreg, rreg);  break;
-        case lir_mul_strictfp: // fall through
         case lir_mul: __ mulss(lreg, rreg);  break;
-        case lir_div_strictfp: // fall through
         case lir_div: __ divss(lreg, rreg);  break;
         default: ShouldNotReachHere();
       }
@@ -2225,9 +2223,7 @@ void LIR_Assembler::arith_op(LIR_Code code, LIR_Opr left, LIR_Opr right, LIR_Opr
       switch (code) {
         case lir_add: __ addss(lreg, raddr);  break;
         case lir_sub: __ subss(lreg, raddr);  break;
-        case lir_mul_strictfp: // fall through
         case lir_mul: __ mulss(lreg, raddr);  break;
-        case lir_div_strictfp: // fall through
         case lir_div: __ divss(lreg, raddr);  break;
         default: ShouldNotReachHere();
       }
@@ -2242,9 +2238,7 @@ void LIR_Assembler::arith_op(LIR_Code code, LIR_Opr left, LIR_Opr right, LIR_Opr
       switch (code) {
         case lir_add: __ addsd(lreg, rreg);  break;
         case lir_sub: __ subsd(lreg, rreg);  break;
-        case lir_mul_strictfp: // fall through
         case lir_mul: __ mulsd(lreg, rreg);  break;
-        case lir_div_strictfp: // fall through
         case lir_div: __ divsd(lreg, rreg);  break;
         default: ShouldNotReachHere();
       }
@@ -2261,9 +2255,7 @@ void LIR_Assembler::arith_op(LIR_Code code, LIR_Opr left, LIR_Opr right, LIR_Opr
       switch (code) {
         case lir_add: __ addsd(lreg, raddr);  break;
         case lir_sub: __ subsd(lreg, raddr);  break;
-        case lir_mul_strictfp: // fall through
         case lir_mul: __ mulsd(lreg, raddr);  break;
-        case lir_div_strictfp: // fall through
         case lir_div: __ divsd(lreg, raddr);  break;
         default: ShouldNotReachHere();
       }
@@ -2295,9 +2287,7 @@ void LIR_Assembler::arith_op(LIR_Code code, LIR_Opr left, LIR_Opr right, LIR_Opr
       switch (code) {
         case lir_add: __ fadd_s(raddr); break;
         case lir_sub: __ fsub_s(raddr); break;
-        case lir_mul_strictfp: // fall through
         case lir_mul: __ fmul_s(raddr); break;
-        case lir_div_strictfp: // fall through
         case lir_div: __ fdiv_s(raddr); break;
         default:      ShouldNotReachHere();
       }
@@ -2306,9 +2296,9 @@ void LIR_Assembler::arith_op(LIR_Code code, LIR_Opr left, LIR_Opr right, LIR_Opr
   } else if (left->is_double_fpu()) {
     assert(dest->is_double_fpu(),  "fpu stack allocation required");
 
-    if (code == lir_mul_strictfp || code == lir_div_strictfp) {
+    if (code == lir_mul || code == lir_div) {
       // Double values require special handling for strictfp mul/div on x86
-      __ fld_x(ExternalAddress(StubRoutines::addr_fpu_subnormal_bias1()));
+      __ fld_x(ExternalAddress(StubRoutines::x86::addr_fpu_subnormal_bias1()));
       __ fmulp(left->fpu_regnrLo() + 1);
     }
 
@@ -2332,17 +2322,15 @@ void LIR_Assembler::arith_op(LIR_Code code, LIR_Opr left, LIR_Opr right, LIR_Opr
       switch (code) {
         case lir_add: __ fadd_d(raddr); break;
         case lir_sub: __ fsub_d(raddr); break;
-        case lir_mul_strictfp: // fall through
         case lir_mul: __ fmul_d(raddr); break;
-        case lir_div_strictfp: // fall through
         case lir_div: __ fdiv_d(raddr); break;
         default: ShouldNotReachHere();
       }
     }
 
-    if (code == lir_mul_strictfp || code == lir_div_strictfp) {
+    if (code == lir_mul || code == lir_div) {
       // Double values require special handling for strictfp mul/div on x86
-      __ fld_x(ExternalAddress(StubRoutines::addr_fpu_subnormal_bias2()));
+      __ fld_x(ExternalAddress(StubRoutines::x86::addr_fpu_subnormal_bias2()));
       __ fmulp(dest->fpu_regnrLo() + 1);
     }
 #endif // !_LP64
@@ -2417,14 +2405,12 @@ void LIR_Assembler::arith_fpu_implementation(LIR_Code code, int left_index, int 
       }
       break;
 
-    case lir_mul_strictfp: // fall through
     case lir_mul:
       if (pop_fpu_stack)       __ fmulp(non_tos_index);
       else if (dest_is_tos)    __ fmul (non_tos_index);
       else                     __ fmula(non_tos_index);
       break;
 
-    case lir_div_strictfp: // fall through
     case lir_div:
       if (left_is_tos) {
         if (pop_fpu_stack)     __ fdivrp(non_tos_index);

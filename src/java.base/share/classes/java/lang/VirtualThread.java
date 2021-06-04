@@ -709,6 +709,7 @@ class VirtualThread extends Thread {
     }
 
     @Override
+    @SuppressWarnings("removal")
     public void interrupt() {
         if (Thread.currentThread() != this) {
             checkAccess();
@@ -986,6 +987,7 @@ class VirtualThread extends Thread {
     /**
      * Creates the default scheduler.
      */
+    @SuppressWarnings("removal")
     private static ForkJoinPool createDefaultScheduler() {
         ForkJoinWorkerThreadFactory factory = pool -> {
             PrivilegedAction<ForkJoinWorkerThread> pa = () -> new CarrierThread(pool);
@@ -1023,6 +1025,7 @@ class VirtualThread extends Thread {
             try {
                 PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
                     MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
+                @SuppressWarnings("removal")
                 MethodHandles.Lookup l = AccessController.doPrivileged(pa);
                 MethodType methodType = MethodType.methodType(void.class, Runnable.class);
                 externalExecuteTask = l.findVirtual(ForkJoinPool.class, "externalExecuteTask", methodType);
@@ -1050,6 +1053,7 @@ class VirtualThread extends Thread {
      */
     private static class CarrierThread extends ForkJoinWorkerThread {
         private static final ThreadGroup CARRIER_THREADGROUP = carrierThreadGroup();
+        @SuppressWarnings("removal")
         private static final AccessControlContext INNOCUOUS_ACC = innocuousACC();
 
         private static final Unsafe UNSAFE;
@@ -1075,6 +1079,7 @@ class VirtualThread extends Thread {
         /**
          * The thread group for the carrier threads.
          */
+        @SuppressWarnings("removal")
         private static final ThreadGroup carrierThreadGroup() {
             return AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
                 public ThreadGroup run() {
@@ -1091,6 +1096,7 @@ class VirtualThread extends Thread {
         /**
          * Return an AccessControlContext that doesn't support any permissions.
          */
+        @SuppressWarnings("removal")
         private static AccessControlContext innocuousACC() {
             return new AccessControlContext(new ProtectionDomain[] {
                 new ProtectionDomain(null, null)

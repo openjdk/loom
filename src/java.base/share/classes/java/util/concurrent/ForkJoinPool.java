@@ -179,6 +179,7 @@ import jdk.internal.misc.VirtualThreads;
  * @since 1.7
  * @author Doug Lea
  */
+@SuppressWarnings("removal")
 public class ForkJoinPool extends AbstractExecutorService {
 
     /*

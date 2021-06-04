@@ -167,6 +167,7 @@ class StructuredThreadExecutor
     /**
      * Invoked when the timeout expires.
      */
+    @SuppressWarnings("removal")
     private void timeout() {
         deadlineExpired = true;
 

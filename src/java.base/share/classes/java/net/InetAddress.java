@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -667,6 +667,7 @@ public class InetAddress implements java.io.Serializable {
                  * the hostname for this IP address, ie, connect to the host
                  */
                 if (check) {
+                    @SuppressWarnings("removal")
                     SecurityManager sec = System.getSecurityManager();
                     if (sec != null) {
                         sec.checkConnect(host, -1);
@@ -1464,6 +1465,7 @@ public class InetAddress implements java.io.Serializable {
          * give out a hostname
          */
         if (check) {
+            @SuppressWarnings("removal")
             SecurityManager security = System.getSecurityManager();
             if (security != null) {
                 security.checkConnect(host, -1);
@@ -1625,6 +1627,7 @@ public class InetAddress implements java.io.Serializable {
      */
     public static InetAddress getLocalHost() throws UnknownHostException {
 
+        @SuppressWarnings("removal")
         SecurityManager security = System.getSecurityManager();
         try {
             // is cached data still valid?

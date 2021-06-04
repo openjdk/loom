@@ -50,7 +50,9 @@ class PinnedThreadPrinter {
         var options = Set.of(SHOW_REFLECT_FRAMES, RETAIN_CLASS_REFERENCE);
         PrivilegedAction<StackWalker> pa = () ->
             LiveStackFrame.getStackWalker(options, VirtualThread.continuationScope());
-        STACK_WALKER = AccessController.doPrivileged(pa);
+        @SuppressWarnings("removal")
+        var stackWalker = AccessController.doPrivileged(pa);
+        STACK_WALKER = stackWalker;
     }
 
     // maps a class to the hashes of stack traces pinned by that code in that class
