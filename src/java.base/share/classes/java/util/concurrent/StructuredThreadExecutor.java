@@ -33,6 +33,7 @@ import java.util.List;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.InnocuousThread;
+import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.ThreadContainer;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
@@ -106,10 +107,19 @@ class StructuredThreadExecutor
         this.previous = previous;
     }
 
+    // Unsafe mechanics
+    private static final Unsafe U = Unsafe.getUnsafe();
+    private static final long NONINHERITABLESCOPELOCALBINDINGS
+            = U.objectFieldOffset(Thread.class, "noninheritableScopeLocalBindings");
+
     @Override
     Thread newThread(Runnable task) {
         checkOwner();
-        return super.newThread(task);
+        var newThread = super.newThread(task);
+        // Question: should this inheritance be gated by Thread.NO_INHERIT_SCOPE_LOCALS ?
+        U.putReference(newThread, NONINHERITABLESCOPELOCALBINDINGS,
+                U.getReference(Thread.currentThread(), NONINHERITABLESCOPELOCALBINDINGS));
+        return newThread;
     }
 
     @Override
