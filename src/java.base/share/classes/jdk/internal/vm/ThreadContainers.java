@@ -190,20 +190,6 @@ public class ThreadContainers {
     }
 
     /**
-     * Returns an estimate of the number of virtual threads.
-     */
-    public static long virtualThreadCount() {
-        Stream<Thread> s1 = sharedContainers().flatMap(ThreadContainer::threads);
-        Stream<Thread> s2 = ownedContainers()
-                .values()
-                .stream()
-                .flatMap(List::stream)
-                .flatMap(ThreadContainer::threads);
-        return Stream.concat(s1, s2).map(Thread::isVirtual).count()
-                + UNMANAGED_VTHREAD_COUNT.sum();
-    }
-
-    /**
      * Root container.
      */
     private static class RootContainer implements ThreadContainer {
