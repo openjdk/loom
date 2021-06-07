@@ -46,6 +46,7 @@ import java.util.concurrent.locks.LockSupport;
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.ThreadContainer;
@@ -670,8 +671,16 @@ public class Thread implements Runnable {
                 ClassLoader parentLoader = contextClassLoader(parent);
                 if (parentLoader != ClassLoaders.NOT_SUPPORTED) {
                     this.contextClassLoader = parentLoader;
+                } else if (VM.isBooted()) {
+                    // parent does not support thread locals so no CCL to inherit
+                    this.contextClassLoader = ClassLoader.getSystemClassLoader();
                 }
+            } else if (VM.isBooted()) {
+                // default CCL to the system class loader when not inheriting
+                this.contextClassLoader = ClassLoader.getSystemClassLoader();
             }
+
+            // scoped variables
             if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
                 this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
             }
@@ -718,7 +727,13 @@ public class Thread implements Runnable {
             ClassLoader parentLoader = contextClassLoader(parent);
             if (parentLoader != ClassLoaders.NOT_SUPPORTED) {
                 this.contextClassLoader = parentLoader;
+            } else {
+                // parent does not support thread locals so no CCL to inherit
+                this.contextClassLoader = ClassLoader.getSystemClassLoader();
             }
+        } else {
+            // default CCL to the system class loader when not inheriting
+            this.contextClassLoader = ClassLoader.getSystemClassLoader();
         }
 
         // scoped variables

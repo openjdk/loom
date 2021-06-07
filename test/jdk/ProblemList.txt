@@ -874,8 +874,6 @@ java/lang/Continuation/Basic.java#id1                           8253570 generic-
 
 com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
-javax/management/remote/mandatory/notif/NotificationEmissionTest.java 8265342 generic-all
-
 jdk/jfr/event/runtime/TestVirtualThreadStartEvent.java                 0000000 generic-all
 jdk/jfr/event/runtime/TestVirtualThreadEndEvent.java                   0000000 generic-all
 
