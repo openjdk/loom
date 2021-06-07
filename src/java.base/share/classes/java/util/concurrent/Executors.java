@@ -254,7 +254,7 @@ public class Executors {
      * @since 99
      */
     public static ExecutorService newThreadExecutor(ThreadFactory threadFactory) {
-        return new ThreadExecutor(threadFactory);
+        return new ThreadPerTaskExecutor(threadFactory);
     }
 
     /**
@@ -300,7 +300,7 @@ public class Executors {
      * @since 99
      */
     public static ExecutorService newStructuredThreadExecutor(ThreadFactory threadFactory) {
-        return new StructuredThreadExecutor(threadFactory, null);
+        return new StructuredThreadPerTaskExecutor(threadFactory, null);
     }
 
     /**
@@ -352,7 +352,7 @@ public class Executors {
     public static ExecutorService newStructuredThreadExecutor(ThreadFactory threadFactory,
                                                               Instant deadline) {
         Objects.requireNonNull(deadline);
-        return new StructuredThreadExecutor(threadFactory, deadline);
+        return new StructuredThreadPerTaskExecutor(threadFactory, deadline);
     }
 
     /**

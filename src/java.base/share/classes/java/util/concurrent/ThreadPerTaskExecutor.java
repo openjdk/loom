@@ -47,14 +47,14 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * An ExecutorService that starts a new thread for each task. The number of
  * threads is unbounded.
  */
-class ThreadExecutor implements ExecutorService, ThreadContainer {
+class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final Permission MODIFY_THREAD = new RuntimePermission("modifyThread");
     private static final VarHandle STATE;
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
-            STATE = l.findVarHandle(ThreadExecutor.class, "state", int.class);
+            STATE = l.findVarHandle(ThreadPerTaskExecutor.class, "state", int.class);
         } catch (Exception e) {
             throw new InternalError(e);
         }
@@ -74,10 +74,10 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
     private volatile int state;
 
     /**
-     * Constructs a ThreadExecutor that creates threads using the given factory.
-     * The ThreadExecutor is optionally tracked.
+     * Constructs a thread-per-task executor that creates threads using the given
+     * factory. The executor is optionally tracked.
      */
-    ThreadExecutor(ThreadFactory factory, boolean tracked) {
+    ThreadPerTaskExecutor(ThreadFactory factory, boolean tracked) {
         this.factory = Objects.requireNonNull(factory);
         if (tracked) {
             this.registrationKey = ThreadContainers.registerSharedContainer(this);
@@ -87,9 +87,10 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
     }
 
     /**
-     * Constructs a ThreadExecutor that creates threads using the given factory.
+     * Constructs a thread-per-task executor that creates threads using the given
+     * factory. The executor is tracked.
      */
-    ThreadExecutor(ThreadFactory factory) {
+    ThreadPerTaskExecutor(ThreadFactory factory) {
         this(factory, true);
     }
 
@@ -321,12 +322,12 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
     }
 
     /**
-     * Runs a task and notifies a ThreadExecutor when it completes.
+     * Runs a task and notifies the executor when it completes.
      */
     private static class TaskRunner implements Runnable {
-        final ThreadExecutor executor;
+        final ThreadPerTaskExecutor executor;
         final Runnable task;
-        TaskRunner(ThreadExecutor executor, Runnable task) {
+        TaskRunner(ThreadPerTaskExecutor executor, Runnable task) {
             this.executor = executor;
             this.task = task;
         }
@@ -343,17 +344,17 @@ class ThreadExecutor implements ExecutorService, ThreadContainer {
     /**
      * A Future for a task that runs in its own thread. The thread is
      * created (but not started) when the Future is created. The thread
-     * is interrupted when the future is cancelled. Its ThreadExecutor
-     * is notified when the task completes.
+     * is interrupted when the future is cancelled. The executor is
+     * notified when the task completes.
      */
     private static class ThreadBoundFuture<T>
             extends CompletableFuture<T> implements Runnable {
 
-        final ThreadExecutor executor;
+        final ThreadPerTaskExecutor executor;
         final Callable<T> task;
         final Thread thread;
 
-        ThreadBoundFuture(ThreadExecutor executor, Callable<T> task) {
+        ThreadBoundFuture(ThreadPerTaskExecutor executor, Callable<T> task) {
             this.executor = executor;
             this.task = task;
             this.thread = executor.newThread(this);

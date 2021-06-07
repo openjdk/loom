@@ -38,10 +38,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
  * An ExecutorService intended to be used in a <em>structured manner</em> that
- * starts a new thread for each task. It may be created with a deadline.
+ * starts a new thread for each task. The number of threads is unbounded.
  */
-class StructuredThreadExecutor
-        extends ThreadExecutor implements StructuredExecutorService {
+class StructuredThreadPerTaskExecutor extends ThreadPerTaskExecutor {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final Permission MODIFY_THREAD = new RuntimePermission("modifyThread");
 
@@ -57,7 +56,11 @@ class StructuredThreadExecutor
     private final Object closeLock = new Object();
     private boolean closeInvoked;  // true if owner invokes close, needs closeLock
 
-    StructuredThreadExecutor(ThreadFactory factory, Instant deadline) {
+    /**
+     * Constructs a structured thread-per-task executor that creates threads
+     * using the given factory. The executor has an optional deadline.
+     */
+    StructuredThreadPerTaskExecutor(ThreadFactory factory, Instant deadline) {
         super(factory, false);
 
         this.owner = Thread.currentThread();

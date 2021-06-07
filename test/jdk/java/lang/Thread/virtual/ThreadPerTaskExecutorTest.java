@@ -24,7 +24,7 @@
 /*
  * @test
  * @summary Basic tests for new thread-per-task executors
- * @run testng/othervm/timeout=300 ThreadExecutorTest
+ * @run testng/othervm/timeout=300 ThreadPerTaskExecutorTest
  */
 
 import java.time.Duration;
@@ -44,7 +44,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class ThreadExecutorTest {
+public class ThreadPerTaskExecutorTest {
     // long running interruptible task
     private static final Callable<Void> SLEEP_FOR_A_DAY = () -> {
         Thread.sleep(Duration.ofDays(1));

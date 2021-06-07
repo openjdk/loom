@@ -23,8 +23,8 @@
 
 /*
  * @test
- * @summary Basic tests for executors created by ...
- * @run testng/othervm/timeout=300 StructuredThreadExecutorTest
+ * @summary Basic tests for structured exectors
+ * @run testng/othervm/timeout=300 StructuredThreadPerTaskExecutorTest
  */
 
 import java.util.List;
@@ -39,7 +39,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class StructuredThreadExecutorTest {
+public class StructuredThreadPerTaskExecutorTest {
     // long running interruptible task
     private static final Callable<Void> SLEEP_FOR_A_DAY = () -> {
         Thread.sleep(Duration.ofDays(1));
