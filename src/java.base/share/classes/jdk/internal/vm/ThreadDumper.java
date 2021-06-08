@@ -33,9 +33,11 @@ import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Stream;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Thread dump support.
@@ -91,18 +93,9 @@ public class ThreadDumper {
      */
     public static void dumpThreads(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
-
-        ThreadContainers.sharedContainers()
+        ThreadContainers.allContainers()
                 .flatMap(ThreadContainer::threads)
                 .forEach(t -> dumpThread(t, ps));
-
-        ThreadContainers.ownedContainers()
-                .values()
-                .stream()
-                .flatMap(List::stream)
-                .flatMap(ThreadContainer::threads)
-                .forEach(t -> dumpThread(t, ps));
-
         ps.flush();
     }
 
@@ -128,18 +121,30 @@ public class ThreadDumper {
      * Generate a thread dump to the given print stream in JSON format.
      */
     private static void dumpThreadsToJson(PrintStream out) {
+        List<ThreadContainer> containers = new ArrayList<>();
+        containers.add(ThreadContainers.root());
+        ThreadContainers.sharedContainers().forEach(containers::add);
+
+        // maps thread container to its enclosing container
+        Map<ThreadContainer, ThreadContainer> containerToEnclosing = new HashMap<>();
+        for (List<ThreadContainer> list : ThreadContainers.ownedContainers().values()) {
+            list.forEach(containers::add);
+            if (list.size() > 1) {
+                ThreadContainer previous = list.get(0);
+                for (int i = 1; i < list.size(); i++) {
+                    ThreadContainer container = list.get(i);
+                    containerToEnclosing.put(container, previous);
+                    previous = container;
+                }
+            }
+        }
+
         out.println("{");
         out.println("  \"threadDump\": {");
 
         out.println("    \"threadContainers\": [");
 
-        Stream<ThreadContainer> shared = ThreadContainers.sharedContainers();
-        Stream<ThreadContainer> owned = ThreadContainers.ownedContainers()
-                .values()
-                .stream()
-                .flatMap(List::stream);
-
-        Iterator<ThreadContainer> iterator = Stream.concat(shared, owned).iterator();
+        Iterator<ThreadContainer> iterator = containers.iterator();
         while (iterator.hasNext()) {
             ThreadContainer container = iterator.next();
 
@@ -151,6 +156,13 @@ public class ThreadDumper {
                 out.format("        \"owner\": null,%n");
             } else {
                 out.format("        \"owner\": %d,%n", owner.getId());
+            }
+
+            ThreadContainer parent = containerToEnclosing.get(container);
+            if (parent == null) {
+                out.format("        \"enclosedBy\": null,%n");
+            } else {
+                out.format("        \"enclosedBy\": \"%s\",%n", escape(parent.toString()));
             }
 
             long threadCount = 0;
